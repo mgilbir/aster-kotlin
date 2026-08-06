@@ -16,6 +16,7 @@ Four differential fixtures pass, all matching upstream exactly on every mark and
 | `stacked-bar` | 42 | stack and aggregate transforms, signals, signal-valued scale property, conditional fill, gridlines |
 | `line-area` | 50 | line, area, symbol and text encoders |
 | `log-scale` | 75 | log axis with blanked labels, sqrt scale |
+| `colour-scheme` | 39 | ordinal category10 scheme, interpolated sequential colour |
 
 The gate is wired into `./scripts/oracle.sh`, so every further scale, mark and transform is built
 against a harness that can say we are wrong — which golden tests cannot.
@@ -52,7 +53,8 @@ The entire data and specification half is absent:
 | `vega-transforms` — the other 28 transforms | most of 3,754 | 0 |
 | `vega-dataflow` — pulse propagation and incremental evaluation | 2,081 | contracts only |
 | `vega-functions` — the other 59 functions, mostly date, colour, geo and selection | most of 790 | 0 |
-| Remaining scale types — time, utc, sequential, quantile, quantize, threshold, bin-ordinal | rest of `vega-scale` + d3-interpolate, d3-scale-chromatic, d3-time | 0 |
+| Remaining scale types — time, utc, quantile, quantize, threshold, bin-ordinal | rest of `vega-scale` + d3-time | 0 |
+| Continuous colour ramps | `d3-scale-chromatic` interpolator tables | 0, reported |
 | Remaining mark encoders — arc, image, path, group, trail, shape | rest of `vega-encode` + d3-shape | 0 |
 | Line and area interpolation methods — basis, cardinal, catmull-rom, monotone, step | part of d3-shape | 0, reported |
 | Legends, titles, label overlap removal | parts of `vega-encode`, `vega-label` | 0 |
@@ -70,12 +72,12 @@ substantive compatibility items:
 | 1. Compiled Vega JSON loads without JavaScript | Partial — a substantial subset compiles, including expressions, signals and 12 transforms |
 | 2. Bar, line, area, scatter, stacked bar render natively | **Yes** — all five compile from a specification, three of them differentially verified |
 | 3. Axes, legends, labels and titles supported | Axes and labels yes; legends and titles no |
-| 4. Basic transforms and scales execute in Kotlin | **Yes** — 7 scale types and the 12 transforms the brief lists |
+| 4. Basic transforms and scales execute in Kotlin | **Yes** — 8 scale types and the 12 transforms the brief lists |
 | 5. Tap, hover, tooltip, selection, pan, zoom | Yes, except tooltip rendering |
 | 6. View and Compose APIs | Yes |
 | 7. SVG, PNG, PDF export | Yes |
 | 8. TalkBack can describe and navigate | Partial — virtual nodes are tested by instrumentation, not with TalkBack itself |
-| 9. At least 100 compatibility fixtures pass | 4 of 100 |
+| 9. At least 100 compatibility fixtures pass | 5 of 100 |
 | 10. Core runtime has no Android dependency | Yes |
 | 11. Renders without WebView | Yes |
 | 12. Build and test loop runs from the terminal | Yes |
@@ -172,7 +174,7 @@ ordering), and the pipeline is now verified end to end on one fixture, but the b
 
 ## Verification
 
-- 369 JVM tests pass (`./scripts/test-core.sh`, `./gradlew test`).
+- 371 JVM tests pass (`./scripts/test-core.sh`, `./gradlew test`).
 - Android lint is clean with `warningsAsErrors` on every Android module.
 - 47 instrumented tests pass on an API 37 arm64 emulator (`./scripts/test-android.sh`): 40 in
   `vega-android-canvas`, 4 in `vega-compose`, 3 in `demo`.
@@ -268,14 +270,12 @@ The performance targets in PROJECT_BRIEF.md 19 are therefore all unverified.
 
 ## Next three tasks
 
-1. **Colour scales and schemes.** Sequential and ordinal colour, plus the named schemes, which need
-   colour-space interpolation (`d3-interpolate`, `d3-scale-chromatic`). Almost any chart that encodes a
-   category or a magnitude by colour needs this, and today a `{"scheme": ...}` range is reported as
-   unsupported. Self-contained and directly verifiable against upstream.
-2. **Group marks and faceting.** The `group` encoder, which is what `layout`, small multiples and
-   nested charts all depend on. This is the largest remaining structural gap and it changes how the
-   compiler walks a specification, since groups nest scales, axes and marks of their own.
-3. **Time and UTC scales.** A date and time layer: parsing, `timeunit`, tick intervals at
-   second-to-year granularity, and locale-aware formatting. It also unblocks the date expression
-   functions and the `timeunit` transform, both currently reported. Substantial, and worth doing after
-   the two above because it touches formatting everywhere.
+1. **Group marks and faceting.** The `group` encoder, which is what `layout`, small multiples and
+   nested charts all depend on. The largest remaining structural gap, and it changes how the compiler
+   walks a specification, since a group nests scales, axes and marks of its own.
+2. **Legends.** The last structural piece of a chart the compiler cannot produce, and the one users
+   notice first. Symbol, gradient and discrete forms, orientation and wrapping; it shares the
+   label-overlap machinery axes will eventually need. Now unblocked by colour scales.
+3. **Time and UTC scales.** A date and time layer: parsing, `timeunit`, tick intervals from second to
+   year, and locale-aware formatting. Also unblocks the date expression functions and the `timeunit`
+   transform, both currently reported. Substantial, and it touches formatting everywhere.

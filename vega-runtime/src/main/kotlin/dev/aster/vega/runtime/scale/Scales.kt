@@ -3,6 +3,8 @@ package dev.aster.vega.runtime.scale
 import dev.aster.vega.model.VegaValue
 import dev.aster.vega.model.asDouble
 import dev.aster.vega.model.asString
+import dev.aster.vega.scene.ColorSpaces
+import dev.aster.vega.scene.SceneColor
 import kotlin.math.exp
 import kotlin.math.floor
 import kotlin.math.ln
@@ -493,6 +495,44 @@ public class OrdinalScale(
  * string in a specification is not supported and must be reported as a diagnostic by the caller
  * rather than silently ignored.
  */
+/**
+ * A continuous scale whose range is a colour ramp.
+ *
+ * Covers Vega's `sequential` type and a `linear` scale given a colour range. The position along the
+ * ramp comes from the same normalization a numeric scale uses, so a colour scale and a positional
+ * one over the same domain stay in step.
+ */
+public class SequentialColorScale(
+  override val name: String,
+  public val domain: List<Double>,
+  public val colors: List<SceneColor>,
+  public val space: ColorSpaces.Interpolation = ColorSpaces.Interpolation.RGB,
+  public val clamp: Boolean = true,
+) : VegaScale {
+
+  init {
+    require(domain.size >= 2) { "$name needs at least two domain values, got $domain" }
+    require(colors.isNotEmpty()) { "$name needs at least one colour" }
+  }
+
+  /** The colour at [x], or `null` when the input cannot be placed on the ramp. */
+  public fun colorAt(x: Double): SceneColor? {
+    if (x.isNaN()) return null
+    val lo = domain.first()
+    val hi = domain.last()
+    if (lo == hi) return colors.last()
+    val raw = (x - lo) / (hi - lo)
+    // Sequential scales clamp by default, since a colour past the end of a ramp has no meaning.
+    if (!clamp && (raw < 0.0 || raw > 1.0)) return null
+    return ColorSpaces.sample(colors, raw.coerceIn(0.0, 1.0), space)
+  }
+
+  override fun scale(value: VegaValue): VegaValue {
+    val colour = colorAt(value.asDouble()) ?: return VegaValue.Null
+    return VegaValue.Str(colour.toCssHex())
+  }
+}
+
 /**
  * Formats an axis tick label the way Vega's default does: fixed decimals plus thousands separators.
  *

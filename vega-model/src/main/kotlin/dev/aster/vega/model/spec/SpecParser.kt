@@ -283,6 +283,7 @@ public class SpecParser {
       base = obj.numberOrSignal("base", "$path.base"),
       exponent = obj.numberOrSignal("exponent", "$path.exponent"),
       constant = obj.numberOrSignal("constant", "$path.constant"),
+      interpolate = obj.fields["interpolate"]?.takeIf { it is VegaValue.Str }?.asString(),
     )
   }
 

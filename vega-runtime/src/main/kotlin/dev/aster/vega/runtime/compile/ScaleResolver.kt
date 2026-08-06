@@ -12,14 +12,18 @@ import dev.aster.vega.model.spec.RangeSpec
 import dev.aster.vega.model.spec.ScaleSpec
 import dev.aster.vega.model.spec.ScaleType
 import dev.aster.vega.runtime.scale.BandScale
+import dev.aster.vega.runtime.scale.ColorSchemes
 import dev.aster.vega.runtime.scale.LinearScale
 import dev.aster.vega.runtime.scale.LogScale
 import dev.aster.vega.runtime.scale.OrdinalScale
 import dev.aster.vega.runtime.scale.PointScale
 import dev.aster.vega.runtime.scale.PowScale
+import dev.aster.vega.runtime.scale.SequentialColorScale
 import dev.aster.vega.runtime.scale.SymlogScale
 import dev.aster.vega.runtime.scale.Ticks
 import dev.aster.vega.runtime.scale.VegaScale
+import dev.aster.vega.scene.ColorSpaces
+import dev.aster.vega.scene.SceneColor
 
 /** The chart's plotting size, which named ranges like `"width"` resolve against. */
 public data class PlotSize(val width: Double, val height: Double)
@@ -51,7 +55,9 @@ public class ScaleResolver(
 
   private fun build(spec: ScaleSpec): VegaScale? =
     when (spec.type) {
-      ScaleType.LINEAR -> buildLinear(spec)
+      // A linear scale with a colour range is a colour scale, not a positional one.
+      ScaleType.LINEAR -> if (hasColorRange(spec)) buildSequentialColor(spec) else buildLinear(spec)
+      ScaleType.SEQUENTIAL -> buildSequentialColor(spec)
       ScaleType.LOG -> buildLog(spec)
       ScaleType.POW -> buildPow(spec, defaultExponent = 1.0)
       ScaleType.SQRT -> buildPow(spec, defaultExponent = 0.5)
@@ -106,6 +112,87 @@ public class ScaleResolver(
       scale
     }
   }
+
+  /** True when the scale's range is colours rather than numbers. */
+  private fun hasColorRange(spec: ScaleSpec): Boolean =
+    when (val range = spec.range) {
+      is RangeSpec.Scheme -> true
+      is RangeSpec.Literal ->
+        range.values.isNotEmpty() && range.values.all { SceneColor.parse(it.asString()) != null }
+      else -> false
+    }
+
+  private fun buildSequentialColor(spec: ScaleSpec): SequentialColorScale? {
+    val colors = colorRange(spec) ?: return null
+    val domain = explicitOrExtent(spec, zeroDefault = false) ?: return null
+    val space =
+      spec.interpolate?.let { name ->
+        ColorSpaces.Interpolation.fromName(name)
+          ?: run {
+            diagnostics.warn(
+              DiagnosticCodes.SCALE_UNSUPPORTED_TYPE,
+              "Colour interpolation space '$name' is not implemented; interpolating in RGB instead",
+              operator = spec.name,
+            )
+            null
+          }
+      } ?: ColorSpaces.Interpolation.RGB
+
+    return SequentialColorScale(
+      name = spec.name,
+      domain = orient(domain, spec.reverse),
+      colors = colors,
+      space = space,
+    )
+  }
+
+  /**
+   * The colour list a scale's range describes.
+   *
+   * A named categorical scheme resolves to its palette. A ramp scheme is reported instead:
+   * reproducing one needs d3's interpolator table and Vega's default scheme extent, and
+   * approximating either would be wrong in a way that still looks like a chart.
+   */
+  private fun colorRange(spec: ScaleSpec): List<SceneColor>? =
+    when (val range = spec.range) {
+      is RangeSpec.Literal -> {
+        val colors = range.values.mapNotNull { SceneColor.parse(it.asString()) }
+        if (colors.size < range.values.size) {
+          diagnostics.error(
+            DiagnosticCodes.SCALE_INVALID_DOMAIN,
+            "Scale '${spec.name}' has a range containing unparseable colours",
+            operator = spec.name,
+          )
+          null
+        } else {
+          colors.ifEmpty { null }
+        }
+      }
+      is RangeSpec.Scheme -> {
+        val palette = ColorSchemes.categoricalOrNull(range.name)
+        when {
+          palette != null -> range.count?.let { palette.take(it.coerceAtLeast(1)) } ?: palette
+          ColorSchemes.isKnownRamp(range.name) -> {
+            diagnostics.error(
+              DiagnosticCodes.SCALE_UNSUPPORTED_TYPE,
+              "Colour scheme '${range.name}' is a continuous ramp, which is not implemented; " +
+                "give the scale an explicit colour range instead",
+              operator = spec.name,
+            )
+            null
+          }
+          else -> {
+            diagnostics.error(
+              DiagnosticCodes.SCALE_UNSUPPORTED_TYPE,
+              "Unknown colour scheme '${range.name}'",
+              operator = spec.name,
+            )
+            null
+          }
+        }
+      }
+      else -> null
+    }
 
   private fun buildLog(spec: ScaleSpec): LogScale? {
     val range = numericRange(spec) ?: return null
@@ -207,18 +294,12 @@ public class ScaleResolver(
     val range =
       when (val r = spec.range) {
         is RangeSpec.Literal -> r.values
-        is RangeSpec.Scheme -> {
-          diagnostics.error(
-            DiagnosticCodes.SCALE_UNSUPPORTED_TYPE,
-            "Colour schemes are not implemented; scale '${spec.name}' has no range",
-            operator = spec.name,
-          )
-          return null
-        }
+        // A categorical scheme is exactly an ordinal range, so resolve it to one.
+        is RangeSpec.Scheme -> colorRange(spec)?.map { VegaValue.Str(it.toCssHex()) } ?: return null
         else -> {
           diagnostics.error(
             DiagnosticCodes.SCALE_INVALID_DOMAIN,
-            "An ordinal scale needs an explicit range array (scale '${spec.name}')",
+            "An ordinal scale needs an explicit range array or a scheme (scale '${spec.name}')",
             operator = spec.name,
           )
           return null
@@ -349,7 +430,7 @@ public class ScaleResolver(
       is RangeSpec.Scheme -> {
         diagnostics.error(
           DiagnosticCodes.SCALE_UNSUPPORTED_TYPE,
-          "Colour schemes are not implemented (scale '${spec.name}')",
+          "Scale '${spec.name}' needs a numeric range but was given a colour scheme",
           operator = spec.name,
         )
         null

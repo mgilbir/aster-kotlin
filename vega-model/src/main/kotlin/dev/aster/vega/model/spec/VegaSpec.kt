@@ -205,6 +205,8 @@ public data class ScaleSpec(
   val exponent: NumberValue? = null,
   /** Symlog constant; defaults to 1. */
   val constant: NumberValue? = null,
+  /** Colour interpolation space for a colour range, e.g. `"rgb"` or `"lab"`. */
+  val interpolate: String? = null,
 )
 
 public enum class Orient {

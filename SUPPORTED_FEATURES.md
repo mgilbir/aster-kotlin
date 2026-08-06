@@ -50,7 +50,10 @@ the scope note in STATUS.md for how much of upstream Vega remains.
 | Pow, sqrt | **Supported** | `TransformedScalesTest` | `pow` defaults to exponent 1, i.e. linear, as upstream; `sqrt` is exponent 0.5. Negative domains handled by sign | 3 |
 | Symlog | **Supported** | `TransformedScalesTest` | `sign(x) * ln(1 + abs(x) / constant)`; handles zero and both signs | 3 |
 | Time, UTC | Planned | — | Need a date and time layer, which also gates the date expression functions and the `timeunit` transform | 5 |
-| Sequential colour | Planned | — | Needs colour interpolation | 3 |
+| Sequential colour | **Supported** | `ColorScaleTest`, `BarFixtureDifferentialTest` | An explicit colour range interpolated in RGB or Lab, clamped at both ends as upstream does | 3 |
+| Categorical colour schemes | **Supported** | `ColorScaleTest`, `BarFixtureDifferentialTest` | 15 palettes, values read out of `vega.scheme()` so they are exact: category10/20/20b/20c, tableau10/20, accent, dark2, paired, pastel1/2, set1/2/3, observable10 |
+| Continuous colour ramps (`viridis`, `blues`, …) | Not implemented | `ColorScaleTest` | Each needs d3's interpolator table, and Vega also samples ramps over a default extent of roughly `[0.2, 1]`. Both are reported by name so the diagnostic distinguishes "upstream has it, we do not" from "no such scheme" | 5 |
+| Colour interpolation spaces | Partial | `ColorScaleTest` | `rgb` and `lab`. `hcl`, `hsl` and `cubehelix` fall back to RGB with a diagnostic | 5 |
 | Quantile, quantize, threshold, bin-ordinal | Not planned (first release) | — | Reports `VEGA_SCALE_UNSUPPORTED_TYPE` | — |
 
 ## Data transforms
@@ -143,7 +146,7 @@ Upstream Vega exposes 119 expression functions; 60 are implemented. The language
 | --- | --- | --- | --- | --- |
 | Comparison harness | Supported | `Differential` | Compares mark count, type, role, coordinates, extents and scale outputs in absolute content space | 3 |
 | Reference generation | Supported | `oracle-js/src/reference.js`, `scripts/oracle.sh` | References are checked in, so JVM tests need no Node and no network | 3 |
-| Fixtures passing | 4 of a target 100 | `BarFixtureDifferentialTest` | `bar` (48 marks), `stacked-bar` (42, stack + aggregate + signals + conditional fill), `line-area` (50, line + area + symbol + text), `log-scale` (75, log axis + sqrt). All marks and scale outputs match exactly | 3 |
+| Fixtures passing | 5 of a target 100 | `BarFixtureDifferentialTest` | `bar` (48 marks), `stacked-bar` (42, stack + aggregate + signals + conditional fill), `line-area` (50, line + area + symbol + text), `log-scale` (75, log axis + sqrt), `colour-scheme` (39, ordinal scheme + interpolated stroke). All marks and scale outputs match exactly | 3 |
 | Series normalization | Supported | `Differential` | Vega emits one item per datum for a line or area; this engine builds one path. Both sides collapse to an outline point list, compared numerically | 3 |
 | Axis group bounds | Known difference | `BarFixtureDifferentialTest` | Vega derives an axis group's bounds from the axis extent rather than by unioning its items, so its frame bounds exclude the half-pixel crisp offset and the domain line's stroke. Our surface is up to 1 unit larger per axis; every mark coordinate still agrees exactly | 5 |
 | Text metrics in comparisons | Supported | `VegaHeadlessTextEngine` | Reproduces upstream's canvas-free estimate, `trunc(0.8 × chars × fontSize)`, so layout is comparable. A comparison engine only — never used for display | 3 |
