@@ -222,8 +222,14 @@ internal fun measures(params: VegaValue.Obj, context: TransformContext): List<Me
   return measures
 }
 
-/** Groups tuples by the `groupby` field values, preserving first-seen group order. */
-internal fun groupTuples(
+/**
+ * Groups tuples by the `groupby` field values, preserving first-seen group order.
+ *
+ * Public because faceting needs the same partitioning: upstream implements a faceted group mark by
+ * inserting an `aggregate` transform with the group's `groupby`, so the two must agree on both the
+ * grouping and its order.
+ */
+public fun groupTuples(
   input: List<VegaValue>,
   groupBy: List<String>,
 ): Map<List<VegaValue>, List<VegaValue>> {
@@ -235,7 +241,7 @@ internal fun groupTuples(
   return groups
 }
 
-internal fun groupKey(datum: VegaValue, groupBy: List<String>): List<VegaValue> = groupBy.map {
+public fun groupKey(datum: VegaValue, groupBy: List<String>): List<VegaValue> = groupBy.map {
   datum.field(it)
 }
 

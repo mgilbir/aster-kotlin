@@ -230,6 +230,51 @@ class BarFixtureDifferentialTest {
     )
   }
 
+  // ---- sixth fixture: faceted group marks -------------------------------------
+
+  @Test
+  fun `the facet trellis fixture compiles without errors`() {
+    val (_, compiled) = fixture("facet-trellis")
+    val serious = compiled.diagnostics.filter { it.severity >= DiagnosticSeverity.ERROR }
+    assertTrue(serious.isEmpty(), "expected a clean compile; got:\n${serious.joinToString("\n")}")
+  }
+
+  @Test
+  fun `the facet trellis fixture's marks match upstream`() {
+    val (reference, compiled) = fixture("facet-trellis")
+    val ours = Differential.flattenScene(requireNotNull(compiled.scene))
+    val differences = Differential.compareMarks(reference.marks, ours)
+    assertTrue(
+      differences.isEmpty(),
+      buildString {
+        append("compiled ${ours.size} marks, upstream had ${reference.marks.size}\n")
+        append("${differences.size} difference(s), first 25:\n")
+        differences.take(25).forEach { append("  ").append(it).append('\n') }
+      },
+    )
+  }
+
+  @Test
+  fun `each facet cell resolves its own scales, so the cells differ`() {
+    // The point of faceting: three cells, each scaled to its own partition. If nested scales leaked
+    // between cells every bar would be the same height, and the geometry comparison above would
+    // still
+    // pass only if upstream leaked identically — which it does not.
+    val (_, compiled) = fixture("facet-trellis")
+    val cells =
+      Differential.flattenScene(requireNotNull(compiled.scene)).filter { it.role == "scope" }
+    assertEquals(3, cells.size, "one group item per region")
+    val bars =
+      Differential.flattenScene(requireNotNull(compiled.scene)).filter {
+        it.type == "rect" && it.role == "mark"
+      }
+    assertEquals(9, bars.size)
+    assertTrue(
+      bars.map { it.numbers["height"] }.distinct().size > 1,
+      "bars should not all share one height",
+    )
+  }
+
   @Test
   fun `the reference was generated from the pinned upstream version`() {
     // A silently upgraded oracle would make every comparison suspect.

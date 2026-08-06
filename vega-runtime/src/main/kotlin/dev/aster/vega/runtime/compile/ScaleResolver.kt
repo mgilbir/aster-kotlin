@@ -402,9 +402,12 @@ public class ScaleResolver(
     when (val range = spec.range) {
       is RangeSpec.Named ->
         when (range.name.lowercase()) {
-          // Vega's "height" range is descending, so larger values sit higher on screen.
           "width" -> listOf(0.0, size.width)
-          "height" -> listOf(size.height, 0.0)
+          // `"height"` descends for a continuous scale, so larger values sit higher on screen, but
+          // ascends for a discrete one, so the first category is at the top. Upstream keys this off
+          // the scale type, and getting it wrong flips a row-faceted trellis top to bottom.
+          "height" ->
+            if (spec.type.isDiscrete) listOf(0.0, size.height) else listOf(size.height, 0.0)
           else -> {
             diagnostics.error(
               DiagnosticCodes.SCALE_UNSUPPORTED_TYPE,

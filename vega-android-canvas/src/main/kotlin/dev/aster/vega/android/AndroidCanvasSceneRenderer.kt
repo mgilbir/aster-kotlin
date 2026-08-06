@@ -140,21 +140,25 @@ public class AndroidCanvasSceneRenderer(
       )
     }
 
-    // A group with its own paint fills its clip rectangle, matching Vega group marks.
-    if (clipRect != null && (node.fill != null || node.stroke != null)) {
+    // A group with its own paint draws a rectangle of its declared size, as Vega group marks do.
+    val paintRect = node.paintRect
+    if (paintRect != null) {
       scratchRect.set(
-        clipRect.left.toFloat(),
-        clipRect.top.toFloat(),
-        clipRect.right.toFloat(),
-        clipRect.bottom.toFloat(),
+        paintRect.left.toFloat(),
+        paintRect.top.toFloat(),
+        paintRect.right.toFloat(),
+        paintRect.bottom.toFloat(),
       )
+      val radius = node.cornerRadius.toFloat()
       node.fill?.let { fill ->
-        preparePaint(fillPaint, fill, opacity, clipRect, node.blendMode, diagnostics)
-        canvas.drawRect(scratchRect, fillPaint)
+        preparePaint(fillPaint, fill, opacity, paintRect, node.blendMode, diagnostics)
+        if (radius > 0f) canvas.drawRoundRect(scratchRect, radius, radius, fillPaint)
+        else canvas.drawRect(scratchRect, fillPaint)
       }
       node.stroke?.let { stroke ->
-        prepareStroke(stroke, opacity, clipRect, node.blendMode, diagnostics)
-        canvas.drawRect(scratchRect, strokePaint)
+        prepareStroke(stroke, opacity, paintRect, node.blendMode, diagnostics)
+        if (radius > 0f) canvas.drawRoundRect(scratchRect, radius, radius, strokePaint)
+        else canvas.drawRect(scratchRect, strokePaint)
       }
     }
 

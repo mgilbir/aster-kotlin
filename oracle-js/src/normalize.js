@@ -15,6 +15,7 @@ import { canonicalNumber, DEFAULT_PRECISION } from './canonical.js';
 
 /** Channels compared per mark type. Anything not listed here is ignored on both sides. */
 const GEOMETRY_CHANNELS = {
+  group: ['x', 'y', 'width', 'height'],
   rect: ['x', 'y', 'width', 'height'],
   rule: ['x', 'y', 'x2', 'y2'],
   line: ['x', 'y'],

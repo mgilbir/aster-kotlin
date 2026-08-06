@@ -16,7 +16,7 @@ the scope note in STATUS.md for how much of upstream Vega remains.
 | Feature | Status | Tests | Known differences | Target milestone |
 | --- | --- | --- | --- | --- |
 | Hand-authored scene graph | Supported | `SampleScenes`, `SceneSnapshotTest` | Not a Vega input format | 1 |
-| Compiled Vega JSON | Partial | `SpecCompilerTest`, `BarFixtureDifferentialTest` | Parses and compiles the subset below, including signals, expressions and 12 transforms. No legends, titles or faceting; each reports a diagnostic. `VegaChartController.setSpec` still reports not-implemented — the compiler is not wired into it yet | 3 |
+| Compiled Vega JSON | Partial | `SpecCompilerTest`, `BarFixtureDifferentialTest` | Parses and compiles the subset below, including signals, expressions, 12 transforms and nested group scopes. No legends, titles or `layout`; each reports a diagnostic. `VegaChartController.setSpec` still reports not-implemented — the compiler is not wired into it yet | 3 |
 | Vega-Lite compilation | Not planned (first release) | — | Compile upstream via `oracle-js/src/compile-vega-lite.js` | — |
 | Generic JSON value model | Supported | `VegaValueTest`, `JsonBridgeTest` | Numbers are always `Double` | 0 |
 | Dotted / bracketed field paths | Supported | `VegaValueTest` | Malformed paths resolve to null rather than throwing | 0 |
@@ -25,7 +25,10 @@ the scope note in STATUS.md for how much of upstream Vega remains.
 
 | Feature | Status | Tests | Known differences | Target milestone |
 | --- | --- | --- | --- | --- |
-| Group | Renderable | `SceneNodeTest`, `AndroidCanvasSceneRendererTest` | The scene node works; there is no group-mark encoder, so faceting and small multiples are unavailable | 5 |
+| Group | **Supported** | `GroupMarkTest`, `BarFixtureDifferentialTest` (`facet-trellis` fixture) | One container per datum, translated by its `x`/`y`, painting its fill and stroke over its declared `width` × `height`. `clip` narrows it. Nests to any depth | 3 |
+| Faceting (`from.facet`) | **Supported** | `GroupMarkTest`, `BarFixtureDifferentialTest` (`facet-trellis` fixture) | `groupby` only, on one or more fields. Cells appear in first-appearance order and each cell's datum is the groupby fields plus `count`, matching the `aggregate` transform upstream inserts. Pre-faceted `facet.field` and extra `facet.aggregate` measures are reported | 3 |
+| Group scopes (nested `data`, `signals`, `scales`, `axes`, `marks`) | **Supported** | `GroupMarkTest` | A nested definition shadows a same-named one outside. Two upstream behaviours are reproduced rather than corrected: `parent` is the group's datum, not the group item, so `parent.width` is undefined; and `width`/`height` are inherited, so a nested `"height"` range spans the whole chart unless the group declares its own `height` signal | 3 |
+| Group `layout` (the trellis grid) | Not implemented | `GroupMarkTest` | Automatic row/column placement with headers and titles. Reported; position each cell from its own encode block instead | 5 |
 | Rect | **Supported** | `SpecCompilerTest`, `BarFixtureDifferentialTest` | Encoder handles x/x2/width and y/y2/height pairs, band offsets, fill, stroke, opacity, corner radius. Geometry matches upstream exactly on the bar fixture | 3 |
 | Rule | **Supported** | `SpecCompilerTest` | A missing `x2`/`y2` defaults to `x`/`y`, as upstream. Bounds expand on both axes, so they are slightly conservative for a butt-capped rule | 3 |
 | Line | **Supported** | `BarFixtureDifferentialTest` (`line-area` fixture) | One `PathNode` per series where upstream emits one item per datum; the harness normalizes both to a point list. A gap breaks the line, as `defined` does. Interpolation methods other than linear are reported, not approximated | 3 |
@@ -89,6 +92,7 @@ Upstream Vega exposes 119 expression functions; 60 are implemented. The language
 | --- | --- | --- | --- | --- |
 | Lexer, parser, evaluator | **Supported** | `ParserTest`, `ExpressionReferenceTest` | Full JavaScript expression subset: literals, members, calls, unary, binary, logical, bitwise, conditional, array and object literals. No regular-expression literals or template strings — both are syntax errors | 4 |
 | JavaScript coercion semantics | **Supported** | `ExpressionReferenceTest` (115 upstream vectors) | `+` concatenates for strings, arrays and objects; `==` is loose; strings compare lexicographically; `-7 % 3` is `-1`; `round(-2.5)` is `-2` | 4 |
+| `null` versus `undefined` | Known difference | `ExpressionReferenceTest`, `GroupMarkTest` | This value model has one absent value where JavaScript has two, so a missing property stringifies as `"null"` where upstream prints `"undefined"`. Arithmetic and truthiness agree; only the printed form differs, and only for an expression that stringifies an absent value | 5 |
 | Math, string, array, predicate and coercion functions | **Supported** | `ExpressionReferenceTest` | 60 of 119. `min`/`max` are `Math.min`/`Math.max`, so an array argument is NaN | 4 |
 | `format` | Partial | `ExpressionReferenceTest` | Supports `.Nf`, `.Ne`, `.N%`, `d` and `,` grouping. Other d3-format specifiers fall back to plain number formatting | 5 |
 | Date and time functions | Not implemented | — | Reported by name with a reason; needs time scales first | 5 |
@@ -146,7 +150,8 @@ Upstream Vega exposes 119 expression functions; 60 are implemented. The language
 | --- | --- | --- | --- | --- |
 | Comparison harness | Supported | `Differential` | Compares mark count, type, role, coordinates, extents and scale outputs in absolute content space | 3 |
 | Reference generation | Supported | `oracle-js/src/reference.js`, `scripts/oracle.sh` | References are checked in, so JVM tests need no Node and no network | 3 |
-| Fixtures passing | 5 of a target 100 | `BarFixtureDifferentialTest` | `bar` (48 marks), `stacked-bar` (42, stack + aggregate + signals + conditional fill), `line-area` (50, line + area + symbol + text), `log-scale` (75, log axis + sqrt), `colour-scheme` (39, ordinal scheme + interpolated stroke). All marks and scale outputs match exactly | 3 |
+| Fixtures passing | 6 of a target 100 | `BarFixtureDifferentialTest` | `bar` (48 marks), `stacked-bar` (42, stack + aggregate + signals + conditional fill), `line-area` (50, line + area + symbol + text), `log-scale` (75, log axis + sqrt), `colour-scheme` (39, ordinal scheme + interpolated stroke), `facet-trellis` (55, faceted groups with per-cell scales and axes). All marks and scale outputs match exactly | 3 |
+| Nested scale outputs | Not compared | `Differential` | The reference records only top-level scales, because a faceted group resolves its scales once per cell and there is no single scale of that name to compare. The cells' geometry is compared in full, which is what those scales produce | 5 |
 | Series normalization | Supported | `Differential` | Vega emits one item per datum for a line or area; this engine builds one path. Both sides collapse to an outline point list, compared numerically | 3 |
 | Axis group bounds | Known difference | `BarFixtureDifferentialTest` | Vega derives an axis group's bounds from the axis extent rather than by unioning its items, so its frame bounds exclude the half-pixel crisp offset and the domain line's stroke. Our surface is up to 1 unit larger per axis; every mark coordinate still agrees exactly | 5 |
 | Text metrics in comparisons | Supported | `VegaHeadlessTextEngine` | Reproduces upstream's canvas-free estimate, `trunc(0.8 × chars × fontSize)`, so layout is comparable. A comparison engine only — never used for display | 3 |

@@ -8,6 +8,7 @@ import dev.aster.vega.model.spec.Orient
 import dev.aster.vega.runtime.scale.BandScale
 import dev.aster.vega.runtime.scale.LinearScale
 import dev.aster.vega.runtime.scale.PointScale
+import dev.aster.vega.runtime.scale.PositionScale
 import dev.aster.vega.runtime.scale.TransformedScale
 import dev.aster.vega.runtime.scale.VegaScale
 import dev.aster.vega.scene.Fill
@@ -36,6 +37,13 @@ import dev.aster.vega.scene.Transform2D
  *   the band while ticks stay crisp
  *
  * Titles are not generated; the parser reports that.
+ *
+ * Three different sizes govern an axis, which is invisible at the top level because they coincide
+ * there and only diverges inside a group mark. Established by reading upstream's own axis layout:
+ * - the axis group is *placed* at the enclosing group's `width`/`height` — its encoded extent
+ * - a gridline is as long as the `width`/`height` **signals**, which a group inherits from the
+ *   chart unless it declares its own
+ * - the domain line spans the scale's own range, not the plotting area
  */
 public class AxisBuilder(
   private val scales: Map<String, VegaScale>,
@@ -49,7 +57,11 @@ public class AxisBuilder(
   /** One tick's label text and its position along the axis. */
   private data class Tick(val label: String, val position: Double)
 
-  public fun build(spec: AxisSpec, plot: PlotSize): SceneNode? {
+  /**
+   * @param extent the enclosing group's encoded size, which positions a bottom or right axis.
+   * @param gridSize the `width`/`height` signals in scope, which set how long a gridline is.
+   */
+  public fun build(spec: AxisSpec, extent: PlotSize, gridSize: PlotSize = extent): SceneNode? {
     val scale = scales[spec.scale]
     if (scale == null) {
       diagnostics.error(
@@ -91,10 +103,18 @@ public class AxisBuilder(
           when (spec.orient) {
             Orient.BOTTOM,
             Orient.TOP ->
-              RuleNode(ids.allocate(), at, 0.0, at, -plot.height, gridStroke, metadata = gridMeta)
+              RuleNode(
+                ids.allocate(),
+                at,
+                0.0,
+                at,
+                -gridSize.height,
+                gridStroke,
+                metadata = gridMeta,
+              )
             Orient.LEFT,
             Orient.RIGHT ->
-              RuleNode(ids.allocate(), 0.0, at, plot.width, at, gridStroke, metadata = gridMeta)
+              RuleNode(ids.allocate(), 0.0, at, gridSize.width, at, gridStroke, metadata = gridMeta)
           }
       }
     }
@@ -150,29 +170,26 @@ public class AxisBuilder(
       val domainStroke =
         Stroke(paint = ScenePaint.Solid(AxisDefaults.domainColor), width = AxisDefaults.TICK_WIDTH)
       val domainMeta = NodeMetadata(role = "axis-domain")
+      // Upstream encodes the domain line's endpoints as range positions 0 and 1 of the axis scale,
+      // so a scale that does not span the whole plotting area gets a correspondingly short line.
+      val span = (scale as? PositionScale)?.range
+      val from = span?.firstOrNull() ?: 0.0
+      val to = span?.lastOrNull() ?: if (spec.orient.isVertical) extent.height else extent.width
       children +=
         when (spec.orient) {
           Orient.BOTTOM,
           Orient.TOP ->
-            RuleNode(ids.allocate(), 0.0, 0.0, plot.width, 0.0, domainStroke, metadata = domainMeta)
+            RuleNode(ids.allocate(), from, 0.0, to, 0.0, domainStroke, metadata = domainMeta)
           Orient.LEFT,
           Orient.RIGHT ->
-            RuleNode(
-              ids.allocate(),
-              0.0,
-              plot.height,
-              0.0,
-              0.0,
-              domainStroke,
-              metadata = domainMeta,
-            )
+            RuleNode(ids.allocate(), 0.0, from, 0.0, to, domainStroke, metadata = domainMeta)
         }
     }
 
     return GroupNode(
       id = ids.allocate(),
       children = children,
-      transform = groupTransform(spec, plot),
+      transform = groupTransform(spec, extent),
       metadata = NodeMetadata(role = "axis", markName = spec.scale),
     )
   }
@@ -183,13 +200,13 @@ public class AxisBuilder(
    * The half-pixel offset is Vega's, not a rounding artefact of ours: it makes 1-pixel ticks land
    * on pixel centres instead of straddling two pixels.
    */
-  private fun groupTransform(spec: AxisSpec, plot: PlotSize): Transform2D {
+  private fun groupTransform(spec: AxisSpec, extent: PlotSize): Transform2D {
     val offset = numbers.resolve(spec.offset, spec.scale) ?: 0.0
     return when (spec.orient) {
       Orient.BOTTOM ->
         Transform2D.translate(
           AxisDefaults.CRISP_OFFSET,
-          plot.height + AxisDefaults.CRISP_OFFSET + offset,
+          extent.height + AxisDefaults.CRISP_OFFSET + offset,
         )
       Orient.TOP ->
         Transform2D.translate(AxisDefaults.CRISP_OFFSET, AxisDefaults.CRISP_OFFSET - offset)
@@ -197,7 +214,7 @@ public class AxisBuilder(
         Transform2D.translate(AxisDefaults.CRISP_OFFSET - offset, AxisDefaults.CRISP_OFFSET)
       Orient.RIGHT ->
         Transform2D.translate(
-          plot.width + AxisDefaults.CRISP_OFFSET + offset,
+          extent.width + AxisDefaults.CRISP_OFFSET + offset,
           AxisDefaults.CRISP_OFFSET,
         )
     }

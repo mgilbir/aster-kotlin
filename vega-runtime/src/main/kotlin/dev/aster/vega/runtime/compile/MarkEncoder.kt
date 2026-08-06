@@ -21,17 +21,20 @@ import dev.aster.vega.runtime.scale.VegaScale
 import dev.aster.vega.scene.AccessibilityDescriptor
 import dev.aster.vega.scene.Fill
 import dev.aster.vega.scene.FontStyle
+import dev.aster.vega.scene.GroupNode
 import dev.aster.vega.scene.MetricTextEngine
 import dev.aster.vega.scene.NodeMetadata
 import dev.aster.vega.scene.PathData
 import dev.aster.vega.scene.PathNode
 import dev.aster.vega.scene.PointD
+import dev.aster.vega.scene.RectD
 import dev.aster.vega.scene.RectNode
 import dev.aster.vega.scene.RuleNode
 import dev.aster.vega.scene.SceneColor
 import dev.aster.vega.scene.SceneNode
 import dev.aster.vega.scene.SceneNodeIdAllocator
 import dev.aster.vega.scene.ScenePaint
+import dev.aster.vega.scene.SizeD
 import dev.aster.vega.scene.Stroke
 import dev.aster.vega.scene.SymbolNode
 import dev.aster.vega.scene.SymbolShape
@@ -41,13 +44,14 @@ import dev.aster.vega.scene.TextEngine
 import dev.aster.vega.scene.TextNode
 import dev.aster.vega.scene.TextRun
 import dev.aster.vega.scene.TextStyle
+import dev.aster.vega.scene.Transform2D
 
 /**
  * Turns a mark specification plus its data into scene nodes.
  *
- * Implemented: `rect`, `rule`, `symbol`, `text`, `line` and `area`. Every other type reports
- * `VEGA_TRANSFORM_NOT_IMPLEMENTED` and contributes no nodes, so a chart that needs one is visibly
- * missing it rather than silently short.
+ * Implemented: `rect`, `rule`, `symbol`, `text`, `line`, `area`, and `group` through [encodeGroup].
+ * Every other type reports `VEGA_TRANSFORM_NOT_IMPLEMENTED` and contributes no nodes, so a chart
+ * that needs one is visibly missing it rather than silently short.
  *
  * Channel resolution follows Vega: `enter` provides the base and `update` overrides it, a scaled
  * channel maps its field through the named scale, and `band` adds a fraction of the scale's
@@ -88,6 +92,51 @@ public class MarkEncoder(
         emptyList()
       }
     }
+
+  /**
+   * Encodes a group mark: one translated container per datum, holding whatever [contents] builds.
+   *
+   * The nested scene is a callback rather than a parameter because building it needs the group's
+   * own scope — its data, signals, scales and axes — and that belongs to the compiler. What stays
+   * here is only what a group has in common with every other mark: resolving its channels against
+   * its datum.
+   *
+   * The group's own channels are resolved in the *enclosing* scope, since that is where the scales
+   * positioning it live; [contents] is what sees the scope inside.
+   */
+  public fun encodeGroup(
+    spec: MarkSpec,
+    data: List<VegaValue>,
+    contents: (datum: VegaValue, index: Int, extent: SizeD) -> List<SceneNode>,
+  ): List<SceneNode> {
+    val channels = spec.encode.effective
+    return data.mapIndexed { index, datum ->
+      val style = style(channels, datum, spec)
+      val x = position(channels["x"], datum) ?: 0.0
+      val y = position(channels["y"], datum) ?: 0.0
+      // Upstream treats an unset dimension as zero once either is given, and gives a group with
+      // neither no extent at all — it then paints nothing and measures only its children.
+      val width = position(channels["width"], datum)
+      val height = position(channels["height"], datum)
+      val size = if (width == null && height == null) null else SizeD(width ?: 0.0, height ?: 0.0)
+      val extent = size ?: SizeD(0.0, 0.0)
+
+      GroupNode(
+        id = ids.allocate(),
+        children = contents(datum, index, extent),
+        transform = if (x == 0.0 && y == 0.0) Transform2D.Identity else Transform2D.translate(x, y),
+        size = size,
+        cornerRadius = number(channels["cornerRadius"], datum) ?: 0.0,
+        clip = if (spec.clip) RectD(0.0, 0.0, extent.width, extent.height) else null,
+        fill = style.fill,
+        stroke = style.stroke,
+        opacity = style.opacity,
+        // Upstream calls a group mark's role "scope", distinguishing it from the guide groups that
+        // hold axes and legends.
+        metadata = metadata(spec, datum, index, channels).copy(role = "scope"),
+      )
+    }
+  }
 
   private fun rect(spec: MarkSpec, datum: VegaValue, index: Int): SceneNode? {
     val channels = spec.encode.effective

@@ -35,6 +35,14 @@ public sealed interface PositionScale : VegaScale {
 
   /** Width of a band, or 0 for a continuous scale. */
   public val bandwidth: Double
+
+  /**
+   * The range in range space, low index first as written in the specification.
+   *
+   * Exposed because an axis draws its domain line between the range endpoints rather than across
+   * the plotting area — the two coincide at the top level but not inside a group.
+   */
+  public val range: List<Double>
 }
 
 /**
@@ -46,7 +54,7 @@ public sealed interface PositionScale : VegaScale {
 public class LinearScale(
   override val name: String,
   public val domain: List<Double>,
-  public val range: List<Double>,
+  override val range: List<Double>,
   public val clamp: Boolean = false,
 ) : PositionScale {
 
@@ -172,7 +180,7 @@ public class LinearScale(
 public class BandScale(
   override val name: String,
   public val domain: List<String>,
-  public val range: List<Double>,
+  override val range: List<Double>,
   public val paddingInner: Double = 0.0,
   public val paddingOuter: Double = 0.0,
   public val align: Double = 0.5,
@@ -242,7 +250,7 @@ public class BandScale(
 public class PointScale(
   override val name: String,
   public val domain: List<String>,
-  public val range: List<Double>,
+  override val range: List<Double>,
   public val padding: Double = 0.0,
   public val align: Double = 0.5,
   public val round: Boolean = false,
@@ -282,7 +290,7 @@ public class PointScale(
 public abstract class TransformedScale(
   override val name: String,
   public val domain: List<Double>,
-  public val range: List<Double>,
+  override val range: List<Double>,
   public val clamp: Boolean,
 ) : PositionScale {
 

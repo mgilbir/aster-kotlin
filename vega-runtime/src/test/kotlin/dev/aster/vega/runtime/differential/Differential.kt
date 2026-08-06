@@ -278,15 +278,28 @@ public object Differential {
     )
   }
 
+  /**
+   * A painted group: a facet cell's background, or any group mark with a fill or a stroke.
+   *
+   * Its origin is its own coordinate origin, which the accumulated transform already carries, and
+   * its extent is the size it declared — the same two things upstream reports as the group item's
+   * `x`/`y` and `width`/`height`.
+   */
   private fun groupMark(node: GroupNode, world: Transform2D): Mark {
-    val clip = node.clip
-    val origin = world.apply(clip?.left ?: 0.0, clip?.top ?: 0.0)
-    return Mark(
-      "group",
-      node.metadata.role,
-      linkedMapOf("x" to origin.x, "y" to origin.y),
-      emptyMap(),
-    )
+    val origin = world.apply(0.0, 0.0)
+    val size = node.size
+    val numbers = linkedMapOf("x" to origin.x, "y" to origin.y)
+    if (size != null) {
+      numbers["width"] = size.width
+      numbers["height"] = size.height
+    }
+    val strings = LinkedHashMap<String, String>()
+    node.fill?.let { f -> solidColour(f.paint)?.let { strings["fill"] = it.toCssHex() } }
+    node.stroke?.let { s ->
+      solidColour(s.paint)?.let { strings["stroke"] = it.toCssHex() }
+      numbers["strokeWidth"] = s.width
+    }
+    return Mark("group", node.metadata.role, numbers, strings)
   }
 
   private fun paintNumbers(node: SceneNode): Map<String, Double> {

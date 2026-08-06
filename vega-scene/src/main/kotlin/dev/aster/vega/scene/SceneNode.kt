@@ -98,26 +98,43 @@ public data class GroupNode(
   override val metadata: NodeMetadata = NodeMetadata.None,
   val fill: Fill? = null,
   val stroke: Stroke? = null,
+  /**
+   * The group's own extent, from the `width` and `height` channels of a Vega group mark.
+   *
+   * A group that declares a size paints its fill and stroke as a rectangle of that size at its
+   * origin, and contributes that rectangle to its own bounds even when its children are smaller.
+   * `null` means a pure container — an axis group, or the scene root — which neither paints nor
+   * measures anything of its own.
+   */
+  val size: SizeD? = null,
+  val cornerRadius: Double = 0.0,
   /** Clip rectangle in this group's own coordinate space, applied before drawing children. */
   val clip: RectD? = null,
   val clipPath: PathData? = null,
   val blendMode: SceneBlendMode = SceneBlendMode.NORMAL,
 ) : SceneNode {
 
+  /** The rectangle this group's own fill and stroke cover, or `null` when it paints nothing. */
+  public val paintRect: RectD?
+    get() =
+      when {
+        fill == null && stroke == null -> null
+        size != null -> RectD(0.0, 0.0, size.width, size.height)
+        else -> clip
+      }
+
   override val bounds: RectD by
     lazy(LazyThreadSafetyMode.NONE) {
-      val own =
-        when {
-          fill != null || stroke != null -> clip ?: RectD.Empty
-          else -> RectD.Empty
-        }
-      var result = own
+      // Upstream measures a group as its declared extent unioned with its children. Clipping
+      // narrows that, since nothing outside the clip is drawn. Upstream applies the narrowing one
+      // level up, at a marktype layer this scene graph has no equivalent of; applying it to the
+      // group itself draws the same pixels and gives the same overall surface.
+      var result = size?.let { RectD(0.0, 0.0, it.width, it.height) } ?: RectD.Empty
       for (child in children) {
         if (child.visible) result = result.union(child.transformedBounds)
       }
-      val strokeExpanded = stroke?.let { result.expand(it.halfWidth) } ?: result
-      val clipped = if (clip != null) intersect(strokeExpanded, clip) else strokeExpanded
-      clipped.normalized()
+      if (clip != null) result = intersect(result, clip)
+      (stroke?.let { result.expand(it.halfWidth) } ?: result).normalized()
     }
 }
 

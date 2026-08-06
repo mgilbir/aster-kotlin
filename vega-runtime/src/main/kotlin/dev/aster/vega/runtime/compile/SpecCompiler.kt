@@ -1,18 +1,12 @@
 package dev.aster.vega.runtime.compile
 
-import dev.aster.vega.dataflow.transform.TransformContext
-import dev.aster.vega.dataflow.transform.TransformPipeline
 import dev.aster.vega.expression.CachingExpressionCompiler
-import dev.aster.vega.expression.ExpressionCompiler
-import dev.aster.vega.expression.ExpressionScope
 import dev.aster.vega.expression.VegaExpressionCompiler
 import dev.aster.vega.model.DiagnosticCodes
 import dev.aster.vega.model.DiagnosticCollector
 import dev.aster.vega.model.VegaDiagnostic
 import dev.aster.vega.model.VegaValue
 import dev.aster.vega.model.spec.AutosizeType
-import dev.aster.vega.model.spec.DataSpec
-import dev.aster.vega.model.spec.MarkSpec
 import dev.aster.vega.model.spec.SpecParser
 import dev.aster.vega.model.spec.VegaSpec
 import dev.aster.vega.runtime.scale.VegaScale
@@ -22,7 +16,6 @@ import dev.aster.vega.scene.NodeMetadata
 import dev.aster.vega.scene.RectD
 import dev.aster.vega.scene.Scene
 import dev.aster.vega.scene.SceneColor
-import dev.aster.vega.scene.SceneNode
 import dev.aster.vega.scene.SceneNodeIdAllocator
 import dev.aster.vega.scene.TextEngine
 import dev.aster.vega.scene.Transform2D
@@ -30,6 +23,12 @@ import dev.aster.vega.scene.Transform2D
 /** A compiled specification: the scene, the scales it built, and everything it could not honour. */
 public data class CompiledSpec(
   val scene: Scene?,
+  /**
+   * The top-level scales.
+   *
+   * Scales declared inside a group mark are absent by design: a faceted group resolves its scales
+   * once per cell against that cell's data, so there is no single scale of that name to report.
+   */
   val scales: Map<String, VegaScale>,
   /** Resolved signal values, including the implicit `width`, `height` and `padding`. */
   val signals: SignalScope,
@@ -42,13 +41,13 @@ public data class CompiledSpec(
 /**
  * Compiles a parsed Vega specification into a scene.
  *
- * This is the thin vertical slice through the pipeline: data, scales, mark encoding, axes and
- * layout. It executes the subset the runtime supports and reports the rest, which is what lets the
- * differential harness compare against upstream on a real specification instead of on hand-authored
- * scenes.
+ * This walks the pipeline in the order the stages depend on each other: data, signals, scales, mark
+ * encoding, axes and layout. It executes the subset the runtime supports and reports the rest,
+ * which is what lets the differential harness compare against upstream on a real specification
+ * instead of on hand-authored scenes.
  *
- * Not implemented, each reported rather than approximated: signals and expressions, data
- * transforms, legends, titles, faceting, and every mark type except `rect`.
+ * Nesting lives in [ScopeCompiler]: a group mark carries a whole scope of its own, and this class
+ * only sets up the outermost one. Legends and titles are not implemented; the parser reports them.
  *
  * @param textEngine measures axis labels. Pass the Android engine to get the scene the device will
  *   draw, or the default deterministic engine for JVM comparisons.
@@ -104,24 +103,18 @@ public class SpecCompiler(private val textEngine: TextEngine = MetricTextEngine(
     // signals see the datasets resolved before them. A specification that crosses those in both
     // directions needs the full dataflow, and is reported rather than silently mis-ordered.
     val transformSignals = LinkedHashMap<String, VegaValue>(implicitSignals)
-    val datasets = resolveData(spec.data, diagnostics, expressions, transformSignals)
+    val data = DataResolver(diagnostics, expressions)
+    val datasets = data.resolve(spec.data, transformSignals)
     val signals =
       SignalResolver(diagnostics, expressions).resolve(spec.signals, datasets, transformSignals)
 
     val numbers = NumberResolver(expressions, signals, diagnostics)
     val scales = ScaleResolver(datasets, plot, diagnostics, numbers).resolve(spec.scales)
 
-    val axisBuilder = AxisBuilder(scales, ids, textEngine, diagnostics, numbers)
-    val markEncoder = MarkEncoder(scales, ids, diagnostics, signals, expressions, textEngine)
-
-    val children = mutableListOf<SceneNode>()
-    // Vega draws axes below marks unless an axis opts into a higher zindex.
-    val (underlayAxes, overlayAxes) = spec.axes.partition { it.zindex <= 0 }
-    underlayAxes.forEach { axis -> axisBuilder.build(axis, plot)?.let { children += it } }
-    for (mark in spec.marks) {
-      children += encodeMark(mark, datasets, markEncoder, diagnostics)
-    }
-    overlayAxes.forEach { axis -> axisBuilder.build(axis, plot)?.let { children += it } }
+    val root = CompileScope(datasets, signals, scales, plot)
+    val children =
+      ScopeCompiler(ids, textEngine, diagnostics, expressions, data)
+        .compile(spec.marks, spec.axes, root, plot)
 
     val content =
       GroupNode(
@@ -132,91 +125,6 @@ public class SpecCompiler(private val textEngine: TextEngine = MetricTextEngine(
 
     val scene = layout(spec, content, plot, ids, diagnostics)
     return CompiledSpec(scene, scales, signals, diagnostics.diagnostics)
-  }
-
-  private fun encodeMark(
-    mark: MarkSpec,
-    datasets: Map<String, List<VegaValue>>,
-    encoder: MarkEncoder,
-    diagnostics: DiagnosticCollector,
-  ): List<SceneNode> {
-    val dataName = mark.from?.data
-    val data =
-      when {
-        dataName == null -> listOf(VegaValue.EmptyObject) // a mark with no data draws once
-        datasets.containsKey(dataName) -> datasets.getValue(dataName)
-        else -> {
-          diagnostics.error(
-            DiagnosticCodes.PARSE_UNKNOWN_PROPERTY,
-            "Mark refers to unknown dataset '$dataName'",
-            operator = mark.name,
-          )
-          emptyList()
-        }
-      }
-    return encoder.encode(mark, data)
-  }
-
-  /**
-   * Resolves datasets to plain value lists.
-   *
-   * Transforms are not implemented, so a dataset that declares any is passed through unchanged with
-   * a diagnostic naming the operators that were skipped — the chart then shows untransformed data,
-   * which is wrong, but visibly and explicably so.
-   */
-  private fun resolveData(
-    specs: List<DataSpec>,
-    diagnostics: DiagnosticCollector,
-    expressions: ExpressionCompiler,
-    signals: MutableMap<String, VegaValue>,
-  ): Map<String, List<VegaValue>> {
-    val result = LinkedHashMap<String, List<VegaValue>>(specs.size)
-    val pipeline = TransformPipeline()
-
-    for (spec in specs) {
-      var values = spec.values ?: emptyList()
-      if (spec.source != null) {
-        val upstream = result[spec.source]
-        if (upstream == null) {
-          diagnostics.error(
-            DiagnosticCodes.PARSE_UNKNOWN_PROPERTY,
-            "Dataset '${spec.name}' sources from unknown dataset '${spec.source}'",
-            operator = spec.name,
-          )
-        } else {
-          values = upstream
-        }
-      }
-      if (spec.transform.isNotEmpty()) {
-        val context = CompileTransformContext(diagnostics, expressions, signals, result, spec.name)
-        values = pipeline.run(values, spec.transform, context)
-      }
-      result[spec.name] = values
-    }
-    return result
-  }
-
-  /**
-   * Transform context for one dataset.
-   *
-   * Signals written by a transform — `extent` publishing a range, for instance — go into the shared
-   * map, so a later dataset or a signal definition can read them.
-   */
-  private class CompileTransformContext(
-    override val diagnostics: DiagnosticCollector,
-    override val expressions: ExpressionCompiler,
-    private val signals: MutableMap<String, VegaValue>,
-    private val datasets: Map<String, List<VegaValue>>,
-    private val datasetName: String,
-  ) : TransformContext {
-
-    override val scope: ExpressionScope = scopeFor(VegaValue.Null)
-
-    override fun setSignal(name: String, value: VegaValue) {
-      signals[name] = value
-    }
-
-    override fun scopeFor(datum: VegaValue): ExpressionScope = SignalScope(signals, datasets, datum)
   }
 
   /**

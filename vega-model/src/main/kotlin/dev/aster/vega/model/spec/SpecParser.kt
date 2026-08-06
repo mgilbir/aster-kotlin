@@ -443,13 +443,7 @@ public class SpecParser {
     }
 
     val from = obj.fields["from"] as? VegaValue.Obj
-    if (from?.fields?.get("facet") != null) {
-      diagnostics.error(
-        DiagnosticCodes.TRANSFORM_NOT_IMPLEMENTED,
-        "Faceted group marks are not implemented; this mark will render no data",
-        jsonPath = "$path.from.facet",
-      )
-    }
+    val facet = from?.fields?.get("facet")?.let { parseFacet(it, "$path.from.facet", type) }
     if (obj.fields["transform"] != null) {
       diagnostics.warn(
         DiagnosticCodes.TRANSFORM_NOT_IMPLEMENTED,
@@ -465,21 +459,105 @@ public class SpecParser {
       )
     }
 
+    if (type == MarkType.GROUP) reportUnsupportedGroupScope(obj, path)
+
     return MarkSpec(
       type = type,
       name = obj.fields["name"]?.asString(),
-      from =
-        from?.let {
-          FromSpec(data = it.fields["data"]?.asString(), facet = it.fields["facet"])
-        },
+      from = from?.let { FromSpec(data = it.fields["data"]?.asString(), facet = facet) },
       encode = parseEncode(obj.fields["encode"], "$path.encode"),
       marks = parseArray(obj, "marks", path) { child, childPath -> parseMark(child, childPath) },
       axes = parseArray(obj, "axes", path) { child, childPath -> parseAxis(child, childPath) },
+      data = parseArray(obj, "data", path) { child, childPath -> parseData(child, childPath) },
+      signals =
+        parseArray(obj, "signals", path) { child, childPath -> parseSignal(child, childPath) },
+      scales = parseArray(obj, "scales", path) { child, childPath -> parseScale(child, childPath) },
       zindex = (obj.fields["zindex"] as? VegaValue.Num)?.value?.toInt() ?: 0,
       interactive = obj.fields["interactive"]?.asBoolean() ?: true,
       clip = obj.fields["clip"]?.asBoolean() ?: false,
     )
   }
+
+  /**
+   * Parses `from.facet`.
+   *
+   * Only the `groupby` form is modelled. The `field` form takes an array-valued field that has
+   * already been partitioned upstream, which the dataflow would have to preserve through the whole
+   * pipeline; it is reported rather than approximated by grouping on the field's value.
+   */
+  private fun parseFacet(value: VegaValue, path: String, type: MarkType): FacetSpec? {
+    val obj = value as? VegaValue.Obj ?: return unexpected("a facet definition", path)
+    if (type != MarkType.GROUP) {
+      diagnostics.error(
+        DiagnosticCodes.PARSE_UNKNOWN_PROPERTY,
+        "Only a group mark can be faceted, and this is a '${type.name.lowercase()}' mark",
+        jsonPath = path,
+      )
+      return null
+    }
+
+    val name = obj.fields["name"]?.asString()
+    val data = obj.fields["data"]?.asString()
+    if (name.isNullOrEmpty() || data.isNullOrEmpty()) {
+      diagnostics.error(
+        DiagnosticCodes.PARSE_MISSING_PROPERTY,
+        "A facet needs both a 'name' to bind its partition to and a 'data' set to partition",
+        jsonPath = path,
+      )
+      return null
+    }
+
+    val groupby = obj.fields["groupby"]?.let { stringList(it) }
+    if (groupby.isNullOrEmpty()) {
+      val reason =
+        if (obj.fields["field"] != null) {
+          "Pre-faceted data ('facet.field') is not implemented; use 'groupby' instead"
+        } else {
+          "A facet needs a 'groupby'"
+        }
+      diagnostics.error(DiagnosticCodes.TRANSFORM_NOT_IMPLEMENTED, reason, jsonPath = path)
+      return null
+    }
+    if (obj.fields["aggregate"] != null) {
+      diagnostics.warn(
+        DiagnosticCodes.TRANSFORM_NOT_IMPLEMENTED,
+        "Extra facet aggregates are not implemented; each group's datum carries only the " +
+          "groupby fields and 'count'",
+        jsonPath = "$path.aggregate",
+      )
+    }
+    return FacetSpec(name = name, data = data, groupby = groupby)
+  }
+
+  /** Reports the parts of a group's scope that the runtime cannot build. */
+  private fun reportUnsupportedGroupScope(obj: VegaValue.Obj, path: String) {
+    val unsupported =
+      mapOf(
+        "legends" to "Legend generation is not implemented",
+        "title" to "Title generation is not implemented",
+        "layout" to
+          "Group layout is not implemented; position each group from its own encode block instead",
+        "projections" to "Geographic projections are out of scope",
+      )
+    for ((key, reason) in unsupported) {
+      val value = obj.fields[key] ?: continue
+      if (value is VegaValue.Arr && value.values.isEmpty()) continue
+      diagnostics.warn(
+        DiagnosticCodes.PARSE_UNKNOWN_PROPERTY,
+        "$reason; '$key' on this group was ignored",
+        jsonPath = "$path.$key",
+      )
+    }
+  }
+
+  /** Vega accepts a single string or an array of them wherever a field list is allowed. */
+  private fun stringList(value: VegaValue): List<String> =
+    when (value) {
+      is VegaValue.Arr ->
+        value.values.mapNotNull { it.takeIf { v -> v !is VegaValue.Null }?.asString() }
+      is VegaValue.Null -> emptyList()
+      else -> listOf(value.asString())
+    }
 
   private fun parseEncode(value: VegaValue?, path: String): EncodeSpec {
     val obj = value as? VegaValue.Obj ?: return EncodeSpec()

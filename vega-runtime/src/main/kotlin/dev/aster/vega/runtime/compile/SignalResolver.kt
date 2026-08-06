@@ -18,7 +18,8 @@ import dev.aster.vega.model.spec.SignalSpec
  * per mark instance by [withDatum], which shares the underlying maps rather than copying them.
  */
 public class SignalScope(
-  private val values: Map<String, VegaValue>,
+  /** Exposed so a nested group scope can inherit these and add its own. */
+  public val values: Map<String, VegaValue>,
   private val datasets: Map<String, List<VegaValue>>,
   override val datum: VegaValue = VegaValue.Null,
 ) : ExpressionScope {

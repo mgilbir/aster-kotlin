@@ -281,7 +281,20 @@ public enum class MarkType {
 }
 
 /** Where a mark's data comes from. */
-public data class FromSpec(val data: String? = null, val facet: VegaValue? = null)
+public data class FromSpec(val data: String? = null, val facet: FacetSpec? = null)
+
+/**
+ * A group mark's facet definition: `{"facet": {"name": "cell", "data": "table", "groupby":
+ * "cat"}}`.
+ *
+ * One group is produced per distinct combination of the [groupby] fields, in the order those
+ * combinations first appear in [data]. Each group's datum is the groupby fields plus a `count`, and
+ * its partition of the rows is bound to [name] as a dataset the nested marks can read.
+ *
+ * That datum shape is not a convention this engine chose: upstream implements faceting by inserting
+ * an `aggregate` transform with the same `groupby`, so the group sees an aggregate tuple.
+ */
+public data class FacetSpec(val name: String, val data: String, val groupby: List<String>)
 
 /**
  * One channel's value in an encode block.
@@ -340,6 +353,13 @@ public data class EncodeSpec(
     get() = if (update.isEmpty()) enter else enter + update
 }
 
+/**
+ * A mark definition.
+ *
+ * A `group` mark is also a scope: [data], [signals], [scales], [axes] and [marks] declared on it
+ * are visible to its nested content and nowhere else, and may shadow same-named definitions outside
+ * it.
+ */
 public data class MarkSpec(
   val type: MarkType,
   val name: String? = null,
@@ -348,6 +368,12 @@ public data class MarkSpec(
   /** Nested marks, for a group mark. */
   val marks: List<MarkSpec> = emptyList(),
   val axes: List<AxisSpec> = emptyList(),
+  /** Datasets scoped to this group. */
+  val data: List<DataSpec> = emptyList(),
+  /** Signals scoped to this group. */
+  val signals: List<SignalSpec> = emptyList(),
+  /** Scales scoped to this group, resolved against the group's own data. */
+  val scales: List<ScaleSpec> = emptyList(),
   val zindex: Int = 0,
   val interactive: Boolean = true,
   val clip: Boolean = false,
