@@ -37,14 +37,20 @@ import dev.aster.vega.android.AndroidTextEngine
 import dev.aster.vega.android.BitmapExportOptions
 import dev.aster.vega.android.SceneExporter
 import dev.aster.vega.compose.VegaChart
+import dev.aster.vega.model.DiagnosticSeverity
 import dev.aster.vega.runtime.ChartEvent
 import dev.aster.vega.runtime.VegaChartController
 import dev.aster.vega.svg.toSvg
 import java.io.File
 
 /**
- * Demonstrates the Milestone 1 and 2 surface: hand-authored scenes rendered through the Canvas
- * backend, the Compose API hosting the canonical View, interaction, and SVG/PNG/PDF export.
+ * Demonstrates the whole surface: hand-authored scenes and compiled Vega specifications rendered
+ * through the Canvas backend, the Compose API hosting the canonical View, interaction, and SVG, PNG
+ * and PDF export.
+ *
+ * The specification entries load Vega JSON from the app's assets and compile it on a background
+ * thread, which is what a user of this library does. They are the same fixtures the differential
+ * tests compare against upstream, so what appears here is what was proved correct.
  */
 public class DemoActivity : ComponentActivity() {
 
@@ -61,13 +67,29 @@ private fun DemoScreen() {
   var status by remember { mutableStateOf("Tap a mark, drag to pan, pinch to zoom.") }
 
   val context = LocalContext.current
-  // One text engine for measurement and drawing, shared with the view that renders the scene.
+  // One text engine for building hand-authored scenes, which the view also draws with. The
+  // controller gets a *second* instance: it compiles off the main thread, and one engine must not
+  // be
+  // touched by two threads at once.
   val textEngine = remember { AndroidTextEngine() }
   val exporter = remember { SceneExporter() }
-  val controller = remember { VegaChartController() }
+  val controller = remember { VegaChartController(textEngine = AndroidTextEngine()) }
 
-  val scene = remember(chart, dark) { chart.build(textEngine, dark) }
-  LaunchedEffect(scene) { controller.setScene(scene) }
+  LaunchedEffect(chart, dark) {
+    val asset = chart.specAsset
+    if (asset != null) {
+      val json = context.assets.open(asset).bufferedReader().use { it.readText() }
+      val compiled = controller.setSpecAsync(json)
+      val errors = compiled.diagnostics.count { it.severity >= DiagnosticSeverity.ERROR }
+      status =
+        if (!compiled.isUsable) "$asset did not compile; see diagnostics"
+        else if (errors > 0) "$asset compiled with $errors error(s)"
+        else "$asset compiled: ${compiled.diagnostics.size} diagnostic(s)"
+    } else {
+      chart.build(textEngine, dark)?.let { controller.setScene(it) }
+      status = "Tap a mark, drag to pan, pinch to zoom."
+    }
+  }
 
   MaterialTheme(colorScheme = if (dark) darkColorScheme() else lightColorScheme()) {
     Surface(modifier = Modifier.fillMaxSize()) {
@@ -93,7 +115,7 @@ private fun DemoScreen() {
           horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
           Text("Dark background")
-          Switch(checked = dark, onCheckedChange = { dark = it })
+          Switch(checked = dark, onCheckedChange = { dark = it }, enabled = !chart.isSpec)
           Button(onClick = { controller.resetViewport() }) { Text("Reset zoom") }
         }
 
@@ -118,7 +140,8 @@ private fun DemoScreen() {
           Button(
             onClick = {
               val file = File(context.cacheDir, "chart.svg")
-              file.writeText(scene.toSvg())
+              // Whatever is on screen, hand-authored or compiled — the exporters do not care which.
+              file.writeText(controller.snapshot.scene.toSvg())
               status = "Wrote SVG (${file.length()} bytes) to ${file.name}"
             }
           ) {
@@ -128,7 +151,7 @@ private fun DemoScreen() {
             onClick = {
               val export =
                 exporter.toPng(
-                  scene,
+                  controller.snapshot.scene,
                   BitmapExportOptions(width = 1200.0, height = 800.0, pixelScale = 2f),
                 )
               val file = File(context.cacheDir, "chart.png")
@@ -140,7 +163,12 @@ private fun DemoScreen() {
           }
           Button(
             onClick = {
-              val export = exporter.toPdf(scene, widthPoints = 1200.0, heightPoints = 800.0)
+              val export =
+                exporter.toPdf(
+                  controller.snapshot.scene,
+                  widthPoints = 1200.0,
+                  heightPoints = 800.0,
+                )
               val file = File(context.cacheDir, "chart.pdf")
               file.writeBytes(export.bytes)
               status = "Wrote PDF (${export.bytes.size} bytes), ${export.warnings.size} warnings"

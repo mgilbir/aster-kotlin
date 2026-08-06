@@ -68,9 +68,24 @@ constructor(context: Context, attrs: AttributeSet? = null, defStyleAttr: Int = 0
       invalidate()
     }
 
-  /** The text engine used for both measurement and drawing; pass it when compiling a scene. */
+  /**
+   * The engine this view measures and draws with. Use it to build a scene by hand.
+   *
+   * Do **not** hand it to a [VegaChartController] that compiles specifications off the main thread:
+   * this instance is in use whenever the view paints, and it keeps one shared `TextPaint`. Call
+   * [newCompatibleTextEngine] for that instead.
+   */
   public val chartTextEngine: AndroidTextEngine
     get() = textEngine
+
+  /**
+   * A second engine measuring exactly as this view's does, safe to use on another thread.
+   *
+   * Measurement depends only on the text style and the font scale, so two engines configured alike
+   * are interchangeable — which is what makes compiling on a background thread safe without either
+   * side locking. Two *threads* sharing one engine is what is not safe.
+   */
+  public fun newCompatibleTextEngine(): AndroidTextEngine = AndroidTextEngine()
 
   init {
     isFocusable = true

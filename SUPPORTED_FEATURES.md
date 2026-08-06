@@ -16,7 +16,7 @@ the scope note in STATUS.md for how much of upstream Vega remains.
 | Feature | Status | Tests | Known differences | Target milestone |
 | --- | --- | --- | --- | --- |
 | Hand-authored scene graph | Supported | `SampleScenes`, `SceneSnapshotTest` | Not a Vega input format | 1 |
-| Compiled Vega JSON | Partial | `SpecCompilerTest`, `BarFixtureDifferentialTest` | Parses and compiles the subset below, including signals, expressions, 12 transforms, nested group scopes, legends and titles. No group `layout`; it reports a diagnostic. `VegaChartController.setSpec` still reports not-implemented — the compiler is not wired into it yet | 3 |
+| Compiled Vega JSON | Partial | `SpecCompilerTest`, `BarFixtureDifferentialTest` | Parses and compiles the subset below, including signals, expressions, 12 transforms, nested group scopes, legends and titles. No group `layout`; it reports a diagnostic. Loaded through `VegaChartController.setSpec`, or `setSpecAsync` to compile off the calling thread | 3 |
 | Vega-Lite compilation | Not planned (first release) | — | Compile upstream via `oracle-js/src/compile-vega-lite.js` | — |
 | Generic JSON value model | Supported | `VegaValueTest`, `JsonBridgeTest` | Numbers are always `Double` | 0 |
 | Dotted / bracketed field paths | Supported | `VegaValueTest` | Malformed paths resolve to null rather than throwing | 0 |

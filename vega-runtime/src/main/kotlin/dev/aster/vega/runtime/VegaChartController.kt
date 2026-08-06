@@ -4,11 +4,18 @@ import dev.aster.vega.model.DiagnosticCodes
 import dev.aster.vega.model.DiagnosticSeverity
 import dev.aster.vega.model.VegaDiagnostic
 import dev.aster.vega.model.VegaValue
+import dev.aster.vega.runtime.compile.CompiledSpec
+import dev.aster.vega.runtime.compile.SpecCompiler
 import dev.aster.vega.scene.HitTestOptions
+import dev.aster.vega.scene.MetricTextEngine
 import dev.aster.vega.scene.PointD
 import dev.aster.vega.scene.Scene
 import dev.aster.vega.scene.SceneHitIndex
 import dev.aster.vega.scene.SceneNode
+import dev.aster.vega.scene.TextEngine
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -16,6 +23,9 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.withContext
 
 /** Immutable pair of scene plus interaction state, published to renderers as one unit. */
 public data class ChartSnapshot(
@@ -50,11 +60,25 @@ public data class ChartState(
  * (PROJECT_BRIEF.md 10.2). The controller itself does no Android work and no drawing; it holds
  * immutable state and hands it to whichever surface is rendering.
  *
- * Specification compilation arrives in Milestone 3. Until then [setScene] accepts hand-authored
- * scenes, which is exactly what Milestone 1 needs, and [setSpec] reports an explicit diagnostic
- * rather than silently rendering nothing.
+ * [setSpec] compiles a Vega specification; [setScene] accepts a hand-authored one. Both publish the
+ * same way, so a host does not care which produced the scene it is drawing.
+ *
+ * @param textEngine measures text while compiling a specification. It must be the same
+ *   implementation the surface draws with, or labels will not sit where the layout expected them
+ *   (docs/adr/0006) — and, for a platform engine, **not the same instance**, since compiling off
+ *   the main thread while that thread draws would race on the engine's shared paint.
+ *   `AndroidTextEngine` instances configured alike measure alike, so a second one is all this
+ *   needs.
  */
-public class VegaChartController(initialScene: Scene = Scene.empty()) {
+public class VegaChartController(
+  initialScene: Scene = Scene.empty(),
+  textEngine: TextEngine = MetricTextEngine(),
+) {
+
+  private val compiler = SpecCompiler(textEngine)
+
+  /** Serializes compilation, so one text engine is only ever used by one compile at a time. */
+  private val compileLock = Mutex()
 
   private var nextRevision = initialScene.revision + 1
 
@@ -133,22 +157,69 @@ public class VegaChartController(initialScene: Scene = Scene.empty()) {
       if (value > 0.0 && value.isFinite()) field = value
     }
 
+  /** The most recent compilation, so a host can read the scales and signals it resolved. */
+  public var lastCompiled: CompiledSpec? = null
+    private set
+
   /**
-   * Loads a compiled Vega specification.
+   * Compiles a Vega specification and publishes the scene it produces.
    *
-   * Not implemented before Milestone 3; reports `VEGA_TRANSFORM_NOT_IMPLEMENTED` rather than
-   * leaving the caller with a blank chart and no explanation.
+   * Runs on the calling thread. That is the right default — a specification with a few hundred
+   * marks compiles in well under a frame — but a large dataset does not belong on the main thread,
+   * and [setSpecAsync] exists for that.
+   *
+   * Diagnostics are **replaced**, not appended: they describe the specification now loaded, and
+   * carrying the previous one's complaints forward would make a fixed problem look unfixed.
+   *
+   * A specification that fails to produce a scene at all leaves the current chart alone rather than
+   * blanking it. The diagnostics say why, and a reader keeps the chart they were looking at.
    */
-  public fun setSpec(@Suppress("UNUSED_PARAMETER") json: String) {
-    report(
-      VegaDiagnostic(
-        severity = DiagnosticSeverity.ERROR,
-        code = DiagnosticCodes.TRANSFORM_NOT_IMPLEMENTED,
-        message =
-          "Vega specification compilation is not implemented yet (planned for Milestone 3). " +
-            "Use setScene() with a hand-authored scene until then.",
+  public fun setSpec(json: String): CompiledSpec = publish(compiler.compileJson(json))
+
+  /**
+   * Compiles a specification off the calling thread, then publishes on it.
+   *
+   * Compilations are serialized, so the text engine is only ever touched by one at a time. The host
+   * still must not hand this controller the engine its renderer draws with; see the class docs.
+   */
+  public suspend fun setSpecAsync(
+    json: String,
+    dispatcher: CoroutineDispatcher = Dispatchers.Default,
+  ): CompiledSpec {
+    _state.value = _state.value.copy(isLoading = true)
+    val compiled =
+      try {
+        compileLock.withLock { withContext(dispatcher) { compiler.compileJson(json) } }
+      } catch (e: CancellationException) {
+        _state.value = _state.value.copy(isLoading = false)
+        throw e
+      }
+    return publish(compiled)
+  }
+
+  private fun publish(compiled: CompiledSpec): CompiledSpec {
+    lastCompiled = compiled
+    _diagnostics.value = compiled.diagnostics
+    val scene = compiled.scene
+    if (scene == null) {
+      _state.value = _state.value.copy(isLoading = false, diagnostics = compiled.diagnostics)
+      return compiled
+    }
+    val revision = nextRevision++
+    val published = scene.copy(revision = revision)
+    hitIndex = SceneHitIndex(published, hitOptions)
+    _state.value =
+      ChartState(
+        snapshot =
+          ChartSnapshot(
+            scene = published,
+            interactionState = _state.value.snapshot.interactionState,
+            revision = revision,
+          ),
+        isLoading = false,
+        diagnostics = compiled.diagnostics,
       )
-    )
+    return compiled
   }
 
   public fun report(diagnostic: VegaDiagnostic) {
@@ -336,5 +407,14 @@ public class VegaChartController(initialScene: Scene = Scene.empty()) {
 
     /** Creates a controller for a hand-authored scene. */
     public fun fromScene(scene: Scene): VegaChartController = VegaChartController(scene)
+
+    /** Creates a controller and immediately loads [json], returning both it and the compilation. */
+    public fun fromSpec(
+      json: String,
+      textEngine: TextEngine = MetricTextEngine(),
+    ): Pair<VegaChartController, CompiledSpec> {
+      val controller = VegaChartController(textEngine = textEngine)
+      return controller to controller.setSpec(json)
+    }
   }
 }

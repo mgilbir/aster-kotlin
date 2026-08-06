@@ -2,6 +2,7 @@ package dev.aster.vega.runtime
 
 import dev.aster.vega.fixtures.SampleScenes
 import dev.aster.vega.model.DiagnosticCodes
+import dev.aster.vega.model.DiagnosticSeverity
 import dev.aster.vega.scene.PointD
 import dev.aster.vega.scene.RectNode
 import dev.aster.vega.scene.Scene
@@ -211,15 +212,101 @@ class VegaChartControllerTest {
     assertEquals(VectorD.Zero, controller.snapshot.interactionState.viewportOffset)
   }
 
+  // ---- loading a specification -------------------------------------------------
+
+  private val barSpec =
+    """
+    {
+      "width": 120, "height": 60, "padding": 0,
+      "data": [{"name": "t", "values": [{"c": "a", "v": 1}, {"c": "b", "v": 3}]}],
+      "scales": [
+        {"name": "x", "type": "band", "domain": {"data": "t", "field": "c"}, "range": "width"},
+        {"name": "y", "type": "linear", "domain": {"data": "t", "field": "v"}, "range": "height"}
+      ],
+      "marks": [{
+        "type": "rect", "from": {"data": "t"},
+        "encode": {"enter": {
+          "x": {"scale": "x", "field": "c"},
+          "width": {"scale": "x", "band": 1},
+          "y": {"scale": "y", "field": "v"},
+          "y2": {"scale": "y", "value": 0}
+        }}
+      }]
+    }
+    """
+      .trimIndent()
+
   @Test
-  fun `setSpec reports an explicit diagnostic instead of rendering nothing`() {
+  fun `setSpec compiles a specification and publishes its scene`() {
+    val controller = VegaChartController()
+    val compiled = controller.setSpec(barSpec)
+
+    assertTrue(compiled.isUsable)
+    assertEquals(2, controller.snapshot.scene.flatten().count { it.node is RectNode })
+    assertTrue(
+      controller.diagnostics.value.none { it.severity >= DiagnosticSeverity.ERROR },
+      controller.diagnostics.value.toString(),
+    )
+    // The scales it resolved are available to the host, which is how a caller inverts a position.
+    assertNotNull(controller.lastCompiled?.scales?.get("x"))
+  }
+
+  @Test
+  fun `a published spec is immediately hit testable`() {
+    // Publishing has to rebuild the hit index, or the first tap on a newly loaded chart misses.
+    val controller = VegaChartController()
+    controller.setSpec(barSpec)
+    val bar = controller.snapshot.scene.flatten().first { it.node is RectNode }
+    val box = bar.worldBounds
+    controller.dispatch(ChartInputEvent.Tap(PointD(box.centerX, box.centerY)))
+    assertEquals(setOf(bar.node.id), controller.snapshot.interactionState.selection.nodeIds)
+  }
+
+  @Test
+  fun `each load replaces the previous load's diagnostics`() {
+    // Carrying them forward would leave a fixed problem looking unfixed.
+    val controller = VegaChartController()
+    controller.setSpec(barSpec.replace("\"type\": \"rect\"", "\"type\": \"nonsense\""))
+    assertTrue(controller.diagnostics.value.isNotEmpty())
+
+    controller.setSpec(barSpec)
+    assertTrue(controller.diagnostics.value.isEmpty(), controller.diagnostics.value.toString())
+  }
+
+  @Test
+  fun `a specification that produces no scene leaves the chart alone and says why`() {
     val controller = VegaChartController.fromScene(scene)
-    controller.setSpec("{\"\$schema\": \"https://vega.github.io/schema/vega/v5.json\"}")
+    val before = controller.snapshot.scene
+    val compiled = controller.setSpec("not json at all")
 
-    val diagnostic = controller.diagnostics.value.single()
-    assertEquals(DiagnosticCodes.TRANSFORM_NOT_IMPLEMENTED, diagnostic.code)
-    assertTrue(diagnostic.message.contains("Milestone 3"))
+    assertFalse(compiled.isUsable)
+    assertEquals(before, controller.snapshot.scene, "the chart on screen should not be blanked")
+    assertTrue(controller.diagnostics.value.any { it.severity >= DiagnosticSeverity.ERROR })
+    assertFalse(controller.state.value.isLoading)
+  }
 
+  @Test
+  fun `setSpecAsync compiles off the caller's thread and clears the loading flag`() = runTest {
+    val controller = VegaChartController()
+    val compiled = controller.setSpecAsync(barSpec, UnconfinedTestDispatcher(testScheduler))
+    assertTrue(compiled.isUsable)
+    assertFalse(controller.state.value.isLoading)
+    assertEquals(2, controller.snapshot.scene.flatten().count { it.node is RectNode })
+  }
+
+  @Test
+  fun `loading a spec bumps the revision so a view knows to repaint`() {
+    val controller = VegaChartController.fromScene(scene)
+    val before = controller.snapshot.revision
+    controller.setSpec(barSpec)
+    assertTrue(controller.snapshot.revision > before)
+  }
+
+  @Test
+  fun `diagnostics can still be cleared by hand`() {
+    val controller = VegaChartController()
+    controller.setSpec("not json at all")
+    assertTrue(controller.diagnostics.value.isNotEmpty())
     controller.clearDiagnostics()
     assertTrue(controller.diagnostics.value.isEmpty())
   }

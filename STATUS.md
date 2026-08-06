@@ -73,7 +73,7 @@ substantive compatibility items:
 
 | MVP criterion | State |
 | --- | --- |
-| 1. Compiled Vega JSON loads without JavaScript | Partial — a substantial subset compiles, including expressions, signals and 12 transforms |
+| 1. Compiled Vega JSON loads without JavaScript | **Yes**, for a substantial subset — `VegaChartController.setSpec` loads it and the demo renders three bundled specifications on device |
 | 2. Bar, line, area, scatter, stacked bar render natively | **Yes** — all five compile from a specification, and small multiples of them too |
 | 3. Axes, legends, labels and titles supported | **Yes** — all four |
 | 4. Basic transforms and scales execute in Kotlin | **Yes** — 8 scale types and the 12 transforms the brief lists |
@@ -155,6 +155,15 @@ ordering), and the pipeline is now verified end to end on one fixture, but the b
   joinaggregate, bin, stack, fold, flatten — with the bin step algorithm ported from vega-statistics.
 - **Full CSS named-colour table**, replacing a subset that silently failed on `firebrick`.
 
+### Milestone 5 (in progress) — the specification reaches the screen
+
+- **`VegaChartController.setSpec`** compiles a specification and publishes its scene, rebuilding the
+  hit index so a newly loaded chart is tappable straight away. `setSpecAsync` moves compilation off
+  the caller's thread.
+- **The demo loads three bundled specifications** from its assets — the same fixtures the differential
+  tests compare against upstream — so what the device draws is what was proved correct.
+- **`scripts/emulator.sh`** starts the project AVD with a window and installs the demo.
+
 ### Milestone 3 (in progress) — scales, specification parsing and the differential harness
 
 - **Tick generation** ported from d3-array, including the negative-reciprocal `tickIncrement`
@@ -194,13 +203,18 @@ ordering), and the pipeline is now verified end to end on one fixture, but the b
 
 ## Verification
 
-- 636 JVM tests pass (`./scripts/test-core.sh`, `./gradlew test`).
+- 642 JVM tests pass (`./scripts/test-core.sh`, `./gradlew test`).
 - Android lint is clean with `warningsAsErrors` on every Android module.
-- 47 instrumented tests pass on an API 37 arm64 emulator (`./scripts/test-android.sh`): 40 in
-  `vega-android-canvas`, 4 in `vega-compose`, 3 in `demo`.
-- The demo was installed and driven on the emulator: all six chart entries render, marks are
+- 48 instrumented tests pass on an API 37 arm64 emulator (`./scripts/test-android.sh`): 40 in
+  `vega-android-canvas`, 4 in `vega-compose`, 4 in `demo` — including one that compiles every bundled
+  specification with the device's own font metrics, which the differential tests cannot cover because
+  they deliberately measure text upstream's way.
+- The demo was installed and driven on the emulator: all nine chart entries render, marks are
   selectable by tap, light and dark palettes are legible, and SVG/PNG/PDF export all wrote files with
-  zero warnings. Screenshots are under `build/artifacts/`.
+  zero warnings. The three specification entries load Vega JSON from assets, compile it on a
+  background thread and report zero diagnostics; tapping a bar on a compiled chart selects it, which
+  is what proves the hit index is rebuilt when a specification is published. `scripts/emulator.sh`
+  starts the AVD with a window and installs the demo, for looking at rather than only asserting on.
 
 Four defects were found by running on a device rather than by the test suite, and all four are fixed
 with regression tests:
@@ -269,13 +283,17 @@ The performance targets in PROJECT_BRIEF.md 19 are therefore all unverified.
    derives. That is the simplest correct arrangement for one surface per controller, but it becomes
    wrong the moment two surfaces of different sizes share a controller. Decide whether the transform
    belongs in a per-surface object when the Compose `DrawScope` backend is considered (Milestone 8).
-4. **Wiring the compiler into the controller.** `SpecCompiler` works, but `VegaChartController.setSpec`
-   still reports not-implemented. Connecting them means deciding where compilation runs (it must not be
-   on the main thread for large data) and how diagnostics reach `controller.diagnostics`. Deliberately
-   deferred until transforms exist, so the threading decision is made against a realistic workload.
-5. **Text measurement on the compile thread.** `AndroidTextEngine` is not thread-safe. If scene
-   compilation moves off the main thread, either the engine needs per-thread instances or measurement
-   needs to be hoisted into a separate pass. Decide with Milestone 5.
+4. ~~**Wiring the compiler into the controller.**~~ **Settled.** `setSpec` compiles on the calling
+   thread and `setSpecAsync` compiles on a dispatcher, with compilations serialized so one text engine
+   is only ever used by one at a time. Diagnostics *replace* rather than accumulate, since they
+   describe the specification now loaded. A specification that produces no scene leaves the chart
+   alone and explains why, rather than blanking it.
+5. ~~**Text measurement on the compile thread.**~~ **Settled**, by the cheapest correct route:
+   per-instance ownership rather than locking. `AndroidTextEngine` keeps one shared `TextPaint` and
+   the renderer hands it out mid-draw, so a lock inside the engine would not have helped. Instead a
+   controller that compiles gets its own instance — `VegaChartView.newCompatibleTextEngine()` makes
+   that the easy thing to do — and two instances configured alike measure alike, so the layouts still
+   match what the surface draws.
 
 ## Deviations from PROJECT_BRIEF.md
 
@@ -303,11 +321,10 @@ The performance targets in PROJECT_BRIEF.md 19 are therefore all unverified.
 
 ## Next three tasks
 
-1. **Wire the compiler into `VegaChartController.setSpec`.** Every guide a chart needs now compiles,
-   and the demo still renders hand-authored scenes — the one thing a user of this library would try
-   first still reports not-implemented. The open questions are where compilation runs (it must not be
-   the main thread for large data) and how diagnostics reach `controller.diagnostics`; both were
-   deliberately deferred until there was a realistic workload to decide against, and there now is.
+1. **Grow the fixture corpus.** The pipeline is now end to end — JSON in, chart on a device — and 8 of
+   the brief's 100 fixtures pass. Every fixture so far has found something no unit test would have:
+   an upside-down trellis, a whole wrong symbol table, nine units of phantom chart. That rate is the
+   argument for making this the priority over any single new feature.
 2. **Grid layout, shared by group `layout` and legend entry columns.** The automatic trellis grid —
    `layout` with columns, padding, headers — and a legend's multi-column entry grid are the same row
    and column algorithm, and both are currently reported. Doing them together is why this is one task
