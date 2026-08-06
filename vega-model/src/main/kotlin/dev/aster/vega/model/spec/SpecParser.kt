@@ -56,6 +56,7 @@ public class SpecParser {
         padding = parsePadding(root.fields["padding"], "$.padding"),
         autosize = parseAutosize(root.fields["autosize"], "$.autosize"),
         background = root.fields["background"]?.takeIf { it is VegaValue.Str }?.asString(),
+        signals = parseArray(root, "signals") { value, path -> parseSignal(value, path) },
         data = parseArray(root, "data") { value, path -> parseData(value, path) },
         scales = parseArray(root, "scales") { value, path -> parseScale(value, path) },
         axes = parseArray(root, "axes") { value, path -> parseAxis(value, path) },
@@ -77,7 +78,6 @@ public class SpecParser {
   private fun reportUnsupportedTopLevel(root: VegaValue.Obj) {
     val unsupported =
       mapOf(
-        "signals" to "Signals require the expression evaluator",
         "legends" to "Legend generation is not implemented",
         "title" to "Title generation is not implemented",
         "projections" to "Geographic projections are out of scope",
@@ -96,6 +96,48 @@ public class SpecParser {
         jsonPath = "$.$key",
       )
     }
+  }
+
+  // ---- signals --------------------------------------------------------------
+
+  private fun parseSignal(value: VegaValue, path: String): SignalSpec? {
+    val obj = value as? VegaValue.Obj ?: return unexpected("a signal definition", path)
+    val name = obj.fields["name"]?.asString()
+    if (name.isNullOrEmpty()) {
+      diagnostics.error(
+        DiagnosticCodes.PARSE_MISSING_PROPERTY,
+        "A signal needs a name",
+        jsonPath = path,
+      )
+      return null
+    }
+
+    val on = (obj.fields["on"] as? VegaValue.Arr)?.values ?: emptyList()
+    if (on.isNotEmpty()) {
+      diagnostics.warn(
+        DiagnosticCodes.PARSE_UNKNOWN_PROPERTY,
+        "Event-stream handlers need the interaction system; signal '$name' will keep its " +
+          "initial value and never update",
+        jsonPath = "$path.on",
+      )
+    }
+    if (obj.fields["bind"] != null) {
+      diagnostics.warn(
+        DiagnosticCodes.PARSE_UNKNOWN_PROPERTY,
+        "Signal bindings create input widgets, which have no equivalent here; signal '$name' " +
+          "will keep its initial value",
+        jsonPath = "$path.bind",
+      )
+    }
+
+    return SignalSpec(
+      name = name,
+      value = obj.fields["value"],
+      init = obj.fields["init"]?.asString(),
+      update = obj.fields["update"]?.asString(),
+      on = on,
+      bind = obj.fields["bind"],
+    )
   }
 
   private fun parsePadding(value: VegaValue?, path: String): Padding =
@@ -464,25 +506,32 @@ public class SpecParser {
   }
 
   private fun parseChannel(channel: String, value: VegaValue, path: String): ChannelValue? {
-    // Vega allows an array of conditional productions; only a single definition is supported.
+    // Vega allows an array of conditional productions, each optionally guarded by a `test`
+    // expression; the first passing entry wins and a trailing unguarded entry is the default.
     if (value is VegaValue.Arr) {
-      diagnostics.error(
-        DiagnosticCodes.EXPRESSION_UNSUPPORTED_FUNCTION,
-        "Conditional encode rules need expression support; channel '$channel' was ignored",
-        jsonPath = path,
-      )
-      return null
+      val rules =
+        value.values.mapIndexedNotNull { index, rule ->
+          val ruleObj = rule as? VegaValue.Obj
+          val test = ruleObj?.fields?.get("test")?.asString()
+          val production =
+            parseChannel(channel, rule, "$path[$index]") ?: return@mapIndexedNotNull null
+          ConditionalRule(test, production)
+        }
+      if (rules.isEmpty()) {
+        diagnostics.warn(
+          DiagnosticCodes.PARSE_UNKNOWN_PROPERTY,
+          "Channel '$channel' has no usable production rules",
+          jsonPath = path,
+        )
+        return null
+      }
+      return ChannelValue.Conditional(rules)
     }
     val obj =
       value as? VegaValue.Obj ?: return ChannelValue.Constant(value) // a bare literal is a constant
 
     obj.fields["signal"]?.let {
-      diagnostics.error(
-        DiagnosticCodes.EXPRESSION_UNSUPPORTED_FUNCTION,
-        "Signal expressions are not implemented; channel '$channel' was ignored",
-        jsonPath = "$path.signal",
-      )
-      return null
+      return ChannelValue.Signal(it.asString())
     }
 
     val scale = obj.fields["scale"]

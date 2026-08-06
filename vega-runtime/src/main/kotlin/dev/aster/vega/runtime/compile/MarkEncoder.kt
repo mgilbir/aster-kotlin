@@ -1,5 +1,11 @@
 package dev.aster.vega.runtime.compile
 
+import dev.aster.vega.expression.CachingExpressionCompiler
+import dev.aster.vega.expression.ExpressionCompiler
+import dev.aster.vega.expression.ExpressionEvaluationException
+import dev.aster.vega.expression.ExpressionResult
+import dev.aster.vega.expression.JsSemantics
+import dev.aster.vega.expression.VegaExpressionCompiler
 import dev.aster.vega.model.DiagnosticCodes
 import dev.aster.vega.model.DiagnosticCollector
 import dev.aster.vega.model.VegaValue
@@ -37,6 +43,9 @@ public class MarkEncoder(
   private val scales: Map<String, VegaScale>,
   private val ids: SceneNodeIdAllocator,
   private val diagnostics: DiagnosticCollector,
+  /** Signals and datasets expressions can read. */
+  private val scope: SignalScope = SignalScope(emptyMap(), emptyMap()),
+  private val expressions: ExpressionCompiler = CachingExpressionCompiler(VegaExpressionCompiler()),
 ) {
 
   public fun encode(spec: MarkSpec, data: List<VegaValue>): List<SceneNode> =
@@ -137,9 +146,59 @@ public class MarkEncoder(
       null -> null
       is ChannelValue.Constant -> channel.value.asDouble().takeIf { !it.isNaN() }
       is ChannelValue.Field -> datum.field(channel.path).asDouble().takeIf { !it.isNaN() }
-      is ChannelValue.Signal -> null // reported by the parser
+      is ChannelValue.Signal ->
+        evaluateExpression(channel.expression, datum)?.asDouble()?.takeIf { !it.isNaN() }
+      is ChannelValue.Conditional -> position(selectRule(channel, datum), datum)
       is ChannelValue.Scaled -> scaledPosition(channel, datum)
     }
+
+  /**
+   * Evaluates an expression against a datum, reporting a failure once rather than per datum.
+   *
+   * Returns `null` on failure so the caller can leave the channel unset, which is what Vega does
+   * with an expression that throws.
+   */
+  private fun evaluateExpression(source: String, datum: VegaValue): VegaValue? =
+    when (val compiled = expressions.compile(source)) {
+      is ExpressionResult.Failed -> {
+        reportOnce(source, compiled.diagnostic)
+        null
+      }
+      is ExpressionResult.Compiled ->
+        try {
+          compiled.expression.evaluate(scope.withDatum(datum))
+        } catch (e: ExpressionEvaluationException) {
+          reportOnce(source, e.diagnostic)
+          null
+        }
+    }
+
+  /**
+   * An expression that fails fails for every datum, so report it once.
+   *
+   * Without this a 10,000-row dataset would produce 10,000 identical diagnostics and bury
+   * everything else.
+   */
+  private fun reportOnce(source: String, diagnostic: dev.aster.vega.model.VegaDiagnostic) {
+    if (reported.add(source)) diagnostics.add(diagnostic)
+  }
+
+  private val reported = mutableSetOf<String>()
+
+  /**
+   * Picks the first production rule whose `test` passes.
+   *
+   * An untested rule always passes, so a trailing one is the default. If every test fails and there
+   * is no default, the channel is left unset — as upstream does.
+   */
+  private fun selectRule(channel: ChannelValue.Conditional, datum: VegaValue): ChannelValue? {
+    for (rule in channel.rules) {
+      val test = rule.test ?: return rule.production
+      val result = evaluateExpression(test, datum) ?: continue
+      if (JsSemantics.truthy(result)) return rule.production
+    }
+    return null
+  }
 
   private fun scaledPosition(channel: ChannelValue.Scaled, datum: VegaValue): Double? {
     val scale = scales[channel.scale]
@@ -186,7 +245,9 @@ public class MarkEncoder(
       is ChannelValue.Constant -> channel.value.asDouble().takeIf { !it.isNaN() }
       is ChannelValue.Field -> datum.field(channel.path).asDouble().takeIf { !it.isNaN() }
       is ChannelValue.Scaled -> scaledPosition(channel, datum)
-      is ChannelValue.Signal -> null
+      is ChannelValue.Signal ->
+        evaluateExpression(channel.expression, datum)?.asDouble()?.takeIf { !it.isNaN() }
+      is ChannelValue.Conditional -> number(selectRule(channel, datum), datum)
     }
 
   private fun paint(
@@ -213,7 +274,12 @@ public class MarkEncoder(
           val input = channel.field?.let { datum.field(it) } ?: channel.value ?: return null
           scale.scale(input).asString()
         }
-        is ChannelValue.Signal -> return null
+        is ChannelValue.Signal ->
+          evaluateExpression(channel.expression, datum)?.asString() ?: return null
+        is ChannelValue.Conditional -> {
+          val selected = selectRule(channel, datum) ?: return null
+          return paint(selected, datum, channelName, spec)
+        }
       }
     val colour = SceneColor.parse(text)
     if (colour == null) {

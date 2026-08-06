@@ -130,13 +130,23 @@ class SpecCompilerTest {
   }
 
   @Test
-  fun `signal expressions are reported and the channel is dropped`() {
+  fun `a signal expression in an encoding is evaluated, not rejected`() {
+    // Signals used to be rejected here; they now compile. SignalCompileTest covers the behaviour,
+    // so
+    // this only guards against a regression to reporting them as unsupported.
     val withSignal =
-      minimalBar.replace(
-        """{"value": "steelblue"}""",
-        """{"signal": "datum.v > 1 ? 'red' : 'blue'}"}""",
-      )
-    assertTrue(codes(withSignal).contains(DiagnosticCodes.EXPRESSION_UNSUPPORTED_FUNCTION))
+      minimalBar.replace("""{"value": "steelblue"}""", """{"signal": "'steelblue'"}""")
+    val compiled = compile(withSignal)
+    assertTrue(
+      compiled.diagnostics.none { it.code == DiagnosticCodes.EXPRESSION_UNSUPPORTED_FUNCTION },
+      compiled.diagnostics.toString(),
+    )
+  }
+
+  @Test
+  fun `a malformed encoding expression is reported`() {
+    val broken = minimalBar.replace("""{"value": "steelblue"}""", """{"signal": "1 +"}""")
+    assertTrue(codes(broken).contains(DiagnosticCodes.EXPRESSION_PARSE_ERROR))
   }
 
   @Test
@@ -167,17 +177,17 @@ class SpecCompilerTest {
   }
 
   @Test
-  fun `legends, titles and signals at the top level are reported`() {
+  fun `legends and titles at the top level are reported`() {
     val extras =
       minimalBar.replace(
         "\"marks\":",
-        "\"signals\": [{\"name\": \"s\", \"value\": 1}], " +
-          "\"legends\": [{\"fill\": \"x\"}], \"title\": \"A chart\", \"marks\":",
+        "\"legends\": [{\"fill\": \"x\"}], \"title\": \"A chart\", \"marks\":",
       )
     val messages = compile(extras).diagnostics.map { it.message }
-    assertTrue(messages.any { it.contains("signals") }, messages.toString())
     assertTrue(messages.any { it.contains("legends") }, messages.toString())
     assertTrue(messages.any { it.contains("title") }, messages.toString())
+    // Signals are no longer in that list; they compile.
+    assertTrue(messages.none { it.contains("Signals require") }, messages.toString())
   }
 
   @Test

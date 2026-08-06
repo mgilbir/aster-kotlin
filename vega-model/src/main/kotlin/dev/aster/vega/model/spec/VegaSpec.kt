@@ -19,11 +19,35 @@ public data class VegaSpec(
   val padding: Padding,
   val autosize: Autosize,
   val background: String?,
+  val signals: List<SignalSpec>,
   val data: List<DataSpec>,
   val scales: List<ScaleSpec>,
   val axes: List<AxisSpec>,
   val marks: List<MarkSpec>,
 )
+
+/**
+ * A named signal.
+ *
+ * Vega resolves a signal's value as `update` if present, otherwise `init`, otherwise `value` —
+ * verified against upstream, where `{value: 5, update: "99"}` yields 99. Resolution follows
+ * dependency order, not declaration order.
+ *
+ * @param on event-stream handlers, which need the interaction system and are reported as
+ *   unsupported.
+ */
+public data class SignalSpec(
+  val name: String,
+  val value: VegaValue? = null,
+  val init: String? = null,
+  val update: String? = null,
+  val on: List<VegaValue> = emptyList(),
+  val bind: VegaValue? = null,
+) {
+  /** The expression that produces this signal's value for a static render, if any. */
+  public val expression: String?
+    get() = update ?: init
+}
 
 /** Space around the chart. Vega accepts a single number or per-side values. */
 public data class Padding(
@@ -264,7 +288,18 @@ public sealed interface ChannelValue {
   ) : ChannelValue
 
   public data class Signal(val expression: String) : ChannelValue
+
+  /**
+   * An array of production rules, as in `[{"test": "...", "value": 1}, {"value": 0}]`.
+   *
+   * The first rule whose test passes wins; a rule with no test always passes, so a trailing
+   * unguarded rule acts as the default.
+   */
+  public data class Conditional(val rules: List<ConditionalRule>) : ChannelValue
 }
+
+/** One entry in a [ChannelValue.Conditional]. A `null` [test] always passes. */
+public data class ConditionalRule(val test: String?, val production: ChannelValue)
 
 public typealias EncodeEntry = Map<String, ChannelValue>
 

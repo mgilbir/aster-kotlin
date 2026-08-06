@@ -1,5 +1,7 @@
 package dev.aster.vega.runtime.compile
 
+import dev.aster.vega.expression.CachingExpressionCompiler
+import dev.aster.vega.expression.VegaExpressionCompiler
 import dev.aster.vega.model.DiagnosticCodes
 import dev.aster.vega.model.DiagnosticCollector
 import dev.aster.vega.model.VegaDiagnostic
@@ -26,6 +28,8 @@ import dev.aster.vega.scene.Transform2D
 public data class CompiledSpec(
   val scene: Scene?,
   val scales: Map<String, VegaScale>,
+  /** Resolved signal values, including the implicit `width`, `height` and `padding`. */
+  val signals: SignalScope,
   val diagnostics: List<VegaDiagnostic>,
 ) {
   public val isUsable: Boolean
@@ -50,7 +54,8 @@ public class SpecCompiler(private val textEngine: TextEngine = MetricTextEngine(
 
   public fun compileJson(json: String): CompiledSpec {
     val parsed = SpecParser().parseJson(json)
-    val spec = parsed.spec ?: return CompiledSpec(null, emptyMap(), parsed.diagnostics)
+    val spec =
+      parsed.spec ?: return CompiledSpec(null, emptyMap(), EMPTY_SIGNALS, parsed.diagnostics)
     val compiled = compile(spec)
     // Parse diagnostics come first so a reader sees problems in specification order.
     return compiled.copy(diagnostics = parsed.diagnostics + compiled.diagnostics)
@@ -71,10 +76,32 @@ public class SpecCompiler(private val textEngine: TextEngine = MetricTextEngine(
     val plot = PlotSize(width, height)
 
     val datasets = resolveData(spec.data, diagnostics)
+
+    // Vega exposes width, height and padding as implicit signals, so expressions can size things
+    // relative to the chart. Verified: a signal with `update: "width/2"` resolves without declaring
+    // width itself.
+    val implicitSignals =
+      mapOf(
+        "width" to VegaValue.Num(width),
+        "height" to VegaValue.Num(height),
+        "padding" to
+          VegaValue.Obj(
+            linkedMapOf(
+              "left" to VegaValue.Num(spec.padding.left),
+              "top" to VegaValue.Num(spec.padding.top),
+              "right" to VegaValue.Num(spec.padding.right),
+              "bottom" to VegaValue.Num(spec.padding.bottom),
+            )
+          ),
+      )
+    val expressions = CachingExpressionCompiler(VegaExpressionCompiler())
+    val signals =
+      SignalResolver(diagnostics, expressions).resolve(spec.signals, datasets, implicitSignals)
+
     val scales = ScaleResolver(datasets, plot, diagnostics).resolve(spec.scales)
 
     val axisBuilder = AxisBuilder(scales, ids, textEngine, diagnostics)
-    val markEncoder = MarkEncoder(scales, ids, diagnostics)
+    val markEncoder = MarkEncoder(scales, ids, diagnostics, signals, expressions)
 
     val children = mutableListOf<SceneNode>()
     // Vega draws axes below marks unless an axis opts into a higher zindex.
@@ -93,7 +120,7 @@ public class SpecCompiler(private val textEngine: TextEngine = MetricTextEngine(
       )
 
     val scene = layout(spec, content, plot, ids, diagnostics)
-    return CompiledSpec(scene, scales, diagnostics.diagnostics)
+    return CompiledSpec(scene, scales, signals, diagnostics.diagnostics)
   }
 
   private fun encodeMark(
@@ -246,6 +273,8 @@ public class SpecCompiler(private val textEngine: TextEngine = MetricTextEngine(
   }
 
   public companion object {
+    private val EMPTY_SIGNALS = SignalScope(emptyMap(), emptyMap())
+
     public const val DEFAULT_WIDTH: Double = 200.0
     public const val DEFAULT_HEIGHT: Double = 200.0
   }
