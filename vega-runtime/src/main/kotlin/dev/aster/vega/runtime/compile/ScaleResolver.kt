@@ -32,6 +32,8 @@ public class ScaleResolver(
   private val datasets: Map<String, List<VegaValue>>,
   private val size: PlotSize,
   private val diagnostics: DiagnosticCollector,
+  /** Resolves scale properties that a specification supplied as signals. */
+  private val numbers: NumberResolver,
 ) {
 
   public fun resolve(specs: List<ScaleSpec>): Map<String, VegaScale> {
@@ -101,14 +103,14 @@ public class ScaleResolver(
     val range = numericRange(spec) ?: return null
     val domain = discreteDomain(spec.domain, spec.name) ?: return null
     // `padding` is shorthand for both inner and outer; explicit values win.
-    val padding = spec.padding
+    val padding = numbers.resolve(spec.padding, spec.name)
     return BandScale(
       name = spec.name,
       domain = if (spec.reverse) domain.reversed() else domain,
       range = range,
-      paddingInner = spec.paddingInner ?: padding ?: 0.0,
-      paddingOuter = spec.paddingOuter ?: padding ?: 0.0,
-      align = spec.align ?: 0.5,
+      paddingInner = numbers.resolve(spec.paddingInner, spec.name) ?: padding ?: 0.0,
+      paddingOuter = numbers.resolve(spec.paddingOuter, spec.name) ?: padding ?: 0.0,
+      align = numbers.resolve(spec.align, spec.name) ?: 0.5,
       round = spec.round,
     )
   }
@@ -120,8 +122,11 @@ public class ScaleResolver(
       name = spec.name,
       domain = if (spec.reverse) domain.reversed() else domain,
       range = range,
-      padding = spec.paddingOuter ?: spec.padding ?: 0.0,
-      align = spec.align ?: 0.5,
+      padding =
+        numbers.resolve(spec.paddingOuter, spec.name)
+          ?: numbers.resolve(spec.padding, spec.name)
+          ?: 0.0,
+      align = numbers.resolve(spec.align, spec.name) ?: 0.5,
       round = spec.round,
     )
   }

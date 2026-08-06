@@ -27,6 +27,19 @@ public data class VegaSpec(
 )
 
 /**
+ * A numeric property that may be written directly or supplied by a signal.
+ *
+ * Vega allows `{"signal": "..."}` almost anywhere a literal is accepted, so a parser that only
+ * reads numbers silently drops those and the chart lays out with a default. Modelling both forms
+ * keeps the substitution visible.
+ */
+public sealed interface NumberValue {
+  public data class Constant(val value: Double) : NumberValue
+
+  public data class Signal(val expression: String) : NumberValue
+}
+
+/**
  * A named signal.
  *
  * Vega resolves a signal's value as `update` if present, otherwise `init`, otherwise `value` —
@@ -182,10 +195,10 @@ public data class ScaleSpec(
   val niceCount: Int? = null,
   /** `null` means "not stated", which matters because the default differs by scale type. */
   val zero: Boolean? = null,
-  val padding: Double? = null,
-  val paddingInner: Double? = null,
-  val paddingOuter: Double? = null,
-  val align: Double? = null,
+  val padding: NumberValue? = null,
+  val paddingInner: NumberValue? = null,
+  val paddingOuter: NumberValue? = null,
+  val align: NumberValue? = null,
 )
 
 public enum class Orient {
@@ -217,11 +230,11 @@ public data class AxisSpec(
   val ticks: Boolean = true,
   val labels: Boolean = true,
   val domainLine: Boolean = true,
-  val tickCount: Int? = null,
-  val tickSize: Double? = null,
-  val labelPadding: Double? = null,
-  val labelFontSize: Double? = null,
-  val offset: Double = 0.0,
+  val tickCount: NumberValue? = null,
+  val tickSize: NumberValue? = null,
+  val labelPadding: NumberValue? = null,
+  val labelFontSize: NumberValue? = null,
+  val offset: NumberValue? = null,
   val zindex: Int = 0,
 )
 

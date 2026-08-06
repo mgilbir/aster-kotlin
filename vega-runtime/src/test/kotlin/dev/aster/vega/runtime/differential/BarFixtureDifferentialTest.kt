@@ -19,6 +19,18 @@ import org.junit.jupiter.api.Test
  */
 class BarFixtureDifferentialTest {
 
+  /** Named so a failure says which fixture disagreed. */
+  private fun fixture(
+    name: String
+  ): Pair<Differential.Reference, dev.aster.vega.runtime.compile.CompiledSpec> {
+    val spec = File(repositoryRoot, "test-fixtures/specs/$name.vg.json")
+    val reference =
+      Differential.readReference(
+        File(repositoryRoot, "test-fixtures/reference/$name.reference.json")
+      )
+    return reference to SpecCompiler(VegaHeadlessTextEngine()).compileJson(spec.readText())
+  }
+
   private val repositoryRoot = File(System.getProperty("user.dir")).parentFile
   private val specFile = File(repositoryRoot, "test-fixtures/specs/bar.vg.json")
   private val referenceFile = File(repositoryRoot, "test-fixtures/reference/bar.reference.json")
@@ -113,6 +125,37 @@ class BarFixtureDifferentialTest {
      * that a real layout regression cannot hide behind it.
      */
     const val AXIS_BOUNDS_TOLERANCE = 1.0
+  }
+
+  // ---- second fixture: transforms, signals and conditional encodings ---------
+
+  @Test
+  fun `the stacked bar fixture compiles without errors`() {
+    val (_, compiled) = fixture("stacked-bar")
+    val serious = compiled.diagnostics.filter { it.severity >= DiagnosticSeverity.ERROR }
+    assertTrue(serious.isEmpty(), "expected a clean compile; got:\n${serious.joinToString("\n")}")
+  }
+
+  @Test
+  fun `the stacked bar fixture's scales match upstream`() {
+    val (reference, compiled) = fixture("stacked-bar")
+    val differences = Differential.compareScales(reference.scales, compiled.scales)
+    assertTrue(differences.isEmpty(), "scale differences:\n${differences.joinToString("\n")}")
+  }
+
+  @Test
+  fun `the stacked bar fixture's marks match upstream`() {
+    val (reference, compiled) = fixture("stacked-bar")
+    val ours = Differential.flattenScene(requireNotNull(compiled.scene))
+    val differences = Differential.compareMarks(reference.marks, ours)
+    assertTrue(
+      differences.isEmpty(),
+      buildString {
+        append("compiled ${ours.size} marks, upstream had ${reference.marks.size}\n")
+        append("${differences.size} difference(s), first 25:\n")
+        differences.take(25).forEach { append("  ").append(it).append('\n') }
+      },
+    )
   }
 
   @Test

@@ -276,10 +276,10 @@ public class SpecParser {
       nice = parseNice(obj.fields["nice"], "$path.nice"),
       niceCount = (obj.fields["nice"] as? VegaValue.Num)?.value?.toInt(),
       zero = obj.fields["zero"]?.asBoolean(),
-      padding = obj.optionalNumber("padding", "$path.padding"),
-      paddingInner = obj.optionalNumber("paddingInner", "$path.paddingInner"),
-      paddingOuter = obj.optionalNumber("paddingOuter", "$path.paddingOuter"),
-      align = obj.optionalNumber("align", "$path.align"),
+      padding = obj.numberOrSignal("padding", "$path.padding"),
+      paddingInner = obj.numberOrSignal("paddingInner", "$path.paddingInner"),
+      paddingOuter = obj.numberOrSignal("paddingOuter", "$path.paddingOuter"),
+      align = obj.numberOrSignal("align", "$path.align"),
     )
   }
 
@@ -406,11 +406,11 @@ public class SpecParser {
       ticks = obj.fields["ticks"]?.asBoolean() ?: true,
       labels = obj.fields["labels"]?.asBoolean() ?: true,
       domainLine = obj.fields["domain"]?.asBoolean() ?: true,
-      tickCount = (obj.fields["tickCount"] as? VegaValue.Num)?.value?.toInt(),
-      tickSize = obj.optionalNumber("tickSize", "$path.tickSize"),
-      labelPadding = obj.optionalNumber("labelPadding", "$path.labelPadding"),
-      labelFontSize = obj.optionalNumber("labelFontSize", "$path.labelFontSize"),
-      offset = obj.optionalNumber("offset", "$path.offset") ?: 0.0,
+      tickCount = obj.numberOrSignal("tickCount", "$path.tickCount"),
+      tickSize = obj.numberOrSignal("tickSize", "$path.tickSize"),
+      labelPadding = obj.numberOrSignal("labelPadding", "$path.labelPadding"),
+      labelFontSize = obj.numberOrSignal("labelFontSize", "$path.labelFontSize"),
+      offset = obj.numberOrSignal("offset", "$path.offset"),
       zindex = (obj.fields["zindex"] as? VegaValue.Num)?.value?.toInt() ?: 0,
     )
   }
@@ -617,6 +617,36 @@ public class SpecParser {
       jsonPath = path,
     )
     return null
+  }
+
+  /**
+   * Reads a numeric property that Vega allows to be a signal.
+   *
+   * Returning `null` for an absent property lets the caller apply its own default, which differs by
+   * property, rather than baking one in here.
+   */
+  private fun VegaValue.Obj.numberOrSignal(key: String, path: String): NumberValue? {
+    val value = fields[key] ?: return null
+    if (value is VegaValue.Obj) {
+      val signal = value.fields["signal"]?.asString()
+      if (signal != null) return NumberValue.Signal(signal)
+      diagnostics.warn(
+        DiagnosticCodes.PARSE_UNKNOWN_PROPERTY,
+        "'$key' must be a number or a signal reference",
+        jsonPath = path,
+      )
+      return null
+    }
+    val number = value.asDouble()
+    if (number.isNaN()) {
+      diagnostics.warn(
+        DiagnosticCodes.PARSE_UNKNOWN_PROPERTY,
+        "'$key' must be a number, found ${value.asString()}",
+        jsonPath = path,
+      )
+      return null
+    }
+    return NumberValue.Constant(number)
   }
 
   private fun VegaValue.Obj.optionalNumber(key: String, path: String): Double? {

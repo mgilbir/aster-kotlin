@@ -41,6 +41,8 @@ public class AxisBuilder(
   private val ids: SceneNodeIdAllocator,
   private val textEngine: TextEngine,
   private val diagnostics: DiagnosticCollector,
+  /** Resolves axis properties that a specification supplied as signals. */
+  private val numbers: NumberResolver,
 ) {
 
   /** One tick's label text and its position along the axis. */
@@ -67,10 +69,10 @@ public class AxisBuilder(
       return null
     }
 
-    val tickSize = spec.tickSize ?: AxisDefaults.TICK_SIZE
-    val labelPadding = spec.labelPadding ?: AxisDefaults.LABEL_PADDING
+    val tickSize = numbers.resolve(spec.tickSize, spec.scale) ?: AxisDefaults.TICK_SIZE
+    val labelPadding = numbers.resolve(spec.labelPadding, spec.scale) ?: AxisDefaults.LABEL_PADDING
     val labelOffset = tickSize + labelPadding
-    val fontSize = spec.labelFontSize ?: AxisDefaults.LABEL_FONT_SIZE
+    val fontSize = numbers.resolve(spec.labelFontSize, spec.scale) ?: AxisDefaults.LABEL_FONT_SIZE
     val labelStyle = TextStyle(fontFamily = AxisDefaults.LABEL_FONT_FAMILY, fontSize = fontSize)
 
     val children = mutableListOf<SceneNode>()
@@ -180,23 +182,25 @@ public class AxisBuilder(
    * The half-pixel offset is Vega's, not a rounding artefact of ours: it makes 1-pixel ticks land
    * on pixel centres instead of straddling two pixels.
    */
-  private fun groupTransform(spec: AxisSpec, plot: PlotSize): Transform2D =
-    when (spec.orient) {
+  private fun groupTransform(spec: AxisSpec, plot: PlotSize): Transform2D {
+    val offset = numbers.resolve(spec.offset, spec.scale) ?: 0.0
+    return when (spec.orient) {
       Orient.BOTTOM ->
         Transform2D.translate(
           AxisDefaults.CRISP_OFFSET,
-          plot.height + AxisDefaults.CRISP_OFFSET + spec.offset,
+          plot.height + AxisDefaults.CRISP_OFFSET + offset,
         )
       Orient.TOP ->
-        Transform2D.translate(AxisDefaults.CRISP_OFFSET, AxisDefaults.CRISP_OFFSET - spec.offset)
+        Transform2D.translate(AxisDefaults.CRISP_OFFSET, AxisDefaults.CRISP_OFFSET - offset)
       Orient.LEFT ->
-        Transform2D.translate(AxisDefaults.CRISP_OFFSET - spec.offset, AxisDefaults.CRISP_OFFSET)
+        Transform2D.translate(AxisDefaults.CRISP_OFFSET - offset, AxisDefaults.CRISP_OFFSET)
       Orient.RIGHT ->
         Transform2D.translate(
-          plot.width + AxisDefaults.CRISP_OFFSET + spec.offset,
+          plot.width + AxisDefaults.CRISP_OFFSET + offset,
           AxisDefaults.CRISP_OFFSET,
         )
     }
+  }
 
   private fun labelAlign(orient: Orient): TextAlign =
     when (orient) {
@@ -232,7 +236,8 @@ public class AxisBuilder(
           Tick(label, scale.position(VegaValue.Str(label)))
         }
       is LinearScale -> {
-        val count = spec.tickCount ?: AxisDefaults.DEFAULT_TICK_COUNT
+        val count =
+          numbers.resolveInt(spec.tickCount, spec.scale) ?: AxisDefaults.DEFAULT_TICK_COUNT
         scale.ticks(count).map { value ->
           Tick(scale.formatTick(value, count), scale.apply(value))
         }

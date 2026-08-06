@@ -1,12 +1,15 @@
 package dev.aster.vega.runtime.compile
 
+import dev.aster.vega.dataflow.transform.TransformContext
+import dev.aster.vega.dataflow.transform.TransformPipeline
 import dev.aster.vega.expression.CachingExpressionCompiler
+import dev.aster.vega.expression.ExpressionCompiler
+import dev.aster.vega.expression.ExpressionScope
 import dev.aster.vega.expression.VegaExpressionCompiler
 import dev.aster.vega.model.DiagnosticCodes
 import dev.aster.vega.model.DiagnosticCollector
 import dev.aster.vega.model.VegaDiagnostic
 import dev.aster.vega.model.VegaValue
-import dev.aster.vega.model.asString
 import dev.aster.vega.model.spec.AutosizeType
 import dev.aster.vega.model.spec.DataSpec
 import dev.aster.vega.model.spec.MarkSpec
@@ -75,8 +78,6 @@ public class SpecCompiler(private val textEngine: TextEngine = MetricTextEngine(
     }
     val plot = PlotSize(width, height)
 
-    val datasets = resolveData(spec.data, diagnostics)
-
     // Vega exposes width, height and padding as implicit signals, so expressions can size things
     // relative to the chart. Verified: a signal with `update: "width/2"` resolves without declaring
     // width itself.
@@ -95,12 +96,22 @@ public class SpecCompiler(private val textEngine: TextEngine = MetricTextEngine(
           ),
       )
     val expressions = CachingExpressionCompiler(VegaExpressionCompiler())
+
+    // Data first, because a signal may read a dataset and a transform may publish a signal. A
+    // single
+    // ordered pass is enough for a static compile: transforms see the signals resolved before them,
+    // and
+    // signals see the datasets resolved before them. A specification that crosses those in both
+    // directions needs the full dataflow, and is reported rather than silently mis-ordered.
+    val transformSignals = LinkedHashMap<String, VegaValue>(implicitSignals)
+    val datasets = resolveData(spec.data, diagnostics, expressions, transformSignals)
     val signals =
-      SignalResolver(diagnostics, expressions).resolve(spec.signals, datasets, implicitSignals)
+      SignalResolver(diagnostics, expressions).resolve(spec.signals, datasets, transformSignals)
 
-    val scales = ScaleResolver(datasets, plot, diagnostics).resolve(spec.scales)
+    val numbers = NumberResolver(expressions, signals, diagnostics)
+    val scales = ScaleResolver(datasets, plot, diagnostics, numbers).resolve(spec.scales)
 
-    val axisBuilder = AxisBuilder(scales, ids, textEngine, diagnostics)
+    val axisBuilder = AxisBuilder(scales, ids, textEngine, diagnostics, numbers)
     val markEncoder = MarkEncoder(scales, ids, diagnostics, signals, expressions)
 
     val children = mutableListOf<SceneNode>()
@@ -156,8 +167,12 @@ public class SpecCompiler(private val textEngine: TextEngine = MetricTextEngine(
   private fun resolveData(
     specs: List<DataSpec>,
     diagnostics: DiagnosticCollector,
+    expressions: ExpressionCompiler,
+    signals: MutableMap<String, VegaValue>,
   ): Map<String, List<VegaValue>> {
     val result = LinkedHashMap<String, List<VegaValue>>(specs.size)
+    val pipeline = TransformPipeline()
+
     for (spec in specs) {
       var values = spec.values ?: emptyList()
       if (spec.source != null) {
@@ -173,18 +188,35 @@ public class SpecCompiler(private val textEngine: TextEngine = MetricTextEngine(
         }
       }
       if (spec.transform.isNotEmpty()) {
-        val operators =
-          spec.transform.mapNotNull { (it as? VegaValue.Obj)?.fields?.get("type")?.asString() }
-        diagnostics.error(
-          DiagnosticCodes.TRANSFORM_NOT_IMPLEMENTED,
-          "Transforms are not implemented; dataset '${spec.name}' skipped " +
-            "[${operators.joinToString(", ")}] and will contain untransformed values",
-          operator = spec.name,
-        )
+        val context = CompileTransformContext(diagnostics, expressions, signals, result, spec.name)
+        values = pipeline.run(values, spec.transform, context)
       }
       result[spec.name] = values
     }
     return result
+  }
+
+  /**
+   * Transform context for one dataset.
+   *
+   * Signals written by a transform — `extent` publishing a range, for instance — go into the shared
+   * map, so a later dataset or a signal definition can read them.
+   */
+  private class CompileTransformContext(
+    override val diagnostics: DiagnosticCollector,
+    override val expressions: ExpressionCompiler,
+    private val signals: MutableMap<String, VegaValue>,
+    private val datasets: Map<String, List<VegaValue>>,
+    private val datasetName: String,
+  ) : TransformContext {
+
+    override val scope: ExpressionScope = scopeFor(VegaValue.Null)
+
+    override fun setSignal(name: String, value: VegaValue) {
+      signals[name] = value
+    }
+
+    override fun scopeFor(datum: VegaValue): ExpressionScope = SignalScope(signals, datasets, datum)
   }
 
   /**

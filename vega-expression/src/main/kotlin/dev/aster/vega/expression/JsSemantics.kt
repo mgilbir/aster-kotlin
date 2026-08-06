@@ -1,7 +1,6 @@
 package dev.aster.vega.expression
 
 import dev.aster.vega.model.VegaValue
-import dev.aster.vega.model.canonicalNumberString
 import kotlin.math.floor
 import kotlin.math.truncate
 
@@ -107,8 +106,21 @@ public object JsSemantics {
       value == Double.NEGATIVE_INFINITY -> "-Infinity"
       value == 0.0 -> "0"
       value == floor(value) && kotlin.math.abs(value) < 1e21 -> value.toLong().toString()
-      else -> canonicalNumberString(value, precision = 17).trimEnd('0').trimEnd('.')
+      // Kotlin's Double.toString already produces the shortest representation that round-trips,
+      // which
+      // is what JavaScript prints: 2/10 is "0.2", not "0.20000000000000001". Fixed-precision
+      // formatting would expose the binary representation instead.
+      else -> normalizeExponent(value.toString())
     }
+
+  /** Rewrites Kotlin's `1.0E21` as JavaScript's `1e+21`. */
+  private fun normalizeExponent(text: String): String {
+    val exponentAt = text.indexOf('E')
+    if (exponentAt < 0) return text
+    val mantissa = text.substring(0, exponentAt).removeSuffix(".0")
+    val exponent = text.substring(exponentAt + 1)
+    return "${mantissa}e${if (exponent.startsWith("-")) exponent else "+$exponent"}"
+  }
 
   // ---- arithmetic -----------------------------------------------------------
 

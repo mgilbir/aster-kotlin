@@ -116,17 +116,34 @@ class SpecCompilerTest {
   // ---- diagnostics ----------------------------------------------------------
 
   @Test
-  fun `data transforms are reported, not silently skipped`() {
+  fun `an implemented transform runs`() {
     val withTransform =
       minimalBar.replace(
         """"values": [{"c": "a", "v": 1}, {"c": "b", "v": 2}]""",
-        """"values": [{"c": "a", "v": 1}], "transform": [{"type": "filter", "expr": "datum.v > 0"}]""",
+        """"values": [{"c": "a", "v": 1}, {"c": "b", "v": 2}], """ +
+          """"transform": [{"type": "filter", "expr": "datum.v > 1"}]""",
+      )
+    val compiled = compile(withTransform)
+    assertTrue(
+      compiled.diagnostics.none { it.severity >= DiagnosticSeverity.ERROR },
+      compiled.diagnostics.toString(),
+    )
+    // One row survived the filter, so one bar.
+    assertEquals(1, requireNotNull(compiled.scene).flatten().count { it.node is RectNode })
+  }
+
+  @Test
+  fun `an unimplemented transform stops the pipeline and is reported`() {
+    val withTransform =
+      minimalBar.replace(
+        """"values": [{"c": "a", "v": 1}, {"c": "b", "v": 2}]""",
+        """"values": [{"c": "a", "v": 1}], "transform": [{"type": "kde", "field": "v"}]""",
       )
     val diagnostic =
       compile(withTransform).diagnostics.first {
         it.code == DiagnosticCodes.TRANSFORM_NOT_IMPLEMENTED
       }
-    assertTrue(diagnostic.message.contains("filter"), diagnostic.message)
+    assertTrue(diagnostic.message.contains("kde"), diagnostic.message)
   }
 
   @Test

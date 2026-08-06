@@ -1,0 +1,260 @@
+package dev.aster.vega.dataflow.transform
+
+import dev.aster.vega.expression.ExpressionCompiler
+import dev.aster.vega.expression.ExpressionEvaluationException
+import dev.aster.vega.expression.ExpressionResult
+import dev.aster.vega.expression.ExpressionScope
+import dev.aster.vega.model.DiagnosticCodes
+import dev.aster.vega.model.DiagnosticCollector
+import dev.aster.vega.model.VegaValue
+import dev.aster.vega.model.asDouble
+import dev.aster.vega.model.asString
+import dev.aster.vega.model.field
+import dev.aster.vega.model.isMissing
+
+/**
+ * Everything a transform may read or report.
+ *
+ * Passed in rather than reachable from ambient state, so a transform's inputs are visible at its
+ * call site and a pipeline can be run in isolation by a test.
+ */
+public interface TransformContext {
+  public val diagnostics: DiagnosticCollector
+
+  /** Shared so repeated expression text is parsed once across a whole specification. */
+  public val expressions: ExpressionCompiler
+
+  /** Signals and datasets an expression can read. Datum is supplied per tuple. */
+  public val scope: ExpressionScope
+
+  /** Transforms like `extent` publish a signal rather than changing the data. */
+  public fun setSignal(name: String, value: VegaValue)
+
+  /** Sets the datum an expression sees. */
+  public fun scopeFor(datum: VegaValue): ExpressionScope
+}
+
+/**
+ * One data transform.
+ *
+ * Transforms are pure functions from a tuple list to a tuple list: they never mutate their input.
+ * Upstream Vega does mutate tuples in place — which is why its own test fixtures contaminate each
+ * other if you reuse an input array — and copying instead costs an allocation per changed tuple but
+ * makes the pipeline reasoning local and the results reproducible.
+ */
+public interface Transform {
+  /** The `type` name in a specification, e.g. `"filter"`. */
+  public val type: String
+
+  public fun apply(
+    input: List<VegaValue>,
+    params: VegaValue.Obj,
+    context: TransformContext,
+  ): List<VegaValue>
+}
+
+/**
+ * Runs a transform pipeline.
+ *
+ * An unknown or unimplemented transform stops the pipeline at that point and reports
+ * `VEGA_TRANSFORM_NOT_IMPLEMENTED`, returning what the earlier stages produced. Continuing past it
+ * would feed later stages data they were never meant to see, and silently produce a
+ * plausible-looking wrong answer.
+ */
+public class TransformPipeline(
+  private val registry: TransformRegistry = TransformRegistry.Default
+) {
+
+  public fun run(
+    input: List<VegaValue>,
+    transforms: List<VegaValue>,
+    context: TransformContext,
+  ): List<VegaValue> {
+    var current = input
+    for ((index, definition) in transforms.withIndex()) {
+      val params = definition as? VegaValue.Obj
+      if (params == null) {
+        context.diagnostics.error(
+          DiagnosticCodes.TRANSFORM_INVALID_PARAMETER,
+          "Transform $index is not an object",
+        )
+        return current
+      }
+      val type = params.fields["type"]?.asString()
+      if (type.isNullOrEmpty()) {
+        context.diagnostics.error(
+          DiagnosticCodes.TRANSFORM_INVALID_PARAMETER,
+          "Transform $index has no type",
+        )
+        return current
+      }
+      val transform = registry[type]
+      if (transform == null) {
+        context.diagnostics.error(
+          DiagnosticCodes.TRANSFORM_NOT_IMPLEMENTED,
+          "Transform '$type' is not implemented; the pipeline stopped here, so later " +
+            "transforms did not run and the data is as of the previous stage",
+          operator = type,
+        )
+        return current
+      }
+      current = transform.apply(current, params, context)
+    }
+    return current
+  }
+}
+
+/** Maps a specification's transform `type` to an implementation. */
+public class TransformRegistry(transforms: List<Transform>) {
+
+  private val byType: Map<String, Transform> = transforms.associateBy { it.type }
+
+  public operator fun get(type: String): Transform? = byType[type]
+
+  public val types: Set<String>
+    get() = byType.keys
+
+  public companion object {
+    /** The transforms the brief lists for the first release (PROJECT_BRIEF.md 3.2). */
+    public val Default: TransformRegistry =
+      TransformRegistry(
+        listOf(
+          FilterTransform,
+          FormulaTransform,
+          CollectTransform,
+          ProjectTransform,
+          IdentifierTransform,
+          ExtentTransform,
+          AggregateTransform,
+          JoinAggregateTransform,
+          BinTransform,
+          StackTransform,
+          FoldTransform,
+          FlattenTransform,
+        )
+      )
+  }
+}
+
+// ---- shared helpers ---------------------------------------------------------
+
+/** Reads a parameter as a list of strings, accepting Vega's single-value shorthand. */
+internal fun VegaValue.Obj.stringList(key: String): List<String> {
+  val value = fields[key] ?: return emptyList()
+  return when (value) {
+    is VegaValue.Arr -> value.values.map { it.asString() }
+    is VegaValue.Null -> emptyList()
+    else -> listOf(value.asString())
+  }
+}
+
+internal fun VegaValue.Obj.numberList(key: String): List<Double> {
+  val value = fields[key] ?: return emptyList()
+  return when (value) {
+    is VegaValue.Arr -> value.values.map { it.asDouble() }
+    is VegaValue.Null -> emptyList()
+    else -> listOf(value.asDouble())
+  }
+}
+
+internal fun VegaValue.Obj.number(key: String): Double? =
+  fields[key]?.asDouble()?.takeIf { !it.isNaN() }
+
+internal fun VegaValue.Obj.string(key: String): String? =
+  fields[key]?.takeIf { it !is VegaValue.Null }?.asString()
+
+internal fun VegaValue.Obj.boolean(key: String): Boolean? =
+  when (val value = fields[key]) {
+    null,
+    is VegaValue.Null -> null
+    is VegaValue.Bool -> value.value
+    else -> null
+  }
+
+/** Returns a copy of [this] tuple with [updates] applied. Transforms never mutate their input. */
+internal fun VegaValue.withFields(updates: Map<String, VegaValue>): VegaValue {
+  val existing = (this as? VegaValue.Obj)?.fields ?: emptyMap()
+  val merged = LinkedHashMap<String, VegaValue>(existing.size + updates.size)
+  merged.putAll(existing)
+  merged.putAll(updates)
+  return VegaValue.Obj(merged)
+}
+
+internal fun VegaValue.withField(name: String, value: VegaValue): VegaValue =
+  withFields(mapOf(name to value))
+
+/**
+ * Compiles and evaluates an expression parameter once per tuple.
+ *
+ * A failure is reported once for the whole transform rather than once per tuple: the expression
+ * fails identically for every row, and a large dataset would otherwise bury every other diagnostic.
+ */
+internal class TupleExpression(
+  private val source: String,
+  private val context: TransformContext,
+  private val operator: String,
+) {
+  private val compiled = context.expressions.compile(source)
+  private var reported = false
+
+  init {
+    if (compiled is ExpressionResult.Failed) report(compiled.diagnostic)
+  }
+
+  val isUsable: Boolean
+    get() = compiled is ExpressionResult.Compiled
+
+  fun evaluate(datum: VegaValue): VegaValue? {
+    val expression = (compiled as? ExpressionResult.Compiled)?.expression ?: return null
+    return try {
+      expression.evaluate(context.scopeFor(datum))
+    } catch (e: ExpressionEvaluationException) {
+      report(e.diagnostic)
+      null
+    }
+  }
+
+  private fun report(diagnostic: dev.aster.vega.model.VegaDiagnostic) {
+    if (reported) return
+    reported = true
+    context.diagnostics.add(diagnostic.copy(operator = operator))
+  }
+}
+
+/**
+ * Vega's ascending comparator for arbitrary field values.
+ *
+ * Null and NaN sort first in ascending order, which is what upstream's `collect` does — verified,
+ * and the opposite of the SQL convention many people expect.
+ */
+internal fun compareFieldValues(left: VegaValue, right: VegaValue): Int {
+  val leftMissing = left.isMissing
+  val rightMissing = right.isMissing
+  if (leftMissing || rightMissing) {
+    return when {
+      leftMissing && rightMissing -> 0
+      leftMissing -> -1
+      else -> 1
+    }
+  }
+  val leftNumber = left.asDouble()
+  val rightNumber = right.asDouble()
+  if (!leftNumber.isNaN() && !rightNumber.isNaN()) return leftNumber.compareTo(rightNumber)
+  return left.asString().compareTo(right.asString())
+}
+
+/** Builds a comparator from Vega's `{field, order}` sort parameter, accepting arrays for both. */
+internal fun sortComparator(sort: VegaValue?): Comparator<VegaValue>? {
+  val spec = sort as? VegaValue.Obj ?: return null
+  val fields = spec.stringList("field")
+  if (fields.isEmpty()) return null
+  val orders = spec.stringList("order")
+  return Comparator { a, b ->
+    for ((index, path) in fields.withIndex()) {
+      val descending = orders.getOrNull(index)?.startsWith("desc") == true
+      val comparison = compareFieldValues(a.field(path), b.field(path))
+      if (comparison != 0) return@Comparator if (descending) -comparison else comparison
+    }
+    0
+  }
+}
