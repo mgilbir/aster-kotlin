@@ -1,8 +1,5 @@
 package dev.aster.vega.model
 
-import java.math.BigDecimal
-import java.math.RoundingMode
-
 /**
  * Canonical numeric formatting shared by snapshot serialization, SVG output and label text.
  *
@@ -25,9 +22,7 @@ public fun canonicalNumberString(
   if (value == Double.NEGATIVE_INFINITY) return "-Infinity"
 
   val normalized = normalizeZero(value)
-  val rounded =
-    BigDecimal(normalized).setScale(precision, RoundingMode.HALF_UP).stripTrailingZeros()
-  val text = rounded.toPlainString()
+  val text = PlatformDecimals.trimmed(normalized, precision)
   // stripTrailingZeros can leave "0E-6"-style values; toPlainString already expands those, but a
   // rounded-to-zero negative still needs the sign removed.
   return if (text == "-0") "0" else text

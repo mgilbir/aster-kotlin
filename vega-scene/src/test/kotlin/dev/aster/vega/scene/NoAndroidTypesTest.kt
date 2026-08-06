@@ -81,21 +81,19 @@ class NoAndroidTypesTest {
    * for JVM-only APIs. Calendar work goes through `kotlinx-datetime`; rounding goes through
    * `roundHalfUp`, which is also more faithful to d3 than `java.lang.Math.round`.
    *
-   * Two uses remain and are listed rather than hidden: both are fixed-precision decimal formatting,
-   * which common Kotlin has no equivalent of, and both are being replaced by a hand-written
-   * formatter. Anything *new* fails here.
+   * One file is exempt, [dev.aster.vega.model.PlatformDecimals], and it explains itself: rounding a
+   * decimal at N places has to round the double's exact binary value, which needs
+   * arbitrary-precision arithmetic common Kotlin does not have. Confining it to one file is what
+   * makes the eventual `expect`/`actual` split mechanical. Anything else fails here.
    */
   @Test
-  fun `core modules use no JVM-only APIs beyond the known decimal formatting`() {
-    val allowed =
-      setOf(
-        // Canonical number output, pending a portable fixed-precision formatter.
-        "vega-model/main/kotlin/dev/aster/vega/model/CanonicalNumber.kt",
-        // `format()` expression directives, pending the same.
-        "vega-expression/main/kotlin/dev/aster/vega/expression/Functions.kt",
-        // Default numeric tick labels, pending the same.
-        "vega-runtime/main/kotlin/dev/aster/vega/runtime/scale/Scales.kt",
-      )
+  fun `core modules use no JVM-only APIs outside the one platform seam`() {
+    // The single permitted exception, and the file's own documentation says why: rounding a decimal
+    // at
+    // N places has to round the double's exact binary value, which needs arbitrary-precision
+    // arithmetic that common Kotlin does not have. It becomes the `expect` when the core goes
+    // multiplatform.
+    val allowed = setOf("vega-model/main/kotlin/dev/aster/vega/model/PlatformDecimals.kt")
     val banned =
       listOf(
         Regex("""\bjava\.(util|math|text|time)\."""),

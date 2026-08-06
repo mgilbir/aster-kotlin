@@ -356,8 +356,7 @@ The performance targets in PROJECT_BRIEF.md 19 are therefore all unverified.
    `layout` with columns, padding, headers — and a legend's multi-column entry grid are the same row
    and column algorithm, and both are currently reported. Doing them together is why this is one task
    rather than two.
-3. **Finish the portability sweep, then the date expression functions.** Three files still format
-   fixed-precision decimals with `String.format` and `BigDecimal`, which common Kotlin has no
-   equivalent of; a hand-written formatter replaces them and the guard test already lists them. After
-   that, the date functions (`datetime`, `year`, `month`, `timeFormat`) and the `timeunit` transform
-   are the rest of the date layer, and they now have a calendar to build on.
+3. **The date expression functions and the `timeunit` transform.** `datetime`, `year`, `month`,
+   `timeFormat` and friends are most of what remains of the 59 unimplemented expression functions, and
+   `timeunit` is the transform that groups by them. Both now have a calendar to build on, and together
+   they are what a real time series specification uses beyond the axis.

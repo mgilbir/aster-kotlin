@@ -1,5 +1,6 @@
 package dev.aster.vega.expression
 
+import dev.aster.vega.model.PlatformDecimals
 import dev.aster.vega.model.VegaValue
 import dev.aster.vega.model.roundHalfUp
 import kotlin.math.abs
@@ -471,12 +472,12 @@ public object NumberFormatSubset {
     val text =
       when (spec.type) {
         'd' -> roundHalfUp(value).toLong().toString()
-        'e' -> String.format(java.util.Locale.ROOT, "%.${spec.precision ?: 6}e", value)
+        'e' -> PlatformDecimals.exponential(value, spec.precision ?: 6)
         '%' -> {
           val scaled = value * 100.0
-          String.format(java.util.Locale.ROOT, "%.${spec.precision ?: 0}f", scaled) + "%"
+          PlatformDecimals.fixed(scaled, spec.precision ?: 0) + "%"
         }
-        else -> String.format(java.util.Locale.ROOT, "%.${spec.precision ?: 6}f", value)
+        else -> PlatformDecimals.fixed(value, spec.precision ?: 6)
       }
     return if (spec.group) groupThousands(text) else text
   }
