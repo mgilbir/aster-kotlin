@@ -5,6 +5,7 @@ import dev.aster.vega.model.DiagnosticCodes
 import dev.aster.vega.model.VegaValue
 import dev.aster.vega.model.field
 import dev.aster.vega.model.isMissing
+import dev.aster.vega.model.roundHalfUp
 import kotlin.math.abs
 import kotlin.math.ceil
 import kotlin.math.floor
@@ -135,7 +136,7 @@ public object BinTransform : Transform {
       chosen = step
     } else {
       val level = ceil(ln(maxbins.toDouble()) / logBase)
-      chosen = maxOf(minstep, base.pow(Math.round(ln(span) / logBase).toDouble() - level))
+      chosen = maxOf(minstep, base.pow(roundHalfUp(ln(span) / logBase) - level))
       // Grow until the bin count fits.
       while (ceil(span / chosen) > maxbins) chosen *= base
       // Then take the finest permitted subdivision that still fits.

@@ -8,7 +8,7 @@ Milestones 0, 1 and 2 complete. **Milestones 3 and 4 in progress**: Vega specifi
 end — including expressions, signals and the twelve data transforms the brief lists — and are verified
 against upstream Vega by differential tests.
 
-Twenty differential fixtures pass, all matching upstream exactly on every mark and scale output:
+Twenty-one differential fixtures pass, all matching upstream exactly on every mark and scale output:
 
 | Fixture | Marks | Covers |
 | --- | --- | --- |
@@ -32,6 +32,7 @@ Twenty differential fixtures pass, all matching upstream exactly on every mark a
 | `axis-variants` | 34 | a top axis, an offset one, a grid above the marks, one with no domain or ticks |
 | `band-padding` | 22 | inner and outer padding, alignment, rounding, a reversed range |
 | `flatten-arrays` | 25 | parallel array fields expanded and re-aggregated |
+| `time-axis` | 32 | a UTC scale ticking on months and another on hours, ISO dates read by `format.parse` |
 
 The gate is wired into `./scripts/oracle.sh`, so every further scale, mark and transform is built
 against a harness that can say we are wrong — which golden tests cannot.
@@ -68,7 +69,7 @@ The entire data and specification half is absent:
 | `vega-transforms` — the other 28 transforms | most of 3,754 | 0 |
 | `vega-dataflow` — pulse propagation and incremental evaluation | 2,081 | contracts only |
 | `vega-functions` — the other 59 functions, mostly date, colour, geo and selection | most of 790 | 0 |
-| Remaining scale types — time, utc, quantile, quantize, threshold, bin-ordinal | rest of `vega-scale` + d3-time | 0 |
+| Remaining scale types — quantile, quantize, threshold, bin-ordinal | rest of `vega-scale` | 0 |
 | Continuous colour ramps | `d3-scale-chromatic` interpolator tables | 0, reported |
 | Remaining mark encoders — arc, image, path, trail, shape | rest of `vega-encode` + d3-shape | 0 |
 | Group `layout` — the trellis grid, headers and titles | `vega-view-transforms` grid layout | 0, reported |
@@ -76,7 +77,7 @@ The entire data and specification half is absent:
 | Label overlap removal, banded legends, group `layout` | parts of `vega-encode`, `vega-label`, `vega-view-transforms` | 0, reported |
 | `vega-view`, `vega-view-transforms` — layout, overlap removal | 2,623 | bounds only |
 | `vega-event-selector` — event-stream DSL | 191 | 0 |
-| `vega-time`, `vega-format` — locale and time units | 587 + d3-format, d3-time-format | 0 |
+| `vega-time`, `vega-format` — `timeunit`, locales, format strings | 587 + d3-format, d3-time-format | tick selection and default labels only |
 | geo, force, hierarchy, label, voronoi, wordcloud, crossfilter, statistics | ~5,700 | 0, and mostly explicit non-goals (PROJECT_BRIEF.md 3.3) |
 
 Full parity was never the goal — PROJECT_BRIEF.md 3.3 rules most of that last row out. But the brief's
@@ -88,12 +89,12 @@ substantive compatibility items:
 | 1. Compiled Vega JSON loads without JavaScript | **Yes**, for a substantial subset — `VegaChartController.setSpec` loads it and the demo renders three bundled specifications on device |
 | 2. Bar, line, area, scatter, stacked bar render natively | **Yes** — all five compile from a specification, and small multiples of them too |
 | 3. Axes, legends, labels and titles supported | **Yes** — all four |
-| 4. Basic transforms and scales execute in Kotlin | **Yes** — 8 scale types and the 12 transforms the brief lists |
+| 4. Basic transforms and scales execute in Kotlin | **Yes** — 10 scale types, including time and UTC, and the 12 transforms the brief lists |
 | 5. Tap, hover, tooltip, selection, pan, zoom | Yes, except tooltip rendering |
 | 6. View and Compose APIs | Yes |
 | 7. SVG, PNG, PDF export | Yes |
 | 8. TalkBack can describe and navigate | Partial — virtual nodes are tested by instrumentation, not with TalkBack itself |
-| 9. At least 100 compatibility fixtures pass | 20 of 100 |
+| 9. At least 100 compatibility fixtures pass | 21 of 100 |
 | 10. Core runtime has no Android dependency | Yes |
 | 11. Renders without WebView | Yes |
 | 12. Build and test loop runs from the terminal | Yes |
@@ -206,6 +207,12 @@ ordering), and the pipeline is now verified end to end on one fixture, but the b
   twelve combinations verified against upstream — plus a title on each axis. A title is placed against
   the whole drawing rather than the plotting area, so a chart with wide y-axis labels has its title
   visibly off the plot's centre, exactly as upstream draws it.
+- **Time and UTC scales**: ticks land on calendar boundaries chosen from d3's own table, `nice` widens
+  to one of them, and each label is written at its *own* granularity — so a monthly axis puts the year
+  back every January and an hourly one puts the date back every midnight. Dates arrive as ISO strings
+  and are read by `format.parse`. Calendar arithmetic goes through `kotlinx-datetime`, which keeps the
+  core portable to Kotlin Multiplatform; a day is a calendar day, so a daily tick stays at midnight
+  across a daylight-saving change rather than drifting to 01:00.
 - **Layout**: `autosize: pad` and `none`, sizing the surface from the drawing's reach plus padding.
 - **Differential harness**: `oracle-js/src/reference.js` emits a normalized comparison model, checked in
   under `test-fixtures/reference/`; `Differential` flattens our scene the same way and compares.
@@ -312,8 +319,12 @@ The performance targets in PROJECT_BRIEF.md 19 are therefore all unverified.
 - **JDK.** The brief pins JDK 17. The build runs on the JDK available on the development machine
   (21) and targets JVM bytecode 17 through `jvmTarget`/`sourceCompatibility` rather than a Gradle
   toolchain, so no JDK is auto-downloaded. Any JDK 17 or newer works.
-- **`compileSdk`/`targetSdk` 37.** API 37 ships as minor-versioned platforms; the setup script
-  installs both `android-37.0` and `android-37.1`.
+- **`compileSdk`/`targetSdk` 37, `minSdk` 26.** API 37 ships as minor-versioned platforms; the setup
+  script installs both `android-37.0` and `android-37.1`. `minSdk` is 26 rather than the 23 this
+  project started with: the core does its calendar arithmetic with `kotlinx-datetime`, which is
+  implemented on `java.time`, and 26 is where that arrives. The alternative — core library desugaring
+  — was tried and removed, since 26 covers effectively every device now and carrying a backport to
+  avoid raising it is the worse trade.
 - **`androidx.benchmark` Gradle plugin.** Version 1.4.1 is incompatible with AGP 9.3.1 (it reads the
   removed `TestedExtension`). The benchmark module uses `benchmark-junit4` with
   `AndroidBenchmarkRunner` directly, without the plugin, so it compiles and runs but does not get the
@@ -333,7 +344,7 @@ The performance targets in PROJECT_BRIEF.md 19 are therefore all unverified.
 
 ## Next three tasks
 
-1. **Keep growing the fixture corpus.** 20 of the brief's 100 pass, and the return has not dropped
+1. **Keep growing the fixture corpus.** 21 of the brief's 100 pass, and the return has not dropped
    off: of the last twelve fixtures, eight failed on arrival. Between them they found a missing
    scale-domain form, a legend layout rule that only diverges once swatches grow, unreported opacity,
    rotated text offsets both sides of the harness had wrong in the same way, a line-gap behaviour this
@@ -345,6 +356,8 @@ The performance targets in PROJECT_BRIEF.md 19 are therefore all unverified.
    `layout` with columns, padding, headers — and a legend's multi-column entry grid are the same row
    and column algorithm, and both are currently reported. Doing them together is why this is one task
    rather than two.
-3. **Time and UTC scales.** A date and time layer: parsing, `timeunit`, tick intervals from second to
-   year, and locale-aware formatting. Also unblocks the date expression functions and the `timeunit`
-   transform, both currently reported. Substantial, and it touches formatting everywhere.
+3. **Finish the portability sweep, then the date expression functions.** Three files still format
+   fixed-precision decimals with `String.format` and `BigDecimal`, which common Kotlin has no
+   equivalent of; a hand-written formatter replaces them and the guard test already lists them. After
+   that, the date functions (`datetime`, `year`, `month`, `timeFormat`) and the `timeunit` transform
+   are the rest of the date layer, and they now have a calendar to build on.

@@ -108,6 +108,13 @@ public data class DataSpec(
   /** Raw transform definitions, resolved by the runtime so it can report unsupported operators. */
   val transform: List<VegaValue> = emptyList(),
   val source: String? = null,
+  /**
+   * `format.parse`: how to read each named field, e.g. `{"when": "date"}`.
+   *
+   * Only the coercion matters here, not the input syntax — JSON has no date type, so a date arrives
+   * as a string or a number and something has to say which fields to convert.
+   */
+  val parse: Map<String, String> = emptyMap(),
 )
 
 public enum class ScaleType {

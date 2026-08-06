@@ -21,9 +21,12 @@ import dev.aster.vega.runtime.scale.PowScale
 import dev.aster.vega.runtime.scale.SequentialColorScale
 import dev.aster.vega.runtime.scale.SymlogScale
 import dev.aster.vega.runtime.scale.Ticks
+import dev.aster.vega.runtime.scale.TimeScale
+import dev.aster.vega.runtime.scale.TimeTicks
 import dev.aster.vega.runtime.scale.VegaScale
 import dev.aster.vega.scene.ColorSpaces
 import dev.aster.vega.scene.SceneColor
+import kotlinx.datetime.TimeZone
 
 /** The chart's plotting size, which named ranges like `"width"` resolve against. */
 public data class PlotSize(val width: Double, val height: Double)
@@ -62,6 +65,8 @@ public class ScaleResolver(
       ScaleType.POW -> buildPow(spec, defaultExponent = 1.0)
       ScaleType.SQRT -> buildPow(spec, defaultExponent = 0.5)
       ScaleType.SYMLOG -> buildSymlog(spec)
+      ScaleType.TIME -> buildTime(spec, TimeZone.currentSystemDefault())
+      ScaleType.UTC -> buildTime(spec, TimeZone.UTC)
       ScaleType.BAND -> buildBand(spec)
       ScaleType.POINT -> buildPoint(spec)
       ScaleType.ORDINAL -> buildOrdinal(spec)
@@ -255,6 +260,38 @@ public class ScaleResolver(
       hi = maxOf(hi, 0.0)
     }
     return listOf(lo, hi)
+  }
+
+  /**
+   * A time or UTC scale.
+   *
+   * The only difference between the two is the zone, and it is not cosmetic: it decides where a day
+   * starts, so the same specification ticks differently in Sydney and in Reykjavik. That is
+   * upstream's behaviour and the reason `utc` exists as a separate type.
+   */
+  private fun buildTime(spec: ScaleSpec, zone: TimeZone): TimeScale? {
+    val range = numericRange(spec) ?: return null
+    val explicit = literalNumbers(spec.domain)
+    val domain =
+      if (explicit != null && explicit.size >= 2) explicit
+      else {
+        val extent = numericExtent(spec.domain, spec.name) ?: return null
+        listOf(extent.start, extent.endInclusive)
+      }
+    val niced =
+      if (spec.nice) {
+        val (lo, hi) =
+          TimeTicks.nice(
+            domain.first(),
+            domain.last(),
+            spec.niceCount ?: LinearScale.DEFAULT_TICK_COUNT,
+            zone,
+          )
+        listOf(lo, hi)
+      } else {
+        domain
+      }
+    return TimeScale(spec.name, niced, oriented(range, spec.reverse), zone, spec.clamp)
   }
 
   private fun buildBand(spec: ScaleSpec): BandScale? {

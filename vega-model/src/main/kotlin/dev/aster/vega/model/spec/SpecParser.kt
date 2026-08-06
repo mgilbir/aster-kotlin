@@ -223,12 +223,29 @@ public class SpecParser {
         jsonPath = "$path.url",
       )
     }
-    if (obj.fields["format"] != null) {
-      diagnostics.warn(
-        DiagnosticCodes.PARSE_UNKNOWN_PROPERTY,
-        "Data format options are not implemented; values are used as parsed JSON",
-        jsonPath = "$path.format",
-      )
+    val format = obj.fields["format"] as? VegaValue.Obj
+    val parse = LinkedHashMap<String, String>()
+    if (format != null) {
+      for ((key, value) in format.fields) {
+        if (key == "parse") {
+          val fields = value as? VegaValue.Obj
+          if (fields == null) {
+            diagnostics.warn(
+              DiagnosticCodes.PARSE_UNKNOWN_PROPERTY,
+              "'format.parse' must name each field and how to read it",
+              jsonPath = "$path.format.parse",
+            )
+            continue
+          }
+          for ((field, kind) in fields.fields) parse[field] = kind.asString()
+        } else {
+          diagnostics.warn(
+            DiagnosticCodes.PARSE_UNKNOWN_PROPERTY,
+            "Data format option '$key' is not implemented; values are used as parsed JSON",
+            jsonPath = "$path.format.$key",
+          )
+        }
+      }
     }
 
     return DataSpec(
@@ -237,6 +254,7 @@ public class SpecParser {
       url = url,
       transform = (obj.fields["transform"] as? VegaValue.Arr)?.values ?: emptyList(),
       source = obj.fields["source"]?.asString(),
+      parse = parse,
     )
   }
 

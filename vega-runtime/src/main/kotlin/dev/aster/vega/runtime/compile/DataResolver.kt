@@ -4,10 +4,14 @@ import dev.aster.vega.dataflow.transform.TransformContext
 import dev.aster.vega.dataflow.transform.TransformPipeline
 import dev.aster.vega.expression.ExpressionCompiler
 import dev.aster.vega.expression.ExpressionScope
+import dev.aster.vega.expression.JsSemantics
 import dev.aster.vega.model.DiagnosticCodes
 import dev.aster.vega.model.DiagnosticCollector
 import dev.aster.vega.model.VegaValue
+import dev.aster.vega.model.asDouble
+import dev.aster.vega.model.asString
 import dev.aster.vega.model.spec.DataSpec
+import dev.aster.vega.runtime.scale.DateValues
 
 /**
  * Resolves dataset definitions to plain value lists, running their transform pipelines.
@@ -54,6 +58,7 @@ internal class DataResolver(
           values = upstream
         }
       }
+      if (spec.parse.isNotEmpty()) values = values.map { parseFields(it, spec) }
       if (spec.transform.isNotEmpty()) {
         val context = TransformScope(diagnostics, expressions, signals, result)
         values = pipeline.run(values, spec.transform, context)
@@ -61,6 +66,45 @@ internal class DataResolver(
       result[spec.name] = values
     }
     return result
+  }
+
+  /**
+   * Applies `format.parse` to one row.
+   *
+   * JSON has no date type, so a specification has to say which fields hold one. Everything
+   * downstream then works in epoch milliseconds, which is what makes a date an ordinary number to a
+   * scale.
+   */
+  private fun parseFields(datum: VegaValue, spec: DataSpec): VegaValue {
+    val obj = datum as? VegaValue.Obj ?: return datum
+    val fields = LinkedHashMap(obj.fields)
+    for ((field, kind) in spec.parse) {
+      val raw = fields[field] ?: continue
+      val converted =
+        when (kind.lowercase()) {
+          "date" -> DateValues.parse(raw)
+          "number" -> VegaValue.Num(raw.asDouble())
+          "string" -> VegaValue.Str(raw.asString())
+          "boolean" -> VegaValue.Bool(JsSemantics.truthy(raw))
+          else -> {
+            diagnostics.warn(
+              DiagnosticCodes.PARSE_UNKNOWN_PROPERTY,
+              "Cannot read field '$field' as '$kind'; it was left as it came",
+              operator = spec.name,
+            )
+            raw
+          }
+        }
+      if (converted == null) {
+        diagnostics.warn(
+          DiagnosticCodes.TRANSFORM_INVALID_PARAMETER,
+          "Could not read '${raw.asString()}' as a date in field '$field' of '${spec.name}'",
+          operator = spec.name,
+        )
+      }
+      fields[field] = converted ?: VegaValue.Null
+    }
+    return VegaValue.Obj(fields)
   }
 
   /**

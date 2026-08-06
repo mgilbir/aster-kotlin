@@ -33,6 +33,16 @@ public fun canonicalNumberString(
   return if (text == "-0") "0" else text
 }
 
+/**
+ * JavaScript's `Math.round`: halves go to positive infinity, so `-2.5` rounds to `-2`.
+ *
+ * Not Kotlin's `round`, which rounds halves away from zero in both directions, and not Java's
+ * `Math.round`, which is unavailable off the JVM. Every rounding in this engine has to agree with
+ * d3's, and d3 rounds the way its host language does.
+ */
+public fun roundHalfUp(value: Double): Double =
+  if (value.isNaN() || value.isInfinite()) value else kotlin.math.floor(value + 0.5)
+
 /** Maps `-0.0` to `0.0` and leaves every other value untouched. */
 public fun normalizeZero(value: Double): Double = if (value == 0.0) 0.0 else value
 

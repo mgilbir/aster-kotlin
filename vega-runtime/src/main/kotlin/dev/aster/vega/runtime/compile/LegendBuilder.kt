@@ -13,6 +13,7 @@ import dev.aster.vega.runtime.scale.LinearScale
 import dev.aster.vega.runtime.scale.OrdinalScale
 import dev.aster.vega.runtime.scale.PointScale
 import dev.aster.vega.runtime.scale.SequentialColorScale
+import dev.aster.vega.runtime.scale.TimeScale
 import dev.aster.vega.runtime.scale.TransformedScale
 import dev.aster.vega.runtime.scale.VegaScale
 import dev.aster.vega.scene.Fill
@@ -556,6 +557,8 @@ internal class LegendBuilder(
       is TransformedScale ->
         scale.ticks(count).zip(scale.tickLabels(count)).map { (v, l) -> Entry(VegaValue.Num(v), l) }
       is SequentialColorScale ->
+        scale.ticks(count).zip(scale.tickLabels(count)).map { (v, l) -> Entry(VegaValue.Num(v), l) }
+      is TimeScale ->
         scale.ticks(count).zip(scale.tickLabels(count)).map { (v, l) -> Entry(VegaValue.Num(v), l) }
     }
   }

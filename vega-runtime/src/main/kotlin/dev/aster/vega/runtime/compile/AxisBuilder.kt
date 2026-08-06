@@ -10,6 +10,7 @@ import dev.aster.vega.runtime.scale.BandScale
 import dev.aster.vega.runtime.scale.LinearScale
 import dev.aster.vega.runtime.scale.PointScale
 import dev.aster.vega.runtime.scale.PositionScale
+import dev.aster.vega.runtime.scale.TimeScale
 import dev.aster.vega.runtime.scale.TransformedScale
 import dev.aster.vega.runtime.scale.VegaScale
 import dev.aster.vega.scene.Fill
@@ -418,6 +419,13 @@ public class AxisBuilder(
         }
       }
       is TransformedScale -> {
+        val count =
+          numbers.resolveInt(spec.tickCount, spec.scale) ?: AxisDefaults.DEFAULT_TICK_COUNT
+        scale.ticks(count).zip(scale.tickLabels(count)).map { (value, label) ->
+          Tick(label, scale.apply(value))
+        }
+      }
+      is TimeScale -> {
         val count =
           numbers.resolveInt(spec.tickCount, spec.scale) ?: AxisDefaults.DEFAULT_TICK_COUNT
         scale.ticks(count).zip(scale.tickLabels(count)).map { (value, label) ->

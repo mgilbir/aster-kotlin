@@ -378,4 +378,56 @@ class SpecCompilerTest {
     assertEquals(listOf("a", "b"), band.domain, "the domain keeps its order")
     assertEquals(listOf(100.0, 0.0), band.range)
   }
+
+  // ---- time scales ------------------------------------------------------------
+
+  @Test
+  fun `time and utc scales differ only in the zone they read the calendar in`() {
+    // Which is not a detail: it decides where a day starts, so the same specification ticks
+    // differently in Sydney and in Reykjavik. That is also why every time fixture uses `utc` — a
+    // local-time reference would depend on the machine that generated it.
+    val compiled =
+      compile(
+        """
+        {
+          "width": 300, "height": 100, "padding": 0,
+          "data": [{"name": "t", "values": [
+            {"d": "2026-01-15T00:00:00Z"}, {"d": "2026-08-05T00:00:00Z"}],
+            "format": {"parse": {"d": "date"}}}],
+          "scales": [
+            {"name": "local", "type": "time", "domain": {"data": "t", "field": "d"},
+             "range": "width"},
+            {"name": "utc", "type": "utc", "domain": {"data": "t", "field": "d"},
+             "range": "width"}
+          ]
+        }
+        """
+          .trimIndent()
+      )
+    val local = compiled.scales["local"] as dev.aster.vega.runtime.scale.TimeScale
+    val utc = compiled.scales["utc"] as dev.aster.vega.runtime.scale.TimeScale
+    assertEquals(kotlinx.datetime.TimeZone.currentSystemDefault(), local.zone)
+    assertEquals(kotlinx.datetime.TimeZone.UTC, utc.zone)
+    // The domain is the same instants either way; only the calendar reading of them differs.
+    assertEquals(local.domain, utc.domain)
+  }
+
+  @Test
+  fun `a field that cannot be read as a date is reported, not silently zeroed`() {
+    val compiled =
+      compile(
+        """
+        {
+          "width": 100, "height": 100, "padding": 0,
+          "data": [{"name": "t", "values": [{"d": "last Tuesday"}],
+            "format": {"parse": {"d": "date"}}}]
+        }
+        """
+          .trimIndent()
+      )
+    assertTrue(
+      compiled.diagnostics.any { it.message.contains("last Tuesday") },
+      compiled.diagnostics.toString(),
+    )
+  }
 }

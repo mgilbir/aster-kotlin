@@ -1,5 +1,6 @@
 package dev.aster.vega.runtime.scale
 
+import dev.aster.vega.model.roundHalfUp
 import kotlin.math.abs
 import kotlin.math.ceil
 import kotlin.math.floor
@@ -61,16 +62,16 @@ public object Ticks {
       if (step > 0) {
         // Nudge the bounds by one part in 1e12 so a bound that should be a tick is not lost to
         // floating-point representation, matching d3's `Math.round` on the scaled bounds.
-        var i1 = Math.round(lo / step).toDouble()
-        var i2 = Math.round(hi / step).toDouble()
+        var i1 = roundHalfUp(lo / step)
+        var i2 = roundHalfUp(hi / step)
         if (i1 * step < lo) i1 += 1
         if (i2 * step > hi) i2 -= 1
         val n = (i2 - i1 + 1).toInt()
         if (n <= 0) emptyList() else List(n) { (i1 + it) * step }
       } else {
         val inverse = -step
-        var i1 = Math.round(lo * inverse).toDouble()
-        var i2 = Math.round(hi * inverse).toDouble()
+        var i1 = roundHalfUp(lo * inverse)
+        var i2 = roundHalfUp(hi * inverse)
         if (i1 / inverse < lo) i1 += 1
         if (i2 / inverse > hi) i2 -= 1
         val n = (i2 - i1 + 1).toInt()

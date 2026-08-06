@@ -7,13 +7,14 @@ android {
   compileSdk = 37
 
   defaultConfig {
-    minSdk = 23
+    minSdk = 26
     testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
   }
 
   compileOptions {
     sourceCompatibility = JavaVersion.VERSION_17
     targetCompatibility = JavaVersion.VERSION_17
+    // java.time.
   }
 
   lint {
@@ -28,6 +29,7 @@ kotlin {
 }
 
 dependencies {
+  // so
   api(project(":vega-scene"))
   api(project(":vega-runtime"))
   implementation(libs.androidx.core.ktx)

@@ -1,6 +1,7 @@
 package dev.aster.vega.expression
 
 import dev.aster.vega.model.VegaValue
+import dev.aster.vega.model.roundHalfUp
 import kotlin.math.abs
 import kotlin.math.acos
 import kotlin.math.asin
@@ -469,7 +470,7 @@ public object NumberFormatSubset {
 
     val text =
       when (spec.type) {
-        'd' -> Math.round(value).toString()
+        'd' -> roundHalfUp(value).toLong().toString()
         'e' -> String.format(java.util.Locale.ROOT, "%.${spec.precision ?: 6}e", value)
         '%' -> {
           val scaled = value * 100.0

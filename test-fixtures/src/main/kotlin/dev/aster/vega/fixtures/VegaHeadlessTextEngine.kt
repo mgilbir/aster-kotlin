@@ -1,5 +1,6 @@
 package dev.aster.vega.fixtures
 
+import dev.aster.vega.model.roundHalfUp
 import dev.aster.vega.scene.RectD
 import dev.aster.vega.scene.SizeD
 import dev.aster.vega.scene.TextAlign
@@ -88,13 +89,13 @@ public class VegaHeadlessTextEngine : TextEngine {
         TextBaseline.LINE_BOTTOM -> 0.29 * fontSize - 0.5 * metrics.lineHeight
         TextBaseline.ALPHABETIC -> 0.0
       }
-    val top = Math.round(baselineOffset) - Math.round(0.8 * fontSize)
+    val top = roundHalfUp(baselineOffset) - roundHalfUp(0.8 * fontSize)
     val left =
       when (run.align) {
         TextAlign.LEFT -> 0.0
         TextAlign.CENTER -> -metrics.width / 2.0
         TextAlign.RIGHT -> -metrics.width
       }
-    return RectD(left, top.toDouble(), left + metrics.width, top + metrics.height)
+    return RectD(left, top, left + metrics.width, top + metrics.height)
   }
 }

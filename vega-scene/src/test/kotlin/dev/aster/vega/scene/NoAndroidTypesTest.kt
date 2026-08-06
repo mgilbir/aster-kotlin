@@ -73,4 +73,60 @@ class NoAndroidTypesTest {
       "Android Gradle plugin applied to platform-independent modules: $offenders",
     )
   }
+
+  /**
+   * Guards the core's portability to Kotlin Multiplatform.
+   *
+   * The core is plain Kotlin/JVM today but is meant to move to KMP unchanged, so it must not reach
+   * for JVM-only APIs. Calendar work goes through `kotlinx-datetime`; rounding goes through
+   * `roundHalfUp`, which is also more faithful to d3 than `java.lang.Math.round`.
+   *
+   * Two uses remain and are listed rather than hidden: both are fixed-precision decimal formatting,
+   * which common Kotlin has no equivalent of, and both are being replaced by a hand-written
+   * formatter. Anything *new* fails here.
+   */
+  @Test
+  fun `core modules use no JVM-only APIs beyond the known decimal formatting`() {
+    val allowed =
+      setOf(
+        // Canonical number output, pending a portable fixed-precision formatter.
+        "vega-model/main/kotlin/dev/aster/vega/model/CanonicalNumber.kt",
+        // `format()` expression directives, pending the same.
+        "vega-expression/main/kotlin/dev/aster/vega/expression/Functions.kt",
+        // Default numeric tick labels, pending the same.
+        "vega-runtime/main/kotlin/dev/aster/vega/runtime/scale/Scales.kt",
+      )
+    val banned =
+      listOf(
+        Regex("""\bjava\.(util|math|text|time)\."""),
+        Regex("""\bMath\.[a-z]"""),
+        Regex("""\bString\.format\b"""),
+      )
+
+    val repositoryRoot = File(System.getProperty("user.dir")).parentFile
+    val offenders = mutableListOf<String>()
+    for (module in coreModules) {
+      File(repositoryRoot, "$module/src/main")
+        .walkTopDown()
+        .filter { it.isFile && it.extension == "kt" }
+        .forEach { file ->
+          val relative = "$module/${file.relativeTo(File(repositoryRoot, "$module/src"))}"
+          if (relative in allowed) return@forEach
+          file.readLines().forEachIndexed { index, line ->
+            // A comment naming an API is documentation, not a use of it.
+            val trimmed = line.trim()
+            if (trimmed.startsWith("*") || trimmed.startsWith("/*")) return@forEachIndexed
+            val code = line.substringBefore("//")
+            if (banned.any { it.containsMatchIn(code) }) {
+              offenders.add("$relative:${index + 1}: ${line.trim()}")
+            }
+          }
+        }
+    }
+    assertTrue(
+      offenders.isEmpty(),
+      "JVM-only APIs in the core; use kotlinx-datetime or a portable helper instead:\n" +
+        offenders.joinToString("\n"),
+    )
+  }
 }

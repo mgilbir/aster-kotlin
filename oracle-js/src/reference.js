@@ -49,12 +49,22 @@ await view.finalize();
 
 function surfaceSize(view) {
   const padding = view.padding() || {};
-  const frame = view.scenegraph().root.items[0];
-  const bounds = frame && frame.bounds;
   const left = padding.left || 0;
   const top = padding.top || 0;
   const right = padding.right || 0;
   const bottom = padding.bottom || 0;
+
+  // `autosize: none` uses the declared size verbatim and lets the content overflow, so the frame
+  // bounds say nothing about how large the surface is. Reading them anyway made a chart whose labels
+  // overhang look bigger than it renders.
+  const autosize = spec.autosize;
+  const type = typeof autosize === 'string' ? autosize : autosize && autosize.type;
+  if (type === 'none') {
+    return { width: view.width() + left + right, height: view.height() + top + bottom };
+  }
+
+  const frame = view.scenegraph().root.items[0];
+  const bounds = frame && frame.bounds;
   if (!bounds) {
     return { width: view.width() + left + right, height: view.height() + top + bottom };
   }

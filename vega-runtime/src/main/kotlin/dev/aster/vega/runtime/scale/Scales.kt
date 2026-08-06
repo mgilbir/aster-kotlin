@@ -3,6 +3,7 @@ package dev.aster.vega.runtime.scale
 import dev.aster.vega.model.VegaValue
 import dev.aster.vega.model.asDouble
 import dev.aster.vega.model.asString
+import dev.aster.vega.model.roundHalfUp
 import dev.aster.vega.scene.ColorSpaces
 import dev.aster.vega.scene.SceneColor
 import kotlin.math.exp
@@ -412,7 +413,7 @@ public class LogScale(
     if (values.isEmpty()) return emptyList()
     val threshold = maxOf(1.0, base * count / values.size)
     return values.map { value ->
-      var mantissa = kotlin.math.abs(value) / base.pow(Math.round(logMagnitude(value)).toDouble())
+      var mantissa = kotlin.math.abs(value) / base.pow(roundHalfUp(logMagnitude(value)))
       // Guard the case where floating point leaves the mantissa just under 1.
       if (mantissa * base < base - 0.5) mantissa *= base
       if (mantissa <= threshold + MANTISSA_EPSILON) formatTick(value, count) else ""
@@ -473,6 +474,49 @@ public class SymlogScale(
 
   override fun backward(value: Double): Double =
     if (value < 0.0) -constant * (exp(-value) - 1.0) else constant * (exp(value) - 1.0)
+}
+
+/**
+ * A continuous scale over instants, in epoch milliseconds.
+ *
+ * Positionally this is a linear scale and nothing more — upstream's is too. What makes it a time
+ * scale is everything derived from it: ticks land on calendar boundaries rather than round numbers,
+ * `nice` widens to one of those boundaries, and each label is written at its own granularity.
+ *
+ * @param zone what a day and a month mean. UTC for a `utc` scale, the platform default for `time`,
+ *   which is why the same specification can draw differently in two places and is supposed to.
+ */
+public class TimeScale(
+  override val name: String,
+  public val domain: List<Double>,
+  override val range: List<Double>,
+  public val zone: kotlinx.datetime.TimeZone,
+  public val clamp: Boolean = false,
+) : PositionScale {
+
+  init {
+    require(domain.size >= 2) { "$name needs at least two domain values, got $domain" }
+    require(range.size >= 2) { "$name needs at least two range values, got $range" }
+  }
+
+  private val linear = LinearScale(name, domain, range, clamp)
+
+  override val bandwidth: Double
+    get() = 0.0
+
+  public fun apply(instant: Double): Double = linear.apply(instant)
+
+  public fun invert(position: Double): Double = linear.invert(position)
+
+  override fun position(value: VegaValue): Double = linear.position(value)
+
+  override fun scale(value: VegaValue): VegaValue = linear.scale(value)
+
+  public fun ticks(count: Int = LinearScale.DEFAULT_TICK_COUNT): List<Double> =
+    TimeTicks.ticks(domain.first(), domain.last(), count, zone)
+
+  public fun tickLabels(count: Int = LinearScale.DEFAULT_TICK_COUNT): List<String> =
+    ticks(count).map { TimeTicks.label(it, zone) }
 }
 
 /**
@@ -596,7 +640,7 @@ public fun formatNumber(value: Double, decimals: Int): String {
   if (value.isInfinite()) return if (value > 0) "∞" else "-∞"
   val normalized = if (value == 0.0) 0.0 else value
   if (decimals <= 0) {
-    val rounded = Math.round(normalized)
+    val rounded = roundHalfUp(normalized).toLong()
     return rounded.toString()
   }
   val text = String.format(java.util.Locale.ROOT, "%.${decimals}f", normalized)

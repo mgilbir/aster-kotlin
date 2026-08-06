@@ -1,0 +1,483 @@
+{
+  "marks": [
+    {
+      "opacity": 1,
+      "role": "axis-tick",
+      "stroke": "#888",
+      "strokeWidth": 1,
+      "type": "rule",
+      "x": 25.5,
+      "x2": 25.5,
+      "y": 126.5,
+      "y2": 131.5
+    },
+    {
+      "opacity": 1,
+      "role": "axis-tick",
+      "stroke": "#888",
+      "strokeWidth": 1,
+      "type": "rule",
+      "x": 67.5,
+      "x2": 67.5,
+      "y": 126.5,
+      "y2": 131.5
+    },
+    {
+      "opacity": 1,
+      "role": "axis-tick",
+      "stroke": "#888",
+      "strokeWidth": 1,
+      "type": "rule",
+      "x": 113.5,
+      "x2": 113.5,
+      "y": 126.5,
+      "y2": 131.5
+    },
+    {
+      "opacity": 1,
+      "role": "axis-tick",
+      "stroke": "#888",
+      "strokeWidth": 1,
+      "type": "rule",
+      "x": 157.5,
+      "x2": 157.5,
+      "y": 126.5,
+      "y2": 131.5
+    },
+    {
+      "opacity": 1,
+      "role": "axis-tick",
+      "stroke": "#888",
+      "strokeWidth": 1,
+      "type": "rule",
+      "x": 203.5,
+      "x2": 203.5,
+      "y": 126.5,
+      "y2": 131.5
+    },
+    {
+      "opacity": 1,
+      "role": "axis-tick",
+      "stroke": "#888",
+      "strokeWidth": 1,
+      "type": "rule",
+      "x": 248.5,
+      "x2": 248.5,
+      "y": 126.5,
+      "y2": 131.5
+    },
+    {
+      "opacity": 1,
+      "role": "axis-tick",
+      "stroke": "#888",
+      "strokeWidth": 1,
+      "type": "rule",
+      "x": 294.5,
+      "x2": 294.5,
+      "y": 126.5,
+      "y2": 131.5
+    },
+    {
+      "align": "center",
+      "angle": 0,
+      "baseline": "top",
+      "fill": "#000",
+      "font": "sans-serif",
+      "fontSize": 10,
+      "opacity": 1,
+      "role": "axis-label",
+      "text": "February",
+      "type": "text",
+      "x": 25.747525,
+      "y": 133.5
+    },
+    {
+      "align": "center",
+      "angle": 0,
+      "baseline": "top",
+      "fill": "#000",
+      "font": "sans-serif",
+      "fontSize": 10,
+      "opacity": 1,
+      "role": "axis-label",
+      "text": "March",
+      "type": "text",
+      "x": 67.331683,
+      "y": 133.5
+    },
+    {
+      "align": "center",
+      "angle": 0,
+      "baseline": "top",
+      "fill": "#000",
+      "font": "sans-serif",
+      "fontSize": 10,
+      "opacity": 1,
+      "role": "axis-label",
+      "text": "April",
+      "type": "text",
+      "x": 113.371287,
+      "y": 133.5
+    },
+    {
+      "align": "center",
+      "angle": 0,
+      "baseline": "top",
+      "fill": "#000",
+      "font": "sans-serif",
+      "fontSize": 10,
+      "opacity": 1,
+      "role": "axis-label",
+      "text": "May",
+      "type": "text",
+      "x": 157.925743,
+      "y": 133.5
+    },
+    {
+      "align": "center",
+      "angle": 0,
+      "baseline": "top",
+      "fill": "#000",
+      "font": "sans-serif",
+      "fontSize": 10,
+      "opacity": 1,
+      "role": "axis-label",
+      "text": "June",
+      "type": "text",
+      "x": 203.965347,
+      "y": 133.5
+    },
+    {
+      "align": "center",
+      "angle": 0,
+      "baseline": "top",
+      "fill": "#000",
+      "font": "sans-serif",
+      "fontSize": 10,
+      "opacity": 1,
+      "role": "axis-label",
+      "text": "July",
+      "type": "text",
+      "x": 248.519802,
+      "y": 133.5
+    },
+    {
+      "align": "center",
+      "angle": 0,
+      "baseline": "top",
+      "fill": "#000",
+      "font": "sans-serif",
+      "fontSize": 10,
+      "opacity": 1,
+      "role": "axis-label",
+      "text": "August",
+      "type": "text",
+      "x": 294.559406,
+      "y": 133.5
+    },
+    {
+      "opacity": 1,
+      "role": "axis-domain",
+      "stroke": "#888",
+      "strokeWidth": 1,
+      "type": "rule",
+      "x": 0.5,
+      "x2": 300.5,
+      "y": 126.5,
+      "y2": 126.5
+    },
+    {
+      "opacity": 1,
+      "role": "axis-tick",
+      "stroke": "#888",
+      "strokeWidth": 1,
+      "type": "rule",
+      "x": 0.5,
+      "x2": 0.5,
+      "y": 0.5,
+      "y2": -4.5
+    },
+    {
+      "opacity": 1,
+      "role": "axis-tick",
+      "stroke": "#888",
+      "strokeWidth": 1,
+      "type": "rule",
+      "x": 75.5,
+      "x2": 75.5,
+      "y": 0.5,
+      "y2": -4.5
+    },
+    {
+      "opacity": 1,
+      "role": "axis-tick",
+      "stroke": "#888",
+      "strokeWidth": 1,
+      "type": "rule",
+      "x": 150.5,
+      "x2": 150.5,
+      "y": 0.5,
+      "y2": -4.5
+    },
+    {
+      "opacity": 1,
+      "role": "axis-tick",
+      "stroke": "#888",
+      "strokeWidth": 1,
+      "type": "rule",
+      "x": 225.5,
+      "x2": 225.5,
+      "y": 0.5,
+      "y2": -4.5
+    },
+    {
+      "opacity": 1,
+      "role": "axis-tick",
+      "stroke": "#888",
+      "strokeWidth": 1,
+      "type": "rule",
+      "x": 300.5,
+      "x2": 300.5,
+      "y": 0.5,
+      "y2": -4.5
+    },
+    {
+      "align": "center",
+      "angle": 0,
+      "baseline": "bottom",
+      "fill": "#000",
+      "font": "sans-serif",
+      "fontSize": 10,
+      "opacity": 1,
+      "role": "axis-label",
+      "text": "May",
+      "type": "text",
+      "x": 0.5,
+      "y": -6.5
+    },
+    {
+      "align": "center",
+      "angle": 0,
+      "baseline": "bottom",
+      "fill": "#000",
+      "font": "sans-serif",
+      "fontSize": 10,
+      "opacity": 1,
+      "role": "axis-label",
+      "text": "06 AM",
+      "type": "text",
+      "x": 75.5,
+      "y": -6.5
+    },
+    {
+      "align": "center",
+      "angle": 0,
+      "baseline": "bottom",
+      "fill": "#000",
+      "font": "sans-serif",
+      "fontSize": 10,
+      "opacity": 1,
+      "role": "axis-label",
+      "text": "12 PM",
+      "type": "text",
+      "x": 150.5,
+      "y": -6.5
+    },
+    {
+      "align": "center",
+      "angle": 0,
+      "baseline": "bottom",
+      "fill": "#000",
+      "font": "sans-serif",
+      "fontSize": 10,
+      "opacity": 1,
+      "role": "axis-label",
+      "text": "06 PM",
+      "type": "text",
+      "x": 225.5,
+      "y": -6.5
+    },
+    {
+      "align": "center",
+      "angle": 0,
+      "baseline": "bottom",
+      "fill": "#000",
+      "font": "sans-serif",
+      "fontSize": 10,
+      "opacity": 1,
+      "role": "axis-label",
+      "text": "Sat 02",
+      "type": "text",
+      "x": 300.5,
+      "y": -6.5
+    },
+    {
+      "opacity": 1,
+      "role": "axis-domain",
+      "stroke": "#888",
+      "strokeWidth": 1,
+      "type": "rule",
+      "x": 0.5,
+      "x2": 300.5,
+      "y": 0.5,
+      "y2": 0.5
+    },
+    {
+      "points": "0 99.285714 68.316832 70.714286 141.089109 85 218.316832 60 300 92.142857",
+      "role": "mark",
+      "stroke": "#4c78a8",
+      "strokeWidth": 2,
+      "type": "line"
+    },
+    {
+      "fill": "#e45756",
+      "role": "mark",
+      "shapeHeight": 7.071068,
+      "shapeWidth": 7.071068,
+      "size": 50,
+      "type": "symbol",
+      "x": 0,
+      "y": 37.5
+    },
+    {
+      "fill": "#e45756",
+      "role": "mark",
+      "shapeHeight": 7.071068,
+      "shapeWidth": 7.071068,
+      "size": 50,
+      "type": "symbol",
+      "x": 75,
+      "y": 11.25
+    },
+    {
+      "fill": "#e45756",
+      "role": "mark",
+      "shapeHeight": 7.071068,
+      "shapeWidth": 7.071068,
+      "size": 50,
+      "type": "symbol",
+      "x": 150,
+      "y": 22.5
+    },
+    {
+      "fill": "#e45756",
+      "role": "mark",
+      "shapeHeight": 7.071068,
+      "shapeWidth": 7.071068,
+      "size": 50,
+      "type": "symbol",
+      "x": 225,
+      "y": 0
+    },
+    {
+      "fill": "#e45756",
+      "role": "mark",
+      "shapeHeight": 7.071068,
+      "shapeWidth": 7.071068,
+      "size": 50,
+      "type": "symbol",
+      "x": 300,
+      "y": 30
+    }
+  ],
+  "scales": {
+    "hx": {
+      "domain": [
+        "Fri May 01 2026 02:00:00 GMT+0200 (Central European Summer Time)",
+        "Sat May 02 2026 02:00:00 GMT+0200 (Central European Summer Time)"
+      ],
+      "range": [
+        0,
+        300
+      ],
+      "ticks": [
+        {},
+        {},
+        {},
+        {},
+        {},
+        {},
+        {},
+        {},
+        {}
+      ]
+    },
+    "hy": {
+      "domain": [
+        0,
+        12
+      ],
+      "range": [
+        45,
+        0
+      ],
+      "ticks": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12
+      ]
+    },
+    "x": {
+      "domain": [
+        "Thu Jan 15 2026 01:00:00 GMT+0100 (Central European Standard Time)",
+        "Wed Aug 05 2026 02:00:00 GMT+0200 (Central European Summer Time)"
+      ],
+      "range": [
+        0,
+        300
+      ],
+      "ticks": [
+        {},
+        {},
+        {},
+        {},
+        {},
+        {},
+        {}
+      ]
+    },
+    "y": {
+      "domain": [
+        0,
+        14
+      ],
+      "range": [
+        110,
+        60
+      ],
+      "ticks": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13,
+        14
+      ]
+    }
+  },
+  "size": {
+    "height": 170,
+    "width": 346
+  },
+  "spec": "time-axis.vg.json",
+  "vegaVersion": "6.3.1"
+}

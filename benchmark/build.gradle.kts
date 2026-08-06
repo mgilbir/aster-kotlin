@@ -7,13 +7,14 @@ android {
   compileSdk = 37
 
   defaultConfig {
-    minSdk = 23
+    minSdk = 26
     testInstrumentationRunner = "androidx.benchmark.junit4.AndroidBenchmarkRunner"
   }
 
   compileOptions {
     sourceCompatibility = JavaVersion.VERSION_17
     targetCompatibility = JavaVersion.VERSION_17
+    // java.time.
   }
 
   testBuildType = "release"
@@ -35,6 +36,7 @@ android {
 kotlin { compilerOptions { allWarningsAsErrors.set(true) } }
 
 dependencies {
+  // so
   androidTestImplementation(project(":test-fixtures"))
   androidTestImplementation(project(":vega-scene"))
   androidTestImplementation(project(":vega-svg"))

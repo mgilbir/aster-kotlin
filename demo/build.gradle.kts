@@ -9,7 +9,7 @@ android {
 
   defaultConfig {
     applicationId = "dev.aster.vega.demo"
-    minSdk = 23
+    minSdk = 26
     targetSdk = 37
     versionCode = 1
     versionName = "0.1.0"
@@ -28,6 +28,7 @@ android {
   compileOptions {
     sourceCompatibility = JavaVersion.VERSION_17
     targetCompatibility = JavaVersion.VERSION_17
+    // java.time.
   }
 
   buildFeatures { compose = true }
@@ -41,6 +42,7 @@ android {
 kotlin { compilerOptions { allWarningsAsErrors.set(true) } }
 
 dependencies {
+  // so
   implementation(project(":vega-compose"))
   implementation(project(":test-fixtures"))
   implementation(project(":vega-android-canvas"))
