@@ -3,6 +3,7 @@ package dev.aster.vega.runtime.scale
 import kotlin.math.abs
 import kotlin.math.ceil
 import kotlin.math.floor
+import kotlin.math.ln
 import kotlin.math.log10
 import kotlin.math.pow
 import kotlin.math.sqrt
@@ -153,6 +154,84 @@ public object Ticks {
     val exponent = floor(log10(abs(step)))
     return if (exponent >= 0) 0 else (-exponent).toInt()
   }
+
+  /**
+   * Tick values for a log scale, ported from `d3.scaleLog().ticks()`.
+   *
+   * Two behaviours are easy to miss. When the domain spans few enough octaves, the ticks are the
+   * integer multiples `1..base-1` at each power — so base 10 over `[1, 1000]` gives 1…9, 10, 20…90,
+   * 100…, not just the powers. And when that produces fewer than half the requested count, d3
+   * *falls back to linear ticks*: base 2 over `[1, 8]` yields 1, 1.5, 2, 2.5… rather than 1, 2,
+   * 4, 8.
+   */
+  public fun logTicks(start: Double, stop: Double, base: Double, count: Int = 10): List<Double> {
+    if (start <= 0.0 && stop <= 0.0) {
+      // A wholly negative domain mirrors the positive case.
+      return logTicks(-stop, -start, base, count).map { -it }.reversed()
+    }
+    if (start <= 0.0 || stop <= 0.0 || base <= 1.0) return emptyList()
+
+    val reverse = stop < start
+    val lo = if (reverse) stop else start
+    val hi = if (reverse) start else stop
+
+    val logLo = log(lo, base)
+    val logHi = log(hi, base)
+    val integerBase = base == floor(base)
+
+    val values = mutableListOf<Double>()
+    if (integerBase && logHi - logLo < count) {
+      var i = floor(logLo).toInt()
+      val j = ceil(logHi).toInt()
+      outer@ while (i <= j) {
+        var k = 1
+        while (k < base.toInt()) {
+          val value = if (i < 0) k / base.pow(-i) else k * base.pow(i)
+          if (value < lo) {
+            k++
+            continue
+          }
+          if (value > hi) break@outer
+          values.add(value)
+          k++
+        }
+        i++
+      }
+      // Too sparse to be useful, so d3 abandons the log spacing entirely.
+      if (values.size * 2 < count) {
+        val linear = ticks(lo, hi, count)
+        return if (reverse) linear.reversed() else linear
+      }
+    } else {
+      val span = ticks(logLo, logHi, minOf((logHi - logLo).toInt(), count).coerceAtLeast(1))
+      values.addAll(span.map { base.pow(it) })
+    }
+    return if (reverse) values.reversed() else values
+  }
+
+  /**
+   * Extends a log domain outward to the enclosing powers of [base], as `d3.scaleLog().nice()` does.
+   *
+   * `[3, 700]` at base 10 becomes `[1, 1000]`.
+   */
+  public fun niceLog(domain: List<Double>, base: Double): List<Double> {
+    if (domain.size < 2 || base <= 1.0) return domain
+    val start = domain.first()
+    val stop = domain.last()
+    if (start <= 0.0 || stop <= 0.0 || !start.isFinite() || !stop.isFinite()) return domain
+
+    val reverse = stop < start
+    val lo = if (reverse) stop else start
+    val hi = if (reverse) start else stop
+    val niceLo = base.pow(floor(log(lo, base)))
+    val niceHi = base.pow(ceil(log(hi, base)))
+    val result = domain.toMutableList()
+    result[0] = if (reverse) niceHi else niceLo
+    result[result.size - 1] = if (reverse) niceLo else niceHi
+    return result
+  }
+
+  private fun log(value: Double, base: Double): Double = ln(value) / ln(base)
 
   private const val MAX_NICE_PASSES = 8
 }

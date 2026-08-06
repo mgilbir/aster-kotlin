@@ -8,8 +8,8 @@ structured diagnostic; nothing is silently ignored (PROJECT_BRIEF.md 3.3, 14).
 **Read the Marks table carefully.** A row says "Supported" only when the engine can *produce* that
 construct from an input specification. Where a scene node type exists but nothing encodes data into it
 yet, the row says **Renderable** — the geometry draws and hit-tests correctly, but there is no mark
-encoder, so a Vega specification cannot ask for it. Most of the engine is currently in that state: see
-the scope note in STATUS.md for how much of upstream Vega that leaves.
+encoder, so a Vega specification cannot ask for it. Six of the twelve mark types are now Supported; see
+the scope note in STATUS.md for how much of upstream Vega remains.
 
 ## Input
 
@@ -25,14 +25,14 @@ the scope note in STATUS.md for how much of upstream Vega that leaves.
 
 | Feature | Status | Tests | Known differences | Target milestone |
 | --- | --- | --- | --- | --- |
-| Group | Renderable | `SceneNodeTest`, `AndroidCanvasSceneRendererTest` | Transforms, clipping and paint work. No group-mark faceting or layout | 3 |
+| Group | Renderable | `SceneNodeTest`, `AndroidCanvasSceneRendererTest` | The scene node works; there is no group-mark encoder, so faceting and small multiples are unavailable | 5 |
 | Rect | **Supported** | `SpecCompilerTest`, `BarFixtureDifferentialTest` | Encoder handles x/x2/width and y/y2/height pairs, band offsets, fill, stroke, opacity, corner radius. Geometry matches upstream exactly on the bar fixture | 3 |
-| Rule | Renderable | `SceneNodeTest`, `HitTestTest` | Bounds expand on both axes, so they are slightly conservative for a butt-capped rule. No encoder | 3 |
-| Line | Renderable | `PathTest`, golden `svg/line-chart.svg` | `PathNode` draws a polyline. No encoder, no interpolation methods, no `defined` handling | 3 |
-| Area | Renderable | golden `svg/area-chart.svg` | `PathNode` draws the outline. No encoder, no stacking, no interpolation | 3 |
-| Symbol | Renderable | `SceneNodeTest` | 9 shapes following d3-shape proportions; `wedge`, `arrow`, custom SVG paths absent. No encoder | 3 |
-| Text | Renderable | `TextTest`, `AndroidTextEngineTest` | Metrics are platform text metrics, not browser metrics. No encoder | 3 |
-| Image | Renderable | `SceneExportTest` | Needs an `AndroidImageResolver`; unresolved images report `VEGA_EXPORT_IMAGE_UNRESOLVED`. No encoder | 3 |
+| Rule | **Supported** | `SpecCompilerTest` | A missing `x2`/`y2` defaults to `x`/`y`, as upstream. Bounds expand on both axes, so they are slightly conservative for a butt-capped rule | 3 |
+| Line | **Supported** | `BarFixtureDifferentialTest` (`line-area` fixture) | One `PathNode` per series where upstream emits one item per datum; the harness normalizes both to a point list. A gap breaks the line, as `defined` does. Interpolation methods other than linear are reported, not approximated | 3 |
+| Area | **Supported** | `BarFixtureDifferentialTest` (`line-area` fixture) | Both orientations, via the (x, y) and (x2, y2) boundary pairs. Stacking comes from the `stack` transform. Interpolation as for `line` | 3 |
+| Symbol | **Supported** | `BarFixtureDifferentialTest` (`log-scale` fixture) | 9 shapes following d3-shape proportions. `wedge`, `arrow` and SVG path strings are reported and drawn as a circle | 3 |
+| Text | **Supported** | `BarFixtureDifferentialTest` (`line-area` fixture) | Align, baseline, font, size, weight, style, angle and `dx`/`dy`. Metrics are platform metrics, not browser metrics | 3 |
+| Image | Renderable | `SceneExportTest` | The scene node works and needs an `AndroidImageResolver`; there is no encoder | 5 |
 | Arc | Planned | — | — | 3 |
 | Path (from SVG path strings) | Planned | — | Path-string parsing not implemented | 3 |
 | Trail | Not planned (first release) | — | — | — |
@@ -46,8 +46,10 @@ the scope note in STATUS.md for how much of upstream Vega that leaves.
 | Band | **Supported** | `ScalesTest`, `BarFixtureDifferentialTest` | Step, bandwidth, padding, align and round match d3-scaleBand exactly | 3 |
 | Point | **Supported** | `ScalesTest` | Implemented as a band scale with paddingInner 1, as d3 does | 3 |
 | Ordinal | **Supported** | `ScalesTest` | Explicit range arrays only; colour schemes report `VEGA_SCALE_UNSUPPORTED_TYPE` | 3 |
-| Log, pow, sqrt, symlog | Planned | — | Reports `VEGA_SCALE_UNSUPPORTED_TYPE` | 3 |
-| Time, UTC | Planned | — | — | 3 |
+| Log | **Supported** | `TransformedScalesTest`, `BarFixtureDifferentialTest` | Configurable base; a domain spanning or touching zero is reported rather than adjusted. Ticks are the powers and their multiples, falling back to linear spacing when that is too sparse, and crowded labels are blanked as d3 does | 3 |
+| Pow, sqrt | **Supported** | `TransformedScalesTest` | `pow` defaults to exponent 1, i.e. linear, as upstream; `sqrt` is exponent 0.5. Negative domains handled by sign | 3 |
+| Symlog | **Supported** | `TransformedScalesTest` | `sign(x) * ln(1 + abs(x) / constant)`; handles zero and both signs | 3 |
+| Time, UTC | Planned | — | Need a date and time layer, which also gates the date expression functions and the `timeunit` transform | 5 |
 | Sequential colour | Planned | — | Needs colour interpolation | 3 |
 | Quantile, quantize, threshold, bin-ordinal | Not planned (first release) | — | Reports `VEGA_SCALE_UNSUPPORTED_TYPE` | — |
 
@@ -141,7 +143,8 @@ Upstream Vega exposes 119 expression functions; 60 are implemented. The language
 | --- | --- | --- | --- | --- |
 | Comparison harness | Supported | `Differential` | Compares mark count, type, role, coordinates, extents and scale outputs in absolute content space | 3 |
 | Reference generation | Supported | `oracle-js/src/reference.js`, `scripts/oracle.sh` | References are checked in, so JVM tests need no Node and no network | 3 |
-| Fixtures passing | 2 of a target 100 | `BarFixtureDifferentialTest` | `bar.vg.json` (48 marks) and `stacked-bar.vg.json` (42 marks, exercising stack, aggregate, signals and a conditional encoding): all marks and scale outputs match exactly | 3 |
+| Fixtures passing | 4 of a target 100 | `BarFixtureDifferentialTest` | `bar` (48 marks), `stacked-bar` (42, stack + aggregate + signals + conditional fill), `line-area` (50, line + area + symbol + text), `log-scale` (75, log axis + sqrt). All marks and scale outputs match exactly | 3 |
+| Series normalization | Supported | `Differential` | Vega emits one item per datum for a line or area; this engine builds one path. Both sides collapse to an outline point list, compared numerically | 3 |
 | Axis group bounds | Known difference | `BarFixtureDifferentialTest` | Vega derives an axis group's bounds from the axis extent rather than by unioning its items, so its frame bounds exclude the half-pixel crisp offset and the domain line's stroke. Our surface is up to 1 unit larger per axis; every mark coordinate still agrees exactly | 5 |
 | Text metrics in comparisons | Supported | `VegaHeadlessTextEngine` | Reproduces upstream's canvas-free estimate, `trunc(0.8 × chars × fontSize)`, so layout is comparable. A comparison engine only — never used for display | 3 |
 

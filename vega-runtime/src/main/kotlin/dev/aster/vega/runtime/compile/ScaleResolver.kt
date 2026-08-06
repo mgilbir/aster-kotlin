@@ -13,8 +13,12 @@ import dev.aster.vega.model.spec.ScaleSpec
 import dev.aster.vega.model.spec.ScaleType
 import dev.aster.vega.runtime.scale.BandScale
 import dev.aster.vega.runtime.scale.LinearScale
+import dev.aster.vega.runtime.scale.LogScale
 import dev.aster.vega.runtime.scale.OrdinalScale
 import dev.aster.vega.runtime.scale.PointScale
+import dev.aster.vega.runtime.scale.PowScale
+import dev.aster.vega.runtime.scale.SymlogScale
+import dev.aster.vega.runtime.scale.Ticks
 import dev.aster.vega.runtime.scale.VegaScale
 
 /** The chart's plotting size, which named ranges like `"width"` resolve against. */
@@ -48,6 +52,10 @@ public class ScaleResolver(
   private fun build(spec: ScaleSpec): VegaScale? =
     when (spec.type) {
       ScaleType.LINEAR -> buildLinear(spec)
+      ScaleType.LOG -> buildLog(spec)
+      ScaleType.POW -> buildPow(spec, defaultExponent = 1.0)
+      ScaleType.SQRT -> buildPow(spec, defaultExponent = 0.5)
+      ScaleType.SYMLOG -> buildSymlog(spec)
       ScaleType.BAND -> buildBand(spec)
       ScaleType.POINT -> buildPoint(spec)
       ScaleType.ORDINAL -> buildOrdinal(spec)
@@ -97,6 +105,69 @@ public class ScaleResolver(
     } else {
       scale
     }
+  }
+
+  private fun buildLog(spec: ScaleSpec): LogScale? {
+    val range = numericRange(spec) ?: return null
+    val base = numbers.resolve(spec.base, spec.name) ?: 10.0
+    // A log domain cannot include zero, and `zero: true` would force it to, so it never applies
+    // here.
+    var domain = explicitOrExtent(spec, zeroDefault = false) ?: return null
+    if (spec.nice) domain = Ticks.niceLog(domain, base)
+
+    val scale = LogScale(spec.name, orient(domain, spec.reverse), range, base, spec.clamp)
+    if (!scale.isValid) {
+      diagnostics.error(
+        DiagnosticCodes.SCALE_INVALID_DOMAIN,
+        "Log scale '${spec.name}' has a domain of $domain, which spans or touches zero; " +
+          "marks using it cannot be positioned",
+        operator = spec.name,
+      )
+      return null
+    }
+    return scale
+  }
+
+  private fun buildPow(spec: ScaleSpec, defaultExponent: Double): PowScale? {
+    val range = numericRange(spec) ?: return null
+    var domain = explicitOrExtent(spec, zeroDefault = true) ?: return null
+    if (spec.nice) domain = niceOf(domain, spec)
+    val exponent = numbers.resolve(spec.exponent, spec.name) ?: defaultExponent
+    return PowScale(spec.name, orient(domain, spec.reverse), range, exponent, spec.clamp)
+  }
+
+  private fun buildSymlog(spec: ScaleSpec): SymlogScale? {
+    val range = numericRange(spec) ?: return null
+    var domain = explicitOrExtent(spec, zeroDefault = true) ?: return null
+    if (spec.nice) domain = niceOf(domain, spec)
+    val constant = numbers.resolve(spec.constant, spec.name) ?: 1.0
+    return SymlogScale(spec.name, orient(domain, spec.reverse), range, constant, spec.clamp)
+  }
+
+  /**
+   * The domain for a continuous scale: the literal if there is one, otherwise the data extent.
+   *
+   * [zeroDefault] is whether this scale type includes zero by default when the domain comes from
+   * data. Log scales never do, because a domain containing zero is unusable.
+   */
+  private fun explicitOrExtent(spec: ScaleSpec, zeroDefault: Boolean): List<Double>? {
+    literalNumbers(spec.domain)?.let { explicit ->
+      if (explicit.size >= 2) return explicit
+      diagnostics.error(
+        DiagnosticCodes.SCALE_INVALID_DOMAIN,
+        "Scale '${spec.name}' needs at least two domain values",
+        operator = spec.name,
+      )
+      return null
+    }
+    val extent = numericExtent(spec.domain, spec.name) ?: return listOf(1.0, 10.0)
+    var lo = extent.start
+    var hi = extent.endInclusive
+    if (spec.zero ?: zeroDefault) {
+      lo = minOf(lo, 0.0)
+      hi = maxOf(hi, 0.0)
+    }
+    return listOf(lo, hi)
   }
 
   private fun buildBand(spec: ScaleSpec): BandScale? {

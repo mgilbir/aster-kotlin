@@ -199,6 +199,12 @@ public data class ScaleSpec(
   val paddingInner: NumberValue? = null,
   val paddingOuter: NumberValue? = null,
   val align: NumberValue? = null,
+  /** Log base; defaults to 10. */
+  val base: NumberValue? = null,
+  /** Power-scale exponent; defaults to 1 for `pow` and 0.5 for `sqrt`. */
+  val exponent: NumberValue? = null,
+  /** Symlog constant; defaults to 1. */
+  val constant: NumberValue? = null,
 )
 
 public enum class Orient {

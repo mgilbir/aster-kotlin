@@ -168,11 +168,23 @@ class SpecCompilerTest {
 
   @Test
   fun `an unsupported scale type is reported and dependent marks report too`() {
-    val withLog = minimalBar.replace("\"type\": \"linear\"", "\"type\": \"log\"")
-    val diagnostics = compile(withLog).diagnostics
+    // `quantile` is genuinely unimplemented; `log`, `pow`, `sqrt` and `symlog` are not any more.
+    val withQuantile = minimalBar.replace("\"type\": \"linear\"", "\"type\": \"quantile\"")
+    val diagnostics = compile(withQuantile).diagnostics
     assertTrue(diagnostics.any { it.code == DiagnosticCodes.SCALE_UNSUPPORTED_TYPE })
     // The mark that referenced it must complain as well, rather than positioning at the origin.
     assertTrue(diagnostics.count { it.code == DiagnosticCodes.SCALE_UNSUPPORTED_TYPE } > 1)
+  }
+
+  @Test
+  fun `a log scale with a domain spanning zero is reported`() {
+    val withLog =
+      minimalBar
+        .replace("\"type\": \"linear\"", "\"type\": \"log\"")
+        .replace("""{"c": "a", "v": 1}""", """{"c": "a", "v": 0}""")
+    val diagnostic =
+      compile(withLog).diagnostics.first { it.code == DiagnosticCodes.SCALE_INVALID_DOMAIN }
+    assertTrue(diagnostic.message.contains("zero"), diagnostic.message)
   }
 
   @Test

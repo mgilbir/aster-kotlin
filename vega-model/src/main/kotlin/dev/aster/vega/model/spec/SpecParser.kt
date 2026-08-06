@@ -280,6 +280,9 @@ public class SpecParser {
       paddingInner = obj.numberOrSignal("paddingInner", "$path.paddingInner"),
       paddingOuter = obj.numberOrSignal("paddingOuter", "$path.paddingOuter"),
       align = obj.numberOrSignal("align", "$path.align"),
+      base = obj.numberOrSignal("base", "$path.base"),
+      exponent = obj.numberOrSignal("exponent", "$path.exponent"),
+      constant = obj.numberOrSignal("constant", "$path.constant"),
     )
   }
 

@@ -3,7 +3,10 @@ package dev.aster.vega.runtime.scale
 import dev.aster.vega.model.VegaValue
 import dev.aster.vega.model.asDouble
 import dev.aster.vega.model.asString
+import kotlin.math.exp
 import kotlin.math.floor
+import kotlin.math.ln
+import kotlin.math.pow
 import kotlin.math.roundToInt
 
 /**
@@ -115,8 +118,12 @@ public class LinearScale(
   public fun formatTick(value: Double, count: Int = DEFAULT_TICK_COUNT): String {
     val step = Ticks.stepFrom(Ticks.tickIncrement(domain.first(), domain.last(), count))
     val precision = if (step.isFinite()) Ticks.precisionForStep(step) else 0
-    return formatNumber(value, precision)
+    return formatTickLabel(value, precision)
   }
+
+  /** Labels aligned with [ticks], so a scale can suppress some of them. */
+  public fun tickLabels(count: Int = DEFAULT_TICK_COUNT): List<String> =
+    ticks(count).map { formatTick(it, count) }
 
   public companion object {
     public const val DEFAULT_TICK_COUNT: Int = 10
@@ -264,6 +271,201 @@ public class PointScale(
 }
 
 /**
+ * A continuous scale that interpolates in transformed space.
+ *
+ * Log, power and symlog scales all work the same way: map the domain through a monotonic transform,
+ * interpolate linearly there, and invert by going back. Sharing that structure keeps the difference
+ * between them to the transform itself, which is the only part worth reading carefully.
+ */
+public abstract class TransformedScale(
+  override val name: String,
+  public val domain: List<Double>,
+  public val range: List<Double>,
+  public val clamp: Boolean,
+) : PositionScale {
+
+  init {
+    require(domain.size >= 2) { "$name needs at least two domain values, got $domain" }
+    require(range.size >= 2) { "$name needs at least two range values, got $range" }
+  }
+
+  /** The monotonic transform this scale interpolates in. */
+  protected abstract fun forward(value: Double): Double
+
+  /** The inverse of [forward], for [invert]. */
+  protected abstract fun backward(value: Double): Double
+
+  override val bandwidth: Double
+    get() = 0.0
+
+  override fun position(value: VegaValue): Double = apply(value.asDouble())
+
+  override fun scale(value: VegaValue): VegaValue {
+    val result = position(value)
+    return if (result.isNaN()) VegaValue.Null else VegaValue.Num(result)
+  }
+
+  public fun apply(x: Double): Double {
+    if (x.isNaN()) return Double.NaN
+    val d0 = forward(domain.first())
+    val d1 = forward(domain.last())
+    if (!d0.isFinite() || !d1.isFinite()) return Double.NaN
+    if (d0 == d1) return (range.first() + range.last()) / 2.0
+
+    val low = minOf(domain.first(), domain.last())
+    val high = maxOf(domain.first(), domain.last())
+    val input = if (clamp) x.coerceIn(low, high) else x
+    val t = forward(input)
+    if (!t.isFinite()) return Double.NaN
+    return range.first() + ((t - d0) / (d1 - d0)) * (range.last() - range.first())
+  }
+
+  public fun invert(y: Double): Double {
+    val r0 = range.first()
+    val r1 = range.last()
+    if (r0 == r1) return Double.NaN
+    val d0 = forward(domain.first())
+    val d1 = forward(domain.last())
+    return backward(d0 + ((y - r0) / (r1 - r0)) * (d1 - d0))
+  }
+
+  public open fun ticks(count: Int = LinearScale.DEFAULT_TICK_COUNT): List<Double> =
+    Ticks.ticks(domain.first(), domain.last(), count)
+
+  public open fun formatTick(value: Double, count: Int = LinearScale.DEFAULT_TICK_COUNT): String {
+    val step = Ticks.stepFrom(Ticks.tickIncrement(domain.first(), domain.last(), count))
+    return formatTickLabel(value, if (step.isFinite()) Ticks.precisionForStep(step) else 0)
+  }
+
+  /** Labels aligned with [ticks]. Overridden where a scale suppresses some of them. */
+  public open fun tickLabels(count: Int = LinearScale.DEFAULT_TICK_COUNT): List<String> =
+    ticks(count).map { formatTick(it, count) }
+}
+
+/**
+ * Logarithmic scale.
+ *
+ * The domain must not span or touch zero, since the transform is undefined there. [isValid] reports
+ * that, and the caller turns it into a diagnostic rather than silently clamping the domain into
+ * something usable.
+ */
+public class LogScale(
+  name: String,
+  domain: List<Double>,
+  range: List<Double>,
+  public val base: Double = 10.0,
+  clamp: Boolean = false,
+) : TransformedScale(name, domain, range, clamp) {
+
+  private val logBase = ln(base)
+
+  /** True when the domain lies entirely on one side of zero, i.e. the scale is usable. */
+  public val isValid: Boolean =
+    base > 1.0 &&
+      domain.first() != 0.0 &&
+      domain.last() != 0.0 &&
+      (domain.first() > 0.0) == (domain.last() > 0.0)
+
+  override fun forward(value: Double): Double {
+    if (!isValid) return Double.NaN
+    // A negative domain reflects: the log of the magnitude, negated, so ordering is preserved.
+    return if (domain.first() < 0.0) {
+      if (value >= 0.0) Double.NaN else -ln(-value) / logBase
+    } else {
+      if (value <= 0.0) Double.NaN else ln(value) / logBase
+    }
+  }
+
+  override fun backward(value: Double): Double =
+    if (domain.first() < 0.0) -base.pow(-value) else base.pow(value)
+
+  override fun ticks(count: Int): List<Double> =
+    Ticks.logTicks(domain.first(), domain.last(), base, count)
+
+  override fun formatTick(value: Double, count: Int): String =
+    // Log ticks are powers and their small multiples, so a fixed decimal count does not apply.
+    formatTickLabel(value, if (value == floor(value)) 0 else 2)
+
+  /**
+   * Log tick labels, with the crowded ones blanked as d3 and Vega do.
+   *
+   * A log axis generates every integer multiple at each power — 1…9, 10…90, 100… — which is far
+   * more labels than an axis can show. d3 keeps a label only where the tick's mantissa is at most
+   * `base * count / tickCount` and blanks the rest, so the axis reads 1, 2, 3 then gaps up to 10.
+   * Verified against upstream: `[1, 100]` labels mantissas up to 5, and `[1, 1000000]` only the
+   * powers.
+   *
+   * A blank label is not a missing tick: the tick mark is still drawn.
+   */
+  override fun tickLabels(count: Int): List<String> {
+    val values = ticks(count)
+    if (values.isEmpty()) return emptyList()
+    val threshold = maxOf(1.0, base * count / values.size)
+    return values.map { value ->
+      var mantissa = kotlin.math.abs(value) / base.pow(Math.round(logMagnitude(value)).toDouble())
+      // Guard the case where floating point leaves the mantissa just under 1.
+      if (mantissa * base < base - 0.5) mantissa *= base
+      if (mantissa <= threshold + MANTISSA_EPSILON) formatTick(value, count) else ""
+    }
+  }
+
+  /** The log of the magnitude, which is what the mantissa is measured against. */
+  private fun logMagnitude(value: Double): Double = ln(kotlin.math.abs(value)) / logBase
+
+  private companion object {
+    /** d3 compares the mantissa against a fractional threshold; tolerate representation error. */
+    const val MANTISSA_EPSILON = 1e-9
+  }
+}
+
+/**
+ * Power scale, and by extension `sqrt`.
+ *
+ * The default exponent is 1, which makes an unparameterized `pow` scale linear — worth knowing,
+ * since a specification that omits `exponent` is not actually doing anything.
+ */
+public class PowScale(
+  name: String,
+  domain: List<Double>,
+  range: List<Double>,
+  public val exponent: Double = 1.0,
+  clamp: Boolean = false,
+) : TransformedScale(name, domain, range, clamp) {
+
+  override fun forward(value: Double): Double = signedPow(value, exponent)
+
+  override fun backward(value: Double): Double = signedPow(value, 1.0 / exponent)
+
+  /** Raising a negative value to a fractional power needs the sign handled separately. */
+  private fun signedPow(value: Double, power: Double): Double =
+    if (value < 0.0) -((-value).pow(power)) else value.pow(power)
+}
+
+/**
+ * Symmetric log scale, which unlike [LogScale] handles zero and both signs.
+ *
+ * The transform is `sign(x) * ln(1 + |x| / constant)`. Verified against upstream: over `[-100,
+ * 100]` with the default constant of 1, `-1` lands at 42.49% of the range and `0` exactly at the
+ * midpoint.
+ */
+public class SymlogScale(
+  name: String,
+  domain: List<Double>,
+  range: List<Double>,
+  public val constant: Double = 1.0,
+  clamp: Boolean = false,
+) : TransformedScale(name, domain, range, clamp) {
+
+  override fun forward(value: Double): Double {
+    val scaled = value / constant
+    return if (scaled < 0.0) -ln(1.0 - scaled) else ln(1.0 + scaled)
+  }
+
+  override fun backward(value: Double): Double =
+    if (value < 0.0) -constant * (exp(-value) - 1.0) else constant * (exp(value) - 1.0)
+}
+
+/**
  * Ordinal scale: a discrete domain mapped to a discrete range, cycling when the range is shorter.
  */
 public class OrdinalScale(
@@ -291,6 +493,27 @@ public class OrdinalScale(
  * string in a specification is not supported and must be reported as a diagnostic by the caller
  * rather than silently ignored.
  */
+/**
+ * Formats an axis tick label the way Vega's default does: fixed decimals plus thousands separators.
+ *
+ * Grouping is not optional here. Verified against upstream: a linear axis over `[0, 1000000]`
+ * labels `100,000`, not `100000`, and so does a log axis.
+ */
+public fun formatTickLabel(value: Double, decimals: Int): String =
+  groupThousands(formatNumber(value, decimals))
+
+/** Inserts `,` every three digits of the integer part, leaving any fraction alone. */
+public fun groupThousands(text: String): String {
+  val negative = text.startsWith("-")
+  val body = if (negative) text.substring(1) else text
+  val dot = body.indexOf('.')
+  val integerPart = if (dot < 0) body else body.substring(0, dot)
+  if (integerPart.length <= 3 || integerPart.any { !it.isDigit() }) return text
+  val fraction = if (dot < 0) "" else body.substring(dot)
+  val grouped = integerPart.reversed().chunked(3).joinToString(",").reversed()
+  return (if (negative) "-" else "") + grouped + fraction
+}
+
 public fun formatNumber(value: Double, decimals: Int): String {
   if (value.isNaN()) return "NaN"
   if (value.isInfinite()) return if (value > 0) "∞" else "-∞"

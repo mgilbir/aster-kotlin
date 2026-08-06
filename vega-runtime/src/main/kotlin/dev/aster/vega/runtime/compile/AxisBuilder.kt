@@ -8,6 +8,7 @@ import dev.aster.vega.model.spec.Orient
 import dev.aster.vega.runtime.scale.BandScale
 import dev.aster.vega.runtime.scale.LinearScale
 import dev.aster.vega.runtime.scale.PointScale
+import dev.aster.vega.runtime.scale.TransformedScale
 import dev.aster.vega.runtime.scale.VegaScale
 import dev.aster.vega.scene.Fill
 import dev.aster.vega.scene.GroupNode
@@ -238,8 +239,18 @@ public class AxisBuilder(
       is LinearScale -> {
         val count =
           numbers.resolveInt(spec.tickCount, spec.scale) ?: AxisDefaults.DEFAULT_TICK_COUNT
-        scale.ticks(count).map { value ->
-          Tick(scale.formatTick(value, count), scale.apply(value))
+        // Labels come from the scale rather than being formatted here, because a log scale blanks
+        // the
+        // crowded ones and only it knows which.
+        scale.ticks(count).zip(scale.tickLabels(count)).map { (value, label) ->
+          Tick(label, scale.apply(value))
+        }
+      }
+      is TransformedScale -> {
+        val count =
+          numbers.resolveInt(spec.tickCount, spec.scale) ?: AxisDefaults.DEFAULT_TICK_COUNT
+        scale.ticks(count).zip(scale.tickLabels(count)).map { (value, label) ->
+          Tick(label, scale.apply(value))
         }
       }
       else -> null
