@@ -232,4 +232,51 @@ class ExpressionReferenceTest {
     assertEquals("1", evaluate("{\"a\": 1}.a"))
     assertEquals("1", evaluate("{a: 1}[\"a\"]"))
   }
+
+  /**
+   * Date functions, pinned against upstream.
+   *
+   * Only the `utc` half is checked here, deliberately: the local-time half reads whatever zone the
+   * machine is in, so a reference vector for it would pass in one place and fail in another. The
+   * two share every line of implementation past the zone they are handed, and `TimeScaleTest`
+   * covers the zone-dependent behaviour with zones it names explicitly.
+   */
+  @ParameterizedTest(name = "{0}")
+  @CsvSource(
+    delimiter = '|',
+    value =
+      [
+        // ---- accessors: month and day-of-week are zero-based, quarter and day-of-year are not
+        // ----
+        "utcyear(utc(2026, 2, 14))|2026",
+        "utcquarter(utc(2026, 2, 14))|1",
+        "utcmonth(utc(2026, 2, 14))|2",
+        "utcdate(utc(2026, 2, 14))|14",
+        "utcday(utc(2026, 2, 14))|6",
+        "utcdayofyear(utc(2026, 2, 14))|73",
+        "utchours(utc(2026, 2, 14, 9, 5, 3, 250))|9",
+        "utcminutes(utc(2026, 2, 14, 9, 5, 3, 250))|5",
+        "utcseconds(utc(2026, 2, 14, 9, 5, 3, 250))|3",
+        "utcmilliseconds(utc(2026, 2, 14, 9, 5, 3, 250))|250",
+        // ---- construction rolls over, as JavaScript's Date does ----
+        "utc(2026, 12, 1)|1798761600000",
+        "utc(2026, 0, 32)|1769904000000",
+        "utc(2026, 0, 1) - utc(2025, 11, 31)|86400000",
+        "time(utc(2026, 0, 1))|1767225600000",
+        // ---- formatting ----
+        "utcFormat(utc(2026, 2, 14, 9, 5), '%Y-%m-%d %H:%M')|\"2026-03-14 09:05\"",
+        "utcFormat(utc(2026, 0, 5), '%B %d, %Y')|\"January 05, 2026\"",
+        "utcFormat(utc(2026, 0, 5), '%a %b %e')|\"Mon Jan  5\"",
+        "utcFormat(utc(2026, 0, 5), '%j')|\"005\"",
+        "utcFormat(utc(2026, 6, 4, 13, 7), '%I:%M %p')|\"01:07 PM\"",
+        "utcFormat(utc(2026, 6, 4), '%y')|\"26\"",
+        // ---- reading ----
+        "toDate('2026-01-05T00:00:00Z')|1767571200000",
+        "utcyear(toDate('2026-01-05T00:00:00Z'))|2026",
+        "utcyear(1767225600000)|2026",
+      ],
+  )
+  fun `date functions match upstream`(expression: String, expected: String) {
+    assertEquals(expected, evaluate(expression), expression)
+  }
 }

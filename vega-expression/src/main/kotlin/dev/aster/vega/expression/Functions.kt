@@ -3,6 +3,8 @@ package dev.aster.vega.expression
 import dev.aster.vega.model.PlatformDecimals
 import dev.aster.vega.model.VegaValue
 import dev.aster.vega.model.roundHalfUp
+import dev.aster.vega.model.time.DateValues
+import dev.aster.vega.model.time.TimeFormat
 import kotlin.math.abs
 import kotlin.math.acos
 import kotlin.math.asin
@@ -17,6 +19,16 @@ import kotlin.math.pow
 import kotlin.math.sin
 import kotlin.math.sqrt
 import kotlin.math.tan
+import kotlin.time.Instant
+import kotlinx.datetime.DateTimeUnit
+import kotlinx.datetime.LocalDate
+import kotlinx.datetime.LocalDateTime
+import kotlinx.datetime.TimeZone
+import kotlinx.datetime.atStartOfDayIn
+import kotlinx.datetime.isoDayNumber
+import kotlinx.datetime.number
+import kotlinx.datetime.offsetAt
+import kotlinx.datetime.plus
 
 /** A callable expression function. Arguments arrive already evaluated. */
 public fun interface ExpressionFunction {
@@ -73,18 +85,12 @@ public object Functions {
       "sampleLogNormal" to "produces a non-reproducible scene",
       "sampleUniform" to "produces a non-reproducible scene",
       "now" to "produces a non-reproducible scene",
-      "datetime" to "date and time functions are not implemented",
-      "date" to "date and time functions are not implemented",
-      "day" to "date and time functions are not implemented",
-      "year" to "date and time functions are not implemented",
-      "month" to "date and time functions are not implemented",
-      "hours" to "date and time functions are not implemented",
-      "minutes" to "date and time functions are not implemented",
-      "seconds" to "date and time functions are not implemented",
-      "timeFormat" to "date and time functions are not implemented",
-      "timeParse" to "date and time functions are not implemented",
-      "utcFormat" to "date and time functions are not implemented",
-      "utcParse" to "date and time functions are not implemented",
+      "timeParse" to
+        "parsing a date against a format string needs a strptime the engine does not have; " +
+          "an ISO 8601 string works through toDate",
+      "utcParse" to
+        "parsing a date against a format string needs a strptime the engine does not have; " +
+          "an ISO 8601 string works through toDate",
       "scale" to "requires the scale registry, which the evaluator has no access to yet",
       "invert" to "requires the scale registry, which the evaluator has no access to yet",
       "gradient" to "gradients cannot be produced from an expression yet",
@@ -327,6 +333,45 @@ public object Functions {
       VegaValue.Arr(listOf(VegaValue.Num(lo), VegaValue.Num(hi)))
     }
 
+    // ---- dates --------------------------------------------------------------
+    //
+    // A date is epoch milliseconds here, where upstream has a `Date` object. Arithmetic, comparison
+    // and every accessor below behave the same on both, and it saves the value model a type it
+    // would
+    // otherwise carry everywhere. What it does cost is `typeof`: `isDate` cannot tell a date from a
+    // number, and reports rather than guessing.
+    map["datetime"] = ExpressionFunction { args -> VegaValue.Num(construct(args, localZone())) }
+    map["utc"] = ExpressionFunction { args -> VegaValue.Num(construct(args, TimeZone.UTC)) }
+    map["toDate"] = ExpressionFunction { args -> DateValues.parse(args.at(0)) ?: VegaValue.Null }
+    map["time"] = ExpressionFunction { args -> VegaValue.Num(instantOf(args.at(0))) }
+
+    // Month and day-of-week are zero-based, as JavaScript's are; quarter and day-of-year are not.
+    dateField(map, "year") { it.year.toDouble() }
+    dateField(map, "quarter") { ((it.month.number - 1) / 3 + 1).toDouble() }
+    dateField(map, "month") { (it.month.number - 1).toDouble() }
+    dateField(map, "date") { it.day.toDouble() }
+    dateField(map, "day") { (it.date.dayOfWeek.isoDayNumber % 7).toDouble() }
+    dateField(map, "dayofyear") { it.date.dayOfYear.toDouble() }
+    dateField(map, "hours") { it.hour.toDouble() }
+    dateField(map, "minutes") { it.minute.toDouble() }
+    dateField(map, "seconds") { it.second.toDouble() }
+    dateField(map, "milliseconds") { (it.nanosecond / 1_000_000).toDouble() }
+
+    map["timeFormat"] = ExpressionFunction { args -> formatted(args, localZone()) }
+    map["utcFormat"] = ExpressionFunction { args -> formatted(args, TimeZone.UTC) }
+
+    map["timezoneoffset"] = ExpressionFunction { args ->
+      // JavaScript reports the offset as minutes *behind* UTC, so a zone east of Greenwich is
+      // negative. Reproducing the sign matters more than it looks: specifications subtract it.
+      val instant = instantOf(args.at(0))
+      if (instant.isNaN()) VegaValue.Num(Double.NaN)
+      else {
+        val seconds =
+          localZone().offsetAt(Instant.fromEpochMilliseconds(instant.toLong())).totalSeconds
+        VegaValue.Num(-seconds / 60.0)
+      }
+    }
+
     // ---- control flow -------------------------------------------------------
     map["if"] = ExpressionFunction { args ->
       if (JsSemantics.truthy(args.at(0))) args.at(1) else args.at(2)
@@ -334,6 +379,81 @@ public object Functions {
 
     return map
   }
+
+  /**
+   * Registers a date accessor and its `utc` twin.
+   *
+   * The pair is the whole reason `utc` exists in the language: `month` reads the calendar where the
+   * reader is, `utcmonth` reads it where the data was recorded, and a chart that mixes them is
+   * wrong in a way nothing complains about.
+   */
+  private fun dateField(
+    map: MutableMap<String, ExpressionFunction>,
+    name: String,
+    read: (LocalDateTime) -> Double,
+  ) {
+    map[name] = ExpressionFunction { args -> fieldOf(args.at(0), localZone(), read) }
+    map["utc$name"] = ExpressionFunction { args -> fieldOf(args.at(0), TimeZone.UTC, read) }
+  }
+
+  private fun fieldOf(
+    value: VegaValue,
+    zone: TimeZone,
+    read: (LocalDateTime) -> Double,
+  ): VegaValue {
+    val instant = instantOf(value)
+    if (instant.isNaN()) return VegaValue.Num(Double.NaN)
+    return VegaValue.Num(read(TimeFormat.at(instant, zone)))
+  }
+
+  private fun formatted(args: List<VegaValue>, zone: TimeZone): VegaValue {
+    val instant = instantOf(args.at(0))
+    if (instant.isNaN()) return VegaValue.Str("Invalid Date")
+    return VegaValue.Str(TimeFormat.format(instant, args.string(1), zone))
+  }
+
+  /** Epoch milliseconds for a value that is already an instant, or that reads as an ISO date. */
+  private fun instantOf(value: VegaValue): Double =
+    (DateValues.parse(value) as? VegaValue.Num)?.value ?: JsSemantics.toNumber(value)
+
+  /**
+   * `datetime(year, month, ...)`, where every component past the year is optional and out-of-range
+   * values roll over — `datetime(2026, 12, 1)` is January 2027, as in JavaScript.
+   *
+   * Building from the first of January and adding is what gives the rollover for free; constructing
+   * the date directly would have to reject month 12 instead.
+   */
+  private fun construct(args: List<VegaValue>, zone: TimeZone): Double {
+    val year = args.number(0)
+    if (year.isNaN()) return Double.NaN
+    val start = LocalDate(year.toInt(), 1, 1).atStartOfDayIn(zone)
+    val months = args.numberOr(1, 0.0)
+    val days = args.numberOr(2, 1.0) - 1.0
+    val hours = args.numberOr(3, 0.0)
+    val minutes = args.numberOr(4, 0.0)
+    val seconds = args.numberOr(5, 0.0)
+    val millis = args.numberOr(6, 0.0)
+    if (months.isNaN() || days.isNaN()) return Double.NaN
+
+    // Months and days step through the calendar; the rest is a fixed duration, which is what makes
+    // a
+    // daylight-saving day 23 hours long rather than silently 24.
+    val shifted =
+      start
+        .plus(months.toLong(), DateTimeUnit.MONTH, zone)
+        .plus(days.toLong(), DateTimeUnit.DAY, zone)
+    return shifted.toEpochMilliseconds() +
+      hours * 3_600_000.0 +
+      minutes * 60_000.0 +
+      seconds * 1000.0 +
+      millis
+  }
+
+  private fun List<VegaValue>.numberOr(index: Int, fallback: Double): Double =
+    if (index < size && at(index) != VegaValue.Null) JsSemantics.toNumber(at(index)) else fallback
+
+  /** Where "now" is, for the accessors that read a local calendar. */
+  private fun localZone(): TimeZone = TimeZone.currentSystemDefault()
 
   // ---- helpers --------------------------------------------------------------
 

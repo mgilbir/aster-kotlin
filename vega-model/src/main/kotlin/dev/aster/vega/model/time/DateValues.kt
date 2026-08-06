@@ -1,4 +1,4 @@
-package dev.aster.vega.runtime.scale
+package dev.aster.vega.model.time
 
 import dev.aster.vega.model.VegaValue
 import kotlinx.datetime.LocalDate

@@ -1,12 +1,13 @@
 package dev.aster.vega.runtime.scale
 
+import dev.aster.vega.model.time.TimeFormat
+import dev.aster.vega.model.time.TimeInterval
+import dev.aster.vega.model.time.TimeStepper
 import kotlin.math.abs
-import kotlin.time.Instant
 import kotlinx.datetime.LocalDateTime
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.isoDayNumber
 import kotlinx.datetime.number
-import kotlinx.datetime.toLocalDateTime
 
 /**
  * Choosing and formatting the ticks of a time axis, ported from d3-time and d3-time-format.
@@ -114,89 +115,23 @@ public object TimeTicks {
   public fun label(millis: Double, zone: TimeZone): String {
     val at = localAt(millis, zone)
     return when {
-      at.nanosecond != 0 -> format(at, ".%L")
-      at.second != 0 -> format(at, ":%S")
-      at.minute != 0 -> format(at, "%I:%M")
-      at.hour != 0 -> format(at, "%I %p")
+      at.nanosecond != 0 -> TimeFormat.format(at, ".%L")
+      at.second != 0 -> TimeFormat.format(at, ":%S")
+      at.minute != 0 -> TimeFormat.format(at, "%I:%M")
+      at.hour != 0 -> TimeFormat.format(at, "%I %p")
       at.day != 1 ->
         // A Sunday is a week boundary, so it gets the month back; any other day only needs its
         // name.
-        if (at.date.dayOfWeek.isoDayNumber == 7) format(at, "%b %d") else format(at, "%a %d")
-      at.month.number != 1 -> format(at, "%B")
-      else -> format(at, "%Y")
+        if (at.date.dayOfWeek.isoDayNumber == 7) TimeFormat.format(at, "%b %d")
+        else TimeFormat.format(at, "%a %d")
+      at.month.number != 1 -> TimeFormat.format(at, "%B")
+      else -> TimeFormat.format(at, "%Y")
     }
   }
 
-  private fun localAt(millis: Double, zone: TimeZone): LocalDateTime =
-    Instant.fromEpochMilliseconds(millis.toLong()).toLocalDateTime(zone)
+  private fun localAt(millis: Double, zone: TimeZone): LocalDateTime = TimeFormat.at(millis, zone)
 
-  private val MONTHS =
-    listOf(
-      "January",
-      "February",
-      "March",
-      "April",
-      "May",
-      "June",
-      "July",
-      "August",
-      "September",
-      "October",
-      "November",
-      "December",
-    )
-
-  private val WEEKDAYS =
-    listOf("Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday")
-
-  /**
-   * The strftime directives d3's default time formats use, and only those.
-   *
-   * A specification asking for anything else gets a diagnostic from the caller rather than a
-   * half-honoured format string, which is the same rule the numeric formatter follows.
-   */
+  /** Convenience for callers that already know the pattern they want. */
   public fun format(millis: Double, pattern: String, zone: TimeZone): String =
-    format(localAt(millis, zone), pattern)
-
-  private fun format(at: LocalDateTime, pattern: String): String {
-    val out = StringBuilder(pattern.length + 8)
-    var i = 0
-    while (i < pattern.length) {
-      val c = pattern[i]
-      if (c != '%' || i == pattern.lastIndex) {
-        out.append(c)
-        i++
-        continue
-      }
-      // Sunday-first, because that is the week d3 labels against.
-      val weekday = at.date.dayOfWeek.isoDayNumber % 7
-      when (pattern[i + 1]) {
-        'Y' -> out.append(at.year)
-        'y' -> out.append(pad(at.year % 100, 2))
-        'm' -> out.append(pad(at.month.number, 2))
-        'B' -> out.append(MONTHS[at.month.number - 1])
-        'b' -> out.append(MONTHS[at.month.number - 1].take(3))
-        'A' -> out.append(WEEKDAYS[weekday])
-        'a' -> out.append(WEEKDAYS[weekday].take(3))
-        'd' -> out.append(pad(at.day, 2))
-        'e' -> out.append(at.day.toString().padStart(2, ' '))
-        'H' -> out.append(pad(at.hour, 2))
-        // Twelve-hour clock, where midnight and noon both read 12 rather than 0.
-        'I' -> out.append(pad((at.hour % 12).let { if (it == 0) 12 else it }, 2))
-        'p' -> out.append(if (at.hour < 12) "AM" else "PM")
-        'M' -> out.append(pad(at.minute, 2))
-        'S' -> out.append(pad(at.second, 2))
-        'L' -> out.append(pad(at.nanosecond / 1_000_000, 3))
-        '%' -> out.append('%')
-        else -> {
-          out.append('%')
-          out.append(pattern[i + 1])
-        }
-      }
-      i += 2
-    }
-    return out.toString()
-  }
-
-  private fun pad(value: Int, width: Int): String = value.toString().padStart(width, '0')
+    TimeFormat.format(millis, pattern, zone)
 }

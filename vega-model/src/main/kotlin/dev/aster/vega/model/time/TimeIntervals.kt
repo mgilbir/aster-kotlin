@@ -1,4 +1,4 @@
-package dev.aster.vega.runtime.scale
+package dev.aster.vega.model.time
 
 import kotlin.time.Instant
 import kotlinx.datetime.DateTimeUnit

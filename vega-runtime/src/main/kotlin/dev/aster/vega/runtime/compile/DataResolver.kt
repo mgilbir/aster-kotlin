@@ -11,7 +11,7 @@ import dev.aster.vega.model.VegaValue
 import dev.aster.vega.model.asDouble
 import dev.aster.vega.model.asString
 import dev.aster.vega.model.spec.DataSpec
-import dev.aster.vega.runtime.scale.DateValues
+import dev.aster.vega.model.time.DateValues
 
 /**
  * Resolves dataset definitions to plain value lists, running their transform pipelines.

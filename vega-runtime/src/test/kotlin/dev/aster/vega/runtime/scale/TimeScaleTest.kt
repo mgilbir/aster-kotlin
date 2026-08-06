@@ -1,6 +1,9 @@
 package dev.aster.vega.runtime.scale
 
 import dev.aster.vega.model.VegaValue
+import dev.aster.vega.model.time.DateValues
+import dev.aster.vega.model.time.TimeInterval
+import dev.aster.vega.model.time.TimeStepper
 import kotlinx.datetime.TimeZone
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertNull
