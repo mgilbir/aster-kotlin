@@ -112,18 +112,18 @@ public class SpecCompiler(private val textEngine: TextEngine = MetricTextEngine(
     val scales = ScaleResolver(datasets, plot, diagnostics, numbers).resolve(spec.scales)
 
     val root = CompileScope(datasets, signals, scales, plot)
-    val children =
+    val scope =
       ScopeCompiler(ids, textEngine, diagnostics, expressions, data)
-        .compile(spec.marks, spec.axes, spec.legends, root, plot)
+        .compile(spec.marks, spec.axes, spec.legends, spec.title, root, plot)
 
     val content =
       GroupNode(
         id = ids.allocate(),
-        children = children,
+        children = scope.nodes,
         metadata = NodeMetadata(role = "frame", markName = "root"),
       )
 
-    val scene = layout(spec, content, plot, ids, diagnostics)
+    val scene = layout(spec, scope.bounds, content, plot, ids, diagnostics)
     return CompiledSpec(scene, scales, signals, diagnostics.diagnostics)
   }
 
@@ -137,6 +137,11 @@ public class SpecCompiler(private val textEngine: TextEngine = MetricTextEngine(
    */
   private fun layout(
     spec: VegaSpec,
+    /**
+     * How far the drawing reaches, measured the way upstream measures it — from each axis's extent
+     * rather than from the items it happens to have drawn. Not the same as `content.bounds`.
+     */
+    reach: RectD,
     content: GroupNode,
     plot: PlotSize,
     ids: SceneNodeIdAllocator,
@@ -155,8 +160,7 @@ public class SpecCompiler(private val textEngine: TextEngine = MetricTextEngine(
       AutosizeType.PAD -> {
         // Content bounds include everything drawn, so overflow to the left or above shows up as a
         // negative edge and becomes extra translation.
-        val bounds =
-          if (content.bounds.isEmpty) RectD(0.0, 0.0, plot.width, plot.height) else content.bounds
+        val bounds = if (reach.isEmpty) RectD(0.0, 0.0, plot.width, plot.height) else reach
         val overflowLeft = maxOf(0.0, -bounds.left)
         val overflowTop = maxOf(0.0, -bounds.top)
         val overflowRight = maxOf(0.0, bounds.right - plot.width)
@@ -203,6 +207,7 @@ public class SpecCompiler(private val textEngine: TextEngine = MetricTextEngine(
         )
         layout(
           spec.copy(autosize = spec.autosize.copy(type = AutosizeType.PAD)),
+          reach,
           content,
           plot,
           ids,

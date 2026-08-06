@@ -24,6 +24,7 @@ public data class VegaSpec(
   val scales: List<ScaleSpec>,
   val axes: List<AxisSpec>,
   val legends: List<LegendSpec>,
+  val title: TitleSpec?,
   val marks: List<MarkSpec>,
 )
 
@@ -231,10 +232,50 @@ public enum class Orient {
   }
 }
 
+/** Where a guide's title is anchored along the guide. */
+public enum class Anchor {
+  START,
+  MIDDLE,
+  END;
+
+  public companion object {
+    public fun fromName(name: String): Anchor? =
+      when (name.lowercase()) {
+        "start" -> START
+        "middle" -> MIDDLE
+        "end" -> END
+        else -> null
+      }
+  }
+}
+
+/**
+ * The chart title, and its subtitle.
+ *
+ * @param frame what the title is positioned against. `"group"` means the plotting area; anything
+ *   else — including the default — means the whole drawing, so a title centres over the chart *and
+ *   its axes* rather than over the plotting area alone.
+ */
+public data class TitleSpec(
+  val text: String,
+  val subtitle: String? = null,
+  val orient: Orient = Orient.TOP,
+  val anchor: Anchor = Anchor.MIDDLE,
+  val frame: String? = null,
+  val offset: NumberValue? = null,
+  val subtitlePadding: NumberValue? = null,
+  val fontSize: NumberValue? = null,
+  val subtitleFontSize: NumberValue? = null,
+  val zindex: Int = 0,
+)
+
 public data class AxisSpec(
   val scale: String,
   val orient: Orient,
   val title: String? = null,
+  val titlePadding: NumberValue? = null,
+  val titleFontSize: NumberValue? = null,
+  val titleAnchor: Anchor? = null,
   val grid: Boolean = false,
   val ticks: Boolean = true,
   val labels: Boolean = true,

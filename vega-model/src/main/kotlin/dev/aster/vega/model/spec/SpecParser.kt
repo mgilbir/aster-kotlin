@@ -61,6 +61,7 @@ public class SpecParser {
         scales = parseArray(root, "scales") { value, path -> parseScale(value, path) },
         axes = parseArray(root, "axes") { value, path -> parseAxis(value, path) },
         legends = parseArray(root, "legends") { value, path -> parseLegend(value, path) },
+        title = root.fields["title"]?.let { parseTitle(it, "$.title") },
         marks = parseArray(root, "marks") { value, path -> parseMark(value, path) },
       )
 
@@ -79,7 +80,6 @@ public class SpecParser {
   private fun reportUnsupportedTopLevel(root: VegaValue.Obj) {
     val unsupported =
       mapOf(
-        "title" to "Title generation is not implemented",
         "projections" to "Geographic projections are out of scope",
         "layout" to "Layout specifications are not implemented",
         "config" to "Configuration overrides are not implemented; built-in defaults are used",
@@ -406,6 +406,9 @@ public class SpecParser {
       scale = scale,
       orient = orient,
       title = obj.fields["title"]?.takeIf { it is VegaValue.Str }?.asString(),
+      titlePadding = obj.numberOrSignal("titlePadding", "$path.titlePadding"),
+      titleFontSize = obj.numberOrSignal("titleFontSize", "$path.titleFontSize"),
+      titleAnchor = obj.enumOrNull("titleAnchor", path, "title anchor") { Anchor.fromName(it) },
       grid = obj.fields["grid"]?.asBoolean() ?: false,
       ticks = obj.fields["ticks"]?.asBoolean() ?: true,
       labels = obj.fields["labels"]?.asBoolean() ?: true,
@@ -415,6 +418,63 @@ public class SpecParser {
       labelPadding = obj.numberOrSignal("labelPadding", "$path.labelPadding"),
       labelFontSize = obj.numberOrSignal("labelFontSize", "$path.labelFontSize"),
       offset = obj.numberOrSignal("offset", "$path.offset"),
+      zindex = (obj.fields["zindex"] as? VegaValue.Num)?.value?.toInt() ?: 0,
+    )
+  }
+
+  // ---- titles ---------------------------------------------------------------
+
+  /**
+   * Parses the chart title.
+   *
+   * Vega accepts either a bare string or an object, and both mean the same thing; `encode`
+   * overrides and the styling properties beyond font size are reported rather than partly honoured.
+   */
+  private fun parseTitle(value: VegaValue, path: String): TitleSpec? {
+    if (value is VegaValue.Str) return TitleSpec(text = value.value)
+    val obj = value as? VegaValue.Obj ?: return unexpected("a title definition", path)
+
+    val text = obj.fields["text"]?.takeIf { it is VegaValue.Str }?.asString()
+    if (text.isNullOrEmpty()) {
+      diagnostics.error(
+        DiagnosticCodes.PARSE_MISSING_PROPERTY,
+        "A title needs a 'text'",
+        jsonPath = path,
+      )
+      return null
+    }
+
+    val unsupported =
+      mapOf(
+        "encode" to "Title encode overrides are not implemented",
+        "style" to "Title styles are not implemented",
+        "limit" to "Title text limits are not implemented",
+        "dx" to "Title dx is not implemented",
+        "dy" to "Title dy is not implemented",
+        "align" to "Title alignment follows 'anchor'; an explicit align is not implemented",
+        "angle" to "Title rotation follows 'orient'; an explicit angle is not implemented",
+      )
+    for ((key, reason) in unsupported) {
+      if (obj.fields[key] == null) continue
+      diagnostics.warn(
+        DiagnosticCodes.PARSE_UNKNOWN_PROPERTY,
+        "$reason; '$key' was ignored",
+        jsonPath = "$path.$key",
+      )
+    }
+
+    return TitleSpec(
+      text = text,
+      subtitle = obj.fields["subtitle"]?.takeIf { it is VegaValue.Str }?.asString(),
+      orient =
+        obj.enumOrNull("orient", path, "title orientation") { Orient.fromName(it) } ?: Orient.TOP,
+      anchor =
+        obj.enumOrNull("anchor", path, "title anchor") { Anchor.fromName(it) } ?: Anchor.MIDDLE,
+      frame = obj.fields["frame"]?.asString(),
+      offset = obj.numberOrSignal("offset", "$path.offset"),
+      subtitlePadding = obj.numberOrSignal("subtitlePadding", "$path.subtitlePadding"),
+      fontSize = obj.numberOrSignal("fontSize", "$path.fontSize"),
+      subtitleFontSize = obj.numberOrSignal("subtitleFontSize", "$path.subtitleFontSize"),
       zindex = (obj.fields["zindex"] as? VegaValue.Num)?.value?.toInt() ?: 0,
     )
   }
@@ -638,7 +698,6 @@ public class SpecParser {
   private fun reportUnsupportedGroupScope(obj: VegaValue.Obj, path: String) {
     val unsupported =
       mapOf(
-        "title" to "Title generation is not implemented",
         "layout" to
           "Group layout is not implemented; position each group from its own encode block instead",
         "projections" to "Geographic projections are out of scope",

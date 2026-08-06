@@ -3,6 +3,7 @@ package dev.aster.vega.runtime.compile
 import dev.aster.vega.model.DiagnosticCodes
 import dev.aster.vega.model.DiagnosticCollector
 import dev.aster.vega.model.VegaValue
+import dev.aster.vega.model.spec.Anchor
 import dev.aster.vega.model.spec.AxisSpec
 import dev.aster.vega.model.spec.Orient
 import dev.aster.vega.runtime.scale.BandScale
@@ -38,14 +39,16 @@ import dev.aster.vega.scene.transformedBounds
  * - a band scale's positions are the band centres, shifted back half a pixel, so labels centre on
  *   the band while ticks stay crisp
  *
- * Titles are not generated; the parser reports that.
- *
  * Three different sizes govern an axis, which is invisible at the top level because they coincide
  * there and only diverges inside a group mark. Established by reading upstream's own axis layout:
  * - the axis group is *placed* at the enclosing group's `width`/`height` — its encoded extent
  * - a gridline is as long as the `width`/`height` **signals**, which a group inherits from the
  *   chart unless it declares its own
  * - the domain line spans the scale's own range, not the plotting area
+ *
+ * The title is placed against a fourth quantity: the reach of the ticks and labels only. Gridlines
+ * and the domain line are excluded, so turning on a grid does not push the title away from the
+ * axis.
  */
 public class AxisBuilder(
   private val scales: Map<String, VegaScale>,
@@ -59,24 +62,24 @@ public class AxisBuilder(
   /** One tick's label text and its position along the axis. */
   private data class Tick(val label: String, val position: Double)
 
-  public companion object {
-    /**
-     * The bounds upstream reports for an axis group, which are not this node's bounds.
-     *
-     * Upstream places an axis item at its computed position *plus* the half-pixel crisp offset but
-     * measures it from the position itself, so its bounds sit half a pixel tighter on each axis.
-     * Anything that rounds those bounds outwards — legend placement does, with `floor` and `ceil` —
-     * turns that half pixel into a whole unit of displacement, so the distinction has to be kept.
-     */
-    public fun guideBounds(node: SceneNode): RectD =
-      node.transformedBounds.translate(-AxisDefaults.CRISP_OFFSET, -AxisDefaults.CRISP_OFFSET)
-  }
+  /**
+   * An axis, and the rectangle everything else measures it by.
+   *
+   * The two are not the same, and the difference is upstream's rather than an approximation.
+   * [guideBounds] covers the axis's whole *extent* — the full length of the scale range, and the
+   * depth its ticks and labels reach — where the node's own bounds are the union of the items
+   * actually drawn. An axis whose ticks stop short of its domain therefore still measures its full
+   * length, so a chart's size does not wobble as tick values come and go. The half-pixel crisp
+   * offset the node carries is excluded too, because anything that rounds these bounds outwards
+   * turns half a pixel into a whole unit of displacement.
+   */
+  public data class BuiltAxis(val node: SceneNode, val guideBounds: RectD)
 
   /**
    * @param extent the enclosing group's encoded size, which positions a bottom or right axis.
    * @param gridSize the `width`/`height` signals in scope, which set how long a gridline is.
    */
-  public fun build(spec: AxisSpec, extent: PlotSize, gridSize: PlotSize = extent): SceneNode? {
+  public fun build(spec: AxisSpec, extent: PlotSize, gridSize: PlotSize = extent): BuiltAxis? {
     val scale = scales[spec.scale]
     if (scale == null) {
       diagnostics.error(
@@ -104,6 +107,9 @@ public class AxisBuilder(
     val labelStyle = TextStyle(fontFamily = AxisDefaults.LABEL_FONT_FAMILY, fontSize = fontSize)
 
     val children = mutableListOf<SceneNode>()
+    // Ticks and labels only. Upstream measures an axis by these two and skips the gridlines, so
+    // switching a grid on does not widen the chart or push the axis title away.
+    val measured = mutableListOf<SceneNode>()
     val tickStroke =
       Stroke(paint = ScenePaint.Solid(AxisDefaults.tickColor), width = AxisDefaults.TICK_WIDTH)
     val gridStroke =
@@ -138,7 +144,7 @@ public class AxisBuilder(
       val tickMeta = NodeMetadata(role = "axis-tick")
       for (tick in ticks) {
         val at = AxisDefaults.crispRound(tick.position)
-        children +=
+        measured +=
           when (spec.orient) {
             Orient.BOTTOM ->
               RuleNode(ids.allocate(), at, 0.0, at, tickSize, tickStroke, metadata = tickMeta)
@@ -169,7 +175,7 @@ public class AxisBuilder(
             Orient.LEFT -> -labelOffset to tick.position
             Orient.RIGHT -> labelOffset to tick.position
           }
-        children +=
+        measured +=
           TextNode(
             id = ids.allocate(),
             x = x,
@@ -180,6 +186,10 @@ public class AxisBuilder(
           )
       }
     }
+
+    val tickAndLabelReach =
+      measured.fold(RectD.Empty) { acc, node -> acc.union(node.transformedBounds) }
+    children += measured
 
     if (spec.domainLine) {
       val domainStroke =
@@ -201,11 +211,125 @@ public class AxisBuilder(
         }
     }
 
-    return GroupNode(
+    val titleNode = spec.title?.let { title(spec, it, scale, tickAndLabelReach) }
+    titleNode?.let { children += it }
+
+    val placement = groupTransform(spec, extent)
+    val node =
+      GroupNode(
+        id = ids.allocate(),
+        children = children,
+        transform = placement,
+        metadata = NodeMetadata(role = "axis", markName = spec.scale),
+      )
+
+    val guide =
+      extentRect(spec, scale, tickAndLabelReach)
+        .union(tickAndLabelReach)
+        .union(titleNode?.bounds ?: RectD.Empty)
+        .translate(
+          placement.e - AxisDefaults.CRISP_OFFSET,
+          placement.f - AxisDefaults.CRISP_OFFSET,
+        )
+    return BuiltAxis(node, guide)
+  }
+
+  /**
+   * The rectangle an axis occupies by definition: its full length, and how deep its ticks and
+   * labels reach on its own side.
+   *
+   * Upstream adds this to an axis's bounds unconditionally, which is what makes an axis measure the
+   * whole scale range even when its outermost tick falls short of the domain's end.
+   */
+  private fun extentRect(spec: AxisSpec, scale: VegaScale, reach: RectD): RectD {
+    val range = (scale as? PositionScale)?.range
+    val length =
+      if (range == null || range.size < 2) 0.0 else kotlin.math.abs(range.last() - range.first())
+    val depth = depth(spec, reach)
+    return when (spec.orient) {
+      Orient.BOTTOM -> RectD(0.0, 0.0, length, depth)
+      Orient.TOP -> RectD(0.0, -depth, length, 0.0)
+      Orient.LEFT -> RectD(-depth, 0.0, 0.0, length)
+      Orient.RIGHT -> RectD(0.0, 0.0, depth, length)
+    }
+  }
+
+  /**
+   * How far the ticks and labels stick out on the axis's own side, clamped as upstream clamps it.
+   */
+  private fun depth(spec: AxisSpec, reach: RectD): Double =
+    when (spec.orient) {
+      Orient.BOTTOM -> reach.bottom
+      Orient.TOP -> -reach.top
+      Orient.LEFT -> -reach.left
+      Orient.RIGHT -> reach.right
+    }.coerceIn(AxisDefaults.TITLE_MIN_EXTENT, AxisDefaults.TITLE_MAX_EXTENT)
+
+  /**
+   * The axis title.
+   *
+   * Placed a fixed padding beyond however far the ticks and labels reach, so it never collides with
+   * a long label. A vertical axis rotates its title a quarter turn, and — this is the part that
+   * looks arbitrary until you see it drawn — baselines it at the *bottom* in both directions,
+   * because after the rotation the baseline runs along the axis rather than across it.
+   */
+  private fun title(
+    spec: AxisSpec,
+    text: String,
+    scale: VegaScale,
+    reach: RectD,
+  ): TextNode {
+    val padding = numbers.resolve(spec.titlePadding, spec.scale) ?: AxisDefaults.TITLE_PADDING
+    val fontSize = numbers.resolve(spec.titleFontSize, spec.scale) ?: AxisDefaults.TITLE_FONT_SIZE
+    val anchor = spec.titleAnchor ?: Anchor.MIDDLE
+
+    val depth = depth(spec, reach)
+    val away =
+      if (spec.orient == Orient.TOP || spec.orient == Orient.LEFT) -(depth + padding)
+      else depth + padding
+
+    // Along the axis, the title sits wherever the anchor says on the *scale's range*, not on the
+    // plotting area — the two differ inside a group.
+    val range = (scale as? PositionScale)?.range
+    val from = range?.firstOrNull() ?: 0.0
+    val to = range?.lastOrNull() ?: 0.0
+    val along =
+      when (anchor) {
+        Anchor.START -> from
+        Anchor.END -> to
+        Anchor.MIDDLE -> (from + to) / 2.0
+      }
+
+    val run =
+      TextRun(
+        text = text,
+        style =
+          TextStyle(
+            fontFamily = AxisDefaults.LABEL_FONT_FAMILY,
+            fontSize = fontSize,
+            fontWeight = AxisDefaults.TITLE_FONT_WEIGHT,
+          ),
+        align =
+          when (anchor) {
+            Anchor.START -> TextAlign.LEFT
+            Anchor.END -> TextAlign.RIGHT
+            Anchor.MIDDLE -> TextAlign.CENTER
+          },
+        baseline = if (spec.orient == Orient.BOTTOM) TextBaseline.TOP else TextBaseline.BOTTOM,
+      )
+    return TextNode(
       id = ids.allocate(),
-      children = children,
-      transform = groupTransform(spec, extent),
-      metadata = NodeMetadata(role = "axis", markName = spec.scale),
+      x = if (spec.orient.isVertical) away else along,
+      y = if (spec.orient.isVertical) along else away,
+      layout = textEngine.layout(run),
+      angleDegrees =
+        when (spec.orient) {
+          Orient.LEFT -> -90.0
+          Orient.RIGHT -> 90.0
+          else -> 0.0
+        },
+      fill = Fill.of(AxisDefaults.titleColor),
+      metadata = NodeMetadata(role = "axis-title", markName = spec.scale),
     )
   }
 

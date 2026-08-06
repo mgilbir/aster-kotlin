@@ -362,7 +362,11 @@ public class SvgRenderer(private val options: SvgOptions = SvgOptions()) {
     }
     if (stroke.join != StrokeJoin.MITER) {
       out.append(" stroke-linejoin=\"").append(stroke.join.name.lowercase()).append('"')
-    } else if (stroke.miterLimit != 10.0) {
+    } else if (stroke.miterLimit != Stroke.DEFAULT_MITER_LIMIT) {
+      // Omitted at the default, which leaves SVG's own limit of 10 in force. The two only differ at
+      // a
+      // join sharper than about 29 degrees, which no chart mark produces, and saying nothing keeps
+      // the output comparable with upstream's — which also says nothing.
       out.append(" stroke-miterlimit=\"").append(num(stroke.miterLimit)).append('"')
     }
     if (stroke.dashArray.isNotEmpty()) {

@@ -206,17 +206,20 @@ class SpecCompilerTest {
   }
 
   @Test
-  fun `a top-level title is reported, while legends compile`() {
+  fun `legends, titles and signals all compile rather than being reported`() {
     val extras =
       minimalBar.replace(
         "\"marks\":",
         "\"legends\": [{\"fill\": \"x\"}], \"title\": \"A chart\", \"marks\":",
       )
-    val messages = compile(extras).diagnostics.map { it.message }
-    assertTrue(messages.any { it.contains("title") }, messages.toString())
-    // Legends and signals are no longer in that list; they compile.
+    val compiled = compile(extras)
+    val messages = compiled.diagnostics.map { it.message }
     assertTrue(messages.none { it.contains("Legend generation") }, messages.toString())
+    assertTrue(messages.none { it.contains("Title generation") }, messages.toString())
     assertTrue(messages.none { it.contains("Signals require") }, messages.toString())
+    val roles =
+      requireNotNull(compiled.scene).flatten().mapNotNull { it.node.metadata.role }.toSet()
+    assertTrue(roles.containsAll(setOf("legend", "title", "title-text")), roles.toString())
   }
 
   @Test

@@ -8,7 +8,7 @@ Milestones 0, 1 and 2 complete. **Milestones 3 and 4 in progress**: Vega specifi
 end — including expressions, signals and the twelve data transforms the brief lists — and are verified
 against upstream Vega by differential tests.
 
-Seven differential fixtures pass, all matching upstream exactly on every mark and scale output:
+Eight differential fixtures pass, all matching upstream exactly on every mark and scale output:
 
 | Fixture | Marks | Covers |
 | --- | --- | --- |
@@ -19,6 +19,7 @@ Seven differential fixtures pass, all matching upstream exactly on every mark an
 | `colour-scheme` | 39 | ordinal category10 scheme, interpolated sequential colour |
 | `facet-trellis` | 55 | faceted group marks, nested scopes, per-cell scales and axes, the `parent` signal |
 | `legends` | 28 | a symbol legend beside the chart and a gradient legend below it |
+| `titles` | 28 | chart title and subtitle, titles on both axes, all placed against the whole drawing |
 
 The gate is wired into `./scripts/oracle.sh`, so every further scale, mark and transform is built
 against a harness that can say we are wrong — which golden tests cannot.
@@ -43,7 +44,7 @@ upstream-verified slice through parsing, scales, rect encoding and axes:
 | Diagnostics, canonical snapshots, goldens, oracle scaffolding | no upstream equivalent | complete |
 | `vega-scale` (linear, band, point, ordinal) + d3-array ticks | 790 + parts of d3-scale, d3-array | 4 of ~15 scale types, exact against upstream |
 | `vega-parser` (width, height, padding, autosize, data, signals, scales, axes, marks, group scopes) | 3,790 | a subset; no legends, titles or `layout` |
-| `vega-encode` (mark encoders, axes, legends) | 952 | 7 of 12 mark encoders; axes and legends without titles or overlap removal |
+| `vega-encode` (mark encoders, axes, legends, titles) | 952 | 7 of 12 mark encoders; axes, legends and titles without overlap removal |
 | `vega-expression` + `vega-functions` | 2,388 | language complete; 60 of 119 functions |
 | `vega-transforms` (12 of 40) | 3,754 | the 12 the brief lists, exact against upstream |
 | `vega-dataflow` | 2,081 | contracts and scheduling only; no pulse propagation |
@@ -60,7 +61,7 @@ The entire data and specification half is absent:
 | Remaining mark encoders — arc, image, path, trail, shape | rest of `vega-encode` + d3-shape | 0 |
 | Group `layout` — the trellis grid, headers and titles | `vega-view-transforms` grid layout | 0, reported |
 | Line and area interpolation methods — basis, cardinal, catmull-rom, monotone, step | part of d3-shape | 0, reported |
-| Titles, label overlap removal, banded legends | parts of `vega-encode`, `vega-label` | 0, reported |
+| Label overlap removal, banded legends, group `layout` | parts of `vega-encode`, `vega-label`, `vega-view-transforms` | 0, reported |
 | `vega-view`, `vega-view-transforms` — layout, overlap removal | 2,623 | bounds only |
 | `vega-event-selector` — event-stream DSL | 191 | 0 |
 | `vega-time`, `vega-format` — locale and time units | 587 + d3-format, d3-time-format | 0 |
@@ -74,13 +75,13 @@ substantive compatibility items:
 | --- | --- |
 | 1. Compiled Vega JSON loads without JavaScript | Partial — a substantial subset compiles, including expressions, signals and 12 transforms |
 | 2. Bar, line, area, scatter, stacked bar render natively | **Yes** — all five compile from a specification, and small multiples of them too |
-| 3. Axes, legends, labels and titles supported | Axes, labels and legends yes; titles no |
+| 3. Axes, legends, labels and titles supported | **Yes** — all four |
 | 4. Basic transforms and scales execute in Kotlin | **Yes** — 8 scale types and the 12 transforms the brief lists |
 | 5. Tap, hover, tooltip, selection, pan, zoom | Yes, except tooltip rendering |
 | 6. View and Compose APIs | Yes |
 | 7. SVG, PNG, PDF export | Yes |
 | 8. TalkBack can describe and navigate | Partial — virtual nodes are tested by instrumentation, not with TalkBack itself |
-| 9. At least 100 compatibility fixtures pass | 7 of 100 |
+| 9. At least 100 compatibility fixtures pass | 8 of 100 |
 | 10. Core runtime has no Android dependency | Yes |
 | 11. Renders without WebView | Yes |
 | 12. Build and test loop runs from the terminal | Yes |
@@ -180,7 +181,11 @@ ordering), and the pipeline is now verified end to end on one fixture, but the b
   upstream's `config.legend` and is pinned by a test, because legend layout is pure arithmetic on those
   numbers — a row is `max(ceil(sqrt(symbolSize) + symbolStrokeWidth), labelFontSize)` tall, and a
   gradient is sampled at the scale's own ticks so a multi-stop ramp bends where upstream's does.
-- **Layout**: `autosize: pad` and `none`, sizing the surface from content bounds plus padding.
+- **Titles**: a chart title and subtitle at any of the four edges and any of the three anchors — all
+  twelve combinations verified against upstream — plus a title on each axis. A title is placed against
+  the whole drawing rather than the plotting area, so a chart with wide y-axis labels has its title
+  visibly off the plot's centre, exactly as upstream draws it.
+- **Layout**: `autosize: pad` and `none`, sizing the surface from the drawing's reach plus padding.
 - **Differential harness**: `oracle-js/src/reference.js` emits a normalized comparison model, checked in
   under `test-fixtures/reference/`; `Differential` flattens our scene the same way and compares.
   `scripts/oracle.sh` regenerates references and runs the comparison.
@@ -189,7 +194,7 @@ ordering), and the pipeline is now verified end to end on one fixture, but the b
 
 ## Verification
 
-- 600 JVM tests pass (`./scripts/test-core.sh`, `./gradlew test`).
+- 636 JVM tests pass (`./scripts/test-core.sh`, `./gradlew test`).
 - Android lint is clean with `warningsAsErrors` on every Android module.
 - 47 instrumented tests pass on an API 37 arm64 emulator (`./scripts/test-android.sh`): 40 in
   `vega-android-canvas`, 4 in `vega-compose`, 3 in `demo`.
@@ -233,9 +238,13 @@ diamond and the triangles were each wrong in their own way. The harness could no
 compared a symbol's `size` channel — the requested size — and never the outline. Both sides now report
 the drawn extent, and the twelve shapes are pinned by reference vectors.
 
-One documented difference: our surface is half a pixel larger per axis, because Vega derives an axis
-group's bounds from the axis extent rather than by unioning its items. Every mark coordinate agrees
-exactly.
+**The surface size now matches upstream exactly on all eight fixtures**, where it had been documented
+since Milestone 3 as up to a unit larger per axis. Closing it meant reproducing three separate things
+upstream does when it measures a chart, none of which show up in any single mark's coordinates: an axis
+is measured by its extent rather than by the items it drew, gridlines are excluded from that
+measurement, and a stroked path reserves four stroke widths for a miter join rather than the ten a
+canvas defaults to. Building titles is what forced the issue — a title is placed against that
+measurement, so it could not be approximated.
 
 ## Performance observations
 
@@ -294,13 +303,14 @@ The performance targets in PROJECT_BRIEF.md 19 are therefore all unverified.
 
 ## Next three tasks
 
-1. **Titles, and the axis titles that go with them.** The last guide the compiler cannot produce, and
-   the smallest of the three: chart title and subtitle, axis titles, legend `titleOrient`. All of them
-   are one text node plus placement arithmetic against bounds that already exist, and titles are what
-   a reader looks for first in a chart they did not make.
+1. **Wire the compiler into `VegaChartController.setSpec`.** Every guide a chart needs now compiles,
+   and the demo still renders hand-authored scenes — the one thing a user of this library would try
+   first still reports not-implemented. The open questions are where compilation runs (it must not be
+   the main thread for large data) and how diagnostics reach `controller.diagnostics`; both were
+   deliberately deferred until there was a realistic workload to decide against, and there now is.
 2. **Grid layout, shared by group `layout` and legend entry columns.** The automatic trellis grid —
-   `layout` with columns, padding, headers — and a legend's multi-column entry grid are the same row and
-   column algorithm, and both are currently reported. Doing them together is why this is one task
+   `layout` with columns, padding, headers — and a legend's multi-column entry grid are the same row
+   and column algorithm, and both are currently reported. Doing them together is why this is one task
    rather than two.
 3. **Time and UTC scales.** A date and time layer: parsing, `timeunit`, tick intervals from second to
    year, and locale-aware formatting. Also unblocks the date expression functions and the `timeunit`

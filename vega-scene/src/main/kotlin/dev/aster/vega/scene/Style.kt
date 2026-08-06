@@ -347,7 +347,17 @@ public data class Stroke(
   val width: Double = 1.0,
   val cap: StrokeCap = StrokeCap.BUTT,
   val join: StrokeJoin = StrokeJoin.MITER,
-  val miterLimit: Double = 10.0,
+  /**
+   * How far a miter join may extend past a vertex, in multiples of the stroke width.
+   *
+   * Four, not the 10 that Canvas and SVG default to, because that is the allowance upstream Vega
+   * reserves when it measures a stroked path: a 3-unit line ends up 6 units longer than its points
+   * rather than 15, and under `autosize: pad` that difference lands straight in the chart's overall
+   * size. The two limits only draw differently at a join sharper than about 29 degrees, which no
+   * mark in a chart produces — the sharpest is a triangle symbol's 60-degree corner, needing an
+   * allowance of 2 — so measuring upstream's way costs nothing in fidelity.
+   */
+  val miterLimit: Double = DEFAULT_MITER_LIMIT,
   val dashArray: List<Double> = emptyList(),
   val dashOffset: Double = 0.0,
   val opacity: Double = 1.0,
@@ -358,6 +368,13 @@ public data class Stroke(
   /** Half the stroke width, i.e. how far a stroke extends beyond the geometry it outlines. */
   public val halfWidth: Double
     get() = width / 2.0
+
+  public companion object {
+    /**
+     * See [miterLimit]: upstream's measuring allowance, not the platform's drawing default of 10.
+     */
+    public const val DEFAULT_MITER_LIMIT: Double = 4.0
+  }
 }
 
 /** Fill description, split from [Stroke] so a node can carry one, both or neither. */

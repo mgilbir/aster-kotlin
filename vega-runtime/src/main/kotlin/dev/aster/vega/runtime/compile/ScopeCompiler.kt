@@ -10,10 +10,14 @@ import dev.aster.vega.model.spec.FacetSpec
 import dev.aster.vega.model.spec.LegendSpec
 import dev.aster.vega.model.spec.MarkSpec
 import dev.aster.vega.model.spec.MarkType
+import dev.aster.vega.model.spec.TitleSpec
 import dev.aster.vega.runtime.scale.VegaScale
+import dev.aster.vega.scene.GroupNode
+import dev.aster.vega.scene.RectD
 import dev.aster.vega.scene.SceneNode
 import dev.aster.vega.scene.SceneNodeIdAllocator
 import dev.aster.vega.scene.TextEngine
+import dev.aster.vega.scene.transformedBounds
 
 /**
  * Everything visible from one point in a specification: the top level, or the inside of a group
@@ -54,41 +58,70 @@ internal class ScopeCompiler(
    * @param extent the size of the group being filled, which positions its bottom and right axes. At
    *   the top level this is the chart's plotting area.
    */
+  /** A scope's scene nodes, and how far the drawing they make up reaches. */
+  data class ScopeContent(val nodes: List<SceneNode>, val bounds: RectD)
+
   fun compile(
     marks: List<MarkSpec>,
     axes: List<AxisSpec>,
     legends: List<LegendSpec>,
+    title: TitleSpec?,
     scope: CompileScope,
     extent: PlotSize,
-  ): List<SceneNode> {
+  ): ScopeContent {
     val numbers = NumberResolver(expressions, scope.signals, diagnostics)
     val axisBuilder = AxisBuilder(scope.scales, ids, textEngine, diagnostics, numbers)
     val encoder =
       MarkEncoder(scope.scales, ids, diagnostics, scope.signals, expressions, textEngine)
 
     val children = mutableListOf<SceneNode>()
+    // How far the drawing reaches, which is what a title is placed against. It starts as the
+    // plotting
+    // area and grows: an axis contributes its *guide* bounds rather than its node bounds, for the
+    // same
+    // half-pixel reason legend placement does.
+    var content = RectD(0.0, 0.0, extent.width, extent.height)
+
     // Vega draws axes below marks unless an axis opts into a higher zindex, and legends above both.
     val (underlay, overlay) = axes.partition { it.zindex <= 0 }
     var guides = GuideBounds.of(extent)
     for (axis in underlay) {
-      val node = axisBuilder.build(axis, extent, scope.rangeSize) ?: continue
-      children += node
-      guides = guides.including(axis, node)
+      val built = axisBuilder.build(axis, extent, scope.rangeSize) ?: continue
+      children += built.node
+      guides = guides.including(axis, built.guideBounds)
+      content = content.union(built.guideBounds)
     }
     for (mark in marks) {
-      children +=
-        if (mark.type == MarkType.GROUP) group(mark, scope, encoder)
-        else encoder.encode(mark, markData(mark, scope))
+      if (mark.type == MarkType.GROUP) {
+        val built = group(mark, scope, encoder)
+        children += built.nodes
+        content = content.union(built.bounds)
+      } else {
+        val nodes = encoder.encode(mark, markData(mark, scope))
+        children += nodes
+        for (node in nodes) content = content.union(node.transformedBounds)
+      }
     }
     for (axis in overlay) {
-      val node = axisBuilder.build(axis, extent, scope.rangeSize) ?: continue
-      children += node
-      guides = guides.including(axis, node)
+      val built = axisBuilder.build(axis, extent, scope.rangeSize) ?: continue
+      children += built.node
+      guides = guides.including(axis, built.guideBounds)
+      content = content.union(built.guideBounds)
     }
-    children +=
+    val legendNodes =
       LegendBuilder(scope.scales, ids, textEngine, diagnostics, numbers)
         .build(legends, extent, guides)
-    return children
+    children += legendNodes
+    for (node in legendNodes) content = content.union(node.transformedBounds)
+
+    // Last, because a title is placed against everything else: it centres over the chart *and* its
+    // axes and legends, not over the plotting area.
+    title?.let {
+      val node = TitleBuilder(ids, textEngine, diagnostics, numbers).build(it, content, extent)
+      children += node
+      content = content.union(node.transformedBounds)
+    }
+    return ScopeContent(children, content)
   }
 
   /**
@@ -98,11 +131,9 @@ internal class ScopeCompiler(
    * heightens what a top or bottom legend clears. Upstream keeps them separate, so a left axis does
    * not shift a right-hand legend even though it enlarges the chart.
    */
-  private fun GuideBounds.including(axis: AxisSpec, node: SceneNode): GuideBounds {
-    val bounds = AxisBuilder.guideBounds(node)
-    return if (axis.orient.isVertical) copy(vertical = vertical.union(bounds))
+  private fun GuideBounds.including(axis: AxisSpec, bounds: RectD): GuideBounds =
+    if (axis.orient.isVertical) copy(vertical = vertical.union(bounds))
     else copy(horizontal = horizontal.union(bounds))
-  }
 
   // ---- group marks ------------------------------------------------------------
 
@@ -114,12 +145,39 @@ internal class ScopeCompiler(
     val boundName: String? = null,
   )
 
-  private fun group(spec: MarkSpec, outer: CompileScope, encoder: MarkEncoder): List<SceneNode> {
+  /**
+   * Compiles a group mark, keeping each cell's *reach* as well as its nodes.
+   *
+   * A cell's reach is not the same as its node bounds: the axes inside it measure by their extent,
+   * so asking the finished [GroupNode] how big it is would quietly reintroduce the half-pixel crisp
+   * offset that everything outside the cell is careful to exclude.
+   */
+  private fun group(spec: MarkSpec, outer: CompileScope, encoder: MarkEncoder): ScopeContent {
     val partitions = partition(spec, outer)
-    return encoder.encodeGroup(spec, partitions.map { it.datum }) { _, index, extent ->
-      val inner = nest(spec, partitions[index], outer)
-      compile(spec.marks, spec.axes, spec.legends, inner, PlotSize(extent.width, extent.height))
+    val inner = arrayOfNulls<RectD>(partitions.size)
+    val nodes =
+      encoder.encodeGroup(spec, partitions.map { it.datum }) { _, index, extent ->
+        val scoped =
+          compile(
+            spec.marks,
+            spec.axes,
+            spec.legends,
+            null,
+            nest(spec, partitions[index], outer),
+            PlotSize(extent.width, extent.height),
+          )
+        inner[index] = scoped.bounds
+        scoped.nodes
+      }
+
+    var bounds = RectD.Empty
+    nodes.forEachIndexed { index, node ->
+      val cell = node as? GroupNode ?: return@forEachIndexed
+      var reach = inner[index] ?: RectD.Empty
+      node.stroke?.let { reach = reach.expand(it.halfWidth) }
+      bounds = bounds.union(cell.transform.mapBounds(reach))
     }
+    return ScopeContent(nodes, bounds)
   }
 
   /**

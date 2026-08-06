@@ -38,4 +38,23 @@ public object AxisDefaults {
    * spelled out here rather than assumed.
    */
   public fun crispRound(value: Double): Double = kotlin.math.floor(value + 0.5)
+
+  /** Gap between the far edge of the ticks and labels and the axis title. */
+  public const val TITLE_PADDING: Double = 4.0
+
+  public const val TITLE_FONT_SIZE: Double = 11.0
+
+  /** Axis and legend titles are bold; their labels are not. */
+  public const val TITLE_FONT_WEIGHT: Int = 700
+
+  /**
+   * How far a title may be pushed away from its axis.
+   *
+   * Upstream clamps to `[0, 200]`, so an axis with pathologically long labels stops pushing its
+   * title outwards rather than dragging the whole surface with it.
+   */
+  public const val TITLE_MIN_EXTENT: Double = 0.0
+  public const val TITLE_MAX_EXTENT: Double = 200.0
+
+  public val titleColor: SceneColor = SceneColor.parse("#000")!!
 }

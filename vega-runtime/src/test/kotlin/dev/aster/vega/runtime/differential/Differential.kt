@@ -205,7 +205,14 @@ public object Differential {
   private fun textMark(node: TextNode, world: Transform2D): Mark {
     val anchor = world.apply(node.x, node.y)
     val run = node.layout.run
-    val numbers = linkedMapOf("x" to anchor.x, "y" to anchor.y, "fontSize" to run.style.fontSize)
+    val numbers =
+      linkedMapOf(
+        "x" to anchor.x,
+        "y" to anchor.y,
+        "fontSize" to run.style.fontSize,
+        // Rotation is geometry, not styling: a quarter-turned axis title reads down the page.
+        "angle" to node.angleDegrees,
+      )
     val strings =
       linkedMapOf(
         "text" to run.text,
