@@ -516,7 +516,7 @@ class GroupMarkTest {
   }
 
   @Test
-  fun `a group's layout is reported, while its legends are built in its own scope`() {
+  fun `a group's legends are built in its own scope`() {
     val compiled =
       compile(
         """
@@ -524,14 +524,11 @@ class GroupMarkTest {
           "width": 100, "height": 100, "padding": 0,
           "marks": [{"type": "group",
             "encode": {"enter": {"width": {"value": 40}, "height": {"value": 40}}},
-            "layout": {"columns": 2},
             "scales": [{"name": "c", "type": "ordinal", "domain": ["a"], "range": ["red"]}],
             "legends": [{"fill": "c"}]}]
         }
         """
       )
-    val messages = compiled.diagnostics.map { it.message }
-    assertTrue(messages.any { it.contains("layout") }, messages.toString())
     // The legend reads a scale declared on the group, so it can only have been built in that scope.
     val legend =
       requireNotNull(compiled.scene)
@@ -540,6 +537,52 @@ class GroupMarkTest {
         .filterIsInstance<GroupNode>()
         .single { it.metadata.role == "legend" }
     assertEquals("c", legend.metadata.markName)
+  }
+
+  @Test
+  fun `a layout grids the cells, overriding wherever their own encode put them`() {
+    // Read off upstream: three 30x20 cells in two columns with 10 and 6 of padding sit at (0,0),
+    // (40,0) and (0,26) — and the x each cell encoded for itself is discarded, which is the point.
+    val groups =
+      scopes(
+        """
+        {
+          "width": 200, "height": 100, "padding": 0,
+          "data": [{"name": "t", "values": [{"k": "a"}, {"k": "b"}, {"k": "c"}]}],
+          "layout": {"columns": 2, "padding": {"row": 6, "column": 10}},
+          "marks": [{
+            "type": "group",
+            "from": {"facet": {"name": "cell", "data": "t", "groupby": "k"}},
+            "encode": {"enter": {"x": {"value": 99}, "y": {"value": 99},
+              "width": {"value": 30}, "height": {"value": 20}, "fill": {"value": "#eee"}}}
+          }]
+        }
+        """
+      )
+    assertEquals(3, groups.size)
+    assertEquals(
+      listOf(0.0 to 0.0, 40.0 to 0.0, 0.0 to 26.0),
+      groups.map { it.transform.e to it.transform.f },
+    )
+  }
+
+  @Test
+  fun `layout features that are not implemented are reported by name`() {
+    val compiled =
+      compile(
+        """
+        {
+          "width": 100, "height": 100, "padding": 0,
+          "layout": {"columns": 2, "align": "all", "center": true, "headerBand": 0.5},
+          "marks": [{"type": "group",
+            "encode": {"enter": {"width": {"value": 10}, "height": {"value": 10}}}}]
+        }
+        """
+      )
+    val messages = compiled.diagnostics.map { it.message }
+    for (name in listOf("align", "center", "headerBand")) {
+      assertTrue(messages.any { it.contains("'$name'") }, "$name not reported in $messages")
+    }
   }
 
   @Test

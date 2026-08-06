@@ -287,52 +287,51 @@ internal class LegendBuilder(
     val rowPadding = numbers.resolve(spec.rowPadding, scaleName) ?: LegendDefaults.ROW_PADDING
     val columnPadding =
       numbers.resolve(spec.columnPadding, scaleName) ?: LegendDefaults.COLUMN_PADDING
-    return place(cells, vertical, if (vertical) rowPadding else columnPadding, scaleName)
+    // Upstream's default is one column when the entries run down and one row when they run across;
+    // `columns` overrides either.
+    val columns =
+      numbers.resolveInt(spec.columns, scaleName)?.coerceAtLeast(1)
+        ?: if (vertical) 1 else cells.size
+    return place(cells, columns, rowPadding, columnPadding, scaleName)
   }
 
   /**
-   * Lays entries out along the legend, in upstream's own arithmetic.
+   * Places the entries in a grid.
    *
-   * Not simply "advance by the entry's height": upstream rounds the previous cell's far edge *up*,
-   * and separately adds however far the next cell overhangs *backwards*, rounded up too. With
-   * uniform swatches the two rules coincide and either would do; with a size legend, where each
-   * swatch is larger than the last and overhangs its own origin, they diverge by several units per
-   * row and the legend drifts.
+   * A multi-column legend fills *down* each column before moving across, which is how a reader
+   * scans a list; the nodes come back in row-major order, which is the order they are drawn in.
    */
   private fun place(
     cells: List<List<SceneNode>>,
-    vertical: Boolean,
-    padding: Double,
+    columns: Int,
+    rowPadding: Double,
+    columnPadding: Double,
     scaleName: String,
   ): List<SceneNode> {
-    val boxes = cells.map { cell -> cell.fold(RectD.Empty) { acc, node -> acc.union(node.bounds) } }
-    val placed = mutableListOf<SceneNode>()
-    var at = 0.0
-    cells.forEachIndexed { index, cell ->
-      if (index > 0) {
-        val previous = boxes[index - 1]
-        val box = boxes[index]
-        val far = if (vertical) previous.bottom else previous.right
-        val near = if (vertical) box.top else box.left
-        at += padding + overhang(near) + ceil(far)
-      }
-      placed +=
-        GroupNode(
-          id = ids.allocate(),
-          children = cell,
-          transform =
-            if (vertical) Transform2D.translate(0.0, at) else Transform2D.translate(at, 0.0),
-          // Upstream calls this a "scope" group; naming it for what it is keeps a legend entry
-          // distinguishable from a group mark's cell, which shares that role.
-          metadata =
-            NodeMetadata(role = "legend-entry-item", markName = scaleName, datumIndex = index),
-        )
+    val order = GridLayout.columnMajorOrder(cells.size, columns)
+    val ordered = order.map { cells[it] }
+    val boxes = ordered.map { cell ->
+      cell.fold(RectD.Empty) { acc, node -> acc.union(node.bounds) }
     }
-    return placed
-  }
+    val offsets = GridLayout.place(boxes, GridLayout.Options(columns, rowPadding, columnPadding))
 
-  /** How far a cell reaches back past its own origin, rounded up. Zero when it does not. */
-  private fun overhang(edge: Double): Double = if (edge < 0.0) ceil(-edge) else 0.0
+    return ordered.indices.map { position ->
+      val offset = offsets[position]
+      GroupNode(
+        id = ids.allocate(),
+        children = ordered[position],
+        transform = Transform2D.translate(offset.x, offset.y),
+        // Upstream calls this a "scope" group; naming it for what it is keeps a legend entry
+        // distinguishable from a group mark's cell, which shares that role.
+        metadata =
+          NodeMetadata(
+            role = "legend-entry-item",
+            markName = scaleName,
+            datumIndex = order[position],
+          ),
+      )
+    }
+  }
 
   private fun symbolShape(spec: LegendSpec): SymbolShape {
     val name = spec.symbolType ?: return SymbolShape.CIRCLE

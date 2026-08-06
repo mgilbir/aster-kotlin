@@ -7,6 +7,7 @@ import dev.aster.vega.model.DiagnosticCollector
 import dev.aster.vega.model.VegaValue
 import dev.aster.vega.model.spec.AxisSpec
 import dev.aster.vega.model.spec.FacetSpec
+import dev.aster.vega.model.spec.LayoutSpec
 import dev.aster.vega.model.spec.LegendSpec
 import dev.aster.vega.model.spec.MarkSpec
 import dev.aster.vega.model.spec.MarkType
@@ -17,6 +18,7 @@ import dev.aster.vega.scene.RectD
 import dev.aster.vega.scene.SceneNode
 import dev.aster.vega.scene.SceneNodeIdAllocator
 import dev.aster.vega.scene.TextEngine
+import dev.aster.vega.scene.Transform2D
 import dev.aster.vega.scene.transformedBounds
 
 /**
@@ -58,14 +60,24 @@ internal class ScopeCompiler(
    * @param extent the size of the group being filled, which positions its bottom and right axes. At
    *   the top level this is the chart's plotting area.
    */
-  /** A scope's scene nodes, and how far the drawing they make up reaches. */
-  data class ScopeContent(val nodes: List<SceneNode>, val bounds: RectD)
+  /**
+   * A scope's scene nodes, and how far the drawing they make up reaches.
+   *
+   * @param cellReach set only for a group mark's cells, which a `layout` needs in order to grid
+   *   them by what they contain rather than by what they declared.
+   */
+  data class ScopeContent(
+    val nodes: List<SceneNode>,
+    val bounds: RectD,
+    val cellReach: List<RectD> = emptyList(),
+  )
 
   fun compile(
     marks: List<MarkSpec>,
     axes: List<AxisSpec>,
     legends: List<LegendSpec>,
     title: TitleSpec?,
+    layout: LayoutSpec?,
     scope: CompileScope,
     extent: PlotSize,
   ): ScopeContent {
@@ -94,8 +106,15 @@ internal class ScopeCompiler(
     for (mark in marks) {
       if (mark.type == MarkType.GROUP) {
         val built = group(mark, scope, encoder)
-        children += built.nodes
-        content = content.union(built.bounds)
+        // A `layout` replaces whatever the cells' own encode blocks positioned them at, which is
+        // the
+        // point of it: the specification describes one cell and lets the grid place them all.
+        val placed =
+          if (layout == null) built
+          else
+            grid(layout, built, NumberResolver(expressions, scope.signals, diagnostics), mark.name)
+        children += placed.nodes
+        content = content.union(placed.bounds)
       } else {
         val nodes = encoder.encode(mark, markData(mark, scope))
         children += nodes
@@ -163,6 +182,7 @@ internal class ScopeCompiler(
             spec.axes,
             spec.legends,
             null,
+            spec.layout,
             nest(spec, partitions[index], outer),
             PlotSize(extent.width, extent.height),
           )
@@ -170,14 +190,53 @@ internal class ScopeCompiler(
         scoped.nodes
       }
 
+    val reaches = nodes.mapIndexed { index, node ->
+      var reach = inner[index] ?: RectD.Empty
+      (node as? GroupNode)?.stroke?.let { reach = reach.expand(it.halfWidth) }
+      reach
+    }
     var bounds = RectD.Empty
     nodes.forEachIndexed { index, node ->
-      val cell = node as? GroupNode ?: return@forEachIndexed
-      var reach = inner[index] ?: RectD.Empty
-      node.stroke?.let { reach = reach.expand(it.halfWidth) }
-      bounds = bounds.union(cell.transform.mapBounds(reach))
+      bounds = bounds.union(node.transform.mapBounds(reaches[index]))
     }
-    return ScopeContent(nodes, bounds)
+    return ScopeContent(nodes, bounds, reaches)
+  }
+
+  /**
+   * Places a group mark's cells on a grid.
+   *
+   * The cells are measured by how far their contents reach, not by their declared size, so a
+   * trellis whose axis labels hang off to the left leaves room for them instead of overlapping the
+   * cell next door.
+   */
+  private fun grid(
+    layout: LayoutSpec,
+    built: ScopeContent,
+    numbers: NumberResolver,
+    owner: String?,
+  ): ScopeContent {
+    if (built.nodes.isEmpty()) return built
+    val name = owner ?: "layout"
+    val options =
+      GridLayout.Options(
+        columns = numbers.resolveInt(layout.columns, name)?.coerceAtLeast(1) ?: built.nodes.size,
+        rowPadding = numbers.resolve(layout.rowPadding, name) ?: 0.0,
+        columnPadding = numbers.resolve(layout.columnPadding, name) ?: 0.0,
+      )
+    val offsets = GridLayout.place(built.cellReach, options)
+    var bounds = RectD.Empty
+    val placed =
+      built.nodes.mapIndexed { index, node ->
+        val offset = offsets[index]
+        val moved =
+          when (node) {
+            is GroupNode -> node.copy(transform = Transform2D.translate(offset.x, offset.y))
+            else -> node
+          }
+        bounds = bounds.union(moved.transform.mapBounds(built.cellReach[index]))
+        moved
+      }
+    return ScopeContent(placed, bounds, built.cellReach)
   }
 
   /**

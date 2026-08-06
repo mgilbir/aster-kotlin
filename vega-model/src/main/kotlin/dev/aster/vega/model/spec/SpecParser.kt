@@ -62,6 +62,7 @@ public class SpecParser {
         axes = parseArray(root, "axes") { value, path -> parseAxis(value, path) },
         legends = parseArray(root, "legends") { value, path -> parseLegend(value, path) },
         title = root.fields["title"]?.let { parseTitle(it, "$.title") },
+        layout = root.fields["layout"]?.let { parseLayout(it, "$.layout") },
         marks = parseArray(root, "marks") { value, path -> parseMark(value, path) },
       )
 
@@ -81,7 +82,6 @@ public class SpecParser {
     val unsupported =
       mapOf(
         "projections" to "Geographic projections are out of scope",
-        "layout" to "Layout specifications are not implemented",
         "config" to "Configuration overrides are not implemented; built-in defaults are used",
         "encode" to "Top-level encode blocks are not implemented",
         "usermeta" to "usermeta is ignored",
@@ -541,6 +541,7 @@ public class SpecParser {
         gradientThickness = obj.numberOrSignal("gradientThickness", "$path.gradientThickness"),
         rowPadding = obj.numberOrSignal("rowPadding", "$path.rowPadding"),
         columnPadding = obj.numberOrSignal("columnPadding", "$path.columnPadding"),
+        columns = obj.numberOrSignal("columns", "$path.columns"),
         legendX = obj.numberOrSignal("legendX", "$path.legendX"),
         legendY = obj.numberOrSignal("legendY", "$path.legendY"),
         zindex = (obj.fields["zindex"] as? VegaValue.Num)?.value?.toInt() ?: 0,
@@ -561,7 +562,6 @@ public class SpecParser {
         "encode" to "Legend encode overrides are not implemented",
         "format" to "Legend label format specifiers are not implemented",
         "formatType" to "Legend label format types are not implemented",
-        "columns" to "Multi-column legend layout is not implemented; entries run in a single line",
         "labelOverlap" to "Legend label overlap removal is not implemented",
         "symbolLimit" to "Legend entry limits are not implemented; every entry is shown",
         "titleOrient" to "Only a legend title above the entries is implemented",
@@ -658,6 +658,7 @@ public class SpecParser {
       scales = parseArray(obj, "scales", path) { child, childPath -> parseScale(child, childPath) },
       legends =
         parseArray(obj, "legends", path) { child, childPath -> parseLegend(child, childPath) },
+      layout = obj.fields["layout"]?.let { parseLayout(it, "$path.layout") },
       zindex = (obj.fields["zindex"] as? VegaValue.Num)?.value?.toInt() ?: 0,
       interactive = obj.fields["interactive"]?.asBoolean() ?: true,
       clip = obj.fields["clip"]?.asBoolean() ?: false,
@@ -715,14 +716,57 @@ public class SpecParser {
     return FacetSpec(name = name, data = data, groupby = groupby)
   }
 
-  /** Reports the parts of a group's scope that the runtime cannot build. */
-  private fun reportUnsupportedGroupScope(obj: VegaValue.Obj, path: String) {
+  /**
+   * Parses a group's `layout`.
+   *
+   * Only the placement is modelled. Headers, footers and titles are separate marks upstream
+   * generates around the grid, and they are reported rather than silently dropped, because a
+   * trellis without its row and column labels is a chart nobody can read.
+   */
+  private fun parseLayout(value: VegaValue, path: String): LayoutSpec? {
+    val obj = value as? VegaValue.Obj ?: return unexpected("a layout definition", path)
     val unsupported =
       mapOf(
-        "layout" to
-          "Group layout is not implemented; position each group from its own encode block instead",
-        "projections" to "Geographic projections are out of scope",
+        "headerBand" to "Layout header bands are not implemented",
+        "footerBand" to "Layout footer bands are not implemented",
+        "titleBand" to "Layout title bands are not implemented",
+        "align" to "Only per-cell ('each') grid alignment is implemented",
+        "bounds" to "Only full-bounds grid layout is implemented",
+        "center" to "Centring cells within their row or column is not implemented",
+        "offset" to "Layout offsets are not implemented",
       )
+    for ((key, reason) in unsupported) {
+      if (obj.fields[key] == null) continue
+      diagnostics.warn(
+        DiagnosticCodes.PARSE_UNKNOWN_PROPERTY,
+        "$reason; '$key' was ignored",
+        jsonPath = "$path.$key",
+      )
+    }
+
+    // `padding` is either one number for both directions or a per-direction object.
+    val padding = obj.fields["padding"]
+    val rowPadding: NumberValue?
+    val columnPadding: NumberValue?
+    if (padding is VegaValue.Obj) {
+      rowPadding = padding.numberOrSignal("row", "$path.padding.row")
+      columnPadding = padding.numberOrSignal("column", "$path.padding.column")
+    } else {
+      val both = obj.numberOrSignal("padding", "$path.padding")
+      rowPadding = both
+      columnPadding = both
+    }
+
+    return LayoutSpec(
+      columns = obj.numberOrSignal("columns", "$path.columns"),
+      rowPadding = rowPadding,
+      columnPadding = columnPadding,
+    )
+  }
+
+  /** Reports the parts of a group's scope that the runtime cannot build. */
+  private fun reportUnsupportedGroupScope(obj: VegaValue.Obj, path: String) {
+    val unsupported = mapOf("projections" to "Geographic projections are out of scope")
     for ((key, reason) in unsupported) {
       val value = obj.fields[key] ?: continue
       if (value is VegaValue.Arr && value.values.isEmpty()) continue

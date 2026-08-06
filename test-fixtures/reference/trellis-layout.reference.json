@@ -1,0 +1,101 @@
+{
+  "marks": [
+    {
+      "fill": "#eee",
+      "height": 40,
+      "role": "scope",
+      "type": "group",
+      "width": 60,
+      "x": 0,
+      "y": 0
+    },
+    {
+      "fill": "#4c78a8",
+      "height": 3,
+      "role": "mark",
+      "type": "rect",
+      "width": 10,
+      "x": 2,
+      "y": 2
+    },
+    {
+      "fill": "#eee",
+      "height": 40,
+      "role": "scope",
+      "type": "group",
+      "width": 60,
+      "x": 80,
+      "y": 0
+    },
+    {
+      "fill": "#4c78a8",
+      "height": 5,
+      "role": "mark",
+      "type": "rect",
+      "width": 10,
+      "x": 82,
+      "y": 2
+    },
+    {
+      "fill": "#eee",
+      "height": 40,
+      "role": "scope",
+      "type": "group",
+      "width": 60,
+      "x": 160,
+      "y": 0
+    },
+    {
+      "fill": "#4c78a8",
+      "height": 2,
+      "role": "mark",
+      "type": "rect",
+      "width": 10,
+      "x": 162,
+      "y": 2
+    },
+    {
+      "fill": "#eee",
+      "height": 40,
+      "role": "scope",
+      "type": "group",
+      "width": 60,
+      "x": 0,
+      "y": 52
+    },
+    {
+      "fill": "#4c78a8",
+      "height": 7,
+      "role": "mark",
+      "type": "rect",
+      "width": 10,
+      "x": 2,
+      "y": 54
+    },
+    {
+      "fill": "#eee",
+      "height": 40,
+      "role": "scope",
+      "type": "group",
+      "width": 60,
+      "x": 80,
+      "y": 52
+    },
+    {
+      "fill": "#4c78a8",
+      "height": 4,
+      "role": "mark",
+      "type": "rect",
+      "width": 10,
+      "x": 82,
+      "y": 54
+    }
+  ],
+  "scales": {},
+  "size": {
+    "height": 210,
+    "width": 310
+  },
+  "spec": "trellis-layout.vg.json",
+  "vegaVersion": "6.3.1"
+}

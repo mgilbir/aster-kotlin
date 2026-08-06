@@ -489,12 +489,12 @@ class LegendTest {
     val compiled =
       compile(
         spec(
-          """{"fill": "s1", "columns": 2, "labelOverlap": "parity", "symbolLimit": 4,
+          """{"fill": "s1", "labelOverlap": "parity", "symbolLimit": 4,
              "format": ".2f", "titleOrient": "left"}"""
         )
       )
     val messages = compiled.diagnostics.map { it.message }
-    for (name in listOf("columns", "labelOverlap", "symbolLimit", "format", "titleOrient")) {
+    for (name in listOf("labelOverlap", "symbolLimit", "format", "titleOrient")) {
       assertTrue(messages.any { it.contains("'$name'") }, "$name not reported in $messages")
     }
   }
@@ -506,5 +506,33 @@ class LegendTest {
       compiled.diagnostics.any { it.message.contains("legend orientation 'sideways'") },
       compiled.diagnostics.toString(),
     )
+  }
+
+  @Test
+  fun `columns wrap the entries, filling down each column before moving across`() {
+    // Read off upstream: five entries in two columns sit at (0,0), (42,0), (0,13), (42,13), (0,26),
+    // and the *order* is aa, dd, bb, ee, cc — down the left column, then down the right.
+    val json =
+      spec(
+        """{"fill": "s5", "columns": 2}""",
+        scales =
+          """
+          {"name": "s5", "type": "ordinal", "domain": ["aa", "bb", "cc", "dd", "ee"],
+           "range": {"scheme": "category10"}}
+          """,
+      )
+    val labels = role(json, "legend-label").map { (it as TextNode).text }
+    assertEquals(listOf("aa", "dd", "bb", "ee", "cc"), labels)
+
+    val legendX = legends(json).single().transform.e
+    val placedSymbols = placed(json, "legend-symbol").map { it.centerX - legendX to it.centerY }
+    assertEquals(
+      listOf(6.0 to 6.0, 48.0 to 6.0, 6.0 to 19.0, 48.0 to 19.0, 6.0 to 32.0),
+      placedSymbols,
+    )
+    // 32 wide plus columnPadding 10 across, 11 tall plus rowPadding 2 down.
+    val legend = legends(json).single()
+    assertEquals(74.0, legend.size?.width)
+    assertEquals(37.0, legend.size?.height)
   }
 }

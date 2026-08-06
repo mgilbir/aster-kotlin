@@ -114,7 +114,7 @@ public class SpecCompiler(private val textEngine: TextEngine = MetricTextEngine(
     val root = CompileScope(datasets, signals, scales, plot)
     val scope =
       ScopeCompiler(ids, textEngine, diagnostics, expressions, data)
-        .compile(spec.marks, spec.axes, spec.legends, spec.title, root, plot)
+        .compile(spec.marks, spec.axes, spec.legends, spec.title, spec.layout, root, plot)
 
     val content =
       GroupNode(

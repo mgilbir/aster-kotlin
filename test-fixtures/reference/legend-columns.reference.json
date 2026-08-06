@@ -1,0 +1,153 @@
+{
+  "marks": [
+    {
+      "fill": "#1f77b4",
+      "opacity": 1,
+      "role": "legend-symbol",
+      "shapeHeight": 10,
+      "shapeWidth": 10,
+      "size": 100,
+      "type": "symbol",
+      "x": 224,
+      "y": 6
+    },
+    {
+      "align": "left",
+      "baseline": "middle",
+      "fill": "#000",
+      "font": "sans-serif",
+      "fontSize": 10,
+      "opacity": 1,
+      "role": "legend-label",
+      "text": "aa",
+      "type": "text",
+      "x": 234,
+      "y": 6
+    },
+    {
+      "fill": "#d62728",
+      "opacity": 1,
+      "role": "legend-symbol",
+      "shapeHeight": 10,
+      "shapeWidth": 10,
+      "size": 100,
+      "type": "symbol",
+      "x": 266,
+      "y": 6
+    },
+    {
+      "align": "left",
+      "baseline": "middle",
+      "fill": "#000",
+      "font": "sans-serif",
+      "fontSize": 10,
+      "opacity": 1,
+      "role": "legend-label",
+      "text": "dd",
+      "type": "text",
+      "x": 276,
+      "y": 6
+    },
+    {
+      "fill": "#ff7f0e",
+      "opacity": 1,
+      "role": "legend-symbol",
+      "shapeHeight": 10,
+      "shapeWidth": 10,
+      "size": 100,
+      "type": "symbol",
+      "x": 224,
+      "y": 19
+    },
+    {
+      "align": "left",
+      "baseline": "middle",
+      "fill": "#000",
+      "font": "sans-serif",
+      "fontSize": 10,
+      "opacity": 1,
+      "role": "legend-label",
+      "text": "bb",
+      "type": "text",
+      "x": 234,
+      "y": 19
+    },
+    {
+      "fill": "#9467bd",
+      "opacity": 1,
+      "role": "legend-symbol",
+      "shapeHeight": 10,
+      "shapeWidth": 10,
+      "size": 100,
+      "type": "symbol",
+      "x": 266,
+      "y": 19
+    },
+    {
+      "align": "left",
+      "baseline": "middle",
+      "fill": "#000",
+      "font": "sans-serif",
+      "fontSize": 10,
+      "opacity": 1,
+      "role": "legend-label",
+      "text": "ee",
+      "type": "text",
+      "x": 276,
+      "y": 19
+    },
+    {
+      "fill": "#2ca02c",
+      "opacity": 1,
+      "role": "legend-symbol",
+      "shapeHeight": 10,
+      "shapeWidth": 10,
+      "size": 100,
+      "type": "symbol",
+      "x": 224,
+      "y": 32
+    },
+    {
+      "align": "left",
+      "baseline": "middle",
+      "fill": "#000",
+      "font": "sans-serif",
+      "fontSize": 10,
+      "opacity": 1,
+      "role": "legend-label",
+      "text": "cc",
+      "type": "text",
+      "x": 234,
+      "y": 32
+    }
+  ],
+  "scales": {
+    "s": {
+      "domain": [
+        "aa",
+        "bb",
+        "cc",
+        "dd",
+        "ee"
+      ],
+      "range": [
+        "#1f77b4",
+        "#ff7f0e",
+        "#2ca02c",
+        "#d62728",
+        "#9467bd",
+        "#8c564b",
+        "#e377c2",
+        "#7f7f7f",
+        "#bcbd22",
+        "#17becf"
+      ]
+    }
+  },
+  "size": {
+    "height": 110,
+    "width": 302
+  },
+  "spec": "legend-columns.vg.json",
+  "vegaVersion": "6.3.1"
+}

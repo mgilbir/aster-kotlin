@@ -25,6 +25,8 @@ public data class VegaSpec(
   val axes: List<AxisSpec>,
   val legends: List<LegendSpec>,
   val title: TitleSpec?,
+  /** Automatic grid placement for this scope's group-mark cells. */
+  val layout: LayoutSpec?,
   val marks: List<MarkSpec>,
 )
 
@@ -412,6 +414,8 @@ public data class LegendSpec(
   val gradientThickness: NumberValue? = null,
   val rowPadding: NumberValue? = null,
   val columnPadding: NumberValue? = null,
+  /** How many entries per row. `null` means one column vertically, one row horizontally. */
+  val columns: NumberValue? = null,
   /** Absolute placement, used when [orient] is [LegendOrient.NONE]. */
   val legendX: NumberValue? = null,
   val legendY: NumberValue? = null,
@@ -539,6 +543,19 @@ public data class EncodeSpec(
 }
 
 /**
+ * A group mark's automatic grid placement.
+ *
+ * Given a `layout`, a group's cells are positioned by the grid rather than by their own `x` and
+ * `y`, which is how small multiples avoid computing cell positions by hand.
+ */
+public data class LayoutSpec(
+  /** Cells per row. `null` puts them all in one row, as upstream does. */
+  val columns: NumberValue? = null,
+  val rowPadding: NumberValue? = null,
+  val columnPadding: NumberValue? = null,
+)
+
+/**
  * A mark definition.
  *
  * A `group` mark is also a scope: [data], [signals], [scales], [axes] and [marks] declared on it
@@ -560,6 +577,8 @@ public data class MarkSpec(
   /** Scales scoped to this group, resolved against the group's own data. */
   val scales: List<ScaleSpec> = emptyList(),
   val legends: List<LegendSpec> = emptyList(),
+  /** Automatic grid placement for this group's cells. */
+  val layout: LayoutSpec? = null,
   val zindex: Int = 0,
   val interactive: Boolean = true,
   val clip: Boolean = false,
