@@ -8,7 +8,7 @@ Milestones 0, 1 and 2 complete. **Milestones 3 and 4 in progress**: Vega specifi
 end — including expressions, signals and the twelve data transforms the brief lists — and are verified
 against upstream Vega by differential tests.
 
-Twenty-four differential fixtures pass, all matching upstream exactly on every mark and scale output:
+Twenty-five differential fixtures pass, all matching upstream exactly on every mark and scale output:
 
 | Fixture | Marks | Covers |
 | --- | --- | --- |
@@ -36,6 +36,7 @@ Twenty-four differential fixtures pass, all matching upstream exactly on every m
 | `timeunit` | 25 | rows bucketed into calendar months, then counted |
 | `legend-columns` | 10 | legend entries wrapped into two columns |
 | `trellis-layout` | 10 | five cells gridded by a layout, with row and column padding |
+| `trellis-headers` | 8 | a grid with row and column headers, each titled from its own datum |
 
 The gate is wired into `./scripts/oracle.sh`, so every further scale, mark and transform is built
 against a harness that can say we are wrong — which golden tests cannot.
@@ -77,7 +78,7 @@ The entire data and specification half is absent:
 | Remaining mark encoders — arc, image, path, trail, shape | rest of `vega-encode` + d3-shape | 0 |
 | Group `layout` — the trellis grid, headers and titles | `vega-view-transforms` grid layout | 0, reported |
 | Line and area interpolation methods — basis, cardinal, catmull-rom, monotone, step | part of d3-shape | 0, reported |
-| Label overlap removal, banded legends, trellis headers and titles | parts of `vega-encode`, `vega-label`, `vega-view-transforms` | 0, reported |
+| Label overlap removal, banded legends, trellis footers | parts of `vega-encode`, `vega-label`, `vega-view-transforms` | 0, reported |
 | `vega-view`, `vega-view-transforms` — layout, overlap removal | 2,623 | bounds only |
 | `vega-event-selector` — event-stream DSL | 191 | 0 |
 | `vega-time`, `vega-format` — `timeunit`, locales, format strings | 587 + d3-format, d3-time-format | tick selection and default labels only |
@@ -97,7 +98,7 @@ substantive compatibility items:
 | 6. View and Compose APIs | Yes |
 | 7. SVG, PNG, PDF export | Yes |
 | 8. TalkBack can describe and navigate | Partial — virtual nodes are tested by instrumentation, not with TalkBack itself |
-| 9. At least 100 compatibility fixtures pass | 24 of 100 |
+| 9. At least 100 compatibility fixtures pass | 25 of 100 |
 | 10. Core runtime has no Android dependency | Yes |
 | 11. Renders without WebView | Yes |
 | 12. Build and test loop runs from the terminal | Yes |
@@ -207,6 +208,9 @@ ordering), and the pipeline is now verified end to end on one fixture, but the b
   upstream's `config.legend` and is pinned by a test, because legend layout is pure arithmetic on those
   numbers — a row is `max(ceil(sqrt(symbolSize) + symbolStrokeWidth), labelFontSize)` tall, and a
   gradient is sampled at the scale's own ticks so a multi-stop ramp bends where upstream's does.
+- **Trellis headers and titles**: a group marked `row-header` or `column-title` is arranged around
+  the grid rather than gridded into it, each labelled from its own datum through a group `title` whose
+  text is a signal.
 - **Grid layout**: `layout` places a group mark's cells on a row-and-column grid, and a legend's
   `columns` wraps its entries the same way — one algorithm, which is why they were done together. A
   multi-column legend fills down each column before moving across, the order a reader scans a list.
@@ -359,9 +363,9 @@ The performance targets in PROJECT_BRIEF.md 19 are therefore all unverified.
    that kept a gap for ticks that were switched off, and `reverse` reversing the wrong end of the
    scale. Still untouched: `sequence`, `window` and the other 28 transforms, arc and shape marks, and
    anything involving dates.
-2. **Trellis headers and titles.** The grid places cells; what it does not yet do is label the rows
-   and columns, which upstream generates as separate marks around the grid. A trellis without them is
-   a chart nobody can read, so this is the other half of the feature rather than a refinement.
-3. **Label overlap removal.** `labelOverlap` on an axis or a legend, which is what stops a dense
-   time axis printing every label on top of the last. Reported everywhere it appears today, and the
-   most visible remaining gap on a chart that is otherwise correct.
+2. **Label overlap removal.** `labelOverlap` on an axis or a legend, which is what stops a dense time
+   axis printing every label on top of the last. Reported everywhere it appears, and the most visible
+   remaining gap on a chart that is otherwise correct.
+3. **The remaining mark encoders.** `arc` first, since a pie chart is the commonest chart this
+   engine still cannot draw at all, then `trail`, `shape`, `image` and `path`. Each is reported today,
+   so a specification using one is visibly missing its marks rather than wrong.

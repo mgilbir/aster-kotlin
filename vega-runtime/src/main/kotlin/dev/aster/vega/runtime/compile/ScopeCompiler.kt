@@ -5,6 +5,7 @@ import dev.aster.vega.expression.ExpressionCompiler
 import dev.aster.vega.model.DiagnosticCodes
 import dev.aster.vega.model.DiagnosticCollector
 import dev.aster.vega.model.VegaValue
+import dev.aster.vega.model.roundHalfUp
 import dev.aster.vega.model.spec.AxisSpec
 import dev.aster.vega.model.spec.FacetSpec
 import dev.aster.vega.model.spec.LayoutSpec
@@ -14,6 +15,7 @@ import dev.aster.vega.model.spec.MarkType
 import dev.aster.vega.model.spec.TitleSpec
 import dev.aster.vega.runtime.scale.VegaScale
 import dev.aster.vega.scene.GroupNode
+import dev.aster.vega.scene.PointD
 import dev.aster.vega.scene.RectD
 import dev.aster.vega.scene.SceneNode
 import dev.aster.vega.scene.SceneNodeIdAllocator
@@ -70,7 +72,10 @@ internal class ScopeCompiler(
     val nodes: List<SceneNode>,
     val bounds: RectD,
     val cellReach: List<RectD> = emptyList(),
-  )
+  ) {
+    /** How far node [index] reaches in its own coordinates, falling back to its own bounds. */
+    fun boxOf(index: Int): RectD = cellReach.getOrNull(index) ?: nodes[index].bounds
+  }
 
   fun compile(
     marks: List<MarkSpec>,
@@ -103,23 +108,29 @@ internal class ScopeCompiler(
       guides = guides.including(axis, built.guideBounds)
       content = content.union(built.guideBounds)
     }
+    // A `layout` cannot place anything until every group in the scope is built, because the cells
+    // decide the grid and the headers are placed against it. So they are collected first.
+    val trellisParts = mutableListOf<Pair<TrellisRole, ScopeContent>>()
     for (mark in marks) {
       if (mark.type == MarkType.GROUP) {
         val built = group(mark, scope, encoder)
-        // A `layout` replaces whatever the cells' own encode blocks positioned them at, which is
-        // the
-        // point of it: the specification describes one cell and lets the grid place them all.
-        val placed =
-          if (layout == null) built
-          else
-            grid(layout, built, NumberResolver(expressions, scope.signals, diagnostics), mark.name)
-        children += placed.nodes
-        content = content.union(placed.bounds)
+        if (layout != null) {
+          trellisParts += TrellisRole.of(mark.role) to built
+        } else {
+          children += built.nodes
+          content = content.union(built.bounds)
+        }
       } else {
         val nodes = encoder.encode(mark, markData(mark, scope))
         children += nodes
         for (node in nodes) content = content.union(node.transformedBounds)
       }
+    }
+    if (layout != null) {
+      val placed =
+        trellis(layout, trellisParts, NumberResolver(expressions, scope.signals, diagnostics))
+      children += placed.nodes
+      content = content.union(placed.bounds)
     }
     for (axis in overlay) {
       val built = axisBuilder.build(axis, extent, scope.rangeSize) ?: continue
@@ -181,7 +192,7 @@ internal class ScopeCompiler(
             spec.marks,
             spec.axes,
             spec.legends,
-            null,
+            spec.title,
             spec.layout,
             nest(spec, partitions[index], outer),
             PlotSize(extent.width, extent.height),
@@ -201,6 +212,104 @@ internal class ScopeCompiler(
     }
     return ScopeContent(nodes, bounds, reaches)
   }
+
+  /**
+   * Arranges a whole trellis: the cells on a grid, and the row and column labels around it.
+   *
+   * A header is placed against the cell it labels on one axis and against the grid's edge on the
+   * other, so the labels track the grid however it wraps. A title is placed halfway along the grid,
+   * just outside whatever its headers reached.
+   */
+  private fun trellis(
+    layout: LayoutSpec,
+    parts: List<Pair<TrellisRole, ScopeContent>>,
+    numbers: NumberResolver,
+  ): ScopeContent {
+    val gridded = parts.map { (role, part) ->
+      role to if (role == TrellisRole.CELL) grid(layout, part, numbers, null) else part
+    }
+    val cells = gridded.filter { it.first == TrellisRole.CELL }.map { it.second }
+    val cellNodes = cells.flatMap { it.nodes }
+    val cellBoxes = cells.flatMap { part -> part.nodes.indices.map { part.boxOf(it) } }
+    val columns =
+      numbers.resolveInt(layout.columns, "layout")?.coerceAtLeast(1)
+        ?: cellNodes.size.coerceAtLeast(1)
+
+    var bounds = cells.fold(RectD.Empty) { acc, part -> acc.union(part.bounds) }
+
+    // Where the grid begins on each axis: what a header hangs off.
+    val left =
+      cellNodes.indices
+        .filter { it % columns == 0 }
+        .minOfOrNull {
+          cellNodes[it].transform.e + cellBoxes[it].left
+        } ?: 0.0
+    val top = cellNodes.indices.minOfOrNull { cellNodes[it].transform.f + cellBoxes[it].top } ?: 0.0
+
+    // Headers first, because a title is placed just outside whatever they reached. The results are
+    // kept per declaration so the scene can be emitted in specification order, which is the order
+    // upstream emits it in.
+    val placed = HashMap<Int, List<SceneNode>>()
+    val edges = HashMap<TrellisRole, RectD>()
+    gridded.forEachIndexed { index, (role, part) ->
+      if (role != TrellisRole.ROW_HEADER && role != TrellisRole.COLUMN_HEADER) return@forEachIndexed
+      val alongRows = role == TrellisRole.ROW_HEADER
+      var edge = edges[role] ?: RectD.Empty
+      val moved =
+        part.nodes.mapIndexedNotNull { position, node ->
+          // Header j labels the first cell of row j, or the j-th cell of the top row.
+          val cell = cellNodes.getOrNull(if (alongRows) position * columns else position)
+          if (cell == null) null
+          else {
+            val at =
+              if (alongRows) PointD(left, cell.transform.f) else PointD(cell.transform.e, top)
+            val node2 = moveTo(node, at)
+            val box = node2.transform.mapBounds(part.boxOf(position))
+            bounds = bounds.union(box)
+            edge = edge.union(box)
+            node2
+          }
+        }
+      edges[role] = edge
+      placed[index] = moved
+    }
+
+    val gridBounds = bounds
+    gridded.forEachIndexed { index, (role, part) ->
+      if (role != TrellisRole.ROW_TITLE && role != TrellisRole.COLUMN_TITLE) return@forEachIndexed
+      val alongRows = role == TrellisRole.ROW_TITLE
+      val headerEdge =
+        edges[if (alongRows) TrellisRole.ROW_HEADER else TrellisRole.COLUMN_HEADER] ?: RectD.Empty
+      val moved =
+        part.nodes.mapIndexed { position, node ->
+          val at =
+            if (alongRows) {
+              PointD(
+                if (headerEdge.isEmpty) left else headerEdge.left,
+                roundHalfUp(gridBounds.top + 0.5 * gridBounds.height),
+              )
+            } else {
+              PointD(
+                roundHalfUp(gridBounds.left + 0.5 * gridBounds.width),
+                if (headerEdge.isEmpty) top else headerEdge.top,
+              )
+            }
+          val node2 = moveTo(node, at)
+          bounds = bounds.union(node2.transform.mapBounds(part.boxOf(position)))
+          node2
+        }
+      placed[index] = moved
+    }
+
+    val nodes = gridded.flatMapIndexed { index, (_, part) -> placed[index] ?: part.nodes }
+    return ScopeContent(nodes, bounds)
+  }
+
+  private fun moveTo(node: SceneNode, at: PointD): SceneNode =
+    when (node) {
+      is GroupNode -> node.copy(transform = Transform2D.translate(at.x, at.y))
+      else -> node
+    }
 
   /**
    * Places a group mark's cells on a grid.
@@ -223,17 +332,12 @@ internal class ScopeCompiler(
         rowPadding = numbers.resolve(layout.rowPadding, name) ?: 0.0,
         columnPadding = numbers.resolve(layout.columnPadding, name) ?: 0.0,
       )
-    val offsets = GridLayout.place(built.cellReach, options)
+    val offsets = GridLayout.place(built.nodes.indices.map { built.boxOf(it) }, options)
     var bounds = RectD.Empty
     val placed =
       built.nodes.mapIndexed { index, node ->
-        val offset = offsets[index]
-        val moved =
-          when (node) {
-            is GroupNode -> node.copy(transform = Transform2D.translate(offset.x, offset.y))
-            else -> node
-          }
-        bounds = bounds.union(moved.transform.mapBounds(built.cellReach[index]))
+        val moved = moveTo(node, offsets[index])
+        bounds = bounds.union(moved.transform.mapBounds(built.boxOf(index)))
         moved
       }
     return ScopeContent(placed, bounds, built.cellReach)

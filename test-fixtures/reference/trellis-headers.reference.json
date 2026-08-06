@@ -1,0 +1,99 @@
+{
+  "marks": [
+    {
+      "align": "center",
+      "angle": 0,
+      "baseline": "top",
+      "fill": "#000",
+      "font": "sans-serif",
+      "fontSize": 13,
+      "fontWeight": "bold",
+      "opacity": 1,
+      "role": "title-text",
+      "text": "x",
+      "type": "text"
+    },
+    {
+      "align": "center",
+      "angle": 0,
+      "baseline": "top",
+      "fill": "#000",
+      "font": "sans-serif",
+      "fontSize": 13,
+      "fontWeight": "bold",
+      "opacity": 1,
+      "role": "title-text",
+      "text": "y",
+      "type": "text"
+    },
+    {
+      "align": "center",
+      "angle": -90,
+      "baseline": "top",
+      "fill": "#000",
+      "font": "sans-serif",
+      "fontSize": 13,
+      "fontWeight": "bold",
+      "opacity": 1,
+      "role": "title-text",
+      "text": "one",
+      "type": "text"
+    },
+    {
+      "align": "center",
+      "angle": -90,
+      "baseline": "top",
+      "fill": "#000",
+      "font": "sans-serif",
+      "fontSize": 13,
+      "fontWeight": "bold",
+      "opacity": 1,
+      "role": "title-text",
+      "text": "two",
+      "type": "text"
+    },
+    {
+      "fill": "#eee",
+      "height": 50,
+      "role": "scope",
+      "type": "group",
+      "width": 80,
+      "x": 0,
+      "y": 0
+    },
+    {
+      "fill": "#eee",
+      "height": 50,
+      "role": "scope",
+      "type": "group",
+      "width": 80,
+      "x": 90,
+      "y": 0
+    },
+    {
+      "fill": "#eee",
+      "height": 50,
+      "role": "scope",
+      "type": "group",
+      "width": 80,
+      "x": 0,
+      "y": 60
+    },
+    {
+      "fill": "#eee",
+      "height": 50,
+      "role": "scope",
+      "type": "group",
+      "width": 80,
+      "x": 90,
+      "y": 60
+    }
+  ],
+  "scales": {},
+  "size": {
+    "height": 177,
+    "width": 327
+  },
+  "spec": "trellis-headers.vg.json",
+  "vegaVersion": "6.3.1"
+}

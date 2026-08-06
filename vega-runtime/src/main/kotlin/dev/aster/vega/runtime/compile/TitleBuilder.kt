@@ -88,12 +88,14 @@ internal class TitleBuilder(
         Anchor.MIDDLE -> TextAlign.CENTER
       }
 
+    // A trellis header takes its words from the row it labels, so the text may be a signal.
+    val text = spec.textExpression?.let { numbers.resolveText(it, "title") } ?: spec.text
     val title =
       TextNode(
         id = ids.allocate(),
         x = 0.0,
         y = 0.0,
-        layout = textEngine.layout(run(spec.text, fontSize, TitleDefaults.FONT_WEIGHT, align)),
+        layout = textEngine.layout(run(text, fontSize, TitleDefaults.FONT_WEIGHT, align)),
         angleDegrees = angle,
         fill = Fill.of(TitleDefaults.color),
         metadata = NodeMetadata(role = "title-text"),

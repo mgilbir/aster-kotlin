@@ -455,8 +455,10 @@ public class SpecParser {
     if (value is VegaValue.Str) return TitleSpec(text = value.value)
     val obj = value as? VegaValue.Obj ?: return unexpected("a title definition", path)
 
-    val text = obj.fields["text"]?.takeIf { it is VegaValue.Str }?.asString()
-    if (text.isNullOrEmpty()) {
+    val textField = obj.fields["text"]
+    val expression = (textField as? VegaValue.Obj)?.fields?.get("signal")?.asString()
+    val text = textField?.takeIf { it is VegaValue.Str }?.asString() ?: ""
+    if (text.isEmpty() && expression == null) {
       diagnostics.error(
         DiagnosticCodes.PARSE_MISSING_PROPERTY,
         "A title needs a 'text'",
@@ -486,6 +488,7 @@ public class SpecParser {
 
     return TitleSpec(
       text = text,
+      textExpression = expression,
       subtitle = obj.fields["subtitle"]?.takeIf { it is VegaValue.Str }?.asString(),
       orient =
         obj.enumOrNull("orient", path, "title orientation") { Orient.fromName(it) } ?: Orient.TOP,
@@ -648,6 +651,7 @@ public class SpecParser {
     return MarkSpec(
       type = type,
       name = obj.fields["name"]?.asString(),
+      role = obj.fields["role"]?.takeIf { it is VegaValue.Str }?.asString(),
       from = from?.let { FromSpec(data = it.fields["data"]?.asString(), facet = facet) },
       encode = parseEncode(obj.fields["encode"], "$path.encode"),
       marks = parseArray(obj, "marks", path) { child, childPath -> parseMark(child, childPath) },
@@ -659,6 +663,7 @@ public class SpecParser {
       legends =
         parseArray(obj, "legends", path) { child, childPath -> parseLegend(child, childPath) },
       layout = obj.fields["layout"]?.let { parseLayout(it, "$path.layout") },
+      title = obj.fields["title"]?.let { parseTitle(it, "$path.title") },
       zindex = (obj.fields["zindex"] as? VegaValue.Num)?.value?.toInt() ?: 0,
       interactive = obj.fields["interactive"]?.asBoolean() ?: true,
       clip = obj.fields["clip"]?.asBoolean() ?: false,

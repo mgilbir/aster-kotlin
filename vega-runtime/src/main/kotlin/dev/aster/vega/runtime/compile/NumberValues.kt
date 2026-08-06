@@ -9,7 +9,9 @@ import dev.aster.vega.model.VegaValue
 import dev.aster.vega.model.spec.NumberValue
 
 /**
- * Resolves a [NumberValue] to a number, evaluating a signal expression if that is what it is.
+ * Resolves a property that a specification may have supplied as a signal.
+ *
+ * Mostly numbers, hence the name, but a title's words can come from a signal too.
  *
  * Returns `null` when the value is absent or its expression fails, so the caller applies its own
  * default rather than a shared one — the default for `padding` is not the default for `tickSize`.
@@ -49,6 +51,24 @@ public class NumberResolver(
    * specification points a scale straight at it. A signal that is not an array is treated as a
    * one-element list rather than rejected, which is what upstream's own array coercion does.
    */
+  /**
+   * Evaluates an expression to text, for the properties whose value is words rather than a size.
+   */
+  public fun resolveText(expression: String, owner: String): String? =
+    when (val compiled = expressions.compile(expression)) {
+      is ExpressionResult.Failed -> {
+        diagnostics.add(compiled.diagnostic.copy(operator = owner))
+        null
+      }
+      is ExpressionResult.Compiled ->
+        try {
+          JsSemantics.toStringValue(compiled.expression.evaluate(scope))
+        } catch (e: ExpressionEvaluationException) {
+          diagnostics.add(e.diagnostic.copy(operator = owner))
+          null
+        }
+    }
+
   public fun resolveList(expression: String, owner: String): List<VegaValue>? =
     when (val compiled = expressions.compile(expression)) {
       is ExpressionResult.Failed -> {

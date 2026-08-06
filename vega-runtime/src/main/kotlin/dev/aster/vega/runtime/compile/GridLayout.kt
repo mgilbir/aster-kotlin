@@ -98,3 +98,33 @@ internal object GridLayout {
   /** How far a cell reaches back past its own origin, rounded up. Zero when it does not. */
   private fun overhang(edge: Double): Double = if (edge < 0.0) ceil(-edge) else 0.0
 }
+
+/**
+ * Where a group mark sits in a trellis.
+ *
+ * A grid is not only its cells: a specification supplies the row and column labels as ordinary
+ * group marks tagged with a role, and the layout arranges them around the cells rather than among
+ * them.
+ */
+internal enum class TrellisRole {
+  /** A cell of the grid itself. Anything without a recognised role is one. */
+  CELL,
+  ROW_HEADER,
+  COLUMN_HEADER,
+  ROW_TITLE,
+  COLUMN_TITLE;
+
+  companion object {
+    fun of(role: String?): TrellisRole =
+      when (role) {
+        "row-header" -> ROW_HEADER
+        "column-header" -> COLUMN_HEADER
+        "row-title" -> ROW_TITLE
+        "column-title" -> COLUMN_TITLE
+        else -> CELL
+      }
+
+    /** Roles a `layout` positions but does not grid. */
+    fun isGuide(role: String?): Boolean = of(role) != CELL
+  }
+}

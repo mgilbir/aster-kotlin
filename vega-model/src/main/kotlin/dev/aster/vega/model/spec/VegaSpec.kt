@@ -274,7 +274,15 @@ public enum class Anchor {
  *   its axes* rather than over the plotting area alone.
  */
 public data class TitleSpec(
+  /** The literal text, or empty when [textExpression] supplies it instead. */
   val text: String,
+  /**
+   * An expression producing the text.
+   *
+   * A trellis header labels its row with `{"signal": "parent.r"}`, so a title whose words come from
+   * the data is not an edge case — it is how the commonest use of a group title works.
+   */
+  val textExpression: String? = null,
   val subtitle: String? = null,
   val orient: Orient = Orient.TOP,
   val anchor: Anchor = Anchor.MIDDLE,
@@ -565,6 +573,14 @@ public data class LayoutSpec(
 public data class MarkSpec(
   val type: MarkType,
   val name: String? = null,
+  /**
+   * What this mark is *for*, which only matters inside a `layout`.
+   *
+   * A group marked `row-header` or `column-title` is not a cell of the grid; it labels one.
+   * Upstream reads the same property to decide which marks the grid places and which it arranges
+   * around it.
+   */
+  val role: String? = null,
   val from: FromSpec? = null,
   val encode: EncodeSpec = EncodeSpec(),
   /** Nested marks, for a group mark. */
@@ -579,6 +595,8 @@ public data class MarkSpec(
   val legends: List<LegendSpec> = emptyList(),
   /** Automatic grid placement for this group's cells. */
   val layout: LayoutSpec? = null,
+  /** A title for this group, which is how a trellis header labels its row or column. */
+  val title: TitleSpec? = null,
   val zindex: Int = 0,
   val interactive: Boolean = true,
   val clip: Boolean = false,
