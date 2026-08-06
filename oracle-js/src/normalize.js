@@ -156,6 +156,9 @@ function record(type, role, item, dx, dy, precision) {
     for (const channel of TEXT_CHANNELS) {
       if (item[channel] !== undefined) entry[channel] = canonicalNumber(item[channel], precision);
     }
+    // A text mark's content is whatever the field held, so a numeric field gives a numeric `text`.
+    // Both engines draw its string form, so compare that rather than its type.
+    if (entry.text !== undefined) entry.text = String(entry.text);
   }
   return entry;
 }

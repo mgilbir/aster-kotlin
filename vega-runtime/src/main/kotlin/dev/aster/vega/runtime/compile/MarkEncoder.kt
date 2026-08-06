@@ -299,7 +299,7 @@ public class MarkEncoder(
   private fun line(spec: MarkSpec, data: List<VegaValue>): SceneNode? {
     if (data.isEmpty()) return null
     val channels = spec.encode.effective
-    val segments = segments(data) { datum -> point(channels, datum) }
+    val segments = segments(data, channels) { datum -> point(channels, datum) }
     if (segments.isEmpty()) return null
 
     val style = style(channels, data.first(), spec)
@@ -333,10 +333,9 @@ public class MarkEncoder(
     // handles both orientations, because a vertical area leaves x2 defaulting to x and a horizontal
     // one leaves y2 defaulting to y.
     val pairs =
-      segments(data) { datum ->
-        val x = position(channels["x"], datum)
-        val y = position(channels["y"], datum)
-        if (x == null || y == null) return@segments null
+      segments(data, channels) { datum ->
+        val x = position(channels["x"], datum) ?: 0.0
+        val y = position(channels["y"], datum) ?: 0.0
         val x2 = position(channels["x2"], datum) ?: x
         val y2 = position(channels["y2"], datum) ?: y
         PointD(x, y) to PointD(x2, y2)
@@ -364,28 +363,59 @@ public class MarkEncoder(
     )
   }
 
-  private fun point(channels: EncodeEntry, datum: VegaValue): PointD? {
-    val x = position(channels["x"], datum) ?: return null
-    val y = position(channels["y"], datum) ?: return null
-    return PointD(x, y)
+  /**
+   * A series point.
+   *
+   * An unresolvable coordinate becomes zero rather than a gap. That is upstream's behaviour and it
+   * surprises people: a `null` in the data does **not** break a Vega line, because the renderer
+   * reads the coordinate as `item.y || 0` and draws straight through the axis. Breaking a series is
+   * what the `defined` channel is for, and [broken] handles that.
+   */
+  private fun point(channels: EncodeEntry, datum: VegaValue): PointD =
+    PointD(position(channels["x"], datum) ?: 0.0, position(channels["y"], datum) ?: 0.0)
+
+  /** True when this datum's `defined` channel says the series should break here. */
+  private fun broken(channels: EncodeEntry, datum: VegaValue): Boolean {
+    val channel = channels["defined"] ?: return false
+    val value = boolean(channel, datum) ?: return false
+    return !value
   }
 
-  /** Splits data into runs of consecutive resolvable points, so a gap breaks the series. */
-  private fun <T> segments(data: List<VegaValue>, resolve: (VegaValue) -> T?): List<List<T>> {
+  /** Splits data into runs of consecutive defined points, so `defined: false` breaks the series. */
+  private fun <T> segments(
+    data: List<VegaValue>,
+    channels: EncodeEntry,
+    resolve: (VegaValue) -> T,
+  ): List<List<T>> {
     val result = mutableListOf<List<T>>()
     var current = mutableListOf<T>()
     for (datum in data) {
-      val resolved = resolve(datum)
-      if (resolved == null) {
+      if (broken(channels, datum)) {
         if (current.size > 1) result.add(current)
         current = mutableListOf()
       } else {
-        current.add(resolved)
+        current.add(resolve(datum))
       }
     }
     if (current.size > 1) result.add(current)
     return result
   }
+
+  /** Resolves a channel to a boolean, following the same rules as the numeric resolution. */
+  private fun boolean(channel: ChannelValue?, datum: VegaValue): Boolean? =
+    when (channel) {
+      null -> null
+      is ChannelValue.Constant -> JsSemantics.truthy(channel.value)
+      is ChannelValue.Field -> JsSemantics.truthy(datum.field(channel.path))
+      is ChannelValue.Signal ->
+        evaluateExpression(channel.expression, datum)?.let { JsSemantics.truthy(it) }
+      is ChannelValue.Conditional -> boolean(selectRule(channel, datum), datum)
+      is ChannelValue.Scaled -> {
+        val scale = scales[channel.scale]
+        val input = channel.field?.let { datum.field(it) } ?: channel.value
+        if (scale != null && input != null) JsSemantics.truthy(scale.scale(input)) else null
+      }
+    }
 
   /**
    * Reports an interpolation method other than linear.

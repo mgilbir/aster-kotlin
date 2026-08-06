@@ -8,7 +8,7 @@ Milestones 0, 1 and 2 complete. **Milestones 3 and 4 in progress**: Vega specifi
 end — including expressions, signals and the twelve data transforms the brief lists — and are verified
 against upstream Vega by differential tests.
 
-Fourteen differential fixtures pass, all matching upstream exactly on every mark and scale output:
+Seventeen differential fixtures pass, all matching upstream exactly on every mark and scale output:
 
 | Fixture | Marks | Covers |
 | --- | --- | --- |
@@ -26,6 +26,9 @@ Fourteen differential fixtures pass, all matching upstream exactly on every mark
 | `expressions` | 26 | a signal-valued domain and padding, filter, formula, extent, conditional fill |
 | `nested-groups` | 14 | a group inside a group, clipped, driven by plain data rather than a facet |
 | `size-legend` | 36 | a size legend of growing swatches, and a horizontal one |
+| `reshape` | 30 | fold, project, collect with a two-key sort, identifier |
+| `share-of-total` | 26 | joinaggregate written back onto every row |
+| `area-gaps` | 22 | a band area between two fields, and a line through a null |
 
 The gate is wired into `./scripts/oracle.sh`, so every further scale, mark and transform is built
 against a harness that can say we are wrong — which golden tests cannot.
@@ -87,7 +90,7 @@ substantive compatibility items:
 | 6. View and Compose APIs | Yes |
 | 7. SVG, PNG, PDF export | Yes |
 | 8. TalkBack can describe and navigate | Partial — virtual nodes are tested by instrumentation, not with TalkBack itself |
-| 9. At least 100 compatibility fixtures pass | 14 of 100 |
+| 9. At least 100 compatibility fixtures pass | 17 of 100 |
 | 10. Core runtime has no Android dependency | Yes |
 | 11. Renders without WebView | Yes |
 | 12. Build and test loop runs from the terminal | Yes |
@@ -209,7 +212,7 @@ ordering), and the pipeline is now verified end to end on one fixture, but the b
 
 ## Verification
 
-- 698 JVM tests pass (`./scripts/test-core.sh`, `./gradlew test`).
+- 718 JVM tests pass (`./scripts/test-core.sh`, `./gradlew test`).
 - Android lint is clean with `warningsAsErrors` on every Android module.
 - 48 instrumented tests pass on an API 37 arm64 emulator (`./scripts/test-android.sh`): 40 in
   `vega-android-canvas`, 4 in `vega-compose`, 4 in `demo` — including one that compiles every bundled
@@ -244,7 +247,7 @@ dark chrome, so a dark background was unreadable — they now take a `SampleScen
 
 ## Known failing fixtures
 
-None. Fourteen fixtures exist and all fourteen pass. The brief's MVP asks for 100; growing the corpus is the main
+None. Seventeen fixtures exist and all seventeen pass. The brief's MVP asks for 100; growing the corpus is the main
 task now, and each new fixture is expected to surface gaps rather than pass immediately. That keeps
 happening, which is the point of the harness: `stacked-bar` surfaced two real bugs, and `facet-trellis`
 surfaced a third — `range: "height"` was descending for every scale type, where upstream ascends for a
@@ -327,12 +330,12 @@ The performance targets in PROJECT_BRIEF.md 19 are therefore all unverified.
 
 ## Next three tasks
 
-1. **Keep growing the fixture corpus.** 14 of the brief's 100 pass. The last six were added in one
-   batch and four of them failed on arrival, which is still the best return available: they found a
-   missing scale-domain form, a legend layout rule that only diverges when swatches grow, unreported
-   opacity, and rotated text offsets that both sides of the harness had wrong in the same way. The
-   obvious next areas are the transforms with no fixture at all (`fold`, `flatten`, `project`,
-   `joinaggregate`, `identifier`), area orientations, and line gaps.
+1. **Keep growing the fixture corpus.** 17 of the brief's 100 pass, and the return has not dropped
+   off: of the last nine fixtures, six failed on arrival. They found a missing scale-domain form, a
+   legend layout rule that only diverges once swatches grow, unreported opacity, rotated text offsets
+   that both sides of the harness had wrong in the same way, and a line-gap behaviour this engine had
+   documented backwards. Still untouched: `flatten`, `timeunit`-free date handling, `sequence`, arc
+   and shape marks, and every axis variation beyond the four orientations.
 2. **Grid layout, shared by group `layout` and legend entry columns.** The automatic trellis grid —
    `layout` with columns, padding, headers — and a legend's multi-column entry grid are the same row
    and column algorithm, and both are currently reported. Doing them together is why this is one task

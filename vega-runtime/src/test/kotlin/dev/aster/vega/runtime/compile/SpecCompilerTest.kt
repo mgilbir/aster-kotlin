@@ -2,6 +2,7 @@ package dev.aster.vega.runtime.compile
 
 import dev.aster.vega.model.DiagnosticCodes
 import dev.aster.vega.model.DiagnosticSeverity
+import dev.aster.vega.scene.PathNode
 import dev.aster.vega.scene.RectNode
 import dev.aster.vega.scene.RuleNode
 import dev.aster.vega.scene.TextNode
@@ -288,5 +289,59 @@ class SpecCompilerTest {
     val perSideScene = requireNotNull(perSide.scene)
     assertEquals(uniformScene.width, perSideScene.width, 1e-9)
     assertEquals(uniformScene.height, perSideScene.height, 1e-9)
+  }
+
+  // ---- series continuity ------------------------------------------------------
+
+  private fun seriesSpec(defined: String = "") =
+    """
+    {
+      "width": 200, "height": 100, "padding": 0, "autosize": "none",
+      "data": [{"name": "s", "values": [
+        {"t": 0, "v": 10}, {"t": 1, "v": 20}, {"t": 2, "v": null},
+        {"t": 3, "v": 30}, {"t": 4, "v": 15}]}],
+      "scales": [
+        {"name": "x", "type": "linear", "domain": [0, 4], "range": "width"},
+        {"name": "y", "type": "linear", "domain": [0, 30], "range": "height"}
+      ],
+      "marks": [{"type": "line", "from": {"data": "s"}, "encode": {"enter": {
+        "x": {"scale": "x", "field": "t"}, "y": {"scale": "y", "field": "v"}$defined,
+        "stroke": {"value": "#000000"}}}}]
+    }
+    """
+      .trimIndent()
+
+  @Test
+  fun `a null in a series does not break the line, it draws through zero`() {
+    // The surprise, and upstream's actual behaviour: a Vega line reads its coordinate as `item.y ||
+    // 0`
+    // and draws straight to the top of the range. Breaking a series is what `defined` is for, and
+    // nothing else does it — verified against upstream, which emits one unbroken path here.
+    val path =
+      requireNotNull(compile(seriesSpec()).scene)
+        .flatten()
+        .map { it.node }
+        .filterIsInstance<PathNode>()
+        .single()
+    val moves = path.path.commands.count { it is dev.aster.vega.scene.PathCommand.MoveTo }
+    assertEquals(1, moves, "the line should be one unbroken run")
+    val nullPoint =
+      path.path.commands.filterIsInstance<dev.aster.vega.scene.PathCommand.LineTo>().first {
+        it.x == 100.0
+      }
+    assertEquals(0.0, nullPoint.y, 1e-9, "an unresolvable value reads as zero, not as a gap")
+  }
+
+  @Test
+  fun `the defined channel is what breaks a series`() {
+    val json = seriesSpec(""", "defined": {"signal": "isValid(datum.v)"}""")
+    val path =
+      requireNotNull(compile(json).scene)
+        .flatten()
+        .map { it.node }
+        .filterIsInstance<PathNode>()
+        .single()
+    val moves = path.path.commands.count { it is dev.aster.vega.scene.PathCommand.MoveTo }
+    assertEquals(2, moves, "two runs, split where the value was not defined")
   }
 }
