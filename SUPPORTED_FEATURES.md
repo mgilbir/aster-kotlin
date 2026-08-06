@@ -16,7 +16,7 @@ the scope note in STATUS.md for how much of upstream Vega that leaves.
 | Feature | Status | Tests | Known differences | Target milestone |
 | --- | --- | --- | --- | --- |
 | Hand-authored scene graph | Supported | `SampleScenes`, `SceneSnapshotTest` | Not a Vega input format | 1 |
-| Compiled Vega JSON | Partial | `SpecCompilerTest`, `BarFixtureDifferentialTest` | Parses and compiles the subset below. No signals, transforms, legends, titles or faceting; each reports a diagnostic. `VegaChartController.setSpec` still reports not-implemented — the compiler is not wired into it yet | 3 |
+| Compiled Vega JSON | Partial | `SpecCompilerTest`, `BarFixtureDifferentialTest` | Parses and compiles the subset below, including signals, expressions and 12 transforms. No legends, titles or faceting; each reports a diagnostic. `VegaChartController.setSpec` still reports not-implemented — the compiler is not wired into it yet | 3 |
 | Vega-Lite compilation | Not planned (first release) | — | Compile upstream via `oracle-js/src/compile-vega-lite.js` | — |
 | Generic JSON value model | Supported | `VegaValueTest`, `JsonBridgeTest` | Numbers are always `Double` | 0 |
 | Dotted / bracketed field paths | Supported | `VegaValueTest` | Malformed paths resolve to null rather than throwing | 0 |
@@ -53,28 +53,48 @@ the scope note in STATUS.md for how much of upstream Vega that leaves.
 
 ## Data transforms
 
-Upstream Vega has 40 transforms. None are implemented; the rows below cover the surrounding
-machinery only.
+Upstream Vega has 40 transforms; the 12 the brief lists for the first release are implemented.
+Expected values in `TransformReferenceTest` were all generated from upstream.
 
 | Feature | Status | Tests | Known differences | Target milestone |
 | --- | --- | --- | --- | --- |
-| Tuple identity, change sets | Supported | `DataflowTest` | Data model only; nothing propagates pulses yet | 0 |
-| Deterministic operator scheduling | Supported | `DataflowTest` | Topological ordering only; no evaluation engine | 0 |
-| Pulse propagation / incremental evaluation | Not implemented | — | The `DataflowOperator` contract exists; there is no engine behind it | 4 |
-| Filter, formula, collect, aggregate | Planned | — | — | 4 |
-| Join aggregate, extent, bin, stack | Planned | — | — | 4 |
-| Project, identifier, fold, flatten | Planned | — | — | 4 |
+| `filter` | **Supported** | `TransformReferenceTest` | A broken expression leaves the data alone rather than dropping every row | 4 |
+| `formula` | **Supported** | `TransformReferenceTest` | — | 4 |
+| `collect` | **Supported** | `TransformReferenceTest` | Missing values sort first ascending, as upstream; multi-field with per-field order | 4 |
+| `project` | **Supported** | `TransformReferenceTest` | — | 4 |
+| `identifier` | **Supported** | `TransformReferenceTest` | Numbers from 1 per pipeline, not per view, so ids are reproducible but not globally unique | 4 |
+| `extent` | **Supported** | `TransformReferenceTest` | Publishes a signal; missing values excluded | 4 |
+| `aggregate` | **Supported** | `TransformReferenceTest` | 17 ops. `count` counts tuples while `valid` counts values; `variance`/`stdev` are the sample forms | 4 |
+| `joinaggregate` | **Supported** | `TransformReferenceTest` | — | 4 |
+| `bin` | **Supported** | `TransformReferenceTest` | Step algorithm ported from vega-statistics; out-of-extent values get null bounds. Deriving a missing `extent` from the data is an addition upstream does not make, and is reported | 4 |
+| `stack` | **Supported** | `TransformReferenceTest` | `zero`, `center` and `normalize`; negatives stack away from zero; `sort` reorders stacking only | 4 |
+| `fold` | **Supported** | `TransformReferenceTest` | — | 4 |
+| `flatten` | **Supported** | `TransformReferenceTest` | Parallel fields flatten together; empty arrays drop the row | 4 |
+| The other 28 transforms | Not implemented | `TransformReferenceTest` | An unimplemented transform stops the pipeline and reports it, so later stages never run on data they were not meant to see | 4+ |
+| Tuple identity, change sets | Supported | `DataflowTest` | Data model only; the transform pipeline does not use it yet | 0 |
+| Deterministic operator scheduling | Supported | `DataflowTest` | Topological ordering only | 0 |
+| Pulse propagation / incremental evaluation | Not implemented | — | Transforms currently recompute a whole dataset. The `DataflowOperator` contract exists; there is no incremental engine behind it | 4 |
 | Geo transforms, force layout | Not planned | — | Reports `VEGA_TRANSFORM_NOT_IMPLEMENTED` | — |
 
 ## Expressions
 
-Upstream Vega exposes 119 expression functions. None are implemented.
+Upstream Vega exposes 119 expression functions; 60 are implemented. The language itself is complete.
 
 | Feature | Status | Tests | Known differences | Target milestone |
 | --- | --- | --- | --- | --- |
-| Expression compiler contract and cache | Supported | `ExpressionCompilerTest` | Interface and LRU cache only | 0 |
-| Lexer, parser, evaluator | Not implemented | — | Every expression reports `VEGA_EXPRESSION_UNSUPPORTED_FUNCTION` | 4 |
-| Signals | Not implemented | — | `{"signal": ...}` appears throughout real specs, so this blocks faithful parsing | 4 |
+| Lexer, parser, evaluator | **Supported** | `ParserTest`, `ExpressionReferenceTest` | Full JavaScript expression subset: literals, members, calls, unary, binary, logical, bitwise, conditional, array and object literals. No regular-expression literals or template strings — both are syntax errors | 4 |
+| JavaScript coercion semantics | **Supported** | `ExpressionReferenceTest` (115 upstream vectors) | `+` concatenates for strings, arrays and objects; `==` is loose; strings compare lexicographically; `-7 % 3` is `-1`; `round(-2.5)` is `-2` | 4 |
+| Math, string, array, predicate and coercion functions | **Supported** | `ExpressionReferenceTest` | 60 of 119. `min`/`max` are `Math.min`/`Math.max`, so an array argument is NaN | 4 |
+| `format` | Partial | `ExpressionReferenceTest` | Supports `.Nf`, `.Ne`, `.N%`, `d` and `,` grouping. Other d3-format specifiers fall back to plain number formatting | 5 |
+| Date and time functions | Not implemented | — | Reported by name with a reason; needs time scales first | 5 |
+| `scale`, `invert`, `gradient` | Not implemented | — | Need a scale registry the evaluator cannot reach yet | 6 |
+| `random` and the stochastic functions | Not planned | `ParserTest` | Excluded so a scene stays reproducible (PROJECT_BRIEF.md 18.2); reported with that reason | — |
+| Colour, geo and selection helpers | Not implemented | — | Belong to subsystems that do not exist yet | — |
+| Signals | **Supported** | `SignalCompileTest` | `update` beats `init` beats `value`; dependency-ordered; `width`, `height` and `padding` implicit; cycles reported by name | 4 |
+| Signal event handlers (`on`) | Not implemented | `SignalCompileTest` | Reported; the signal keeps its initial value. Needs the interaction system | 6 |
+| Signal bindings (`bind`) | Not planned | `SignalCompileTest` | Input widgets have no equivalent here | — |
+| Signal-valued scale and axis properties | **Supported** | `BarFixtureDifferentialTest` | `padding`, `align`, `tickCount`, `tickSize`, `labelPadding`, `labelFontSize`, `offset` | 4 |
+| Conditional encode rules | **Supported** | `SignalCompileTest` | The `[{test, ...}, {...}]` array form, for every channel kind | 4 |
 | `eval` / JavaScript execution | Not planned | — | Explicitly forbidden (PROJECT_BRIEF.md 6.1) | — |
 
 ## Layout
@@ -121,7 +141,7 @@ Upstream Vega exposes 119 expression functions. None are implemented.
 | --- | --- | --- | --- | --- |
 | Comparison harness | Supported | `Differential` | Compares mark count, type, role, coordinates, extents and scale outputs in absolute content space | 3 |
 | Reference generation | Supported | `oracle-js/src/reference.js`, `scripts/oracle.sh` | References are checked in, so JVM tests need no Node and no network | 3 |
-| Fixtures passing | 1 of a target 100 | `BarFixtureDifferentialTest` | `bar.vg.json`: all 48 marks and all scale outputs match exactly | 3 |
+| Fixtures passing | 2 of a target 100 | `BarFixtureDifferentialTest` | `bar.vg.json` (48 marks) and `stacked-bar.vg.json` (42 marks, exercising stack, aggregate, signals and a conditional encoding): all marks and scale outputs match exactly | 3 |
 | Axis group bounds | Known difference | `BarFixtureDifferentialTest` | Vega derives an axis group's bounds from the axis extent rather than by unioning its items, so its frame bounds exclude the half-pixel crisp offset and the domain line's stroke. Our surface is up to 1 unit larger per axis; every mark coordinate still agrees exactly | 5 |
 | Text metrics in comparisons | Supported | `VegaHeadlessTextEngine` | Reproduces upstream's canvas-free estimate, `trunc(0.8 × chars × fontSize)`, so layout is comparable. A comparison engine only — never used for display | 3 |
 
