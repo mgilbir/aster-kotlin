@@ -5,6 +5,12 @@ Statuses: **Supported** · **Partial** · **Planned** · **Not planned** · **Bl
 "Tests" names the test class or golden that covers the row. An unsupported construct always produces a
 structured diagnostic; nothing is silently ignored (PROJECT_BRIEF.md 3.3, 14).
 
+**Read the Marks table carefully.** A row says "Supported" only when the engine can *produce* that
+construct from an input specification. Where a scene node type exists but nothing encodes data into it
+yet, the row says **Renderable** — the geometry draws and hit-tests correctly, but there is no mark
+encoder, so a Vega specification cannot ask for it. Most of the engine is currently in that state: see
+the scope note in STATUS.md for how much of upstream Vega that leaves.
+
 ## Input
 
 | Feature | Status | Tests | Known differences | Target milestone |
@@ -19,17 +25,18 @@ structured diagnostic; nothing is silently ignored (PROJECT_BRIEF.md 3.3, 14).
 
 | Feature | Status | Tests | Known differences | Target milestone |
 | --- | --- | --- | --- | --- |
-| Group | Supported | `SceneNodeTest`, `AndroidCanvasSceneRendererTest` | — | 1 |
-| Rect | Supported | `SceneNodeTest`, `SvgRendererTest` | Corner radius clamped to half the shortest side | 1 |
-| Rule | Supported | `SceneNodeTest`, `HitTestTest` | Bounds expand on both axes, so they are slightly conservative for a butt-capped rule | 1 |
-| Line | Supported (as `PathNode`) | `PathTest`, golden `svg/line-chart.svg` | Interpolation methods other than linear are not implemented | 1 |
-| Area | Supported (as `PathNode`) | golden `svg/area-chart.svg` | As above | 1 |
-| Symbol | Supported | `SceneNodeTest` | Shapes follow d3-shape; `wedge`, `arrow`, `triangle`, custom SVG paths not built in | 1 |
-| Text | Supported | `TextTest`, `AndroidTextEngineTest` | Metrics are platform text metrics, not browser metrics | 1 |
-| Image | Partial | `SceneExportTest` | Needs an `AndroidImageResolver`; unresolved images report `VEGA_EXPORT_IMAGE_UNRESOLVED` | 1 |
+| Group | Renderable | `SceneNodeTest`, `AndroidCanvasSceneRendererTest` | Transforms, clipping and paint work. No group-mark faceting or layout | 3 |
+| Rect | Renderable | `SceneNodeTest`, `SvgRendererTest` | Corner radius clamped to half the shortest side. No encoder | 3 |
+| Rule | Renderable | `SceneNodeTest`, `HitTestTest` | Bounds expand on both axes, so they are slightly conservative for a butt-capped rule. No encoder | 3 |
+| Line | Renderable | `PathTest`, golden `svg/line-chart.svg` | `PathNode` draws a polyline. No encoder, no interpolation methods, no `defined` handling | 3 |
+| Area | Renderable | golden `svg/area-chart.svg` | `PathNode` draws the outline. No encoder, no stacking, no interpolation | 3 |
+| Symbol | Renderable | `SceneNodeTest` | 9 shapes following d3-shape proportions; `wedge`, `arrow`, custom SVG paths absent. No encoder | 3 |
+| Text | Renderable | `TextTest`, `AndroidTextEngineTest` | Metrics are platform text metrics, not browser metrics. No encoder | 3 |
+| Image | Renderable | `SceneExportTest` | Needs an `AndroidImageResolver`; unresolved images report `VEGA_EXPORT_IMAGE_UNRESOLVED`. No encoder | 3 |
 | Arc | Planned | — | — | 3 |
 | Path (from SVG path strings) | Planned | — | Path-string parsing not implemented | 3 |
-| Shape, trail | Not planned (first release) | — | — | — |
+| Trail | Not planned (first release) | — | — | — |
+| Shape (geo) | Not planned | — | Needs projections, an explicit non-goal | — |
 
 ## Scales
 
@@ -46,10 +53,14 @@ structured diagnostic; nothing is silently ignored (PROJECT_BRIEF.md 3.3, 14).
 
 ## Data transforms
 
+Upstream Vega has 40 transforms. None are implemented; the rows below cover the surrounding
+machinery only.
+
 | Feature | Status | Tests | Known differences | Target milestone |
 | --- | --- | --- | --- | --- |
-| Tuple identity, change sets | Supported | `DataflowTest` | — | 0 |
-| Deterministic operator scheduling | Supported | `DataflowTest` | Cycles raise `CyclicDataflowException` | 0 |
+| Tuple identity, change sets | Supported | `DataflowTest` | Data model only; nothing propagates pulses yet | 0 |
+| Deterministic operator scheduling | Supported | `DataflowTest` | Topological ordering only; no evaluation engine | 0 |
+| Pulse propagation / incremental evaluation | Not implemented | — | The `DataflowOperator` contract exists; there is no engine behind it | 4 |
 | Filter, formula, collect, aggregate | Planned | — | — | 4 |
 | Join aggregate, extent, bin, stack | Planned | — | — | 4 |
 | Project, identifier, fold, flatten | Planned | — | — | 4 |
@@ -57,10 +68,13 @@ structured diagnostic; nothing is silently ignored (PROJECT_BRIEF.md 3.3, 14).
 
 ## Expressions
 
+Upstream Vega exposes 119 expression functions. None are implemented.
+
 | Feature | Status | Tests | Known differences | Target milestone |
 | --- | --- | --- | --- | --- |
-| Expression compiler contract and cache | Supported | `ExpressionCompilerTest` | — | 0 |
-| Lexer, parser, evaluator | Planned | — | Every expression currently reports `VEGA_EXPRESSION_UNSUPPORTED_FUNCTION` | 4 |
+| Expression compiler contract and cache | Supported | `ExpressionCompilerTest` | Interface and LRU cache only | 0 |
+| Lexer, parser, evaluator | Not implemented | — | Every expression reports `VEGA_EXPRESSION_UNSUPPORTED_FUNCTION` | 4 |
+| Signals | Not implemented | — | `{"signal": ...}` appears throughout real specs, so this blocks faithful parsing | 4 |
 | `eval` / JavaScript execution | Not planned | — | Explicitly forbidden (PROJECT_BRIEF.md 6.1) | — |
 
 ## Layout
@@ -70,7 +84,7 @@ structured diagnostic; nothing is silently ignored (PROJECT_BRIEF.md 3.3, 14).
 | Width, height, viewport | Supported | `SceneSnapshotTest` | Padding and `autosize` come with spec parsing | 1 |
 | Group transforms | Supported | `SceneNodeTest` | — | 1 |
 | Clip rectangles and clip paths | Supported | `AndroidCanvasSceneRendererTest`, `SvgRendererTest` | — | 1 |
-| Axes, legends, titles | Partial | golden scenes | Hand-authored in `SampleScenes`; not generated from a spec | 5 |
+| Axes, legends, titles | Not implemented | — | The sample scenes hand-author them as ordinary nodes; the engine generates nothing. Needs tick placement, label alignment and overlap removal | 5 |
 | Label collision handling | Planned | — | — | 5 |
 | Padding and `autosize` | Planned | — | — | 3 |
 

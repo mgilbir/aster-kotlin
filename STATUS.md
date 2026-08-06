@@ -7,6 +7,67 @@ Last updated: 2026-08-06
 Milestone 2 complete (SVG renderer). Milestone 0 (bootstrap) and Milestone 1 (scene graph and Canvas
 renderer) are also complete. Milestone 3 (scales and Vega JSON parsing) is next and not started.
 
+## Scope: how much of Vega this is
+
+Measured against the pinned upstream packages in `oracle-js/node_modules`, so these numbers are
+checkable rather than estimated.
+
+Upstream Vega is 31 packages, roughly 28,500 lines of source, and leans on about 35,000 further lines
+of `d3-*` code (d3-scale, d3-shape, d3-time-format, d3-array, d3-interpolate) that a native port has to
+reimplement. It exposes **40 transforms, 119 expression functions, 12 mark types and ~15 scale types.**
+
+This repository is 6,334 lines of main source and 3,351 of tests. What it covers is the **output half**
+of the pipeline plus the testing and diagnostic infrastructure:
+
+| Built here | Upstream equivalent | State |
+| --- | --- | --- |
+| Scene graph, geometry, paths, hit index | part of `vega-scenegraph` (4,994) | 7 of 12 node types; rendering and hit-testing side only |
+| Canvas renderer, SVG serializer | rest of `vega-scenegraph` | complete for those 7 |
+| Diagnostics, canonical snapshots, goldens, oracle scaffolding | no upstream equivalent | complete |
+| `vega-dataflow`, `vega-expression`, `vega-runtime` | 4,266 lines upstream | **contracts only, no behaviour** |
+
+The entire data and specification half is absent:
+
+| Missing | Upstream size | Here |
+| --- | --- | --- |
+| `vega-parser` — specification to dataflow graph | 3,790 | 0 |
+| `vega-transforms` — 40 transforms | 3,754 | 0 |
+| `vega-dataflow` — pulse propagation | 2,081 | contracts only |
+| `vega-expression` — lexer, parser, evaluator | 1,598 | contracts only |
+| `vega-functions` — 119 functions | 790 | 0 |
+| `vega-scale` — scale types, ticks, colour schemes | 790 + d3-scale, d3-interpolate, d3-scale-chromatic | 0 |
+| `vega-encode` — mark encoders, axis and legend generation | 952 | 0 |
+| `vega-view`, `vega-view-transforms` — layout, overlap removal | 2,623 | bounds only |
+| `vega-event-selector` — event-stream DSL | 191 | 0 |
+| `vega-time`, `vega-format` — locale and time units | 587 + d3-format, d3-time-format | 0 |
+| geo, force, hierarchy, label, voronoi, wordcloud, crossfilter, statistics | ~5,700 | 0, and mostly explicit non-goals (PROJECT_BRIEF.md 3.3) |
+
+Full parity was never the goal — PROJECT_BRIEF.md 3.3 rules most of that last row out. But the brief's
+own MVP definition (section 23) stands at roughly **6.5 of its 15 criteria**, and the unmet ones are the
+substantive compatibility items:
+
+| MVP criterion | State |
+| --- | --- |
+| 1. Compiled Vega JSON loads without JavaScript | No |
+| 2. Bar, line, area, scatter, stacked bar render natively | Only from hand-authored scenes, not from specifications |
+| 3. Axes, legends, labels and titles supported | No — hand-authored in fixtures |
+| 4. Basic transforms and scales execute in Kotlin | No |
+| 5. Tap, hover, tooltip, selection, pan, zoom | Yes, except tooltip rendering |
+| 6. View and Compose APIs | Yes |
+| 7. SVG, PNG, PDF export | Yes |
+| 8. TalkBack can describe and navigate | Partial — virtual nodes are tested by instrumentation, not with TalkBack itself |
+| 9. At least 100 compatibility fixtures pass | No — zero exist |
+| 10. Core runtime has no Android dependency | Yes |
+| 11. Renders without WebView | Yes |
+| 12. Build and test loop runs from the terminal | Yes |
+| 13. Performance measured on a physical device | No |
+| 14. Unsupported features produce explicit diagnostics | Yes, in the areas that exist |
+| 15. Instructions to reproduce from a clean macOS install | Yes |
+
+Remaining work for the MVP subset — excluding the non-goals — is on the order of 10,000 more lines of
+Kotlin plus the fixture corpus. The foundation was built first deliberately (PROJECT_BRIEF.md milestone
+ordering), but the harder half is still ahead.
+
 ## Completed work
 
 ### Milestone 0 — repository bootstrap
