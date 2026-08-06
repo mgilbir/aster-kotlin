@@ -60,6 +60,7 @@ public class SpecParser {
         data = parseArray(root, "data") { value, path -> parseData(value, path) },
         scales = parseArray(root, "scales") { value, path -> parseScale(value, path) },
         axes = parseArray(root, "axes") { value, path -> parseAxis(value, path) },
+        legends = parseArray(root, "legends") { value, path -> parseLegend(value, path) },
         marks = parseArray(root, "marks") { value, path -> parseMark(value, path) },
       )
 
@@ -72,13 +73,12 @@ public class SpecParser {
   /**
    * Reports specification sections the runtime does not implement.
    *
-   * Silence here would be the worst outcome: a chart with signals or legends would render without
-   * them and look merely wrong rather than unsupported.
+   * Silence here would be the worst outcome: a chart with a title or a layout would render without
+   * it and look merely wrong rather than unsupported.
    */
   private fun reportUnsupportedTopLevel(root: VegaValue.Obj) {
     val unsupported =
       mapOf(
-        "legends" to "Legend generation is not implemented",
         "title" to "Title generation is not implemented",
         "projections" to "Geographic projections are out of scope",
         "layout" to "Layout specifications are not implemented",
@@ -419,6 +419,109 @@ public class SpecParser {
     )
   }
 
+  // ---- legends --------------------------------------------------------------
+
+  /**
+   * Parses a legend.
+   *
+   * Only what the runtime can build is modelled. `encode` overrides, `format`, `labelOverlap`,
+   * `symbolLimit` and multi-column grids each report rather than being partly honoured, because a
+   * legend that silently drops half its entries or ignores a formatter looks finished and is not.
+   */
+  private fun parseLegend(value: VegaValue, path: String): LegendSpec? {
+    val obj = value as? VegaValue.Obj ?: return unexpected("a legend definition", path)
+
+    val spec =
+      LegendSpec(
+        fill = obj.fields["fill"]?.asString(),
+        stroke = obj.fields["stroke"]?.asString(),
+        size = obj.fields["size"]?.asString(),
+        shape = obj.fields["shape"]?.asString(),
+        opacity = obj.fields["opacity"]?.asString(),
+        type = obj.enumOrNull("type", path, "legend type") { LegendType.fromName(it) },
+        orient =
+          obj.enumOrNull("orient", path, "legend orientation") { LegendOrient.fromName(it) }
+            ?: LegendOrient.RIGHT,
+        direction =
+          obj.enumOrNull("direction", path, "legend direction") { Direction.fromName(it) },
+        title = obj.fields["title"]?.takeIf { it is VegaValue.Str }?.asString(),
+        values = (obj.fields["values"] as? VegaValue.Arr)?.values,
+        tickCount = obj.numberOrSignal("tickCount", "$path.tickCount"),
+        offset = obj.numberOrSignal("offset", "$path.offset"),
+        padding = obj.numberOrSignal("padding", "$path.padding"),
+        titlePadding = obj.numberOrSignal("titlePadding", "$path.titlePadding"),
+        titleFontSize = obj.numberOrSignal("titleFontSize", "$path.titleFontSize"),
+        labelFontSize = obj.numberOrSignal("labelFontSize", "$path.labelFontSize"),
+        labelOffset = obj.numberOrSignal("labelOffset", "$path.labelOffset"),
+        symbolType = obj.fields["symbolType"]?.asString(),
+        symbolSize = obj.numberOrSignal("symbolSize", "$path.symbolSize"),
+        symbolStrokeWidth = obj.numberOrSignal("symbolStrokeWidth", "$path.symbolStrokeWidth"),
+        gradientLength = obj.numberOrSignal("gradientLength", "$path.gradientLength"),
+        gradientThickness = obj.numberOrSignal("gradientThickness", "$path.gradientThickness"),
+        rowPadding = obj.numberOrSignal("rowPadding", "$path.rowPadding"),
+        columnPadding = obj.numberOrSignal("columnPadding", "$path.columnPadding"),
+        legendX = obj.numberOrSignal("legendX", "$path.legendX"),
+        legendY = obj.numberOrSignal("legendY", "$path.legendY"),
+        zindex = (obj.fields["zindex"] as? VegaValue.Num)?.value?.toInt() ?: 0,
+      )
+
+    if (spec.scale == null) {
+      diagnostics.error(
+        DiagnosticCodes.PARSE_MISSING_PROPERTY,
+        "A legend needs at least one of 'fill', 'stroke', 'size', 'shape' or 'opacity' to say " +
+          "which scale it describes",
+        jsonPath = path,
+      )
+      return null
+    }
+
+    val unsupported =
+      mapOf(
+        "encode" to "Legend encode overrides are not implemented",
+        "format" to "Legend label format specifiers are not implemented",
+        "formatType" to "Legend label format types are not implemented",
+        "columns" to "Multi-column legend layout is not implemented; entries run in a single line",
+        "labelOverlap" to "Legend label overlap removal is not implemented",
+        "symbolLimit" to "Legend entry limits are not implemented; every entry is shown",
+        "titleOrient" to "Only a legend title above the entries is implemented",
+        "gradientOpacity" to "Legend gradient opacity is not implemented",
+        "titleAnchor" to "Legend title anchoring is not implemented",
+      )
+    for ((key, reason) in unsupported) {
+      if (obj.fields[key] == null) continue
+      diagnostics.warn(
+        DiagnosticCodes.PARSE_UNKNOWN_PROPERTY,
+        "$reason; '$key' was ignored",
+        jsonPath = "$path.$key",
+      )
+    }
+    return spec
+  }
+
+  /**
+   * Reads an enumerated property, reporting an unrecognized value instead of quietly defaulting.
+   *
+   * Returns `null` both for absent and for unrecognized, so the caller applies its own default; the
+   * difference between the two is already in the diagnostics.
+   */
+  private fun <T> VegaValue.Obj.enumOrNull(
+    key: String,
+    path: String,
+    what: String,
+    parse: (String) -> T?,
+  ): T? {
+    val text = fields[key]?.asString() ?: return null
+    val parsed = parse(text)
+    if (parsed == null) {
+      diagnostics.error(
+        DiagnosticCodes.PARSE_UNKNOWN_PROPERTY,
+        "Unknown $what '$text'",
+        jsonPath = "$path.$key",
+      )
+    }
+    return parsed
+  }
+
   // ---- marks ----------------------------------------------------------------
 
   private fun parseMark(value: VegaValue, path: String): MarkSpec? {
@@ -472,6 +575,8 @@ public class SpecParser {
       signals =
         parseArray(obj, "signals", path) { child, childPath -> parseSignal(child, childPath) },
       scales = parseArray(obj, "scales", path) { child, childPath -> parseScale(child, childPath) },
+      legends =
+        parseArray(obj, "legends", path) { child, childPath -> parseLegend(child, childPath) },
       zindex = (obj.fields["zindex"] as? VegaValue.Num)?.value?.toInt() ?: 0,
       interactive = obj.fields["interactive"]?.asBoolean() ?: true,
       clip = obj.fields["clip"]?.asBoolean() ?: false,
@@ -533,7 +638,6 @@ public class SpecParser {
   private fun reportUnsupportedGroupScope(obj: VegaValue.Obj, path: String) {
     val unsupported =
       mapOf(
-        "legends" to "Legend generation is not implemented",
         "title" to "Title generation is not implemented",
         "layout" to
           "Group layout is not implemented; position each group from its own encode block instead",

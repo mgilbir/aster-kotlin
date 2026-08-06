@@ -7,6 +7,7 @@ import dev.aster.vega.model.DiagnosticCollector
 import dev.aster.vega.model.VegaValue
 import dev.aster.vega.model.spec.AxisSpec
 import dev.aster.vega.model.spec.FacetSpec
+import dev.aster.vega.model.spec.LegendSpec
 import dev.aster.vega.model.spec.MarkSpec
 import dev.aster.vega.model.spec.MarkType
 import dev.aster.vega.runtime.scale.VegaScale
@@ -56,6 +57,7 @@ internal class ScopeCompiler(
   fun compile(
     marks: List<MarkSpec>,
     axes: List<AxisSpec>,
+    legends: List<LegendSpec>,
     scope: CompileScope,
     extent: PlotSize,
   ): List<SceneNode> {
@@ -65,20 +67,41 @@ internal class ScopeCompiler(
       MarkEncoder(scope.scales, ids, diagnostics, scope.signals, expressions, textEngine)
 
     val children = mutableListOf<SceneNode>()
-    // Vega draws axes below marks unless an axis opts into a higher zindex.
+    // Vega draws axes below marks unless an axis opts into a higher zindex, and legends above both.
     val (underlay, overlay) = axes.partition { it.zindex <= 0 }
-    underlay.forEach { axis ->
-      axisBuilder.build(axis, extent, scope.rangeSize)?.let { children += it }
+    var guides = GuideBounds.of(extent)
+    for (axis in underlay) {
+      val node = axisBuilder.build(axis, extent, scope.rangeSize) ?: continue
+      children += node
+      guides = guides.including(axis, node)
     }
     for (mark in marks) {
       children +=
         if (mark.type == MarkType.GROUP) group(mark, scope, encoder)
         else encoder.encode(mark, markData(mark, scope))
     }
-    overlay.forEach { axis ->
-      axisBuilder.build(axis, extent, scope.rangeSize)?.let { children += it }
+    for (axis in overlay) {
+      val node = axisBuilder.build(axis, extent, scope.rangeSize) ?: continue
+      children += node
+      guides = guides.including(axis, node)
     }
+    children +=
+      LegendBuilder(scope.scales, ids, textEngine, diagnostics, numbers)
+        .build(legends, extent, guides)
     return children
+  }
+
+  /**
+   * Grows the rectangles legend placement measures against by one axis.
+   *
+   * A vertical axis widens what a left or right legend is pushed past, and a horizontal one
+   * heightens what a top or bottom legend clears. Upstream keeps them separate, so a left axis does
+   * not shift a right-hand legend even though it enlarges the chart.
+   */
+  private fun GuideBounds.including(axis: AxisSpec, node: SceneNode): GuideBounds {
+    val bounds = AxisBuilder.guideBounds(node)
+    return if (axis.orient.isVertical) copy(vertical = vertical.union(bounds))
+    else copy(horizontal = horizontal.union(bounds))
   }
 
   // ---- group marks ------------------------------------------------------------
@@ -95,7 +118,7 @@ internal class ScopeCompiler(
     val partitions = partition(spec, outer)
     return encoder.encodeGroup(spec, partitions.map { it.datum }) { _, index, extent ->
       val inner = nest(spec, partitions[index], outer)
-      compile(spec.marks, spec.axes, inner, PlotSize(extent.width, extent.height))
+      compile(spec.marks, spec.axes, spec.legends, inner, PlotSize(extent.width, extent.height))
     }
   }
 

@@ -14,6 +14,7 @@ import dev.aster.vega.runtime.scale.VegaScale
 import dev.aster.vega.scene.Fill
 import dev.aster.vega.scene.GroupNode
 import dev.aster.vega.scene.NodeMetadata
+import dev.aster.vega.scene.RectD
 import dev.aster.vega.scene.RuleNode
 import dev.aster.vega.scene.SceneNode
 import dev.aster.vega.scene.SceneNodeIdAllocator
@@ -26,6 +27,7 @@ import dev.aster.vega.scene.TextNode
 import dev.aster.vega.scene.TextRun
 import dev.aster.vega.scene.TextStyle
 import dev.aster.vega.scene.Transform2D
+import dev.aster.vega.scene.transformedBounds
 
 /**
  * Generates axis scene nodes: ticks, labels, gridlines and the domain line.
@@ -56,6 +58,19 @@ public class AxisBuilder(
 
   /** One tick's label text and its position along the axis. */
   private data class Tick(val label: String, val position: Double)
+
+  public companion object {
+    /**
+     * The bounds upstream reports for an axis group, which are not this node's bounds.
+     *
+     * Upstream places an axis item at its computed position *plus* the half-pixel crisp offset but
+     * measures it from the position itself, so its bounds sit half a pixel tighter on each axis.
+     * Anything that rounds those bounds outwards — legend placement does, with `floor` and `ceil` —
+     * turns that half pixel into a whole unit of displacement, so the distinction has to be kept.
+     */
+    public fun guideBounds(node: SceneNode): RectD =
+      node.transformedBounds.translate(-AxisDefaults.CRISP_OFFSET, -AxisDefaults.CRISP_OFFSET)
+  }
 
   /**
    * @param extent the enclosing group's encoded size, which positions a bottom or right axis.

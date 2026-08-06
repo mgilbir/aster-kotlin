@@ -539,6 +539,35 @@ public class SequentialColorScale(
     val colour = colorAt(value.asDouble()) ?: return VegaValue.Null
     return VegaValue.Str(colour.toCssHex())
   }
+
+  /**
+   * Where [x] sits along the ramp, in `0..1`.
+   *
+   * A gradient legend needs this twice over: once for each stop's offset, and once to place each
+   * label against the swatch.
+   */
+  public fun fraction(x: Double): Double {
+    val lo = domain.first()
+    val hi = domain.last()
+    if (lo == hi) return 0.0
+    return ((x - lo) / (hi - lo)).coerceIn(0.0, 1.0)
+  }
+
+  /** Tick values across the domain, as a linear scale over the same domain would produce. */
+  public fun ticks(count: Int = LinearScale.DEFAULT_TICK_COUNT): List<Double> =
+    Ticks.ticks(domain.first(), domain.last(), count)
+
+  /** Default label text for [value], with the decimals the tick step implies. */
+  public fun formatTick(value: Double, count: Int = LinearScale.DEFAULT_TICK_COUNT): String {
+    val step = Ticks.stepFrom(Ticks.tickIncrement(domain.first(), domain.last(), count))
+    return formatTickLabel(value, if (step.isFinite()) Ticks.precisionForStep(step) else 0)
+  }
+
+  public fun tickLabels(count: Int = LinearScale.DEFAULT_TICK_COUNT): List<String> {
+    val step = Ticks.stepFrom(Ticks.tickIncrement(domain.first(), domain.last(), count))
+    val precision = if (step.isFinite()) Ticks.precisionForStep(step) else 0
+    return ticks(count).map { formatTickLabel(it, precision) }
+  }
 }
 
 /**

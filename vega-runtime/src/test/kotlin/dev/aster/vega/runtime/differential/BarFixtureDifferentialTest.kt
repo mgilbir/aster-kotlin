@@ -275,6 +275,30 @@ class BarFixtureDifferentialTest {
     )
   }
 
+  // ---- seventh fixture: legends -----------------------------------------------
+
+  @Test
+  fun `the legends fixture compiles without errors`() {
+    val (_, compiled) = fixture("legends")
+    val serious = compiled.diagnostics.filter { it.severity >= DiagnosticSeverity.ERROR }
+    assertTrue(serious.isEmpty(), "expected a clean compile; got:\n${serious.joinToString("\n")}")
+  }
+
+  @Test
+  fun `the legends fixture's marks match upstream`() {
+    val (reference, compiled) = fixture("legends")
+    val ours = Differential.flattenScene(requireNotNull(compiled.scene))
+    val differences = Differential.compareMarks(reference.marks, ours)
+    assertTrue(
+      differences.isEmpty(),
+      buildString {
+        append("compiled ${ours.size} marks, upstream had ${reference.marks.size}\n")
+        append("${differences.size} difference(s), first 25:\n")
+        differences.take(25).forEach { append("  ").append(it).append('\n') }
+      },
+    )
+  }
+
   @Test
   fun `the reference was generated from the pinned upstream version`() {
     // A silently upgraded oracle would make every comparison suspect.

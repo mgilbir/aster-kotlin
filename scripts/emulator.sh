@@ -31,7 +31,11 @@ if "$ADB" devices | grep -q emulator; then
 fi
 
 echo "==> Starting $AVD"
-"$EMULATOR" "@$AVD" "${WINDOW[@]}" > build/emulator.log 2>&1 &
+# nohup + disown so the emulator outlives this script's shell; otherwise it dies with the terminal or
+# CI step that started it, which is confusing when the window simply vanishes.
+mkdir -p build
+nohup "$EMULATOR" "@$AVD" "${WINDOW[@]}" > build/emulator.log 2>&1 &
+disown
 
 "$ADB" wait-for-device
 echo "==> Waiting for boot to complete"

@@ -16,7 +16,7 @@ the scope note in STATUS.md for how much of upstream Vega remains.
 | Feature | Status | Tests | Known differences | Target milestone |
 | --- | --- | --- | --- | --- |
 | Hand-authored scene graph | Supported | `SampleScenes`, `SceneSnapshotTest` | Not a Vega input format | 1 |
-| Compiled Vega JSON | Partial | `SpecCompilerTest`, `BarFixtureDifferentialTest` | Parses and compiles the subset below, including signals, expressions, 12 transforms and nested group scopes. No legends, titles or `layout`; each reports a diagnostic. `VegaChartController.setSpec` still reports not-implemented — the compiler is not wired into it yet | 3 |
+| Compiled Vega JSON | Partial | `SpecCompilerTest`, `BarFixtureDifferentialTest` | Parses and compiles the subset below, including signals, expressions, 12 transforms, nested group scopes and legends. No titles or group `layout`; each reports a diagnostic. `VegaChartController.setSpec` still reports not-implemented — the compiler is not wired into it yet | 3 |
 | Vega-Lite compilation | Not planned (first release) | — | Compile upstream via `oracle-js/src/compile-vega-lite.js` | — |
 | Generic JSON value model | Supported | `VegaValueTest`, `JsonBridgeTest` | Numbers are always `Double` | 0 |
 | Dotted / bracketed field paths | Supported | `VegaValueTest` | Malformed paths resolve to null rather than throwing | 0 |
@@ -33,7 +33,7 @@ the scope note in STATUS.md for how much of upstream Vega remains.
 | Rule | **Supported** | `SpecCompilerTest` | A missing `x2`/`y2` defaults to `x`/`y`, as upstream. Bounds expand on both axes, so they are slightly conservative for a butt-capped rule | 3 |
 | Line | **Supported** | `BarFixtureDifferentialTest` (`line-area` fixture) | One `PathNode` per series where upstream emits one item per datum; the harness normalizes both to a point list. A gap breaks the line, as `defined` does. Interpolation methods other than linear are reported, not approximated | 3 |
 | Area | **Supported** | `BarFixtureDifferentialTest` (`line-area` fixture) | Both orientations, via the (x, y) and (x2, y2) boundary pairs. Stacking comes from the `stack` transform. Interpolation as for `line` | 3 |
-| Symbol | **Supported** | `BarFixtureDifferentialTest` (`log-scale` fixture) | 9 shapes following d3-shape proportions. `wedge`, `arrow` and SVG path strings are reported and drawn as a circle | 3 |
+| Symbol | **Supported** | `SceneNodeTest`, `BarFixtureDifferentialTest` (`log-scale` fixture) | All 12 of upstream's shapes, pinned by reference vectors. Sized upstream's way, from `sqrt(size) / 2`, **not** d3-shape's area convention — the two differ by 13% on a circle. An SVG path string is reported and drawn as a circle | 3 |
 | Text | **Supported** | `BarFixtureDifferentialTest` (`line-area` fixture) | Align, baseline, font, size, weight, style, angle and `dx`/`dy`. Metrics are platform metrics, not browser metrics | 3 |
 | Image | Renderable | `SceneExportTest` | The scene node works and needs an `AndroidImageResolver`; there is no encoder | 5 |
 | Arc | Planned | — | — | 3 |
@@ -114,7 +114,12 @@ Upstream Vega exposes 119 expression functions; 60 are implemented. The language
 | Group transforms | Supported | `SceneNodeTest` | — | 1 |
 | Clip rectangles and clip paths | Supported | `AndroidCanvasSceneRendererTest`, `SvgRendererTest` | — | 1 |
 | Axes | **Supported** | `SpecCompilerTest`, `BarFixtureDifferentialTest` | Ticks, labels, gridlines and domain line for all four orientations. Tick positions, label anchors, alignment and text match upstream exactly. No titles, no label overlap removal, no `encode` overrides, no format strings | 5 |
-| Legends, titles | Not implemented | — | Reported as diagnostics; the sample scenes hand-author them as ordinary nodes | 5 |
+| Symbol legends | **Supported** | `LegendTest`, `BarFixtureDifferentialTest` (`legends` fixture) | One swatch and label per entry, filled from the scale. Row heights, label offsets and the legend's own size match upstream exactly. A legend that maps no colour gets grey outlined swatches, as upstream does | 5 |
+| Gradient legends | **Supported** | `LegendTest`, `BarFixtureDifferentialTest` (`legends` fixture) | Sampled at the scale's own ticks plus the domain ends, so a multi-stop ramp bends where upstream's does. Vertical and horizontal, with end labels baselined inside the swatch | 5 |
+| Legend placement | **Supported** | `LegendTest` | All four edges, all four corners, `orient: none` with `legendX`/`legendY`, and stacking for legends that share an orientation. A vertical axis pushes out a side legend and a horizontal one an edge legend, kept separate as upstream does | 5 |
+| Discrete (banded) legends | Not implemented | `LegendTest` | For quantize, quantile and threshold scales, none of which exist here yet. Reported | 6 |
+| Legend entry grids and overlap removal | Not implemented | `LegendTest` | `columns`, `labelOverlap`, `symbolLimit` and `encode` overrides are each reported by name | 6 |
+| Titles | Not implemented | — | Reported as a diagnostic; the sample scenes hand-author them as ordinary nodes | 5 |
 | Label collision handling | Planned | — | — | 5 |
 | Padding and `autosize` | Partial | `SpecCompilerTest`, `BarFixtureDifferentialTest` | `pad` and `none` implemented. `fit`, `fit-x`, `fit-y` need a second layout pass and fall back to `pad` with a diagnostic. Surface size matches upstream to within half a pixel per axis — see the note below | 3 |
 
@@ -150,10 +155,13 @@ Upstream Vega exposes 119 expression functions; 60 are implemented. The language
 | --- | --- | --- | --- | --- |
 | Comparison harness | Supported | `Differential` | Compares mark count, type, role, coordinates, extents and scale outputs in absolute content space | 3 |
 | Reference generation | Supported | `oracle-js/src/reference.js`, `scripts/oracle.sh` | References are checked in, so JVM tests need no Node and no network | 3 |
-| Fixtures passing | 6 of a target 100 | `BarFixtureDifferentialTest` | `bar` (48 marks), `stacked-bar` (42, stack + aggregate + signals + conditional fill), `line-area` (50, line + area + symbol + text), `log-scale` (75, log axis + sqrt), `colour-scheme` (39, ordinal scheme + interpolated stroke), `facet-trellis` (55, faceted groups with per-cell scales and axes). All marks and scale outputs match exactly | 3 |
+| Fixtures passing | 7 of a target 100 | `BarFixtureDifferentialTest` | `bar` (48 marks), `stacked-bar` (42, stack + aggregate + signals + conditional fill), `line-area` (50, line + area + symbol + text), `log-scale` (75, log axis + sqrt), `colour-scheme` (39, ordinal scheme + interpolated stroke), `facet-trellis` (55, faceted groups with per-cell scales and axes), `legends` (28, a symbol legend and a gradient legend). All marks and scale outputs match exactly | 3 |
+| Symbol extents compared | Supported | `Differential`, `oracle-js/src/normalize.js` | Both sides report a symbol's drawn extent, not just its `size` channel. Added because comparing `size` alone hid a wrong shape table for six shapes | 3 |
+| Spurious paint detected | Supported | `Differential` | A fill or stroke present here and absent upstream is reported, so an outline that should not be there cannot pass by being an extra channel | 3 |
+| Fixture SVG side by side | Supported | `FixtureSvgTest` | Writes every fixture to `build/fixture-svg/` beside the oracle's own SVG, so a disagreement can be looked at rather than only read as coordinate deltas | 3 |
 | Nested scale outputs | Not compared | `Differential` | The reference records only top-level scales, because a faceted group resolves its scales once per cell and there is no single scale of that name to compare. The cells' geometry is compared in full, which is what those scales produce | 5 |
 | Series normalization | Supported | `Differential` | Vega emits one item per datum for a line or area; this engine builds one path. Both sides collapse to an outline point list, compared numerically | 3 |
-| Axis group bounds | Known difference | `BarFixtureDifferentialTest` | Vega derives an axis group's bounds from the axis extent rather than by unioning its items, so its frame bounds exclude the half-pixel crisp offset and the domain line's stroke. Our surface is up to 1 unit larger per axis; every mark coordinate still agrees exactly | 5 |
+| Axis group bounds | Known difference | `BarFixtureDifferentialTest` | Vega derives an axis group's bounds from the axis extent rather than by unioning its items, so its frame bounds exclude the half-pixel crisp offset and the domain line's stroke. Our surface is up to 1 unit larger per axis; every mark coordinate still agrees exactly. Legend placement is *not* affected: it measures axes through `AxisBuilder.guideBounds`, which reproduces upstream's tighter rectangle, because rounding half a pixel outwards would move a legend a whole unit | 5 |
 | Text metrics in comparisons | Supported | `VegaHeadlessTextEngine` | Reproduces upstream's canvas-free estimate, `trunc(0.8 × chars × fontSize)`, so layout is comparable. A comparison engine only — never used for display | 3 |
 
 ## Rendering details

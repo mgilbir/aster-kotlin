@@ -7,5 +7,7 @@ dependencies {
   api(project(":vega-scene"))
   api(libs.kotlinx.coroutines.core)
   testImplementation(project(":test-fixtures"))
+  // Only so FixtureSvgTest can write a lookable-at rendering of each fixture beside the oracle's.
+  testImplementation(project(":vega-svg"))
   testImplementation(libs.kotlinx.coroutines.test)
 }

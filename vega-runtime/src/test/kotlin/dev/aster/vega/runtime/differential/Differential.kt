@@ -423,6 +423,15 @@ public object Differential {
         out.add(Difference("$where.$channel", fmt(wanted), fmt(got)))
       }
     }
+    // Paint the reference does not have is as much a difference as paint it has and we lack: a mark
+    // stroked here and unstroked upstream draws an outline that should not be there, and comparing
+    // only the reference's own channels would never notice.
+    for (channel in COLOUR_CHANNELS) {
+      if (channel in ignored) continue
+      if (channel !in expected.strings && channel in actual.strings) {
+        out.add(Difference("$where.$channel", "absent", actual.strings.getValue(channel)))
+      }
+    }
     for ((channel, wanted) in expected.strings) {
       if (channel in ignored) continue
       val got = actual.strings[channel]

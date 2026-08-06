@@ -136,6 +136,10 @@ function record(type, role, item, dx, dy, precision) {
   for (const channel of STYLE_CHANNELS) {
     if (item[channel] !== undefined) entry[channel] = canonicalNumber(item[channel], precision);
   }
+  // Vega sets a legend symbol's strokeWidth whether or not it has a stroke colour, so an unstroked
+  // swatch carries a width that paints nothing. This engine has no way to say "a width with no
+  // stroke", and would not want one, so drop the width when there is nothing to draw it with.
+  if (entry.strokeWidth !== undefined && entry.stroke === undefined) delete entry.strokeWidth;
   // A symbol's `size` channel says nothing about the outline it actually draws, and Vega ships its own
   // symbol table rather than d3's — so compare the drawn extent, not just the requested size.
   if (type === 'symbol' && item.bounds) {

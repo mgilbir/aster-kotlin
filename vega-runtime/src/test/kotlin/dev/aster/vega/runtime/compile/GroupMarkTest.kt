@@ -516,23 +516,30 @@ class GroupMarkTest {
   }
 
   @Test
-  fun `a group's legends and layout are reported`() {
+  fun `a group's layout is reported, while its legends are built in its own scope`() {
     val compiled =
       compile(
         """
         {
           "width": 100, "height": 100, "padding": 0,
-          "scales": [{"name": "c", "type": "ordinal", "domain": ["a"], "range": ["red"]}],
           "marks": [{"type": "group",
-            "encode": {"enter": {"width": {"value": 1}, "height": {"value": 1}}},
+            "encode": {"enter": {"width": {"value": 40}, "height": {"value": 40}}},
             "layout": {"columns": 2},
+            "scales": [{"name": "c", "type": "ordinal", "domain": ["a"], "range": ["red"]}],
             "legends": [{"fill": "c"}]}]
         }
         """
       )
     val messages = compiled.diagnostics.map { it.message }
-    assertTrue(messages.any { it.contains("Legend") }, messages.toString())
     assertTrue(messages.any { it.contains("layout") }, messages.toString())
+    // The legend reads a scale declared on the group, so it can only have been built in that scope.
+    val legend =
+      requireNotNull(compiled.scene)
+        .flatten()
+        .map { it.node }
+        .filterIsInstance<GroupNode>()
+        .single { it.metadata.role == "legend" }
+    assertEquals("c", legend.metadata.markName)
   }
 
   @Test

@@ -23,6 +23,7 @@ public data class VegaSpec(
   val data: List<DataSpec>,
   val scales: List<ScaleSpec>,
   val axes: List<AxisSpec>,
+  val legends: List<LegendSpec>,
   val marks: List<MarkSpec>,
 )
 
@@ -246,6 +247,134 @@ public data class AxisSpec(
   val zindex: Int = 0,
 )
 
+/**
+ * Which form a legend takes.
+ *
+ * A specification usually leaves this unstated, and upstream then derives it from the scale: a
+ * continuous colour scale gets a gradient, a discretizing one gets banded swatches, and anything
+ * else gets one symbol per entry.
+ */
+public enum class LegendType {
+  SYMBOL,
+  GRADIENT,
+  /** Banded swatches for a quantize, quantile or threshold scale. */
+  DISCRETE;
+
+  public companion object {
+    public fun fromName(name: String): LegendType? =
+      when (name.lowercase()) {
+        "symbol" -> SYMBOL
+        "gradient" -> GRADIENT
+        "discrete" -> DISCRETE
+        else -> null
+      }
+  }
+}
+
+/**
+ * Where a legend sits.
+ *
+ * The four edges place the legend outside the plotting area; the four corners place it inside it.
+ * [NONE] disables placement entirely, so `legendX` and `legendY` position it by hand.
+ */
+public enum class LegendOrient {
+  LEFT,
+  RIGHT,
+  TOP,
+  BOTTOM,
+  TOP_LEFT,
+  TOP_RIGHT,
+  BOTTOM_LEFT,
+  BOTTOM_RIGHT,
+  NONE;
+
+  public val isSide: Boolean
+    get() = this == LEFT || this == RIGHT || this == TOP || this == BOTTOM
+
+  public companion object {
+    public fun fromName(name: String): LegendOrient? =
+      when (name.lowercase()) {
+        "left" -> LEFT
+        "right" -> RIGHT
+        "top" -> TOP
+        "bottom" -> BOTTOM
+        "top-left" -> TOP_LEFT
+        "top-right" -> TOP_RIGHT
+        "bottom-left" -> BOTTOM_LEFT
+        "bottom-right" -> BOTTOM_RIGHT
+        "none" -> NONE
+        else -> null
+      }
+  }
+}
+
+public enum class Direction {
+  VERTICAL,
+  HORIZONTAL;
+
+  public companion object {
+    public fun fromName(name: String): Direction? =
+      when (name.lowercase()) {
+        "vertical" -> VERTICAL
+        "horizontal" -> HORIZONTAL
+        else -> null
+      }
+  }
+}
+
+/**
+ * A legend.
+ *
+ * At least one of [fill], [stroke], [size], [shape] or [opacity] names the scale being described; a
+ * legend with none of them cannot say what it is a legend for, and is rejected.
+ */
+public data class LegendSpec(
+  val fill: String? = null,
+  val stroke: String? = null,
+  val size: String? = null,
+  val shape: String? = null,
+  val opacity: String? = null,
+  /** `null` means "derive from the scale type", which is what a specification usually wants. */
+  val type: LegendType? = null,
+  val orient: LegendOrient = LegendOrient.RIGHT,
+  /** `null` means the per-orient default: vertical at the sides, horizontal above and below. */
+  val direction: Direction? = null,
+  val title: String? = null,
+  /** Explicit entry values, overriding whatever the scale would generate. */
+  val values: List<VegaValue>? = null,
+  val tickCount: NumberValue? = null,
+  val offset: NumberValue? = null,
+  val padding: NumberValue? = null,
+  val titlePadding: NumberValue? = null,
+  val titleFontSize: NumberValue? = null,
+  val labelFontSize: NumberValue? = null,
+  val labelOffset: NumberValue? = null,
+  val symbolType: String? = null,
+  val symbolSize: NumberValue? = null,
+  val symbolStrokeWidth: NumberValue? = null,
+  val gradientLength: NumberValue? = null,
+  val gradientThickness: NumberValue? = null,
+  val rowPadding: NumberValue? = null,
+  val columnPadding: NumberValue? = null,
+  /** Absolute placement, used when [orient] is [LegendOrient.NONE]. */
+  val legendX: NumberValue? = null,
+  val legendY: NumberValue? = null,
+  val zindex: Int = 0,
+) {
+  /**
+   * The scale this legend describes.
+   *
+   * Upstream picks the first channel present in this order and calls it the canonical scale, so a
+   * legend encoding both `fill` and `size` is titled and sized from the fill scale.
+   */
+  public val scale: String?
+    get() = fill ?: stroke ?: size ?: shape ?: opacity
+
+  /** How many channels this legend maps, which is what decides whether the type can be derived. */
+  public val channelCount: Int
+    get() = listOfNotNull(fill, stroke, size, shape, opacity).size
+}
+
 public enum class MarkType {
   ARC,
   AREA,
@@ -374,6 +503,7 @@ public data class MarkSpec(
   val signals: List<SignalSpec> = emptyList(),
   /** Scales scoped to this group, resolved against the group's own data. */
   val scales: List<ScaleSpec> = emptyList(),
+  val legends: List<LegendSpec> = emptyList(),
   val zindex: Int = 0,
   val interactive: Boolean = true,
   val clip: Boolean = false,
