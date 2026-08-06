@@ -506,8 +506,8 @@ class TransformReferenceTest {
   }
 
   @Test
-  fun `the registry covers the transforms the brief lists`() {
-    val expected =
+  fun `the registry covers the transforms the brief lists, and timeunit`() {
+    val fromTheBrief =
       setOf(
         "filter",
         "formula",
@@ -522,6 +522,8 @@ class TransformReferenceTest {
         "fold",
         "flatten",
       )
-    assertEquals(expected, TransformRegistry.Default.types)
+    // `timeunit` is not on the brief's list but is the date half of `bin`, and a time series is
+    // barely usable without it.
+    assertEquals(fromTheBrief + "timeunit", TransformRegistry.Default.types)
   }
 }

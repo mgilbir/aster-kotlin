@@ -8,7 +8,7 @@ Milestones 0, 1 and 2 complete. **Milestones 3 and 4 in progress**: Vega specifi
 end — including expressions, signals and the twelve data transforms the brief lists — and are verified
 against upstream Vega by differential tests.
 
-Twenty-one differential fixtures pass, all matching upstream exactly on every mark and scale output:
+Twenty-two differential fixtures pass, all matching upstream exactly on every mark and scale output:
 
 | Fixture | Marks | Covers |
 | --- | --- | --- |
@@ -33,6 +33,7 @@ Twenty-one differential fixtures pass, all matching upstream exactly on every ma
 | `band-padding` | 22 | inner and outer padding, alignment, rounding, a reversed range |
 | `flatten-arrays` | 25 | parallel array fields expanded and re-aggregated |
 | `time-axis` | 32 | a UTC scale ticking on months and another on hours, ISO dates read by `format.parse` |
+| `timeunit` | 25 | rows bucketed into calendar months, then counted |
 
 The gate is wired into `./scripts/oracle.sh`, so every further scale, mark and transform is built
 against a harness that can say we are wrong — which golden tests cannot.
@@ -59,14 +60,14 @@ upstream-verified slice through parsing, scales, rect encoding and axes:
 | `vega-parser` (width, height, padding, autosize, data, signals, scales, axes, marks, group scopes) | 3,790 | a subset; no legends, titles or `layout` |
 | `vega-encode` (mark encoders, axes, legends, titles) | 952 | 7 of 12 mark encoders; axes, legends and titles without overlap removal |
 | `vega-expression` + `vega-functions` | 2,388 | language complete; 60 of 119 functions |
-| `vega-transforms` (12 of 40) | 3,754 | the 12 the brief lists, exact against upstream |
+| `vega-transforms` (13 of 40) | 3,754 | the 12 the brief lists plus `timeunit`, exact against upstream |
 | `vega-dataflow` | 2,081 | contracts and scheduling only; no pulse propagation |
 
 The entire data and specification half is absent:
 
 | Missing | Upstream size | Here |
 | --- | --- | --- |
-| `vega-transforms` — the other 28 transforms | most of 3,754 | 0 |
+| `vega-transforms` — the other 27 transforms | most of 3,754 | 0 |
 | `vega-dataflow` — pulse propagation and incremental evaluation | 2,081 | contracts only |
 | `vega-functions` — the other 44 functions, mostly colour, geo and selection | most of 790 | 0 |
 | Remaining scale types — quantile, quantize, threshold, bin-ordinal | rest of `vega-scale` | 0 |
@@ -94,7 +95,7 @@ substantive compatibility items:
 | 6. View and Compose APIs | Yes |
 | 7. SVG, PNG, PDF export | Yes |
 | 8. TalkBack can describe and navigate | Partial — virtual nodes are tested by instrumentation, not with TalkBack itself |
-| 9. At least 100 compatibility fixtures pass | 21 of 100 |
+| 9. At least 100 compatibility fixtures pass | 22 of 100 |
 | 10. Core runtime has no Android dependency | Yes |
 | 11. Renders without WebView | Yes |
 | 12. Build and test loop runs from the terminal | Yes |
@@ -164,8 +165,9 @@ ordering), and the pipeline is now verified end to end on one fixture, but the b
   implicit, cycles reported as the path that closed them.
 - **Conditional encode rules** (`[{test, ...}, {...}]`) for every channel kind.
 - **Signal-valued scale and axis properties** via a `NumberValue` model.
-- **Twelve transforms**: filter, formula, collect, project, identifier, extent, aggregate,
-  joinaggregate, bin, stack, fold, flatten — with the bin step algorithm ported from vega-statistics.
+- **Thirteen transforms**: filter, formula, collect, project, identifier, extent, aggregate,
+  joinaggregate, bin, stack, fold, flatten and `timeunit` — with the bin step algorithm ported from
+  vega-statistics.
 - **Full CSS named-colour table**, replacing a subset that silently failed on `firebrick`.
 
 ### Milestone 5 (in progress) — the specification reaches the screen
@@ -356,6 +358,7 @@ The performance targets in PROJECT_BRIEF.md 19 are therefore all unverified.
    `layout` with columns, padding, headers — and a legend's multi-column entry grid are the same row
    and column algorithm, and both are currently reported. Doing them together is why this is one task
    rather than two.
-3. **The `timeunit` transform.** The last piece of the date layer: grouping rows into calendar
-   buckets, which is how a time series gets aggregated by month or by hour. The calendar and the date
-   functions it needs both exist now, so this is the transform on top of them.
+3. **Grid layout, shared by group `layout` and legend entry columns.** The automatic trellis grid —
+   `layout` with columns, padding, headers — and a legend's multi-column entry grid are the same row
+   and column algorithm, and both are still reported. Doing them together is why this is one task
+   rather than two, and it is now the largest reported feature left.
