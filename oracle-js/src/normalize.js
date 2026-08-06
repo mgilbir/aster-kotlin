@@ -113,9 +113,15 @@ function record(type, role, item, dx, dy, precision) {
   const channels = GEOMETRY_CHANNELS[type] || ['x', 'y'];
 
   // Vega keeps a text mark's dx/dy as separate render-time offsets; this engine folds them into the
-  // anchor, which draws identically. Fold them here too so the two agree.
-  const textDx = type === 'text' ? item.dx || 0 : 0;
-  const textDy = type === 'text' ? item.dy || 0 : 0;
+  // anchor, which draws identically. Fold them here too so the two agree — through the rotation,
+  // because Vega applies them *inside* it (`translate(x,y) rotate(a) translate(dx,dy)`), so on rotated
+  // text an offset runs along the text rather than along the page.
+  let textDx = 0, textDy = 0;
+  if (type === 'text' && (item.dx || item.dy)) {
+    const dx = item.dx || 0, dy = item.dy || 0, a = ((item.angle || 0) * Math.PI) / 180;
+    textDx = dx * Math.cos(a) - dy * Math.sin(a);
+    textDy = dx * Math.sin(a) + dy * Math.cos(a);
+  }
 
   for (const channel of channels) {
     let value = item[channel];

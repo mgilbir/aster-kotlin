@@ -1,0 +1,218 @@
+{
+  "marks": [
+    {
+      "fill": "#bbbbbb",
+      "role": "mark",
+      "shapeHeight": 4.472136,
+      "shapeWidth": 4.472136,
+      "size": 20,
+      "type": "symbol",
+      "x": 40,
+      "y": 20
+    },
+    {
+      "fill": "#bbbbbb",
+      "role": "mark",
+      "shapeHeight": 4.472136,
+      "shapeWidth": 4.472136,
+      "size": 20,
+      "type": "symbol",
+      "x": 130,
+      "y": 20
+    },
+    {
+      "fill": "#bbbbbb",
+      "role": "mark",
+      "shapeHeight": 4.472136,
+      "shapeWidth": 4.472136,
+      "size": 20,
+      "type": "symbol",
+      "x": 220,
+      "y": 20
+    },
+    {
+      "fill": "#bbbbbb",
+      "role": "mark",
+      "shapeHeight": 4.472136,
+      "shapeWidth": 4.472136,
+      "size": 20,
+      "type": "symbol",
+      "x": 40,
+      "y": 70
+    },
+    {
+      "fill": "#bbbbbb",
+      "role": "mark",
+      "shapeHeight": 4.472136,
+      "shapeWidth": 4.472136,
+      "size": 20,
+      "type": "symbol",
+      "x": 130,
+      "y": 70
+    },
+    {
+      "fill": "#bbbbbb",
+      "role": "mark",
+      "shapeHeight": 4.472136,
+      "shapeWidth": 4.472136,
+      "size": 20,
+      "type": "symbol",
+      "x": 220,
+      "y": 70
+    },
+    {
+      "fill": "#bbbbbb",
+      "role": "mark",
+      "shapeHeight": 4.472136,
+      "shapeWidth": 4.472136,
+      "size": 20,
+      "type": "symbol",
+      "x": 40,
+      "y": 125
+    },
+    {
+      "fill": "#bbbbbb",
+      "role": "mark",
+      "shapeHeight": 4.472136,
+      "shapeWidth": 4.472136,
+      "size": 20,
+      "type": "symbol",
+      "x": 130,
+      "y": 125
+    },
+    {
+      "fill": "#bbbbbb",
+      "role": "mark",
+      "shapeHeight": 4.472136,
+      "shapeWidth": 4.472136,
+      "size": 20,
+      "type": "symbol",
+      "x": 220,
+      "y": 125
+    },
+    {
+      "align": "left",
+      "angle": 0,
+      "baseline": "top",
+      "fill": "#333333",
+      "font": "sans-serif",
+      "fontSize": 12,
+      "role": "mark",
+      "text": "Lt",
+      "type": "text",
+      "x": 40,
+      "y": 20
+    },
+    {
+      "align": "center",
+      "angle": 0,
+      "baseline": "middle",
+      "fill": "#333333",
+      "font": "sans-serif",
+      "fontSize": 12,
+      "role": "mark",
+      "text": "Cm",
+      "type": "text",
+      "x": 130,
+      "y": 20
+    },
+    {
+      "align": "right",
+      "angle": 0,
+      "baseline": "bottom",
+      "fill": "#333333",
+      "font": "sans-serif",
+      "fontSize": 12,
+      "role": "mark",
+      "text": "Rb",
+      "type": "text",
+      "x": 220,
+      "y": 20
+    },
+    {
+      "align": "left",
+      "angle": 0,
+      "baseline": "alphabetic",
+      "fill": "#333333",
+      "font": "sans-serif",
+      "fontSize": 12,
+      "role": "mark",
+      "text": "La",
+      "type": "text",
+      "x": 46,
+      "y": 66
+    },
+    {
+      "align": "center",
+      "angle": 45,
+      "baseline": "top",
+      "fill": "#333333",
+      "font": "sans-serif",
+      "fontSize": 12,
+      "role": "mark",
+      "text": "Rot",
+      "type": "text",
+      "x": 130,
+      "y": 70
+    },
+    {
+      "align": "right",
+      "angle": -30,
+      "baseline": "middle",
+      "fill": "#333333",
+      "font": "sans-serif",
+      "fontSize": 12,
+      "role": "mark",
+      "text": "Neg",
+      "type": "text",
+      "x": 219.901924,
+      "y": 75.830127
+    },
+    {
+      "align": "center",
+      "angle": 90,
+      "baseline": "bottom",
+      "fill": "#333333",
+      "font": "sans-serif",
+      "fontSize": 12,
+      "role": "mark",
+      "text": "Up",
+      "type": "text",
+      "x": 40,
+      "y": 125
+    },
+    {
+      "align": "left",
+      "angle": 0,
+      "baseline": "middle",
+      "fill": "#333333",
+      "font": "sans-serif",
+      "fontSize": 12,
+      "role": "mark",
+      "text": "Dx",
+      "type": "text",
+      "x": 142,
+      "y": 125
+    },
+    {
+      "align": "center",
+      "angle": 0,
+      "baseline": "alphabetic",
+      "fill": "#333333",
+      "font": "sans-serif",
+      "fontSize": 12,
+      "role": "mark",
+      "text": "Dy",
+      "type": "text",
+      "x": 220,
+      "y": 135
+    }
+  ],
+  "scales": {},
+  "size": {
+    "height": 170,
+    "width": 270
+  },
+  "spec": "text-anchors.vg.json",
+  "vegaVersion": "6.3.1"
+}

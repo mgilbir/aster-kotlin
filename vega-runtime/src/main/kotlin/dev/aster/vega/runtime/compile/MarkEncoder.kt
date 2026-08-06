@@ -248,6 +248,14 @@ public class MarkEncoder(
     val anchorX = position(channels["x"], datum) ?: return null
     val anchorY = position(channels["y"], datum) ?: return null
     val content = string(channels["text"], datum) ?: return null
+    val angle = number(channels["angle"], datum) ?: 0.0
+    // `dx` and `dy` shift the anchor without affecting alignment — but for rotated text upstream
+    // applies them *after* the rotation, so an offset runs along the text rather than along the
+    // page.
+    // Rotating them here keeps the anchor as the point the text turns about, which is what it is.
+    val nudge = PointD(number(channels["dx"], datum) ?: 0.0, number(channels["dy"], datum) ?: 0.0)
+    val offset =
+      if (angle == 0.0) nudge else Transform2D.rotateDegrees(angle).apply(nudge.x, nudge.y)
     val style = style(channels, datum, spec)
 
     val textStyle =
@@ -272,12 +280,11 @@ public class MarkEncoder(
 
     return TextNode(
       id = ids.allocate(),
-      // `dx` and `dy` shift the anchor without affecting alignment.
-      x = anchorX + (number(channels["dx"], datum) ?: 0.0),
-      y = anchorY + (number(channels["dy"], datum) ?: 0.0),
+      x = anchorX + offset.x,
+      y = anchorY + offset.y,
       layout = textEngine.layout(run),
       fill = style.fill ?: Fill.of(MarkDefaults.TEXT_FILL),
-      angleDegrees = number(channels["angle"], datum) ?: 0.0,
+      angleDegrees = angle,
       opacity = style.opacity,
       metadata = metadata(spec, datum, index, channels),
     )

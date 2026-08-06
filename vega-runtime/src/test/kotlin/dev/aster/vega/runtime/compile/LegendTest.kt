@@ -3,6 +3,7 @@ package dev.aster.vega.runtime.compile
 import dev.aster.vega.fixtures.VegaHeadlessTextEngine
 import dev.aster.vega.model.DiagnosticSeverity
 import dev.aster.vega.scene.GroupNode
+import dev.aster.vega.scene.RectD
 import dev.aster.vega.scene.RectNode
 import dev.aster.vega.scene.SceneNode
 import dev.aster.vega.scene.ScenePaint
@@ -11,7 +12,6 @@ import dev.aster.vega.scene.TextBaseline
 import dev.aster.vega.scene.TextNode
 import dev.aster.vega.scene.flatten
 import org.junit.jupiter.api.Assertions.assertEquals
-import org.junit.jupiter.api.Assertions.assertNull
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.params.ParameterizedTest
@@ -44,6 +44,20 @@ class LegendTest {
 
   private fun role(json: String, role: String): List<SceneNode> =
     nodes(json).filter { it.metadata.role == role }
+
+  /**
+   * Where nodes of [role] actually land, in scene coordinates.
+   *
+   * Entries are positioned by a group transform, so a symbol's own `x` is cell-local and says
+   * nothing about where it is drawn. This asks the flattened scene instead.
+   */
+  private fun placed(json: String, role: String): List<RectD> {
+    val compiled = compile(json)
+    return requireNotNull(compiled.scene)
+      .flatten()
+      .filter { it.node.metadata.role == role }
+      .map { it.worldBounds }
+  }
 
   /** Two categories whose labels measure 16 units wide, which makes the arithmetic checkable. */
   private fun spec(
@@ -79,16 +93,19 @@ class LegendTest {
   @Test
   fun `symbol and label sit where upstream puts them`() {
     // Upstream's row box is max(ceil(sqrt(100) + 1.5), 10) = 12, so the swatch centres at 6 and the
-    // label starts at 12 + labelOffset 4 = 16. The second row is 13 lower: the row is 11 tall (the
-    // symbol's own extent, not the box) plus rowPadding 2.
-    val symbols = role(spec("""{"fill": "s1"}"""), "legend-symbol").map { it as SymbolNode }
-    val labels = role(spec("""{"fill": "s1"}"""), "legend-label").map { it as TextNode }
-    assertEquals(6.0, symbols[0].x, 1e-9)
-    assertEquals(6.0, symbols[0].y, 1e-9)
-    assertEquals(6.0 + 13.0, symbols[1].y, 1e-9)
-    assertEquals(16.0, labels[0].x, 1e-9)
-    assertEquals(6.0, labels[0].y, 1e-9)
-    assertEquals(19.0, labels[1].y, 1e-9)
+    // label starts at 12 + labelOffset 4 = 16. The second row is 13 lower: the previous cell
+    // reaches
+    // 11 and rowPadding is 2, with nothing overhanging backwards to add.
+    val json = spec("""{"fill": "s1"}""")
+    val symbols = placed(json, "legend-symbol")
+    val labels = placed(json, "legend-label")
+    val legendX = legends(json).single().transform.e
+    assertEquals(6.0, symbols[0].centerX - legendX, 1e-9)
+    assertEquals(6.0, symbols[0].centerY, 1e-9)
+    assertEquals(6.0 + 13.0, symbols[1].centerY, 1e-9)
+    assertEquals(16.0, labels[0].left - legendX, 1e-9)
+    assertEquals(6.0, labels[0].centerY, 1e-9)
+    assertEquals(19.0, labels[1].centerY, 1e-9)
   }
 
   @Test
@@ -114,7 +131,12 @@ class LegendTest {
     val symbols = role(json, "legend-symbol").map { it as SymbolNode }
     assertTrue(symbols.isNotEmpty())
     symbols.forEach {
-      assertNull(it.fill, "a size legend should not imply a colour")
+      // Upstream fills these transparently rather than not at all, which says "no colour here"
+      // instead of leaving it to whatever default a renderer has.
+      assertEquals(
+        0.0,
+        requireNotNull(it.fill).paint.let { p -> (p as ScenePaint.Solid).color.alpha },
+      )
       val stroke = requireNotNull(it.stroke)
       assertEquals(
         LegendDefaults.symbolBaseStrokeColor.toCssHex(),
@@ -130,23 +152,21 @@ class LegendTest {
     // Upstream's symbolDirection and gradientDirection are both vertical and neither depends on
     // orient, so a legend along the bottom still stacks its entries rather than spreading them.
     for (orient in listOf("right", "bottom", "top-left")) {
-      val symbols =
-        role(spec("""{"fill": "s1", "orient": "$orient"}"""), "legend-symbol").map {
-          it as SymbolNode
-        }
-      assertEquals(symbols[0].x, symbols[1].x, 1e-9, "$orient should stack, not spread")
-      assertTrue(symbols[1].y > symbols[0].y, orient)
+      val symbols = placed(spec("""{"fill": "s1", "orient": "$orient"}"""), "legend-symbol")
+      assertEquals(symbols[0].centerX, symbols[1].centerX, 1e-9, "$orient should stack, not spread")
+      assertTrue(symbols[1].centerY > symbols[0].centerY, "$orient: $symbols")
     }
   }
 
   @Test
   fun `a horizontal legend runs its entries along a row`() {
     val json = spec("""{"fill": "s1", "direction": "horizontal"}""")
-    val symbols = role(json, "legend-symbol").map { it as SymbolNode }
-    // Entry width is 16 (label start) + 16 (label width), then columnPadding 10: 32 + 10 = 42.
-    assertEquals(6.0, symbols[0].x, 1e-9)
-    assertEquals(6.0 + 42.0, symbols[1].x, 1e-9)
-    assertEquals(6.0, symbols[1].y, 1e-9)
+    val symbols = placed(json, "legend-symbol")
+    val legendX = legends(json).single().transform.e
+    // The first cell reaches 32 and columnPadding is 10, so the second starts at 42.
+    assertEquals(6.0, symbols[0].centerX - legendX, 1e-9)
+    assertEquals(6.0 + 42.0, symbols[1].centerX - legendX, 1e-9)
+    assertEquals(symbols[0].centerY, symbols[1].centerY, 1e-9)
   }
 
   // ---- titles and sizing ------------------------------------------------------

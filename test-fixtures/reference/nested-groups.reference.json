@@ -1,0 +1,199 @@
+{
+  "marks": [
+    {
+      "fill": "#eef3fa",
+      "height": 100,
+      "role": "scope",
+      "stroke": "#cccccc",
+      "type": "group",
+      "width": 125,
+      "x": 0,
+      "y": 20
+    },
+    {
+      "fill": "#666666",
+      "font": "sans-serif",
+      "fontSize": 11,
+      "role": "mark",
+      "text": "left",
+      "type": "text",
+      "x": 6,
+      "y": 32
+    },
+    {
+      "points": "8 89 44.666667 53 81.333333 71 118 33.5",
+      "role": "mark",
+      "stroke": "#4c78a8",
+      "strokeWidth": 2,
+      "type": "line"
+    },
+    {
+      "fill": "#4c78a8",
+      "role": "mark",
+      "shapeHeight": 6.708204,
+      "shapeWidth": 6.708204,
+      "size": 45,
+      "type": "symbol",
+      "x": 8,
+      "y": 89
+    },
+    {
+      "fill": "#4c78a8",
+      "role": "mark",
+      "shapeHeight": 6.708204,
+      "shapeWidth": 6.708204,
+      "size": 45,
+      "type": "symbol",
+      "x": 44.666667,
+      "y": 53
+    },
+    {
+      "fill": "#4c78a8",
+      "role": "mark",
+      "shapeHeight": 6.708204,
+      "shapeWidth": 6.708204,
+      "size": 45,
+      "type": "symbol",
+      "x": 81.333333,
+      "y": 71
+    },
+    {
+      "fill": "#4c78a8",
+      "role": "mark",
+      "shapeHeight": 6.708204,
+      "shapeWidth": 6.708204,
+      "size": 45,
+      "type": "symbol",
+      "x": 118,
+      "y": 33.5
+    },
+    {
+      "fill": "#faf0ee",
+      "height": 100,
+      "role": "scope",
+      "stroke": "#cccccc",
+      "type": "group",
+      "width": 125,
+      "x": 135,
+      "y": 20
+    },
+    {
+      "fill": "#666666",
+      "font": "sans-serif",
+      "fontSize": 11,
+      "role": "mark",
+      "text": "right",
+      "type": "text",
+      "x": 141,
+      "y": 32
+    },
+    {
+      "points": "143 89 179.666667 53 216.333333 71 253 33.5",
+      "role": "mark",
+      "stroke": "#4c78a8",
+      "strokeWidth": 2,
+      "type": "line"
+    },
+    {
+      "fill": "#4c78a8",
+      "role": "mark",
+      "shapeHeight": 6.708204,
+      "shapeWidth": 6.708204,
+      "size": 45,
+      "type": "symbol",
+      "x": 143,
+      "y": 89
+    },
+    {
+      "fill": "#4c78a8",
+      "role": "mark",
+      "shapeHeight": 6.708204,
+      "shapeWidth": 6.708204,
+      "size": 45,
+      "type": "symbol",
+      "x": 179.666667,
+      "y": 53
+    },
+    {
+      "fill": "#4c78a8",
+      "role": "mark",
+      "shapeHeight": 6.708204,
+      "shapeWidth": 6.708204,
+      "size": 45,
+      "type": "symbol",
+      "x": 216.333333,
+      "y": 71
+    },
+    {
+      "fill": "#4c78a8",
+      "role": "mark",
+      "shapeHeight": 6.708204,
+      "shapeWidth": 6.708204,
+      "size": 45,
+      "type": "symbol",
+      "x": 253,
+      "y": 33.5
+    }
+  ],
+  "scales": {
+    "x": {
+      "domain": [
+        0,
+        3
+      ],
+      "range": [
+        0,
+        110
+      ],
+      "ticks": [
+        0,
+        0.2,
+        0.4,
+        0.6,
+        0.8,
+        1,
+        1.2,
+        1.4,
+        1.6,
+        1.8,
+        2,
+        2.2,
+        2.4,
+        2.6,
+        2.8,
+        3
+      ]
+    },
+    "y": {
+      "domain": [
+        0,
+        60
+      ],
+      "range": [
+        90,
+        0
+      ],
+      "ticks": [
+        0,
+        5,
+        10,
+        15,
+        20,
+        25,
+        30,
+        35,
+        40,
+        45,
+        50,
+        55,
+        60
+      ]
+    }
+  },
+  "size": {
+    "height": 140,
+    "width": 271
+  },
+  "spec": "nested-groups.vg.json",
+  "vegaVersion": "6.3.1"
+}

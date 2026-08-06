@@ -324,8 +324,22 @@ public object Differential {
     return Mark("group", node.metadata.role, numbers, strings)
   }
 
+  /**
+   * Paint values that are numbers, including the opacities.
+   *
+   * Opacity is easy to leave out and expensive to get wrong: a mark at 0.75 fill opacity and one at
+   * 1 have identical geometry, so nothing else in this comparison would notice.
+   */
   private fun paintNumbers(node: SceneNode): Map<String, Double> {
     val result = LinkedHashMap<String, Double>()
+    val fill =
+      when (node) {
+        is RectNode -> node.fill
+        is SymbolNode -> node.fill
+        is PathNode -> node.fill
+        else -> null
+      }
+    fill?.let { result["fillOpacity"] = it.opacity }
     val stroke =
       when (node) {
         is RectNode -> node.stroke
@@ -333,7 +347,10 @@ public object Differential {
         is PathNode -> node.stroke
         else -> null
       }
-    stroke?.let { result["strokeWidth"] = it.width }
+    stroke?.let {
+      result["strokeWidth"] = it.width
+      result["strokeOpacity"] = it.opacity
+    }
     return result
   }
 

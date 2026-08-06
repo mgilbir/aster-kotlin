@@ -307,6 +307,9 @@ public class SpecParser {
     return when (domain) {
       is VegaValue.Arr -> DomainSpec.Literal(domain.values)
       is VegaValue.Obj -> {
+        domain.fields["signal"]?.let {
+          return DomainSpec.FromSignal(it.asString())
+        }
         val data = domain.fields["data"]?.asString()
         val field = domain.fields["field"]?.asString()
         val fields = (domain.fields["fields"] as? VegaValue.Arr)?.values?.map { it.asString() }

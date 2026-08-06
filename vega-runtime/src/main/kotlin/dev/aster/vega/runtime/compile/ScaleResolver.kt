@@ -334,6 +334,7 @@ public class ScaleResolver(
         is DomainSpec.FromField -> fieldValues(domain.data, listOf(domain.field), scaleName)
         is DomainSpec.FromFields -> fieldValues(domain.data, domain.fields, scaleName)
         is DomainSpec.Literal -> domain.values
+        is DomainSpec.FromSignal -> signalDomain(domain, scaleName) ?: return null
         DomainSpec.Unset -> {
           diagnostics.error(
             DiagnosticCodes.SCALE_INVALID_DOMAIN,
@@ -364,6 +365,7 @@ public class ScaleResolver(
           if (domain.sort) raw.sortedBy { it.asString() } else raw
         }
         is DomainSpec.FromFields -> fieldValues(domain.data, domain.fields, scaleName)
+        is DomainSpec.FromSignal -> signalDomain(domain, scaleName) ?: return null
         DomainSpec.Unset -> {
           diagnostics.error(
             DiagnosticCodes.SCALE_INVALID_DOMAIN,
@@ -375,6 +377,26 @@ public class ScaleResolver(
       }
     // Vega's discrete domains keep first-seen order and drop duplicates.
     return values.map { it.asString() }.distinct()
+  }
+
+  /**
+   * A domain supplied by a signal.
+   *
+   * Reported rather than defaulted when the signal is missing or empty, because a scale silently
+   * falling back to `[0, 1]` produces a chart that looks plausible and is not.
+   */
+  private fun signalDomain(domain: DomainSpec.FromSignal, scaleName: String): List<VegaValue>? {
+    val values = numbers.resolveList(domain.expression, scaleName)
+    if (values.isNullOrEmpty()) {
+      diagnostics.error(
+        DiagnosticCodes.SCALE_INVALID_DOMAIN,
+        "Scale '$scaleName' takes its domain from signal expression " +
+          "'${domain.expression}', which produced nothing",
+        operator = scaleName,
+      )
+      return null
+    }
+    return values
   }
 
   private fun fieldValues(

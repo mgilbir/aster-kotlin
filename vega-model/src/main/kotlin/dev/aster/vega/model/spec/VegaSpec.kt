@@ -170,6 +170,14 @@ public sealed interface DomainSpec {
   /** `{"data": "table", "fields": [...]}` — the union of several fields. */
   public data class FromFields(val data: String, val fields: List<String>) : DomainSpec
 
+  /**
+   * `{"signal": "..."}` — an expression producing the domain array.
+   *
+   * Common in practice because the `extent` transform publishes exactly this: a two-element array a
+   * scale can be pointed straight at.
+   */
+  public data class FromSignal(val expression: String) : DomainSpec
+
   public data object Unset : DomainSpec
 }
 

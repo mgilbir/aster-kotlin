@@ -238,7 +238,7 @@ internal class LegendBuilder(
 
     val sizes = entries.map { symbolSizeFor(spec, it.value, declaredSize) }
     // A row is as tall as the taller of its symbol and its label, and upstream rounds the symbol's
-    // contribution up before comparing: this is the number every other offset is derived from.
+    // contribution up before comparing: this is the number every offset within a cell derives from.
     val boxes = sizes.map { maxOf(ceil(sqrt(it) + strokeWidth), labelFontSize) }
     // A vertical legend aligns every label at the widest symbol; a horizontal one packs each entry
     // against its own symbol. That is upstream's `datum.offset` versus `datum.size`.
@@ -246,19 +246,14 @@ internal class LegendBuilder(
 
     val labelStyle = TextStyle(fontFamily = LegendDefaults.FONT_FAMILY, fontSize = labelFontSize)
 
-    val nodes = mutableListOf<SceneNode>()
-    var x = 0.0
-    var y = 0.0
-    val rowPadding = numbers.resolve(spec.rowPadding, scaleName) ?: LegendDefaults.ROW_PADDING
-    val columnPadding =
-      numbers.resolve(spec.columnPadding, scaleName) ?: LegendDefaults.COLUMN_PADDING
-
-    entries.forEachIndexed { index, entry ->
+    // Build each entry at its own origin first: the layout below needs to know how far a cell
+    // reaches
+    // before it can decide where the next one starts.
+    val cells = entries.mapIndexed { index, entry ->
       val box = boxes[index]
       val anchor = if (vertical) widest else box
-      val symbolX = anchor * 0.5 + LegendDefaults.SYMBOL_OFFSET
-      val centreY = box * 0.5
-
+      val centre = box * 0.5
+      val labelX = anchor + LegendDefaults.SYMBOL_OFFSET + labelOffset
       val run =
         TextRun(
           text = entry.label,
@@ -266,36 +261,77 @@ internal class LegendBuilder(
           align = TextAlign.LEFT,
           baseline = TextBaseline.MIDDLE,
         )
-      val layout = textEngine.layout(run)
-      val labelX = anchor + LegendDefaults.SYMBOL_OFFSET + labelOffset
-
-      nodes +=
+      listOf(
         SymbolNode(
           id = ids.allocate(),
-          x = x + symbolX,
-          y = y + centreY,
+          x = anchor * 0.5 + LegendDefaults.SYMBOL_OFFSET,
+          y = centre,
           size = sizes[index],
           shape = shape,
           fill = symbolFill(spec, entry.value),
           stroke = symbolStroke(spec, entry.value, strokeWidth),
           metadata = NodeMetadata(role = "legend-symbol", markName = scaleName, datumIndex = index),
-        )
-      nodes +=
+        ),
         TextNode(
           id = ids.allocate(),
-          x = x + labelX,
-          y = y + centreY,
-          layout = layout,
+          x = labelX,
+          y = centre,
+          layout = textEngine.layout(run),
           fill = Fill.of(LegendDefaults.labelColor),
           metadata = NodeMetadata(role = "legend-label", markName = scaleName, datumIndex = index),
-        )
-
-      val entryWidth = labelX + layout.bounds.width
-      val entryHeight = maxOf(centreY + sqrt(sizes[index]) / 2.0, centreY + labelFontSize / 2.0)
-      if (vertical) y += entryHeight + rowPadding else x += entryWidth + columnPadding
+        ),
+      )
     }
-    return nodes
+
+    val rowPadding = numbers.resolve(spec.rowPadding, scaleName) ?: LegendDefaults.ROW_PADDING
+    val columnPadding =
+      numbers.resolve(spec.columnPadding, scaleName) ?: LegendDefaults.COLUMN_PADDING
+    return place(cells, vertical, if (vertical) rowPadding else columnPadding, scaleName)
   }
+
+  /**
+   * Lays entries out along the legend, in upstream's own arithmetic.
+   *
+   * Not simply "advance by the entry's height": upstream rounds the previous cell's far edge *up*,
+   * and separately adds however far the next cell overhangs *backwards*, rounded up too. With
+   * uniform swatches the two rules coincide and either would do; with a size legend, where each
+   * swatch is larger than the last and overhangs its own origin, they diverge by several units per
+   * row and the legend drifts.
+   */
+  private fun place(
+    cells: List<List<SceneNode>>,
+    vertical: Boolean,
+    padding: Double,
+    scaleName: String,
+  ): List<SceneNode> {
+    val boxes = cells.map { cell -> cell.fold(RectD.Empty) { acc, node -> acc.union(node.bounds) } }
+    val placed = mutableListOf<SceneNode>()
+    var at = 0.0
+    cells.forEachIndexed { index, cell ->
+      if (index > 0) {
+        val previous = boxes[index - 1]
+        val box = boxes[index]
+        val far = if (vertical) previous.bottom else previous.right
+        val near = if (vertical) box.top else box.left
+        at += padding + overhang(near) + ceil(far)
+      }
+      placed +=
+        GroupNode(
+          id = ids.allocate(),
+          children = cell,
+          transform =
+            if (vertical) Transform2D.translate(0.0, at) else Transform2D.translate(at, 0.0),
+          // Upstream calls this a "scope" group; naming it for what it is keeps a legend entry
+          // distinguishable from a group mark's cell, which shares that role.
+          metadata =
+            NodeMetadata(role = "legend-entry-item", markName = scaleName, datumIndex = index),
+        )
+    }
+    return placed
+  }
+
+  /** How far a cell reaches back past its own origin, rounded up. Zero when it does not. */
+  private fun overhang(edge: Double): Double = if (edge < 0.0) ceil(-edge) else 0.0
 
   private fun symbolShape(spec: LegendSpec): SymbolShape {
     val name = spec.symbolType ?: return SymbolShape.CIRCLE
@@ -331,8 +367,18 @@ internal class LegendBuilder(
     return if (number != null && number.isFinite() && number > 0.0) number else declared
   }
 
+  /**
+   * A legend swatch's fill.
+   *
+   * A legend that maps no colour still gets an explicit transparent fill rather than none, which is
+   * what upstream does — a `size` legend's swatches are outlines, and saying "transparent" says so
+   * where saying nothing would leave it to whatever default the renderer has.
+   */
   private fun symbolFill(spec: LegendSpec, value: VegaValue): Fill? {
-    val fillScale = spec.fill?.let { scales[it] } ?: return null
+    val fillScale = spec.fill?.let { scales[it] }
+    if (fillScale == null) {
+      return if (spec.stroke == null) Fill.of(SceneColor.Transparent) else null
+    }
     val colour = SceneColor.parse(fillScale.scale(value).asString()) ?: return null
     return Fill.of(colour)
   }

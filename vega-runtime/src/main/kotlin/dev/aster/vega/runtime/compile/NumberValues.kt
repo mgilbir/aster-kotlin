@@ -5,6 +5,7 @@ import dev.aster.vega.expression.ExpressionEvaluationException
 import dev.aster.vega.expression.ExpressionResult
 import dev.aster.vega.expression.JsSemantics
 import dev.aster.vega.model.DiagnosticCollector
+import dev.aster.vega.model.VegaValue
 import dev.aster.vega.model.spec.NumberValue
 
 /**
@@ -40,4 +41,30 @@ public class NumberResolver(
     }
 
   public fun resolveInt(value: NumberValue?, owner: String): Int? = resolve(value, owner)?.toInt()
+
+  /**
+   * Evaluates an expression to a list of values, for the places a signal supplies a whole array.
+   *
+   * A scale domain is the common one: the `extent` transform publishes a two-element array and a
+   * specification points a scale straight at it. A signal that is not an array is treated as a
+   * one-element list rather than rejected, which is what upstream's own array coercion does.
+   */
+  public fun resolveList(expression: String, owner: String): List<VegaValue>? =
+    when (val compiled = expressions.compile(expression)) {
+      is ExpressionResult.Failed -> {
+        diagnostics.add(compiled.diagnostic.copy(operator = owner))
+        null
+      }
+      is ExpressionResult.Compiled ->
+        try {
+          when (val value = compiled.expression.evaluate(scope)) {
+            is VegaValue.Arr -> value.values
+            VegaValue.Null -> null
+            else -> listOf(value)
+          }
+        } catch (e: ExpressionEvaluationException) {
+          diagnostics.add(e.diagnostic.copy(operator = owner))
+          null
+        }
+    }
 }
