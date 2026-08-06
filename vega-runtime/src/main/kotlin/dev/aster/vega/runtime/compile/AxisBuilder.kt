@@ -102,7 +102,10 @@ public class AxisBuilder(
 
     val tickSize = numbers.resolve(spec.tickSize, spec.scale) ?: AxisDefaults.TICK_SIZE
     val labelPadding = numbers.resolve(spec.labelPadding, spec.scale) ?: AxisDefaults.LABEL_PADDING
-    val labelOffset = tickSize + labelPadding
+    // An axis with its ticks switched off pulls its labels in by the tick size: there is nothing
+    // for
+    // them to clear. Upstream passes 0 in place of the tick size rather than keeping the gap.
+    val labelOffset = (if (spec.ticks) tickSize else 0.0) + labelPadding
     val fontSize = numbers.resolve(spec.labelFontSize, spec.scale) ?: AxisDefaults.LABEL_FONT_SIZE
     val labelStyle = TextStyle(fontFamily = AxisDefaults.LABEL_FONT_FAMILY, fontSize = fontSize)
 
@@ -114,6 +117,10 @@ public class AxisBuilder(
       Stroke(paint = ScenePaint.Solid(AxisDefaults.tickColor), width = AxisDefaults.TICK_WIDTH)
     val gridStroke =
       Stroke(paint = ScenePaint.Solid(AxisDefaults.gridColor), width = AxisDefaults.TICK_WIDTH)
+
+    // A gridline runs back across the plot, away from the side its axis is on: up from a bottom
+    // axis, down from a top one, right from a left one, left from a right one.
+    val gridSign = if (spec.orient == Orient.TOP || spec.orient == Orient.LEFT) 1.0 else -1.0
 
     // Gridlines first so they sit under the ticks, matching Vega's ordering.
     if (spec.grid) {
@@ -129,13 +136,21 @@ public class AxisBuilder(
                 at,
                 0.0,
                 at,
-                -gridSize.height,
+                gridSign * gridSize.height,
                 gridStroke,
                 metadata = gridMeta,
               )
             Orient.LEFT,
             Orient.RIGHT ->
-              RuleNode(ids.allocate(), 0.0, at, gridSize.width, at, gridStroke, metadata = gridMeta)
+              RuleNode(
+                ids.allocate(),
+                0.0,
+                at,
+                gridSign * gridSize.width,
+                at,
+                gridStroke,
+                metadata = gridMeta,
+              )
           }
       }
     }

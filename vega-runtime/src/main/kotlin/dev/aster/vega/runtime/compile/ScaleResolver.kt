@@ -89,7 +89,7 @@ public class ScaleResolver(
         return null
       }
       val domain = if (spec.nice) niceOf(explicit, spec) else explicit
-      return LinearScale(spec.name, orient(domain, spec.reverse), range, spec.clamp)
+      return LinearScale(spec.name, domain, oriented(range, spec.reverse), spec.clamp)
     }
 
     val extent = numericExtent(spec.domain, spec.name)
@@ -107,7 +107,7 @@ public class ScaleResolver(
         clamp = spec.clamp,
       )
     return if (spec.reverse) {
-      LinearScale(spec.name, scale.domain.reversed(), range, spec.clamp)
+      LinearScale(spec.name, scale.domain, range.reversed(), spec.clamp)
     } else {
       scale
     }
@@ -140,8 +140,8 @@ public class ScaleResolver(
 
     return SequentialColorScale(
       name = spec.name,
-      domain = orient(domain, spec.reverse),
-      colors = colors,
+      domain = domain,
+      colors = if (spec.reverse) colors.reversed() else colors,
       space = space,
     )
   }
@@ -202,7 +202,7 @@ public class ScaleResolver(
     var domain = explicitOrExtent(spec, zeroDefault = false) ?: return null
     if (spec.nice) domain = Ticks.niceLog(domain, base)
 
-    val scale = LogScale(spec.name, orient(domain, spec.reverse), range, base, spec.clamp)
+    val scale = LogScale(spec.name, domain, oriented(range, spec.reverse), base, spec.clamp)
     if (!scale.isValid) {
       diagnostics.error(
         DiagnosticCodes.SCALE_INVALID_DOMAIN,
@@ -220,7 +220,7 @@ public class ScaleResolver(
     var domain = explicitOrExtent(spec, zeroDefault = true) ?: return null
     if (spec.nice) domain = niceOf(domain, spec)
     val exponent = numbers.resolve(spec.exponent, spec.name) ?: defaultExponent
-    return PowScale(spec.name, orient(domain, spec.reverse), range, exponent, spec.clamp)
+    return PowScale(spec.name, domain, oriented(range, spec.reverse), exponent, spec.clamp)
   }
 
   private fun buildSymlog(spec: ScaleSpec): SymlogScale? {
@@ -228,7 +228,7 @@ public class ScaleResolver(
     var domain = explicitOrExtent(spec, zeroDefault = true) ?: return null
     if (spec.nice) domain = niceOf(domain, spec)
     val constant = numbers.resolve(spec.constant, spec.name) ?: 1.0
-    return SymlogScale(spec.name, orient(domain, spec.reverse), range, constant, spec.clamp)
+    return SymlogScale(spec.name, domain, oriented(range, spec.reverse), constant, spec.clamp)
   }
 
   /**
@@ -264,8 +264,8 @@ public class ScaleResolver(
     val padding = numbers.resolve(spec.padding, spec.name)
     return BandScale(
       name = spec.name,
-      domain = if (spec.reverse) domain.reversed() else domain,
-      range = range,
+      domain = domain,
+      range = oriented(range, spec.reverse),
       paddingInner = numbers.resolve(spec.paddingInner, spec.name) ?: padding ?: 0.0,
       paddingOuter = numbers.resolve(spec.paddingOuter, spec.name) ?: padding ?: 0.0,
       align = numbers.resolve(spec.align, spec.name) ?: 0.5,
@@ -278,8 +278,8 @@ public class ScaleResolver(
     val domain = discreteDomain(spec.domain, spec.name) ?: return null
     return PointScale(
       name = spec.name,
-      domain = if (spec.reverse) domain.reversed() else domain,
-      range = range,
+      domain = domain,
+      range = oriented(range, spec.reverse),
       padding =
         numbers.resolve(spec.paddingOuter, spec.name)
           ?: numbers.resolve(spec.padding, spec.name)
@@ -316,8 +316,15 @@ public class ScaleResolver(
     return if (numbers.any { it.isNaN() }) null else numbers
   }
 
-  private fun orient(domain: List<Double>, reverse: Boolean): List<Double> =
-    if (reverse) domain.reversed() else domain
+  /**
+   * Applies `reverse`, which flips the **range** and leaves the domain alone.
+   *
+   * Reversing the domain instead maps every value to the same place, so a chart looks identical and
+   * everything derived from the domain is backwards: the ticks come out in descending order, so the
+   * axis labels are reversed and the domain line runs the wrong way.
+   */
+  private fun oriented(range: List<Double>, reverse: Boolean): List<Double> =
+    if (reverse) range.reversed() else range
 
   private fun niceOf(domain: List<Double>, spec: ScaleSpec): List<Double> =
     dev.aster.vega.runtime.scale.Ticks.nice(

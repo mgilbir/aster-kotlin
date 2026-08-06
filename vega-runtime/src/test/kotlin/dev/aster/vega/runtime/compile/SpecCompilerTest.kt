@@ -344,4 +344,38 @@ class SpecCompilerTest {
     val moves = path.path.commands.count { it is dev.aster.vega.scene.PathCommand.MoveTo }
     assertEquals(2, moves, "two runs, split where the value was not defined")
   }
+
+  // ---- scale reverse ----------------------------------------------------------
+
+  @Test
+  fun `reverse flips the range and leaves the domain alone`() {
+    // Reversing the domain instead maps every value to the same place, so a chart looks right and
+    // everything derived from the domain is backwards — the ticks descend, so the axis labels run
+    // the
+    // wrong way and the domain line is drawn end to end. Verified against upstream, which keeps the
+    // domain ascending and reverses the range.
+    val compiled =
+      compile(
+        """
+        {
+          "width": 100, "height": 100, "padding": 0,
+          "scales": [
+            {"name": "y", "type": "linear", "domain": [0, 20], "range": "height", "reverse": true},
+            {"name": "b", "type": "band", "domain": ["a", "b"], "range": "width", "reverse": true}
+          ]
+        }
+        """
+          .trimIndent()
+      )
+    val y = compiled.scales["y"] as dev.aster.vega.runtime.scale.LinearScale
+    assertEquals(listOf(0.0, 20.0), y.domain)
+    assertEquals(listOf(0.0, 100.0), y.range)
+    // The mapping is the same either way; only what the axis reads off it differs.
+    assertEquals(0.0, y.apply(0.0), 1e-9)
+    assertEquals(100.0, y.apply(20.0), 1e-9)
+
+    val band = compiled.scales["b"] as dev.aster.vega.runtime.scale.BandScale
+    assertEquals(listOf("a", "b"), band.domain, "the domain keeps its order")
+    assertEquals(listOf(100.0, 0.0), band.range)
+  }
 }
