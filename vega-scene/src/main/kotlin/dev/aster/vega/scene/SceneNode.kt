@@ -36,6 +36,14 @@ public data class AccessibilityDescriptor(
 public data class NodeMetadata(
   val markName: String? = null,
   val role: String? = null,
+  /**
+   * The specification mark type this node came from, e.g. `"line"`.
+   *
+   * A `PathNode` can stand for a line, an area or a literal path, and they are not interchangeable
+   * to anything that reasons about the scene — hit testing tolerances, accessibility descriptions
+   * and the differential harness all need to tell them apart.
+   */
+  val markKind: String? = null,
   /** Stable tuple identity from the dataflow, preserved across incremental updates. */
   val datumId: Long? = null,
   val datumIndex: Int? = null,

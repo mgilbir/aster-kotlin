@@ -225,10 +225,46 @@ public object Differential {
     return Mark("symbol", node.metadata.role, numbers + paintNumbers(node), paintStrings(node))
   }
 
+  /**
+   * A path node standing in for a line or an area.
+   *
+   * Upstream emits one item per datum and connects them at render time; this engine builds the
+   * whole outline as one node. Both sides therefore report a point list rather than per-item
+   * coordinates — see `SERIES_TYPES` in `oracle-js/src/normalize.js`.
+   */
   private fun pathMark(node: PathNode, world: Transform2D): Mark {
-    val bounds = world.mapBounds(node.path.bounds)
-    val numbers = linkedMapOf("x" to bounds.left, "y" to bounds.top)
-    return Mark("path", node.metadata.role, numbers, emptyMap())
+    val kind = node.metadata.markKind ?: "path"
+    if (kind != "line" && kind != "area") {
+      val bounds = world.mapBounds(node.path.bounds)
+      return Mark(
+        "path",
+        node.metadata.role,
+        linkedMapOf("x" to bounds.left, "y" to bounds.top),
+        emptyMap(),
+      )
+    }
+
+    val vertices =
+      node.path.commands.mapNotNull { command ->
+        when (command) {
+          is dev.aster.vega.scene.PathCommand.MoveTo -> world.apply(command.x, command.y)
+          is dev.aster.vega.scene.PathCommand.LineTo -> world.apply(command.x, command.y)
+          else -> null
+        }
+      }
+    val strings = LinkedHashMap<String, String>()
+    strings["points"] = vertices.joinToString(" ") { "${fmt(it.x)} ${fmt(it.y)}" }
+    val numbers = LinkedHashMap<String, Double>()
+    node.fill?.let { f ->
+      solidColour(f.paint)?.let { strings["fill"] = it.toCssHex() }
+      numbers["fillOpacity"] = f.opacity
+    }
+    node.stroke?.let { st ->
+      solidColour(st.paint)?.let { strings["stroke"] = it.toCssHex() }
+      numbers["strokeWidth"] = st.width
+      numbers["strokeOpacity"] = st.opacity
+    }
+    return Mark(kind, node.metadata.role, numbers, strings)
   }
 
   private fun imageMark(node: ImageNode, world: Transform2D): Mark {
@@ -366,17 +402,31 @@ public object Differential {
         out.add(Difference("$where.$channel", wanted, "absent"))
         continue
       }
-      // Colours compare by value, not by spelling: "steelblue" and "#4682b4" are the same colour.
       val equal =
-        if (channel in COLOUR_CHANNELS) {
-          val a = SceneColor.parse(wanted)
-          val b = SceneColor.parse(got)
-          a != null && b != null && a.toCssHex() == b.toCssHex()
-        } else {
-          wanted == got
+        when {
+          // Colours compare by value, not by spelling: "steelblue" and "#4682b4" are one colour.
+          channel in COLOUR_CHANNELS -> {
+            val a = SceneColor.parse(wanted)
+            val b = SceneColor.parse(got)
+            a != null && b != null && a.toCssHex() == b.toCssHex()
+          }
+          // A point list is geometry, so it compares numerically within tolerance. Comparing the
+          // text
+          // would fail on nothing worse than the reference rounding 57.6 where we print
+          // 57.599999999999994.
+          channel == "points" -> pointsMatch(wanted, got, tolerance)
+          else -> wanted == got
         }
       if (!equal) out.add(Difference("$where.$channel", wanted, got))
     }
+  }
+
+  /** Compares two whitespace-separated coordinate lists numerically. */
+  private fun pointsMatch(expected: String, actual: String, tolerance: Double): Boolean {
+    val wanted = expected.trim().split(Regex("\\s+")).mapNotNull { it.toDoubleOrNull() }
+    val got = actual.trim().split(Regex("\\s+")).mapNotNull { it.toDoubleOrNull() }
+    if (wanted.size != got.size) return false
+    return wanted.indices.all { abs(wanted[it] - got[it]) <= tolerance }
   }
 
   /** Channels Vega always emits that default to a known value on our side. */

@@ -112,7 +112,7 @@ public class SpecCompiler(private val textEngine: TextEngine = MetricTextEngine(
     val scales = ScaleResolver(datasets, plot, diagnostics, numbers).resolve(spec.scales)
 
     val axisBuilder = AxisBuilder(scales, ids, textEngine, diagnostics, numbers)
-    val markEncoder = MarkEncoder(scales, ids, diagnostics, signals, expressions)
+    val markEncoder = MarkEncoder(scales, ids, diagnostics, signals, expressions, textEngine)
 
     val children = mutableListOf<SceneNode>()
     // Vega draws axes below marks unless an axis opts into a higher zindex.

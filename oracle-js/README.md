@@ -45,8 +45,33 @@ node src/compile-vega-lite.js input.vl.json output.vg.json
 
 Both sides must apply identical rules, otherwise a diff reports formatting rather than behaviour.
 
-## Status
+## Differential references
 
-The scripts and canonicalization are in place. Wiring them into a Gradle differential-test task
-lands with Milestone 3, when the Kotlin runtime can consume a Vega specification at all. Until then
-`scripts/oracle.sh` reports that there is nothing to compare rather than passing vacuously.
+`src/reference.js` emits the normalized comparison model the Kotlin differential tests read, and
+`../scripts/oracle.sh` regenerates one per fixture into `../test-fixtures/reference/`. Those files are
+checked in, so the JVM tests need neither Node nor a network.
+
+`src/normalize.js` flattens Vega's scenegraph into that model. Structure is deliberately not preserved:
+Vega nests marktypes inside group items and emits one item per datum even for a line, whereas this
+engine produces a flat node list with one path per series. Comparing tree shape would report a
+difference on every fixture while saying nothing about correctness, so both sides collapse to absolute
+coordinates, and lines and areas to a single outline point list.
+
+Two other normalizations, each because the drawn result is identical either way:
+
+- a text mark's `dx`/`dy` are folded into its anchor, where Vega keeps them as separate render-time
+  offsets
+- glyph bounds are excluded entirely, since font metrics legitimately differ from a browser's
+  (`../docs/adr/0006-text-measurement-and-font-policy.md`)
+
+## Probes
+
+Three scripts exist to establish upstream behaviour before implementing it, rather than guessing:
+
+- `src/eval-probe.js` — evaluates expressions and prints their results
+- `src/transform-probe.js` — runs a transform pipeline and prints the resulting dataset
+- `src/render.js` — renders a fixture to a canonical scene summary and SVG, for eyeballing
+
+Every reference vector in the Kotlin tests came from one of these. `transform-probe.js` deep-copies its
+input per run, because Vega's transforms mutate the tuples they are given and a shared array silently
+contaminates every result after the first.

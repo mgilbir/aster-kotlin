@@ -41,9 +41,24 @@ export function normalizeScene(root, precision = DEFAULT_PRECISION) {
   return { marks };
 }
 
+/**
+ * Mark types Vega emits one item per datum for, but which draw as a single connected shape.
+ *
+ * This engine produces one path node for the whole series instead, so comparing item-for-item would
+ * report a structural difference on every line chart. Both sides collapse to one record carrying the
+ * point list, which is what actually has to agree.
+ */
+const SERIES_TYPES = new Set(['line', 'area', 'trail']);
+
 /** A marktype node: `{marktype, role, items: [...]}`. */
 function walkMarktype(marktype, dx, dy, out, precision) {
   const type = marktype.marktype || 'group';
+
+  if (SERIES_TYPES.has(type) && (marktype.items || []).length > 0) {
+    out.push(seriesRecord(type, marktype, dx, dy, precision));
+    return;
+  }
+
   for (const item of marktype.items || []) {
     if (type === 'group') {
       // A group item positions its children; Vega stores child coordinates relative to it.
@@ -61,9 +76,45 @@ function walkMarktype(marktype, dx, dy, out, precision) {
   }
 }
 
+/**
+ * One record for a whole line or area: its point list plus the style of its first item.
+ *
+ * Vega repeats the style on every item of a series, so reading it from the first is faithful.
+ */
+function seriesRecord(type, marktype, dx, dy, precision) {
+  const items = marktype.items;
+  const first = items[0];
+  const entry = { type, role: marktype.role || null };
+
+  // The outline, in the order it would be drawn: forward along the primary boundary, and for an area
+  // back along the secondary one. Both sides emit this same order so the lists compare textually.
+  const points = [];
+  const push = (x, y) => {
+    points.push(canonicalNumber((x || 0) + dx, precision));
+    points.push(canonicalNumber((y || 0) + dy, precision));
+  };
+  for (const item of items) push(item.x, item.y);
+  if (type === 'area') {
+    for (const item of [...items].reverse()) {
+      push(item.x2 !== undefined ? item.x2 : item.x, item.y2 !== undefined ? item.y2 : item.y);
+    }
+  }
+  entry.points = points.join(' ');
+
+  for (const channel of STYLE_CHANNELS) {
+    if (first[channel] !== undefined) entry[channel] = canonicalNumber(first[channel], precision);
+  }
+  return entry;
+}
+
 function record(type, role, item, dx, dy, precision) {
   const entry = { type, role: role || null };
   const channels = GEOMETRY_CHANNELS[type] || ['x', 'y'];
+
+  // Vega keeps a text mark's dx/dy as separate render-time offsets; this engine folds them into the
+  // anchor, which draws identically. Fold them here too so the two agree.
+  const textDx = type === 'text' ? item.dx || 0 : 0;
+  const textDy = type === 'text' ? item.dy || 0 : 0;
 
   for (const channel of channels) {
     let value = item[channel];
@@ -74,7 +125,8 @@ function record(type, role, item, dx, dy, precision) {
       else continue;
     }
     if (typeof value !== 'number') continue;
-    const offset = channel.startsWith('x') ? dx : channel.startsWith('y') ? dy : 0;
+    const offset =
+      channel.startsWith('x') ? dx + textDx : channel.startsWith('y') ? dy + textDy : 0;
     // Width, height and size are extents, not positions, so they take no offset.
     const isExtent = channel === 'width' || channel === 'height' || channel === 'size';
     entry[channel] = canonicalNumber(isExtent ? value : value + offset, precision);
