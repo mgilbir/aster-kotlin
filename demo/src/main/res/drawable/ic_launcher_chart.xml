@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- A three-bar chart glyph, so the demo has an icon without pulling in an asset pipeline. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="48dp"
+    android:height="48dp"
+    android:viewportWidth="48"
+    android:viewportHeight="48">
+    <path
+        android:fillColor="#4682B4"
+        android:pathData="M8,28h8v14H8zM20,16h8v26h-8zM32,22h8v20h-8z" />
+    <path
+        android:fillColor="#888888"
+        android:pathData="M6,42h36v2H6z" />
+</vector>

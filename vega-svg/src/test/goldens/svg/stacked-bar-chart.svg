@@ -1,0 +1,81 @@
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" version="1.1" width="400" height="260" viewBox="0 0 400 260">
+  <defs>
+    <clipPath id="vc0"><rect x="0" y="0" width="400" height="260"/></clipPath>
+  </defs>
+  <rect x="0" y="0" width="400" height="260" fill="#ffffff"/>
+  <g clip-path="url(#vc0)">
+    <text x="200" y="11.333333" font-family="sans-serif" font-size="15" font-weight="600" text-anchor="middle" dominant-baseline="text-before-edge" fill="#222222" role="heading" aria-label="Revenue by segment">Revenue by segment</text>
+    <g>
+      <line x1="44" y1="34" x2="44" y2="230" stroke="#888888"/>
+      <line x1="44" y1="230" x2="388" y2="230" stroke="#dddddd" stroke-dasharray="2,2"/>
+      <line x1="40" y1="230" x2="44" y2="230" stroke="#888888"/>
+      <text x="37" y="230" font-family="sans-serif" font-size="11" text-anchor="end" dominant-baseline="central" fill="#444444">0</text>
+      <line x1="44" y1="190.8" x2="388" y2="190.8" stroke="#dddddd" stroke-dasharray="2,2"/>
+      <line x1="40" y1="190.8" x2="44" y2="190.8" stroke="#888888"/>
+      <text x="37" y="190.8" font-family="sans-serif" font-size="11" text-anchor="end" dominant-baseline="central" fill="#444444">20</text>
+      <line x1="44" y1="151.6" x2="388" y2="151.6" stroke="#dddddd" stroke-dasharray="2,2"/>
+      <line x1="40" y1="151.6" x2="44" y2="151.6" stroke="#888888"/>
+      <text x="37" y="151.6" font-family="sans-serif" font-size="11" text-anchor="end" dominant-baseline="central" fill="#444444">40</text>
+      <line x1="44" y1="112.4" x2="388" y2="112.4" stroke="#dddddd" stroke-dasharray="2,2"/>
+      <line x1="40" y1="112.4" x2="44" y2="112.4" stroke="#888888"/>
+      <text x="37" y="112.4" font-family="sans-serif" font-size="11" text-anchor="end" dominant-baseline="central" fill="#444444">60</text>
+      <line x1="44" y1="73.2" x2="388" y2="73.2" stroke="#dddddd" stroke-dasharray="2,2"/>
+      <line x1="40" y1="73.2" x2="44" y2="73.2" stroke="#888888"/>
+      <text x="37" y="73.2" font-family="sans-serif" font-size="11" text-anchor="end" dominant-baseline="central" fill="#444444">80</text>
+      <line x1="44" y1="34" x2="388" y2="34" stroke="#dddddd" stroke-dasharray="2,2"/>
+      <line x1="40" y1="34" x2="44" y2="34" stroke="#888888"/>
+      <text x="37" y="34" font-family="sans-serif" font-size="11" text-anchor="end" dominant-baseline="central" fill="#444444">100</text>
+    </g>
+    <g>
+      <line x1="44" y1="230" x2="388" y2="230" stroke="#888888"/>
+      <line x1="65.5" y1="230" x2="65.5" y2="234" stroke="#888888"/>
+      <text x="65.5" y="237" font-family="sans-serif" font-size="11" text-anchor="middle" dominant-baseline="text-before-edge" fill="#444444">Jan</text>
+      <line x1="108.5" y1="230" x2="108.5" y2="234" stroke="#888888"/>
+      <text x="108.5" y="237" font-family="sans-serif" font-size="11" text-anchor="middle" dominant-baseline="text-before-edge" fill="#444444">Feb</text>
+      <line x1="151.5" y1="230" x2="151.5" y2="234" stroke="#888888"/>
+      <text x="151.5" y="237" font-family="sans-serif" font-size="11" text-anchor="middle" dominant-baseline="text-before-edge" fill="#444444">Mar</text>
+      <line x1="194.5" y1="230" x2="194.5" y2="234" stroke="#888888"/>
+      <text x="194.5" y="237" font-family="sans-serif" font-size="11" text-anchor="middle" dominant-baseline="text-before-edge" fill="#444444">Apr</text>
+      <line x1="237.5" y1="230" x2="237.5" y2="234" stroke="#888888"/>
+      <text x="237.5" y="237" font-family="sans-serif" font-size="11" text-anchor="middle" dominant-baseline="text-before-edge" fill="#444444">May</text>
+      <line x1="280.5" y1="230" x2="280.5" y2="234" stroke="#888888"/>
+      <text x="280.5" y="237" font-family="sans-serif" font-size="11" text-anchor="middle" dominant-baseline="text-before-edge" fill="#444444">Jun</text>
+      <line x1="323.5" y1="230" x2="323.5" y2="234" stroke="#888888"/>
+      <text x="323.5" y="237" font-family="sans-serif" font-size="11" text-anchor="middle" dominant-baseline="text-before-edge" fill="#444444">Jul</text>
+      <line x1="366.5" y1="230" x2="366.5" y2="234" stroke="#888888"/>
+      <text x="366.5" y="237" font-family="sans-serif" font-size="11" text-anchor="middle" dominant-baseline="text-before-edge" fill="#444444">Aug</text>
+    </g>
+    <rect x="50.45" y="199.816" width="30.1" height="30.184" fill="#4682b4" aria-label="Jan product: 15.400000000000002"/>
+    <rect x="50.45" y="183.352" width="30.1" height="16.464" fill="#f0a35e" aria-label="Jan services: 8.4"/>
+    <rect x="50.45" y="175.12" width="30.1" height="8.232" fill="#7fb069" aria-label="Jan support: 4.2"/>
+    <rect x="93.45" y="170.71" width="30.1" height="59.29" fill="#4682b4" aria-label="Feb product: 30.250000000000004"/>
+    <rect x="93.45" y="138.37" width="30.1" height="32.34" fill="#f0a35e" aria-label="Feb services: 16.5"/>
+    <rect x="93.45" y="122.2" width="30.1" height="16.17" fill="#7fb069" aria-label="Feb support: 8.25"/>
+    <rect x="136.45" y="183.646" width="30.1" height="46.354" fill="#4682b4" aria-label="Mar product: 23.650000000000002"/>
+    <rect x="136.45" y="158.362" width="30.1" height="25.284" fill="#f0a35e" aria-label="Mar services: 12.9"/>
+    <rect x="136.45" y="145.72" width="30.1" height="12.642" fill="#7fb069" aria-label="Mar support: 6.45"/>
+    <rect x="179.45" y="131.902" width="30.1" height="98.098" fill="#4682b4" aria-label="Apr product: 50.050000000000004"/>
+    <rect x="179.45" y="78.394" width="30.1" height="53.508" fill="#f0a35e" aria-label="Apr services: 27.3"/>
+    <rect x="179.45" y="51.64" width="30.1" height="26.754" fill="#7fb069" aria-label="Apr support: 13.65"/>
+    <rect x="222.45" y="142.682" width="30.1" height="87.318" fill="#4682b4" aria-label="May product: 44.550000000000004"/>
+    <rect x="222.45" y="95.054" width="30.1" height="47.628" fill="#f0a35e" aria-label="May services: 24.3"/>
+    <rect x="222.45" y="71.24" width="30.1" height="23.814" fill="#7fb069" aria-label="May support: 12.15"/>
+    <rect x="265.45" y="172.866" width="30.1" height="57.134" fill="#4682b4" aria-label="Jun product: 29.150000000000002"/>
+    <rect x="265.45" y="141.702" width="30.1" height="31.164" fill="#f0a35e" aria-label="Jun services: 15.899999999999999"/>
+    <rect x="265.45" y="126.12" width="30.1" height="15.582" fill="#7fb069" aria-label="Jun support: 7.949999999999999"/>
+    <rect x="308.45" y="209.518" width="30.1" height="20.482" fill="#4682b4" aria-label="Jul product: 10.450000000000001"/>
+    <rect x="308.45" y="198.346" width="30.1" height="11.172" fill="#f0a35e" aria-label="Jul services: 5.7"/>
+    <rect x="308.45" y="192.76" width="30.1" height="5.586" fill="#7fb069" aria-label="Jul support: 2.85"/>
+    <rect x="351.45" y="136.214" width="30.1" height="93.786" fill="#4682b4" aria-label="Aug product: 47.85"/>
+    <rect x="351.45" y="85.058" width="30.1" height="51.156" fill="#f0a35e" aria-label="Aug services: 26.099999999999998"/>
+    <rect x="351.45" y="59.48" width="30.1" height="25.578" fill="#7fb069" aria-label="Aug support: 13.049999999999999"/>
+    <g transform="matrix(1 0 0 1 314 0)">
+      <rect x="0" y="34" width="9" height="9" fill="#4682b4"/>
+      <text x="13" y="38.5" font-family="sans-serif" font-size="11" text-anchor="start" dominant-baseline="central" fill="#444444">product</text>
+      <rect x="0" y="48" width="9" height="9" fill="#f0a35e"/>
+      <text x="13" y="52.5" font-family="sans-serif" font-size="11" text-anchor="start" dominant-baseline="central" fill="#444444">services</text>
+      <rect x="0" y="62" width="9" height="9" fill="#7fb069"/>
+      <text x="13" y="66.5" font-family="sans-serif" font-size="11" text-anchor="start" dominant-baseline="central" fill="#444444">support</text>
+    </g>
+  </g>
+</svg>

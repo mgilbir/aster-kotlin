@@ -1,0 +1,18 @@
+{
+  "name": "vega-native-oracle",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Pinned upstream Vega, used as the reference implementation for differential tests.",
+  "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "render": "node src/render.js",
+    "compile-vega-lite": "node src/compile-vega-lite.js"
+  },
+  "dependencies": {
+    "vega": "6.3.1",
+    "vega-lite": "6.4.3"
+  }
+}

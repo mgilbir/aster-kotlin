@@ -1,0 +1,21 @@
+# Gradle
+.gradle/
+build/
+*/build/
+local.properties
+
+# Node
+node_modules/
+
+# macOS
+.DS_Store
+
+# IDE
+.idea/
+*.iml
+.kotlin/
+
+# Build artifacts
+*.apk
+*.aab
+*.hprof

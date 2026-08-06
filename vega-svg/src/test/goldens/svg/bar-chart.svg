@@ -1,0 +1,57 @@
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" version="1.1" width="400" height="260" viewBox="0 0 400 260">
+  <defs>
+    <clipPath id="vc0"><rect x="0" y="0" width="400" height="260"/></clipPath>
+  </defs>
+  <rect x="0" y="0" width="400" height="260" fill="#ffffff"/>
+  <g clip-path="url(#vc0)">
+    <text x="200" y="11.333333" font-family="sans-serif" font-size="15" font-weight="600" text-anchor="middle" dominant-baseline="text-before-edge" fill="#222222" role="heading" aria-label="Monthly revenue">Monthly revenue</text>
+    <g>
+      <line x1="44" y1="34" x2="44" y2="230" stroke="#888888"/>
+      <line x1="44" y1="230" x2="388" y2="230" stroke="#dddddd" stroke-dasharray="2,2"/>
+      <line x1="40" y1="230" x2="44" y2="230" stroke="#888888"/>
+      <text x="37" y="230" font-family="sans-serif" font-size="11" text-anchor="end" dominant-baseline="central" fill="#444444">0</text>
+      <line x1="44" y1="190.8" x2="388" y2="190.8" stroke="#dddddd" stroke-dasharray="2,2"/>
+      <line x1="40" y1="190.8" x2="44" y2="190.8" stroke="#888888"/>
+      <text x="37" y="190.8" font-family="sans-serif" font-size="11" text-anchor="end" dominant-baseline="central" fill="#444444">20</text>
+      <line x1="44" y1="151.6" x2="388" y2="151.6" stroke="#dddddd" stroke-dasharray="2,2"/>
+      <line x1="40" y1="151.6" x2="44" y2="151.6" stroke="#888888"/>
+      <text x="37" y="151.6" font-family="sans-serif" font-size="11" text-anchor="end" dominant-baseline="central" fill="#444444">40</text>
+      <line x1="44" y1="112.4" x2="388" y2="112.4" stroke="#dddddd" stroke-dasharray="2,2"/>
+      <line x1="40" y1="112.4" x2="44" y2="112.4" stroke="#888888"/>
+      <text x="37" y="112.4" font-family="sans-serif" font-size="11" text-anchor="end" dominant-baseline="central" fill="#444444">60</text>
+      <line x1="44" y1="73.2" x2="388" y2="73.2" stroke="#dddddd" stroke-dasharray="2,2"/>
+      <line x1="40" y1="73.2" x2="44" y2="73.2" stroke="#888888"/>
+      <text x="37" y="73.2" font-family="sans-serif" font-size="11" text-anchor="end" dominant-baseline="central" fill="#444444">80</text>
+      <line x1="44" y1="34" x2="388" y2="34" stroke="#dddddd" stroke-dasharray="2,2"/>
+      <line x1="40" y1="34" x2="44" y2="34" stroke="#888888"/>
+      <text x="37" y="34" font-family="sans-serif" font-size="11" text-anchor="end" dominant-baseline="central" fill="#444444">100</text>
+    </g>
+    <g>
+      <line x1="44" y1="230" x2="388" y2="230" stroke="#888888"/>
+      <line x1="65.5" y1="230" x2="65.5" y2="234" stroke="#888888"/>
+      <text x="65.5" y="237" font-family="sans-serif" font-size="11" text-anchor="middle" dominant-baseline="text-before-edge" fill="#444444">Jan</text>
+      <line x1="108.5" y1="230" x2="108.5" y2="234" stroke="#888888"/>
+      <text x="108.5" y="237" font-family="sans-serif" font-size="11" text-anchor="middle" dominant-baseline="text-before-edge" fill="#444444">Feb</text>
+      <line x1="151.5" y1="230" x2="151.5" y2="234" stroke="#888888"/>
+      <text x="151.5" y="237" font-family="sans-serif" font-size="11" text-anchor="middle" dominant-baseline="text-before-edge" fill="#444444">Mar</text>
+      <line x1="194.5" y1="230" x2="194.5" y2="234" stroke="#888888"/>
+      <text x="194.5" y="237" font-family="sans-serif" font-size="11" text-anchor="middle" dominant-baseline="text-before-edge" fill="#444444">Apr</text>
+      <line x1="237.5" y1="230" x2="237.5" y2="234" stroke="#888888"/>
+      <text x="237.5" y="237" font-family="sans-serif" font-size="11" text-anchor="middle" dominant-baseline="text-before-edge" fill="#444444">May</text>
+      <line x1="280.5" y1="230" x2="280.5" y2="234" stroke="#888888"/>
+      <text x="280.5" y="237" font-family="sans-serif" font-size="11" text-anchor="middle" dominant-baseline="text-before-edge" fill="#444444">Jun</text>
+      <line x1="323.5" y1="230" x2="323.5" y2="234" stroke="#888888"/>
+      <text x="323.5" y="237" font-family="sans-serif" font-size="11" text-anchor="middle" dominant-baseline="text-before-edge" fill="#444444">Jul</text>
+      <line x1="366.5" y1="230" x2="366.5" y2="234" stroke="#888888"/>
+      <text x="366.5" y="237" font-family="sans-serif" font-size="11" text-anchor="middle" dominant-baseline="text-before-edge" fill="#444444">Aug</text>
+    </g>
+    <rect x="48.3" y="175.12" width="34.4" height="54.88" fill="#4682b4" role="graphics-symbol" aria-label="Jan: 28.0"/>
+    <rect x="91.3" y="122.2" width="34.4" height="107.8" fill="#4682b4" role="graphics-symbol" aria-label="Feb: 55.0"/>
+    <rect x="134.3" y="145.72" width="34.4" height="84.28" fill="#4682b4" role="graphics-symbol" aria-label="Mar: 43.0"/>
+    <rect x="177.3" y="51.64" width="34.4" height="178.36" fill="#4682b4" role="graphics-symbol" aria-label="Apr: 91.0"/>
+    <rect x="220.3" y="71.24" width="34.4" height="158.76" fill="#4682b4" role="graphics-symbol" aria-label="May: 81.0"/>
+    <rect x="263.3" y="126.12" width="34.4" height="103.88" fill="#4682b4" role="graphics-symbol" aria-label="Jun: 53.0"/>
+    <rect x="306.3" y="192.76" width="34.4" height="37.24" fill="#4682b4" role="graphics-symbol" aria-label="Jul: 19.0"/>
+    <rect x="349.3" y="59.48" width="34.4" height="170.52" fill="#4682b4" role="graphics-symbol" aria-label="Aug: 87.0"/>
+  </g>
+</svg>
