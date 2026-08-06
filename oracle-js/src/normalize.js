@@ -136,6 +136,12 @@ function record(type, role, item, dx, dy, precision) {
   for (const channel of STYLE_CHANNELS) {
     if (item[channel] !== undefined) entry[channel] = canonicalNumber(item[channel], precision);
   }
+  // A symbol's `size` channel says nothing about the outline it actually draws, and Vega ships its own
+  // symbol table rather than d3's — so compare the drawn extent, not just the requested size.
+  if (type === 'symbol' && item.bounds) {
+    entry.shapeWidth = canonicalNumber(item.bounds.x2 - item.bounds.x1, precision);
+    entry.shapeHeight = canonicalNumber(item.bounds.y2 - item.bounds.y1, precision);
+  }
   if (type === 'text') {
     for (const channel of TEXT_CHANNELS) {
       if (item[channel] !== undefined) entry[channel] = canonicalNumber(item[channel], precision);

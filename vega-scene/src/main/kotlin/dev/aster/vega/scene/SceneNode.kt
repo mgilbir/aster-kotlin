@@ -240,12 +240,25 @@ public enum class SymbolShape {
   TRIANGLE_DOWN,
   TRIANGLE_LEFT,
   TRIANGLE_RIGHT,
+  /**
+   * Vega's plain `triangle`, which is [TRIANGLE_UP] shifted so it balances on its centroid rather
+   * than on the centre of its bounding box. The two are not interchangeable.
+   */
+  TRIANGLE,
   /** A horizontal tick, Vega's `stroke` symbol. */
   STROKE,
+  ARROW,
+  WEDGE,
 }
 
 /**
- * Vega's `symbol` mark. [size] is the symbol's *area* in square pixels, as in Vega, not its radius.
+ * Vega's `symbol` mark.
+ *
+ * [size] follows Vega's own convention, which is **not** d3's: it is the squared extent, so every
+ * shape fits inside a `sqrt(size)` box and [reference] is `sqrt(size) / 2`. A circle of size 100
+ * has radius 5, where d3-shape — which sizes by area — would give 5.64. Vega ships its own symbol
+ * table for exactly this reason, and a chart that mixes the two conventions draws symbols 13% too
+ * large.
  */
 public data class SymbolNode(
   override val id: SceneNodeId,
@@ -265,9 +278,9 @@ public data class SymbolNode(
   val blendMode: SceneBlendMode = SceneBlendMode.NORMAL,
 ) : SceneNode {
 
-  /** Radius of the circle whose area is [size]; the reference length for every shape. */
-  public val radius: Double
-    get() = if (size <= 0.0) 0.0 else kotlin.math.sqrt(size / kotlin.math.PI)
+  /** Half of `sqrt(size)`: the reference length every shape is built from, as upstream. */
+  public val reference: Double
+    get() = if (size <= 0.0) 0.0 else kotlin.math.sqrt(size) / 2.0
 
   /** The symbol outline in scene coordinates, including rotation about ([x], [y]). */
   public val outline: PathData by lazy(LazyThreadSafetyMode.NONE) { buildSymbolPath(this) }
@@ -275,7 +288,15 @@ public data class SymbolNode(
   override val bounds: RectD by
     lazy(LazyThreadSafetyMode.NONE) {
       val base = outline.bounds
-      (if (stroke != null && stroke.isVisible) base.expand(stroke.halfWidth) else base).normalized()
+      // Upstream bounds a symbol's stroke with the miter allowance, because a miter join on a
+      // triangle's tip really does reach that far past the vertex. It applies the same allowance to
+      // a
+      // circle, which is over-generous; reproducing it keeps our bounds comparable with upstream's.
+      val expansion =
+        if (stroke != null && stroke.isVisible) {
+          maxOf(stroke.halfWidth, stroke.miterLimit.coerceAtLeast(1.0) * stroke.halfWidth)
+        } else 0.0
+      (if (expansion > 0.0) base.expand(expansion) else base).normalized()
     }
 }
 
@@ -351,57 +372,111 @@ public data class ImageNode(
 /**
  * Generates a symbol outline in scene coordinates.
  *
- * Shape proportions follow upstream Vega: every shape is sized relative to the radius of the circle
- * with the same area, so symbols of different shapes look equally heavy.
+ * Every proportion here is upstream Vega's own symbol table, not d3-shape's. Vega replaces d3's
+ * table wholesale: it sizes each shape from `r = sqrt(size) / 2` so all of them fit inside a
+ * `sqrt(size)` box, where d3 sizes by area. The two differ visibly — a circle 13% too wide — and
+ * the table also splits `triangle` (balanced on its centroid) from `triangle-up` (balanced on its
+ * bounding box), which d3 does not.
  */
 private fun buildSymbolPath(node: SymbolNode): PathData {
-  val r = node.radius
+  val r = node.reference
   if (r <= 0.0) return PathData.Empty
+
+  // sin(60°) and tan(30°): the height of an equilateral triangle of half-width r, and the offset
+  // between its centroid and the centre of its bounding box.
+  val halfSqrt3 = kotlin.math.sqrt(3.0) / 2.0
+  val tan30 = 1.0 / kotlin.math.sqrt(3.0)
 
   val local =
     node.customPath
       ?: PathData.build {
         when (node.shape) {
           SymbolShape.CIRCLE -> circle(0.0, 0.0, r)
-          SymbolShape.SQUARE -> {
-            val half = kotlin.math.sqrt(node.size) / 2.0
-            rect(-half, -half, half * 2.0, half * 2.0)
-          }
+          SymbolShape.SQUARE -> rect(-r, -r, r * 2.0, r * 2.0)
           SymbolShape.CROSS -> {
-            // Vega uses a cross whose arms are one third of its extent.
-            val s = kotlin.math.sqrt(node.size / 5.0) / 2.0
-            moveTo(-3 * s, -s)
-            lineTo(-s, -s)
-            lineTo(-s, -3 * s)
-            lineTo(s, -3 * s)
-            lineTo(s, -s)
-            lineTo(3 * s, -s)
-            lineTo(3 * s, s)
-            lineTo(s, s)
-            lineTo(s, 3 * s)
-            lineTo(-s, 3 * s)
+            val s = r / 2.5
+            moveTo(-r, -s)
+            lineTo(-r, s)
             lineTo(-s, s)
-            lineTo(-3 * s, s)
+            lineTo(-s, r)
+            lineTo(s, r)
+            lineTo(s, s)
+            lineTo(r, s)
+            lineTo(r, -s)
+            lineTo(s, -s)
+            lineTo(s, -r)
+            lineTo(-s, -r)
+            lineTo(-s, -s)
             close()
           }
           SymbolShape.DIAMOND -> {
-            // d3-shape's symbolDiamond: a rhombus with the requested area.
-            val tan30 = kotlin.math.sqrt(1.0 / 3.0)
-            val dy = kotlin.math.sqrt(node.size / (tan30 * 2.0))
-            val dx = dy * tan30
-            moveTo(0.0, -dy)
-            lineTo(dx, 0.0)
-            lineTo(0.0, dy)
-            lineTo(-dx, 0.0)
+            moveTo(-r, 0.0)
+            lineTo(0.0, -r)
+            lineTo(r, 0.0)
+            lineTo(0.0, r)
             close()
           }
-          SymbolShape.TRIANGLE_UP -> triangle(this, node.size, Orientation.UP)
-          SymbolShape.TRIANGLE_DOWN -> triangle(this, node.size, Orientation.DOWN)
-          SymbolShape.TRIANGLE_RIGHT -> triangle(this, node.size, Orientation.RIGHT)
-          SymbolShape.TRIANGLE_LEFT -> triangle(this, node.size, Orientation.LEFT)
+          SymbolShape.TRIANGLE_UP -> {
+            val h = halfSqrt3 * r
+            moveTo(0.0, -h)
+            lineTo(-r, h)
+            lineTo(r, h)
+            close()
+          }
+          SymbolShape.TRIANGLE_DOWN -> {
+            val h = halfSqrt3 * r
+            moveTo(0.0, h)
+            lineTo(-r, -h)
+            lineTo(r, -h)
+            close()
+          }
+          SymbolShape.TRIANGLE_RIGHT -> {
+            val h = halfSqrt3 * r
+            moveTo(h, 0.0)
+            lineTo(-h, -r)
+            lineTo(-h, r)
+            close()
+          }
+          SymbolShape.TRIANGLE_LEFT -> {
+            val h = halfSqrt3 * r
+            moveTo(-h, 0.0)
+            lineTo(h, -r)
+            lineTo(h, r)
+            close()
+          }
+          SymbolShape.TRIANGLE -> {
+            val h = halfSqrt3 * r
+            val o = h - r * tan30
+            moveTo(0.0, -h - o)
+            lineTo(-r, h - o)
+            lineTo(r, h - o)
+            close()
+          }
           SymbolShape.STROKE -> {
             moveTo(-r, 0.0)
             lineTo(r, 0.0)
+          }
+          SymbolShape.ARROW -> {
+            val s = r / 7.0
+            val t = r / 2.5
+            val v = r / 8.0
+            moveTo(-s, r)
+            lineTo(s, r)
+            lineTo(s, -v)
+            lineTo(t, -v)
+            lineTo(0.0, -r)
+            lineTo(-t, -v)
+            lineTo(-s, -v)
+            close()
+          }
+          SymbolShape.WEDGE -> {
+            val h = halfSqrt3 * r
+            val o = h - r * tan30
+            val b = r / 4.0
+            moveTo(0.0, -h - o)
+            lineTo(-b, h - o)
+            lineTo(b, h - o)
+            close()
           }
         }
       }
@@ -413,49 +488,6 @@ private fun buildSymbolPath(node: SymbolNode): PathData {
       Transform2D.translate(node.x, node.y).concat(Transform2D.rotateDegrees(node.angleDegrees))
     }
   return local.transformedBy(placement)
-}
-
-private enum class Orientation {
-  UP,
-  DOWN,
-  LEFT,
-  RIGHT,
-}
-
-/**
- * Equilateral triangle with area == [size], matching d3-shape's `symbolTriangle` geometry (apex at
- * `2y`, base at `-y` with `y = -sqrt(size / (3 * sqrt(3)))`).
- */
-private fun triangle(builder: PathBuilder, size: Double, orientation: Orientation) {
-  val sqrt3 = kotlin.math.sqrt(3.0)
-  val y = -kotlin.math.sqrt(size / (sqrt3 * 3.0))
-  val apex = 2.0 * y
-  val base = -y
-  val half = -sqrt3 * y
-
-  when (orientation) {
-    Orientation.UP -> {
-      builder.moveTo(0.0, apex)
-      builder.lineTo(-half, base)
-      builder.lineTo(half, base)
-    }
-    Orientation.DOWN -> {
-      builder.moveTo(0.0, -apex)
-      builder.lineTo(half, -base)
-      builder.lineTo(-half, -base)
-    }
-    Orientation.RIGHT -> {
-      builder.moveTo(-apex, 0.0)
-      builder.lineTo(-base, half)
-      builder.lineTo(-base, -half)
-    }
-    Orientation.LEFT -> {
-      builder.moveTo(apex, 0.0)
-      builder.lineTo(base, -half)
-      builder.lineTo(base, half)
-    }
-  }
-  builder.close()
 }
 
 /** Returns a copy of this path with every coordinate mapped through [transform]. */

@@ -5,6 +5,7 @@ import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.params.ParameterizedTest
+import org.junit.jupiter.params.provider.CsvSource
 import org.junit.jupiter.params.provider.EnumSource
 
 class SceneNodeTest {
@@ -111,28 +112,68 @@ class SceneNodeTest {
     }
   }
 
+  /**
+   * Every shape's extent, read off upstream Vega drawing a size-100 symbol at (50, 50).
+   *
+   * These are reference vectors, and they exist because upstream does **not** use d3-shape's symbol
+   * table: it ships its own, sized from `sqrt(size) / 2` so every shape fits a `sqrt(size)` box,
+   * where d3 sizes by area. A circle built d3's way is 13% too wide, and nothing in the drawn
+   * output says so — which is why the differential harness now compares symbol extents too.
+   */
+  @ParameterizedTest
+  @CsvSource(
+    "CIRCLE,45,45,55,55",
+    "SQUARE,45,45,55,55",
+    "CROSS,45,45,55,55",
+    "DIAMOND,45,45,55,55",
+    "TRIANGLE_UP,45,45.669873,55,54.330127",
+    "TRIANGLE_DOWN,45,45.669873,55,54.330127",
+    "TRIANGLE_LEFT,45.669873,45,54.330127,55",
+    "TRIANGLE_RIGHT,45.669873,45,54.330127,55",
+    "TRIANGLE,45,44.226497,55,52.886751",
+    "STROKE,45,50,55,50",
+    "ARROW,48,45,52,55",
+    "WEDGE,48.75,44.226497,51.25,52.886751",
+  )
+  fun `every shape's extent matches upstream`(
+    shape: SymbolShape,
+    left: Double,
+    top: Double,
+    right: Double,
+    bottom: Double,
+  ) {
+    val node = SymbolNode(id = ids.allocate(), x = 50.0, y = 50.0, size = 100.0, shape = shape)
+    val bounds = node.bounds
+    assertEquals(left, bounds.left, 1e-6, "$shape left")
+    assertEquals(top, bounds.top, 1e-6, "$shape top")
+    assertEquals(right, bounds.right, 1e-6, "$shape right")
+    assertEquals(bottom, bounds.bottom, 1e-6, "$shape bottom")
+  }
+
   @Test
-  fun `triangles are balanced on their centroid as in d3-shape`() {
-    // d3-shape places a triangle's apex at 2y and its base at -y, so the bounding box is
-    // deliberately not centred on the anchor: the centroid is.
-    val node =
+  fun `the plain triangle is not a synonym for triangle-up`() {
+    // Upstream keeps both: `triangle` balances on its centroid, `triangle-up` on its bounding box.
+    // Treating them as the same shape shifts a symbol by a tenth of its height.
+    val up =
       SymbolNode(
         id = ids.allocate(),
         x = 0.0,
         y = 0.0,
-        size = 300.0,
+        size = 100.0,
         shape = SymbolShape.TRIANGLE_UP,
       )
-    val bounds = node.bounds
-    assertEquals(0.0, bounds.centerX, 1e-6)
-    assertEquals(2.0, -bounds.top / bounds.bottom, 1e-6, "apex should be twice as far as the base")
+    val plain = up.copy(shape = SymbolShape.TRIANGLE)
+    assertEquals(up.bounds.height, plain.bounds.height, 1e-6, "same height")
+    assertTrue(plain.bounds.top < up.bounds.top, "the centroid form sits higher")
   }
 
   @Test
-  fun `symbol size is an area so radius scales with its square root`() {
+  fun `symbol size is a squared extent, so the reference length scales with its square root`() {
     val small = SymbolNode(id = ids.allocate(), x = 0.0, y = 0.0, size = 100.0)
     val large = SymbolNode(id = ids.allocate(), x = 0.0, y = 0.0, size = 400.0)
-    assertEquals(2.0, large.radius / small.radius, 1e-9)
+    assertEquals(2.0, large.reference / small.reference, 1e-9)
+    // Upstream's convention, not d3's: the extent is sqrt(size), so a size-100 circle is 10 across.
+    assertEquals(10.0, small.bounds.width, 1e-9)
   }
 
   @Test
@@ -152,13 +193,15 @@ class SceneNodeTest {
 
   @Test
   fun `rotating a symbol rotates its outline about its own position`() {
+    // The centroid-balanced `triangle`, because its bounds are *not* symmetric about its position —
+    // a shape that is symmetric would pass this test whether or not it rotated at all.
     val upright =
       SymbolNode(
         id = ids.allocate(),
         x = 100.0,
         y = 100.0,
         size = 200.0,
-        shape = SymbolShape.TRIANGLE_UP,
+        shape = SymbolShape.TRIANGLE,
       )
     val rotated = upright.copy(angleDegrees = 180.0)
     // A 180 degree rotation about the symbol's own position reflects its bounds through that point.

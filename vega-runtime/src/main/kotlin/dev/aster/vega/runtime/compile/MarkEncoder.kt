@@ -217,16 +217,19 @@ public class MarkEncoder(
         "square" -> SymbolShape.SQUARE
         "cross" -> SymbolShape.CROSS
         "diamond" -> SymbolShape.DIAMOND
-        "triangle-up",
-        "triangle" -> SymbolShape.TRIANGLE_UP
+        "triangle-up" -> SymbolShape.TRIANGLE_UP
+        // Not a synonym for triangle-up: upstream's plain `triangle` balances on its centroid.
+        "triangle" -> SymbolShape.TRIANGLE
         "triangle-down" -> SymbolShape.TRIANGLE_DOWN
         "triangle-left" -> SymbolShape.TRIANGLE_LEFT
         "triangle-right" -> SymbolShape.TRIANGLE_RIGHT
         "stroke" -> SymbolShape.STROKE
+        "arrow" -> SymbolShape.ARROW
+        "wedge" -> SymbolShape.WEDGE
         else -> null
       }
     if (shape == null) {
-      // An SVG path string or `wedge`/`arrow` would need a path parser or a generator we lack.
+      // Only an SVG path string is left, which would need a path parser.
       reportOnce(
         "shape:$name",
         dev.aster.vega.model.VegaDiagnostic(

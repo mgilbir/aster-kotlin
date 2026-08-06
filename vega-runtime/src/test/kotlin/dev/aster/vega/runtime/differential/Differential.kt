@@ -219,9 +219,24 @@ public object Differential {
     return Mark("text", node.metadata.role, numbers, strings)
   }
 
+  /**
+   * A symbol, compared by drawn extent as well as by position.
+   *
+   * The `size` channel alone would not catch a wrong shape table: upstream replaces d3-shape's
+   * symbols with its own, sized so every shape fits a `sqrt(size)` box rather than by area.
+   * Comparing the outline extent is what makes that visible.
+   */
   private fun symbolMark(node: SymbolNode, world: Transform2D): Mark {
     val centre = world.apply(node.x, node.y)
-    val numbers = linkedMapOf("x" to centre.x, "y" to centre.y, "size" to node.size)
+    val extent = world.mapBounds(node.bounds)
+    val numbers =
+      linkedMapOf(
+        "x" to centre.x,
+        "y" to centre.y,
+        "size" to node.size,
+        "shapeWidth" to extent.width,
+        "shapeHeight" to extent.height,
+      )
     return Mark("symbol", node.metadata.role, numbers + paintNumbers(node), paintStrings(node))
   }
 
