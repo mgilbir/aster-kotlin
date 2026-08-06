@@ -4,8 +4,14 @@ Last updated: 2026-08-06
 
 ## Current milestone
 
-Milestone 2 complete (SVG renderer). Milestone 0 (bootstrap) and Milestone 1 (scene graph and Canvas
-renderer) are also complete. Milestone 3 (scales and Vega JSON parsing) is next and not started.
+Milestones 0, 1 and 2 complete. **Milestone 3 in progress**: a Vega specification now compiles end to
+end and is verified against upstream Vega by a differential test.
+
+The first differential fixture passes: `test-fixtures/specs/bar.vg.json` compiles to 48 marks whose
+coordinates, extents, types and roles all match upstream Vega exactly, as do every scale's domain,
+range, bandwidth, step and tick values. That gate is now wired into `./scripts/oracle.sh`, so from here
+every scale, mark and transform can be built against a harness that can tell us we are wrong — which
+golden tests cannot.
 
 ## Scope: how much of Vega this is
 
@@ -16,27 +22,31 @@ Upstream Vega is 31 packages, roughly 28,500 lines of source, and leans on about
 of `d3-*` code (d3-scale, d3-shape, d3-time-format, d3-array, d3-interpolate) that a native port has to
 reimplement. It exposes **40 transforms, 119 expression functions, 12 mark types and ~15 scale types.**
 
-This repository is 6,334 lines of main source and 3,351 of tests. What it covers is the **output half**
-of the pipeline plus the testing and diagnostic infrastructure:
+This repository is around 9,000 lines of main source and 5,000 of tests. It covers the **output half**
+of the pipeline, the testing and diagnostic infrastructure, and — as of Milestone 3 — a thin but
+upstream-verified slice through parsing, scales, rect encoding and axes:
 
 | Built here | Upstream equivalent | State |
 | --- | --- | --- |
 | Scene graph, geometry, paths, hit index | part of `vega-scenegraph` (4,994) | 7 of 12 node types; rendering and hit-testing side only |
 | Canvas renderer, SVG serializer | rest of `vega-scenegraph` | complete for those 7 |
 | Diagnostics, canonical snapshots, goldens, oracle scaffolding | no upstream equivalent | complete |
-| `vega-dataflow`, `vega-expression`, `vega-runtime` | 4,266 lines upstream | **contracts only, no behaviour** |
+| `vega-scale` (linear, band, point, ordinal) + d3-array ticks | 790 + parts of d3-scale, d3-array | 4 of ~15 scale types, exact against upstream |
+| `vega-parser` (width, height, padding, autosize, data, scales, axes, marks) | 3,790 | a subset; no signals, transforms, legends, titles or faceting |
+| `vega-encode` (rect encoder, axis generation) | 952 | 1 of 12 mark encoders; axes without titles or overlap removal |
+| `vega-dataflow`, `vega-expression` | 3,679 lines upstream | **contracts only, no behaviour** |
 
 The entire data and specification half is absent:
 
 | Missing | Upstream size | Here |
 | --- | --- | --- |
-| `vega-parser` — specification to dataflow graph | 3,790 | 0 |
 | `vega-transforms` — 40 transforms | 3,754 | 0 |
 | `vega-dataflow` — pulse propagation | 2,081 | contracts only |
 | `vega-expression` — lexer, parser, evaluator | 1,598 | contracts only |
 | `vega-functions` — 119 functions | 790 | 0 |
-| `vega-scale` — scale types, ticks, colour schemes | 790 + d3-scale, d3-interpolate, d3-scale-chromatic | 0 |
-| `vega-encode` — mark encoders, axis and legend generation | 952 | 0 |
+| Remaining scale types — log, pow, sqrt, symlog, time, utc, sequential, quantile … | rest of `vega-scale` + d3-interpolate, d3-scale-chromatic | 0 |
+| Remaining mark encoders — line, area, symbol, text, arc, image, path, group, trail, shape | rest of `vega-encode` + d3-shape | 0 |
+| Legends, titles, label overlap removal | parts of `vega-encode`, `vega-label` | 0 |
 | `vega-view`, `vega-view-transforms` — layout, overlap removal | 2,623 | bounds only |
 | `vega-event-selector` — event-stream DSL | 191 | 0 |
 | `vega-time`, `vega-format` — locale and time units | 587 + d3-format, d3-time-format | 0 |
@@ -48,15 +58,15 @@ substantive compatibility items:
 
 | MVP criterion | State |
 | --- | --- |
-| 1. Compiled Vega JSON loads without JavaScript | No |
-| 2. Bar, line, area, scatter, stacked bar render natively | Only from hand-authored scenes, not from specifications |
-| 3. Axes, legends, labels and titles supported | No — hand-authored in fixtures |
-| 4. Basic transforms and scales execute in Kotlin | No |
+| 1. Compiled Vega JSON loads without JavaScript | Partial — a subset compiles; no signals or transforms |
+| 2. Bar, line, area, scatter, stacked bar render natively | Bar renders from a specification; the rest only from hand-authored scenes |
+| 3. Axes, legends, labels and titles supported | Axes and labels yes; legends and titles no |
+| 4. Basic transforms and scales execute in Kotlin | Scales yes (4 types); transforms no |
 | 5. Tap, hover, tooltip, selection, pan, zoom | Yes, except tooltip rendering |
 | 6. View and Compose APIs | Yes |
 | 7. SVG, PNG, PDF export | Yes |
 | 8. TalkBack can describe and navigate | Partial — virtual nodes are tested by instrumentation, not with TalkBack itself |
-| 9. At least 100 compatibility fixtures pass | No — zero exist |
+| 9. At least 100 compatibility fixtures pass | 1 of 100 |
 | 10. Core runtime has no Android dependency | Yes |
 | 11. Renders without WebView | Yes |
 | 12. Build and test loop runs from the terminal | Yes |
@@ -64,9 +74,10 @@ substantive compatibility items:
 | 14. Unsupported features produce explicit diagnostics | Yes, in the areas that exist |
 | 15. Instructions to reproduce from a clean macOS install | Yes |
 
-Remaining work for the MVP subset — excluding the non-goals — is on the order of 10,000 more lines of
+Remaining work for the MVP subset — excluding the non-goals — is on the order of 8,000 more lines of
 Kotlin plus the fixture corpus. The foundation was built first deliberately (PROJECT_BRIEF.md milestone
-ordering), but the harder half is still ahead.
+ordering), and the pipeline is now verified end to end on one fixture, but the bulk of Vega's behaviour
+— expressions, dataflow, transforms, the other eleven mark types — is still ahead.
 
 ## Completed work
 
@@ -115,9 +126,30 @@ ordering), but the harder half is still ahead.
   scene's drawable node count.
 - Well-formedness verified by parsing every generated document.
 
+### Milestone 3 (in progress) — scales, specification parsing and the differential harness
+
+- **Tick generation** ported from d3-array, including the negative-reciprocal `tickIncrement`
+  convention that keeps fractional steps exact. Reference vectors generated from the pinned d3.
+- **Scales**: linear (with piecewise domains, clamping, invert), band, point and ordinal. Band step,
+  padding, align and round match d3-scaleBand exactly.
+- **Specification model and parser** for width, height, padding, autosize, data, scales, axes and
+  marks, with a JSON path on every diagnostic.
+- **Scale resolution** from data, applying Vega's `zero` then `nice` ordering, with `zero` defaulting to
+  true for data-driven quantitative domains.
+- **Rect mark encoder** handling Vega's x/x2/width and y/y2/height channel pairs, band offsets and
+  paint channels.
+- **Axis generation**: ticks, labels, gridlines and domain lines for all four orientations, reproducing
+  Vega's half-pixel crisp offset and whole-pixel tick rounding.
+- **Layout**: `autosize: pad` and `none`, sizing the surface from content bounds plus padding.
+- **Differential harness**: `oracle-js/src/reference.js` emits a normalized comparison model, checked in
+  under `test-fixtures/reference/`; `Differential` flattens our scene the same way and compares.
+  `scripts/oracle.sh` regenerates references and runs the comparison.
+- **`VegaHeadlessTextEngine`** reproduces upstream's canvas-free text estimate so layout is comparable
+  on the JVM. A comparison engine only.
+
 ## Verification
 
-- 197 JVM tests pass (`./scripts/test-core.sh`, `./gradlew test`).
+- 285 JVM tests pass (`./scripts/test-core.sh`, `./gradlew test`).
 - Android lint is clean with `warningsAsErrors` on every Android module.
 - 47 instrumented tests pass on an API 37 arm64 emulator (`./scripts/test-android.sh`): 40 in
   `vega-android-canvas`, 4 in `vega-compose`, 3 in `demo`.
@@ -147,9 +179,13 @@ dark chrome, so a dark background was unreadable — they now take a `SampleScen
 
 ## Known failing fixtures
 
-None. There are no differential fixtures yet: `scripts/oracle.sh` produces reference output from
-upstream Vega and exits non-zero rather than reporting a vacuous pass, because the Kotlin side cannot
-consume a Vega specification until Milestone 3.
+None. One fixture exists and passes: `bar.vg.json`, compared against upstream Vega on 48 marks and 2
+scales. The brief's MVP asks for 100; growing the corpus is the main task now, and each new fixture is
+expected to surface gaps rather than pass immediately.
+
+One documented difference within that fixture: our surface is half a pixel larger per axis, because
+Vega derives an axis group's bounds from the axis extent rather than by unioning its items. Every mark
+coordinate agrees exactly.
 
 ## Performance observations
 
@@ -174,7 +210,11 @@ The performance targets in PROJECT_BRIEF.md 19 are therefore all unverified.
    derives. That is the simplest correct arrangement for one surface per controller, but it becomes
    wrong the moment two surfaces of different sizes share a controller. Decide whether the transform
    belongs in a per-surface object when the Compose `DrawScope` backend is considered (Milestone 8).
-4. **Text measurement on the compile thread.** `AndroidTextEngine` is not thread-safe. If scene
+4. **Wiring the compiler into the controller.** `SpecCompiler` works, but `VegaChartController.setSpec`
+   still reports not-implemented. Connecting them means deciding where compilation runs (it must not be
+   on the main thread for large data) and how diagnostics reach `controller.diagnostics`. Deliberately
+   deferred until transforms exist, so the threading decision is made against a realistic workload.
+5. **Text measurement on the compile thread.** `AndroidTextEngine` is not thread-safe. If scene
    compilation moves off the main thread, either the engine needs per-thread instances or measurement
    needs to be hoisted into a separate pass. Decide with Milestone 5.
 
@@ -204,11 +244,18 @@ The performance targets in PROJECT_BRIEF.md 19 are therefore all unverified.
 
 ## Next three tasks
 
-1. **Milestone 3, part 1: Vega specification models and parsing.** Parse `width`, `height`,
-   `padding`, `autosize`, `data`, `scales`, `axes` and `marks` into `vega-model` types with source
-   locations, emitting `VEGA_PARSE_*` diagnostics for anything unsupported.
-2. **Milestone 3, part 2: scales.** Linear, band, point and ordinal scales in `vega-runtime`, with
-   unit tests for reversed domains, zero-length domains, `nice`, and out-of-domain values.
-3. **Milestone 3, part 3: mark encoding and the differential harness.** Encode rect, line, symbol and
-   text marks from a parsed specification, then wire `scripts/oracle.sh` step 5 to compare the Kotlin
-   scene against upstream Vega for `test-fixtures/specs/bar.vg.json` and grow to 20 fixtures.
+1. **The expression engine.** The brief schedules this for Milestone 4, after parsing and scales, but
+   that ordering is wrong for real specifications: `{"signal": ...}` appears throughout encodings, scale
+   domains and axis configuration, so the parser currently has to reject a large fraction of real-world
+   input. A lexer, Pratt parser, AST and evaluator plus the subset of upstream's 119 functions the MVP
+   needs — roughly 40 — unblocks everything downstream. Around 2,000 lines.
+2. **The remaining mark encoders, fixture by fixture.** `line`, `area`, `symbol` and `text`, each landing
+   with a differential fixture. `line` and `area` need path generators equivalent to d3-shape,
+   including interpolation methods and `defined` handling. Add fixtures for reversed domains, log
+   scales, negative values and empty data as each becomes supported, since those are where a port
+   usually diverges first.
+3. **Dataflow evaluation and the first transforms.** Pulse propagation behind the existing
+   `DataflowOperator` contract, then `collect`, `extent`, `filter`, `formula`, `aggregate`, `bin` and
+   `stack` — the brief's list — each gated by a fixture. This is what makes `setSpec` genuinely useful,
+   and it is also the point at which `VegaChartController.setSpec` should stop reporting
+   not-implemented and start calling the compiler.

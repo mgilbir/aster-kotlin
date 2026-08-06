@@ -16,7 +16,7 @@ the scope note in STATUS.md for how much of upstream Vega that leaves.
 | Feature | Status | Tests | Known differences | Target milestone |
 | --- | --- | --- | --- | --- |
 | Hand-authored scene graph | Supported | `SampleScenes`, `SceneSnapshotTest` | Not a Vega input format | 1 |
-| Compiled Vega JSON | Planned | — | `setSpec` reports `VEGA_TRANSFORM_NOT_IMPLEMENTED` | 3 |
+| Compiled Vega JSON | Partial | `SpecCompilerTest`, `BarFixtureDifferentialTest` | Parses and compiles the subset below. No signals, transforms, legends, titles or faceting; each reports a diagnostic. `VegaChartController.setSpec` still reports not-implemented — the compiler is not wired into it yet | 3 |
 | Vega-Lite compilation | Not planned (first release) | — | Compile upstream via `oracle-js/src/compile-vega-lite.js` | — |
 | Generic JSON value model | Supported | `VegaValueTest`, `JsonBridgeTest` | Numbers are always `Double` | 0 |
 | Dotted / bracketed field paths | Supported | `VegaValueTest` | Malformed paths resolve to null rather than throwing | 0 |
@@ -26,7 +26,7 @@ the scope note in STATUS.md for how much of upstream Vega that leaves.
 | Feature | Status | Tests | Known differences | Target milestone |
 | --- | --- | --- | --- | --- |
 | Group | Renderable | `SceneNodeTest`, `AndroidCanvasSceneRendererTest` | Transforms, clipping and paint work. No group-mark faceting or layout | 3 |
-| Rect | Renderable | `SceneNodeTest`, `SvgRendererTest` | Corner radius clamped to half the shortest side. No encoder | 3 |
+| Rect | **Supported** | `SpecCompilerTest`, `BarFixtureDifferentialTest` | Encoder handles x/x2/width and y/y2/height pairs, band offsets, fill, stroke, opacity, corner radius. Geometry matches upstream exactly on the bar fixture | 3 |
 | Rule | Renderable | `SceneNodeTest`, `HitTestTest` | Bounds expand on both axes, so they are slightly conservative for a butt-capped rule. No encoder | 3 |
 | Line | Renderable | `PathTest`, golden `svg/line-chart.svg` | `PathNode` draws a polyline. No encoder, no interpolation methods, no `defined` handling | 3 |
 | Area | Renderable | golden `svg/area-chart.svg` | `PathNode` draws the outline. No encoder, no stacking, no interpolation | 3 |
@@ -42,13 +42,13 @@ the scope note in STATUS.md for how much of upstream Vega that leaves.
 
 | Feature | Status | Tests | Known differences | Target milestone |
 | --- | --- | --- | --- | --- |
-| Linear | Planned | — | — | 3 |
-| Band | Planned | — | — | 3 |
-| Point | Planned | — | — | 3 |
-| Ordinal | Planned | — | — | 3 |
-| Log, pow, sqrt | Planned | — | — | 3 |
+| Linear | **Supported** | `ScalesTest`, `TicksTest`, `BarFixtureDifferentialTest` | Domain, range, ticks and `nice` match d3 and upstream exactly. `zero` defaults to true for data-driven domains, as upstream does | 3 |
+| Band | **Supported** | `ScalesTest`, `BarFixtureDifferentialTest` | Step, bandwidth, padding, align and round match d3-scaleBand exactly | 3 |
+| Point | **Supported** | `ScalesTest` | Implemented as a band scale with paddingInner 1, as d3 does | 3 |
+| Ordinal | **Supported** | `ScalesTest` | Explicit range arrays only; colour schemes report `VEGA_SCALE_UNSUPPORTED_TYPE` | 3 |
+| Log, pow, sqrt, symlog | Planned | — | Reports `VEGA_SCALE_UNSUPPORTED_TYPE` | 3 |
 | Time, UTC | Planned | — | — | 3 |
-| Sequential colour | Planned | — | — | 3 |
+| Sequential colour | Planned | — | Needs colour interpolation | 3 |
 | Quantile, quantize, threshold, bin-ordinal | Not planned (first release) | — | Reports `VEGA_SCALE_UNSUPPORTED_TYPE` | — |
 
 ## Data transforms
@@ -84,9 +84,10 @@ Upstream Vega exposes 119 expression functions. None are implemented.
 | Width, height, viewport | Supported | `SceneSnapshotTest` | Padding and `autosize` come with spec parsing | 1 |
 | Group transforms | Supported | `SceneNodeTest` | — | 1 |
 | Clip rectangles and clip paths | Supported | `AndroidCanvasSceneRendererTest`, `SvgRendererTest` | — | 1 |
-| Axes, legends, titles | Not implemented | — | The sample scenes hand-author them as ordinary nodes; the engine generates nothing. Needs tick placement, label alignment and overlap removal | 5 |
+| Axes | **Supported** | `SpecCompilerTest`, `BarFixtureDifferentialTest` | Ticks, labels, gridlines and domain line for all four orientations. Tick positions, label anchors, alignment and text match upstream exactly. No titles, no label overlap removal, no `encode` overrides, no format strings | 5 |
+| Legends, titles | Not implemented | — | Reported as diagnostics; the sample scenes hand-author them as ordinary nodes | 5 |
 | Label collision handling | Planned | — | — | 5 |
-| Padding and `autosize` | Planned | — | — | 3 |
+| Padding and `autosize` | Partial | `SpecCompilerTest`, `BarFixtureDifferentialTest` | `pad` and `none` implemented. `fit`, `fit-x`, `fit-y` need a second layout pass and fall back to `pad` with a diagnostic. Surface size matches upstream to within half a pixel per axis — see the note below | 3 |
 
 ## Interaction
 
@@ -113,6 +114,16 @@ Upstream Vega exposes 119 expression functions. None are implemented.
 | PNG | Supported | `SceneExportTest` | — | 1 |
 | PDF | Supported | `SceneExportTest` | Single page; unsupported operations surface as warnings | 1 |
 | Canonical scene snapshot | Supported | `SceneSnapshotTest` + 5 goldens | — | 1 |
+
+## Differential testing against upstream Vega
+
+| Feature | Status | Tests | Known differences | Target milestone |
+| --- | --- | --- | --- | --- |
+| Comparison harness | Supported | `Differential` | Compares mark count, type, role, coordinates, extents and scale outputs in absolute content space | 3 |
+| Reference generation | Supported | `oracle-js/src/reference.js`, `scripts/oracle.sh` | References are checked in, so JVM tests need no Node and no network | 3 |
+| Fixtures passing | 1 of a target 100 | `BarFixtureDifferentialTest` | `bar.vg.json`: all 48 marks and all scale outputs match exactly | 3 |
+| Axis group bounds | Known difference | `BarFixtureDifferentialTest` | Vega derives an axis group's bounds from the axis extent rather than by unioning its items, so its frame bounds exclude the half-pixel crisp offset and the domain line's stroke. Our surface is up to 1 unit larger per axis; every mark coordinate still agrees exactly | 5 |
+| Text metrics in comparisons | Supported | `VegaHeadlessTextEngine` | Reproduces upstream's canvas-free estimate, `trunc(0.8 × chars × fontSize)`, so layout is comparable. A comparison engine only — never used for display | 3 |
 
 ## Rendering details
 

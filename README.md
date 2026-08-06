@@ -11,14 +11,24 @@ work actually stands, and [SUPPORTED_FEATURES.md](SUPPORTED_FEATURES.md) for the
 
 ## Current status
 
-Milestones 0, 1 and 2 are complete: the repository builds, the scene graph and Android Canvas
-renderer work, and SVG output is deterministic and golden-tested.
+Milestones 0, 1 and 2 are complete: the repository builds, the scene graph and Android Canvas renderer
+work, and SVG output is deterministic and golden-tested. Milestone 3 is in progress.
 
-**Vega JSON specifications are not accepted yet.** `VegaChartController.setSpec` reports
-`VEGA_TRANSFORM_NOT_IMPLEMENTED` rather than rendering nothing; specification parsing and scales
-arrive in Milestone 3. Until then charts are built as scene graphs directly — see
-`test-fixtures/src/main/kotlin/dev/aster/vega/fixtures/SampleScenes.kt` for worked examples of bar,
-stacked bar, line, area and scatter charts.
+**A Vega specification compiles end to end, and is verified against upstream Vega.** `SpecCompiler`
+turns a compiled Vega JSON specification into a scene, and `BarFixtureDifferentialTest` compares the
+result against upstream: for `test-fixtures/specs/bar.vg.json` all 48 marks and both scales match
+exactly. Run `./scripts/oracle.sh` to regenerate the reference data and re-check.
+
+That slice is deliberately thin. Supported today: `linear`, `band`, `point` and `ordinal` scales; the
+`rect` mark; axes with ticks, labels, gridlines and domain lines; `autosize: pad`. **Not** supported:
+expressions and signals, all 40 data transforms, the other eleven mark types, legends and titles. Each
+of those reports a diagnostic rather than rendering something wrong — see `SUPPORTED_FEATURES.md` for
+the matrix and `STATUS.md` for how much of upstream Vega that leaves.
+
+`VegaChartController.setSpec` is not yet wired to the compiler; build a scene with `SpecCompiler` and
+pass it to `setScene`. Charts can also be built as scene graphs directly — see
+`test-fixtures/src/main/kotlin/dev/aster/vega/fixtures/SampleScenes.kt` for worked bar, stacked bar,
+line, area and scatter examples.
 
 ## Supported features
 
@@ -35,8 +45,16 @@ Fully supported today:
 - Accessibility: virtual accessibility descendants with labels, values, activation and selected state
 - APIs: `VegaChartView` and the `VegaChart` Composable
 
-Planned: Vega JSON parsing and scales (Milestone 3), dataflow and transforms (4), generated axes and
-legends (5), signal-driven interaction (6), richer accessibility (7), performance work (9).
+Compiles from a Vega specification, verified against upstream:
+
+- `linear`, `band`, `point`, `ordinal` scales, with d3-exact tick generation and `nice`
+- the `rect` mark, with Vega's x/x2/width and y/y2/height channel pairs and band offsets
+- axes: ticks, labels, gridlines, domain lines, all four orientations
+- `autosize: pad` layout
+
+Planned: expressions and signals, the 40 data transforms, the remaining eleven mark encoders, legends
+and titles (Milestones 3-5), signal-driven interaction (6), richer accessibility (7), performance work
+(9).
 
 `SUPPORTED_FEATURES.md` has the per-feature matrix with test references and known differences.
 
@@ -66,10 +84,14 @@ val chartView = VegaChartView(context)
 chartView.setScene(SampleScenes.barChart(chartView.chartTextEngine))
 ```
 
-Once Milestone 3 lands, the same view accepts a compiled Vega specification:
+A compiled Vega specification, via the compiler:
 
 ```kotlin
-chartView.controller.setSpec(specJson)
+val compiled = SpecCompiler(chartView.chartTextEngine).compileJson(specJson)
+
+// Never ignore the diagnostics: anything unsupported is reported here rather than rendered wrongly.
+compiled.diagnostics.forEach { Log.w("chart", it.toString()) }
+compiled.scene?.let { chartView.setScene(it) }
 ```
 
 ## Compose example
@@ -134,11 +156,15 @@ lifecycleScope.launch {
 
 ## Known limitations
 
-- **No Vega JSON input yet.** Charts must be built as scene graphs until Milestone 3.
-- **No expression evaluation yet.** Every expression reports
-  `VEGA_EXPRESSION_UNSUPPORTED_FUNCTION`; the evaluator arrives in Milestone 4.
-- **Axes, legends and titles are hand-authored** in the sample scenes rather than generated from a
-  specification (Milestone 5).
+- **Only a subset of Vega compiles.** Four scale types, one mark type, axes without titles. One
+  differential fixture passes out of the 100 the brief asks for.
+- **No expression evaluation.** Every `{"signal": ...}` reports
+  `VEGA_EXPRESSION_UNSUPPORTED_FUNCTION` and the channel is dropped. This is the biggest gap, because
+  signals are pervasive in real specifications.
+- **No data transforms.** All 40 report `VEGA_TRANSFORM_NOT_IMPLEMENTED`, and the dataset passes through
+  untransformed — so a chart that needs one shows the wrong data, visibly and with an explanation.
+- **Legends and titles are not generated** from a specification (Milestone 5).
+- **`setSpec` is not wired to the compiler**; call `SpecCompiler` and `setScene` yourself.
 - **Pan and zoom are a view transform**, so axes do not rescale with the zoom. Vega-style zoom that
   updates scale domains needs the dataflow (Milestone 6).
 - **Text metrics are platform metrics, not browser metrics.** Structural geometry compares tightly
