@@ -1079,14 +1079,25 @@ public class SpecParser {
         val scheme = value.fields["scheme"]
         val signal = value.fields["signal"]?.asString()
         val step = value.fields["step"]
+        val count = value.fields["count"]
+        if (count != null && count !is VegaValue.Num) {
+          diagnostics.warn(
+            DiagnosticCodes.PARSE_UNKNOWN_PROPERTY,
+            "A scheme 'count' must be a number; the whole scheme will be used",
+            jsonPath = "$path.count",
+          )
+        }
         when {
-          // A scheme name may itself be signal-valued, so it is read as a value not a string.
-          scheme != null && value.fields.size == 1 && scheme is VegaValue.Obj ->
-            RangeSpec.Signal(scheme.fields["signal"]?.asString() ?: "")
           scheme != null ->
             RangeSpec.Scheme(
-              scheme.asString(),
-              (value.fields["count"] as? VegaValue.Num)?.value?.toInt(),
+              // The name may itself come from a signal — how a chart offers a palette picker — and
+              // the stops may be written out instead of named.
+              when (scheme) {
+                is VegaValue.Obj -> SchemeRef.Signal(scheme.fields["signal"]?.asString() ?: "")
+                is VegaValue.Arr -> SchemeRef.Colors(scheme.values)
+                else -> SchemeRef.Named(scheme.asString())
+              },
+              (count as? VegaValue.Num)?.value?.toInt(),
             )
           !signal.isNullOrEmpty() -> RangeSpec.Signal(signal)
           step != null ->

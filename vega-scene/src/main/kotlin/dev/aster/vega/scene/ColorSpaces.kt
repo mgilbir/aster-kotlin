@@ -1,5 +1,6 @@
 package dev.aster.vega.scene
 
+import dev.aster.vega.model.roundHalfUp
 import kotlin.math.cbrt
 import kotlin.math.pow
 
@@ -29,13 +30,30 @@ public object ColorSpaces {
     }
   }
 
-  /** Interpolates componentwise in sRGB, which is what Vega does unless told otherwise. */
+  /**
+   * Interpolates componentwise in sRGB, which is what Vega does unless told otherwise.
+   *
+   * The arithmetic happens on the **8-bit channel values**, not on the 0..1 fractions, because that
+   * is where upstream's halves are halves. Viridis's stops 22 and 23 have blue 104 and 93, and a
+   * midpoint between them is exactly 98.5, which rounds up to 99. Averaging `104/255` and `93/255`
+   * and scaling back gives 98.49999999999999, which rounds down to 98 — a colour off by one, on
+   * every ramp, wherever a value happens to land halfway between two stops. `n / 255.0 * 255.0` is
+   * exactly `n` for every byte, so working in 8-bit space costs nothing and keeps the halves whole.
+   *
+   * Rounding here rather than when the colour is written out matches d3, which rounds as it
+   * stringifies: an interpolated colour is never interpolated again, so the two are the same.
+   */
   public fun interpolateRgb(from: SceneColor, to: SceneColor, t: Double): SceneColor {
     val amount = t.coerceIn(0.0, 1.0)
+    fun channel(a: Double, b: Double): Double {
+      val start = a * 255.0
+      return roundHalfUp(start + (b * 255.0 - start) * amount) / 255.0
+    }
     return SceneColor(
-      red = from.red + (to.red - from.red) * amount,
-      green = from.green + (to.green - from.green) * amount,
-      blue = from.blue + (to.blue - from.blue) * amount,
+      red = channel(from.red, to.red),
+      green = channel(from.green, to.green),
+      blue = channel(from.blue, to.blue),
+      // Opacity is not an 8-bit channel upstream and d3 does not round it.
       alpha = from.alpha + (to.alpha - from.alpha) * amount,
     )
   }

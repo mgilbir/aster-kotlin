@@ -460,6 +460,11 @@
   "caption": "Y-axis for a discrete scale with 5 values: a, b, c, d, e"
  },
  {
+  "fixture": "scheme-forms",
+  "kind": "axis",
+  "caption": "X-axis for a discrete scale with 5 values: 0, 1, 2, 3, 4"
+ },
+ {
   "fixture": "sequence-lookup",
   "kind": "axis",
   "caption": "X-axis for a discrete scale with 4 values: South, North, West, #bbbbbb"

@@ -293,14 +293,30 @@ public sealed interface DomainSpec {
   public data object Unset : DomainSpec
 }
 
+/**
+ * How a specification says *which* colours a scheme supplies.
+ *
+ * Three forms, because upstream accepts three: a name, a signal holding a name — how a chart offers
+ * a palette picker — and the stops written out inline, which is a scheme in every respect except
+ * that nobody named it.
+ */
+public sealed interface SchemeRef {
+  public data class Named(val name: String) : SchemeRef
+
+  public data class Signal(val expression: String) : SchemeRef
+
+  /** `{"scheme": ["#67000d", ...]}` — the stops themselves, interpolated like any other ramp. */
+  public data class Colors(val values: List<VegaValue>) : SchemeRef
+}
+
 public sealed interface RangeSpec {
   public data class Literal(val values: List<VegaValue>) : RangeSpec
 
   /** `"width"`, `"height"` and friends, resolved against the chart size. */
   public data class Named(val name: String) : RangeSpec
 
-  /** A named colour scheme. */
-  public data class Scheme(val name: String, val count: Int? = null) : RangeSpec
+  /** A colour scheme, named outright, chosen by a signal, or written out as its stops. */
+  public data class Scheme(val scheme: SchemeRef, val count: Int? = null) : RangeSpec
 
   /**
    * `{"signal": "..."}` — the whole range comes from a signal.

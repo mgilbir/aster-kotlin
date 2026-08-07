@@ -21,7 +21,7 @@ end to end — expressions, signals, 33 of upstream's 40 data transforms, every 
 and an event handler that recompiles the chart — and are verified against upstream Vega by
 differential tests.
 
-Fifty-nine differential fixtures pass, all matching upstream exactly on every mark and scale output:
+Sixty-one differential fixtures pass, all matching upstream exactly on every mark and scale output:
 
 | Fixture | Marks | Covers |
 | --- | --- | --- |
@@ -84,6 +84,8 @@ Fifty-nine differential fixtures pass, all matching upstream exactly on every ma
 | `local-time-dst` | 35 | a local time scale across the spring clock change, beside a UTC one |
 | `bin-to-ordinal` | 36 | the bin transform feeding a bin-ordinal scale, labels placed by `scale()` |
 | `image-marks` | 18 | every image align and baseline anchor, and one stretched rather than fitted |
+| `named-range` | 60 | `"range": "category"` and the other named ranges, resolved to upstream's own defaults |
+| `scheme-forms` | 31 | a scheme named in the wrong case, one chosen by a signal, one written out as its stops |
 
 The gate is wired into `./scripts/oracle.sh`, so every further scale, mark and transform is built
 against a harness that can say we are wrong — which golden tests cannot.
@@ -143,7 +145,7 @@ substantive compatibility items:
 | 6. View and Compose APIs | Yes |
 | 7. SVG, PNG, PDF export | Yes |
 | 8. TalkBack can describe and navigate | Partial — virtual nodes are tested by instrumentation, not with TalkBack itself |
-| 9. At least 100 compatibility fixtures pass | 59 of 100 |
+| 9. At least 100 compatibility fixtures pass | 61 of 100 |
 | 10. Core runtime has no Android dependency | Yes |
 | 11. Renders without WebView | Yes |
 | 12. Build and test loop runs from the terminal | Yes |
@@ -480,7 +482,7 @@ each example a deadline.
 
 ## Known failing fixtures
 
-None. Fifty-nine fixtures exist and all fifty-nine pass — and that sentence became worth
+None. Sixty-one fixtures exist and all sixty-one pass — and that sentence became worth
 something only once the gate could no longer skip itself, below.
 
 **The gate could report success without running.** `FixtureDifferentialTest` reads the fixtures and

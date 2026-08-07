@@ -15,6 +15,7 @@ import dev.aster.vega.model.spec.DomainSpec
 import dev.aster.vega.model.spec.RangeSpec
 import dev.aster.vega.model.spec.ScaleSpec
 import dev.aster.vega.model.spec.ScaleType
+import dev.aster.vega.model.spec.SchemeRef
 import dev.aster.vega.runtime.scale.BandScale
 import dev.aster.vega.runtime.scale.BinOrdinalScale
 import dev.aster.vega.runtime.scale.ColorSchemes
@@ -161,12 +162,12 @@ public class ScaleResolver(
    */
   private fun namedRange(name: String): RangeSpec? =
     when (name.lowercase()) {
-      "category" -> RangeSpec.Scheme("tableau10")
-      "ordinal" -> RangeSpec.Scheme("blues")
-      "ramp" -> RangeSpec.Scheme("blues")
-      "heatmap" -> RangeSpec.Scheme("yellowgreenblue")
+      "category" -> RangeSpec.Scheme(SchemeRef.Named("tableau10"))
+      "ordinal" -> RangeSpec.Scheme(SchemeRef.Named("blues"))
+      "ramp" -> RangeSpec.Scheme(SchemeRef.Named("blues"))
+      "heatmap" -> RangeSpec.Scheme(SchemeRef.Named("yellowgreenblue"))
       // Upstream pairs this one with `extent: [1, 0]`, which reads the scheme backwards.
-      "diverging" -> RangeSpec.Scheme("blueorange")
+      "diverging" -> RangeSpec.Scheme(SchemeRef.Named("blueorange"))
       "symbol" ->
         RangeSpec.Literal(
           listOf(
@@ -214,6 +215,70 @@ public class ScaleResolver(
     return numbers.resolveValue(reference.value, spec.name) ?: VegaValue.Null
   }
 
+  /**
+   * The stops a scheme supplies, whichever of the three ways it was named.
+   *
+   * Upstream lowercases a scheme name before looking it up (`vega-encode/src/scale.js`), so a
+   * palette picker offering "Viridis" finds `viridis`. Stops written out inline are not looked up
+   * at all — they are already the table every named scheme resolves to.
+   */
+  private fun schemeColors(spec: ScaleSpec, range: RangeSpec.Scheme): List<SceneColor>? {
+    if (range.scheme is SchemeRef.Colors) {
+      val values = (range.scheme as SchemeRef.Colors).values
+      val colors = values.mapNotNull { SceneColor.parse(it.asString()) }
+      if (colors.size < values.size) {
+        diagnostics.error(
+          DiagnosticCodes.SCALE_INVALID_DOMAIN,
+          "Scale '${spec.name}' has a scheme containing unparseable colours",
+          operator = spec.name,
+        )
+        return null
+      }
+      return colors.ifEmpty { null }
+    }
+    val name =
+      when (val scheme = range.scheme) {
+        is SchemeRef.Named -> scheme.name
+        is SchemeRef.Signal ->
+          numbers
+            .resolveValue(scheme.expression, spec.name)
+            ?.takeIf { it !is VegaValue.Null }
+            ?.asString()
+            ?: run {
+              diagnostics.error(
+                DiagnosticCodes.SCALE_UNSUPPORTED_TYPE,
+                "Scheme signal '${scheme.expression}' produced no scheme name (scale " +
+                  "'${spec.name}')",
+                operator = spec.name,
+              )
+              return null
+            }
+        is SchemeRef.Colors -> return null // handled above
+      }.lowercase()
+
+    val palette = ColorSchemes.categoricalOrNull(name)
+    // A ramp's stops are a colour list like any other; the scale interpolates between them.
+    val ramp = ColorSchemes.rampOrNull(name)
+    return when {
+      // `count` truncates a palette for the discretizing scales, but **not** for an ordinal one:
+      // upstream's `configureScheme` ends `type === Ordinal ? scheme : scheme.slice(0, count)`, so
+      // an ordinal scale keeps the whole palette and cycles through it. Truncating there would
+      // repeat the first colours instead of reaching the later ones.
+      palette != null ->
+        if (spec.type == ScaleType.ORDINAL) palette
+        else range.count?.let { palette.take(it.coerceAtLeast(1)) } ?: palette
+      ramp != null -> ramp
+      else -> {
+        diagnostics.error(
+          DiagnosticCodes.SCALE_UNSUPPORTED_TYPE,
+          "Unknown colour scheme '$name'",
+          operator = spec.name,
+        )
+        null
+      }
+    }
+  }
+
   private fun colorRange(spec: ScaleSpec): List<SceneColor>? =
     when (val range = effectiveRange(spec)) {
       is RangeSpec.Literal -> {
@@ -229,23 +294,7 @@ public class ScaleResolver(
           colors.ifEmpty { null }
         }
       }
-      is RangeSpec.Scheme -> {
-        val palette = ColorSchemes.categoricalOrNull(range.name)
-        // A ramp's stops are a colour list like any other; the scale interpolates between them.
-        val ramp = ColorSchemes.rampOrNull(range.name)
-        when {
-          palette != null -> range.count?.let { palette.take(it.coerceAtLeast(1)) } ?: palette
-          ramp != null -> ramp
-          else -> {
-            diagnostics.error(
-              DiagnosticCodes.SCALE_UNSUPPORTED_TYPE,
-              "Unknown colour scheme '${range.name}'",
-              operator = spec.name,
-            )
-            null
-          }
-        }
-      }
+      is RangeSpec.Scheme -> schemeColors(spec, range)
       else -> null
     }
 
@@ -830,7 +879,8 @@ public class ScaleResolver(
       is VegaValue.Arr -> RangeSpec.Literal(value.values)
       is VegaValue.Str -> RangeSpec.Named(value.value)
       is VegaValue.Obj ->
-        value.fields["scheme"]?.asString()?.let { RangeSpec.Scheme(it) } ?: RangeSpec.Unset
+        value.fields["scheme"]?.asString()?.let { RangeSpec.Scheme(SchemeRef.Named(it)) }
+          ?: RangeSpec.Unset
       else -> RangeSpec.Unset
     }
   }
