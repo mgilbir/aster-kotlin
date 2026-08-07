@@ -586,7 +586,7 @@ public class MarkEncoder(
         evaluateExpression(channel.expression, datum)?.let { JsSemantics.truthy(it) }
       is ChannelValue.Conditional -> boolean(selectRule(channel, datum), datum)
       is ChannelValue.Scaled -> {
-        val scale = scales[scaleNameOf(channel)]
+        val scale = scales[scaleNameOf(channel, datum)]
         val input = channel.field?.let { datum.fieldOf(it) } ?: channel.value
         if (scale != null && input != null) JsSemantics.truthy(scale.scale(input)) else null
       }
@@ -862,11 +862,12 @@ public class MarkEncoder(
   /**
    * Which scale a channel means, when the specification lets a signal decide.
    *
-   * `{"scale": {"signal": "..."}}` is how a chart offers a control that switches an axis between,
-   * say, linear and log. The name is not known until the signals are, so it is read here.
+   * Takes the same four forms a `field` does — a control switching an axis between linear and log
+   * is `signal`, a faceted cell inheriting its parent's scale is `parent`, and a
+   * parallel-coordinates plot choosing a scale per row is `datum`. None is known until now.
    */
-  private fun scaleNameOf(channel: ChannelValue.Scaled): String =
-    channel.scaleSignal?.let { signalText(it) } ?: channel.scale
+  private fun scaleNameOf(channel: ChannelValue.Scaled, datum: VegaValue): String =
+    channel.scaleRef?.let { datum.fieldOf(it).asString() } ?: channel.scale
 
   private fun VegaValue.fieldOf(ref: FieldRef): VegaValue =
     when (ref) {
@@ -951,7 +952,7 @@ public class MarkEncoder(
       is ChannelValue.Signal -> evaluateExpression(channel.expression, datum)?.asString()
       is ChannelValue.Conditional -> string(selectRule(channel, datum), datum)
       is ChannelValue.Scaled -> {
-        val scale = scales[scaleNameOf(channel)]
+        val scale = scales[scaleNameOf(channel, datum)]
         val input = channel.field?.let { datum.fieldOf(it) } ?: channel.value
         if (scale != null && input != null) scale.scale(input).asString() else null
       }
@@ -1058,20 +1059,20 @@ public class MarkEncoder(
   }
 
   private fun scaledPosition(channel: ChannelValue.Scaled, datum: VegaValue): Double? {
-    val scale = scales[scaleNameOf(channel)]
+    val scale = scales[scaleNameOf(channel, datum)]
     if (scale == null) {
       diagnostics.error(
         DiagnosticCodes.SCALE_UNSUPPORTED_TYPE,
-        "Encoding refers to scale '${scaleNameOf(channel)}', which was not built",
-        operator = scaleNameOf(channel),
+        "Encoding refers to scale '${scaleNameOf(channel, datum)}', which was not built",
+        operator = scaleNameOf(channel, datum),
       )
       return null
     }
     if (scale !is PositionScale) {
       diagnostics.error(
         DiagnosticCodes.SCALE_UNSUPPORTED_TYPE,
-        "Scale '${scaleNameOf(channel)}' has no numeric range and cannot position a mark",
-        operator = scaleNameOf(channel),
+        "Scale '${scaleNameOf(channel, datum)}' has no numeric range and cannot position a mark",
+        operator = scaleNameOf(channel, datum),
       )
       return null
     }
@@ -1119,12 +1120,12 @@ public class MarkEncoder(
         is ChannelValue.Constant -> channel.value.asString()
         is ChannelValue.Field -> datum.fieldOf(channel.ref).asString()
         is ChannelValue.Scaled -> {
-          val scale = scales[scaleNameOf(channel)]
+          val scale = scales[scaleNameOf(channel, datum)]
           if (scale == null) {
             diagnostics.error(
               DiagnosticCodes.SCALE_UNSUPPORTED_TYPE,
               "Colour channel '$channelName' refers to scale '${channel.scale}', which was not built",
-              operator = scaleNameOf(channel),
+              operator = scaleNameOf(channel, datum),
             )
             return null
           }

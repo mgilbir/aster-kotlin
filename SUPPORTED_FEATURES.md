@@ -146,6 +146,7 @@ Upstream Vega exposes 119 expression functions; 82 are implemented and 17 more a
 | Signal event handlers (`on`) | Not implemented | `SignalCompileTest` | Reported; the signal keeps its initial value. Needs the interaction system | 6 |
 | Signal bindings (`bind`) | Not planned | `SignalCompileTest` | Input widgets have no equivalent here | — |
 | Signal-valued scale and axis properties | **Supported** | `FixtureDifferentialTest` | `padding`, `align`, `tickCount`, `tickSize`, `labelPadding`, `labelFontSize`, `offset` | 4 |
+| Indirect scale references (`"scale": {"signal"|"parent"|"datum"|"group"}`) | **Supported** | `SpecCompilerTest` | Which scale a channel uses, when the specification does not name it outright. Takes the same four forms a `field` does and resolves through the same code: `signal` is a control switching an axis between linear and log, `parent` is a faceted cell using the scale its enclosing group chose, and `datum` is a parallel-coordinates plot picking a different scale per row. An object naming none of the four is reported rather than read as a scale called nothing | 5 |
 | Conditional encode rules | **Supported** | `SignalCompileTest` | The `[{test, ...}, {...}]` array form, for every channel kind | 4 |
 | `eval` / JavaScript execution | Not planned | — | Explicitly forbidden (PROJECT_BRIEF.md 6.1) | — |
 
