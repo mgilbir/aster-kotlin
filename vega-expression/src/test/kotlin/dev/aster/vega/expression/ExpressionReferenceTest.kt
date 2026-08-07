@@ -197,6 +197,29 @@ class ExpressionReferenceTest {
         "format(1234.5678,\".2f\")|\"1234.57\"",
         "format(0.1234,\".1%\")|\"12.3%\"",
         "format(1234567,\",d\")|\"1,234,567\"",
+        // d3-format signs a formatted magnitude with U+2212 MINUS SIGN, not an ASCII hyphen —
+        // every vector below was read out of the pinned d3-format. `toString` and `+` keep the
+        // hyphen, because those are JavaScript's own coercion rather than a format string.
+        "format(-5,\"\")|\"−5\"",
+        "format(-5,\".2f\")|\"−5.00\"",
+        "format(-1234.5,\",.2f\")|\"−1,234.50\"",
+        "format(-0.5,\".0%\")|\"−50%\"",
+        "format(-7,\"d\")|\"−7\"",
+        // Only the leading sign: the exponent keeps its own hyphen.
+        "format(-0.005,\".2e\")|\"−5.00e-3\"",
+        "format(-0.001,\".2f\")|\"0.00\"",
+        "toString(-5)|\"-5\"",
+        "\"\" + -5|\"-5\"",
+        // A specifier with no type is d3's `.12~g`, not plain fixed formatting: twelve significant
+        // digits, trailing zeros trimmed, exponential outside the range that fits.
+        "format(5,\"\")|\"5\"",
+        "format(0,\"\")|\"0\"",
+        "format(1234.5678,\"\")|\"1234.5678\"",
+        "format(0.000001234,\"\")|\"0.000001234\"",
+        "format(0.0000001,\"\")|\"1e-7\"",
+        "format(123456789012345,\"\")|\"1.23456789012e+14\"",
+        "format(1234567,\",\")|\"1,234,567\"",
+        "format(1234.5678,\",\")|\"1,234.5678\"",
       ],
   )
   fun `functions match upstream Vega`(source: String, expected: String) {

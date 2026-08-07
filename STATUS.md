@@ -20,7 +20,7 @@ Milestones 0, 1 and 2 complete. **Milestones 3 and 4 in progress**: Vega specifi
 end — including expressions, signals and the twelve data transforms the brief lists — and are verified
 against upstream Vega by differential tests.
 
-Twenty-seven differential fixtures pass, all matching upstream exactly on every mark and scale output:
+Thirty differential fixtures pass, all matching upstream exactly on every mark and scale output:
 
 | Fixture | Marks | Covers |
 | --- | --- | --- |
@@ -51,6 +51,9 @@ Twenty-seven differential fixtures pass, all matching upstream exactly on every 
 | `trellis-headers` | 8 | a grid with row and column headers, each titled from its own datum |
 | `pie` | 13 | a donut chart: the pie transform feeding arc marks, with a legend |
 | `sorted-domain` | 35 | bands ordered by a sum they never carry, colours ordered numerically |
+| `box-plot` | 32 | min, q1, median, q3 and max from one aggregate, drawn as whiskers and a box |
+| `stack-offsets` | 32 | a normalized stacked area, its series faceted out of the stacked rows |
+| `stack-diverging` | 45 | negatives stacking away from zero, over a domain taken from both bounds |
 
 The gate is wired into `./scripts/oracle.sh`, so every further scale, mark and transform is built
 against a harness that can say we are wrong — which golden tests cannot.
@@ -112,7 +115,7 @@ substantive compatibility items:
 | 6. View and Compose APIs | Yes |
 | 7. SVG, PNG, PDF export | Yes |
 | 8. TalkBack can describe and navigate | Partial — virtual nodes are tested by instrumentation, not with TalkBack itself |
-| 9. At least 100 compatibility fixtures pass | 27 of 100 |
+| 9. At least 100 compatibility fixtures pass | 30 of 100 |
 | 10. Core runtime has no Android dependency | Yes |
 | 11. Renders without WebView | Yes |
 | 12. Build and test loop runs from the terminal | Yes |
@@ -254,7 +257,7 @@ ordering), and the pipeline is now verified end to end on one fixture, but the b
 
 ## Verification
 
-- 866 JVM tests pass (`./scripts/test-core.sh`, `./gradlew test`).
+- 903 JVM tests pass (`./scripts/test-core.sh`, `./gradlew test`).
 - Android lint is clean with `warningsAsErrors` on every Android module.
 - 48 instrumented tests pass on an API 37 arm64 emulator (`./scripts/test-android.sh`): 40 in
   `vega-android-canvas`, 4 in `vega-compose`, 4 in `demo` — including one that compiles every bundled
@@ -289,7 +292,7 @@ dark chrome, so a dark background was unreadable — they now take a `SampleScen
 
 ## Known failing fixtures
 
-None. Twenty-seven fixtures exist and all twenty-seven pass. The brief's MVP asks for 100; growing the
+None. Thirty fixtures exist and all thirty pass. The brief's MVP asks for 100; growing the
 corpus is the main task now, and each new fixture is expected to surface gaps rather than pass
 immediately. That keeps happening, which is the point of the harness: `stacked-bar` surfaced two real
 bugs, and `facet-trellis` surfaced a third — `range: "height"` was descending for every scale type,
@@ -304,6 +307,19 @@ Underneath that, `sort: true` sorted the values' *rendered* form, so a numeric d
 3, 9. And once the fixture was passing, the multi-field domain next to it turned out to be assembled
 row by row where upstream assembles it field by field — the two agree until two fields interleave,
 after which every entry but the first has moved.
+
+`box-plot` and `stack-offsets` are the first two fixtures in a while to pass on arrival: the quantile
+aggregates and the normalized stack were already right. `stack-diverging` was not, and what it found
+was in none of those places. **Every negative number on a continuous axis was drawn with the wrong
+character.** d3-format signs a formatted magnitude with U+2212 MINUS SIGN, not the ASCII hyphen, so a
+tick reading `-10` here reads `−10` upstream — a different glyph of a different width, and the one
+that is typographically correct. The distinction is not uniform, which is why it went unnoticed: it
+follows the *format string*, so a continuous axis label and a gradient legend label get it while a
+discrete axis label, which is the domain's own string, keeps the hyphen. Chasing it into the `format`
+expression function turned up two more: an exponent was zero-padded where JavaScript's
+`toExponential` does not pad, and a specifier naming no type was being treated as plain fixed
+formatting when d3 aliases it to `.12~g` — twelve significant digits, trimmed — so `format(x, "")`
+printed `5.000000` for 5.
 
 Building legends surfaced a fourth, and a worse one, in code that had been "passing" for six fixtures:
 **every symbol was the wrong size.** Upstream ships its own symbol table rather than d3-shape's, sizing
@@ -352,6 +368,9 @@ depends on them. Each has a test and a comment; this is the index.
 | A discrete domain is grouped, not listed, so `sort` orders groups and may name a field the domain never mentions | `ScaleResolver.orderedDomain` |
 | A domain over several fields runs field by field, not row by row | `ScaleResolver.orderedDomain` |
 | A domain `sort` object with neither `op` nor `field` sorts by the value, and a `field` with no `op` does nothing at all | `SpecParser.parseDomainSort` |
+| A number formatted through a format string is signed with U+2212, not a hyphen; one stringified by JavaScript is not | `formatTickLabel`, `MINUS_SIGN` |
+| A format specifier naming no type is `.12~g`, not plain fixed formatting | `NumberFormatSubset.parse` |
+| An exponent is not zero-padded, because d3 formats `e` by calling JavaScript's own `toExponential` | `PlatformDecimals.exponential` |
 
 ## Architectural decisions pending
 
@@ -410,7 +429,7 @@ depends on them. Each has a test and a comment; this is the index.
 
 ## Next three tasks
 
-1. **Keep growing the fixture corpus.** 27 of the brief's 100 pass, and the return has not dropped
+1. **Keep growing the fixture corpus.** 30 of the brief's 100 pass, and the return has not dropped
    off: most fixtures added so far failed on arrival, and every one of those failures was a real
    defect. Between them they have found a missing scale-domain form, a legend layout rule that only
    diverges once swatches grow, unreported opacity, rotated text offsets both sides of the harness had

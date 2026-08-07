@@ -1,10 +1,12 @@
 package dev.aster.vega.expression
 
+import dev.aster.vega.model.MINUS_SIGN
 import dev.aster.vega.model.PlatformDecimals
 import dev.aster.vega.model.VegaValue
 import dev.aster.vega.model.roundHalfUp
 import dev.aster.vega.model.time.DateValues
 import dev.aster.vega.model.time.TimeFormat
+import dev.aster.vega.model.withTypographicMinus
 import kotlin.math.abs
 import kotlin.math.acos
 import kotlin.math.asin
@@ -573,33 +575,67 @@ public object NumberFormatSubset {
     val group: Boolean,
     val precision: Int?,
     val type: Char,
+    /** Strips insignificant trailing zeros, which is d3's `~` and is implied by a missing type. */
+    val trim: Boolean = false,
   )
 
+  /**
+   * A specifier naming **no type** is not "plain formatting": d3 aliases it to `.12~g` — twelve
+   * significant digits, trailing zeros trimmed. That is why `format(x, "")` prints `5` rather than
+   * `5.000000`, and why it switches to `1.23456789012e+14` once a number outgrows twelve digits.
+   */
   public fun parse(specifier: String): Spec? {
     val match = PATTERN.matchEntire(specifier) ?: return null
     val group = match.groupValues[1] == ","
     val precision =
       match.groupValues[2].takeIf { it.isNotEmpty() }?.removePrefix(".")?.toIntOrNull()
-    val type = match.groupValues[3].firstOrNull() ?: 'f'
-    return Spec(group, precision, type)
+    val type = match.groupValues[3].firstOrNull()
+    return if (type == null) {
+      Spec(group, precision ?: DEFAULT_SIGNIFICANT_DIGITS, 'g', trim = true)
+    } else {
+      Spec(group, precision, type)
+    }
   }
 
   public fun format(value: Double, specifier: String): String {
-    val spec = parse(specifier) ?: return JsSemantics.numberToString(value)
+    val spec = parse(specifier) ?: return withTypographicMinus(JsSemantics.numberToString(value))
     if (value.isNaN()) return "NaN"
-    if (value.isInfinite()) return if (value > 0) "∞" else "-∞"
+    // d3-format spells these the way JavaScript does, then signs them like any other number.
+    if (value.isInfinite()) return if (value > 0) "Infinity" else MINUS_SIGN + "Infinity"
 
-    val text =
+    val raw =
       when (spec.type) {
         'd' -> roundHalfUp(value).toLong().toString()
         'e' -> PlatformDecimals.exponential(value, spec.precision ?: 6)
+        'g' ->
+          PlatformDecimals.significant(
+            value,
+            (spec.precision ?: DEFAULT_SIGNIFICANT_DIGITS).coerceAtLeast(1),
+          )
         '%' -> {
           val scaled = value * 100.0
           PlatformDecimals.fixed(scaled, spec.precision ?: 0) + "%"
         }
         else -> PlatformDecimals.fixed(value, spec.precision ?: 6)
       }
-    return if (spec.group) groupThousands(text) else text
+    val text = if (spec.trim) trimInsignificantZeros(raw) else raw
+    // d3 formats the magnitude and prefixes the sign, so the substitution comes last and leaves an
+    // exponent's own hyphen alone: `.2e` of -0.005 is `−5.00e-3`, with two different characters.
+    return withTypographicMinus(if (spec.group) groupThousands(text) else text)
+  }
+
+  /**
+   * d3's `~`: drops trailing zeros from the fraction, and the point with them, leaving any exponent
+   * suffix in place. `5.00000000000` becomes `5`; `1.00000000000e+21` becomes `1e+21`.
+   */
+  private fun trimInsignificantZeros(text: String): String {
+    val dot = text.indexOf('.')
+    if (dot < 0) return text
+    val exponent = text.indexOf('e', dot)
+    val suffix = if (exponent < 0) "" else text.substring(exponent)
+    val body = if (exponent < 0) text else text.substring(0, exponent)
+    val trimmed = body.trimEnd('0').trimEnd('.')
+    return trimmed + suffix
   }
 
   private fun groupThousands(text: String): String {
@@ -611,6 +647,9 @@ public object NumberFormatSubset {
     val grouped = integerPart.reversed().chunked(3).joinToString(",").reversed()
     return (if (negative) "-" else "") + grouped + rest
   }
+
+  /** d3's default precision for a specifier with no type: `.12~g`. */
+  private const val DEFAULT_SIGNIFICANT_DIGITS = 12
 
   private val PATTERN = Regex("^(,?)(\\.\\d+)?([dfe%]?)$")
 }

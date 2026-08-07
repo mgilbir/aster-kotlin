@@ -29,6 +29,27 @@ public fun canonicalNumberString(
 }
 
 /**
+ * U+2212 MINUS SIGN, which is what d3-format writes and what upstream therefore draws.
+ *
+ * Not the ASCII hyphen. The distinction is not cosmetic and it is not everywhere: d3 formats the
+ * absolute value and prefixes this, so anything that goes through a *format string* — every
+ * continuous axis label, every gradient legend label, the `format` expression function — gets it,
+ * while anything that goes through JavaScript's own `String(n)` — a discrete axis label, a text
+ * mark bound to a numeric field — keeps the hyphen. Two different glyphs of two different widths,
+ * so the two are not interchangeable even before a reader notices which one is on the page.
+ */
+public const val MINUS_SIGN: String = "−"
+
+/**
+ * Replaces a leading ASCII hyphen with [MINUS_SIGN].
+ *
+ * Only the leading one: d3 signs the formatted magnitude, so `-5.00e-3` becomes `−5.00e-3` with the
+ * exponent's own hyphen left alone.
+ */
+public fun withTypographicMinus(text: String): String =
+  if (text.startsWith("-")) MINUS_SIGN + text.substring(1) else text
+
+/**
  * JavaScript's `Math.round`: halves go to positive infinity, so `-2.5` rounds to `-2`.
  *
  * Not Kotlin's `round`, which rounds halves away from zero in both directions, and not Java's

@@ -5,6 +5,7 @@ import dev.aster.vega.model.VegaValue
 import dev.aster.vega.model.asDouble
 import dev.aster.vega.model.asString
 import dev.aster.vega.model.roundHalfUp
+import dev.aster.vega.model.withTypographicMinus
 import dev.aster.vega.scene.ColorSpaces
 import dev.aster.vega.scene.SceneColor
 import kotlin.math.exp
@@ -616,13 +617,17 @@ public class SequentialColorScale(
 }
 
 /**
- * Formats an axis tick label the way Vega's default does: fixed decimals plus thousands separators.
+ * Formats an axis tick label the way Vega's default does: fixed decimals, thousands separators and
+ * a typographic minus.
  *
- * Grouping is not optional here. Verified against upstream: a linear axis over `[0, 1000000]`
- * labels `100,000`, not `100000`, and so does a log axis.
+ * Neither of the last two is optional. Verified against upstream: a linear axis over `[0, 1000000]`
+ * labels `100,000`, not `100000`, and so does a log axis; and a negative tick is signed with U+2212
+ * rather than a hyphen, because the label goes through d3-format. A *discrete* axis does not — its
+ * labels are the domain's own strings — which is why the substitution lives here and not in
+ * [formatNumber].
  */
 public fun formatTickLabel(value: Double, decimals: Int): String =
-  groupThousands(formatNumber(value, decimals))
+  withTypographicMinus(groupThousands(formatNumber(value, decimals)))
 
 /** Inserts `,` every three digits of the integer part, leaving any fraction alone. */
 public fun groupThousands(text: String): String {
@@ -638,7 +643,8 @@ public fun groupThousands(text: String): String {
 
 public fun formatNumber(value: Double, decimals: Int): String {
   if (value.isNaN()) return "NaN"
-  if (value.isInfinite()) return if (value > 0) "∞" else "-∞"
+  // d3-format spells these the way JavaScript does rather than with the mathematical symbol.
+  if (value.isInfinite()) return if (value > 0) "Infinity" else "-Infinity"
   val normalized = if (value == 0.0) 0.0 else value
   if (decimals <= 0) {
     val rounded = roundHalfUp(normalized).toLong()

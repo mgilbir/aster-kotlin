@@ -268,4 +268,37 @@ class ScalesTest {
     assertEquals("0.0", formatNumber(-0.0001, 1))
     assertEquals("NaN", formatNumber(Double.NaN, 0))
   }
+
+  /**
+   * A continuous axis labels through d3-format, which signs a negative with U+2212 MINUS SIGN. A
+   * *discrete* axis does not — its labels are the domain's own strings, which JavaScript spells
+   * with a hyphen — so upstream draws two different characters depending on the scale type. Both
+   * forms were read out of the pinned upstream; a band axis over `[-5, 12, -1200]` labels `-5`,
+   * ungrouped, while a linear one over the same values labels `−1,200`.
+   */
+  @Test
+  fun `a continuous tick label is signed with a typographic minus`() {
+    assertEquals("−5", formatTickLabel(-5.0, 0))
+    assertEquals("−1,200", formatTickLabel(-1200.0, 0))
+    assertEquals("−0.50", formatTickLabel(-0.5, 2))
+    assertEquals("0", formatTickLabel(-0.0, 0))
+    assertEquals("5", formatTickLabel(5.0, 0))
+    assertEquals(
+      listOf("−10", "−5", "0", "5"),
+      LinearScale("s", listOf(-12.0, 8.0), listOf(0.0, 200.0)).let { scale ->
+        scale.ticks(5).map { scale.formatTick(it, 5) }
+      },
+    )
+    assertEquals(
+      listOf("-5", "12", "-1200"),
+      BandScale("s", listOf("-5", "12", "-1200"), listOf(0.0, 200.0)).domain,
+    )
+  }
+
+  /** d3-format spells these the way JavaScript does, rather than with the mathematical symbol. */
+  @Test
+  fun `a non-finite tick label reads as upstream writes it`() {
+    assertEquals("Infinity", formatTickLabel(Double.POSITIVE_INFINITY, 0))
+    assertEquals("−Infinity", formatTickLabel(Double.NEGATIVE_INFINITY, 0))
+  }
 }
