@@ -156,17 +156,11 @@ public class ScaleResolver(
       }
       is RangeSpec.Scheme -> {
         val palette = ColorSchemes.categoricalOrNull(range.name)
+        // A ramp's stops are a colour list like any other; the scale interpolates between them.
+        val ramp = ColorSchemes.rampOrNull(range.name)
         when {
           palette != null -> range.count?.let { palette.take(it.coerceAtLeast(1)) } ?: palette
-          ColorSchemes.isKnownRamp(range.name) -> {
-            diagnostics.error(
-              DiagnosticCodes.SCALE_UNSUPPORTED_TYPE,
-              "Colour scheme '${range.name}' is a continuous ramp, which is not implemented; " +
-                "give the scale an explicit colour range instead",
-              operator = spec.name,
-            )
-            null
-          }
+          ramp != null -> ramp
           else -> {
             diagnostics.error(
               DiagnosticCodes.SCALE_UNSUPPORTED_TYPE,

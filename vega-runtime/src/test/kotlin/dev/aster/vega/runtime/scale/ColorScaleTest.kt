@@ -164,15 +164,25 @@ class ColorScaleTest {
     }
   }
 
+  /**
+   * The ramps are **Vega's own tables, not d3's**, which is the whole finding.
+   *
+   * `blues` starts at `#cfe1f2`, a fifth of the way into d3's `interpolateBlues`, and that looked
+   * for a long time like a scale-level extent of `[0.2, 1]` applied over d3's ramp. It is not:
+   * `vega-scale/src/palettes.js` simply starts its table there, and nothing at the scale level
+   * narrows anything. `viridis`, by contrast, does begin at d3's own zero.
+   */
   @Test
-  fun `a continuous ramp is recognised as known but unimplemented`() {
-    // Distinguishing "upstream has this and we do not" from "no such scheme" makes the diagnostic
-    // actionable.
-    assertTrue(ColorSchemes.isKnownRamp("viridis"))
-    assertTrue(ColorSchemes.isKnownRamp("blues"))
-    assertTrue(ColorSchemes.isKnownRamp("Spectral"))
-    assertTrue(!ColorSchemes.isKnownRamp("category10"))
-    assertTrue(!ColorSchemes.isKnownRamp("nosuchscheme"))
+  fun `the continuous ramps are Vega's tables rather than d3's`() {
+    assertEquals("#cfe1f2", ColorSchemes.rampOrNull("blues")!!.first().toCssHex())
+    assertEquals("#0a4a90", ColorSchemes.rampOrNull("blues")!!.last().toCssHex())
+    assertEquals("#440154", ColorSchemes.rampOrNull("viridis")!!.first().toCssHex())
+    assertEquals("#fde725", ColorSchemes.rampOrNull("viridis")!!.last().toCssHex())
+    // Fifty-three of them, named the way upstream stores them: lowercased, unhyphenated.
+    assertEquals(53, ColorSchemes.ramps.size)
+    assertNotNull(ColorSchemes.rampOrNull("redYellowBlue"))
+    assertNull(ColorSchemes.rampOrNull("nosuchscheme"))
+    // A ramp is not a categorical palette, and a diagnostic that confused the two would mislead.
     assertNull(ColorSchemes.categoricalOrNull("viridis"))
   }
 

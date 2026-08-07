@@ -20,7 +20,7 @@ Milestones 0, 1 and 2 complete. **Milestones 3 and 4 in progress**: Vega specifi
 end — including expressions, signals and the twelve data transforms the brief lists — and are verified
 against upstream Vega by differential tests.
 
-Forty-six differential fixtures pass, all matching upstream exactly on every mark and scale output:
+Forty-seven differential fixtures pass, all matching upstream exactly on every mark and scale output:
 
 | Fixture | Marks | Covers |
 | --- | --- | --- |
@@ -70,6 +70,7 @@ Forty-six differential fixtures pass, all matching upstream exactly on every mar
 | `label-limit` | 33 | labels truncated at the limit nobody set, and at an explicit one |
 | `step-lines` | 24 | the three staircase interpolations and a stepped area |
 | `curves` | 27 | monotone, natural, basis and cardinal over one series, and a monotone area |
+| `colour-ramps` | 57 | four continuous schemes across one domain, with a gradient legend |
 
 The gate is wired into `./scripts/oracle.sh`, so every further scale, mark and transform is built
 against a harness that can say we are wrong — which golden tests cannot.
@@ -107,7 +108,6 @@ The entire data and specification half is absent:
 | `vega-dataflow` — pulse propagation and incremental evaluation | 2,081 | contracts only |
 | `vega-functions` — the other 44 functions, mostly colour, geo and selection | most of 790 | 0 |
 | Remaining scale types — quantile, quantize, threshold, bin-ordinal | rest of `vega-scale` | 0 |
-| Continuous colour ramps | `d3-scale-chromatic` interpolator tables | 0, reported |
 | Remaining mark encoders — image, path, trail, shape | rest of `vega-encode` + d3-shape | 0 |
 | Group `layout` — the trellis grid, headers and titles | `vega-view-transforms` grid layout | 0, reported |
 | Line and area interpolation — `catmull-rom` and `bundle` | part of d3-shape | 0, reported; the step and spline families are implemented |
@@ -131,7 +131,7 @@ substantive compatibility items:
 | 6. View and Compose APIs | Yes |
 | 7. SVG, PNG, PDF export | Yes |
 | 8. TalkBack can describe and navigate | Partial — virtual nodes are tested by instrumentation, not with TalkBack itself |
-| 9. At least 100 compatibility fixtures pass | 46 of 100 |
+| 9. At least 100 compatibility fixtures pass | 47 of 100 |
 | 10. Core runtime has no Android dependency | Yes |
 | 11. Renders without WebView | Yes |
 | 12. Build and test loop runs from the terminal | Yes |
@@ -264,6 +264,11 @@ ordering), and the pipeline is now verified end to end on one fixture, but the b
   out, so a linear scale handed `[10, 20]` still starts at 0 where this engine had been leaving it
   at 10. The limits then replace an end rather than clamping it, and run after `zero`, which is why
   `domainMin: 30` beats it.
+- **The 53 continuous colour schemes** — `viridis`, `blues`, `redblue`, `turbo` and the rest — so a
+  heatmap or a choropleth can be drawn at all. They turned out to be much smaller than expected once
+  probed: Vega ships its **own** tables rather than d3's and joins the stops with plain piecewise
+  RGB, which the sequential colour scale already did. `blues` starting at `#cfe1f2` had looked like
+  a scale-level extent of `[0.2, 1]` applied over d3's ramp; the table simply starts there.
 - **The spline interpolations**: `monotone`, `natural`, `basis` and `cardinal`, ported from
   d3-shape as its own state machines rather than rewritten in closed form — each has a first and
   last segment unlike its middle ones, and `cardinal`'s opening control point falls out of a state
@@ -397,7 +402,7 @@ dark chrome, so a dark background was unreadable — they now take a `SampleScen
 
 ## Known failing fixtures
 
-None. Forty-six fixtures exist and all forty-six pass. The brief's MVP asks for 100; growing the
+None. Forty-seven fixtures exist and all forty-seven pass. The brief's MVP asks for 100; growing the
 corpus is the main task now, and each new fixture is expected to surface gaps rather than pass
 immediately. That keeps happening, which is the point of the harness: `stacked-bar` surfaced two real
 bugs, and `facet-trellis` surfaced a third — `range: "height"` was descending for every scale type,
@@ -523,6 +528,7 @@ depends on them. Each has a test and a comment; this is the index.
 | `labelLimit` truncates by default — 180 on an axis, 160 on a legend — and the scene keeps the whole string | `TextRun.displayText` |
 | A `step` line never draws the data point itself: it turns at the two midpoints either side | `PathBuilder.steps` |
 | `monotone` is two curves — d3's X and Y forms — and Vega picks between them from the mark's `orient` | `CurveKind.MONOTONE` |
+| The colour ramps are Vega's own tables, not d3's: `blues` starts a fifth of the way in, and nothing narrows it | `ColorSchemes.ramps` |
 | `padAngle` is a gap at a pad *radius*, converted back to an angle per edge, so the sides stay parallel | `ArcPath.sector` |
 | `cornerRadius` is clamped by where the slice's own edges would meet, not just by its thickness | `ArcPath.sector` |
 | A label hidden by overlap removal stays in the scene at zero opacity, so the mark count does not move | `LabelOverlap` |
@@ -584,7 +590,7 @@ depends on them. Each has a test and a comment; this is the index.
 
 ## Next three tasks
 
-1. **Keep growing the fixture corpus.** 46 of the brief's 100 pass. The return has fallen off and
+1. **Keep growing the fixture corpus.** 47 of the brief's 100 pass. The return has fallen off and
    that is worth recording rather than glossing: of the last eight fixtures, five passed on arrival.
    The corpus has caught up with the parts of the engine that were written without one. It is still
    the cheapest way to find a defect, but a fixture over ground already covered now mostly buys a
