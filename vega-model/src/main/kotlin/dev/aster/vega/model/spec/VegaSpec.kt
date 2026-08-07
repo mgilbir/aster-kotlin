@@ -28,6 +28,14 @@ public data class VegaSpec(
   /** Automatic grid placement for this scope's group-mark cells. */
   val layout: LayoutSpec?,
   val marks: List<MarkSpec>,
+  /**
+   * What the chart *is*, for a reader who cannot see it.
+   *
+   * Every fixture in this repository already carries one and nothing read it. A screen reader
+   * meeting a chart with none announces its marks and never says what they are marks of, which is
+   * the difference between a list of numbers and a chart.
+   */
+  val description: String? = null,
 )
 
 /**

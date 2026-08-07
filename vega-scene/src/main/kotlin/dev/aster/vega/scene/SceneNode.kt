@@ -30,6 +30,20 @@ public data class AccessibilityDescriptor(
 )
 
 /**
+ * A number as a screen reader should *say* it.
+ *
+ * `28.0.toString()` is read aloud as "twenty-eight point zero", so a chart of whole numbers sounds
+ * as though every value carried a spurious decimal. The canonical form cannot simply be changed —
+ * it has to round-trip and compare — so speech gets its own. A genuine fraction keeps its digits.
+ *
+ * Lives beside [AccessibilityDescriptor] because it was got wrong independently in two places, in
+ * the mark encoder and in the sample scenes, which is what a shared rule is for.
+ */
+public fun spokenNumber(value: Double): String =
+  if (value.isFinite() && value == kotlin.math.floor(value)) value.toLong().toString()
+  else value.toString()
+
+/**
  * Everything a node needs to carry for hit testing, tooltips, selection, accessibility, debugging
  * and datum lookup (PROJECT_BRIEF.md 7).
  */

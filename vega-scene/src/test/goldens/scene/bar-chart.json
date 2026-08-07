@@ -456,7 +456,7 @@
           "datumIndex": 0,
           "interactive": true,
           "tooltip": "Jan: 28.0",
-          "accessibility": {"label": "Jan", "value": "28.0", "role": "graphics-symbol", "focusable": true}
+          "accessibility": {"label": "Jan", "value": "28", "role": "graphics-symbol", "focusable": true}
         }
       },
       {
@@ -474,7 +474,7 @@
           "datumIndex": 1,
           "interactive": true,
           "tooltip": "Feb: 55.0",
-          "accessibility": {"label": "Feb", "value": "55.0", "role": "graphics-symbol", "focusable": true}
+          "accessibility": {"label": "Feb", "value": "55", "role": "graphics-symbol", "focusable": true}
         }
       },
       {
@@ -492,7 +492,7 @@
           "datumIndex": 2,
           "interactive": true,
           "tooltip": "Mar: 43.0",
-          "accessibility": {"label": "Mar", "value": "43.0", "role": "graphics-symbol", "focusable": true}
+          "accessibility": {"label": "Mar", "value": "43", "role": "graphics-symbol", "focusable": true}
         }
       },
       {
@@ -510,7 +510,7 @@
           "datumIndex": 3,
           "interactive": true,
           "tooltip": "Apr: 91.0",
-          "accessibility": {"label": "Apr", "value": "91.0", "role": "graphics-symbol", "focusable": true}
+          "accessibility": {"label": "Apr", "value": "91", "role": "graphics-symbol", "focusable": true}
         }
       },
       {
@@ -528,7 +528,7 @@
           "datumIndex": 4,
           "interactive": true,
           "tooltip": "May: 81.0",
-          "accessibility": {"label": "May", "value": "81.0", "role": "graphics-symbol", "focusable": true}
+          "accessibility": {"label": "May", "value": "81", "role": "graphics-symbol", "focusable": true}
         }
       },
       {
@@ -546,7 +546,7 @@
           "datumIndex": 5,
           "interactive": true,
           "tooltip": "Jun: 53.0",
-          "accessibility": {"label": "Jun", "value": "53.0", "role": "graphics-symbol", "focusable": true}
+          "accessibility": {"label": "Jun", "value": "53", "role": "graphics-symbol", "focusable": true}
         }
       },
       {
@@ -564,7 +564,7 @@
           "datumIndex": 6,
           "interactive": true,
           "tooltip": "Jul: 19.0",
-          "accessibility": {"label": "Jul", "value": "19.0", "role": "graphics-symbol", "focusable": true}
+          "accessibility": {"label": "Jul", "value": "19", "role": "graphics-symbol", "focusable": true}
         }
       },
       {
@@ -582,7 +582,7 @@
           "datumIndex": 7,
           "interactive": true,
           "tooltip": "Aug: 87.0",
-          "accessibility": {"label": "Aug", "value": "87.0", "role": "graphics-symbol", "focusable": true}
+          "accessibility": {"label": "Aug", "value": "87", "role": "graphics-symbol", "focusable": true}
         }
       }
     ],

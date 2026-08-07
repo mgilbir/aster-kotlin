@@ -65,8 +65,25 @@ constructor(context: Context, attrs: AttributeSet? = null, defStyleAttr: Int = 0
       syncContentScale()
       observeController()
       updatePreferredSize()
+      applyChartDescription()
       invalidate()
     }
+
+  /**
+   * Announces what the chart *is*, before a screen reader starts reading its marks.
+   *
+   * Taken from the specification's own `description`, which every fixture in this repository
+   * already carries and nothing read until TalkBack was pointed at the demo. Without it a reader
+   * hears a list of labelled values and is never told they are a chart, let alone of what — the
+   * difference between "Jan 28, Feb 55" and "Monthly rainfall. Jan 28, Feb 55".
+   *
+   * Only set when the specification supplies one; a host that set its own `contentDescription` for
+   * a hand-built scene keeps it.
+   */
+  private fun applyChartDescription() {
+    val description = controller.lastCompiled?.spec?.description ?: return
+    contentDescription = description
+  }
 
   /**
    * The engine this view measures and draws with. Use it to build a scene by hand.
@@ -193,6 +210,7 @@ constructor(context: Context, attrs: AttributeSet? = null, defStyleAttr: Int = 0
         syncContentScale()
         accessibilityHelper.invalidateSemanticTree()
         updatePreferredSize()
+        applyChartDescription()
         invalidateIfStale()
       }
     }

@@ -58,6 +58,7 @@ import dev.aster.vega.scene.TextStyle
 import dev.aster.vega.scene.TrailPath
 import dev.aster.vega.scene.Transform2D
 import dev.aster.vega.scene.curve
+import dev.aster.vega.scene.spokenNumber
 
 /**
  * Turns a mark specification plus its data into scene nodes.
@@ -1103,14 +1104,18 @@ public class MarkEncoder(
    * Uses the fields the mark actually encodes, so the description follows the chart rather than
    * guessing at which datum properties matter.
    */
+  /** A value as a screen reader should say it; see [spokenNumber]. */
+  private fun spoken(value: VegaValue): String =
+    if (value is VegaValue.Num) spokenNumber(value.value) else value.asString()
+
   private fun describe(datum: VegaValue, channels: EncodeEntry): AccessibilityDescriptor? {
     val labelField =
       channels.values.filterIsInstance<ChannelValue.Scaled>().firstNotNullOfOrNull { it.field }
     val valueField =
       channels.values.filterIsInstance<ChannelValue.Scaled>().mapNotNull { it.field }.lastOrNull()
     if (labelField == null) return null
-    val label = datum.field(labelField).asString()
-    val value = valueField?.takeIf { it != labelField }?.let { datum.field(it).asString() }
+    val label = spoken(datum.field(labelField))
+    val value = valueField?.takeIf { it != labelField }?.let { spoken(datum.field(it)) }
     return AccessibilityDescriptor(
       label = label,
       value = value,

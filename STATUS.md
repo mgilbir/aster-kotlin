@@ -404,7 +404,7 @@ ordering), and the pipeline is now verified end to end on one fixture, but the b
 
 - 1,243 JVM tests pass (`./scripts/test-core.sh`, `./gradlew test`).
 - Android lint is clean with `warningsAsErrors` on every Android module.
-- 54 instrumented tests pass on an API 37 arm64 emulator (`./scripts/test-android.sh`): 46 in
+- 57 instrumented tests pass on an API 37 arm64 emulator (`./scripts/test-android.sh`): 49 in
   `vega-android-canvas`, 4 in `vega-compose`, 4 in `demo`. Three groups of them cover what no JVM
   test can: one compiles every bundled specification with the device's own font metrics, which the
   differential tests deliberately cannot because they measure text upstream's way; three tap a real
@@ -441,8 +441,8 @@ dark chrome, so a dark background was unreadable — they now take a `SampleScen
 
 ## Known failing fixtures
 
-None. Fifty-nine fixtures exist and all fifty-nine pass — and as of this commit that sentence is
-worth something, which it was not before.
+None. Fifty-nine fixtures exist and all fifty-nine pass — and that sentence became worth
+something only once the gate could no longer skip itself, below.
 
 **The gate could report success without running.** `FixtureDifferentialTest` reads the fixtures and
 their upstream references straight off disk, so Gradle could not see them; after `scripts/oracle.sh`
@@ -673,11 +673,11 @@ depends on them. Each has a test and a comment; this is the index.
    the event's own mark rather than a signal, is reported and does nothing. The first needs a
    scheduler the controller does not have; the second needs a signal to notice its own change; the
    third needs the compiler to hand back a mutable node. All three are reported by name today.
-2. **Accessibility, now that a device is reachable.** The accessibility tree is asserted on by
-   instrumented tests but nobody has listened to it — criterion 8 asks for TalkBack itself. An
-   emulator can run TalkBack, so this is no longer out of reach the way physical-hardware timing
-   is; it needs the service enabled on the AVD and a pass over the demo's nine charts. Expect the
-   descriptions to be the weak part rather than the tree.
+2. **Give axes and legends descriptions**, which is what listening to TalkBack turned up next and
+   is the largest remaining accessibility gap. A reader reaches every mark and is told the chart's
+   own description, and gets no frame of reference in between: no "x axis, months, January to
+   August", no "legend, three series". A mark's label means little without them. The descriptor
+   type exists on `NodeMetadata`; nothing populates it for a guide.
 3. **Keep growing the fixture corpus.** 58 of the brief's 100. Aiming it at *combinations* the
    engine has not met rather than at more variations of a single feature is what makes it find
    things: that is how `scale()` in an expression turned up missing. Untried combinations that
@@ -685,11 +685,13 @@ depends on them. Each has a test and a comment; this is the index.
    and a `timeunit` transform feeding a `time` scale across the same daylight-saving boundary the
    `local-time-dst` fixture crosses.
 
-Two further items still need something this environment does not have. Performance on **physical
-hardware** (PROJECT_BRIEF.md 19, criterion 13) — the emulator is available and useful for
-behaviour, but PROJECT_BRIEF.md 18.6 says emulator timings are not authoritative, and it is right.
-And **TalkBack itself** rather than instrumentation (criterion 8): the accessibility tree is
-asserted on, but nobody has listened to it.
+One item still needs something this environment does not have: performance on **physical hardware**
+(PROJECT_BRIEF.md 19, criterion 13). The emulator is available and useful for behaviour, but
+PROJECT_BRIEF.md 18.6 says emulator timings are not authoritative, and it is right.
+**TalkBack** (criterion 8) is no longer one of them. It was enabled on the emulator and the demo
+explored with it; the tree was already correct and two things it *said* were wrong, both now fixed
+and pinned by instrumented tests. What remains untested there is physical hardware and a real user,
+which is a different claim from "not verified at all".
 
 A note on the harness, because it is now the sixth time. The differential comparison has had to be
 taught to see a symbol's outline, fill and stroke opacity, a dash pattern, a node's own opacity, an

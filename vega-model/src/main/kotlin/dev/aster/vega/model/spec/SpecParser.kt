@@ -431,6 +431,7 @@ public class SpecParser {
         title = root.fields["title"]?.let { parseTitle(it, "$.title") },
         layout = root.fields["layout"]?.let { parseLayout(it, "$.layout") },
         marks = parseArray(root, "marks") { value, path -> parseMark(value, path) },
+        description = root.fields["description"]?.asString()?.takeIf { it.isNotBlank() },
       )
 
     reportUnsupportedTopLevel(root)

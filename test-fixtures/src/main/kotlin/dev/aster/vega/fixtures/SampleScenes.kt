@@ -29,6 +29,7 @@ import dev.aster.vega.scene.TextNode
 import dev.aster.vega.scene.TextRun
 import dev.aster.vega.scene.TextStyle
 import dev.aster.vega.scene.Transform2D
+import dev.aster.vega.scene.spokenNumber
 
 /**
  * Hand-authored scenes, built without any Vega parsing.
@@ -161,7 +162,7 @@ public object SampleScenes {
               accessibility =
                 AccessibilityDescriptor(
                   label = category.label,
-                  value = category.value.toString(),
+                  value = spokenNumber(category.value),
                   role = "graphics-symbol",
                   focusable = true,
                 ),
@@ -221,7 +222,7 @@ public object SampleScenes {
                 accessibility =
                   AccessibilityDescriptor(
                     label = "${category.label} $name",
-                    value = segmentValue.toString(),
+                    value = spokenNumber(segmentValue),
                     focusable = true,
                   ),
               ),

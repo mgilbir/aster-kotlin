@@ -254,12 +254,14 @@ Upstream Vega exposes 119 expression functions; 82 are implemented and 17 more a
 | Feature | Status | Tests | Known differences | Target milestone |
 | --- | --- | --- | --- | --- |
 | Virtual accessibility descendants | Supported | `VegaChartViewTest` | One provider for the whole chart | 1 |
-| Mark labels with value | Supported | `VegaChartViewTest` | — | 1 |
+| Mark labels with value | **Supported** | `ChartAccessibilityInstrumentedTest`, `VegaChartViewTest` | A whole number is spoken as a whole number. The canonical form is `28.0` because it has to round-trip and compare; a screen reader reads that as "twenty-eight point zero", so a chart of whole numbers sounded as though every value carried a spurious decimal. A genuine fraction keeps its digits. Found by listening, not by reading — the tree was already correct | 1 |
+| Chart-level description | **Supported** | `ChartAccessibilityInstrumentedTest` | The specification's own `description` becomes the view's content description, so a reader is told what the chart *is* before its marks are read. Every fixture here already carried one and nothing read it. A host's own `contentDescription` on a hand-built scene is left alone | 7 |
 | Activation action | Supported | `VegaChartViewTest` | — | 1 |
 | Selected state | Supported | `VegaChartViewTest` | — | 1 |
 | Dense-chart summary | Partial | `VegaChartViewTest` | Collapses above 120 focusable marks; the summary text is minimal | 7 |
 | Light and dark palettes | Supported | `DemoActivityTest` | `SampleScenes.Palette` switches chrome colours; geometry is identical | 1 |
-| Axis and legend descriptions | Planned | — | — | 7 |
+| Axis and legend descriptions | Planned | — | Axes and legends carry no descriptors, so a reader gets the marks and no frame of reference for them | 7 |
+| Verified with TalkBack | **Yes** | manual, on an API 37 emulator | TalkBack was enabled on the emulator and the demo's charts explored. It reaches every mark and reads the chart's description first. Both defects it found are fixed and pinned by instrumented tests. Not verified on physical hardware or with a real user | 7 |
 | Domain adjustment and reset-zoom actions | Planned | — | — | 7 |
 
 ## Platform
