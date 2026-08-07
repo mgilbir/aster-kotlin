@@ -354,6 +354,13 @@ public data class AxisSpec(
   val labelFontSize: NumberValue? = null,
   val offset: NumberValue? = null,
   val zindex: Int = 0,
+  /**
+   * Explicit tick values, replacing the ones the scale would generate.
+   *
+   * Not a filter and not a suggestion: whatever survives being mapped into the scale's range is
+   * what the axis draws, and the gridlines follow it.
+   */
+  val values: List<VegaValue>? = null,
   /** Appearance of the four parts, each defaulting to Vega's own when unstated. */
   val labelStyle: GuideStroke = GuideStroke(),
   val tickStyle: GuideStroke = GuideStroke(),

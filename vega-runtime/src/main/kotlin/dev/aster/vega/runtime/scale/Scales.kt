@@ -108,10 +108,20 @@ public class LinearScale(
     )
   }
 
+  /**
+   * d3's interpolation, in d3's arithmetic.
+   *
+   * `r0 * (1 - t) + r1 * t`, not the algebraically equal `r0 + t * (r1 - r0)`. The two differ in
+   * the last bits of a double, and that is not academic here: value 33 of a `[0, 100]` domain over
+   * a 150-unit range is 100.5 written the second way and 100.49999999999999 written d3's, and an
+   * axis rounds its ticks to whole pixels — so the tick lands a pixel away, along with its
+   * gridline. Found by a fixture whose explicit tick values happened to fall on the boundary; every
+   * generated tick before it had landed clear of one.
+   */
   private fun interpolate(d0: Double, d1: Double, r0: Double, r1: Double, x: Double): Double {
     if (d0 == d1) return (r0 + r1) / 2.0
     val t = (x - d0) / (d1 - d0)
-    return r0 + t * (r1 - r0)
+    return r0 * (1.0 - t) + r1 * t
   }
 
   /** The data value that maps to range position [y]. Only defined for a two-point domain. */

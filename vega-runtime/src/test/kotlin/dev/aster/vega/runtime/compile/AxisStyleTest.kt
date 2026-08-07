@@ -138,7 +138,6 @@ class AxisStyleTest {
   fun `every unhonoured axis property is reported by name`() {
     val unhonoured =
       listOf(
-        "\"values\": [1, 2]",
         "\"format\": \".2f\"",
         "\"formatType\": \"number\"",
         "\"labelAngle\": 45",
@@ -183,19 +182,6 @@ class AxisStyleTest {
       }
       assertTrue(reported.isNotEmpty(), "'$name' was not reported: $diagnostics")
     }
-  }
-
-  /**
-   * `values` deserves the strongest wording of the lot: an axis that quietly draws the scale's own
-   * ticks where four were named is not a partly-supported axis, it is a different axis.
-   */
-  @Test
-  fun `explicit tick values say what will be drawn instead`() {
-    val reported =
-      compile("""{"orient": "bottom", "scale": "x", "values": ["a"]}""").diagnostics.first {
-        it.jsonPath?.endsWith("values") == true
-      }
-    assertTrue("scale's own ticks" in reported.message, reported.message)
   }
 
   @Test

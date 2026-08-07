@@ -3,6 +3,8 @@ package dev.aster.vega.runtime.compile
 import dev.aster.vega.model.DiagnosticCodes
 import dev.aster.vega.model.DiagnosticCollector
 import dev.aster.vega.model.VegaValue
+import dev.aster.vega.model.asDouble
+import dev.aster.vega.model.asString
 import dev.aster.vega.model.spec.Anchor
 import dev.aster.vega.model.spec.AxisSpec
 import dev.aster.vega.model.spec.Orient
@@ -11,6 +13,7 @@ import dev.aster.vega.runtime.scale.LinearScale
 import dev.aster.vega.runtime.scale.PointScale
 import dev.aster.vega.runtime.scale.PositionScale
 import dev.aster.vega.runtime.scale.TimeScale
+import dev.aster.vega.runtime.scale.TimeTicks
 import dev.aster.vega.runtime.scale.TransformedScale
 import dev.aster.vega.runtime.scale.VegaScale
 import dev.aster.vega.scene.GroupNode
@@ -386,7 +389,96 @@ public class AxisBuilder(
    * values. Band positions are the band centres shifted back half a pixel, which is what upstream
    * emits — verified by comparing against Vega's own axis items for band, point and linear scales.
    */
-  private fun ticksFor(scale: VegaScale, spec: AxisSpec): List<Tick>? =
+  /**
+   * The ticks an axis draws, from the scale or from an explicit `values` list.
+   *
+   * Upstream's `validTicks`, reproduced rather than approximated, because three of its four steps
+   * are surprises:
+   * - a value that falls outside the scale's *range* is dropped, not clamped;
+   * - the survivors are ordered by where they land, so a list written out of order comes out in
+   *   order — and backwards when the range is reversed;
+   * - if there are more of them than `tickCount` allows, every other one is dropped repeatedly
+   *   until few enough remain, and if that leaves fewer than three the first and last are used
+   *   instead. Five values with `tickCount: 4` therefore give three, not four.
+   *
+   * The fourth is the label format, and it is the one a specification is most likely to trip over:
+   * with no `tickCount`, upstream formats using a count equal to the **number of values given**. So
+   * `values: [0.5, 1.5]` on a `[0, 2]` domain formats at the precision a two-tick axis would use,
+   * which is none, and both labels read as whole numbers. Reproduced, because a specification
+   * written against upstream is looking at those labels.
+   */
+  private fun ticksFor(scale: VegaScale, spec: AxisSpec): List<Tick>? {
+    val explicit = spec.values ?: return generatedTicks(scale, spec)
+    if (scale !is PositionScale) return generatedTicks(scale, spec)
+
+    val count = numbers.resolveInt(spec.tickCount, spec.scale) ?: explicit.size.coerceAtLeast(1)
+    val label = labeller(scale, count)
+
+    val range = scale.range
+    val low = kotlin.math.floor(minOf(range.first(), range.last()))
+    val high = kotlin.math.ceil(maxOf(range.first(), range.last()))
+    val descending = range.last() < range.first()
+
+    val placed =
+      explicit
+        .map { it to scale.position(it) }
+        .filter { (_, at) -> at.isFinite() && at >= low && at <= high }
+        .sortedWith(if (descending) compareByDescending { it.second } else compareBy { it.second })
+    return thin(placed, count).map { (value, at) ->
+      Tick(label(value), at + bandOffset(scale))
+    }
+  }
+
+  /**
+   * Upstream's thinning: halve the list until it fits, then fall back to the two ends.
+   *
+   * The fallback is what makes five values under `tickCount: 4` give three rather than four — the
+   * halving overshoots and the endpoints are only restored when it drops below three.
+   */
+  private fun <T> thin(values: List<T>, count: Int): List<T> {
+    if (count <= 0 || values.size <= 1) return values
+    val ends = listOf(values.first(), values.last())
+    var kept = values
+    while (kept.size > count && kept.size >= 3) {
+      kept = kept.filterIndexed { index, _ -> index % 2 == 0 }
+    }
+    return if (kept.size < 3) ends else kept
+  }
+
+  /**
+   * A band scale positions a value at its band's *start*; a tick belongs at the centre.
+   *
+   * Half a pixel comes back off, the same shift the generated band ticks carry, so the labels stay
+   * centred on the band while the ticks stay crisp.
+   */
+  private fun bandOffset(scale: PositionScale): Double =
+    if (scale is BandScale) scale.bandwidth / 2.0 - AxisDefaults.CRISP_OFFSET else 0.0
+
+  /**
+   * How an explicit value is labelled.
+   *
+   * A discrete scale has no formatter — upstream falls back to plain string coercion, which is why
+   * a band axis over negative numbers keeps its hyphens where a linear one gets a minus sign.
+   */
+  private fun labeller(scale: PositionScale, count: Int): (VegaValue) -> String =
+    when (scale) {
+      is LinearScale -> { value ->
+        scale.formatTick(value.asDouble(), count)
+      }
+      is TransformedScale -> { value ->
+        scale.formatTick(value.asDouble(), count)
+      }
+      // A time label is written at its own granularity — a January tick carries the year — so it
+      // comes from the tick itself rather than from a shared precision.
+      is TimeScale -> { value ->
+        TimeTicks.label(value.asDouble(), scale.zone)
+      }
+      else -> { value ->
+        value.asString()
+      }
+    }
+
+  private fun generatedTicks(scale: VegaScale, spec: AxisSpec): List<Tick>? =
     when (scale) {
       is BandScale ->
         scale.domain.zip(scale.centers()).map { (label, centre) ->

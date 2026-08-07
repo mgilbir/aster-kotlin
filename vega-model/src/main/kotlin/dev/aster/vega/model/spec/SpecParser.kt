@@ -46,6 +46,7 @@ private val AXIS_CONSUMED =
     "labelFontSize",
     "offset",
     "zindex",
+    "values",
   ) + guideStyleKeys("label", "tick", "grid", "domain", "title")
 
 /**
@@ -63,9 +64,6 @@ private fun guideStyleKeys(vararg prefixes: String): Set<String> =
 
 private val AXIS_UNSUPPORTED =
   mapOf(
-    "values" to
-      "Explicit axis tick values are not implemented; the scale's own ticks are drawn instead, " +
-        "so the axis will show a different set of ticks from the one requested",
     "format" to "Axis label format strings are not implemented; default formatting is used",
     "formatType" to "Axis label format types are not implemented; default formatting is used",
     "encode" to "Axis encode overrides are not implemented",
@@ -802,6 +800,7 @@ public class SpecParser {
       labelFontSize = obj.numberOrSignal("labelFontSize", "$path.labelFontSize"),
       offset = obj.numberOrSignal("offset", "$path.offset"),
       zindex = (obj.fields["zindex"] as? VegaValue.Num)?.value?.toInt() ?: 0,
+      values = (obj.fields["values"] as? VegaValue.Arr)?.values,
       labelStyle = obj.guideStroke("label"),
       tickStyle = obj.guideStroke("tick"),
       gridStyle = obj.guideStroke("grid"),
