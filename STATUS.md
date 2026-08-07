@@ -392,7 +392,7 @@ ordering), and the pipeline is now verified end to end on one fixture, but the b
 
 ## Verification
 
-- 1,160 JVM tests pass (`./scripts/test-core.sh`, `./gradlew test`).
+- 1,179 JVM tests pass (`./scripts/test-core.sh`, `./gradlew test`).
 - Android lint is clean with `warningsAsErrors` on every Android module.
 - 48 instrumented tests pass on an API 37 arm64 emulator (`./scripts/test-android.sh`): 40 in
   `vega-android-canvas`, 4 in `vega-compose`, 4 in `demo` — including one that compiles every bundled
@@ -625,13 +625,15 @@ depends on them. Each has a test and a comment; this is the index.
    `shape` needs projections. It wants an `AndroidImageResolver` to turn a URL into pixels, so
    unlike everything else in this session it cannot be finished or verified from here: the
    differential harness has no way to fetch and decode an image the way a device would.
-2. **The interaction gap**, which is now the largest untouched area by a wide margin. Signal `on`
-   handlers and the event-stream DSL are what make a chart respond to a tap rather than merely
-   redraw when told to, and none of it exists: `VegaChartController` has pan and zoom as a view
-   transform and nothing else. Unlike the `image` mark it can be built and tested here — an event
-   stream is a parser and a dispatch table, and only the final gesture binding needs a device.
-   Read `vega-parser/src/parsers/event-selector.js` before starting; the DSL has more in it than
-   its examples suggest, including filters, throttling and marks as sources.
+2. **Dispatching an event once it has been matched.** The selector language and the `on` handler
+   model are both in and exact against upstream, so the shape of a handler is now known: its
+   streams, its `{"signal"}` and `{"scale"}` sources, and its update. What is missing is the loop —
+   an arriving event has to be matched against every registered stream, gated by any `between`
+   pair, throttled or debounced, filtered by its expressions, and then the signal set and
+   everything downstream of it re-run. The last of those is the real work: nothing here recomputes
+   incrementally, so a changed signal currently means recompiling the whole specification. Read
+   `SignalResolver.kt` alongside upstream's `vega-dataflow` pulse before
+   deciding whether to make that incremental or to accept the full recompile for a first cut.
 3. **Keep growing the fixture corpus.** 55 of the brief's 100. Fixtures no longer find defects on
    arrival — the last nine passed first try — because the corpus has caught up with everything
    written without one, and the recent work was all built against upstream vectors before a

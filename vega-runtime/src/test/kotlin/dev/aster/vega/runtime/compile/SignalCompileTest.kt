@@ -169,17 +169,43 @@ class SignalCompileTest {
     assertEquals("bad", diagnostic.operator)
   }
 
+  /**
+   * Handlers now parse into a model — the selector, the sources and the update are all read and
+   * checked — but nothing dispatches them yet, so the signal still keeps its initial value. The
+   * diagnostic says which of those two it is, because "not supported" and "supported but not wired
+   * up" call for different things from a reader.
+   */
   @Test
-  fun `an event handler is reported since there is no interaction system yet`() {
+  fun `an event handler parses but does not yet fire`() {
     val compiled =
       compile(
         spec(
           signals =
-            """{"name": "hovered", "value": null, "on": [{"events": "mouseover", "update": "1"}]}""",
+            """{"name": "hovered", "value": null,
+                "on": [{"events": "rect:mouseover[event.shiftKey]{100}", "update": "1"}]}""",
           encode = basePosition,
         )
       )
-    assertTrue(compiled.diagnostics.any { it.message.contains("Event-stream handlers") })
+    assertTrue(
+      compiled.diagnostics.any { it.message.contains("do not yet run") },
+      compiled.diagnostics.toString(),
+    )
+  }
+
+  /** A selector that cannot be read is an error, not a handler that silently never fires. */
+  @Test
+  fun `an unreadable event selector is reported`() {
+    val compiled =
+      compile(
+        spec(
+          signals = """{"name": "s", "value": 0, "on": [{"events": "click[", "update": "1"}]}""",
+          encode = basePosition,
+        )
+      )
+    assertTrue(
+      compiled.diagnostics.any { it.message.contains("Unmatched left bracket") },
+      compiled.diagnostics.toString(),
+    )
   }
 
   @Test

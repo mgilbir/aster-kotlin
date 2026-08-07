@@ -181,7 +181,9 @@ Upstream Vega exposes 119 expression functions; 60 are implemented. The language
 | Interval selection | Partial | `HitTestTest` (`nodesIntersecting`) | No drag-to-select gesture yet | 6 |
 | Pan | Supported | `VegaChartControllerTest` | View transform; axes do not rescale | 1 |
 | Pinch and wheel zoom | Supported | `VegaChartControllerTest` | As above; clamped to 0.1×–50× | 1 |
-| Signal updates from input | Planned | — | Needs the signal system | 6 |
+| Event-selector language | **Supported** | `EventSelectorTest` (upstream vectors) | The whole grammar, ported from `vega-event-selector`: comma-separated streams, `source:type` prefixes, `@name` for a named mark, stacked `[filter]` expressions, `{throttle, debounce}` read from the end, a trailing `!` to consume, and the `[a, b] > c` pair a drag is written as. A word before the colon is a **mark type** if it happens to be one and an event source otherwise, so a mark named `rect` cannot be reached without the `@` — upstream's rule, matched. A pair wrapping a stream that already has one nests rather than merging | 6 |
+| Signal `on` handlers | Partial | `SignalCompileTest`, `SpecParserTest` | Parsed into a model — the selectors, the `{"signal"}` and `{"scale"}` sources that fire without any event, and `update` in all four forms (bare expression, `expr`, `value`, `signal`). Nothing dispatches them yet, so a signal still keeps its initial value; the diagnostic says which of those two it is, because "unsupported" and "parsed but not wired up" call for different things from a reader. A `merge` stream object is reported and asks for the equivalent comma-separated string | 6 |
+| Dispatching a handler when an event arrives | Not implemented | — | The event loop itself: matching an arriving event to its streams, applying `between` gating, throttling, and re-running what depends on the changed signal | 6 |
 | Keyboard focus navigation | Partial | `VegaChartViewTest` | Key events are translated; traversal semantics come with accessibility work | 7 |
 
 ## Outputs

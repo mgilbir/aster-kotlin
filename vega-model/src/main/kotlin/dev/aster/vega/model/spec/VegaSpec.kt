@@ -58,12 +58,50 @@ public data class SignalSpec(
   val value: VegaValue? = null,
   val init: String? = null,
   val update: String? = null,
-  val on: List<VegaValue> = emptyList(),
+  val on: List<SignalHandler> = emptyList(),
   val bind: VegaValue? = null,
 ) {
   /** The expression that produces this signal's value for a static render, if any. */
   public val expression: String?
     get() = update ?: init
+}
+
+/**
+ * One `on` entry of a signal: what makes it fire, and what it becomes when it does.
+ *
+ * A handler is driven by an **event** or by another **signal or scale changing**, and upstream
+ * treats those as the same kind of thing — both are sources that push a new value. That is why
+ * `events` accepts `{"signal": "width"}` alongside `"click"`, and why a chart can be made reactive
+ * without any events at all.
+ */
+public data class SignalHandler(
+  val streams: List<EventStream> = emptyList(),
+  /** Signals whose change fires this handler, from `{"signal": "..."}` entries in `events`. */
+  val signalSources: List<String> = emptyList(),
+  /** Scales whose change fires this handler, from `{"scale": "..."}` entries in `events`. */
+  val scaleSources: List<String> = emptyList(),
+  val update: SignalUpdate? = null,
+  /** `encode` sets properties on the event's item instead of producing a value. */
+  val encode: VegaValue? = null,
+  /**
+   * Re-runs everything downstream even when the value has not changed.
+   *
+   * Needed when the value is an object that was mutated in place rather than replaced — without it
+   * the equality check upstream performs would decide nothing had happened.
+   */
+  val force: Boolean = false,
+)
+
+/** What a fired handler sets the signal to. */
+public sealed interface SignalUpdate {
+  /** An expression, either written bare or as `{"expr": "..."}`. */
+  public data class Expression(val expr: String) : SignalUpdate
+
+  /** A literal, from `{"value": ...}`. */
+  public data class Constant(val value: VegaValue) : SignalUpdate
+
+  /** Another signal's current value, from `{"signal": "..."}`. */
+  public data class Reference(val name: String) : SignalUpdate
 }
 
 /** Space around the chart. Vega accepts a single number or per-side values. */

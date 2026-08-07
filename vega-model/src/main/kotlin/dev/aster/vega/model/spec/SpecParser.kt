@@ -60,6 +60,24 @@ private val CONFIG_HONOURED =
  * specification asked for four, or drew its labels horizontally where the specification turned them
  * 45 degrees, looks like a chart and is not the chart that was asked for.
  */
+/** Everything an `on` handler may say. */
+private val SIGNAL_HANDLER_CONSUMED = setOf("events", "update", "encode", "force")
+
+/** Everything the object form of an event stream may say. */
+private val EVENT_STREAM_CONSUMED =
+  setOf(
+    "source",
+    "type",
+    "marktype",
+    "markname",
+    "markrole",
+    "filter",
+    "throttle",
+    "debounce",
+    "consume",
+    "between",
+  )
+
 private val AXIS_CONSUMED =
   setOf(
     "scale",
@@ -508,7 +526,7 @@ public class SpecParser {
 
   // ---- signals --------------------------------------------------------------
 
-  private fun parseSignal(value: VegaValue, path: String): SignalSpec? {
+  private fun parseSignal(value: VegaValue, path: String, subscope: Boolean = false): SignalSpec? {
     val obj = value as? VegaValue.Obj ?: return unexpected("a signal definition", path)
     val name = obj.fields["name"]?.asString()
     if (name.isNullOrEmpty()) {
@@ -520,12 +538,16 @@ public class SpecParser {
       return null
     }
 
-    val on = (obj.fields["on"] as? VegaValue.Arr)?.values ?: emptyList()
+    val on =
+      ((obj.fields["on"] as? VegaValue.Arr)?.values ?: emptyList()).mapIndexedNotNull { index, entry
+        ->
+        parseSignalHandler(entry, "$path.on[$index]", name, subscope)
+      }
     if (on.isNotEmpty()) {
       diagnostics.warn(
         DiagnosticCodes.PARSE_UNKNOWN_PROPERTY,
-        "Event-stream handlers need the interaction system; signal '$name' will keep its " +
-          "initial value and never update",
+        "Signal '$name' has ${on.size} handler(s), which parse but do not yet run: dispatching " +
+          "them needs the event loop, so the signal keeps its initial value",
         jsonPath = "$path.on",
       )
     }
@@ -545,6 +567,176 @@ public class SpecParser {
       update = obj.fields["update"]?.asString(),
       on = on,
       bind = obj.fields["bind"],
+    )
+  }
+
+  /**
+   * One `on` entry: its sources, and what it sets the signal to.
+   *
+   * `events` mixes two unrelated things on purpose — event selectors, and `{"signal": ...}` or
+   * `{"scale": ...}` entries that fire when *those* change. Upstream treats both as sources pushing
+   * a new value, which is why a chart can be made reactive with no events at all.
+   */
+  private fun parseSignalHandler(
+    value: VegaValue,
+    path: String,
+    signalName: String,
+    subscope: Boolean,
+  ): SignalHandler? {
+    val obj = value as? VegaValue.Obj ?: return unexpected("a signal handler", path)
+    val events = obj.fields["events"]
+    if (events == null) {
+      diagnostics.error(
+        DiagnosticCodes.PARSE_MISSING_PROPERTY,
+        "A handler on signal '$signalName' needs an 'events' specification",
+        jsonPath = path,
+      )
+      return null
+    }
+
+    val streams = mutableListOf<EventStream>()
+    val signals = mutableListOf<String>()
+    val scales = mutableListOf<String>()
+    val defaultSource = if (subscope) EventStream.SOURCE_SCOPE else EventStream.SOURCE_VIEW
+    for (entry in if (events is VegaValue.Arr) events.values else listOf(events)) {
+      when (entry) {
+        is VegaValue.Str ->
+          try {
+            streams += EventSelector.parse(entry.value, defaultSource)
+          } catch (failure: EventSelectorException) {
+            diagnostics.error(
+              DiagnosticCodes.PARSE_UNKNOWN_PROPERTY,
+              "Could not read the event selector for signal '$signalName': ${failure.message}",
+              jsonPath = "$path.events",
+            )
+            return null
+          }
+        is VegaValue.Obj -> {
+          val signal = entry.fields["signal"]?.asString()
+          val scale = entry.fields["scale"]?.asString()
+          when {
+            !signal.isNullOrEmpty() -> signals += signal
+            !scale.isNullOrEmpty() -> scales += scale
+            else -> {
+              val stream = parseEventStreamObject(entry, "$path.events", defaultSource)
+              if (stream == null) return null
+              streams += stream
+            }
+          }
+        }
+        else -> {
+          diagnostics.error(
+            DiagnosticCodes.PARSE_UNKNOWN_PROPERTY,
+            "An 'events' entry must be a selector string or an object",
+            jsonPath = "$path.events",
+          )
+          return null
+        }
+      }
+    }
+
+    val encode = obj.fields["encode"]
+    val updateValue = obj.fields["update"]
+    if (encode != null && updateValue != null) {
+      // Upstream rewrites `encode` into an `encode(item(), ...)` call, so the two would fight over
+      // the same slot. It errors rather than picking one, and so does this.
+      diagnostics.error(
+        DiagnosticCodes.PARSE_UNKNOWN_PROPERTY,
+        "A handler on signal '$signalName' has both 'encode' and 'update'; they set the same " +
+          "thing and cannot both apply",
+        jsonPath = path,
+      )
+      return null
+    }
+
+    val update =
+      when {
+        updateValue == null -> null
+        updateValue is VegaValue.Str -> SignalUpdate.Expression(updateValue.value)
+        updateValue is VegaValue.Obj -> {
+          val expr = updateValue.fields["expr"]?.asString()
+          val signal = updateValue.fields["signal"]?.asString()
+          val literal = updateValue.fields["value"]
+          when {
+            !expr.isNullOrEmpty() -> SignalUpdate.Expression(expr)
+            literal != null -> SignalUpdate.Constant(literal)
+            !signal.isNullOrEmpty() -> SignalUpdate.Reference(signal)
+            else -> {
+              diagnostics.error(
+                DiagnosticCodes.PARSE_UNKNOWN_PROPERTY,
+                "An 'update' object needs one of 'expr', 'value' or 'signal'",
+                jsonPath = "$path.update",
+              )
+              return null
+            }
+          }
+        }
+        else -> SignalUpdate.Constant(updateValue)
+      }
+    if (update == null && encode == null) {
+      diagnostics.error(
+        DiagnosticCodes.PARSE_MISSING_PROPERTY,
+        "A handler on signal '$signalName' needs an 'update' or an 'encode'",
+        jsonPath = path,
+      )
+      return null
+    }
+
+    obj.reportUnhandled("Signal handler", path, SIGNAL_HANDLER_CONSUMED)
+    return SignalHandler(
+      streams = streams,
+      signalSources = signals,
+      scaleSources = scales,
+      update = update,
+      encode = encode,
+      force = (obj.fields["force"] as? VegaValue.Bool)?.value ?: false,
+    )
+  }
+
+  /**
+   * The object form of a stream, which a specification uses when a selector string cannot say it.
+   */
+  private fun parseEventStreamObject(
+    obj: VegaValue.Obj,
+    path: String,
+    defaultSource: String,
+  ): EventStream? {
+    (obj.fields["merge"] as? VegaValue.Arr)?.let {
+      diagnostics.error(
+        DiagnosticCodes.PARSE_UNKNOWN_PROPERTY,
+        "A 'merge' stream combines several streams into one; write them as a comma-separated " +
+          "selector string instead",
+        jsonPath = path,
+      )
+      return null
+    }
+    val type = obj.fields["type"]?.asString()
+    if (type.isNullOrEmpty()) {
+      diagnostics.error(
+        DiagnosticCodes.PARSE_MISSING_PROPERTY,
+        "An event stream object needs a 'type'",
+        jsonPath = path,
+      )
+      return null
+    }
+    val between =
+      (obj.fields["between"] as? VegaValue.Arr)?.values?.mapNotNull {
+        (it as? VegaValue.Obj)?.let { child -> parseEventStreamObject(child, path, defaultSource) }
+      } ?: emptyList()
+    obj.reportUnhandled("Event stream", path, EVENT_STREAM_CONSUMED)
+    return EventStream(
+      source = obj.fields["source"]?.asString()?.takeIf { it.isNotEmpty() } ?: defaultSource,
+      type = type,
+      markType = obj.fields["marktype"]?.asString()?.takeIf { it.isNotEmpty() },
+      markName = obj.fields["markname"]?.asString()?.takeIf { it.isNotEmpty() },
+      filters =
+        (obj.fields["filter"] as? VegaValue.Arr)?.values?.map { it.asString() }
+          ?: obj.fields["filter"]?.asString()?.let { listOf(it) }
+          ?: emptyList(),
+      throttle = obj.fields["throttle"]?.asDouble()?.takeIf { !it.isNaN() && it != 0.0 },
+      debounce = obj.fields["debounce"]?.asDouble()?.takeIf { !it.isNaN() && it != 0.0 },
+      consume = (obj.fields["consume"] as? VegaValue.Bool)?.value ?: false,
+      between = between,
     )
   }
 
@@ -1230,7 +1422,9 @@ public class SpecParser {
       axes = parseArray(obj, "axes", path) { child, childPath -> parseAxis(child, childPath) },
       data = parseArray(obj, "data", path) { child, childPath -> parseData(child, childPath) },
       signals =
-        parseArray(obj, "signals", path) { child, childPath -> parseSignal(child, childPath) },
+        parseArray(obj, "signals", path) { child, childPath ->
+          parseSignal(child, childPath, subscope = true)
+        },
       scales = parseArray(obj, "scales", path) { child, childPath -> parseScale(child, childPath) },
       legends =
         parseArray(obj, "legends", path) { child, childPath -> parseLegend(child, childPath) },
