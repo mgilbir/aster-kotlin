@@ -241,8 +241,12 @@ public class PathBuilder {
    * increasing clockwise, which is what a pie chart's first slice starts from. That is a quarter
    * turn from the mathematical convention, and getting it wrong rotates every slice.
    *
-   * The sweep is split into segments of at most a quarter turn, because a single cubic approximates
-   * a circular arc well only over a short span.
+   * The sweep is split into segments of at most an eighth of a turn. A quarter turn is the usual
+   * choice and leaves about 0.03% radial error, which is invisible but not negligible: on a 72-unit
+   * donut it moved the mark's measured extent far enough to fail a differential comparison against
+   * upstream, which measures an arc exactly from its centre and radii. Halving the span costs a few
+   * more cubics on arcs alone — a symbol's circle is built by [PathBuilder.circle] and is untouched
+   * — and takes the error to roughly a thousandth of that.
    */
   public fun arcTo(
     cx: Double,
@@ -254,7 +258,7 @@ public class PathBuilder {
     if (radius <= 0.0) return this
     val sweep = endAngle - startAngle
     if (sweep == 0.0) return this
-    val segments = kotlin.math.ceil(kotlin.math.abs(sweep) / (kotlin.math.PI / 2.0)).toInt()
+    val segments = kotlin.math.ceil(kotlin.math.abs(sweep) / MAX_ARC_SEGMENT).toInt()
     val step = sweep / segments
 
     fun pointAt(angle: Double) =
@@ -320,6 +324,9 @@ public class PathBuilder {
 
     /** How far apart two points may be and still count as the same place, when joining subpaths. */
     private const val JOIN_TOLERANCE: Double = 1e-9
+
+    /** The widest sweep one cubic may approximate. See [PathBuilder.arcTo]. */
+    private const val MAX_ARC_SEGMENT: Double = kotlin.math.PI / 4.0
   }
 }
 

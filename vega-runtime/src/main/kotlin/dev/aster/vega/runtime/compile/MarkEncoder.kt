@@ -19,6 +19,7 @@ import dev.aster.vega.model.spec.MarkType
 import dev.aster.vega.runtime.scale.PositionScale
 import dev.aster.vega.runtime.scale.VegaScale
 import dev.aster.vega.scene.AccessibilityDescriptor
+import dev.aster.vega.scene.ArcPath
 import dev.aster.vega.scene.Fill
 import dev.aster.vega.scene.FontStyle
 import dev.aster.vega.scene.GroupNode
@@ -176,9 +177,9 @@ public class MarkEncoder(
    * zero inner radius makes a wedge rather than a ring, and the outline is closed differently in
    * the two cases — a wedge returns through the centre, a ring runs back along the inner edge.
    *
-   * `padAngle` and `cornerRadius` are reported rather than approximated: upstream insets a padded
-   * arc against a pad *radius* and rounds its corners with tangent circles, and a slice that is
-   * visibly the wrong shape is worse than one that is honestly missing.
+   * `padAngle` and `cornerRadius` are d3's own geometry, ported in [ArcPath] rather than
+   * approximated — a padded arc is inset against a pad *radius* and its corners are rounded with
+   * tangent circles, neither of which is what the property names suggest.
    */
   private fun arc(spec: MarkSpec, datum: VegaValue, index: Int): SceneNode? {
     val channels = spec.encode.effective
@@ -190,32 +191,21 @@ public class MarkEncoder(
     val outerRadius = number(channels["outerRadius"], datum) ?: 0.0
     if (outerRadius <= 0.0 || startAngle == endAngle) return null
 
-    for (unsupported in listOf("padAngle", "cornerRadius")) {
-      if (channels[unsupported] != null) {
-        reportOnce(
-          "arc:$unsupported",
-          dev.aster.vega.model.VegaDiagnostic(
-            severity = dev.aster.vega.model.DiagnosticSeverity.WARNING,
-            code = DiagnosticCodes.TRANSFORM_NOT_IMPLEMENTED,
-            message =
-              "Arc '$unsupported' is not implemented; the slice was drawn with square corners and " +
-                "no gap",
-            operator = spec.name,
-          ),
-        )
-      }
-    }
-
+    val config = MarkConfig(spec)
     val style = style(channels, datum, spec)
-    val path = PathData.build {
-      arcTo(cx, cy, outerRadius, startAngle, endAngle)
-      if (innerRadius > 0.0) {
-        arcTo(cx, cy, innerRadius, endAngle, startAngle)
-      } else {
-        lineTo(cx, cy)
-      }
-      close()
-    }
+    val path =
+      ArcPath.build(
+        centreX = cx,
+        centreY = cy,
+        innerRadius = innerRadius,
+        outerRadius = outerRadius,
+        startAngle = startAngle,
+        endAngle = endAngle,
+        padAngle = number(channels["padAngle"], datum) ?: config.number("padAngle") ?: 0.0,
+        cornerRadius =
+          number(channels["cornerRadius"], datum) ?: config.number("cornerRadius") ?: 0.0,
+        padRadius = number(channels["padRadius"], datum) ?: config.number("padRadius"),
+      )
     return PathNode(
       id = ids.allocate(),
       path = path,

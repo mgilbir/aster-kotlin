@@ -219,26 +219,37 @@ class SpecCompilerTest {
     assertTrue(requireNotNull(compiled.scene).flatten().none { it.node is PathNode })
   }
 
+  /**
+   * `padAngle` and `cornerRadius` used to be reported rather than drawn. They are now d3's own
+   * geometry, so the arc is a different shape from the square-cornered one and nothing is reported.
+   */
   @Test
-  fun `arc padding and corner rounding are reported rather than drawn square in silence`() {
-    val compiled =
-      compile(
-        """
-        {
-          "width": 100, "height": 100, "padding": 0,
-          "data": [{"name": "t", "values": [{"a": 0}]}],
-          "marks": [{"type": "arc", "from": {"data": "t"}, "encode": {"enter": {
-            "x": {"value": 50}, "y": {"value": 50},
-            "startAngle": {"value": 0}, "endAngle": {"value": 1},
-            "outerRadius": {"value": 40},
-            "padAngle": {"value": 0.05}, "cornerRadius": {"value": 3}}}}]
-        }
-        """
-          .trimIndent()
-      )
-    val messages = compiled.diagnostics.map { it.message }
-    assertTrue(messages.any { it.contains("padAngle") }, messages.toString())
-    assertTrue(messages.any { it.contains("cornerRadius") }, messages.toString())
+  fun `arc padding and corner rounding change the shape and report nothing`() {
+    fun arcPath(extra: String): PathNode {
+      val compiled =
+        compile(
+          """
+          {
+            "width": 100, "height": 100, "padding": 0,
+            "data": [{"name": "t", "values": [{"a": 0}]}],
+            "marks": [{"type": "arc", "from": {"data": "t"}, "encode": {"enter": {
+              "x": {"value": 50}, "y": {"value": 50},
+              "startAngle": {"value": 0}, "endAngle": {"value": 1},
+              "innerRadius": {"value": 20}, "outerRadius": {"value": 40}$extra}}}]
+          }
+          """
+            .trimIndent()
+        )
+      assertTrue(compiled.diagnostics.isEmpty(), compiled.diagnostics.toString())
+      return compiled.scene!!.flatten().map { it.node }.filterIsInstance<PathNode>().single()
+    }
+
+    val plain = arcPath("")
+    val padded = arcPath(""", "padAngle": {"value": 0.1}""")
+    val rounded = arcPath(""", "cornerRadius": {"value": 5}""")
+    // A gap narrows the slice, and rounding pulls its corners in; both shrink the drawn extent.
+    assertTrue(padded.bounds.width < plain.bounds.width, "padding did not narrow the slice")
+    assertTrue(rounded.bounds.width < plain.bounds.width, "rounding did not pull the corners in")
   }
 
   @Test

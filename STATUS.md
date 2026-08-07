@@ -20,7 +20,7 @@ Milestones 0, 1 and 2 complete. **Milestones 3 and 4 in progress**: Vega specifi
 end — including expressions, signals and the twelve data transforms the brief lists — and are verified
 against upstream Vega by differential tests.
 
-Thirty-eight differential fixtures pass, all matching upstream exactly on every mark and scale output:
+Thirty-nine differential fixtures pass, all matching upstream exactly on every mark and scale output:
 
 | Fixture | Marks | Covers |
 | --- | --- | --- |
@@ -62,6 +62,7 @@ Thirty-eight differential fixtures pass, all matching upstream exactly on every 
 | `axis-label-angle` | 33 | labels turned 45 degrees, hung Vega's way and corrected Vega-Lite's |
 | `config-theme` | 42 | a theme in `config`, every level of the precedence chain visible at once |
 | `config-marks` | 31 | a theme reaching the marks, and a rect that encodes only a stroke |
+| `arc-padding` | 10 | a padded, round-cornered donut beside a pie of the same data |
 
 The gate is wired into `./scripts/oracle.sh`, so every further scale, mark and transform is built
 against a harness that can say we are wrong — which golden tests cannot.
@@ -123,7 +124,7 @@ substantive compatibility items:
 | 6. View and Compose APIs | Yes |
 | 7. SVG, PNG, PDF export | Yes |
 | 8. TalkBack can describe and navigate | Partial — virtual nodes are tested by instrumentation, not with TalkBack itself |
-| 9. At least 100 compatibility fixtures pass | 38 of 100 |
+| 9. At least 100 compatibility fixtures pass | 39 of 100 |
 | 10. Core runtime has no Android dependency | Yes |
 | 11. Renders without WebView | Yes |
 | 12. Build and test loop runs from the terminal | Yes |
@@ -256,6 +257,14 @@ ordering), and the pipeline is now verified end to end on one fixture, but the b
   out, so a linear scale handed `[10, 20]` still starts at 0 where this engine had been leaving it
   at 10. The limits then replace an end rather than clamping it, and run after `zero`, which is why
   `domainMin: 30` beats it.
+- **Arc padding and corner rounding**, ported from d3-shape rather than approximated. Neither is
+  what its name suggests: `padAngle` is a gap measured at a pad *radius* and converted back into an
+  angle separately for each edge, so the two sides of a gap stay parallel instead of splaying
+  outwards; and `cornerRadius` is clamped by where the slice's own straight edges would meet, so a
+  thin slice rounds less than a fat one and one too small to round loses its corners rather than
+  folding inside out. The arc's cubic approximation was tightened from a quarter turn to an eighth
+  at the same time — the old error was invisible on screen but moved a 72-unit donut's measured
+  extent enough to fail the comparison.
 - **`config` blocks for the marks**: `config.mark`, the per-mark-type blocks, and named
   `config.style` blocks a mark opts into through its own `style` property. The ordering is the part
   that is not guessable — `config.mark` sits *below* the engine's built-in per-type defaults and
@@ -318,7 +327,7 @@ ordering), and the pipeline is now verified end to end on one fixture, but the b
 
 ## Verification
 
-- 1,004 JVM tests pass (`./scripts/test-core.sh`, `./gradlew test`).
+- 1,010 JVM tests pass (`./scripts/test-core.sh`, `./gradlew test`).
 - Android lint is clean with `warningsAsErrors` on every Android module.
 - 48 instrumented tests pass on an API 37 arm64 emulator (`./scripts/test-android.sh`): 40 in
   `vega-android-canvas`, 4 in `vega-compose`, 4 in `demo` — including one that compiles every bundled
@@ -353,7 +362,7 @@ dark chrome, so a dark background was unreadable — they now take a `SampleScen
 
 ## Known failing fixtures
 
-None. Thirty-eight fixtures exist and all thirty-eight pass. The brief's MVP asks for 100; growing the
+None. Thirty-nine fixtures exist and all thirty-nine pass. The brief's MVP asks for 100; growing the
 corpus is the main task now, and each new fixture is expected to surface gaps rather than pass
 immediately. That keeps happening, which is the point of the harness: `stacked-bar` surfaced two real
 bugs, and `facet-trellis` surfaced a third — `range: "height"` was descending for every scale type,
@@ -472,6 +481,8 @@ depends on them. Each has a test and a comment; this is the index.
 | A `style` block names properties the way a mark does, so `fill` has to become `labelColor` | `GuideConfig.prefixed` |
 | `config.mark` loses to the built-in per-type defaults and `config.{marktype}` beats them | `MarkEncoder.MarkConfig` |
 | A mark that encodes *either* paint channel gets **neither** default, so a stroke-only rect is hollow | `MarkEncoder.style` |
+| `padAngle` is a gap at a pad *radius*, converted back to an angle per edge, so the sides stay parallel | `ArcPath.sector` |
+| `cornerRadius` is clamped by where the slice's own edges would meet, not just by its thickness | `ArcPath.sector` |
 | A label hidden by overlap removal stays in the scene at zero opacity, so the mark count does not move | `LabelOverlap` |
 
 ## Architectural decisions pending
@@ -531,7 +542,7 @@ depends on them. Each has a test and a comment; this is the index.
 
 ## Next three tasks
 
-1. **Keep growing the fixture corpus.** 38 of the brief's 100 pass, and the return has not fallen
+1. **Keep growing the fixture corpus.** 39 of the brief's 100 pass, and the return has not fallen
    off: the last ten fixtures found fourteen defects between them, and half of those were in code
    that had been passing for a dozen fixtures. Worth aiming at next: a `config` block of any kind,
    which is where a Vega-Lite-compiled specification puts everything and where every default in this

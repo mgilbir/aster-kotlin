@@ -296,8 +296,8 @@ private val ENCODE_CONSUMED =
     "strokeDash",
     "strokeCap",
     "strokeJoin",
-    // Read in order to be reported by name, which is more useful than the generic message.
     "padAngle",
+    "padRadius",
   )
 
 private val ENCODE_UNSUPPORTED =
