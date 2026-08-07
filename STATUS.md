@@ -100,7 +100,7 @@ upstream-verified slice through parsing, scales, rect encoding and axes:
 | `vega-parser` (width, height, padding, autosize, data, signals, scales, axes, legends, titles, marks, group scopes, `layout`, `config`) | 3,790 | a subset, and every property it does not read is reported by name |
 | `vega-encode` (mark encoders, axes, legends, titles) | 952 | 8 of 12 mark encoders; axes, legends and titles including overlap removal, truncation and the `config` cascade; nine interpolation methods |
 | `vega-expression` + `vega-functions` | 2,388 | language complete; 60 of 119 functions |
-| `vega-transforms` (31 of 40) | 3,754 | the 12 the brief lists plus `timeunit`, `pie`, `window`, `sequence`, `lookup`, `impute`, `cross`, `pivot`, `countpattern`, the statistical family — `quantile`, `regression`, `loess`, `kde`, `density`, `dotbin` — and four of the hierarchy family: `stratify`, `nest`, `treemap`, `partition`. Exact against upstream |
+| `vega-transforms` (33 of 40) | 3,754 | the 12 the brief lists plus `timeunit`, `pie`, `window`, `sequence`, `lookup`, `impute`, `cross`, `pivot`, `countpattern`, the statistical family — `quantile`, `regression`, `loess`, `kde`, `density`, `dotbin` — and the whole hierarchy family: `stratify`, `nest`, `treemap`, `partition`, `pack`, `tree`. Exact against upstream |
 | `vega-dataflow` | 2,081 | contracts and scheduling only; no pulse propagation |
 
 The entire data and specification half is absent:
@@ -133,7 +133,7 @@ substantive compatibility items:
 | 6. View and Compose APIs | Yes |
 | 7. SVG, PNG, PDF export | Yes |
 | 8. TalkBack can describe and navigate | Partial — virtual nodes are tested by instrumentation, not with TalkBack itself |
-| 9. At least 100 compatibility fixtures pass | 54 of 100 |
+| 9. At least 100 compatibility fixtures pass | 55 of 100 |
 | 10. Core runtime has no Android dependency | Yes |
 | 11. Renders without WebView | Yes |
 | 12. Build and test loop runs from the terminal | Yes |
@@ -392,7 +392,7 @@ ordering), and the pipeline is now verified end to end on one fixture, but the b
 
 ## Verification
 
-- 1,147 JVM tests pass (`./scripts/test-core.sh`, `./gradlew test`).
+- 1,160 JVM tests pass (`./scripts/test-core.sh`, `./gradlew test`).
 - Android lint is clean with `warningsAsErrors` on every Android module.
 - 48 instrumented tests pass on an API 37 arm64 emulator (`./scripts/test-android.sh`): 40 in
   `vega-android-canvas`, 4 in `vega-compose`, 4 in `demo` — including one that compiles every bundled
@@ -621,26 +621,25 @@ depends on them. Each has a test and a comment; this is the index.
 
 ## Next three tasks
 
-1. **The `image` mark, and then the interaction gap.** `image` is the last of the twelve with no
-   encoder that is not an explicit non-goal — `shape` needs projections. It wants an
-   `AndroidImageResolver` to turn a URL into pixels, so unlike everything else this session it
-   cannot be finished or verified without a device. After it, the largest untouched area is not a
-   mark or a transform at all: signal `on` handlers and the event-stream DSL, which is what makes a
-   chart respond to a tap rather than merely redraw when told to.
-2. **The rest of the transforms.** 31 of upstream's 40. `pack` and `tree` are what is left of the
-   hierarchy family, and they are now only geometry: the tree, the sizing, the sorting and the
-   writing-back are all done and shared. `pack` wants Welzl's smallest-enclosing-circle with d3's
-   seeded shuffle; `tree` wants the Reingold-Tilford tidy algorithm, which is the harder of the
-   two. Everything else unimplemented is out of scope — the geographic transforms need map
-   projections, and `force`, `voronoi`, `wordcloud`, `label` and `crossfilter` are explicit
-   non-goals (PROJECT_BRIEF.md 3.3). `sample` is the one small leftover and needs a seeded random
-   source before its output could be compared against anything.
-3. **Keep growing the fixture corpus.** 54 of the brief's 100. The return has fallen off — of the
-   last ten, seven passed on arrival — because the corpus has caught up with the parts of the
-   engine written without one. Aim it at what is genuinely untouched rather than at more
-   combinations of what is covered: the `quantile`, `quantize`, `threshold` and `bin-ordinal`
-   scales, a local `time` scale across a daylight-saving boundary, and whatever the two items above
-   add.
+1. **The `image` mark.** The last of the twelve with no encoder that is not an explicit non-goal —
+   `shape` needs projections. It wants an `AndroidImageResolver` to turn a URL into pixels, so
+   unlike everything else in this session it cannot be finished or verified from here: the
+   differential harness has no way to fetch and decode an image the way a device would.
+2. **The interaction gap**, which is now the largest untouched area by a wide margin. Signal `on`
+   handlers and the event-stream DSL are what make a chart respond to a tap rather than merely
+   redraw when told to, and none of it exists: `VegaChartController` has pan and zoom as a view
+   transform and nothing else. Unlike the `image` mark it can be built and tested here — an event
+   stream is a parser and a dispatch table, and only the final gesture binding needs a device.
+   Read `vega-parser/src/parsers/event-selector.js` before starting; the DSL has more in it than
+   its examples suggest, including filters, throttling and marks as sources.
+3. **Keep growing the fixture corpus.** 55 of the brief's 100. Fixtures no longer find defects on
+   arrival — the last nine passed first try — because the corpus has caught up with everything
+   written without one, and the recent work was all built against upstream vectors before a
+   fixture ever saw it. That makes them regression cover rather than a search, which is still
+   worth having but is a different activity: aim them at what is genuinely untouched rather than
+   at more combinations of what is covered. The `quantile`, `quantize`, `threshold` and
+   `bin-ordinal` scales are the largest such gap, then a local `time` scale across a
+   daylight-saving boundary.
 
 Two further items, both real and both needing something this environment does not have: performance
 on physical hardware (PROJECT_BRIEF.md 19, criterion 13) and TalkBack itself rather than

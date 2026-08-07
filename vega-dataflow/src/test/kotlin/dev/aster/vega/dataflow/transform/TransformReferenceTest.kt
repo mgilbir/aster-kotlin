@@ -509,7 +509,7 @@ class TransformReferenceTest {
   }
 
   @Test
-  fun `the registry covers the transforms the brief lists, plus nineteen more`() {
+  fun `the registry covers the transforms the brief lists, plus twenty-one more`() {
     val fromTheBrief =
       setOf(
         "filter",
@@ -553,7 +553,9 @@ class TransformReferenceTest {
         "stratify" +
         "nest" +
         "treemap" +
-        "partition",
+        "partition" +
+        "pack" +
+        "tree",
       TransformRegistry.Default.types,
     )
   }
@@ -1603,6 +1605,116 @@ class TransformReferenceTest {
     run("""[{"type": "treemap", "field": "size", "size": [10, 10]}]""", forest)
     assertTrue(
       context.diagnostics.diagnostics.any { it.message.contains("put a 'stratify'") },
+      context.diagnostics.diagnostics.toString(),
+    )
+  }
+
+  // ---- pack, tree -----------------------------------------------------------
+
+  /** Only x, y, r and depth, so an eight-node layout stays readable as an expectation. */
+  private fun circles(transform: String): String =
+    run("[$STRATIFY, $transform]", forest)
+      .let { Regex("\\{[^}]*}").findAll(it).toList() }
+      .joinToString(" ") { match ->
+        Regex(""""(x|y|r|depth)":(-?[0-9.eE-]+)""")
+          .findAll(match.value)
+          .associate { it.groupValues[1] to it.groupValues[2] }
+          .let { "${it["x"]},${it["y"]}" + (it["r"]?.let { r -> ",$r" } ?: "") + "/${it["depth"]}" }
+      }
+
+  /**
+   * A leaf's radius is the square root of its value, so **area** carries the quantity — a radius
+   * proportional to value would square the difference. The packing itself is Welzl's enclosing
+   * circle over a seeded shuffle, which is why it comes out the same every run.
+   */
+  @Test
+  fun `circle packing matches upstream`() {
+    assertEquals(
+      "50,50,50/0 25.19736415175014,50,25.19736415175014/1 " +
+        "75.19736415175014,50,24.80263584824986/1 " +
+        "11.325956731384244,50,11.325956731384244/2 36.52332088313438,50,13.871407420365896/2 " +
+        "60.21218638409848,49.48369549411809,9.80856625154212/2 " +
+        "85.00358507120094,49.48369549411809,14.982832435560345/2 " +
+        "68.34924779954463,65.3343046817553,8.008660808187225/2",
+      circles("""{"type": "pack", "field": "size", "size": [100, 100]}"""),
+    )
+  }
+
+  /** Padding is applied in the finished chart's units, so it is rescaled into the pack's own. */
+  @Test
+  fun `pack padding matches upstream`() {
+    assertEquals(
+      "50,50,50.00000000000001/0 25.716357660545793,50,23.35686860131813/1 " +
+        "74.53661313093197,50,23.103897809840372/1 " +
+        "13.626801782784357,50,8.907823664329023/2 35.803925854488654,50,10.909811348147603/2 " +
+        "61.560578003500964,48.815264127207506,7.714401585741121/2 " +
+        "83.4184117177851,48.815264127207506,11.78394306931535/2 " +
+        "69.06235484490092,63.36819409834665,6.298782518661054/2",
+      circles("""{"type": "pack", "field": "size", "size": [100, 100], "padding": 3}"""),
+    )
+  }
+
+  /**
+   * `radius` reads off the layout node, not the row — so naming a data column gives every circle a
+   * radius of zero. That is upstream's behaviour, matched here rather than corrected, and reported.
+   */
+  @Test
+  fun `pack radius resolves against the node and is reported`() {
+    assertEquals(
+      "50,50,0/0 50,50,0/1 50,50,0/1 50,50,0/2 50,50,0/2 50,50,0/2 50,50,0/2 50,50,0/2",
+      circles("""{"type": "pack", "radius": "size", "size": [100, 100]}"""),
+    )
+    assertTrue(
+      context.diagnostics.diagnostics.any { it.message.contains("read off the layout node") },
+      context.diagnostics.diagnostics.toString(),
+    )
+  }
+
+  /**
+   * The tidy layout puts every node at its own depth and guarantees identical subtrees are drawn
+   * identically; the dendrogram puts every leaf on the last row whatever its depth. Here the tree
+   * is uniform, so the two land within a rounding of each other — which is exactly the case where
+   * the choice does not matter, and worth pinning so a later change to either is visible.
+   */
+  @Test
+  fun `both tree layouts match upstream`() {
+    assertEquals(
+      "46.42857142857143,0/0 21.42857142857143,50/1 71.42857142857143,50/1 " +
+        "14.285714285714286,100/2 28.571428571428573,100/2 57.142857142857146,100/2 " +
+        "71.42857142857143,100/2 85.71428571428572,100/2",
+      circles("""{"type": "tree", "field": "size", "size": [100, 100]}"""),
+    )
+    assertEquals(
+      "46.42857142857143,0/0 21.428571428571427,50/1 71.42857142857143,50/1 " +
+        "14.285714285714285,100/2 28.57142857142857,100/2 57.14285714285714,100/2 " +
+        "71.42857142857143,100/2 85.71428571428571,100/2",
+      circles("""{"type": "tree", "method": "cluster", "size": [100, 100]}"""),
+    )
+  }
+
+  /** `separation` off packs cousins as tightly as siblings, so the five leaves space evenly. */
+  @Test
+  fun `separation off packs cousins as tightly as siblings`() {
+    assertEquals(
+      "45,0/0 20,50/1 70,50/1 10,100/2 30,100/2 50,100/2 70,100/2 90,100/2",
+      circles("""{"type": "tree", "size": [100, 100], "separation": false}"""),
+    )
+  }
+
+  /** `nodeSize` fixes the spacing per node and lets the diagram be whatever size that comes to. */
+  @Test
+  fun `nodeSize sizes the nodes rather than the diagram`() {
+    assertEquals(
+      "0,0/0 -35,30/1 35,30/1 -45,60/2 -25,60/2 15,60/2 35,60/2 55,60/2",
+      circles("""{"type": "tree", "nodeSize": [20, 30]}"""),
+    )
+  }
+
+  @Test
+  fun `an unknown tree method is reported`() {
+    run("""[$STRATIFY, {"type": "tree", "method": "radial", "size": [10, 10]}]""", forest)
+    assertTrue(
+      context.diagnostics.diagnostics.any { it.message.contains("radial") },
       context.diagnostics.diagnostics.toString(),
     )
   }

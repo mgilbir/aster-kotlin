@@ -409,3 +409,121 @@ public object PartitionTransform : Transform {
       true
     }
 }
+
+/**
+ * `pack`: nested circles, each sized by the quantity it holds.
+ *
+ * A leaf's radius is the **square root** of its value, so that area carries the quantity — a radius
+ * proportional to value would square the difference and make a large leaf look far larger than it
+ * is. The same reasoning as a treemap; the difference is that circles cannot tile, so a pack always
+ * wastes space between siblings and is read as grouping rather than as proportion.
+ *
+ * `radius` names a field to size leaves directly instead, in which case nothing is rescaled and the
+ * layout may run outside `size`.
+ */
+public object PackTransform : Transform {
+  override val type: String = "pack"
+
+  /** The names `radius` can actually reach, being the layout node's own properties. */
+  private val NODE_PROPERTIES = listOf("value", "depth", "height", "x", "y", "r")
+
+  /**
+   * Upstream resolves `radius` against the **layout node**, not against the row.
+   *
+   * So it reads the node's own `value`, `depth`, `height`, `x`, `y` or `r`, and any other name
+   * comes back as zero however plainly it names a data column. Matched rather than corrected: a
+   * pack that quietly sized itself differently from Vega would be worse than one that does the
+   * surprising thing and reports it.
+   */
+  private fun radiusAccessor(
+    field: String?,
+    context: TransformContext,
+  ): ((TreeNode) -> Double)? {
+    val name = field?.takeIf { it.isNotEmpty() } ?: return null
+    if (name !in NODE_PROPERTIES) {
+      context.diagnostics.warn(
+        DiagnosticCodes.TRANSFORM_INVALID_PARAMETER,
+        "pack 'radius' names '$name', which is read off the layout node rather than the row; " +
+          "upstream does the same, so every radius came out zero. Only " +
+          "${NODE_PROPERTIES.joinToString(", ")} resolve",
+        operator = type,
+      )
+      return { 0.0 }
+    }
+    return { node -> nodeProperty(node, name) }
+  }
+
+  private fun nodeProperty(node: TreeNode, name: String): Double =
+    when (name) {
+      "value" -> node.value
+      "depth" -> node.depth.toDouble()
+      "height" -> node.height.toDouble()
+      "x" -> node.x
+      "y" -> node.y
+      else -> node.r
+    }
+
+  private val OUTPUTS = listOf(TreeField.X, TreeField.Y, TreeField.R, TreeField.DEPTH)
+
+  private val NAMES = listOf("x", "y", "r", "depth", "children")
+
+  override fun apply(
+    input: List<VegaValue>,
+    params: VegaValue.Obj,
+    context: TransformContext,
+  ): List<VegaValue> =
+    applyTreeLayout(input, params, context, type, OUTPUTS, NAMES) { root ->
+      val (width, height) = sizeOf(params)
+      val radiusField = params.string("radius")?.takeIf { it.isNotEmpty() }
+      val radiusOf = radiusAccessor(params.string("radius"), context)
+      TreeCircles.pack(root, width, height, params.number("padding") ?: 0.0, radiusOf)
+      true
+    }
+}
+
+/**
+ * `tree`: a node-link diagram, either as a tidy tree or as a dendrogram.
+ *
+ * The two methods differ in where the leaves go, and that difference is the whole choice. `tidy`
+ * (Reingold-Tilford, in Buchheim's linear-time form) puts every node at its own depth and
+ * guarantees that identical subtrees are drawn identically wherever they appear — which is what
+ * makes structure comparable by eye. `cluster` puts every **leaf** on the last row whatever its
+ * depth, because in a clustering result the leaves are the things being compared and the interior
+ * nodes are only the joins.
+ *
+ * `size` fits the whole diagram to a box; `nodeSize` fixes the spacing per node instead and lets
+ * the diagram be whatever size that comes to, which is what a scrollable tree wants.
+ */
+public object TreeTransform : Transform {
+  override val type: String = "tree"
+
+  private val OUTPUTS = listOf(TreeField.X, TreeField.Y, TreeField.DEPTH)
+
+  private val NAMES = listOf("x", "y", "depth", "children")
+
+  override fun apply(
+    input: List<VegaValue>,
+    params: VegaValue.Obj,
+    context: TransformContext,
+  ): List<VegaValue> =
+    applyTreeLayout(input, params, context, type, OUTPUTS, NAMES) { root ->
+      val nodeSize = params.numberList("nodeSize").takeIf { it.size >= 2 }?.let { it[0] to it[1] }
+      val (width, height) = sizeOf(params)
+      // `separation` off packs cousins as tightly as siblings, which is what a dense tree wants and
+      // what makes two neighbouring subtrees hard to tell apart.
+      val separate = params.boolean("separation") != false
+      when (val method = params.string("method") ?: "tidy") {
+        "tidy" -> TreeCircles.tidy(root, width, height, nodeSize, separate)
+        "cluster" -> TreeCircles.cluster(root, width, height, nodeSize, separate)
+        else -> {
+          context.diagnostics.error(
+            DiagnosticCodes.TRANSFORM_INVALID_PARAMETER,
+            "tree method '$method' is neither 'tidy' nor 'cluster'",
+            operator = type,
+          )
+          return@applyTreeLayout false
+        }
+      }
+      true
+    }
+}

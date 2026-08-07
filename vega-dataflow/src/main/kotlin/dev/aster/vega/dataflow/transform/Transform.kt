@@ -169,6 +169,8 @@ public class TransformRegistry(transforms: List<Transform>) {
           NestTransform,
           TreemapTransform,
           PartitionTransform,
+          PackTransform,
+          TreeTransform,
         )
       )
   }
