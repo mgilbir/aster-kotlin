@@ -129,7 +129,8 @@ public class MarkEncoder(
         children = contents(datum, index, extent),
         transform = if (x == 0.0 && y == 0.0) Transform2D.Identity else Transform2D.translate(x, y),
         size = size,
-        cornerRadius = number(channels["cornerRadius"], datum) ?: 0.0,
+        cornerRadius =
+          number(channels["cornerRadius"], datum) ?: MarkConfig(spec).number("cornerRadius") ?: 0.0,
         clip = if (spec.clip) RectD(0.0, 0.0, extent.width, extent.height) else null,
         fill = style.fill,
         stroke = style.stroke,
@@ -151,7 +152,8 @@ public class MarkEncoder(
     if (horizontal == null || vertical == null) return null
 
     val style = style(channels, datum, spec)
-    val cornerRadius = number(channels["cornerRadius"], datum) ?: 0.0
+    val cornerRadius =
+      number(channels["cornerRadius"], datum) ?: MarkConfig(spec).number("cornerRadius") ?: 0.0
 
     return RectNode(
       id = ids.allocate(),
@@ -259,7 +261,10 @@ public class MarkEncoder(
       id = ids.allocate(),
       x = x,
       y = y,
-      size = number(channels["size"], datum) ?: MarkDefaults.SYMBOL_SIZE,
+      size =
+        number(channels["size"], datum)
+          ?: MarkConfig(spec).number("size")
+          ?: MarkDefaults.SYMBOL_SIZE,
       shape = shape,
       angleDegrees = number(channels["angle"], datum) ?: 0.0,
       fill = style.fill,
@@ -320,8 +325,14 @@ public class MarkEncoder(
 
     val textStyle =
       TextStyle(
-        fontFamily = string(channels["font"], datum) ?: MarkDefaults.TEXT_FONT_FAMILY,
-        fontSize = number(channels["fontSize"], datum) ?: MarkDefaults.TEXT_FONT_SIZE,
+        fontFamily =
+          string(channels["font"], datum)
+            ?: MarkConfig(spec).text("font")
+            ?: MarkDefaults.TEXT_FONT_FAMILY,
+        fontSize =
+          number(channels["fontSize"], datum)
+            ?: MarkConfig(spec).number("fontSize")
+            ?: MarkDefaults.TEXT_FONT_SIZE,
         fontWeight = fontWeight(channels, datum),
         fontStyle =
           if (string(channels["fontStyle"], datum)?.equals("italic", ignoreCase = true) == true) {
@@ -505,19 +516,30 @@ public class MarkEncoder(
   private data class Style(val fill: Fill?, val stroke: Stroke?, val opacity: Double)
 
   private fun style(channels: EncodeEntry, datum: VegaValue, spec: MarkSpec): Style {
+    val defaults = MarkConfig(spec)
+    // Upstream's pairing rule: a mark that encodes *either* paint channel gets **neither**
+    // default. So a rect outlined with a stroke and no fill is an outline, where checking only
+    // `fill` would have filled it with the built-in blue.
+    val paintsItself = channels["fill"] != null || channels["stroke"] != null
     val fillColour =
       paint(channels["fill"], datum, "fill", spec)
-        ?: MarkDefaults.fillFor(spec.type).takeIf { channels["fill"] == null }
+        ?: defaults.colour("fill", MarkDefaults.fillFor(spec.type)).takeIf { !paintsItself }
     val strokeColour =
       paint(channels["stroke"], datum, "stroke", spec)
-        ?: MarkDefaults.strokeFor(spec.type).takeIf { channels["stroke"] == null }
-    val fillOpacity = number(channels["fillOpacity"], datum) ?: 1.0
-    val strokeOpacity = number(channels["strokeOpacity"], datum) ?: 1.0
+        ?: defaults.colour("stroke", MarkDefaults.strokeFor(spec.type)).takeIf { !paintsItself }
+    val fillOpacity =
+      number(channels["fillOpacity"], datum) ?: defaults.number("fillOpacity") ?: 1.0
+    val strokeOpacity =
+      number(channels["strokeOpacity"], datum) ?: defaults.number("strokeOpacity") ?: 1.0
     val strokeWidth =
-      number(channels["strokeWidth"], datum) ?: MarkDefaults.strokeWidthFor(spec.type)
-    val strokeDash = numberList(channels["strokeDash"], datum) ?: emptyList()
-    val cap = strokeCap(string(channels["strokeCap"], datum), spec)
-    val join = strokeJoin(string(channels["strokeJoin"], datum), spec)
+      number(channels["strokeWidth"], datum)
+        ?: defaults.number("strokeWidth")
+        ?: MarkDefaults.strokeWidthFor(spec.type)
+    val strokeDash =
+      numberList(channels["strokeDash"], datum) ?: defaults.numbers("strokeDash") ?: emptyList()
+    val cap = strokeCap(string(channels["strokeCap"], datum) ?: defaults.text("strokeCap"), spec)
+    val join =
+      strokeJoin(string(channels["strokeJoin"], datum) ?: defaults.text("strokeJoin"), spec)
 
     return Style(
       fill = fillColour?.let { Fill(ScenePaint.Solid(it), fillOpacity) },
@@ -532,8 +554,39 @@ public class MarkEncoder(
             dashArray = strokeDash,
           )
         },
-      opacity = number(channels["opacity"], datum) ?: 1.0,
+      opacity = number(channels["opacity"], datum) ?: defaults.number("opacity") ?: 1.0,
     )
+  }
+
+  /**
+   * A mark's `config` defaults, resolved either side of the engine's built-in per-type block.
+   *
+   * `config.mark` loses to the built-ins and `config.{marktype}` plus the mark's `style` blocks
+   * beat them. That ordering is upstream's and is not what the names suggest: it is why setting
+   * `config.mark.fill` leaves a rect blue and setting `config.rect.fill` recolours it — the default
+   * configuration already fills `config.rect` in.
+   */
+  private class MarkConfig(spec: MarkSpec) {
+    private val below = spec.configBelowDefaults
+    private val above = spec.configAboveDefaults
+
+    fun colour(key: String, builtin: SceneColor?): SceneColor? =
+      above[key]?.let { SceneColor.parse(it.asString()) }
+        ?: builtin
+        ?: below[key]?.let { SceneColor.parse(it.asString()) }
+
+    fun number(key: String): Double? = value(key)?.asDouble()?.takeIf { !it.isNaN() }
+
+    fun text(key: String): String? = value(key)?.takeIf { it is VegaValue.Str }?.asString()
+
+    fun numbers(key: String): List<Double>? =
+      (value(key) as? VegaValue.Arr)
+        ?.values
+        ?.map { it.asDouble() }
+        ?.takeIf { list -> list.isNotEmpty() && list.all { it.isFinite() } }
+
+    /** For everything but the paints there is no built-in in between, so the two just stack. */
+    private fun value(key: String): VegaValue? = above[key] ?: below[key]
   }
 
   private fun strokeCap(name: String?, spec: MarkSpec): StrokeCap =

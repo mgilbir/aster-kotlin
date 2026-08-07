@@ -6,6 +6,7 @@ import dev.aster.vega.scene.ScenePaint
 import dev.aster.vega.scene.TextNode
 import dev.aster.vega.scene.flatten
 import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertNull
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 
@@ -175,6 +176,82 @@ class ConfigTest {
     )
   }
 
+  // ---- marks ----------------------------------------------------------------
+
+  private fun rectStyle(config: String, mark: String = "", encode: String = "") =
+    SpecCompiler()
+      .compileJson(
+        """
+        {
+          "width": 100, "height": 60, "padding": 0,
+          "config": $config,
+          "data": [{"name": "t", "values": [{"v": 1}]}],
+          "marks": [{"type": "rect"$mark, "from": {"data": "t"}, "encode": {"enter": {
+            "x": {"value": 0}, "width": {"value": 10},
+            "y": {"value": 0}, "height": {"value": 10}$encode}}}]
+        }
+        """
+          .trimIndent()
+      )
+      .scene!!
+      .flatten()
+      .map { it.node }
+      .filterIsInstance<dev.aster.vega.scene.RectNode>()
+      .first { it.metadata.role == "mark" }
+
+  /**
+   * `config.mark` sits **below** the engine's built-in per-type defaults and `config.{marktype}`
+   * sits above them, which is not what the names suggest. Upstream's own default configuration
+   * fills `config.rect` in with the blue, so `config.mark.fill` never reaches a rect and
+   * `config.rect.fill` does.
+   */
+  @Test
+  fun `config mark loses to the built-in type default and config rect beats it`() {
+    assertEquals("#4c78a8", colourOf(rectStyle("{}").fill!!.paint))
+    assertEquals("#4c78a8", colourOf(rectStyle("""{"mark": {"fill": "#123456"}}""").fill!!.paint))
+    assertEquals(
+      "#654321",
+      colourOf(
+        rectStyle("""{"mark": {"fill": "#123456"}, "rect": {"fill": "#654321"}}""").fill!!.paint
+      ),
+    )
+  }
+
+  /** Where there is no built-in in between, `config.mark` applies straight through. */
+  @Test
+  fun `config mark applies where the type has no built-in of its own`() {
+    val styled = rectStyle("""{"mark": {"stroke": "#334455", "strokeWidth": 3}}""")
+    assertEquals("#334455", colourOf(styled.stroke!!.paint))
+    assertEquals(3.0, styled.stroke!!.width)
+  }
+
+  /**
+   * Upstream's pairing rule: a mark that encodes *either* paint channel gets **neither** default. A
+   * rect outlined with a stroke and no fill is an outline — checking only `fill`, as this engine
+   * did, filled it with the built-in blue instead.
+   */
+  @Test
+  fun `encoding one paint channel suppresses the default for both`() {
+    val outlined = rectStyle("{}", encode = """, "stroke": {"value": "#224466"}""")
+    assertNull(outlined.fill, "a stroked rect must not pick up the built-in fill")
+    assertEquals("#224466", colourOf(outlined.stroke!!.paint))
+
+    val filled = rectStyle("{}", encode = """, "fill": {"value": "#00ff00"}""")
+    assertEquals("#00ff00", colourOf(filled.fill!!.paint))
+  }
+
+  /** A named style beats the type block, and a later style beats an earlier one. */
+  @Test
+  fun `a mark opts into a config style by name`() {
+    val config =
+      """{"rect": {"fill": "#111111"},
+          "style": {"a": {"fill": "#aaaaaa"}, "b": {"fill": "#bbbbbb", "cornerRadius": 5}}}"""
+    assertEquals("#aaaaaa", colourOf(rectStyle(config, mark = """, "style": "a"""").fill!!.paint))
+    val both = rectStyle(config, mark = """, "style": ["a", "b"]""")
+    assertEquals("#bbbbbb", colourOf(both.fill!!.paint))
+    assertEquals(5.0, both.cornerRadius)
+  }
+
   // ---- what is still reported -----------------------------------------------
 
   /**
@@ -184,10 +261,10 @@ class ConfigTest {
   @Test
   fun `config blocks that do not reach the chart are reported`() {
     val diagnostics =
-      compile("""{"mark": {"fill": "#123456"}, "rect": {"stroke": "#000"}, "range": {}}""")
-        .diagnostics
-        .filter { it.code == DiagnosticCodes.PARSE_UNKNOWN_PROPERTY }
-    for (name in listOf("mark", "rect", "range")) {
+      compile("""{"range": {}, "group": {"fill": "#eee"}, "projection": {}}""").diagnostics.filter {
+        it.code == DiagnosticCodes.PARSE_UNKNOWN_PROPERTY
+      }
+    for (name in listOf("range", "group", "projection")) {
       assertTrue(
         diagnostics.any { it.jsonPath == "$.config.$name" },
         "$name not reported in $diagnostics",
@@ -195,13 +272,13 @@ class ConfigTest {
     }
   }
 
+  /**
+   * A style block reaches a mark through the mark's own `style` property, so an unused one is not a
+   * gap — it is a style nothing opted into, exactly as upstream leaves it.
+   */
   @Test
-  fun `a style nothing reads is reported by name`() {
-    val diagnostics = compile("""{"style": {"point": {"size": 30}}}""").diagnostics
-    assertTrue(
-      diagnostics.any { it.jsonPath == "$.config.style.point" },
-      diagnostics.toString(),
-    )
+  fun `a style nothing names is simply unused`() {
+    assertTrue(compile("""{"style": {"point": {"size": 30}}}""").diagnostics.isEmpty())
   }
 
   @Test

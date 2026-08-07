@@ -28,6 +28,18 @@ private val MULTI_FIELD_SORT_OPS = listOf("count", "min", "max")
  */
 private val CONFIG_HONOURED =
   setOf(
+    "mark",
+    "rect",
+    "symbol",
+    "line",
+    "area",
+    "rule",
+    "text",
+    "arc",
+    "path",
+    "image",
+    "trail",
+    "shape",
     "axis",
     "axisX",
     "axisY",
@@ -38,11 +50,6 @@ private val CONFIG_HONOURED =
     "axisBand",
     "legend",
   )
-
-/**
- * Guide text defaults live here; a mark style needs the mark `style` property, which is reported.
- */
-private val CONFIG_HONOURED_STYLES = setOf("guide-label", "guide-title")
 
 /**
  * Axis properties this engine reads.
@@ -439,17 +446,6 @@ public class SpecParser {
               "theme setting it will not reach the chart",
             jsonPath = "$.config.$key",
           )
-      }
-    }
-    (blocks["style"])?.let { style ->
-      for (name in style.fields.keys) {
-        if (name in CONFIG_HONOURED_STYLES) continue
-        diagnostics.warn(
-          DiagnosticCodes.PARSE_UNKNOWN_PROPERTY,
-          "Config style '$name' is not implemented; only the guide label and title styles are " +
-            "read, since marks do not carry a style name here",
-          jsonPath = "$.config.style.$name",
-        )
       }
     }
     return GuideConfig(blocks)
@@ -1218,6 +1214,8 @@ public class SpecParser {
     if (type == MarkType.GROUP) reportUnsupportedGroupScope(obj, path)
     obj.reportUnhandled("Mark", path, MARK_CONSUMED)
 
+    val (below, above) = config.markDefaults(typeName.lowercase(), markStyles(obj))
+
     return MarkSpec(
       type = type,
       name = obj.fields["name"]?.asString(),
@@ -1237,8 +1235,18 @@ public class SpecParser {
       zindex = (obj.fields["zindex"] as? VegaValue.Num)?.value?.toInt() ?: 0,
       interactive = obj.fields["interactive"]?.asBoolean() ?: true,
       clip = obj.fields["clip"]?.asBoolean() ?: false,
+      configBelowDefaults = below.fields,
+      configAboveDefaults = above.fields,
     )
   }
+
+  /** A mark's `style`, which names `config.style` blocks and accepts one or several. */
+  private fun markStyles(obj: VegaValue.Obj): List<String> =
+    when (val style = obj.fields["style"]) {
+      is VegaValue.Str -> listOf(style.value)
+      is VegaValue.Arr -> style.values.map { it.asString() }
+      else -> emptyList()
+    }
 
   /**
    * Parses `from.facet`.

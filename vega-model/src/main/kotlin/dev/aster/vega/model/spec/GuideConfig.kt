@@ -50,6 +50,27 @@ public class GuideConfig(private val blocks: Map<String, VegaValue.Obj>) {
     if (band) add(block("axisBand"))
   }
 
+  /**
+   * A mark's defaults, split either side of the engine's own built-in per-type block.
+   *
+   * Upstream resolves them as `extend({}, config.mark, config[type])` and then the mark's `style`
+   * names in order — but its *default* configuration already fills `config[type]` in, with a rect's
+   * blue and a symbol's size of 64. So `config.mark` sits **below** those built-ins and everything
+   * else sits above, which is why setting `config.mark.fill` does not recolour a rect and setting
+   * `config.rect.fill` does.
+   *
+   * @return the block that loses to the built-ins, then the one that beats them.
+   */
+  public fun markDefaults(type: String, styles: List<String>): Pair<VegaValue.Obj, VegaValue.Obj> {
+    val above = LinkedHashMap<String, VegaValue>()
+    above.putAll(block(type).fields)
+    for (name in styles) above.putAll(styleBlock(name).fields)
+    return block("mark") to VegaValue.Obj(above)
+  }
+
+  /** A named `config.style` block, which a mark opts into through its own `style` property. */
+  public fun styleBlock(name: String): VegaValue.Obj = style(name)
+
   /** A legend has one block, over the same guide styles. */
   public fun legendDefaults(): List<VegaValue.Obj> = listOf(guideStyleDefaults(), block("legend"))
 

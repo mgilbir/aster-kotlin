@@ -163,6 +163,11 @@ function record(type, role, item, dx, dy, precision) {
   // swatch carries a width that paints nothing. This engine has no way to say "a width with no
   // stroke", and would not want one, so drop the width when there is nothing to draw it with.
   if (entry.strokeWidth !== undefined && entry.stroke === undefined) delete entry.strokeWidth;
+  // Same reasoning for the opacities. Vega carries `fillOpacity` on an item whether or not it has a
+  // fill, and this engine's scene graph puts the opacity *on* the fill, so an unfilled mark has
+  // nowhere to keep one. Nothing is drawn differently either way.
+  if (entry.fillOpacity !== undefined && entry.fill === undefined) delete entry.fillOpacity;
+  if (entry.strokeOpacity !== undefined && entry.stroke === undefined) delete entry.strokeOpacity;
   const dash = dashOf(item);
   if (dash !== undefined) entry.strokeDash = dash;
   // A symbol's `size` channel says nothing about the outline it actually draws, and Vega ships its own

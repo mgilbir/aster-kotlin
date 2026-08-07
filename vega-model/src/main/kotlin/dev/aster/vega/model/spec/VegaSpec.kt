@@ -705,4 +705,13 @@ public data class MarkSpec(
   val zindex: Int = 0,
   val interactive: Boolean = true,
   val clip: Boolean = false,
+  /**
+   * Appearance defaults from `config`, either side of the engine's own built-in per-type block.
+   *
+   * Two maps rather than one because the built-ins sit between them: `config.mark` loses to a
+   * rect's blue and `config.rect` beats it, which is upstream's ordering and is not what the names
+   * suggest.
+   */
+  val configBelowDefaults: Map<String, VegaValue> = emptyMap(),
+  val configAboveDefaults: Map<String, VegaValue> = emptyMap(),
 )
