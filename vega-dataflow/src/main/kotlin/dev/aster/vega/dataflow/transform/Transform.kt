@@ -142,6 +142,7 @@ public class TransformRegistry(transforms: List<Transform>) {
           CountPatternTransform,
           QuantileTransform,
           RegressionTransform,
+          LoessTransform,
         )
       )
   }

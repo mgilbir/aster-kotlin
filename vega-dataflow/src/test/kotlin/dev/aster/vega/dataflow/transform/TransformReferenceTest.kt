@@ -507,7 +507,7 @@ class TransformReferenceTest {
   }
 
   @Test
-  fun `the registry covers the transforms the brief lists, plus eleven more`() {
+  fun `the registry covers the transforms the brief lists, plus twelve more`() {
     val fromTheBrief =
       setOf(
         "filter",
@@ -529,8 +529,8 @@ class TransformReferenceTest {
     // moving average all are; `sequence` is how a specification draws a function with no data to
     // bind to; `lookup` is the only join there is; and `impute` is what stops a line jumping the
     // gap where a series has no row. `cross`, `pivot` and `countpattern` are the reshaping three:
-    // a matrix, a long table made wide, and the word counts a cloud is drawn from. `quantile` and
-    // `regression` are the first two of the statistical family.
+    // a matrix, a long table made wide, and the word counts a cloud is drawn from. `quantile`,
+    // `regression` and `loess` are the statistical family.
     assertEquals(
       fromTheBrief +
         "timeunit" +
@@ -543,7 +543,8 @@ class TransformReferenceTest {
         "pivot" +
         "countpattern" +
         "quantile" +
-        "regression",
+        "regression" +
+        "loess",
       TransformRegistry.Default.types,
     )
   }
@@ -1003,19 +1004,132 @@ class TransformReferenceTest {
     )
   }
 
+  private val curvy =
+    """
+    [{"x": 1, "y": 2}, {"x": 2, "y": 5}, {"x": 3, "y": 11}, {"x": 4, "y": 21},
+     {"x": 5, "y": 34}, {"x": 6, "y": 52}, {"x": 7, "y": 71}, {"x": 8, "y": 99}]
+    """
+      .trimIndent()
+
+  private fun coefficients(method: String, extra: String = ""): String =
+    run(
+      """[{"type": "regression", "x": "x", "y": "y", "method": "$method", "params": true$extra}]""",
+      curvy,
+    )
+
   /**
-   * A curved fit is sampled adaptively upstream, subdividing wherever the direction turns by more
-   * than half a degree. A grid would be visibly coarser exactly where the curvature is, so the
-   * method is reported rather than approximated.
+   * Every method's coefficients, against upstream. What each pair *means* differs by method, and
+   * the shape of the list is the only clue: `pow` reports a multiplier and an exponent rather than
+   * an intercept and a slope, and the polynomials report their terms from the constant upward.
    */
   @Test
-  fun `a curved regression method is reported rather than approximated`() {
-    val output = run("""[{"type": "regression", "x": "x", "y": "y", "method": "log"}]""", scatter)
+  fun `each regression method reports its own kind of coefficients`() {
+    assertEquals("""[{"coef":[36.875],"rSquared":0}]""", coefficients("constant"))
+    assertEquals(
+      """[{"coef":[-18.827471327599483,42.02135381282752],"rSquared":0.726756178797916}]""",
+      coefficients("log"),
+    )
+    assertEquals(
+      """[{"coef":[3.456988384045931,0.4298715892180333],"rSquared":0.9806420833787446}]""",
+      coefficients("exp"),
+    )
+    assertEquals(
+      """[{"coef":[1.5884436383130596,1.921653211967671],"rSquared":0.9771828870809403}]""",
+      coefficients("pow"),
+    )
+    assertEquals(
+      """[{"coef":[4.017857142857139,-3.458333333333334,1.8988095238095237],""" +
+        """"rSquared":0.9993541765255546}]""",
+      coefficients("quad"),
+    )
+    assertEquals(
+      """[{"coef":[1.1428571428571672,-0.4671717171717553,1.114718614718624,""" +
+        """0.05808080808080738],"rSquared":0.9995923010228036}]""",
+      coefficients("poly", ""","order": 3"""),
+    )
+  }
+
+  /** A constant fit is a horizontal line, so it needs two endpoints like a linear one. */
+  @Test
+  fun `a constant fit is the mean of y, drawn end to end`() {
+    assertEquals(
+      """[{"x":1,"y":36.875},{"x":8,"y":36.875}]""",
+      run("""[{"type": "regression", "x": "x", "y": "y", "method": "constant"}]""", curvy),
+    )
+  }
+
+  /**
+   * The adaptive sampler, which is the point of this test rather than the quadratic.
+   *
+   * Note the spacing: 0.07 apart where the curve is turning near x = 1, widening to 0.28 by the
+   * time it has straightened out at x = 8. A uniform grid of the same 48 points would have put them
+   * 0.15 apart everywhere, and the bend is where that shows.
+   */
+  @Test
+  fun `a curved fit is sampled where it bends, not on a grid`() {
+    val output = run("""[{"type": "regression", "x": "x", "y": "y", "method": "quad"}]""", curvy)
+    val points = output.split("},{")
+    assertEquals(48, points.size)
+    assertTrue(output.startsWith("""[{"x":1,"y":2.4583333333333286},{"x":1.07,"""), output.take(60))
     assertTrue(
-      context.diagnostics.diagnostics.any { it.message.contains("log") },
+      output.endsWith("""{"x":7.72,"y":90.48553333333334},{"x":8,"y":97.875}]"""),
+      output.takeLast(60),
+    )
+  }
+
+  @Test
+  fun `a log fit is sampled the same way`() {
+    val output = run("""[{"type": "regression", "x": "x", "y": "y", "method": "log"}]""", scatter)
+    assertEquals(35, output.split("},{").size)
+    assertTrue(output.startsWith("""[{"x":1,"y":1.0813382366396915}"""), output.take(50))
+    assertTrue(output.endsWith("""{"x":6,"y":10.752485834986695}]"""), output.takeLast(40))
+  }
+
+  /** Fitting a curve to no more points than it has parameters would say nothing; upstream skips. */
+  @Test
+  fun `a group with no more points than parameters is skipped`() {
+    val two = """[{"x": 1, "y": 2}, {"x": 2, "y": 5}]"""
+    assertEquals(
+      "[]",
+      run("""[{"type": "regression", "x": "x", "y": "y", "method": "quad"}]""", two),
+    )
+    assertTrue(
+      context.diagnostics.diagnostics.any { it.message.contains("more parameters than data") },
       context.diagnostics.diagnostics.toString(),
     )
-    // The data is left alone rather than replaced by a wrong curve.
-    assertTrue(output.contains(""""x":1"""), output)
+  }
+
+  @Test
+  fun `an unknown regression method is reported`() {
+    run("""[{"type": "regression", "x": "x", "y": "y", "method": "cubic"}]""", scatter)
+    assertTrue(
+      context.diagnostics.diagnostics.any { it.message.contains("cubic") },
+      context.diagnostics.diagnostics.toString(),
+    )
+  }
+
+  // ---- loess ----------------------------------------------------------------
+
+  /**
+   * A local fit over a wide window smooths; over a narrow one it does not.
+   *
+   * The default bandwidth of 0.3 across eight points gives a window of two, and a straight line
+   * through two points passes through both — so the "smoothed" output is the input exactly. That is
+   * not a bug and it is worth pinning: a loess with too small a bandwidth silently does nothing.
+   */
+  @Test
+  fun `loess smooths only as far as its bandwidth reaches`() {
+    assertEquals(
+      """[{"x":1,"y":2},{"x":2,"y":5},{"x":3,"y":11},{"x":4,"y":21},{"x":5,"y":34},""" +
+        """{"x":6,"y":52},{"x":7,"y":71},{"x":8,"y":99}]""",
+      run("""[{"type": "loess", "x": "x", "y": "y"}]""", curvy),
+    )
+    assertEquals(
+      """[{"x":1,"y":1.6605545158476431},{"x":2,"y":5.858431622822565},""" +
+        """{"x":3,"y":12.168605655250985},{"x":4,"y":21.82788783657626},""" +
+        """{"x":5,"y":35.51686928081588},{"x":6,"y":52.22088818332823},""" +
+        """{"x":7,"y":74.33942427425657},{"x":8,"y":98.31241958028772}]""",
+      run("""[{"type": "loess", "x": "x", "y": "y", "bandwidth": 0.6}]""", curvy),
+    )
   }
 }

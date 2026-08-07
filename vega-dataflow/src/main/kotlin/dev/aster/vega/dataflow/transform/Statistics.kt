@@ -74,20 +74,26 @@ public object QuantileTransform : Transform {
 }
 
 /**
- * `regression`: a fitted line through a scatter, which is what a trend line is.
+ * `regression`: a fitted trend through a scatter.
  *
- * A linear fit needs only its two endpoints, because a line between them is the line — which is why
- * the output is two rows and not a sampled curve. Every other method upstream offers is a curve,
- * and upstream samples those **adaptively**, subdividing wherever the direction turns by more than
- * half a degree. That sampler is a separate algorithm and its output is not the evenly-spaced grid
- * a reader would assume, so the curved methods are reported by name rather than approximated with a
- * grid that would be visibly coarser in exactly the places curvature matters.
+ * The seven methods divide by how their output is produced, not by how they are fitted. A `linear`
+ * or `constant` fit comes back as its **two endpoints**, because a straight line between them is
+ * the line and a hundred points would draw the same picture. Everything curved — `log`, `exp`,
+ * `pow`, `quad`, `poly` — is instead handed to [CurveSampler], which places points where the curve
+ * bends rather than on a grid, so the number of rows depends on the data and not on a parameter.
  *
- * `params` swaps the fitted points for the fit itself: `coef` as `[intercept, slope]` and the
- * `rSquared` that says how much of the variance it explains.
+ * `params` swaps the fitted points for the fit itself: `coef` in the form each method reports (an
+ * intercept and a slope; for `pow`, a multiplier and an exponent; for `quad` and `poly`, the
+ * polynomial's terms from the constant upward) and the `rSquared` that says how much of the
+ * variance it accounts for.
+ *
+ * A group with no more points than the fit has parameters is **skipped with a warning** rather than
+ * fitted, since such a fit passes exactly through its data and means nothing.
  */
 public object RegressionTransform : Transform {
   override val type: String = "regression"
+
+  private val METHODS = setOf("constant", "linear", "log", "exp", "pow", "quad", "poly")
 
   override fun apply(
     input: List<VegaValue>,
@@ -105,11 +111,10 @@ public object RegressionTransform : Transform {
       return input
     }
     val method = params.string("method") ?: "linear"
-    if (!method.equals("linear", ignoreCase = true)) {
+    if (method !in METHODS) {
       context.diagnostics.error(
-        DiagnosticCodes.TRANSFORM_NOT_IMPLEMENTED,
-        "regression method '$method' is not implemented; it is a curve, and upstream samples one " +
-          "adaptively rather than on a grid, so no fitted points were produced",
+        DiagnosticCodes.TRANSFORM_INVALID_PARAMETER,
+        "regression method '$method' is not one of ${METHODS.sorted().joinToString(", ")}",
         operator = type,
       )
       return input
@@ -117,87 +122,124 @@ public object RegressionTransform : Transform {
 
     val groupBy = params.stringList("groupby")
     val wantParams = params.boolean("params") ?: false
-    val extent = params.numberList("extent").takeIf { it.size >= 2 }
+    val order = params.number("order")?.toInt() ?: 3
+    val names = params.stringList("as")
+    val xName = names.getOrNull(0)?.takeIf { it.isNotEmpty() } ?: xField
+    val yName = names.getOrNull(1)?.takeIf { it.isNotEmpty() } ?: yField
+    val dof = RegressionFits.degreesOfFreedom(method, order)
+
+    var extent = params.numberList("extent").takeIf { it.size >= 2 }
+    if (extent != null && method == "log" && extent[0] <= 0.0) {
+      // A logarithm has nothing to say below zero, so the extent is dropped rather than producing
+      // a run of NaN the chart would silently omit.
+      context.diagnostics.warn(
+        DiagnosticCodes.TRANSFORM_INVALID_PARAMETER,
+        "ignoring an extent starting at or below zero for a log regression",
+        operator = type,
+      )
+      extent = null
+    }
+
+    return groupTuples(input, groupBy).flatMap { (groupKey, rows) ->
+      val points = numericPairs(rows, xField, yField)
+      if (points.size <= dof) {
+        context.diagnostics.warn(
+          DiagnosticCodes.TRANSFORM_INVALID_PARAMETER,
+          "skipping a regression with more parameters than data points",
+          operator = type,
+        )
+        return@flatMap emptyList()
+      }
+      val model = RegressionFits.fit(method, points, order) ?: return@flatMap emptyList()
+      val prefix = LinkedHashMap<String, VegaValue>(groupBy.size)
+      groupBy.forEachIndexed { index, path -> prefix[path] = groupKey[index] }
+
+      if (wantParams) {
+        listOf(
+          VegaValue.Obj(
+            prefix +
+              mapOf(
+                "coef" to VegaValue.Arr(model.coef.map { VegaValue.Num(it) }),
+                "rSquared" to VegaValue.Num(model.rSquared),
+              )
+          )
+        )
+      } else {
+        val low = extent?.get(0) ?: points.minOf { it[0] }
+        val high = extent?.get(1) ?: points.maxOf { it[0] }
+        val sampled =
+          if (method == "linear" || method == "constant") {
+            listOf(doubleArrayOf(low, model.predict(low)), doubleArrayOf(high, model.predict(high)))
+          } else {
+            CurveSampler.sample(model.predict, low, high, minSteps = 25, maxSteps = 200)
+          }
+        sampled.map { p ->
+          VegaValue.Obj(prefix + mapOf(xName to VegaValue.Num(p[0]), yName to VegaValue.Num(p[1])))
+        }
+      }
+    }
+  }
+}
+
+/**
+ * `loess`: a smooth trend with no equation behind it.
+ *
+ * Where `regression` fits one curve to everything, this fits a **separate weighted straight line at
+ * every point** over its nearest neighbours, and joins the answers up. That is what lets it follow
+ * a shape no formula describes — and equally what stops the result from having coefficients to
+ * report, which is why there is no `params` here.
+ *
+ * `bandwidth` is the fraction of the data each local fit sees, 0.3 by default. Small values chase
+ * noise; large ones approach the straight line `regression` would have drawn.
+ */
+public object LoessTransform : Transform {
+  override val type: String = "loess"
+
+  override fun apply(
+    input: List<VegaValue>,
+    params: VegaValue.Obj,
+    context: TransformContext,
+  ): List<VegaValue> {
+    val xField = params.string("x")
+    val yField = params.string("y")
+    if (xField.isNullOrEmpty() || yField.isNullOrEmpty()) {
+      context.diagnostics.error(
+        DiagnosticCodes.TRANSFORM_INVALID_PARAMETER,
+        "loess needs 'x' and 'y'",
+        operator = type,
+      )
+      return input
+    }
+    val groupBy = params.stringList("groupby")
+    val bandwidth = params.number("bandwidth")?.takeIf { it > 0.0 } ?: 0.3
     val names = params.stringList("as")
     val xName = names.getOrNull(0)?.takeIf { it.isNotEmpty() } ?: xField
     val yName = names.getOrNull(1)?.takeIf { it.isNotEmpty() } ?: yField
 
     return groupTuples(input, groupBy).flatMap { (groupKey, rows) ->
-      val points =
-        rows
-          .map { it.field(xField).asDouble() to it.field(yField).asDouble() }
-          .filter { it.first.isFinite() && it.second.isFinite() }
-      if (points.size < 2) {
-        emptyList()
-      } else {
-        val fit = leastSquares(points)
-        val prefix = LinkedHashMap<String, VegaValue>(groupBy.size)
-        groupBy.forEachIndexed { index, path -> prefix[path] = groupKey[index] }
-        if (wantParams) {
-          listOf(
-            VegaValue.Obj(
-              prefix +
-                mapOf(
-                  "coef" to
-                    VegaValue.Arr(listOf(VegaValue.Num(fit.intercept), VegaValue.Num(fit.slope))),
-                  "rSquared" to VegaValue.Num(fit.rSquared),
-                )
-            )
-          )
-        } else {
-          val low = extent?.get(0) ?: points.minOf { it.first }
-          val high = extent?.get(1) ?: points.maxOf { it.first }
-          listOf(low, high).map { x ->
-            VegaValue.Obj(
-              prefix +
-                mapOf(
-                  xName to VegaValue.Num(x),
-                  yName to VegaValue.Num(fit.intercept + fit.slope * x),
-                )
-            )
-          }
-        }
+      val points = numericPairs(rows, xField, yField)
+      if (points.isEmpty()) return@flatMap emptyList()
+      val prefix = LinkedHashMap<String, VegaValue>(groupBy.size)
+      groupBy.forEachIndexed { index, path -> prefix[path] = groupKey[index] }
+      RegressionFits.loess(points, bandwidth).map { p ->
+        VegaValue.Obj(prefix + mapOf(xName to VegaValue.Num(p[0]), yName to VegaValue.Num(p[1])))
       }
     }
   }
-
-  private class Fit(val intercept: Double, val slope: Double, val rSquared: Double)
-
-  /**
-   * Ordinary least squares in upstream's own arithmetic.
-   *
-   * The four moments are accumulated as **running means** — `X += (x - X) / n` — rather than as
-   * sums divided at the end, and the slope comes from those rather than from mean-centred
-   * deviations. The two are algebraically the same and differ in the last bits of a double, which
-   * is enough to miss a reference vector by 1e-14; the same lesson d3's interpolation taught.
-   */
-  private fun leastSquares(points: List<Pair<Double, Double>>): Fit {
-    var meanX = 0.0
-    var meanY = 0.0
-    var meanXY = 0.0
-    var meanX2 = 0.0
-    var n = 0
-    for ((x, y) in points) {
-      n++
-      meanX += (x - meanX) / n
-      meanY += (y - meanY) / n
-      meanXY += (x * y - meanXY) / n
-      meanX2 += (x * x - meanX2) / n
-    }
-
-    val delta = meanX2 - meanX * meanX
-    // Upstream's own guard: a vertical scatter has no slope rather than an infinite one.
-    val slope = if (kotlin.math.abs(delta) < 1e-24) 0.0 else (meanXY - meanX * meanY) / delta
-    val intercept = meanY - slope * meanX
-
-    var sse = 0.0
-    var sst = 0.0
-    for ((x, y) in points) {
-      val residual = y - (intercept + slope * x)
-      val deviation = y - meanY
-      sse += residual * residual
-      sst += deviation * deviation
-    }
-    return Fit(intercept, slope, 1.0 - sse / sst)
-  }
 }
+
+/**
+ * The rows a fit will see, as `[x, y]` pairs.
+ *
+ * A row is dropped when either value is **not a number** — which upstream writes as `(u = +u) >= u`
+ * and is false only for NaN. An infinity survives that test and reaches the fit, so a column
+ * holding one produces an unusable model rather than a plausible one fitted to the rest.
+ */
+internal fun numericPairs(
+  rows: List<VegaValue>,
+  xField: String,
+  yField: String,
+): List<DoubleArray> =
+  rows
+    .map { doubleArrayOf(it.field(xField).asDouble(), it.field(yField).asDouble()) }
+    .filterNot { it[0].isNaN() || it[1].isNaN() }
