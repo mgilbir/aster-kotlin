@@ -42,6 +42,7 @@ class TransformReferenceTest {
     override val expressions: ExpressionCompiler =
       CachingExpressionCompiler(VegaExpressionCompiler())
     val signals = LinkedHashMap<String, VegaValue>()
+    val tables = LinkedHashMap<String, List<VegaValue>>()
 
     override val scope: ExpressionScope = scopeFor(VegaValue.Null)
 
@@ -55,7 +56,7 @@ class TransformReferenceTest {
 
         override fun signal(name: String): VegaValue = signals[name] ?: VegaValue.Null
 
-        override fun dataset(name: String): List<VegaValue> = emptyList()
+        override fun dataset(name: String): List<VegaValue> = tables[name] ?: emptyList()
       }
   }
 
@@ -506,7 +507,7 @@ class TransformReferenceTest {
   }
 
   @Test
-  fun `the registry covers the transforms the brief lists, plus three more`() {
+  fun `the registry covers the transforms the brief lists, plus five more`() {
     val fromTheBrief =
       setOf(
         "filter",
@@ -522,12 +523,12 @@ class TransformReferenceTest {
         "fold",
         "flatten",
       )
-    // Three are not on the brief's list. `timeunit` is the date half of `bin`, `pie` turns a column
-    // of numbers into the angles an arc mark needs, and `window` is what a running total, a rank
-    // and a moving average all are — the commonest thing a specification asks for that no other
-    // transform can express.
+    // Five are not on the brief's list. `timeunit` is the date half of `bin`; `pie` turns a column
+    // of numbers into the angles an arc mark needs; `window` is what a running total, a rank and a
+    // moving average all are; `sequence` is how a specification draws a function with no data to
+    // bind to; and `lookup` is the only join there is.
     assertEquals(
-      fromTheBrief + "timeunit" + "pie" + "window",
+      fromTheBrief + "timeunit" + "pie" + "window" + "sequence" + "lookup",
       TransformRegistry.Default.types,
     )
   }
@@ -661,6 +662,93 @@ class TransformReferenceTest {
     assertTrue(
       context.diagnostics.diagnostics.any { it.message.contains("nonesuch") },
       context.diagnostics.diagnostics.toString(),
+    )
+  }
+
+  // ---- sequence, lookup -----------------------------------------------------
+
+  /** `stop` is exclusive, so this is five rows and not six, and the field is named `data`. */
+  @Test
+  fun `sequence generates rows from nothing`() {
+    assertEquals(
+      """[{"data":0},{"data":1},{"data":2},{"data":3},{"data":4}]""",
+      run("""[{"type": "sequence", "start": 0, "stop": 5}]""", "[]"),
+    )
+    assertEquals(
+      """[{"data":1},{"data":3},{"data":5},{"data":7},{"data":9}]""",
+      run("""[{"type": "sequence", "start": 1, "stop": 10, "step": 2}]""", "[]"),
+    )
+    assertEquals(
+      """[{"x":0},{"x":1},{"x":2}]""",
+      run("""[{"type": "sequence", "start": 0, "stop": 3, "as": "x"}]""", "[]"),
+    )
+  }
+
+  @Test
+  fun `sequence counts backwards and in fractions`() {
+    assertEquals(
+      """[{"data":5},{"data":3},{"data":1}]""",
+      run("""[{"type": "sequence", "start": 5, "stop": 0, "step": -2}]""", "[]"),
+    )
+    // Multiplied out from the start rather than accumulated, so the steps do not drift.
+    assertEquals(
+      """[{"data":0},{"data":0.25},{"data":0.5},{"data":0.75}]""",
+      run("""[{"type": "sequence", "start": 0, "stop": 1, "step": 0.25}]""", "[]"),
+    )
+  }
+
+  private val lookupRows = """[{"k": "a", "v": 1}, {"k": "b", "v": 2}, {"k": "zz", "v": 3}]"""
+
+  private fun runWithTable(transforms: String): String {
+    context = TestContext()
+    context.tables["other"] =
+      (VegaJson.parse(
+          """[{"id": "a", "label": "Alpha", "n": 10}, {"id": "b", "label": "Bravo", "n": 20}]"""
+        ) as VegaValue.Arr)
+        .values
+    val input = (VegaJson.parse(lookupRows) as VegaValue.Arr).values
+    val definitions = (VegaJson.parse(transforms) as VegaValue.Arr).values
+    return pipeline.run(input, definitions, context).joinToString(",", "[", "]") { asJson(it) }
+  }
+
+  @Test
+  fun `lookup copies named values and defaults an unmatched row`() {
+    assertEquals(
+      """[{"k":"a","name":"Alpha","v":1},{"k":"b","name":"Bravo","v":2},""" +
+        """{"k":"zz","name":null,"v":3}]""",
+      runWithTable(
+        """[{"type": "lookup", "from": "other", "key": "id", "fields": ["k"],
+             "values": ["label"], "as": ["name"]}]"""
+      ),
+    )
+    assertEquals(
+      """[{"k":"a","label":"Alpha","v":1},{"k":"b","label":"Bravo","v":2},""" +
+        """{"k":"zz","label":null,"v":3}]""",
+      runWithTable(
+        """[{"type": "lookup", "from": "other", "key": "id", "fields": ["k"],
+             "values": ["label"]}]"""
+      ),
+    )
+    assertEquals(
+      """[{"k":"a","name":"Alpha","v":1},{"k":"b","name":"Bravo","v":2},""" +
+        """{"k":"zz","name":"?","v":3}]""",
+      runWithTable(
+        """[{"type": "lookup", "from": "other", "key": "id", "fields": ["k"],
+             "values": ["label"], "as": ["name"], "default": "?"}]"""
+      ),
+    )
+  }
+
+  /** With no `values`, the whole matched row lands in the field `as` names. */
+  @Test
+  fun `lookup without values writes the whole matched row`() {
+    assertEquals(
+      """[{"k":"a","row":{"id":"a","label":"Alpha","n":10},"v":1},""" +
+        """{"k":"b","row":{"id":"b","label":"Bravo","n":20},"v":2},""" +
+        """{"k":"zz","row":null,"v":3}]""",
+      runWithTable(
+        """[{"type": "lookup", "from": "other", "key": "id", "fields": ["k"], "as": ["row"]}]"""
+      ),
     )
   }
 }

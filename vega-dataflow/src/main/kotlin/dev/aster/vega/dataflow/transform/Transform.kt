@@ -134,6 +134,8 @@ public class TransformRegistry(transforms: List<Transform>) {
           TimeUnitTransform,
           PieTransform,
           WindowTransform,
+          SequenceTransform,
+          LookupTransform,
         )
       )
   }
