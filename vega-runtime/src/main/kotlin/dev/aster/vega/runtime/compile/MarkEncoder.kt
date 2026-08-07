@@ -51,6 +51,7 @@ import dev.aster.vega.scene.TextEngine
 import dev.aster.vega.scene.TextNode
 import dev.aster.vega.scene.TextRun
 import dev.aster.vega.scene.TextStyle
+import dev.aster.vega.scene.TrailPath
 import dev.aster.vega.scene.Transform2D
 import dev.aster.vega.scene.curve
 
@@ -92,6 +93,7 @@ public class MarkEncoder(
       MarkType.AREA -> listOfNotNull(area(spec, data))
       MarkType.ARC -> data.mapIndexedNotNull { index, datum -> arc(spec, datum, index) }
       MarkType.PATH -> data.mapIndexedNotNull { index, datum -> path(spec, datum, index) }
+      MarkType.TRAIL -> listOfNotNull(trail(spec, data))
       else -> {
         diagnostics.error(
           DiagnosticCodes.TRANSFORM_NOT_IMPLEMENTED,
@@ -173,6 +175,36 @@ public class MarkEncoder(
       stroke = style.stroke,
       opacity = style.opacity,
       metadata = metadata(spec, datum, index, channels),
+    )
+  }
+
+  /**
+   * `trail`: a line whose thickness follows the data.
+   *
+   * One filled node for the whole series, like a line — but filled rather than stroked, because a
+   * stroke has one width and the whole point here is that it does not. A `null` in the data breaks
+   * the trail the same way it breaks a line.
+   */
+  private fun trail(spec: MarkSpec, data: List<VegaValue>): SceneNode? {
+    if (data.isEmpty()) return null
+    val channels = spec.encode.effective
+    val segments =
+      segments(data, channels) { datum ->
+        point(channels, datum) to
+          (number(channels["size"], datum) ?: MarkConfig(spec).number("size") ?: 1.0)
+      }
+    if (segments.isEmpty()) return null
+
+    val style = style(channels, data.first(), spec)
+    val path = PathData(segments.flatMap { TrailPath.build(it).commands })
+    if (path.isEmpty) return null
+    return PathNode(
+      id = ids.allocate(),
+      path = path,
+      fill = style.fill ?: Fill.of(MarkDefaults.DEFAULT_FILL),
+      stroke = style.stroke,
+      opacity = style.opacity,
+      metadata = metadata(spec, data.first(), 0, channels).copy(markKind = "trail"),
     )
   }
 

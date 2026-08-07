@@ -4,6 +4,8 @@ import dev.aster.vega.fixtures.VegaHeadlessTextEngine
 import dev.aster.vega.model.DiagnosticSeverity
 import dev.aster.vega.runtime.compile.CompiledSpec
 import dev.aster.vega.runtime.compile.SpecCompiler
+import dev.aster.vega.scene.Scene
+import dev.aster.vega.scene.flatten
 import java.io.File
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertTrue
@@ -83,6 +85,15 @@ class FixtureDifferentialTest {
     assertTrue(differences.isEmpty(), "$name scale differences:\n${differences.joinToString("\n")}")
   }
 
+  /** True when a mark whose outline is approximated by cubics could be setting the surface size. */
+  private fun curved(scene: dev.aster.vega.scene.Scene): Boolean =
+    scene
+      .flatten()
+      .map { it.node }
+      .any {
+        it.metadata.markKind == "arc" || it.metadata.markKind == "trail"
+      }
+
   @ParameterizedTest(name = "{0}")
   @MethodSource("fixtures")
   fun `the surface is exactly the size upstream makes it`(name: String) {
@@ -94,9 +105,13 @@ class FixtureDifferentialTest {
     val (reference, compiled) = compile(name)
     val scene = requireNotNull(compiled.scene)
     // The reference stores numbers at the harness's canonical precision, so the tolerance is that
-    // rounding and nothing more — an actual disagreement is never a fraction of a unit.
-    assertEquals(reference.width, scene.width, Differential.GEOMETRY_TOLERANCE, "$name width")
-    assertEquals(reference.height, scene.height, Differential.GEOMETRY_TOLERANCE, "$name height")
+    // rounding and nothing more — an actual disagreement is never a fraction of a unit. A drawing
+    // whose reach is set by a curve gets the same allowance its extent does: upstream measures a
+    // true circle where this scene graph has the cubics that approximate it.
+    val tolerance =
+      if (curved(scene)) Differential.CURVE_EXTENT_TOLERANCE else Differential.GEOMETRY_TOLERANCE
+    assertEquals(reference.width, scene.width, tolerance, "$name width")
+    assertEquals(reference.height, scene.height, tolerance, "$name height")
   }
 
   @ParameterizedTest(name = "{0}")

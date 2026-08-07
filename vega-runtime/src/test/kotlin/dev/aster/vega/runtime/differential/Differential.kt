@@ -507,8 +507,13 @@ public object Differential {
         continue
       }
       val allowed =
-        if (expected.type == "arc" && channel.startsWith("shape")) CURVE_EXTENT_TOLERANCE
-        else tolerance
+        // A trail's end caps are semicircles, so it is measured the same way an arc is: by the
+        // cubics actually painted rather than by an exact circle.
+        if ((expected.type == "arc" || expected.type == "trail") && channel.startsWith("shape")) {
+          CURVE_EXTENT_TOLERANCE
+        } else {
+          tolerance
+        }
       if (abs(wanted - got) > allowed) {
         out.add(Difference("$where.$channel", fmt(wanted), fmt(got)))
       }

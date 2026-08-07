@@ -75,7 +75,19 @@ export function normalizeScene(root, precision = DEFAULT_PRECISION) {
  * report a structural difference on every line chart. Both sides collapse to one record carrying the
  * point list, which is what actually has to agree.
  */
-const SERIES_TYPES = new Set(['line', 'area', 'trail']);
+const SERIES_TYPES = new Set(['line', 'area']);
+
+/**
+ * A `trail` is a series upstream and one filled shape here.
+ *
+ * Unlike a line, its outline is not derivable from the item positions — the width at each point
+ * turns the series into a run of capsules — and unlike a step or a spline, `d3-shape` has no curve
+ * to ask, because the generator is Vega's own and emits true circular arcs where this engine emits
+ * cubics. So the two are compared by the extent they actually cover, the way an arc is. That
+ * catches a trail too thick, too thin or in the wrong place, and would not catch its segments drawn
+ * in the wrong order.
+ */
+const EXTENT_ONLY_SERIES = new Set(['trail']);
 
 /** A marktype node: `{marktype, role, items: [...]}`. */
 function walkMarktype(marktype, dx, dy, out, precision) {
@@ -83,6 +95,11 @@ function walkMarktype(marktype, dx, dy, out, precision) {
 
   if (SERIES_TYPES.has(type) && (marktype.items || []).length > 0) {
     out.push(seriesRecord(type, marktype, dx, dy, precision));
+    return;
+  }
+
+  if (EXTENT_ONLY_SERIES.has(type) && (marktype.items || []).length > 0) {
+    out.push(extentRecord(type, marktype, dx, dy, precision));
     return;
   }
 
@@ -152,6 +169,31 @@ function expandCurve(points, curve) {
   };
   line().curve(curve).x(p => p[0]).y(p => p[1]).context(context)(points);
   return collected.length ? collected : points;
+}
+
+/**
+ * One record for a series compared by the ground it covers rather than by its outline.
+ *
+ * The bounds come from the marktype rather than from any one item, because the shape is the union
+ * of every segment.
+ */
+function extentRecord(type, marktype, dx, dy, precision) {
+  const first = marktype.items[0];
+  const b = marktype.bounds;
+  const entry = {
+    type,
+    role: marktype.role || null,
+    shapeLeft: canonicalNumber(b.x1 + dx, precision),
+    shapeTop: canonicalNumber(b.y1 + dy, precision),
+    shapeWidth: canonicalNumber(b.x2 - b.x1, precision),
+    shapeHeight: canonicalNumber(b.y2 - b.y1, precision),
+  };
+  for (const channel of STYLE_CHANNELS) {
+    if (first[channel] !== undefined) entry[channel] = canonicalNumber(first[channel], precision);
+  }
+  if (entry.fillOpacity !== undefined && entry.fill === undefined) delete entry.fillOpacity;
+  if (entry.strokeOpacity !== undefined && entry.stroke === undefined) delete entry.strokeOpacity;
+  return entry;
 }
 
 /**

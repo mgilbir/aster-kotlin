@@ -20,7 +20,7 @@ Milestones 0, 1 and 2 complete. **Milestones 3 and 4 in progress**: Vega specifi
 end — including expressions, signals and the twelve data transforms the brief lists — and are verified
 against upstream Vega by differential tests.
 
-Forty-eight differential fixtures pass, all matching upstream exactly on every mark and scale output:
+Forty-nine differential fixtures pass, all matching upstream exactly on every mark and scale output:
 
 | Fixture | Marks | Covers |
 | --- | --- | --- |
@@ -72,6 +72,7 @@ Forty-eight differential fixtures pass, all matching upstream exactly on every m
 | `curves` | 27 | monotone, natural, basis and cardinal over one series, and a monotone area |
 | `colour-ramps` | 57 | four continuous schemes across one domain, with a gradient legend |
 | `path-marks` | 34 | outlines from SVG path strings, on path marks and on symbols |
+| `trail` | 28 | a line whose thickness follows the data, beside a plain line through it |
 
 The gate is wired into `./scripts/oracle.sh`, so every further scale, mark and transform is built
 against a harness that can say we are wrong — which golden tests cannot.
@@ -109,7 +110,7 @@ The entire data and specification half is absent:
 | `vega-dataflow` — pulse propagation and incremental evaluation | 2,081 | contracts only |
 | `vega-functions` — the other 44 functions, mostly colour, geo and selection | most of 790 | 0 |
 | Remaining scale types — quantile, quantize, threshold, bin-ordinal | rest of `vega-scale` | 0 |
-| Remaining mark encoders — image, trail, shape | rest of `vega-encode` + d3-shape | 0 |
+| Remaining mark encoders — image and shape | rest of `vega-encode` | 0; `image` needs a device resolver, `shape` needs projections |
 | Line and area interpolation — `catmull-rom` and `bundle` | part of d3-shape | 0, reported; the step and spline families are implemented |
 | Banded legends, trellis footers, legend `symbolLimit` | parts of `vega-encode`, `vega-view-transforms` | 0, reported |
 | `vega-view`, `vega-view-transforms` — the view lifecycle and incremental layout | 2,623 | bounds, grid layout and label overlap removal |
@@ -131,7 +132,7 @@ substantive compatibility items:
 | 6. View and Compose APIs | Yes |
 | 7. SVG, PNG, PDF export | Yes |
 | 8. TalkBack can describe and navigate | Partial — virtual nodes are tested by instrumentation, not with TalkBack itself |
-| 9. At least 100 compatibility fixtures pass | 48 of 100 |
+| 9. At least 100 compatibility fixtures pass | 49 of 100 |
 | 10. Core runtime has no Android dependency | Yes |
 | 11. Renders without WebView | Yes |
 | 12. Build and test loop runs from the terminal | Yes |
@@ -264,6 +265,11 @@ ordering), and the pipeline is now verified end to end on one fixture, but the b
   out, so a linear scale handed `[10, 20]` still starts at 0 where this engine had been leaving it
   at 10. The limits then replace an end rather than clamping it, and run after `zero`, which is why
   `domainMin: 30` beats it.
+- **The `trail` mark**: a line whose thickness follows the data. Filled rather than stroked — a
+  stroke has one width and the whole point is that it does not — and built as one closed capsule per
+  segment, overlapping at the shared points, which is what makes the joins look continuous without
+  any segment knowing about its neighbours. Its `size` is a **width**, halved to a radius, where a
+  symbol's `size` is a squared extent; neither name says which.
 - **The `path` mark, and outlines from SVG path strings generally.** A `path` mark places a written
   outline once per datum, scaled and rotated about its anchor; and a `symbol` whose `shape` is not
   one of the twelve names is now read the same way rather than drawn as a circle. The parser takes
@@ -410,7 +416,7 @@ dark chrome, so a dark background was unreadable — they now take a `SampleScen
 
 ## Known failing fixtures
 
-None. Forty-eight fixtures exist and all forty-eight pass. The brief's MVP asks for 100; growing the
+None. Forty-nine fixtures exist and all forty-nine pass. The brief's MVP asks for 100; growing the
 corpus is the main task now, and each new fixture is expected to surface gaps rather than pass
 immediately. That keeps happening, which is the point of the harness: `stacked-bar` surfaced two real
 bugs, and `facet-trellis` surfaced a third — `range: "height"` was descending for every scale type,
@@ -539,6 +545,7 @@ depends on them. Each has a test and a comment; this is the index.
 | The colour ramps are Vega's own tables, not d3's: `blues` starts a fifth of the way in, and nothing narrows it | `ColorSchemes.ramps` |
 | A custom symbol outline is written in a unit box and scaled by the symbol's own reference length | `SceneNode.scalePath` |
 | A repeated `M` in a path string means `L`, which is the one place the implicit-command shorthand changes meaning | `SvgPath.parse` |
+| A trail is *filled*, not stroked, and its `size` is a width where a symbol's is a squared extent | `TrailPath` |
 | `padAngle` is a gap at a pad *radius*, converted back to an angle per edge, so the sides stay parallel | `ArcPath.sector` |
 | `cornerRadius` is clamped by where the slice's own edges would meet, not just by its thickness | `ArcPath.sector` |
 | A label hidden by overlap removal stays in the scene at zero opacity, so the mark count does not move | `LabelOverlap` |
@@ -611,7 +618,7 @@ depends on them. Each has a test and a comment; this is the index.
    `countpattern`. Each is self-contained and each wants its vectors read out of
    `transform-probe.js` first — `window` alone had four behaviours that no reading of the
    documentation would have given.
-3. **Keep growing the fixture corpus.** 48 of the brief's 100. The return has fallen off — of the
+3. **Keep growing the fixture corpus.** 49 of the brief's 100. The return has fallen off — of the
    last ten, seven passed on arrival — because the corpus has caught up with the parts of the
    engine written without one. Aim it at what is genuinely untouched rather than at more
    combinations of what is covered: the `quantile`, `quantize`, `threshold` and `bin-ordinal`

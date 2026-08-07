@@ -190,11 +190,13 @@ class SpecCompilerTest {
 
   @Test
   fun `an unimplemented mark type is reported and contributes nothing`() {
-    val withTrail = minimalBar.replace("\"type\": \"rect\"", "\"type\": \"trail\"")
-    val compiled = compile(withTrail)
+    // `image` is the last of the twelve with no encoder: the scene node has worked since Milestone
+    // 1 and it needs a resolver to turn a URL into pixels, which only a device can supply.
+    val withImage = minimalBar.replace("\"type\": \"rect\"", "\"type\": \"image\"")
+    val compiled = compile(withImage)
     assertTrue(
       compiled.diagnostics.any {
-        it.code == DiagnosticCodes.TRANSFORM_NOT_IMPLEMENTED && it.message.contains("trail")
+        it.code == DiagnosticCodes.TRANSFORM_NOT_IMPLEMENTED && it.message.contains("image")
       }
     )
     assertTrue(compiled.scene!!.flatten().none { it.node is RectNode })
