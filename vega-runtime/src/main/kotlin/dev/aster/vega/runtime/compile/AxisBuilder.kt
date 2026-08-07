@@ -13,21 +13,17 @@ import dev.aster.vega.runtime.scale.PositionScale
 import dev.aster.vega.runtime.scale.TimeScale
 import dev.aster.vega.runtime.scale.TransformedScale
 import dev.aster.vega.runtime.scale.VegaScale
-import dev.aster.vega.scene.Fill
 import dev.aster.vega.scene.GroupNode
 import dev.aster.vega.scene.NodeMetadata
 import dev.aster.vega.scene.RectD
 import dev.aster.vega.scene.RuleNode
 import dev.aster.vega.scene.SceneNode
 import dev.aster.vega.scene.SceneNodeIdAllocator
-import dev.aster.vega.scene.ScenePaint
-import dev.aster.vega.scene.Stroke
 import dev.aster.vega.scene.TextAlign
 import dev.aster.vega.scene.TextBaseline
 import dev.aster.vega.scene.TextEngine
 import dev.aster.vega.scene.TextNode
 import dev.aster.vega.scene.TextRun
-import dev.aster.vega.scene.TextStyle
 import dev.aster.vega.scene.Transform2D
 import dev.aster.vega.scene.transformedBounds
 
@@ -108,16 +104,14 @@ public class AxisBuilder(
     // them to clear. Upstream passes 0 in place of the tick size rather than keeping the gap.
     val labelOffset = (if (spec.ticks) tickSize else 0.0) + labelPadding
     val fontSize = numbers.resolve(spec.labelFontSize, spec.scale) ?: AxisDefaults.LABEL_FONT_SIZE
-    val labelStyle = TextStyle(fontFamily = AxisDefaults.LABEL_FONT_FAMILY, fontSize = fontSize)
+    val labelStyle = GuideStyle.text(spec.labelStyle, fontSize, defaultWeight = 400)
 
     val children = mutableListOf<SceneNode>()
     // Ticks and labels only. Upstream measures an axis by these two and skips the gridlines, so
     // switching a grid on does not widen the chart or push the axis title away.
     val measured = mutableListOf<SceneNode>()
-    val tickStroke =
-      Stroke(paint = ScenePaint.Solid(AxisDefaults.tickColor), width = AxisDefaults.TICK_WIDTH)
-    val gridStroke =
-      Stroke(paint = ScenePaint.Solid(AxisDefaults.gridColor), width = AxisDefaults.TICK_WIDTH)
+    val tickStroke = GuideStyle.stroke(spec.tickStyle, AxisDefaults.tickColor)
+    val gridStroke = GuideStyle.stroke(spec.gridStyle, AxisDefaults.gridColor)
 
     // A gridline runs back across the plot, away from the side its axis is on: up from a bottom
     // axis, down from a top one, right from a left one, left from a right one.
@@ -197,7 +191,7 @@ public class AxisBuilder(
             x = x,
             y = y,
             layout = layout,
-            fill = Fill.of(AxisDefaults.labelColor),
+            fill = GuideStyle.fill(spec.labelStyle, AxisDefaults.labelColor),
             metadata = NodeMetadata(role = "axis-label"),
           )
       }
@@ -208,8 +202,7 @@ public class AxisBuilder(
     children += measured
 
     if (spec.domainLine) {
-      val domainStroke =
-        Stroke(paint = ScenePaint.Solid(AxisDefaults.domainColor), width = AxisDefaults.TICK_WIDTH)
+      val domainStroke = GuideStyle.stroke(spec.domainStyle, AxisDefaults.domainColor)
       val domainMeta = NodeMetadata(role = "axis-domain")
       // Upstream encodes the domain line's endpoints as range positions 0 and 1 of the axis scale,
       // so a scale that does not span the whole plotting area gets a correspondingly short line.
@@ -319,12 +312,7 @@ public class AxisBuilder(
     val run =
       TextRun(
         text = text,
-        style =
-          TextStyle(
-            fontFamily = AxisDefaults.LABEL_FONT_FAMILY,
-            fontSize = fontSize,
-            fontWeight = AxisDefaults.TITLE_FONT_WEIGHT,
-          ),
+        style = GuideStyle.text(spec.titleStyle, fontSize, AxisDefaults.TITLE_FONT_WEIGHT),
         align =
           when (anchor) {
             Anchor.START -> TextAlign.LEFT
@@ -344,7 +332,7 @@ public class AxisBuilder(
           Orient.RIGHT -> 90.0
           else -> 0.0
         },
-      fill = Fill.of(AxisDefaults.titleColor),
+      fill = GuideStyle.fill(spec.titleStyle, AxisDefaults.titleColor),
       metadata = NodeMetadata(role = "axis-title", markName = spec.scale),
     )
   }

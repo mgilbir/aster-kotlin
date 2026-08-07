@@ -8,6 +8,7 @@ import dev.aster.vega.runtime.scale.BandScale
 import dev.aster.vega.runtime.scale.LinearScale
 import dev.aster.vega.runtime.scale.PointScale
 import dev.aster.vega.runtime.scale.VegaScale
+import dev.aster.vega.scene.FontStyle
 import dev.aster.vega.scene.GroupNode
 import dev.aster.vega.scene.ImageNode
 import dev.aster.vega.scene.PathNode
@@ -16,6 +17,7 @@ import dev.aster.vega.scene.RuleNode
 import dev.aster.vega.scene.Scene
 import dev.aster.vega.scene.SceneColor
 import dev.aster.vega.scene.SceneNode
+import dev.aster.vega.scene.Stroke
 import dev.aster.vega.scene.SymbolNode
 import dev.aster.vega.scene.TextNode
 import dev.aster.vega.scene.Transform2D
@@ -207,11 +209,23 @@ public object Differential {
         "x2" to b.x,
         "y2" to b.y,
         "strokeWidth" to node.stroke.width,
+        "strokeOpacity" to node.stroke.opacity,
       )
     val strings = LinkedHashMap<String, String>()
     solidColour(node.stroke.paint)?.let { strings["stroke"] = it.toCssHex() }
+    dashOf(node.stroke)?.let { strings["strokeDash"] = it }
     return Mark("rule", node.metadata.role, numbers, strings)
   }
+
+  /**
+   * A dash pattern as one comparable string, or null for a solid line.
+   *
+   * Compared because nothing else here can see it: a dashed gridline and a solid one agree on
+   * position, colour, width and opacity, so leaving the dash out would let a chart pass the
+   * comparison and draw differently — the same way a symbol's outline once did.
+   */
+  private fun dashOf(stroke: Stroke): String? =
+    stroke.dashArray.takeIf { it.isNotEmpty() }?.joinToString(",") { fmt(it) }
 
   private fun textMark(node: TextNode, world: Transform2D): Mark {
     val anchor = world.apply(node.x, node.y)
@@ -231,8 +245,10 @@ public object Differential {
         "baseline" to vegaBaseline(run.baseline),
         "font" to run.style.fontFamily,
       )
+    if (run.style.fontStyle == FontStyle.ITALIC) strings["fontStyle"] = "italic"
     node.fill?.let { fill ->
       solidColour(fill.paint)?.let { strings["fill"] = it.toCssHex() }
+      numbers["fillOpacity"] = fill.opacity
     }
     return Mark("text", node.metadata.role, numbers, strings)
   }
@@ -391,7 +407,10 @@ public object Differential {
         is PathNode -> node.stroke
         else -> null
       }
-    stroke?.let { s -> solidColour(s.paint)?.let { result["stroke"] = it.toCssHex() } }
+    stroke?.let { s ->
+      solidColour(s.paint)?.let { result["stroke"] = it.toCssHex() }
+      dashOf(s)?.let { result["strokeDash"] = it }
+    }
     return result
   }
 

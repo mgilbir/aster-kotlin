@@ -345,6 +345,30 @@ public data class AxisSpec(
   val labelFontSize: NumberValue? = null,
   val offset: NumberValue? = null,
   val zindex: Int = 0,
+  /** Appearance of the four parts, each defaulting to Vega's own when unstated. */
+  val labelStyle: GuideStroke = GuideStroke(),
+  val tickStyle: GuideStroke = GuideStroke(),
+  val gridStyle: GuideStroke = GuideStroke(),
+  val domainStyle: GuideStroke = GuideStroke(),
+  val titleStyle: GuideStroke = GuideStroke(),
+)
+
+/**
+ * The colour, weight and transparency of one part of a guide.
+ *
+ * One type for all five parts of an axis because upstream treats them alike: `labelColor`,
+ * `tickColor`, `gridColor`, `domainColor` and `titleColor` are the same property with a different
+ * prefix, and so are the widths, dashes and opacities. A label uses [color] as a fill and the rest
+ * use it as a stroke, which is the only asymmetry.
+ */
+public data class GuideStroke(
+  val color: String? = null,
+  val width: Double? = null,
+  val dash: List<Double>? = null,
+  val opacity: Double? = null,
+  val font: String? = null,
+  val fontWeight: String? = null,
+  val fontStyle: String? = null,
 )
 
 /**

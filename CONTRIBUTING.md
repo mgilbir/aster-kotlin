@@ -63,6 +63,7 @@ times, and each time the fix belonged in `oracle-js/src/normalize.js` as much as
   passed the comparison and drew in the wrong place
 - a symbol's `size` channel was compared but never its outline, hiding a wrong shape table
 - fill and stroke opacity were never compared at all
+- a dash pattern was never compared, so a dashed gridline and a solid one were the same mark
 
 If a difference is visible in the SVG but the comparison passes, suspect the normalizer.
 

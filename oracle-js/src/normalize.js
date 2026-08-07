@@ -32,7 +32,20 @@ const GEOMETRY_CHANNELS = {
 };
 
 const STYLE_CHANNELS = ['fill', 'stroke', 'strokeWidth', 'opacity', 'fillOpacity', 'strokeOpacity'];
-const TEXT_CHANNELS = ['text', 'align', 'baseline', 'font', 'fontSize', 'fontWeight', 'angle'];
+const TEXT_CHANNELS = ['text', 'align', 'baseline', 'font', 'fontSize', 'fontWeight', 'fontStyle', 'angle'];
+
+/**
+ * A dash pattern, joined into one comparable string.
+ *
+ * Reported separately from the scalar channels because it is an array, and added because it was the
+ * fourth thing this harness compared its way past: a dashed gridline and a solid one have identical
+ * geometry, identical colour and identical width, so nothing else here can tell them apart.
+ */
+function dashOf(item) {
+  const dash = item.strokeDash;
+  if (!Array.isArray(dash) || dash.length === 0) return undefined;
+  return dash.join(',');
+}
 
 /**
  * @param root the value of `view.scenegraph().root`
@@ -107,6 +120,8 @@ function seriesRecord(type, marktype, dx, dy, precision) {
   for (const channel of STYLE_CHANNELS) {
     if (first[channel] !== undefined) entry[channel] = canonicalNumber(first[channel], precision);
   }
+  const seriesDash = dashOf(first);
+  if (seriesDash !== undefined) entry.strokeDash = seriesDash;
   return entry;
 }
 
@@ -148,6 +163,8 @@ function record(type, role, item, dx, dy, precision) {
   // swatch carries a width that paints nothing. This engine has no way to say "a width with no
   // stroke", and would not want one, so drop the width when there is nothing to draw it with.
   if (entry.strokeWidth !== undefined && entry.stroke === undefined) delete entry.strokeWidth;
+  const dash = dashOf(item);
+  if (dash !== undefined) entry.strokeDash = dash;
   // A symbol's `size` channel says nothing about the outline it actually draws, and Vega ships its own
   // symbol table rather than d3's — so compare the drawn extent, not just the requested size.
   if ((type === 'symbol' || type === 'arc') && item.bounds) {

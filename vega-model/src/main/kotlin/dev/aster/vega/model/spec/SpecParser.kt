@@ -19,6 +19,66 @@ import dev.aster.vega.model.asString
  */
 private val MULTI_FIELD_SORT_OPS = listOf("count", "min", "max")
 
+/**
+ * Axis properties upstream accepts and this engine does not honour, each reported by name.
+ *
+ * Upstream's axis takes 74 properties. Listing the gap explicitly rather than ignoring whatever is
+ * unrecognized is the point: an axis that quietly drew ten ticks where the specification asked for
+ * four, or drew its labels horizontally where the specification turned them 45 degrees, looks like
+ * a chart and is not the chart that was asked for. Each entry says what a specification should
+ * expect instead.
+ */
+private val AXIS_UNSUPPORTED =
+  mapOf(
+    "values" to
+      "Explicit axis tick values are not implemented; the scale's own ticks are drawn instead, " +
+        "so the axis will show a different set of ticks from the one requested",
+    "format" to "Axis label format strings are not implemented; default formatting is used",
+    "formatType" to "Axis label format types are not implemented; default formatting is used",
+    "encode" to "Axis encode overrides are not implemented",
+    "labelAngle" to "Rotated axis labels are not implemented; labels are drawn horizontally",
+    "labelAlign" to "Explicit axis label alignment is not implemented; the orientation decides it",
+    "labelBaseline" to
+      "Explicit axis label baselines are not implemented; the orientation decides it",
+    "labelOverlap" to
+      "Axis label overlap removal is not implemented; every label is drawn, so a dense axis " +
+        "will print labels on top of each other",
+    "labelSeparation" to "Axis label separation is not implemented; it needs overlap removal first",
+    "labelLimit" to "Axis label truncation is not implemented; labels are drawn in full",
+    "labelBound" to "Bounding axis labels to the plotting area is not implemented",
+    "labelFlush" to "Flushing the first and last axis label to the range ends is not implemented",
+    "labelFlushOffset" to "Axis label flush offsets are not implemented; they need labelFlush",
+    "labelOffset" to "Axis label offsets along the axis are not implemented",
+    "labelLineHeight" to "Multi-line axis labels are not implemented",
+    "tickMinStep" to "A minimum tick step is not implemented; the scale's own tick count is used",
+    "tickExtra" to "Adding a tick at the range end is not implemented",
+    "tickRound" to "Suppressing tick rounding is not implemented; ticks are always rounded",
+    "tickOffset" to "Axis tick offsets are not implemented",
+    "tickBand" to "Placing band-scale ticks at band edges is not implemented; they sit at centres",
+    "tickCap" to "Axis tick line caps are not implemented",
+    "tickDashOffset" to "Dash offsets are not implemented; the dash pattern starts at the line end",
+    "gridCap" to "Gridline caps are not implemented",
+    "gridDashOffset" to "Dash offsets are not implemented; the dash pattern starts at the line end",
+    "gridScale" to "Gridlines driven by a second scale are not implemented",
+    "domainCap" to "Domain line caps are not implemented",
+    "domainDashOffset" to
+      "Dash offsets are not implemented; the dash pattern starts at the line end",
+    "bandPosition" to "Moving a label off a band's centre is not implemented",
+    "position" to "Positioning an axis along its own dimension is not implemented",
+    "translate" to "Overriding the axis's half-pixel translation is not implemented",
+    "minExtent" to "A minimum axis extent is not implemented; the axis is measured by its contents",
+    "maxExtent" to "A maximum axis extent is not implemented; the axis is measured by its contents",
+    "titleAlign" to "Explicit axis title alignment is not implemented; the anchor decides it",
+    "titleBaseline" to "Explicit axis title baselines are not implemented; the orientation sets it",
+    "titleAngle" to "Explicit axis title angles are not implemented; a vertical axis turns its own",
+    "titleLimit" to "Axis title truncation is not implemented; the title is drawn in full",
+    "titleLineHeight" to "Multi-line axis titles are not implemented",
+    "titleX" to "Absolute axis title placement is not implemented",
+    "titleY" to "Absolute axis title placement is not implemented",
+    "aria" to "Accessibility attributes on a guide are not implemented",
+    "description" to "Accessibility descriptions on a guide are not implemented",
+  )
+
 /** A parsed specification plus everything the parser could not honour. */
 public data class ParsedSpec(val spec: VegaSpec?, val diagnostics: List<VegaDiagnostic>) {
   public val isUsable: Boolean
@@ -493,19 +553,10 @@ public class SpecParser {
       return null
     }
 
-    if (obj.fields["encode"] != null) {
-      diagnostics.warn(
-        DiagnosticCodes.PARSE_UNKNOWN_PROPERTY,
-        "Axis encode overrides are not implemented",
-        jsonPath = "$path.encode",
-      )
-    }
-    if (obj.fields["format"] != null) {
-      diagnostics.warn(
-        DiagnosticCodes.PARSE_UNKNOWN_PROPERTY,
-        "Axis label format strings are not implemented; default formatting is used",
-        jsonPath = "$path.format",
-      )
+    for ((key, reason) in AXIS_UNSUPPORTED) {
+      if (obj.fields[key] != null) {
+        diagnostics.warn(DiagnosticCodes.PARSE_UNKNOWN_PROPERTY, reason, jsonPath = "$path.$key")
+      }
     }
 
     return AxisSpec(
@@ -525,8 +576,42 @@ public class SpecParser {
       labelFontSize = obj.numberOrSignal("labelFontSize", "$path.labelFontSize"),
       offset = obj.numberOrSignal("offset", "$path.offset"),
       zindex = (obj.fields["zindex"] as? VegaValue.Num)?.value?.toInt() ?: 0,
+      labelStyle = obj.guideStroke("label"),
+      tickStyle = obj.guideStroke("tick"),
+      gridStyle = obj.guideStroke("grid"),
+      domainStyle = obj.guideStroke("domain"),
+      titleStyle = obj.guideStroke("title"),
     )
   }
+
+  /**
+   * Reads the `{prefix}Color`, `Width`, `Dash`, `Opacity`, `Font`, `FontWeight` and `FontStyle`
+   * family for one part of a guide.
+   *
+   * Upstream spells all five parts the same way — the prefix is the only thing that changes — so
+   * they are read the same way rather than five times over.
+   */
+  private fun VegaValue.Obj.guideStroke(prefix: String): GuideStroke =
+    GuideStroke(
+      color = fields["${prefix}Color"]?.takeIf { it is VegaValue.Str }?.asString(),
+      width = (fields["${prefix}Width"] as? VegaValue.Num)?.value,
+      dash =
+        (fields["${prefix}Dash"] as? VegaValue.Arr)
+          ?.values
+          ?.map { it.asDouble() }
+          ?.takeIf { values -> values.isNotEmpty() && values.all { it.isFinite() } },
+      opacity = (fields["${prefix}Opacity"] as? VegaValue.Num)?.value,
+      font = fields["${prefix}Font"]?.takeIf { it is VegaValue.Str }?.asString(),
+      // Vega accepts either a keyword (`"bold"`) or a number (`700`); both reach the renderer as
+      // text, so a number is normalized to its integer spelling rather than kept as a double.
+      fontWeight =
+        when (val weight = fields["${prefix}FontWeight"]) {
+          is VegaValue.Str -> weight.value
+          is VegaValue.Num -> weight.value.takeIf { it.isFinite() }?.toInt()?.toString()
+          else -> null
+        },
+      fontStyle = fields["${prefix}FontStyle"]?.takeIf { it is VegaValue.Str }?.asString(),
+    )
 
   // ---- titles ---------------------------------------------------------------
 

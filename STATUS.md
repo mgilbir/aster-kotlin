@@ -20,7 +20,7 @@ Milestones 0, 1 and 2 complete. **Milestones 3 and 4 in progress**: Vega specifi
 end — including expressions, signals and the twelve data transforms the brief lists — and are verified
 against upstream Vega by differential tests.
 
-Thirty differential fixtures pass, all matching upstream exactly on every mark and scale output:
+Thirty-one differential fixtures pass, all matching upstream exactly on every mark and scale output:
 
 | Fixture | Marks | Covers |
 | --- | --- | --- |
@@ -54,6 +54,7 @@ Thirty differential fixtures pass, all matching upstream exactly on every mark a
 | `box-plot` | 32 | min, q1, median, q3 and max from one aggregate, drawn as whiskers and a box |
 | `stack-offsets` | 32 | a normalized stacked area, its series faceted out of the stacked rows |
 | `stack-diverging` | 45 | negatives stacking away from zero, over a domain taken from both bounds |
+| `axis-style` | 37 | every part of an axis restyled: colour, width, dash, opacity, italic labels |
 
 The gate is wired into `./scripts/oracle.sh`, so every further scale, mark and transform is built
 against a harness that can say we are wrong — which golden tests cannot.
@@ -115,7 +116,7 @@ substantive compatibility items:
 | 6. View and Compose APIs | Yes |
 | 7. SVG, PNG, PDF export | Yes |
 | 8. TalkBack can describe and navigate | Partial — virtual nodes are tested by instrumentation, not with TalkBack itself |
-| 9. At least 100 compatibility fixtures pass | 30 of 100 |
+| 9. At least 100 compatibility fixtures pass | 31 of 100 |
 | 10. Core runtime has no Android dependency | Yes |
 | 11. Renders without WebView | Yes |
 | 12. Build and test loop runs from the terminal | Yes |
@@ -238,6 +239,12 @@ ordering), and the pipeline is now verified end to end on one fixture, but the b
   dataset on the domain field rather than listing its values, which is what lets a bar chart be
   ordered by a total no row carries, and what makes a multi-field domain run field by field rather
   than row by row.
+- **Axis appearance**: `labelColor`, `tickColor`, `gridColor`, `domainColor` and `titleColor`, each
+  with its own width, dash, opacity and font — the five parts of an axis are the same property with a
+  different prefix upstream, and are read that way here. A label's colour is a fill and every other
+  part's is a stroke, which is the only asymmetry and the one a renderer cannot paper over. The
+  remaining fifty-odd axis properties upstream accepts are each reported by name, with what will be
+  drawn instead.
 - **Titles**: a chart title and subtitle at any of the four edges and any of the three anchors — all
   twelve combinations verified against upstream — plus a title on each axis. A title is placed against
   the whole drawing rather than the plotting area, so a chart with wide y-axis labels has its title
@@ -257,7 +264,7 @@ ordering), and the pipeline is now verified end to end on one fixture, but the b
 
 ## Verification
 
-- 903 JVM tests pass (`./scripts/test-core.sh`, `./gradlew test`).
+- 917 JVM tests pass (`./scripts/test-core.sh`, `./gradlew test`).
 - Android lint is clean with `warningsAsErrors` on every Android module.
 - 48 instrumented tests pass on an API 37 arm64 emulator (`./scripts/test-android.sh`): 40 in
   `vega-android-canvas`, 4 in `vega-compose`, 4 in `demo` — including one that compiles every bundled
@@ -292,7 +299,7 @@ dark chrome, so a dark background was unreadable — they now take a `SampleScen
 
 ## Known failing fixtures
 
-None. Thirty fixtures exist and all thirty pass. The brief's MVP asks for 100; growing the
+None. Thirty-one fixtures exist and all thirty-one pass. The brief's MVP asks for 100; growing the
 corpus is the main task now, and each new fixture is expected to surface gaps rather than pass
 immediately. That keeps happening, which is the point of the harness: `stacked-bar` surfaced two real
 bugs, and `facet-trellis` surfaced a third — `range: "height"` was descending for every scale type,
@@ -320,6 +327,15 @@ expression function turned up two more: an exponent was zero-padded where JavaSc
 `toExponential` does not pad, and a specifier naming no type was being treated as plain fixed
 formatting when d3 aliases it to `.12~g` — twelve significant digits, trimmed — so `format(x, "")`
 printed `5.000000` for 5.
+
+`axis-style` passed on arrival too, but only after the harness was taught to look. Upstream's axis
+takes **74 properties** and this engine honoured fifteen; the other fifty-nine were dropped without a
+word, which is exactly the failure this project exists to avoid — an axis that draws ten ticks where
+`values` named four still looks like a chart. Every one of them is now reported by name, and the
+styling family is implemented. Writing the fixture first showed the harness could not have caught it:
+`strokeDash` was not compared at all, so a dashed gridline and a solid one were indistinguishable to
+it, the same way a symbol's outline once was. That makes four things the normalizer has had to be
+taught to see.
 
 Building legends surfaced a fourth, and a worse one, in code that had been "passing" for six fixtures:
 **every symbol was the wrong size.** Upstream ships its own symbol table rather than d3-shape's, sizing
@@ -371,6 +387,7 @@ depends on them. Each has a test and a comment; this is the index.
 | A number formatted through a format string is signed with U+2212, not a hyphen; one stringified by JavaScript is not | `formatTickLabel`, `MINUS_SIGN` |
 | A format specifier naming no type is `.12~g`, not plain fixed formatting | `NumberFormatSubset.parse` |
 | An exponent is not zero-padded, because d3 formats `e` by calling JavaScript's own `toExponential` | `PlatformDecimals.exponential` |
+| A tick's stroke width counts towards the chart's size and a gridline's does not | `GuideStyle`, `AxisBuilder` |
 
 ## Architectural decisions pending
 
@@ -429,25 +446,37 @@ depends on them. Each has a test and a comment; this is the index.
 
 ## Next three tasks
 
-1. **Keep growing the fixture corpus.** 30 of the brief's 100 pass, and the return has not dropped
-   off: most fixtures added so far failed on arrival, and every one of those failures was a real
-   defect. Between them they have found a missing scale-domain form, a legend layout rule that only
-   diverges once swatches grow, unreported opacity, rotated text offsets both sides of the harness had
-   wrong in the same way, a line-gap behaviour this engine had documented backwards, gridlines running
-   the wrong way from a top or right axis, labels keeping a gap for ticks that were switched off,
-   `reverse` reversing the wrong end of the scale, and a domain `sort` that read an object as a
-   boolean and quietly ordered a bar chart alphabetically. Worth aiming at next, because each is a
-   construct in wide use that no fixture touches: a `config` block of any kind — the most likely
-   place for a silent divergence, since every default in the engine is currently a hard-coded
-   constant with no way for a specification to move it — and the aggregate operations no fixture
-   exercises end to end (`median`, `q1`, `q3`, `stdev`, `distinct`), which a box plot would cover in
-   one chart. Still untouched beyond that: `sequence`, `window` and `lookup` and the other 25
-   transforms; `trail`, `shape`, `image` and `path` marks; and `quantile`, `quantize`, `threshold`
-   and `bin-ordinal` scales.
-2. **Label overlap removal.** `labelOverlap` on an axis or a legend, which is what stops a dense time
-   axis printing every label on top of the last. Reported everywhere it appears, and the most visible
-   remaining gap on a chart that is otherwise correct.
-3. **Arc padding and corner rounding.** Both are reported today, and both are what separates a
-   serviceable donut from a finished one. Upstream insets a padded arc against a pad *radius* and
-   rounds its corners with tangent circles, so this is real geometry rather than a parameter to pass
-   through — which is why it was left out of the first cut rather than guessed at.
+1. **Take the same audit to the legends, the marks and the scales.** Auditing the axis against
+   upstream's schema found fifty-nine properties being dropped without a word — the single largest
+   breach of "nothing is silently ignored" the project has had, and it was invisible because an axis
+   with the wrong ticks still looks like an axis. There is no reason to think the axis was unusual.
+   Upstream's legend takes about 90 properties, its marks around 40 each and its scales 20; this
+   engine's parsers were written property by property from the fixtures at hand, so the same gap is
+   almost certainly there. `node -e` over `oracle-js/node_modules/vega/build/vega-schema.json` lists
+   any definition's properties, which is how the axis list was obtained. Report first, implement
+   second: the report is what makes a partial implementation usable, and it is an afternoon's work
+   against weeks for the features.
+2. **`values`, then `labelAngle`.** The two most consequential things a specification can ask an axis
+   for and not get. `values` replaces the tick set outright — upstream keeps the grid in step with it,
+   and on a band scale it filters the domain rather than positioning freely — and `labelAngle` is how
+   every chart with long category names is made readable. The angle is the harder of the two: it
+   changes the label's align and baseline defaults and its contribution to the axis extent, so the
+   chart's size moves with it. Both are reported today, so neither is a silent wrong answer, which is
+   why they rank behind the audit.
+3. **Keep growing the fixture corpus.** 31 of the brief's 100 pass, and the return has not dropped
+   off: of the last four, one passed and three found defects — a domain `sort` that read an object as
+   a boolean and quietly ordered a bar chart alphabetically, and the wrong character on every negative
+   axis label. Between them the corpus has also found a missing scale-domain form, a legend layout
+   rule that only diverges once swatches grow, unreported opacity, rotated text offsets both sides of
+   the harness had wrong in the same way, a line-gap behaviour this engine had documented backwards,
+   gridlines running the wrong way from a top or right axis, labels keeping a gap for ticks that were
+   switched off, and `reverse` reversing the wrong end of the scale. Worth aiming at next: a `config`
+   block of any kind, which is where a Vega-Lite-compiled specification puts everything and where
+   every default in this engine is still a hard-coded constant with no way for a specification to move
+   it; and a local `time` scale crossing a daylight-saving boundary, where only UTC is covered today.
+   Still untouched beyond that: `sequence`, `window` and `lookup` and the other 25 transforms;
+   `trail`, `shape`, `image` and `path` marks; and `quantile`, `quantize`, `threshold` and
+   `bin-ordinal` scales.
+4. **Label overlap removal** and **arc padding and corner rounding**, both previously ranked second
+   and third and both still worth doing — but each is a self-contained feature that is honestly
+   reported today, where the audit above is a class of silent wrong answers.
