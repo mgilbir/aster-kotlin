@@ -307,6 +307,67 @@ class SignalCompileTest {
     assertEquals(VegaValue.Num(100.0), compiled.signals["width"])
   }
 
+  /**
+   * A transform runs before the signals are resolved, so a computed signal reads as null there —
+   * and null is zero to arithmetic, which draws a chart in the wrong place rather than failing.
+   *
+   * Vega's own radial tree example is written this way: `originX` has an `update`, and every node's
+   * `x` is `originX + radius * cos(...)`, so the whole diagram collapsed onto the origin with
+   * nothing said. Only a signal with a plain `value` can be seeded before the data, because a
+   * signal's `update` may itself read a dataset.
+   */
+  @Test
+  fun `a transform reading a computed signal is reported by name`() {
+    val compiled =
+      compile(
+        """
+        {
+          "width": 100, "height": 50, "padding": 0,
+          "signals": [{"name": "origin", "update": "width / 2"}],
+          "data": [
+            {
+              "name": "t",
+              "values": [{"v": 1}],
+              "transform": [{"type": "formula", "expr": "origin + datum.v", "as": "p"}]
+            }
+          ],
+          "marks": []
+        }
+        """
+          .trimIndent()
+      )
+    val reported = compiled.diagnostics.filter { it.message.contains("signal 'origin'") }
+    assertEquals(1, reported.size, compiled.diagnostics.toString())
+    assertEquals(DiagnosticCodes.TRANSFORM_INVALID_PARAMETER, reported.single().code)
+  }
+
+  /** A signal written down as a constant is available, so it must not be reported. */
+  @Test
+  fun `a transform reading a plain signal value says nothing`() {
+    val compiled =
+      compile(
+        """
+        {
+          "width": 100, "height": 50, "padding": 0,
+          "signals": [{"name": "origin", "value": 50}],
+          "data": [
+            {
+              "name": "t",
+              "values": [{"v": 1}],
+              "transform": [{"type": "formula", "expr": "origin + datum.v", "as": "p"}]
+            }
+          ],
+          "marks": []
+        }
+        """
+          .trimIndent()
+      )
+    assertTrue(
+      compiled.diagnostics.none { it.message.contains("signal 'origin'") },
+      compiled.diagnostics.toString(),
+    )
+  }
+
   private fun solidFill(node: RectNode): SceneColor? =
     (node.fill?.paint as? ScenePaint.Solid)?.color
 }

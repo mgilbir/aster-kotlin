@@ -524,8 +524,11 @@ public object Differential {
       }
       val allowed =
         // A trail's end caps are semicircles, so it is measured the same way an arc is: by the
-        // cubics actually painted rather than by an exact circle.
-        if ((expected.type == "arc" || expected.type == "trail") && channel.startsWith("shape")) {
+        // cubics actually painted rather than by an exact circle. A `path` mark joins them because
+        // its outline may contain an SVG `A` command, which both engines approximate with cubics
+        // and neither splits identically — a circle written as one arc measures 14.000002 upstream
+        // and 14.0000001 here.
+        if (channel.startsWith("shape") && expected.type in CURVE_EXTENT_TYPES) {
           CURVE_EXTENT_TOLERANCE
         } else {
           tolerance
@@ -699,6 +702,9 @@ public object Differential {
    * unrelated to this engine's behaviour. Everything else is compared.
    */
   public val DEFAULT_IGNORED_CHANNELS: Set<String> = setOf("font", "fontWeight")
+
+  /** Mark types whose drawn extent comes from a curve approximating a true circular arc. */
+  private val CURVE_EXTENT_TYPES = setOf("arc", "trail", "path")
 
   private val COLOUR_CHANNELS = setOf("fill", "stroke")
 }

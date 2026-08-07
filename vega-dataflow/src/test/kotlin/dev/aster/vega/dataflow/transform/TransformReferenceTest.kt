@@ -9,6 +9,8 @@ import dev.aster.vega.model.DiagnosticCodes
 import dev.aster.vega.model.DiagnosticCollector
 import dev.aster.vega.model.VegaJson
 import dev.aster.vega.model.VegaValue
+import dev.aster.vega.model.asString
+import dev.aster.vega.model.field
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
@@ -509,7 +511,7 @@ class TransformReferenceTest {
   }
 
   @Test
-  fun `the registry covers the transforms the brief lists, plus twenty-one more`() {
+  fun `the registry covers the transforms the brief lists, plus twenty-three more`() {
     val fromTheBrief =
       setOf(
         "filter",
@@ -532,7 +534,8 @@ class TransformReferenceTest {
     // bind to; `lookup` is the only join there is; and `impute` is what stops a line jumping the
     // gap where a series has no row. `cross`, `pivot` and `countpattern` are the reshaping three:
     // a matrix, a long table made wide, and the word counts a cloud is drawn from. `quantile`,
-    // `regression`, `loess`, `kde`, `density` and `dotbin` are the statistical family.
+    // `regression`, `loess`, `kde`, `density` and `dotbin` are the statistical family. `treelinks`
+    // and `linkpath` are what turns a laid-out tree into the edges drawn between its nodes.
     assertEquals(
       fromTheBrief +
         "timeunit" +
@@ -555,7 +558,9 @@ class TransformReferenceTest {
         "treemap" +
         "partition" +
         "pack" +
-        "tree",
+        "tree" +
+        "treelinks" +
+        "linkpath",
       TransformRegistry.Default.types,
     )
   }
@@ -1715,6 +1720,216 @@ class TransformReferenceTest {
     run("""[$STRATIFY, {"type": "tree", "method": "radial", "size": [10, 10]}]""", forest)
     assertTrue(
       context.diagnostics.diagnostics.any { it.message.contains("radial") },
+      context.diagnostics.diagnostics.toString(),
+    )
+  }
+
+  // ---- treelinks, linkpath --------------------------------------------------
+
+  /** Four nodes, so a tidy layout lands on round numbers and the path vectors stay readable. */
+  private val fork =
+    """
+    [{"id": "root", "parent": null},
+     {"id": "a", "parent": "root"},
+     {"id": "b", "parent": "root"},
+     {"id": "a1", "parent": "a"}]
+    """
+      .trimIndent()
+
+  private fun rows(transforms: String, data: String): List<VegaValue> {
+    context = TestContext()
+    return pipeline.run(
+      (VegaJson.parse(data) as VegaValue.Arr).values,
+      (VegaJson.parse(transforms) as VegaValue.Arr).values,
+      context,
+    )
+  }
+
+  /**
+   * `root` and `a` are the only nodes with children, so an edge list that came out depth-first
+   * would read `root>a a>a1 a>a2 root>b …` and put a different link under every mark.
+   */
+  @Test
+  fun `treelinks emits one row per edge, breadth-first`() {
+    assertEquals(
+      "root>a root>b a>a1 a>a2 b>b1 b>b2 b>b3",
+      rows("""[$STRATIFY, {"type": "treelinks"}]""", forest).joinToString(" ") {
+        "${it.field("source.id").asString()}>${it.field("target.id").asString()}"
+      },
+    )
+  }
+
+  /** The whole row goes into each end, so an accessor reaches through `source` or `target`. */
+  @Test
+  fun `an edge carries both rows whole`() {
+    val edge = rows("""[$STRATIFY, {"type": "treelinks"}]""", fork).first()
+    assertEquals("root", edge.field("source.id").asString())
+    assertEquals("a", edge.field("target.id").asString())
+  }
+
+  private val LAID_OUT =
+    """$STRATIFY, {"type": "tree", "size": [100, 100]}, {"type": "treelinks"}"""
+
+  /** The text `linkpath` wrote on each edge, in the order the edges came out. */
+  private fun paths(transform: String, output: String = "path"): String =
+    rows("[$LAID_OUT, $transform]", fork).joinToString(" ") { it.field(output).asString() }
+
+  private fun linkpath(shape: String, orient: String): String =
+    paths("""{"type": "linkpath", "shape": "$shape", "orient": "$orient"}""")
+
+  /**
+   * `line`, `arc` and `curve` are symmetric in x and y, so upstream gives them no per-orientation
+   * form and a Cartesian `orient` falls through to the bare shape. Pinned in both orientations
+   * because a lookup that failed to fall back would report an unsupported pair instead.
+   */
+  @Test
+  fun `the symmetric shapes ignore a Cartesian orientation`() {
+    val line = "M50,0L25,50 M50,0L75,50 M25,50L25,100"
+    assertEquals(line, linkpath("line", "horizontal"))
+    assertEquals(line, linkpath("line", "vertical"))
+
+    val arc =
+      "M50,0A27.95084971874737,27.95084971874737 116.56505117707799 0 1 25,50 " +
+        "M50,0A27.95084971874737,27.95084971874737 63.43494882292201 0 1 75,50 " +
+        "M25,50A25,25 90 0 1 25,100"
+    assertEquals(arc, linkpath("arc", "horizontal"))
+    assertEquals(arc, linkpath("arc", "vertical"))
+
+    val curve = "M50,0C55,15 40,45 25,50 M50,0C65,5 80,35 75,50 M25,50C35,60 35,90 25,100"
+    assertEquals(curve, linkpath("curve", "horizontal"))
+    assertEquals(curve, linkpath("curve", "vertical"))
+  }
+
+  /** `orthogonal` and `diagonal` bend towards the axis the tree grows along, so orient decides. */
+  @Test
+  fun `the bending shapes follow the orientation`() {
+    assertEquals(
+      "M50,0V50H25 M50,0V50H75 M25,50V100H25",
+      linkpath("orthogonal", "horizontal"),
+    )
+    assertEquals("M50,0H25V50 M50,0H75V50 M25,50H25V100", linkpath("orthogonal", "vertical"))
+    assertEquals(
+      "M50,0C37.5,0 37.5,50 25,50 M50,0C62.5,0 62.5,50 75,50 M25,50C25,50 25,100 25,100",
+      linkpath("diagonal", "horizontal"),
+    )
+    assertEquals(
+      "M50,0C50,25 25,25 25,50 M50,0C50,25 75,25 75,50 M25,50C25,75 25,75 25,100",
+      linkpath("diagonal", "vertical"),
+    )
+  }
+
+  /**
+   * Radially the four accessors are angle and radius rather than x and y, so the same layout that
+   * drew a fan of straight lines above now wraps around the origin.
+   */
+  @Test
+  fun `every radial shape matches upstream`() {
+    assertEquals(
+      "M0,0L49.56014059317368,-6.617587504888651 " +
+        "M0,0L46.087563486237464,-19.389081770471524 " +
+        "M49.56014059317368,-6.617587504888651L99.12028118634736,-13.235175009777302",
+      linkpath("line", "radial"),
+    )
+    assertEquals(
+      "M0,0A25,25 -7.605512172941977 0 1 49.56014059317368,-6.617587504888651 " +
+        "M0,0A25,25 -22.816536518825938 0 1 46.087563486237464,-19.389081770471524 " +
+        "M49.56014059317368,-6.617587504888651A25,25 -7.605512172941977 0 1 " +
+        "99.12028118634736,-13.235175009777302",
+      linkpath("arc", "radial"),
+    )
+    assertEquals(
+      "M0,0C8.588510617657006,-11.235545619612466 38.32459497356121,-15.206098122545658 " +
+        "49.56014059317368,-6.617587504888651 " +
+        "M0,0C5.3396963431531885,-13.0953290513418 32.992234434895664,-24.728778113624713 " +
+        "46.087563486237464,-19.389081770471524 " +
+        "M49.56014059317368,-6.617587504888651C58.148651210830685,-17.853133124501117 " +
+        "87.88473556673489,-21.82368562743431 99.12028118634736,-13.235175009777302",
+      linkpath("curve", "radial"),
+    )
+    assertEquals(
+      "M0,0C24.124150712302832,-6.559371342598219 24.78007029658684,-3.3087937524443256 " +
+        "49.56014059317368,-6.617587504888651 " +
+        "M0,0C24.124150712302832,-6.559371342598219 23.043781743118732,-9.694540885235762 " +
+        "46.087563486237464,-19.389081770471524 " +
+        "M49.56014059317368,-6.617587504888651C74.34021088976051,-9.926381257332977 " +
+        "74.34021088976051,-9.926381257332977 99.12028118634736,-13.235175009777302",
+      linkpath("diagonal", "radial"),
+    )
+    // The first two edges leave the root, whose radius is zero, so their arc is a point — upstream
+    // emits the degenerate `A0,0` rather than skipping it, and the renderer draws the line only.
+    assertEquals(
+      "M0,0A0,0 0 0,1 0,0L49.56014059317368,-6.617587504888651 " +
+        "M0,0A0,0 0 0,0 0,0L46.087563486237464,-19.389081770471524 " +
+        "M49.56014059317368,-6.617587504888651A50,50 0 0,0 " +
+        "49.56014059317368,-6.617587504888651L99.12028118634736,-13.235175009777302",
+      linkpath("orthogonal", "radial"),
+    )
+  }
+
+  /** With nothing said, upstream draws a straight `line` and writes it to `path`. */
+  @Test
+  fun `linkpath defaults to a straight line written to path`() {
+    assertEquals("M50,0L25,50 M50,0L75,50 M25,50L25,100", paths("""{"type": "linkpath"}"""))
+  }
+
+  /** The radial tree example names all four, because radially they are not x and y at all. */
+  @Test
+  fun `explicit accessors and a renamed output match upstream`() {
+    assertEquals(
+      "M0,50L50,25 M0,50L50,75 M50,25L100,25",
+      paths(
+        """{"type": "linkpath", "sourceX": "source.y", "sourceY": "source.x",
+             "targetX": "target.y", "targetY": "target.x", "as": "wire"}""",
+        output = "wire",
+      ),
+    )
+  }
+
+  @Test
+  fun `treelinks with no tree before it is reported`() {
+    assertTrue(rows("""[{"type": "treelinks"}]""", fork).isEmpty())
+    assertTrue(
+      context.diagnostics.diagnostics.any { it.message.contains("treelinks needs a tree") },
+      context.diagnostics.diagnostics.toString(),
+    )
+  }
+
+  /**
+   * Position is the only link left between a node and its row once a transform has copied it, so a
+   * filter in between is refused rather than silently joining the wrong pair of rows.
+   */
+  @Test
+  fun `rows dropped between the tree and treelinks are reported`() {
+    val output =
+      rows(
+        """[$STRATIFY, {"type": "filter", "expr": "datum.id != 'b'"},
+            {"type": "treelinks"}]""",
+        fork,
+      )
+    assertTrue(output.isEmpty())
+    assertTrue(
+      context.diagnostics.diagnostics.any { it.message.contains("added or removed rows") },
+      context.diagnostics.diagnostics.toString(),
+    )
+  }
+
+  @Test
+  fun `a shape with no form for the orientation is reported`() {
+    paths("""{"type": "linkpath", "shape": "orthogonal", "orient": "diagonal"}""")
+    assertTrue(
+      context.diagnostics.diagnostics.any {
+        it.message.contains("no 'orthogonal' shape for a 'diagonal' layout")
+      },
+      context.diagnostics.diagnostics.toString(),
+    )
+  }
+
+  /** Nothing re-runs a transform here, so the parameter that would trigger it says so. */
+  @Test
+  fun `linkpath require is reported`() {
+    paths("""{"type": "linkpath", "require": "hover"}""")
+    assertTrue(
+      context.diagnostics.diagnostics.any { it.message.contains("'require'") },
       context.diagnostics.diagnostics.toString(),
     )
   }

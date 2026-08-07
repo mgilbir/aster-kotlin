@@ -19,3 +19,6 @@ node_modules/
 *.apk
 *.aab
 *.hprof
+
+# Worktrees for parallel agents; each is its own checkout, not content of this one.
+.claude/worktrees/
