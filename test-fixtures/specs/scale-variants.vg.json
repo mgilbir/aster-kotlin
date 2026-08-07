@@ -1,0 +1,76 @@
+{
+  "$schema": "https://vega.github.io/schema/vega/v6.json",
+  "description": "A symlog axis spanning both signs, a pow axis with an exponent other than one, and a reversed point scale — three scale types with no fixture of their own.",
+  "width": 240,
+  "height": 150,
+  "padding": 5,
+  "data": [
+    {
+      "name": "table",
+      "values": [
+        {"c": "a", "v": -900, "p": 4, "q": 1},
+        {"c": "b", "v": -12, "p": 36, "q": 2},
+        {"c": "c", "v": 0, "p": 81, "q": 3},
+        {"c": "d", "v": 45, "p": 144, "q": 4},
+        {"c": "e", "v": 1400, "p": 400, "q": 5}
+      ]
+    }
+  ],
+  "scales": [
+    {
+      "name": "sym",
+      "type": "symlog",
+      "domain": {"data": "table", "field": "v"},
+      "range": "width",
+      "constant": 10
+    },
+    {
+      "name": "power",
+      "type": "pow",
+      "exponent": 0.5,
+      "domain": {"data": "table", "field": "p"},
+      "range": "height",
+      "nice": true
+    },
+    {
+      "name": "steps",
+      "type": "point",
+      "domain": {"data": "table", "field": "c"},
+      "range": "height",
+      "padding": 0.5,
+      "reverse": true
+    }
+  ],
+  "axes": [
+    {"orient": "bottom", "scale": "sym", "tickCount": 5, "title": "Symlog, both signs"},
+    {"orient": "left", "scale": "power", "tickCount": 4, "title": "Pow 0.5"},
+    {"orient": "right", "scale": "steps"}
+  ],
+  "marks": [
+    {
+      "type": "symbol",
+      "from": {"data": "table"},
+      "encode": {
+        "enter": {
+          "x": {"scale": "sym", "field": "v"},
+          "y": {"scale": "power", "field": "p"},
+          "size": {"value": 90},
+          "shape": {"value": "diamond"},
+          "fill": {"value": "#4c78a8"}
+        }
+      }
+    },
+    {
+      "type": "rule",
+      "from": {"data": "table"},
+      "encode": {
+        "enter": {
+          "x": {"scale": "sym", "value": 0},
+          "x2": {"scale": "sym", "field": "v"},
+          "y": {"scale": "steps", "field": "c"},
+          "stroke": {"value": "#999999"}
+        }
+      }
+    }
+  ]
+}

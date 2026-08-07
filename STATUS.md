@@ -20,7 +20,7 @@ Milestones 0, 1 and 2 complete. **Milestones 3 and 4 in progress**: Vega specifi
 end — including expressions, signals and the twelve data transforms the brief lists — and are verified
 against upstream Vega by differential tests.
 
-Forty-one differential fixtures pass, all matching upstream exactly on every mark and scale output:
+Forty-three differential fixtures pass, all matching upstream exactly on every mark and scale output:
 
 | Fixture | Marks | Covers |
 | --- | --- | --- |
@@ -65,6 +65,8 @@ Forty-one differential fixtures pass, all matching upstream exactly on every mar
 | `arc-padding` | 10 | a padded, round-cornered donut beside a pie of the same data |
 | `window` | 43 | a running total and a three-point moving average, partitioned by series |
 | `sequence-lookup` | 27 | a curve generated from nothing, over bars joined to a second dataset |
+| `scale-variants` | 43 | a symlog axis over both signs, a pow axis, a reversed point scale |
+| `negative-labels` | 45 | where the minus sign applies and where the hyphen stays |
 
 The gate is wired into `./scripts/oracle.sh`, so every further scale, mark and transform is built
 against a harness that can say we are wrong — which golden tests cannot.
@@ -126,7 +128,7 @@ substantive compatibility items:
 | 6. View and Compose APIs | Yes |
 | 7. SVG, PNG, PDF export | Yes |
 | 8. TalkBack can describe and navigate | Partial — virtual nodes are tested by instrumentation, not with TalkBack itself |
-| 9. At least 100 compatibility fixtures pass | 41 of 100 |
+| 9. At least 100 compatibility fixtures pass | 43 of 100 |
 | 10. Core runtime has no Android dependency | Yes |
 | 11. Renders without WebView | Yes |
 | 12. Build and test loop runs from the terminal | Yes |
@@ -374,7 +376,7 @@ dark chrome, so a dark background was unreadable — they now take a `SampleScen
 
 ## Known failing fixtures
 
-None. Forty-one fixtures exist and all forty-one pass. The brief's MVP asks for 100; growing the
+None. Forty-three fixtures exist and all forty-three pass. The brief's MVP asks for 100; growing the
 corpus is the main task now, and each new fixture is expected to surface gaps rather than pass
 immediately. That keeps happening, which is the point of the harness: `stacked-bar` surfaced two real
 bugs, and `facet-trellis` surfaced a third — `range: "height"` was descending for every scale type,
@@ -558,7 +560,7 @@ depends on them. Each has a test and a comment; this is the index.
 
 ## Next three tasks
 
-1. **Keep growing the fixture corpus.** 41 of the brief's 100 pass, and the return has not fallen
+1. **Keep growing the fixture corpus.** 43 of the brief's 100 pass, and the return has not fallen
    off: the last ten fixtures found fourteen defects between them, and half of those were in code
    that had been passing for a dozen fixtures. Worth aiming at next: a `config` block of any kind,
    which is where a Vega-Lite-compiled specification puts everything and where every default in this
