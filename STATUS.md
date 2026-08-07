@@ -402,7 +402,7 @@ ordering), and the pipeline is now verified end to end on one fixture, but the b
 
 ## Verification
 
-- 1,243 JVM tests pass (`./scripts/test-core.sh`, `./gradlew test`).
+- 1,244 JVM tests pass (`./scripts/test-core.sh`, `./gradlew test`).
 - Android lint is clean with `warningsAsErrors` on every Android module.
 - 57 instrumented tests pass on an API 37 arm64 emulator (`./scripts/test-android.sh`): 49 in
   `vega-android-canvas`, 4 in `vega-compose`, 4 in `demo`. Three groups of them cover what no JVM
@@ -673,11 +673,12 @@ depends on them. Each has a test and a comment; this is the index.
    the event's own mark rather than a signal, is reported and does nothing. The first needs a
    scheduler the controller does not have; the second needs a signal to notice its own change; the
    third needs the compiler to hand back a mutable node. All three are reported by name today.
-2. **Give axes and legends descriptions**, which is what listening to TalkBack turned up next and
-   is the largest remaining accessibility gap. A reader reaches every mark and is told the chart's
-   own description, and gets no frame of reference in between: no "x axis, months, January to
-   August", no "legend, three series". A mark's label means little without them. The descriptor
-   type exists on `NodeMetadata`; nothing populates it for a guide.
+2. **The fixture descriptions are written for the wrong reader.** Now that a chart's
+   `description` is announced, the corpus's own prose is what TalkBack says first — and it was
+   written for a developer reading the corpus: "so both legend forms and both placement axes are
+   covered". That is the right sentence in the wrong place. Either the fixtures grow a second,
+   reader-facing description, or the demo's bundled specifications stop being fixture files. The
+   engine is not at fault; the demo reads badly and a user would notice before any of us did.
 3. **Keep growing the fixture corpus.** 58 of the brief's 100. Aiming it at *combinations* the
    engine has not met rather than at more variations of a single feature is what makes it find
    things: that is how `scale()` in an expression turned up missing. Untried combinations that

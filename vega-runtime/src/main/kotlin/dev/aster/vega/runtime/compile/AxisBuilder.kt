@@ -8,6 +8,7 @@ import dev.aster.vega.model.asString
 import dev.aster.vega.model.spec.Anchor
 import dev.aster.vega.model.spec.AxisSpec
 import dev.aster.vega.model.spec.Orient
+import dev.aster.vega.model.spec.ScaleType
 import dev.aster.vega.runtime.scale.BandScale
 import dev.aster.vega.runtime.scale.LinearScale
 import dev.aster.vega.runtime.scale.PointScale
@@ -16,6 +17,7 @@ import dev.aster.vega.runtime.scale.TimeScale
 import dev.aster.vega.runtime.scale.TimeTicks
 import dev.aster.vega.runtime.scale.TransformedScale
 import dev.aster.vega.runtime.scale.VegaScale
+import dev.aster.vega.scene.AccessibilityDescriptor
 import dev.aster.vega.scene.GroupNode
 import dev.aster.vega.scene.NodeMetadata
 import dev.aster.vega.scene.RectD
@@ -52,6 +54,10 @@ import dev.aster.vega.scene.transformedBounds
  */
 public class AxisBuilder(
   private val scales: Map<String, VegaScale>,
+  /**
+   * The declared `type` per scale, for the accessibility caption; `sqrt` and `pow` share a class.
+   */
+  private val scaleTypes: Map<String, ScaleType>,
   private val ids: SceneNodeIdAllocator,
   private val textEngine: TextEngine,
   private val diagnostics: DiagnosticCollector,
@@ -270,7 +276,22 @@ public class AxisBuilder(
         id = ids.allocate(),
         children = children,
         transform = placement,
-        metadata = NodeMetadata(role = "axis", markName = spec.scale),
+        metadata =
+          NodeMetadata(
+            role = "axis",
+            markName = spec.scale,
+            // What a screen reader is told before it reaches the marks this axis frames.
+            accessibility =
+              GuideCaption.axis(
+                  spec.orient.name.lowercase(),
+                  spec.title,
+                  scale,
+                  scaleTypes[spec.scale],
+                )
+                ?.let {
+                  AccessibilityDescriptor(label = it, role = "graphics-symbol", focusable = true)
+                },
+          ),
       )
 
     val guide =

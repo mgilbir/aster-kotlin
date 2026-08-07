@@ -260,7 +260,7 @@ Upstream Vega exposes 119 expression functions; 82 are implemented and 17 more a
 | Selected state | Supported | `VegaChartViewTest` | — | 1 |
 | Dense-chart summary | Partial | `VegaChartViewTest` | Collapses above 120 focusable marks; the summary text is minimal | 7 |
 | Light and dark palettes | Supported | `DemoActivityTest` | `SampleScenes.Palette` switches chrome colours; geometry is identical | 1 |
-| Axis and legend descriptions | Planned | — | Axes and legends carry no descriptors, so a reader gets the marks and no frame of reference for them | 7 |
+| Axis and legend descriptions | **Supported** | `GuideCaptionTest` (127 upstream captions across the whole corpus) | "X-axis titled 'Value' for a linear scale with values from 0 to 100", "Symbol legend titled 'Series' for fill color with 3 values: alpha, beta, gamma". The wording is upstream's, ported from `vega-scenegraph/src/util/aria.js` and `vega-scale/src/caption.js` rather than invented, so a reader who has met Vega charts elsewhere hears the same phrasing. A domain longer than seven values reads its first five and its last; numbers carry the same thousands separators and typographic minus as tick labels; a time scale reads a full long-form date. The declared scale `type` is used, not the runtime class, so a specification that wrote `sqrt` hears "sqrt" and not "pow" | 7 |
 | Verified with TalkBack | **Yes** | manual, on an API 37 emulator | TalkBack was enabled on the emulator and the demo's charts explored. It reaches every mark and reads the chart's description first. Both defects it found are fixed and pinned by instrumented tests. Not verified on physical hardware or with a real user | 7 |
 | Domain adjustment and reset-zoom actions | Planned | — | — | 7 |
 

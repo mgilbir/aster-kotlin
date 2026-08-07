@@ -12,6 +12,7 @@ import dev.aster.vega.model.spec.LayoutSpec
 import dev.aster.vega.model.spec.LegendSpec
 import dev.aster.vega.model.spec.MarkSpec
 import dev.aster.vega.model.spec.MarkType
+import dev.aster.vega.model.spec.ScaleType
 import dev.aster.vega.model.spec.TitleSpec
 import dev.aster.vega.runtime.scale.VegaScale
 import dev.aster.vega.scene.GroupNode
@@ -40,6 +41,13 @@ internal class CompileScope(
   val signals: SignalScope,
   val scales: Map<String, VegaScale>,
   val rangeSize: PlotSize,
+  /**
+   * Each scale's declared `type`, which its built object no longer knows.
+   *
+   * `sqrt` and `pow` are the same class, and a specification that wrote `sqrt` should hear "sqrt"
+   * from a screen reader. Carried alongside the scales because a group scope shadows both together.
+   */
+  val scaleTypes: Map<String, ScaleType> = emptyMap(),
 )
 
 /**
@@ -87,7 +95,8 @@ internal class ScopeCompiler(
     extent: PlotSize,
   ): ScopeContent {
     val numbers = NumberResolver(expressions, scope.signals, diagnostics)
-    val axisBuilder = AxisBuilder(scope.scales, ids, textEngine, diagnostics, numbers)
+    val axisBuilder =
+      AxisBuilder(scope.scales, scope.scaleTypes, ids, textEngine, diagnostics, numbers)
     val encoder =
       MarkEncoder(
         scope.scales,
@@ -455,7 +464,13 @@ internal class ScopeCompiler(
     val numbers = NumberResolver(expressions, signals, diagnostics)
     val scales =
       outer.scales + ScaleResolver(datasets, rangeSize, diagnostics, numbers).resolve(spec.scales)
-    return CompileScope(datasets, signals, scales, rangeSize)
+    return CompileScope(
+      datasets,
+      signals,
+      scales,
+      rangeSize,
+      outer.scaleTypes + spec.scales.associate { it.name to it.type },
+    )
   }
 
   private fun numberSignal(signals: SignalScope, name: String): Double? =

@@ -18,6 +18,7 @@ import dev.aster.vega.runtime.scale.TimeScale
 import dev.aster.vega.runtime.scale.TransformedScale
 import dev.aster.vega.runtime.scale.VegaScale
 import dev.aster.vega.runtime.scale.formatTickLabel
+import dev.aster.vega.scene.AccessibilityDescriptor
 import dev.aster.vega.scene.Fill
 import dev.aster.vega.scene.GradientStop
 import dev.aster.vega.scene.GroupNode
@@ -719,12 +720,43 @@ internal class LegendBuilder(
     return nodes
   }
 
+  /**
+   * What a screen reader is told about a legend.
+   *
+   * The channels are listed in the order Vega does, so "fill color and size" rather than whichever
+   * order this happens to read them in — a caption that varies by implementation is a caption a
+   * reader cannot learn.
+   */
+  private fun caption(built: Built): String? {
+    val spec = built.spec
+    val channels =
+      listOfNotNull(
+        spec.fill?.let { "fill" },
+        spec.stroke?.let { "stroke" },
+        spec.size?.let { "size" },
+        spec.shape?.let { "shape" },
+        spec.opacity?.let { "opacity" },
+      )
+    val scaleName = spec.scale ?: return null
+    val scale = scales[scaleName] ?: return null
+    val kind = if (resolveType(spec, scale) == LegendType.GRADIENT) "gradient" else "symbol"
+    return GuideCaption.legend(kind, spec.title, channels, scale)
+  }
+
   private fun node(built: Built, x: Double, y: Double): SceneNode =
     GroupNode(
       id = built.id,
       children = built.content,
       transform = Transform2D.translate(x, y),
       size = built.size,
-      metadata = NodeMetadata(role = "legend", markName = built.spec.scale),
+      metadata =
+        NodeMetadata(
+          role = "legend",
+          markName = built.spec.scale,
+          accessibility =
+            caption(built)?.let {
+              AccessibilityDescriptor(label = it, role = "graphics-symbol", focusable = true)
+            },
+        ),
     )
 }

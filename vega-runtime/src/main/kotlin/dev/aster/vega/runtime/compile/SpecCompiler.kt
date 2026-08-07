@@ -131,7 +131,8 @@ public class SpecCompiler(private val textEngine: TextEngine = MetricTextEngine(
     val numbers = NumberResolver(expressions, signals, diagnostics)
     val scales = ScaleResolver(datasets, plot, diagnostics, numbers).resolve(spec.scales)
 
-    val root = CompileScope(datasets, signals, scales, plot)
+    val root =
+      CompileScope(datasets, signals, scales, plot, spec.scales.associate { it.name to it.type })
     val scope =
       ScopeCompiler(ids, textEngine, diagnostics, expressions, data)
         .compile(spec.marks, spec.axes, spec.legends, spec.title, spec.layout, root, plot)

@@ -1,0 +1,637 @@
+[
+ {
+  "fixture": "area-gaps",
+  "kind": "axis",
+  "caption": "X-axis for a linear scale with values from 0 to 4"
+ },
+ {
+  "fixture": "area-gaps",
+  "kind": "axis",
+  "caption": "Y-axis for a linear scale with values from 0 to 36"
+ },
+ {
+  "fixture": "axis-label-angle",
+  "kind": "axis",
+  "caption": "X-axis for a discrete scale with 4 values: alpha-long-name, bravo-long-name, charlie-long, delta-longer"
+ },
+ {
+  "fixture": "axis-label-angle",
+  "kind": "axis",
+  "caption": "X-axis for a discrete scale with 4 values: alpha-long-name, bravo-long-name, charlie-long, delta-longer"
+ },
+ {
+  "fixture": "axis-label-angle",
+  "kind": "axis",
+  "caption": "Y-axis for a linear scale with values from 0 to 80"
+ },
+ {
+  "fixture": "axis-style",
+  "kind": "axis",
+  "caption": "X-axis titled 'Category' for a discrete scale with 5 values: a, b, c, d, e"
+ },
+ {
+  "fixture": "axis-style",
+  "kind": "axis",
+  "caption": "Y-axis titled 'Value' for a linear scale with values from 0 to 100"
+ },
+ {
+  "fixture": "axis-values",
+  "kind": "axis",
+  "caption": "X-axis for a discrete scale with 5 values: alpha, bravo, charlie, delta, echo"
+ },
+ {
+  "fixture": "axis-values",
+  "kind": "axis",
+  "caption": "Y-axis titled 'Out of order' for a linear scale with values from 0 to 100"
+ },
+ {
+  "fixture": "axis-values",
+  "kind": "axis",
+  "caption": "Y-axis titled 'Thinned' for a linear scale with values from 0 to 100"
+ },
+ {
+  "fixture": "axis-variants",
+  "kind": "axis",
+  "caption": "X-axis for a discrete scale with 4 values: a, b, c, d"
+ },
+ {
+  "fixture": "axis-variants",
+  "kind": "axis",
+  "caption": "X-axis for a discrete scale with 4 values: a, b, c, d"
+ },
+ {
+  "fixture": "axis-variants",
+  "kind": "axis",
+  "caption": "Y-axis for a linear scale with values from 0 to 35"
+ },
+ {
+  "fixture": "axis-variants",
+  "kind": "axis",
+  "caption": "Y-axis for a linear scale with values from 0 to 35"
+ },
+ {
+  "fixture": "band-padding",
+  "kind": "axis",
+  "caption": "X-axis for a discrete scale with 3 values: one, two, three"
+ },
+ {
+  "fixture": "band-padding",
+  "kind": "axis",
+  "caption": "Y-axis for a linear scale with values from 0 to 19"
+ },
+ {
+  "fixture": "bar",
+  "kind": "axis",
+  "caption": "X-axis for a discrete scale with 8 values: Jan, Feb, Mar, Apr, May, ending with Aug"
+ },
+ {
+  "fixture": "bar",
+  "kind": "axis",
+  "caption": "Y-axis for a linear scale with values from 0 to 100"
+ },
+ {
+  "fixture": "bin-to-ordinal",
+  "kind": "axis",
+  "caption": "X-axis for a linear scale with values from 0 to 50"
+ },
+ {
+  "fixture": "bin-to-ordinal",
+  "kind": "axis",
+  "caption": "Y-axis for a linear scale with values from 0 to 5"
+ },
+ {
+  "fixture": "binned-scales",
+  "kind": "axis",
+  "caption": "X-axis for a linear scale with values from 0 to 100"
+ },
+ {
+  "fixture": "box-plot",
+  "kind": "axis",
+  "caption": "Y-axis for a discrete scale with 3 values: north, south, east"
+ },
+ {
+  "fixture": "box-plot",
+  "kind": "axis",
+  "caption": "X-axis for a linear scale with values from 5 to 50"
+ },
+ {
+  "fixture": "colour-ramps",
+  "kind": "axis",
+  "caption": "X-axis for a discrete scale with 8 values: 0, 1, 2, 3, 4, ending with 7"
+ },
+ {
+  "fixture": "colour-ramps",
+  "kind": "legend",
+  "caption": "Gradient legend titled 'viridis' for fill color with values from 0 to 100"
+ },
+ {
+  "fixture": "colour-scheme",
+  "kind": "axis",
+  "caption": "X-axis for a discrete scale with 5 values: alpha, beta, gamma, delta, epsilon"
+ },
+ {
+  "fixture": "colour-scheme",
+  "kind": "axis",
+  "caption": "Y-axis for a linear scale with values from 0 to 100"
+ },
+ {
+  "fixture": "config-marks",
+  "kind": "axis",
+  "caption": "X-axis for a discrete scale with 3 values: alpha, bravo, charlie"
+ },
+ {
+  "fixture": "config-marks",
+  "kind": "axis",
+  "caption": "Y-axis for a linear scale with values from 0 to 90"
+ },
+ {
+  "fixture": "config-theme",
+  "kind": "axis",
+  "caption": "X-axis titled 'Band, themed all the way down' for a discrete scale with 3 values: alpha, bravo, charlie"
+ },
+ {
+  "fixture": "config-theme",
+  "kind": "axis",
+  "caption": "X-axis for a discrete scale with 3 values: alpha, bravo, charlie"
+ },
+ {
+  "fixture": "config-theme",
+  "kind": "axis",
+  "caption": "Y-axis titled 'Linear' for a linear scale with values from 0 to 90"
+ },
+ {
+  "fixture": "config-theme",
+  "kind": "legend",
+  "caption": "Symbol legend titled 'Series' for fill color with 3 values: alpha, bravo, charlie"
+ },
+ {
+  "fixture": "curves",
+  "kind": "axis",
+  "caption": "X-axis for a linear scale with values from 0 to 5"
+ },
+ {
+  "fixture": "curves",
+  "kind": "axis",
+  "caption": "Y-axis for a linear scale with values from 0 to 70"
+ },
+ {
+  "fixture": "density-plot",
+  "kind": "axis",
+  "caption": "X-axis for a linear scale with values from 0 to 14"
+ },
+ {
+  "fixture": "density-plot",
+  "kind": "axis",
+  "caption": "Y-axis for a linear scale with values from 0.00 to 0.16"
+ },
+ {
+  "fixture": "domain-limits",
+  "kind": "axis",
+  "caption": "X-axis for a discrete scale with 4 values: a, b, c, d"
+ },
+ {
+  "fixture": "domain-limits",
+  "kind": "axis",
+  "caption": "Y-axis titled 'Pinned' for a linear scale with values from 20 to 80"
+ },
+ {
+  "fixture": "domain-limits",
+  "kind": "axis",
+  "caption": "Y-axis titled 'Written out' for a linear scale with values from 0 to 60"
+ },
+ {
+  "fixture": "dot-plot",
+  "kind": "axis",
+  "caption": "X-axis for a discrete scale with 4 values: one, two, three, four"
+ },
+ {
+  "fixture": "dot-plot",
+  "kind": "axis",
+  "caption": "Y-axis for a linear scale with values from 0 to 40"
+ },
+ {
+  "fixture": "expressions",
+  "kind": "axis",
+  "caption": "X-axis for a discrete scale with 4 values: a, b, d, e"
+ },
+ {
+  "fixture": "expressions",
+  "kind": "axis",
+  "caption": "Y-axis for a linear scale with values from 0 to 70"
+ },
+ {
+  "fixture": "facet-trellis",
+  "kind": "axis",
+  "caption": "Y-axis for a linear scale with values from 0 to 50"
+ },
+ {
+  "fixture": "facet-trellis",
+  "kind": "axis",
+  "caption": "X-axis for a discrete scale with 3 values: Q1, Q2, Q3"
+ },
+ {
+  "fixture": "facet-trellis",
+  "kind": "axis",
+  "caption": "Y-axis for a linear scale with values from 0 to 20"
+ },
+ {
+  "fixture": "facet-trellis",
+  "kind": "axis",
+  "caption": "X-axis for a discrete scale with 3 values: Q1, Q2, Q3"
+ },
+ {
+  "fixture": "facet-trellis",
+  "kind": "axis",
+  "caption": "Y-axis for a linear scale with values from 0 to 80"
+ },
+ {
+  "fixture": "facet-trellis",
+  "kind": "axis",
+  "caption": "X-axis for a discrete scale with 3 values: Q1, Q2, Q3"
+ },
+ {
+  "fixture": "flatten-arrays",
+  "kind": "axis",
+  "caption": "X-axis for a discrete scale with 3 values: 1, 2, 3"
+ },
+ {
+  "fixture": "flatten-arrays",
+  "kind": "axis",
+  "caption": "Y-axis for a linear scale with values from 0 to 18"
+ },
+ {
+  "fixture": "histogram",
+  "kind": "axis",
+  "caption": "X-axis titled 'Value' for a linear scale with values from 0 to 20"
+ },
+ {
+  "fixture": "histogram",
+  "kind": "axis",
+  "caption": "Y-axis titled 'Count' for a linear scale with values from 0 to 8"
+ },
+ {
+  "fixture": "label-limit",
+  "kind": "axis",
+  "caption": "Y-axis for a discrete scale with 3 values: a-really-quite-long-category-name-here, another-long-one-that-runs-on-and-on, short"
+ },
+ {
+  "fixture": "label-limit",
+  "kind": "axis",
+  "caption": "Y-axis for a discrete scale with 3 values: a-really-quite-long-category-name-here, another-long-one-that-runs-on-and-on, short"
+ },
+ {
+  "fixture": "label-limit",
+  "kind": "axis",
+  "caption": "X-axis for a linear scale with values from 0 to 70"
+ },
+ {
+  "fixture": "label-limit",
+  "kind": "legend",
+  "caption": "Symbol legend titled 'Series' for fill color with 3 values: a-really-quite-long-category-name-here, another-long-one-that-runs-on-and-on, short"
+ },
+ {
+  "fixture": "label-overlap",
+  "kind": "axis",
+  "caption": "X-axis for a discrete scale with 8 values: category-one, category-two, category-three, category-four, category-five, ending with category-eight"
+ },
+ {
+  "fixture": "label-overlap",
+  "kind": "axis",
+  "caption": "X-axis for a discrete scale with 8 values: category-one, category-two, category-three, category-four, category-five, ending with category-eight"
+ },
+ {
+  "fixture": "label-overlap",
+  "kind": "axis",
+  "caption": "Y-axis for a linear scale with values from 0 to 90"
+ },
+ {
+  "fixture": "label-overlap",
+  "kind": "legend",
+  "caption": "Gradient legend titled 'Value' for fill color with values from 12 to 83"
+ },
+ {
+  "fixture": "legend-columns",
+  "kind": "legend",
+  "caption": "Symbol legend for fill color with 5 values: aa, bb, cc, dd, ee"
+ },
+ {
+  "fixture": "legend-style",
+  "kind": "axis",
+  "caption": "X-axis for a linear scale with values from 1.0 to 3.0"
+ },
+ {
+  "fixture": "legend-style",
+  "kind": "axis",
+  "caption": "Y-axis for a linear scale with values from 0 to 80"
+ },
+ {
+  "fixture": "legend-style",
+  "kind": "legend",
+  "caption": "Symbol legend titled 'Series' for fill color with 2 values: alpha, beta"
+ },
+ {
+  "fixture": "legends",
+  "kind": "axis",
+  "caption": "X-axis for a discrete scale with 3 values: alpha, beta, gamma"
+ },
+ {
+  "fixture": "legends",
+  "kind": "axis",
+  "caption": "Y-axis for a linear scale with values from 0 to 55"
+ },
+ {
+  "fixture": "legends",
+  "kind": "legend",
+  "caption": "Symbol legend titled 'Segment' for fill color with 3 values: alpha, beta, gamma"
+ },
+ {
+  "fixture": "legends",
+  "kind": "legend",
+  "caption": "Gradient legend titled 'Score' for fill color with values from 0 to 19"
+ },
+ {
+  "fixture": "line-area",
+  "kind": "axis",
+  "caption": "X-axis for a linear scale with values from 0 to 5"
+ },
+ {
+  "fixture": "line-area",
+  "kind": "axis",
+  "caption": "Y-axis for a linear scale with values from 0 to 100"
+ },
+ {
+  "fixture": "local-time-dst",
+  "kind": "axis",
+  "caption": "X-axis titled 'local' for a time scale with values from Friday, 27 March 2026, 12:00:00 AM to Tuesday, 31 March 2026, 12:00:00 AM"
+ },
+ {
+  "fixture": "local-time-dst",
+  "kind": "axis",
+  "caption": "X-axis titled 'utc' for a utc scale with values from Thursday, 26 March 2026, 11:00:00 PM UTC to Monday, 30 March 2026, 10:00:00 PM UTC"
+ },
+ {
+  "fixture": "local-time-dst",
+  "kind": "axis",
+  "caption": "Y-axis for a linear scale with values from 0 to 26"
+ },
+ {
+  "fixture": "log-scale",
+  "kind": "axis",
+  "caption": "X-axis for a log scale with values from 1 to 1,000"
+ },
+ {
+  "fixture": "log-scale",
+  "kind": "axis",
+  "caption": "Y-axis for a sqrt scale with values from 0 to 100"
+ },
+ {
+  "fixture": "negative-labels",
+  "kind": "axis",
+  "caption": "X-axis titled 'Band: hyphens' for a discrete scale with 4 values: -1200, -5, 12, 340"
+ },
+ {
+  "fixture": "negative-labels",
+  "kind": "axis",
+  "caption": "Y-axis titled 'Linear: minus signs' for a linear scale with values from −40 to 50"
+ },
+ {
+  "fixture": "negative-labels",
+  "kind": "legend",
+  "caption": "Symbol legend titled 'Ordinal' for fill color with 4 values: -1200, -5, 12, 340"
+ },
+ {
+  "fixture": "negative-labels",
+  "kind": "legend",
+  "caption": "Gradient legend titled 'Ramp' for fill color with values from −35 to 44"
+ },
+ {
+  "fixture": "path-marks",
+  "kind": "axis",
+  "caption": "X-axis for a discrete scale with 4 values: 0, 1, 2, 3"
+ },
+ {
+  "fixture": "path-marks",
+  "kind": "axis",
+  "caption": "Y-axis for a linear scale with values from 0 to 100"
+ },
+ {
+  "fixture": "pie",
+  "kind": "legend",
+  "caption": "Symbol legend titled 'Slice' for fill color with 4 values: alpha, beta, gamma, delta"
+ },
+ {
+  "fixture": "reshape-matrix",
+  "kind": "axis",
+  "caption": "X-axis for a discrete scale with 4 values: alpha, beta, gamma, delta"
+ },
+ {
+  "fixture": "reshape",
+  "kind": "axis",
+  "caption": "X-axis for a discrete scale with 3 values: Mar, Jan, Feb"
+ },
+ {
+  "fixture": "reshape",
+  "kind": "axis",
+  "caption": "Y-axis for a linear scale with values from 0 to 45"
+ },
+ {
+  "fixture": "scale-variants",
+  "kind": "axis",
+  "caption": "X-axis titled 'Symlog, both signs' for a symlog scale with values from −900 to 1,400"
+ },
+ {
+  "fixture": "scale-variants",
+  "kind": "axis",
+  "caption": "Y-axis titled 'Pow 0.5' for a pow scale with values from 0 to 400"
+ },
+ {
+  "fixture": "scale-variants",
+  "kind": "axis",
+  "caption": "Y-axis for a discrete scale with 5 values: a, b, c, d, e"
+ },
+ {
+  "fixture": "sequence-lookup",
+  "kind": "axis",
+  "caption": "X-axis for a discrete scale with 4 values: South, North, West, #bbbbbb"
+ },
+ {
+  "fixture": "sequence-lookup",
+  "kind": "axis",
+  "caption": "Y-axis for a linear scale with values from 0 to 100"
+ },
+ {
+  "fixture": "share-of-total",
+  "kind": "axis",
+  "caption": "X-axis for a discrete scale with 4 values: a, b, c, d"
+ },
+ {
+  "fixture": "share-of-total",
+  "kind": "axis",
+  "caption": "Y-axis for a linear scale with values from 0.0 to 0.5"
+ },
+ {
+  "fixture": "size-legend",
+  "kind": "axis",
+  "caption": "X-axis for a linear scale with values from 0 to 5"
+ },
+ {
+  "fixture": "size-legend",
+  "kind": "axis",
+  "caption": "Y-axis for a linear scale with values from 0 to 45"
+ },
+ {
+  "fixture": "size-legend",
+  "kind": "legend",
+  "caption": "Symbol legend titled 'Weight' for size with values from 0 to 27"
+ },
+ {
+  "fixture": "size-legend",
+  "kind": "legend",
+  "caption": "Symbol legend titled 'Group' for fill color with 2 values: north, south"
+ },
+ {
+  "fixture": "sorted-domain",
+  "kind": "axis",
+  "caption": "Y-axis for a discrete scale with 4 values: alpha, charlie, bravo, delta"
+ },
+ {
+  "fixture": "sorted-domain",
+  "kind": "axis",
+  "caption": "X-axis for a linear scale with values from 0 to 11"
+ },
+ {
+  "fixture": "sorted-domain",
+  "kind": "legend",
+  "caption": "Symbol legend titled 'Tier' for fill color with 4 values: 3, 9, 20, 100"
+ },
+ {
+  "fixture": "stack-diverging",
+  "kind": "axis",
+  "caption": "X-axis for a discrete scale with 4 values: Q1, Q2, Q3, Q4"
+ },
+ {
+  "fixture": "stack-diverging",
+  "kind": "axis",
+  "caption": "Y-axis for a linear scale with values from −12 to 14"
+ },
+ {
+  "fixture": "stack-diverging",
+  "kind": "legend",
+  "caption": "Symbol legend titled 'Series' for fill color with 3 values: gain, loss, other"
+ },
+ {
+  "fixture": "stack-offsets",
+  "kind": "axis",
+  "caption": "X-axis for a linear scale with values from 1.0 to 4.0"
+ },
+ {
+  "fixture": "stack-offsets",
+  "kind": "axis",
+  "caption": "Y-axis for a linear scale with values from 0.0 to 1.0"
+ },
+ {
+  "fixture": "stack-offsets",
+  "kind": "legend",
+  "caption": "Symbol legend titled 'Series' for fill color with 3 values: alpha, beta, gamma"
+ },
+ {
+  "fixture": "stacked-bar",
+  "kind": "axis",
+  "caption": "X-axis for a discrete scale with 4 values: Q1, Q2, Q3, Q4"
+ },
+ {
+  "fixture": "stacked-bar",
+  "kind": "axis",
+  "caption": "Y-axis for a linear scale with values from 0 to 35"
+ },
+ {
+  "fixture": "statistics",
+  "kind": "axis",
+  "caption": "X-axis for a linear scale with values from 1 to 7"
+ },
+ {
+  "fixture": "statistics",
+  "kind": "axis",
+  "caption": "Y-axis for a linear scale with values from 0 to 14"
+ },
+ {
+  "fixture": "step-lines",
+  "kind": "axis",
+  "caption": "X-axis for a linear scale with values from 0 to 4"
+ },
+ {
+  "fixture": "step-lines",
+  "kind": "axis",
+  "caption": "Y-axis for a linear scale with values from 0 to 70"
+ },
+ {
+  "fixture": "time-axis",
+  "kind": "axis",
+  "caption": "X-axis for a utc scale with values from Thursday, 15 January 2026, 12:00:00 AM UTC to Wednesday, 05 August 2026, 12:00:00 AM UTC"
+ },
+ {
+  "fixture": "time-axis",
+  "kind": "axis",
+  "caption": "X-axis for a utc scale with values from Friday, 01 May 2026, 12:00:00 AM UTC to Saturday, 02 May 2026, 12:00:00 AM UTC"
+ },
+ {
+  "fixture": "timeunit",
+  "kind": "axis",
+  "caption": "X-axis for a utc scale with values from Thursday, 01 January 2026, 12:00:00 AM UTC to Tuesday, 05 May 2026, 12:00:00 AM UTC"
+ },
+ {
+  "fixture": "timeunit",
+  "kind": "axis",
+  "caption": "Y-axis titled 'Events' for a linear scale with values from 0.0 to 3.0"
+ },
+ {
+  "fixture": "titles",
+  "kind": "axis",
+  "caption": "X-axis titled 'Segment' for a discrete scale with 3 values: alpha, beta, gamma"
+ },
+ {
+  "fixture": "titles",
+  "kind": "axis",
+  "caption": "Y-axis titled 'Amount' for a linear scale with values from 0 to 55"
+ },
+ {
+  "fixture": "titles",
+  "kind": "legend",
+  "caption": "Symbol legend titled 'Segment' for fill color with 3 values: alpha, beta, gamma"
+ },
+ {
+  "fixture": "trail",
+  "kind": "axis",
+  "caption": "X-axis for a linear scale with values from 0 to 5"
+ },
+ {
+  "fixture": "trail",
+  "kind": "axis",
+  "caption": "Y-axis for a linear scale with values from 0 to 100"
+ },
+ {
+  "fixture": "trend-lines",
+  "kind": "axis",
+  "caption": "X-axis for a linear scale with values from 1 to 8"
+ },
+ {
+  "fixture": "trend-lines",
+  "kind": "axis",
+  "caption": "Y-axis for a linear scale with values from 0 to 100"
+ },
+ {
+  "fixture": "window",
+  "kind": "axis",
+  "caption": "X-axis titled 'Step' for a discrete scale with 5 values: 1, 2, 3, 4, 5"
+ },
+ {
+  "fixture": "window",
+  "kind": "axis",
+  "caption": "Y-axis titled 'Running total' for a linear scale with values from 0 to 110"
+ },
+ {
+  "fixture": "window",
+  "kind": "legend",
+  "caption": "Symbol legend titled 'Series' for fill color with 2 values: north, south"
+ }
+]
