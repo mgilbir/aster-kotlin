@@ -227,9 +227,13 @@ internal class TupleExpression(
  * Vega's ascending comparator for arbitrary field values.
  *
  * Null and NaN sort first in ascending order, which is what upstream's `collect` does — verified,
- * and the opposite of the SQL convention many people expect.
+ * and the opposite of the SQL convention many people expect. A descending sort negates the result,
+ * so those values move to the end rather than staying pinned at the front.
+ *
+ * Public because a discrete scale domain's `sort` orders its values with the same comparator, and
+ * two orderings that were meant to agree are the kind of thing that silently stops agreeing.
  */
-internal fun compareFieldValues(left: VegaValue, right: VegaValue): Int {
+public fun compareFieldValues(left: VegaValue, right: VegaValue): Int {
   val leftMissing = left.isMissing
   val rightMissing = right.isMissing
   if (leftMissing || rightMissing) {

@@ -20,7 +20,7 @@ Milestones 0, 1 and 2 complete. **Milestones 3 and 4 in progress**: Vega specifi
 end — including expressions, signals and the twelve data transforms the brief lists — and are verified
 against upstream Vega by differential tests.
 
-Twenty-six differential fixtures pass, all matching upstream exactly on every mark and scale output:
+Twenty-seven differential fixtures pass, all matching upstream exactly on every mark and scale output:
 
 | Fixture | Marks | Covers |
 | --- | --- | --- |
@@ -50,6 +50,7 @@ Twenty-six differential fixtures pass, all matching upstream exactly on every ma
 | `trellis-layout` | 10 | five cells gridded by a layout, with row and column padding |
 | `trellis-headers` | 8 | a grid with row and column headers, each titled from its own datum |
 | `pie` | 13 | a donut chart: the pie transform feeding arc marks, with a legend |
+| `sorted-domain` | 35 | bands ordered by a sum they never carry, colours ordered numerically |
 
 The gate is wired into `./scripts/oracle.sh`, so every further scale, mark and transform is built
 against a harness that can say we are wrong — which golden tests cannot.
@@ -111,7 +112,7 @@ substantive compatibility items:
 | 6. View and Compose APIs | Yes |
 | 7. SVG, PNG, PDF export | Yes |
 | 8. TalkBack can describe and navigate | Partial — virtual nodes are tested by instrumentation, not with TalkBack itself |
-| 9. At least 100 compatibility fixtures pass | 26 of 100 |
+| 9. At least 100 compatibility fixtures pass | 27 of 100 |
 | 10. Core runtime has no Android dependency | Yes |
 | 11. Renders without WebView | Yes |
 | 12. Build and test loop runs from the terminal | Yes |
@@ -229,6 +230,11 @@ ordering), and the pipeline is now verified end to end on one fixture, but the b
 - **Grid layout**: `layout` places a group mark's cells on a row-and-column grid, and a legend's
   `columns` wraps its entries the same way — one algorithm, which is why they were done together. A
   multi-column legend fills down each column before moving across, the order a reader scans a list.
+- **Discrete domain ordering**: `sort` on a data-driven discrete domain, in every form upstream
+  accepts — by the domain value, or by an aggregate of another field entirely. Upstream *groups* the
+  dataset on the domain field rather than listing its values, which is what lets a bar chart be
+  ordered by a total no row carries, and what makes a multi-field domain run field by field rather
+  than row by row.
 - **Titles**: a chart title and subtitle at any of the four edges and any of the three anchors — all
   twelve combinations verified against upstream — plus a title on each axis. A title is placed against
   the whole drawing rather than the plotting area, so a chart with wide y-axis labels has its title
@@ -248,7 +254,7 @@ ordering), and the pipeline is now verified end to end on one fixture, but the b
 
 ## Verification
 
-- 737 JVM tests pass (`./scripts/test-core.sh`, `./gradlew test`).
+- 866 JVM tests pass (`./scripts/test-core.sh`, `./gradlew test`).
 - Android lint is clean with `warningsAsErrors` on every Android module.
 - 48 instrumented tests pass on an API 37 arm64 emulator (`./scripts/test-android.sh`): 40 in
   `vega-android-canvas`, 4 in `vega-compose`, 4 in `demo` — including one that compiles every bundled
@@ -283,12 +289,21 @@ dark chrome, so a dark background was unreadable — they now take a `SampleScen
 
 ## Known failing fixtures
 
-None. Twenty fixtures exist and all twenty pass. The brief's MVP asks for 100; growing the corpus is the main
-task now, and each new fixture is expected to surface gaps rather than pass immediately. That keeps
-happening, which is the point of the harness: `stacked-bar` surfaced two real bugs, and `facet-trellis`
-surfaced a third — `range: "height"` was descending for every scale type, where upstream ascends for a
-discrete one. A row-faceted trellis was therefore upside down, and nothing but a differential fixture
-would have said so.
+None. Twenty-seven fixtures exist and all twenty-seven pass. The brief's MVP asks for 100; growing the
+corpus is the main task now, and each new fixture is expected to surface gaps rather than pass
+immediately. That keeps happening, which is the point of the harness: `stacked-bar` surfaced two real
+bugs, and `facet-trellis` surfaced a third — `range: "height"` was descending for every scale type,
+where upstream ascends for a discrete one. A row-faceted trellis was therefore upside down, and
+nothing but a differential fixture would have said so.
+
+`sorted-domain` is the most recent, and it surfaced two more of the same kind. A scale domain's
+`sort` was read as a **boolean**, so the object form every sorted bar chart is written with —
+`{"op": "sum", "field": "amount", "order": "descending"}` — was truthy, and the domain came out
+alphabetical. Silently: the chart still had bars, still had labels, and was in the wrong order.
+Underneath that, `sort: true` sorted the values' *rendered* form, so a numeric domain read 100, 20,
+3, 9. And once the fixture was passing, the multi-field domain next to it turned out to be assembled
+row by row where upstream assembles it field by field — the two agree until two fields interleave,
+after which every entry but the first has moved.
 
 Building legends surfaced a fourth, and a worse one, in code that had been "passing" for six fixtures:
 **every symbol was the wrong size.** Upstream ships its own symbol table rather than d3-shape's, sizing
@@ -334,6 +349,9 @@ depends on them. Each has a test and a comment; this is the index.
 | Trellis marks are emitted in specification order, not grouped by role | `ScopeCompiler.trellis` |
 | A multi-column legend fills down each column before moving across | `GridLayout.columnMajorOrder` |
 | Arc angles run clockwise from twelve o'clock | `PathBuilder.arcTo` |
+| A discrete domain is grouped, not listed, so `sort` orders groups and may name a field the domain never mentions | `ScaleResolver.orderedDomain` |
+| A domain over several fields runs field by field, not row by row | `ScaleResolver.orderedDomain` |
+| A domain `sort` object with neither `op` nor `field` sorts by the value, and a `field` with no `op` does nothing at all | `SpecParser.parseDomainSort` |
 
 ## Architectural decisions pending
 
@@ -392,15 +410,21 @@ depends on them. Each has a test and a comment; this is the index.
 
 ## Next three tasks
 
-1. **Keep growing the fixture corpus.** 26 of the brief's 100 pass, and the return has not dropped
+1. **Keep growing the fixture corpus.** 27 of the brief's 100 pass, and the return has not dropped
    off: most fixtures added so far failed on arrival, and every one of those failures was a real
    defect. Between them they have found a missing scale-domain form, a legend layout rule that only
    diverges once swatches grow, unreported opacity, rotated text offsets both sides of the harness had
    wrong in the same way, a line-gap behaviour this engine had documented backwards, gridlines running
-   the wrong way from a top or right axis, labels keeping a gap for ticks that were switched off, and
-   `reverse` reversing the wrong end of the scale. Still untouched: `sequence`, `window`, `lookup`,
-   `sequence`-driven data and the other 26 transforms; `trail`, `shape`, `image` and `path` marks;
-   `quantile`, `quantize`, `threshold` and `bin-ordinal` scales; and `config` blocks of any kind.
+   the wrong way from a top or right axis, labels keeping a gap for ticks that were switched off,
+   `reverse` reversing the wrong end of the scale, and a domain `sort` that read an object as a
+   boolean and quietly ordered a bar chart alphabetically. Worth aiming at next, because each is a
+   construct in wide use that no fixture touches: a `config` block of any kind — the most likely
+   place for a silent divergence, since every default in the engine is currently a hard-coded
+   constant with no way for a specification to move it — and the aggregate operations no fixture
+   exercises end to end (`median`, `q1`, `q3`, `stdev`, `distinct`), which a box plot would cover in
+   one chart. Still untouched beyond that: `sequence`, `window` and `lookup` and the other 25
+   transforms; `trail`, `shape`, `image` and `path` marks; and `quantile`, `quantize`, `threshold`
+   and `bin-ordinal` scales.
 2. **Label overlap removal.** `labelOverlap` on an axis or a legend, which is what stops a dense time
    axis printing every label on top of the last. Reported everywhere it appears, and the most visible
    remaining gap on a chart that is otherwise correct.

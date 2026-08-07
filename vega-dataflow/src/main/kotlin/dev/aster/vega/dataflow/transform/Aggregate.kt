@@ -98,6 +98,20 @@ public object JoinAggregateTransform : Transform {
   }
 }
 
+/**
+ * Computes one summary over a group of tuples, outside any transform pipeline.
+ *
+ * A discrete scale domain sorted by `{"op": "sum", "field": "amount"}` needs exactly this, and
+ * upstream implements that sort by inserting an `aggregate` into the dataflow. Sharing the
+ * machinery is what keeps the two from drifting: seventeen operations with `count`-versus-`valid`
+ * and sample-versus-population distinctions are not worth reimplementing beside themselves.
+ */
+public fun aggregateOver(
+  op: AggregateOp,
+  fieldPath: String?,
+  tuples: List<VegaValue>,
+): VegaValue = Measure(op, fieldPath, outputName = "").compute(tuples)
+
 // ---- shared machinery -------------------------------------------------------
 
 /** One requested summary: an operation, the field it reads, and the name it writes. */

@@ -9,6 +9,16 @@ import dev.aster.vega.model.asBoolean
 import dev.aster.vega.model.asDouble
 import dev.aster.vega.model.asString
 
+/**
+ * The aggregate operations a domain over several fields may be sorted by.
+ *
+ * Upstream summarizes each field separately and then combines the results, so only operations that
+ * survive being applied twice are allowed: a count of counts is their sum, a min of mins is a min.
+ * There is no way to combine two means, so upstream rejects one rather than producing an average of
+ * averages.
+ */
+private val MULTI_FIELD_SORT_OPS = listOf("count", "min", "max")
+
 /** A parsed specification plus everything the parser could not honour. */
 public data class ParsedSpec(val spec: VegaSpec?, val diagnostics: List<VegaDiagnostic>) {
   public val isUsable: Boolean
@@ -333,8 +343,17 @@ public class SpecParser {
         val fields = (domain.fields["fields"] as? VegaValue.Arr)?.values?.map { it.asString() }
         when {
           data != null && field != null ->
-            DomainSpec.FromField(data, field, domain.fields["sort"]?.asBoolean() ?: false)
-          data != null && fields != null -> DomainSpec.FromFields(data, fields)
+            DomainSpec.FromField(
+              data,
+              field,
+              parseDomainSort(domain.fields["sort"], "$path.sort", multiField = false),
+            )
+          data != null && fields != null ->
+            DomainSpec.FromFields(
+              data,
+              fields,
+              parseDomainSort(domain.fields["sort"], "$path.sort", multiField = true),
+            )
           else -> {
             diagnostics.error(
               DiagnosticCodes.SCALE_INVALID_DOMAIN,
@@ -353,6 +372,72 @@ public class SpecParser {
         )
         DomainSpec.Unset
       }
+    }
+  }
+
+  /**
+   * A discrete domain's `sort`, which upstream normalizes in `parseSort` before the dataflow ever
+   * sees it.
+   *
+   * Three of its four branches are only visible by reading that function:
+   * - an object naming neither `op` nor `field` sorts by the domain value, exactly as `sort: true`
+   *   does, so `{"order": "descending"}` is the way to reverse a domain alphabetically;
+   * - a `field` with no `op` names an aggregate output that was never computed, so upstream sorts
+   *   on a column of undefined and — its sort being stable — changes nothing at all. Reproduced,
+   *   because a specification written against upstream may be relying on the order it *does* get,
+   *   but reported, because it is almost certainly not the order the author wanted;
+   * - an `op` other than `count` with no `field`, and a multi-field domain sorted by anything but
+   *   `count`, `min` or `max`, are both hard errors upstream. Reported here and the sort dropped,
+   *   which leaves the domain in the order upstream would have produced had the sort been absent.
+   */
+  private fun parseDomainSort(value: VegaValue?, path: String, multiField: Boolean): DomainSort? {
+    val obj =
+      when (value) {
+        null -> return null
+        is VegaValue.Bool -> return if (value.value) DomainSort.ByValue() else null
+        is VegaValue.Obj -> value
+        else -> {
+          diagnostics.warn(
+            DiagnosticCodes.PARSE_UNKNOWN_PROPERTY,
+            "A domain 'sort' must be true or an object; ignoring it",
+            jsonPath = path,
+          )
+          return null
+        }
+      }
+    val op = obj.fields["op"]?.asString()?.takeIf { it.isNotEmpty() }
+    val field = obj.fields["field"]?.asString()?.takeIf { it.isNotEmpty() }
+    val descending = obj.fields["order"]?.asString()?.startsWith("desc") == true
+    return when {
+      op == null && field == null -> DomainSort.ByValue(descending)
+      op == null -> {
+        diagnostics.warn(
+          DiagnosticCodes.PARSE_UNKNOWN_PROPERTY,
+          "Domain sort field '$field' has no 'op', so upstream computes no such aggregate and " +
+            "the domain keeps its first-appearance order; name an 'op' to sort by it",
+          jsonPath = path,
+        )
+        null
+      }
+      field == null && !op.equals("count", ignoreCase = true) -> {
+        diagnostics.error(
+          DiagnosticCodes.SCALE_INVALID_DOMAIN,
+          "Domain sort op '$op' needs a 'field'; leaving the domain unsorted",
+          jsonPath = path,
+        )
+        null
+      }
+      multiField && !MULTI_FIELD_SORT_OPS.any { it.equals(op, ignoreCase = true) } -> {
+        diagnostics.error(
+          DiagnosticCodes.SCALE_INVALID_DOMAIN,
+          "A domain over several fields cannot be sorted by '$op'; upstream allows only " +
+            "${MULTI_FIELD_SORT_OPS.joinToString(", ")}, because each field is summarized " +
+            "separately and the results then combined. Leaving the domain unsorted",
+          jsonPath = path,
+        )
+        null
+      }
+      else -> DomainSort.ByAggregate(op, field, descending)
     }
   }
 

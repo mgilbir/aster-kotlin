@@ -1,5 +1,8 @@
 package dev.aster.vega.runtime.compile
 
+import dev.aster.vega.dataflow.transform.AggregateOp
+import dev.aster.vega.dataflow.transform.aggregateOver
+import dev.aster.vega.dataflow.transform.compareFieldValues
 import dev.aster.vega.model.DiagnosticCodes
 import dev.aster.vega.model.DiagnosticCollector
 import dev.aster.vega.model.VegaValue
@@ -7,6 +10,7 @@ import dev.aster.vega.model.asDouble
 import dev.aster.vega.model.asString
 import dev.aster.vega.model.field
 import dev.aster.vega.model.isMissing
+import dev.aster.vega.model.spec.DomainSort
 import dev.aster.vega.model.spec.DomainSpec
 import dev.aster.vega.model.spec.RangeSpec
 import dev.aster.vega.model.spec.ScaleSpec
@@ -30,6 +34,9 @@ import kotlinx.datetime.TimeZone
 
 /** The chart's plotting size, which named ranges like `"width"` resolve against. */
 public data class PlotSize(val width: Double, val height: Double)
+
+/** The field name the per-field sort summaries are wrapped in before being folded together. */
+private const val MULTI_FIELD_COMBINE_FIELD = "value"
 
 /**
  * Builds runtime scales from parsed [ScaleSpec]s and resolved data.
@@ -403,12 +410,13 @@ public class ScaleResolver(
   private fun discreteDomain(domain: DomainSpec, scaleName: String): List<String>? {
     val values =
       when (domain) {
+        // An explicit domain is never sorted, whatever `sort` says: upstream reads the array
+        // straight through and only the data-driven branches ever see a sort.
         is DomainSpec.Literal -> domain.values
-        is DomainSpec.FromField -> {
-          val raw = fieldValues(domain.data, listOf(domain.field), scaleName)
-          if (domain.sort) raw.sortedBy { it.asString() } else raw
-        }
-        is DomainSpec.FromFields -> fieldValues(domain.data, domain.fields, scaleName)
+        is DomainSpec.FromField ->
+          orderedDomain(domain.data, listOf(domain.field), domain.sort, scaleName) ?: return null
+        is DomainSpec.FromFields ->
+          orderedDomain(domain.data, domain.fields, domain.sort, scaleName) ?: return null
         is DomainSpec.FromSignal -> signalDomain(domain, scaleName) ?: return null
         DomainSpec.Unset -> {
           diagnostics.error(
@@ -422,6 +430,121 @@ public class ScaleResolver(
     // Vega's discrete domains keep first-seen order and drop duplicates.
     return values.map { it.asString() }.distinct()
   }
+
+  /**
+   * The values of a data-driven discrete domain, in the order upstream produces them.
+   *
+   * Upstream does not collect a domain's values; it *groups* the dataset on the domain field and
+   * takes the group keys. Two things follow, and neither is visible from the specification:
+   * - the default order is first appearance, deduplicated — the group order;
+   * - `sort` can order by an aggregate of a field the domain never mentions, because the grouping
+   *   it sorts is already there and the aggregate rides along on it.
+   *
+   * With several fields each is grouped separately and the results concatenated, so the order is
+   * field by field rather than row by row. Those two agree until two fields interleave, at which
+   * point every entry after the first is in a different place.
+   */
+  private fun orderedDomain(
+    dataName: String,
+    fields: List<String>,
+    sort: DomainSort?,
+    scaleName: String,
+  ): List<VegaValue>? {
+    val dataset = dataset(dataName, scaleName) ?: return null
+    val keys =
+      fields
+        .flatMap { path -> dataset.map { it.field(path) }.filterNot { it.isMissing } }
+        .distinctBy { it.asString() }
+    return when (sort) {
+      null -> keys
+      is DomainSort.ByValue -> keys.sortedWith(domainOrder(sort.descending) { it })
+      is DomainSort.ByAggregate -> {
+        val summaries = aggregateSortKeys(dataset, fields, sort, scaleName) ?: return keys
+        keys.sortedWith(domainOrder(sort.descending) { summaries[it.asString()] ?: VegaValue.Null })
+      }
+    }
+  }
+
+  /**
+   * Vega's ascending comparator, negated for a descending sort.
+   *
+   * Negating rather than reversing is what upstream does — it multiplies the comparison by -1 — and
+   * it is why a missing value leads an ascending domain and trails a descending one. Kotlin's sort
+   * is stable, as is the one upstream uses, so values whose keys tie keep their group order.
+   */
+  private fun domainOrder(
+    descending: Boolean,
+    key: (VegaValue) -> VegaValue,
+  ): Comparator<VegaValue> = Comparator { left, right ->
+    val comparison = compareFieldValues(key(left), key(right))
+    if (descending) -comparison else comparison
+  }
+
+  /**
+   * The aggregate each distinct domain value sorts by, keyed by that value's string form.
+   *
+   * With one domain field this is a plain group-and-summarize. With several, upstream summarizes
+   * each field separately and then folds the per-field results together — a count of counts is
+   * their sum, a min of mins is a min — which is why it accepts only those three operations there
+   * and rejects, say, a mean of means. The specification parser has already turned anything else
+   * away; a null here means the operation is one this engine does not implement at all.
+   */
+  private fun aggregateSortKeys(
+    dataset: List<VegaValue>,
+    fields: List<String>,
+    sort: DomainSort.ByAggregate,
+    scaleName: String,
+  ): Map<String, VegaValue>? {
+    val op = AggregateOp.fromName(sort.op)
+    if (op == null) {
+      diagnostics.error(
+        DiagnosticCodes.SCALE_INVALID_DOMAIN,
+        "Scale '$scaleName' sorts its domain by aggregate '${sort.op}', which is not " +
+          "implemented; leaving the domain in first-appearance order",
+        operator = scaleName,
+      )
+      return null
+    }
+    if (op.needsField && sort.field == null) {
+      diagnostics.error(
+        DiagnosticCodes.SCALE_INVALID_DOMAIN,
+        "Scale '$scaleName' sorts its domain by '${sort.op}' with no field to read; " +
+          "leaving the domain in first-appearance order",
+        operator = scaleName,
+      )
+      return null
+    }
+
+    val perField = fields.map { path ->
+      val groups = LinkedHashMap<String, MutableList<VegaValue>>()
+      for (datum in dataset) {
+        val value = datum.field(path)
+        if (value.isMissing) continue
+        groups.getOrPut(value.asString()) { mutableListOf() }.add(datum)
+      }
+      groups.mapValues { (_, tuples) -> aggregateOver(op, sort.field, tuples) }
+    }
+    if (perField.size == 1) return perField[0]
+
+    val combine =
+      when (op) {
+        AggregateOp.COUNT -> AggregateOp.SUM
+        AggregateOp.MIN -> AggregateOp.MIN
+        AggregateOp.MAX -> AggregateOp.MAX
+        // Unreachable: the parser rejects every other operation on a multi-field domain.
+        else -> return null
+      }
+    val gathered = LinkedHashMap<String, MutableList<VegaValue>>()
+    for (summaries in perField) {
+      for ((key, value) in summaries) gathered.getOrPut(key) { mutableListOf() }.add(value)
+    }
+    return gathered.mapValues { (_, values) ->
+      aggregateOver(combine, MULTI_FIELD_COMBINE_FIELD, values.map { it.asCombineTuple() })
+    }
+  }
+
+  private fun VegaValue.asCombineTuple(): VegaValue =
+    VegaValue.Obj(mapOf(MULTI_FIELD_COMBINE_FIELD to this))
 
   /**
    * A domain supplied by a signal.
@@ -443,11 +566,7 @@ public class ScaleResolver(
     return values
   }
 
-  private fun fieldValues(
-    dataName: String,
-    fields: List<String>,
-    scaleName: String,
-  ): List<VegaValue> {
+  private fun dataset(dataName: String, scaleName: String): List<VegaValue>? {
     val dataset = datasets[dataName]
     if (dataset == null) {
       diagnostics.error(
@@ -455,11 +574,19 @@ public class ScaleResolver(
         "Scale '$scaleName' refers to unknown dataset '$dataName'",
         operator = scaleName,
       )
-      return emptyList()
+      return null
     }
-    return dataset.flatMap { datum ->
-      fields.map { datum.field(it) }.filterNot { it.isMissing }
-    }
+    return dataset
+  }
+
+  /** Field by field rather than row by row, which is the order upstream's grouping produces. */
+  private fun fieldValues(
+    dataName: String,
+    fields: List<String>,
+    scaleName: String,
+  ): List<VegaValue> {
+    val dataset = dataset(dataName, scaleName) ?: return emptyList()
+    return fields.flatMap { path -> dataset.map { it.field(path) }.filterNot { it.isMissing } }
   }
 
   // ---- ranges ---------------------------------------------------------------

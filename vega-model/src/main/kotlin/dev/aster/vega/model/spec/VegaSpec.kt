@@ -168,16 +168,50 @@ public enum class ScaleType {
   }
 }
 
+/**
+ * How a discrete domain is ordered.
+ *
+ * Upstream builds a discrete domain by *grouping* the dataset on the domain field, not by listing
+ * its values, so `sort` orders those groups. That is why an aggregate sort may name a field the
+ * domain never mentions: the aggregate is computed over each group on the way past. An explicit
+ * domain array is never sorted, whatever `sort` says.
+ */
+public sealed interface DomainSort {
+  public val descending: Boolean
+
+  /**
+   * `sort: true`, or an object naming neither `op` nor `field`: order by the domain value itself.
+   */
+  public data class ByValue(override val descending: Boolean = false) : DomainSort
+
+  /**
+   * `sort: {"op": "sum", "field": "amount"}`: order by an aggregate computed per distinct domain
+   * value. A `count` needs no field; every other operation does.
+   */
+  public data class ByAggregate(
+    val op: String,
+    val field: String?,
+    override val descending: Boolean = false,
+  ) : DomainSort
+}
+
 public sealed interface DomainSpec {
   /** An explicit domain written into the specification. */
   public data class Literal(val values: List<VegaValue>) : DomainSpec
 
   /** `{"data": "table", "field": "amount"}` — resolved from a dataset. */
-  public data class FromField(val data: String, val field: String, val sort: Boolean = false) :
-    DomainSpec
+  public data class FromField(
+    val data: String,
+    val field: String,
+    val sort: DomainSort? = null,
+  ) : DomainSpec
 
   /** `{"data": "table", "fields": [...]}` — the union of several fields. */
-  public data class FromFields(val data: String, val fields: List<String>) : DomainSpec
+  public data class FromFields(
+    val data: String,
+    val fields: List<String>,
+    val sort: DomainSort? = null,
+  ) : DomainSpec
 
   /**
    * `{"signal": "..."}` — an expression producing the domain array.
