@@ -201,8 +201,18 @@ public class ScaleResolver(
         resolveRangeSignal(spec, range.expression).let {
           if (it is RangeSpec.Named) namedRange(it.name) ?: it else it
         }
+      // A range array may hold signal references among its literals — `[{"signal": "height"}, 0]`
+      // is how a chart reverses an axis whose extent is computed. Each element resolves on its own,
+      // because the array as a whole is not a reference and only part of it may be one.
+      is RangeSpec.Literal -> RangeSpec.Literal(range.values.map { resolveRangeElement(spec, it) })
       else -> range
     }
+
+  private fun resolveRangeElement(spec: ScaleSpec, value: VegaValue): VegaValue {
+    val reference = (value as? VegaValue.Obj)?.takeIf { it.fields.size == 1 }?.fields?.get("signal")
+    if (reference !is VegaValue.Str) return value
+    return numbers.resolveValue(reference.value, spec.name) ?: VegaValue.Null
+  }
 
   private fun colorRange(spec: ScaleSpec): List<SceneColor>? =
     when (val range = effectiveRange(spec)) {
