@@ -20,7 +20,7 @@ Milestones 0, 1 and 2 complete. **Milestones 3 and 4 in progress**: Vega specifi
 end — including expressions, signals and the twelve data transforms the brief lists — and are verified
 against upstream Vega by differential tests.
 
-Thirty-nine differential fixtures pass, all matching upstream exactly on every mark and scale output:
+Forty differential fixtures pass, all matching upstream exactly on every mark and scale output:
 
 | Fixture | Marks | Covers |
 | --- | --- | --- |
@@ -63,6 +63,7 @@ Thirty-nine differential fixtures pass, all matching upstream exactly on every m
 | `config-theme` | 42 | a theme in `config`, every level of the precedence chain visible at once |
 | `config-marks` | 31 | a theme reaching the marks, and a rect that encodes only a stroke |
 | `arc-padding` | 10 | a padded, round-cornered donut beside a pie of the same data |
+| `window` | 43 | a running total and a three-point moving average, partitioned by series |
 
 The gate is wired into `./scripts/oracle.sh`, so every further scale, mark and transform is built
 against a harness that can say we are wrong — which golden tests cannot.
@@ -89,14 +90,14 @@ upstream-verified slice through parsing, scales, rect encoding and axes:
 | `vega-parser` (width, height, padding, autosize, data, signals, scales, axes, marks, group scopes) | 3,790 | a subset; no legends, titles or `layout` |
 | `vega-encode` (mark encoders, axes, legends, titles) | 952 | 8 of 12 mark encoders; axes, legends and titles without overlap removal |
 | `vega-expression` + `vega-functions` | 2,388 | language complete; 60 of 119 functions |
-| `vega-transforms` (14 of 40) | 3,754 | the 12 the brief lists plus `timeunit` and `pie`, exact against upstream |
+| `vega-transforms` (15 of 40) | 3,754 | the 12 the brief lists plus `timeunit`, `pie` and `window`, exact against upstream |
 | `vega-dataflow` | 2,081 | contracts and scheduling only; no pulse propagation |
 
 The entire data and specification half is absent:
 
 | Missing | Upstream size | Here |
 | --- | --- | --- |
-| `vega-transforms` — the other 26 transforms | most of 3,754 | 0 |
+| `vega-transforms` — the other 25 transforms | most of 3,754 | 0 |
 | `vega-dataflow` — pulse propagation and incremental evaluation | 2,081 | contracts only |
 | `vega-functions` — the other 44 functions, mostly colour, geo and selection | most of 790 | 0 |
 | Remaining scale types — quantile, quantize, threshold, bin-ordinal | rest of `vega-scale` | 0 |
@@ -124,7 +125,7 @@ substantive compatibility items:
 | 6. View and Compose APIs | Yes |
 | 7. SVG, PNG, PDF export | Yes |
 | 8. TalkBack can describe and navigate | Partial — virtual nodes are tested by instrumentation, not with TalkBack itself |
-| 9. At least 100 compatibility fixtures pass | 39 of 100 |
+| 9. At least 100 compatibility fixtures pass | 40 of 100 |
 | 10. Core runtime has no Android dependency | Yes |
 | 11. Renders without WebView | Yes |
 | 12. Build and test loop runs from the terminal | Yes |
@@ -257,6 +258,11 @@ ordering), and the pipeline is now verified end to end on one fixture, but the b
   out, so a linear scale handed `[10, 20]` still starts at 0 where this engine had been leaving it
   at 10. The limits then replace an end rather than clamping it, and run after `zero`, which is why
   `domainMin: 30` beats it.
+- **The `window` transform**: running totals, ranks and moving averages, which is the commonest
+  thing a specification asks for that no other transform can express. Two kinds of operation share
+  it and behave differently — the ranking family looks at the whole partition and the aggregate
+  family at the *frame* — and the frame's default is `[null, 0]`, the partition start up to this
+  row, which is what makes a bare `sum` a running total rather than a partition total.
 - **Arc padding and corner rounding**, ported from d3-shape rather than approximated. Neither is
   what its name suggests: `padAngle` is a gap measured at a pad *radius* and converted back into an
   angle separately for each edge, so the two sides of a gap stay parallel instead of splaying
@@ -327,7 +333,7 @@ ordering), and the pipeline is now verified end to end on one fixture, but the b
 
 ## Verification
 
-- 1,010 JVM tests pass (`./scripts/test-core.sh`, `./gradlew test`).
+- 1,017 JVM tests pass (`./scripts/test-core.sh`, `./gradlew test`).
 - Android lint is clean with `warningsAsErrors` on every Android module.
 - 48 instrumented tests pass on an API 37 arm64 emulator (`./scripts/test-android.sh`): 40 in
   `vega-android-canvas`, 4 in `vega-compose`, 4 in `demo` — including one that compiles every bundled
@@ -362,7 +368,7 @@ dark chrome, so a dark background was unreadable — they now take a `SampleScen
 
 ## Known failing fixtures
 
-None. Thirty-nine fixtures exist and all thirty-nine pass. The brief's MVP asks for 100; growing the
+None. Forty fixtures exist and all forty pass. The brief's MVP asks for 100; growing the
 corpus is the main task now, and each new fixture is expected to surface gaps rather than pass
 immediately. That keeps happening, which is the point of the harness: `stacked-bar` surfaced two real
 bugs, and `facet-trellis` surfaced a third — `range: "height"` was descending for every scale type,
@@ -481,6 +487,8 @@ depends on them. Each has a test and a comment; this is the index.
 | A `style` block names properties the way a mark does, so `fill` has to become `labelColor` | `GuideConfig.prefixed` |
 | `config.mark` loses to the built-in per-type defaults and `config.{marktype}` beats them | `MarkEncoder.MarkConfig` |
 | A mark that encodes *either* paint channel gets **neither** default, so a stroke-only rect is hollow | `MarkEncoder.style` |
+| A window's default frame is the partition start to this row, so a bare `sum` is a running total | `WindowTransform` |
+| A window's ranking operations ignore the frame; only its aggregate operations respect it | `WindowTransform` |
 | `padAngle` is a gap at a pad *radius*, converted back to an angle per edge, so the sides stay parallel | `ArcPath.sector` |
 | `cornerRadius` is clamped by where the slice's own edges would meet, not just by its thickness | `ArcPath.sector` |
 | A label hidden by overlap removal stays in the scene at zero opacity, so the mark count does not move | `LabelOverlap` |
@@ -542,7 +550,7 @@ depends on them. Each has a test and a comment; this is the index.
 
 ## Next three tasks
 
-1. **Keep growing the fixture corpus.** 39 of the brief's 100 pass, and the return has not fallen
+1. **Keep growing the fixture corpus.** 40 of the brief's 100 pass, and the return has not fallen
    off: the last ten fixtures found fourteen defects between them, and half of those were in code
    that had been passing for a dozen fixtures. Worth aiming at next: a `config` block of any kind,
    which is where a Vega-Lite-compiled specification puts everything and where every default in this

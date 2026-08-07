@@ -506,7 +506,7 @@ class TransformReferenceTest {
   }
 
   @Test
-  fun `the registry covers the transforms the brief lists, plus timeunit and pie`() {
+  fun `the registry covers the transforms the brief lists, plus three more`() {
     val fromTheBrief =
       setOf(
         "filter",
@@ -522,10 +522,145 @@ class TransformReferenceTest {
         "fold",
         "flatten",
       )
-    // `timeunit` is not on the brief's list but is the date half of `bin`, and a time series is
-    // barely usable without it.
-    // `timeunit` and `pie` are not on the brief's list. `timeunit` is the date half of `bin`, and
-    // `pie` is what turns a column of numbers into the angles an arc mark needs.
-    assertEquals(fromTheBrief + "timeunit" + "pie", TransformRegistry.Default.types)
+    // Three are not on the brief's list. `timeunit` is the date half of `bin`, `pie` turns a column
+    // of numbers into the angles an arc mark needs, and `window` is what a running total, a rank
+    // and a moving average all are — the commonest thing a specification asks for that no other
+    // transform can express.
+    assertEquals(
+      fromTheBrief + "timeunit" + "pie" + "window",
+      TransformRegistry.Default.types,
+    )
+  }
+
+  // ---- window ---------------------------------------------------------------
+
+  /**
+   * The probe's dataset for `window`, two partitions of three rows each.
+   *
+   * Every expected string below came from `oracle-js/src/transform-probe.js` running the same
+   * definition, which is the only way to settle what the frame defaults to and which operations
+   * ignore it.
+   */
+  private val windowRows =
+    """
+    [{"c": "a", "t": 1, "v": 10},
+     {"c": "a", "t": 2, "v": 20},
+     {"c": "a", "t": 3, "v": 5},
+     {"c": "b", "t": 1, "v": 7},
+     {"c": "b", "t": 2, "v": 3},
+     {"c": "b", "t": 3, "v": 9}]
+    """
+      .trimIndent()
+
+  /**
+   * The default frame is `[null, 0]` — the start of the partition up to and including this row — so
+   * a bare `sum` is a running total and not a partition total. With no `groupby` the whole dataset
+   * is one partition, which is why the total carries on across the change from `a` to `b`.
+   */
+  @Test
+  fun `window sums cumulatively by default`() {
+    assertEquals(
+      """[{"c":"a","run":10,"t":1,"v":10},{"c":"a","run":30,"t":2,"v":20},""" +
+        """{"c":"a","run":35,"t":3,"v":5},{"c":"b","run":42,"t":1,"v":7},""" +
+        """{"c":"b","run":45,"t":2,"v":3},{"c":"b","run":54,"t":3,"v":9}]""",
+      run(
+        """[{"type": "window", "ops": ["sum"], "fields": ["v"], "as": ["run"]}]""",
+        windowRows,
+      ),
+    )
+  }
+
+  @Test
+  fun `window partitions and ranks within each group`() {
+    assertEquals(
+      """[{"c":"a","n":1,"rk":1,"run":10,"t":1,"v":10},""" +
+        """{"c":"a","n":2,"rk":2,"run":30,"t":2,"v":20},""" +
+        """{"c":"a","n":3,"rk":3,"run":35,"t":3,"v":5},""" +
+        """{"c":"b","n":1,"rk":1,"run":7,"t":1,"v":7},""" +
+        """{"c":"b","n":2,"rk":2,"run":10,"t":2,"v":3},""" +
+        """{"c":"b","n":3,"rk":3,"run":19,"t":3,"v":9}]""",
+      run(
+        """[{"type": "window", "groupby": ["c"], "sort": {"field": "t"},
+             "ops": ["sum", "rank", "row_number"], "fields": ["v", null, null],
+             "as": ["run", "rk", "n"]}]""",
+        windowRows,
+      ),
+    )
+  }
+
+  /** A frame of `[-1, 0]` is this row and the one before it: a two-row moving average. */
+  @Test
+  fun `window honours an explicit frame`() {
+    assertEquals(
+      """[{"c":"a","ma":10,"t":1,"v":10},{"c":"a","ma":15,"t":2,"v":20},""" +
+        """{"c":"a","ma":12.5,"t":3,"v":5},{"c":"b","ma":6,"t":1,"v":7},""" +
+        """{"c":"b","ma":5,"t":2,"v":3},{"c":"b","ma":6,"t":3,"v":9}]""",
+      run(
+        """[{"type": "window", "ops": ["mean"], "fields": ["v"], "as": ["ma"],
+             "frame": [-1, 0]}]""",
+        windowRows,
+      ),
+    )
+  }
+
+  /** `[null, null]` is the whole partition, which is the total rather than the running total. */
+  @Test
+  fun `an unbounded frame covers the whole partition`() {
+    assertEquals(
+      """[{"c":"a","t":1,"tot":54,"v":10},{"c":"a","t":2,"tot":54,"v":20},""" +
+        """{"c":"a","t":3,"tot":54,"v":5},{"c":"b","t":1,"tot":54,"v":7},""" +
+        """{"c":"b","t":2,"tot":54,"v":3},{"c":"b","t":3,"tot":54,"v":9}]""",
+      run(
+        """[{"type": "window", "ops": ["sum"], "fields": ["v"], "as": ["tot"],
+             "frame": [null, null]}]""",
+        windowRows,
+      ),
+    )
+  }
+
+  /** Ranking operations look at the whole partition and ignore the frame entirely. */
+  @Test
+  fun `lag and lead reach outside the frame`() {
+    assertEquals(
+      """[{"c":"a","next":20,"prev":null,"t":1,"v":10},""" +
+        """{"c":"a","next":5,"prev":10,"t":2,"v":20},""" +
+        """{"c":"a","next":7,"prev":20,"t":3,"v":5},""" +
+        """{"c":"b","next":3,"prev":5,"t":1,"v":7},""" +
+        """{"c":"b","next":9,"prev":7,"t":2,"v":3},""" +
+        """{"c":"b","next":null,"prev":3,"t":3,"v":9}]""",
+      run(
+        """[{"type": "window", "ops": ["lag", "lead"], "fields": ["v", "v"],
+             "as": ["prev", "next"]}]""",
+        windowRows,
+      ),
+    )
+  }
+
+  /**
+   * `rank` restarts at the row's own index after a tie, so a run of ties gives 1, 1, 3 — where
+   * `dense_rank` counts distinct values and gives 1, 1, 2.
+   */
+  @Test
+  fun `the ranking family matches upstream on a tied sort`() {
+    assertEquals(
+      """[{"cd":0.6666666666666666,"dr":2,"pr":0.5,"rk":2,"rn":2,"t":1,"v":10},""" +
+        """{"cd":1,"dr":3,"pr":1,"rk":3,"rn":3,"t":2,"v":20},""" +
+        """{"cd":0.3333333333333333,"dr":1,"pr":0,"rk":1,"rn":1,"t":1,"v":7}]""",
+      run(
+        """[{"type": "window",
+             "ops": ["row_number", "rank", "dense_rank", "percent_rank", "cume_dist"],
+             "as": ["rn", "rk", "dr", "pr", "cd"], "sort": {"field": "v"}}]""",
+        """[{"t": 1, "v": 10}, {"t": 2, "v": 20}, {"t": 1, "v": 7}]""",
+      ),
+    )
+  }
+
+  @Test
+  fun `an unimplemented window operation is reported`() {
+    run("""[{"type": "window", "ops": ["nonesuch"], "as": ["x"]}]""", windowRows)
+    assertTrue(
+      context.diagnostics.diagnostics.any { it.message.contains("nonesuch") },
+      context.diagnostics.diagnostics.toString(),
+    )
   }
 }
