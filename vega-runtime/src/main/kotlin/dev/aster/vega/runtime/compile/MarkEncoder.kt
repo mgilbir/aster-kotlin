@@ -794,6 +794,7 @@ public class MarkEncoder(
       markKind = spec.type.name.lowercase(),
       datumIndex = index,
       interactive = spec.interactive,
+      datum = datum,
       tooltip = datum,
       accessibility = describe(datum, channels),
     )

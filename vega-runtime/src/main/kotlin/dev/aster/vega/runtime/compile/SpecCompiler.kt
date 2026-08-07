@@ -33,6 +33,13 @@ public data class CompiledSpec(
   /** Resolved signal values, including the implicit `width`, `height` and `padding`. */
   val signals: SignalScope,
   val diagnostics: List<VegaDiagnostic>,
+  /**
+   * The parsed specification, so a caller can read what was *asked for* rather than what came out.
+   *
+   * The interaction layer needs it: a signal's `on` handlers are part of the specification and
+   * survive a recompile, while everything else in here is rebuilt each time.
+   */
+  val spec: VegaSpec? = null,
 ) {
   public val isUsable: Boolean
     get() = scene != null
@@ -137,7 +144,7 @@ public class SpecCompiler(private val textEngine: TextEngine = MetricTextEngine(
       )
 
     val scene = layout(spec, scope.bounds, content, plot, ids, diagnostics)
-    return CompiledSpec(scene, scales, signals, diagnostics.diagnostics)
+    return CompiledSpec(scene, scales, signals, diagnostics.diagnostics, spec)
   }
 
   /**

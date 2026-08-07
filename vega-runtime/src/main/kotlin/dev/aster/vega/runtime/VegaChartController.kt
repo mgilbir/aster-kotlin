@@ -1,11 +1,20 @@
 package dev.aster.vega.runtime
 
+// Aliased: this class already has a `ChartInputEvent`, and the two are different things — one is a
+// gesture the host reports, the other is the Vega event a selector matches.
+import dev.aster.vega.expression.CachingExpressionCompiler
+import dev.aster.vega.expression.VegaExpressionCompiler
 import dev.aster.vega.model.DiagnosticCodes
+import dev.aster.vega.model.DiagnosticCollector
 import dev.aster.vega.model.DiagnosticSeverity
 import dev.aster.vega.model.VegaDiagnostic
 import dev.aster.vega.model.VegaValue
 import dev.aster.vega.runtime.compile.CompiledSpec
 import dev.aster.vega.runtime.compile.SpecCompiler
+import dev.aster.vega.runtime.interaction.EventDispatcher
+import dev.aster.vega.runtime.interaction.HandlerBinding
+import dev.aster.vega.runtime.interaction.InputEvent as VegaEvent
+import dev.aster.vega.runtime.interaction.SignalUpdater
 import dev.aster.vega.scene.HitTestOptions
 import dev.aster.vega.scene.MetricTextEngine
 import dev.aster.vega.scene.PointD
@@ -13,6 +22,7 @@ import dev.aster.vega.scene.Scene
 import dev.aster.vega.scene.SceneHitIndex
 import dev.aster.vega.scene.SceneNode
 import dev.aster.vega.scene.TextEngine
+import kotlin.time.Clock
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
@@ -73,6 +83,13 @@ public data class ChartState(
 public class VegaChartController(
   initialScene: Scene = Scene.empty(),
   textEngine: TextEngine = MetricTextEngine(),
+  /**
+   * Wall-clock milliseconds, for throttling an event stream.
+   *
+   * Injected rather than read directly so a test can drive a throttle without sleeping, and so the
+   * core stays free of a platform clock.
+   */
+  private val clock: () -> Long = { Clock.System.now().toEpochMilliseconds() },
 ) {
 
   private val compiler = SpecCompiler(textEngine)
@@ -174,7 +191,21 @@ public class VegaChartController(
    * A specification that fails to produce a scene at all leaves the current chart alone rather than
    * blanking it. The diagnostics say why, and a reader keeps the chart they were looking at.
    */
-  public fun setSpec(json: String): CompiledSpec = publish(compiler.compileJson(json))
+  public fun setSpec(json: String): CompiledSpec {
+    loadedSpecJson = json
+    signals.reset()
+    return publish(compiler.compileJson(json))
+  }
+
+  /** The text of the loaded specification, so a fired handler can recompile it. */
+  private var loadedSpecJson: String? = null
+
+  private val expressions = CachingExpressionCompiler(VegaExpressionCompiler())
+
+  private val signals = SignalUpdater(expressions, DiagnosticCollector())
+
+  /** Rebuilt on every publish, because the handlers and the scales both come from the compile. */
+  private var vegaEvents: EventDispatcher? = null
 
   /**
    * Compiles a specification off the calling thread, then publishes on it.
@@ -199,6 +230,16 @@ public class VegaChartController(
 
   private fun publish(compiled: CompiledSpec): CompiledSpec {
     lastCompiled = compiled
+    val bindings =
+      compiled.spec?.signals.orEmpty().flatMap { signal ->
+        signal.on.map { HandlerBinding(signal.name, it) }
+      }
+    vegaEvents =
+      if (bindings.isEmpty()) {
+        null
+      } else {
+        EventDispatcher(bindings, expressions, DiagnosticCollector(), compiled.signals)
+      }
     _diagnostics.value = compiled.diagnostics
     val scene = compiled.scene
     if (scene == null) {
@@ -250,9 +291,73 @@ public class VegaChartController(
       is ChartInputEvent.PointerDown,
       is ChartInputEvent.PointerUp,
       is ChartInputEvent.Key,
-      is ChartInputEvent.Resized -> Unit // Handled in later milestones; deliberately inert.
+      is ChartInputEvent.Resized -> Unit // No built-in behaviour; a signal handler may still fire.
     }
+    fireSignalHandlers(event)
   }
+
+  /**
+   * Turns a gesture into the Vega events a specification's selectors are written against, and
+   * recompiles if a handler changed a signal.
+   *
+   * One gesture produces **several** event names, which is not padding: a browser on a touch screen
+   * fires the touch family *and* synthesises the pointer, mouse and click families from it, and
+   * almost every specification in the wild is written against `click` or `mousedown`. Emitting only
+   * `touchstart` would leave those specifications inert on Android for no reason a reader could
+   * see.
+   *
+   * The order within a gesture is the browser's: pointer, then touch, then mouse, then `click`.
+   */
+  private fun fireSignalHandlers(event: ChartInputEvent) {
+    val dispatcher = vegaEvents ?: return
+    val compiled = lastCompiled ?: return
+    val types =
+      when (event) {
+        is ChartInputEvent.PointerDown -> listOf("pointerdown", "touchstart", "mousedown")
+        is ChartInputEvent.PointerUp -> listOf("pointerup", "touchend", "mouseup")
+        is ChartInputEvent.PointerMoved -> listOf("pointermove", "touchmove", "mousemove")
+        is ChartInputEvent.PointerEntered -> listOf("pointerover", "mouseover")
+        is ChartInputEvent.PointerExited -> listOf("pointerout", "mouseout")
+        is ChartInputEvent.Tap -> listOf("click")
+        else -> return
+      }
+    val point = pointOf(event)
+    val hit = point?.let { hitIndex.hitTest(toSceneSpace(it)) }?.node
+    val changed = LinkedHashSet<String>()
+    for (type in types) {
+      val fired =
+        dispatcher.dispatch(
+          VegaEvent(
+            type = type,
+            timestampMillis = clock(),
+            markType = hit?.metadata?.markKind,
+            markName = hit?.metadata?.markName,
+            datum = hit?.metadata?.datum ?: VegaValue.Null,
+            x = point?.x ?: 0.0,
+            y = point?.y ?: 0.0,
+          )
+        )
+      if (fired.isNotEmpty()) changed += signals.apply(fired, compiled.signals)
+    }
+    if (changed.isEmpty()) return
+
+    // Recompile rather than patch. Measured at well under a frame for the heaviest fixture, which
+    // is what makes this simple enough to be obviously correct (STATUS.md, Performance
+    // observations).
+    val json = loadedSpecJson ?: return
+    publish(compiler.compileJson(json, signals.overrides))
+  }
+
+  private fun pointOf(event: ChartInputEvent): PointD? =
+    when (event) {
+      is ChartInputEvent.PointerDown -> event.point
+      is ChartInputEvent.PointerUp -> event.point
+      is ChartInputEvent.PointerMoved -> event.point
+      is ChartInputEvent.PointerEntered -> event.point
+      is ChartInputEvent.PointerExited -> event.point
+      is ChartInputEvent.Tap -> event.point
+      else -> null
+    }
 
   private fun updateHover(point: PointD?) {
     val hit = point?.let { hitIndex.hitTest(toSceneSpace(it)) }

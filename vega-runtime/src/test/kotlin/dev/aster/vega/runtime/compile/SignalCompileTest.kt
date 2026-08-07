@@ -170,13 +170,14 @@ class SignalCompileTest {
   }
 
   /**
-   * Handlers now parse into a model — the selector, the sources and the update are all read and
-   * checked — but nothing dispatches them yet, so the signal still keeps its initial value. The
-   * diagnostic says which of those two it is, because "not supported" and "supported but not wired
-   * up" call for different things from a reader.
+   * A handler that parses is not a limitation and no longer warns.
+   *
+   * It did while nothing dispatched them. `VegaChartController` does now, and the parser cannot
+   * know whether a host wired one up — so warning unconditionally cried wolf on every working
+   * chart, which is the fastest way to teach a reader to ignore diagnostics.
    */
   @Test
-  fun `an event handler parses but does not yet fire`() {
+  fun `a handler that parses cleanly says nothing`() {
     val compiled =
       compile(
         spec(
@@ -186,10 +187,7 @@ class SignalCompileTest {
           encode = basePosition,
         )
       )
-    assertTrue(
-      compiled.diagnostics.any { it.message.contains("do not yet run") },
-      compiled.diagnostics.toString(),
-    )
+    assertEquals(emptyList<String>(), compiled.diagnostics.map { it.message })
   }
 
   /** A selector that cannot be read is an error, not a handler that silently never fires. */

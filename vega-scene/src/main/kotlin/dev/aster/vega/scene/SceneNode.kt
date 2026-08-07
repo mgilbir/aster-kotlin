@@ -55,6 +55,14 @@ public data class NodeMetadata(
   val datumId: Long? = null,
   val datumIndex: Int? = null,
   val interactive: Boolean = false,
+  /**
+   * The data row this node was encoded from.
+   *
+   * Needed by the interaction layer: `{"events": "rect:click", "update": "datum.category"}` is the
+   * commonest handler there is, and it reads the datum of the mark under the pointer. Holds the
+   * same object the encoder saw rather than a copy, so it costs a reference.
+   */
+  val datum: VegaValue? = null,
   val tooltip: VegaValue? = null,
   val accessibility: AccessibilityDescriptor? = null,
 ) {

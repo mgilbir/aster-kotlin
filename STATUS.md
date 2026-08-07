@@ -401,12 +401,15 @@ ordering), and the pipeline is now verified end to end on one fixture, but the b
 
 ## Verification
 
-- 1,231 JVM tests pass (`./scripts/test-core.sh`, `./gradlew test`).
+- 1,237 JVM tests pass (`./scripts/test-core.sh`, `./gradlew test`).
 - Android lint is clean with `warningsAsErrors` on every Android module.
-- 48 instrumented tests pass on an API 37 arm64 emulator (`./scripts/test-android.sh`): 40 in
-  `vega-android-canvas`, 4 in `vega-compose`, 4 in `demo` — including one that compiles every bundled
-  specification with the device's own font metrics, which the differential tests cannot cover because
-  they deliberately measure text upstream's way.
+- 51 instrumented tests pass on an API 37 arm64 emulator (`./scripts/test-android.sh`): 43 in
+  `vega-android-canvas`, 4 in `vega-compose`, 4 in `demo`. Two of them cover what no JVM test can:
+  one compiles every bundled specification with the device's own font metrics, which the
+  differential tests deliberately cannot because they measure text upstream's way; and three tap a
+  real view with a synthetic `MotionEvent` and read the pixels back, which is the only way to know
+  the gesture detector, the view's touch handling and the content scale all carry a finger through
+  to a signal handler.
 - The demo was installed and driven on the emulator: all nine chart entries render, marks are
   selectable by tap, light and dark palettes are legible, and SVG/PNG/PDF export all wrote files with
   zero warnings. The three specification entries load Vega JSON from assets, compile it on a
@@ -661,29 +664,30 @@ depends on them. Each has a test and a comment; this is the index.
 
 ## Next three tasks
 
-1. **The `image` mark.** The last of the twelve with no encoder that is not an explicit non-goal —
-   `shape` needs projections. It wants an `AndroidImageResolver` to turn a URL into pixels, so
-   unlike everything else in this session it cannot be finished or verified from here: the
-   differential harness has no way to fetch and decode an image the way a device would.
-2. **Binding a real gesture to a stream**, which is the only part of the interaction chain left
-   and the only part that needs a device. Everything from an event to a redrawn scene now works
-   and is tested: `EventDispatcher` matches, `SignalUpdater` evaluates, and the specification is
-   recompiled with the changed signals pinned. What is missing is the translation layer — an
-   Android `MotionEvent` becoming an `InputEvent`, with the mark under the pointer resolved by
-   the existing hit tester and the event type mapped onto Vega's names (`pointerdown` and friends
-   rather than `mousedown`, which the selector language does not know about). `VegaChartController`
-   already owns hit testing and gesture detection, so it is the place for it. Verify on hardware.
-3. **Keep growing the fixture corpus.** 56 of the brief's 100, and the last ten passed on
-   arrival. That is not a sign the corpus is finished — it is a sign that recent work was built
-   against upstream vectors before a fixture ever saw it, which makes fixtures regression cover
-   rather than a search. Where they still find things is any *combination* the engine has not met:
-   a local `time` scale across a daylight-saving boundary, a `bin` transform feeding a
-   `bin-ordinal` scale end to end, an axis on a discretizing scale, a group whose signals shadow
-   the outer scope's. Aim there rather than at more variations of a single feature.
+1. **The `image` mark**, now that the emulator is in play. It is the last of the twelve with no
+   encoder that is not an explicit non-goal — `shape` needs projections. It wants an
+   `AndroidImageResolver` to turn a URL into pixels, and unlike everything else it cannot be
+   verified by the differential harness, which has no way to fetch and decode an image the way a
+   device would. An instrumented test drawing a bundled asset is the check.
+2. **What the interaction system still does not do.** The chain works end to end, and three things
+   inside it are stubbed rather than finished: a `debounce` fires on every event instead of after
+   the quiet period, because nothing schedules; a `{"signal": "..."}` or `{"scale": "..."}` source
+   parses but only ever fires from a real event; and an `encode` handler, which sets properties on
+   the event's own mark rather than a signal, is reported and does nothing. The first needs a
+   scheduler the controller does not have; the second needs a signal to notice its own change; the
+   third needs the compiler to hand back a mutable node. All three are reported by name today.
+3. **Keep growing the fixture corpus.** 58 of the brief's 100. Aiming it at *combinations* the
+   engine has not met rather than at more variations of a single feature is what makes it find
+   things: that is how `scale()` in an expression turned up missing. Untried combinations that
+   remain include an axis on a discretizing scale, a group whose signals shadow the outer scope's,
+   and a `timeunit` transform feeding a `time` scale across the same daylight-saving boundary the
+   `local-time-dst` fixture crosses.
 
-Two further items, both real and both needing something this environment does not have: performance
-on physical hardware (PROJECT_BRIEF.md 19, criterion 13) and TalkBack itself rather than
-instrumentation (criterion 8). They are the only MVP criteria that cannot be moved from here.
+Two further items still need something this environment does not have. Performance on **physical
+hardware** (PROJECT_BRIEF.md 19, criterion 13) — the emulator is available and useful for
+behaviour, but PROJECT_BRIEF.md 18.6 says emulator timings are not authoritative, and it is right.
+And **TalkBack itself** rather than instrumentation (criterion 8): the accessibility tree is
+asserted on, but nobody has listened to it.
 
 A note on the harness, because it is now the sixth time. The differential comparison has had to be
 taught to see a symbol's outline, fill and stroke opacity, a dash pattern, a node's own opacity, an

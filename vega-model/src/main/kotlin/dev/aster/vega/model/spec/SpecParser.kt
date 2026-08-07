@@ -543,14 +543,6 @@ public class SpecParser {
         ->
         parseSignalHandler(entry, "$path.on[$index]", name, subscope)
       }
-    if (on.isNotEmpty()) {
-      diagnostics.warn(
-        DiagnosticCodes.PARSE_UNKNOWN_PROPERTY,
-        "Signal '$name' has ${on.size} handler(s), which parse but do not yet run: dispatching " +
-          "them needs the event loop, so the signal keeps its initial value",
-        jsonPath = "$path.on",
-      )
-    }
     if (obj.fields["bind"] != null) {
       diagnostics.warn(
         DiagnosticCodes.PARSE_UNKNOWN_PROPERTY,
