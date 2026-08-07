@@ -1,0 +1,236 @@
+package dev.aster.vega.runtime.interaction
+
+import dev.aster.vega.expression.ExpressionCompiler
+import dev.aster.vega.expression.ExpressionEvaluationException
+import dev.aster.vega.expression.ExpressionResult
+import dev.aster.vega.expression.ExpressionScope
+import dev.aster.vega.expression.JsSemantics
+import dev.aster.vega.model.DiagnosticCodes
+import dev.aster.vega.model.DiagnosticCollector
+import dev.aster.vega.model.VegaValue
+import dev.aster.vega.model.spec.EventStream
+import dev.aster.vega.model.spec.SignalHandler
+
+/**
+ * An input event, in terms the engine can reason about.
+ *
+ * Deliberately not an Android `MotionEvent` or anything like one: the core stays portable, and the
+ * host translates whatever it has into this. [timestampMillis] is supplied rather than read from a
+ * clock for the same reason — and because a throttle that consults the wall clock cannot be tested.
+ *
+ * [properties] carries whatever `event.something` a filter might ask for: `shiftKey`, `button`,
+ * `key`, and so on. An absent one reads as null, which is falsy, so a filter on a modifier the host
+ * does not report simply never passes rather than failing.
+ */
+public data class InputEvent(
+  val type: String,
+  val timestampMillis: Long,
+  val source: String = EventStream.SOURCE_VIEW,
+  /** The mark instance under the pointer, if the event landed on one. */
+  val markType: String? = null,
+  val markName: String? = null,
+  /** The datum of the mark under the pointer, for `event.item.datum`. */
+  val datum: VegaValue = VegaValue.Null,
+  val x: Double = 0.0,
+  val y: Double = 0.0,
+  val properties: Map<String, VegaValue> = emptyMap(),
+) {
+  /** The `event` object a filter expression sees. */
+  internal fun asValue(): VegaValue {
+    val fields = LinkedHashMap<String, VegaValue>(properties.size + 4)
+    fields.putAll(properties)
+    fields["type"] = VegaValue.Str(type)
+    fields["x"] = VegaValue.Num(x)
+    fields["y"] = VegaValue.Num(y)
+    fields["timeStamp"] = VegaValue.Num(timestampMillis.toDouble())
+    if (markType != null || markName != null || datum !is VegaValue.Null) {
+      val mark = LinkedHashMap<String, VegaValue>(2)
+      markType?.let { mark["marktype"] = VegaValue.Str(it) }
+      markName?.let { mark["name"] = VegaValue.Str(it) }
+      fields["item"] = VegaValue.Obj(mapOf("mark" to VegaValue.Obj(mark), "datum" to datum))
+    }
+    return VegaValue.Obj(fields)
+  }
+}
+
+/** A handler that fired, and the event that fired it. */
+public data class FiredHandler(
+  val signalName: String,
+  val handler: SignalHandler,
+  val event: InputEvent,
+)
+
+/** One `on` handler, bound to the signal it sets. */
+public data class HandlerBinding(val signalName: String, val handler: SignalHandler)
+
+/**
+ * Matches arriving events against the streams a specification registered.
+ *
+ * This is the half of the interaction system that can be built and tested away from a device: given
+ * an event, decide which handlers fire. What it deliberately does **not** do is apply the update —
+ * that needs the signal graph re-run, which is the next piece.
+ *
+ * Three behaviours are worth knowing, all matched to upstream:
+ *
+ * **`between` is a latch, not a queue.** `[mousedown, mouseup] > mousemove` is implemented as a
+ * boolean turned on by the first stream and off by the second; the gated stream fires while it is
+ * on. So a `mouseup` that never arrives leaves the gate open indefinitely, which is what makes a
+ * drag survive the pointer leaving the chart — and also why a lost `mouseup` leaves it stuck.
+ *
+ * **Gates are updated before gated streams are tested.** When one event could both close a gate and
+ * fire the stream it gates, the gate wins. Upstream's ordering here follows from the order streams
+ * were registered and is not stated anywhere; this fixes it, because leaving it to registration
+ * order would make the behaviour depend on how the specification was written.
+ *
+ * **A consumed event stops there.** A stream marked `!` fires and no later stream sees the event,
+ * which is how a mark handler stops the view-level one behind it from also firing.
+ */
+public class EventDispatcher(
+  bindings: List<HandlerBinding>,
+  private val expressions: ExpressionCompiler,
+  private val diagnostics: DiagnosticCollector,
+  /** Signals and datasets a filter expression may read, alongside `event`. */
+  private val scope: ExpressionScope,
+) {
+
+  /** One stream being watched, with whatever state it needs between events. */
+  private class Watch(
+    val stream: EventStream,
+    val binding: HandlerBinding?,
+    /** Streams whose gate this one opens, and those whose gate it closes. */
+    val opens: MutableList<Gate> = mutableListOf(),
+    val closes: MutableList<Gate> = mutableListOf(),
+  ) {
+    /** Null until the stream has fired once. A sentinel would overflow the subtraction. */
+    var lastFired: Long? = null
+  }
+
+  private class Gate {
+    var open: Boolean = false
+  }
+
+  /** The gate a stream must pass, or null if it has none. */
+  private val gateOf = HashMap<Watch, Gate>()
+
+  private val watches = mutableListOf<Watch>()
+
+  /** Gate-opening and gate-closing streams, tested before anything they gate. */
+  private val gateWatches = mutableListOf<Watch>()
+
+  init {
+    for (binding in bindings) {
+      for (stream in binding.handler.streams) register(stream, binding)
+    }
+  }
+
+  private fun register(stream: EventStream, binding: HandlerBinding) {
+    if (stream.nested != null) {
+      // A pair wrapping a pair. Honouring it means gating a gate, which the latch model can do,
+      // but nothing in the corpus uses it and guessing at the ordering would be worse than saying
+      // so.
+      diagnostics.warn(
+        DiagnosticCodes.PARSE_UNKNOWN_PROPERTY,
+        "A 'between' selector wrapping another 'between' is not dispatched; signal " +
+          "'${binding.signalName}' will not update from it",
+        operator = binding.signalName,
+      )
+      return
+    }
+    val watch = Watch(stream, binding)
+    if (stream.between.size == 2) {
+      val gate = Gate()
+      gateOf[watch] = gate
+      gateWatches += Watch(stream.between[0], null, opens = mutableListOf(gate))
+      gateWatches += Watch(stream.between[1], null, closes = mutableListOf(gate))
+    }
+    if (stream.debounce != null) {
+      // A debounce fires *after* a quiet period, so honouring it needs something that can wake up
+      // later. Nothing here schedules, and silently treating it as a throttle would fire on the
+      // leading edge instead of the trailing one — the opposite behaviour.
+      diagnostics.warn(
+        DiagnosticCodes.PARSE_UNKNOWN_PROPERTY,
+        "A debounce needs a scheduler to fire after the quiet period; signal " +
+          "'${binding.signalName}' will fire on every matching event instead",
+        operator = binding.signalName,
+      )
+    }
+    watches += watch
+  }
+
+  /** @return the handlers this event fired, in registration order. */
+  public fun dispatch(event: InputEvent): List<FiredHandler> {
+    for (gateWatch in gateWatches) {
+      if (!matches(gateWatch.stream, event)) continue
+      for (gate in gateWatch.opens) gate.open = true
+      for (gate in gateWatch.closes) gate.open = false
+    }
+
+    val fired = mutableListOf<FiredHandler>()
+    for (watch in watches) {
+      val binding = watch.binding ?: continue
+      if (!matches(watch.stream, event)) continue
+      if (gateOf[watch]?.open == false) continue
+      val throttle = watch.stream.throttle
+      val since = watch.lastFired
+      if (throttle != null && since != null && event.timestampMillis - since < throttle) continue
+      watch.lastFired = event.timestampMillis
+      fired += FiredHandler(binding.signalName, binding.handler, event)
+      // `!` on the type: this stream consumed the event, so nothing after it sees it.
+      if (watch.stream.consume) break
+    }
+    return fired
+  }
+
+  private fun matches(stream: EventStream, event: InputEvent): Boolean {
+    if (stream.type != null && stream.type != event.type) return false
+    if (stream.source != event.source) return false
+    // `*` matches any mark, but still requires that the event landed on one.
+    if (stream.markType != null) {
+      if (event.markType == null) return false
+      if (stream.markType != "*" && stream.markType != event.markType) return false
+    }
+    if (stream.markName != null && stream.markName != event.markName) return false
+    return stream.filters.all { passes(it, event) }
+  }
+
+  /**
+   * A filter that cannot be read or cannot be evaluated **suppresses** the event.
+   *
+   * The alternative — treating a broken filter as absent — would fire the handler on every event of
+   * that type, which is the loudest possible failure. Not firing is quieter and is reported.
+   */
+  private fun passes(filter: String, event: InputEvent): Boolean {
+    val compiled = expressions.compile(filter)
+    if (compiled !is ExpressionResult.Compiled) {
+      diagnostics.error(
+        DiagnosticCodes.EXPRESSION_PARSE_ERROR,
+        "Could not read the event filter '$filter'; no event will pass it",
+        operator = "event filter",
+      )
+      return false
+    }
+    return try {
+      JsSemantics.truthy(compiled.expression.evaluate(EventScope(scope, event.asValue())))
+    } catch (failure: ExpressionEvaluationException) {
+      diagnostics.error(
+        DiagnosticCodes.EXPRESSION_PARSE_ERROR,
+        "The event filter '$filter' could not be evaluated (${failure.message}); no event " +
+          "passed it",
+        operator = "event filter",
+      )
+      false
+    }
+  }
+
+  /** The specification's own scope, with `event` added on top. */
+  private class EventScope(private val delegate: ExpressionScope, private val event: VegaValue) :
+    ExpressionScope {
+    override val datum: VegaValue
+      get() = delegate.datum
+
+    override fun signal(name: String): VegaValue =
+      if (name == "event") event else delegate.signal(name)
+
+    override fun dataset(name: String): List<VegaValue> = delegate.dataset(name)
+  }
+}
