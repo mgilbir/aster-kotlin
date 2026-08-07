@@ -92,8 +92,8 @@ upstream-verified slice through parsing, scales, rect encoding and axes:
 | Canvas renderer, SVG serializer | rest of `vega-scenegraph` | complete for those 7 |
 | Diagnostics, canonical snapshots, goldens, oracle scaffolding | no upstream equivalent | complete |
 | `vega-scale` (linear, band, point, ordinal) + d3-array ticks | 790 + parts of d3-scale, d3-array | 4 of ~15 scale types, exact against upstream |
-| `vega-parser` (width, height, padding, autosize, data, signals, scales, axes, marks, group scopes) | 3,790 | a subset; no legends, titles or `layout` |
-| `vega-encode` (mark encoders, axes, legends, titles) | 952 | 8 of 12 mark encoders; axes, legends and titles without overlap removal |
+| `vega-parser` (width, height, padding, autosize, data, signals, scales, axes, legends, titles, marks, group scopes, `layout`, `config`) | 3,790 | a subset, and every property it does not read is reported by name |
+| `vega-encode` (mark encoders, axes, legends, titles) | 952 | 8 of 12 mark encoders; axes, legends and titles including overlap removal, truncation and the `config` cascade |
 | `vega-expression` + `vega-functions` | 2,388 | language complete; 60 of 119 functions |
 | `vega-transforms` (17 of 40) | 3,754 | the 12 the brief lists plus `timeunit`, `pie`, `window`, `sequence` and `lookup`, exact against upstream |
 | `vega-dataflow` | 2,081 | contracts and scheduling only; no pulse propagation |
@@ -110,7 +110,7 @@ The entire data and specification half is absent:
 | Remaining mark encoders — image, path, trail, shape | rest of `vega-encode` + d3-shape | 0 |
 | Group `layout` — the trellis grid, headers and titles | `vega-view-transforms` grid layout | 0, reported |
 | Line and area interpolation — basis, cardinal, catmull-rom, monotone, natural | part of d3-shape | 0, reported; the step family is implemented |
-| Label overlap removal, banded legends, trellis footers | parts of `vega-encode`, `vega-label`, `vega-view-transforms` | 0, reported |
+| Banded legends, trellis footers | parts of `vega-encode`, `vega-view-transforms` | 0, reported |
 | `vega-view`, `vega-view-transforms` — layout, overlap removal | 2,623 | bounds only |
 | `vega-event-selector` — event-stream DSL | 191 | 0 |
 | `vega-time`, `vega-format` — `timeunit`, locales, format strings | 587 + d3-format, d3-time-format | tick selection and default labels only |
@@ -575,29 +575,33 @@ depends on them. Each has a test and a comment; this is the index.
 
 ## Next three tasks
 
-1. **Keep growing the fixture corpus.** 45 of the brief's 100 pass, and the return has not fallen
-   off: the last ten fixtures found fourteen defects between them, and half of those were in code
-   that had been passing for a dozen fixtures. Worth aiming at next: a `config` block of any kind,
-   which is where a Vega-Lite-compiled specification puts everything and where every default in this
-   engine is still a hard-coded constant with no way for a specification to move it — and it is now
-   the last large silent-divergence surface left, since the guide audit closed the others. Then a
-   local `time` scale crossing a daylight-saving boundary, where only UTC is covered today. Still
-   untouched beyond that: `sequence`, `window` and `lookup` and the other 25 transforms; `trail`,
-   `shape`, `image` and `path` marks; and `quantile`, `quantize`, `threshold` and `bin-ordinal`
-   scales.
-2. **Arc padding and corner rounding.** Both reported today, and both are what separates a
-   serviceable donut from a finished one. Upstream insets a padded arc against a pad *radius* and
-   rounds its corners with tangent circles, so this is real geometry rather than a parameter to pass
-   through — which is why it was left out of the first cut rather than guessed at. The longest-
-   standing item on this list now that the axis work is done.
-3. **`labelLimit`, and then the rest of the axis tail.** `labelLimit` defaults to 180 on an axis and
-   160 on a legend, so it is a *default* this engine does not implement — a label longer than that
-   is truncated with an ellipsis upstream and drawn in full here. Narrow, since few labels are that
-   long, but it is the same class of thing as the `labelOverlap` asymmetry: a default hiding in
-   `config.js`. After it, `tickMinStep` and `tickBand` are the two most likely to be asked for.
+1. **Keep growing the fixture corpus.** 45 of the brief's 100 pass. The return has fallen off and
+   that is worth recording rather than glossing: of the last eight fixtures, five passed on arrival.
+   The corpus has caught up with the parts of the engine that were written without one. It is still
+   the cheapest way to find a defect, but a fixture over ground already covered now mostly buys a
+   regression test. Aim at what is genuinely untouched: `trail`, `shape`, `image` and `path` marks;
+   the `quantile`, `quantize`, `threshold` and `bin-ordinal` scales; and the 23 remaining transforms,
+   of which `impute`, `cross`, `pivot` and `countpattern` are the ones a real specification reaches
+   for.
+2. **The remaining curve families.** `basis`, `cardinal`, `catmull-rom`, `monotone` and `natural`
+   are the last of the interpolation methods, and `monotone` is the one people actually ask for — a
+   smoothed line that does not overshoot its data. Each is a d3-shape curve to port, the same shape
+   of work as `ArcPath`, and the harness can now see the result: it asks d3 for the outline, so
+   adding a curve there is a two-line change beside the port.
+3. **Continuous colour ramps.** `viridis`, `blues` and the rest, still reported by name. They need
+   d3's interpolator tables and Vega's default scheme extent of roughly `[0.2, 1]`, which is a
+   sizeable table but no algorithm — and a heatmap or a choropleth cannot be drawn without them, so
+   this is the largest remaining thing a specification can ask for and simply not get.
 
-A note on the harness, because it is now the fourth time: the differential comparison has had to be
-taught to see a symbol's outline, fill and stroke opacity, a dash pattern and a node's own opacity.
-Each was invisible for the same reason — two marks that agree on every channel being compared and
-differ in the drawn result. Before trusting a green fixture on a *new* kind of property, check that
-`oracle-js/src/normalize.js` and `Differential.kt` both emit it.
+Two further items, both real and both needing something this environment does not have: performance
+on physical hardware (PROJECT_BRIEF.md 19, criterion 13) and TalkBack itself rather than
+instrumentation (criterion 8). They are the only MVP criteria that cannot be moved from here.
+
+A note on the harness, because it is now the sixth time. The differential comparison has had to be
+taught to see a symbol's outline, fill and stroke opacity, a dash pattern, a node's own opacity, an
+unfilled mark's missing opacity, and the corners a curve puts between a series' points. Each was
+invisible for the same reason — two marks agreeing on every channel being compared and differing in
+the drawn result. Before trusting a green fixture on a *new* kind of property, check that
+`oracle-js/src/normalize.js` and `Differential.kt` both emit it. And look at the two pictures: three
+of the six were found that way, most recently a renderer drawing the full text of a label it had
+measured as truncated.
