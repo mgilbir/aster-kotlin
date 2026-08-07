@@ -498,11 +498,30 @@ measurement, so it could not be approximated.
 
 ## Performance observations
 
-None recorded. No measurement has been taken on physical hardware yet, and emulator numbers are not
-authoritative (PROJECT_BRIEF.md 18.6). The benchmark module and fixtures exist
-(`benchmark/src/androidTest`, `scripts/benchmark.sh`) but have not been run on a device.
+Nothing on hardware. No measurement has been taken on a physical device, and emulator numbers are
+not authoritative (PROJECT_BRIEF.md 18.6). The benchmark module and fixtures exist
+(`benchmark/src/androidTest`, `scripts/benchmark.sh`) but have not been run on one, so the targets
+in PROJECT_BRIEF.md 19 are all unverified.
 
-The performance targets in PROJECT_BRIEF.md 19 are therefore all unverified.
+**One number was taken on the JVM**, because a design decision hung on it. Before building an
+incremental dataflow so that a changed signal need not recompile everything, it was worth knowing
+what a full recompile actually costs. Compiling each of the 55 fixtures 200 times after 50 warm-up
+rounds, on a warm JIT:
+
+| | microseconds per full compile |
+| --- | --- |
+| heaviest fixture (`axis-values`) | 366 |
+| median fixture | 112 |
+
+A 60 fps frame is 16,600 microseconds. Even allowing an order of magnitude for ART, a cold cache
+and a phone's CPU, the heaviest fixture recompiles in well under a frame. **So a fired signal
+handler can re-resolve the signals and recompile the whole specification, and an incremental
+dataflow is not needed for interaction to be smooth.** That removes what looked like the largest
+piece of work in the interaction system.
+
+Two caveats on the number. It is a desktop JVM with the JIT warm, which is the most favourable case
+there is; and it measures compilation only, not the Canvas draw that follows. It is an order of
+magnitude, enough to rule an approach in, and not a substitute for measuring on hardware.
 
 ## What a reader should not have to rediscover
 
@@ -629,11 +648,12 @@ depends on them. Each has a test and a comment; this is the index.
    the one that touches everything else. Matching is done — `EventDispatcher` turns an event into
    the list of handlers it fired — so what remains is: evaluate the handler's update in a scope
    where `event` and `item` are visible, set the signal, and re-run whatever depends on it. That
-   last step is the real decision. Nothing here recomputes incrementally: `SpecCompiler` goes from
-   specification to scene in one pass, so the cheap first cut is to re-resolve the signals and
-   recompile, and the honest question is whether that is fast enough at sixty frames a second on
-   a real chart. Measure before building an incremental dataflow — the benchmark module exists
-   and a full recompile of the largest fixture is the number to get first.
+   last step looked like the largest piece of work here, and measuring says it is not: a full
+   recompile of the heaviest fixture costs 366 microseconds against a 16,600 microsecond frame
+   (see Performance observations). So re-resolve the signals and recompile — no incremental
+   dataflow. What is left is the ordinary part: evaluate the update in a scope where `event` and
+   `item` are visible, honour `force`, and decide where the mutable signal state lives, since
+   `SignalResolver` is deliberately stateless between calls.
 3. **Keep growing the fixture corpus.** 55 of the brief's 100. Fixtures no longer find defects on
    arrival — the last nine passed first try — because the corpus has caught up with everything
    written without one, and the recent work was all built against upstream vectors before a
