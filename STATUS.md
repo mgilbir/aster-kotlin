@@ -21,7 +21,7 @@ end to end — expressions, signals, 33 of upstream's 40 data transforms, every 
 and an event handler that recompiles the chart — and are verified against upstream Vega by
 differential tests.
 
-Sixty-three differential fixtures pass, all matching upstream exactly on every mark and scale output:
+Sixty-four differential fixtures pass, all matching upstream exactly on every mark and scale output:
 
 | Fixture | Marks | Covers |
 | --- | --- | --- |
@@ -88,6 +88,7 @@ Sixty-three differential fixtures pass, all matching upstream exactly on every m
 | `scheme-forms` | 31 | a scheme named in the wrong case, one chosen by a signal, one written out as its stops |
 | `centre-anchors` | 22 | `xc`/`yc` on five mark types, an `x2` with no `x`, and a pair written backwards |
 | `signal-transform-params` | 29 | a signal choosing an aggregate's operation and field, and bounding a filter |
+| `link-paths` | 77 | one tree joined four ways: diagonal, orthogonal and curved links, and a radial fan |
 
 The gate is wired into `./scripts/oracle.sh`, so every further scale, mark and transform is built
 against a harness that can say we are wrong — which golden tests cannot.
@@ -114,7 +115,7 @@ upstream-verified slice through parsing, scales, rect encoding and axes:
 | `vega-parser` (width, height, padding, autosize, data, signals, scales, axes, legends, titles, marks, group scopes, `layout`, `config`) | 3,790 | a subset, and every property it does not read is reported by name |
 | `vega-encode` (mark encoders, axes, legends, titles) | 952 | 11 of 12 mark encoders — all but `shape`, which needs projections and is an explicit non-goal; axes, legends and titles including overlap removal, truncation and the `config` cascade; nine interpolation methods |
 | `vega-expression` + `vega-functions` | 2,388 | language complete; 82 of 119 functions, with 17 more reported by name and reason |
-| `vega-transforms` (33 of 40) | 3,754 | the 12 the brief lists plus `timeunit`, `pie`, `window`, `sequence`, `lookup`, `impute`, `cross`, `pivot`, `countpattern`, the statistical family — `quantile`, `regression`, `loess`, `kde`, `density`, `dotbin` — and the whole hierarchy family: `stratify`, `nest`, `treemap`, `partition`, `pack`, `tree`. Exact against upstream |
+| `vega-transforms` (35 of 40) | 3,754 | the 12 the brief lists plus `timeunit`, `pie`, `window`, `sequence`, `lookup`, `impute`, `cross`, `pivot`, `countpattern`, the statistical family — `quantile`, `regression`, `loess`, `kde`, `density`, `dotbin` — and the whole hierarchy family: `stratify`, `nest`, `treemap`, `partition`, `pack`, `tree`, plus `treelinks` and `linkpath`, which turn a laid-out tree into the edges drawn between its nodes. Exact against upstream |
 | `vega-dataflow` | 2,081 | contracts and scheduling only; no pulse propagation |
 
 The entire data and specification half is absent:
@@ -142,12 +143,12 @@ substantive compatibility items:
 | 1. Compiled Vega JSON loads without JavaScript | **Yes**, for a substantial subset — `VegaChartController.setSpec` loads it and the demo renders three bundled specifications on device |
 | 2. Bar, line, area, scatter, stacked bar render natively | **Yes** — all five compile from a specification, and small multiples of them too |
 | 3. Axes, legends, labels and titles supported | **Yes** — all four |
-| 4. Basic transforms and scales execute in Kotlin | **Yes** — every scale type in scope, including time and UTC and the four discretizing ones, and 33 of upstream's 40 transforms |
+| 4. Basic transforms and scales execute in Kotlin | **Yes** — every scale type in scope, including time and UTC and the four discretizing ones, and 35 of upstream's 40 transforms |
 | 5. Tap, hover, tooltip, selection, pan, zoom | Yes, except tooltip rendering |
 | 6. View and Compose APIs | Yes |
 | 7. SVG, PNG, PDF export | Yes |
 | 8. TalkBack can describe and navigate | Partial — virtual nodes are tested by instrumentation, not with TalkBack itself |
-| 9. At least 100 compatibility fixtures pass | 63 of 100 |
+| 9. At least 100 compatibility fixtures pass | 64 of 100 |
 | 10. Core runtime has no Android dependency | Yes |
 | 11. Renders without WebView | Yes |
 | 12. Build and test loop runs from the terminal | Yes |
@@ -484,7 +485,7 @@ each example a deadline.
 
 ## Known failing fixtures
 
-None. Sixty-three fixtures exist and all sixty-three pass — and that sentence became worth
+None. Sixty-four fixtures exist and all sixty-four pass — and that sentence became worth
 something only once the gate could no longer skip itself, below.
 
 **The gate could report success without running.** `FixtureDifferentialTest` reads the fixtures and
@@ -737,11 +738,13 @@ explored with it; the tree was already correct and two things it *said* were wro
 and pinned by instrumented tests. What remains untested there is physical hardware and a real user,
 which is a different claim from "not verified at all".
 
-A note on the harness, because it is now the sixth time. The differential comparison has had to be
+A note on the harness, because it is now the seventh time. The differential comparison has had to be
 taught to see a symbol's outline, fill and stroke opacity, a dash pattern, a node's own opacity, an
-unfilled mark's missing opacity, and the corners a curve puts between a series' points. Each was
-invisible for the same reason — two marks agreeing on every channel being compared and differing in
-the drawn result. Before trusting a green fixture on a *new* kind of property, check that
+unfilled mark's missing opacity, the corners a curve puts between a series' points, and — adding
+`linkpath` — the outline a `path` mark actually draws, which until then was compared only by the
+anchor it hung from. Each was invisible for the same reason — two marks agreeing on every channel
+being compared and differing in the drawn result. Before trusting a green fixture on a *new* kind of
+property, check that
 `oracle-js/src/normalize.js` and `Differential.kt` both emit it. And look at the two pictures: three
 of the six were found that way, most recently a renderer drawing the full text of a label it had
 measured as truncated.

@@ -112,6 +112,7 @@ public object StratifyTransform : Transform {
       return input
     }
 
+    root.sourceSize = input.size
     context.tree = root
     return input
   }
@@ -174,6 +175,7 @@ public object NestTransform : Transform {
 
     build(input.withIndex().map { it.index to it.value }, 0, root)
     root.eachBefore { TreeNode.computeHeight(it) }
+    root.sourceSize = input.size
     context.tree = root
     if (!generate) return input
 
@@ -199,8 +201,48 @@ public object NestTransform : Transform {
       }
       level = next
     }
+    root.sourceSize = input.size + generated.size
     return input + generated
   }
+}
+
+/**
+ * The tree an earlier `stratify` or `nest` built, checked against the rows it is about to be used
+ * on.
+ *
+ * A hierarchy transform hands its rows on unchanged, and everything that reads the tree afterwards
+ * — the four layouts and `treelinks` — reaches a row through the position the node recorded.
+ * Upstream can be laxer: it mutates tuples in place and each node holds its own tuple, so it
+ * recognises a row by identity however the list has since been rearranged. Transforms here copy
+ * instead, which is what makes a pipeline reproducible, and it leaves position as the only
+ * remaining link between a node and its row.
+ *
+ * So a transform that adds or drops rows between the two breaks the correspondence, and would break
+ * it silently: every node would write its coordinates onto some other node's row, or a link would
+ * join the wrong pair. That is refused here rather than guessed at.
+ */
+internal fun carriedTree(
+  input: List<VegaValue>,
+  context: TransformContext,
+  type: String,
+  missing: String,
+): TreeNode? {
+  val root = context.tree as? TreeNode
+  if (root == null) {
+    context.diagnostics.error(DiagnosticCodes.TRANSFORM_INVALID_PARAMETER, missing, operator = type)
+    return null
+  }
+  if (root.sourceSize != input.size) {
+    context.diagnostics.error(
+      DiagnosticCodes.TRANSFORM_INVALID_PARAMETER,
+      "$type was given ${input.size} row(s) where the tree was built over ${root.sourceSize}, so " +
+        "something between the two added or removed rows and no node can be matched to its row " +
+        "any more",
+      operator = type,
+    )
+    return null
+  }
+  return root
 }
 
 /**
@@ -224,15 +266,13 @@ internal fun applyTreeLayout(
   defaultNames: List<String>,
   layout: (TreeNode) -> Boolean,
 ): List<VegaValue> {
-  val root = context.tree as? TreeNode
-  if (root == null) {
-    context.diagnostics.error(
-      DiagnosticCodes.TRANSFORM_INVALID_PARAMETER,
+  val root =
+    carriedTree(
+      input,
+      context,
+      type,
       "$type needs a tree; put a 'stratify' or 'nest' transform before it",
-      operator = type,
-    )
-    return input
-  }
+    ) ?: return input
 
   val measure = params.string("field")
   if (measure.isNullOrEmpty()) {

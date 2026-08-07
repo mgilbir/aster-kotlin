@@ -299,7 +299,12 @@ function record(type, role, item, dx, dy, precision) {
   if (dash !== undefined) entry.strokeDash = dash;
   // A symbol's `size` channel says nothing about the outline it actually draws, and Vega ships its own
   // symbol table rather than d3's — so compare the drawn extent, not just the requested size.
-  if ((type === 'symbol' || type === 'arc') && item.bounds) {
+  //
+  // A `path` mark is the same case and was for a long time the wider hole: its whole geometry lives
+  // in a path string, and the only channels compared were the anchor it hangs from. Two engines
+  // could agree on `x` and `y` and draw completely different outlines — which is exactly what a
+  // `linkpath` transform emitting the wrong shape would look like.
+  if ((type === 'symbol' || type === 'arc' || type === 'path') && item.bounds) {
     entry.shapeLeft = canonicalNumber(item.bounds.x1 + dx, precision);
     entry.shapeTop = canonicalNumber(item.bounds.y1 + dy, precision);
     entry.shapeWidth = canonicalNumber(item.bounds.x2 - item.bounds.x1, precision);

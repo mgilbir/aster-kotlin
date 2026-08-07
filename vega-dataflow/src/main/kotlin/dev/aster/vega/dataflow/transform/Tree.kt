@@ -31,6 +31,16 @@ internal class TreeNode(index: Int, val datum: VegaValue?) : TreeSource {
   var depth: Int = 0
   var height: Int = 0
 
+  /**
+   * How many rows the hierarchy transform handed on, recorded on the root and meaningless
+   * elsewhere.
+   *
+   * Every consumer of a tree finds a node's row by [index], which is a position in that list. The
+   * count is what lets a consumer check that the list it was given is still that one — see
+   * [carriedTree].
+   */
+  var sourceSize: Int = 0
+
   /** The summed measure a layout divides space by. */
   var value: Double = 0.0
 

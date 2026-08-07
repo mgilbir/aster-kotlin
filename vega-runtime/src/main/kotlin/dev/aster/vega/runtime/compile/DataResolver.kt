@@ -20,6 +20,32 @@ import dev.aster.vega.runtime.load.DenyLoader
 import dev.aster.vega.runtime.load.LoadDeniedException
 
 /**
+ * The datasets visible at one point in a specification, and the tree each of them carries.
+ *
+ * A tree belongs to the **dataset** that built it, not to the pipeline run that built it. Vega's
+ * own tree examples are written as two datasets — one that stratifies and lays out, and a second
+ * that sources from it and turns it into links — and upstream connects them by hanging the tree off
+ * the source array as `source.root`, which a dataset sourcing from it then reads. Keeping it per
+ * pipeline instead left the second dataset with nothing, and `treelinks` reporting a missing tree
+ * for a specification that plainly had one.
+ *
+ * Carried beside the rows rather than inside them because a tree is not data: nothing downstream of
+ * a layout ever sees the structure, only the coordinates written back onto the rows.
+ */
+internal class ScopeData(
+  val datasets: Map<String, List<VegaValue>>,
+  val trees: Map<String, TreeSource> = emptyMap(),
+) {
+  /** A dataset bound from outside the resolver — a facet's own rows, which carry no tree. */
+  fun withDataset(name: String, rows: List<VegaValue>): ScopeData =
+    ScopeData(datasets + (name to rows), trees - name)
+
+  companion object {
+    val Empty: ScopeData = ScopeData(emptyMap())
+  }
+}
+
+/**
  * Resolves dataset definitions to plain value lists, running their transform pipelines.
  *
  * Separate from [SpecCompiler] because a group mark declares datasets of its own, and those resolve
@@ -139,16 +165,20 @@ internal class DataResolver(
   fun resolve(
     specs: List<DataSpec>,
     signals: MutableMap<String, VegaValue>,
-    inherited: Map<String, List<VegaValue>> = emptyMap(),
-  ): Map<String, List<VegaValue>> {
+    inherited: ScopeData = ScopeData.Empty,
+  ): ScopeData {
     if (specs.isEmpty()) return inherited
 
-    val result = LinkedHashMap(inherited)
+    val result = LinkedHashMap(inherited.datasets)
+    val trees = LinkedHashMap(inherited.trees)
     val pipeline = TransformPipeline()
 
     for (spec in specs) {
       var values = spec.values ?: emptyList()
       spec.url?.let { values = loadUrl(spec, it) }
+      // A dataset that sources from another starts with that one's tree as well as its rows, which
+      // is what lets `treelinks` sit in a dataset of its own.
+      var tree: TreeSource? = null
       if (spec.source != null) {
         val upstream = result[spec.source]
         if (upstream == null) {
@@ -159,16 +189,19 @@ internal class DataResolver(
           )
         } else {
           values = upstream
+          tree = trees[spec.source]
         }
       }
       if (spec.parse.isNotEmpty()) values = values.map { parseFields(it, spec) }
       if (spec.transform.isNotEmpty()) {
-        val context = TransformScope(diagnostics, expressions, signals, result)
+        val context = TransformScope(diagnostics, expressions, signals, result, tree)
         values = pipeline.run(values, spec.transform, context)
+        tree = context.tree
       }
       result[spec.name] = values
+      if (tree == null) trees.remove(spec.name) else trees[spec.name] = tree
     }
-    return result
+    return ScopeData(result, trees)
   }
 
   /**
@@ -221,8 +254,9 @@ internal class DataResolver(
     override val expressions: ExpressionCompiler,
     private val signals: MutableMap<String, VegaValue>,
     private val datasets: Map<String, List<VegaValue>>,
+    /** Inherited from the dataset this one sources from, and null for a dataset of its own. */
+    override var tree: TreeSource?,
   ) : TransformContext {
-    override var tree: TreeSource? = null
 
     override val scope: ExpressionScope = scopeFor(VegaValue.Null)
 

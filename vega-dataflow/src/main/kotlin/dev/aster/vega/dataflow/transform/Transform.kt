@@ -216,6 +216,8 @@ public class TransformRegistry(transforms: List<Transform>) {
           PartitionTransform,
           PackTransform,
           TreeTransform,
+          TreeLinksTransform,
+          LinkPathTransform,
         )
       )
   }

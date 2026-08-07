@@ -37,7 +37,7 @@ import dev.aster.vega.scene.transformedBounds
  *   same way here.
  */
 internal class CompileScope(
-  val datasets: Map<String, List<VegaValue>>,
+  val data: ScopeData,
   val signals: SignalScope,
   val scales: Map<String, VegaScale>,
   val rangeSize: PlotSize,
@@ -48,7 +48,10 @@ internal class CompileScope(
    * from a screen reader. Carried alongside the scales because a group scope shadows both together.
    */
   val scaleTypes: Map<String, ScaleType> = emptyMap(),
-)
+) {
+  val datasets: Map<String, List<VegaValue>>
+    get() = data.datasets
+}
 
 /**
  * Compiles the marks and axes of one scope into scene nodes, recursing through group marks.
@@ -445,11 +448,12 @@ internal class ScopeCompiler(
 
     val inherited =
       if (partition.rows != null && partition.boundName != null) {
-        outer.datasets + (partition.boundName to partition.rows)
+        outer.data.withDataset(partition.boundName, partition.rows)
       } else {
-        outer.datasets
+        outer.data
       }
-    val datasets = data.resolve(spec.data, signalValues, inherited)
+    val resolved = data.resolve(spec.data, signalValues, inherited)
+    val datasets = resolved.datasets
     val signals =
       SignalResolver(diagnostics, expressions).resolve(spec.signals, datasets, signalValues)
 
@@ -465,7 +469,7 @@ internal class ScopeCompiler(
     val scales =
       outer.scales + ScaleResolver(datasets, rangeSize, diagnostics, numbers).resolve(spec.scales)
     return CompileScope(
-      datasets,
+      resolved,
       signals,
       scales,
       rangeSize,
