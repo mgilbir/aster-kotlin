@@ -21,7 +21,7 @@ end to end — expressions, signals, 33 of upstream's 40 data transforms, every 
 and an event handler that recompiles the chart — and are verified against upstream Vega by
 differential tests.
 
-Fifty-eight differential fixtures pass, all matching upstream exactly on every mark and scale output:
+Fifty-nine differential fixtures pass, all matching upstream exactly on every mark and scale output:
 
 | Fixture | Marks | Covers |
 | --- | --- | --- |
@@ -83,6 +83,7 @@ Fifty-eight differential fixtures pass, all matching upstream exactly on every m
 | `binned-scales` | 69 | one skewed column through all four discretizing scales |
 | `local-time-dst` | 35 | a local time scale across the spring clock change, beside a UTC one |
 | `bin-to-ordinal` | 36 | the bin transform feeding a bin-ordinal scale, labels placed by `scale()` |
+| `image-marks` | 18 | every image align and baseline anchor, and one stretched rather than fitted |
 
 The gate is wired into `./scripts/oracle.sh`, so every further scale, mark and transform is built
 against a harness that can say we are wrong — which golden tests cannot.
@@ -107,7 +108,7 @@ upstream-verified slice through parsing, scales, rect encoding and axes:
 | Diagnostics, canonical snapshots, goldens, oracle scaffolding | no upstream equivalent | complete |
 | `vega-scale` (linear, log, pow, sqrt, symlog, time, utc, band, point, ordinal, sequential) + d3-array ticks | 790 + parts of d3-scale, d3-array | every scale type in scope — the 11 continuous and discrete ones plus quantize, quantile, threshold and bin-ordinal — exact against upstream, with all 68 colour schemes |
 | `vega-parser` (width, height, padding, autosize, data, signals, scales, axes, legends, titles, marks, group scopes, `layout`, `config`) | 3,790 | a subset, and every property it does not read is reported by name |
-| `vega-encode` (mark encoders, axes, legends, titles) | 952 | 10 of 12 mark encoders (`image` needs a device, `shape` needs projections); axes, legends and titles including overlap removal, truncation and the `config` cascade; nine interpolation methods |
+| `vega-encode` (mark encoders, axes, legends, titles) | 952 | 11 of 12 mark encoders — all but `shape`, which needs projections and is an explicit non-goal; axes, legends and titles including overlap removal, truncation and the `config` cascade; nine interpolation methods |
 | `vega-expression` + `vega-functions` | 2,388 | language complete; 82 of 119 functions, with 17 more reported by name and reason |
 | `vega-transforms` (33 of 40) | 3,754 | the 12 the brief lists plus `timeunit`, `pie`, `window`, `sequence`, `lookup`, `impute`, `cross`, `pivot`, `countpattern`, the statistical family — `quantile`, `regression`, `loess`, `kde`, `density`, `dotbin` — and the whole hierarchy family: `stratify`, `nest`, `treemap`, `partition`, `pack`, `tree`. Exact against upstream |
 | `vega-dataflow` | 2,081 | contracts and scheduling only; no pulse propagation |
@@ -142,7 +143,7 @@ substantive compatibility items:
 | 6. View and Compose APIs | Yes |
 | 7. SVG, PNG, PDF export | Yes |
 | 8. TalkBack can describe and navigate | Partial — virtual nodes are tested by instrumentation, not with TalkBack itself |
-| 9. At least 100 compatibility fixtures pass | 58 of 100 |
+| 9. At least 100 compatibility fixtures pass | 59 of 100 |
 | 10. Core runtime has no Android dependency | Yes |
 | 11. Renders without WebView | Yes |
 | 12. Build and test loop runs from the terminal | Yes |
@@ -401,15 +402,16 @@ ordering), and the pipeline is now verified end to end on one fixture, but the b
 
 ## Verification
 
-- 1,237 JVM tests pass (`./scripts/test-core.sh`, `./gradlew test`).
+- 1,243 JVM tests pass (`./scripts/test-core.sh`, `./gradlew test`).
 - Android lint is clean with `warningsAsErrors` on every Android module.
-- 51 instrumented tests pass on an API 37 arm64 emulator (`./scripts/test-android.sh`): 43 in
-  `vega-android-canvas`, 4 in `vega-compose`, 4 in `demo`. Two of them cover what no JVM test can:
-  one compiles every bundled specification with the device's own font metrics, which the
-  differential tests deliberately cannot because they measure text upstream's way; and three tap a
-  real view with a synthetic `MotionEvent` and read the pixels back, which is the only way to know
-  the gesture detector, the view's touch handling and the content scale all carry a finger through
-  to a signal handler.
+- 54 instrumented tests pass on an API 37 arm64 emulator (`./scripts/test-android.sh`): 46 in
+  `vega-android-canvas`, 4 in `vega-compose`, 4 in `demo`. Three groups of them cover what no JVM
+  test can: one compiles every bundled specification with the device's own font metrics, which the
+  differential tests deliberately cannot because they measure text upstream's way; three tap a real
+  view with a synthetic `MotionEvent` and read the pixels back, which is the only way to know the
+  gesture detector, the view's touch handling and the content scale all carry a finger through to a
+  signal handler; and three decode a real bitmap into an `image` mark, which the differential
+  harness cannot do at all and so cannot tell a drawn image from a silently skipped one.
 - The demo was installed and driven on the emulator: all nine chart entries render, marks are
   selectable by tap, light and dark palettes are legible, and SVG/PNG/PDF export all wrote files with
   zero warnings. The three specification entries load Vega JSON from assets, compile it on a
@@ -439,7 +441,7 @@ dark chrome, so a dark background was unreadable — they now take a `SampleScen
 
 ## Known failing fixtures
 
-None. Fifty-eight fixtures exist and all fifty-eight pass — and as of this commit that sentence is
+None. Fifty-nine fixtures exist and all fifty-nine pass — and as of this commit that sentence is
 worth something, which it was not before.
 
 **The gate could report success without running.** `FixtureDifferentialTest` reads the fixtures and
@@ -664,18 +666,18 @@ depends on them. Each has a test and a comment; this is the index.
 
 ## Next three tasks
 
-1. **The `image` mark**, now that the emulator is in play. It is the last of the twelve with no
-   encoder that is not an explicit non-goal — `shape` needs projections. It wants an
-   `AndroidImageResolver` to turn a URL into pixels, and unlike everything else it cannot be
-   verified by the differential harness, which has no way to fetch and decode an image the way a
-   device would. An instrumented test drawing a bundled asset is the check.
-2. **What the interaction system still does not do.** The chain works end to end, and three things
+1. **What the interaction system still does not do.** The chain works end to end and three things
    inside it are stubbed rather than finished: a `debounce` fires on every event instead of after
    the quiet period, because nothing schedules; a `{"signal": "..."}` or `{"scale": "..."}` source
    parses but only ever fires from a real event; and an `encode` handler, which sets properties on
    the event's own mark rather than a signal, is reported and does nothing. The first needs a
    scheduler the controller does not have; the second needs a signal to notice its own change; the
    third needs the compiler to hand back a mutable node. All three are reported by name today.
+2. **Accessibility, now that a device is reachable.** The accessibility tree is asserted on by
+   instrumented tests but nobody has listened to it — criterion 8 asks for TalkBack itself. An
+   emulator can run TalkBack, so this is no longer out of reach the way physical-hardware timing
+   is; it needs the service enabled on the AVD and a pass over the demo's nine charts. Expect the
+   descriptions to be the weak part rather than the tree.
 3. **Keep growing the fixture corpus.** 58 of the brief's 100. Aiming it at *combinations* the
    engine has not met rather than at more variations of a single feature is what makes it find
    things: that is how `scale()` in an expression turned up missing. Untried combinations that

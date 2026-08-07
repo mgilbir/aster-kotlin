@@ -273,6 +273,16 @@ function record(type, role, item, dx, dy, precision) {
     entry[channel] = canonicalNumber(isExtent ? value : value + offset, precision);
   }
 
+  // An image's anchor is not where it is drawn: Vega keeps `align` and `baseline` on the item and
+  // offsets only at paint time. Comparing the drawn corner would agree with an engine that folded
+  // the offset into `x`, and that engine's scene would then disagree with Vega's on every centred
+  // image — so compare the anchor and the two channels that say what it means.
+  if (type === 'image') {
+    entry.url = item.url;
+    entry.align = item.align || 'left';
+    entry.baseline = item.baseline || 'top';
+  }
+
   for (const channel of STYLE_CHANNELS) {
     if (item[channel] !== undefined) entry[channel] = canonicalNumber(item[channel], precision);
   }

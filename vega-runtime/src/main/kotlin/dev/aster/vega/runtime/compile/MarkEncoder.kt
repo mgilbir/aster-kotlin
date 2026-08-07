@@ -24,6 +24,10 @@ import dev.aster.vega.scene.CurveKind
 import dev.aster.vega.scene.Fill
 import dev.aster.vega.scene.FontStyle
 import dev.aster.vega.scene.GroupNode
+import dev.aster.vega.scene.ImageAlign
+import dev.aster.vega.scene.ImageBaseline
+import dev.aster.vega.scene.ImageFit
+import dev.aster.vega.scene.ImageNode
 import dev.aster.vega.scene.MetricTextEngine
 import dev.aster.vega.scene.NodeMetadata
 import dev.aster.vega.scene.PathBuilder
@@ -94,6 +98,7 @@ public class MarkEncoder(
       MarkType.ARC -> data.mapIndexedNotNull { index, datum -> arc(spec, datum, index) }
       MarkType.PATH -> data.mapIndexedNotNull { index, datum -> path(spec, datum, index) }
       MarkType.TRAIL -> listOfNotNull(trail(spec, data))
+      MarkType.IMAGE -> data.mapIndexedNotNull { index, datum -> image(spec, datum, index) }
       else -> {
         diagnostics.error(
           DiagnosticCodes.TRANSFORM_NOT_IMPLEMENTED,
@@ -337,8 +342,8 @@ public class MarkEncoder(
 
     return SymbolNode(
       id = ids.allocate(),
-      x = x,
-      y = y,
+      x = number(channels["x"], datum) ?: 0.0,
+      y = number(channels["y"], datum) ?: 0.0,
       size =
         number(channels["size"], datum)
           ?: MarkConfig(spec).number("size")
@@ -780,6 +785,63 @@ public class MarkEncoder(
       }
     val values = (value as? VegaValue.Arr)?.values?.map { it.asDouble() } ?: return null
     return values.takeIf { list -> list.isNotEmpty() && list.all { it.isFinite() && it >= 0.0 } }
+  }
+
+  /**
+   * An `image` mark.
+   *
+   * `align` and `baseline` shift the whole image rather than moving text inside a box: `align:
+   * "center"` puts `x` at the image's middle, `baseline: "bottom"` puts `y` at its foot. That is
+   * upstream's rule and it is the opposite of what a reader coming from `rect` expects, where `x`
+   * is always the left edge.
+   *
+   * `aspect` defaults to true, which fits the image inside the box and letterboxes it; `false`
+   * stretches it to fill.
+   *
+   * **A missing `width` or `height` is taken from the image's own pixels**, which the compiler
+   * cannot know — only the renderer has the decoded bitmap. Upstream has the same gap and reports
+   * zero until the image loads; this emits the mark at zero and says so, rather than dropping it.
+   */
+  private fun image(spec: MarkSpec, datum: VegaValue, index: Int): SceneNode? {
+    val channels = spec.encode.effective
+    val url = string(channels["url"], datum)
+    if (url.isNullOrEmpty()) {
+      diagnostics.error(
+        DiagnosticCodes.PARSE_MISSING_PROPERTY,
+        "An image mark needs a 'url'; nothing was drawn for this row",
+        operator = spec.name ?: "image",
+      )
+      return null
+    }
+    val width = number(channels["width"], datum)
+    val height = number(channels["height"], datum)
+    if (width == null || height == null) {
+      diagnostics.warn(
+        DiagnosticCodes.EXPORT_IMAGE_UNRESOLVED,
+        "Image '$url' has no explicit ${if (width == null) "width" else "height"}; upstream takes " +
+          "it from the image's own pixels, which only the renderer has, so the mark was placed " +
+          "with a zero extent",
+        operator = spec.name ?: "image",
+      )
+    }
+    val w = width ?: 0.0
+    val h = height ?: 0.0
+    val aspect = boolean(channels["aspect"], datum) ?: true
+    val style = style(channels, datum, spec)
+    return ImageNode(
+      id = ids.allocate(),
+      url = url,
+      x = number(channels["x"], datum) ?: 0.0,
+      y = number(channels["y"], datum) ?: 0.0,
+      width = w,
+      height = h,
+      fit = if (aspect) ImageFit.CONTAIN else ImageFit.FILL,
+      smooth = boolean(channels["smooth"], datum) ?: true,
+      align = ImageAlign.fromName(string(channels["align"], datum)),
+      baseline = ImageBaseline.fromName(string(channels["baseline"], datum)),
+      opacity = style.opacity,
+      metadata = metadata(spec, datum, index, channels).copy(markKind = "image"),
+    )
   }
 
   private fun metadata(

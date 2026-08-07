@@ -349,14 +349,30 @@ public object Differential {
     return Mark(kind, node.metadata.role, numbers, strings)
   }
 
+  /**
+   * An image's reported `x` is the one the specification gave, **not** where it is drawn.
+   *
+   * Upstream keeps `align` and `baseline` on the item and offsets only at paint time, so comparing
+   * the drawn corner would disagree with it on every centred image. `align` and `baseline` are
+   * compared too, since two images at different anchors can be drawn in the same place and are not
+   * interchangeable to anything that lays out again.
+   */
   private fun imageMark(node: ImageNode, world: Transform2D): Mark {
-    val rect = node.rect
-    val origin = world.apply(rect.left, rect.top)
+    val anchor = world.apply(node.x, node.y)
     return Mark(
       "image",
       node.metadata.role,
-      linkedMapOf("x" to origin.x, "y" to origin.y, "width" to rect.width, "height" to rect.height),
-      linkedMapOf("url" to node.url),
+      linkedMapOf(
+        "x" to anchor.x,
+        "y" to anchor.y,
+        "width" to node.width,
+        "height" to node.height,
+      ),
+      linkedMapOf(
+        "url" to node.url,
+        "align" to node.align.name.lowercase(),
+        "baseline" to node.baseline.name.lowercase(),
+      ),
     )
   }
 

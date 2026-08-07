@@ -169,9 +169,10 @@ class SpecCompilerTest {
 
   @Test
   fun `an unsupported scale type is reported and dependent marks report too`() {
-    // `quantile` is genuinely unimplemented; `log`, `pow`, `sqrt` and `symlog` are not any more.
-    val withQuantile = minimalBar.replace("\"type\": \"linear\"", "\"type\": \"quantile\"")
-    val diagnostics = compile(withQuantile).diagnostics
+    // `identity` is the last scale type with no implementation. Everything else the parser accepts
+    // now builds — including `quantile`, which this test used to name.
+    val withIdentity = minimalBar.replace("\"type\": \"linear\"", "\"type\": \"identity\"")
+    val diagnostics = compile(withIdentity).diagnostics
     assertTrue(diagnostics.any { it.code == DiagnosticCodes.SCALE_UNSUPPORTED_TYPE })
     // The mark that referenced it must complain as well, rather than positioning at the origin.
     assertTrue(diagnostics.count { it.code == DiagnosticCodes.SCALE_UNSUPPORTED_TYPE } > 1)
@@ -190,13 +191,14 @@ class SpecCompilerTest {
 
   @Test
   fun `an unimplemented mark type is reported and contributes nothing`() {
-    // `image` is the last of the twelve with no encoder: the scene node has worked since Milestone
-    // 1 and it needs a resolver to turn a URL into pixels, which only a device can supply.
-    val withImage = minimalBar.replace("\"type\": \"rect\"", "\"type\": \"image\"")
-    val compiled = compile(withImage)
+    // `shape` is the last of the twelve without an encoder, and the only one that is a permanent
+    // non-goal rather than unfinished work: it draws a GeoJSON feature through a map projection,
+    // and projections are out of scope (PROJECT_BRIEF.md 3.5).
+    val withShape = minimalBar.replace("\"type\": \"rect\"", "\"type\": \"shape\"")
+    val compiled = compile(withShape)
     assertTrue(
       compiled.diagnostics.any {
-        it.code == DiagnosticCodes.TRANSFORM_NOT_IMPLEMENTED && it.message.contains("image")
+        it.code == DiagnosticCodes.TRANSFORM_NOT_IMPLEMENTED && it.message.contains("shape")
       }
     )
     assertTrue(compiled.scene!!.flatten().none { it.node is RectNode })

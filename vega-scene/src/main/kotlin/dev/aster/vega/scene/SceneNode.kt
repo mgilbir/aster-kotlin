@@ -349,6 +349,38 @@ public data class TextNode(
 }
 
 /** How an image fills its destination rectangle. */
+/** Where an image mark's `x` sits on the image. */
+public enum class ImageAlign {
+  LEFT,
+  CENTER,
+  RIGHT;
+
+  public companion object {
+    public fun fromName(name: String?): ImageAlign =
+      when (name?.lowercase()) {
+        "center" -> CENTER
+        "right" -> RIGHT
+        else -> LEFT
+      }
+  }
+}
+
+/** Where an image mark's `y` sits on the image. */
+public enum class ImageBaseline {
+  TOP,
+  MIDDLE,
+  BOTTOM;
+
+  public companion object {
+    public fun fromName(name: String?): ImageBaseline =
+      when (name?.lowercase()) {
+        "middle" -> MIDDLE
+        "bottom" -> BOTTOM
+        else -> TOP
+      }
+  }
+}
+
 public enum class ImageFit {
   /** Stretch to the destination rectangle, ignoring the source aspect ratio. */
   FILL,
@@ -371,6 +403,17 @@ public data class ImageNode(
   val height: Double,
   val fit: ImageFit = ImageFit.FILL,
   val smooth: Boolean = true,
+  /**
+   * Where [x] sits on the image: its left edge, its middle or its right edge.
+   *
+   * Held here rather than folded into [x] because upstream does the same — a scene item keeps the
+   * `x` the specification gave it and the renderer shifts by the offset. Folding it in would make
+   * the scene disagree with Vega's on every centred image, and would lose the difference between
+   * "at 120, centred" and "at 100, left-aligned": they draw identically and are not the same thing
+   * to anything that lays out again.
+   */
+  val align: ImageAlign = ImageAlign.LEFT,
+  val baseline: ImageBaseline = ImageBaseline.TOP,
   override val transform: Transform2D = Transform2D.Identity,
   override val opacity: Double = 1.0,
   override val visible: Boolean = true,
@@ -378,8 +421,25 @@ public data class ImageNode(
   val blendMode: SceneBlendMode = SceneBlendMode.NORMAL,
 ) : SceneNode {
 
+  /** Where the image is actually drawn, once [align] and [baseline] have shifted it. */
   public val rect: RectD
-    get() = RectD.fromSize(x, y, width, height)
+    get() =
+      RectD.fromSize(
+        x -
+          when (align) {
+            ImageAlign.LEFT -> 0.0
+            ImageAlign.CENTER -> width / 2
+            ImageAlign.RIGHT -> width
+          },
+        y -
+          when (baseline) {
+            ImageBaseline.TOP -> 0.0
+            ImageBaseline.MIDDLE -> height / 2
+            ImageBaseline.BOTTOM -> height
+          },
+        width,
+        height,
+      )
 
   override val bounds: RectD by lazy(LazyThreadSafetyMode.NONE) { rect.normalized() }
 }
