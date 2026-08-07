@@ -2,6 +2,7 @@ package dev.aster.vega.runtime.compile
 
 import dev.aster.vega.dataflow.transform.TransformContext
 import dev.aster.vega.dataflow.transform.TransformPipeline
+import dev.aster.vega.dataflow.transform.TreeSource
 import dev.aster.vega.expression.ExpressionCompiler
 import dev.aster.vega.expression.ExpressionScope
 import dev.aster.vega.expression.JsSemantics
@@ -119,6 +120,7 @@ internal class DataResolver(
     private val signals: MutableMap<String, VegaValue>,
     private val datasets: Map<String, List<VegaValue>>,
   ) : TransformContext {
+    override var tree: TreeSource? = null
 
     override val scope: ExpressionScope = scopeFor(VegaValue.Null)
 

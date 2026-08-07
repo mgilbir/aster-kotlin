@@ -38,6 +38,8 @@ class TransformReferenceTest {
       .trimIndent()
 
   private class TestContext : TransformContext {
+    override var tree: TreeSource? = null
+
     override val diagnostics: DiagnosticCollector = DiagnosticCollector()
     override val expressions: ExpressionCompiler =
       CachingExpressionCompiler(VegaExpressionCompiler())
@@ -469,7 +471,7 @@ class TransformReferenceTest {
     val output =
       run(
         """[{"type": "formula", "expr": "1", "as": "one"},
-            {"type": "treemap", "field": "v"},
+            {"type": "geojson", "field": "v"},
             {"type": "filter", "expr": "false"}]"""
       )
     // The formula ran; the filter after the unknown transform did not.
@@ -479,7 +481,7 @@ class TransformReferenceTest {
       context.diagnostics.diagnostics.first {
         it.code == DiagnosticCodes.TRANSFORM_NOT_IMPLEMENTED
       }
-    assertTrue(diagnostic.message.contains("treemap"), diagnostic.message)
+    assertTrue(diagnostic.message.contains("geojson"), diagnostic.message)
   }
 
   @Test
@@ -507,7 +509,7 @@ class TransformReferenceTest {
   }
 
   @Test
-  fun `the registry covers the transforms the brief lists, plus fifteen more`() {
+  fun `the registry covers the transforms the brief lists, plus nineteen more`() {
     val fromTheBrief =
       setOf(
         "filter",
@@ -547,7 +549,11 @@ class TransformReferenceTest {
         "loess" +
         "kde" +
         "density" +
-        "dotbin",
+        "dotbin" +
+        "stratify" +
+        "nest" +
+        "treemap" +
+        "partition",
       TransformRegistry.Default.types,
     )
   }
@@ -1369,6 +1375,235 @@ class TransformReferenceTest {
         """{"bin":4,"g":"a","v":4},{"bin":5,"g":"b","v":5},{"bin":6,"g":"b","v":6},""" +
         """{"bin":6,"g":"b","v":6},{"bin":9,"g":"b","v":9}]""",
       run("""[{"type": "dotbin", "field": "v", "groupby": ["g"], "step": 1}]""", twoGroups),
+    )
+  }
+
+  // ---- stratify, nest, treemap, partition -----------------------------------
+
+  private val forest =
+    """
+    [{"id": "root", "parent": null, "size": 0},
+     {"id": "a", "parent": "root", "size": 0},
+     {"id": "b", "parent": "root", "size": 0},
+     {"id": "a1", "parent": "a", "size": 4},
+     {"id": "a2", "parent": "a", "size": 6},
+     {"id": "b1", "parent": "b", "size": 3},
+     {"id": "b2", "parent": "b", "size": 7},
+     {"id": "b3", "parent": "b", "size": 2}]
+    """
+      .trimIndent()
+
+  private val STRATIFY = """{"type": "stratify", "key": "id", "parentKey": "parent"}"""
+
+  /** Only the coordinates, so the expectations stay readable at eight nodes a piece. */
+  private fun boxes(transform: String, data: String = forest): String =
+    run("[$STRATIFY, $transform]", data)
+      .let { Regex("\\{[^}]*}").findAll(it).toList() }
+      .joinToString(" ") { match ->
+        Regex(""""(x0|y0|x1|y1|depth|children)":(-?[0-9.eE-]+)""")
+          .findAll(match.value)
+          .associate { it.groupValues[1] to it.groupValues[2] }
+          .let {
+            "${it["x0"]},${it["y0"]},${it["x1"]},${it["y1"]}/${it["depth"]}:${it["children"]}"
+          }
+      }
+
+  /**
+   * The tree never reaches the data. `stratify` returns exactly its input, and the layout after it
+   * writes coordinates back onto those same rows — so a mark sees a flat table with four more
+   * columns, which is why no part of the data model had to learn about trees.
+   */
+  @Test
+  fun `stratify returns its rows unchanged`() {
+    assertEquals(run("[$STRATIFY]", forest), run("[]", forest))
+  }
+
+  @Test
+  fun `a squarified treemap matches upstream`() {
+    assertEquals(
+      "0,0,100,100/0:2 0,0,100,45.45454545454546/1:2 0,45.45454545454546,100,100/1:3 " +
+        "0,0,40,45.45454545454546/2:0 40,0,100,45.45454545454546/2:0 " +
+        "0,45.45454545454546,83.33333333333333,61.81818181818183/2:0 " +
+        "0,61.81818181818183,83.33333333333333,100/2:0 " +
+        "83.33333333333333,45.45454545454546,100,100/2:0",
+      boxes("""{"type": "treemap", "field": "size", "size": [100, 100]}"""),
+    )
+  }
+
+  /**
+   * The other tilings, which differ in what they preserve. `dice` and `slice` keep sibling order
+   * exactly and will produce slivers; `binary` keeps order and splits recursively; `slicedice`
+   * alternates by depth, which is what makes its nesting readable.
+   */
+  @Test
+  fun `each treemap tiling matches upstream`() {
+    assertEquals(
+      "0,0,100,100/0:2 0,0,100,45.45454545454545/1:2 0,45.45454545454545,100,100/1:3 " +
+        "0,0,40,45.45454545454545/2:0 40,0,100,45.45454545454545/2:0 " +
+        "0,45.45454545454545,25,100/2:0 25,45.45454545454545,83.33333333333333,100/2:0 " +
+        "83.33333333333333,45.45454545454545,100,100/2:0",
+      boxes("""{"type": "treemap", "field": "size", "method": "binary", "size": [100, 100]}"""),
+    )
+    assertEquals(
+      "0,0,100,100/0:2 0,0,45.45454545454546,100/1:2 45.45454545454546,0,100,100/1:3 " +
+        "0,0,18.181818181818183,100/2:0 18.181818181818183,0,45.45454545454545,100/2:0 " +
+        "45.45454545454546,0,59.09090909090909,100/2:0 " +
+        "59.09090909090909,0,90.9090909090909,100/2:0 90.9090909090909,0,100,100/2:0",
+      boxes("""{"type": "treemap", "field": "size", "method": "dice", "size": [100, 100]}"""),
+    )
+    assertEquals(
+      "0,0,100,100/0:2 0,0,100,45.45454545454546/1:2 0,45.45454545454546,100,100/1:3 " +
+        "0,0,100,18.181818181818183/2:0 0,18.181818181818183,100,45.45454545454545/2:0 " +
+        "0,45.45454545454546,100,59.09090909090909/2:0 " +
+        "0,59.09090909090909,100,90.9090909090909/2:0 0,90.9090909090909,100,100/2:0",
+      boxes("""{"type": "treemap", "field": "size", "method": "slice", "size": [100, 100]}"""),
+    )
+    assertEquals(
+      "0,0,100,100/0:2 0,0,45.45454545454546,100/1:2 45.45454545454546,0,100,100/1:3 " +
+        "0,0,45.45454545454546,40/2:0 0,40,45.45454545454546,100/2:0 " +
+        "45.45454545454546,0,100,25/2:0 45.45454545454546,25,100,83.33333333333334/2:0 " +
+        "45.45454545454546,83.33333333333334,100,100.00000000000001/2:0",
+      boxes("""{"type": "treemap", "field": "size", "method": "slicedice", "size": [100, 100]}"""),
+    )
+  }
+
+  /** Half the inner padding comes off each side, so a gap between siblings is one padding wide. */
+  @Test
+  fun `treemap padding and rounding match upstream`() {
+    assertEquals(
+      "0,0,100,100/0:2 2,2,98,45/1:2 2,47,98,98/1:3 4,4,40,43/2:0 42,4,96,43/2:0 " +
+        "4,49,80,61/2:0 4,63,80,96/2:0 82,49,96,96/2:0",
+      boxes(
+        """{"type": "treemap", "field": "size", "size": [100, 100],
+            "padding": 2, "round": true}"""
+      ),
+    )
+  }
+
+  /** With no `field`, a branch is sized by how many leaves hang off it rather than by a measure. */
+  @Test
+  fun `a treemap with no field counts its leaves`() {
+    assertEquals(
+      "0,0,100,100/0:2 0,0,100,40/1:2 0,40,100,100/1:3 0,0,50,40/2:0 50,0,100,40/2:0 " +
+        "0,40,66.66666666666667,70/2:0 0,70,66.66666666666667,100/2:0 " +
+        "66.66666666666667,40,100,100/2:0",
+      boxes("""{"type": "treemap", "size": [100, 100]}"""),
+    )
+  }
+
+  /** An icicle plot: every level gets an equal band whatever its values, and dices its width. */
+  @Test
+  fun `a partition layout matches upstream`() {
+    assertEquals(
+      "0,0,100,33.333333333333336/0:2 0,33.333333333333336,45.45454545454546," +
+        "66.66666666666667/1:2 45.45454545454546,33.333333333333336,100,66.66666666666667/1:3 " +
+        "0,66.66666666666667,18.181818181818183,100/2:0 " +
+        "18.181818181818183,66.66666666666667,45.45454545454545,100/2:0 " +
+        "45.45454545454546,66.66666666666667,59.09090909090909,100/2:0 " +
+        "59.09090909090909,66.66666666666667,90.9090909090909,100/2:0 " +
+        "90.9090909090909,66.66666666666667,100,100/2:0",
+      boxes("""{"type": "partition", "field": "size", "size": [100, 100]}"""),
+    )
+    assertEquals(
+      "1,1,99,32/0:2 1,33,45,66/1:2 46,33,99,66/1:3 1,67,18,99/2:0 19,67,45,99/2:0 " +
+        "46,67,59,99/2:0 60,67,90,99/2:0 91,67,99,99/2:0",
+      boxes(
+        """{"type": "partition", "field": "size", "size": [100, 100],
+            "padding": 1, "round": true}"""
+      ),
+    )
+  }
+
+  private val nested =
+    """
+    [{"g": "x", "h": "p", "n": 1}, {"g": "x", "h": "p", "n": 2}, {"g": "x", "h": "q", "n": 3},
+     {"g": "y", "h": "p", "n": 4}, {"g": "y", "h": "r", "n": 5}]
+    """
+      .trimIndent()
+
+  /**
+   * `nest` groups where `stratify` links, and its interior nodes are invented rather than found —
+   * so without `generate` they size the layout but appear nowhere in the output.
+   */
+  @Test
+  fun `a nested tree lays out without emitting its interior nodes`() {
+    assertEquals(
+      """[{"children":0,"depth":3,"g":"x","h":"p","n":1,"x0":0,"x1":50,"y0":0,""" +
+        """"y1":13.333333333333334},{"children":0,"depth":3,"g":"x","h":"p","n":2,"x0":0,""" +
+        """"x1":50,"y0":13.333333333333334,"y1":40},{"children":0,"depth":3,"g":"x","h":"q",""" +
+        """"n":3,"x0":50,"x1":100,"y0":0,"y1":40},{"children":0,"depth":3,"g":"y","h":"p",""" +
+        """"n":4,"x0":0,"x1":44.44444444444444,"y0":40,"y1":100},{"children":0,"depth":3,""" +
+        """"g":"y","h":"r","n":5,"x0":44.44444444444444,"x1":100,"y0":40,"y1":100}]""",
+      run(
+        """[{"type": "nest", "keys": ["g", "h"]},
+            {"type": "treemap", "field": "n", "size": [100, 100]}]""",
+        nested,
+      ),
+    )
+  }
+
+  /**
+   * With `generate`, the groups join the data — level by level from the root, as upstream emits.
+   */
+  @Test
+  fun `generate adds a row per interior node`() {
+    val output =
+      run(
+        """[{"type": "nest", "keys": ["g", "h"], "generate": true},
+            {"type": "treemap", "field": "n", "size": [100, 100]}]""",
+        nested,
+      )
+    // Five leaves, then the root, the two 'g' groups, and the four 'h' groups.
+    assertEquals(12, output.split("},{").size)
+    assertTrue(
+      output.contains(""""children":2,"depth":0,"x0":0,"x1":100,"y0":0,"y1":100"""),
+      output,
+    )
+    assertTrue(
+      output.contains(""""children":2,"depth":1,"key":"x","x0":0,"x1":100,"y0":0,"y1":40"""),
+      output,
+    )
+    assertTrue(
+      context.diagnostics.diagnostics.any { it.message.contains("'values'") },
+      context.diagnostics.diagnostics.toString(),
+    )
+  }
+
+  /** A tree assembled from bad links is a different tree, not a smaller one, so each case stops. */
+  @Test
+  fun `stratify reports a broken tree rather than repairing it`() {
+    val twoRoots =
+      """[{"id": "a", "parent": null}, {"id": "b", "parent": null}, {"id": "c", "parent": "a"}]"""
+    run("[$STRATIFY]", twoRoots)
+    assertTrue(
+      context.diagnostics.diagnostics.any {
+        it.message.contains("more than one row with no parent")
+      },
+      context.diagnostics.diagnostics.toString(),
+    )
+
+    val missing = """[{"id": "a", "parent": null}, {"id": "b", "parent": "nowhere"}]"""
+    run("[$STRATIFY]", missing)
+    assertTrue(
+      context.diagnostics.diagnostics.any { it.message.contains("'nowhere'") },
+      context.diagnostics.diagnostics.toString(),
+    )
+
+    val duplicate =
+      """[{"id": "a", "parent": null}, {"id": "a", "parent": null}, {"id": "c", "parent": "a"}]"""
+    run("[$STRATIFY]", duplicate)
+    assertTrue(
+      context.diagnostics.diagnostics.any { it.message.contains("more than one row") },
+      context.diagnostics.diagnostics.toString(),
+    )
+  }
+
+  @Test
+  fun `a layout with no tree before it is reported`() {
+    run("""[{"type": "treemap", "field": "size", "size": [10, 10]}]""", forest)
+    assertTrue(
+      context.diagnostics.diagnostics.any { it.message.contains("put a 'stratify'") },
+      context.diagnostics.diagnostics.toString(),
     )
   }
 }

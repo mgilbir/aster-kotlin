@@ -100,7 +100,7 @@ upstream-verified slice through parsing, scales, rect encoding and axes:
 | `vega-parser` (width, height, padding, autosize, data, signals, scales, axes, legends, titles, marks, group scopes, `layout`, `config`) | 3,790 | a subset, and every property it does not read is reported by name |
 | `vega-encode` (mark encoders, axes, legends, titles) | 952 | 8 of 12 mark encoders; axes, legends and titles including overlap removal, truncation and the `config` cascade; nine interpolation methods |
 | `vega-expression` + `vega-functions` | 2,388 | language complete; 60 of 119 functions |
-| `vega-transforms` (27 of 40) | 3,754 | the 12 the brief lists plus `timeunit`, `pie`, `window`, `sequence`, `lookup`, `impute`, `cross`, `pivot`, `countpattern` and the whole statistical family — `quantile`, `regression`, `loess`, `kde`, `density`, `dotbin` — exact against upstream |
+| `vega-transforms` (31 of 40) | 3,754 | the 12 the brief lists plus `timeunit`, `pie`, `window`, `sequence`, `lookup`, `impute`, `cross`, `pivot`, `countpattern`, the statistical family — `quantile`, `regression`, `loess`, `kde`, `density`, `dotbin` — and four of the hierarchy family: `stratify`, `nest`, `treemap`, `partition`. Exact against upstream |
 | `vega-dataflow` | 2,081 | contracts and scheduling only; no pulse propagation |
 
 The entire data and specification half is absent:
@@ -117,7 +117,7 @@ The entire data and specification half is absent:
 | `vega-view`, `vega-view-transforms` — the view lifecycle and incremental layout | 2,623 | bounds, grid layout and label overlap removal |
 | `vega-event-selector` — event-stream DSL | 191 | 0 |
 | `vega-time`, `vega-format` — `timeunit`, locales, format strings | 587 + d3-format, d3-time-format | tick selection and default labels only |
-| geo, force, hierarchy, label, voronoi, wordcloud, crossfilter | ~4,900 | 0. The statistics that used to sit in this row are now done; of the rest, hierarchy is in scope and the others are explicit non-goals (PROJECT_BRIEF.md 3.3) |
+| geo, force, label, voronoi, wordcloud, crossfilter | ~4,300 | 0, and all explicit non-goals (PROJECT_BRIEF.md 3.3). The statistics and most of the hierarchy family that used to sit here are now done |
 
 Full parity was never the goal — PROJECT_BRIEF.md 3.3 rules most of that last row out. But the brief's
 own MVP definition (section 23) stands at roughly **6.5 of its 15 criteria**, and the unmet ones are the
@@ -133,7 +133,7 @@ substantive compatibility items:
 | 6. View and Compose APIs | Yes |
 | 7. SVG, PNG, PDF export | Yes |
 | 8. TalkBack can describe and navigate | Partial — virtual nodes are tested by instrumentation, not with TalkBack itself |
-| 9. At least 100 compatibility fixtures pass | 53 of 100 |
+| 9. At least 100 compatibility fixtures pass | 54 of 100 |
 | 10. Core runtime has no Android dependency | Yes |
 | 11. Renders without WebView | Yes |
 | 12. Build and test loop runs from the terminal | Yes |
@@ -392,7 +392,7 @@ ordering), and the pipeline is now verified end to end on one fixture, but the b
 
 ## Verification
 
-- 1,137 JVM tests pass (`./scripts/test-core.sh`, `./gradlew test`).
+- 1,147 JVM tests pass (`./scripts/test-core.sh`, `./gradlew test`).
 - Android lint is clean with `warningsAsErrors` on every Android module.
 - 48 instrumented tests pass on an API 37 arm64 emulator (`./scripts/test-android.sh`): 40 in
   `vega-android-canvas`, 4 in `vega-compose`, 4 in `demo` — including one that compiles every bundled
@@ -627,17 +627,15 @@ depends on them. Each has a test and a comment; this is the index.
    cannot be finished or verified without a device. After it, the largest untouched area is not a
    mark or a transform at all: signal `on` handlers and the event-stream DSL, which is what makes a
    chart respond to a tap rather than merely redraw when told to.
-2. **The rest of the transforms.** 27 of upstream's 40, and the statistical family is finished.
-   The next one worth taking is the hierarchy family — `nest`, `stratify`, `treemap`, `pack`,
-   `partition`, `tree` — and it is not six transforms so much as one data-model change: a tuple
-   list cannot express a parent-child structure, so `stratify` has nowhere to put its result and
-   the four layouts have nothing to read. Decide how a tree is represented before writing any of
-   them. Of what else is unimplemented, the geographic transforms (`geojson`, `geopath`,
-   `geopoint`, `geoshape`, `graticule`, `heatmap`, `isocontour`, `contour`, `kde2d`) all need map
+2. **The rest of the transforms.** 31 of upstream's 40. `pack` and `tree` are what is left of the
+   hierarchy family, and they are now only geometry: the tree, the sizing, the sorting and the
+   writing-back are all done and shared. `pack` wants Welzl's smallest-enclosing-circle with d3's
+   seeded shuffle; `tree` wants the Reingold-Tilford tidy algorithm, which is the harder of the
+   two. Everything else unimplemented is out of scope — the geographic transforms need map
    projections, and `force`, `voronoi`, `wordcloud`, `label` and `crossfilter` are explicit
-   non-goals (PROJECT_BRIEF.md 3.3). `sample` is the one small leftover, and it needs a seeded
-   random source before its output could be compared against anything.
-3. **Keep growing the fixture corpus.** 53 of the brief's 100. The return has fallen off — of the
+   non-goals (PROJECT_BRIEF.md 3.3). `sample` is the one small leftover and needs a seeded random
+   source before its output could be compared against anything.
+3. **Keep growing the fixture corpus.** 54 of the brief's 100. The return has fallen off — of the
    last ten, seven passed on arrival — because the corpus has caught up with the parts of the
    engine written without one. Aim it at what is genuinely untouched rather than at more
    combinations of what is covered: the `quantile`, `quantize`, `threshold` and `bin-ordinal`

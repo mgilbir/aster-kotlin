@@ -42,6 +42,8 @@ class TimeUnitTransformTest {
     override val expressions: ExpressionCompiler =
       CachingExpressionCompiler(VegaExpressionCompiler()),
   ) : TransformContext {
+    override var tree: TreeSource? = null
+
     override val scope: ExpressionScope = scopeFor(VegaValue.Null)
 
     override fun setSignal(name: String, value: VegaValue) = Unit

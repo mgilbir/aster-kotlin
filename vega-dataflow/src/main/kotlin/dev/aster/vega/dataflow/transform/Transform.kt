@@ -32,7 +32,26 @@ public interface TransformContext {
 
   /** Sets the datum an expression sees. */
   public fun scopeFor(datum: VegaValue): ExpressionScope
+
+  /**
+   * The tree a `stratify` or `nest` built, for a layout transform later in the same pipeline.
+   *
+   * It rides on the pipeline rather than on the tuples because that is where it lives: a
+   * specification's rows go into `stratify` and come out unchanged, and the layout after it writes
+   * coordinates back onto those same rows. Nothing downstream ever sees a nested structure.
+   * Upstream keeps it in the same place, hanging it off the source array as `source.root`.
+   */
+  public var tree: TreeSource?
 }
+
+/**
+ * The tree a hierarchy transform passes to the layout after it, kept opaque on purpose.
+ *
+ * Nothing outside `vega-dataflow` can do anything with a tree — a mark reads the coordinates a
+ * layout wrote onto the rows, never the structure — so this carries no members. Widening it later
+ * is easy; narrowing a published node type would not be.
+ */
+public interface TreeSource
 
 /**
  * One data transform.
@@ -146,6 +165,10 @@ public class TransformRegistry(transforms: List<Transform>) {
           KdeTransform,
           DensityTransform,
           DotBinTransform,
+          StratifyTransform,
+          NestTransform,
+          TreemapTransform,
+          PartitionTransform,
         )
       )
   }
