@@ -735,6 +735,13 @@ public sealed interface ChannelValue {
    */
   public data class Scaled(
     val scale: String,
+    /**
+     * `"scale": {"signal": "..."}` — *which* scale to use is itself chosen at runtime.
+     *
+     * How a chart lets a control switch an axis between, say, a linear and a log scale. Resolved in
+     * the encoder, since the answer is not known until the signals are.
+     */
+    val scaleSignal: String? = null,
     val field: FieldRef? = null,
     val value: VegaValue? = null,
     val band: Double? = null,

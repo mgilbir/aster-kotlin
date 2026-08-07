@@ -1676,16 +1676,18 @@ public class SpecParser {
 
     val scale = obj.fields["scale"]
     if (scale != null) {
-      if (scale !is VegaValue.Str) {
+      val scaleSignal = (scale as? VegaValue.Obj)?.fields?.get("signal")?.asString()
+      if (scale !is VegaValue.Str && scaleSignal.isNullOrEmpty()) {
         diagnostics.error(
           DiagnosticCodes.PARSE_UNKNOWN_PROPERTY,
-          "Only a named scale reference is supported",
+          "A scale reference must be a name or a {\"signal\": ...}",
           jsonPath = "$path.scale",
         )
         return null
       }
       return ChannelValue.Scaled(
-        scale = scale.value,
+        scale = (scale as? VegaValue.Str)?.value ?: "",
+        scaleSignal = scaleSignal,
         field = fieldPath(obj.fields["field"], "$path.field"),
         value = obj.fields["value"],
         band = obj.optionalNumber("band", "$path.band"),
