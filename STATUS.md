@@ -93,9 +93,9 @@ upstream-verified slice through parsing, scales, rect encoding and axes:
 | Scene graph, geometry, paths, hit index | part of `vega-scenegraph` (4,994) | 7 of 12 node types; rendering and hit-testing side only. All 12 symbol shapes, pinned to upstream |
 | Canvas renderer, SVG serializer | rest of `vega-scenegraph` | complete for those 7 |
 | Diagnostics, canonical snapshots, goldens, oracle scaffolding | no upstream equivalent | complete |
-| `vega-scale` (linear, band, point, ordinal) + d3-array ticks | 790 + parts of d3-scale, d3-array | 4 of ~15 scale types, exact against upstream |
+| `vega-scale` (linear, log, pow, sqrt, symlog, time, utc, band, point, ordinal, sequential) + d3-array ticks | 790 + parts of d3-scale, d3-array | 11 of ~15 scale types, exact against upstream, with all 68 colour schemes |
 | `vega-parser` (width, height, padding, autosize, data, signals, scales, axes, legends, titles, marks, group scopes, `layout`, `config`) | 3,790 | a subset, and every property it does not read is reported by name |
-| `vega-encode` (mark encoders, axes, legends, titles) | 952 | 8 of 12 mark encoders; axes, legends and titles including overlap removal, truncation and the `config` cascade |
+| `vega-encode` (mark encoders, axes, legends, titles) | 952 | 8 of 12 mark encoders; axes, legends and titles including overlap removal, truncation and the `config` cascade; nine interpolation methods |
 | `vega-expression` + `vega-functions` | 2,388 | language complete; 60 of 119 functions |
 | `vega-transforms` (17 of 40) | 3,754 | the 12 the brief lists plus `timeunit`, `pie`, `window`, `sequence` and `lookup`, exact against upstream |
 | `vega-dataflow` | 2,081 | contracts and scheduling only; no pulse propagation |
@@ -109,10 +109,9 @@ The entire data and specification half is absent:
 | `vega-functions` — the other 44 functions, mostly colour, geo and selection | most of 790 | 0 |
 | Remaining scale types — quantile, quantize, threshold, bin-ordinal | rest of `vega-scale` | 0 |
 | Remaining mark encoders — image, path, trail, shape | rest of `vega-encode` + d3-shape | 0 |
-| Group `layout` — the trellis grid, headers and titles | `vega-view-transforms` grid layout | 0, reported |
 | Line and area interpolation — `catmull-rom` and `bundle` | part of d3-shape | 0, reported; the step and spline families are implemented |
-| Banded legends, trellis footers | parts of `vega-encode`, `vega-view-transforms` | 0, reported |
-| `vega-view`, `vega-view-transforms` — layout, overlap removal | 2,623 | bounds only |
+| Banded legends, trellis footers, legend `symbolLimit` | parts of `vega-encode`, `vega-view-transforms` | 0, reported |
+| `vega-view`, `vega-view-transforms` — the view lifecycle and incremental layout | 2,623 | bounds, grid layout and label overlap removal |
 | `vega-event-selector` — event-stream DSL | 191 | 0 |
 | `vega-time`, `vega-format` — `timeunit`, locales, format strings | 587 + d3-format, d3-time-format | tick selection and default labels only |
 | geo, force, hierarchy, label, voronoi, wordcloud, crossfilter, statistics | ~5,700 | 0, and mostly explicit non-goals (PROJECT_BRIEF.md 3.3) |
@@ -590,23 +589,23 @@ depends on them. Each has a test and a comment; this is the index.
 
 ## Next three tasks
 
-1. **Keep growing the fixture corpus.** 47 of the brief's 100 pass. The return has fallen off and
-   that is worth recording rather than glossing: of the last eight fixtures, five passed on arrival.
-   The corpus has caught up with the parts of the engine that were written without one. It is still
-   the cheapest way to find a defect, but a fixture over ground already covered now mostly buys a
-   regression test. Aim at what is genuinely untouched: `trail`, `shape`, `image` and `path` marks;
-   the `quantile`, `quantize`, `threshold` and `bin-ordinal` scales; and the 23 remaining transforms,
-   of which `impute`, `cross`, `pivot` and `countpattern` are the ones a real specification reaches
-   for.
-2. **The remaining curve families.** `basis`, `cardinal`, `catmull-rom`, `monotone` and `natural`
-   are the last of the interpolation methods, and `monotone` is the one people actually ask for — a
-   smoothed line that does not overshoot its data. Each is a d3-shape curve to port, the same shape
-   of work as `ArcPath`, and the harness can now see the result: it asks d3 for the outline, so
-   adding a curve there is a two-line change beside the port.
-3. **Continuous colour ramps.** `viridis`, `blues` and the rest, still reported by name. They need
-   d3's interpolator tables and Vega's default scheme extent of roughly `[0.2, 1]`, which is a
-   sizeable table but no algorithm — and a heatmap or a choropleth cannot be drawn without them, so
-   this is the largest remaining thing a specification can ask for and simply not get.
+1. **The remaining mark encoders: `image`, `path`, `trail` and `shape`.** Four of the twelve mark
+   types still cannot be produced from a specification, and two of them are cheap. `path` needs an
+   SVG path-string parser, which the scene graph is ready for — it already stores paths as commands
+   and `SymbolNode` accepts a custom outline. `image` needs only an `AndroidImageResolver` and an
+   encoder; the node type has worked since Milestone 1. `trail` is a variable-width line and
+   `shape` needs projections, which is an explicit non-goal.
+2. **The rest of the transforms.** 17 of upstream's 40. The ones a real specification reaches for
+   next are `impute` (filling gaps in a series so a line does not jump them), `cross`, `pivot` and
+   `countpattern`. Each is self-contained and each wants its vectors read out of
+   `transform-probe.js` first — `window` alone had four behaviours that no reading of the
+   documentation would have given.
+3. **Keep growing the fixture corpus.** 47 of the brief's 100. The return has fallen off — of the
+   last ten, seven passed on arrival — because the corpus has caught up with the parts of the
+   engine written without one. Aim it at what is genuinely untouched rather than at more
+   combinations of what is covered: the `quantile`, `quantize`, `threshold` and `bin-ordinal`
+   scales, a local `time` scale across a daylight-saving boundary, and whatever the two items above
+   add.
 
 Two further items, both real and both needing something this environment does not have: performance
 on physical hardware (PROJECT_BRIEF.md 19, criterion 13) and TalkBack itself rather than
