@@ -369,6 +369,17 @@ public data class AxisSpec(
    */
   val labelOverlap: String? = null,
   val labelSeparation: NumberValue? = null,
+  /**
+   * `labelAngle`, in degrees, turning each label about its own anchor.
+   *
+   * Only the angle: upstream leaves the alignment and baseline at whatever the orientation gives
+   * them, so a 45-degree label on a bottom axis is still centred and top-baselined and therefore
+   * hangs to the left of its tick. [labelAlign] and [labelBaseline] are how that is corrected, and
+   * they are what Vega-Lite emits alongside an angle.
+   */
+  val labelAngle: NumberValue? = null,
+  val labelAlign: String? = null,
+  val labelBaseline: String? = null,
   /** Appearance of the four parts, each defaulting to Vega's own when unstated. */
   val labelStyle: GuideStroke = GuideStroke(),
   val tickStyle: GuideStroke = GuideStroke(),

@@ -20,7 +20,7 @@ Milestones 0, 1 and 2 complete. **Milestones 3 and 4 in progress**: Vega specifi
 end — including expressions, signals and the twelve data transforms the brief lists — and are verified
 against upstream Vega by differential tests.
 
-Thirty-five differential fixtures pass, all matching upstream exactly on every mark and scale output:
+Thirty-six differential fixtures pass, all matching upstream exactly on every mark and scale output:
 
 | Fixture | Marks | Covers |
 | --- | --- | --- |
@@ -59,6 +59,7 @@ Thirty-five differential fixtures pass, all matching upstream exactly on every m
 | `legend-style` | 30 | a restyled legend beside dashed, round-capped marks |
 | `axis-values` | 34 | explicit tick values: out of order, out of range, thinned, filtering a band |
 | `label-overlap` | 90 | a parity axis, a greedy one, and a ramp that thins its labels unasked |
+| `axis-label-angle` | 33 | labels turned 45 degrees, hung Vega's way and corrected Vega-Lite's |
 
 The gate is wired into `./scripts/oracle.sh`, so every further scale, mark and transform is built
 against a harness that can say we are wrong — which golden tests cannot.
@@ -120,7 +121,7 @@ substantive compatibility items:
 | 6. View and Compose APIs | Yes |
 | 7. SVG, PNG, PDF export | Yes |
 | 8. TalkBack can describe and navigate | Partial — virtual nodes are tested by instrumentation, not with TalkBack itself |
-| 9. At least 100 compatibility fixtures pass | 35 of 100 |
+| 9. At least 100 compatibility fixtures pass | 36 of 100 |
 | 10. Core runtime has no Android dependency | Yes |
 | 11. Renders without WebView | Yes |
 | 12. Build and test loop runs from the terminal | Yes |
@@ -253,6 +254,11 @@ ordering), and the pipeline is now verified end to end on one fixture, but the b
   out, so a linear scale handed `[10, 20]` still starts at 0 where this engine had been leaving it
   at 10. The limits then replace an end rather than clamping it, and run after `zero`, which is why
   `domainMin: 30` beats it.
+- **Turned axis labels.** `labelAngle`, with `labelAlign` and `labelBaseline`. The angle alone is
+  all upstream applies — the alignment and baseline stay where the orientation put them, so a
+  45-degree label on a bottom axis is still centred and top-baselined and hangs off to the left of
+  its tick. That looks wrong and is what plain Vega draws; the two overrides are how it is corrected,
+  and they are what Vega-Lite emits alongside an angle. Both forms are in the fixture, side by side.
 - **Label overlap removal.** `parity` and `greedy`, with `labelSeparation`, on axis labels and
   gradient legend labels. A **legend** does this by default and an **axis** does not — the
   `labelOverlap: true` in upstream's config sits in the `legend` block and the `axis` block has no
@@ -297,7 +303,7 @@ ordering), and the pipeline is now verified end to end on one fixture, but the b
 
 ## Verification
 
-- 971 JVM tests pass (`./scripts/test-core.sh`, `./gradlew test`).
+- 978 JVM tests pass (`./scripts/test-core.sh`, `./gradlew test`).
 - Android lint is clean with `warningsAsErrors` on every Android module.
 - 48 instrumented tests pass on an API 37 arm64 emulator (`./scripts/test-android.sh`): 40 in
   `vega-android-canvas`, 4 in `vega-compose`, 4 in `demo` — including one that compiles every bundled
@@ -332,7 +338,7 @@ dark chrome, so a dark background was unreadable — they now take a `SampleScen
 
 ## Known failing fixtures
 
-None. Thirty-five fixtures exist and all thirty-five pass. The brief's MVP asks for 100; growing the
+None. Thirty-six fixtures exist and all thirty-six pass. The brief's MVP asks for 100; growing the
 corpus is the main task now, and each new fixture is expected to surface gaps rather than pass
 immediately. That keeps happening, which is the point of the harness: `stacked-bar` surfaced two real
 bugs, and `facet-trellis` surfaced a third — `range: "height"` was descending for every scale type,
@@ -446,6 +452,7 @@ depends on them. Each has a test and a comment; this is the index.
 | An axis `values` list is filtered by range, ordered by position, and thinned by halving | `AxisBuilder.ticksFor` |
 | Explicit tick labels are formatted at the precision the *number of values* implies | `AxisBuilder.labeller` |
 | A legend removes overlapping labels by default and an axis does not; the config entry is in the `legend` block | `LabelOverlap` |
+| `labelAngle` turns a label about its anchor and leaves its alignment alone, so a turned label hangs off to one side | `AxisBuilder` |
 | A label hidden by overlap removal stays in the scene at zero opacity, so the mark count does not move | `LabelOverlap` |
 
 ## Architectural decisions pending
@@ -505,28 +512,26 @@ depends on them. Each has a test and a comment; this is the index.
 
 ## Next three tasks
 
-1. **`values`, then `labelAngle`.** The two most consequential things a specification can ask an
-   axis for and not get, now that the audit's cheaper items are in. `values` replaces the tick set
-   outright — upstream keeps the grid in step with it, and on a band scale it filters the domain
-   rather than positioning freely — and `labelAngle` is how every chart with long category names is
-   made readable. The angle is the harder of the two: it changes the label's align and baseline
-   defaults and its contribution to the axis extent, so the chart's size moves with it. Both are
-   reported today, so neither is a silent wrong answer.
-2. **Keep growing the fixture corpus.** 35 of the brief's 100 pass, and the return has if anything
-   gone up: the last five fixtures found nine defects between them, and four of those were in code
-   that had been passing for a dozen fixtures — a legend placed over the marks it should clear, a
-   symbol sized to nothing that measured as nothing, `zero` skipped for a written-out domain, and
-   the wrong character on every negative axis label. Worth aiming at next: a `config` block of any
-   kind, which is where a Vega-Lite-compiled specification puts everything and where every default
-   in this engine is still a hard-coded constant with no way for a specification to move it; and a
+1. **Keep growing the fixture corpus.** 36 of the brief's 100 pass, and the return has not fallen
+   off: the last ten fixtures found fourteen defects between them, and half of those were in code
+   that had been passing for a dozen fixtures. Worth aiming at next: a `config` block of any kind,
+   which is where a Vega-Lite-compiled specification puts everything and where every default in this
+   engine is still a hard-coded constant with no way for a specification to move it — and it is now
+   the last large silent-divergence surface left, since the guide audit closed the others. Then a
    local `time` scale crossing a daylight-saving boundary, where only UTC is covered today. Still
    untouched beyond that: `sequence`, `window` and `lookup` and the other 25 transforms; `trail`,
    `shape`, `image` and `path` marks; and `quantile`, `quantize`, `threshold` and `bin-ordinal`
    scales.
-3. **Label overlap removal**, still the most visible remaining gap on a chart that is otherwise
-   correct, and **arc padding and corner rounding**, which is what separates a serviceable donut
-   from a finished one. Both are honestly reported today, which is why they rank behind work that
-   removes silent wrong answers.
+2. **Arc padding and corner rounding.** Both reported today, and both are what separates a
+   serviceable donut from a finished one. Upstream insets a padded arc against a pad *radius* and
+   rounds its corners with tangent circles, so this is real geometry rather than a parameter to pass
+   through — which is why it was left out of the first cut rather than guessed at. The longest-
+   standing item on this list now that the axis work is done.
+3. **`labelLimit`, and then the rest of the axis tail.** `labelLimit` defaults to 180 on an axis and
+   160 on a legend, so it is a *default* this engine does not implement — a label longer than that
+   is truncated with an ellipsis upstream and drawn in full here. Narrow, since few labels are that
+   long, but it is the same class of thing as the `labelOverlap` asymmetry: a default hiding in
+   `config.js`. After it, `tickMinStep` and `tickBand` are the two most likely to be asked for.
 
 A note on the harness, because it is now the fourth time: the differential comparison has had to be
 taught to see a symbol's outline, fill and stroke opacity, a dash pattern and a node's own opacity.

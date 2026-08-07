@@ -49,6 +49,9 @@ private val AXIS_CONSUMED =
     "values",
     "labelOverlap",
     "labelSeparation",
+    "labelAngle",
+    "labelAlign",
+    "labelBaseline",
   ) + guideStyleKeys("label", "tick", "grid", "domain", "title")
 
 /**
@@ -69,10 +72,6 @@ private val AXIS_UNSUPPORTED =
     "format" to "Axis label format strings are not implemented; default formatting is used",
     "formatType" to "Axis label format types are not implemented; default formatting is used",
     "encode" to "Axis encode overrides are not implemented",
-    "labelAngle" to "Rotated axis labels are not implemented; labels are drawn horizontally",
-    "labelAlign" to "Explicit axis label alignment is not implemented; the orientation decides it",
-    "labelBaseline" to
-      "Explicit axis label baselines are not implemented; the orientation decides it",
     "labelLimit" to "Axis label truncation is not implemented; labels are drawn in full",
     "labelBound" to "Bounding axis labels to the plotting area is not implemented",
     "labelFlush" to "Flushing the first and last axis label to the range ends is not implemented",
@@ -803,6 +802,9 @@ public class SpecParser {
       values = (obj.fields["values"] as? VegaValue.Arr)?.values,
       labelOverlap = obj.fields["labelOverlap"]?.asString(),
       labelSeparation = obj.numberOrSignal("labelSeparation", "$path.labelSeparation"),
+      labelAngle = obj.numberOrSignal("labelAngle", "$path.labelAngle"),
+      labelAlign = obj.fields["labelAlign"]?.takeIf { it is VegaValue.Str }?.asString(),
+      labelBaseline = obj.fields["labelBaseline"]?.takeIf { it is VegaValue.Str }?.asString(),
       labelStyle = obj.guideStroke("label"),
       tickStyle = obj.guideStroke("tick"),
       gridStyle = obj.guideStroke("grid"),

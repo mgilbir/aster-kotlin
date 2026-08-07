@@ -179,14 +179,15 @@ public class AxisBuilder(
     }
 
     if (spec.labels) {
+      val labelAngle = numbers.resolve(spec.labelAngle, spec.scale) ?: 0.0
       val labels = mutableListOf<TextNode>()
       for (tick in ticks) {
         val run =
           TextRun(
             text = tick.label,
             style = labelStyle,
-            align = labelAlign(spec.orient),
-            baseline = labelBaseline(spec.orient),
+            align = alignOf(spec.labelAlign) ?: labelAlign(spec.orient),
+            baseline = baselineOf(spec.labelBaseline) ?: labelBaseline(spec.orient),
           )
         val layout = textEngine.layout(run)
         val (x, y) =
@@ -202,6 +203,9 @@ public class AxisBuilder(
             x = x,
             y = y,
             layout = layout,
+            // The angle alone: upstream leaves the alignment and baseline where the orientation put
+            // them, so a turned label pivots about its anchor rather than being re-hung from it.
+            angleDegrees = labelAngle,
             fill = GuideStyle.fill(spec.labelStyle, AxisDefaults.labelColor),
             metadata = NodeMetadata(role = "axis-label"),
           )
@@ -397,6 +401,24 @@ public class AxisBuilder(
         )
     }
   }
+
+  /** An explicit `labelAlign`, or null to let the orientation decide. */
+  private fun alignOf(name: String?): TextAlign? =
+    when (name?.lowercase()) {
+      "left" -> TextAlign.LEFT
+      "center" -> TextAlign.CENTER
+      "right" -> TextAlign.RIGHT
+      else -> null
+    }
+
+  private fun baselineOf(name: String?): TextBaseline? =
+    when (name?.lowercase()) {
+      "top" -> TextBaseline.TOP
+      "middle" -> TextBaseline.MIDDLE
+      "bottom" -> TextBaseline.BOTTOM
+      "alphabetic" -> TextBaseline.ALPHABETIC
+      else -> null
+    }
 
   private fun labelAlign(orient: Orient): TextAlign =
     when (orient) {

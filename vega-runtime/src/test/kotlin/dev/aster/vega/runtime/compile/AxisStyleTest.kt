@@ -140,9 +140,6 @@ class AxisStyleTest {
       listOf(
         "\"format\": \".2f\"",
         "\"formatType\": \"number\"",
-        "\"labelAngle\": 45",
-        "\"labelAlign\": \"left\"",
-        "\"labelBaseline\": \"middle\"",
         "\"labelLimit\": 50",
         "\"labelBound\": true",
         "\"labelFlush\": true",

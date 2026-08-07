@@ -111,4 +111,15 @@ class LabelOverlapTest {
   fun `a roomy axis keeps everything`() {
     assertEquals(8, visible(""", "labelOverlap": "parity"""", width = 2000).size)
   }
+
+  /**
+   * Turning the labels is what usually makes them fit, and the two work together: the same axis
+   * that has to drop six labels flat keeps them all on the diagonal, because a turned label's
+   * footprint along the axis is its height rather than its width.
+   */
+  @Test
+  fun `turning the labels removes the collisions`() {
+    assertEquals(2, visible(""", "labelOverlap": "parity"""").size)
+    assertEquals(8, visible(""", "labelOverlap": "parity", "labelAngle": -90""").size)
+  }
 }
