@@ -89,7 +89,16 @@ internal class ScopeCompiler(
     val numbers = NumberResolver(expressions, scope.signals, diagnostics)
     val axisBuilder = AxisBuilder(scope.scales, ids, textEngine, diagnostics, numbers)
     val encoder =
-      MarkEncoder(scope.scales, ids, diagnostics, scope.signals, expressions, textEngine)
+      MarkEncoder(
+        scope.scales,
+        ids,
+        diagnostics,
+        // The scales exist by now, so an encoding expression can call `scale()` — which a signal's
+        // own `update` cannot, since scales are built from signals and not the reverse.
+        scope.signals.withScales(scope.scales, diagnostics),
+        expressions,
+        textEngine,
+      )
 
     val children = mutableListOf<SceneNode>()
     // How far the drawing reaches, which is what a title is placed against. It starts as the

@@ -35,6 +35,17 @@ public interface ExpressionScope {
 
   /** Named datasets, for `data('name')`. */
   public fun dataset(name: String): List<VegaValue>
+
+  /**
+   * `scale('name', value)` — a scale applied from inside an expression.
+   *
+   * Values in and values out, so `vega-expression` stays free of any scale type. A scope with no
+   * scales returns null, which is what a bare expression evaluated outside a chart should do.
+   */
+  public fun applyScale(name: String, value: VegaValue): VegaValue = VegaValue.Null
+
+  /** `invert('name', value)` — the same in reverse, for a continuous scale. */
+  public fun invertScale(name: String, value: VegaValue): VegaValue = VegaValue.Null
 }
 
 public sealed interface ExpressionResult {

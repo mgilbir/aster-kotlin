@@ -31,6 +31,17 @@ public sealed interface VegaScale {
   public fun scale(value: VegaValue): VegaValue
 }
 
+/**
+ * A scale that can be read backwards, from a position to a data value.
+ *
+ * Only the continuous ones can: a band or ordinal scale maps many positions to one value and an
+ * inverse would have to pick. `invert()` in an expression is how a brush turns pixels into a domain
+ * range.
+ */
+public sealed interface InvertibleScale : VegaScale {
+  public fun invert(position: Double): Double
+}
+
 /** A scale with a numeric range, usable for positional encoding. */
 public sealed interface PositionScale : VegaScale {
   /** Range-space position for [value], or `NaN` when it cannot be mapped. */
@@ -59,7 +70,7 @@ public class LinearScale(
   public val domain: List<Double>,
   override val range: List<Double>,
   public val clamp: Boolean = false,
-) : PositionScale {
+) : PositionScale, InvertibleScale {
 
   init {
     require(domain.size >= 2) { "A linear scale needs at least two domain values, got $domain" }
@@ -125,12 +136,12 @@ public class LinearScale(
   }
 
   /** The data value that maps to range position [y]. Only defined for a two-point domain. */
-  public fun invert(y: Double): Double {
+  override fun invert(position: Double): Double {
     if (domain.size != 2 || range.size != 2) return Double.NaN
     val r0 = range[0]
     val r1 = range[1]
     if (r0 == r1) return Double.NaN
-    val t = (y - r0) / (r1 - r0)
+    val t = (position - r0) / (r1 - r0)
     return domain[0] + t * (domain[1] - domain[0])
   }
 
@@ -305,7 +316,7 @@ public abstract class TransformedScale(
   public val domain: List<Double>,
   override val range: List<Double>,
   public val clamp: Boolean,
-) : PositionScale {
+) : PositionScale, InvertibleScale {
 
   init {
     require(domain.size >= 2) { "$name needs at least two domain values, got $domain" }
@@ -343,13 +354,13 @@ public abstract class TransformedScale(
     return range.first() + ((t - d0) / (d1 - d0)) * (range.last() - range.first())
   }
 
-  public fun invert(y: Double): Double {
+  override fun invert(position: Double): Double {
     val r0 = range.first()
     val r1 = range.last()
     if (r0 == r1) return Double.NaN
     val d0 = forward(domain.first())
     val d1 = forward(domain.last())
-    return backward(d0 + ((y - r0) / (r1 - r0)) * (d1 - d0))
+    return backward(d0 + ((position - r0) / (r1 - r0)) * (d1 - d0))
   }
 
   public open fun ticks(count: Int = LinearScale.DEFAULT_TICK_COUNT): List<Double> =
@@ -504,7 +515,7 @@ public class TimeScale(
   override val range: List<Double>,
   public val zone: kotlinx.datetime.TimeZone,
   public val clamp: Boolean = false,
-) : PositionScale {
+) : PositionScale, InvertibleScale {
 
   init {
     require(domain.size >= 2) { "$name needs at least two domain values, got $domain" }
@@ -518,7 +529,7 @@ public class TimeScale(
 
   public fun apply(instant: Double): Double = linear.apply(instant)
 
-  public fun invert(position: Double): Double = linear.invert(position)
+  override fun invert(position: Double): Double = linear.invert(position)
 
   override fun position(value: VegaValue): Double = linear.position(value)
 

@@ -140,6 +140,39 @@ public class Evaluator(
       return VegaValue.Arr(dataset)
     }
 
+    // `scale` and `invert` reach out to the chart's scales, which the evaluator cannot know about.
+    // The scope answers instead, values in and values out, so this module stays free of any scale
+    // type. A third argument names a group scope upstream; there is no equivalent here, so it is
+    // reported rather than quietly ignored.
+    if (name == "scale" || name == "invert") {
+      if (node.arguments.size < 2) {
+        throw ExpressionEvaluationException(
+          VegaDiagnostic(
+            severity = DiagnosticSeverity.ERROR,
+            code = DiagnosticCodes.EXPRESSION_UNSUPPORTED_FUNCTION,
+            message = "$name() takes a scale name and a value",
+            operator = name,
+          )
+        )
+      }
+      if (node.arguments.size > 2) {
+        throw ExpressionEvaluationException(
+          VegaDiagnostic(
+            severity = DiagnosticSeverity.ERROR,
+            code = DiagnosticCodes.EXPRESSION_UNSUPPORTED_FUNCTION,
+            message =
+              "$name() with a group argument selects a scale from another scope, which has no " +
+                "equivalent here",
+            operator = name,
+          )
+        )
+      }
+      val scaleName = evaluate(node.arguments[0], scope).asString()
+      val argument = evaluate(node.arguments[1], scope)
+      return if (name == "scale") scope.applyScale(scaleName, argument)
+      else scope.invertScale(scaleName, argument)
+    }
+
     val function = functions[name]
     if (function == null) {
       val reason = Functions.knownUnsupported[name]

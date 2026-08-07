@@ -93,8 +93,6 @@ public object Functions {
       "utcParse" to
         "parsing a date against a format string needs a strptime the engine does not have; " +
           "an ISO 8601 string works through toDate",
-      "scale" to "requires the scale registry, which the evaluator has no access to yet",
-      "invert" to "requires the scale registry, which the evaluator has no access to yet",
       "gradient" to "gradients cannot be produced from an expression yet",
       "rgb" to "colour helpers are not implemented",
       "hsl" to "colour helpers are not implemented",
