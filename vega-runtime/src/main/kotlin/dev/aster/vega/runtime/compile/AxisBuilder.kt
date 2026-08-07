@@ -110,8 +110,13 @@ public class AxisBuilder(
     val labelStyle = GuideStyle.text(spec.labelStyle, fontSize, defaultWeight = 400)
 
     val children = mutableListOf<SceneNode>()
-    // Ticks and labels only. Upstream measures an axis by these two and skips the gridlines, so
-    // switching a grid on does not widen the chart or push the axis title away.
+    // Ticks and labels, in paint order, hidden labels included so the mark count does not change
+    // with the chart's width.
+    val drawn = mutableListOf<SceneNode>()
+    // The subset those two contribute to the axis's size. Upstream measures an axis by its ticks
+    // and
+    // labels and skips the gridlines, so switching a grid on does not widen the chart or push the
+    // axis title away — and a label hidden by overlap removal drops out of the measurement too.
     val measured = mutableListOf<SceneNode>()
     val tickStroke = GuideStyle.stroke(spec.tickStyle, AxisDefaults.tickColor)
     val gridStroke = GuideStyle.stroke(spec.gridStyle, AxisDefaults.gridColor)
@@ -157,7 +162,7 @@ public class AxisBuilder(
       val tickMeta = NodeMetadata(role = "axis-tick")
       for (tick in ticks) {
         val at = AxisDefaults.crispRound(tick.position)
-        measured +=
+        val tickNode =
           when (spec.orient) {
             Orient.BOTTOM ->
               RuleNode(ids.allocate(), at, 0.0, at, tickSize, tickStroke, metadata = tickMeta)
@@ -168,10 +173,13 @@ public class AxisBuilder(
             Orient.RIGHT ->
               RuleNode(ids.allocate(), 0.0, at, tickSize, at, tickStroke, metadata = tickMeta)
           }
+        drawn += tickNode
+        measured += tickNode
       }
     }
 
     if (spec.labels) {
+      val labels = mutableListOf<TextNode>()
       for (tick in ticks) {
         val run =
           TextRun(
@@ -188,7 +196,7 @@ public class AxisBuilder(
             Orient.LEFT -> -labelOffset to tick.position
             Orient.RIGHT -> labelOffset to tick.position
           }
-        measured +=
+        labels +=
           TextNode(
             id = ids.allocate(),
             x = x,
@@ -198,11 +206,35 @@ public class AxisBuilder(
             metadata = NodeMetadata(role = "axis-label"),
           )
       }
+      // An axis removes overlapping labels only when asked; a legend does it by default. The
+      // asymmetry is upstream's — see LabelOverlap.
+      val method = LabelOverlap.Method.fromValue(spec.labelOverlap)
+      val kept =
+        if (method == null) labels
+        else {
+          LabelOverlap.visible(
+            labels,
+            method,
+            numbers.resolve(spec.labelSeparation, spec.scale) ?: 0.0,
+          )
+        }
+      // A hidden label stays in the scene at zero opacity, so the mark count does not change with
+      // the chart's width — but it drops out of the measurement, which is what upstream does when
+      // it
+      // recomputes the label mark's bounds from the survivors.
+      for (label in labels) {
+        if (label in kept) {
+          drawn += label
+          measured += label
+        } else {
+          drawn += label.copy(opacity = 0.0)
+        }
+      }
     }
 
     val tickAndLabelReach =
       measured.fold(RectD.Empty) { acc, node -> acc.union(node.transformedBounds) }
-    children += measured
+    children += drawn
 
     if (spec.domainLine) {
       val domainStroke = GuideStyle.stroke(spec.domainStyle, AxisDefaults.domainColor)

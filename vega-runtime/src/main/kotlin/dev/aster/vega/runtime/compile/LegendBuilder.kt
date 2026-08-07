@@ -463,6 +463,7 @@ internal class LegendBuilder(
 
     val nodes = mutableListOf<SceneNode>(swatch)
     val labelStyle = GuideStyle.text(spec.labelStyle, labelFontSize, defaultWeight = 400)
+    val labels = mutableListOf<TextNode>()
 
     for ((index, entry) in gradientLabels(spec, scale, scaleName).withIndex()) {
       val fraction = scale.fraction((entry.value as VegaValue.Num).value)
@@ -482,7 +483,7 @@ internal class LegendBuilder(
             else if (fraction <= 0.0) TextBaseline.BOTTOM
             else if (fraction >= 1.0) TextBaseline.TOP else TextBaseline.MIDDLE,
         )
-      nodes +=
+      labels +=
         TextNode(
           id = ids.allocate(),
           x = if (vertical) thickness + labelOffset else fraction * length,
@@ -492,6 +493,22 @@ internal class LegendBuilder(
           metadata = NodeMetadata(role = "legend-label", markName = scaleName, datumIndex = index),
         )
     }
+
+    // A legend removes overlapping labels *by default*, where an axis does so only when asked —
+    // `labelOverlap: true` lives in upstream's `legend` config block and the `axis` block has no
+    // entry. A horizontal ramp squeezed short is where it shows: the middle labels go, the ends
+    // stay.
+    val method = LabelOverlap.Method.fromValue(spec.labelOverlap ?: "parity")
+    val kept =
+      if (method == null) labels
+      else {
+        LabelOverlap.visible(
+          labels,
+          method,
+          numbers.resolve(spec.labelSeparation, scaleName) ?: 0.0,
+        )
+      }
+    for (label in labels) nodes += if (label in kept) label else label.copy(opacity = 0.0)
     return nodes
   }
 

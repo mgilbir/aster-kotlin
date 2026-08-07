@@ -143,8 +143,6 @@ class AxisStyleTest {
         "\"labelAngle\": 45",
         "\"labelAlign\": \"left\"",
         "\"labelBaseline\": \"middle\"",
-        "\"labelOverlap\": \"parity\"",
-        "\"labelSeparation\": 2",
         "\"labelLimit\": 50",
         "\"labelBound\": true",
         "\"labelFlush\": true",

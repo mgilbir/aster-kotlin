@@ -47,6 +47,8 @@ private val AXIS_CONSUMED =
     "offset",
     "zindex",
     "values",
+    "labelOverlap",
+    "labelSeparation",
   ) + guideStyleKeys("label", "tick", "grid", "domain", "title")
 
 /**
@@ -71,10 +73,6 @@ private val AXIS_UNSUPPORTED =
     "labelAlign" to "Explicit axis label alignment is not implemented; the orientation decides it",
     "labelBaseline" to
       "Explicit axis label baselines are not implemented; the orientation decides it",
-    "labelOverlap" to
-      "Axis label overlap removal is not implemented; every label is drawn, so a dense axis " +
-        "will print labels on top of each other",
-    "labelSeparation" to "Axis label separation is not implemented; it needs overlap removal first",
     "labelLimit" to "Axis label truncation is not implemented; labels are drawn in full",
     "labelBound" to "Bounding axis labels to the plotting area is not implemented",
     "labelFlush" to "Flushing the first and last axis label to the range ends is not implemented",
@@ -175,6 +173,8 @@ private val LEGEND_CONSUMED =
     "zindex",
     "symbolDash",
     "symbolOpacity",
+    "labelOverlap",
+    "labelSeparation",
   ) + guideStyleKeys("label", "title", "symbolStroke")
 
 /** Title properties this engine reads. */
@@ -801,6 +801,8 @@ public class SpecParser {
       offset = obj.numberOrSignal("offset", "$path.offset"),
       zindex = (obj.fields["zindex"] as? VegaValue.Num)?.value?.toInt() ?: 0,
       values = (obj.fields["values"] as? VegaValue.Arr)?.values,
+      labelOverlap = obj.fields["labelOverlap"]?.asString(),
+      labelSeparation = obj.numberOrSignal("labelSeparation", "$path.labelSeparation"),
       labelStyle = obj.guideStroke("label"),
       tickStyle = obj.guideStroke("tick"),
       gridStyle = obj.guideStroke("grid"),
@@ -939,6 +941,8 @@ public class SpecParser {
         legendX = obj.numberOrSignal("legendX", "$path.legendX"),
         legendY = obj.numberOrSignal("legendY", "$path.legendY"),
         zindex = (obj.fields["zindex"] as? VegaValue.Num)?.value?.toInt() ?: 0,
+        labelOverlap = obj.fields["labelOverlap"]?.asString(),
+        labelSeparation = obj.numberOrSignal("labelSeparation", "$path.labelSeparation"),
         labelStyle = obj.guideStroke("label"),
         titleStyle = obj.guideStroke("title"),
         // `symbolStrokeColor`/`symbolStrokeWidth` rather than `symbolColor`/`symbolWidth`, so the
@@ -975,7 +979,6 @@ public class SpecParser {
         "encode" to "Legend encode overrides are not implemented",
         "format" to "Legend label format specifiers are not implemented",
         "formatType" to "Legend label format types are not implemented",
-        "labelOverlap" to "Legend label overlap removal is not implemented",
         "symbolLimit" to "Legend entry limits are not implemented; every entry is shown",
         "titleOrient" to "Only a legend title above the entries is implemented",
         "gradientOpacity" to "Legend gradient opacity is not implemented",

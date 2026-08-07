@@ -489,12 +489,12 @@ class LegendTest {
     val compiled =
       compile(
         spec(
-          """{"fill": "s1", "labelOverlap": "parity", "symbolLimit": 4,
+          """{"fill": "s1", "symbolLimit": 4,
              "format": ".2f", "titleOrient": "left"}"""
         )
       )
     val messages = compiled.diagnostics.map { it.message }
-    for (name in listOf("labelOverlap", "symbolLimit", "format", "titleOrient")) {
+    for (name in listOf("symbolLimit", "format", "titleOrient")) {
       assertTrue(messages.any { it.contains("'$name'") }, "$name not reported in $messages")
     }
   }

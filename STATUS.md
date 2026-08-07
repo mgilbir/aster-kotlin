@@ -20,7 +20,7 @@ Milestones 0, 1 and 2 complete. **Milestones 3 and 4 in progress**: Vega specifi
 end — including expressions, signals and the twelve data transforms the brief lists — and are verified
 against upstream Vega by differential tests.
 
-Thirty-four differential fixtures pass, all matching upstream exactly on every mark and scale output:
+Thirty-five differential fixtures pass, all matching upstream exactly on every mark and scale output:
 
 | Fixture | Marks | Covers |
 | --- | --- | --- |
@@ -58,6 +58,7 @@ Thirty-four differential fixtures pass, all matching upstream exactly on every m
 | `domain-limits` | 37 | a domain pinned by `domainMin`/`domainMax` beside one written out in full |
 | `legend-style` | 30 | a restyled legend beside dashed, round-capped marks |
 | `axis-values` | 34 | explicit tick values: out of order, out of range, thinned, filtering a band |
+| `label-overlap` | 90 | a parity axis, a greedy one, and a ramp that thins its labels unasked |
 
 The gate is wired into `./scripts/oracle.sh`, so every further scale, mark and transform is built
 against a harness that can say we are wrong — which golden tests cannot.
@@ -119,7 +120,7 @@ substantive compatibility items:
 | 6. View and Compose APIs | Yes |
 | 7. SVG, PNG, PDF export | Yes |
 | 8. TalkBack can describe and navigate | Partial — virtual nodes are tested by instrumentation, not with TalkBack itself |
-| 9. At least 100 compatibility fixtures pass | 34 of 100 |
+| 9. At least 100 compatibility fixtures pass | 35 of 100 |
 | 10. Core runtime has no Android dependency | Yes |
 | 11. Renders without WebView | Yes |
 | 12. Build and test loop runs from the terminal | Yes |
@@ -252,6 +253,12 @@ ordering), and the pipeline is now verified end to end on one fixture, but the b
   out, so a linear scale handed `[10, 20]` still starts at 0 where this engine had been leaving it
   at 10. The limits then replace an end rather than clamping it, and run after `zero`, which is why
   `domainMin: 30` beats it.
+- **Label overlap removal.** `parity` and `greedy`, with `labelSeparation`, on axis labels and
+  gradient legend labels. A **legend** does this by default and an **axis** does not — the
+  `labelOverlap: true` in upstream's config sits in the `legend` block and the `axis` block has no
+  entry — so a dense axis really does print every label on top of the last unless asked otherwise.
+  A hidden label is not removed: it stays at zero opacity, so a chart has the same marks however
+  wide it is drawn, and only the guide's measured extent shrinks.
 - **Explicit axis tick values.** `values` replaces the ticks the scale would generate, and the
   gridlines follow. Four rules, three of them surprising: a value outside the *range* is dropped
   rather than clamped, the survivors come out in range order however they were written, too many for
@@ -290,7 +297,7 @@ ordering), and the pipeline is now verified end to end on one fixture, but the b
 
 ## Verification
 
-- 957 JVM tests pass (`./scripts/test-core.sh`, `./gradlew test`).
+- 971 JVM tests pass (`./scripts/test-core.sh`, `./gradlew test`).
 - Android lint is clean with `warningsAsErrors` on every Android module.
 - 48 instrumented tests pass on an API 37 arm64 emulator (`./scripts/test-android.sh`): 40 in
   `vega-android-canvas`, 4 in `vega-compose`, 4 in `demo` — including one that compiles every bundled
@@ -325,7 +332,7 @@ dark chrome, so a dark background was unreadable — they now take a `SampleScen
 
 ## Known failing fixtures
 
-None. Thirty-four fixtures exist and all thirty-four pass. The brief's MVP asks for 100; growing the
+None. Thirty-five fixtures exist and all thirty-five pass. The brief's MVP asks for 100; growing the
 corpus is the main task now, and each new fixture is expected to surface gaps rather than pass
 immediately. That keeps happening, which is the point of the harness: `stacked-bar` surfaced two real
 bugs, and `facet-trellis` surfaced a third — `range: "height"` was descending for every scale type,
@@ -438,6 +445,8 @@ depends on them. Each has a test and a comment; this is the index.
 | d3 interpolates as `a(1-t) + bt`, not `a + t(b-a)`; the last bits decide which pixel a tick lands on | `LinearScale.interpolate` |
 | An axis `values` list is filtered by range, ordered by position, and thinned by halving | `AxisBuilder.ticksFor` |
 | Explicit tick labels are formatted at the precision the *number of values* implies | `AxisBuilder.labeller` |
+| A legend removes overlapping labels by default and an axis does not; the config entry is in the `legend` block | `LabelOverlap` |
+| A label hidden by overlap removal stays in the scene at zero opacity, so the mark count does not move | `LabelOverlap` |
 
 ## Architectural decisions pending
 
@@ -503,7 +512,7 @@ depends on them. Each has a test and a comment; this is the index.
    made readable. The angle is the harder of the two: it changes the label's align and baseline
    defaults and its contribution to the axis extent, so the chart's size moves with it. Both are
    reported today, so neither is a silent wrong answer.
-2. **Keep growing the fixture corpus.** 34 of the brief's 100 pass, and the return has if anything
+2. **Keep growing the fixture corpus.** 35 of the brief's 100 pass, and the return has if anything
    gone up: the last five fixtures found nine defects between them, and four of those were in code
    that had been passing for a dozen fixtures — a legend placed over the marks it should clear, a
    symbol sized to nothing that measured as nothing, `zero` skipped for a written-out domain, and

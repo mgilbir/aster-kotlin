@@ -361,6 +361,14 @@ public data class AxisSpec(
    * what the axis draws, and the gridlines follow it.
    */
   val values: List<VegaValue>? = null,
+  /**
+   * `labelOverlap`: `"parity"`, `"greedy"`, `true` (which means parity) or `false`.
+   *
+   * Absent on an axis means no removal, which is upstream's default — the `labelOverlap: true` in
+   * its config sits in the `legend` block, not the `axis` one.
+   */
+  val labelOverlap: String? = null,
+  val labelSeparation: NumberValue? = null,
   /** Appearance of the four parts, each defaulting to Vega's own when unstated. */
   val labelStyle: GuideStroke = GuideStroke(),
   val tickStyle: GuideStroke = GuideStroke(),
@@ -511,6 +519,9 @@ public data class LegendSpec(
   val labelStyle: GuideStroke = GuideStroke(),
   val titleStyle: GuideStroke = GuideStroke(),
   val symbolStyle: GuideStroke = GuideStroke(),
+  /** Unlike an axis, a legend removes overlapping labels by default; `false` switches it off. */
+  val labelOverlap: String? = null,
+  val labelSeparation: NumberValue? = null,
 ) {
   /**
    * The scale this legend describes.
