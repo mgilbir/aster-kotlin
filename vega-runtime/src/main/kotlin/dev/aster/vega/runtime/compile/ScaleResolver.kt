@@ -514,6 +514,7 @@ public class ScaleResolver(
         is DomainSpec.Literal -> domain.values
         is DomainSpec.FromField -> fieldValues(domain.data, listOf(domain.field), spec.name)
         is DomainSpec.FromFields -> fieldValues(domain.data, domain.fields, spec.name)
+        is DomainSpec.Union -> unionValues(domain.parts, spec.name)
         is DomainSpec.FromSignal -> signalDomain(domain, spec.name) ?: return null
         DomainSpec.Unset -> {
           diagnostics.error(
@@ -560,6 +561,24 @@ public class ScaleResolver(
       spec.niceCount ?: LinearScale.DEFAULT_TICK_COUNT,
     )
 
+  /**
+   * Every value a union's parts contribute, in the order they were written.
+   *
+   * The parts are read recursively rather than assumed to be `{data, field}` pairs, so a literal
+   * array mixed in among them widens the domain exactly as upstream does.
+   */
+  private fun unionValues(parts: List<DomainSpec>, scaleName: String): List<VegaValue> =
+    parts.flatMap { part ->
+      when (part) {
+        is DomainSpec.Literal -> part.values
+        is DomainSpec.FromField -> fieldValues(part.data, listOf(part.field), scaleName)
+        is DomainSpec.FromFields -> fieldValues(part.data, part.fields, scaleName)
+        is DomainSpec.Union -> unionValues(part.parts, scaleName)
+        is DomainSpec.FromSignal -> signalDomain(part, scaleName) ?: emptyList()
+        DomainSpec.Unset -> emptyList()
+      }
+    }
+
   private fun numericExtent(
     domain: DomainSpec,
     scaleName: String,
@@ -568,6 +587,7 @@ public class ScaleResolver(
       when (domain) {
         is DomainSpec.FromField -> fieldValues(domain.data, listOf(domain.field), scaleName)
         is DomainSpec.FromFields -> fieldValues(domain.data, domain.fields, scaleName)
+        is DomainSpec.Union -> unionValues(domain.parts, scaleName)
         is DomainSpec.Literal -> domain.values
         is DomainSpec.FromSignal -> signalDomain(domain, scaleName) ?: return null
         DomainSpec.Unset -> {
@@ -602,6 +622,9 @@ public class ScaleResolver(
         is DomainSpec.FromFields ->
           orderedDomain(domain.data, domain.fields, domain.sort, scaleName) ?: return null
         is DomainSpec.FromSignal -> signalDomain(domain, scaleName) ?: return null
+        // A discrete union keeps first-appearance order across every part, which is the same rule
+        // a single dataset's domain follows — the parts simply extend the sequence.
+        is DomainSpec.Union -> unionValues(domain.parts, scaleName)
         DomainSpec.Unset -> {
           diagnostics.error(
             DiagnosticCodes.SCALE_INVALID_DOMAIN,

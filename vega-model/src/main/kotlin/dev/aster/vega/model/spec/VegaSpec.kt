@@ -273,6 +273,16 @@ public sealed interface DomainSpec {
   ) : DomainSpec
 
   /**
+   * `{"fields": [{"data": …, "field": …}, …]}` — the union of parts from **different** datasets.
+   *
+   * Distinct from [FromFields], which unions several columns of one dataset. This is how a chart
+   * puts two independently-computed series on one axis, and how a histogram shares an axis with the
+   * count of its own null values. A part may also be a literal array, so a specification can widen
+   * a data-driven domain to include a fixed range.
+   */
+  public data class Union(val parts: List<DomainSpec>, val sort: DomainSort? = null) : DomainSpec
+
+  /**
    * `{"signal": "..."}` — an expression producing the domain array.
    *
    * Common in practice because the `extent` transform publishes exactly this: a two-element array a

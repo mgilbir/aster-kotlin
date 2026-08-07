@@ -945,7 +945,31 @@ public class SpecParser {
         }
         val data = domain.fields["data"]?.asString()
         val field = domain.fields["field"]?.asString()
-        val fields = (domain.fields["fields"] as? VegaValue.Arr)?.values?.map { it.asString() }
+        val rawFields = (domain.fields["fields"] as? VegaValue.Arr)?.values
+        // With no `data` of its own, each entry of `fields` names its own source — a union across
+        // datasets rather than across columns of one. An entry may also be a literal array, which
+        // is how a specification widens a data-driven domain to cover a fixed range as well.
+        if (data == null && rawFields != null) {
+          val parts = rawFields.mapNotNull { part ->
+            when (part) {
+              is VegaValue.Arr -> DomainSpec.Literal(part.values)
+              is VegaValue.Obj -> parseDomain(VegaValue.Obj(mapOf("domain" to part)), path)
+              else -> {
+                diagnostics.error(
+                  DiagnosticCodes.SCALE_INVALID_DOMAIN,
+                  "A domain union entry must be an array or a data reference",
+                  jsonPath = path,
+                )
+                null
+              }
+            }
+          }
+          return DomainSpec.Union(
+            parts,
+            parseDomainSort(domain.fields["sort"], "$path.sort", multiField = true),
+          )
+        }
+        val fields = rawFields?.map { it.asString() }
         when {
           data != null && field != null ->
             DomainSpec.FromField(
