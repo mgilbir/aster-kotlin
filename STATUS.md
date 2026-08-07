@@ -8,7 +8,7 @@ Milestones 0, 1 and 2 complete. **Milestones 3 and 4 in progress**: Vega specifi
 end — including expressions, signals and the twelve data transforms the brief lists — and are verified
 against upstream Vega by differential tests.
 
-Twenty-five differential fixtures pass, all matching upstream exactly on every mark and scale output:
+Twenty-six differential fixtures pass, all matching upstream exactly on every mark and scale output:
 
 | Fixture | Marks | Covers |
 | --- | --- | --- |
@@ -37,6 +37,7 @@ Twenty-five differential fixtures pass, all matching upstream exactly on every m
 | `legend-columns` | 10 | legend entries wrapped into two columns |
 | `trellis-layout` | 10 | five cells gridded by a layout, with row and column padding |
 | `trellis-headers` | 8 | a grid with row and column headers, each titled from its own datum |
+| `pie` | 13 | a donut chart: the pie transform feeding arc marks, with a legend |
 
 The gate is wired into `./scripts/oracle.sh`, so every further scale, mark and transform is built
 against a harness that can say we are wrong — which golden tests cannot.
@@ -61,21 +62,21 @@ upstream-verified slice through parsing, scales, rect encoding and axes:
 | Diagnostics, canonical snapshots, goldens, oracle scaffolding | no upstream equivalent | complete |
 | `vega-scale` (linear, band, point, ordinal) + d3-array ticks | 790 + parts of d3-scale, d3-array | 4 of ~15 scale types, exact against upstream |
 | `vega-parser` (width, height, padding, autosize, data, signals, scales, axes, marks, group scopes) | 3,790 | a subset; no legends, titles or `layout` |
-| `vega-encode` (mark encoders, axes, legends, titles) | 952 | 7 of 12 mark encoders; axes, legends and titles without overlap removal |
+| `vega-encode` (mark encoders, axes, legends, titles) | 952 | 8 of 12 mark encoders; axes, legends and titles without overlap removal |
 | `vega-expression` + `vega-functions` | 2,388 | language complete; 60 of 119 functions |
-| `vega-transforms` (13 of 40) | 3,754 | the 12 the brief lists plus `timeunit`, exact against upstream |
+| `vega-transforms` (14 of 40) | 3,754 | the 12 the brief lists plus `timeunit` and `pie`, exact against upstream |
 | `vega-dataflow` | 2,081 | contracts and scheduling only; no pulse propagation |
 
 The entire data and specification half is absent:
 
 | Missing | Upstream size | Here |
 | --- | --- | --- |
-| `vega-transforms` — the other 27 transforms | most of 3,754 | 0 |
+| `vega-transforms` — the other 26 transforms | most of 3,754 | 0 |
 | `vega-dataflow` — pulse propagation and incremental evaluation | 2,081 | contracts only |
 | `vega-functions` — the other 44 functions, mostly colour, geo and selection | most of 790 | 0 |
 | Remaining scale types — quantile, quantize, threshold, bin-ordinal | rest of `vega-scale` | 0 |
 | Continuous colour ramps | `d3-scale-chromatic` interpolator tables | 0, reported |
-| Remaining mark encoders — arc, image, path, trail, shape | rest of `vega-encode` + d3-shape | 0 |
+| Remaining mark encoders — image, path, trail, shape | rest of `vega-encode` + d3-shape | 0 |
 | Group `layout` — the trellis grid, headers and titles | `vega-view-transforms` grid layout | 0, reported |
 | Line and area interpolation methods — basis, cardinal, catmull-rom, monotone, step | part of d3-shape | 0, reported |
 | Label overlap removal, banded legends, trellis footers | parts of `vega-encode`, `vega-label`, `vega-view-transforms` | 0, reported |
@@ -98,7 +99,7 @@ substantive compatibility items:
 | 6. View and Compose APIs | Yes |
 | 7. SVG, PNG, PDF export | Yes |
 | 8. TalkBack can describe and navigate | Partial — virtual nodes are tested by instrumentation, not with TalkBack itself |
-| 9. At least 100 compatibility fixtures pass | 25 of 100 |
+| 9. At least 100 compatibility fixtures pass | 26 of 100 |
 | 10. Core runtime has no Android dependency | Yes |
 | 11. Renders without WebView | Yes |
 | 12. Build and test loop runs from the terminal | Yes |
@@ -208,6 +209,8 @@ ordering), and the pipeline is now verified end to end on one fixture, but the b
   upstream's `config.legend` and is pinned by a test, because legend layout is pure arithmetic on those
   numbers — a row is `max(ceil(sqrt(symbolSize) + symbolStrokeWidth), labelFontSize)` tall, and a
   gradient is sampled at the scale's own ticks so a multi-stop ramp bends where upstream's does.
+- **Arc marks and the `pie` transform**: pie and donut charts, which were the commonest chart the
+  engine could not draw at all. `padAngle` and `cornerRadius` are reported rather than approximated.
 - **Trellis headers and titles**: a group marked `row-header` or `column-title` is arranged around
   the grid rather than gridded into it, each labelled from its own datum through a group `title` whose
   text is a signal.
@@ -366,6 +369,7 @@ The performance targets in PROJECT_BRIEF.md 19 are therefore all unverified.
 2. **Label overlap removal.** `labelOverlap` on an axis or a legend, which is what stops a dense time
    axis printing every label on top of the last. Reported everywhere it appears, and the most visible
    remaining gap on a chart that is otherwise correct.
-3. **The remaining mark encoders.** `arc` first, since a pie chart is the commonest chart this
-   engine still cannot draw at all, then `trail`, `shape`, `image` and `path`. Each is reported today,
-   so a specification using one is visibly missing its marks rather than wrong.
+3. **Arc padding and corner rounding.** Both are reported today, and both are what separates a
+   serviceable donut from a finished one. Upstream insets a padded arc against a pad *radius* and
+   rounds its corners with tangent circles, so this is real geometry rather than a parameter to pass
+   through — which is why it was left out of the first cut rather than guessed at.

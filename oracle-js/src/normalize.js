@@ -23,7 +23,9 @@ const GEOMETRY_CHANNELS = {
   symbol: ['x', 'y', 'size'],
   text: ['x', 'y'],
   image: ['x', 'y', 'width', 'height'],
-  arc: ['x', 'y'],
+  // An arc's centre says nothing about the wedge it drew, so compare the drawn extent instead. This
+  // engine builds an arc as a path with the centre already applied, and has no centre to report.
+  arc: [],
   path: ['x', 'y'],
   trail: ['x', 'y'],
   shape: ['x', 'y'],
@@ -148,7 +150,9 @@ function record(type, role, item, dx, dy, precision) {
   if (entry.strokeWidth !== undefined && entry.stroke === undefined) delete entry.strokeWidth;
   // A symbol's `size` channel says nothing about the outline it actually draws, and Vega ships its own
   // symbol table rather than d3's — so compare the drawn extent, not just the requested size.
-  if (type === 'symbol' && item.bounds) {
+  if ((type === 'symbol' || type === 'arc') && item.bounds) {
+    entry.shapeLeft = canonicalNumber(item.bounds.x1 + dx, precision);
+    entry.shapeTop = canonicalNumber(item.bounds.y1 + dy, precision);
     entry.shapeWidth = canonicalNumber(item.bounds.x2 - item.bounds.x1, precision);
     entry.shapeHeight = canonicalNumber(item.bounds.y2 - item.bounds.y1, precision);
   }

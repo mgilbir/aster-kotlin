@@ -49,9 +49,9 @@ import dev.aster.vega.scene.Transform2D
 /**
  * Turns a mark specification plus its data into scene nodes.
  *
- * Implemented: `rect`, `rule`, `symbol`, `text`, `line`, `area`, and `group` through [encodeGroup].
- * Every other type reports `VEGA_TRANSFORM_NOT_IMPLEMENTED` and contributes no nodes, so a chart
- * that needs one is visibly missing it rather than silently short.
+ * Implemented: `rect`, `rule`, `symbol`, `text`, `line`, `area`, `arc`, and `group` through
+ * [encodeGroup]. Every other type reports `VEGA_TRANSFORM_NOT_IMPLEMENTED` and contributes no
+ * nodes, so a chart that needs one is visibly missing it rather than silently short.
  *
  * Channel resolution follows Vega: `enter` provides the base and `update` overrides it, a scaled
  * channel maps its field through the named scale, and `band` adds a fraction of the scale's
@@ -82,6 +82,7 @@ public class MarkEncoder(
       // One node for the whole series, not one per datum.
       MarkType.LINE -> listOfNotNull(line(spec, data))
       MarkType.AREA -> listOfNotNull(area(spec, data))
+      MarkType.ARC -> data.mapIndexedNotNull { index, datum -> arc(spec, datum, index) }
       else -> {
         diagnostics.error(
           DiagnosticCodes.TRANSFORM_NOT_IMPLEMENTED,
@@ -161,6 +162,63 @@ public class MarkEncoder(
       stroke = style.stroke,
       opacity = style.opacity,
       metadata = metadata(spec, datum, index, channels),
+    )
+  }
+
+  /**
+   * `arc`: an annular sector, which is what a pie or donut chart is made of.
+   *
+   * Angles run clockwise from twelve o'clock, so a slice starting at zero begins straight up. A
+   * zero inner radius makes a wedge rather than a ring, and the outline is closed differently in
+   * the two cases — a wedge returns through the centre, a ring runs back along the inner edge.
+   *
+   * `padAngle` and `cornerRadius` are reported rather than approximated: upstream insets a padded
+   * arc against a pad *radius* and rounds its corners with tangent circles, and a slice that is
+   * visibly the wrong shape is worse than one that is honestly missing.
+   */
+  private fun arc(spec: MarkSpec, datum: VegaValue, index: Int): SceneNode? {
+    val channels = spec.encode.effective
+    val cx = position(channels["x"], datum) ?: 0.0
+    val cy = position(channels["y"], datum) ?: 0.0
+    val startAngle = number(channels["startAngle"], datum) ?: 0.0
+    val endAngle = number(channels["endAngle"], datum) ?: 0.0
+    val innerRadius = number(channels["innerRadius"], datum) ?: 0.0
+    val outerRadius = number(channels["outerRadius"], datum) ?: 0.0
+    if (outerRadius <= 0.0 || startAngle == endAngle) return null
+
+    for (unsupported in listOf("padAngle", "cornerRadius")) {
+      if (channels[unsupported] != null) {
+        reportOnce(
+          "arc:$unsupported",
+          dev.aster.vega.model.VegaDiagnostic(
+            severity = dev.aster.vega.model.DiagnosticSeverity.WARNING,
+            code = DiagnosticCodes.TRANSFORM_NOT_IMPLEMENTED,
+            message =
+              "Arc '$unsupported' is not implemented; the slice was drawn with square corners and " +
+                "no gap",
+            operator = spec.name,
+          ),
+        )
+      }
+    }
+
+    val style = style(channels, datum, spec)
+    val path = PathData.build {
+      arcTo(cx, cy, outerRadius, startAngle, endAngle)
+      if (innerRadius > 0.0) {
+        arcTo(cx, cy, innerRadius, endAngle, startAngle)
+      } else {
+        lineTo(cx, cy)
+      }
+      close()
+    }
+    return PathNode(
+      id = ids.allocate(),
+      path = path,
+      fill = style.fill ?: Fill.of(MarkDefaults.DEFAULT_FILL),
+      stroke = style.stroke,
+      opacity = style.opacity,
+      metadata = metadata(spec, datum, index, channels).copy(markKind = "arc"),
     )
   }
 

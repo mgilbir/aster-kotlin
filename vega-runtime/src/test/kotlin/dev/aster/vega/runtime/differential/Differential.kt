@@ -45,6 +45,17 @@ public object Differential {
    */
   public const val GEOMETRY_TOLERANCE: Double = 1e-6
 
+  /**
+   * Tolerance for the extent of a mark built from curves.
+   *
+   * Upstream measures an arc exactly, from its centre and radii, because its renderer emits a true
+   * circular arc. This engine's scene graph has only cubics — every backend it draws on takes them
+   * — so an arc is approximated, and its bounds are the bounds of the curves actually painted. The
+   * difference is about one part in a hundred thousand: a thousandth of a pixel on a 90-unit
+   * radius, and on the side of describing what is drawn rather than what was intended.
+   */
+  public const val CURVE_EXTENT_TOLERANCE: Double = 1e-2
+
   /** One mark, flattened. Channel names match the reference file's. */
   public data class Mark(
     val type: String,
@@ -241,6 +252,8 @@ public object Differential {
         "x" to centre.x,
         "y" to centre.y,
         "size" to node.size,
+        "shapeLeft" to extent.left,
+        "shapeTop" to extent.top,
         "shapeWidth" to extent.width,
         "shapeHeight" to extent.height,
       )
@@ -257,12 +270,19 @@ public object Differential {
   private fun pathMark(node: PathNode, world: Transform2D): Mark {
     val kind = node.metadata.markKind ?: "path"
     if (kind != "line" && kind != "area") {
-      val bounds = world.mapBounds(node.path.bounds)
+      // An arc is compared by the wedge it drew rather than by a centre point, which says nothing
+      // about its radii or its sweep.
+      val bounds = world.mapBounds(node.bounds)
       return Mark(
-        "path",
+        kind,
         node.metadata.role,
-        linkedMapOf("x" to bounds.left, "y" to bounds.top),
-        emptyMap(),
+        linkedMapOf(
+          "shapeLeft" to bounds.left,
+          "shapeTop" to bounds.top,
+          "shapeWidth" to bounds.width,
+          "shapeHeight" to bounds.height,
+        ) + paintNumbers(node),
+        paintStrings(node),
       )
     }
 
@@ -443,7 +463,10 @@ public object Differential {
         out.add(Difference("$where.$channel", fmt(wanted), "absent"))
         continue
       }
-      if (abs(wanted - got) > tolerance) {
+      val allowed =
+        if (expected.type == "arc" && channel.startsWith("shape")) CURVE_EXTENT_TOLERANCE
+        else tolerance
+      if (abs(wanted - got) > allowed) {
         out.add(Difference("$where.$channel", fmt(wanted), fmt(got)))
       }
     }

@@ -190,14 +190,55 @@ class SpecCompilerTest {
 
   @Test
   fun `an unimplemented mark type is reported and contributes nothing`() {
-    val withArc = minimalBar.replace("\"type\": \"rect\"", "\"type\": \"arc\"")
-    val compiled = compile(withArc)
+    val withTrail = minimalBar.replace("\"type\": \"rect\"", "\"type\": \"trail\"")
+    val compiled = compile(withTrail)
     assertTrue(
       compiled.diagnostics.any {
-        it.code == DiagnosticCodes.TRANSFORM_NOT_IMPLEMENTED && it.message.contains("arc")
+        it.code == DiagnosticCodes.TRANSFORM_NOT_IMPLEMENTED && it.message.contains("trail")
       }
     )
     assertTrue(compiled.scene!!.flatten().none { it.node is RectNode })
+  }
+
+  @Test
+  fun `an arc without a radius or a sweep draws nothing rather than a degenerate shape`() {
+    val compiled =
+      compile(
+        """
+        {
+          "width": 100, "height": 100, "padding": 0,
+          "data": [{"name": "t", "values": [{"a": 0}]}],
+          "marks": [{"type": "arc", "from": {"data": "t"}, "encode": {"enter": {
+            "x": {"value": 50}, "y": {"value": 50},
+            "startAngle": {"value": 0}, "endAngle": {"value": 0},
+            "outerRadius": {"value": 40}}}}]
+        }
+        """
+          .trimIndent()
+      )
+    assertTrue(requireNotNull(compiled.scene).flatten().none { it.node is PathNode })
+  }
+
+  @Test
+  fun `arc padding and corner rounding are reported rather than drawn square in silence`() {
+    val compiled =
+      compile(
+        """
+        {
+          "width": 100, "height": 100, "padding": 0,
+          "data": [{"name": "t", "values": [{"a": 0}]}],
+          "marks": [{"type": "arc", "from": {"data": "t"}, "encode": {"enter": {
+            "x": {"value": 50}, "y": {"value": 50},
+            "startAngle": {"value": 0}, "endAngle": {"value": 1},
+            "outerRadius": {"value": 40},
+            "padAngle": {"value": 0.05}, "cornerRadius": {"value": 3}}}}]
+        }
+        """
+          .trimIndent()
+      )
+    val messages = compiled.diagnostics.map { it.message }
+    assertTrue(messages.any { it.contains("padAngle") }, messages.toString())
+    assertTrue(messages.any { it.contains("cornerRadius") }, messages.toString())
   }
 
   @Test

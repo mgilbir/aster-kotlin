@@ -132,6 +132,7 @@ public class TransformRegistry(transforms: List<Transform>) {
           FoldTransform,
           FlattenTransform,
           TimeUnitTransform,
+          PieTransform,
         )
       )
   }

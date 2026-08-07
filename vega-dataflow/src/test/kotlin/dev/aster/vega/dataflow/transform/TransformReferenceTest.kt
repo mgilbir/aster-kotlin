@@ -506,7 +506,7 @@ class TransformReferenceTest {
   }
 
   @Test
-  fun `the registry covers the transforms the brief lists, and timeunit`() {
+  fun `the registry covers the transforms the brief lists, plus timeunit and pie`() {
     val fromTheBrief =
       setOf(
         "filter",
@@ -524,6 +524,8 @@ class TransformReferenceTest {
       )
     // `timeunit` is not on the brief's list but is the date half of `bin`, and a time series is
     // barely usable without it.
-    assertEquals(fromTheBrief + "timeunit", TransformRegistry.Default.types)
+    // `timeunit` and `pie` are not on the brief's list. `timeunit` is the date half of `bin`, and
+    // `pie` is what turns a column of numbers into the angles an arc mark needs.
+    assertEquals(fromTheBrief + "timeunit" + "pie", TransformRegistry.Default.types)
   }
 }

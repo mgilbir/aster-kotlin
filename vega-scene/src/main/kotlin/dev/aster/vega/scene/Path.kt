@@ -234,6 +234,66 @@ public class PathBuilder {
   }
 
   /** Circle approximated by four cubic segments; maximum radial error is about 0.027 %. */
+  /**
+   * Appends a circular arc, as cubics.
+   *
+   * Angles are in radians and measured the way a chart measures them: zero at twelve o'clock,
+   * increasing clockwise, which is what a pie chart's first slice starts from. That is a quarter
+   * turn from the mathematical convention, and getting it wrong rotates every slice.
+   *
+   * The sweep is split into segments of at most a quarter turn, because a single cubic approximates
+   * a circular arc well only over a short span.
+   */
+  public fun arcTo(
+    cx: Double,
+    cy: Double,
+    radius: Double,
+    startAngle: Double,
+    endAngle: Double,
+  ): PathBuilder {
+    if (radius <= 0.0) return this
+    val sweep = endAngle - startAngle
+    if (sweep == 0.0) return this
+    val segments = kotlin.math.ceil(kotlin.math.abs(sweep) / (kotlin.math.PI / 2.0)).toInt()
+    val step = sweep / segments
+
+    fun pointAt(angle: Double) =
+      PointD(cx + radius * kotlin.math.sin(angle), cy - radius * kotlin.math.cos(angle))
+
+    // Open the subpath, or join to it if the caller has already drawn up to this point — which is
+    // how
+    // the two edges of an annular sector connect without a seam.
+    val entry = pointAt(startAngle)
+    if (commands.isEmpty()) moveTo(entry.x, entry.y)
+    else if (
+      kotlin.math.abs(cursor.x - entry.x) > JOIN_TOLERANCE ||
+        kotlin.math.abs(cursor.y - entry.y) > JOIN_TOLERANCE
+    ) {
+      lineTo(entry.x, entry.y)
+    }
+
+    for (index in 0 until segments) {
+      val from = startAngle + step * index
+      val to = from + step
+      // The control-point distance for a cubic approximating an arc of this span.
+      val handle = 4.0 / 3.0 * kotlin.math.tan((to - from) / 4.0) * radius
+      val p0 = pointAt(from)
+      val p1 = pointAt(to)
+      // Tangents point along the direction of travel, which flips with the sweep's sign.
+      val t0 = PointD(kotlin.math.cos(from), kotlin.math.sin(from))
+      val t1 = PointD(kotlin.math.cos(to), kotlin.math.sin(to))
+      cubicTo(
+        p0.x + handle * t0.x,
+        p0.y + handle * t0.y,
+        p1.x - handle * t1.x,
+        p1.y - handle * t1.y,
+        p1.x,
+        p1.y,
+      )
+    }
+    return this
+  }
+
   public fun circle(cx: Double, cy: Double, radius: Double): PathBuilder {
     val k = radius * KAPPA
     moveTo(cx, cy - radius)
@@ -257,6 +317,9 @@ public class PathBuilder {
   public companion object {
     /** Control-point offset ratio for a circular quadrant: `4/3 * (sqrt(2) - 1)`. */
     public const val KAPPA: Double = 0.5522847498307933
+
+    /** How far apart two points may be and still count as the same place, when joining subpaths. */
+    private const val JOIN_TOLERANCE: Double = 1e-9
   }
 }
 
