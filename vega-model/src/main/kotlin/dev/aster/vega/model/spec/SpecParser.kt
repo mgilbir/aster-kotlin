@@ -20,6 +20,31 @@ import dev.aster.vega.model.asString
 private val MULTI_FIELD_SORT_OPS = listOf("count", "min", "max")
 
 /**
+ * The `config` blocks whose defaults reach the chart.
+ *
+ * Everything else upstream accepts — `mark`, the per-mark-type blocks, `range`, `group`,
+ * `projection` — is reported by name, because a theme that reaches the axes and not the bars looks
+ * more broken than one that reaches neither.
+ */
+private val CONFIG_HONOURED =
+  setOf(
+    "axis",
+    "axisX",
+    "axisY",
+    "axisTop",
+    "axisBottom",
+    "axisLeft",
+    "axisRight",
+    "axisBand",
+    "legend",
+  )
+
+/**
+ * Guide text defaults live here; a mark style needs the mark `style` property, which is reported.
+ */
+private val CONFIG_HONOURED_STYLES = setOf("guide-label", "guide-title")
+
+/**
  * Axis properties this engine reads.
  *
  * Upstream's axis takes 74 of them and this reads twenty-odd. Everything else is reported —
@@ -325,6 +350,20 @@ public class SpecParser {
 
   private val diagnostics = DiagnosticCollector()
 
+  /** The specification's `config` block, which every guide reads behind its own properties. */
+  private var config: GuideConfig = GuideConfig.Empty
+
+  /**
+   * Every scale's type, by name, collected before anything else is parsed.
+   *
+   * An axis needs it to know whether `config.axisBand` applies, and axes are parsed before the
+   * scales inside the group that holds them. Collected from the whole specification in one pass
+   * rather than per scope, so a scale name reused at two different types in two different scopes
+   * resolves to whichever was written last — rare enough to accept, and better than an axis that
+   * silently drops a band correction.
+   */
+  private var scaleTypes: Map<String, ScaleType> = emptyMap()
+
   public fun parseJson(json: String): ParsedSpec {
     val root =
       VegaJson.parseOrNull(json, diagnostics) ?: return ParsedSpec(null, diagnostics.diagnostics)
@@ -341,13 +380,22 @@ public class SpecParser {
       return ParsedSpec(null, diagnostics.diagnostics)
     }
 
+    config = parseConfig(root.fields["config"])
+    scaleTypes = collectScaleTypes(root)
+
     val spec =
       VegaSpec(
         width = root.optionalNumber("width", "$.width"),
         height = root.optionalNumber("height", "$.height"),
-        padding = parsePadding(root.fields["padding"], "$.padding"),
-        autosize = parseAutosize(root.fields["autosize"], "$.autosize"),
-        background = root.fields["background"]?.takeIf { it is VegaValue.Str }?.asString(),
+        // Each falls back to `config`, which is where a theme sets a chart's frame.
+        padding =
+          parsePadding(root.fields["padding"] ?: configScalar(root, "padding"), "$.padding"),
+        autosize =
+          parseAutosize(root.fields["autosize"] ?: configScalar(root, "autosize"), "$.autosize"),
+        background =
+          (root.fields["background"] ?: configScalar(root, "background"))
+            ?.takeIf { it is VegaValue.Str }
+            ?.asString(),
         signals = parseArray(root, "signals") { value, path -> parseSignal(value, path) },
         data = parseArray(root, "data") { value, path -> parseData(value, path) },
         scales = parseArray(root, "scales") { value, path -> parseScale(value, path) },
@@ -362,6 +410,77 @@ public class SpecParser {
     return ParsedSpec(spec, diagnostics.diagnostics)
   }
 
+  // ---- config ---------------------------------------------------------------
+
+  /**
+   * Reads the `config` block, reporting the parts of it nothing consumes yet.
+   *
+   * The blocks that are honoured are the guide ones. A `config.mark` or a per-mark-type block still
+   * changes what a chart looks like and is reported by name, because a theme that silently applies
+   * to the axes and not to the bars is worse than one that applies to neither.
+   */
+  private fun parseConfig(value: VegaValue?): GuideConfig {
+    val obj = value as? VegaValue.Obj ?: return GuideConfig.Empty
+    val blocks = LinkedHashMap<String, VegaValue.Obj>()
+    for ((key, block) in obj.fields) {
+      val child = block as? VegaValue.Obj
+      when {
+        child == null ->
+          diagnostics.warn(
+            DiagnosticCodes.PARSE_UNKNOWN_PROPERTY,
+            "A config block must be an object; '$key' was ignored",
+            jsonPath = "$.config.$key",
+          )
+        key in CONFIG_HONOURED || key == "style" -> blocks[key] = child
+        else ->
+          diagnostics.warn(
+            DiagnosticCodes.PARSE_UNKNOWN_PROPERTY,
+            "Config block '$key' is not implemented; the engine's own defaults are used, so a " +
+              "theme setting it will not reach the chart",
+            jsonPath = "$.config.$key",
+          )
+      }
+    }
+    (blocks["style"])?.let { style ->
+      for (name in style.fields.keys) {
+        if (name in CONFIG_HONOURED_STYLES) continue
+        diagnostics.warn(
+          DiagnosticCodes.PARSE_UNKNOWN_PROPERTY,
+          "Config style '$name' is not implemented; only the guide label and title styles are " +
+            "read, since marks do not carry a style name here",
+          jsonPath = "$.config.style.$name",
+        )
+      }
+    }
+    return GuideConfig(blocks)
+  }
+
+  /** A chart-level value written in `config` rather than at the top level. */
+  private fun configScalar(root: VegaValue.Obj, key: String): VegaValue? =
+    (root.fields["config"] as? VegaValue.Obj)?.fields?.get(key)
+
+  /**
+   * Every scale's type, gathered from the whole specification including group scopes.
+   *
+   * Needed before the axes are parsed, and a group's axes are parsed before its scales, so this
+   * cannot be built up as it goes.
+   */
+  private fun collectScaleTypes(root: VegaValue.Obj): Map<String, ScaleType> {
+    val types = LinkedHashMap<String, ScaleType>()
+    fun walk(scope: VegaValue.Obj) {
+      (scope.fields["scales"] as? VegaValue.Arr)?.values?.forEach { entry ->
+        val scale = entry as? VegaValue.Obj ?: return@forEach
+        val name = scale.fields["name"]?.asString() ?: return@forEach
+        ScaleType.fromName(scale.fields["type"]?.asString() ?: "linear")?.let { types[name] = it }
+      }
+      (scope.fields["marks"] as? VegaValue.Arr)?.values?.forEach { entry ->
+        (entry as? VegaValue.Obj)?.let { walk(it) }
+      }
+    }
+    walk(root)
+    return types
+  }
+
   // ---- top level ------------------------------------------------------------
 
   /**
@@ -374,7 +493,6 @@ public class SpecParser {
     val unsupported =
       mapOf(
         "projections" to "Geographic projections are out of scope",
-        "config" to "Configuration overrides are not implemented; built-in defaults are used",
         "encode" to "Top-level encode blocks are not implemented",
         "usermeta" to "usermeta is ignored",
       )
@@ -759,8 +877,8 @@ public class SpecParser {
   // ---- axes -----------------------------------------------------------------
 
   private fun parseAxis(value: VegaValue, path: String): AxisSpec? {
-    val obj = value as? VegaValue.Obj ?: return unexpected("an axis definition", path)
-    val scale = obj.fields["scale"]?.asString()
+    val own = value as? VegaValue.Obj ?: return unexpected("an axis definition", path)
+    val scale = own.fields["scale"]?.asString()
     if (scale.isNullOrEmpty()) {
       diagnostics.error(
         DiagnosticCodes.PARSE_MISSING_PROPERTY,
@@ -769,7 +887,7 @@ public class SpecParser {
       )
       return null
     }
-    val orientName = obj.fields["orient"]?.asString() ?: "bottom"
+    val orientName = own.fields["orient"]?.asString() ?: "bottom"
     val orient = Orient.fromName(orientName)
     if (orient == null) {
       diagnostics.error(
@@ -780,7 +898,12 @@ public class SpecParser {
       return null
     }
 
-    obj.reportUnhandled("Axis", path, AXIS_CONSUMED, AXIS_UNSUPPORTED)
+    // Reported against the axis's *own* properties: a theme should not make every axis in a chart
+    // complain about something it set once in `config`.
+    own.reportUnhandled("Axis", path, AXIS_CONSUMED, AXIS_UNSUPPORTED)
+
+    val obj =
+      GuideConfig.merge(own, config.axisDefaults(orient, scaleTypes[scale] == ScaleType.BAND))
 
     return AxisSpec(
       scale = scale,
@@ -908,7 +1031,8 @@ public class SpecParser {
    * legend that silently drops half its entries or ignores a formatter looks finished and is not.
    */
   private fun parseLegend(value: VegaValue, path: String): LegendSpec? {
-    val obj = value as? VegaValue.Obj ?: return unexpected("a legend definition", path)
+    val own = value as? VegaValue.Obj ?: return unexpected("a legend definition", path)
+    val obj = GuideConfig.merge(own, config.legendDefaults())
 
     val spec =
       LegendSpec(
@@ -973,7 +1097,7 @@ public class SpecParser {
       return null
     }
 
-    obj.reportUnhandled(
+    own.reportUnhandled(
       "Legend",
       path,
       LEGEND_CONSUMED,

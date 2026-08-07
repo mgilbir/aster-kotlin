@@ -20,7 +20,7 @@ Milestones 0, 1 and 2 complete. **Milestones 3 and 4 in progress**: Vega specifi
 end — including expressions, signals and the twelve data transforms the brief lists — and are verified
 against upstream Vega by differential tests.
 
-Thirty-six differential fixtures pass, all matching upstream exactly on every mark and scale output:
+Thirty-seven differential fixtures pass, all matching upstream exactly on every mark and scale output:
 
 | Fixture | Marks | Covers |
 | --- | --- | --- |
@@ -60,6 +60,7 @@ Thirty-six differential fixtures pass, all matching upstream exactly on every ma
 | `axis-values` | 34 | explicit tick values: out of order, out of range, thinned, filtering a band |
 | `label-overlap` | 90 | a parity axis, a greedy one, and a ramp that thins its labels unasked |
 | `axis-label-angle` | 33 | labels turned 45 degrees, hung Vega's way and corrected Vega-Lite's |
+| `config-theme` | 42 | a theme in `config`, every level of the precedence chain visible at once |
 
 The gate is wired into `./scripts/oracle.sh`, so every further scale, mark and transform is built
 against a harness that can say we are wrong — which golden tests cannot.
@@ -121,7 +122,7 @@ substantive compatibility items:
 | 6. View and Compose APIs | Yes |
 | 7. SVG, PNG, PDF export | Yes |
 | 8. TalkBack can describe and navigate | Partial — virtual nodes are tested by instrumentation, not with TalkBack itself |
-| 9. At least 100 compatibility fixtures pass | 36 of 100 |
+| 9. At least 100 compatibility fixtures pass | 37 of 100 |
 | 10. Core runtime has no Android dependency | Yes |
 | 11. Renders without WebView | Yes |
 | 12. Build and test loop runs from the terminal | Yes |
@@ -254,6 +255,14 @@ ordering), and the pipeline is now verified end to end on one fixture, but the b
   out, so a linear scale handed `[10, 20]` still starts at 0 where this engine had been leaving it
   at 10. The limits then replace an end rather than clamping it, and run after `zero`, which is why
   `domainMin: 30` beats it.
+- **`config` blocks for the guides.** `config.axis`, its `axisX`/`axisY`, `axisTop`/`axisBottom`/
+  `axisLeft`/`axisRight` and `axisBand` variants, `config.legend`, the `guide-label` and
+  `guide-title` styles, and `background`/`padding`/`autosize`. This is where a Vega-Lite-compiled
+  specification puts everything it does not say inline, so a chart that ignores it is not one with a
+  few options missing — it is one drawn in somebody else's theme. Two things had to be got right: the
+  precedence, which runs through five levels before the axis's own properties, and the fact that a
+  `style` block names its properties the way a *mark* does, so `fill` becomes `labelColor` on the
+  way through. Without that translation the form every theme uses would set nothing at all.
 - **Turned axis labels.** `labelAngle`, with `labelAlign` and `labelBaseline`. The angle alone is
   all upstream applies — the alignment and baseline stay where the orientation put them, so a
   45-degree label on a bottom axis is still centred and top-baselined and hangs off to the left of
@@ -303,7 +312,7 @@ ordering), and the pipeline is now verified end to end on one fixture, but the b
 
 ## Verification
 
-- 978 JVM tests pass (`./scripts/test-core.sh`, `./gradlew test`).
+- 994 JVM tests pass (`./scripts/test-core.sh`, `./gradlew test`).
 - Android lint is clean with `warningsAsErrors` on every Android module.
 - 48 instrumented tests pass on an API 37 arm64 emulator (`./scripts/test-android.sh`): 40 in
   `vega-android-canvas`, 4 in `vega-compose`, 4 in `demo` — including one that compiles every bundled
@@ -338,7 +347,7 @@ dark chrome, so a dark background was unreadable — they now take a `SampleScen
 
 ## Known failing fixtures
 
-None. Thirty-six fixtures exist and all thirty-six pass. The brief's MVP asks for 100; growing the
+None. Thirty-seven fixtures exist and all thirty-seven pass. The brief's MVP asks for 100; growing the
 corpus is the main task now, and each new fixture is expected to surface gaps rather than pass
 immediately. That keeps happening, which is the point of the harness: `stacked-bar` surfaced two real
 bugs, and `facet-trellis` surfaced a third — `range: "height"` was descending for every scale type,
@@ -453,6 +462,8 @@ depends on them. Each has a test and a comment; this is the index.
 | Explicit tick labels are formatted at the precision the *number of values* implies | `AxisBuilder.labeller` |
 | A legend removes overlapping labels by default and an axis does not; the config entry is in the `legend` block | `LabelOverlap` |
 | `labelAngle` turns a label about its anchor and leaves its alignment alone, so a turned label hangs off to one side | `AxisBuilder` |
+| A guide's config chain runs style → axis → axisX/Y → axis{Side} → axisBand → the axis itself | `GuideConfig` |
+| A `style` block names properties the way a mark does, so `fill` has to become `labelColor` | `GuideConfig.prefixed` |
 | A label hidden by overlap removal stays in the scene at zero opacity, so the mark count does not move | `LabelOverlap` |
 
 ## Architectural decisions pending
@@ -512,7 +523,7 @@ depends on them. Each has a test and a comment; this is the index.
 
 ## Next three tasks
 
-1. **Keep growing the fixture corpus.** 36 of the brief's 100 pass, and the return has not fallen
+1. **Keep growing the fixture corpus.** 37 of the brief's 100 pass, and the return has not fallen
    off: the last ten fixtures found fourteen defects between them, and half of those were in code
    that had been passing for a dozen fixtures. Worth aiming at next: a `config` block of any kind,
    which is where a Vega-Lite-compiled specification puts everything and where every default in this
