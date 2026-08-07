@@ -16,14 +16,18 @@ import dev.aster.vega.model.spec.RangeSpec
 import dev.aster.vega.model.spec.ScaleSpec
 import dev.aster.vega.model.spec.ScaleType
 import dev.aster.vega.runtime.scale.BandScale
+import dev.aster.vega.runtime.scale.BinOrdinalScale
 import dev.aster.vega.runtime.scale.ColorSchemes
 import dev.aster.vega.runtime.scale.LinearScale
 import dev.aster.vega.runtime.scale.LogScale
 import dev.aster.vega.runtime.scale.OrdinalScale
 import dev.aster.vega.runtime.scale.PointScale
 import dev.aster.vega.runtime.scale.PowScale
+import dev.aster.vega.runtime.scale.QuantileScale
+import dev.aster.vega.runtime.scale.QuantizeScale
 import dev.aster.vega.runtime.scale.SequentialColorScale
 import dev.aster.vega.runtime.scale.SymlogScale
+import dev.aster.vega.runtime.scale.ThresholdScale
 import dev.aster.vega.runtime.scale.Ticks
 import dev.aster.vega.runtime.scale.TimeScale
 import dev.aster.vega.runtime.scale.TimeTicks
@@ -77,6 +81,10 @@ public class ScaleResolver(
       ScaleType.BAND -> buildBand(spec)
       ScaleType.POINT -> buildPoint(spec)
       ScaleType.ORDINAL -> buildOrdinal(spec)
+      ScaleType.QUANTIZE -> buildQuantize(spec)
+      ScaleType.QUANTILE -> buildQuantile(spec)
+      ScaleType.THRESHOLD -> buildThreshold(spec)
+      ScaleType.BIN_ORDINAL -> buildBinOrdinal(spec)
       else -> {
         diagnostics.error(
           DiagnosticCodes.SCALE_UNSUPPORTED_TYPE,
@@ -365,6 +373,110 @@ public class ScaleResolver(
         }
       }
     return OrdinalScale(spec.name, domain, range)
+  }
+
+  /**
+   * The discrete range these four share: an explicit array, or a scheme resolved to one.
+   *
+   * A scheme here is *sampled* rather than interpolated, because the output is a fixed number of
+   * buckets and not a continuum — the count comes from the range, so `{"scheme": "blues"}` on a
+   * four-bucket quantize gives four blues and not a ramp.
+   */
+  private fun binnedRange(spec: ScaleSpec, buckets: Int?): List<VegaValue>? =
+    when (val r = spec.range) {
+      is RangeSpec.Literal -> if (spec.reverse) r.values.reversed() else r.values
+      is RangeSpec.Scheme -> {
+        val colors = colorRange(spec) ?: return null
+        val wanted = r.count ?: buckets ?: colors.size
+        val taken = if (colors.size > wanted) sampleEvenly(colors, wanted) else colors
+        (if (spec.reverse) taken.reversed() else taken).map { VegaValue.Str(it.toCssHex()) }
+      }
+      else -> {
+        diagnostics.error(
+          DiagnosticCodes.SCALE_INVALID_DOMAIN,
+          "A '${spec.type.name.lowercase().replace('_', '-')}' scale needs an explicit range " +
+            "array or a scheme (scale '${spec.name}')",
+          operator = spec.name,
+        )
+        null
+      }
+    }
+
+  /** Takes [count] colours spread across a ramp, so a bucketed scheme uses its whole range. */
+  private fun sampleEvenly(colors: List<SceneColor>, count: Int): List<SceneColor> {
+    if (count <= 1) return listOf(colors.first())
+    return (0 until count).map { i ->
+      colors[((i.toDouble() / (count - 1)) * (colors.size - 1)).toInt()]
+    }
+  }
+
+  private fun buildQuantize(spec: ScaleSpec): QuantizeScale? {
+    val range = binnedRange(spec, buckets = null) ?: return null
+    val domain =
+      continuousDomain(spec, zeroDefault = false, fallback = listOf(0.0, 1.0)) ?: return null
+    return QuantizeScale(spec.name, domain, range)
+  }
+
+  private fun buildQuantile(spec: ScaleSpec): QuantileScale? {
+    val range = binnedRange(spec, buckets = null) ?: return null
+    // Every value, not the extent: a quantile scale cuts by count, so it needs the whole column.
+    val domain = fullNumericDomain(spec) ?: return null
+    return QuantileScale(spec.name, domain, range)
+  }
+
+  private fun buildThreshold(spec: ScaleSpec): ThresholdScale? {
+    val cuts = fullNumericDomain(spec) ?: return null
+    val range = binnedRange(spec, buckets = cuts.size + 1) ?: return null
+    if (range.size != cuts.size + 1) {
+      diagnostics.warn(
+        DiagnosticCodes.SCALE_INVALID_DOMAIN,
+        "A threshold scale's domain is its cut points, so it needs one more range value than " +
+          "domain value; scale '${spec.name}' has ${cuts.size} cut point(s) and ${range.size} " +
+          "range value(s), and the surplus on either side will not be used",
+        operator = spec.name,
+      )
+    }
+    return ThresholdScale(spec.name, cuts, range)
+  }
+
+  private fun buildBinOrdinal(spec: ScaleSpec): BinOrdinalScale? {
+    val edges = fullNumericDomain(spec) ?: return null
+    val range = binnedRange(spec, buckets = maxOf(1, edges.size - 1)) ?: return null
+    return BinOrdinalScale(spec.name, edges, range)
+  }
+
+  /**
+   * Every numeric value of the domain, in order, rather than its extent.
+   *
+   * Duplicates are kept, which matters: `quantile` cuts by count, so dropping a repeated value
+   * would move every quartile.
+   */
+  private fun fullNumericDomain(spec: ScaleSpec): List<Double>? {
+    val values =
+      when (val domain = spec.domain) {
+        is DomainSpec.Literal -> domain.values
+        is DomainSpec.FromField -> fieldValues(domain.data, listOf(domain.field), spec.name)
+        is DomainSpec.FromFields -> fieldValues(domain.data, domain.fields, spec.name)
+        is DomainSpec.FromSignal -> signalDomain(domain, spec.name) ?: return null
+        DomainSpec.Unset -> {
+          diagnostics.error(
+            DiagnosticCodes.SCALE_INVALID_DOMAIN,
+            "Scale '${spec.name}' has no domain",
+            operator = spec.name,
+          )
+          return null
+        }
+      }
+    val numbers = values.map { it.asDouble() }.filterNot { it.isNaN() }
+    if (numbers.isEmpty()) {
+      diagnostics.error(
+        DiagnosticCodes.SCALE_INVALID_DOMAIN,
+        "Scale '${spec.name}' has no numeric values in its domain",
+        operator = spec.name,
+      )
+      return null
+    }
+    return numbers
   }
 
   // ---- domains --------------------------------------------------------------

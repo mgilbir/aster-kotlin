@@ -553,6 +553,192 @@ public class OrdinalScale(
 }
 
 /**
+ * The four scales that map a continuous input onto a **discrete** output.
+ *
+ * They differ only in where the cut points come from, and that difference is the whole choice a
+ * specification is making:
+ * - `quantize` cuts the domain into equal **intervals**, so a skewed column puts most of its rows
+ *   into one bucket;
+ * - `quantile` cuts it into equal **counts**, so every bucket holds the same number of rows however
+ *   skewed the column is, and the buckets are of unequal width;
+ * - `threshold` takes the cut points literally from the domain, which is how a specification says
+ *   "these are the boundaries that matter" rather than deriving them;
+ * - `bin-ordinal` treats the domain as bin *edges* and looks the bin up in an ordinal range, which
+ *   is what pairs a `bin` transform with a colour scheme.
+ *
+ * All four resolve with a **right bisection**: a value equal to a cut point falls into the bucket
+ * *above* it. That is d3's rule and it matters at every boundary — the interval is `[low, high)`,
+ * so a value of exactly 25 on a 0-100 quantize with four buckets is in the second, not the first.
+ */
+/**
+ * The shape the four discrete-output scales share, so a legend can draw any of them once.
+ *
+ * A banded legend is one swatch per range value, labelled by the cut point at its *lower* edge —
+ * which is why the first swatch carries no label at all: nothing bounds it from below.
+ */
+public sealed interface BinnedScale : VegaScale {
+  /** The cut points between buckets; one fewer than there are range values. */
+  public val thresholds: List<Double>
+
+  public val rangeValues: List<VegaValue>
+
+  /**
+   * One input value per bucket, for a legend to colour its swatches with.
+   *
+   * Taken through [scale] rather than indexing the range directly, so the legend cannot drift out
+   * of step with what the marks are actually painted.
+   */
+  public val bucketRepresentatives: List<Double>
+    get() =
+      rangeValues.indices.map { i ->
+        // Any value strictly below the first cut point lands in bucket 0, and subtracting one
+        // always is. Later buckets take their own lower edge, since an equal value bisects right.
+        if (i == 0) (thresholds.firstOrNull() ?: 0.0) - 1.0 else thresholds[i - 1]
+      }
+}
+
+private fun bisectRight(values: List<Double>, x: Double, high: Int = values.size): Int {
+  var low = 0
+  var hi = high
+  while (low < hi) {
+    val mid = (low + hi) ushr 1
+    if (x < values[mid]) hi = mid else low = mid + 1
+  }
+  return low
+}
+
+/**
+ * `quantize`: equal-width intervals of the domain, one per range value.
+ *
+ * Cut points are computed rather than stored, in d3's own form — `((i + 1)·x1 - (i - n)·x0) / (n +
+ * 1)` — which spaces them evenly without accumulating a rounding error across the domain.
+ */
+public class QuantizeScale(
+  override val name: String,
+  public val domain: List<Double>,
+  override val rangeValues: List<VegaValue>,
+) : BinnedScale {
+
+  /** One fewer cut point than there are buckets. */
+  override val thresholds: List<Double> =
+    if (rangeValues.size < 2) {
+      emptyList()
+    } else {
+      val n = rangeValues.size - 1
+      val x0 = domain.firstOrNull() ?: 0.0
+      val x1 = domain.lastOrNull() ?: 1.0
+      (0 until n).map { i -> ((i + 1) * x1 - (i - n) * x0) / (n + 1) }
+    }
+
+  override fun scale(value: VegaValue): VegaValue {
+    if (rangeValues.isEmpty()) return VegaValue.Null
+    val x = value.asDouble()
+    if (x.isNaN()) return VegaValue.Null
+    return rangeValues[bisectRight(thresholds, x)]
+  }
+}
+
+/**
+ * `quantile`: equal-count buckets, so each holds the same share of the data.
+ *
+ * The cut points are the quantiles of the **domain itself**, which is why a quantile scale's domain
+ * is the whole column rather than its extent. A skewed column gets narrow buckets where it is dense
+ * and wide ones where it is sparse — the opposite of `quantize`, and the reason to reach for it.
+ */
+public class QuantileScale(
+  override val name: String,
+  domain: List<Double>,
+  override val rangeValues: List<VegaValue>,
+) : BinnedScale {
+
+  private val sorted: List<Double> = domain.filterNot { it.isNaN() }.sorted()
+
+  override val thresholds: List<Double> =
+    (1 until maxOf(1, rangeValues.size)).map { i ->
+      quantileSorted(sorted, i.toDouble() / maxOf(1, rangeValues.size))
+    }
+
+  override fun scale(value: VegaValue): VegaValue {
+    if (rangeValues.isEmpty()) return VegaValue.Null
+    val x = value.asDouble()
+    if (x.isNaN()) return VegaValue.Null
+    return rangeValues[bisectRight(thresholds, x)]
+  }
+
+  private fun quantileSorted(values: List<Double>, p: Double): Double {
+    if (values.isEmpty()) return Double.NaN
+    if (values.size == 1) return values[0]
+    val position = (values.size - 1) * p
+    val lower = kotlin.math.floor(position).toInt()
+    val upper = kotlin.math.ceil(position).toInt()
+    if (lower == upper) return values[lower]
+    val weight = position - lower
+    return values[lower] * (1.0 - weight) + values[upper] * weight
+  }
+}
+
+/**
+ * `threshold`: the domain *is* the list of cut points.
+ *
+ * So a threshold scale has one more range value than domain value, and the specification is stating
+ * the boundaries rather than asking for them to be derived — which is what a chart wants when the
+ * boundaries mean something outside the data, like a target or a regulatory limit.
+ */
+public class ThresholdScale(
+  override val name: String,
+  override val thresholds: List<Double>,
+  override val rangeValues: List<VegaValue>,
+) : BinnedScale {
+
+  /** The domain of a threshold scale *is* its cut points, which is what distinguishes it. */
+  public val domain: List<Double>
+    get() = thresholds
+
+  override fun scale(value: VegaValue): VegaValue {
+    if (rangeValues.isEmpty()) return VegaValue.Null
+    val x = value.asDouble()
+    if (x.isNaN()) return VegaValue.Null
+    // d3 clamps the search to one fewer than the range length, so extra domain values past the end
+    // of the range are ignored rather than indexing off it.
+    val limit = minOf(thresholds.size, rangeValues.size - 1)
+    return rangeValues[bisectRight(thresholds, x, limit)]
+  }
+}
+
+/**
+ * `bin-ordinal`: the domain is a list of bin edges, and the bucket indexes an ordinal range.
+ *
+ * The pairing this exists for is a `bin` transform feeding a colour scheme. Two consequences follow
+ * from it being ordinal rather than continuous, and both are visible on a chart: the range
+ * **wraps** when there are more bins than colours, so a fourth bin reuses the first colour rather
+ * than running out; and a value below the first edge maps to nothing at all rather than to the
+ * first bucket.
+ */
+public class BinOrdinalScale(
+  override val name: String,
+  public val domain: List<Double>,
+  override val rangeValues: List<VegaValue>,
+) : BinnedScale {
+
+  /** The interior edges: the first and last bound the outermost buckets and label nothing. */
+  override val thresholds: List<Double>
+    get() = domain.drop(1).dropLast(1)
+
+  // A bucket's lower edge is a domain entry, not a threshold, so the shared default is wrong here.
+  override val bucketRepresentatives: List<Double>
+    get() = rangeValues.indices.map { i -> domain.getOrElse(i) { domain.lastOrNull() ?: 0.0 } }
+
+  override fun scale(value: VegaValue): VegaValue {
+    if (rangeValues.isEmpty()) return VegaValue.Null
+    val x = value.asDouble()
+    if (x.isNaN()) return VegaValue.Null
+    val index = bisectRight(domain, x) - 1
+    if (index < 0) return VegaValue.Null
+    return rangeValues[index % rangeValues.size]
+  }
+}
+
+/**
  * Formats a number with a fixed number of decimals, trimming a trailing `.0`.
  *
  * A deliberately small subset of d3-format: enough for default tick labels. An explicit `format`

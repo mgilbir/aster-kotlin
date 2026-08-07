@@ -9,6 +9,7 @@ import dev.aster.vega.model.spec.LegendOrient
 import dev.aster.vega.model.spec.LegendSpec
 import dev.aster.vega.model.spec.LegendType
 import dev.aster.vega.runtime.scale.BandScale
+import dev.aster.vega.runtime.scale.BinnedScale
 import dev.aster.vega.runtime.scale.LinearScale
 import dev.aster.vega.runtime.scale.OrdinalScale
 import dev.aster.vega.runtime.scale.PointScale
@@ -16,6 +17,7 @@ import dev.aster.vega.runtime.scale.SequentialColorScale
 import dev.aster.vega.runtime.scale.TimeScale
 import dev.aster.vega.runtime.scale.TransformedScale
 import dev.aster.vega.runtime.scale.VegaScale
+import dev.aster.vega.runtime.scale.formatTickLabel
 import dev.aster.vega.scene.Fill
 import dev.aster.vega.scene.GradientStop
 import dev.aster.vega.scene.GroupNode
@@ -213,6 +215,27 @@ internal class LegendBuilder(
 
   /** One legend entry: the value the scale maps, and the text shown beside it. */
   private class Entry(val value: VegaValue, val label: String)
+
+  /**
+   * How many decimals a set of cut points needs to stay distinguishable.
+   *
+   * A banded legend labels the cut points, and they are derived rather than chosen — quartiles of a
+   * column land wherever they land. Formatting them all to the same width is what makes the column
+   * of labels readable, and taking the width from the *values* rather than from a tick step is what
+   * stops `2.5` being labelled `2` beside a `5`.
+   */
+  private fun decimalsFor(values: List<Double>): Int {
+    for (decimals in 0..6) {
+      if (values.all { kotlin.math.abs(it - roundTo(it, decimals)) < 1e-9 }) return decimals
+    }
+    return 6
+  }
+
+  private fun roundTo(value: Double, decimals: Int): Double {
+    var factor = 1.0
+    repeat(decimals) { factor *= 10 }
+    return kotlin.math.round(value * factor) / factor
+  }
 
   private fun symbolEntries(
     spec: LegendSpec,
@@ -589,6 +612,15 @@ internal class LegendBuilder(
         scale.ticks(count).zip(scale.tickLabels(count)).map { (v, l) -> Entry(VegaValue.Num(v), l) }
       is TimeScale ->
         scale.ticks(count).zip(scale.tickLabels(count)).map { (v, l) -> Entry(VegaValue.Num(v), l) }
+      // A banded legend: one swatch per bucket, labelled by the cut point at its lower edge. The
+      // first carries no label because nothing bounds it from below, which is upstream's shape too.
+      is BinnedScale -> {
+        val decimals = decimalsFor(scale.thresholds)
+        scale.bucketRepresentatives.mapIndexed { index, value ->
+          val label = scale.thresholds.getOrNull(index - 1)
+          Entry(VegaValue.Num(value), label?.let { formatTickLabel(it, decimals) } ?: "")
+        }
+      }
     }
   }
 

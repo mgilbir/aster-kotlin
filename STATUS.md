@@ -110,7 +110,7 @@ The entire data and specification half is absent:
 | `vega-transforms` — the other 19 transforms | most of 3,754 | 0 |
 | `vega-dataflow` — pulse propagation and incremental evaluation | 2,081 | contracts only |
 | `vega-functions` — the other 44 functions, mostly colour, geo and selection | most of 790 | 0 |
-| Remaining scale types — quantile, quantize, threshold, bin-ordinal | rest of `vega-scale` | 0 |
+| Remaining scale types — quantile, quantize, threshold, bin-ordinal | rest of `vega-scale` | all four, with banded legends |
 | Remaining mark encoders — image and shape | rest of `vega-encode` | 0; `image` needs a device resolver, `shape` needs projections |
 | Line and area interpolation — `catmull-rom` and `bundle` | part of d3-shape | 0, reported; the step and spline families are implemented |
 | Banded legends, trellis footers, legend `symbolLimit` | parts of `vega-encode`, `vega-view-transforms` | 0, reported |
@@ -133,7 +133,7 @@ substantive compatibility items:
 | 6. View and Compose APIs | Yes |
 | 7. SVG, PNG, PDF export | Yes |
 | 8. TalkBack can describe and navigate | Partial — virtual nodes are tested by instrumentation, not with TalkBack itself |
-| 9. At least 100 compatibility fixtures pass | 55 of 100 |
+| 9. At least 100 compatibility fixtures pass | 56 of 100 |
 | 10. Core runtime has no Android dependency | Yes |
 | 11. Renders without WebView | Yes |
 | 12. Build and test loop runs from the terminal | Yes |
@@ -392,7 +392,7 @@ ordering), and the pipeline is now verified end to end on one fixture, but the b
 
 ## Verification
 
-- 1,198 JVM tests pass (`./scripts/test-core.sh`, `./gradlew test`).
+- 1,212 JVM tests pass (`./scripts/test-core.sh`, `./gradlew test`).
 - Android lint is clean with `warningsAsErrors` on every Android module.
 - 48 instrumented tests pass on an API 37 arm64 emulator (`./scripts/test-android.sh`): 40 in
   `vega-android-canvas`, 4 in `vega-compose`, 4 in `demo` — including one that compiles every bundled
@@ -652,14 +652,13 @@ depends on them. Each has a test and a comment; this is the index.
    the existing hit tester and the event type mapped onto Vega's names (`pointerdown` and friends
    rather than `mousedown`, which the selector language does not know about). `VegaChartController`
    already owns hit testing and gesture detection, so it is the place for it. Verify on hardware.
-3. **Keep growing the fixture corpus.** 55 of the brief's 100. Fixtures no longer find defects on
-   arrival — the last nine passed first try — because the corpus has caught up with everything
-   written without one, and the recent work was all built against upstream vectors before a
-   fixture ever saw it. That makes them regression cover rather than a search, which is still
-   worth having but is a different activity: aim them at what is genuinely untouched rather than
-   at more combinations of what is covered. The `quantile`, `quantize`, `threshold` and
-   `bin-ordinal` scales are the largest such gap, then a local `time` scale across a
-   daylight-saving boundary.
+3. **Keep growing the fixture corpus.** 56 of the brief's 100, and the last ten passed on
+   arrival. That is not a sign the corpus is finished — it is a sign that recent work was built
+   against upstream vectors before a fixture ever saw it, which makes fixtures regression cover
+   rather than a search. Where they still find things is any *combination* the engine has not met:
+   a local `time` scale across a daylight-saving boundary, a `bin` transform feeding a
+   `bin-ordinal` scale end to end, an axis on a discretizing scale, a group whose signals shadow
+   the outer scope's. Aim there rather than at more variations of a single feature.
 
 Two further items, both real and both needing something this environment does not have: performance
 on physical hardware (PROJECT_BRIEF.md 19, criterion 13) and TalkBack itself rather than
