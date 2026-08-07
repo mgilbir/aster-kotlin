@@ -42,6 +42,7 @@ import dev.aster.vega.scene.SizeD
 import dev.aster.vega.scene.Stroke
 import dev.aster.vega.scene.StrokeCap
 import dev.aster.vega.scene.StrokeJoin
+import dev.aster.vega.scene.SvgPath
 import dev.aster.vega.scene.SymbolNode
 import dev.aster.vega.scene.SymbolShape
 import dev.aster.vega.scene.TextAlign
@@ -90,6 +91,7 @@ public class MarkEncoder(
       MarkType.LINE -> listOfNotNull(line(spec, data))
       MarkType.AREA -> listOfNotNull(area(spec, data))
       MarkType.ARC -> data.mapIndexedNotNull { index, datum -> arc(spec, datum, index) }
+      MarkType.PATH -> data.mapIndexedNotNull { index, datum -> path(spec, datum, index) }
       else -> {
         diagnostics.error(
           DiagnosticCodes.TRANSFORM_NOT_IMPLEMENTED,
@@ -175,6 +177,53 @@ public class MarkEncoder(
   }
 
   /**
+   * `path`: an outline written out as an SVG path string, drawn at the mark's own position.
+   *
+   * The string is in its own coordinates and the mark's `x`/`y` translate it, so the same outline
+   * can be placed once per datum. `scaleX`, `scaleY` and `angle` transform it about that anchor.
+   */
+  private fun path(spec: MarkSpec, datum: VegaValue, index: Int): SceneNode? {
+    val channels = spec.encode.effective
+    val source = string(channels["path"], datum) ?: return null
+    val parsed = SvgPath.parse(source)
+    if (!parsed.complete) {
+      reportOnce(
+        "path:$source",
+        dev.aster.vega.model.VegaDiagnostic(
+          severity = dev.aster.vega.model.DiagnosticSeverity.WARNING,
+          code = DiagnosticCodes.PARSE_UNKNOWN_PROPERTY,
+          message =
+            "Could not read all of the path '$source'; the outline stops where the reading did",
+          operator = spec.name,
+        ),
+      )
+    }
+    if (parsed.path.isEmpty) return null
+
+    val x = position(channels["x"], datum) ?: 0.0
+    val y = position(channels["y"], datum) ?: 0.0
+    val scaleX = number(channels["scaleX"], datum) ?: 1.0
+    val scaleY = number(channels["scaleY"], datum) ?: 1.0
+    val angle = number(channels["angle"], datum) ?: 0.0
+    val style = style(channels, datum, spec)
+
+    var transform = Transform2D.translate(x, y)
+    if (angle != 0.0) transform = transform.concat(Transform2D.rotateDegrees(angle))
+    if (scaleX != 1.0 || scaleY != 1.0) {
+      transform = transform.concat(Transform2D.scale(scaleX, scaleY))
+    }
+    return PathNode(
+      id = ids.allocate(),
+      path = parsed.path,
+      transform = transform,
+      fill = style.fill,
+      stroke = style.stroke,
+      opacity = style.opacity,
+      metadata = metadata(spec, datum, index, channels).copy(markKind = "path"),
+    )
+  }
+
+  /**
    * `arc`: an annular sector, which is what a pie or donut chart is made of.
    *
    * Angles run clockwise from twelve o'clock, so a slice starting at zero begins straight up. A
@@ -249,7 +298,10 @@ public class MarkEncoder(
     val y = position(channels["y"], datum) ?: return null
     val style = style(channels, datum, spec)
     val shapeName = string(channels["shape"], datum)
-    val shape = shapeName?.let { symbolShape(it, spec) } ?: SymbolShape.CIRCLE
+    val shape = shapeName?.let { symbolShape(it, spec) }
+    // Anything that is not one of the twelve names is an SVG path string — which is how a
+    // specification asks for a shape upstream does not ship.
+    val outline = if (shape == null && shapeName != null) customShape(shapeName, spec) else null
 
     return SymbolNode(
       id = ids.allocate(),
@@ -259,7 +311,8 @@ public class MarkEncoder(
         number(channels["size"], datum)
           ?: MarkConfig(spec).number("size")
           ?: MarkDefaults.SYMBOL_SIZE,
-      shape = shape,
+      shape = shape ?: SymbolShape.CIRCLE,
+      customPath = outline,
       angleDegrees = number(channels["angle"], datum) ?: 0.0,
       fill = style.fill,
       stroke = style.stroke,
@@ -268,7 +321,32 @@ public class MarkEncoder(
     )
   }
 
-  /** Maps Vega's shape names onto the built-in set, reporting anything else. */
+  /**
+   * A symbol outline written as an SVG path string.
+   *
+   * Returns null, and reports, when the string cannot be read — a circle in its place is at least a
+   * mark the reader can see and ask about, where nothing at all would look like missing data.
+   */
+  private fun customShape(source: String, spec: MarkSpec): PathData? {
+    val parsed = SvgPath.parse(source)
+    if (!parsed.complete || parsed.path.isEmpty) {
+      reportOnce(
+        "shape:$source",
+        dev.aster.vega.model.VegaDiagnostic(
+          severity = dev.aster.vega.model.DiagnosticSeverity.WARNING,
+          code = DiagnosticCodes.PARSE_UNKNOWN_PROPERTY,
+          message =
+            "Symbol shape '$source' is neither one of the twelve names nor a path this engine " +
+              "could read; a circle was drawn instead",
+          operator = spec.name,
+        ),
+      )
+      return null
+    }
+    return parsed.path
+  }
+
+  /** Maps Vega's shape names onto the built-in set; anything else is a path string. */
   private fun symbolShape(name: String, spec: MarkSpec): SymbolShape? {
     val shape =
       when (name.lowercase()) {
@@ -287,18 +365,6 @@ public class MarkEncoder(
         "wedge" -> SymbolShape.WEDGE
         else -> null
       }
-    if (shape == null) {
-      // Only an SVG path string is left, which would need a path parser.
-      reportOnce(
-        "shape:$name",
-        dev.aster.vega.model.VegaDiagnostic(
-          severity = dev.aster.vega.model.DiagnosticSeverity.WARNING,
-          code = DiagnosticCodes.PARSE_UNKNOWN_PROPERTY,
-          message = "Symbol shape '$name' is not implemented; drawing a circle instead",
-          operator = spec.name,
-        ),
-      )
-    }
     return shape
   }
 

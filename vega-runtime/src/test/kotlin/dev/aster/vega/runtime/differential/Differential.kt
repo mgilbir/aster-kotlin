@@ -299,17 +299,21 @@ public object Differential {
       // An arc is compared by the wedge it drew rather than by a centre point, which says nothing
       // about its radii or its sweep.
       val bounds = world.mapBounds(node.bounds)
-      return Mark(
-        kind,
-        node.metadata.role,
+      val numbers =
         linkedMapOf(
           "shapeLeft" to bounds.left,
           "shapeTop" to bounds.top,
           "shapeWidth" to bounds.width,
           "shapeHeight" to bounds.height,
-        ) + paintNumbers(node),
-        paintStrings(node),
-      )
+        )
+      // A `path` mark also reports the anchor it was placed at, which upstream carries as the
+      // item's own x and y — the outline itself is in the path string's coordinates.
+      if (kind == "path") {
+        val anchor = world.apply(0.0, 0.0)
+        numbers["x"] = anchor.x
+        numbers["y"] = anchor.y
+      }
+      return Mark(kind, node.metadata.role, numbers + paintNumbers(node), paintStrings(node))
     }
 
     val vertices =

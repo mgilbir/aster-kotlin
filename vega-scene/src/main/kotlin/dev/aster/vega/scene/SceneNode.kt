@@ -385,6 +385,27 @@ public data class ImageNode(
  * the table also splits `triangle` (balanced on its centroid) from `triangle-up` (balanced on its
  * bounding box), which d3 does not.
  */
+/** Scales a path about the origin, for a custom symbol outline. */
+private fun scalePath(path: PathData, factor: Double): PathData =
+  PathData(
+    path.commands.map { command ->
+      when (command) {
+        is PathCommand.MoveTo -> PathCommand.MoveTo(command.x * factor, command.y * factor)
+        is PathCommand.LineTo -> PathCommand.LineTo(command.x * factor, command.y * factor)
+        is PathCommand.CubicTo ->
+          PathCommand.CubicTo(
+            command.x1 * factor,
+            command.y1 * factor,
+            command.x2 * factor,
+            command.y2 * factor,
+            command.x * factor,
+            command.y * factor,
+          )
+        PathCommand.Close -> PathCommand.Close
+      }
+    }
+  )
+
 private fun buildSymbolPath(node: SymbolNode): PathData {
   val r = node.reference
   // A symbol sized to nothing is still *somewhere*: upstream bounds it as a degenerate point at its
@@ -399,7 +420,10 @@ private fun buildSymbolPath(node: SymbolNode): PathData {
   val tan30 = 1.0 / kotlin.math.sqrt(3.0)
 
   val local =
-    node.customPath
+    // A custom outline is written in a unit box and scaled by the symbol's reference length, so the
+    // same path string sizes with `size` exactly as a built-in shape does. Drawing it at its
+    // literal coordinates instead leaves every custom symbol the same size whatever the data says.
+    node.customPath?.let { outline -> scalePath(outline, r) }
       ?: PathData.build {
         when (node.shape) {
           SymbolShape.CIRCLE -> circle(0.0, 0.0, r)

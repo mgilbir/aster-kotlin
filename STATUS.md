@@ -20,7 +20,7 @@ Milestones 0, 1 and 2 complete. **Milestones 3 and 4 in progress**: Vega specifi
 end — including expressions, signals and the twelve data transforms the brief lists — and are verified
 against upstream Vega by differential tests.
 
-Forty-seven differential fixtures pass, all matching upstream exactly on every mark and scale output:
+Forty-eight differential fixtures pass, all matching upstream exactly on every mark and scale output:
 
 | Fixture | Marks | Covers |
 | --- | --- | --- |
@@ -71,6 +71,7 @@ Forty-seven differential fixtures pass, all matching upstream exactly on every m
 | `step-lines` | 24 | the three staircase interpolations and a stepped area |
 | `curves` | 27 | monotone, natural, basis and cardinal over one series, and a monotone area |
 | `colour-ramps` | 57 | four continuous schemes across one domain, with a gradient legend |
+| `path-marks` | 34 | outlines from SVG path strings, on path marks and on symbols |
 
 The gate is wired into `./scripts/oracle.sh`, so every further scale, mark and transform is built
 against a harness that can say we are wrong — which golden tests cannot.
@@ -90,7 +91,7 @@ upstream-verified slice through parsing, scales, rect encoding and axes:
 
 | Built here | Upstream equivalent | State |
 | --- | --- | --- |
-| Scene graph, geometry, paths, hit index | part of `vega-scenegraph` (4,994) | 7 of 12 node types; rendering and hit-testing side only. All 12 symbol shapes, pinned to upstream |
+| Scene graph, geometry, paths, hit index | part of `vega-scenegraph` (4,994) | 7 of 12 node types; rendering and hit-testing side only. All 12 symbol shapes pinned to upstream, plus outlines read from SVG path strings |
 | Canvas renderer, SVG serializer | rest of `vega-scenegraph` | complete for those 7 |
 | Diagnostics, canonical snapshots, goldens, oracle scaffolding | no upstream equivalent | complete |
 | `vega-scale` (linear, log, pow, sqrt, symlog, time, utc, band, point, ordinal, sequential) + d3-array ticks | 790 + parts of d3-scale, d3-array | 11 of ~15 scale types, exact against upstream, with all 68 colour schemes |
@@ -108,7 +109,7 @@ The entire data and specification half is absent:
 | `vega-dataflow` — pulse propagation and incremental evaluation | 2,081 | contracts only |
 | `vega-functions` — the other 44 functions, mostly colour, geo and selection | most of 790 | 0 |
 | Remaining scale types — quantile, quantize, threshold, bin-ordinal | rest of `vega-scale` | 0 |
-| Remaining mark encoders — image, path, trail, shape | rest of `vega-encode` + d3-shape | 0 |
+| Remaining mark encoders — image, trail, shape | rest of `vega-encode` + d3-shape | 0 |
 | Line and area interpolation — `catmull-rom` and `bundle` | part of d3-shape | 0, reported; the step and spline families are implemented |
 | Banded legends, trellis footers, legend `symbolLimit` | parts of `vega-encode`, `vega-view-transforms` | 0, reported |
 | `vega-view`, `vega-view-transforms` — the view lifecycle and incremental layout | 2,623 | bounds, grid layout and label overlap removal |
@@ -130,7 +131,7 @@ substantive compatibility items:
 | 6. View and Compose APIs | Yes |
 | 7. SVG, PNG, PDF export | Yes |
 | 8. TalkBack can describe and navigate | Partial — virtual nodes are tested by instrumentation, not with TalkBack itself |
-| 9. At least 100 compatibility fixtures pass | 47 of 100 |
+| 9. At least 100 compatibility fixtures pass | 48 of 100 |
 | 10. Core runtime has no Android dependency | Yes |
 | 11. Renders without WebView | Yes |
 | 12. Build and test loop runs from the terminal | Yes |
@@ -263,6 +264,14 @@ ordering), and the pipeline is now verified end to end on one fixture, but the b
   out, so a linear scale handed `[10, 20]` still starts at 0 where this engine had been leaving it
   at 10. The limits then replace an end rather than clamping it, and run after `zero`, which is why
   `domainMin: 30` beats it.
+- **The `path` mark, and outlines from SVG path strings generally.** A `path` mark places a written
+  outline once per datum, scaled and rotated about its anchor; and a `symbol` whose `shape` is not
+  one of the twelve names is now read the same way rather than drawn as a circle. The parser takes
+  the whole grammar, including the parts real path data leans on — implicit repeated commands, where
+  a repeated `M` means `L`; numbers run together where a sign or a point already ended the last one;
+  the `S`/`T` reflections; and the elliptical arc, converted from its endpoint form to a centre and
+  then to cubics. A string it cannot finish reading stops there and is reported, because a truncated
+  glyph is more use than no chart.
 - **The 53 continuous colour schemes** — `viridis`, `blues`, `redblue`, `turbo` and the rest — so a
   heatmap or a choropleth can be drawn at all. They turned out to be much smaller than expected once
   probed: Vega ships its **own** tables rather than d3's and joins the stops with plain piecewise
@@ -401,7 +410,7 @@ dark chrome, so a dark background was unreadable — they now take a `SampleScen
 
 ## Known failing fixtures
 
-None. Forty-seven fixtures exist and all forty-seven pass. The brief's MVP asks for 100; growing the
+None. Forty-eight fixtures exist and all forty-eight pass. The brief's MVP asks for 100; growing the
 corpus is the main task now, and each new fixture is expected to surface gaps rather than pass
 immediately. That keeps happening, which is the point of the harness: `stacked-bar` surfaced two real
 bugs, and `facet-trellis` surfaced a third — `range: "height"` was descending for every scale type,
@@ -528,6 +537,8 @@ depends on them. Each has a test and a comment; this is the index.
 | A `step` line never draws the data point itself: it turns at the two midpoints either side | `PathBuilder.steps` |
 | `monotone` is two curves — d3's X and Y forms — and Vega picks between them from the mark's `orient` | `CurveKind.MONOTONE` |
 | The colour ramps are Vega's own tables, not d3's: `blues` starts a fifth of the way in, and nothing narrows it | `ColorSchemes.ramps` |
+| A custom symbol outline is written in a unit box and scaled by the symbol's own reference length | `SceneNode.scalePath` |
+| A repeated `M` in a path string means `L`, which is the one place the implicit-command shorthand changes meaning | `SvgPath.parse` |
 | `padAngle` is a gap at a pad *radius*, converted back to an angle per edge, so the sides stay parallel | `ArcPath.sector` |
 | `cornerRadius` is clamped by where the slice's own edges would meet, not just by its thickness | `ArcPath.sector` |
 | A label hidden by overlap removal stays in the scene at zero opacity, so the mark count does not move | `LabelOverlap` |
@@ -600,7 +611,7 @@ depends on them. Each has a test and a comment; this is the index.
    `countpattern`. Each is self-contained and each wants its vectors read out of
    `transform-probe.js` first — `window` alone had four behaviours that no reading of the
    documentation would have given.
-3. **Keep growing the fixture corpus.** 47 of the brief's 100. The return has fallen off — of the
+3. **Keep growing the fixture corpus.** 48 of the brief's 100. The return has fallen off — of the
    last ten, seven passed on arrival — because the corpus has caught up with the parts of the
    engine written without one. Aim it at what is genuinely untouched rather than at more
    combinations of what is covered: the `quantile`, `quantize`, `threshold` and `bin-ordinal`
