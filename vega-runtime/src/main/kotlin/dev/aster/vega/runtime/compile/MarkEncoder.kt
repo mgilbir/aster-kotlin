@@ -25,6 +25,8 @@ import dev.aster.vega.scene.FontStyle
 import dev.aster.vega.scene.GroupNode
 import dev.aster.vega.scene.MetricTextEngine
 import dev.aster.vega.scene.NodeMetadata
+import dev.aster.vega.scene.PathBuilder
+import dev.aster.vega.scene.PathCommand
 import dev.aster.vega.scene.PathData
 import dev.aster.vega.scene.PathNode
 import dev.aster.vega.scene.PointD
@@ -36,6 +38,7 @@ import dev.aster.vega.scene.SceneNode
 import dev.aster.vega.scene.SceneNodeIdAllocator
 import dev.aster.vega.scene.ScenePaint
 import dev.aster.vega.scene.SizeD
+import dev.aster.vega.scene.StepPosition
 import dev.aster.vega.scene.Stroke
 import dev.aster.vega.scene.StrokeCap
 import dev.aster.vega.scene.StrokeJoin
@@ -367,7 +370,7 @@ public class MarkEncoder(
     val interpolate = string(channels["interpolate"], data.first())
     reportUnsupportedInterpolation(interpolate, spec)
 
-    val path = PathData.build { segments.forEach { polyline(it) } }
+    val path = PathData.build { segments.forEach { trace(it, interpolate) } }
     return PathNode(
       id = ids.allocate(),
       path = path,
@@ -376,7 +379,7 @@ public class MarkEncoder(
           ?: Stroke(ScenePaint.Solid(MarkDefaults.DEFAULT_FILL), MarkDefaults.LINE_STROKE_WIDTH),
       fill = null,
       opacity = style.opacity,
-      metadata = metadata(spec, data.first(), 0, channels),
+      metadata = metadata(spec, data.first(), 0, channels).copy(interpolate = interpolate),
     )
   }
 
@@ -404,13 +407,16 @@ public class MarkEncoder(
     if (pairs.isEmpty()) return null
 
     val style = style(channels, data.first(), spec)
-    reportUnsupportedInterpolation(string(channels["interpolate"], data.first()), spec)
+    val interpolate = string(channels["interpolate"], data.first())
+    reportUnsupportedInterpolation(interpolate, spec)
 
     val path = PathData.build {
       for (segment in pairs) {
-        // Forward along the primary boundary, back along the secondary one, then close.
-        polyline(segment.map { it.first })
-        segment.reversed().forEach { lineTo(it.second.x, it.second.y) }
+        // Forward along the primary boundary, back along the secondary one, then close. The
+        // return leg steps the opposite way round, so a staircase area closes flush against
+        // itself rather than crossing.
+        trace(segment.map { it.first }, interpolate)
+        traceOnward(segment.reversed().map { it.second }, mirrored(interpolate))
         close()
       }
     }
@@ -420,7 +426,7 @@ public class MarkEncoder(
       fill = style.fill ?: Fill.of(MarkDefaults.DEFAULT_FILL),
       stroke = style.stroke,
       opacity = style.opacity,
-      metadata = metadata(spec, data.first(), 0, channels),
+      metadata = metadata(spec, data.first(), 0, channels).copy(interpolate = interpolate),
     )
   }
 
@@ -478,15 +484,59 @@ public class MarkEncoder(
       }
     }
 
+  /** Traces a segment with whatever interpolation the specification asked for. */
+  private fun PathBuilder.trace(points: List<PointD>, method: String?) {
+    val step = stepPosition(method)
+    if (step == null) polyline(points) else steps(points, step)
+  }
+
+  /** The same, joining onto the path already under construction rather than starting a subpath. */
+  private fun PathBuilder.traceOnward(points: List<PointD>, method: String?) {
+    val step = stepPosition(method)
+    if (step == null) {
+      points.forEach { lineTo(it.x, it.y) }
+    } else {
+      // `steps` opens with a moveTo; a line to the first point instead keeps the outline closed.
+      points.firstOrNull()?.let { lineTo(it.x, it.y) }
+      val tail = PathData.build { steps(points, step) }
+      tail.commands.drop(1).forEach { command ->
+        if (command is PathCommand.LineTo) lineTo(command.x, command.y)
+      }
+    }
+  }
+
   /**
-   * Reports an interpolation method other than linear.
+   * The return leg of a staircase area steps the opposite way round.
    *
-   * Vega's `basis`, `cardinal`, `catmull-rom`, `monotone` and the step family each need their own
-   * spline generator. Drawing them as straight lines would look plausible and be wrong, so the
-   * substitution is reported.
+   * `step-before` forward is `step-after` backward and the other way about, because reversing the
+   * point order swaps which of each pair the vertical belongs to. Getting it wrong leaves the two
+   * boundaries out of step and the area self-intersecting at every riser.
+   */
+  private fun mirrored(method: String?): String? =
+    when (method?.lowercase()) {
+      "step-before" -> "step-after"
+      "step-after" -> "step-before"
+      else -> method
+    }
+
+  private fun stepPosition(method: String?): StepPosition? =
+    when (method?.lowercase()) {
+      "step" -> StepPosition.MIDDLE
+      "step-before" -> StepPosition.BEFORE
+      "step-after" -> StepPosition.AFTER
+      else -> null
+    }
+
+  /**
+   * Reports an interpolation method this engine cannot draw.
+   *
+   * The step family is implemented; `basis`, `cardinal`, `catmull-rom`, `monotone` and `natural`
+   * each need their own spline generator, and drawing one as straight lines would look plausible
+   * and be wrong, so the substitution is reported.
    */
   private fun reportUnsupportedInterpolation(method: String?, spec: MarkSpec) {
     if (method == null || method.equals("linear", ignoreCase = true)) return
+    if (stepPosition(method) != null) return
     reportOnce(
       "interpolate:$method",
       dev.aster.vega.model.VegaDiagnostic(

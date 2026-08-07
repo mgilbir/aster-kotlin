@@ -322,6 +322,7 @@ public object Differential {
       }
     val strings = LinkedHashMap<String, String>()
     strings["points"] = vertices.joinToString(" ") { "${fmt(it.x)} ${fmt(it.y)}" }
+    node.metadata.interpolate?.let { strings["interpolate"] = it }
     val numbers = LinkedHashMap<String, Double>()
     node.fill?.let { f ->
       solidColour(f.paint)?.let { strings["fill"] = it.toCssHex() }

@@ -12,6 +12,7 @@
  */
 
 import { canonicalNumber, DEFAULT_PRECISION } from './canonical.js';
+import { curveStep, curveStepAfter, curveStepBefore, line } from 'd3-shape';
 
 /** Channels compared per mark type. Anything not listed here is ignored on both sides. */
 const GEOMETRY_CHANNELS = {
@@ -92,6 +93,36 @@ function walkMarktype(marktype, dx, dy, out, precision) {
   }
 }
 
+const STEP_CURVES = {
+  'step': curveStep,
+  'step-before': curveStepBefore,
+  'step-after': curveStepAfter,
+};
+
+const MIRRORED_STEPS = {
+  'step': curveStep,
+  'step-before': curveStepAfter,
+  'step-after': curveStepBefore,
+};
+
+/**
+ * The corners d3 puts between a series' points, read back out of d3 rather than reconstructed.
+ *
+ * Collected through a recording context rather than by parsing the path string: `d3-path` rounds
+ * its output to three decimals, which is finer than any pixel and far coarser than this
+ * comparison's tolerance.
+ */
+function expandSteps(points, curve) {
+  const collected = [];
+  const context = {
+    moveTo: (x, y) => collected.push([x, y]),
+    lineTo: (x, y) => collected.push([x, y]),
+    closePath: () => {},
+  };
+  line().curve(curve).x(p => p[0]).y(p => p[1]).context(context)(points);
+  return collected.length ? collected : points;
+}
+
 /**
  * One record for a whole line or area: its point list plus the style of its first item.
  *
@@ -109,13 +140,26 @@ function seriesRecord(type, marktype, dx, dy, precision) {
     points.push(canonicalNumber((x || 0) + dx, precision));
     points.push(canonicalNumber((y || 0) + dy, precision));
   };
-  for (const item of items) push(item.x, item.y);
+  // A step interpolation puts corners between the data points, so the drawn outline is not the
+  // item list. Rather than reimplementing the staircase here — a second copy that could be wrong
+  // the same way the port is — the corners come from d3-shape itself, which is what Vega draws
+  // with. Every other curve family is reported as unsupported by the engine, so this only has to
+  // cover the steps.
+  const stepped = STEP_CURVES[first.interpolate];
+
+  const primary = items.map(i => [i.x || 0, i.y || 0]);
+  for (const [x, y] of stepped ? expandSteps(primary, stepped) : primary) push(x, y);
   if (type === 'area') {
-    for (const item of [...items].reverse()) {
-      push(item.x2 !== undefined ? item.x2 : item.x, item.y2 !== undefined ? item.y2 : item.y);
-    }
+    const secondary = [...items]
+      .reverse()
+      .map(i => [i.x2 !== undefined ? i.x2 : i.x || 0, i.y2 !== undefined ? i.y2 : i.y || 0]);
+    // The return leg steps the opposite way round, because reversing the points swaps which of
+    // each pair the vertical belongs to.
+    const back = stepped ? expandSteps(secondary, MIRRORED_STEPS[first.interpolate]) : secondary;
+    for (const [x, y] of back) push(x, y);
   }
   entry.points = points.join(' ');
+  if (first.interpolate) entry.interpolate = first.interpolate;
 
   for (const channel of STYLE_CHANNELS) {
     if (first[channel] !== undefined) entry[channel] = canonicalNumber(first[channel], precision);

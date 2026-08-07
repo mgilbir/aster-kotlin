@@ -178,6 +178,13 @@ public class PathData(public val commands: List<PathCommand>) {
  *
  * Not thread-safe; build a path once and share the resulting immutable [PathData].
  */
+/** Where a staircase puts its vertical between two points. */
+public enum class StepPosition {
+  MIDDLE,
+  BEFORE,
+  AFTER,
+}
+
 public class PathBuilder {
   private val commands = mutableListOf<PathCommand>()
   private var cursor = PointD.Origin
@@ -306,6 +313,43 @@ public class PathBuilder {
     cubicTo(cx - k, cy + radius, cx - radius, cy + k, cx - radius, cy)
     cubicTo(cx - radius, cy - k, cx - k, cy - radius, cx, cy - radius)
     return close()
+  }
+
+  /**
+   * A staircase through [points], which is what Vega's `step` interpolation family draws.
+   *
+   * The three differ only in where the vertical goes: `step` puts it half way between two points,
+   * `step-before` puts it at the first of them and `step-after` at the second. A chart of values
+   * that hold until they change wants `step-after`; one of values that were already at their new
+   * level wants `step-before`; and `step` splits the difference, which is d3's default.
+   */
+  public fun steps(points: List<PointD>, position: StepPosition): PathBuilder {
+    if (points.isEmpty()) return this
+    moveTo(points[0].x, points[0].y)
+    for (index in 1 until points.size) {
+      val from = points[index - 1]
+      val to = points[index]
+      when (position) {
+        StepPosition.MIDDLE -> {
+          // The riser sits at the midpoint and the *data point itself is never emitted* — d3 turns
+          // at the two midpoints either side of it and joins them straight through. Only the last
+          // point of the series is drawn, which is why this branch does not close each segment.
+          val mid = (from.x + to.x) / 2.0
+          lineTo(mid, from.y)
+          lineTo(mid, to.y)
+          if (index == points.size - 1) lineTo(to.x, to.y)
+        }
+        StepPosition.BEFORE -> {
+          lineTo(from.x, to.y)
+          lineTo(to.x, to.y)
+        }
+        StepPosition.AFTER -> {
+          lineTo(to.x, from.y)
+          lineTo(to.x, to.y)
+        }
+      }
+    }
+    return this
   }
 
   public fun polyline(points: List<PointD>, closePath: Boolean = false): PathBuilder {

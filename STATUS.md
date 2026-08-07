@@ -20,7 +20,7 @@ Milestones 0, 1 and 2 complete. **Milestones 3 and 4 in progress**: Vega specifi
 end — including expressions, signals and the twelve data transforms the brief lists — and are verified
 against upstream Vega by differential tests.
 
-Forty-four differential fixtures pass, all matching upstream exactly on every mark and scale output:
+Forty-five differential fixtures pass, all matching upstream exactly on every mark and scale output:
 
 | Fixture | Marks | Covers |
 | --- | --- | --- |
@@ -68,6 +68,7 @@ Forty-four differential fixtures pass, all matching upstream exactly on every ma
 | `scale-variants` | 43 | a symlog axis over both signs, a pow axis, a reversed point scale |
 | `negative-labels` | 45 | where the minus sign applies and where the hyphen stays |
 | `label-limit` | 33 | labels truncated at the limit nobody set, and at an explicit one |
+| `step-lines` | 24 | the three staircase interpolations and a stepped area |
 
 The gate is wired into `./scripts/oracle.sh`, so every further scale, mark and transform is built
 against a harness that can say we are wrong — which golden tests cannot.
@@ -108,7 +109,7 @@ The entire data and specification half is absent:
 | Continuous colour ramps | `d3-scale-chromatic` interpolator tables | 0, reported |
 | Remaining mark encoders — image, path, trail, shape | rest of `vega-encode` + d3-shape | 0 |
 | Group `layout` — the trellis grid, headers and titles | `vega-view-transforms` grid layout | 0, reported |
-| Line and area interpolation methods — basis, cardinal, catmull-rom, monotone, step | part of d3-shape | 0, reported |
+| Line and area interpolation — basis, cardinal, catmull-rom, monotone, natural | part of d3-shape | 0, reported; the step family is implemented |
 | Label overlap removal, banded legends, trellis footers | parts of `vega-encode`, `vega-label`, `vega-view-transforms` | 0, reported |
 | `vega-view`, `vega-view-transforms` — layout, overlap removal | 2,623 | bounds only |
 | `vega-event-selector` — event-stream DSL | 191 | 0 |
@@ -129,7 +130,7 @@ substantive compatibility items:
 | 6. View and Compose APIs | Yes |
 | 7. SVG, PNG, PDF export | Yes |
 | 8. TalkBack can describe and navigate | Partial — virtual nodes are tested by instrumentation, not with TalkBack itself |
-| 9. At least 100 compatibility fixtures pass | 44 of 100 |
+| 9. At least 100 compatibility fixtures pass | 45 of 100 |
 | 10. Core runtime has no Android dependency | Yes |
 | 11. Renders without WebView | Yes |
 | 12. Build and test loop runs from the terminal | Yes |
@@ -262,6 +263,12 @@ ordering), and the pipeline is now verified end to end on one fixture, but the b
   out, so a linear scale handed `[10, 20]` still starts at 0 where this engine had been leaving it
   at 10. The limits then replace an end rather than clamping it, and run after `zero`, which is why
   `domainMin: 30` beats it.
+- **The step interpolations**: `step`, `step-before` and `step-after`, on lines and on areas. The
+  middle one is the odd one — it never draws the data point at all, turning at the two midpoints
+  either side and joining them straight through — and a stepped area's return leg steps the
+  opposite way round, or the two boundaries cross at every riser. `basis`, `cardinal`,
+  `catmull-rom`, `monotone` and `natural` each still need their own spline generator and are still
+  reported.
 - **`labelLimit`**, which is a *default* rather than an option: upstream's config carries 180 for
   an axis and 160 for a legend, so a long category name is already being shortened on every chart
   drawn against upstream and was being drawn in full here. The scene keeps the **whole** string on
@@ -382,7 +389,7 @@ dark chrome, so a dark background was unreadable — they now take a `SampleScen
 
 ## Known failing fixtures
 
-None. Forty-four fixtures exist and all forty-four pass. The brief's MVP asks for 100; growing the
+None. Forty-five fixtures exist and all forty-five pass. The brief's MVP asks for 100; growing the
 corpus is the main task now, and each new fixture is expected to surface gaps rather than pass
 immediately. That keeps happening, which is the point of the harness: `stacked-bar` surfaced two real
 bugs, and `facet-trellis` surfaced a third — `range: "height"` was descending for every scale type,
@@ -506,6 +513,7 @@ depends on them. Each has a test and a comment; this is the index.
 | A `sequence`'s `stop` is exclusive, so `0..5` is five rows, and its field is named `data` | `SequenceTransform` |
 | A `lookup` with no `values` writes the whole matched row into one field | `LookupTransform` |
 | `labelLimit` truncates by default — 180 on an axis, 160 on a legend — and the scene keeps the whole string | `TextRun.displayText` |
+| A `step` line never draws the data point itself: it turns at the two midpoints either side | `PathBuilder.steps` |
 | `padAngle` is a gap at a pad *radius*, converted back to an angle per edge, so the sides stay parallel | `ArcPath.sector` |
 | `cornerRadius` is clamped by where the slice's own edges would meet, not just by its thickness | `ArcPath.sector` |
 | A label hidden by overlap removal stays in the scene at zero opacity, so the mark count does not move | `LabelOverlap` |
@@ -567,7 +575,7 @@ depends on them. Each has a test and a comment; this is the index.
 
 ## Next three tasks
 
-1. **Keep growing the fixture corpus.** 44 of the brief's 100 pass, and the return has not fallen
+1. **Keep growing the fixture corpus.** 45 of the brief's 100 pass, and the return has not fallen
    off: the last ten fixtures found fourteen defects between them, and half of those were in code
    that had been passing for a dozen fixtures. Worth aiming at next: a `config` block of any kind,
    which is where a Vega-Lite-compiled specification puts everything and where every default in this

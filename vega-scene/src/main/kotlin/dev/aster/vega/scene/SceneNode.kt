@@ -44,6 +44,13 @@ public data class NodeMetadata(
    * and the differential harness all need to tell them apart.
    */
   val markKind: String? = null,
+  /**
+   * How a series' points were joined, e.g. `"step-after"`.
+   *
+   * Kept because the drawn outline no longer says: two staircases and a straight line can pass
+   * through the same points, and the differential harness compares the method alongside them.
+   */
+  val interpolate: String? = null,
   /** Stable tuple identity from the dataflow, preserved across incremental updates. */
   val datumId: Long? = null,
   val datumIndex: Int? = null,
