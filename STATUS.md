@@ -20,7 +20,7 @@ Milestones 0, 1 and 2 complete. **Milestones 3 and 4 in progress**: Vega specifi
 end — including expressions, signals and the twelve data transforms the brief lists — and are verified
 against upstream Vega by differential tests.
 
-Forty-nine differential fixtures pass, all matching upstream exactly on every mark and scale output:
+Fifty differential fixtures pass, all matching upstream exactly on every mark and scale output:
 
 | Fixture | Marks | Covers |
 | --- | --- | --- |
@@ -73,6 +73,7 @@ Forty-nine differential fixtures pass, all matching upstream exactly on every ma
 | `colour-ramps` | 57 | four continuous schemes across one domain, with a gradient legend |
 | `path-marks` | 34 | outlines from SVG path strings, on path marks and on symbols |
 | `trail` | 28 | a line whose thickness follows the data, beside a plain line through it |
+| `reshape-matrix` | 33 | a heatmap crossed from one list, and a word-count chart beside it |
 
 The gate is wired into `./scripts/oracle.sh`, so every further scale, mark and transform is built
 against a harness that can say we are wrong — which golden tests cannot.
@@ -99,14 +100,14 @@ upstream-verified slice through parsing, scales, rect encoding and axes:
 | `vega-parser` (width, height, padding, autosize, data, signals, scales, axes, legends, titles, marks, group scopes, `layout`, `config`) | 3,790 | a subset, and every property it does not read is reported by name |
 | `vega-encode` (mark encoders, axes, legends, titles) | 952 | 8 of 12 mark encoders; axes, legends and titles including overlap removal, truncation and the `config` cascade; nine interpolation methods |
 | `vega-expression` + `vega-functions` | 2,388 | language complete; 60 of 119 functions |
-| `vega-transforms` (18 of 40) | 3,754 | the 12 the brief lists plus `timeunit`, `pie`, `window`, `sequence`, `lookup` and `impute`, exact against upstream |
+| `vega-transforms` (21 of 40) | 3,754 | the 12 the brief lists plus `timeunit`, `pie`, `window`, `sequence`, `lookup`, `impute`, `cross`, `pivot` and `countpattern`, exact against upstream |
 | `vega-dataflow` | 2,081 | contracts and scheduling only; no pulse propagation |
 
 The entire data and specification half is absent:
 
 | Missing | Upstream size | Here |
 | --- | --- | --- |
-| `vega-transforms` — the other 22 transforms | most of 3,754 | 0 |
+| `vega-transforms` — the other 19 transforms | most of 3,754 | 0 |
 | `vega-dataflow` — pulse propagation and incremental evaluation | 2,081 | contracts only |
 | `vega-functions` — the other 44 functions, mostly colour, geo and selection | most of 790 | 0 |
 | Remaining scale types — quantile, quantize, threshold, bin-ordinal | rest of `vega-scale` | 0 |
@@ -132,7 +133,7 @@ substantive compatibility items:
 | 6. View and Compose APIs | Yes |
 | 7. SVG, PNG, PDF export | Yes |
 | 8. TalkBack can describe and navigate | Partial — virtual nodes are tested by instrumentation, not with TalkBack itself |
-| 9. At least 100 compatibility fixtures pass | 49 of 100 |
+| 9. At least 100 compatibility fixtures pass | 50 of 100 |
 | 10. Core runtime has no Android dependency | Yes |
 | 11. Renders without WebView | Yes |
 | 12. Build and test loop runs from the terminal | Yes |
@@ -265,6 +266,11 @@ ordering), and the pipeline is now verified end to end on one fixture, but the b
   out, so a linear scale handed `[10, 20]` still starts at 0 where this engine had been leaving it
   at 10. The limits then replace an end rather than clamping it, and run after `zero`, which is why
   `domainMin: 30` beats it.
+- **`cross`, `pivot` and `countpattern`** — a matrix, a long table made wide, and the word counts a
+  cloud is drawn from. Two surprises between them: a crossed row holds the two originals **whole**
+  under `a` and `b` rather than merging their fields, so an expression reaching into one writes
+  `datum.a.value`; and `pivot` sorts its column names **alphabetically** before `limit` takes the
+  first few, so limiting a pivot drops whatever sorts late however often it occurs.
 - **The `impute` transform**, which is what stops a line jumping the gap where a series has no row.
   Its key domain is the union across the **whole dataset**, not per group — a group is missing a key
   precisely when some other group has it — and `keyvals` replaces that domain outright, so a series
@@ -421,7 +427,7 @@ dark chrome, so a dark background was unreadable — they now take a `SampleScen
 
 ## Known failing fixtures
 
-None. Forty-nine fixtures exist and all forty-nine pass. The brief's MVP asks for 100; growing the
+None. Fifty fixtures exist and all fifty pass. The brief's MVP asks for 100; growing the
 corpus is the main task now, and each new fixture is expected to surface gaps rather than pass
 immediately. That keeps happening, which is the point of the harness: `stacked-bar` surfaced two real
 bugs, and `facet-trellis` surfaced a third — `range: "height"` was descending for every scale type,
@@ -552,6 +558,8 @@ depends on them. Each has a test and a comment; this is the index.
 | A repeated `M` in a path string means `L`, which is the one place the implicit-command shorthand changes meaning | `SvgPath.parse` |
 | A trail is *filled*, not stroked, and its `size` is a width where a symbol's is a squared extent | `TrailPath` |
 | `impute` takes its key domain from the whole dataset, and appends the rows it adds rather than merging them | `ImputeTransform` |
+| A crossed row holds the two originals whole under `a` and `b`, rather than merging their fields | `CrossTransform` |
+| `pivot` sorts its column names alphabetically *before* applying `limit`, so a late-sorting column goes however common it is | `PivotTransform` |
 | `padAngle` is a gap at a pad *radius*, converted back to an angle per edge, so the sides stay parallel | `ArcPath.sector` |
 | `cornerRadius` is clamped by where the slice's own edges would meet, not just by its thickness | `ArcPath.sector` |
 | A label hidden by overlap removal stays in the scene at zero opacity, so the mark count does not move | `LabelOverlap` |
@@ -619,11 +627,12 @@ depends on them. Each has a test and a comment; this is the index.
    cannot be finished or verified without a device. After it, the largest untouched area is not a
    mark or a transform at all: signal `on` handlers and the event-stream DSL, which is what makes a
    chart respond to a tap rather than merely redraw when told to.
-2. **The rest of the transforms.** 18 of upstream's 40. The ones a real specification reaches for
-   next are `cross`, `pivot`, `countpattern` and `density`. Each is self-contained and each wants
-   its vectors read out of `transform-probe.js` first — `window` alone had four behaviours that no
-   reading of the documentation would have given, and `impute` two more.
-3. **Keep growing the fixture corpus.** 49 of the brief's 100. The return has fallen off — of the
+2. **The rest of the transforms.** 21 of upstream's 40. What is left divides in two: `density`,
+   `kde`, `regression`, `loess`, `quantile` and `dotbin` are statistics, each a self-contained
+   numerical method; and `nest`, `stratify`, `treemap`, `pack`, `partition` and `tree` are the
+   hierarchy family, which needs a tree structure the dataflow has no representation for yet. The
+   statistics are the ones to take first — they need no new machinery.
+3. **Keep growing the fixture corpus.** 50 of the brief's 100. The return has fallen off — of the
    last ten, seven passed on arrival — because the corpus has caught up with the parts of the
    engine written without one. Aim it at what is genuinely untouched rather than at more
    combinations of what is covered: the `quantile`, `quantize`, `threshold` and `bin-ordinal`

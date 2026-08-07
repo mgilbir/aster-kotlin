@@ -1,0 +1,428 @@
+{
+  "marks": [
+    {
+      "opacity": 1,
+      "role": "axis-tick",
+      "stroke": "#888",
+      "strokeWidth": 1,
+      "type": "rule",
+      "x": 14.5,
+      "x2": 14.5,
+      "y": 120.5,
+      "y2": 125.5
+    },
+    {
+      "opacity": 1,
+      "role": "axis-tick",
+      "stroke": "#888",
+      "strokeWidth": 1,
+      "type": "rule",
+      "x": 41.5,
+      "x2": 41.5,
+      "y": 120.5,
+      "y2": 125.5
+    },
+    {
+      "opacity": 1,
+      "role": "axis-tick",
+      "stroke": "#888",
+      "strokeWidth": 1,
+      "type": "rule",
+      "x": 68.5,
+      "x2": 68.5,
+      "y": 120.5,
+      "y2": 125.5
+    },
+    {
+      "opacity": 1,
+      "role": "axis-tick",
+      "stroke": "#888",
+      "strokeWidth": 1,
+      "type": "rule",
+      "x": 95.5,
+      "x2": 95.5,
+      "y": 120.5,
+      "y2": 125.5
+    },
+    {
+      "align": "right",
+      "angle": -45,
+      "baseline": "top",
+      "fill": "#000",
+      "font": "sans-serif",
+      "fontSize": 10,
+      "opacity": 1,
+      "role": "axis-label",
+      "text": "alpha",
+      "type": "text",
+      "x": 14.259259,
+      "y": 127.5
+    },
+    {
+      "align": "right",
+      "angle": -45,
+      "baseline": "top",
+      "fill": "#000",
+      "font": "sans-serif",
+      "fontSize": 10,
+      "opacity": 1,
+      "role": "axis-label",
+      "text": "beta",
+      "type": "text",
+      "x": 41.419753,
+      "y": 127.5
+    },
+    {
+      "align": "right",
+      "angle": -45,
+      "baseline": "top",
+      "fill": "#000",
+      "font": "sans-serif",
+      "fontSize": 10,
+      "opacity": 1,
+      "role": "axis-label",
+      "text": "gamma",
+      "type": "text",
+      "x": 68.580247,
+      "y": 127.5
+    },
+    {
+      "align": "right",
+      "angle": -45,
+      "baseline": "top",
+      "fill": "#000",
+      "font": "sans-serif",
+      "fontSize": 10,
+      "opacity": 1,
+      "role": "axis-label",
+      "text": "delta",
+      "type": "text",
+      "x": 95.740741,
+      "y": 127.5
+    },
+    {
+      "opacity": 1,
+      "role": "axis-domain",
+      "stroke": "#888",
+      "strokeWidth": 1,
+      "type": "rule",
+      "x": 0.5,
+      "x2": 110.5,
+      "y": 120.5,
+      "y2": 120.5
+    },
+    {
+      "fill": "rgb(207, 225, 242)",
+      "height": 25.802469,
+      "role": "mark",
+      "type": "rect",
+      "width": 25.802469,
+      "x": 1.358025,
+      "y": 1.358025
+    },
+    {
+      "fill": "rgb(196, 219, 238)",
+      "height": 25.802469,
+      "role": "mark",
+      "type": "rect",
+      "width": 25.802469,
+      "x": 28.518519,
+      "y": 1.358025
+    },
+    {
+      "fill": "rgb(183, 213, 234)",
+      "height": 25.802469,
+      "role": "mark",
+      "type": "rect",
+      "width": 25.802469,
+      "x": 55.679012,
+      "y": 1.358025
+    },
+    {
+      "fill": "rgb(168, 206, 229)",
+      "height": 25.802469,
+      "role": "mark",
+      "type": "rect",
+      "width": 25.802469,
+      "x": 82.839506,
+      "y": 1.358025
+    },
+    {
+      "fill": "rgb(196, 219, 238)",
+      "height": 25.802469,
+      "role": "mark",
+      "type": "rect",
+      "width": 25.802469,
+      "x": 1.358025,
+      "y": 28.518519
+    },
+    {
+      "fill": "rgb(168, 206, 229)",
+      "height": 25.802469,
+      "role": "mark",
+      "type": "rect",
+      "width": 25.802469,
+      "x": 28.518519,
+      "y": 28.518519
+    },
+    {
+      "fill": "rgb(134, 188, 220)",
+      "height": 25.802469,
+      "role": "mark",
+      "type": "rect",
+      "width": 25.802469,
+      "x": 55.679012,
+      "y": 28.518519
+    },
+    {
+      "fill": "rgb(99, 168, 210)",
+      "height": 25.802469,
+      "role": "mark",
+      "type": "rect",
+      "width": 25.802469,
+      "x": 82.839506,
+      "y": 28.518519
+    },
+    {
+      "fill": "rgb(183, 213, 234)",
+      "height": 25.802469,
+      "role": "mark",
+      "type": "rect",
+      "width": 25.802469,
+      "x": 1.358025,
+      "y": 55.679012
+    },
+    {
+      "fill": "rgb(134, 188, 220)",
+      "height": 25.802469,
+      "role": "mark",
+      "type": "rect",
+      "width": 25.802469,
+      "x": 28.518519,
+      "y": 55.679012
+    },
+    {
+      "fill": "rgb(84, 157, 204)",
+      "height": 25.802469,
+      "role": "mark",
+      "type": "rect",
+      "width": 25.802469,
+      "x": 55.679012,
+      "y": 55.679012
+    },
+    {
+      "fill": "rgb(43, 123, 185)",
+      "height": 25.802469,
+      "role": "mark",
+      "type": "rect",
+      "width": 25.802469,
+      "x": 82.839506,
+      "y": 55.679012
+    },
+    {
+      "fill": "rgb(168, 206, 229)",
+      "height": 25.802469,
+      "role": "mark",
+      "type": "rect",
+      "width": 25.802469,
+      "x": 1.358025,
+      "y": 82.839506
+    },
+    {
+      "fill": "rgb(99, 168, 210)",
+      "height": 25.802469,
+      "role": "mark",
+      "type": "rect",
+      "width": 25.802469,
+      "x": 28.518519,
+      "y": 82.839506
+    },
+    {
+      "fill": "rgb(43, 123, 185)",
+      "height": 25.802469,
+      "role": "mark",
+      "type": "rect",
+      "width": 25.802469,
+      "x": 55.679012,
+      "y": 82.839506
+    },
+    {
+      "fill": "rgb(10, 74, 144)",
+      "height": 25.802469,
+      "role": "mark",
+      "type": "rect",
+      "width": 25.802469,
+      "x": 82.839506,
+      "y": 82.839506
+    },
+    {
+      "fill": "#f58518",
+      "height": 10.731707,
+      "role": "mark",
+      "type": "rect",
+      "width": 90,
+      "x": 150,
+      "y": 2.682927
+    },
+    {
+      "fill": "#f58518",
+      "height": 10.731707,
+      "role": "mark",
+      "type": "rect",
+      "width": 90,
+      "x": 150,
+      "y": 16.097561
+    },
+    {
+      "fill": "#f58518",
+      "height": 10.731707,
+      "role": "mark",
+      "type": "rect",
+      "width": 45,
+      "x": 150,
+      "y": 29.512195
+    },
+    {
+      "fill": "#f58518",
+      "height": 10.731707,
+      "role": "mark",
+      "type": "rect",
+      "width": 45,
+      "x": 150,
+      "y": 42.926829
+    },
+    {
+      "fill": "#f58518",
+      "height": 10.731707,
+      "role": "mark",
+      "type": "rect",
+      "width": 45,
+      "x": 150,
+      "y": 56.341463
+    },
+    {
+      "fill": "#f58518",
+      "height": 10.731707,
+      "role": "mark",
+      "type": "rect",
+      "width": 45,
+      "x": 150,
+      "y": 69.756098
+    },
+    {
+      "fill": "#f58518",
+      "height": 10.731707,
+      "role": "mark",
+      "type": "rect",
+      "width": 45,
+      "x": 150,
+      "y": 83.170732
+    },
+    {
+      "fill": "#f58518",
+      "height": 10.731707,
+      "role": "mark",
+      "type": "rect",
+      "width": 45,
+      "x": 150,
+      "y": 96.585366
+    }
+  ],
+  "scales": {
+    "heat": {
+      "domain": [
+        1,
+        16
+      ],
+      "range": [
+        "rgb(207, 225, 242)",
+        "rgb(10, 74, 144)"
+      ],
+      "ticks": [
+        2,
+        4,
+        6,
+        8,
+        10,
+        12,
+        14,
+        16
+      ]
+    },
+    "wx": {
+      "domain": [
+        0,
+        2
+      ],
+      "range": [
+        150,
+        240
+      ],
+      "ticks": [
+        0,
+        0.2,
+        0.4,
+        0.6,
+        0.8,
+        1,
+        1.2,
+        1.4,
+        1.6,
+        1.8,
+        2
+      ]
+    },
+    "wy": {
+      "bandwidth": 10.731707,
+      "domain": [
+        "fox",
+        "dog",
+        "quick",
+        "brown",
+        "jumps",
+        "lazy",
+        "barks",
+        "runs"
+      ],
+      "range": [
+        0,
+        110
+      ],
+      "step": 13.414634
+    },
+    "x": {
+      "bandwidth": 25.802469,
+      "domain": [
+        "alpha",
+        "beta",
+        "gamma",
+        "delta"
+      ],
+      "range": [
+        0,
+        110
+      ],
+      "step": 27.160494
+    },
+    "y": {
+      "bandwidth": 25.802469,
+      "domain": [
+        "alpha",
+        "beta",
+        "gamma",
+        "delta"
+      ],
+      "range": [
+        0,
+        110
+      ],
+      "step": 27.160494
+    }
+  },
+  "size": {
+    "height": 172.355339,
+    "width": 264.525012
+  },
+  "spec": "reshape-matrix.vg.json",
+  "vegaVersion": "6.3.1"
+}

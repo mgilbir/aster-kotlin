@@ -137,6 +137,9 @@ public class TransformRegistry(transforms: List<Transform>) {
           SequenceTransform,
           LookupTransform,
           ImputeTransform,
+          CrossTransform,
+          PivotTransform,
+          CountPatternTransform,
         )
       )
   }

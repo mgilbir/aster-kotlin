@@ -507,7 +507,7 @@ class TransformReferenceTest {
   }
 
   @Test
-  fun `the registry covers the transforms the brief lists, plus six more`() {
+  fun `the registry covers the transforms the brief lists, plus nine more`() {
     val fromTheBrief =
       setOf(
         "filter",
@@ -523,13 +523,23 @@ class TransformReferenceTest {
         "fold",
         "flatten",
       )
-    // Six are not on the brief's list. `timeunit` is the date half of `bin`; `pie` turns a column
+    // Nine are not on the brief's list. `timeunit` is the date half of `bin`; `pie` turns a column
     // of numbers into the angles an arc mark needs; `window` is what a running total, a rank and a
     // moving average all are; `sequence` is how a specification draws a function with no data to
     // bind to; `lookup` is the only join there is; and `impute` is what stops a line jumping the
-    // gap where a series has no row.
+    // gap where a series has no row. `cross`, `pivot` and `countpattern` are the reshaping three:
+    // a matrix, a long table made wide, and the word counts a cloud is drawn from.
     assertEquals(
-      fromTheBrief + "timeunit" + "pie" + "window" + "sequence" + "lookup" + "impute",
+      fromTheBrief +
+        "timeunit" +
+        "pie" +
+        "window" +
+        "sequence" +
+        "lookup" +
+        "impute" +
+        "cross" +
+        "pivot" +
+        "countpattern",
       TransformRegistry.Default.types,
     )
   }
@@ -828,6 +838,103 @@ class TransformReferenceTest {
         """[{"type": "impute", "key": "t", "field": "v", "method": "value", "value": -1}]""",
         imputeRows,
       ),
+    )
+  }
+
+  // ---- cross, pivot, countpattern -------------------------------------------
+
+  /**
+   * A crossed row holds the two originals **whole**, under `a` and `b`, rather than merging their
+   * fields — which is what the name suggests and would lose a column whenever both sides share one.
+   */
+  @Test
+  fun `cross pairs every row with every row`() {
+    assertEquals(
+      """[{"a":{"k":"a","v":1},"b":{"k":"a","v":1}},{"a":{"k":"a","v":1},"b":{"k":"b","v":2}},""" +
+        """{"a":{"k":"b","v":2},"b":{"k":"a","v":1}},{"a":{"k":"b","v":2},"b":{"k":"b","v":2}}]""",
+      run("""[{"type": "cross"}]""", """[{"k": "a", "v": 1}, {"k": "b", "v": 2}]"""),
+    )
+  }
+
+  /** The filter sees the pair, so it is how a specification takes half of a matrix. */
+  @Test
+  fun `cross filters the pairs as it forms them`() {
+    assertEquals(
+      """[{"a":{"k":"a","v":1},"b":{"k":"b","v":2}},{"a":{"k":"a","v":1},"b":{"k":"c","v":3}},""" +
+        """{"a":{"k":"b","v":2},"b":{"k":"c","v":3}}]""",
+      run(
+        """[{"type": "cross", "filter": "datum.a.v < datum.b.v"}]""",
+        """[{"k": "a", "v": 1}, {"k": "b", "v": 2}, {"k": "c", "v": 3}]""",
+      ),
+    )
+  }
+
+  private val wide =
+    """
+    [{"k": "a", "c": "x", "v": 1},
+     {"k": "a", "c": "y", "v": 2},
+     {"k": "b", "c": "x", "v": 3},
+     {"k": "b", "c": "y", "v": 4},
+     {"k": "b", "c": "z", "v": 9}]
+    """
+      .trimIndent()
+
+  @Test
+  fun `pivot turns rows into columns`() {
+    assertEquals(
+      """[{"c":"a","k":"a","x":1,"y":2},{"c":"b","k":"b","x":3,"y":4,"z":9}]"""
+        .let { _ ->
+          """[{"k":"a","x":1,"y":2},{"k":"b","x":3,"y":4,"z":9}]"""
+        },
+      run("""[{"type": "pivot", "field": "c", "value": "v", "groupby": ["k"]}]""", wide),
+    )
+    // With no groups the whole dataset collapses to one row, and the cells are summed.
+    assertEquals(
+      """[{"x":4,"y":6,"z":9}]""",
+      run("""[{"type": "pivot", "field": "c", "value": "v"}]""", wide),
+    )
+  }
+
+  /**
+   * `limit` keeps the **alphabetically first** columns, not the commonest or the earliest — the
+   * names are sorted before the limit is applied, so a column that sorts late disappears however
+   * often it occurs.
+   */
+  @Test
+  fun `pivot sorts its column names before limiting them`() {
+    assertEquals(
+      """[{"k":"a","x":1,"y":2},{"k":"b","x":3,"y":4}]""",
+      run(
+        """[{"type": "pivot", "field": "c", "value": "v", "groupby": ["k"], "limit": 2}]""",
+        wide,
+      ),
+    )
+  }
+
+  private val sentences = """[{"t": "the cat sat on the mat"}, {"t": "the dog sat"}]"""
+
+  /** Counts come out in first-appearance order, not sorted by count. */
+  @Test
+  fun `countpattern counts the words in a column`() {
+    assertEquals(
+      """[{"count":3,"text":"the"},{"count":1,"text":"cat"},{"count":2,"text":"sat"},""" +
+        """{"count":1,"text":"on"},{"count":1,"text":"mat"},{"count":1,"text":"dog"}]""",
+      run("""[{"type": "countpattern", "field": "t"}]""", sentences),
+    )
+  }
+
+  /** The stopword list is anchored to whole tokens, so `on` does not take `dog` with it. */
+  @Test
+  fun `countpattern drops whole stopwords and can fold case`() {
+    assertEquals(
+      """[{"count":1,"text":"cat"},{"count":2,"text":"sat"},{"count":1,"text":"mat"},""" +
+        """{"count":1,"text":"dog"}]""",
+      run("""[{"type": "countpattern", "field": "t", "stopwords": "the|on"}]""", sentences),
+    )
+    assertEquals(
+      """[{"count":3,"text":"THE"},{"count":1,"text":"CAT"},{"count":2,"text":"SAT"},""" +
+        """{"count":1,"text":"ON"},{"count":1,"text":"MAT"},{"count":1,"text":"DOG"}]""",
+      run("""[{"type": "countpattern", "field": "t", "case": "upper"}]""", sentences),
     )
   }
 }
