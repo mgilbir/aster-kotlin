@@ -12,7 +12,17 @@
  */
 
 import { canonicalNumber, DEFAULT_PRECISION } from './canonical.js';
-import { curveStep, curveStepAfter, curveStepBefore, line } from 'd3-shape';
+import {
+  curveBasis,
+  curveCardinal,
+  curveMonotoneX,
+  curveMonotoneY,
+  curveNatural,
+  curveStep,
+  curveStepAfter,
+  curveStepBefore,
+  line,
+} from 'd3-shape';
 
 /** Channels compared per mark type. Anything not listed here is ignored on both sides. */
 const GEOMETRY_CHANNELS = {
@@ -93,17 +103,33 @@ function walkMarktype(marktype, dx, dy, out, precision) {
   }
 }
 
-const STEP_CURVES = {
+/**
+ * The curves both engines can draw, so the comparison can see the outline rather than the points.
+ *
+ * `monotone` is two curves: Vega picks between d3's X and Y forms from the mark's `orient`, so this
+ * is resolved per item rather than by name alone.
+ */
+const CURVES = {
   'step': curveStep,
   'step-before': curveStepBefore,
   'step-after': curveStepAfter,
+  'basis': curveBasis,
+  'cardinal': curveCardinal,
+  'natural': curveNatural,
 };
 
-const MIRRORED_STEPS = {
-  'step': curveStep,
-  'step-before': curveStepAfter,
-  'step-after': curveStepBefore,
+/** The return leg of an area steps the opposite way round; every other curve is symmetric. */
+const MIRRORED = {
+  'step-before': 'step-after',
+  'step-after': 'step-before',
 };
+
+function curveFor(interpolate, orient) {
+  if (interpolate === 'monotone') {
+    return orient === 'horizontal' ? curveMonotoneY : curveMonotoneX;
+  }
+  return CURVES[interpolate];
+}
 
 /**
  * The corners d3 puts between a series' points, read back out of d3 rather than reconstructed.
@@ -112,11 +138,16 @@ const MIRRORED_STEPS = {
  * its output to three decimals, which is finer than any pixel and far coarser than this
  * comparison's tolerance.
  */
-function expandSteps(points, curve) {
+function expandCurve(points, curve) {
+  if (!curve) return points;
   const collected = [];
   const context = {
     moveTo: (x, y) => collected.push([x, y]),
     lineTo: (x, y) => collected.push([x, y]),
+    // A cubic's control points are part of the outline: two curves through the same anchors are
+    // different shapes, and comparing anchors alone would not see it.
+    bezierCurveTo: (x1, y1, x2, y2, x, y) =>
+      collected.push([x1, y1], [x2, y2], [x, y]),
     closePath: () => {},
   };
   line().curve(curve).x(p => p[0]).y(p => p[1]).context(context)(points);
@@ -145,17 +176,17 @@ function seriesRecord(type, marktype, dx, dy, precision) {
   // the same way the port is — the corners come from d3-shape itself, which is what Vega draws
   // with. Every other curve family is reported as unsupported by the engine, so this only has to
   // cover the steps.
-  const stepped = STEP_CURVES[first.interpolate];
+  const curve = curveFor(first.interpolate, first.orient);
 
   const primary = items.map(i => [i.x || 0, i.y || 0]);
-  for (const [x, y] of stepped ? expandSteps(primary, stepped) : primary) push(x, y);
+  for (const [x, y] of curve ? expandCurve(primary, curve) : primary) push(x, y);
   if (type === 'area') {
     const secondary = [...items]
       .reverse()
       .map(i => [i.x2 !== undefined ? i.x2 : i.x || 0, i.y2 !== undefined ? i.y2 : i.y || 0]);
-    // The return leg steps the opposite way round, because reversing the points swaps which of
-    // each pair the vertical belongs to.
-    const back = stepped ? expandSteps(secondary, MIRRORED_STEPS[first.interpolate]) : secondary;
+    const back = curve
+      ? expandCurve(secondary, curveFor(MIRRORED[first.interpolate] || first.interpolate, first.orient))
+      : secondary;
     for (const [x, y] of back) push(x, y);
   }
   entry.points = points.join(' ');

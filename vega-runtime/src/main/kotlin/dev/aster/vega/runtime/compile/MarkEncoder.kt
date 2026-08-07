@@ -20,6 +20,7 @@ import dev.aster.vega.runtime.scale.PositionScale
 import dev.aster.vega.runtime.scale.VegaScale
 import dev.aster.vega.scene.AccessibilityDescriptor
 import dev.aster.vega.scene.ArcPath
+import dev.aster.vega.scene.CurveKind
 import dev.aster.vega.scene.Fill
 import dev.aster.vega.scene.FontStyle
 import dev.aster.vega.scene.GroupNode
@@ -38,7 +39,6 @@ import dev.aster.vega.scene.SceneNode
 import dev.aster.vega.scene.SceneNodeIdAllocator
 import dev.aster.vega.scene.ScenePaint
 import dev.aster.vega.scene.SizeD
-import dev.aster.vega.scene.StepPosition
 import dev.aster.vega.scene.Stroke
 import dev.aster.vega.scene.StrokeCap
 import dev.aster.vega.scene.StrokeJoin
@@ -51,6 +51,7 @@ import dev.aster.vega.scene.TextNode
 import dev.aster.vega.scene.TextRun
 import dev.aster.vega.scene.TextStyle
 import dev.aster.vega.scene.Transform2D
+import dev.aster.vega.scene.curve
 
 /**
  * Turns a mark specification plus its data into scene nodes.
@@ -370,7 +371,8 @@ public class MarkEncoder(
     val interpolate = string(channels["interpolate"], data.first())
     reportUnsupportedInterpolation(interpolate, spec)
 
-    val path = PathData.build { segments.forEach { trace(it, interpolate) } }
+    val horizontal = string(channels["orient"], data.first())?.lowercase() == "horizontal"
+    val path = PathData.build { segments.forEach { trace(it, interpolate, horizontal) } }
     return PathNode(
       id = ids.allocate(),
       path = path,
@@ -408,6 +410,7 @@ public class MarkEncoder(
 
     val style = style(channels, data.first(), spec)
     val interpolate = string(channels["interpolate"], data.first())
+    val horizontal = string(channels["orient"], data.first())?.lowercase() == "horizontal"
     reportUnsupportedInterpolation(interpolate, spec)
 
     val path = PathData.build {
@@ -415,8 +418,8 @@ public class MarkEncoder(
         // Forward along the primary boundary, back along the secondary one, then close. The
         // return leg steps the opposite way round, so a staircase area closes flush against
         // itself rather than crossing.
-        trace(segment.map { it.first }, interpolate)
-        traceOnward(segment.reversed().map { it.second }, mirrored(interpolate))
+        trace(segment.map { it.first }, interpolate, horizontal)
+        traceOnward(segment.reversed().map { it.second }, mirrored(interpolate), horizontal)
         close()
       }
     }
@@ -485,22 +488,30 @@ public class MarkEncoder(
     }
 
   /** Traces a segment with whatever interpolation the specification asked for. */
-  private fun PathBuilder.trace(points: List<PointD>, method: String?) {
-    val step = stepPosition(method)
-    if (step == null) polyline(points) else steps(points, step)
+  private fun PathBuilder.trace(points: List<PointD>, method: String?, horizontal: Boolean) {
+    curve(points, CurveKind.fromName(method) ?: CurveKind.LINEAR, horizontal)
   }
 
-  /** The same, joining onto the path already under construction rather than starting a subpath. */
-  private fun PathBuilder.traceOnward(points: List<PointD>, method: String?) {
-    val step = stepPosition(method)
-    if (step == null) {
+  /**
+   * The same, joining onto the path already under construction rather than starting a subpath.
+   *
+   * Every curve opens with a `moveTo`, which would break an area's outline in two; that leading
+   * command becomes a line to the same place and the rest is copied through unchanged.
+   */
+  private fun PathBuilder.traceOnward(points: List<PointD>, method: String?, horizontal: Boolean) {
+    val kind = CurveKind.fromName(method) ?: CurveKind.LINEAR
+    if (kind == CurveKind.LINEAR) {
       points.forEach { lineTo(it.x, it.y) }
-    } else {
-      // `steps` opens with a moveTo; a line to the first point instead keeps the outline closed.
-      points.firstOrNull()?.let { lineTo(it.x, it.y) }
-      val tail = PathData.build { steps(points, step) }
-      tail.commands.drop(1).forEach { command ->
-        if (command is PathCommand.LineTo) lineTo(command.x, command.y)
+      return
+    }
+    val tail = PathData.build { curve(points, kind, horizontal) }
+    for (command in tail.commands) {
+      when (command) {
+        is PathCommand.MoveTo -> lineTo(command.x, command.y)
+        is PathCommand.LineTo -> lineTo(command.x, command.y)
+        is PathCommand.CubicTo ->
+          cubicTo(command.x1, command.y1, command.x2, command.y2, command.x, command.y)
+        else -> Unit
       }
     }
   }
@@ -519,24 +530,15 @@ public class MarkEncoder(
       else -> method
     }
 
-  private fun stepPosition(method: String?): StepPosition? =
-    when (method?.lowercase()) {
-      "step" -> StepPosition.MIDDLE
-      "step-before" -> StepPosition.BEFORE
-      "step-after" -> StepPosition.AFTER
-      else -> null
-    }
-
   /**
    * Reports an interpolation method this engine cannot draw.
    *
-   * The step family is implemented; `basis`, `cardinal`, `catmull-rom`, `monotone` and `natural`
-   * each need their own spline generator, and drawing one as straight lines would look plausible
-   * and be wrong, so the substitution is reported.
+   * Everything but the `catmull-rom` and `bundle` families is implemented; those two carry their
+   * own parameterisation and closed variants, and drawing one as straight lines would look
+   * plausible and be wrong, so the substitution is reported.
    */
   private fun reportUnsupportedInterpolation(method: String?, spec: MarkSpec) {
-    if (method == null || method.equals("linear", ignoreCase = true)) return
-    if (stepPosition(method) != null) return
+    if (method == null || CurveKind.fromName(method) != null) return
     reportOnce(
       "interpolate:$method",
       dev.aster.vega.model.VegaDiagnostic(

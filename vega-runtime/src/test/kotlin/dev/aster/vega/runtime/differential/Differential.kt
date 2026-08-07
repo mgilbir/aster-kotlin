@@ -313,11 +313,19 @@ public object Differential {
     }
 
     val vertices =
-      node.path.commands.mapNotNull { command ->
+      node.path.commands.flatMap { command ->
         when (command) {
-          is dev.aster.vega.scene.PathCommand.MoveTo -> world.apply(command.x, command.y)
-          is dev.aster.vega.scene.PathCommand.LineTo -> world.apply(command.x, command.y)
-          else -> null
+          is dev.aster.vega.scene.PathCommand.MoveTo -> listOf(world.apply(command.x, command.y))
+          is dev.aster.vega.scene.PathCommand.LineTo -> listOf(world.apply(command.x, command.y))
+          // A cubic's control points are part of the outline: two curves through the same anchors
+          // are different shapes, and comparing anchors alone would not see it.
+          is dev.aster.vega.scene.PathCommand.CubicTo ->
+            listOf(
+              world.apply(command.x1, command.y1),
+              world.apply(command.x2, command.y2),
+              world.apply(command.x, command.y),
+            )
+          else -> emptyList()
         }
       }
     val strings = LinkedHashMap<String, String>()

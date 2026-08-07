@@ -290,6 +290,7 @@ private val ENCODE_CONSUMED =
     "cornerRadius",
     "defined",
     "interpolate",
+    "orient",
     "startAngle",
     "endAngle",
     "innerRadius",
