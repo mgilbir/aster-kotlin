@@ -859,7 +859,7 @@ public class MarkEncoder(
       interactive = spec.interactive,
       datum = datum,
       tooltip = datum,
-      accessibility = describe(datum, channels),
+      accessibility = describe(spec, datum, channels),
     )
 
   private fun fontWeight(channels: EncodeEntry, datum: VegaValue): Int {
@@ -1108,18 +1108,48 @@ public class MarkEncoder(
   private fun spoken(value: VegaValue): String =
     if (value is VegaValue.Num) spokenNumber(value.value) else value.asString()
 
-  private fun describe(datum: VegaValue, channels: EncodeEntry): AccessibilityDescriptor? {
+  /**
+   * What a screen reader is told about one mark.
+   *
+   * Upstream's model, plus one deliberate addition. Upstream labels an individual item **only**
+   * when the specification supplies a `description` channel; with none, the item carries no label
+   * at all and only the mark container is announced. That is right for a pointer, where a reader
+   * meets the chart as a whole and the guides carry the meaning.
+   *
+   * It is wrong for a touch screen. Exploring by touch means landing on individual marks, and an
+   * unlabelled one announces nothing — so a bar chart would be silent everywhere except its axes.
+   * When there is no `description`, a label is built from the mark's own scaled fields instead.
+   * That is a **divergence from upstream**, made on purpose and recorded here rather than
+   * discovered later: a specification that says nothing gets something useful, and one that says
+   * something gets exactly what it asked for.
+   *
+   * `aria: false`, on the mark or on the row, suppresses all of it.
+   */
+  private fun describe(
+    spec: MarkSpec,
+    datum: VegaValue,
+    channels: EncodeEntry,
+  ): AccessibilityDescriptor? {
+    if (!spec.aria) return null
+    if (boolean(channels["aria"], datum) == false) return null
+
+    val role = string(channels["ariaRole"], datum) ?: "graphics-symbol"
+    // The specification's own words win over anything derived from the channels.
+    string(channels["description"], datum)
+      ?.takeIf { it.isNotBlank() }
+      ?.let {
+        return AccessibilityDescriptor(label = it, role = role, focusable = true)
+      }
+
     val labelField =
       channels.values.filterIsInstance<ChannelValue.Scaled>().firstNotNullOfOrNull { it.field }
     val valueField =
       channels.values.filterIsInstance<ChannelValue.Scaled>().mapNotNull { it.field }.lastOrNull()
     if (labelField == null) return null
-    val label = spoken(datum.field(labelField))
-    val value = valueField?.takeIf { it != labelField }?.let { spoken(datum.field(it)) }
     return AccessibilityDescriptor(
-      label = label,
-      value = value,
-      role = "graphics-symbol",
+      label = spoken(datum.field(labelField)),
+      value = valueField?.takeIf { it != labelField }?.let { spoken(datum.field(it)) },
+      role = role,
       focusable = true,
     )
   }

@@ -754,6 +754,13 @@ public data class MarkSpec(
   val title: TitleSpec? = null,
   val zindex: Int = 0,
   val interactive: Boolean = true,
+  /**
+   * `aria: false` hides this mark from a screen reader entirely.
+   *
+   * The escape hatch for anything decorative — a background, a rule that only guides the eye. A
+   * chart with no way to say "ignore this" makes a reader listen to its scaffolding.
+   */
+  val aria: Boolean = true,
   val clip: Boolean = false,
   /**
    * Appearance defaults from `config`, either side of the engine's own built-in per-type block.

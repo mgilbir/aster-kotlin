@@ -46,10 +46,15 @@ class GuideCaptionTest {
     val scene = SpecCompiler().compileJson(json).scene ?: return emptyList()
     val out = mutableListOf<Pair<String, String>>()
     fun walk(node: SceneNode) {
-      val role = node.metadata.role
-      if (role == "axis" || role == "legend") {
-        node.metadata.accessibility?.let { out += role to it.label }
-      }
+      val kind =
+        when (node.metadata.role) {
+          "axis" -> "axis"
+          "legend" -> "legend"
+          "title-text" -> "title"
+          "title-subtitle" -> "subtitle"
+          else -> null
+        }
+      if (kind != null) node.metadata.accessibility?.let { out += kind to it.label }
       if (node is GroupNode) node.children.forEach { walk(it) }
     }
     walk(scene.root)
@@ -66,7 +71,7 @@ class GuideCaptionTest {
       val ours = captionsOf(fixture)
       // Compare as multisets per kind: the two engines emit guides in different orders, and the
       // order a screen reader meets them in is decided by the scene tree, not by the caption.
-      for (kind in listOf("axis", "legend")) {
+      for (kind in listOf("axis", "legend", "title", "subtitle")) {
         val want = wanted.filter { it.kind == kind }.map { it.caption }.sorted()
         val got = ours.filter { it.first == kind }.map { it.second }.sorted()
         compared += want.size

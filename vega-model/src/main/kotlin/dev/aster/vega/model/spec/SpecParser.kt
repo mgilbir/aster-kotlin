@@ -260,6 +260,7 @@ private val MARK_CONSUMED =
     "title",
     "zindex",
     "interactive",
+    "aria",
     "clip",
     // Both are read only to be reported, which reportUnhandled would otherwise duplicate.
     "transform",
@@ -281,6 +282,12 @@ private val DATA_CONSUMED = setOf("name", "values", "source", "transform", "form
  */
 private val ENCODE_CONSUMED =
   setOf(
+    // The accessibility channels. `description` is Vega's *only* documented way to label an
+    // individual mark; `aria: false` hides one from a screen reader entirely.
+    "description",
+    "aria",
+    "ariaRole",
+    "ariaRoleDescription",
     "x",
     "x2",
     "y",
@@ -1425,6 +1432,7 @@ public class SpecParser {
       title = obj.fields["title"]?.let { parseTitle(it, "$path.title") },
       zindex = (obj.fields["zindex"] as? VegaValue.Num)?.value?.toInt() ?: 0,
       interactive = obj.fields["interactive"]?.asBoolean() ?: true,
+      aria = obj.fields["aria"]?.asBoolean() ?: true,
       clip = obj.fields["clip"]?.asBoolean() ?: false,
       configBelowDefaults = below.fields,
       configAboveDefaults = above.fields,

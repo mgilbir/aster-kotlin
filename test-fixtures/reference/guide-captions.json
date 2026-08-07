@@ -600,6 +600,16 @@
   "caption": "Symbol legend titled 'Segment' for fill color with 3 values: alpha, beta, gamma"
  },
  {
+  "fixture": "titles",
+  "kind": "title",
+  "caption": "Title text 'Revenue by segment'"
+ },
+ {
+  "fixture": "titles",
+  "kind": "subtitle",
+  "caption": "Subtitle text '2026 to date'"
+ },
+ {
   "fixture": "trail",
   "kind": "axis",
   "caption": "X-axis for a linear scale with values from 0 to 5"
@@ -608,6 +618,26 @@
   "fixture": "trail",
   "kind": "axis",
   "caption": "Y-axis for a linear scale with values from 0 to 100"
+ },
+ {
+  "fixture": "trellis-headers",
+  "kind": "title",
+  "caption": "Title text 'x'"
+ },
+ {
+  "fixture": "trellis-headers",
+  "kind": "title",
+  "caption": "Title text 'y'"
+ },
+ {
+  "fixture": "trellis-headers",
+  "kind": "title",
+  "caption": "Title text 'one'"
+ },
+ {
+  "fixture": "trellis-headers",
+  "kind": "title",
+  "caption": "Title text 'two'"
  },
  {
   "fixture": "trend-lines",

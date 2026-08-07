@@ -56,7 +56,7 @@ scene_dir, out = sys.argv[1], sys.argv[2]
 rows = []
 for path in sorted(glob.glob(os.path.join(scene_dir, '*.svg'))):
     svg = open(path).read()
-    for m in re.finditer(r'aria-roledescription="(axis|legend)" aria-label="([^"]*)"', svg):
+    for m in re.finditer(r'aria-roledescription="(axis|legend|title|subtitle)" aria-label="([^"]*)"', svg):
         rows.append({"fixture": os.path.basename(path)[:-4],
                      "kind": m.group(1), "caption": m.group(2)})
 json.dump(rows, open(out, 'w'), indent=1, ensure_ascii=False)

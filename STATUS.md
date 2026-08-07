@@ -402,7 +402,7 @@ ordering), and the pipeline is now verified end to end on one fixture, but the b
 
 ## Verification
 
-- 1,244 JVM tests pass (`./scripts/test-core.sh`, `./gradlew test`).
+- 1,250 JVM tests pass (`./scripts/test-core.sh`, `./gradlew test`).
 - Android lint is clean with `warningsAsErrors` on every Android module.
 - 57 instrumented tests pass on an API 37 arm64 emulator (`./scripts/test-android.sh`): 49 in
   `vega-android-canvas`, 4 in `vega-compose`, 4 in `demo`. Three groups of them cover what no JVM

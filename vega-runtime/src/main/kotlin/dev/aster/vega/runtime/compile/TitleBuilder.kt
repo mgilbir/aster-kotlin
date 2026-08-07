@@ -4,6 +4,7 @@ import dev.aster.vega.model.DiagnosticCollector
 import dev.aster.vega.model.spec.Anchor
 import dev.aster.vega.model.spec.Orient
 import dev.aster.vega.model.spec.TitleSpec
+import dev.aster.vega.scene.AccessibilityDescriptor
 import dev.aster.vega.scene.Fill
 import dev.aster.vega.scene.GroupNode
 import dev.aster.vega.scene.NodeMetadata
@@ -98,7 +99,18 @@ internal class TitleBuilder(
         layout = textEngine.layout(run(text, fontSize, TitleDefaults.FONT_WEIGHT, align)),
         angleDegrees = angle,
         fill = Fill.of(TitleDefaults.color),
-        metadata = NodeMetadata(role = "title-text"),
+        metadata =
+          NodeMetadata(
+            role = "title-text",
+            // A title is a guide like any other, and a screen reader is told which kind it is
+            // rather than just being read the words.
+            accessibility =
+              AccessibilityDescriptor(
+                label = "Title text '$text'",
+                role = "graphics-symbol",
+                focusable = true,
+              ),
+          ),
       )
 
     val children = mutableListOf<SceneNode>(title)
@@ -126,7 +138,16 @@ internal class TitleBuilder(
               ),
             angleDegrees = angle,
             fill = Fill.of(TitleDefaults.color),
-            metadata = NodeMetadata(role = "title-subtitle"),
+            metadata =
+              NodeMetadata(
+                role = "title-subtitle",
+                accessibility =
+                  AccessibilityDescriptor(
+                    label = "Subtitle text '$text'",
+                    role = "graphics-symbol",
+                    focusable = true,
+                  ),
+              ),
           )
       }
 
