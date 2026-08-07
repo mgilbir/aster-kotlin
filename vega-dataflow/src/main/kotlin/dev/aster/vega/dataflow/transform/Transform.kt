@@ -140,6 +140,8 @@ public class TransformRegistry(transforms: List<Transform>) {
           CrossTransform,
           PivotTransform,
           CountPatternTransform,
+          QuantileTransform,
+          RegressionTransform,
         )
       )
   }

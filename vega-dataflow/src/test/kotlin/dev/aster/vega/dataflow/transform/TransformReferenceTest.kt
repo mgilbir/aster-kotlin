@@ -507,7 +507,7 @@ class TransformReferenceTest {
   }
 
   @Test
-  fun `the registry covers the transforms the brief lists, plus nine more`() {
+  fun `the registry covers the transforms the brief lists, plus eleven more`() {
     val fromTheBrief =
       setOf(
         "filter",
@@ -523,12 +523,14 @@ class TransformReferenceTest {
         "fold",
         "flatten",
       )
-    // Nine are not on the brief's list. `timeunit` is the date half of `bin`; `pie` turns a column
+    // Eleven are not on the brief's list. `timeunit` is the date half of `bin`; `pie` turns a
+    // column
     // of numbers into the angles an arc mark needs; `window` is what a running total, a rank and a
     // moving average all are; `sequence` is how a specification draws a function with no data to
     // bind to; `lookup` is the only join there is; and `impute` is what stops a line jumping the
     // gap where a series has no row. `cross`, `pivot` and `countpattern` are the reshaping three:
-    // a matrix, a long table made wide, and the word counts a cloud is drawn from.
+    // a matrix, a long table made wide, and the word counts a cloud is drawn from. `quantile` and
+    // `regression` are the first two of the statistical family.
     assertEquals(
       fromTheBrief +
         "timeunit" +
@@ -539,7 +541,9 @@ class TransformReferenceTest {
         "impute" +
         "cross" +
         "pivot" +
-        "countpattern",
+        "countpattern" +
+        "quantile" +
+        "regression",
       TransformRegistry.Default.types,
     )
   }
@@ -936,5 +940,82 @@ class TransformReferenceTest {
         """{"count":1,"text":"ON"},{"count":1,"text":"MAT"},{"count":1,"text":"DOG"}]""",
       run("""[{"type": "countpattern", "field": "t", "case": "upper"}]""", sentences),
     )
+  }
+
+  // ---- quantile, regression -------------------------------------------------
+
+  private val ten =
+    """[{"v": 1}, {"v": 2}, {"v": 3}, {"v": 4}, {"v": 5},
+                        {"v": 6}, {"v": 7}, {"v": 8}, {"v": 9}, {"v": 10}]"""
+
+  /**
+   * The probabilities sit at the **middle** of each step, `(i + 0.5) × step`, so they never ask for
+   * the minimum or the maximum. Asking for 0 and 1 would pin a quantile plot's ends to the two most
+   * extreme observations, which is exactly what such a plot is trying not to do.
+   */
+  @Test
+  fun `quantile samples the middle of each step`() {
+    assertEquals(
+      """[{"prob":0.125,"value":2.125},{"prob":0.375,"value":4.375},""" +
+        """{"prob":0.625,"value":6.625},{"prob":0.875,"value":8.875}]""",
+      run("""[{"type": "quantile", "field": "v", "step": 0.25}]""", ten),
+    )
+    assertEquals(
+      """[{"prob":0.1,"value":1.9},{"prob":0.5,"value":5.5},{"prob":0.9,"value":9.1}]""",
+      run("""[{"type": "quantile", "field": "v", "probs": [0.1, 0.5, 0.9]}]""", ten),
+    )
+  }
+
+  @Test
+  fun `the default step gives a hundred probabilities from 0_005 to 0_995`() {
+    val output = run("""[{"type": "quantile", "field": "v"}]""", ten)
+    assertEquals(100, output.split("},{").size)
+    assertTrue(output.startsWith("""[{"prob":0.005,"""), output.take(40))
+    assertTrue(output.endsWith("""value":9.955}]"""), output.takeLast(40))
+  }
+
+  private val scatter =
+    """
+    [{"x": 1, "y": 2.1}, {"x": 2, "y": 3.9}, {"x": 3, "y": 6.2},
+     {"x": 4, "y": 7.8}, {"x": 5, "y": 10.1}, {"x": 6, "y": 11.9}]
+    """
+      .trimIndent()
+
+  /** A line between two points *is* the line, so a linear fit needs no sampled curve. */
+  @Test
+  fun `a linear regression is its two endpoints`() {
+    assertEquals(
+      """[{"x":1,"y":2.0571428571428596},{"x":6,"y":11.94285714285714}]""",
+      run("""[{"type": "regression", "x": "x", "y": "y", "method": "linear"}]""", scatter),
+    )
+    // `linear` is also the default, and `extent` moves the two ends.
+    assertEquals(
+      """[{"x":0,"y":0.08000000000000362},{"x":10,"y":19.851428571428563}]""",
+      run("""[{"type": "regression", "x": "x", "y": "y", "extent": [0, 10]}]""", scatter),
+    )
+  }
+
+  @Test
+  fun `params reports the fit rather than the fitted points`() {
+    assertEquals(
+      """[{"coef":[0.08000000000000362,1.977142857142856],"rSquared":0.9983821199232757}]""",
+      run("""[{"type": "regression", "x": "x", "y": "y", "params": true}]""", scatter),
+    )
+  }
+
+  /**
+   * A curved fit is sampled adaptively upstream, subdividing wherever the direction turns by more
+   * than half a degree. A grid would be visibly coarser exactly where the curvature is, so the
+   * method is reported rather than approximated.
+   */
+  @Test
+  fun `a curved regression method is reported rather than approximated`() {
+    val output = run("""[{"type": "regression", "x": "x", "y": "y", "method": "log"}]""", scatter)
+    assertTrue(
+      context.diagnostics.diagnostics.any { it.message.contains("log") },
+      context.diagnostics.diagnostics.toString(),
+    )
+    // The data is left alone rather than replaced by a wrong curve.
+    assertTrue(output.contains(""""x":1"""), output)
   }
 }

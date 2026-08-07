@@ -100,7 +100,7 @@ upstream-verified slice through parsing, scales, rect encoding and axes:
 | `vega-parser` (width, height, padding, autosize, data, signals, scales, axes, legends, titles, marks, group scopes, `layout`, `config`) | 3,790 | a subset, and every property it does not read is reported by name |
 | `vega-encode` (mark encoders, axes, legends, titles) | 952 | 8 of 12 mark encoders; axes, legends and titles including overlap removal, truncation and the `config` cascade; nine interpolation methods |
 | `vega-expression` + `vega-functions` | 2,388 | language complete; 60 of 119 functions |
-| `vega-transforms` (21 of 40) | 3,754 | the 12 the brief lists plus `timeunit`, `pie`, `window`, `sequence`, `lookup`, `impute`, `cross`, `pivot` and `countpattern`, exact against upstream |
+| `vega-transforms` (23 of 40) | 3,754 | the 12 the brief lists plus `timeunit`, `pie`, `window`, `sequence`, `lookup`, `impute`, `cross`, `pivot`, `countpattern`, `quantile` and `regression`, exact against upstream |
 | `vega-dataflow` | 2,081 | contracts and scheduling only; no pulse propagation |
 
 The entire data and specification half is absent:
@@ -133,7 +133,7 @@ substantive compatibility items:
 | 6. View and Compose APIs | Yes |
 | 7. SVG, PNG, PDF export | Yes |
 | 8. TalkBack can describe and navigate | Partial — virtual nodes are tested by instrumentation, not with TalkBack itself |
-| 9. At least 100 compatibility fixtures pass | 50 of 100 |
+| 9. At least 100 compatibility fixtures pass | 51 of 100 |
 | 10. Core runtime has no Android dependency | Yes |
 | 11. Renders without WebView | Yes |
 | 12. Build and test loop runs from the terminal | Yes |
@@ -392,7 +392,7 @@ ordering), and the pipeline is now verified end to end on one fixture, but the b
 
 ## Verification
 
-- 1,033 JVM tests pass (`./scripts/test-core.sh`, `./gradlew test`).
+- 1,102 JVM tests pass (`./scripts/test-core.sh`, `./gradlew test`).
 - Android lint is clean with `warningsAsErrors` on every Android module.
 - 48 instrumented tests pass on an API 37 arm64 emulator (`./scripts/test-android.sh`): 40 in
   `vega-android-canvas`, 4 in `vega-compose`, 4 in `demo` — including one that compiles every bundled
@@ -627,12 +627,15 @@ depends on them. Each has a test and a comment; this is the index.
    cannot be finished or verified without a device. After it, the largest untouched area is not a
    mark or a transform at all: signal `on` handlers and the event-stream DSL, which is what makes a
    chart respond to a tap rather than merely redraw when told to.
-2. **The rest of the transforms.** 21 of upstream's 40. What is left divides in two: `density`,
-   `kde`, `regression`, `loess`, `quantile` and `dotbin` are statistics, each a self-contained
-   numerical method; and `nest`, `stratify`, `treemap`, `pack`, `partition` and `tree` are the
-   hierarchy family, which needs a tree structure the dataflow has no representation for yet. The
-   statistics are the ones to take first — they need no new machinery.
-3. **Keep growing the fixture corpus.** 50 of the brief's 100. The return has fallen off — of the
+2. **The rest of the transforms.** 23 of upstream's 40. `quantile` and `regression`'s linear
+   method are in; what is left of the statistics — `density`, `kde`, `loess` and regression's
+   curved methods — all want the same missing piece, upstream's **adaptive curve sampler**
+   (`vega-statistics/src/sampleCurve.js`): it subdivides a span until it bends less than half a
+   degree, so the output is not a fixed number of points and cannot be produced by evaluating the
+   fit at regular intervals. Write that once and four transforms follow. The other family is
+   `nest`, `stratify`, `treemap`, `pack`, `partition` and `tree`, which needs a tree structure the
+   dataflow has no representation for yet.
+3. **Keep growing the fixture corpus.** 51 of the brief's 100. The return has fallen off — of the
    last ten, seven passed on arrival — because the corpus has caught up with the parts of the
    engine written without one. Aim it at what is genuinely untouched rather than at more
    combinations of what is covered: the `quantile`, `quantize`, `threshold` and `bin-ordinal`
