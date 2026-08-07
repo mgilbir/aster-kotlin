@@ -76,6 +76,8 @@ subprojects {
       // rather than by coincidence.
       environment("TZ", TEST_TIME_ZONE)
       systemProperty("user.timezone", TEST_TIME_ZONE)
+      // Lets a scratch triage run point at a directory of specs outside the repository.
+      providers.systemProperty("examples.dir").orNull?.let { systemProperty("examples.dir", it) }
 
       // The differential tests read the fixtures and their upstream references straight off disk,
       // so Gradle cannot see them and will call the task up to date after `scripts/oracle.sh` has

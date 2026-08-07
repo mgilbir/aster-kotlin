@@ -45,6 +45,7 @@ import dev.aster.vega.runtime.ChartEvent
 import dev.aster.vega.runtime.VegaChartController
 import dev.aster.vega.svg.toSvg
 import java.io.File
+import kotlinx.coroutines.delay
 
 /**
  * Demonstrates the whole surface: hand-authored scenes and compiled Vega specifications rendered
@@ -88,6 +89,15 @@ private fun DemoScreen() {
         report = null
         status = "Paste a Vega specification, or type one."
       } else {
+        // Wait for the typing to stop before compiling.
+        //
+        // `LaunchedEffect` cancels the previous run whenever `pasted` changes, so this delay is a
+        // debounce: a paste is one change and renders in a blink, while typing only ever compiles
+        // the text that was left behind. Without it every keystroke queued a compile and the demo
+        // stopped answering — 1,484 characters typed into the field produced 1,484 compilations
+        // and an ANR.
+        delay(PASTE_DEBOUNCE_MILLIS)
+        status = "Compiling…"
         val compiled = controller.setSpecAsync(pasted)
         report = PasteReport.of(compiled)
         status = report!!.headline
@@ -251,6 +261,9 @@ private fun PasteControls(text: String, onText: (String) -> Unit, onPaste: () ->
     )
   }
 }
+
+/** Long enough to swallow a burst of typing, short enough that a paste feels immediate. */
+private const val PASTE_DEBOUNCE_MILLIS = 400L
 
 private fun describe(event: ChartEvent): String? =
   when (event) {

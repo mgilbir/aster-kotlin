@@ -270,6 +270,9 @@ private val MARK_CONSUMED =
     "on",
   )
 
+/** The formats a loaded document can be read as. `topojson` needs projections and is a non-goal. */
+private val READABLE_FORMATS = setOf("json", "csv", "tsv", "dsv")
+
 /** Data properties this engine reads. */
 private val DATA_CONSUMED = setOf("name", "values", "source", "transform", "format", "url")
 
@@ -816,17 +819,11 @@ public class SpecParser {
 
     val values = (obj.fields["values"] as? VegaValue.Arr)?.values
     val url = obj.fields["url"]?.asString()
-    if (url != null) {
-      diagnostics.error(
-        DiagnosticCodes.PARSE_UNKNOWN_PROPERTY,
-        "Loading data from a URL is not implemented; dataset '$name' will be empty",
-        jsonPath = "$path.url",
-      )
-    }
     val format = obj.fields["format"] as? VegaValue.Obj
     val parse = LinkedHashMap<String, String>()
     if (format != null) {
       for ((key, value) in format.fields) {
+        if (key == "type" || key == "property" || key == "delimiter") continue
         if (key == "parse") {
           val fields = value as? VegaValue.Obj
           if (fields == null) {
@@ -848,10 +845,23 @@ public class SpecParser {
       }
     }
 
+    val formatType = format?.fields?.get("type")?.asString()?.lowercase()
+    if (formatType != null && formatType !in READABLE_FORMATS) {
+      diagnostics.error(
+        DiagnosticCodes.PARSE_UNKNOWN_PROPERTY,
+        "Data format '$formatType' is not implemented; dataset '$name' will be empty. " +
+          "Readable formats are ${READABLE_FORMATS.sorted().joinToString(", ")}",
+        jsonPath = "$path.format.type",
+      )
+    }
+
     return DataSpec(
       name = name,
       values = values,
       url = url,
+      formatType = formatType,
+      property = format?.fields?.get("property")?.asString()?.takeIf { it.isNotEmpty() },
+      delimiter = format?.fields?.get("delimiter")?.asString()?.takeIf { it.isNotEmpty() },
       transform = (obj.fields["transform"] as? VegaValue.Arr)?.values ?: emptyList(),
       source = obj.fields["source"]?.asString(),
       parse = parse,

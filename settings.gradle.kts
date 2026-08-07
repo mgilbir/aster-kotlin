@@ -29,6 +29,8 @@ include(":vega-runtime")
 
 include(":vega-svg")
 
+include(":vega-loader")
+
 include(":test-fixtures")
 
 // Android presentation layer.

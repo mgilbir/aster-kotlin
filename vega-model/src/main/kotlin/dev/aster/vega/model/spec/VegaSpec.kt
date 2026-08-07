@@ -163,6 +163,19 @@ public data class DataSpec(
    * as a string or a number and something has to say which fields to convert.
    */
   val parse: Map<String, String> = emptyMap(),
+  /**
+   * `format.type`: how to read what the URL returned — `json`, `csv`, `tsv` or `dsv`.
+   *
+   * Defaults to `json`, which is also what upstream infers from a `.json` extension. A tabular
+   * format is not a lesser JSON: every cell arrives as a string, so `format.parse` is the only
+   * thing that makes a CSV column numeric, and a specification that forgets it gets a scale over
+   * strings rather than a wrong chart.
+   */
+  val formatType: String? = null,
+  /** `format.property`: the field inside a JSON document that actually holds the rows. */
+  val property: String? = null,
+  /** `format.delimiter` for a `dsv` file. */
+  val delimiter: String? = null,
 )
 
 public enum class ScaleType {

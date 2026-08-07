@@ -1,6 +1,7 @@
 plugins { alias(libs.plugins.kotlin.jvm) }
 
 dependencies {
+  testImplementation(project(":vega-loader"))
   api(project(":vega-model"))
   api(project(":vega-expression"))
   api(project(":vega-dataflow"))

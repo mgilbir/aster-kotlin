@@ -108,7 +108,7 @@ public class ScaleResolver(
 
   /** True when the scale's range is colours rather than numbers. */
   private fun hasColorRange(spec: ScaleSpec): Boolean =
-    when (val range = spec.range) {
+    when (val range = effectiveRange(spec)) {
       is RangeSpec.Scheme -> true
       is RangeSpec.Literal ->
         range.values.isNotEmpty() && range.values.all { SceneColor.parse(it.asString()) != null }
@@ -147,8 +147,58 @@ public class ScaleResolver(
    * reproducing one needs d3's interpolator table and Vega's default scheme extent, and
    * approximating either would be wrong in a way that still looks like a chart.
    */
+  /**
+   * Vega's **named ranges**: `"range": "category"` and its siblings.
+   *
+   * These are not scheme names and not literal arrays — they are keys into `config.range`, which
+   * ships defaults for each. `category` is how almost every real specification asks for a
+   * categorical palette, including the stacked-bar example in Vega's own documentation, so a scale
+   * that rejects it rejects most charts anyone will paste.
+   *
+   * The defaults are upstream's own (`vega-parser/src/config.js`). A specification that overrides
+   * them through `config.range` is **not** honoured yet, and the config block is reported as unread
+   * — so the substitution is visible rather than silent.
+   */
+  private fun namedRange(name: String): RangeSpec? =
+    when (name.lowercase()) {
+      "category" -> RangeSpec.Scheme("tableau10")
+      "ordinal" -> RangeSpec.Scheme("blues")
+      "ramp" -> RangeSpec.Scheme("blues")
+      "heatmap" -> RangeSpec.Scheme("yellowgreenblue")
+      // Upstream pairs this one with `extent: [1, 0]`, which reads the scheme backwards.
+      "diverging" -> RangeSpec.Scheme("blueorange")
+      "symbol" ->
+        RangeSpec.Literal(
+          listOf(
+              "circle",
+              "square",
+              "triangle-up",
+              "cross",
+              "diamond",
+              "triangle-right",
+              "triangle-down",
+              "triangle-left",
+            )
+            .map { VegaValue.Str(it) }
+        )
+      else -> null
+    }
+
+  /** True for the named ranges that read their scheme backwards. */
+  private fun isReversedNamedRange(spec: ScaleSpec): Boolean =
+    (spec.range as? RangeSpec.Named)?.name?.lowercase() == "diverging"
+
+  /**
+   * The range to resolve against, with a named one already turned into what it stands for.
+   *
+   * Done once here rather than at each use, so every scale type gets named ranges for free and none
+   * of them can forget.
+   */
+  private fun effectiveRange(spec: ScaleSpec): RangeSpec =
+    (spec.range as? RangeSpec.Named)?.let { namedRange(it.name) } ?: spec.range
+
   private fun colorRange(spec: ScaleSpec): List<SceneColor>? =
-    when (val range = spec.range) {
+    when (val range = effectiveRange(spec)) {
       is RangeSpec.Literal -> {
         val colors = range.values.mapNotNull { SceneColor.parse(it.asString()) }
         if (colors.size < range.values.size) {
@@ -359,7 +409,7 @@ public class ScaleResolver(
   private fun buildOrdinal(spec: ScaleSpec): OrdinalScale? {
     val domain = discreteDomain(spec.domain, spec.name) ?: return null
     val range =
-      when (val r = spec.range) {
+      when (val r = effectiveRange(spec)) {
         is RangeSpec.Literal -> r.values
         // A categorical scheme is exactly an ordinal range, so resolve it to one.
         is RangeSpec.Scheme -> colorRange(spec)?.map { VegaValue.Str(it.toCssHex()) } ?: return null
@@ -383,7 +433,7 @@ public class ScaleResolver(
    * four-bucket quantize gives four blues and not a ramp.
    */
   private fun binnedRange(spec: ScaleSpec, buckets: Int?): List<VegaValue>? =
-    when (val r = spec.range) {
+    when (val r = effectiveRange(spec)) {
       is RangeSpec.Literal -> if (spec.reverse) r.values.reversed() else r.values
       is RangeSpec.Scheme -> {
         val colors = colorRange(spec) ?: return null

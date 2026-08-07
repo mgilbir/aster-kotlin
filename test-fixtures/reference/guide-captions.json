@@ -385,6 +385,16 @@
   "caption": "Y-axis for a sqrt scale with values from 0 to 100"
  },
  {
+  "fixture": "named-range",
+  "kind": "axis",
+  "caption": "X-axis for a discrete scale with 10 values: 0, 1, 2, 3, 4, ending with 9"
+ },
+ {
+  "fixture": "named-range",
+  "kind": "axis",
+  "caption": "Y-axis for a linear scale with values from 0 to 160"
+ },
+ {
   "fixture": "negative-labels",
   "kind": "axis",
   "caption": "X-axis titled 'Band: hyphens' for a discrete scale with 4 values: -1200, -5, 12, 340"

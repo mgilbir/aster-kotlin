@@ -6,13 +6,18 @@ import dev.aster.vega.dataflow.transform.TreeSource
 import dev.aster.vega.expression.ExpressionCompiler
 import dev.aster.vega.expression.ExpressionScope
 import dev.aster.vega.expression.JsSemantics
+import dev.aster.vega.model.DelimitedText
 import dev.aster.vega.model.DiagnosticCodes
 import dev.aster.vega.model.DiagnosticCollector
+import dev.aster.vega.model.VegaJson
 import dev.aster.vega.model.VegaValue
 import dev.aster.vega.model.asDouble
 import dev.aster.vega.model.asString
 import dev.aster.vega.model.spec.DataSpec
 import dev.aster.vega.model.time.DateValues
+import dev.aster.vega.runtime.load.DataLoader
+import dev.aster.vega.runtime.load.DenyLoader
+import dev.aster.vega.runtime.load.LoadDeniedException
 
 /**
  * Resolves dataset definitions to plain value lists, running their transform pipelines.
@@ -23,7 +28,103 @@ import dev.aster.vega.model.time.DateValues
 internal class DataResolver(
   private val diagnostics: DiagnosticCollector,
   private val expressions: ExpressionCompiler,
+  /** Refuses everything unless the host opted in; see [DataLoader]. */
+  private val loader: DataLoader = DenyLoader,
 ) {
+
+  /**
+   * Fetches and reads one dataset's `url`.
+   *
+   * A refusal and a failure are reported the same way — as an error naming the dataset — because
+   * they have the same consequence for the chart, and telling them apart is what the message text
+   * is for. Either way the dataset is empty rather than absent, so everything downstream reports
+   * against real data rather than falling over.
+   */
+  private fun loadUrl(spec: DataSpec, url: String): List<VegaValue> {
+    val text =
+      try {
+        loader.load(loader.sanitize(url))
+      } catch (denied: LoadDeniedException) {
+        diagnostics.error(
+          DiagnosticCodes.PARSE_UNKNOWN_PROPERTY,
+          "Dataset '${spec.name}' was not loaded. ${denied.message}",
+          operator = spec.name,
+        )
+        return emptyList()
+      } catch (failure: Exception) {
+        diagnostics.error(
+          DiagnosticCodes.PARSE_UNKNOWN_PROPERTY,
+          "Dataset '${spec.name}' could not be loaded from '$url': ${failure.message}",
+          operator = spec.name,
+        )
+        return emptyList()
+      }
+
+    val type = spec.formatType ?: inferFormat(url)
+    return when (type) {
+      "csv" -> DelimitedText.parse(text, ',')
+      "tsv" -> DelimitedText.parse(text, '\t')
+      "dsv" -> {
+        val delimiter = spec.delimiter
+        if (delimiter.isNullOrEmpty()) {
+          diagnostics.error(
+            DiagnosticCodes.PARSE_UNKNOWN_PROPERTY,
+            "Dataset '${spec.name}' is 'dsv' but names no 'format.delimiter'",
+            operator = spec.name,
+          )
+          emptyList()
+        } else {
+          DelimitedText.parse(text, delimiter.first())
+        }
+      }
+      "json" -> readJson(spec, text)
+      else -> {
+        // Reported by the parser already; nothing further to add here.
+        emptyList()
+      }
+    }
+  }
+
+  private fun readJson(spec: DataSpec, text: String): List<VegaValue> {
+    val document =
+      try {
+        VegaJson.parse(text)
+      } catch (failure: Exception) {
+        diagnostics.error(
+          DiagnosticCodes.PARSE_INVALID_JSON,
+          "Dataset '${spec.name}' is not valid JSON: ${failure.message}",
+          operator = spec.name,
+        )
+        return emptyList()
+      }
+    // `format.property` names the field inside the document that holds the rows, which is how a
+    // specification reaches into an API response rather than a bare array.
+    val rows = spec.property?.let { (document as? VegaValue.Obj)?.fields?.get(it) } ?: document
+    return when (rows) {
+      is VegaValue.Arr -> rows.values
+      // A single object is one row; upstream accepts that and several examples rely on it.
+      is VegaValue.Obj -> listOf(rows)
+      else -> {
+        diagnostics.error(
+          DiagnosticCodes.PARSE_UNKNOWN_PROPERTY,
+          "Dataset '${spec.name}' did not contain an array of rows" +
+            (spec.property?.let { " at property '$it'" } ?: ""),
+          operator = spec.name,
+        )
+        emptyList()
+      }
+    }
+  }
+
+  /** Upstream infers the format from the file extension when `format.type` is absent. */
+  private fun inferFormat(url: String): String {
+    val path = url.substringBefore('?').substringBefore('#')
+    return when {
+      path.endsWith(".csv", ignoreCase = true) -> "csv"
+      path.endsWith(".tsv", ignoreCase = true) -> "tsv"
+      else -> "json"
+    }
+  }
 
   /**
    * Resolves [specs], layered over the datasets already visible from an enclosing scope.
@@ -47,6 +148,7 @@ internal class DataResolver(
 
     for (spec in specs) {
       var values = spec.values ?: emptyList()
+      spec.url?.let { values = loadUrl(spec, it) }
       if (spec.source != null) {
         val upstream = result[spec.source]
         if (upstream == null) {

@@ -9,6 +9,8 @@ import dev.aster.vega.model.VegaValue
 import dev.aster.vega.model.spec.AutosizeType
 import dev.aster.vega.model.spec.SpecParser
 import dev.aster.vega.model.spec.VegaSpec
+import dev.aster.vega.runtime.load.DataLoader
+import dev.aster.vega.runtime.load.DenyLoader
 import dev.aster.vega.runtime.scale.VegaScale
 import dev.aster.vega.scene.GroupNode
 import dev.aster.vega.scene.MetricTextEngine
@@ -59,7 +61,16 @@ public data class CompiledSpec(
  * @param textEngine measures axis labels. Pass the Android engine to get the scene the device will
  *   draw, or the default deterministic engine for JVM comparisons.
  */
-public class SpecCompiler(private val textEngine: TextEngine = MetricTextEngine()) {
+public class SpecCompiler(
+  private val textEngine: TextEngine = MetricTextEngine(),
+  /**
+   * How a specification's `url` data is fetched. Refuses everything unless a host opts in.
+   *
+   * See [DataLoader]: a URL in a specification is a request that this process fetch an address the
+   * specification chose, so it is the host's decision and not the specification's.
+   */
+  private val loader: DataLoader = DenyLoader,
+) {
 
   public fun compileJson(
     json: String,
@@ -122,7 +133,7 @@ public class SpecCompiler(private val textEngine: TextEngine = MetricTextEngine(
     // signals see the datasets resolved before them. A specification that crosses those in both
     // directions needs the full dataflow, and is reported rather than silently mis-ordered.
     val transformSignals = LinkedHashMap<String, VegaValue>(implicitSignals)
-    val data = DataResolver(diagnostics, expressions)
+    val data = DataResolver(diagnostics, expressions, loader)
     val datasets = data.resolve(spec.data, transformSignals)
     val signals =
       SignalResolver(diagnostics, expressions)
