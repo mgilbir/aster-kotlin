@@ -234,8 +234,12 @@ the emulator, profiling and layout inspection.
 ./scripts/install-demo.sh   # build and install the demo app
 ./scripts/capture-demo.sh   # screenshot the device into build/artifacts
 ./scripts/benchmark.sh      # microbenchmarks; warns on an emulator
-./scripts/oracle.sh         # upstream Vega reference output
+./scripts/oracle.sh         # regenerate upstream references, then compare
+./scripts/emulator.sh       # start the AVD with a window and install the demo
 ```
+
+`CONTRIBUTING.md` describes how the engine is built rather than what it contains: probing upstream
+before implementing, the differential gate, and why a new fixture is expected to fail.
 
 ### Goldens
 
@@ -253,6 +257,12 @@ Review the resulting diff as a rendering change, not as noise.
 ```bash
 ./gradlew spotlessApply
 ```
+
+### Portability
+
+The core modules are plain Kotlin and are meant to move to Kotlin Multiplatform unchanged: no Android
+types and no JVM-only APIs, with `PlatformDecimals` the single documented exception. `NoAndroidTypesTest`
+enforces it. See `CONTRIBUTING.md`.
 
 ## Architecture
 

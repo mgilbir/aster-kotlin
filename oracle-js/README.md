@@ -64,13 +64,41 @@ Two other normalizations, each because the drawn result is identical either way:
 - glyph bounds are excluded entirely, since font metrics legitimately differ from a browser's
   (`../docs/adr/0006-text-measurement-and-font-policy.md`)
 
+Two things this file reports that upstream does not, both added after a bug hid behind their absence:
+
+- a symbol's and an arc's **drawn extent**, because comparing a symbol's `size` channel or an arc's
+  centre says nothing about the shape that was produced
+- fill and stroke **opacity**, because a mark at 0.75 and one at 1 have identical geometry
+
+If a difference is visible in the SVG and the comparison passes, suspect this file before the engine.
+
 ## Probes
 
-Three scripts exist to establish upstream behaviour before implementing it, rather than guessing:
+These exist to establish upstream behaviour before implementing it, rather than guessing. See
+`../CONTRIBUTING.md`, where that is the first rule.
 
 - `src/eval-probe.js` — evaluates expressions and prints their results
-- `src/transform-probe.js` — runs a transform pipeline and prints the resulting dataset
+
+  ```bash
+  node src/eval-probe.js "utcyear(utc(2026, 2, 14))" "utcFormat(utc(2026, 0, 5), '%B %d')"
+  ```
+
+- `src/transform-probe.js` — runs a transform pipeline and prints the resulting dataset. Exports
+  `run(label, transform, data)`, so a throwaway `.mjs` in this directory is the usual way to probe one
+
+- `src/tree-probe.js` — dumps a scenegraph's tree shape: every marktype, its role, and each item's
+  position, size and bounds. This is the one to reach for when the question is *where does upstream
+  put this* — axis groups, legend entries, trellis cells and titles were all worked out from it
+
+  ```bash
+  node src/tree-probe.js ../test-fixtures/specs/legends.vg.json
+  ```
+
 - `src/render.js` — renders a fixture to a canonical scene summary and SVG, for eyeballing
+
+Anything more specific is worth writing as a throwaway script here and deleting afterwards; several
+reference-vector tables in the Kotlin tests were produced that way, by importing `d3-time` or
+`d3-scale` directly to check a table before porting it.
 
 Every reference vector in the Kotlin tests came from one of these. `transform-probe.js` deep-copies its
 input per run, because Vega's transforms mutate the tuples they are given and a shared array silently

@@ -1,6 +1,18 @@
 # Status
 
-Last updated: 2026-08-06
+Last updated: 2026-08-07
+
+## Picking this up
+
+- **Branch `milestone-0-bootstrap`. Nothing has been pushed, and nothing goes on `main`.** The name is
+  now historical; the work has run well past Milestone 0.
+- Read `CONTRIBUTING.md` first. The method matters more than the remaining feature list: probe upstream
+  before implementing, add a fixture and expect it to fail, report anything unsupported by name.
+- `./scripts/check.sh` is the gate — format, all tests, lint, demo APK. `./scripts/oracle.sh`
+  regenerates the upstream references and runs the differential comparison; both must be green.
+- The next three tasks are at the bottom of this file. They are re-decided every time, not worked
+  through in order — twice now the stated order was wrong and the reason is recorded in the commit
+  that changed it.
 
 ## Current milestone
 
@@ -300,6 +312,28 @@ authoritative (PROJECT_BRIEF.md 18.6). The benchmark module and fixtures exist
 (`benchmark/src/androidTest`, `scripts/benchmark.sh`) but have not been run on a device.
 
 The performance targets in PROJECT_BRIEF.md 19 are therefore all unverified.
+
+## What a reader should not have to rediscover
+
+Behaviours reproduced deliberately because upstream does them and a chart written against upstream
+depends on them. Each has a test and a comment; this is the index.
+
+| Behaviour | Where |
+| --- | --- |
+| `size` on a symbol is the squared extent, not the area; upstream ships its own symbol table | `SceneNode.buildSymbolPath` |
+| `range: "height"` descends for a continuous scale and ascends for a discrete one | `ScaleResolver.numericRange` |
+| `reverse` flips the range, not the domain | `ScaleResolver.oriented` |
+| A `null` in a series does not break a line; `defined` does | `MarkEncoder.point` |
+| `parent` in a facet is the group's datum, so `parent.width` is undefined | `ScopeCompiler.nest` |
+| `width`/`height` are inherited by a subscope, so a nested `"height"` range spans the whole chart | `CompileScope` |
+| An axis is measured by its extent, not by the items it drew, and gridlines are excluded | `AxisBuilder.BuiltAxis` |
+| A stroked path reserves four stroke widths for a miter join, not ten | `Stroke.miterLimit` |
+| A title is placed against the whole drawing, not the plotting area | `TitleBuilder` |
+| `timeunit` builds its floor from the units present and defaults the year to 2012 | `TimeUnitTransform.floor` |
+| A day is a calendar day, so a daily tick holds midnight across a daylight-saving change | `TimeStepper` |
+| Trellis marks are emitted in specification order, not grouped by role | `ScopeCompiler.trellis` |
+| A multi-column legend fills down each column before moving across | `GridLayout.columnMajorOrder` |
+| Arc angles run clockwise from twelve o'clock | `PathBuilder.arcTo` |
 
 ## Architectural decisions pending
 
