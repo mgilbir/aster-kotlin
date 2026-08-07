@@ -69,6 +69,22 @@ public class NumberResolver(
         }
     }
 
+  /** The raw value of a signal, for a property whose shape depends on what the signal holds. */
+  public fun resolveValue(expression: String, owner: String): VegaValue? =
+    when (val compiled = expressions.compile(expression)) {
+      is ExpressionResult.Failed -> {
+        diagnostics.add(compiled.diagnostic.copy(operator = owner))
+        null
+      }
+      is ExpressionResult.Compiled ->
+        try {
+          compiled.expression.evaluate(scope)
+        } catch (e: ExpressionEvaluationException) {
+          diagnostics.add(e.diagnostic.copy(operator = owner))
+          null
+        }
+    }
+
   public fun resolveList(expression: String, owner: String): List<VegaValue>? =
     when (val compiled = expressions.compile(expression)) {
       is ExpressionResult.Failed -> {

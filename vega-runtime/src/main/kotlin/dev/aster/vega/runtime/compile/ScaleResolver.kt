@@ -195,7 +195,14 @@ public class ScaleResolver(
    * of them can forget.
    */
   private fun effectiveRange(spec: ScaleSpec): RangeSpec =
-    (spec.range as? RangeSpec.Named)?.let { namedRange(it.name) } ?: spec.range
+    when (val range = spec.range) {
+      is RangeSpec.Named -> namedRange(range.name) ?: range
+      is RangeSpec.Signal ->
+        resolveRangeSignal(spec, range.expression).let {
+          if (it is RangeSpec.Named) namedRange(it.name) ?: it else it
+        }
+      else -> range
+    }
 
   private fun colorRange(spec: ScaleSpec): List<SceneColor>? =
     when (val range = effectiveRange(spec)) {
@@ -768,8 +775,57 @@ public class ScaleResolver(
 
   // ---- ranges ---------------------------------------------------------------
 
+  /**
+   * A signal-valued range, evaluated now rather than at parse time.
+   *
+   * A signal may be derived from the very data the scale is over, so this cannot happen earlier.
+   * The result is read back through the ordinary range forms, so `{"signal": "..."}` yielding an
+   * array, a scheme name or the word `width` all behave exactly as if they had been written out.
+   */
+  private fun resolveRangeSignal(spec: ScaleSpec, expression: String): RangeSpec {
+    val value = numbers.resolveValue(expression, spec.name)
+    return when (value) {
+      null,
+      is VegaValue.Null -> {
+        diagnostics.error(
+          DiagnosticCodes.SCALE_INVALID_DOMAIN,
+          "Scale '${spec.name}' takes its range from a signal that produced nothing",
+          operator = spec.name,
+        )
+        RangeSpec.Unset
+      }
+      is VegaValue.Arr -> RangeSpec.Literal(value.values)
+      is VegaValue.Str -> RangeSpec.Named(value.value)
+      is VegaValue.Obj ->
+        value.fields["scheme"]?.asString()?.let { RangeSpec.Scheme(it) } ?: RangeSpec.Unset
+      else -> RangeSpec.Unset
+    }
+  }
+
+  /**
+   * `{"step": n}`: a band scale sized by its band rather than by the space it was given.
+   *
+   * The extent follows from the number of categories, so the range is `[0, step × steps]`, where
+   * the step count includes the padding a band scale adds at each end. A chart written this way
+   * grows with its data instead of squeezing it.
+   */
+  private fun stepRange(spec: ScaleSpec, step: Double): List<Double>? {
+    val domain = discreteDomain(spec.domain, spec.name) ?: return null
+    val inner =
+      numbers.resolve(spec.paddingInner, spec.name)
+        ?: numbers.resolve(spec.padding, spec.name)
+        ?: 0.0
+    val outer =
+      numbers.resolve(spec.paddingOuter, spec.name)
+        ?: numbers.resolve(spec.padding, spec.name)
+        ?: 0.0
+    val count = domain.size
+    val span = if (count == 0) 0.0 else step * (count - inner + 2 * outer)
+    return listOf(0.0, span)
+  }
+
   private fun numericRange(spec: ScaleSpec): List<Double>? =
-    when (val range = spec.range) {
+    when (val range = effectiveRange(spec)) {
       is RangeSpec.Named ->
         when (range.name.lowercase()) {
           "width" -> listOf(0.0, size.width)
@@ -787,6 +843,11 @@ public class ScaleResolver(
             null
           }
         }
+      is RangeSpec.Signal -> {
+        val resolved = resolveRangeSignal(spec, range.expression)
+        if (resolved is RangeSpec.Signal) null else numericRange(spec.copy(range = resolved))
+      }
+      is RangeSpec.Step -> stepRange(spec, numbers.resolve(range.step, spec.name) ?: 0.0)
       is RangeSpec.Literal -> {
         val numbers = range.values.map { it.asDouble() }
         if (numbers.size < 2 || numbers.any { it.isNaN() }) {

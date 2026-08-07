@@ -107,6 +107,7 @@ public class TransformPipeline(
         )
         return current
       }
+      val resolved = resolveSignals(params, context) as VegaValue.Obj
       val transform = registry[type]
       if (transform == null) {
         context.diagnostics.error(
@@ -117,11 +118,55 @@ public class TransformPipeline(
         )
         return current
       }
-      current = transform.apply(current, params, context)
+      current = transform.apply(current, resolved, context)
     }
     return current
   }
 }
+
+/**
+ * Replaces every `{"signal": "..."}` in a parameter tree with what the signal holds.
+ *
+ * Vega lets almost any parameter be signal-valued, and until this existed such a parameter reached
+ * the transform as an object whose string form is `signal:name` — so `{"op": {"signal": "op"}}`
+ * became the aggregate operation literally called "signal:op", and was reported as unimplemented. A
+ * dozen of the official examples failed that way, each looking like a different missing feature.
+ *
+ * Resolving here rather than in each transform means none of them can forget, and none of them
+ * needs to know that signals exist.
+ *
+ * Only an object whose **sole** field is `signal` is a reference. That distinction matters: the
+ * `extent` transform takes a `signal` parameter naming the signal it *writes*, and its value is a
+ * string rather than an object, so it is untouched.
+ */
+internal fun resolveSignals(value: VegaValue, context: TransformContext): VegaValue =
+  when (value) {
+    is VegaValue.Obj -> {
+      val reference = value.fields["signal"]
+      if (value.fields.size == 1 && reference is VegaValue.Str) {
+        evaluateSignal(reference.value, context)
+      } else {
+        VegaValue.Obj(value.fields.mapValues { (_, child) -> resolveSignals(child, context) })
+      }
+    }
+    is VegaValue.Arr -> VegaValue.Arr(value.values.map { resolveSignals(it, context) })
+    else -> value
+  }
+
+private fun evaluateSignal(expression: String, context: TransformContext): VegaValue =
+  when (val compiled = context.expressions.compile(expression)) {
+    is ExpressionResult.Failed -> {
+      context.diagnostics.add(compiled.diagnostic)
+      VegaValue.Null
+    }
+    is ExpressionResult.Compiled ->
+      try {
+        compiled.expression.evaluate(context.scope)
+      } catch (failure: ExpressionEvaluationException) {
+        context.diagnostics.add(failure.diagnostic)
+        VegaValue.Null
+      }
+  }
 
 /** Maps a specification's transform `type` to an implementation. */
 public class TransformRegistry(transforms: List<Transform>) {

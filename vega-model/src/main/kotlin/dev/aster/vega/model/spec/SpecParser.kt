@@ -1052,16 +1052,29 @@ public class SpecParser {
       is VegaValue.Str -> RangeSpec.Named(value.value)
       is VegaValue.Arr -> RangeSpec.Literal(value.values)
       is VegaValue.Obj -> {
-        val scheme = value.fields["scheme"]?.asString()
-        if (scheme != null) {
-          RangeSpec.Scheme(scheme, (value.fields["count"] as? VegaValue.Num)?.value?.toInt())
-        } else {
-          diagnostics.warn(
-            DiagnosticCodes.PARSE_UNKNOWN_PROPERTY,
-            "Only '{scheme: ...}' range objects are supported",
-            jsonPath = path,
-          )
-          RangeSpec.Unset
+        val scheme = value.fields["scheme"]
+        val signal = value.fields["signal"]?.asString()
+        val step = value.fields["step"]
+        when {
+          // A scheme name may itself be signal-valued, so it is read as a value not a string.
+          scheme != null && value.fields.size == 1 && scheme is VegaValue.Obj ->
+            RangeSpec.Signal(scheme.fields["signal"]?.asString() ?: "")
+          scheme != null ->
+            RangeSpec.Scheme(
+              scheme.asString(),
+              (value.fields["count"] as? VegaValue.Num)?.value?.toInt(),
+            )
+          !signal.isNullOrEmpty() -> RangeSpec.Signal(signal)
+          step != null ->
+            RangeSpec.Step(value.numberOrSignal("step", path) ?: NumberValue.Constant(0.0))
+          else -> {
+            diagnostics.warn(
+              DiagnosticCodes.PARSE_UNKNOWN_PROPERTY,
+              "A range object must name a 'scheme', a 'signal' or a 'step'",
+              jsonPath = path,
+            )
+            RangeSpec.Unset
+          }
         }
       }
       else -> {

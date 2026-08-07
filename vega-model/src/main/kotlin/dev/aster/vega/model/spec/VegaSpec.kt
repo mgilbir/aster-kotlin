@@ -292,6 +292,22 @@ public sealed interface RangeSpec {
   /** A named colour scheme. */
   public data class Scheme(val name: String, val count: Int? = null) : RangeSpec
 
+  /**
+   * `{"signal": "..."}` — the whole range comes from a signal.
+   *
+   * Resolved when the scale is built rather than when it is parsed, because a signal may itself be
+   * derived from the data the scale is over.
+   */
+  public data class Signal(val expression: String) : RangeSpec
+
+  /**
+   * `{"step": 20}` — a band scale sized by its band rather than by the space available.
+   *
+   * The chart's width then follows from the number of categories, which is what a specification
+   * wants when the bars must stay a fixed width however many there are.
+   */
+  public data class Step(val step: NumberValue) : RangeSpec
+
   public data object Unset : RangeSpec
 }
 
