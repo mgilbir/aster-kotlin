@@ -21,7 +21,7 @@ end to end — expressions, signals, 33 of upstream's 40 data transforms, every 
 and an event handler that recompiles the chart — and are verified against upstream Vega by
 differential tests.
 
-Sixty-two differential fixtures pass, all matching upstream exactly on every mark and scale output:
+Sixty-three differential fixtures pass, all matching upstream exactly on every mark and scale output:
 
 | Fixture | Marks | Covers |
 | --- | --- | --- |
@@ -87,6 +87,7 @@ Sixty-two differential fixtures pass, all matching upstream exactly on every mar
 | `named-range` | 60 | `"range": "category"` and the other named ranges, resolved to upstream's own defaults |
 | `scheme-forms` | 31 | a scheme named in the wrong case, one chosen by a signal, one written out as its stops |
 | `centre-anchors` | 22 | `xc`/`yc` on five mark types, an `x2` with no `x`, and a pair written backwards |
+| `signal-transform-params` | 29 | a signal choosing an aggregate's operation and field, and bounding a filter |
 
 The gate is wired into `./scripts/oracle.sh`, so every further scale, mark and transform is built
 against a harness that can say we are wrong — which golden tests cannot.
@@ -146,7 +147,7 @@ substantive compatibility items:
 | 6. View and Compose APIs | Yes |
 | 7. SVG, PNG, PDF export | Yes |
 | 8. TalkBack can describe and navigate | Partial — virtual nodes are tested by instrumentation, not with TalkBack itself |
-| 9. At least 100 compatibility fixtures pass | 62 of 100 |
+| 9. At least 100 compatibility fixtures pass | 63 of 100 |
 | 10. Core runtime has no Android dependency | Yes |
 | 11. Renders without WebView | Yes |
 | 12. Build and test loop runs from the terminal | Yes |
@@ -483,7 +484,7 @@ each example a deadline.
 
 ## Known failing fixtures
 
-None. Sixty-two fixtures exist and all sixty-two pass — and that sentence became worth
+None. Sixty-three fixtures exist and all sixty-three pass — and that sentence became worth
 something only once the gate could no longer skip itself, below.
 
 **The gate could report success without running.** `FixtureDifferentialTest` reads the fixtures and

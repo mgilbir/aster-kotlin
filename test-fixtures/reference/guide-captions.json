@@ -485,6 +485,16 @@
   "caption": "Y-axis for a linear scale with values from 0.0 to 0.5"
  },
  {
+  "fixture": "signal-transform-params",
+  "kind": "axis",
+  "caption": "Y-axis for a discrete scale with 3 values: alpha, gamma, epsilon"
+ },
+ {
+  "fixture": "signal-transform-params",
+  "kind": "axis",
+  "caption": "X-axis for a linear scale with values from 0 to 40"
+ },
+ {
   "fixture": "size-legend",
   "kind": "axis",
   "caption": "X-axis for a linear scale with values from 0 to 5"

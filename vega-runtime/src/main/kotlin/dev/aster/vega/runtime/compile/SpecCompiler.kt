@@ -126,13 +126,25 @@ public class SpecCompiler(
       )
     val expressions = CachingExpressionCompiler(VegaExpressionCompiler())
 
-    // Data first, because a signal may read a dataset and a transform may publish a signal. A
-    // single
-    // ordered pass is enough for a static compile: transforms see the signals resolved before them,
-    // and
-    // signals see the datasets resolved before them. A specification that crosses those in both
-    // directions needs the full dataflow, and is reported rather than silently mis-ordered.
+    // Data first, because a signal may read a dataset. But a transform may equally read a signal —
+    // `"ops": [{"signal": "op"}]` is how a chart lets a control choose which aggregate to compute —
+    // and resolving every signal after the data left those reading null, silently, since an unknown
+    // name is not an error to an expression.
+    //
+    // So the signals that cannot possibly depend on a dataset go in first: those with a plain
+    // `value` and neither `init` nor `update`. They are constants, so seeding them cannot conflict
+    // with what the full pass works out for them, and they are what a transform parameter actually
+    // reads. A signal whose value is computed still resolves after the data, and a specification
+    // that needs one *inside* a transform needs the full dataflow.
     val transformSignals = LinkedHashMap<String, VegaValue>(implicitSignals)
+    for (signal in spec.signals) {
+      if (signal.init == null && signal.update == null) {
+        signal.value?.let { transformSignals[signal.name] = it }
+      }
+    }
+    // A handler's value is the current one, and a transform should read that rather than the
+    // initial value it is replacing.
+    transformSignals.putAll(signalOverrides.filterKeys { transformSignals.containsKey(it) })
     val data = DataResolver(diagnostics, expressions, loader)
     val datasets = data.resolve(spec.data, transformSignals)
     val signals =
