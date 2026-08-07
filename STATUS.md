@@ -99,14 +99,14 @@ upstream-verified slice through parsing, scales, rect encoding and axes:
 | `vega-parser` (width, height, padding, autosize, data, signals, scales, axes, legends, titles, marks, group scopes, `layout`, `config`) | 3,790 | a subset, and every property it does not read is reported by name |
 | `vega-encode` (mark encoders, axes, legends, titles) | 952 | 8 of 12 mark encoders; axes, legends and titles including overlap removal, truncation and the `config` cascade; nine interpolation methods |
 | `vega-expression` + `vega-functions` | 2,388 | language complete; 60 of 119 functions |
-| `vega-transforms` (17 of 40) | 3,754 | the 12 the brief lists plus `timeunit`, `pie`, `window`, `sequence` and `lookup`, exact against upstream |
+| `vega-transforms` (18 of 40) | 3,754 | the 12 the brief lists plus `timeunit`, `pie`, `window`, `sequence`, `lookup` and `impute`, exact against upstream |
 | `vega-dataflow` | 2,081 | contracts and scheduling only; no pulse propagation |
 
 The entire data and specification half is absent:
 
 | Missing | Upstream size | Here |
 | --- | --- | --- |
-| `vega-transforms` — the other 23 transforms | most of 3,754 | 0 |
+| `vega-transforms` — the other 22 transforms | most of 3,754 | 0 |
 | `vega-dataflow` — pulse propagation and incremental evaluation | 2,081 | contracts only |
 | `vega-functions` — the other 44 functions, mostly colour, geo and selection | most of 790 | 0 |
 | Remaining scale types — quantile, quantize, threshold, bin-ordinal | rest of `vega-scale` | 0 |
@@ -265,6 +265,11 @@ ordering), and the pipeline is now verified end to end on one fixture, but the b
   out, so a linear scale handed `[10, 20]` still starts at 0 where this engine had been leaving it
   at 10. The limits then replace an end rather than clamping it, and run after `zero`, which is why
   `domainMin: 30` beats it.
+- **The `impute` transform**, which is what stops a line jumping the gap where a series has no row.
+  Its key domain is the union across the **whole dataset**, not per group — a group is missing a key
+  precisely when some other group has it — and `keyvals` replaces that domain outright, so a series
+  can be padded past where its data ever reached. The rows it adds are appended rather than merged
+  into position, and carry only the group's fields, the key and the filler.
 - **The `trail` mark**: a line whose thickness follows the data. Filled rather than stroked — a
   stroke has one width and the whole point is that it does not — and built as one closed capsule per
   segment, overlapping at the shared points, which is what makes the joins look continuous without
@@ -546,6 +551,7 @@ depends on them. Each has a test and a comment; this is the index.
 | A custom symbol outline is written in a unit box and scaled by the symbol's own reference length | `SceneNode.scalePath` |
 | A repeated `M` in a path string means `L`, which is the one place the implicit-command shorthand changes meaning | `SvgPath.parse` |
 | A trail is *filled*, not stroked, and its `size` is a width where a symbol's is a squared extent | `TrailPath` |
+| `impute` takes its key domain from the whole dataset, and appends the rows it adds rather than merging them | `ImputeTransform` |
 | `padAngle` is a gap at a pad *radius*, converted back to an angle per edge, so the sides stay parallel | `ArcPath.sector` |
 | `cornerRadius` is clamped by where the slice's own edges would meet, not just by its thickness | `ArcPath.sector` |
 | A label hidden by overlap removal stays in the scene at zero opacity, so the mark count does not move | `LabelOverlap` |
@@ -607,17 +613,16 @@ depends on them. Each has a test and a comment; this is the index.
 
 ## Next three tasks
 
-1. **The remaining mark encoders: `image`, `path`, `trail` and `shape`.** Four of the twelve mark
-   types still cannot be produced from a specification, and two of them are cheap. `path` needs an
-   SVG path-string parser, which the scene graph is ready for — it already stores paths as commands
-   and `SymbolNode` accepts a custom outline. `image` needs only an `AndroidImageResolver` and an
-   encoder; the node type has worked since Milestone 1. `trail` is a variable-width line and
-   `shape` needs projections, which is an explicit non-goal.
-2. **The rest of the transforms.** 17 of upstream's 40. The ones a real specification reaches for
-   next are `impute` (filling gaps in a series so a line does not jump them), `cross`, `pivot` and
-   `countpattern`. Each is self-contained and each wants its vectors read out of
-   `transform-probe.js` first — `window` alone had four behaviours that no reading of the
-   documentation would have given.
+1. **The `image` mark, and then the interaction gap.** `image` is the last of the twelve with no
+   encoder that is not an explicit non-goal — `shape` needs projections. It wants an
+   `AndroidImageResolver` to turn a URL into pixels, so unlike everything else this session it
+   cannot be finished or verified without a device. After it, the largest untouched area is not a
+   mark or a transform at all: signal `on` handlers and the event-stream DSL, which is what makes a
+   chart respond to a tap rather than merely redraw when told to.
+2. **The rest of the transforms.** 18 of upstream's 40. The ones a real specification reaches for
+   next are `cross`, `pivot`, `countpattern` and `density`. Each is self-contained and each wants
+   its vectors read out of `transform-probe.js` first — `window` alone had four behaviours that no
+   reading of the documentation would have given, and `impute` two more.
 3. **Keep growing the fixture corpus.** 49 of the brief's 100. The return has fallen off — of the
    last ten, seven passed on arrival — because the corpus has caught up with the parts of the
    engine written without one. Aim it at what is genuinely untouched rather than at more

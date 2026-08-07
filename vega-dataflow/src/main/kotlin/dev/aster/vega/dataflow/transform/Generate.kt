@@ -146,3 +146,78 @@ public object LookupTransform : Transform {
 
   private fun VegaValue.isMissing(): Boolean = this is VegaValue.Null
 }
+
+/**
+ * `impute`: adds the rows a series is missing, so a line does not jump the gap.
+ *
+ * The key domain is the union of every key in the **whole dataset**, not per group — which is the
+ * point: a group is missing a key precisely when some *other* group has it. `keyvals` supplies that
+ * domain explicitly instead, and can name keys nothing has, so a series can be padded out to a
+ * range the data never reached.
+ *
+ * Two things about the output are worth knowing before reading a chart drawn from it:
+ * - the new rows are **appended**, not merged into position, so anything downstream that cares
+ *   about order has to sort;
+ * - a new row carries only its group's fields, the key and the imputed value. Every other column is
+ *   absent rather than null, which is what a mark encoding one of them will see.
+ */
+public object ImputeTransform : Transform {
+  override val type: String = "impute"
+
+  override fun apply(
+    input: List<VegaValue>,
+    params: VegaValue.Obj,
+    context: TransformContext,
+  ): List<VegaValue> {
+    val key = params.string("key")
+    val field = params.string("field")
+    if (key.isNullOrEmpty() || field.isNullOrEmpty()) {
+      context.diagnostics.error(
+        DiagnosticCodes.TRANSFORM_INVALID_PARAMETER,
+        "impute needs 'key' and 'field'",
+        operator = type,
+      )
+      return input
+    }
+    val groupBy = params.stringList("groupby")
+    val method = params.string("method") ?: "value"
+    val fallback = params.fields["value"] ?: VegaValue.Num(0.0)
+
+    val aggregate =
+      when (method.lowercase()) {
+        "value" -> null
+        else ->
+          AggregateOp.fromName(method)
+            ?: run {
+              context.diagnostics.error(
+                DiagnosticCodes.TRANSFORM_NOT_IMPLEMENTED,
+                "impute method '$method' is not implemented",
+                operator = type,
+              )
+              return input
+            }
+      }
+
+    val explicit = (params.fields["keyvals"] as? VegaValue.Arr)?.values
+    val domain =
+      (explicit ?: input.map { it.field(key) })
+        .filterNot { it is VegaValue.Null }
+        .distinctBy { it.asComparableKey() }
+
+    val groups = groupTuples(input, groupBy)
+    val added = mutableListOf<VegaValue>()
+    for ((groupKey, rows) in groups) {
+      val present = rows.map { it.field(key).asComparableKey() }.toSet()
+      val filler = if (aggregate == null) fallback else aggregateOver(aggregate, field, rows)
+      for (value in domain) {
+        if (value.asComparableKey() in present) continue
+        val fields = LinkedHashMap<String, VegaValue>(groupBy.size + 2)
+        groupBy.forEachIndexed { index, path -> fields[path] = groupKey[index] }
+        fields[key] = value
+        fields[field] = filler
+        added += VegaValue.Obj(fields)
+      }
+    }
+    return input + added
+  }
+}

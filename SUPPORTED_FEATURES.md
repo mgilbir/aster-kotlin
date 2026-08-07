@@ -72,7 +72,7 @@ the scope note in STATUS.md for how much of upstream Vega remains.
 
 ## Data transforms
 
-Upstream Vega has 40 transforms; the 12 the brief lists for the first release are implemented, plus `timeunit`, `pie`, `window`, `sequence` and `lookup`.
+Upstream Vega has 40 transforms; the 12 the brief lists for the first release are implemented, plus `timeunit`, `pie`, `window`, `sequence`, `lookup` and `impute`.
 Expected values in `TransformReferenceTest` were all generated from upstream.
 
 | Feature | Status | Tests | Known differences | Target milestone |
@@ -94,7 +94,8 @@ Expected values in `TransformReferenceTest` were all generated from upstream.
 | `window` | **Supported** | `TransformReferenceTest` (upstream vectors), `FixtureDifferentialTest` (`window`) | Running totals, ranks and moving averages. The ranking family — `row_number`, `rank`, `dense_rank`, `percent_rank`, `cume_dist`, `ntile`, `lag`, `lead`, `first_value`, `last_value`, `nth_value`, `prev_value`, `next_value` — looks at the whole partition and ignores the frame; the aggregate family respects it. The frame defaults to `[null, 0]`, the partition start up to and including this row, which is what makes a bare `sum` a running total rather than a partition total. With a `sort` and without `ignorePeers` the frame widens to cover tying rows, so two rows that compare equal always get the same answer | 6 |
 | `sequence` | **Supported** | `TransformReferenceTest` (upstream vectors), `FixtureDifferentialTest` (`sequence-lookup`) | Generates rows rather than reading them, so it replaces whatever reached it and is only ever a pipeline's first stage. `stop` is **exclusive** — `{start: 0, stop: 5}` is five rows — and the field is named `data` unless `as` says otherwise. Steps are multiplied out from the start rather than accumulated, so a fractional step does not drift | 6 |
 | `lookup` | **Supported** | `TransformReferenceTest` (upstream vectors), `FixtureDifferentialTest` (`sequence-lookup`) | With `values`, the named fields are copied out of the matched row and `as` renames them; without `values`, the whole matched row goes into the one field `as` names. An unmatched row takes `default`, or null. A duplicated key in the lookup table resolves to the **last** row carrying it, as a map built by insertion does | 6 |
-| The other 23 transforms | Not implemented | `TransformReferenceTest` | An unimplemented transform stops the pipeline and reports it, so later stages never run on data they were not meant to see | 4+ |
+| `impute` | **Supported** | `TransformReferenceTest` (upstream vectors) | Adds the rows a series is missing so a line does not jump the gap. The key domain is the union across the **whole dataset**, not per group — a group is missing a key precisely when another group has it — and `keyvals` replaces that domain, so a series can be padded past where its data reached. `method` is `value` (the default, with a value of 0) or any aggregate, computed over the group's existing rows. New rows are **appended** rather than merged into position, and carry only the group's fields, the key and the filler | 6 |
+| The other 22 transforms | Not implemented | `TransformReferenceTest` | An unimplemented transform stops the pipeline and reports it, so later stages never run on data they were not meant to see | 4+ |
 | Tuple identity, change sets | Supported | `DataflowTest` | Data model only; the transform pipeline does not use it yet | 0 |
 | Deterministic operator scheduling | Supported | `DataflowTest` | Topological ordering only | 0 |
 | Pulse propagation / incremental evaluation | Not implemented | — | Transforms currently recompute a whole dataset. The `DataflowOperator` contract exists; there is no incremental engine behind it | 4 |

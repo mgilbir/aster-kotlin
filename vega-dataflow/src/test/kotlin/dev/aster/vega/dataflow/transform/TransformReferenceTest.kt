@@ -507,7 +507,7 @@ class TransformReferenceTest {
   }
 
   @Test
-  fun `the registry covers the transforms the brief lists, plus five more`() {
+  fun `the registry covers the transforms the brief lists, plus six more`() {
     val fromTheBrief =
       setOf(
         "filter",
@@ -523,12 +523,13 @@ class TransformReferenceTest {
         "fold",
         "flatten",
       )
-    // Five are not on the brief's list. `timeunit` is the date half of `bin`; `pie` turns a column
+    // Six are not on the brief's list. `timeunit` is the date half of `bin`; `pie` turns a column
     // of numbers into the angles an arc mark needs; `window` is what a running total, a rank and a
     // moving average all are; `sequence` is how a specification draws a function with no data to
-    // bind to; and `lookup` is the only join there is.
+    // bind to; `lookup` is the only join there is; and `impute` is what stops a line jumping the
+    // gap where a series has no row.
     assertEquals(
-      fromTheBrief + "timeunit" + "pie" + "window" + "sequence" + "lookup",
+      fromTheBrief + "timeunit" + "pie" + "window" + "sequence" + "lookup" + "impute",
       TransformRegistry.Default.types,
     )
   }
@@ -748,6 +749,84 @@ class TransformReferenceTest {
         """{"k":"zz","row":null,"v":3}]""",
       runWithTable(
         """[{"type": "lookup", "from": "other", "key": "id", "fields": ["k"], "as": ["row"]}]"""
+      ),
+    )
+  }
+
+  // ---- impute ---------------------------------------------------------------
+
+  /**
+   * The key domain is the union across the **whole dataset**, not per group — a group is missing a
+   * key precisely when some other group has it — and the new rows are **appended** rather than
+   * merged into position.
+   */
+  private val imputeRows =
+    """
+    [{"c": "a", "t": 1, "v": 10},
+     {"c": "a", "t": 3, "v": 30},
+     {"c": "b", "t": 1, "v": 7},
+     {"c": "b", "t": 2, "v": 9},
+     {"c": "b", "t": 3, "v": 11}]
+    """
+      .trimIndent()
+
+  @Test
+  fun `impute fills a group's missing keys from the whole dataset's`() {
+    val expected =
+      """[{"c":"a","t":1,"v":10},{"c":"a","t":3,"v":30},{"c":"b","t":1,"v":7},""" +
+        """{"c":"b","t":2,"v":9},{"c":"b","t":3,"v":11},{"c":"a","t":2,"v":0}]"""
+    assertEquals(
+      expected,
+      run(
+        """[{"type": "impute", "key": "t", "field": "v", "groupby": ["c"],
+             "method": "value", "value": 0}]""",
+        imputeRows,
+      ),
+    )
+    // `value` with a value of zero is also the default, which is easy to assume is `null`.
+    assertEquals(
+      expected,
+      run("""[{"type": "impute", "key": "t", "field": "v", "groupby": ["c"]}]""", imputeRows),
+    )
+  }
+
+  /** An aggregate method summarises the group's *existing* values: a has 10 and 30, so 20. */
+  @Test
+  fun `impute can fill from an aggregate of the group`() {
+    assertEquals(
+      """[{"c":"a","t":1,"v":10},{"c":"a","t":3,"v":30},{"c":"b","t":1,"v":7},""" +
+        """{"c":"b","t":2,"v":9},{"c":"b","t":3,"v":11},{"c":"a","t":2,"v":20}]""",
+      run(
+        """[{"type": "impute", "key": "t", "field": "v", "groupby": ["c"], "method": "mean"}]""",
+        imputeRows,
+      ),
+    )
+  }
+
+  /** `keyvals` replaces the domain, so a series can be padded past where its data ever reached. */
+  @Test
+  fun `keyvals can name keys nothing in the data has`() {
+    assertEquals(
+      """[{"c":"a","t":1,"v":10},{"c":"a","t":3,"v":30},{"c":"b","t":1,"v":7},""" +
+        """{"c":"b","t":2,"v":9},{"c":"b","t":3,"v":11},{"c":"a","t":2,"v":0},""" +
+        """{"c":"a","t":4,"v":0},{"c":"b","t":4,"v":0}]""",
+      run(
+        """[{"type": "impute", "key": "t", "field": "v", "groupby": ["c"],
+             "keyvals": [1, 2, 3, 4], "method": "value", "value": 0}]""",
+        imputeRows,
+      ),
+    )
+  }
+
+  /** With no groups there is nothing to be missing from, so nothing is added. */
+  @Test
+  fun `impute without a groupby adds nothing`() {
+    assertEquals(
+      """[{"c":"a","t":1,"v":10},{"c":"a","t":3,"v":30},{"c":"b","t":1,"v":7},""" +
+        """{"c":"b","t":2,"v":9},{"c":"b","t":3,"v":11}]""",
+      run(
+        """[{"type": "impute", "key": "t", "field": "v", "method": "value", "value": -1}]""",
+        imputeRows,
       ),
     )
   }
