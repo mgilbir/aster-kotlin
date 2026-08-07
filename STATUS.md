@@ -242,9 +242,14 @@ ordering), and the pipeline is now verified end to end on one fixture, but the b
 - **Axis appearance**: `labelColor`, `tickColor`, `gridColor`, `domainColor` and `titleColor`, each
   with its own width, dash, opacity and font — the five parts of an axis are the same property with a
   different prefix upstream, and are read that way here. A label's colour is a fill and every other
-  part's is a stroke, which is the only asymmetry and the one a renderer cannot paper over. The
-  remaining fifty-odd axis properties upstream accepts are each reported by name, with what will be
-  drawn instead.
+  part's is a stroke, which is the only asymmetry and the one a renderer cannot paper over.
+- **Nothing dropped in silence.** Each parser now names the properties it *consumes* and reports the
+  remainder, rather than a hand-kept list of what is missing. That inversion is the point: the
+  hand-kept list is how the gap grew — the axis honoured fifteen of upstream's 74 properties and
+  ignored fifty-nine, each arriving at a moment when nobody was looking at the whole list. Scales,
+  legends, titles, marks and encode channels are covered the same way, so a property nobody
+  anticipated, including one upstream adds later, becomes a diagnostic. Where there is something
+  specific to say about what will be drawn instead, it is said by name.
 - **Titles**: a chart title and subtitle at any of the four edges and any of the three anchors — all
   twelve combinations verified against upstream — plus a title on each axis. A title is placed against
   the whole drawing rather than the plotting area, so a chart with wide y-axis labels has its title
@@ -264,7 +269,7 @@ ordering), and the pipeline is now verified end to end on one fixture, but the b
 
 ## Verification
 
-- 917 JVM tests pass (`./scripts/test-core.sh`, `./gradlew test`).
+- 923 JVM tests pass (`./scripts/test-core.sh`, `./gradlew test`).
 - Android lint is clean with `warningsAsErrors` on every Android module.
 - 48 instrumented tests pass on an API 37 arm64 emulator (`./scripts/test-android.sh`): 40 in
   `vega-android-canvas`, 4 in `vega-compose`, 4 in `demo` — including one that compiles every bundled
@@ -446,25 +451,22 @@ depends on them. Each has a test and a comment; this is the index.
 
 ## Next three tasks
 
-1. **Take the same audit to the legends, the marks and the scales.** Auditing the axis against
-   upstream's schema found fifty-nine properties being dropped without a word — the single largest
-   breach of "nothing is silently ignored" the project has had, and it was invisible because an axis
-   with the wrong ticks still looks like an axis. There is no reason to think the axis was unusual.
-   Upstream's legend takes about 90 properties, its marks around 40 each and its scales 20; this
-   engine's parsers were written property by property from the fixtures at hand, so the same gap is
-   almost certainly there. `node -e` over `oracle-js/node_modules/vega/build/vega-schema.json` lists
-   any definition's properties, which is how the axis list was obtained. Report first, implement
-   second: the report is what makes a partial implementation usable, and it is an afternoon's work
-   against weeks for the features.
+1. **Implement what the audit just named, starting with `domainMin`/`domainMax`, legend styling and
+   the mark stroke channels.** Reporting the gap was the cheap half and it is done; these three are
+   the parts of it that a chart notices. `domainMin`/`domainMax` pin an axis to a fixed range, which
+   is what stops a dashboard's bars rescaling every refresh. Legend styling is the same
+   `{part}Color`/`Width`/`Dash`/`Opacity` family the axis already has, against the same `GuideStroke`
+   and `GuideStyle` — a legend beside a styled axis currently cannot be made to match it. And
+   `strokeDash`, `strokeCap` and `strokeJoin` on a mark are already in the scene graph and the
+   renderers; only the encoder does not read them.
 2. **`values`, then `labelAngle`.** The two most consequential things a specification can ask an axis
    for and not get. `values` replaces the tick set outright — upstream keeps the grid in step with it,
    and on a band scale it filters the domain rather than positioning freely — and `labelAngle` is how
    every chart with long category names is made readable. The angle is the harder of the two: it
    changes the label's align and baseline defaults and its contribution to the axis extent, so the
-   chart's size moves with it. Both are reported today, so neither is a silent wrong answer, which is
-   why they rank behind the audit.
+   chart's size moves with it.
 3. **Keep growing the fixture corpus.** 31 of the brief's 100 pass, and the return has not dropped
-   off: of the last four, one passed and three found defects — a domain `sort` that read an object as
+   off: of the last five, two passed and three found defects — a domain `sort` that read an object as
    a boolean and quietly ordered a bar chart alphabetically, and the wrong character on every negative
    axis label. Between them the corpus has also found a missing scale-domain form, a legend layout
    rule that only diverges once swatches grow, unreported opacity, rotated text offsets both sides of
@@ -477,6 +479,5 @@ depends on them. Each has a test and a comment; this is the index.
    Still untouched beyond that: `sequence`, `window` and `lookup` and the other 25 transforms;
    `trail`, `shape`, `image` and `path` marks; and `quantile`, `quantize`, `threshold` and
    `bin-ordinal` scales.
-4. **Label overlap removal** and **arc padding and corner rounding**, both previously ranked second
-   and third and both still worth doing — but each is a self-contained feature that is honestly
-   reported today, where the audit above is a class of silent wrong answers.
+4. **Label overlap removal** and **arc padding and corner rounding**, both long-standing and both
+   still worth doing — each a self-contained feature that is honestly reported today.

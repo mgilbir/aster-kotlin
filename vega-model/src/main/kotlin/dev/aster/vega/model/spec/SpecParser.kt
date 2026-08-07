@@ -20,14 +20,47 @@ import dev.aster.vega.model.asString
 private val MULTI_FIELD_SORT_OPS = listOf("count", "min", "max")
 
 /**
- * Axis properties upstream accepts and this engine does not honour, each reported by name.
+ * Axis properties this engine reads.
  *
- * Upstream's axis takes 74 properties. Listing the gap explicitly rather than ignoring whatever is
- * unrecognized is the point: an axis that quietly drew ten ticks where the specification asked for
- * four, or drew its labels horizontally where the specification turned them 45 degrees, looks like
- * a chart and is not the chart that was asked for. Each entry says what a specification should
- * expect instead.
+ * Upstream's axis takes 74 of them and this reads twenty-odd. Everything else is reported —
+ * [AXIS_UNSUPPORTED] where there is something specific to say about what will be drawn instead, and
+ * the generic message otherwise — because an axis that quietly drew ten ticks where the
+ * specification asked for four, or drew its labels horizontally where the specification turned them
+ * 45 degrees, looks like a chart and is not the chart that was asked for.
  */
+private val AXIS_CONSUMED =
+  setOf(
+    "scale",
+    "orient",
+    "title",
+    "titlePadding",
+    "titleFontSize",
+    "titleAnchor",
+    "grid",
+    "ticks",
+    "labels",
+    "domain",
+    "tickCount",
+    "tickSize",
+    "labelPadding",
+    "labelFontSize",
+    "offset",
+    "zindex",
+  ) + guideStyleKeys("label", "tick", "grid", "domain", "title")
+
+/**
+ * The `{prefix}Color`/`Width`/`Dash`/`Opacity`/`Font`/`FontWeight`/`FontStyle` family for each part
+ * of a guide, which [SpecParser.guideStroke] reads as a group.
+ */
+private fun guideStyleKeys(vararg prefixes: String): Set<String> =
+  prefixes
+    .flatMap { prefix ->
+      listOf("Color", "Width", "Dash", "Opacity", "Font", "FontWeight", "FontStyle").map {
+        "$prefix$it"
+      }
+    }
+    .toSet()
+
 private val AXIS_UNSUPPORTED =
   mapOf(
     "values" to
@@ -77,6 +110,200 @@ private val AXIS_UNSUPPORTED =
     "titleY" to "Absolute axis title placement is not implemented",
     "aria" to "Accessibility attributes on a guide are not implemented",
     "description" to "Accessibility descriptions on a guide are not implemented",
+  )
+
+/** Scale properties this engine reads. */
+private val SCALE_CONSUMED =
+  setOf(
+    "name",
+    "type",
+    "domain",
+    "range",
+    "reverse",
+    "round",
+    "clamp",
+    "nice",
+    "zero",
+    "padding",
+    "paddingInner",
+    "paddingOuter",
+    "align",
+    "base",
+    "exponent",
+    "constant",
+    "interpolate",
+  )
+
+private val SCALE_UNSUPPORTED =
+  mapOf(
+    "domainMin" to
+      "Pinning a scale's domain minimum is not implemented; the domain comes from the data alone, " +
+        "so the scale will start wherever the data does",
+    "domainMax" to
+      "Pinning a scale's domain maximum is not implemented; the domain comes from the data alone, " +
+        "so the scale will end wherever the data does",
+    "domainMid" to "A three-point domain from 'domainMid' is not implemented",
+    "domainRaw" to "Overriding a resolved domain with 'domainRaw' is not implemented",
+    "domainImplicit" to "Extending an ordinal domain with unseen values is not implemented",
+    "bins" to "Scale bin boundaries are not implemented",
+  )
+
+/** Legend properties this engine reads. */
+private val LEGEND_CONSUMED =
+  setOf(
+    "fill",
+    "stroke",
+    "size",
+    "shape",
+    "opacity",
+    "type",
+    "orient",
+    "direction",
+    "title",
+    "values",
+    "tickCount",
+    "offset",
+    "padding",
+    "titlePadding",
+    "titleFontSize",
+    "labelFontSize",
+    "labelOffset",
+    "symbolType",
+    "symbolSize",
+    "symbolStrokeWidth",
+    "gradientLength",
+    "gradientThickness",
+    "rowPadding",
+    "columnPadding",
+    "columns",
+    "legendX",
+    "legendY",
+    "zindex",
+  )
+
+/** Title properties this engine reads. */
+private val TITLE_CONSUMED =
+  setOf(
+    "text",
+    "subtitle",
+    "orient",
+    "anchor",
+    "frame",
+    "offset",
+    "subtitlePadding",
+    "fontSize",
+    "subtitleFontSize",
+    "zindex",
+  )
+
+/** Mark properties this engine reads. */
+private val MARK_CONSUMED =
+  setOf(
+    "type",
+    "name",
+    "role",
+    "from",
+    "encode",
+    "marks",
+    "axes",
+    "data",
+    "signals",
+    "scales",
+    "legends",
+    "layout",
+    "title",
+    "zindex",
+    "interactive",
+    "clip",
+    // Both are read only to be reported, which reportUnhandled would otherwise duplicate.
+    "transform",
+    "sort",
+    // Reported by reportUnsupportedGroupScope, for the same reason.
+    "style",
+    "on",
+  )
+
+/** Data properties this engine reads. */
+private val DATA_CONSUMED = setOf("name", "values", "source", "transform", "format", "url")
+
+/**
+ * Encode channels this engine's mark encoders read, across every mark type.
+ *
+ * A union rather than a per-type list: a channel outside it is one nothing can consume, which is
+ * the silence worth breaking. A channel inside it but wrong for the mark at hand — `innerRadius` on
+ * a rect — is upstream's business too, and it ignores those the same way.
+ */
+private val ENCODE_CONSUMED =
+  setOf(
+    "x",
+    "x2",
+    "y",
+    "y2",
+    "width",
+    "height",
+    "size",
+    "shape",
+    "text",
+    "angle",
+    "align",
+    "baseline",
+    "dx",
+    "dy",
+    "font",
+    "fontSize",
+    "fontWeight",
+    "fontStyle",
+    "fill",
+    "fillOpacity",
+    "stroke",
+    "strokeOpacity",
+    "strokeWidth",
+    "opacity",
+    "cornerRadius",
+    "defined",
+    "interpolate",
+    "startAngle",
+    "endAngle",
+    "innerRadius",
+    "outerRadius",
+    // Read in order to be reported by name, which is more useful than the generic message.
+    "padAngle",
+  )
+
+private val ENCODE_UNSUPPORTED =
+  mapOf(
+    "xc" to
+      "Positioning by centre is not implemented; give 'x' with 'width', or 'x' with 'x2', " +
+        "since a mark encoded only by its centre cannot be placed at all",
+    "yc" to
+      "Positioning by centre is not implemented; give 'y' with 'height', or 'y' with 'y2', " +
+        "since a mark encoded only by its centre cannot be placed at all",
+    "strokeDash" to "Dashed marks are not implemented; the outline is drawn solid",
+    "strokeCap" to "Stroke caps on a mark are not implemented; the default butt cap is drawn",
+    "strokeJoin" to "Stroke joins on a mark are not implemented; the default miter join is drawn",
+    "limit" to "Text truncation is not implemented; the text is drawn in full",
+    "ellipsis" to "Text truncation is not implemented, so its ellipsis has nothing to mark",
+    "tooltip" to
+      "Tooltip content from an encode channel is not implemented; a tooltip is built from the " +
+        "mark's own fields instead",
+    "url" to "Image marks have no encoder yet, so a URL channel has nothing to load into",
+    "cornerRadiusTopLeft" to
+      "Per-corner radii are not implemented; use 'cornerRadius' for all four",
+    "cornerRadiusTopRight" to
+      "Per-corner radii are not implemented; use 'cornerRadius' for all four",
+    "cornerRadiusBottomLeft" to
+      "Per-corner radii are not implemented; use 'cornerRadius' for all four",
+    "cornerRadiusBottomRight" to
+      "Per-corner radii are not implemented; use 'cornerRadius' for all four",
+    "blend" to "Blend modes from an encode channel are not implemented",
+    "clip" to "Clipping from an encode channel is not implemented; use the mark's own 'clip'",
+    "zindex" to "Per-item z-order is not implemented; marks are drawn in specification order",
+    "tension" to "Curve tension is not implemented; it needs an interpolation method first",
+    "theta" to "Polar positioning is not implemented",
+    "radius" to "Polar positioning is not implemented",
+    "path" to "SVG path strings on a mark are not implemented",
+    "scaleX" to "Per-item scaling is not implemented",
+    "scaleY" to "Per-item scaling is not implemented",
   )
 
 /** A parsed specification plus everything the parser could not honour. */
@@ -353,6 +580,8 @@ public class SpecParser {
       return null
     }
 
+    obj.reportUnhandled("Scale", path, SCALE_CONSUMED, SCALE_UNSUPPORTED)
+
     return ScaleSpec(
       name = name,
       type = type,
@@ -553,11 +782,7 @@ public class SpecParser {
       return null
     }
 
-    for ((key, reason) in AXIS_UNSUPPORTED) {
-      if (obj.fields[key] != null) {
-        diagnostics.warn(DiagnosticCodes.PARSE_UNKNOWN_PROPERTY, reason, jsonPath = "$path.$key")
-      }
-    }
+    obj.reportUnhandled("Axis", path, AXIS_CONSUMED, AXIS_UNSUPPORTED)
 
     return AxisSpec(
       scale = scale,
@@ -637,7 +862,10 @@ public class SpecParser {
       return null
     }
 
-    val unsupported =
+    obj.reportUnhandled(
+      "Title",
+      path,
+      TITLE_CONSUMED,
       mapOf(
         "encode" to "Title encode overrides are not implemented",
         "style" to "Title styles are not implemented",
@@ -646,15 +874,8 @@ public class SpecParser {
         "dy" to "Title dy is not implemented",
         "align" to "Title alignment follows 'anchor'; an explicit align is not implemented",
         "angle" to "Title rotation follows 'orient'; an explicit angle is not implemented",
-      )
-    for ((key, reason) in unsupported) {
-      if (obj.fields[key] == null) continue
-      diagnostics.warn(
-        DiagnosticCodes.PARSE_UNKNOWN_PROPERTY,
-        "$reason; '$key' was ignored",
-        jsonPath = "$path.$key",
-      )
-    }
+      ),
+    )
 
     return TitleSpec(
       text = text,
@@ -730,7 +951,10 @@ public class SpecParser {
       return null
     }
 
-    val unsupported =
+    obj.reportUnhandled(
+      "Legend",
+      path,
+      LEGEND_CONSUMED,
       mapOf(
         "encode" to "Legend encode overrides are not implemented",
         "format" to "Legend label format specifiers are not implemented",
@@ -740,16 +964,46 @@ public class SpecParser {
         "titleOrient" to "Only a legend title above the entries is implemented",
         "gradientOpacity" to "Legend gradient opacity is not implemented",
         "titleAnchor" to "Legend title anchoring is not implemented",
-      )
-    for ((key, reason) in unsupported) {
-      if (obj.fields[key] == null) continue
+      ),
+    )
+    return spec
+  }
+
+  /**
+   * Reports every property of this object the parser neither consumed nor already explained.
+   *
+   * Enumerating the gap by hand is how the gap grew. The axis honoured fifteen of upstream's 74
+   * properties and dropped the other fifty-nine without a word, each one arriving at a moment when
+   * nobody was looking at the whole list. Naming what *is* consumed and reporting the remainder
+   * inverts that: a property nobody thought about becomes a diagnostic rather than a silence, and
+   * so does one upstream adds after this was written.
+   *
+   * [explained] comes first and says something specific about what will be drawn instead. Anything
+   * left over gets the generic message, which is worth less than a tailored one and much more than
+   * nothing.
+   */
+  private fun VegaValue.Obj.reportUnhandled(
+    kind: String,
+    path: String,
+    consumed: Set<String>,
+    explained: Map<String, String> = emptyMap(),
+  ) {
+    for ((key, reason) in explained) {
+      if (fields[key] == null) continue
       diagnostics.warn(
         DiagnosticCodes.PARSE_UNKNOWN_PROPERTY,
         "$reason; '$key' was ignored",
         jsonPath = "$path.$key",
       )
     }
-    return spec
+    for (key in fields.keys) {
+      if (key in consumed || key in explained) continue
+      diagnostics.warn(
+        DiagnosticCodes.PARSE_UNKNOWN_PROPERTY,
+        "$kind property '$key' is not implemented and was ignored",
+        jsonPath = "$path.$key",
+      )
+    }
   }
 
   /**
@@ -817,6 +1071,7 @@ public class SpecParser {
     }
 
     if (type == MarkType.GROUP) reportUnsupportedGroupScope(obj, path)
+    obj.reportUnhandled("Mark", path, MARK_CONSUMED)
 
     return MarkSpec(
       type = type,
@@ -983,6 +1238,7 @@ public class SpecParser {
 
   private fun parseEncodeEntry(value: VegaValue?, path: String): EncodeEntry {
     val obj = value as? VegaValue.Obj ?: return emptyMap()
+    obj.reportUnhandled("Encode", path, ENCODE_CONSUMED, ENCODE_UNSUPPORTED)
     val result = LinkedHashMap<String, ChannelValue>(obj.fields.size)
     for ((channel, definition) in obj.fields) {
       parseChannel(channel, definition, "$path.$channel")?.let { result[channel] = it }
