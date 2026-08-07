@@ -54,16 +54,28 @@ public data class CompiledSpec(
  */
 public class SpecCompiler(private val textEngine: TextEngine = MetricTextEngine()) {
 
-  public fun compileJson(json: String): CompiledSpec {
+  public fun compileJson(
+    json: String,
+    signalOverrides: Map<String, VegaValue> = emptyMap(),
+  ): CompiledSpec {
     val parsed = SpecParser().parseJson(json)
     val spec =
       parsed.spec ?: return CompiledSpec(null, emptyMap(), EMPTY_SIGNALS, parsed.diagnostics)
-    val compiled = compile(spec)
+    val compiled = compile(spec, signalOverrides)
     // Parse diagnostics come first so a reader sees problems in specification order.
     return compiled.copy(diagnostics = parsed.diagnostics + compiled.diagnostics)
   }
 
-  public fun compile(spec: VegaSpec): CompiledSpec {
+  /**
+   * @param signalOverrides signals an event handler has set, which keep their value through this
+   *   compile rather than being recomputed. This is how interaction works without an incremental
+   *   dataflow: a fired handler sets a signal and the whole specification is compiled again, which
+   *   measurement showed costs well under a frame (STATUS.md, Performance observations).
+   */
+  public fun compile(
+    spec: VegaSpec,
+    signalOverrides: Map<String, VegaValue> = emptyMap(),
+  ): CompiledSpec {
     val diagnostics = DiagnosticCollector()
     val ids = SceneNodeIdAllocator()
 
@@ -106,7 +118,8 @@ public class SpecCompiler(private val textEngine: TextEngine = MetricTextEngine(
     val data = DataResolver(diagnostics, expressions)
     val datasets = data.resolve(spec.data, transformSignals)
     val signals =
-      SignalResolver(diagnostics, expressions).resolve(spec.signals, datasets, transformSignals)
+      SignalResolver(diagnostics, expressions)
+        .resolve(spec.signals, datasets, transformSignals, signalOverrides)
 
     val numbers = NumberResolver(expressions, signals, diagnostics)
     val scales = ScaleResolver(datasets, plot, diagnostics, numbers).resolve(spec.scales)

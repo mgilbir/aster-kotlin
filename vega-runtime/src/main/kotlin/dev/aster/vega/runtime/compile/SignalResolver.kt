@@ -57,17 +57,27 @@ public class SignalResolver(
   private val expressions: ExpressionCompiler = CachingExpressionCompiler(VegaExpressionCompiler()),
 ) {
 
+  /**
+   * @param pinned signals whose value comes from outside and must not be recomputed.
+   *
+   * This is how an event handler's result survives the recompile that follows it. A pinned signal
+   * keeps the value it was given and everything reading it sees that, rather than the `update`
+   * expression it was declared with — which is the point, since the whole reason a handler fired
+   * was to override that.
+   */
   public fun resolve(
     signals: List<SignalSpec>,
     datasets: Map<String, List<VegaValue>>,
     implicit: Map<String, VegaValue> = emptyMap(),
-  ): SignalScope = Resolution(signals, datasets, implicit).run()
+    pinned: Map<String, VegaValue> = emptyMap(),
+  ): SignalScope = Resolution(signals, datasets, implicit, pinned).run()
 
   /** One resolution pass. Holds the mutable bookkeeping so the resolver itself stays reusable. */
   private inner class Resolution(
     signals: List<SignalSpec>,
     private val datasets: Map<String, List<VegaValue>>,
     implicit: Map<String, VegaValue>,
+    pinned: Map<String, VegaValue>,
   ) {
     private val specs = LinkedHashMap<String, SignalSpec>()
     private val values = LinkedHashMap<String, VegaValue>(implicit)
@@ -75,6 +85,9 @@ public class SignalResolver(
     private val inProgress = LinkedHashSet<String>()
 
     init {
+      // Seeded as already settled, so `resolve` returns before evaluating anything.
+      values.putAll(pinned)
+      settled.addAll(pinned.keys)
       for (signal in signals) {
         if (specs.containsKey(signal.name)) {
           diagnostics.warn(
@@ -84,6 +97,20 @@ public class SignalResolver(
           )
         }
         specs[signal.name] = signal
+      }
+      for (name in pinned.keys) {
+        val spec = specs[name] ?: continue
+        if (spec.expression != null) {
+          // Upstream would re-run the update when one of its dependencies changed, even after a
+          // handler had set the signal. Nothing here tracks that, so the handler's value simply
+          // stays — which is right until a dependency moves, and wrong after.
+          diagnostics.warn(
+            DiagnosticCodes.PARSE_UNKNOWN_PROPERTY,
+            "Signal '$name' was set by an event handler and also has an update expression; the " +
+              "handler's value stays and the expression will not run again",
+            operator = name,
+          )
+        }
       }
     }
 

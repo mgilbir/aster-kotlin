@@ -392,7 +392,7 @@ ordering), and the pipeline is now verified end to end on one fixture, but the b
 
 ## Verification
 
-- 1,192 JVM tests pass (`./scripts/test-core.sh`, `./gradlew test`).
+- 1,198 JVM tests pass (`./scripts/test-core.sh`, `./gradlew test`).
 - Android lint is clean with `warningsAsErrors` on every Android module.
 - 48 instrumented tests pass on an API 37 arm64 emulator (`./scripts/test-android.sh`): 40 in
   `vega-android-canvas`, 4 in `vega-compose`, 4 in `demo` — including one that compiles every bundled
@@ -644,16 +644,14 @@ depends on them. Each has a test and a comment; this is the index.
    `shape` needs projections. It wants an `AndroidImageResolver` to turn a URL into pixels, so
    unlike everything else in this session it cannot be finished or verified from here: the
    differential harness has no way to fetch and decode an image the way a device would.
-2. **Applying a fired handler's update**, which is the last piece of the interaction chain and
-   the one that touches everything else. Matching is done — `EventDispatcher` turns an event into
-   the list of handlers it fired — so what remains is: evaluate the handler's update in a scope
-   where `event` and `item` are visible, set the signal, and re-run whatever depends on it. That
-   last step looked like the largest piece of work here, and measuring says it is not: a full
-   recompile of the heaviest fixture costs 366 microseconds against a 16,600 microsecond frame
-   (see Performance observations). So re-resolve the signals and recompile — no incremental
-   dataflow. What is left is the ordinary part: evaluate the update in a scope where `event` and
-   `item` are visible, honour `force`, and decide where the mutable signal state lives, since
-   `SignalResolver` is deliberately stateless between calls.
+2. **Binding a real gesture to a stream**, which is the only part of the interaction chain left
+   and the only part that needs a device. Everything from an event to a redrawn scene now works
+   and is tested: `EventDispatcher` matches, `SignalUpdater` evaluates, and the specification is
+   recompiled with the changed signals pinned. What is missing is the translation layer — an
+   Android `MotionEvent` becoming an `InputEvent`, with the mark under the pointer resolved by
+   the existing hit tester and the event type mapped onto Vega's names (`pointerdown` and friends
+   rather than `mousedown`, which the selector language does not know about). `VegaChartController`
+   already owns hit testing and gesture detection, so it is the place for it. Verify on hardware.
 3. **Keep growing the fixture corpus.** 55 of the brief's 100. Fixtures no longer find defects on
    arrival — the last nine passed first try — because the corpus has caught up with everything
    written without one, and the recent work was all built against upstream vectors before a
