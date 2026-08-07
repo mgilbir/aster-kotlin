@@ -392,14 +392,15 @@ depends on them. Each has a test and a comment; this is the index.
 
 ## Next three tasks
 
-1. **Keep growing the fixture corpus.** 21 of the brief's 100 pass, and the return has not dropped
-   off: of the last twelve fixtures, eight failed on arrival. Between them they found a missing
-   scale-domain form, a legend layout rule that only diverges once swatches grow, unreported opacity,
-   rotated text offsets both sides of the harness had wrong in the same way, a line-gap behaviour this
-   engine had documented backwards, gridlines that ran the wrong way from a top or right axis, labels
-   that kept a gap for ticks that were switched off, and `reverse` reversing the wrong end of the
-   scale. Still untouched: `sequence`, `window` and the other 28 transforms, arc and shape marks, and
-   anything involving dates.
+1. **Keep growing the fixture corpus.** 26 of the brief's 100 pass, and the return has not dropped
+   off: most fixtures added so far failed on arrival, and every one of those failures was a real
+   defect. Between them they have found a missing scale-domain form, a legend layout rule that only
+   diverges once swatches grow, unreported opacity, rotated text offsets both sides of the harness had
+   wrong in the same way, a line-gap behaviour this engine had documented backwards, gridlines running
+   the wrong way from a top or right axis, labels keeping a gap for ticks that were switched off, and
+   `reverse` reversing the wrong end of the scale. Still untouched: `sequence`, `window`, `lookup`,
+   `sequence`-driven data and the other 26 transforms; `trail`, `shape`, `image` and `path` marks;
+   `quantile`, `quantize`, `threshold` and `bin-ordinal` scales; and `config` blocks of any kind.
 2. **Label overlap removal.** `labelOverlap` on an axis or a legend, which is what stops a dense time
    axis printing every label on top of the last. Reported everywhere it appears, and the most visible
    remaining gap on a chart that is otherwise correct.
