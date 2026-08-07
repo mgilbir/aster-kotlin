@@ -16,11 +16,12 @@ Last updated: 2026-08-07
 
 ## Current milestone
 
-Milestones 0, 1 and 2 complete. **Milestones 3 and 4 in progress**: Vega specifications compile end to
-end — including expressions, signals and the twelve data transforms the brief lists — and are verified
-against upstream Vega by differential tests.
+Milestones 0, 1 and 2 complete. **Milestones 3, 4 and 5 in progress**: Vega specifications compile
+end to end — expressions, signals, 33 of upstream's 40 data transforms, every scale type in scope,
+and an event handler that recompiles the chart — and are verified against upstream Vega by
+differential tests.
 
-Fifty differential fixtures pass, all matching upstream exactly on every mark and scale output:
+Fifty-six differential fixtures pass, all matching upstream exactly on every mark and scale output:
 
 | Fixture | Marks | Covers |
 | --- | --- | --- |
@@ -74,6 +75,12 @@ Fifty differential fixtures pass, all matching upstream exactly on every mark an
 | `path-marks` | 34 | outlines from SVG path strings, on path marks and on symbols |
 | `trail` | 28 | a line whose thickness follows the data, beside a plain line through it |
 | `reshape-matrix` | 33 | a heatmap crossed from one list, and a word-count chart beside it |
+| `statistics` | 28 | a least-squares line over its scatter, and the same values as quartile rules |
+| `trend-lines` | 33 | a quadratic fit sampled where it bends, a loess smoothing, the straight line |
+| `density-plot` | 40 | a kernel density over a dot plot, with the theoretical normal behind both |
+| `treemap` | 18 | one tree drawn twice: a squarified treemap and an icicle plot |
+| `tree-layouts` | 31 | a circle pack beside a tidy node-link diagram, with its links |
+| `binned-scales` | 87 | one skewed column through all four discretizing scales, with banded legends |
 
 The gate is wired into `./scripts/oracle.sh`, so every further scale, mark and transform is built
 against a harness that can say we are wrong — which golden tests cannot.
@@ -87,7 +94,7 @@ Upstream Vega is 31 packages, roughly 28,500 lines of source, and leans on about
 of `d3-*` code (d3-scale, d3-shape, d3-time-format, d3-array, d3-interpolate) that a native port has to
 reimplement. It exposes **40 transforms, 119 expression functions, 12 mark types and ~15 scale types.**
 
-This repository is around 9,000 lines of main source and 5,000 of tests. It covers the **output half**
+This repository is around 25,000 lines of main source and 11,000 of tests. It covers the **output half**
 of the pipeline, the testing and diagnostic infrastructure, and — as of Milestone 3 — a thin but
 upstream-verified slice through parsing, scales, rect encoding and axes:
 
@@ -96,10 +103,10 @@ upstream-verified slice through parsing, scales, rect encoding and axes:
 | Scene graph, geometry, paths, hit index | part of `vega-scenegraph` (4,994) | 7 of 12 node types; rendering and hit-testing side only. All 12 symbol shapes pinned to upstream, plus outlines read from SVG path strings |
 | Canvas renderer, SVG serializer | rest of `vega-scenegraph` | complete for those 7 |
 | Diagnostics, canonical snapshots, goldens, oracle scaffolding | no upstream equivalent | complete |
-| `vega-scale` (linear, log, pow, sqrt, symlog, time, utc, band, point, ordinal, sequential) + d3-array ticks | 790 + parts of d3-scale, d3-array | 11 of ~15 scale types, exact against upstream, with all 68 colour schemes |
+| `vega-scale` (linear, log, pow, sqrt, symlog, time, utc, band, point, ordinal, sequential) + d3-array ticks | 790 + parts of d3-scale, d3-array | every scale type in scope — the 11 continuous and discrete ones plus quantize, quantile, threshold and bin-ordinal — exact against upstream, with all 68 colour schemes |
 | `vega-parser` (width, height, padding, autosize, data, signals, scales, axes, legends, titles, marks, group scopes, `layout`, `config`) | 3,790 | a subset, and every property it does not read is reported by name |
-| `vega-encode` (mark encoders, axes, legends, titles) | 952 | 8 of 12 mark encoders; axes, legends and titles including overlap removal, truncation and the `config` cascade; nine interpolation methods |
-| `vega-expression` + `vega-functions` | 2,388 | language complete; 60 of 119 functions |
+| `vega-encode` (mark encoders, axes, legends, titles) | 952 | 10 of 12 mark encoders (`image` needs a device, `shape` needs projections); axes, legends and titles including overlap removal, truncation and the `config` cascade; nine interpolation methods |
+| `vega-expression` + `vega-functions` | 2,388 | language complete; 80 of 119 functions, with 19 more reported by name and reason |
 | `vega-transforms` (33 of 40) | 3,754 | the 12 the brief lists plus `timeunit`, `pie`, `window`, `sequence`, `lookup`, `impute`, `cross`, `pivot`, `countpattern`, the statistical family — `quantile`, `regression`, `loess`, `kde`, `density`, `dotbin` — and the whole hierarchy family: `stratify`, `nest`, `treemap`, `partition`, `pack`, `tree`. Exact against upstream |
 | `vega-dataflow` | 2,081 | contracts and scheduling only; no pulse propagation |
 
@@ -128,7 +135,7 @@ substantive compatibility items:
 | 1. Compiled Vega JSON loads without JavaScript | **Yes**, for a substantial subset — `VegaChartController.setSpec` loads it and the demo renders three bundled specifications on device |
 | 2. Bar, line, area, scatter, stacked bar render natively | **Yes** — all five compile from a specification, and small multiples of them too |
 | 3. Axes, legends, labels and titles supported | **Yes** — all four |
-| 4. Basic transforms and scales execute in Kotlin | **Yes** — 10 scale types, including time and UTC, and the 12 transforms the brief lists |
+| 4. Basic transforms and scales execute in Kotlin | **Yes** — every scale type in scope, including time and UTC and the four discretizing ones, and 33 of upstream's 40 transforms |
 | 5. Tap, hover, tooltip, selection, pan, zoom | Yes, except tooltip rendering |
 | 6. View and Compose APIs | Yes |
 | 7. SVG, PNG, PDF export | Yes |
@@ -198,7 +205,7 @@ ordering), and the pipeline is now verified end to end on one fixture, but the b
 - **Expression language**: lexer, precedence-climbing parser and tree-walking evaluator for the full
   JavaScript expression subset Vega uses. No `eval`, no reflection, no generated bytecode.
 - **JavaScript coercion semantics** in `JsSemantics`, pinned by 115 reference vectors from upstream.
-- **75 of upstream's 119 functions**, with the excluded ones reporting by name and reason.
+- **80 of upstream's 119 functions**, with the excluded ones reporting by name and reason.
 - **Signals**: `update` beats `init` beats `value`, dependency-ordered, `width`/`height`/`padding`
   implicit, cycles reported as the path that closed them.
 - **Conditional encode rules** (`[{test, ...}, {...}]`) for every channel kind.

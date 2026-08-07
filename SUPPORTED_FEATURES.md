@@ -122,7 +122,7 @@ Expected values in `TransformReferenceTest` were all generated from upstream.
 
 ## Expressions
 
-Upstream Vega exposes 119 expression functions; 60 are implemented. The language itself is complete.
+Upstream Vega exposes 119 expression functions; 80 are implemented and 19 more are reported by name and reason. The language itself is complete.
 
 | Feature | Status | Tests | Known differences | Target milestone |
 | --- | --- | --- | --- | --- |
