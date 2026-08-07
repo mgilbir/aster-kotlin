@@ -380,7 +380,11 @@ public data class ImageNode(
  */
 private fun buildSymbolPath(node: SymbolNode): PathData {
   val r = node.reference
-  if (r <= 0.0) return PathData.Empty
+  // A symbol sized to nothing is still *somewhere*: upstream bounds it as a degenerate point at its
+  // anchor, not as an empty rectangle. The difference shows up when a size scale bottoms out — the
+  // point still counts towards the chart's reach under `autosize: pad`, where an empty rectangle
+  // would silently drop out of the measurement.
+  if (r <= 0.0) return PathData.build { moveTo(node.x, node.y) }
 
   // sin(60°) and tan(30°): the height of an equilateral triangle of half-width r, and the offset
   // between its centroid and the centre of its bounding box.

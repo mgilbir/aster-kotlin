@@ -118,6 +118,9 @@ private val SCALE_CONSUMED =
     "name",
     "type",
     "domain",
+    "domainMin",
+    "domainMax",
+    "domainMid",
     "range",
     "reverse",
     "round",
@@ -136,13 +139,6 @@ private val SCALE_CONSUMED =
 
 private val SCALE_UNSUPPORTED =
   mapOf(
-    "domainMin" to
-      "Pinning a scale's domain minimum is not implemented; the domain comes from the data alone, " +
-        "so the scale will start wherever the data does",
-    "domainMax" to
-      "Pinning a scale's domain maximum is not implemented; the domain comes from the data alone, " +
-        "so the scale will end wherever the data does",
-    "domainMid" to "A three-point domain from 'domainMid' is not implemented",
     "domainRaw" to "Overriding a resolved domain with 'domainRaw' is not implemented",
     "domainImplicit" to "Extending an ordinal domain with unseen values is not implemented",
     "bins" to "Scale bin boundaries are not implemented",
@@ -586,6 +582,9 @@ public class SpecParser {
       name = name,
       type = type,
       domain = parseDomain(obj, "$path.domain"),
+      domainMin = obj.numberOrSignal("domainMin", "$path.domainMin"),
+      domainMax = obj.numberOrSignal("domainMax", "$path.domainMax"),
+      domainMid = obj.numberOrSignal("domainMid", "$path.domainMid"),
       range = parseRange(obj.fields["range"], "$path.range"),
       reverse = obj.fields["reverse"]?.asBoolean() ?: false,
       round = obj.fields["round"]?.asBoolean() ?: false,

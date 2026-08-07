@@ -40,7 +40,10 @@ class UnhandledPropertiesTest {
     """
       .trimIndent()
 
-  /** Six of upstream's 23 scale properties, and `domainMin`/`domainMax` are in wide use. */
+  /**
+   * Three of upstream's 23 scale properties remain. `domainMin`, `domainMax` and `domainMid` were
+   * the ones in wide use, and are implemented rather than reported.
+   */
   @Test
   fun `a scale reports the domain overrides it cannot honour`() {
     val reported =
@@ -52,10 +55,7 @@ class UnhandledPropertiesTest {
               "domainRaw": [1, 2], "domainImplicit": true, "bins": [0, 5, 10]}]"""
         )
       )
-    assertEquals(
-      listOf("bins", "domainImplicit", "domainMax", "domainMid", "domainMin", "domainRaw").sorted(),
-      reported.sorted(),
-    )
+    assertEquals(listOf("bins", "domainImplicit", "domainRaw").sorted(), reported.sorted())
   }
 
   @Test
@@ -186,10 +186,10 @@ class UnhandledPropertiesTest {
       diagnostics(
           spec(
             """"scales": [{"name": "s", "type": "linear", "domain": [0, 1],
-                "range": "width", "domainMax": 5}]"""
+                "range": "width", "domainRaw": [1, 2]}]"""
           )
         )
-        .single { it.jsonPath?.endsWith("domainMax") == true }
-    assertTrue("wherever the data does" in tailored.message, tailored.message)
+        .single { it.jsonPath?.endsWith("domainRaw") == true }
+    assertTrue("resolved domain" in tailored.message, tailored.message)
   }
 }

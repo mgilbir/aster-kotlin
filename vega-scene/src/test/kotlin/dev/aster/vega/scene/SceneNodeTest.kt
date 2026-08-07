@@ -176,11 +176,23 @@ class SceneNodeTest {
     assertEquals(10.0, small.bounds.width, 1e-9)
   }
 
+  /**
+   * A symbol sized to nothing is still somewhere.
+   *
+   * This asserted an empty outline until a differential fixture said otherwise: upstream bounds a
+   * zero-sized symbol as a degenerate point at its anchor, and the difference is not academic.
+   * Under `autosize: pad` the chart is measured by how far its marks reach, so a point counts and
+   * an empty rectangle drops silently out of the measurement — which is exactly what happens when a
+   * size scale bottoms out at its domain minimum.
+   */
   @Test
-  fun `zero-size symbol produces an empty outline instead of a degenerate shape`() {
+  fun `zero-size symbol bounds as a point at its anchor, as upstream does`() {
     val node = SymbolNode(id = ids.allocate(), x = 5.0, y = 5.0, size = 0.0)
-    assertTrue(node.outline.isEmpty)
-    assertTrue(node.bounds.isEmpty)
+    assertFalse(node.bounds.isEmpty)
+    assertEquals(5.0, node.bounds.left, 1e-9)
+    assertEquals(5.0, node.bounds.top, 1e-9)
+    assertEquals(0.0, node.bounds.width, 1e-9)
+    assertEquals(0.0, node.bounds.height, 1e-9)
   }
 
   @Test

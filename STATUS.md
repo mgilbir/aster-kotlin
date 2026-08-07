@@ -20,7 +20,7 @@ Milestones 0, 1 and 2 complete. **Milestones 3 and 4 in progress**: Vega specifi
 end — including expressions, signals and the twelve data transforms the brief lists — and are verified
 against upstream Vega by differential tests.
 
-Thirty-one differential fixtures pass, all matching upstream exactly on every mark and scale output:
+Thirty-two differential fixtures pass, all matching upstream exactly on every mark and scale output:
 
 | Fixture | Marks | Covers |
 | --- | --- | --- |
@@ -55,6 +55,7 @@ Thirty-one differential fixtures pass, all matching upstream exactly on every ma
 | `stack-offsets` | 32 | a normalized stacked area, its series faceted out of the stacked rows |
 | `stack-diverging` | 45 | negatives stacking away from zero, over a domain taken from both bounds |
 | `axis-style` | 37 | every part of an axis restyled: colour, width, dash, opacity, italic labels |
+| `domain-limits` | 37 | a domain pinned by `domainMin`/`domainMax` beside one written out in full |
 
 The gate is wired into `./scripts/oracle.sh`, so every further scale, mark and transform is built
 against a harness that can say we are wrong — which golden tests cannot.
@@ -116,7 +117,7 @@ substantive compatibility items:
 | 6. View and Compose APIs | Yes |
 | 7. SVG, PNG, PDF export | Yes |
 | 8. TalkBack can describe and navigate | Partial — virtual nodes are tested by instrumentation, not with TalkBack itself |
-| 9. At least 100 compatibility fixtures pass | 31 of 100 |
+| 9. At least 100 compatibility fixtures pass | 32 of 100 |
 | 10. Core runtime has no Android dependency | Yes |
 | 11. Renders without WebView | Yes |
 | 12. Build and test loop runs from the terminal | Yes |
@@ -243,6 +244,12 @@ ordering), and the pipeline is now verified end to end on one fixture, but the b
   with its own width, dash, opacity and font — the five parts of an axis are the same property with a
   different prefix upstream, and are read that way here. A label's colour is a fill and every other
   part's is a stroke, which is the only asymmetry and the one a renderer cannot paper over.
+- **`domainMin`, `domainMax` and `domainMid`**, which is how a chart is pinned to a fixed range
+  instead of rescaling with its data. Implementing them meant getting `zero` right first: it follows
+  the **scale type** — linear, pow and sqrt, and nothing else — not whether the domain was written
+  out, so a linear scale handed `[10, 20]` still starts at 0 where this engine had been leaving it
+  at 10. The limits then replace an end rather than clamping it, and run after `zero`, which is why
+  `domainMin: 30` beats it.
 - **Nothing dropped in silence.** Each parser now names the properties it *consumes* and reports the
   remainder, rather than a hand-kept list of what is missing. That inversion is the point: the
   hand-kept list is how the gap grew — the axis honoured fifteen of upstream's 74 properties and
@@ -269,7 +276,7 @@ ordering), and the pipeline is now verified end to end on one fixture, but the b
 
 ## Verification
 
-- 923 JVM tests pass (`./scripts/test-core.sh`, `./gradlew test`).
+- 938 JVM tests pass (`./scripts/test-core.sh`, `./gradlew test`).
 - Android lint is clean with `warningsAsErrors` on every Android module.
 - 48 instrumented tests pass on an API 37 arm64 emulator (`./scripts/test-android.sh`): 40 in
   `vega-android-canvas`, 4 in `vega-compose`, 4 in `demo` — including one that compiles every bundled
@@ -304,7 +311,7 @@ dark chrome, so a dark background was unreadable — they now take a `SampleScen
 
 ## Known failing fixtures
 
-None. Thirty-one fixtures exist and all thirty-one pass. The brief's MVP asks for 100; growing the
+None. Thirty-two fixtures exist and all thirty-two pass. The brief's MVP asks for 100; growing the
 corpus is the main task now, and each new fixture is expected to surface gaps rather than pass
 immediately. That keeps happening, which is the point of the harness: `stacked-bar` surfaced two real
 bugs, and `facet-trellis` surfaced a third — `range: "height"` was descending for every scale type,
@@ -341,6 +348,12 @@ styling family is implemented. Writing the fixture first showed the harness coul
 `strokeDash` was not compared at all, so a dashed gridline and a solid one were indistinguishable to
 it, the same way a symbol's outline once was. That makes four things the normalizer has had to be
 taught to see.
+
+`domain-limits` found one more, in a corner nothing had reached before: a symbol sized to **zero**
+was bounded as nothing at all, where upstream bounds it as a degenerate point at its anchor. A test
+had asserted the empty form deliberately, with no upstream evidence behind it. It matters under
+`autosize: pad`, where a chart is measured by how far its marks reach — a point counts and an empty
+rectangle drops out — and a size scale bottoming out at its domain minimum produces exactly that.
 
 Building legends surfaced a fourth, and a worse one, in code that had been "passing" for six fixtures:
 **every symbol was the wrong size.** Upstream ships its own symbol table rather than d3-shape's, sizing
@@ -393,6 +406,9 @@ depends on them. Each has a test and a comment; this is the index.
 | A format specifier naming no type is `.12~g`, not plain fixed formatting | `NumberFormatSubset.parse` |
 | An exponent is not zero-padded, because d3 formats `e` by calling JavaScript's own `toExponential` | `PlatformDecimals.exponential` |
 | A tick's stroke width counts towards the chart's size and a gridline's does not | `GuideStyle`, `AxisBuilder` |
+| `zero` follows the scale *type*, so a linear scale given `[10, 20]` still starts at 0 | `ScaleResolver.continuousDomain` |
+| `domainMin`/`domainMax` replace an end rather than clamping it, and run after `zero` | `ScaleResolver.continuousDomain` |
+| A zero-sized symbol bounds as a point at its anchor, not as nothing | `SceneNode.buildSymbolPath` |
 
 ## Architectural decisions pending
 
@@ -465,7 +481,7 @@ depends on them. Each has a test and a comment; this is the index.
    every chart with long category names is made readable. The angle is the harder of the two: it
    changes the label's align and baseline defaults and its contribution to the axis extent, so the
    chart's size moves with it.
-3. **Keep growing the fixture corpus.** 31 of the brief's 100 pass, and the return has not dropped
+3. **Keep growing the fixture corpus.** 32 of the brief's 100 pass, and the return has not dropped
    off: of the last five, two passed and three found defects — a domain `sort` that read an object as
    a boolean and quietly ordered a bar chart alphabetically, and the wrong character on every negative
    axis label. Between them the corpus has also found a missing scale-domain form, a legend layout

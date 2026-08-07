@@ -90,39 +90,12 @@ public class ScaleResolver(
 
   private fun buildLinear(spec: ScaleSpec): LinearScale? {
     val range = numericRange(spec) ?: return null
-    val explicit = literalNumbers(spec.domain)
-    if (explicit != null) {
-      if (explicit.size < 2) {
-        diagnostics.error(
-          DiagnosticCodes.SCALE_INVALID_DOMAIN,
-          "A linear scale needs at least two domain values (scale '${spec.name}')",
-          operator = spec.name,
-        )
-        return null
-      }
-      val domain = if (spec.nice) niceOf(explicit, spec) else explicit
-      return LinearScale(spec.name, domain, oriented(range, spec.reverse), spec.clamp)
-    }
-
-    val extent = numericExtent(spec.domain, spec.name)
-    // Vega defaults `zero` to true for a data-driven quantitative domain; verified against
-    // upstream.
-    val zero = spec.zero ?: true
-    val scale =
-      LinearScale.fromExtent(
-        name = spec.name,
-        extent = extent,
-        range = range,
-        zero = zero,
-        nice = spec.nice,
-        niceCount = spec.niceCount ?: LinearScale.DEFAULT_TICK_COUNT,
-        clamp = spec.clamp,
-      )
-    return if (spec.reverse) {
-      LinearScale(spec.name, scale.domain, range.reversed(), spec.clamp)
-    } else {
-      scale
-    }
+    // `zero` defaults to true for a linear scale whether or not the domain was written out —
+    // upstream keys it off the scale type, so `domain: [10, 20]` still starts at 0.
+    var domain =
+      continuousDomain(spec, zeroDefault = true, fallback = listOf(0.0, 1.0)) ?: return null
+    if (spec.nice) domain = niceOf(domain, spec)
+    return LinearScale(spec.name, domain, oriented(range, spec.reverse), spec.clamp)
   }
 
   /** True when the scale's range is colours rather than numbers. */
@@ -136,7 +109,8 @@ public class ScaleResolver(
 
   private fun buildSequentialColor(spec: ScaleSpec): SequentialColorScale? {
     val colors = colorRange(spec) ?: return null
-    val domain = explicitOrExtent(spec, zeroDefault = false) ?: return null
+    val domain =
+      continuousDomain(spec, zeroDefault = false, fallback = listOf(0.0, 1.0)) ?: return null
     val space =
       spec.interpolate?.let { name ->
         ColorSpaces.Interpolation.fromName(name)
@@ -211,7 +185,8 @@ public class ScaleResolver(
     val base = numbers.resolve(spec.base, spec.name) ?: 10.0
     // A log domain cannot include zero, and `zero: true` would force it to, so it never applies
     // here.
-    var domain = explicitOrExtent(spec, zeroDefault = false) ?: return null
+    var domain =
+      continuousDomain(spec, zeroDefault = false, fallback = listOf(1.0, 10.0)) ?: return null
     if (spec.nice) domain = Ticks.niceLog(domain, base)
 
     val scale = LogScale(spec.name, domain, oriented(range, spec.reverse), base, spec.clamp)
@@ -229,7 +204,8 @@ public class ScaleResolver(
 
   private fun buildPow(spec: ScaleSpec, defaultExponent: Double): PowScale? {
     val range = numericRange(spec) ?: return null
-    var domain = explicitOrExtent(spec, zeroDefault = true) ?: return null
+    var domain =
+      continuousDomain(spec, zeroDefault = true, fallback = listOf(0.0, 1.0)) ?: return null
     if (spec.nice) domain = niceOf(domain, spec)
     val exponent = numbers.resolve(spec.exponent, spec.name) ?: defaultExponent
     return PowScale(spec.name, domain, oriented(range, spec.reverse), exponent, spec.clamp)
@@ -237,36 +213,81 @@ public class ScaleResolver(
 
   private fun buildSymlog(spec: ScaleSpec): SymlogScale? {
     val range = numericRange(spec) ?: return null
-    var domain = explicitOrExtent(spec, zeroDefault = true) ?: return null
+    // Symlog is not in upstream's zero list: its domain reaches both signs happily.
+    var domain =
+      continuousDomain(spec, zeroDefault = false, fallback = listOf(0.0, 1.0)) ?: return null
     if (spec.nice) domain = niceOf(domain, spec)
     val constant = numbers.resolve(spec.constant, spec.name) ?: 1.0
     return SymlogScale(spec.name, domain, oriented(range, spec.reverse), constant, spec.clamp)
   }
 
   /**
-   * The domain for a continuous scale: the literal if there is one, otherwise the data extent.
+   * A continuous scale's domain, in upstream's order: the values, then `zero`, then the explicit
+   * limits. `nice` is the caller's, because each scale type rounds differently.
    *
-   * [zeroDefault] is whether this scale type includes zero by default when the domain comes from
-   * data. Log scales never do, because a domain containing zero is unusable.
+   * Two things here are visible only in upstream's `configureDomain`, and a reasonable reading gets
+   * both wrong:
+   * - `zero` keys off the **scale type**, not off whether the domain was written out. A linear
+   *   scale handed `[10, 20]` still starts at 0, which is not what "explicit domain" suggests. It
+   *   applies to linear, pow and sqrt and to nothing else — not log, and not symlog, whose domain
+   *   reaches both signs happily.
+   * - `domainMin` and `domainMax` **replace** an end rather than clamping it, and they run *after*
+   *   `zero`, so `domainMin: 30` beats the zero that would otherwise have pulled the domain down.
+   *   Upstream does not correct a minimum placed above the maximum either; it leaves the domain
+   *   running backwards.
+   *
+   * @param zeroDefault whether this scale type includes zero when the specification is silent.
+   * @param fallback the domain to use when nothing resolved; a log-family scale cannot take `[0,
+   *   1]`.
    */
-  private fun explicitOrExtent(spec: ScaleSpec, zeroDefault: Boolean): List<Double>? {
-    literalNumbers(spec.domain)?.let { explicit ->
-      if (explicit.size >= 2) return explicit
-      diagnostics.error(
-        DiagnosticCodes.SCALE_INVALID_DOMAIN,
-        "Scale '${spec.name}' needs at least two domain values",
-        operator = spec.name,
-      )
-      return null
-    }
-    val extent = numericExtent(spec.domain, spec.name) ?: return listOf(1.0, 10.0)
-    var lo = extent.start
-    var hi = extent.endInclusive
+  private fun continuousDomain(
+    spec: ScaleSpec,
+    zeroDefault: Boolean,
+    fallback: List<Double>,
+  ): List<Double>? {
+    val resolved =
+      literalNumbers(spec.domain)?.also {
+        if (it.size < 2) {
+          diagnostics.error(
+            DiagnosticCodes.SCALE_INVALID_DOMAIN,
+            "Scale '${spec.name}' needs at least two domain values",
+            operator = spec.name,
+          )
+          return null
+        }
+      }
+        ?: numericExtent(spec.domain, spec.name)?.let { listOf(it.start, it.endInclusive) }
+        ?: return fallback
+
+    val domain = resolved.toMutableList()
+    val last = domain.size - 1
     if (spec.zero ?: zeroDefault) {
-      lo = minOf(lo, 0.0)
-      hi = maxOf(hi, 0.0)
+      // Per end, as upstream writes it, rather than a symmetric min/max: only a positive low end
+      // and a negative high end move.
+      if (domain[0] > 0.0) domain[0] = 0.0
+      if (domain[last] < 0.0) domain[last] = 0.0
     }
-    return listOf(lo, hi)
+    numbers.resolve(spec.domainMin, spec.name)?.let { domain[0] = it }
+    numbers.resolve(spec.domainMax, spec.name)?.let { domain[last] = it }
+    numbers.resolve(spec.domainMid, spec.name)?.let { mid ->
+      // Upstream inserts before the last value, and warns rather than clamping when the midpoint
+      // falls outside the domain it is meant to divide.
+      val at =
+        when {
+          mid > domain[last] -> last + 1
+          mid < domain[0] -> 0
+          else -> last
+        }
+      if (at != last) {
+        diagnostics.warn(
+          DiagnosticCodes.SCALE_INVALID_DOMAIN,
+          "Scale '${spec.name}' has a domainMid of $mid outside its domain $domain",
+          operator = spec.name,
+        )
+      }
+      domain.add(at, mid)
+    }
+    return domain
   }
 
   /**

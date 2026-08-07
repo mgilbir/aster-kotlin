@@ -240,6 +240,15 @@ public data class ScaleSpec(
   val name: String,
   val type: ScaleType,
   val domain: DomainSpec,
+  /**
+   * `domainMin`/`domainMax` **replace** an end of the resolved domain rather than clamping it, and
+   * they run after `zero`, which is how `domainMin: 30` beats the zero that would otherwise have
+   * pulled the domain down. Upstream does not correct a minimum above the maximum either.
+   */
+  val domainMin: NumberValue? = null,
+  val domainMax: NumberValue? = null,
+  /** Inserts a third domain value, for a diverging scale with a three-colour range. */
+  val domainMid: NumberValue? = null,
   val range: RangeSpec,
   val reverse: Boolean = false,
   val round: Boolean = false,

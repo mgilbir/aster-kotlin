@@ -271,7 +271,7 @@ class DomainSortTest {
 
   /** An array has nowhere to hang a `sort`, and upstream reads it straight through. */
   @Test
-  fun `an explicit domain keeps the order it was written in`() {
+  fun `an explicit discrete domain keeps the order it was written in`() {
     assertEquals(
       listOf("delta", "alpha", "charlie"),
       domainOf("""["delta", "alpha", "charlie"]"""),
