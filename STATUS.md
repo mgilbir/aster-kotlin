@@ -486,33 +486,31 @@ depends on them. Each has a test and a comment; this is the index.
 
 ## Next three tasks
 
-1. **Implement what the audit just named, starting with `domainMin`/`domainMax`, legend styling and
-   the mark stroke channels.** Reporting the gap was the cheap half and it is done; these three are
-   the parts of it that a chart notices. `domainMin`/`domainMax` pin an axis to a fixed range, which
-   is what stops a dashboard's bars rescaling every refresh. Legend styling is the same
-   `{part}Color`/`Width`/`Dash`/`Opacity` family the axis already has, against the same `GuideStroke`
-   and `GuideStyle` — a legend beside a styled axis currently cannot be made to match it. And
-   `strokeDash`, `strokeCap` and `strokeJoin` on a mark are already in the scene graph and the
-   renderers; only the encoder does not read them.
-2. **`values`, then `labelAngle`.** The two most consequential things a specification can ask an axis
-   for and not get. `values` replaces the tick set outright — upstream keeps the grid in step with it,
-   and on a band scale it filters the domain rather than positioning freely — and `labelAngle` is how
-   every chart with long category names is made readable. The angle is the harder of the two: it
-   changes the label's align and baseline defaults and its contribution to the axis extent, so the
-   chart's size moves with it.
-3. **Keep growing the fixture corpus.** 33 of the brief's 100 pass, and the return has not dropped
-   off: of the last five, two passed and three found defects — a domain `sort` that read an object as
-   a boolean and quietly ordered a bar chart alphabetically, and the wrong character on every negative
-   axis label. Between them the corpus has also found a missing scale-domain form, a legend layout
-   rule that only diverges once swatches grow, unreported opacity, rotated text offsets both sides of
-   the harness had wrong in the same way, a line-gap behaviour this engine had documented backwards,
-   gridlines running the wrong way from a top or right axis, labels keeping a gap for ticks that were
-   switched off, and `reverse` reversing the wrong end of the scale. Worth aiming at next: a `config`
-   block of any kind, which is where a Vega-Lite-compiled specification puts everything and where
-   every default in this engine is still a hard-coded constant with no way for a specification to move
-   it; and a local `time` scale crossing a daylight-saving boundary, where only UTC is covered today.
-   Still untouched beyond that: `sequence`, `window` and `lookup` and the other 25 transforms;
-   `trail`, `shape`, `image` and `path` marks; and `quantile`, `quantize`, `threshold` and
-   `bin-ordinal` scales.
-4. **Label overlap removal** and **arc padding and corner rounding**, both long-standing and both
-   still worth doing — each a self-contained feature that is honestly reported today.
+1. **`values`, then `labelAngle`.** The two most consequential things a specification can ask an
+   axis for and not get, now that the audit's cheaper items are in. `values` replaces the tick set
+   outright — upstream keeps the grid in step with it, and on a band scale it filters the domain
+   rather than positioning freely — and `labelAngle` is how every chart with long category names is
+   made readable. The angle is the harder of the two: it changes the label's align and baseline
+   defaults and its contribution to the axis extent, so the chart's size moves with it. Both are
+   reported today, so neither is a silent wrong answer.
+2. **Keep growing the fixture corpus.** 33 of the brief's 100 pass, and the return has if anything
+   gone up: the last five fixtures found nine defects between them, and four of those were in code
+   that had been passing for a dozen fixtures — a legend placed over the marks it should clear, a
+   symbol sized to nothing that measured as nothing, `zero` skipped for a written-out domain, and
+   the wrong character on every negative axis label. Worth aiming at next: a `config` block of any
+   kind, which is where a Vega-Lite-compiled specification puts everything and where every default
+   in this engine is still a hard-coded constant with no way for a specification to move it; and a
+   local `time` scale crossing a daylight-saving boundary, where only UTC is covered today. Still
+   untouched beyond that: `sequence`, `window` and `lookup` and the other 25 transforms; `trail`,
+   `shape`, `image` and `path` marks; and `quantile`, `quantize`, `threshold` and `bin-ordinal`
+   scales.
+3. **Label overlap removal**, still the most visible remaining gap on a chart that is otherwise
+   correct, and **arc padding and corner rounding**, which is what separates a serviceable donut
+   from a finished one. Both are honestly reported today, which is why they rank behind work that
+   removes silent wrong answers.
+
+A note on the harness, because it is now the fourth time: the differential comparison has had to be
+taught to see a symbol's outline, fill and stroke opacity, a dash pattern and a node's own opacity.
+Each was invisible for the same reason — two marks that agree on every channel being compared and
+differ in the drawn result. Before trusting a green fixture on a *new* kind of property, check that
+`oracle-js/src/normalize.js` and `Differential.kt` both emit it.
