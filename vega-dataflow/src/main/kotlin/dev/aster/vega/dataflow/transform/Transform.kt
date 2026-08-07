@@ -143,6 +143,9 @@ public class TransformRegistry(transforms: List<Transform>) {
           QuantileTransform,
           RegressionTransform,
           LoessTransform,
+          KdeTransform,
+          DensityTransform,
+          DotBinTransform,
         )
       )
   }

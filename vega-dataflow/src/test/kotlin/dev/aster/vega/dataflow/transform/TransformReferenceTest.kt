@@ -469,7 +469,7 @@ class TransformReferenceTest {
     val output =
       run(
         """[{"type": "formula", "expr": "1", "as": "one"},
-            {"type": "kde", "field": "v"},
+            {"type": "treemap", "field": "v"},
             {"type": "filter", "expr": "false"}]"""
       )
     // The formula ran; the filter after the unknown transform did not.
@@ -479,7 +479,7 @@ class TransformReferenceTest {
       context.diagnostics.diagnostics.first {
         it.code == DiagnosticCodes.TRANSFORM_NOT_IMPLEMENTED
       }
-    assertTrue(diagnostic.message.contains("kde"), diagnostic.message)
+    assertTrue(diagnostic.message.contains("treemap"), diagnostic.message)
   }
 
   @Test
@@ -507,7 +507,7 @@ class TransformReferenceTest {
   }
 
   @Test
-  fun `the registry covers the transforms the brief lists, plus twelve more`() {
+  fun `the registry covers the transforms the brief lists, plus fifteen more`() {
     val fromTheBrief =
       setOf(
         "filter",
@@ -530,7 +530,7 @@ class TransformReferenceTest {
     // bind to; `lookup` is the only join there is; and `impute` is what stops a line jumping the
     // gap where a series has no row. `cross`, `pivot` and `countpattern` are the reshaping three:
     // a matrix, a long table made wide, and the word counts a cloud is drawn from. `quantile`,
-    // `regression` and `loess` are the statistical family.
+    // `regression`, `loess`, `kde`, `density` and `dotbin` are the statistical family.
     assertEquals(
       fromTheBrief +
         "timeunit" +
@@ -544,7 +544,10 @@ class TransformReferenceTest {
         "countpattern" +
         "quantile" +
         "regression" +
-        "loess",
+        "loess" +
+        "kde" +
+        "density" +
+        "dotbin",
       TransformRegistry.Default.types,
     )
   }
@@ -1130,6 +1133,242 @@ class TransformReferenceTest {
         """{"x":5,"y":35.51686928081588},{"x":6,"y":52.22088818332823},""" +
         """{"x":7,"y":74.33942427425657},{"x":8,"y":98.31241958028772}]""",
       run("""[{"type": "loess", "x": "x", "y": "y", "bandwidth": 0.6}]""", curvy),
+    )
+  }
+
+  // ---- kde, density, dotbin -------------------------------------------------
+
+  private val sample =
+    """
+    [{"v": 2}, {"v": 3}, {"v": 3}, {"v": 4}, {"v": 5}, {"v": 5},
+     {"v": 5}, {"v": 6}, {"v": 7}, {"v": 9}, {"v": 12}, {"v": 3.5}]
+    """
+      .trimIndent()
+
+  private val twoGroups =
+    """
+    [{"g": "a", "v": 1}, {"g": "a", "v": 2}, {"g": "a", "v": 2}, {"g": "a", "v": 4},
+     {"g": "b", "v": 5}, {"g": "b", "v": 6}, {"g": "b", "v": 6}, {"g": "b", "v": 9}]
+    """
+      .trimIndent()
+
+  /**
+   * The bandwidth is Scott's rule when unset, which is the whole answer here: none of these numbers
+   * follows from the data alone.
+   */
+  @Test
+  fun `a kernel density estimate matches upstream`() {
+    assertEquals(
+      """[{"density":0.09011414403662595,"value":2},{"density":0.1582932515223536,"value":4},""" +
+        """{"density":0.11843695231771774,"value":6},{"density":0.05326135520557964,"value":8},""" +
+        """{"density":0.029723008771871905,"value":10},""" +
+        """{"density":0.026355564726171482,"value":12}]""",
+      run("""[{"type": "kde", "field": "v", "steps": 5}]""", sample),
+    )
+  }
+
+  /** `cumulative` climbs to 1 instead; `counts` scales a probability by the group's size. */
+  @Test
+  fun `cumulative and counts change what the density means`() {
+    assertEquals(
+      """[{"density":0.10253359103054159,"value":2},{"density":0.365935355859532,"value":4},""" +
+        """{"density":0.658637755376812,"value":6},{"density":0.8233133572463371,"value":8},""" +
+        """{"density":0.9018160893305828,"value":10},""" +
+        """{"density":0.9570644326217687,"value":12}]""",
+      run("""[{"type": "kde", "field": "v", "steps": 5, "cumulative": true}]""", sample),
+    )
+    assertEquals(
+      """[{"density":1.0798231538090275,"value":2},{"density":2.0738574033025037,"value":4.5},""" +
+        """{"density":0.8624520359708714,"value":7},{"density":0.388042675977441,"value":9.5},""" +
+        """{"density":0.4033756216361776,"value":12}]""",
+      run(
+        """[{"type": "kde", "field": "v", "steps": 4, "bandwidth": 1, "counts": true}]""",
+        sample,
+      ),
+    )
+  }
+
+  /** Each group gets its own extent, so the two densities do not share x positions. */
+  @Test
+  fun `grouped densities are sampled over their own extents`() {
+    assertEquals(
+      """[{"density":0.22182889446291434,"g":"a","value":1},""" +
+        """{"density":0.2734615629587992,"g":"a","value":2},""" +
+        """{"density":0.19497578501765456,"g":"a","value":3},""" +
+        """{"density":0.1278390154599367,"g":"a","value":4},""" +
+        """{"density":0.22075438991637106,"g":"b","value":5},""" +
+        """{"density":0.2325431290214444,"g":"b","value":6.333333333333333},""" +
+        """{"density":0.09359008457132215,"g":"b","value":7.666666666666666},""" +
+        """{"density":0.1019849518627684,"g":"b","value":9}]""",
+      run(
+        """[{"type": "kde", "field": "v", "groupby": ["g"], "steps": 3, "bandwidth": 1}]""",
+        twoGroups,
+      ),
+    )
+  }
+
+  /** The normal CDF is West's rational approximation, not an integral — worth pinning exactly. */
+  @Test
+  fun `a named distribution is sampled over its extent`() {
+    assertEquals(
+      """[{"density":0.0044318484119380075,"value":-3},""" +
+        """{"density":0.07895015830089419,"value":-1.7999999999999998},""" +
+        """{"density":0.3332246028917997,"value":-0.5999999999999996},""" +
+        """{"density":0.3332246028917997,"value":0.5999999999999996},""" +
+        """{"density":0.07895015830089407,"value":1.8000000000000007},""" +
+        """{"density":0.0044318484119380075,"value":3}]""",
+      run(
+        """[{"type": "density", "extent": [-3, 3], "steps": 5,
+             "distribution": {"function": "normal", "mean": 0, "stdev": 1}}]""",
+        sample,
+      ),
+    )
+    assertEquals(
+      """[{"density":0.001349898031630115,"value":-3},""" +
+        """{"density":0.03593031911292582,"value":-1.7999999999999998},""" +
+        """{"density":0.2742531177500737,"value":-0.5999999999999996},""" +
+        """{"density":0.7257468822499262,"value":0.5999999999999996},""" +
+        """{"density":0.9640696808870742,"value":1.8000000000000007},""" +
+        """{"density":0.9986501019683699,"value":3}]""",
+      run(
+        """[{"type": "density", "extent": [-3, 3], "steps": 5, "method": "cdf",
+             "distribution": {"function": "normal"}}]""",
+        sample,
+      ),
+    )
+  }
+
+  @Test
+  fun `lognormal and uniform densities match upstream`() {
+    assertEquals(
+      """[{"density":0.18411619590349992,"value":0.5},""" +
+        """{"density":0.46192945435622274,"value":1.375},""" +
+        """{"density":0.25838163819756943,"value":2.25},""" +
+        """{"density":0.12058133105227524,"value":3.125},""" +
+        """{"density":0.055832224931867395,"value":4}]""",
+      run(
+        """[{"type": "density", "extent": [0.5, 4], "steps": 4,
+             "distribution": {"function": "lognormal", "mean": 0.5, "stdev": 0.6}}]""",
+        sample,
+      ),
+    )
+    // A uniform density is zero outside its own bounds rather than undefined.
+    assertEquals(
+      """[{"density":0,"value":-1},{"density":0.5,"value":0},{"density":0.5,"value":1},""" +
+        """{"density":0.5,"value":2},{"density":0,"value":3}]""",
+      run(
+        """[{"type": "density", "extent": [-1, 3], "steps": 4,
+             "distribution": {"function": "uniform", "min": 0, "max": 2}}]""",
+        sample,
+      ),
+    )
+  }
+
+  /** A mixture normalises its weights, so `[0.3, 0.7]` and `[3, 7]` are the same curve. */
+  @Test
+  fun `a mixture blends its parts by normalised weight`() {
+    val expected =
+      """[{"density":0.016197289953956417,"value":-2},""" +
+        """{"density":0.11968268412043688,"value":0},""" +
+        """{"density":0.016384652270027257,"value":2},""" +
+        """{"density":0.5585593416297352,"value":4},""" +
+        """{"density":1.8736413883569446e-4,"value":6}]"""
+    assertEquals(
+      expected,
+      run(
+        """[{"type": "density", "extent": [-2, 6], "steps": 4,
+             "distribution": {"function": "mixture", "weights": [0.3, 0.7], "distributions": [
+               {"function": "normal", "mean": 0, "stdev": 1},
+               {"function": "normal", "mean": 4, "stdev": 0.5}]}}]""",
+        sample,
+      ),
+    )
+    assertEquals(
+      expected,
+      run(
+        """[{"type": "density", "extent": [-2, 6], "steps": 4,
+             "distribution": {"function": "mixture", "weights": [3, 7], "distributions": [
+               {"function": "normal", "mean": 0, "stdev": 1},
+               {"function": "normal", "mean": 4, "stdev": 0.5}]}}]""",
+        sample,
+      ),
+    )
+  }
+
+  /** A kde distribution can read the rows itself, which is why it alone may omit the extent. */
+  @Test
+  fun `a kde distribution takes its extent from its own data`() {
+    assertEquals(
+      """[{"density":0.017465444564237414,"value":0},""" +
+        """{"density":0.10804378902250249,"value":2.4000000000000004},""" +
+        """{"density":0.1499032509624765,"value":4.800000000000001},""" +
+        """{"density":0.07593112615316225,"value":7.199999999999999},""" +
+        """{"density":0.03343298798682608,"value":9.600000000000001},""" +
+        """{"density":0.02525733414523565,"value":12}]""",
+      run(
+        """[{"type": "density", "extent": [0, 12], "steps": 5,
+             "distribution": {"function": "kde", "field": "v", "bandwidth": 1.5}}]""",
+        sample,
+      ),
+    )
+  }
+
+  /**
+   * Without `steps` the sampler adapts, and a bell over six standard deviations wants 105 points.
+   */
+  @Test
+  fun `a density with no step count is sampled adaptively`() {
+    val output =
+      run(
+        """[{"type": "density", "extent": [-3, 3],
+             "distribution": {"function": "normal"}}]""",
+        sample,
+      )
+    assertEquals(105, output.split("},{").size)
+  }
+
+  /**
+   * A dot plot is not a histogram with round marks: there are no fixed bin edges. A stack opens at
+   * the first value that did not fit in the previous one, and every dot in it takes the midpoint of
+   * that stack's first and last value — so the stacks sit where the data is dense.
+   */
+  @Test
+  fun `dotbin stacks by proximity rather than on a grid`() {
+    // The default step is a thirtieth of the extent, here 0.33, so nothing shares a stack.
+    assertEquals(
+      """[{"bin":2,"v":2},{"bin":3,"v":3},{"bin":3,"v":3},{"bin":4,"v":4},{"bin":5,"v":5},""" +
+        """{"bin":5,"v":5},{"bin":5,"v":5},{"bin":6,"v":6},{"bin":7,"v":7},{"bin":9,"v":9},""" +
+        """{"bin":12,"v":12},{"bin":3.5,"v":3.5}]""",
+      run("""[{"type": "dotbin", "field": "v"}]""", sample),
+    )
+    // A wider step gathers 2, 3, 3 into one stack at 2.5, and 5, 5, 5, 6 into one at 5.5. Note the
+    // rows come back in their original order, so the last row is still the 3.5 — now at 3.75.
+    assertEquals(
+      """[{"bin":2.5,"v":2},{"bin":2.5,"v":3},{"bin":2.5,"v":3},{"bin":3.75,"v":4},""" +
+        """{"bin":5.5,"v":5},{"bin":5.5,"v":5},{"bin":5.5,"v":5},{"bin":5.5,"v":6},""" +
+        """{"bin":7,"v":7},{"bin":9,"v":9},{"bin":12,"v":12},{"bin":3.75,"v":3.5}]""",
+      run("""[{"type": "dotbin", "field": "v", "step": 1.5}]""", sample),
+    )
+  }
+
+  /** Smoothing trades a dot's own value for a less jagged outline, by swapping between stacks. */
+  @Test
+  fun `dotbin smoothing moves dots between adjacent stacks`() {
+    assertEquals(
+      """[{"bin":2.5,"v":2},{"bin":2.5,"v":3},{"bin":3.75,"v":3},{"bin":3.75,"v":4},""" +
+        """{"bin":5.5,"v":5},{"bin":3.75,"v":5},{"bin":7,"v":5},{"bin":7,"v":6},""" +
+        """{"bin":7,"v":7},{"bin":9,"v":9},{"bin":12,"v":12},{"bin":3.75,"v":3.5}]""",
+      run("""[{"type": "dotbin", "field": "v", "step": 1.5, "smooth": true}]""", sample),
+    )
+  }
+
+  @Test
+  fun `dotbin stacks each group separately`() {
+    assertEquals(
+      """[{"bin":1,"g":"a","v":1},{"bin":2,"g":"a","v":2},{"bin":2,"g":"a","v":2},""" +
+        """{"bin":4,"g":"a","v":4},{"bin":5,"g":"b","v":5},{"bin":6,"g":"b","v":6},""" +
+        """{"bin":6,"g":"b","v":6},{"bin":9,"g":"b","v":9}]""",
+      run("""[{"type": "dotbin", "field": "v", "groupby": ["g"], "step": 1}]""", twoGroups),
     )
   }
 }
