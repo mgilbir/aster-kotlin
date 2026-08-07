@@ -104,7 +104,7 @@ public class MarkEncoder(
         diagnostics.error(
           DiagnosticCodes.TRANSFORM_NOT_IMPLEMENTED,
           "The '${spec.type.name.lowercase()}' mark encoder is not implemented; " +
-            "${data.size} data values produced no marks",
+            "${data.size} data row${if (data.size == 1) "" else "s"} produced no marks",
           operator = spec.name ?: spec.type.name.lowercase(),
         )
         emptyList()

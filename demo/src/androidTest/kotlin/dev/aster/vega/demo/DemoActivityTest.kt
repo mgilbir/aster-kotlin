@@ -44,7 +44,8 @@ class DemoActivityTest {
   @Test
   fun everySpecificationCompilesOnDevice() {
     val context = InstrumentationRegistry.getInstrumentation().targetContext
-    for (chart in DemoChart.entries.filter { it.isSpec }) {
+    // Bundled ones only: the paste entry is a specification too, and its text comes from a user.
+    for (chart in DemoChart.entries.filter { it.specAsset != null }) {
       val asset = requireNotNull(chart.specAsset)
       val json = context.assets.open(asset).bufferedReader().use { it.readText() }
       val controller = VegaChartController(textEngine = AndroidTextEngine())
@@ -68,5 +69,115 @@ class DemoActivityTest {
     assertNotEquals(light.toCanonicalJson(), dark.toCanonicalJson())
     assertEquals(light.nodeCount, dark.nodeCount)
     assertEquals(light.contentBounds, dark.contentBounds)
+  }
+
+  // ---- pasting a specification ----------------------------------------------
+
+  private val goodSpec =
+    """
+    {
+      "description": "A pasted bar chart.",
+      "width": 200, "height": 100,
+      "data": [{"name": "t", "values": [{"c": "a", "v": 3}, {"c": "b", "v": 7}]}],
+      "scales": [
+        {"name": "x", "type": "band", "domain": {"data": "t", "field": "c"}, "range": "width"},
+        {"name": "y", "type": "linear", "domain": {"data": "t", "field": "v"}, "range": "height"}
+      ],
+      "marks": [{"type": "rect", "from": {"data": "t"}, "encode": {"enter": {
+        "x": {"scale": "x", "field": "c"}, "width": {"scale": "x", "band": 1},
+        "y": {"scale": "y", "field": "v"}, "y2": {"scale": "y", "value": 0}}}}]
+    }
+    """
+      .trimIndent()
+
+  private fun compileOnDevice(json: String) =
+    VegaChartController(textEngine = AndroidTextEngine()).setSpec(json)
+
+  @Test
+  fun aPastedSpecificationCompilesAndReportsCleanly() {
+    val report = PasteReport.of(compileOnDevice(goodSpec))
+    assertTrue(report.headline, report.headline.contains("nothing unsupported"))
+    assertEquals(emptyList<String>(), report.details)
+  }
+
+  /** Nonsense keeps the previous chart on screen, and the report has to say so. */
+  @Test
+  fun aPastedSpecificationThatIsNotJsonSaysSoRatherThanBlanking() {
+    val report = PasteReport.of(compileOnDevice("not json at all"))
+    assertTrue(report.headline, report.headline.contains("Did not compile"))
+    assertTrue(report.headline, report.headline.contains("previous chart"))
+    assertTrue(report.details.isNotEmpty())
+  }
+
+  /**
+   * The case the whole feature exists for.
+   *
+   * A real-world specification will use something this engine has not implemented. It renders — and
+   * a reader has to be told it is not the chart that was asked for, with the property named. This
+   * is "nothing silently ignored" reaching an actual user for the first time.
+   */
+  @Test
+  fun aPastedSpecificationUsingSomethingUnsupportedSaysWhichPart() {
+    val withUnsupported =
+      goodSpec.replace(
+        """"marks": [{"type": "rect",""",
+        """"marks": [{"type": "shape", "aria": false}, {"type": "rect",""",
+      )
+    val report = PasteReport.of(compileOnDevice(withUnsupported))
+    assertTrue(report.headline, report.headline.contains("not the chart the specification asked"))
+    // Errors and warnings are counted separately: one means the picture is missing something, the
+    // other that it is very nearly right.
+    assertTrue(report.headline, report.headline.contains("1 thing could not be drawn"))
+    assertTrue(report.details.toString(), report.details.any { it.contains("shape") })
+  }
+
+  /** A property that is merely ignored is a softer message than a mark that never drew. */
+  @Test
+  fun anIgnoredPropertyIsReportedWithoutClaimingTheChartIsWrong() {
+    val withIgnored =
+      goodSpec.replace(
+        """"y2": {"scale": "y", "value": 0}""",
+        """"y2": {"scale": "y", "value": 0}, "cornerRadiusTopLeft": {"value": 4}""",
+      )
+    val report = PasteReport.of(compileOnDevice(withIgnored))
+    assertTrue(report.headline, !report.headline.contains("could not be drawn"))
+    assertTrue(report.headline, report.headline.contains("1 property was ignored"))
+  }
+
+  /**
+   * The clipboard read, against a real `ClipboardManager` and a focused activity.
+   *
+   * The activity has to be launched, and that is the finding rather than a test detail: since
+   * Android 10 an app may only read the clipboard while it holds focus, and `getPrimaryClip()`
+   * returns null otherwise. It works in the demo because a person taps the button with the app in
+   * front of them — but the null path is a real one, not just an empty clipboard, which is why the
+   * button says something rather than silently doing nothing.
+   */
+  @Test
+  fun theClipboardIsReadBackAsTextWhileTheAppHasFocus() {
+    ActivityScenario.launch(DemoActivity::class.java).use { scenario ->
+      var read: String? = null
+      var readBlank: String? = "not yet run"
+      scenario.onActivity { activity ->
+        val clipboard =
+          activity.getSystemService(android.content.Context.CLIPBOARD_SERVICE)
+            as android.content.ClipboardManager
+        clipboard.setPrimaryClip(android.content.ClipData.newPlainText("spec", goodSpec))
+        read = clipboardText(activity)
+        // Whitespace alone is not a specification and must not look like one.
+        clipboard.setPrimaryClip(android.content.ClipData.newPlainText("blank", "   "))
+        readBlank = clipboardText(activity)
+      }
+      assertEquals(goodSpec, read)
+      assertEquals(null, readBlank)
+    }
+  }
+
+  @Test
+  fun theCatalogueOffersAPasteEntry() {
+    val pasted = DemoChart.entries.filter { it.isPasted }
+    assertEquals(1, pasted.size)
+    assertTrue(pasted.single().isSpec)
+    assertEquals(null, pasted.single().specAsset)
   }
 }

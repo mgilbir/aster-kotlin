@@ -11,12 +11,15 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
@@ -65,6 +68,9 @@ private fun DemoScreen() {
   var chart by remember { mutableStateOf(DemoChart.BAR) }
   var dark by remember { mutableStateOf(false) }
   var status by remember { mutableStateOf("Tap a mark, drag to pan, pinch to zoom.") }
+  /** The specification the user pasted or typed, and what compiling it had to say. */
+  var pasted by remember { mutableStateOf("") }
+  var report by remember { mutableStateOf<PasteReport?>(null) }
 
   val context = LocalContext.current
   // One text engine for building hand-authored scenes, which the view also draws with. The
@@ -75,9 +81,18 @@ private fun DemoScreen() {
   val exporter = remember { SceneExporter() }
   val controller = remember { VegaChartController(textEngine = AndroidTextEngine()) }
 
-  LaunchedEffect(chart, dark) {
+  LaunchedEffect(chart, dark, pasted) {
     val asset = chart.specAsset
-    if (asset != null) {
+    if (chart.isPasted) {
+      if (pasted.isBlank()) {
+        report = null
+        status = "Paste a Vega specification, or type one."
+      } else {
+        val compiled = controller.setSpecAsync(pasted)
+        report = PasteReport.of(compiled)
+        status = report!!.headline
+      }
+    } else if (asset != null) {
       val json = context.assets.open(asset).bufferedReader().use { it.readText() }
       val compiled = controller.setSpecAsync(json)
       val errors = compiled.diagnostics.count { it.severity >= DiagnosticSeverity.ERROR }
@@ -117,6 +132,17 @@ private fun DemoScreen() {
           Text("Dark background")
           Switch(checked = dark, onCheckedChange = { dark = it }, enabled = !chart.isSpec)
           Button(onClick = { controller.resetViewport() }) { Text("Reset zoom") }
+        }
+
+        if (chart.isPasted) {
+          PasteControls(
+            text = pasted,
+            onText = { pasted = it },
+            onPaste = {
+              val clip = clipboardText(context)
+              if (clip == null) status = "Nothing on the clipboard." else pasted = clip
+            },
+          )
         }
 
         Box(
@@ -179,8 +205,50 @@ private fun DemoScreen() {
         }
 
         Text(text = status, modifier = Modifier.padding(top = 8.dp))
+
+        // Only for a pasted specification: for the bundled ones the diagnostics are ours to fix,
+        // not the reader's to act on.
+        report
+          ?.details
+          ?.takeIf { it.isNotEmpty() }
+          ?.let { details ->
+            Column(
+              modifier =
+                Modifier.fillMaxWidth()
+                  .heightIn(max = 160.dp)
+                  .verticalScroll(rememberScrollState())
+                  .padding(top = 4.dp)
+            ) {
+              details.forEach { line ->
+                Text(text = "• $line", style = MaterialTheme.typography.bodySmall)
+              }
+            }
+          }
       }
     }
+  }
+}
+
+/**
+ * The paste surface: a button for the common case and a field for everything else.
+ *
+ * The field is editable rather than read-only because a specification that failed is exactly the
+ * one worth changing a line of, and going back to another app to do it loses the diagnostics.
+ */
+@Composable
+private fun PasteControls(text: String, onText: (String) -> Unit, onPaste: () -> Unit) {
+  Column(modifier = Modifier.fillMaxWidth().padding(top = 8.dp)) {
+    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+      Button(onClick = onPaste) { Text("Paste from clipboard") }
+      Button(onClick = { onText("") }, enabled = text.isNotEmpty()) { Text("Clear") }
+    }
+    OutlinedTextField(
+      value = text,
+      onValueChange = onText,
+      modifier = Modifier.fillMaxWidth().heightIn(min = 90.dp, max = 150.dp).padding(top = 8.dp),
+      label = { Text("Vega specification (JSON)") },
+      textStyle = MaterialTheme.typography.bodySmall,
+    )
   }
 }
 

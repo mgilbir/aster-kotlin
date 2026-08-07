@@ -13,7 +13,17 @@ import dev.aster.vega.scene.TextEngine
  * the same controller and the same surface, so switching between them shows whether the compiler
  * produces scenes the rest of the stack is happy with.
  */
-public enum class DemoChart(public val label: String, public val specAsset: String? = null) {
+public enum class DemoChart(
+  public val label: String,
+  public val specAsset: String? = null,
+  /**
+   * True for the entry whose specification the user supplies rather than the app.
+   *
+   * It is the only entry that can fail, which makes it the only one where the diagnostics matter to
+   * somebody other than us — so it is the reason the demo shows them at all.
+   */
+  public val isPasted: Boolean = false,
+) {
   BAR("Bar"),
   STACKED_BAR("Stacked bar"),
   LINE("Line"),
@@ -22,11 +32,12 @@ public enum class DemoChart(public val label: String, public val specAsset: Stri
   STRESS("10k symbols"),
   SPEC_TITLES("Spec: titles", "titles.vg.json"),
   SPEC_LEGENDS("Spec: legends", "legends.vg.json"),
-  SPEC_FACETS("Spec: facets", "facet-trellis.vg.json");
+  SPEC_FACETS("Spec: facets", "facet-trellis.vg.json"),
+  PASTED("Paste your own", isPasted = true);
 
   /** True when this entry is compiled from a specification rather than built by hand. */
   public val isSpec: Boolean
-    get() = specAsset != null
+    get() = specAsset != null || isPasted
 
   /**
    * Builds the scene for a hand-authored entry.
@@ -47,7 +58,8 @@ public enum class DemoChart(public val label: String, public val specAsset: Stri
       STRESS -> SampleScenes.symbolStressTest(count = 10_000, palette = palette)
       SPEC_TITLES,
       SPEC_LEGENDS,
-      SPEC_FACETS -> null
+      SPEC_FACETS,
+      PASTED -> null
     }
   }
 }

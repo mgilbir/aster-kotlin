@@ -404,20 +404,26 @@ ordering), and the pipeline is now verified end to end on one fixture, but the b
 
 - 1,250 JVM tests pass (`./scripts/test-core.sh`, `./gradlew test`).
 - Android lint is clean with `warningsAsErrors` on every Android module.
-- 57 instrumented tests pass on an API 37 arm64 emulator (`./scripts/test-android.sh`): 49 in
-  `vega-android-canvas`, 4 in `vega-compose`, 4 in `demo`. Three groups of them cover what no JVM
+- 63 instrumented tests pass on an API 37 arm64 emulator (`./scripts/test-android.sh`): 49 in
+  `vega-android-canvas`, 4 in `vega-compose`, 10 in `demo`. Three groups of them cover what no JVM
   test can: one compiles every bundled specification with the device's own font metrics, which the
   differential tests deliberately cannot because they measure text upstream's way; three tap a real
   view with a synthetic `MotionEvent` and read the pixels back, which is the only way to know the
   gesture detector, the view's touch handling and the content scale all carry a finger through to a
   signal handler; and three decode a real bitmap into an `image` mark, which the differential
   harness cannot do at all and so cannot tell a drawn image from a silently skipped one.
-- The demo was installed and driven on the emulator: all nine chart entries render, marks are
+- The demo was installed and driven on the emulator: all ten chart entries render, marks are
   selectable by tap, light and dark palettes are legible, and SVG/PNG/PDF export all wrote files with
   zero warnings. The three specification entries load Vega JSON from assets, compile it on a
   background thread and report zero diagnostics; tapping a bar on a compiled chart selects it, which
   is what proves the hit index is rebuilt when a specification is published. `scripts/emulator.sh`
   starts the AVD with a window and installs the demo, for looking at rather than only asserting on.
+- **"Paste your own"** takes a Vega specification from the clipboard or typed into the field, and is
+  the only entry that can fail. It was driven by hand on the emulator with both a working
+  specification and one using `geojson`, `shape` and a per-corner radius: the chart renders and the
+  diagnostics appear beneath it, naming each part that was dropped and where. That is the first time
+  "nothing silently ignored" has been visible to anyone outside this repository, and it is worth
+  keeping that way — it is the screen where the discipline pays for itself.
 
 Four defects were found by running on a device rather than by the test suite, and all four are fixed
 with regression tests:
