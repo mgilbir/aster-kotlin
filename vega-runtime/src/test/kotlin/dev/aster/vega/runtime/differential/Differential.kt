@@ -177,14 +177,24 @@ public object Differential {
         if (node.fill != null || node.stroke != null) out.add(groupMark(node, world))
         node.children.forEach { collect(it, world, out) }
       }
-      is RectNode -> out.add(rectMark(node, world))
-      is RuleNode -> out.add(ruleMark(node, world))
-      is TextNode -> out.add(textMark(node, world))
-      is SymbolNode -> out.add(symbolMark(node, world))
-      is PathNode -> out.add(pathMark(node, world))
-      is ImageNode -> out.add(imageMark(node, world))
+      is RectNode -> out.add(withOpacity(node, rectMark(node, world)))
+      is RuleNode -> out.add(withOpacity(node, ruleMark(node, world)))
+      is TextNode -> out.add(withOpacity(node, textMark(node, world)))
+      is SymbolNode -> out.add(withOpacity(node, symbolMark(node, world)))
+      is PathNode -> out.add(withOpacity(node, pathMark(node, world)))
+      is ImageNode -> out.add(withOpacity(node, imageMark(node, world)))
     }
   }
+
+  /**
+   * A node's own opacity, which is not the same channel as a fill's or a stroke's.
+   *
+   * Added centrally because it was missing from every mark type at once, and nothing else in the
+   * comparison could see it: a legend swatch faded to 0.6 by `symbolOpacity` has the same geometry,
+   * the same fill and the same stroke as one at full strength.
+   */
+  private fun withOpacity(node: SceneNode, mark: Mark): Mark =
+    mark.copy(numbers = mark.numbers + ("opacity" to node.opacity))
 
   private fun rectMark(node: RectNode, world: Transform2D): Mark {
     val rect = node.rect
@@ -319,6 +329,7 @@ public object Differential {
     }
     node.stroke?.let { st ->
       solidColour(st.paint)?.let { strings["stroke"] = it.toCssHex() }
+      dashOf(st)?.let { strings["strokeDash"] = it }
       numbers["strokeWidth"] = st.width
       numbers["strokeOpacity"] = st.opacity
     }

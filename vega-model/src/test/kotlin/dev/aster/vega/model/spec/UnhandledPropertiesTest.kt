@@ -58,6 +58,11 @@ class UnhandledPropertiesTest {
     assertEquals(listOf("bins", "domainImplicit", "domainRaw").sorted(), reported.sorted())
   }
 
+  /**
+   * `labelColor`, `labelFont` and `symbolDash` are implemented and so do not appear. What remains
+   * is the legend's own background — `strokeColor`, `cornerRadius` — which nothing draws yet, and
+   * `symbolFillColor`, which upstream applies only where the scale supplies no fill of its own.
+   */
   @Test
   fun `a legend reports the styling it cannot honour`() {
     val reported =
@@ -70,17 +75,7 @@ class UnhandledPropertiesTest {
         )
       )
     assertEquals(
-      listOf(
-          "labelColor",
-          "labelFont",
-          "symbolFillColor",
-          "symbolDash",
-          "strokeColor",
-          "cornerRadius",
-          "clipHeight",
-          "gridAlign",
-        )
-        .sorted(),
+      listOf("symbolFillColor", "strokeColor", "cornerRadius", "clipHeight", "gridAlign").sorted(),
       reported.sorted(),
     )
   }
@@ -130,18 +125,7 @@ class UnhandledPropertiesTest {
         )
       )
     assertEquals(
-      listOf(
-          "xc",
-          "yc",
-          "strokeDash",
-          "strokeCap",
-          "limit",
-          "tooltip",
-          "cornerRadiusTopLeft",
-          "zindex",
-          "cursor",
-        )
-        .sorted(),
+      listOf("xc", "yc", "limit", "tooltip", "cornerRadiusTopLeft", "zindex", "cursor").sorted(),
       reported.sorted(),
     )
   }

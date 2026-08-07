@@ -36,7 +36,6 @@ import dev.aster.vega.scene.TextBaseline
 import dev.aster.vega.scene.TextEngine
 import dev.aster.vega.scene.TextNode
 import dev.aster.vega.scene.TextRun
-import dev.aster.vega.scene.TextStyle
 import dev.aster.vega.scene.Transform2D
 import dev.aster.vega.scene.transformedBounds
 import kotlin.math.ceil
@@ -196,12 +195,7 @@ internal class LegendBuilder(
     val run =
       TextRun(
         text = text,
-        style =
-          TextStyle(
-            fontFamily = LegendDefaults.FONT_FAMILY,
-            fontSize = fontSize,
-            fontWeight = LegendDefaults.TITLE_FONT_WEIGHT,
-          ),
+        style = GuideStyle.text(spec.titleStyle, fontSize, LegendDefaults.TITLE_FONT_WEIGHT),
         align = TextAlign.LEFT,
         baseline = TextBaseline.TOP,
       )
@@ -210,7 +204,7 @@ internal class LegendBuilder(
       x = padding,
       y = padding,
       layout = textEngine.layout(run),
-      fill = Fill.of(LegendDefaults.titleColor),
+      fill = GuideStyle.fill(spec.titleStyle, LegendDefaults.titleColor),
       metadata = NodeMetadata(role = "legend-title", markName = spec.scale),
     )
   }
@@ -245,7 +239,7 @@ internal class LegendBuilder(
     // against its own symbol. That is upstream's `datum.offset` versus `datum.size`.
     val widest = boxes.max()
 
-    val labelStyle = TextStyle(fontFamily = LegendDefaults.FONT_FAMILY, fontSize = labelFontSize)
+    val labelStyle = GuideStyle.text(spec.labelStyle, labelFontSize, defaultWeight = 400)
 
     // Build each entry at its own origin first: the layout below needs to know how far a cell
     // reaches
@@ -271,6 +265,9 @@ internal class LegendBuilder(
           shape = shape,
           fill = symbolFill(spec, entry.value),
           stroke = symbolStroke(spec, entry.value, strokeWidth),
+          // `symbolOpacity` is the item's overall opacity upstream, not a fill or stroke opacity —
+          // it fades the outline with the swatch rather than only what is inside it.
+          opacity = spec.symbolStyle.opacity ?: 1.0,
           metadata = NodeMetadata(role = "legend-symbol", markName = scaleName, datumIndex = index),
         ),
         TextNode(
@@ -278,7 +275,7 @@ internal class LegendBuilder(
           x = labelX,
           y = centre,
           layout = textEngine.layout(run),
-          fill = Fill.of(LegendDefaults.labelColor),
+          fill = GuideStyle.fill(spec.labelStyle, LegendDefaults.labelColor),
           metadata = NodeMetadata(role = "legend-label", markName = scaleName, datumIndex = index),
         ),
       )
@@ -390,13 +387,26 @@ internal class LegendBuilder(
    * swatch in grey and leaves it unfilled, rather than inventing a fill the scale never assigned.
    */
   private fun symbolStroke(spec: LegendSpec, value: VegaValue, width: Double): Stroke? {
+    val dash = spec.symbolStyle.dash ?: emptyList()
+    // An explicit `symbolStrokeColor` outlines every swatch, whatever the scales say.
+    spec.symbolStyle.color
+      ?.let { SceneColor.parse(it) }
+      ?.let {
+        return Stroke(paint = ScenePaint.Solid(it), width = width, dashArray = dash)
+      }
     val strokeScale = spec.stroke?.let { scales[it] }
     if (strokeScale != null) {
       val colour = SceneColor.parse(strokeScale.scale(value).asString())
-      if (colour != null) return Stroke(paint = ScenePaint.Solid(colour), width = width)
+      if (colour != null) {
+        return Stroke(paint = ScenePaint.Solid(colour), width = width, dashArray = dash)
+      }
     }
     if (spec.fill != null || spec.stroke != null) return null
-    return Stroke(paint = ScenePaint.Solid(LegendDefaults.symbolBaseStrokeColor), width = width)
+    return Stroke(
+      paint = ScenePaint.Solid(LegendDefaults.symbolBaseStrokeColor),
+      width = width,
+      dashArray = dash,
+    )
   }
 
   // ---- gradient legends -------------------------------------------------------
@@ -452,7 +462,7 @@ internal class LegendBuilder(
       )
 
     val nodes = mutableListOf<SceneNode>(swatch)
-    val labelStyle = TextStyle(fontFamily = LegendDefaults.FONT_FAMILY, fontSize = labelFontSize)
+    val labelStyle = GuideStyle.text(spec.labelStyle, labelFontSize, defaultWeight = 400)
 
     for ((index, entry) in gradientLabels(spec, scale, scaleName).withIndex()) {
       val fraction = scale.fraction((entry.value as VegaValue.Num).value)
@@ -478,7 +488,7 @@ internal class LegendBuilder(
           x = if (vertical) thickness + labelOffset else fraction * length,
           y = if (vertical) (1.0 - fraction) * length else thickness + labelOffset,
           layout = textEngine.layout(run),
-          fill = Fill.of(LegendDefaults.labelColor),
+          fill = GuideStyle.fill(spec.labelStyle, LegendDefaults.labelColor),
           metadata = NodeMetadata(role = "legend-label", markName = scaleName, datumIndex = index),
         )
     }

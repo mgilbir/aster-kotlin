@@ -175,7 +175,9 @@ private val LEGEND_CONSUMED =
     "legendX",
     "legendY",
     "zindex",
-  )
+    "symbolDash",
+    "symbolOpacity",
+  ) + guideStyleKeys("label", "title", "symbolStroke")
 
 /** Title properties this engine reads. */
 private val TITLE_CONSUMED =
@@ -262,6 +264,9 @@ private val ENCODE_CONSUMED =
     "endAngle",
     "innerRadius",
     "outerRadius",
+    "strokeDash",
+    "strokeCap",
+    "strokeJoin",
     // Read in order to be reported by name, which is more useful than the generic message.
     "padAngle",
   )
@@ -274,9 +279,6 @@ private val ENCODE_UNSUPPORTED =
     "yc" to
       "Positioning by centre is not implemented; give 'y' with 'height', or 'y' with 'y2', " +
         "since a mark encoded only by its centre cannot be placed at all",
-    "strokeDash" to "Dashed marks are not implemented; the outline is drawn solid",
-    "strokeCap" to "Stroke caps on a mark are not implemented; the default butt cap is drawn",
-    "strokeJoin" to "Stroke joins on a mark are not implemented; the default miter join is drawn",
     "limit" to "Text truncation is not implemented; the text is drawn in full",
     "ellipsis" to "Text truncation is not implemented, so its ellipsis has nothing to mark",
     "tooltip" to
@@ -938,6 +940,22 @@ public class SpecParser {
         legendX = obj.numberOrSignal("legendX", "$path.legendX"),
         legendY = obj.numberOrSignal("legendY", "$path.legendY"),
         zindex = (obj.fields["zindex"] as? VegaValue.Num)?.value?.toInt() ?: 0,
+        labelStyle = obj.guideStroke("label"),
+        titleStyle = obj.guideStroke("title"),
+        // `symbolStrokeColor`/`symbolStrokeWidth` rather than `symbolColor`/`symbolWidth`, so the
+        // shared reader is pointed at the `symbolStroke` prefix and the dash and opacity are picked
+        // up separately.
+        symbolStyle =
+          obj
+            .guideStroke("symbolStroke")
+            .copy(
+              dash =
+                (obj.fields["symbolDash"] as? VegaValue.Arr)
+                  ?.values
+                  ?.map { it.asDouble() }
+                  ?.takeIf { values -> values.isNotEmpty() && values.all { it.isFinite() } },
+              opacity = (obj.fields["symbolOpacity"] as? VegaValue.Num)?.value,
+            ),
       )
 
     if (spec.scale == null) {

@@ -36,6 +36,8 @@ import dev.aster.vega.scene.SceneNodeIdAllocator
 import dev.aster.vega.scene.ScenePaint
 import dev.aster.vega.scene.SizeD
 import dev.aster.vega.scene.Stroke
+import dev.aster.vega.scene.StrokeCap
+import dev.aster.vega.scene.StrokeJoin
 import dev.aster.vega.scene.SymbolNode
 import dev.aster.vega.scene.SymbolShape
 import dev.aster.vega.scene.TextAlign
@@ -513,15 +515,78 @@ public class MarkEncoder(
     val strokeOpacity = number(channels["strokeOpacity"], datum) ?: 1.0
     val strokeWidth =
       number(channels["strokeWidth"], datum) ?: MarkDefaults.strokeWidthFor(spec.type)
+    val strokeDash = numberList(channels["strokeDash"], datum) ?: emptyList()
+    val cap = strokeCap(string(channels["strokeCap"], datum), spec)
+    val join = strokeJoin(string(channels["strokeJoin"], datum), spec)
 
     return Style(
       fill = fillColour?.let { Fill(ScenePaint.Solid(it), fillOpacity) },
       stroke =
         strokeColour?.let {
-          Stroke(paint = ScenePaint.Solid(it), width = strokeWidth, opacity = strokeOpacity)
+          Stroke(
+            paint = ScenePaint.Solid(it),
+            width = strokeWidth,
+            cap = cap,
+            join = join,
+            opacity = strokeOpacity,
+            dashArray = strokeDash,
+          )
         },
       opacity = number(channels["opacity"], datum) ?: 1.0,
     )
+  }
+
+  private fun strokeCap(name: String?, spec: MarkSpec): StrokeCap =
+    when (name?.lowercase()) {
+      null -> StrokeCap.BUTT
+      "butt" -> StrokeCap.BUTT
+      "round" -> StrokeCap.ROUND
+      "square" -> StrokeCap.SQUARE
+      else -> {
+        diagnostics.warn(
+          DiagnosticCodes.PARSE_UNKNOWN_PROPERTY,
+          "Unknown strokeCap '$name'; drawing a butt cap",
+          operator = spec.name,
+        )
+        StrokeCap.BUTT
+      }
+    }
+
+  private fun strokeJoin(name: String?, spec: MarkSpec): StrokeJoin =
+    when (name?.lowercase()) {
+      null -> StrokeJoin.MITER
+      "miter" -> StrokeJoin.MITER
+      "round" -> StrokeJoin.ROUND
+      "bevel" -> StrokeJoin.BEVEL
+      else -> {
+        diagnostics.warn(
+          DiagnosticCodes.PARSE_UNKNOWN_PROPERTY,
+          "Unknown strokeJoin '$name'; drawing a miter join",
+          operator = spec.name,
+        )
+        StrokeJoin.MITER
+      }
+    }
+
+  /**
+   * An array-valued channel, which only `strokeDash` uses.
+   *
+   * A dash pattern with a non-finite or negative entry is dropped rather than half-applied: SVG and
+   * Canvas disagree about what such a pattern draws, and a line that is solid on one backend and
+   * dotted on another is worse than one that is solid on both.
+   */
+  private fun numberList(channel: ChannelValue?, datum: VegaValue): List<Double>? {
+    val value =
+      when (channel) {
+        null -> return null
+        is ChannelValue.Constant -> channel.value
+        is ChannelValue.Field -> datum.field(channel.path)
+        is ChannelValue.Signal -> evaluateExpression(channel.expression, datum) ?: return null
+        is ChannelValue.Conditional -> return numberList(selectRule(channel, datum), datum)
+        is ChannelValue.Scaled -> return null
+      }
+    val values = (value as? VegaValue.Arr)?.values?.map { it.asDouble() } ?: return null
+    return values.takeIf { list -> list.isNotEmpty() && list.all { it.isFinite() && it >= 0.0 } }
   }
 
   private fun metadata(

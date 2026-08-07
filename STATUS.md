@@ -20,7 +20,7 @@ Milestones 0, 1 and 2 complete. **Milestones 3 and 4 in progress**: Vega specifi
 end — including expressions, signals and the twelve data transforms the brief lists — and are verified
 against upstream Vega by differential tests.
 
-Thirty-two differential fixtures pass, all matching upstream exactly on every mark and scale output:
+Thirty-three differential fixtures pass, all matching upstream exactly on every mark and scale output:
 
 | Fixture | Marks | Covers |
 | --- | --- | --- |
@@ -56,6 +56,7 @@ Thirty-two differential fixtures pass, all matching upstream exactly on every ma
 | `stack-diverging` | 45 | negatives stacking away from zero, over a domain taken from both bounds |
 | `axis-style` | 37 | every part of an axis restyled: colour, width, dash, opacity, italic labels |
 | `domain-limits` | 37 | a domain pinned by `domainMin`/`domainMax` beside one written out in full |
+| `legend-style` | 30 | a restyled legend beside dashed, round-capped marks |
 
 The gate is wired into `./scripts/oracle.sh`, so every further scale, mark and transform is built
 against a harness that can say we are wrong — which golden tests cannot.
@@ -117,7 +118,7 @@ substantive compatibility items:
 | 6. View and Compose APIs | Yes |
 | 7. SVG, PNG, PDF export | Yes |
 | 8. TalkBack can describe and navigate | Partial — virtual nodes are tested by instrumentation, not with TalkBack itself |
-| 9. At least 100 compatibility fixtures pass | 32 of 100 |
+| 9. At least 100 compatibility fixtures pass | 33 of 100 |
 | 10. Core runtime has no Android dependency | Yes |
 | 11. Renders without WebView | Yes |
 | 12. Build and test loop runs from the terminal | Yes |
@@ -250,6 +251,12 @@ ordering), and the pipeline is now verified end to end on one fixture, but the b
   out, so a linear scale handed `[10, 20]` still starts at 0 where this engine had been leaving it
   at 10. The limits then replace an end rather than clamping it, and run after `zero`, which is why
   `domainMin: 30` beats it.
+- **Legend appearance**, through the same `GuideStroke` the axis uses: label and title colour,
+  font, weight, style and opacity, plus `symbolStrokeColor`, `symbolDash` and `symbolOpacity`. The
+  last is the odd one — upstream makes it the swatch's *overall* opacity rather than a fill or
+  stroke opacity, so it fades the outline along with what is inside it.
+- **`strokeDash`, `strokeCap` and `strokeJoin` on a mark**, which the scene graph and both renderers
+  already had; only the encoder was not reading them.
 - **Nothing dropped in silence.** Each parser now names the properties it *consumes* and reports the
   remainder, rather than a hand-kept list of what is missing. That inversion is the point: the
   hand-kept list is how the gap grew — the axis honoured fifteen of upstream's 74 properties and
@@ -276,7 +283,7 @@ ordering), and the pipeline is now verified end to end on one fixture, but the b
 
 ## Verification
 
-- 938 JVM tests pass (`./scripts/test-core.sh`, `./gradlew test`).
+- 944 JVM tests pass (`./scripts/test-core.sh`, `./gradlew test`).
 - Android lint is clean with `warningsAsErrors` on every Android module.
 - 48 instrumented tests pass on an API 37 arm64 emulator (`./scripts/test-android.sh`): 40 in
   `vega-android-canvas`, 4 in `vega-compose`, 4 in `demo` — including one that compiles every bundled
@@ -311,7 +318,7 @@ dark chrome, so a dark background was unreadable — they now take a `SampleScen
 
 ## Known failing fixtures
 
-None. Thirty-two fixtures exist and all thirty-two pass. The brief's MVP asks for 100; growing the
+None. Thirty-three fixtures exist and all thirty-three pass. The brief's MVP asks for 100; growing the
 corpus is the main task now, and each new fixture is expected to surface gaps rather than pass
 immediately. That keeps happening, which is the point of the harness: `stacked-bar` surfaced two real
 bugs, and `facet-trellis` surfaced a third — `range: "height"` was descending for every scale type,
@@ -354,6 +361,16 @@ was bounded as nothing at all, where upstream bounds it as a degenerate point at
 had asserted the empty form deliberately, with no upstream evidence behind it. It matters under
 `autosize: pad`, where a chart is measured by how far its marks reach — a point counts and an empty
 rectangle drops out — and a size scale bottoming out at its domain minimum produces exactly that.
+
+`legend-style` found the fourth and fifth. **A legend was placed without regard for how far the
+marks reach**, so a chart whose line overhangs the plotting area drew its legend over the overhang.
+The rule turned out to be narrower than "marks": a top-level line whose 3-unit stroke hangs half a
+unit past the right edge leaves the legend exactly where it was, and *the same line inside a faceted
+group* moves it — established by moving one line between the two and watching the legend slide.
+And two more channels the harness could not see: a stroke's dash on a **path**, and every node's own
+`opacity`, neither of which was reported on our side at all. A legend swatch faded to 0.6 by
+`symbolOpacity` has the same geometry, fill and stroke as one at full strength, so nothing else in
+the comparison could have told them apart.
 
 Building legends surfaced a fourth, and a worse one, in code that had been "passing" for six fixtures:
 **every symbol was the wrong size.** Upstream ships its own symbol table rather than d3-shape's, sizing
@@ -409,6 +426,8 @@ depends on them. Each has a test and a comment; this is the index.
 | `zero` follows the scale *type*, so a linear scale given `[10, 20]` still starts at 0 | `ScaleResolver.continuousDomain` |
 | `domainMin`/`domainMax` replace an end rather than clamping it, and run after `zero` | `ScaleResolver.continuousDomain` |
 | A zero-sized symbol bounds as a point at its anchor, not as nothing | `SceneNode.buildSymbolPath` |
+| A *group* mark's overhang pushes a legend outwards; a top-level mark's does not | `ScopeCompiler.markReach` |
+| `symbolOpacity` is a legend swatch's overall opacity, not a fill or stroke opacity | `LegendBuilder.symbolEntries` |
 
 ## Architectural decisions pending
 
@@ -481,7 +500,7 @@ depends on them. Each has a test and a comment; this is the index.
    every chart with long category names is made readable. The angle is the harder of the two: it
    changes the label's align and baseline defaults and its contribution to the axis extent, so the
    chart's size moves with it.
-3. **Keep growing the fixture corpus.** 32 of the brief's 100 pass, and the return has not dropped
+3. **Keep growing the fixture corpus.** 33 of the brief's 100 pass, and the return has not dropped
    off: of the last five, two passed and three found defects — a domain `sort` that read an object as
    a boolean and quietly ordered a bar chart alphabetically, and the wrong character on every negative
    axis label. Between them the corpus has also found a missing scale-domain form, a legend layout

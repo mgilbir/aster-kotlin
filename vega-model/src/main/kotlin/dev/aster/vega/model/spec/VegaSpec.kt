@@ -495,6 +495,15 @@ public data class LegendSpec(
   val legendX: NumberValue? = null,
   val legendY: NumberValue? = null,
   val zindex: Int = 0,
+  /**
+   * Appearance of the three parts, read the same way an axis reads its own.
+   *
+   * A symbol's is the one that behaves differently: `symbolOpacity` becomes the item's overall
+   * opacity rather than a fill or stroke opacity, which is what upstream emits.
+   */
+  val labelStyle: GuideStroke = GuideStroke(),
+  val titleStyle: GuideStroke = GuideStroke(),
+  val symbolStyle: GuideStroke = GuideStroke(),
 ) {
   /**
    * The scale this legend describes.

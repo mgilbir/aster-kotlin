@@ -102,6 +102,14 @@ internal class ScopeCompiler(
     // Vega draws axes below marks unless an axis opts into a higher zindex, and legends above both.
     val (underlay, overlay) = axes.partition { it.zindex <= 0 }
     var guides = GuideBounds.of(extent)
+    // How far this scope's *group* marks reach, which a legend is pushed past along with the axes.
+    //
+    // Group marks only, which is not a simplification: a top-level line whose 3-unit stroke hangs
+    // half a unit past the plot's right edge leaves the legend exactly where it was, and the same
+    // line inside a faceted group moves it. Established by moving one line between the two and
+    // watching the legend slide — upstream places a legend against the group items in its scope,
+    // and a plain mark is not one.
+    var markReach = RectD(0.0, 0.0, extent.width, extent.height)
     for (axis in underlay) {
       val built = axisBuilder.build(axis, extent, scope.rangeSize) ?: continue
       children += built.node
@@ -119,6 +127,7 @@ internal class ScopeCompiler(
         } else {
           children += built.nodes
           content = content.union(built.bounds)
+          markReach = markReach.union(built.bounds)
         }
       } else {
         val nodes = encoder.encode(mark, markData(mark, scope))
@@ -131,6 +140,7 @@ internal class ScopeCompiler(
         trellis(layout, trellisParts, NumberResolver(expressions, scope.signals, diagnostics))
       children += placed.nodes
       content = content.union(placed.bounds)
+      markReach = markReach.union(placed.bounds)
     }
     for (axis in overlay) {
       val built = axisBuilder.build(axis, extent, scope.rangeSize) ?: continue
@@ -140,7 +150,11 @@ internal class ScopeCompiler(
     }
     val legendNodes =
       LegendBuilder(scope.scales, ids, textEngine, diagnostics, numbers)
-        .build(legends, extent, guides)
+        .build(
+          legends,
+          extent,
+          GuideBounds(guides.horizontal.union(markReach), guides.vertical.union(markReach)),
+        )
     children += legendNodes
     for (node in legendNodes) content = content.union(node.transformedBounds)
 
