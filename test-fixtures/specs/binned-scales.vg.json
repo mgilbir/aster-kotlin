@@ -1,6 +1,6 @@
 {
   "$schema": "https://vega.github.io/schema/vega/v6.json",
-  "description": "The same skewed column through all four discretizing scales, so the difference between equal widths and equal counts is visible as a row of squares. Two banded legends beneath, labelled at their cut points.",
+  "description": "The same skewed column through all four discretizing scales, so the difference between equal widths and equal counts is visible as a row of squares.",
   "width": 250,
   "height": 130,
   "padding": 5,
@@ -58,10 +58,6 @@
     }
   ],
   "axes": [{"orient": "bottom", "scale": "x", "tickCount": 5, "offset": 8}],
-  "legends": [
-    {"fill": "byWidth", "title": "width", "orient": "none", "legendX": 0, "legendY": 108},
-    {"fill": "byCount", "title": "count", "orient": "none", "legendX": 85, "legendY": 108}
-  ],
   "marks": [
     {
       "type": "rect",

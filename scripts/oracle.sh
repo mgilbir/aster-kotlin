@@ -14,6 +14,11 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
+# A `time` scale is local, so upstream's output depends on the machine's zone. Pinned to the same
+# zone the JVM tests use (build.gradle.kts), so a checked-in reference means the same thing on any
+# machine — and so a fixture can cross a daylight-saving boundary on purpose.
+export TZ="Europe/Amsterdam"
+
 ROOT="$PWD"
 DIFF_DIR="$ROOT/build/oracle-diffs"
 REFERENCE_DIR="$ROOT/test-fixtures/reference"

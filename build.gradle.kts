@@ -1,6 +1,15 @@
 import com.diffplug.gradle.spotless.SpotlessExtension
+import org.gradle.api.tasks.PathSensitivity
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 import org.jetbrains.kotlin.gradle.dsl.KotlinJvmProjectExtension
+
+/**
+ * The zone every test runs in.
+ *
+ * Europe/Amsterdam, because it observes daylight saving and is one hour off UTC in winter — so a
+ * bug that only shows up away from UTC, or only across a transition, shows up here.
+ */
+val TEST_TIME_ZONE = "Europe/Amsterdam"
 
 plugins {
   alias(libs.plugins.android.application) apply false
@@ -60,6 +69,28 @@ subprojects {
 
     tasks.withType<Test>().configureEach {
       useJUnitPlatform()
+      // A `time` scale is *local*, so its output depends on the machine's zone. Pinning one makes
+      // the differential references reproducible off this machine, and lets a fixture cross a
+      // daylight-saving boundary deliberately — which is where local time scales actually break.
+      // `scripts/oracle.sh` exports the same zone to Node, so both sides agree by construction
+      // rather than by coincidence.
+      environment("TZ", TEST_TIME_ZONE)
+      systemProperty("user.timezone", TEST_TIME_ZONE)
+
+      // The differential tests read the fixtures and their upstream references straight off disk,
+      // so Gradle cannot see them and will call the task up to date after `scripts/oracle.sh` has
+      // rewritten every reference. That is worse than it sounds: the gate prints "Differential
+      // tests passed" without having run, and a fixture that disagrees with upstream gets
+      // committed behind a green check. Declaring them as inputs is what makes the gate mean
+      // something.
+      inputs
+        .dir(rootProject.layout.projectDirectory.dir("test-fixtures/specs"))
+        .withPropertyName("differentialFixtures")
+        .withPathSensitivity(PathSensitivity.RELATIVE)
+      inputs
+        .dir(rootProject.layout.projectDirectory.dir("test-fixtures/reference"))
+        .withPropertyName("differentialReferences")
+        .withPathSensitivity(PathSensitivity.RELATIVE)
       // Goldens are only rewritten when explicitly requested; see :updateGoldens.
       systemProperty(
         "vega.updateGoldens",

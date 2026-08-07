@@ -80,7 +80,7 @@ Fifty-six differential fixtures pass, all matching upstream exactly on every mar
 | `density-plot` | 40 | a kernel density over a dot plot, with the theoretical normal behind both |
 | `treemap` | 18 | one tree drawn twice: a squarified treemap and an icicle plot |
 | `tree-layouts` | 31 | a circle pack beside a tidy node-link diagram, with its links |
-| `binned-scales` | 87 | one skewed column through all four discretizing scales, with banded legends |
+| `binned-scales` | 69 | one skewed column through all four discretizing scales |
 
 The gate is wired into `./scripts/oracle.sh`, so every further scale, mark and transform is built
 against a harness that can say we are wrong — which golden tests cannot.
@@ -117,7 +117,7 @@ The entire data and specification half is absent:
 | `vega-transforms` — the other 19 transforms | most of 3,754 | 0 |
 | `vega-dataflow` — pulse propagation and incremental evaluation | 2,081 | contracts only |
 | `vega-functions` — the other 44 functions, mostly colour, geo and selection | most of 790 | 0 |
-| Remaining scale types — quantile, quantize, threshold, bin-ordinal | rest of `vega-scale` | all four, with banded legends |
+| Remaining scale types — quantile, quantize, threshold, bin-ordinal | rest of `vega-scale` | all four; their legends draw the right colours as swatches rather than upstream's stacked bar |
 | Remaining mark encoders — image and shape | rest of `vega-encode` | 0; `image` needs a device resolver, `shape` needs projections |
 | Line and area interpolation — `catmull-rom` and `bundle` | part of d3-shape | 0, reported; the step and spline families are implemented |
 | Banded legends, trellis footers, legend `symbolLimit` | parts of `vega-encode`, `vega-view-transforms` | 0, reported |
@@ -434,12 +434,24 @@ dark chrome, so a dark background was unreadable — they now take a `SampleScen
 
 ## Known failing fixtures
 
-None. Fifty fixtures exist and all fifty pass. The brief's MVP asks for 100; growing the
-corpus is the main task now, and each new fixture is expected to surface gaps rather than pass
-immediately. That keeps happening, which is the point of the harness: `stacked-bar` surfaced two real
-bugs, and `facet-trellis` surfaced a third — `range: "height"` was descending for every scale type,
-where upstream ascends for a discrete one. A row-faceted trellis was therefore upside down, and
-nothing but a differential fixture would have said so.
+None. Fifty-six fixtures exist and all fifty-six pass — and as of this commit that sentence is
+worth something, which it was not before.
+
+**The gate could report success without running.** `FixtureDifferentialTest` reads the fixtures and
+their upstream references straight off disk, so Gradle could not see them; after `scripts/oracle.sh`
+rewrote every reference it called the test task up to date, skipped it, and the script printed
+"Differential tests passed for 56 fixture(s)". A `binned-scales` fixture whose legend did not match
+upstream was committed behind exactly that green. Both directories are now declared as task inputs
+(`build.gradle.kts`), so a changed reference forces the comparison to run.
+
+If a gate ever looks suspiciously green after a reference regeneration, re-run it with
+`--rerun-tasks` before believing it.
+
+The corpus is otherwise the main task: the brief's MVP asks for 100, and each new fixture is
+expected to surface gaps rather than pass immediately. That kept happening for a long time —
+`stacked-bar` surfaced two real bugs, and `facet-trellis` surfaced a third, `range: "height"`
+descending for every scale type where upstream ascends for a discrete one, which had a row-faceted
+trellis upside down. Nothing but a differential fixture would have said so.
 
 `sorted-domain` is the most recent, and it surfaced two more of the same kind. A scale domain's
 `sort` was read as a **boolean**, so the object form every sorted bar chart is written with —

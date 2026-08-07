@@ -612,9 +612,18 @@ internal class LegendBuilder(
         scale.ticks(count).zip(scale.tickLabels(count)).map { (v, l) -> Entry(VegaValue.Num(v), l) }
       is TimeScale ->
         scale.ticks(count).zip(scale.tickLabels(count)).map { (v, l) -> Entry(VegaValue.Num(v), l) }
-      // A banded legend: one swatch per bucket, labelled by the cut point at its lower edge. The
-      // first carries no label because nothing bounds it from below, which is upstream's shape too.
+      // A banded legend, approximately. Upstream draws one as a *stacked colour bar* —
+      // `legend-band`
+      // rects of `gradientLength / buckets` each, bottom upwards, with the labels sitting at the
+      // boundaries between them. This draws ordinary symbol swatches instead, which shows the right
+      // colours against the right cut points but is not the same picture, so it is reported.
       is BinnedScale -> {
+        diagnostics.warn(
+          DiagnosticCodes.SCALE_UNSUPPORTED_TYPE,
+          "A legend for a '${scaleName}' discretizing scale is drawn upstream as a stacked colour " +
+            "bar; this draws symbol swatches with the same colours and cut points instead",
+          operator = scaleName,
+        )
         val decimals = decimalsFor(scale.thresholds)
         scale.bucketRepresentatives.mapIndexed { index, value ->
           val label = scale.thresholds.getOrNull(index - 1)
