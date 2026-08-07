@@ -144,6 +144,27 @@ public class Evaluator(
     // The scope answers instead, values in and values out, so this module stays free of any scale
     // type. A third argument names a group scope upstream; there is no equivalent here, so it is
     // reported rather than quietly ignored.
+    // `domain`, `range` and `bandwidth` each take a scale name and read a property of it, so they
+    // go through the scope for the same reason `scale` does: this module knows nothing of scales.
+    if (name == "domain" || name == "range" || name == "bandwidth") {
+      if (node.arguments.isEmpty()) {
+        throw ExpressionEvaluationException(
+          VegaDiagnostic(
+            severity = DiagnosticSeverity.ERROR,
+            code = DiagnosticCodes.EXPRESSION_UNSUPPORTED_FUNCTION,
+            message = "$name() takes a scale name",
+            operator = name,
+          )
+        )
+      }
+      val scaleName = evaluate(node.arguments[0], scope).asString()
+      return when (name) {
+        "domain" -> scope.scaleDomain(scaleName)
+        "range" -> scope.scaleRange(scaleName)
+        else -> scope.scaleBandwidth(scaleName)
+      }
+    }
+
     if (name == "scale" || name == "invert") {
       if (node.arguments.size < 2) {
         throw ExpressionEvaluationException(

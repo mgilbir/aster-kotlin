@@ -110,6 +110,79 @@ public object Functions {
   private fun buildFunctions(): Map<String, ExpressionFunction> {
     val map = LinkedHashMap<String, ExpressionFunction>()
 
+    // ---- arrays and sequences -----------------------------------------------
+
+    /**
+     * `lerp(array, fraction)` — a point between an array's first and last values.
+     *
+     * Upstream short-circuits at 0 and 1 rather than computing `lo + f*(hi-lo)`, so those two
+     * return the endpoints exactly rather than to within a rounding. Kept, because a specification
+     * that asks for the end of a range means the end of it.
+     */
+    map["lerp"] = ExpressionFunction { args ->
+      val array =
+        (args.getOrNull(0) as? VegaValue.Arr)?.values ?: return@ExpressionFunction VegaValue.Null
+      if (array.isEmpty()) return@ExpressionFunction VegaValue.Null
+      val lo = JsSemantics.toNumber(array.first())
+      val hi = JsSemantics.toNumber(array.last())
+      val f = JsSemantics.toNumber(args.getOrNull(1) ?: VegaValue.Null)
+      VegaValue.Num(
+        when {
+          array.size == 1 -> lo
+          f == 0.0 || f.isNaN() -> lo
+          f == 1.0 -> hi
+          else -> lo + f * (hi - lo)
+        }
+      )
+    }
+
+    /**
+     * `sequence([start,] stop[, step])` — the numbers a range covers, `stop` exclusive.
+     *
+     * Multiplied out from the start rather than accumulated, so a fractional step does not drift;
+     * the `sequence` transform counts the same way for the same reason.
+     */
+    map["sequence"] = ExpressionFunction { args ->
+      val numbers = args.map { JsSemantics.toNumber(it) }
+      val (start, stop, step) =
+        when (numbers.size) {
+          0 -> return@ExpressionFunction VegaValue.Arr(emptyList())
+          1 -> Triple(0.0, numbers[0], 1.0)
+          2 -> Triple(numbers[0], numbers[1], 1.0)
+          else -> Triple(numbers[0], numbers[1], numbers[2])
+        }
+      if (step == 0.0 || !step.isFinite() || !start.isFinite() || !stop.isFinite()) {
+        return@ExpressionFunction VegaValue.Arr(emptyList())
+      }
+      val count = kotlin.math.ceil((stop - start) / step).toInt()
+      VegaValue.Arr((0 until maxOf(0, count)).map { VegaValue.Num(start + step * it) })
+    }
+
+    /**
+     * `bandspace(count, paddingInner, paddingOuter)` — how many band steps a domain needs.
+     *
+     * The `count ? ... : 0` and the `> 0` floor are upstream's: an empty domain takes no space, and
+     * padding large enough to consume the whole band still leaves one step rather than a negative
+     * one, which would invert the scale.
+     */
+    map["bandspace"] = ExpressionFunction { args ->
+      val count = JsSemantics.toNumber(args.getOrNull(0) ?: VegaValue.Null)
+      val inner =
+        JsSemantics.toNumber(args.getOrNull(1) ?: VegaValue.Null).let {
+          if (it.isNaN()) 0.0 else it
+        }
+      val outer =
+        JsSemantics.toNumber(args.getOrNull(2) ?: VegaValue.Null).let {
+          if (it.isNaN()) 0.0 else it
+        }
+      if (count.isNaN() || count == 0.0) {
+        VegaValue.Num(0.0)
+      } else {
+        val space = count - inner + outer * 2
+        VegaValue.Num(if (space > 0) space else 1.0)
+      }
+    }
+
     // ---- math ---------------------------------------------------------------
     map.unary("abs") { abs(it) }
     map.unary("acos") { acos(it) }

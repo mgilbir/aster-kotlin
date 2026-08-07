@@ -11,7 +11,16 @@ import dev.aster.vega.model.DiagnosticCollector
 import dev.aster.vega.model.VegaValue
 import dev.aster.vega.model.asDouble
 import dev.aster.vega.model.spec.SignalSpec
+import dev.aster.vega.runtime.scale.BandScale
+import dev.aster.vega.runtime.scale.BinnedScale
 import dev.aster.vega.runtime.scale.InvertibleScale
+import dev.aster.vega.runtime.scale.LinearScale
+import dev.aster.vega.runtime.scale.OrdinalScale
+import dev.aster.vega.runtime.scale.PointScale
+import dev.aster.vega.runtime.scale.PositionScale
+import dev.aster.vega.runtime.scale.SequentialColorScale
+import dev.aster.vega.runtime.scale.TimeScale
+import dev.aster.vega.runtime.scale.TransformedScale
 import dev.aster.vega.runtime.scale.VegaScale
 
 /**
@@ -60,6 +69,36 @@ public class SignalScope(
     if (position.isNaN()) return VegaValue.Null
     return VegaValue.Num(scale.invert(position))
   }
+
+  override fun scaleDomain(name: String): VegaValue {
+    val scale = resolveScale(name, "domain") ?: return VegaValue.Null
+    return VegaValue.Arr(
+      when (scale) {
+        is LinearScale -> scale.domain.map { VegaValue.Num(it) }
+        is TransformedScale -> scale.domain.map { VegaValue.Num(it) }
+        is TimeScale -> scale.domain.map { VegaValue.Num(it) }
+        is SequentialColorScale -> scale.domain.map { VegaValue.Num(it) }
+        is BandScale -> scale.domain.map { VegaValue.Str(it) }
+        is PointScale -> scale.domain.map { VegaValue.Str(it) }
+        is OrdinalScale -> scale.domain.map { VegaValue.Str(it) }
+        is BinnedScale -> scale.thresholds.map { VegaValue.Num(it) }
+      }
+    )
+  }
+
+  override fun scaleRange(name: String): VegaValue {
+    val scale = resolveScale(name, "range") ?: return VegaValue.Null
+    return when (scale) {
+      is PositionScale -> VegaValue.Arr(scale.range.map { VegaValue.Num(it) })
+      is OrdinalScale -> VegaValue.Arr(scale.rangeValues)
+      is BinnedScale -> VegaValue.Arr(scale.rangeValues)
+      else -> VegaValue.Arr(emptyList())
+    }
+  }
+
+  /** Zero for anything that is not a band scale, which is what upstream reports. */
+  override fun scaleBandwidth(name: String): VegaValue =
+    VegaValue.Num((resolveScale(name, "bandwidth") as? PositionScale)?.bandwidth ?: 0.0)
 
   private fun resolveScale(name: String, function: String): VegaScale? {
     val scale = scales[name]

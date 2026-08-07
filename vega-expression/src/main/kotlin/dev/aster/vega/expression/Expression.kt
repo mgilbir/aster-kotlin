@@ -46,6 +46,15 @@ public interface ExpressionScope {
 
   /** `invert('name', value)` — the same in reverse, for a continuous scale. */
   public fun invertScale(name: String, value: VegaValue): VegaValue = VegaValue.Null
+
+  /** `domain('name')` — the scale's input extent, which a specification reads to size something. */
+  public fun scaleDomain(name: String): VegaValue = VegaValue.Null
+
+  /** `range('name')` — the scale's output extent. */
+  public fun scaleRange(name: String): VegaValue = VegaValue.Null
+
+  /** `bandwidth('name')` — a band scale's band width, or zero for a scale that has none. */
+  public fun scaleBandwidth(name: String): VegaValue = VegaValue.Num(0.0)
 }
 
 public sealed interface ExpressionResult {
