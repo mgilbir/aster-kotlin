@@ -149,7 +149,15 @@ public class SpecCompiler(
     val datasets = data.resolve(spec.data, transformSignals)
     val signals =
       SignalResolver(diagnostics, expressions)
-        .resolve(spec.signals, datasets, transformSignals, signalOverrides)
+        .resolve(
+          spec.signals,
+          datasets,
+          transformSignals,
+          signalOverrides,
+          // Nothing encloses the top level, so every scale here is still pending — which is the
+          // more precise thing to say than "no scale exists yet".
+          pendingScales = spec.scales.mapTo(mutableSetOf()) { it.name },
+        )
 
     val numbers = NumberResolver(expressions, signals, diagnostics)
     val scales = ScaleResolver(datasets, plot, diagnostics, numbers).resolve(spec.scales)

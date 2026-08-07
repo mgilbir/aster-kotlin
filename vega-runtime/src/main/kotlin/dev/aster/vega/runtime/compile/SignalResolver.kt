@@ -57,6 +57,15 @@ public class SignalScope(
    * datum, which is the difference between linear and quadratic on the specifications that use it.
    */
   private val indataIndexes: MutableMap<Pair<String, String>, Map<String, Int>> = mutableMapOf(),
+  /**
+   * Scale names this scope defines but has not built yet.
+   *
+   * Only ever non-empty while signals are resolving. It exists so the diagnostic can tell "you
+   * asked for this too early" apart from "there is no such scale" — a group whose own signal calls
+   * `bandwidth()` on one of the group's own scales is the first, and reading it as the second sends
+   * the reader hunting for a typo that is not there.
+   */
+  private val pendingScales: Set<String> = emptySet(),
 ) : ExpressionScope {
 
   override fun signal(name: String): VegaValue = values[name] ?: VegaValue.Null
@@ -133,13 +142,18 @@ public class SignalScope(
     if (scale == null) {
       diagnostics?.error(
         DiagnosticCodes.SCALE_UNSUPPORTED_TYPE,
-        // Two different failures, and telling them apart is the whole value of the message: one is
-        // a typo, the other is asking for something that cannot exist at that point.
-        if (scales.isEmpty()) {
-          "$function() cannot be used while signals are resolving: a scale is built *from* " +
-            "signals — its domain or range may be signal-valued — so none exists yet"
-        } else {
-          "$function() names scale '$name', which this specification does not define"
+        // Three different failures, and telling them apart is the whole value of the message. Only
+        // the last is a typo; the first two are questions asked too early, and answering them with
+        // "no such scale" sends the reader hunting for a misspelling that is not there.
+        when {
+          name in pendingScales ->
+            "$function() names scale '$name', which this scope defines but has not built yet: a " +
+              "scale is built *from* the signals of its own scope, so a signal cannot read one " +
+              "declared beside it"
+          scales.isEmpty() ->
+            "$function() cannot be used while signals are resolving: a scale is built *from* " +
+              "signals — its domain or range may be signal-valued — so none exists yet"
+          else -> "$function() names scale '$name', which this specification does not define"
         },
         operator = name,
       )
@@ -196,7 +210,22 @@ public class SignalResolver(
     datasets: Map<String, List<VegaValue>>,
     implicit: Map<String, VegaValue> = emptyMap(),
     pinned: Map<String, VegaValue> = emptyMap(),
-  ): SignalScope = Resolution(signals, datasets, implicit, pinned).run()
+    /**
+     * Scales built in an *enclosing* scope, which a group's own signals may read.
+     *
+     * Empty at the top level, where a scale genuinely does not exist yet. Inside a group it is the
+     * chart's scales, which were built long before the group was reached — which is what lets
+     * `{"name": "height", "update": "bandwidth('yscale')"}` give a trellis cell the height of one
+     * band of the outer scale.
+     */
+    enclosingScales: Map<String, VegaScale> = emptyMap(),
+    /**
+     * Scales this scope will define *after* its signals, so one named here can be reported as
+     * premature rather than as a typo.
+     */
+    pendingScales: Set<String> = emptySet(),
+  ): SignalScope =
+    Resolution(signals, datasets, implicit, pinned, enclosingScales, pendingScales).run()
 
   /** One resolution pass. Holds the mutable bookkeeping so the resolver itself stays reusable. */
   private inner class Resolution(
@@ -204,6 +233,8 @@ public class SignalResolver(
     private val datasets: Map<String, List<VegaValue>>,
     implicit: Map<String, VegaValue>,
     pinned: Map<String, VegaValue>,
+    private val enclosingScales: Map<String, VegaScale>,
+    private val pendingScales: Set<String>,
   ) {
     private val specs = LinkedHashMap<String, SignalSpec>()
     private val values = LinkedHashMap<String, VegaValue>(implicit)
@@ -242,7 +273,7 @@ public class SignalResolver(
 
     fun run(): SignalScope {
       for (name in specs.keys) resolve(name)
-      return SignalScope(values, datasets, diagnostics = diagnostics)
+      return SignalScope(values, datasets, diagnostics = diagnostics, scales = enclosingScales)
     }
 
     private fun resolve(name: String) {
@@ -282,7 +313,15 @@ public class SignalResolver(
             if (dependency != spec.name) resolve(dependency)
           }
           try {
-            compiled.expression.evaluate(SignalScope(values, datasets, diagnostics = diagnostics))
+            compiled.expression.evaluate(
+              SignalScope(
+                values,
+                datasets,
+                diagnostics = diagnostics,
+                scales = enclosingScales,
+                pendingScales = pendingScales,
+              )
+            )
           } catch (e: ExpressionEvaluationException) {
             diagnostics.add(e.diagnostic.copy(operator = spec.name))
             spec.value ?: VegaValue.Null

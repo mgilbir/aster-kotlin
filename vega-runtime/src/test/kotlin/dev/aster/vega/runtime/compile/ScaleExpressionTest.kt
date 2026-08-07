@@ -125,7 +125,68 @@ class ScaleExpressionTest {
         )
     assertEquals(VegaValue.Null, compiled.signals["mid"])
     assertTrue(
-      compiled.diagnostics.any { it.message.contains("while signals are resolving") },
+      compiled.diagnostics.any { it.message.contains("defines but has not built yet") },
+      compiled.diagnostics.toString(),
+    )
+  }
+
+  /**
+   * The other half of that rule, and the half that matters to real charts: a *group's* signals are
+   * resolved long after the chart's scales are built, so one of them may read those.
+   *
+   * This is how a trellis cell takes its height from one band of the outer scale, which two of
+   * Vega's own examples do. Refusing it made the cells collapse to nothing.
+   */
+  @Test
+  fun `a group's signal can reach an enclosing scale`() {
+    val compiled =
+      SpecCompiler()
+        .compileJson(
+          """
+          {
+            "width": 200, "height": 120,
+            "data": [{"name": "t", "values": [{"cat": "a"}, {"cat": "b"}, {"cat": "c"}]}],
+            "scales": [{"name": "yscale", "type": "band",
+                        "domain": {"data": "t", "field": "cat"}, "range": "height"}],
+            "marks": [{
+              "type": "group", "from": {"data": "t"},
+              "signals": [{"name": "height", "update": "bandwidth('yscale')"}],
+              "encode": {"enter": {"y": {"scale": "yscale", "field": "cat"}}},
+              "marks": []
+            }]
+          }
+          """
+            .trimIndent()
+        )
+    assertTrue(
+      compiled.diagnostics.none { it.message.contains("bandwidth()") },
+      compiled.diagnostics.toString(),
+    )
+  }
+
+  /** A group's own scales are built from its signals, so those are still out of reach. */
+  @Test
+  fun `a group's signal cannot reach a scale the group itself declares`() {
+    val compiled =
+      SpecCompiler()
+        .compileJson(
+          """
+          {
+            "width": 200, "height": 120,
+            "data": [{"name": "t", "values": [{"cat": "a"}, {"cat": "b"}]}],
+            "marks": [{
+              "type": "group", "from": {"data": "t"},
+              "signals": [{"name": "step", "update": "bandwidth('inner')"}],
+              "scales": [{"name": "inner", "type": "band",
+                          "domain": [1, 2], "range": [0, 50]}],
+              "marks": []
+            }]
+          }
+          """
+            .trimIndent()
+        )
+    assertTrue(
+      compiled.diagnostics.any { it.message.contains("defines but has not built yet") },
       compiled.diagnostics.toString(),
     )
   }

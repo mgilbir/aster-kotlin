@@ -450,8 +450,20 @@ internal class ScopeCompiler(
         outer.datasets
       }
     val datasets = data.resolve(spec.data, signalValues, inherited)
+    // The enclosing scope's scales, which exist by now: a group is reached long after the chart's
+    // scales are built. That is what lets a cell say `bandwidth('yscale')` to take the height of
+    // one
+    // band of the outer scale. The group's *own* scales are still pending — they are built from
+    // these signals a few lines below — so naming one of those is reported as premature.
     val signals =
-      SignalResolver(diagnostics, expressions).resolve(spec.signals, datasets, signalValues)
+      SignalResolver(diagnostics, expressions)
+        .resolve(
+          spec.signals,
+          datasets,
+          signalValues,
+          enclosingScales = outer.scales,
+          pendingScales = spec.scales.mapTo(mutableSetOf()) { it.name },
+        )
 
     // A group that declares its own width or height signal changes what a nested `"width"` range
     // means; one that does not inherits the chart's.
