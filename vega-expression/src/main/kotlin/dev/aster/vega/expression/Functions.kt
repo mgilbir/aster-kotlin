@@ -7,6 +7,7 @@ import dev.aster.vega.model.roundHalfUp
 import dev.aster.vega.model.time.DateValues
 import dev.aster.vega.model.time.TimeFormat
 import dev.aster.vega.model.withTypographicMinus
+import dev.aster.vega.scene.SceneColor
 import kotlin.math.abs
 import kotlin.math.acos
 import kotlin.math.asin
@@ -94,6 +95,11 @@ public object Functions {
         "parsing a date against a format string needs a strptime the engine does not have; " +
           "an ISO 8601 string works through toDate",
       "gradient" to "gradients cannot be produced from an expression yet",
+      // `luminance` is implemented; `contrast` is not, and saying so by name is the difference
+      // between a chart that reports one missing function and one that reports "unknown".
+      "contrast" to
+        "the contrast ratio of two colours is not implemented; luminance() of each is, and the " +
+          "ratio is (max + 0.05) / (min + 0.05)",
       "rgb" to "colour helpers are not implemented",
       "hsl" to "colour helpers are not implemented",
       "lab" to "colour helpers are not implemented",
@@ -445,6 +451,61 @@ public object Functions {
       }
     }
 
+    // ---- colour -------------------------------------------------------------
+
+    /**
+     * `luminance(color)` — WCAG relative luminance, the quantity a contrast ratio is built from.
+     *
+     * Two constants make this easy to get plausibly wrong. The knee of the gamma expansion is
+     * **0.03928**, WCAG's, not the 0.04045 that d3's CIE Lab conversion uses two modules away; and
+     * the exponent is 2.4 applied to `(v + 0.055) / 1.055`, not a bare `v^2.2`. Either mistake
+     * still returns a number between 0 and 1 that grows with brightness, so only a comparison
+     * against upstream catches it.
+     *
+     * Upstream reads d3-color's **8-bit** channels and divides each by 255. [SceneColor] already
+     * stores exactly that quotient, so the components go straight in; scaling them back to bytes
+     * and dividing again would be a round trip that only introduces error. The channels are
+     * deliberately not rounded — an `hsl()` colour has fractional ones, and rounding them shifts
+     * the result.
+     *
+     * Nothing clamps, because upstream does not: `rgb(300, 0, 0)` is brighter than white there too.
+     *
+     * A colour that cannot be parsed gives NaN, which is what d3 gives it: `rgb('nonsense')` has
+     * NaN channels. So does a fully transparent one — d3 blanks the channels when the opacity is
+     * zero — so `luminance('transparent')` is NaN rather than the 0 that black would give.
+     */
+    map["luminance"] = ExpressionFunction { args ->
+      val color = SceneColor.parse(args.string(0))
+      if (color == null || color.alpha <= 0.0) {
+        VegaValue.Num(Double.NaN)
+      } else {
+        VegaValue.Num(
+          0.2126 * expandGamma(color.red) +
+            0.7152 * expandGamma(color.green) +
+            0.0722 * expandGamma(color.blue)
+        )
+      }
+    }
+
+    // ---- the embedding page -------------------------------------------------
+
+    /**
+     * `containerSize()` — the size of the DOM element the view is embedded in.
+     *
+     * There is no DOM here and there never will be, so this is upstream's headless answer rather
+     * than an invented one: with no container element, `containerSize()` is `[undefined,
+     * undefined]` — a two-element array of absent values, not `[0, 0]` and not an empty array.
+     * Verified against upstream in a `renderer: 'none'` view, which is exactly the configuration
+     * the differential oracle renders every fixture in.
+     *
+     * A specification that sizes itself from its container therefore gets nothing here, the same
+     * nothing it gets from upstream outside a browser. Reporting the view's own width and height
+     * instead would be a different chart from the one upstream draws.
+     */
+    map["containerSize"] = ExpressionFunction {
+      VegaValue.Arr(listOf(VegaValue.Null, VegaValue.Null))
+    }
+
     // ---- control flow -------------------------------------------------------
     map["if"] = ExpressionFunction { args ->
       if (JsSemantics.truthy(args.at(0))) args.at(1) else args.at(2)
@@ -452,6 +513,17 @@ public object Functions {
 
     return map
   }
+
+  /**
+   * sRGB gamma expansion as WCAG defines it, on a channel already divided by 255.
+   *
+   * `ColorSpaces.linearize` looks identical and is not: its knee is at 0.04045, the sRGB
+   * standard's, where this one is at 0.03928, the value WCAG 2.0 printed. For a whole 8-bit channel
+   * the two never disagree — 10/255 is 0.0392 and 11/255 is 0.0431, so no byte lands between them —
+   * but a fractional channel from an `hsl()` colour can, and then the two answers differ.
+   */
+  private fun expandGamma(channel: Double): Double =
+    if (channel <= 0.03928) channel / 12.92 else ((channel + 0.055) / 1.055).pow(2.4)
 
   /**
    * Registers a date accessor and its `utc` twin.
