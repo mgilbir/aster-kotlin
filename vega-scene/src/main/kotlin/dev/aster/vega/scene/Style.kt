@@ -54,9 +54,12 @@ public data class SceneColor(
       )
 
     /**
-     * Parses `#rgb`, `#rgba`, `#rrggbb`, `#rrggbbaa` and the CSS named colours Vega's default
-     * schemes use. Returns `null` for anything else so the caller can emit a diagnostic instead of
-     * guessing a colour.
+     * Parses `#rgb`, `#rgba`, `#rrggbb`, `#rrggbbaa`, `rgb()`/`rgba()`, `hsl()`/`hsla()` and the
+     * CSS named colours Vega's default schemes use. Returns `null` for anything else so the caller
+     * can emit a diagnostic instead of guessing a colour.
+     *
+     * Those are exactly the forms d3-color reads, which is what upstream Vega parses colours with,
+     * so a string this returns `null` for is one upstream would also refuse.
      */
     public fun parse(text: String): SceneColor? {
       val value = text.trim()
@@ -67,6 +70,7 @@ public data class SceneColor(
       }
       if (value.startsWith("#")) return parseHex(value.substring(1))
       if (value.startsWith("rgb", ignoreCase = true)) return parseRgbFunction(value)
+      if (value.startsWith("hsl", ignoreCase = true)) return parseHslFunction(value)
       return NAMED_COLORS[value.lowercase()]?.let { fromArgb(it or ALPHA_OPAQUE) }
     }
 
@@ -129,6 +133,61 @@ public data class SceneColor(
           else text.toDoubleOrNull() ?: return null
         } else 1.0
       return SceneColor(r, g, b, a)
+    }
+
+    /**
+     * `hsl(h, s%, l%)` and `hsla(h, s%, l%, a)`, following d3-color's conversion exactly.
+     *
+     * Two details are d3's rather than the textbook's, and both are visible. A lightness at or
+     * outside `0%..100%` drops the saturation to zero, so `hsl(210, 50%, 100%)` is white rather
+     * than a washed-out blue; and the channels come out **unrounded**, so an `hsl` colour carries
+     * fractional 8-bit components where a hex colour carries whole ones. Anything computed from
+     * those components — a relative luminance, a Lab interpolation — differs in the last digits if
+     * they are rounded first, which is why nothing rounds here.
+     */
+    private fun parseHslFunction(value: String): SceneColor? {
+      val open = value.indexOf('(')
+      val close = value.indexOf(')')
+      if (open < 0 || close < open) return null
+      val parts =
+        value
+          .substring(open + 1, close)
+          .split(',', '/', ' ', '\t')
+          .map { it.trim() }
+          .filter { it.isNotEmpty() }
+      if (parts.size < 3) return null
+
+      fun percent(text: String): Double? =
+        (if (text.endsWith("%")) text.dropLast(1) else text).toDoubleOrNull()?.div(100.0)
+
+      val hue = parts[0].toDoubleOrNull() ?: return null
+      val saturation = percent(parts[1]) ?: return null
+      val lightness = percent(parts[2]) ?: return null
+      val alpha =
+        if (parts.size < 4) 1.0
+        else if (parts[3].endsWith("%")) percent(parts[3]) ?: return null
+        else parts[3].toDoubleOrNull() ?: return null
+
+      val s = if (lightness <= 0.0 || lightness >= 1.0) 0.0 else saturation
+      val h = hue.mod(360.0)
+      val m2 = lightness + (if (lightness < 0.5) lightness else 1.0 - lightness) * s
+      val m1 = 2.0 * lightness - m2
+
+      // d3 reads the three channels off the same ramp at hue, hue+120 and hue+240 (wrapped).
+      fun channel(degrees: Double): Double =
+        when {
+          degrees < 60.0 -> m1 + (m2 - m1) * degrees / 60.0
+          degrees < 180.0 -> m2
+          degrees < 240.0 -> m1 + (m2 - m1) * (240.0 - degrees) / 60.0
+          else -> m1
+        }
+
+      return SceneColor(
+        red = channel(if (h >= 240.0) h - 240.0 else h + 120.0),
+        green = channel(h),
+        blue = channel(if (h < 120.0) h + 240.0 else h - 120.0),
+        alpha = alpha,
+      )
     }
 
     /**

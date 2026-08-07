@@ -21,7 +21,7 @@ end to end — expressions, signals, 33 of upstream's 40 data transforms, every 
 and an event handler that recompiles the chart — and are verified against upstream Vega by
 differential tests.
 
-Sixty-three differential fixtures pass, all matching upstream exactly on every mark and scale output:
+Sixty-six differential fixtures pass, all matching upstream exactly on every mark and scale output:
 
 | Fixture | Marks | Covers |
 | --- | --- | --- |
@@ -88,6 +88,9 @@ Sixty-three differential fixtures pass, all matching upstream exactly on every m
 | `scheme-forms` | 31 | a scheme named in the wrong case, one chosen by a signal, one written out as its stops |
 | `centre-anchors` | 22 | `xc`/`yc` on five mark types, an `x2` with no `x`, and a pair written backwards |
 | `signal-transform-params` | 29 | a signal choosing an aggregate's operation and field, and bounding a filter |
+| `luminance-contrast` | 24 | `luminance()` printed as a number and picking the colour of the text printing it, over swatches either side of the gamma knee |
+| `indata-membership` | 25 | `indata()` against a second dataset, matching a number and a boolean by string coercion, and printing the count it returns |
+| `container-size` | 2 | `containerSize()` with no container, measured and fallen back on the way a responsive specification writes it |
 
 The gate is wired into `./scripts/oracle.sh`, so every further scale, mark and transform is built
 against a harness that can say we are wrong — which golden tests cannot.
@@ -147,7 +150,7 @@ substantive compatibility items:
 | 6. View and Compose APIs | Yes |
 | 7. SVG, PNG, PDF export | Yes |
 | 8. TalkBack can describe and navigate | Partial — virtual nodes are tested by instrumentation, not with TalkBack itself |
-| 9. At least 100 compatibility fixtures pass | 63 of 100 |
+| 9. At least 100 compatibility fixtures pass | 66 of 100 |
 | 10. Core runtime has no Android dependency | Yes |
 | 11. Renders without WebView | Yes |
 | 12. Build and test loop runs from the terminal | Yes |
@@ -406,7 +409,7 @@ ordering), and the pipeline is now verified end to end on one fixture, but the b
 
 ## Verification
 
-- 1,250 JVM tests pass (`./scripts/test-core.sh`, `./gradlew test`).
+- 1,348 JVM tests pass (`./scripts/test-core.sh`, `./gradlew test`).
 - Android lint is clean with `warningsAsErrors` on every Android module.
 - 63 instrumented tests pass on an API 37 arm64 emulator (`./scripts/test-android.sh`): 49 in
   `vega-android-canvas`, 4 in `vega-compose`, 10 in `demo`. Three groups of them cover what no JVM
@@ -469,7 +472,7 @@ symptoms:
 | --- | --- |
 | `topojson`, needing map projections (a non-goal) | 10 |
 | A signal where a literal is expected: `tree.method`, `aggregate.op`, a scale `range` | ~8 |
-| Missing expression functions: `indata`, `setdata`, `bandwidth`, `bandspace`, `containerSize`, `lerp`, `now` | ~8 |
+| Missing expression functions: `setdata` and `now` are what is left of this row. `bandwidth`, `bandspace` and `lerp` arrived earlier; `indata`, `containerSize` and `luminance` since. The survey has not been re-run against the examples directory, so how many of the eight this actually frees is unmeasured rather than estimated | was ~8 |
 | A data-driven domain in a form the scale resolver does not read | 4 |
 | `kde2d`, `graticule` and the geo transforms | ~5 |
 
@@ -484,7 +487,7 @@ each example a deadline.
 
 ## Known failing fixtures
 
-None. Sixty-three fixtures exist and all sixty-three pass — and that sentence became worth
+None. Sixty-six fixtures exist and all sixty-six pass — and that sentence became worth
 something only once the gate could no longer skip itself, below.
 
 **The gate could report success without running.** `FixtureDifferentialTest` reads the fixtures and

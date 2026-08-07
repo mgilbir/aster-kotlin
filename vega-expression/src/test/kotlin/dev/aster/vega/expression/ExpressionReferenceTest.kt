@@ -220,6 +220,41 @@ class ExpressionReferenceTest {
         "format(123456789012345,\"\")|\"1.23456789012e+14\"",
         "format(1234567,\",\")|\"1,234,567\"",
         "format(1234.5678,\",\")|\"1,234.5678\"",
+        // ---- luminance ----
+        // WCAG relative luminance. Every digit here came out of upstream, and several of these
+        // separate implementations that all look right:
+        "luminance('#000000')|0",
+        "luminance('#ffffff')|1",
+        "luminance('red')|0.2126",
+        "luminance('steelblue')|0.20562642207624857",
+        "luminance('#4c78a8')|0.17796594469803553",
+        "luminance('#f80')|0.38868318886144393",
+        "luminance('rgb(10, 20, 30)')|0.006585790668061925",
+        "luminance('rgb(100%, 0%, 0%)')|0.2126",
+        // Either side of the knee: channel 10 takes the linear branch and channel 11 the power one.
+        "luminance('#0a0a0a')|0.003035269835488375",
+        "luminance('#0b0b0b')|0.0033465357638991604",
+        // The vector that tells the two knees apart. A lightness of 4% is a channel of exactly
+        // 0.04, which is above WCAG's 0.03928 and below sRGB's 0.04045, so the linear branch would
+        // give 0.0030959752 here instead — right to five digits and wrong after that.
+        "luminance('hsl(0, 0%, 4%)')|0.0030954995810608937",
+        // Fractional channels, which is what an hsl colour has. Rounding them to bytes first gives
+        // 0.12512359 rather than this.
+        "luminance('hsl(210, 50%, 40%)')|0.1250645743288924",
+        // Opacity is not a channel and does not dim anything.
+        "luminance('hsla(120, 60%, 25%, 0.5)')|0.09788192429901331",
+        // NaN, serialized by JSON.stringify as null: d3 blanks the channels of a colour it cannot
+        // read *and* of one whose opacity is zero, so a transparent colour is not black.
+        "luminance('nonsense')|null",
+        "luminance('transparent')|null",
+        "luminance('none')|null",
+        "luminance('rgba(255, 0, 0, 0)')|null",
+        // ---- containerSize ----
+        // No DOM, so this is upstream's own headless answer: two absent values, not [0, 0].
+        "containerSize()|[null,null]",
+        "length(containerSize())|2",
+        "isValid(containerSize()[0])|false",
+        "containerSize()[0] == null|true",
       ],
   )
   fun `functions match upstream Vega`(source: String, expected: String) {
@@ -301,5 +336,73 @@ class ExpressionReferenceTest {
   )
   fun `date functions match upstream`(expression: String, expected: String) {
     assertEquals(expected, evaluate(expression), expression)
+  }
+
+  /**
+   * `indata` against a dataset holding one of every value kind, pinned against upstream.
+   *
+   * The point of the table is the coercion. Upstream indexes a dataset by the field value coerced
+   * to a string and looks the argument up the same way, so `indata('t', 'k', 1)` finds the row
+   * whose `k` is the *string* `"1"`, and the boolean `true` finds the string `"true"`. An
+   * implementation that compares with `===` — which is what the documented "matches value" suggests
+   * — returns nothing for four of these rows and looks perfectly reasonable while doing it.
+   *
+   * The result is a **count**, not a boolean: `'a'` appears twice and upstream answers 2.
+   */
+  @ParameterizedTest(name = "{0}")
+  @CsvSource(
+    delimiter = '|',
+    value =
+      [
+        "indata('t', 'k', 'a')|2",
+        "indata('t', 'k', 'b')|1",
+        "indata('t', 'k', 'zzz')|null",
+        // The row whose k is the string "1", found by the number 1.
+        "indata('t', 'k', 1)|1",
+        // The row whose k is the number 5, found by either spelling.
+        "indata('t', 'k', 5)|1",
+        "indata('t', 'k', '5')|1",
+        "indata('t', 'k', null)|1",
+        "indata('t', 'k', true)|1",
+        "indata('t', 'k', 'true')|1",
+        "indata('t', 'n', 3)|1",
+        "indata('t', 'n', '3')|1",
+        // A field no row has: upstream groups them all under one absent key, which nothing matches.
+        "indata('t', 'nosuchfield', 'a')|null",
+        "if(indata('t', 'k', 'a'), 'yes', 'no')|\"yes\"",
+        "if(indata('t', 'k', 'zzz'), 'yes', 'no')|\"no\"",
+      ],
+  )
+  fun `indata matches upstream`(expression: String, expected: String) {
+    val result = compiler.compile(expression)
+    assertTrue(result is ExpressionResult.Compiled, "failed to parse '$expression': $result")
+    assertEquals(
+      expected,
+      asJson((result as ExpressionResult.Compiled).expression.evaluate(IndataScope)),
+      expression,
+    )
+  }
+
+  /** The dataset the `indata` table is read against, matching the one the oracle was run on. */
+  private object IndataScope : ExpressionScope {
+    override val datum: VegaValue = VegaValue.EmptyObject
+
+    override fun signal(name: String): VegaValue = VegaValue.Null
+
+    private fun row(k: VegaValue, n: Double): VegaValue =
+      VegaValue.Obj(linkedMapOf("k" to k, "n" to VegaValue.Num(n)))
+
+    private val rows =
+      listOf(
+        row(VegaValue.Str("a"), 1.0),
+        row(VegaValue.Str("a"), 2.0),
+        row(VegaValue.Str("b"), 3.0),
+        row(VegaValue.Str("1"), 4.0),
+        row(VegaValue.Num(5.0), 5.0),
+        row(VegaValue.Null, 6.0),
+        row(VegaValue.Bool(true), 7.0),
+      )
+
+    override fun dataset(name: String): List<VegaValue> = if (name == "t") rows else emptyList()
   }
 }

@@ -3,6 +3,8 @@ package dev.aster.vega.expression
 import dev.aster.vega.model.DiagnosticCodes
 import dev.aster.vega.model.VegaDiagnostic
 import dev.aster.vega.model.VegaValue
+import dev.aster.vega.model.asString
+import dev.aster.vega.model.field
 
 /**
  * Expression API surface.
@@ -37,6 +39,20 @@ public interface ExpressionScope {
   public fun dataset(name: String): List<VegaValue>
 
   /**
+   * `indata('name', 'field', value)` — how many rows of the named dataset carry that value.
+   *
+   * Not a boolean, despite the documentation: upstream returns the **count** of matching rows, or
+   * `undefined` when there are none, and a specification that prints the result prints a number.
+   * [VegaValue.Null] stands in for that `undefined`; both are falsey, so the usual
+   * `if(indata(...))` reads the same either way.
+   *
+   * The default scans, which is correct and quadratic when called once per datum. A scope that
+   * answers many of these — a mark encoding, in practice — should override with an index.
+   */
+  public fun indata(name: String, field: String, value: VegaValue): VegaValue =
+    indataLookup(indataCounts(dataset(name), field), value)
+
+  /**
    * `scale('name', value)` — a scale applied from inside an expression.
    *
    * Values in and values out, so `vega-expression` stays free of any scale type. A scope with no
@@ -56,6 +72,23 @@ public interface ExpressionScope {
   /** `bandwidth('name')` — a band scale's band width, or zero for a scale that has none. */
   public fun scaleBandwidth(name: String): VegaValue = VegaValue.Num(0.0)
 }
+
+/**
+ * The index upstream's `indata` looks a value up in: string-coerced field value to row count.
+ *
+ * Upstream builds it with an `aggregate` grouped by the field feeding a `TupleIndex`, whose map is
+ * a plain JavaScript object — so the key is the field value **coerced to a string**, and so is the
+ * value looked up. That is the whole comparison, and it is not `===`: `indata('t', 'k', 1)` finds a
+ * row whose `k` is the string `"1"`, and `indata('t', 'k', true)` finds one whose `k` is `"true"`.
+ * Reading the documentation's "matches value" as strict equality gives a chart that is silently
+ * missing exactly the rows whose types were not what the specification's author assumed.
+ */
+public fun indataCounts(rows: List<VegaValue>, field: String): Map<String, Int> =
+  rows.groupingBy { it.field(field).asString() }.eachCount()
+
+/** Reads [indataCounts] the way upstream does: the count, or absent rather than zero. */
+public fun indataLookup(counts: Map<String, Int>, value: VegaValue): VegaValue =
+  counts[value.asString()]?.let { VegaValue.Num(it.toDouble()) } ?: VegaValue.Null
 
 public sealed interface ExpressionResult {
   public data class Compiled(val expression: Expression) : ExpressionResult

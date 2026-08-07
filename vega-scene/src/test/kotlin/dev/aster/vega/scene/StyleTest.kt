@@ -34,6 +34,40 @@ class StyleTest {
     assertEquals(0.5019607843137255, long.alpha, 1e-9)
   }
 
+  /**
+   * `hsl()` and `hsla()`, against what d3-color makes of the same strings.
+   *
+   * The last two are the ones that are not the textbook conversion: d3 drops the saturation when
+   * the lightness reaches either end, so a "50% saturated" colour at 100% lightness is plain white
+   * and at 0% is plain black rather than a tinted grey.
+   */
+  @ParameterizedTest
+  @CsvSource(
+    "'hsl(210, 50%, 40%)', #336699",
+    "'hsl(0, 100%, 50%)', #ff0000",
+    "'hsl(120, 100%, 25%)', #008000",
+    // A negative hue wraps forward rather than clamping to zero.
+    "'hsl(-30, 60%, 50%)', #cc3380",
+    "'hsla(120, 60%, 25%, 0.5)', #19661980",
+    "'hsl(210, 50%, 100%)', #ffffff",
+    "'hsl(210, 50%, 0%)', #000000",
+  )
+  fun `parses hsl colours the way d3-color does`(input: String, expected: String) {
+    val color = requireNotNull(SceneColor.parse(input)) { "failed to parse $input" }
+    assertEquals(expected, color.toCssHex())
+  }
+
+  @Test
+  fun `an hsl colour keeps fractional channels`() {
+    // d3 leaves them unrounded, and `luminance()` reads them before anything rounds:
+    // hsl(210,50%,40%)
+    // has a red channel of 50.999999999999986, not 51. Rounding here would shift every number
+    // computed from an hsl colour in its last digits.
+    val color = requireNotNull(SceneColor.parse("hsl(210, 50%, 40%)"))
+    assertEquals(50.999999999999986, color.red * 255.0, 1e-12)
+    assertEquals(153.00000000000003, color.blue * 255.0, 1e-12)
+  }
+
   @Test
   fun `none and transparent map to a transparent colour`() {
     assertTrue(requireNotNull(SceneColor.parse("none")).isTransparent)

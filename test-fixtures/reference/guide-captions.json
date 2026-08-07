@@ -270,6 +270,11 @@
   "caption": "Y-axis titled 'Count' for a linear scale with values from 0 to 8"
  },
  {
+  "fixture": "indata-membership",
+  "kind": "axis",
+  "caption": "X-axis for a discrete scale with 6 values: a, b, c, d, 3, true"
+ },
+ {
   "fixture": "label-limit",
   "kind": "axis",
   "caption": "Y-axis for a discrete scale with 3 values: a-really-quite-long-category-name-here, another-long-one-that-runs-on-and-on, short"

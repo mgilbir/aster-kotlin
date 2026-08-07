@@ -140,6 +140,28 @@ public class Evaluator(
       return VegaValue.Arr(dataset)
     }
 
+    // `indata` reaches the datasets the same way `data` does, through the scope, because the
+    // evaluator has none of its own. Upstream additionally *requires* the first two arguments to be
+    // string literals, since it resolves them into an index at parse time; nothing here needs them
+    // early, so they are evaluated like any other argument and a computed dataset name works.
+    if (name == "indata") {
+      if (node.arguments.size != 3) {
+        throw ExpressionEvaluationException(
+          VegaDiagnostic(
+            severity = DiagnosticSeverity.ERROR,
+            code = DiagnosticCodes.EXPRESSION_UNSUPPORTED_FUNCTION,
+            message = "indata() takes a dataset name, a field name and a value",
+            operator = name,
+          )
+        )
+      }
+      return scope.indata(
+        evaluate(node.arguments[0], scope).asString(),
+        evaluate(node.arguments[1], scope).asString(),
+        evaluate(node.arguments[2], scope),
+      )
+    }
+
     // `scale` and `invert` reach out to the chart's scales, which the evaluator cannot know about.
     // The scope answers instead, values in and values out, so this module stays free of any scale
     // type. A third argument names a group scope upstream; there is no equivalent here, so it is

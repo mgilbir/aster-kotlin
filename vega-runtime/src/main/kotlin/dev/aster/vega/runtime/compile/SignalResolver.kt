@@ -6,6 +6,8 @@ import dev.aster.vega.expression.ExpressionEvaluationException
 import dev.aster.vega.expression.ExpressionResult
 import dev.aster.vega.expression.ExpressionScope
 import dev.aster.vega.expression.VegaExpressionCompiler
+import dev.aster.vega.expression.indataCounts
+import dev.aster.vega.expression.indataLookup
 import dev.aster.vega.model.DiagnosticCodes
 import dev.aster.vega.model.DiagnosticCollector
 import dev.aster.vega.model.VegaValue
@@ -46,11 +48,37 @@ public class SignalScope(
    * Reports an expression naming a scale that does not exist, rather than quietly yielding null.
    */
   private val diagnostics: DiagnosticCollector? = null,
+  /**
+   * `indata` indexes, shared with every scope derived from this one.
+   *
+   * Upstream keeps one index per dataset and field for the life of the view; here the equivalent is
+   * to keep it for the life of a compile, because [withDatum] makes a fresh scope for every row of
+   * every mark. Without this an `indata` in an encoding rescans the whole target dataset once per
+   * datum, which is the difference between linear and quadratic on the specifications that use it.
+   */
+  private val indataIndexes: MutableMap<Pair<String, String>, Map<String, Int>> = mutableMapOf(),
 ) : ExpressionScope {
 
   override fun signal(name: String): VegaValue = values[name] ?: VegaValue.Null
 
   override fun dataset(name: String): List<VegaValue> = datasets[name] ?: emptyList()
+
+  override fun indata(name: String, field: String, value: VegaValue): VegaValue {
+    val rows = datasets[name]
+    if (rows == null) {
+      // Upstream refuses this at parse time — "Undefined data set name" — so it is never a chart
+      // that quietly finds nothing; it is a chart that does not compile. Reported rather than
+      // fatal, since the rest of the specification is still worth drawing.
+      diagnostics?.error(
+        DiagnosticCodes.PARSE_UNKNOWN_PROPERTY,
+        "indata() names dataset '$name', which this specification does not define",
+        operator = name,
+      )
+      return VegaValue.Null
+    }
+    val counts = indataIndexes.getOrPut(name to field) { indataCounts(rows, field) }
+    return indataLookup(counts, value)
+  }
 
   override fun applyScale(name: String, value: VegaValue): VegaValue =
     resolveScale(name, "scale")?.scale(value) ?: VegaValue.Null
@@ -120,13 +148,13 @@ public class SignalScope(
   }
 
   public fun withDatum(datum: VegaValue): SignalScope =
-    SignalScope(values, datasets, datum, scales, diagnostics)
+    SignalScope(values, datasets, datum, scales, diagnostics, indataIndexes)
 
   /** Adds the scales once they exist, which is after every signal has resolved. */
   public fun withScales(
     scales: Map<String, VegaScale>,
     diagnostics: DiagnosticCollector,
-  ): SignalScope = SignalScope(values, datasets, datum, scales, diagnostics)
+  ): SignalScope = SignalScope(values, datasets, datum, scales, diagnostics, indataIndexes)
 
   public val names: Set<String>
     get() = values.keys
