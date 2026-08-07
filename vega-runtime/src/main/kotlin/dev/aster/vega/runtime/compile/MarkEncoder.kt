@@ -14,6 +14,7 @@ import dev.aster.vega.model.asString
 import dev.aster.vega.model.field
 import dev.aster.vega.model.spec.ChannelValue
 import dev.aster.vega.model.spec.EncodeEntry
+import dev.aster.vega.model.spec.FieldRef
 import dev.aster.vega.model.spec.MarkSpec
 import dev.aster.vega.model.spec.MarkType
 import dev.aster.vega.runtime.scale.PositionScale
@@ -580,13 +581,13 @@ public class MarkEncoder(
     when (channel) {
       null -> null
       is ChannelValue.Constant -> JsSemantics.truthy(channel.value)
-      is ChannelValue.Field -> JsSemantics.truthy(datum.field(channel.path))
+      is ChannelValue.Field -> JsSemantics.truthy(datum.fieldOf(channel.ref))
       is ChannelValue.Signal ->
         evaluateExpression(channel.expression, datum)?.let { JsSemantics.truthy(it) }
       is ChannelValue.Conditional -> boolean(selectRule(channel, datum), datum)
       is ChannelValue.Scaled -> {
         val scale = scales[channel.scale]
-        val input = channel.field?.let { datum.field(it) } ?: channel.value
+        val input = channel.field?.let { datum.fieldOf(it) } ?: channel.value
         if (scale != null && input != null) JsSemantics.truthy(scale.scale(input)) else null
       }
     }
@@ -779,7 +780,7 @@ public class MarkEncoder(
       when (channel) {
         null -> return null
         is ChannelValue.Constant -> channel.value
-        is ChannelValue.Field -> datum.field(channel.path)
+        is ChannelValue.Field -> datum.fieldOf(channel.ref)
         is ChannelValue.Signal -> evaluateExpression(channel.expression, datum) ?: return null
         is ChannelValue.Conditional -> return numberList(selectRule(channel, datum), datum)
         is ChannelValue.Scaled -> return null
@@ -845,6 +846,47 @@ public class MarkEncoder(
     )
   }
 
+  /**
+   * Reads a channel's input, which is not always a column of the row being drawn.
+   *
+   * Vega's four object forms of `field` each reach somewhere else, and each is resolved here
+   * because this is the only place that knows all of them:
+   * - **group** — a property of the enclosing group. Inside a group scope `width` and `height` are
+   *   that group's own size, which is exactly what `{"group": "height"}` asks for and why a mark
+   *   can be made to span its cell.
+   * - **parent** — a column of the facet datum, which the `parent` signal already carries.
+   * - **signal** — the column *name* comes from a signal, so the signal is read first and the
+   *   result used as a path.
+   * - **datum** — the name is itself held in a column, one level of indirection further.
+   */
+  private fun VegaValue.fieldOf(ref: FieldRef): VegaValue =
+    when (ref) {
+      is FieldRef.Plain -> field(ref.path)
+      is FieldRef.Group -> scope.signal(ref.path)
+      is FieldRef.Parent -> scope.signal("parent").field(ref.path)
+      is FieldRef.Signal -> {
+        val name = signalText(ref.expression)
+        if (name == null) VegaValue.Null else field(name)
+      }
+      is FieldRef.Datum -> field(field(ref.path).asString())
+    }
+
+  /** Evaluates a signal that supplies a field *name*; a broken one is reported once. */
+  private fun signalText(expression: String): String? =
+    when (val compiled = expressions.compile(expression)) {
+      is ExpressionResult.Failed -> {
+        diagnostics.add(compiled.diagnostic)
+        null
+      }
+      is ExpressionResult.Compiled ->
+        try {
+          compiled.expression.evaluate(scope).asString().takeIf { it.isNotEmpty() }
+        } catch (failure: ExpressionEvaluationException) {
+          diagnostics.add(failure.diagnostic)
+          null
+        }
+    }
+
   private fun metadata(
     spec: MarkSpec,
     datum: VegaValue,
@@ -896,12 +938,12 @@ public class MarkEncoder(
     when (channel) {
       null -> null
       is ChannelValue.Constant -> channel.value.asString()
-      is ChannelValue.Field -> datum.field(channel.path).asString()
+      is ChannelValue.Field -> datum.fieldOf(channel.ref).asString()
       is ChannelValue.Signal -> evaluateExpression(channel.expression, datum)?.asString()
       is ChannelValue.Conditional -> string(selectRule(channel, datum), datum)
       is ChannelValue.Scaled -> {
         val scale = scales[channel.scale]
-        val input = channel.field?.let { datum.field(it) } ?: channel.value
+        val input = channel.field?.let { datum.fieldOf(it) } ?: channel.value
         if (scale != null && input != null) scale.scale(input).asString() else null
       }
     }
@@ -951,7 +993,7 @@ public class MarkEncoder(
     when (channel) {
       null -> null
       is ChannelValue.Constant -> channel.value.asDouble().takeIf { !it.isNaN() }
-      is ChannelValue.Field -> datum.field(channel.path).asDouble().takeIf { !it.isNaN() }
+      is ChannelValue.Field -> datum.fieldOf(channel.ref).asDouble().takeIf { !it.isNaN() }
       is ChannelValue.Signal ->
         evaluateExpression(channel.expression, datum)?.asDouble()?.takeIf { !it.isNaN() }
       is ChannelValue.Conditional -> position(selectRule(channel, datum), datum)
@@ -1035,7 +1077,7 @@ public class MarkEncoder(
     val constant = channel.value
     val input =
       when {
-        fieldPath != null -> datum.field(fieldPath)
+        fieldPath != null -> datum.fieldOf(fieldPath)
         constant != null -> constant
         else -> return null
       }
@@ -1049,7 +1091,7 @@ public class MarkEncoder(
     when (channel) {
       null -> null
       is ChannelValue.Constant -> channel.value.asDouble().takeIf { !it.isNaN() }
-      is ChannelValue.Field -> datum.field(channel.path).asDouble().takeIf { !it.isNaN() }
+      is ChannelValue.Field -> datum.fieldOf(channel.ref).asDouble().takeIf { !it.isNaN() }
       is ChannelValue.Scaled -> scaledPosition(channel, datum)
       is ChannelValue.Signal ->
         evaluateExpression(channel.expression, datum)?.asDouble()?.takeIf { !it.isNaN() }
@@ -1066,7 +1108,7 @@ public class MarkEncoder(
       when (channel) {
         null -> return null
         is ChannelValue.Constant -> channel.value.asString()
-        is ChannelValue.Field -> datum.field(channel.path).asString()
+        is ChannelValue.Field -> datum.fieldOf(channel.ref).asString()
         is ChannelValue.Scaled -> {
           val scale = scales[channel.scale]
           if (scale == null) {
@@ -1077,7 +1119,7 @@ public class MarkEncoder(
             )
             return null
           }
-          val input = channel.field?.let { datum.field(it) } ?: channel.value ?: return null
+          val input = channel.field?.let { datum.fieldOf(it) } ?: channel.value ?: return null
           scale.scale(input).asString()
         }
         is ChannelValue.Signal ->
@@ -1147,8 +1189,8 @@ public class MarkEncoder(
       channels.values.filterIsInstance<ChannelValue.Scaled>().mapNotNull { it.field }.lastOrNull()
     if (labelField == null) return null
     return AccessibilityDescriptor(
-      label = spoken(datum.field(labelField)),
-      value = valueField?.takeIf { it != labelField }?.let { spoken(datum.field(it)) },
+      label = spoken(datum.fieldOf(labelField)),
+      value = valueField?.takeIf { it != labelField }?.let { spoken(datum.fieldOf(it)) },
       role = role,
       focusable = true,
     )

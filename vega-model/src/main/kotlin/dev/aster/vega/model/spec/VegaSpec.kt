@@ -667,10 +667,39 @@ public data class FacetSpec(val name: String, val data: String, val groupby: Lis
  * Vega allows a constant, a datum field, a scaled value, a band offset, or an expression.
  * Expressions are modelled but not evaluated yet, so the runtime reports them rather than guessing.
  */
+/**
+ * Where a channel's input comes from, which is not always the row being drawn.
+ *
+ * Vega lets a `field` be a string or an object, and the object forms reach outside the current
+ * datum. They are not exotic: `{"group": "height"}` is how a mark spans the group it is drawn in,
+ * and it appears in six of the official examples. Reading them all as "a field of this row" would
+ * look up a column that does not exist and silently draw nothing.
+ */
+public sealed interface FieldRef {
+  /** `"field": "amount"` — a column of the row being drawn. */
+  public data class Plain(val path: String) : FieldRef
+
+  /** `{"group": "height"}` — a property of the enclosing group, usually its size. */
+  public data class Group(val path: String) : FieldRef
+
+  /** `{"parent": "key"}` — a column of the facet datum that produced this group. */
+  public data class Parent(val path: String) : FieldRef
+
+  /** `{"signal": "..."}` — the *name* of the column comes from a signal. */
+  public data class Signal(val expression: String) : FieldRef
+
+  /** `{"datum": "which"}` — the name of the column is itself held in a column. */
+  public data class Datum(val path: String) : FieldRef
+
+  /** The literal column name, for the plain case that most callers only ever see. */
+  public val plainPath: String?
+    get() = (this as? Plain)?.path
+}
+
 public sealed interface ChannelValue {
   public data class Constant(val value: VegaValue) : ChannelValue
 
-  public data class Field(val path: String) : ChannelValue
+  public data class Field(val ref: FieldRef) : ChannelValue
 
   /**
    * A scaled channel.
@@ -680,7 +709,7 @@ public sealed interface ChannelValue {
    */
   public data class Scaled(
     val scale: String,
-    val field: String? = null,
+    val field: FieldRef? = null,
     val value: VegaValue? = null,
     val band: Double? = null,
     val offset: Double? = null,

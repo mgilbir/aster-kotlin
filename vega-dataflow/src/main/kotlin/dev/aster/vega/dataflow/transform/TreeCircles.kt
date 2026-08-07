@@ -262,10 +262,22 @@ internal object TreeCircles {
       circles[index] = t
     }
 
+    // Welzl restarts from the beginning every time the basis grows, so it only terminates while
+    // each new basis genuinely encloses more than the last. Rounding can break that: the basis
+    // stops improving, the scan restarts forever, and the chart never appears.
+    //
+    // d3 throws at the equivalent point ("something is very wrong"). Neither hanging nor crashing
+    // is acceptable in a chart, so progress is bounded instead and a guaranteed — if not minimal —
+    // enclosing circle is used if the bound is reached. The pack is then slightly loose rather
+    // than absent, which is visible and survivable. Found by the official `circle-packing` example,
+    // which hung: 250 nodes where the fixture that proved this had eight.
+    val limit = 4 * circles.size + 64
+    var steps = 0
     var i = 0
     var basis = listOf<Circle>()
     var result: Circle? = null
     while (i < circles.size) {
+      if (steps++ > limit) return boundingCircle(circles)
       val p = circles[i]
       if (result != null && enclosesWeak(result, p)) {
         i++
@@ -276,6 +288,36 @@ internal object TreeCircles {
       }
     }
     return result ?: Circle(0.0, 0.0, 0.0)
+  }
+
+  /**
+   * A circle that certainly contains every one of [circles], though not the smallest such.
+   *
+   * The fallback when the exact solver cannot converge. Centred on the middle of the bounding box
+   * and grown to reach the furthest circle's far edge, so it encloses by construction rather than
+   * by an argument that floating point might not honour.
+   */
+  private fun boundingCircle(circles: List<Circle>): Circle {
+    if (circles.isEmpty()) return Circle(0.0, 0.0, 0.0)
+    var left = Double.MAX_VALUE
+    var right = -Double.MAX_VALUE
+    var top = Double.MAX_VALUE
+    var bottom = -Double.MAX_VALUE
+    for (c in circles) {
+      left = minOf(left, c.x - c.r)
+      right = maxOf(right, c.x + c.r)
+      top = minOf(top, c.y - c.r)
+      bottom = maxOf(bottom, c.y + c.r)
+    }
+    val cx = (left + right) / 2
+    val cy = (top + bottom) / 2
+    var radius = 0.0
+    for (c in circles) {
+      val dx = c.x - cx
+      val dy = c.y - cy
+      radius = maxOf(radius, kotlin.math.sqrt(dx * dx + dy * dy) + c.r)
+    }
+    return Circle(cx, cy, radius)
   }
 
   private fun extendBasis(basis: List<Circle>, p: Circle): List<Circle> {

@@ -1676,19 +1676,45 @@ public class SpecParser {
    * Resolves a field reference, which Vega allows to be a string or `{"group": ...}` / `{"datum":
    * ...}`.
    */
-  private fun fieldPath(value: VegaValue?, path: String): String? =
+  /**
+   * Resolves a field reference, which Vega allows to be a string or one of four object forms.
+   *
+   * Each object form reads from somewhere other than the row being drawn, so none of them can be
+   * flattened to a column name here — they are carried into the encoder, which is the only place
+   * that knows what the enclosing group is or what a signal resolved to.
+   */
+  private fun fieldPath(value: VegaValue?, path: String): FieldRef? =
     when (value) {
       null -> null
-      is VegaValue.Str -> value.value
+      is VegaValue.Str -> FieldRef.Plain(value.value)
       is VegaValue.Obj -> {
+        val group = value.fields["group"]?.asString()
+        val parent = value.fields["parent"]?.asString()
+        val signal = value.fields["signal"]?.asString()
+        val datum = value.fields["datum"]?.asString()
+        when {
+          !group.isNullOrEmpty() -> FieldRef.Group(group)
+          !parent.isNullOrEmpty() -> FieldRef.Parent(parent)
+          !signal.isNullOrEmpty() -> FieldRef.Signal(signal)
+          !datum.isNullOrEmpty() -> FieldRef.Datum(datum)
+          else -> {
+            diagnostics.error(
+              DiagnosticCodes.PARSE_UNKNOWN_PROPERTY,
+              "A field reference object must name one of 'group', 'parent', 'signal' or 'datum'",
+              jsonPath = path,
+            )
+            null
+          }
+        }
+      }
+      else -> {
         diagnostics.error(
           DiagnosticCodes.PARSE_UNKNOWN_PROPERTY,
-          "Only plain string field references are supported",
+          "A field reference must be a string or an object",
           jsonPath = path,
         )
         null
       }
-      else -> value.asString()
     }
 
   // ---- helpers --------------------------------------------------------------

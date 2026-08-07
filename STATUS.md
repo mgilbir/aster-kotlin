@@ -452,7 +452,7 @@ are the real measure of this engine, and they are far harder than the fixture co
 written *here*, against what already worked, while the examples were written by other people with no
 regard for what this supports.
 
-**20 of 93 compile with no errors.** Eleven did before data loading existed. `scripts/` has no
+**22 of 93 compile with no errors.** Eleven did before data loading existed. `scripts/` has no
 runner yet — the survey is `ExampleTriage`, a test that is skipped unless `-Dexamples.dir=` points at
 a directory of specs, and which writes a ranked report beside them. Each example gets its own thread
 and a twenty-second deadline, because one specification that loops must not take the survey with it.
@@ -463,18 +463,20 @@ symptoms:
 
 | Root cause | Examples |
 | --- | --- |
-| `"field": {"group": "..."}` and other non-string field references | 10 |
 | `topojson`, needing map projections (a non-goal) | 10 |
-| Two specifications **hang** in `pack` | 2 |
-| A signal where a literal is expected: `tree.method`, `aggregate.op`, an axis `values` | ~6 |
-| Missing expression functions: `indata`, `setdata`, `bandwidth`, `bandspace`, `containerSize`, `now`, `random` | ~8 |
-| `kde2d`, `graticule`, geo transforms | ~5 |
+| A signal where a literal is expected: `tree.method`, `aggregate.op`, a scale `range` | ~8 |
+| Missing expression functions: `indata`, `setdata`, `bandwidth`, `bandspace`, `containerSize`, `lerp`, `now` | ~8 |
+| A data-driven domain in a form the scale resolver does not read | 4 |
+| `kde2d`, `graticule` and the geo transforms | ~5 |
 
-**The two hangs are the most serious thing here** and are a bug in this engine, not a gap:
-`circle-packing` and `zoomable-circle-packing` never finish. Both are `stratify` into `pack` over
-`flare.json`, which is 250-odd nodes where the fixture that proved `pack` had eight. Something in
-the front-chain sibling packer does not terminate at that size. Found only because the triage runner
-has a deadline; a survey without one would simply have appeared to be still running.
+Two examples used to **hang** — `circle-packing` and `zoomable-circle-packing`, both `stratify`
+into `pack` over `flare.json`. That is fixed, and the cause is worth remembering: Welzl's smallest
+enclosing circle restarts its scan every time the basis grows, so it only terminates while each new
+basis genuinely encloses more than the last. d3 throws when that stops being true; this engine
+returned a degenerate basis instead, which looked like graceful degradation and was in fact a
+livelock. The solver is now bounded and falls back to a guaranteed — if not minimal — enclosing
+circle, so a pack comes out slightly loose rather than never. Found only because the survey gives
+each example a deadline.
 
 ## Known failing fixtures
 
