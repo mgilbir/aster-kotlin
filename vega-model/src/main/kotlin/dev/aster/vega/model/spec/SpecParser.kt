@@ -331,6 +331,10 @@ private val ENCODE_CONSUMED =
     "xc",
     "yc",
     "url",
+    // An outline written as an SVG path string, which `SvgPath` has read since the `path-marks`
+    // fixture. The entry below it stayed behind and told every specification using one that it had
+    // been ignored — including both of Vega's tree-diagram examples, whose links are path marks.
+    "path",
   )
 
 private val ENCODE_UNSUPPORTED =
@@ -354,7 +358,6 @@ private val ENCODE_UNSUPPORTED =
     "tension" to "Curve tension is not implemented; it needs an interpolation method first",
     "theta" to "Polar positioning is not implemented",
     "radius" to "Polar positioning is not implemented",
-    "path" to "SVG path strings on a mark are not implemented",
     "scaleX" to "Per-item scaling is not implemented",
     "scaleY" to "Per-item scaling is not implemented",
   )

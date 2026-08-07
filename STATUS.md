@@ -730,6 +730,17 @@ depends on them. Each has a test and a comment; this is the index.
    and a `timeunit` transform feeding a `time` scale across the same daylight-saving boundary the
    `local-time-dst` fixture crosses.
 
+A fourth candidate turned up while `treelinks` was being added, and is stated here rather than
+ranked because whoever re-decides the list should weigh it. **A transform cannot read a computed
+signal**, because signals resolve after the data and only the plain constants are seeded first. It
+is now reported by name, which it was not — but reporting is not resolving, and Vega's own
+`radial-tree-layout` is written on exactly that dependency: every node sits at
+`originX + radius * cos(...)` where `originX` has an `update`, so the whole diagram is drawn on the
+origin. It is the only known case of the engine producing a confidently wrong *picture* rather than
+a missing feature, and no fixture can cover it — upstream draws it correctly, so a fixture written
+around it would only record the disagreement. Resolving it needs the signal pass to run in
+dependency order across the data boundary, which is most of a real dataflow.
+
 One item still needs something this environment does not have: performance on **physical hardware**
 (PROJECT_BRIEF.md 19, criterion 13). The emulator is available and useful for behaviour, but
 PROJECT_BRIEF.md 18.6 says emulator timings are not authoritative, and it is right.

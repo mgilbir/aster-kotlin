@@ -56,6 +56,15 @@ internal class DataResolver(
   private val expressions: ExpressionCompiler,
   /** Refuses everything unless the host opted in; see [DataLoader]. */
   private val loader: DataLoader = DenyLoader,
+  /**
+   * Signals the specification declares whose value is computed rather than written down.
+   *
+   * Signals resolve *after* the data, because a signal's `update` may read a dataset, so only the
+   * plain constants can be seeded beforehand. A transform reaching for one of these therefore gets
+   * nothing — and nothing is zero to arithmetic, which draws a chart rather than failing to. Naming
+   * them is what turns that into a diagnostic; see [TransformScope].
+   */
+  private val deferredSignals: Set<String> = emptySet(),
 ) {
 
   /**
@@ -194,7 +203,16 @@ internal class DataResolver(
       }
       if (spec.parse.isNotEmpty()) values = values.map { parseFields(it, spec) }
       if (spec.transform.isNotEmpty()) {
-        val context = TransformScope(diagnostics, expressions, signals, result, tree)
+        val context =
+          TransformScope(
+            diagnostics,
+            expressions,
+            signals,
+            result,
+            tree,
+            deferredSignals,
+            spec.name,
+          )
         values = pipeline.run(values, spec.transform, context)
         tree = context.tree
       }
@@ -256,7 +274,12 @@ internal class DataResolver(
     private val datasets: Map<String, List<VegaValue>>,
     /** Inherited from the dataset this one sources from, and null for a dataset of its own. */
     override var tree: TreeSource?,
+    private val deferredSignals: Set<String>,
+    private val dataset: String,
   ) : TransformContext {
+
+    /** One diagnostic per signal per dataset; the expression runs once a row. */
+    private val reported = mutableSetOf<String>()
 
     override val scope: ExpressionScope = scopeFor(VegaValue.Null)
 
@@ -264,6 +287,40 @@ internal class DataResolver(
       signals[name] = value
     }
 
-    override fun scopeFor(datum: VegaValue): ExpressionScope = SignalScope(signals, datasets, datum)
+    override fun scopeFor(datum: VegaValue): ExpressionScope =
+      DeferredSignalScope(SignalScope(signals, datasets, datum), ::reportDeferred)
+
+    /**
+     * A transform read a signal whose value is not known until after the data.
+     *
+     * The value comes back null, and null is zero to arithmetic — so the transform computes
+     * something rather than failing, and the chart is drawn in the wrong place with nothing said.
+     * Vega's own radial tree example is written exactly this way: `originX` has an `update`, and
+     * every node's `x` is `originX + radius * cos(...)`, so the whole diagram collapsed onto the
+     * origin. Reporting it is not the same as resolving it — the ordering that would resolve it
+     * needs a real dataflow, which is a separate piece of work — but it is the difference between a
+     * chart that is wrong and one that is wrong and says so.
+     */
+    private fun reportDeferred(name: String) {
+      if (name in signals || name !in deferredSignals || !reported.add(name)) return
+      diagnostics.warn(
+        DiagnosticCodes.TRANSFORM_INVALID_PARAMETER,
+        "A transform on dataset '$dataset' read signal '$name', whose value is computed and so is " +
+          "not known until after the data has been resolved; it read as null. Only a signal with " +
+          "a plain 'value' is available to a transform",
+        operator = dataset,
+      )
+    }
+  }
+
+  /** Delegates everything but the signal lookup, which it announces before answering. */
+  private class DeferredSignalScope(
+    private val inner: ExpressionScope,
+    private val notify: (String) -> Unit,
+  ) : ExpressionScope by inner {
+    override fun signal(name: String): VegaValue {
+      notify(name)
+      return inner.signal(name)
+    }
   }
 }

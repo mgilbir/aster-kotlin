@@ -145,7 +145,10 @@ public class SpecCompiler(
     // A handler's value is the current one, and a transform should read that rather than the
     // initial value it is replacing.
     transformSignals.putAll(signalOverrides.filterKeys { transformSignals.containsKey(it) })
-    val data = DataResolver(diagnostics, expressions, loader)
+    // Everything the specification declares that the seeding above could not supply. A transform
+    // reading one of these gets null, which arithmetic turns into zero, so it has to be named.
+    val deferredSignals = spec.signals.map { it.name }.toSet() - transformSignals.keys
+    val data = DataResolver(diagnostics, expressions, loader, deferredSignals)
     val resolved = data.resolve(spec.data, transformSignals)
     val datasets = resolved.datasets
     val signals =

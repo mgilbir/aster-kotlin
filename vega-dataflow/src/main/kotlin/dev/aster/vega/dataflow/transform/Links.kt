@@ -20,8 +20,8 @@ private typealias LinkShape = (Double, Double, Double, Double) -> String
  *
  * Every node with a parent becomes one row holding the two whole rows, under `source` and `target`
  * — not their fields merged, because both sides carry the same column names and a merge would lose
- * one of each pair. `linkpath` after it reads coordinates out of those, which is why a specification
- * writes `source.x` rather than a bare field name.
+ * one of each pair. `linkpath` after it reads coordinates out of those, which is why a
+ * specification writes `source.x` rather than a bare field name.
  *
  * The output **replaces** the input: a `links` dataset holds edges, not nodes. That is also why the
  * tree stops here rather than being carried on — the rows are no longer the rows the nodes were
@@ -62,9 +62,7 @@ public object TreeLinksTransform : Transform {
       // without `generate` — is absent in exactly that sense.
       if (node.index in input.indices && parent.index in input.indices) {
         links +=
-          VegaValue.Obj(
-            linkedMapOf("source" to input[parent.index], "target" to input[node.index])
-          )
+          VegaValue.Obj(linkedMapOf("source" to input[parent.index], "target" to input[node.index]))
       }
     }
     return links
@@ -127,17 +125,16 @@ public object LinkPathTransform : Transform {
       return value
     }
 
-    val result =
-      input.map { row ->
-        val text =
-          path(
-            read(row, sourceX),
-            read(row, sourceY),
-            read(row, targetX),
-            read(row, targetY),
-          )
-        row.withField(output, VegaValue.Str(text))
-      }
+    val result = input.map { row ->
+      val text =
+        path(
+          read(row, sourceX),
+          read(row, sourceY),
+          read(row, targetX),
+          read(row, targetY),
+        )
+      row.withField(output, VegaValue.Str(text))
+    }
     // Reported once rather than per row: a wrong accessor is wrong for every edge, and a tree of
     // any size would otherwise bury every other diagnostic under one mistake.
     unresolved?.let {
