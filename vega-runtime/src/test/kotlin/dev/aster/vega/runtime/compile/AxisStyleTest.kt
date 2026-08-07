@@ -140,7 +140,6 @@ class AxisStyleTest {
       listOf(
         "\"format\": \".2f\"",
         "\"formatType\": \"number\"",
-        "\"labelLimit\": 50",
         "\"labelBound\": true",
         "\"labelFlush\": true",
         "\"labelOffset\": 3",

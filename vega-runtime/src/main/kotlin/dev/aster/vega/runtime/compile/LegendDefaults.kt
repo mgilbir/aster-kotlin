@@ -30,6 +30,9 @@ public object LegendDefaults {
   public const val TITLE_FONT_WEIGHT: Int = 700
 
   public const val LABEL_FONT_SIZE: Double = 10.0
+
+  /** As for an axis, but 160 rather than 180 — upstream's `config.legend` carries its own. */
+  public const val LABEL_LIMIT: Double = 160.0
   public const val LABEL_OFFSET: Double = 4.0
   public const val FONT_FAMILY: String = "sans-serif"
 

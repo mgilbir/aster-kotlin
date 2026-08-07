@@ -240,6 +240,7 @@ internal class LegendBuilder(
     val widest = boxes.max()
 
     val labelStyle = GuideStyle.text(spec.labelStyle, labelFontSize, defaultWeight = 400)
+    val labelLimit = numbers.resolve(spec.labelLimit, scaleName) ?: LegendDefaults.LABEL_LIMIT
 
     // Build each entry at its own origin first: the layout below needs to know how far a cell
     // reaches
@@ -255,6 +256,7 @@ internal class LegendBuilder(
           style = labelStyle,
           align = TextAlign.LEFT,
           baseline = TextBaseline.MIDDLE,
+          limit = labelLimit,
         )
       listOf(
         SymbolNode(
@@ -463,6 +465,7 @@ internal class LegendBuilder(
 
     val nodes = mutableListOf<SceneNode>(swatch)
     val labelStyle = GuideStyle.text(spec.labelStyle, labelFontSize, defaultWeight = 400)
+    val labelLimit = numbers.resolve(spec.labelLimit, scaleName) ?: LegendDefaults.LABEL_LIMIT
     val labels = mutableListOf<TextNode>()
 
     for ((index, entry) in gradientLabels(spec, scale, scaleName).withIndex()) {

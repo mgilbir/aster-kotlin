@@ -293,7 +293,10 @@ public class SvgRenderer(private val options: SvgOptions = SvgOptions()) {
 
     val lines = node.layout.lines
     if (lines.size <= 1) {
-      out.append(escapeXml(node.text))
+      // The laid-out line, not the node's own text: the two differ when a guide's `limit` has
+      // shortened the label, and the scene deliberately keeps the whole string on the run so a
+      // reader — or the accessibility tree — still gets the value it came from.
+      out.append(escapeXml(lines.firstOrNull()?.text ?: node.text))
     } else {
       // `tspan` with an absolute x keeps every line aligned to the same anchor.
       lines.forEach { line ->

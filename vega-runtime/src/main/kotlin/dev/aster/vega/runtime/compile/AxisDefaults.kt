@@ -13,6 +13,15 @@ public object AxisDefaults {
   public const val TICK_SIZE: Double = 5.0
   public const val LABEL_PADDING: Double = 2.0
   public const val LABEL_FONT_SIZE: Double = 10.0
+
+  /**
+   * How wide an axis label may be drawn before it is truncated with an ellipsis.
+   *
+   * A default, not an opt-in: upstream's `config.axis` carries `labelLimit: 180`, so a long
+   * category name is already being shortened on every chart drawn against upstream. A legend's
+   * is 160.
+   */
+  public const val LABEL_LIMIT: Double = 180.0
   public const val LABEL_FONT_FAMILY: String = "sans-serif"
   public const val TICK_WIDTH: Double = 1.0
   public const val DEFAULT_TICK_COUNT: Int = 10

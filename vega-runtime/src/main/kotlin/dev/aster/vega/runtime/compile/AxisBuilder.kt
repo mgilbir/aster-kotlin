@@ -108,6 +108,7 @@ public class AxisBuilder(
     val labelOffset = (if (spec.ticks) tickSize else 0.0) + labelPadding
     val fontSize = numbers.resolve(spec.labelFontSize, spec.scale) ?: AxisDefaults.LABEL_FONT_SIZE
     val labelStyle = GuideStyle.text(spec.labelStyle, fontSize, defaultWeight = 400)
+    val labelLimit = numbers.resolve(spec.labelLimit, spec.scale) ?: AxisDefaults.LABEL_LIMIT
 
     val children = mutableListOf<SceneNode>()
     // Ticks and labels, in paint order, hidden labels included so the mark count does not change
@@ -188,6 +189,7 @@ public class AxisBuilder(
             style = labelStyle,
             align = alignOf(spec.labelAlign) ?: labelAlign(spec.orient),
             baseline = baselineOf(spec.labelBaseline) ?: labelBaseline(spec.orient),
+            limit = labelLimit,
           )
         val layout = textEngine.layout(run)
         val (x, y) =

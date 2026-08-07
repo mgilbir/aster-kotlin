@@ -380,6 +380,8 @@ public data class AxisSpec(
   val labelAngle: NumberValue? = null,
   val labelAlign: String? = null,
   val labelBaseline: String? = null,
+  /** How wide a label may be drawn before it is truncated. Vega's axis default is 180. */
+  val labelLimit: NumberValue? = null,
   /** Appearance of the four parts, each defaulting to Vega's own when unstated. */
   val labelStyle: GuideStroke = GuideStroke(),
   val tickStyle: GuideStroke = GuideStroke(),
@@ -533,6 +535,8 @@ public data class LegendSpec(
   /** Unlike an axis, a legend removes overlapping labels by default; `false` switches it off. */
   val labelOverlap: String? = null,
   val labelSeparation: NumberValue? = null,
+  /** As for an axis, but Vega's legend default is 160. */
+  val labelLimit: NumberValue? = null,
 ) {
   /**
    * The scale this legend describes.

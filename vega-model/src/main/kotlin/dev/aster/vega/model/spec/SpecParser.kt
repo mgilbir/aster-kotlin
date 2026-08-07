@@ -84,6 +84,7 @@ private val AXIS_CONSUMED =
     "labelAngle",
     "labelAlign",
     "labelBaseline",
+    "labelLimit",
   ) + guideStyleKeys("label", "tick", "grid", "domain", "title")
 
 /**
@@ -104,7 +105,6 @@ private val AXIS_UNSUPPORTED =
     "format" to "Axis label format strings are not implemented; default formatting is used",
     "formatType" to "Axis label format types are not implemented; default formatting is used",
     "encode" to "Axis encode overrides are not implemented",
-    "labelLimit" to "Axis label truncation is not implemented; labels are drawn in full",
     "labelBound" to "Bounding axis labels to the plotting area is not implemented",
     "labelFlush" to "Flushing the first and last axis label to the range ends is not implemented",
     "labelFlushOffset" to "Axis label flush offsets are not implemented; they need labelFlush",
@@ -206,6 +206,7 @@ private val LEGEND_CONSUMED =
     "symbolOpacity",
     "labelOverlap",
     "labelSeparation",
+    "labelLimit",
   ) + guideStyleKeys("label", "title", "symbolStroke")
 
 /** Title properties this engine reads. */
@@ -922,6 +923,7 @@ public class SpecParser {
       labelOverlap = obj.fields["labelOverlap"]?.asString(),
       labelSeparation = obj.numberOrSignal("labelSeparation", "$path.labelSeparation"),
       labelAngle = obj.numberOrSignal("labelAngle", "$path.labelAngle"),
+      labelLimit = obj.numberOrSignal("labelLimit", "$path.labelLimit"),
       labelAlign = obj.fields["labelAlign"]?.takeIf { it is VegaValue.Str }?.asString(),
       labelBaseline = obj.fields["labelBaseline"]?.takeIf { it is VegaValue.Str }?.asString(),
       labelStyle = obj.guideStroke("label"),
@@ -1065,6 +1067,7 @@ public class SpecParser {
         zindex = (obj.fields["zindex"] as? VegaValue.Num)?.value?.toInt() ?: 0,
         labelOverlap = obj.fields["labelOverlap"]?.asString(),
         labelSeparation = obj.numberOrSignal("labelSeparation", "$path.labelSeparation"),
+        labelLimit = obj.numberOrSignal("labelLimit", "$path.labelLimit"),
         labelStyle = obj.guideStroke("label"),
         titleStyle = obj.guideStroke("title"),
         // `symbolStrokeColor`/`symbolStrokeWidth` rather than `symbolColor`/`symbolWidth`, so the

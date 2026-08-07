@@ -52,7 +52,37 @@ public data class TextRun(
   val style: TextStyle = TextStyle(),
   val align: TextAlign = TextAlign.LEFT,
   val baseline: TextBaseline = TextBaseline.ALPHABETIC,
+  /**
+   * The widest the text may be drawn, in the same units as the layout. Zero means no limit.
+   *
+   * Upstream's axes and legends both set one by default — 180 and 160 — so a label longer than that
+   * is truncated with an ellipsis without anything in the specification asking for it. The
+   * scenegraph keeps the **whole** string and only the drawn lines and the measured width shrink,
+   * which is why [TextLayout.run] still carries what the data said.
+   */
+  val limit: Double = 0.0,
+  val ellipsis: String = "\u2026",
 )
+
+/**
+ * The string that actually gets drawn: [TextRun.text] shortened to fit [TextRun.limit].
+ *
+ * Upstream's own binary search, including both of its **strict** comparisons — a string exactly as
+ * wide as the limit is already too wide, and so is a prefix exactly filling the space the ellipsis
+ * leaves. The two together take one more character off than a reading of "fits within the limit"
+ * would, and an off-by-one here is a visible difference in every truncated label.
+ */
+public fun TextRun.displayText(measure: (String) -> Double): String {
+  if (limit <= 0.0 || measure(text) < limit) return text
+  val room = limit - measure(ellipsis)
+  var low = 0
+  var high = text.length
+  while (low < high) {
+    val mid = 1 + ((low + high) ushr 1)
+    if (mid <= text.length && measure(text.substring(0, mid)) < room) low = mid else high = mid - 1
+  }
+  return text.substring(0, low) + ellipsis
+}
 
 public data class TextMetrics(
   val width: Double,
@@ -114,7 +144,7 @@ public class MetricTextEngine(
     val ascent = style.fontSize * ascentRatio
     val descent = style.fontSize * descentRatio
 
-    val rawLines = text.text.split('\n')
+    val rawLines = text.displayText { advance(it, style) }.split('\n')
     val wrapped =
       if (constraint?.width != null && constraint.width > 0.0) {
         rawLines.flatMap { wrap(it, style, constraint.width) }

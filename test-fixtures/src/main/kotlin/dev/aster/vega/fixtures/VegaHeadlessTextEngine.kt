@@ -10,6 +10,7 @@ import dev.aster.vega.scene.TextLayout
 import dev.aster.vega.scene.TextLine
 import dev.aster.vega.scene.TextMetrics
 import dev.aster.vega.scene.TextRun
+import dev.aster.vega.scene.displayText
 
 /**
  * Reproduces upstream Vega's text measurement when it runs without a canvas.
@@ -34,7 +35,7 @@ public class VegaHeadlessTextEngine : TextEngine {
   override fun layout(text: TextRun, constraint: SizeD?): TextLayout {
     val fontSize = text.style.fontSize
     // Vega's fallback ignores wrapping entirely; only explicit newlines break a line.
-    val lines = text.text.split('\n')
+    val lines = text.displayText { estimateWidth(it, fontSize) }.split('\n')
     val lineHeight = text.style.lineHeight ?: fontSize
 
     val measured = lines.map { line -> TextLine(line, estimateWidth(line, fontSize), 0.0) }

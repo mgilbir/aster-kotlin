@@ -20,7 +20,7 @@ Milestones 0, 1 and 2 complete. **Milestones 3 and 4 in progress**: Vega specifi
 end — including expressions, signals and the twelve data transforms the brief lists — and are verified
 against upstream Vega by differential tests.
 
-Forty-three differential fixtures pass, all matching upstream exactly on every mark and scale output:
+Forty-four differential fixtures pass, all matching upstream exactly on every mark and scale output:
 
 | Fixture | Marks | Covers |
 | --- | --- | --- |
@@ -67,6 +67,7 @@ Forty-three differential fixtures pass, all matching upstream exactly on every m
 | `sequence-lookup` | 27 | a curve generated from nothing, over bars joined to a second dataset |
 | `scale-variants` | 43 | a symlog axis over both signs, a pow axis, a reversed point scale |
 | `negative-labels` | 45 | where the minus sign applies and where the hyphen stays |
+| `label-limit` | 33 | labels truncated at the limit nobody set, and at an explicit one |
 
 The gate is wired into `./scripts/oracle.sh`, so every further scale, mark and transform is built
 against a harness that can say we are wrong — which golden tests cannot.
@@ -128,7 +129,7 @@ substantive compatibility items:
 | 6. View and Compose APIs | Yes |
 | 7. SVG, PNG, PDF export | Yes |
 | 8. TalkBack can describe and navigate | Partial — virtual nodes are tested by instrumentation, not with TalkBack itself |
-| 9. At least 100 compatibility fixtures pass | 43 of 100 |
+| 9. At least 100 compatibility fixtures pass | 44 of 100 |
 | 10. Core runtime has no Android dependency | Yes |
 | 11. Renders without WebView | Yes |
 | 12. Build and test loop runs from the terminal | Yes |
@@ -261,6 +262,11 @@ ordering), and the pipeline is now verified end to end on one fixture, but the b
   out, so a linear scale handed `[10, 20]` still starts at 0 where this engine had been leaving it
   at 10. The limits then replace an end rather than clamping it, and run after `zero`, which is why
   `domainMin: 30` beats it.
+- **`labelLimit`**, which is a *default* rather than an option: upstream's config carries 180 for
+  an axis and 160 for a legend, so a long category name is already being shortened on every chart
+  drawn against upstream and was being drawn in full here. The scene keeps the **whole** string on
+  the text run and only the drawn lines and the measured width shrink, so a truncated label still
+  reports the value it came from — to the differential harness, and to a screen reader.
 - **`sequence` and `lookup`.** `sequence` is how a specification draws a function with no data to
   bind to; its `stop` is exclusive, which is the less common convention and would otherwise put an
   extra point on every curve. `lookup` is the only join there is, and it has two shapes — with
@@ -376,7 +382,7 @@ dark chrome, so a dark background was unreadable — they now take a `SampleScen
 
 ## Known failing fixtures
 
-None. Forty-three fixtures exist and all forty-three pass. The brief's MVP asks for 100; growing the
+None. Forty-four fixtures exist and all forty-four pass. The brief's MVP asks for 100; growing the
 corpus is the main task now, and each new fixture is expected to surface gaps rather than pass
 immediately. That keeps happening, which is the point of the harness: `stacked-bar` surfaced two real
 bugs, and `facet-trellis` surfaced a third — `range: "height"` was descending for every scale type,
@@ -499,6 +505,7 @@ depends on them. Each has a test and a comment; this is the index.
 | A window's ranking operations ignore the frame; only its aggregate operations respect it | `WindowTransform` |
 | A `sequence`'s `stop` is exclusive, so `0..5` is five rows, and its field is named `data` | `SequenceTransform` |
 | A `lookup` with no `values` writes the whole matched row into one field | `LookupTransform` |
+| `labelLimit` truncates by default — 180 on an axis, 160 on a legend — and the scene keeps the whole string | `TextRun.displayText` |
 | `padAngle` is a gap at a pad *radius*, converted back to an angle per edge, so the sides stay parallel | `ArcPath.sector` |
 | `cornerRadius` is clamped by where the slice's own edges would meet, not just by its thickness | `ArcPath.sector` |
 | A label hidden by overlap removal stays in the scene at zero opacity, so the mark count does not move | `LabelOverlap` |
@@ -560,7 +567,7 @@ depends on them. Each has a test and a comment; this is the index.
 
 ## Next three tasks
 
-1. **Keep growing the fixture corpus.** 43 of the brief's 100 pass, and the return has not fallen
+1. **Keep growing the fixture corpus.** 44 of the brief's 100 pass, and the return has not fallen
    off: the last ten fixtures found fourteen defects between them, and half of those were in code
    that had been passing for a dozen fixtures. Worth aiming at next: a `config` block of any kind,
    which is where a Vega-Lite-compiled specification puts everything and where every default in this
