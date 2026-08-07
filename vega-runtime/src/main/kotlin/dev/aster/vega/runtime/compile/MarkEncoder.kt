@@ -131,12 +131,19 @@ public class MarkEncoder(
     val channels = spec.encode.effective
     return data.mapIndexed { index, datum ->
       val style = style(channels, datum, spec)
-      val x = position(channels["x"], datum) ?: 0.0
-      val y = position(channels["y"], datum) ?: 0.0
       // Upstream treats an unset dimension as zero once either is given, and gives a group with
       // neither no extent at all — it then paints nothing and measures only its children.
       val width = position(channels["width"], datum)
       val height = position(channels["height"], datum)
+      // A group has an extent, so a centre channel halves it — the same adjustment a rect gets.
+      val x =
+        position(channels["xc"], datum)?.minus((width ?: 0.0) / 2)
+          ?: position(channels["x"], datum)
+          ?: 0.0
+      val y =
+        position(channels["yc"], datum)?.minus((height ?: 0.0) / 2)
+          ?: position(channels["y"], datum)
+          ?: 0.0
       val size = if (width == null && height == null) null else SizeD(width ?: 0.0, height ?: 0.0)
       val extent = size ?: SizeD(0.0, 0.0)
 
@@ -163,8 +170,8 @@ public class MarkEncoder(
     if (channels.isEmpty()) return null
 
     // Vega accepts x/x2, x/width, or x2/width for each axis; resolve whichever pair is present.
-    val horizontal = resolveSpan(channels, datum, "x", "x2", "width", index, spec)
-    val vertical = resolveSpan(channels, datum, "y", "y2", "height", index, spec)
+    val horizontal = resolveSpan(channels, datum, "x", "x2", "width", "xc", index, spec)
+    val vertical = resolveSpan(channels, datum, "y", "y2", "height", "yc", index, spec)
     if (horizontal == null || vertical == null) return null
 
     val style = style(channels, datum, spec)
@@ -239,8 +246,8 @@ public class MarkEncoder(
     }
     if (parsed.path.isEmpty) return null
 
-    val x = position(channels["x"], datum) ?: 0.0
-    val y = position(channels["y"], datum) ?: 0.0
+    val x = centred(channels, datum, "x", "xc") ?: 0.0
+    val y = centred(channels, datum, "y", "yc") ?: 0.0
     val scaleX = number(channels["scaleX"], datum) ?: 1.0
     val scaleY = number(channels["scaleY"], datum) ?: 1.0
     val angle = number(channels["angle"], datum) ?: 0.0
@@ -275,8 +282,8 @@ public class MarkEncoder(
    */
   private fun arc(spec: MarkSpec, datum: VegaValue, index: Int): SceneNode? {
     val channels = spec.encode.effective
-    val cx = position(channels["x"], datum) ?: 0.0
-    val cy = position(channels["y"], datum) ?: 0.0
+    val cx = centred(channels, datum, "x", "xc") ?: 0.0
+    val cy = centred(channels, datum, "y", "yc") ?: 0.0
     val startAngle = number(channels["startAngle"], datum) ?: 0.0
     val endAngle = number(channels["endAngle"], datum) ?: 0.0
     val innerRadius = number(channels["innerRadius"], datum) ?: 0.0
@@ -333,8 +340,8 @@ public class MarkEncoder(
 
   private fun symbol(spec: MarkSpec, datum: VegaValue, index: Int): SceneNode? {
     val channels = spec.encode.effective
-    val x = position(channels["x"], datum) ?: return null
-    val y = position(channels["y"], datum) ?: return null
+    val x = centred(channels, datum, "x", "xc") ?: return null
+    val y = centred(channels, datum, "y", "yc") ?: return null
     val style = style(channels, datum, spec)
     val shapeName = string(channels["shape"], datum)
     val shape = shapeName?.let { symbolShape(it, spec) }
@@ -344,8 +351,10 @@ public class MarkEncoder(
 
     return SymbolNode(
       id = ids.allocate(),
-      x = number(channels["x"], datum) ?: 0.0,
-      y = number(channels["y"], datum) ?: 0.0,
+      // The positions resolved above, not a second read of the raw channels: a symbol placed by
+      // `xc` has no `x` channel to read.
+      x = x,
+      y = y,
       size =
         number(channels["size"], datum)
           ?: MarkConfig(spec).number("size")
@@ -409,8 +418,8 @@ public class MarkEncoder(
 
   private fun text(spec: MarkSpec, datum: VegaValue, index: Int): SceneNode? {
     val channels = spec.encode.effective
-    val anchorX = position(channels["x"], datum) ?: return null
-    val anchorY = position(channels["y"], datum) ?: return null
+    val anchorX = centred(channels, datum, "x", "xc") ?: return null
+    val anchorY = centred(channels, datum, "y", "yc") ?: return null
     val content = string(channels["text"], datum) ?: return null
     val angle = number(channels["angle"], datum) ?: 0.0
     // `dx` and `dy` shift the anchor without affecting alignment — but for rotated text upstream
@@ -505,8 +514,8 @@ public class MarkEncoder(
     // one leaves y2 defaulting to y.
     val pairs =
       segments(data, channels) { datum ->
-        val x = position(channels["x"], datum) ?: 0.0
-        val y = position(channels["y"], datum) ?: 0.0
+        val x = centred(channels, datum, "x", "xc") ?: 0.0
+        val y = centred(channels, datum, "y", "yc") ?: 0.0
         val x2 = position(channels["x2"], datum) ?: x
         val y2 = position(channels["y2"], datum) ?: y
         PointD(x, y) to PointD(x2, y2)
@@ -547,7 +556,7 @@ public class MarkEncoder(
    * what the `defined` channel is for, and [broken] handles that.
    */
   private fun point(channels: EncodeEntry, datum: VegaValue): PointD =
-    PointD(position(channels["x"], datum) ?: 0.0, position(channels["y"], datum) ?: 0.0)
+    PointD(centred(channels, datum, "x", "xc") ?: 0.0, centred(channels, datum, "y", "yc") ?: 0.0)
 
   /** True when this datum's `defined` channel says the series should break here. */
   private fun broken(channels: EncodeEntry, datum: VegaValue): Boolean {
@@ -962,10 +971,16 @@ public class MarkEncoder(
   private data class Span(val start: Double, val extent: Double)
 
   /**
-   * Resolves one axis of a rect from whichever channel pair the specification used.
+   * Resolves one axis of a mark that has an extent of its own, from whichever channels were given.
    *
-   * Vega allows `x` + `x2`, `x` + `width`, or `x2` + `width`; a lone `x` with a band scale takes
-   * its extent from the band. Anything else cannot be positioned and is reported.
+   * This is upstream's `adjustSpatial` (`vega-runtime/src/util.js`), followed in its own order,
+   * which matters twice. An end without a start puts the mark's *far* edge there and lets the
+   * extent run back from it. And a centre is applied **last**, overriding whatever the other
+   * channels worked out, so `xc` with a `width` centres the mark rather than starting it.
+   *
+   * [swap] is upstream's `Swap` set — group, image and rect — where a start beyond its end is read
+   * as the pair written the other way round rather than as a negative extent. A line or an area
+   * keeps the sign, because there the two ends are a direction and not a box.
    */
   private fun resolveSpan(
     channels: EncodeEntry,
@@ -973,30 +988,53 @@ public class MarkEncoder(
     startChannel: String,
     endChannel: String,
     sizeChannel: String,
+    centerChannel: String,
     index: Int,
     spec: MarkSpec,
+    swap: Boolean = true,
   ): Span? {
-    val start = position(channels[startChannel], datum)
+    var start = position(channels[startChannel], datum)
     val end = position(channels[endChannel], datum)
-    val size = position(channels[sizeChannel], datum)
+    var size = position(channels[sizeChannel], datum)
+    val center = position(channels[centerChannel], datum)
 
-    return when {
-      start != null && end != null -> Span(minOf(start, end), kotlin.math.abs(end - start))
-      start != null && size != null -> Span(start, size)
-      end != null && size != null -> Span(end - size, size)
-      start != null -> Span(start, 0.0)
-      end != null -> Span(end, 0.0)
-      else -> {
-        diagnostics.error(
-          DiagnosticCodes.PARSE_MISSING_PROPERTY,
-          "Rect mark '${spec.name ?: "(unnamed)"}' datum $index has no " +
-            "$startChannel, $endChannel or $sizeChannel channel",
-          operator = spec.name,
-        )
-        null
+    if (end != null) {
+      if (start != null) {
+        val low = if (swap) minOf(start, end) else start
+        val high = if (swap) maxOf(start, end) else end
+        start = low
+        size = high - low
+      } else {
+        start = end - (size ?: 0.0)
       }
     }
+    if (center != null) start = center - (size ?: 0.0) / 2
+
+    if (start == null) {
+      if (size != null) return Span(0.0, size)
+      diagnostics.error(
+        DiagnosticCodes.PARSE_MISSING_PROPERTY,
+        "Rect mark '${spec.name ?: "(unnamed)"}' datum $index has no " +
+          "$startChannel, $endChannel, $sizeChannel or $centerChannel channel",
+        operator = spec.name,
+      )
+      return null
+    }
+    return Span(start, size ?: 0.0)
   }
+
+  /**
+   * The position of a mark that has no extent of its own — a symbol, a text, a line's vertex.
+   *
+   * Upstream runs the same spatial adjustment over these, but with no width to halve it reduces to
+   * this: a centre channel is the position, and it wins over a start channel written beside it.
+   */
+  private fun centred(
+    channels: EncodeEntry,
+    datum: VegaValue,
+    channel: String,
+    centerChannel: String,
+  ): Double? = position(channels[centerChannel], datum) ?: position(channels[channel], datum)
 
   /** Resolves a positional channel to a number, applying its scale and band offset. */
   private fun position(channel: ChannelValue?, datum: VegaValue): Double? =

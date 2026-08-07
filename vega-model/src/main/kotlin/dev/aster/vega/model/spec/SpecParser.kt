@@ -328,22 +328,18 @@ private val ENCODE_CONSUMED =
     "strokeJoin",
     "padAngle",
     "padRadius",
+    "xc",
+    "yc",
+    "url",
   )
 
 private val ENCODE_UNSUPPORTED =
   mapOf(
-    "xc" to
-      "Positioning by centre is not implemented; give 'x' with 'width', or 'x' with 'x2', " +
-        "since a mark encoded only by its centre cannot be placed at all",
-    "yc" to
-      "Positioning by centre is not implemented; give 'y' with 'height', or 'y' with 'y2', " +
-        "since a mark encoded only by its centre cannot be placed at all",
     "limit" to "Text truncation is not implemented; the text is drawn in full",
     "ellipsis" to "Text truncation is not implemented, so its ellipsis has nothing to mark",
     "tooltip" to
       "Tooltip content from an encode channel is not implemented; a tooltip is built from the " +
         "mark's own fields instead",
-    "url" to "Image marks have no encoder yet, so a URL channel has nothing to load into",
     "cornerRadiusTopLeft" to
       "Per-corner radii are not implemented; use 'cornerRadius' for all four",
     "cornerRadiusTopRight" to

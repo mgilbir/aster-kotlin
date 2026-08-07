@@ -106,9 +106,9 @@ class UnhandledPropertiesTest {
   }
 
   /**
-   * `xc`/`yc` are the ones that matter most here. A mark encoded only by its centre cannot be
-   * placed at all, so it would have been drawn at the origin — a chart's worth of marks stacked in
-   * one corner, silently.
+   * `limit` is the one that matters most here: a text mark that ignores it draws past the width it
+   * was told to stay inside, which overlaps a neighbour rather than leaving a gap, so the chart
+   * looks composed and reads wrong.
    */
   @Test
   fun `an encode entry reports the channels no encoder reads`() {
@@ -125,7 +125,7 @@ class UnhandledPropertiesTest {
         )
       )
     assertEquals(
-      listOf("xc", "yc", "limit", "tooltip", "cornerRadiusTopLeft", "zindex", "cursor").sorted(),
+      listOf("limit", "tooltip", "cornerRadiusTopLeft", "zindex", "cursor").sorted(),
       reported.sorted(),
     )
   }
