@@ -1,6 +1,7 @@
 package dev.aster.vega.runtime.differential
 
 import dev.aster.vega.fixtures.VegaHeadlessTextEngine
+import dev.aster.vega.loader.FileDataLoader
 import dev.aster.vega.runtime.compile.SpecCompiler
 import dev.aster.vega.svg.SvgRenderer
 import java.io.File
@@ -29,7 +30,12 @@ class FixtureSvgTest {
     assertTrue(specs.isNotEmpty(), "no fixtures found")
 
     for (spec in specs) {
-      val compiled = SpecCompiler(VegaHeadlessTextEngine()).compileJson(spec.readText())
+      val compiled =
+        SpecCompiler(
+            VegaHeadlessTextEngine(),
+            FileDataLoader(File(repositoryRoot, "test-fixtures")),
+          )
+          .compileJson(spec.readText())
       val scene = requireNotNull(compiled.scene) { "${spec.name} produced no scene" }
       val name = spec.name.removeSuffix(".vg.json")
       File(output, "$name.ours.svg").writeText(SvgRenderer().render(scene).svg)

@@ -734,6 +734,15 @@ public object NumberFormatSubset {
     val type: Char,
     /** Strips insignificant trailing zeros, which is d3's `~` and is implied by a missing type. */
     val trim: Boolean = false,
+    /**
+     * d3's currency *symbol* flag, `$`, which is a slot of its own in the grammar and not a type.
+     *
+     * It sits before the zero-pad flag and the width, so `$,.2f` and `$0.2f` both mean "currency,
+     * two decimals" — which is how every price axis in the gallery is written. The symbol itself
+     * comes from the locale; this uses d3's default, `$` before the magnitude and inside the sign,
+     * so a negative price reads `−$1.50`.
+     */
+    val currency: Boolean = false,
   )
 
   /**
@@ -743,14 +752,15 @@ public object NumberFormatSubset {
    */
   public fun parse(specifier: String): Spec? {
     val match = PATTERN.matchEntire(specifier) ?: return null
-    val group = match.groupValues[1] == ","
+    val currency = match.groupValues[1] == "$"
+    val group = match.groupValues[3] == ","
     val precision =
-      match.groupValues[2].takeIf { it.isNotEmpty() }?.removePrefix(".")?.toIntOrNull()
-    val type = match.groupValues[3].firstOrNull()
+      match.groupValues[4].takeIf { it.isNotEmpty() }?.removePrefix(".")?.toIntOrNull()
+    val type = match.groupValues[5].firstOrNull()
     return if (type == null) {
-      Spec(group, precision ?: DEFAULT_SIGNIFICANT_DIGITS, 'g', trim = true)
+      Spec(group, precision ?: DEFAULT_SIGNIFICANT_DIGITS, 'g', trim = true, currency = currency)
     } else {
-      Spec(group, precision, type)
+      Spec(group, precision, type, currency = currency)
     }
   }
 
@@ -776,9 +786,13 @@ public object NumberFormatSubset {
         else -> PlatformDecimals.fixed(value, spec.precision ?: 6)
       }
     val text = if (spec.trim) trimInsignificantZeros(raw) else raw
+    val grouped = if (spec.group) groupThousands(text) else text
+    // The currency symbol goes *inside* the sign, between it and the digits, so -1.5 reads `−$1.50`
+    // rather than `$−1.50`. Applied before the minus substitution because it has to find the sign.
+    val signed = if (spec.currency) prefixCurrency(grouped) else grouped
     // d3 formats the magnitude and prefixes the sign, so the substitution comes last and leaves an
     // exponent's own hyphen alone: `.2e` of -0.005 is `−5.00e-3`, with two different characters.
-    return withTypographicMinus(if (spec.group) groupThousands(text) else text)
+    return withTypographicMinus(signed)
   }
 
   /**
@@ -795,6 +809,10 @@ public object NumberFormatSubset {
     return trimmed + suffix
   }
 
+  /** d3's default currency symbol, placed between the sign and the digits. */
+  private fun prefixCurrency(text: String): String =
+    if (text.startsWith("-")) "-$" + text.substring(1) else "$$text"
+
   private fun groupThousands(text: String): String {
     val negative = text.startsWith("-")
     val body = if (negative) text.substring(1) else text
@@ -808,5 +826,13 @@ public object NumberFormatSubset {
   /** d3's default precision for a specifier with no type: `.12~g`. */
   private const val DEFAULT_SIGNIFICANT_DIGITS = 12
 
-  private val PATTERN = Regex("^(,?)(\\.\\d+)?([dfe%]?)$")
+  /**
+   * The slice of d3's format grammar this subset reads.
+   *
+   * `[$][0][,][.precision][type]`, in that order, which is d3's own order and not negotiable — `$,`
+   * parses and `,$` does not. The zero-pad flag is accepted and ignored: it only matters alongside
+   * a width, which this subset does not implement, and refusing the whole specifier over it would
+   * turn `$0.2f` into unformatted output.
+   */
+  private val PATTERN = Regex("^(\\$?)(0?)(,?)(\\.\\d+)?([dfe%]?)$")
 }

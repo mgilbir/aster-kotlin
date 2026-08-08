@@ -1,5 +1,6 @@
 package dev.aster.vega.runtime.compile
 
+import dev.aster.vega.expression.NumberFormatSubset
 import dev.aster.vega.model.DiagnosticCodes
 import dev.aster.vega.model.DiagnosticCollector
 import dev.aster.vega.model.VegaValue
@@ -287,6 +288,7 @@ public class AxisBuilder(
                   spec.title,
                   scale,
                   scaleTypes[spec.scale],
+                  spec.format,
                 )
                 ?.let {
                   AccessibilityDescriptor(label = it, role = "graphics-symbol", focusable = true)
@@ -489,7 +491,7 @@ public class AxisBuilder(
     if (scale !is PositionScale) return generatedTicks(scale, spec)
 
     val count = numbers.resolveInt(spec.tickCount, spec.scale) ?: explicit.size.coerceAtLeast(1)
-    val label = labeller(scale, count)
+    val label = labeller(scale, count, spec.format)
 
     val range = scale.range
     val low = kotlin.math.floor(minOf(range.first(), range.last()))
@@ -537,8 +539,21 @@ public class AxisBuilder(
    * A discrete scale has no formatter — upstream falls back to plain string coercion, which is why
    * a band axis over negative numbers keeps its hyphens where a linear one gets a minus sign.
    */
-  private fun labeller(scale: PositionScale, count: Int): (VegaValue) -> String =
-    when (scale) {
+  private fun labeller(
+    scale: PositionScale,
+    count: Int,
+    format: String? = null,
+  ): (VegaValue) -> String {
+    // An explicit specifier replaces the precision the scale would have chosen, and applies only
+    // where there is a number to format: upstream coerces a discrete domain's own values to strings
+    // and never consults it, so a band axis keeps its labels whatever this says.
+    if (format != null && scale !is BandScale && scale !is PointScale) {
+      return { value ->
+        val number = value.asDouble()
+        if (number.isNaN()) value.asString() else NumberFormatSubset.format(number, format)
+      }
+    }
+    return when (scale) {
       is LinearScale -> { value ->
         scale.formatTick(value.asDouble(), count)
       }
@@ -554,6 +569,7 @@ public class AxisBuilder(
         value.asString()
       }
     }
+  }
 
   private fun generatedTicks(scale: VegaScale, spec: AxisSpec): List<Tick>? =
     when (scale) {
@@ -571,15 +587,17 @@ public class AxisBuilder(
         // Labels come from the scale rather than being formatted here, because a log scale blanks
         // the
         // crowded ones and only it knows which.
+        val format = labeller(scale, count, spec.format)
         scale.ticks(count).zip(scale.tickLabels(count)).map { (value, label) ->
-          Tick(label, scale.apply(value))
+          Tick(if (spec.format == null) label else format(VegaValue.Num(value)), scale.apply(value))
         }
       }
       is TransformedScale -> {
         val count =
           numbers.resolveInt(spec.tickCount, spec.scale) ?: AxisDefaults.DEFAULT_TICK_COUNT
+        val format = labeller(scale, count, spec.format)
         scale.ticks(count).zip(scale.tickLabels(count)).map { (value, label) ->
-          Tick(label, scale.apply(value))
+          Tick(if (spec.format == null) label else format(VegaValue.Num(value)), scale.apply(value))
         }
       }
       is TimeScale -> {

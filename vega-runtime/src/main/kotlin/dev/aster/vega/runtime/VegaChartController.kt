@@ -15,6 +15,8 @@ import dev.aster.vega.runtime.interaction.EventDispatcher
 import dev.aster.vega.runtime.interaction.HandlerBinding
 import dev.aster.vega.runtime.interaction.InputEvent as VegaEvent
 import dev.aster.vega.runtime.interaction.SignalUpdater
+import dev.aster.vega.runtime.load.DataLoader
+import dev.aster.vega.runtime.load.DenyLoader
 import dev.aster.vega.scene.HitTestOptions
 import dev.aster.vega.scene.MetricTextEngine
 import dev.aster.vega.scene.PointD
@@ -90,9 +92,19 @@ public class VegaChartController(
    * core stays free of a platform clock.
    */
   private val clock: () -> Long = { Clock.System.now().toEpochMilliseconds() },
+  /**
+   * How a specification's `url` data is fetched. Refuses everything unless the host opts in.
+   *
+   * The default is deliberate and is the whole of the policy: a specification is *data*, often data
+   * a user pasted, and a `url` in it asks this process to fetch an address the specification chose.
+   * A host that wants loading says so, and says what it is opening — `VegaDataLoaders` in
+   * `vega-loader` has the two shapes worth having, a directory and a directory backed by a base
+   * URL. Without this seam a host could not opt in at all, whatever the loader could do.
+   */
+  loader: DataLoader = DenyLoader,
 ) {
 
-  private val compiler = SpecCompiler(textEngine)
+  private val compiler = SpecCompiler(textEngine, loader)
 
   /** Serializes compilation, so one text engine is only ever used by one compile at a time. */
   private val compileLock = Mutex()

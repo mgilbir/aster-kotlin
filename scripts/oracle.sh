@@ -37,6 +37,12 @@ if [[ ${#specs[@]} -eq 0 ]]; then
   exit 1
 fi
 
+# A fixture may name its data the way Vega's own examples do, by relative URL. The file itself is
+# checked in beside the references so the JVM tests stay offline; this fetches any that are missing,
+# which is a deliberate step whose result gets reviewed and committed.
+echo "==> Checking fixture datasets"
+(cd oracle-js && node src/fetch-data.js "$ROOT/test-fixtures")
+
 echo "==> Rendering ${#specs[@]} fixture(s) with upstream Vega"
 for spec in "${specs[@]}"; do
   name="$(basename "$spec" .vg.json)"

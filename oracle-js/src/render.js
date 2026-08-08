@@ -10,6 +10,7 @@
 
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname } from 'node:path';
+import { fileLoader, rootsFor } from './file-loader.js';
 import * as vega from 'vega';
 import { canonicalJson, canonicalSvg, summarizeScene } from './canonical.js';
 
@@ -25,7 +26,7 @@ const spec = JSON.parse(readFileSync(specPath, 'utf8'));
 const view = new vega.View(vega.parse(spec), {
   renderer: 'none',
   // Tests must not hit the network (PROJECT_BRIEF.md 21).
-  loader: vega.loader({ mode: 'file', baseURL: dirname(specPath) }),
+  loader: fileLoader(rootsFor(specPath)),
 });
 
 const svg = await view.toSVG();

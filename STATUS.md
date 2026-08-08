@@ -21,7 +21,7 @@ end to end — expressions, signals, 33 of upstream's 40 data transforms, every 
 and an event handler that recompiles the chart — and are verified against upstream Vega by
 differential tests.
 
-Seventy-two differential fixtures pass, all matching upstream exactly on every mark and scale output:
+Seventy-three differential fixtures pass, all matching upstream exactly on every mark and scale output:
 
 | Fixture | Marks | Covers |
 | --- | --- | --- |
@@ -96,7 +96,8 @@ Seventy-two differential fixtures pass, all matching upstream exactly on every m
 | `curves-closed` | 3 | the three closed curve families over one ring of points |
 | `autosize-none` | 19 | a `none` chart inset by its padding, refusing to grow for the labels hanging off it |
 | `grouped-bar` | 56 | `round` on a continuous scale, `mult`/`offset` value references, `contrast()`, labels from the bars' own scene items |
-| `barley-trellis` | 468 | a chart sized by a `height` signal, cells titled from the group mark that made them, axis and legend `encode` blocks, a raised axis painting over the legend |
+| `barley-trellis` | 468 | a chart sized by a `height` signal, cells titled from the group mark that made them, axis and legend `encode` blocks, a raised axis painting over the legend, and 120 rows loaded from a relative `url` |
+| `connected-scatter` | 146 | labels nudged by an ordinal scale with a numeric range, a currency-formatted price axis, data from a relative `url` |
 
 The gate is wired into `./scripts/oracle.sh`, so every further scale, mark and transform is built
 against a harness that can say we are wrong — which golden tests cannot.
@@ -156,7 +157,7 @@ substantive compatibility items:
 | 6. View and Compose APIs | Yes |
 | 7. SVG, PNG, PDF export | Yes |
 | 8. TalkBack can describe and navigate | Partial — virtual nodes are tested by instrumentation, not with TalkBack itself |
-| 9. At least 100 compatibility fixtures pass | 72 of 100 |
+| 9. At least 100 compatibility fixtures pass | 73 of 100 |
 | 10. Core runtime has no Android dependency | Yes |
 | 11. Renders without WebView | Yes |
 | 12. Build and test loop runs from the terminal | Yes |
@@ -493,7 +494,7 @@ each example a deadline.
 
 ## Known failing fixtures
 
-None. Seventy-two fixtures exist and all seventy-two pass — and that sentence became worth
+None. Seventy-three fixtures exist and all seventy-three pass — and that sentence became worth
 something only once the gate could no longer skip itself, below.
 
 **The gate could report success without running.** `FixtureDifferentialTest` reads the fixtures and
@@ -595,6 +596,25 @@ comparison matches marks positionally *within* each type and two guides never in
 `zindex: 1` axis paints after the legends upstream and was painting before them here. It was found
 by putting the two SVGs side by side, which is now the third time that has been the thing that
 found it.
+
+The examples that follow were blocked on something duller than a missing feature: **their data**.
+Nearly every specification in the gallery names it relatively, `"url": "data/barley.json"`, and the
+engine had a loader, a file loader and an HTTP loader with a base URL — and no way to say "disk if it
+is there, the published copy if it is not", which is the one arrangement a corpus of examples needs.
+It also had no seam on `VegaChartController`, so no host could opt in to loading at all, which is the
+same as not having a loader. Both are now there: `FallbackDataLoader` composes loaders in order, and
+`VegaDataLoaders.directoryThenNetwork` is disk-then-`https://vega.github.io/vega/`, optionally
+writing what it fetched to disk so the second run is offline. The fixture harness uses the **file**
+half only and nothing else, because a green test run must not depend on a connection; missing data is
+fetched by `scripts/oracle.sh` and committed beside the reference it belongs to.
+
+`connected-scatter` is the first example that had been waiting only on that, and once its data
+arrived it found two more gaps. An **ordinal scale with a numeric range** could not position a mark
+— refused outright as "no numeric range" — which is exactly how a label is nudged clear of the point
+it belongs to, so every label in the chart sat on top of its own dot. And an axis's `format` was
+reported and ignored, so a price axis read `1.5` where upstream reads `$1.50`; the currency symbol
+turned out to be a slot of its own in d3's grammar, and the caption a screen reader hears follows
+each axis's own format rather than the scale's.
 
 `domain-limits` found one more, in a corner nothing had reached before: a symbol sized to **zero**
 was bounded as nothing at all, where upstream bounds it as a degenerate point at its anchor. A test

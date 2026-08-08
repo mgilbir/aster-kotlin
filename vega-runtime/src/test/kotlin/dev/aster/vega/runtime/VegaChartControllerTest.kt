@@ -3,6 +3,7 @@ package dev.aster.vega.runtime
 import dev.aster.vega.fixtures.SampleScenes
 import dev.aster.vega.model.DiagnosticCodes
 import dev.aster.vega.model.DiagnosticSeverity
+import dev.aster.vega.runtime.load.DataLoader
 import dev.aster.vega.scene.PointD
 import dev.aster.vega.scene.RectNode
 import dev.aster.vega.scene.Scene
@@ -23,6 +24,38 @@ import org.junit.jupiter.api.Test
 class VegaChartControllerTest {
 
   private val scene: Scene = SampleScenes.barChart()
+
+  /** A loader that serves one dataset, so a test can prove the seam is actually wired through. */
+  private class OneFile(private val body: String) : DataLoader {
+    override fun sanitize(uri: String): String = uri
+
+    override fun load(uri: String): String = body
+  }
+
+  @Test
+  fun `a host can pass a loader, and nothing loads without one`() = runTest {
+    val spec =
+      """
+      {"width": 100, "height": 50, "padding": 0,
+       "data": [{"name": "t", "url": "data/rows.json"}],
+       "marks": [{"type": "rect", "from": {"data": "t"},
+                  "encode": {"enter": {"x": {"field": "x"}, "width": {"value": 5},
+                                       "y": {"value": 0}, "height": {"value": 5}}}}]}
+      """
+    // The default refuses, and says so rather than drawing an empty chart in silence.
+    val denied = VegaChartController()
+    denied.setSpec(spec)
+    assertTrue(
+      denied.diagnostics.value.any { it.message.contains("no data loader is configured") },
+      denied.diagnostics.value.toString(),
+    )
+
+    // With a loader the rows arrive and the marks appear.
+    val loaded = VegaChartController(loader = OneFile("""[{"x": 1}, {"x": 2}, {"x": 3}]"""))
+    loaded.setSpec(spec)
+    assertTrue(loaded.diagnostics.value.none { it.severity >= DiagnosticSeverity.ERROR })
+    assertEquals(3, loaded.snapshot.scene.flatten().count { it.node.metadata.role == "mark" })
+  }
 
   private fun firstBarCenter(scene: Scene): PointD {
     val bar =

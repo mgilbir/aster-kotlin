@@ -1,6 +1,7 @@
 package dev.aster.vega.runtime.differential
 
 import dev.aster.vega.fixtures.VegaHeadlessTextEngine
+import dev.aster.vega.loader.FileDataLoader
 import dev.aster.vega.model.DiagnosticSeverity
 import dev.aster.vega.runtime.compile.CompiledSpec
 import dev.aster.vega.runtime.compile.SpecCompiler
@@ -36,7 +37,8 @@ class FixtureDifferentialTest {
       )
     // The engine that reproduces upstream's headless text measurement, so layout — which depends on
     // how wide the labels are — is comparable too. See VegaHeadlessTextEngine.
-    return reference to SpecCompiler(VegaHeadlessTextEngine()).compileJson(spec.readText())
+    return reference to
+      SpecCompiler(VegaHeadlessTextEngine(), fixtureLoader).compileJson(spec.readText())
   }
 
   @ParameterizedTest(name = "{0}")
@@ -118,8 +120,8 @@ class FixtureDifferentialTest {
   @MethodSource("fixtures")
   fun `compilation is deterministic`(name: String) {
     val spec = File(repositoryRoot, "test-fixtures/specs/$name.vg.json").readText()
-    val once = SpecCompiler(VegaHeadlessTextEngine()).compileJson(spec)
-    val again = SpecCompiler(VegaHeadlessTextEngine()).compileJson(spec)
+    val once = SpecCompiler(VegaHeadlessTextEngine(), fixtureLoader).compileJson(spec)
+    val again = SpecCompiler(VegaHeadlessTextEngine(), fixtureLoader).compileJson(spec)
     assertEquals(
       Differential.flattenScene(requireNotNull(once.scene)).map { it.toString() },
       Differential.flattenScene(requireNotNull(again.scene)).map { it.toString() },
@@ -154,6 +156,16 @@ class FixtureDifferentialTest {
 
   private companion object {
     val repositoryRoot: File = File(System.getProperty("user.dir")).parentFile
+
+    /**
+     * A fixture's `url` data, read from the checked-in copy under `test-fixtures/data`.
+     *
+     * A **file** loader and nothing else: these tests must run from a checked-out tree with no
+     * network (PROJECT_BRIEF.md 21), and a loader that could fall back to fetching would make a
+     * green run depend on a connection. Missing data is fetched by `scripts/oracle.sh`, which is a
+     * deliberate step whose result is reviewed and committed like a reference is.
+     */
+    val fixtureLoader = FileDataLoader(File(repositoryRoot, "test-fixtures"))
 
     /** Every fixture on disk, so adding one needs no edit here. */
     @JvmStatic

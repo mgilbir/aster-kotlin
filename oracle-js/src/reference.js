@@ -11,6 +11,7 @@
 
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname } from 'node:path';
+import { fileLoader, rootsFor } from './file-loader.js';
 import * as vega from 'vega';
 import { canonicalJson, canonicalNumber } from './canonical.js';
 import { normalizeScales, normalizeScene } from './normalize.js';
@@ -26,7 +27,7 @@ const spec = JSON.parse(readFileSync(specPath, 'utf8'));
 
 const view = new vega.View(vega.parse(spec), {
   renderer: 'none',
-  loader: vega.loader({ mode: 'file', baseURL: dirname(specPath) }),
+  loader: fileLoader(rootsFor(specPath)),
 });
 await view.runAsync();
 

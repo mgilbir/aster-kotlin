@@ -1197,12 +1197,18 @@ public class MarkEncoder(
       return null
     }
     if (scale !is PositionScale) {
-      diagnostics.error(
-        DiagnosticCodes.SCALE_UNSUPPORTED_TYPE,
-        "Scale '${scaleNameOf(channel, datum)}' has no numeric range and cannot position a mark",
-        operator = scaleNameOf(channel, datum),
-      )
-      return null
+      // A scale that is not *built* for positioning may still produce a number, and upstream simply
+      // applies the scale and uses whatever comes out. An `ordinal` scale over `["left", "right"]`
+      // ranged onto `[-7, 6]` is the ordinary case: it is how a label is nudged clear of the point
+      // it belongs to, and it maps a name to a pixel offset without being a position scale in any
+      // sense this engine models. Refusing it outright was stricter than upstream and cost every
+      // such label its offset.
+      val input =
+        channel.field?.let { datum.fieldOf(it) }
+          ?: channel.value
+          ?: return unpositionable(channel, datum)
+      val mapped = scale.scale(input).asDouble()
+      return if (mapped.isNaN()) unpositionable(channel, datum) else mapped
     }
 
     // `{"scale": "x", "band": 1}` with no field means "a whole band", i.e. the bar's width.
@@ -1274,6 +1280,17 @@ public class MarkEncoder(
   /** The same, as a [VegaValue], for the resolvers that do not know what type they want. */
   private fun adjusted(channel: ChannelValue.Adjusted, datum: VegaValue): VegaValue? =
     adjustedNumber(channel, datum)?.let { VegaValue.Num(it) }
+
+  /** Reports a scale whose output cannot place a mark, and leaves the channel unset. */
+  private fun unpositionable(channel: ChannelValue.Scaled, datum: VegaValue): Double? {
+    diagnostics.error(
+      DiagnosticCodes.SCALE_UNSUPPORTED_TYPE,
+      "Scale '${scaleNameOf(channel, datum)}' produced no number for this datum, so it cannot " +
+        "position a mark",
+      operator = scaleNameOf(channel, datum),
+    )
+    return null
+  }
 
   private fun number(channel: ChannelValue?, datum: VegaValue): Double? =
     when (channel) {

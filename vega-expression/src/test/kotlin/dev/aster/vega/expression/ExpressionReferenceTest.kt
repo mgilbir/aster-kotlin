@@ -220,6 +220,16 @@ class ExpressionReferenceTest {
         "format(123456789012345,\"\")|\"1.23456789012e+14\"",
         "format(1234567,\",\")|\"1,234,567\"",
         "format(1234.5678,\",\")|\"1,234.5678\"",
+        // ---- format: the currency symbol ----
+        // `$` is a slot of its own in d3's grammar, before the zero-pad flag and the grouping
+        // comma, and it goes *inside* the sign: a negative price is the minus, then the symbol.
+        "format(1.5,'$0.2f')|\"$1.50\"",
+        "format(2,'$0.2f')|\"$2.00\"",
+        "format(0,'$0.2f')|\"$0.00\"",
+        "format(-1.5,'$0.2f')|\"−$1.50\"",
+        "format(1234.5,'$,.2f')|\"$1,234.50\"",
+        "format(1234.5,'$.2f')|\"$1234.50\"",
+        "format(1500000,'$,d')|\"$1,500,000\"",
         // ---- luminance ----
         // WCAG relative luminance. Every digit here came out of upstream, and several of these
         // separate implementations that all look right:

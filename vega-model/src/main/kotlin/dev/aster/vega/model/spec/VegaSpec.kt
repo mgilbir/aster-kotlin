@@ -492,6 +492,13 @@ public data class AxisSpec(
   val labelBaseline: String? = null,
   /** How wide a label may be drawn before it is truncated. Vega's axis default is 180. */
   val labelLimit: NumberValue? = null,
+  /**
+   * A d3-format specifier for the tick labels, which is how a price axis reads `$1.50`.
+   *
+   * Only meaningful on a numeric scale: a discrete domain's labels are its own values and upstream
+   * coerces them to strings without consulting this.
+   */
+  val format: String? = null,
   /** Appearance of the four parts, each defaulting to Vega's own when unstated. */
   val labelStyle: GuideStroke = GuideStroke(),
   val tickStyle: GuideStroke = GuideStroke(),

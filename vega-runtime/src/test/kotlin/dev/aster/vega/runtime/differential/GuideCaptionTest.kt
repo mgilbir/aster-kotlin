@@ -16,7 +16,7 @@ import org.junit.jupiter.api.Test
  *
  * These captions are **not** covered by the differential harness: they are `aria-label` attributes,
  * not geometry, and nothing in the comparison model carries them. So they get their own reference
- * file, harvested from the same upstream renders — 127 captions across 59 fixtures, which is a
+ * file, harvested from the same upstream renders — 161 captions across 60 fixtures, which is a
  * wider net than any hand-written set would be and includes the awkward cases nobody thinks to
  * write: a domain long enough to be truncated, a log axis whose thousands are separated, a UTC
  * scale read as a full date.
@@ -43,7 +43,10 @@ class GuideCaptionTest {
   /** Our own captions for one fixture, in the order the scene produces them. */
   private fun captionsOf(fixture: String): List<Pair<String, String>> {
     val json = File(repositoryRoot, "test-fixtures/specs/$fixture.vg.json").readText()
-    val scene = SpecCompiler().compileJson(json).scene ?: return emptyList()
+    // The same file loader the differential tests use: a fixture that names its data by URL has no
+    // axes worth describing until the data is there.
+    val loader = dev.aster.vega.loader.FileDataLoader(File(repositoryRoot, "test-fixtures"))
+    val scene = SpecCompiler(loader = loader).compileJson(json).scene ?: return emptyList()
     val out = mutableListOf<Pair<String, String>>()
     fun walk(node: SceneNode) {
       val kind =

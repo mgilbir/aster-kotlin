@@ -138,7 +138,6 @@ class AxisStyleTest {
   fun `every unhonoured axis property is reported by name`() {
     val unhonoured =
       listOf(
-        "\"format\": \".2f\"",
         "\"formatType\": \"number\"",
         "\"labelBound\": true",
         "\"labelFlush\": true",

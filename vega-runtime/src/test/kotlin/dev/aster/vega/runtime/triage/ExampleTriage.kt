@@ -1,6 +1,6 @@
 package dev.aster.vega.runtime.triage
 
-import dev.aster.vega.loader.FileDataLoader
+import dev.aster.vega.loader.VegaDataLoaders
 import dev.aster.vega.model.DiagnosticSeverity
 import dev.aster.vega.runtime.compile.CompiledSpec
 import dev.aster.vega.runtime.compile.SpecCompiler
@@ -14,8 +14,11 @@ class ExampleTriage {
     if (!dir.isDirectory) return
     val files = dir.listFiles { f -> f.name.endsWith(".vg.json") }!!.sortedBy { it.name }
     // The examples name their data relatively, as `data/x.json`, so the corpus directory is the
-    // root.
-    val loader = FileDataLoader(dir)
+    // root — and what is not in it is fetched from where the Vega project publishes it and kept, so
+    // a corpus downloaded as bare specifications fills itself in on the first run and is offline
+    // from the second. This is a survey run by hand, not a gate; the differential tests read only
+    // from disk.
+    val loader = VegaDataLoaders.directoryThenNetwork(dir, cacheDownloads = true)
     var clean = 0
     val byMessage = sortedMapOf<String, Int>()
     val rows = mutableListOf<String>()

@@ -1,5 +1,6 @@
 package dev.aster.vega.runtime.compile
 
+import dev.aster.vega.expression.NumberFormatSubset
 import dev.aster.vega.model.spec.ScaleType
 import dev.aster.vega.model.time.TimeFormat
 import dev.aster.vega.runtime.scale.BandScale
@@ -53,6 +54,14 @@ internal object GuideCaption {
     title: String?,
     scale: VegaScale?,
     declaredType: ScaleType?,
+    /**
+     * The axis's own label format, so a reader hears the domain the way the labels read it.
+     *
+     * Per axis and not per scale: two axes over one scale, one of them formatted as currency, are
+     * described differently by upstream — the priced one says "from $1.20 to $3.40" and the other
+     * says "from 1.2 to 3.4".
+     */
+    format: String? = null,
   ): String? {
     if (scale == null) return null
     val axis = if (orient == "left" || orient == "right") "Y-axis" else "X-axis"
@@ -60,7 +69,7 @@ internal object GuideCaption {
       append(axis)
       if (!title.isNullOrBlank()) append(" titled '$title'")
       append(" for a ${typeName(scale, declaredType)} scale")
-      append(" with ${domain(scale)}")
+      append(" with ${domain(scale, format)}")
     }
   }
 
@@ -105,7 +114,7 @@ internal object GuideCaption {
    * ranges and the boundaries are what a reader needs to place a mark. A **discrete** scale reads
    * its values, truncated. A **continuous** one reads its two ends.
    */
-  private fun domain(scale: VegaScale): String =
+  private fun domain(scale: VegaScale, format: String? = null): String =
     when (scale) {
       is BinnedScale -> {
         val cuts = scale.thresholds.map { formatTickLabel(it, decimalsFor(scale.thresholds)) }
@@ -122,15 +131,18 @@ internal object GuideCaption {
       }
       is TransformedScale ->
         continuous(scale.domain.first(), scale.domain.last()) { v, _ ->
-          scale.formatTick(v, CAPTION_TICK_COUNT)
+          if (format != null) NumberFormatSubset.format(v, format)
+          else scale.formatTick(v, CAPTION_TICK_COUNT)
         }
       is SequentialColorScale ->
         continuous(scale.domain.first(), scale.domain.last()) { v, _ ->
-          scale.formatTick(v, CAPTION_TICK_COUNT)
+          if (format != null) NumberFormatSubset.format(v, format)
+          else scale.formatTick(v, CAPTION_TICK_COUNT)
         }
       is LinearScale ->
         continuous(scale.domain.first(), scale.domain.last()) { v, _ ->
-          scale.formatTick(v, CAPTION_TICK_COUNT)
+          if (format != null) NumberFormatSubset.format(v, format)
+          else scale.formatTick(v, CAPTION_TICK_COUNT)
         }
     }
 
