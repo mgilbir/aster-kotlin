@@ -334,11 +334,34 @@ class SpecCompilerTest {
   }
 
   @Test
-  fun `a missing width and height is reported and defaults applied`() {
-    val sizeless = minimalBar.replace("\"width\": 100, \"height\": 50,", "")
+  fun `a chart with no declared size is measured from its contents`() {
+    // Upstream seeds the `width` signal with `spec.width || 0`, so a specification with no size is
+    // not an incomplete one: it is a chart the size of what it draws. Probed — this specification
+    // through upstream leaves a frame reaching (0, 0) to (30, 20), so 40 by 30 once the padding is
+    // added. Every faceted Vega-Lite chart is written this way, and a 200-unit default stood a
+    // whole phantom chart beside one.
+    val sizeless =
+      """
+      {
+        "padding": 5,
+        "data": [{"name": "t", "values": [{"a": 1}]}],
+        "marks": [{
+          "type": "rect", "from": {"data": "t"},
+          "encode": {"update": {
+            "x": {"value": 0}, "y": {"value": 0},
+            "width": {"value": 30}, "height": {"value": 20},
+            "fill": {"value": "steelblue"}
+          }}
+        }]
+      }
+      """
+        .trimIndent()
     val compiled = compile(sizeless)
-    assertTrue(compiled.diagnostics.any { it.code == DiagnosticCodes.PARSE_MISSING_PROPERTY })
-    assertEquals(SpecCompiler.DEFAULT_WIDTH, compiled.scene!!.width, 1e-9)
+    val note = compiled.diagnostics.single { it.code == DiagnosticCodes.PARSE_MISSING_PROPERTY }
+    assertEquals(DiagnosticSeverity.INFO, note.severity)
+    val scene = requireNotNull(compiled.scene)
+    assertEquals(40.0, scene.width, 1e-9)
+    assertEquals(30.0, scene.height, 1e-9)
   }
 
   @Test

@@ -16,6 +16,7 @@ import dev.aster.vega.model.spec.LegendSpec
 import dev.aster.vega.model.spec.MarkSort
 import dev.aster.vega.model.spec.MarkSpec
 import dev.aster.vega.model.spec.MarkType
+import dev.aster.vega.model.spec.NumberValue
 import dev.aster.vega.model.spec.ScaleType
 import dev.aster.vega.model.spec.TitleSpec
 import dev.aster.vega.runtime.scale.VegaScale
@@ -27,6 +28,8 @@ import dev.aster.vega.scene.SceneNodeIdAllocator
 import dev.aster.vega.scene.TextEngine
 import dev.aster.vega.scene.Transform2D
 import dev.aster.vega.scene.transformedBounds
+import kotlin.math.ceil
+import kotlin.math.floor
 
 /**
  * Everything visible from one point in a specification: the top level, or the inside of a group
@@ -385,9 +388,15 @@ internal class ScopeCompiler(
   /**
    * Arranges a whole trellis: the cells on a grid, and the row and column labels around it.
    *
-   * A header is placed against the cell it labels on one axis and against the grid's edge on the
-   * other, so the labels track the grid however it wraps. A title is placed halfway along the grid,
-   * just outside whatever its headers reached.
+   * Ported from upstream's `trellisLayout`, and the two rules that read as arbitrary are the ones
+   * that matter. A band of labels sits at a *whole-unit* edge — the margin is the grid's own edge
+   * rounded **outwards**, `floor` on the near side and `ceil` on the far one — so a cell whose
+   * border straddles the half unit (which every Vega-Lite cell's does, being a stroked rectangle)
+   * pushes its row header out to −1 rather than −0.5. And the margin is measured against zero as
+   * well as against the cells, so a band never crosses into the grid.
+   *
+   * A title is then placed halfway along the *cells*, not halfway along everything the headers
+   * reached: a trellis with wide y-axis labels down its left keeps its heading over the plots.
    */
   private fun trellis(
     layout: LayoutSpec,
@@ -401,104 +410,116 @@ internal class ScopeCompiler(
     val gridded = gridTogether(layout, parts, numbers)
     val cells = gridded.filter { it.first == TrellisRole.CELL }.map { it.second }
     val cellNodes = cells.flatMap { it.nodes }
-    val cellBoxes = cells.flatMap { part -> part.nodes.indices.map { part.boxOf(it) } }
+    // Each cell's reach in the enclosing coordinates, which is what every margin is measured from.
+    val cellBoxes =
+      cells
+        .flatMap { part -> part.nodes.indices.map { part.boxOf(it) } }
+        .mapIndexed { index, box -> cellNodes[index].transform.mapBounds(box) }
     val columns =
       numbers.resolveInt(layout.columns, "layout")?.coerceAtLeast(1)
         ?: cellNodes.size.coerceAtLeast(1)
+    val rows = if (cellNodes.isEmpty()) 1 else ceil(cellNodes.size / columns.toDouble()).toInt()
 
+    // The grid itself, which is what a title is centred along.
+    val gridBounds = cellBoxes.fold(RectD.Empty) { acc, box -> acc.union(box) }
     var bounds = cells.fold(RectD.Empty) { acc, part -> acc.union(part.bounds) }
 
-    // Where the grid begins on each axis: what a header hangs off.
-    val left =
-      cellNodes.indices
-        .filter { it % columns == 0 }
-        .minOfOrNull {
-          cellNodes[it].transform.e + cellBoxes[it].left
-        } ?: 0.0
-    val top = cellNodes.indices.minOfOrNull { cellNodes[it].transform.f + cellBoxes[it].top } ?: 0.0
-    // And where it ends, which is what a *footer* hangs off — the shared axis of a trellis.
-    val right =
-      cellNodes.indices.maxOfOrNull { cellNodes[it].transform.e + cellBoxes[it].right } ?: 0.0
-    val bottom =
-      cellNodes.indices.maxOfOrNull { cellNodes[it].transform.f + cellBoxes[it].bottom } ?: 0.0
+    fun offsetOf(value: NumberValue?) = numbers.resolve(value, "layout") ?: 0.0
 
-    // Headers first, because a title is placed just outside whatever they reached. The results are
-    // kept per declaration so the scene can be emitted in specification order, which is the order
-    // upstream emits it in.
+    // Each band of labels in turn, and the edge it ends up occupying — which is what the title
+    // beyond it hangs off. The results are kept per declaration so the scene is emitted in
+    // specification order, the order upstream emits it in.
     val placed = HashMap<Int, List<SceneNode>>()
-    val edges = HashMap<TrellisRole, RectD>()
-    gridded.forEachIndexed { index, (role, part) ->
-      if (role != TrellisRole.ROW_HEADER && role != TrellisRole.COLUMN_HEADER) return@forEachIndexed
-      val alongRows = role == TrellisRole.ROW_HEADER
-      var edge = edges[role] ?: RectD.Empty
-      val moved =
-        part.nodes.mapIndexedNotNull { position, node ->
-          // Header j labels the first cell of row j, or the j-th cell of the top row.
-          val cell = cellNodes.getOrNull(if (alongRows) position * columns else position)
-          if (cell == null) null
-          else {
-            val at =
-              if (alongRows) PointD(left, cell.transform.f) else PointD(cell.transform.e, top)
-            val node2 = moveTo(node, at)
+    val edges = HashMap<TrellisRole, Double>()
+    for (band in TRELLIS_BANDS) {
+      // Which cells the margin is taken over, and which cell each label lines up with. A column
+      // footer belongs to the *last* row and a row footer to the last column, so both walk the grid
+      // from a different corner than their header does.
+      val start =
+        when (band.role) {
+          TrellisRole.ROW_HEADER,
+          TrellisRole.COLUMN_HEADER -> 0
+          TrellisRole.ROW_FOOTER -> columns - 1
+          else -> (rows - 1) * columns
+        }
+      val stride = if (band.alongRows) columns else 1
+      val offset =
+        when (band.role) {
+          TrellisRole.ROW_HEADER -> -offsetOf(layout.offset.rowHeader)
+          TrellisRole.COLUMN_HEADER -> -offsetOf(layout.offset.columnHeader)
+          TrellisRole.ROW_FOOTER -> offsetOf(layout.offset.rowFooter)
+          else -> offsetOf(layout.offset.columnFooter)
+        }
+      // The margin: zero, or however far past it the cells on that side of the grid reach, rounded
+      // outwards to a whole unit.
+      var margin = 0.0
+      var index = start
+      while (index in cellBoxes.indices) {
+        val box = cellBoxes[index]
+        margin =
+          if (band.leading) {
+            floor(minOf(margin, if (band.alongRows) box.left else box.top))
+          } else {
+            ceil(maxOf(margin, if (band.alongRows) box.right else box.bottom))
+          }
+        index += stride
+      }
+      margin += offset
+
+      var edge = 0.0
+      var labels = 0
+      gridded.forEachIndexed { declaration, (role, part) ->
+        if (role != band.role) return@forEachIndexed
+        val moved =
+          part.nodes.mapIndexedNotNull { position, node ->
+            // The nearest cell, walking back from this label's own place in the grid, so a table
+            // with fewer cells than slots still has its last labels against a cell.
+            var at = start + position * stride
+            val back = if (band.alongRows) 1 else columns
+            while (at >= cellNodes.size && at >= back) at -= back
+            val cell = cellNodes.getOrNull(at) ?: return@mapIndexedNotNull null
+            val to =
+              if (band.alongRows) PointD(margin, cell.transform.f)
+              else PointD(cell.transform.e, margin)
+            val node2 = moveTo(node, to)
             val box = node2.transform.mapBounds(part.boxOf(position))
             bounds = bounds.union(box)
-            edge = edge.union(box)
+            val reached =
+              if (band.alongRows) {
+                if (band.leading) box.left else box.right
+              } else {
+                if (band.leading) box.top else box.bottom
+              }
+            edge = if (band.leading) floor(minOf(edge, reached)) else ceil(maxOf(edge, reached))
+            labels++
             node2
           }
-        }
-      edges[role] = edge
-      placed[index] = moved
+        placed[declaration] = moved
+      }
+      // With no labels of this kind, the band is still the margin wide, and that is what a title
+      // beyond it clears.
+      edges[band.role] = if (labels > 0) edge else margin
     }
 
-    // Footers, on the far side: a column's below the grid, a row's to its right. Each is aligned
-    // with the cell it belongs to on the other axis, exactly as a header is.
-    gridded.forEachIndexed { index, (role, part) ->
-      if (role != TrellisRole.ROW_FOOTER && role != TrellisRole.COLUMN_FOOTER) return@forEachIndexed
-      val alongRows = role == TrellisRole.ROW_FOOTER
-      var edge = edges[role] ?: RectD.Empty
-      val moved =
-        part.nodes.mapIndexedNotNull { position, node ->
-          val cell = cellNodes.getOrNull(if (alongRows) position * columns else position)
-          if (cell == null) null
-          else {
-            val at =
-              if (alongRows) PointD(right, cell.transform.f) else PointD(cell.transform.e, bottom)
-            val node2 = moveTo(node, at)
-            val box = node2.transform.mapBounds(part.boxOf(position))
-            bounds = bounds.union(box)
-            edge = edge.union(box)
-            node2
-          }
-        }
-      edges[role] = edge
-      placed[index] = moved
-    }
-
-    val gridBounds = bounds
-    gridded.forEachIndexed { index, (role, part) ->
+    gridded.forEachIndexed { declaration, (role, part) ->
       if (role != TrellisRole.ROW_TITLE && role != TrellisRole.COLUMN_TITLE) return@forEachIndexed
       val alongRows = role == TrellisRole.ROW_TITLE
-      val headerEdge =
-        edges[if (alongRows) TrellisRole.ROW_HEADER else TrellisRole.COLUMN_HEADER] ?: RectD.Empty
+      val band = edges[if (alongRows) TrellisRole.ROW_HEADER else TrellisRole.COLUMN_HEADER] ?: 0.0
+      val gap =
+        band - offsetOf(if (alongRows) layout.offset.rowTitle else layout.offset.columnTitle)
       val moved =
         part.nodes.mapIndexed { position, node ->
           val at =
             if (alongRows) {
-              PointD(
-                if (headerEdge.isEmpty) left else headerEdge.left,
-                roundHalfUp(gridBounds.top + 0.5 * gridBounds.height),
-              )
+              PointD(gap, roundHalfUp(gridBounds.top + 0.5 * gridBounds.height))
             } else {
-              PointD(
-                roundHalfUp(gridBounds.left + 0.5 * gridBounds.width),
-                if (headerEdge.isEmpty) top else headerEdge.top,
-              )
+              PointD(roundHalfUp(gridBounds.left + 0.5 * gridBounds.width), gap)
             }
           val node2 = moveTo(node, at)
           bounds = bounds.union(node2.transform.mapBounds(part.boxOf(position)))
           node2
         }
-      placed[index] = moved
+      placed[declaration] = moved
     }
 
     val nodes = gridded.flatMapIndexed { index, (_, part) -> placed[index] ?: part.nodes }
@@ -815,3 +836,32 @@ internal class ScopeCompiler(
  */
 internal fun unknownSource(name: String, subject: String = "Mark"): String =
   "$subject refers to '$name', which is neither a dataset nor a mark drawn before it in this scope"
+
+/**
+ * One band of labels around a grid: which role fills it, whether it runs down the rows or across
+ * the columns, and whether it sits before the grid or after it.
+ *
+ * @param alongRows a row header and a row footer run down the side, one label per row, and are
+ *   placed horizontally; a column header and footer run along the top or bottom.
+ * @param leading whether the band precedes the grid, which decides both which edge of the cells it
+ *   is measured against and which way that edge is rounded.
+ */
+internal data class TrellisBand(
+  val role: TrellisRole,
+  val alongRows: Boolean,
+  val leading: Boolean,
+)
+
+/**
+ * The four bands of labels a grid can carry, in the order upstream lays them out.
+ *
+ * Headers before footers, because the margin each takes is measured against the cells and a title
+ * beyond a band is measured against the band.
+ */
+private val TRELLIS_BANDS =
+  listOf(
+    TrellisBand(TrellisRole.ROW_HEADER, alongRows = true, leading = true),
+    TrellisBand(TrellisRole.COLUMN_HEADER, alongRows = false, leading = true),
+    TrellisBand(TrellisRole.ROW_FOOTER, alongRows = true, leading = false),
+    TrellisBand(TrellisRole.COLUMN_FOOTER, alongRows = false, leading = false),
+  )

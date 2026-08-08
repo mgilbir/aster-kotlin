@@ -157,18 +157,13 @@ class VegaLiteFixtureDifferentialTest {
   }
 
   /**
-   * Skips the two *placement* comparisons for a chart whose cells this runtime grids differently.
+   * Skips the *placement* comparisons for a chart whose cells this runtime grids differently.
    *
-   * The compiler's half of faceting is done and checked: `VegaLiteFixtureTest` compares the emitted
-   * Vega against upstream's property by property and it matches exactly, so the specification asks
-   * for the right grid. What differs is where this engine's layout *puts* the cells once it has one
-   * — its column header and title take room upstream's do not, so every cell is shifted and the
-   * surface comes out wider.
-   *
-   * Everything else about the fixture is still compared: it compiles without errors and produces
-   * the same marks, in the same numbers and roles. Only the coordinates are left, and STATUS.md
-   * carries the reason. Skipping quietly, or dropping the fixture, would leave a compiler that
-   * emits a faceted specification nobody had checked draws anything.
+   * Empty, and meant to stay that way: `faceted` was the one entry, and its two causes — a band of
+   * labels placed at the grid's own half-unit edge instead of the whole unit upstream rounds it out
+   * to, and a heading centred over the headers rather than over the cells — are fixed. Kept because
+   * the next composition to arrive will need somewhere honest to sit while it is being finished,
+   * and a set with a reason beside it is better than a fixture quietly deleted.
    */
   private fun assumeGridLayoutWorks(name: String) {
     org.junit.jupiter.api.Assumptions.assumeFalse(
@@ -180,7 +175,7 @@ class VegaLiteFixtureDifferentialTest {
 
   private companion object {
     /** Fixtures whose *placement* is pending on the runtime's grid layout. */
-    val GRID_LAYOUT_PENDING = setOf("faceted")
+    val GRID_LAYOUT_PENDING = emptySet<String>()
 
     val repositoryRoot: File = File(System.getProperty("user.dir")).parentFile
 

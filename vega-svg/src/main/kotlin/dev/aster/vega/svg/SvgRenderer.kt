@@ -181,15 +181,25 @@ public class SvgRenderer(private val options: SvgOptions = SvgOptions()) {
 
     appendDescription(out, node, depth + 1)
 
-    // A group with its own paint draws its clip rectangle as a backing rect, matching Vega's
-    // group-mark behaviour.
-    if (clipRect != null && (node.fill != null || node.stroke != null)) {
+    // A group with its own paint draws a rectangle of its declared size, as Vega group marks do —
+    // and which rectangle that is, is what the scene graph's `paintRect` already works out: the
+    // group's size, or failing that its clip. Reading the clip alone missed every Vega-Lite chart.
+    // Its plotting area is a group that states a size and a `#ddd` border and does *not* clip, so
+    // that border was drawn on the device, counted in the differential comparison, and absent from
+    // every SVG export — found by putting the two pictures side by side, which is the only place it
+    // shows.
+    val paintRect = node.paintRect
+    if (paintRect != null) {
       newline(out, depth + 1)
-      out.append("<rect x=\"").append(num(clipRect.left))
-      out.append("\" y=\"").append(num(clipRect.top))
-      out.append("\" width=\"").append(num(clipRect.width))
-      out.append("\" height=\"").append(num(clipRect.height))
+      out.append("<rect x=\"").append(num(paintRect.left))
+      out.append("\" y=\"").append(num(paintRect.top))
+      out.append("\" width=\"").append(num(paintRect.width))
+      out.append("\" height=\"").append(num(paintRect.height))
       out.append('"')
+      if (node.cornerRadius > 0.0) {
+        out.append(" rx=\"").append(num(node.cornerRadius)).append('"')
+        out.append(" ry=\"").append(num(node.cornerRadius)).append('"')
+      }
       appendFill(out, node.fill, defs, node.bounds)
       appendStroke(out, node.stroke, defs, node.bounds)
       out.append("/>")

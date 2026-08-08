@@ -101,17 +101,22 @@ public class GuideConfig(private val blocks: Map<String, VegaValue.Obj>) {
   public fun legendDefaults(): List<VegaValue.Obj> = listOf(guideStyleDefaults(), block("legend"))
 
   /**
-   * `config.title`, over the `group-title` style Vega keeps its own heading defaults in.
+   * `config.title`, over the style block Vega keeps its own heading defaults in.
    *
    * The style names its properties the way a *mark* does — `fill`, not `color` — so it is
    * translated on the way through, exactly as the guide styles are. This is where a Vega-Lite
    * theme's title colour arrives: its compiler redirects `config.title.color` into
    * `style["group-title"].fill`, and reading only `config.title` leaves a themed title black.
+   *
+   * @param style the title's own `style`, which *replaces* `group-title` rather than adding to it —
+   *   upstream's `guideMark` assigns `mark.style = extras.style || mark.style`, so a trellis header
+   *   asking for `guide-label` is set at a label's ten points and not a heading's thirteen.
    */
-  public fun titleDefaults(): List<VegaValue.Obj> = listOf(groupTitleDefaults(), block("title"))
+  public fun titleDefaults(style: String? = null): List<VegaValue.Obj> =
+    listOf(titleStyleDefaults(style ?: "group-title"), block("title"))
 
-  private fun groupTitleDefaults(): VegaValue.Obj {
-    val style = style("group-title")
+  private fun titleStyleDefaults(name: String): VegaValue.Obj {
+    val style = style(name)
     if (style.fields.isEmpty()) return EMPTY
     val fields = LinkedHashMap<String, VegaValue>(style.fields.size)
     for ((key, value) in style.fields) fields[if (key == "fill") "color" else key] = value
@@ -139,13 +144,56 @@ public class GuideConfig(private val blocks: Map<String, VegaValue.Obj>) {
     /**
      * The `config.style` blocks Vega ships with, copied from its own `config.js`.
      *
-     * All five exist for Vega-Lite, which is why they are reached by *name* rather than by mark
-     * type: a specification says `"style": ["point"]` and gets a symbol a third the size of Vega's
-     * own default, stroked twice as thick. The rest of Vega's default configuration lives in
-     * `MarkDefaults`, next to the built-in per-mark-type values it belongs with.
+     * `point`, `circle`, `square`, `cell` and `view` exist for Vega-Lite, which is why they are
+     * reached by *name* rather than by mark type: a specification says `"style": ["point"]` and
+     * gets a symbol a third the size of Vega's own default, stroked twice as thick. The rest of
+     * Vega's default configuration lives in `MarkDefaults`, next to the built-in per-mark-type
+     * values it belongs with.
+     *
+     * The four guide styles carry the font every guide is drawn in, and they are here rather than
+     * only in `AxisDefaults` because anything may *name* one: a group mark's `title` does exactly
+     * that, and a trellis header set at a heading's thirteen points instead of a label's ten is
+     * both the wrong size and, being measured, the wrong amount of chart.
      */
     private val BUILT_IN_STYLES: Map<String, VegaValue.Obj> =
       mapOf(
+        // axis and legend labels
+        "guide-label" to
+          VegaValue.Obj(
+            linkedMapOf(
+              "fill" to VegaValue.Str("#000"),
+              "font" to VegaValue.Str("sans-serif"),
+              "fontSize" to VegaValue.Num(10.0),
+            )
+          ),
+        // axis and legend titles
+        "guide-title" to
+          VegaValue.Obj(
+            linkedMapOf(
+              "fill" to VegaValue.Str("#000"),
+              "font" to VegaValue.Str("sans-serif"),
+              "fontSize" to VegaValue.Num(11.0),
+              "fontWeight" to VegaValue.Str("bold"),
+            )
+          ),
+        // headers, including the chart's own title
+        "group-title" to
+          VegaValue.Obj(
+            linkedMapOf(
+              "fill" to VegaValue.Str("#000"),
+              "font" to VegaValue.Str("sans-serif"),
+              "fontSize" to VegaValue.Num(13.0),
+              "fontWeight" to VegaValue.Str("bold"),
+            )
+          ),
+        "group-subtitle" to
+          VegaValue.Obj(
+            linkedMapOf(
+              "fill" to VegaValue.Str("#000"),
+              "font" to VegaValue.Str("sans-serif"),
+              "fontSize" to VegaValue.Num(12.0),
+            )
+          ),
         "point" to
           VegaValue.Obj(
             linkedMapOf(

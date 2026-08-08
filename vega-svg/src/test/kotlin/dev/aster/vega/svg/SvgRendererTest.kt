@@ -19,6 +19,7 @@ import dev.aster.vega.scene.SceneColor
 import dev.aster.vega.scene.SceneNode
 import dev.aster.vega.scene.SceneNodeIdAllocator
 import dev.aster.vega.scene.ScenePaint
+import dev.aster.vega.scene.SizeD
 import dev.aster.vega.scene.Stroke
 import dev.aster.vega.scene.StrokeCap
 import dev.aster.vega.scene.SymbolNode
@@ -238,6 +239,30 @@ class SvgRendererTest {
     val svg = sceneOf(clipped).toSvg()
     assertTrue(svg.contains("<clipPath id=\"vc0\">"))
     assertTrue(svg.contains("""clip-path="url(#vc0)""""))
+  }
+
+  @Test
+  fun `a group paints a rectangle of its own size, clipped or not`() {
+    // Vega-Lite's plotting area: a group that states a size and a border and does not clip. The
+    // export read the clip alone, so every chart it compiled lost the thin grey box around its
+    // plot — visible only by putting the SVG beside upstream's.
+    val cell =
+      GroupNode(
+        id = ids.allocate(),
+        children =
+          listOf(RectNode(id = ids.allocate(), x = 1.0, y = 1.0, width = 2.0, height = 2.0)),
+        size = SizeD(40.0, 30.0),
+        stroke = Stroke(ScenePaint.Solid(SceneColor.parse("#ddd")!!)),
+      )
+    val svg = sceneOf(cell).toSvg()
+    assertTrue(
+      svg.contains("""<rect x="0" y="0" width="40" height="30""""),
+      "the cell's own border is missing:\n$svg",
+    )
+
+    // And a group that paints nothing still paints nothing, size or no size.
+    val plain = GroupNode(id = ids.allocate(), children = emptyList(), size = SizeD(40.0, 30.0))
+    assertFalse(sceneOf(plain).toSvg().contains("<rect"))
   }
 
   @Test

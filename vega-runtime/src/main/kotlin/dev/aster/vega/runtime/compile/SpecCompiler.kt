@@ -163,9 +163,12 @@ public class SpecCompiler(
     // below, once the signals have resolved.
     val sized = spec.signals.mapTo(mutableSetOf()) { it.name }
     if ((spec.width == null && "width" !in sized) || (spec.height == null && "height" !in sized)) {
-      diagnostics.warn(
+      // Not a warning: a chart measured by its own contents is a written form, not an omission, and
+      // a faceted Vega-Lite chart is always written that way. It is worth saying once, at the level
+      // a host shows only when somebody is looking for it.
+      diagnostics.info(
         DiagnosticCodes.PARSE_MISSING_PROPERTY,
-        "Specification has no width or height; using ${DEFAULT_WIDTH}x$DEFAULT_HEIGHT",
+        "Specification declares no width or height; the surface is measured from its contents",
       )
     }
     // `autosize: {"contains": "padding"}` measures the declared size to the *outside* of the
@@ -547,7 +550,19 @@ public class SpecCompiler(
     /** A stand-in where only the reach and the plot size of a [Pass] are wanted. */
     private val EMPTY_COMPILED = CompiledSpec(null, emptyMap(), EMPTY_SIGNALS, emptyList())
 
-    public const val DEFAULT_WIDTH: Double = 200.0
-    public const val DEFAULT_HEIGHT: Double = 200.0
+    /**
+     * The plotting area a specification that declares none asks for: none at all.
+     *
+     * Upstream's `parseView` seeds the `width` and `height` signals with `spec.width || 0`, so a
+     * specification with no size is not an incomplete one — it is a chart measured entirely by what
+     * it draws, which is how every faceted Vega-Lite chart is written. The cells carry their own
+     * `child_width`, and a default plotting area behind them would be a whole phantom chart's worth
+     * of surface: two hundred units of it, on the `faceted` fixture, past the last cell.
+     *
+     * Verified against upstream rather than assumed: a specification with one rect at (10, 10) and
+     * no width renders 30 by 20 plus its padding, not 200 by 200.
+     */
+    public const val DEFAULT_WIDTH: Double = 0.0
+    public const val DEFAULT_HEIGHT: Double = 0.0
   }
 }

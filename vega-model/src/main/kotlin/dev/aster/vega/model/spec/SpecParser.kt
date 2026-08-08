@@ -244,6 +244,7 @@ private val TITLE_CONSUMED =
     "subtitleFontStyle",
     "color",
     "subtitleColor",
+    "style",
     "zindex",
   )
 
@@ -1549,7 +1550,19 @@ public class SpecParser {
       )
     }
     val own = value as? VegaValue.Obj ?: return unexpected("a title definition", path)
-    val obj = GuideConfig.merge(own, config.titleDefaults())
+    // A title's `style` names the `config.style` block behind it, *replacing* the `group-title`
+    // block a heading otherwise takes: upstream's `guideMark` assigns `mark.style = extras.style ||
+    // mark.style`. That is how a trellis header is set at a label's ten points rather than a
+    // heading's thirteen, and the size is measured as well as drawn.
+    val style = own.fields["style"]?.takeIf { it is VegaValue.Str }?.asString()
+    if (own.fields["style"] != null && style == null) {
+      diagnostics.warn(
+        DiagnosticCodes.PARSE_UNKNOWN_PROPERTY,
+        "A title takes one style name; a list of them is not implemented",
+        jsonPath = "$path.style",
+      )
+    }
+    val obj = GuideConfig.merge(own, config.titleDefaults(style))
 
     val textField = obj.fields["text"]
     val expression = (textField as? VegaValue.Obj)?.fields?.get("signal")?.asString()
@@ -1569,7 +1582,6 @@ public class SpecParser {
       TITLE_CONSUMED,
       mapOf(
         "encode" to "Only 'dx' and 'dy' are read from a title's encode block; the rest was ignored",
-        "style" to "Title styles are not implemented",
         "limit" to "Title text limits are not implemented",
         "align" to "Title alignment follows 'anchor'; an explicit align is not implemented",
         "angle" to "Title rotation follows 'orient'; an explicit angle is not implemented",
@@ -1600,6 +1612,7 @@ public class SpecParser {
       fontStyle = obj.fields["fontStyle"]?.takeIf { it is VegaValue.Str }?.asString(),
       subtitleFontStyle =
         obj.fields["subtitleFontStyle"]?.takeIf { it is VegaValue.Str }?.asString(),
+      font = obj.fields["font"]?.takeIf { it is VegaValue.Str }?.asString(),
       color = obj.fields["color"]?.takeIf { it is VegaValue.Str }?.asString(),
       subtitleColor = obj.fields["subtitleColor"]?.takeIf { it is VegaValue.Str }?.asString(),
       zindex = (obj.fields["zindex"] as? VegaValue.Num)?.value?.toInt() ?: 0,
@@ -1936,9 +1949,9 @@ public class SpecParser {
   /**
    * Parses a group's `layout`.
    *
-   * Only the placement is modelled. Headers, footers and titles are separate marks upstream
-   * generates around the grid, and they are reported rather than silently dropped, because a
-   * trellis without its row and column labels is a chart nobody can read.
+   * The placement and the gaps around it are modelled. The properties that decide *which* cell a
+   * band of labels lines up against are reported rather than half-honoured, because a trellis whose
+   * headers label the wrong row is worse than one that says it cannot place them.
    */
   private fun parseLayout(value: VegaValue, path: String): LayoutSpec? {
     val obj = value as? VegaValue.Obj ?: return unexpected("a layout definition", path)
@@ -1947,10 +1960,11 @@ public class SpecParser {
         "headerBand" to "Layout header bands are not implemented",
         "footerBand" to "Layout footer bands are not implemented",
         "titleBand" to "Layout title bands are not implemented",
+        "titleAnchor" to
+          "A grid title sits at the start of its band; an 'end' anchor is not implemented",
         "align" to "Only per-cell ('each') grid alignment is implemented",
         "bounds" to "Only full-bounds grid layout is implemented",
         "center" to "Centring cells within their row or column is not implemented",
-        "offset" to "Layout offsets are not implemented",
       )
     for ((key, reason) in unsupported) {
       if (obj.fields[key] == null) continue
@@ -1978,6 +1992,28 @@ public class SpecParser {
       columns = obj.numberOrSignal("columns", "$path.columns"),
       rowPadding = rowPadding,
       columnPadding = columnPadding,
+      offset = parseLayoutOffset(obj, path),
+    )
+  }
+
+  /**
+   * `layout.offset`, which upstream reads through `get(offset, key)` — a bare number answers for
+   * every band, an object answers per band, and anything absent is zero.
+   */
+  private fun parseLayoutOffset(obj: VegaValue.Obj, path: String): LayoutOffset {
+    val value = obj.fields["offset"] ?: return LayoutOffset()
+    if (value !is VegaValue.Obj) {
+      val both = obj.numberOrSignal("offset", "$path.offset") ?: return LayoutOffset()
+      return LayoutOffset(both, both, both, both, both, both)
+    }
+    fun band(name: String) = value.numberOrSignal(name, "$path.offset.$name")
+    return LayoutOffset(
+      rowHeader = band("rowHeader"),
+      columnHeader = band("columnHeader"),
+      rowFooter = band("rowFooter"),
+      columnFooter = band("columnFooter"),
+      rowTitle = band("rowTitle"),
+      columnTitle = band("columnTitle"),
     )
   }
 

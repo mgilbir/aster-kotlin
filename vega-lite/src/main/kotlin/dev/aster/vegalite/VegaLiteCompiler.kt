@@ -72,8 +72,8 @@ private class Compilation(
   private val FACET_SPACING = 20.0
   private val HEADER_OFFSET = 10.0
 
-  /** The `row` or `column` this chart is gridded by, if any. */
-  private var facet: Facet? = null
+  /** The `row` and `column` this chart is gridded by, if either. */
+  private var facet: FacetGrid? = null
 
   fun run(): VegaLiteCompilation {
     reportUnsupportedTopLevel()
@@ -95,8 +95,8 @@ private class Compilation(
 
     val data = assembleData(views).toMutableList()
     fillScaleDomains(views, scales)
-    // The facet's own values, which the layout counts and the headers title themselves from.
-    facet?.let { data += it.domainDataset(views.first().mainData) }
+    // The facets' own values, which the layout counts and the headers title themselves from.
+    facet?.let { data += it.domainDatasets(views.first().mainData) }
 
     val axes = assembleAxes(views, scales)
     val legends = assembleLegends(views, scales)
@@ -124,7 +124,7 @@ private class Compilation(
       title()?.let { put("title", it) }
       put("data", arr(data))
       if (layout.signals.isNotEmpty()) put("signals", arr(layout.signals))
-      facet?.let { put("layout", it.layout(FACET_SPACING, HEADER_OFFSET)) }
+      facet?.let { put("layout", it.layout(FACET_SPACING, HEADER_OFFSET, facetTitles())) }
       put("marks", arr(marks(views, axes)))
       if (scales.isNotEmpty()) put("scales", arr(scales.values.map { assembleScale(it) }))
       // A faceted chart has no axes of its own: the gridlines live in every cell and the labelled
@@ -205,12 +205,13 @@ private class Compilation(
    * upstream's naming and is load-bearing: `width` still exists and means the whole grid.
    */
   private fun liftFacet(views: List<UnitView>): List<UnitView> {
-    val found =
-      views.firstNotNullOfOrNull { view ->
-        Channels.FACET_CHANNELS.firstNotNullOfOrNull { channel ->
-          view.spec.encoding[channel]?.takeIf { it.isFieldDef }?.let { Facet(channel, it) }
-        }
-      } ?: return views
+    fun channel(name: String) = views.firstNotNullOfOrNull { view ->
+      view.spec.encoding[name]?.takeIf { it.isFieldDef }?.let { Facet(name, it) }
+    }
+    val row = channel("row")
+    val column = channel("column")
+    if (row == null && column == null) return views
+    val found = FacetGrid(row, column)
     facet = found
 
     return views.map { view ->
@@ -229,7 +230,7 @@ private class Compilation(
         )
         .also {
           it.sizePrefix = "child_"
-          it.facetFields = listOf(found.field)
+          it.facetFields = found.fields
           // The cell's marks read the partition Vega facets out for them, named `facet`; the
           // scales still read the whole table, so every cell is scaled alike.
           it.markData = "facet"
@@ -256,64 +257,30 @@ private class Compilation(
     val vertical = mainAxes - horizontal.toSet()
 
     val out = mutableListOf<VegaValue>()
-    val title = Fields.title(current.def, config) as? VegaValue.Str
-    if (title != null) out += current.titleGroup(title.value, HEADER_OFFSET)
-
-    // A column-faceted chart captions each column above it and shares one x axis below the grid;
-    // a row-faceted one captions each row beside it and shares one y axis to the left.
-    if (current.isColumn) {
-      out +=
-        listOfNotNull(
-          current.headerGroup(
-            "header",
-            vertical,
-            perCell = false,
-            captioned = false,
-            "child_height",
-            HEADER_OFFSET,
-          ),
-          current.headerGroup(
-            "header",
-            emptyList(),
-            perCell = true,
-            captioned = true,
-            "child_width",
-            HEADER_OFFSET,
-          ),
-          current.headerGroup(
-            "footer",
-            horizontal,
-            perCell = true,
-            captioned = false,
-            "child_width",
-            HEADER_OFFSET,
-          ),
-        )
-    } else {
-      out +=
-        listOfNotNull(
-          current.headerGroup(
-            "header",
-            vertical,
-            perCell = true,
-            captioned = true,
-            "child_height",
-            HEADER_OFFSET,
-          ),
-          current.headerGroup(
-            "header",
-            horizontal,
-            perCell = false,
-            captioned = false,
-            "child_width",
-            HEADER_OFFSET,
-          ),
-        )
+    // Both headings first, rows before columns, then the four bands of labels around the grid.
+    for (facetChannel in listOfNotNull(current.row, current.column)) {
+      val title = Fields.title(facetChannel.def, config) as? VegaValue.Str ?: continue
+      out += facetChannel.titleGroup(title.value, HEADER_OFFSET)
     }
+    out += current.headerGroups(vertical, horizontal, HEADER_OFFSET)
 
     out +=
       current.cellGroup(views.first().mainData, childMarks, gridAxes, "child_width", "child_height")
     return out
+  }
+
+  /**
+   * Which facet channels name themselves.
+   *
+   * The `layout` keeps a heading clear of the labels beneath it with `offset.rowTitle` or
+   * `offset.columnTitle`, and upstream writes the offset only where there is a heading to keep
+   * clear — `if (layoutHeaderComponent.title)` in `getHeaderLayoutMixins`.
+   */
+  private fun facetTitles(): Set<String> {
+    val current = facet ?: return emptySet()
+    return listOfNotNull(current.row, current.column)
+      .filter { Fields.title(it.def, config) is VegaValue.Str }
+      .mapTo(mutableSetOf()) { it.channel }
   }
 
   private fun reportUnsupportedTopLevel() {

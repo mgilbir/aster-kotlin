@@ -35,6 +35,14 @@ public object TitleDefaults {
   /** The subtitle is not bold, which is the only thing distinguishing it besides size. */
   public const val SUBTITLE_FONT_WEIGHT: Int = 400
 
+  /**
+   * What a title weighs when no style block names a weight.
+   *
+   * A plain text mark's, not a heading's: the bold belongs to the `group-title` style and reaches a
+   * title through it, so a title that names some other style keeps that style's weight.
+   */
+  public const val TEXT_FONT_WEIGHT: Int = 400
+
   public const val FONT_FAMILY: String = "sans-serif"
 
   public val color: SceneColor = SceneColor.parse("#000")!!
@@ -108,7 +116,9 @@ internal class TitleBuilder(
         x = nudgeX,
         y = nudgeY,
         layout =
-          textEngine.layout(run(text, fontSize, titleWeight(spec), align, styleOf(spec.fontStyle))),
+          textEngine.layout(
+            run(text, fontSize, titleWeight(spec), align, styleOf(spec.fontStyle), spec.font)
+          ),
         angleDegrees = angle,
         fill = Fill.of(titleColor),
         metadata =
@@ -152,6 +162,7 @@ internal class TitleBuilder(
                   TitleDefaults.SUBTITLE_FONT_WEIGHT,
                   align,
                   styleOf(spec.subtitleFontStyle),
+                  spec.font,
                 )
               ),
             angleDegrees = angle,
@@ -229,7 +240,14 @@ internal class TitleBuilder(
     }
   }
 
-  /** The title's own `fontWeight`, or a theme's, falling back to Vega's bold default. */
+  /**
+   * The title's own `fontWeight`, or the one its style block gives it.
+   *
+   * The fallback is a *text mark's* weight rather than a heading's, because the bold belongs to the
+   * `group-title` style and arrives through it. A title that names some other style — a trellis
+   * header asking for `guide-label` — is not bold, and helping it to a heading's weight would set
+   * every column label in a trellis in bold.
+   */
   private fun titleWeight(spec: TitleSpec): Int =
     spec.fontWeight?.let { named ->
       when (named.lowercase()) {
@@ -239,7 +257,7 @@ internal class TitleBuilder(
         "bolder" -> 800
         else -> named.toIntOrNull()
       }
-    } ?: TitleDefaults.FONT_WEIGHT
+    } ?: TitleDefaults.TEXT_FONT_WEIGHT
 
   /** `"italic"` slants the face; anything else, including nothing, leaves it upright. */
   private fun styleOf(name: String?): FontStyle =
@@ -251,12 +269,13 @@ internal class TitleBuilder(
     weight: Int,
     align: TextAlign,
     fontStyle: FontStyle = FontStyle.NORMAL,
+    font: String? = null,
   ) =
     TextRun(
       text = text,
       style =
         TextStyle(
-          fontFamily = TitleDefaults.FONT_FAMILY,
+          fontFamily = font ?: TitleDefaults.FONT_FAMILY,
           fontSize = fontSize,
           fontWeight = weight,
           fontStyle = fontStyle,

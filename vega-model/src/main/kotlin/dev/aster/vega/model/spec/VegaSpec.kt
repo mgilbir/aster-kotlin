@@ -558,6 +558,12 @@ public data class TitleSpec(
   val fontStyle: String? = null,
   val subtitleFontStyle: String? = null,
   /**
+   * The face the heading is set in, which a `config.style` block supplies as often as a title does.
+   *
+   * It is measured as well as drawn, so a heading in a narrower face is a narrower chart.
+   */
+  val font: String? = null,
+  /**
    * The heading's colour, and its subtitle's.
    *
    * A Vega-Lite theme states it as `config.title.color` and its compiler redirects that into the
@@ -577,6 +583,22 @@ public data class TitleSpec(
   val dy: NumberValue? = null,
   val subtitleFontSize: NumberValue? = null,
   val zindex: Int = 0,
+)
+
+/**
+ * `layout.offset` — the gap between the grid and each band of labels around it.
+ *
+ * Written either as one number for all six or as an object naming them. A trellis's column title
+ * arrives with `{"columnTitle": 10}`, which is the whole difference between a heading that clears
+ * the headers beneath it and one that sits on them.
+ */
+public data class LayoutOffset(
+  val rowHeader: NumberValue? = null,
+  val columnHeader: NumberValue? = null,
+  val rowFooter: NumberValue? = null,
+  val columnFooter: NumberValue? = null,
+  val rowTitle: NumberValue? = null,
+  val columnTitle: NumberValue? = null,
 )
 
 public data class AxisSpec(
@@ -1118,6 +1140,7 @@ public data class LayoutSpec(
   val columns: NumberValue? = null,
   val rowPadding: NumberValue? = null,
   val columnPadding: NumberValue? = null,
+  val offset: LayoutOffset = LayoutOffset(),
 )
 
 /**

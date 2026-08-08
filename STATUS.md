@@ -1,6 +1,6 @@
 # Status
 
-Last updated: 2026-08-08
+Last updated: 2026-08-09
 
 ## Picking this up
 
@@ -454,10 +454,11 @@ produces a chart that is plausible and wrong.
 every fixture with upstream and checks two things:
 
 1. `VegaLiteFixtureTest` compares the Vega this compiler emits against upstream's, property by
-   property. Twenty-six fixtures, and all of them match exactly — every transform, scale, signal, axis,
-   legend and mark encoding, down to the accessibility description string.
+   property. Twenty-nine fixtures, and all of them match exactly — every transform, scale, signal,
+   axis, legend and mark encoding, down to the accessibility description string.
 2. `VegaLiteFixtureDifferentialTest` runs that output through this engine's own runtime and compares
-   the scene against the one upstream draws. Every mark of every fixture matches.
+   the scene against the one upstream draws. Every mark of every fixture matches, and nothing is
+   skipped: the set that held the one fixture whose cells this runtime gridded differently is empty.
 
 Comparing the specification is what makes a failure legible: it names the rule that drifted, where a
 scene comparison would only say that some marks moved.
@@ -538,10 +539,11 @@ own) and `grouped-bar` on the step arithmetic.
 
 ### Where the compiler stands, and what it still refuses
 
-Twenty-six fixtures, each matching upstream's compiler property for property and drawing the chart
+Twenty-nine fixtures, each matching upstream's compiler property for property and drawing the chart
 upstream draws. The grammar covered: a single view or a layer of them, eleven marks including `arc`,
 the Cartesian and polar position pairs, nested offsets, fourteen of fifteen transforms, sorting,
-binning, time units, stacking, legends, axes, and a user `config` carried through as a theme.
+binning, time units, stacking, faceting by `row` and `column`, legends, axes, and a user `config`
+carried through as a theme.
 
 What it still refuses, by name, with the reason each is refused rather than approximated:
 
@@ -555,17 +557,17 @@ What it still refuses, by name, with the reason each is refused rather than appr
 - Geographic projections and the `geoshape` mark, which are out of scope for the first release for
   the same reason they are in Vega.
 
-### Faceting: the compiler's half is done, the runtime's is not
+### Faceting: both halves, in three fixtures
 
-`row` and `column` compile. The `faceted` fixture's emitted Vega matches upstream's property for
-property — the cell group faceted from the data, the `column_domain` dataset the layout counts and
-the headers title themselves from, the `layout` block, the `child_width`/`child_height` signals, the
-facet field joining every grouping so a stack stays inside its cell, and the axes *split*: the
-gridlines stay in each cell where the data is, and the labelled axis moves out to a header drawn
-once for the whole grid.
+`row`, `column` and both at once compile *and* draw. `faceted` (one row of cells), `faceted-rows`
+(one column of them) and `faceted-grid` (two by two) each match upstream's compiler property for
+property and upstream's renderer mark for mark, surface included — the cell group faceted from the
+data, the `column_domain` and `row_domain` datasets the layout counts and the headers title
+themselves from, the `layout` block, the `child_width`/`child_height` signals, the facet fields
+joining every grouping so a stack stays inside its cell, and the axes *split*: the gridlines stay in
+each cell where the data is, and the labelled axis moves out to a band drawn once for the whole grid.
 
-What does not yet match is where this engine's layout **puts** the guides around the cells. Two
-causes have been found and fixed, and both were silences of the same kind as the rest:
+Six defects on the way, every one of them a silence:
 
 - **A `column-footer` was taken for a cell** and joined the grid, shifting every real cell along and
   widening the chart by a whole column. Vega-Lite puts a trellis's shared x axis in a column footer
@@ -574,11 +576,42 @@ causes have been found and fixed, and both were silences of the same kind as the
 - **A sized group did not give its own `width` to what was inside it.** A gridline in a cell spanned
   the *chart's* width rather than the cell's, because the subscope's size came only from a group's
   own signal declarations and a Vega-Lite cell states its size in an `encode` block instead.
+- **A band of labels sat at the grid's own half-unit edge.** Upstream rounds that margin *outwards*
+  to a whole unit — `floor` on the near side, `ceil` on the far one, each measured against zero as
+  well as against the cells (`layoutHeaders`, in `vega-view-transforms`) — so a row header clearing
+  a cell whose stroked border reaches −0.5 goes to −1, and every guide inside it inherits the half
+  unit. `trellis()` is now a port of that function rather than an approximation of it, which also
+  settled two cases nothing had exercised: a *footer* is aligned with the last row or column and not
+  the first, and `layout.offset` — which Vega-Lite writes on every faceted chart, to keep a heading
+  ten units clear of the captions under it — was parsed, reported and dropped.
+- **A grid's heading was centred over its headers instead of over its cells.** Upstream centres it
+  along the bounds `gridLayout` returns, which are the cells alone, so a trellis with wide y-axis
+  labels down its left still has its heading over the plots. Ours drifted left by half a row header.
+- **A group mark's `title` ignored its own `style`.** Every caption in a trellis asks for
+  `guide-label` and every heading for `guide-title`, and both were being set at a chart heading's
+  thirteen points, in bold. Upstream's `guideMark` *replaces* the default `group-title` style with
+  whichever is named, so the four style blocks Vega ships — `guide-label`, `guide-title`,
+  `group-title`, `group-subtitle` — are now written down beside the five that were already there,
+  and a title reads its size, face, weight and colour through the one it names.
+- **A chart with no declared `width` was given a plotting area of 200 by 200**, so a faceted chart
+  came out a whole phantom chart wider than upstream's. Upstream seeds the signal with `spec.width
+  || 0`: a specification with no size is not an incomplete one, it is a chart measured entirely by
+  what it draws, which is how every faceted Vega-Lite chart is written. Probed rather than reasoned
+  about — one rect at (10, 10) and no width renders 30 by 20 plus its padding. The default is zero
+  now, and the diagnostic that used to announce the substitution says instead, at `info`, that the
+  surface comes from the contents.
 
-What is left is the axis groups' half-unit crisp offset inside a header, and the room the row header
-takes: the surface is still about a hundred units wider than upstream's. The fixture is kept and only
-the two placement comparisons are skipped, by name and with the reason in the test — it still has to
-compile without errors and produce the same marks in the same numbers and roles.
+The last of those was found by a fixture written *because* the ported layout had no test for it, and
+it failed on arrival: **a row-faceted chart put its x axis in a column header and drew it above the
+chart.** Which band a shared axis lands in follows the axis's own orientation — top or left is a
+header, bottom or right a footer (`getHeaderType`, `compile/header/parse.ts`) — and the facet
+channel only decides whether that band is one group per cell or a single one. The compiler had been
+choosing the band from the facet's *direction*, which agrees with upstream for a column facet and is
+upside down for a row facet.
+
+What is left is `align` and `bounds`. This engine grids cells the way `align: "each"` does and
+Vega-Lite asks for `"all"`; the two agree whenever the cells are the same size, which they are on
+every fixture here, and both are still reported by name rather than assumed away.
 
 ### One difference is still open
 
@@ -596,9 +629,23 @@ property alone keeps them. It is an artifact of Vega's incremental dataflow rath
 compiler is a pure function and has no earlier pass to inherit it from. With `labelFlush` implemented
 the two engines now agree on these fixtures anyway, but the mechanism is not the same one.
 
+### And one the numbers could not have found
+
+**Every SVG export was missing the border around its plotting area.** The exporter painted a group's
+own fill and stroke only when the group *clipped*, and a Vega-Lite plotting area is a group that
+states a size and a `#ddd` border and does not clip — so the border was in the scene graph, drawn on
+the device by the canvas renderer, and counted by the differential comparison, and absent from every
+file the SVG writer produced. The scene graph had already worked out which rectangle a group paints
+(`GroupNode.paintRect`, which the canvas renderer uses); the exporter was not asking it.
+
+It is the eighth entry in the same list as the harness gaps below and the seventh found by putting
+the two pictures side by side: it can only be seen by looking, because both engines' *scenes* agreed
+the whole time.
+
 ## Verification
 
-- 1,348 JVM tests pass (`./scripts/test-core.sh`, `./gradlew test`).
+- 1,845 JVM tests pass and none is skipped (`./gradlew test`). 1,742 of them are the portable core,
+  which `./scripts/test-core.sh` runs without an Android SDK.
 - Android lint is clean with `warningsAsErrors` on every Android module.
 - 63 instrumented tests pass on an API 37 arm64 emulator (`./scripts/test-android.sh`): 49 in
   `vega-android-canvas`, 4 in `vega-compose`, 10 in `demo`. Three groups of them cover what no JVM
@@ -1257,6 +1304,12 @@ depends on them. Each has a test and a comment; this is the index.
    remain include an axis on a discretizing scale, a group whose signals shadow the outer scope's,
    and a `timeunit` transform feeding a `time` scale across the same daylight-saving boundary the
    `local-time-dst` fixture crosses.
+
+Faceting came off this list by being finished, and what it leaves at the front of the Vega-Lite
+work is the **composite-mark normalizer** — `boxplot`, `errorbar` and `errorband`, which upstream
+rewrites into layered views before compiling anything. Layers already work, so it is the rewriting
+that is missing, and it is the last piece that adds *charts* rather than compositions. After it,
+`hconcat`/`vconcat`/`concat` and `repeat`, which need a second kind of layout each.
 
 ~~A fourth candidate: **a transform cannot read a computed signal**.~~ **Resolved**, by the
 dependency ordering that replaced the compile phases. It was described here as needing "the signal
