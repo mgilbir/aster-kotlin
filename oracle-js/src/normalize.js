@@ -50,6 +50,25 @@ const STYLE_CHANNELS = ['fill', 'stroke', 'strokeWidth', 'opacity', 'fillOpacity
 const TEXT_CHANNELS = ['text', 'align', 'baseline', 'font', 'fontSize', 'fontWeight', 'fontStyle', 'angle'];
 
 /**
+ * A numeric channel written as a string, read as the number it is.
+ *
+ * A specification may write `"labelFontSize": "12"`, and upstream carries that straight onto the
+ * scene item and hands the string to its renderer, which emits `font-size="12px"`. This engine
+ * parses it once and stores 12. The two agree on what gets drawn, and comparing `"12"` against `12`
+ * as different *types* reported a difference that does not exist — while quietly hiding any real
+ * one on that channel, since the string form matched nothing on the other side either.
+ *
+ * Deliberately narrow: only the channels this harness already treats as numbers, and only when the
+ * string parses as a finite number. `text` is not one of those — a label reading "12" is a label.
+ */
+function numericIfPossible(value) {
+  if (typeof value !== 'string') return value;
+  const trimmed = value.trim();
+  if (trimmed === '' || !Number.isFinite(+trimmed)) return value;
+  return +trimmed;
+}
+
+/**
  * A dash pattern, joined into one comparable string.
  *
  * Reported separately from the scalar channels because it is an array, and added because it was the
@@ -336,7 +355,12 @@ function record(type, role, item, dx, dy, precision) {
   }
   if (type === 'text') {
     for (const channel of TEXT_CHANNELS) {
-      if (item[channel] !== undefined) entry[channel] = canonicalNumber(item[channel], precision);
+      if (item[channel] !== undefined) {
+        entry[channel] =
+          channel === 'text'
+            ? item[channel]
+            : canonicalNumber(numericIfPossible(item[channel]), precision);
+      }
     }
     // A text mark's content is whatever the field held, so a numeric field gives a numeric `text`.
     // Both engines draw its string form, so compare that rather than its type.

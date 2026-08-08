@@ -21,7 +21,7 @@ end to end — expressions, signals, 33 of upstream's 40 data transforms, every 
 and an event handler that recompiles the chart — and are verified against upstream Vega by
 differential tests.
 
-One hundred and four differential fixtures pass, all matching upstream exactly on every mark and scale output:
+One hundred and five differential fixtures pass, all matching upstream exactly on every mark and scale output:
 
 | Fixture | Marks | Covers |
 | --- | --- | --- |
@@ -525,7 +525,7 @@ each example a deadline.
 
 ## Known failing fixtures
 
-None. One hundred and four fixtures exist and all of them pass — and that sentence became worth
+None. One hundred and five fixtures exist and all of them pass — and that sentence became worth
 something only once the gate could no longer skip itself, below.
 
 **The gate could report success without running.** `FixtureDifferentialTest` reads the fixtures and

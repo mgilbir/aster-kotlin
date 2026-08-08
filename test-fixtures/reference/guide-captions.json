@@ -120,6 +120,21 @@
   "caption": "Y-axis for a linear scale with values from 0 to 19"
  },
  {
+  "fixture": "bar-line-toggle",
+  "kind": "axis",
+  "caption": "X-axis for a discrete scale with 25 values: 1, 2, 3, 4, 5, ending with 25"
+ },
+ {
+  "fixture": "bar-line-toggle",
+  "kind": "axis",
+  "caption": "X-axis for a linear scale with values from NaN to NaN"
+ },
+ {
+  "fixture": "bar-line-toggle",
+  "kind": "axis",
+  "caption": "Y-axis for a linear scale with values from NaN to 100.000000"
+ },
+ {
   "fixture": "bar",
   "kind": "axis",
   "caption": "X-axis for a discrete scale with 8 values: Jan, Feb, Mar, Apr, May, ending with Aug"

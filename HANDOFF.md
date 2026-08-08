@@ -9,7 +9,7 @@ Branch `milestone-0-bootstrap`. Working tree clean, both gates green:
 - `./scripts/check.sh` — format, all tests, lint, demo APK
 - `./scripts/oracle.sh` — regenerates upstream references and runs the differential comparison
 
-**104 differential fixtures pass, all matching upstream exactly.** That is the only number here
+**105 differential fixtures pass, all matching upstream exactly.** That is the only number here
 that means what it says.
 
 ## Read this before trusting the other number
@@ -236,8 +236,8 @@ exactly. The other six in the category were scouted and only one of them is actu
 `error-bars`, `hypothetical-outcome-plots`, `pi-monte-carlo` and `serpentine-timeline` are all
 fixtures now and all pass; STATUS.md records what each one needed. Two are left in this category:
 
-- `bar-line-toggle` — 155 marks against upstream's 100. Needs the `on`-handler machinery, which is
-  the one genuinely structural gap left outside geo and raster.
+- `bar-line-toggle` — done, and it needed nothing to do with `on` handlers: it switches views by
+  *emptying* a dataset, and a scale over no data is `[NaN, NaN]` upstream rather than `[0, 1]`.
 - `word-cloud` — **upstream's own headless output is degenerate**: `fontSize: 0` on every word and a
   surface width of `-Infinity`, because the `wordcloud` transform measures text against a canvas
   that is not there. There is nothing to compare against. This one needs evidence of another kind,

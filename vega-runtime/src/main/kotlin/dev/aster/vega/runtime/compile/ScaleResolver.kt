@@ -831,12 +831,13 @@ public class ScaleResolver(
       }
     val numbers = values.map { it.asDouble() }.filter { it.isFinite() }
     if (numbers.isEmpty()) {
-      diagnostics.warn(
-        DiagnosticCodes.SCALE_INVALID_DOMAIN,
-        "Scale '$scaleName' has no finite numeric values in its domain; using [0, 1]",
-        operator = scaleName,
-      )
-      return null
+      // **Not** a fallback to `[0, 1]`. Upstream's extent of nothing is `[undefined, undefined]`,
+      // and its own arithmetic turns that into `[NaN, NaN]` — a scale that generates no ticks and
+      // positions nothing, so the axis over it draws nothing at all. That is the whole point in a
+      // chart that switches between two views by emptying one of the datasets: substituting a
+      // usable domain draws the axis of the view nobody asked for. `domainMin` and `domainMax`
+      // still replace their end, which is how such a scale keeps one real bound.
+      return Double.NaN..Double.NaN
     }
     return numbers.min()..numbers.max()
   }
