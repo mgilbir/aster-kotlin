@@ -230,6 +230,20 @@ class ExpressionReferenceTest {
         "format(1234.5,'$,.2f')|\"$1,234.50\"",
         "format(1234.5,'$.2f')|\"$1234.50\"",
         "format(1500000,'$,d')|\"$1,500,000\"",
+        // ---- probability distributions ----
+        // Every digit from upstream. `quantileNormal` is an approximation of an inverse with no
+        // closed form, so the coefficients are transcribed rather than derived and these vectors
+        // are what says the transcription is right.
+        "quantileNormal(0.25)|-0.6744897501960816",
+        "quantileNormal(0.975)|1.959963984540054",
+        "quantileNormal(0.5,10,2)|10",
+        "quantileUniform(0.3)|0.3",
+        "quantileUniform(0.3,10,20)|13",
+        "quantileLogNormal(0.5)|1",
+        "densityNormal(0)|0.3989422804014327",
+        "cumulativeNormal(1.96)|0.9750021048517795",
+        "densityUniform(0.5)|1",
+        "cumulativeUniform(0.25)|0.25",
         // ---- luminance ----
         // WCAG relative luminance. Every digit here came out of upstream, and several of these
         // separate implementations that all look right:

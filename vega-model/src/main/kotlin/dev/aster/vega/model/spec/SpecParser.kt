@@ -897,7 +897,9 @@ public class SpecParser {
     }
 
     val values = (obj.fields["values"] as? VegaValue.Arr)?.values
-    val url = obj.fields["url"]?.asString()
+    val urlValue = obj.fields["url"]
+    val urlSignal = (urlValue as? VegaValue.Obj)?.fields?.get("signal")?.asString()
+    val url = if (urlSignal == null) urlValue?.asString() else null
     val format = obj.fields["format"] as? VegaValue.Obj
     val parse = LinkedHashMap<String, String>()
     if (format != null) {
@@ -938,6 +940,7 @@ public class SpecParser {
       name = name,
       values = values,
       url = url,
+      urlSignal = urlSignal,
       formatType = formatType,
       property = format?.fields?.get("property")?.asString()?.takeIf { it.isNotEmpty() },
       delimiter = format?.fields?.get("delimiter")?.asString()?.takeIf { it.isNotEmpty() },
@@ -1159,6 +1162,8 @@ public class SpecParser {
         val signal = value.fields["signal"]?.asString()
         val step = value.fields["step"]
         val count = value.fields["count"]
+        val data = value.fields["data"]
+        val field = value.fields["field"]?.asString()
         if (count != null && count !is VegaValue.Num) {
           diagnostics.warn(
             DiagnosticCodes.PARSE_UNKNOWN_PROPERTY,
@@ -1181,10 +1186,11 @@ public class SpecParser {
           !signal.isNullOrEmpty() -> RangeSpec.Signal(signal)
           step != null ->
             RangeSpec.Step(value.numberOrSignal("step", path) ?: NumberValue.Constant(0.0))
+          data != null && !field.isNullOrEmpty() -> RangeSpec.FromField(data.asString(), field)
           else -> {
             diagnostics.warn(
               DiagnosticCodes.PARSE_UNKNOWN_PROPERTY,
-              "A range object must name a 'scheme', a 'signal' or a 'step'",
+              "A range object must name a 'scheme', a 'signal', a 'step', or a 'data' and 'field'",
               jsonPath = path,
             )
             RangeSpec.Unset

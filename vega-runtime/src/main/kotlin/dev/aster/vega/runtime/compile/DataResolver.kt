@@ -68,6 +68,51 @@ internal class DataResolver(
 ) {
 
   /**
+   * The address a `{"signal": ...}` url resolves to, or null with a diagnostic.
+   *
+   * An address that cannot be worked out is named rather than fetched blindly: an empty string
+   * would be refused by the loader with a message about the wrong thing, and guessing would mean
+   * this process fetching something nobody chose.
+   */
+  private fun urlFromSignal(
+    spec: DataSpec,
+    expression: String,
+    signals: Map<String, VegaValue>,
+  ): String? {
+    val compiled = expressions.compile(expression)
+    if (compiled !is dev.aster.vega.expression.ExpressionResult.Compiled) {
+      diagnostics.error(
+        DiagnosticCodes.EXPRESSION_PARSE_ERROR,
+        "Dataset '${spec.name}' has a url expression that does not parse: '$expression'",
+        operator = spec.name,
+      )
+      return null
+    }
+    val scope =
+      object : ExpressionScope {
+        override val datum: VegaValue = VegaValue.EmptyObject
+
+        override fun signal(name: String): VegaValue = signals[name] ?: VegaValue.Null
+
+        override fun dataset(name: String): List<VegaValue> = emptyList()
+      }
+    val resolved = runCatching {
+      compiled.expression.evaluate(scope)
+    }
+      .getOrNull()
+      ?.asString()
+      ?.takeIf { it.isNotEmpty() }
+    if (resolved == null) {
+      diagnostics.error(
+        DiagnosticCodes.TRANSFORM_INVALID_PARAMETER,
+        "Dataset '${spec.name}' takes its url from '$expression', which resolved to nothing",
+        operator = spec.name,
+      )
+    }
+    return resolved
+  }
+
+  /**
    * Fetches and reads one dataset's `url`.
    *
    * A refusal and a failure are reported the same way — as an error naming the dataset — because
@@ -184,7 +229,11 @@ internal class DataResolver(
 
     for (spec in specs) {
       var values = spec.values ?: emptyList()
-      spec.url?.let { values = loadUrl(spec, it) }
+      // A `url` may itself be a signal — how a control swaps the file a chart is reading. It is
+      // resolved here rather than at parse time because only now are the signals known, and a
+      // signal that cannot be worked out before the data is one this cannot use.
+      val address = spec.url ?: spec.urlSignal?.let { urlFromSignal(spec, it, signals) }
+      address?.let { values = loadUrl(spec, it) }
       // A dataset that sources from another starts with that one's tree as well as its rows, which
       // is what lets `treelinks` sit in a dataset of its own.
       var tree: TreeSource? = null

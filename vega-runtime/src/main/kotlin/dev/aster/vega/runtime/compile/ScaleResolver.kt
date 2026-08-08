@@ -487,6 +487,26 @@ public class ScaleResolver(
     )
   }
 
+  /**
+   * The distinct values of a column, for a range that names a dataset instead of listing values.
+   *
+   * First-seen order and de-duplicated, matching how a discrete *domain* is read from a column —
+   * the two are paired in practice, one scale mapping a dataset's key column onto its label column,
+   * and they have to agree on order or every entry is off by one.
+   */
+  private fun rangeColumn(spec: ScaleSpec, range: RangeSpec.FromField): List<VegaValue>? {
+    val rows = datasets[range.data]
+    if (rows == null) {
+      diagnostics.error(
+        DiagnosticCodes.SCALE_INVALID_DOMAIN,
+        "Scale '${spec.name}' takes its range from unknown dataset '${range.data}'",
+        operator = spec.name,
+      )
+      return null
+    }
+    return rows.map { it.field(range.field) }.distinct()
+  }
+
   private fun buildOrdinal(spec: ScaleSpec): OrdinalScale? {
     val domain = discreteDomain(spec.domain, spec.name) ?: return null
     val range =
@@ -494,6 +514,10 @@ public class ScaleResolver(
         is RangeSpec.Literal -> r.values
         // A categorical scheme is exactly an ordinal range, so resolve it to one.
         is RangeSpec.Scheme -> colorRange(spec)?.map { VegaValue.Str(it.toCssHex()) } ?: return null
+        // A column of the data, read the way a data-driven *domain* is: the scale becomes a lookup
+        // table the rows themselves define — `id` in, `name` out. Distinct values in first-seen
+        // order, so it lines up with a domain read the same way from the same rows.
+        is RangeSpec.FromField -> rangeColumn(spec, r) ?: return null
         else -> {
           diagnostics.error(
             DiagnosticCodes.SCALE_INVALID_DOMAIN,
@@ -966,6 +990,23 @@ public class ScaleResolver(
           operator = spec.name,
         )
         null
+      }
+      // A column can supply a numeric range too, though it is the discrete form that is common.
+      is RangeSpec.FromField -> {
+        val numbers = rangeColumn(spec, range)?.map { it.asDouble() }
+        if (numbers == null || numbers.size < 2 || numbers.any { it.isNaN() }) {
+          if (numbers != null) {
+            diagnostics.error(
+              DiagnosticCodes.SCALE_INVALID_DOMAIN,
+              "Scale '${spec.name}' takes its range from '${range.data}.${range.field}', which is " +
+                "not two or more numbers",
+              operator = spec.name,
+            )
+          }
+          null
+        } else {
+          numbers
+        }
       }
       RangeSpec.Unset -> {
         diagnostics.error(

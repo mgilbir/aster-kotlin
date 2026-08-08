@@ -492,6 +492,44 @@ public object Functions {
       VegaValue.Num((maxOf(first, second) + 0.05) / (minOf(first, second) + 0.05))
     }
 
+    // ---- probability distributions ------------------------------------------
+
+    /**
+     * The nine distribution functions, in upstream's naming: `{density,cumulative,quantile}` over
+     * `{Normal,LogNormal,Uniform}`.
+     *
+     * `quantileNormal` is the one charts actually reach for — a quantile-quantile plot is that
+     * function and nothing else, asking what value each rank *would* have under a normal
+     * distribution so the data's own quantiles can be plotted against it.
+     *
+     * Every one is deterministic. The `sample*` functions beside them upstream are not, and stay
+     * refused for the same reason `random()` is.
+     */
+    fun distribution(
+      name: String,
+      compute: (Double, Double, Double) -> Double,
+      a: Double,
+      b: Double,
+    ) {
+      map[name] = ExpressionFunction { args ->
+        val x = JsSemantics.toNumber(args.at(0))
+        val first = args.getOrNull(1)?.let { JsSemantics.toNumber(it) } ?: a
+        val second = args.getOrNull(2)?.let { JsSemantics.toNumber(it) } ?: b
+        VegaValue.Num(compute(x, first, second))
+      }
+    }
+
+    distribution("densityNormal", Statistics::densityNormal, 0.0, 1.0)
+    distribution("cumulativeNormal", Statistics::cumulativeNormal, 0.0, 1.0)
+    distribution("quantileNormal", Statistics::quantileNormal, 0.0, 1.0)
+    distribution("densityLogNormal", Statistics::densityLogNormal, 0.0, 1.0)
+    distribution("cumulativeLogNormal", Statistics::cumulativeLogNormal, 0.0, 1.0)
+    distribution("quantileLogNormal", Statistics::quantileLogNormal, 0.0, 1.0)
+    // The uniform trio defaults to the unit interval rather than to a mean and a deviation.
+    distribution("densityUniform", Statistics::densityUniform, 0.0, 1.0)
+    distribution("cumulativeUniform", Statistics::cumulativeUniform, 0.0, 1.0)
+    distribution("quantileUniform", Statistics::quantileUniform, 0.0, 1.0)
+
     // ---- the embedding page -------------------------------------------------
 
     /**

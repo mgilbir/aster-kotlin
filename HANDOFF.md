@@ -137,10 +137,19 @@ those before comparing, they paint nothing.
 its datasets are fetched into `test-fixtures/data/` and committed. Discount every loader diagnostic
 when judging how far an example is from passing.
 
-What is left, by the engine gap behind it:
+What is left, by the engine gap behind it. **Two are one gap each from passing** and were taken to
+that point before being set down — their data is already fetched and their remaining differences are
+listed here exactly:
 
-- `budget-forecasts` — the `argmin`/`argmax` aggregate operations.
-- `error-bars` — the `stderr` aggregate operation.
+- `global-development` — compiles cleanly; 12 mark differences, all in the legend. It needs two
+  legend `encode` channels: `symbols.enter.fillOpacity` (a constant, but there is no upstream
+  `symbolFillOpacity` property to fold it into, so it needs a target inventing) and
+  `labels.update.text` with `{"scale": "label", "field": "value"}` — the legend counterpart of the
+  axis-label encode that `budget-forecasts` needed, and the same shape of fix in `LegendBuilder`.
+- `quantile-quantile-plot` — compiles cleanly; the second of its two side-by-side plots is drawn at
+  x = 0 instead of x = 288. Its groups carry no `x`, so something places them: check whether the
+  top-level `layout` is doing it and what our trellis path does with a group that declares its own
+  `width` signal.
 - `probability-density` — a `density` transform taking its extent from its own data for
   distributions other than `kde`.
 - `donut-chart-labelled` — the `pluck` expression function, and a dataset sourcing from *several*
@@ -148,6 +157,14 @@ What is left, by the engine gap behind it:
 - `histogram-null-values` — a range written as an array whose *elements* are signals,
   `[{"signal": "barStep + nullGap"}, {"signal": "width"}]`. The scale is not built at all, which
   cascades into three more reports about the axes and encodings that referred to it.
+- `dot-plot` — `scale()` called from a signal in the scope that defines the scale. Check whether
+  upstream really allows it before implementing; it may be a gotcha to reproduce rather than a gap.
+- `interactive-legend` — a `rect` brush with no `x` at rest; upstream draws 454 marks to our 452.
+
+**Refused, not missing**, and now reported as such: `error-bars`, `bar-line-toggle`, `clock`,
+`hypothetical-outcome-plots` and `pi-monte-carlo` all need `random()` or `now()`. `error-bars` is the
+subtle one — its `ci0`/`ci1` *look* like ordinary summary statistics and are a bootstrap over 1,000
+random resamples.
 
 The scouting trick: copy the candidates into `test-fixtures/specs/` with a `scout-` prefix, generate
 references, run the differential once, read the distinct diagnostics, then delete them all. Much

@@ -162,6 +162,14 @@ public data class DataSpec(
   /** Inline values. `null` when the data comes from [url]. */
   val values: List<VegaValue>? = null,
   val url: String? = null,
+  /**
+   * `{"url": {"signal": "..."}}` — the address itself comes from a signal.
+   *
+   * How a chart lets a control choose its dataset: a dropdown of distributions, a year picker that
+   * swaps the file. Resolved when the data is, so the signal has to be one that does not itself
+   * depend on data — which is the same rule every other pre-data signal follows.
+   */
+  val urlSignal: String? = null,
   /** Raw transform definitions, resolved by the runtime so it can report unsupported operators. */
   val transform: List<VegaValue> = emptyList(),
   val source: String? = null,
@@ -342,6 +350,16 @@ public sealed interface RangeSpec {
    * wants when the bars must stay a fixed width however many there are.
    */
   public data class Step(val step: NumberValue) : RangeSpec
+
+  /**
+   * `{"data": "clusters", "field": "name"}` — the range values come from a column.
+   *
+   * The mirror image of a data-driven *domain*, and it is how an ordinal scale becomes a lookup
+   * table the data itself defines: `id` in, `name` out, both read from the same rows. A chart that
+   * labels a cluster by its number does exactly this, and there is no array to write down because
+   * the values are only known once the data has loaded.
+   */
+  public data class FromField(val data: String, val field: String) : RangeSpec
 
   public data object Unset : RangeSpec
 }

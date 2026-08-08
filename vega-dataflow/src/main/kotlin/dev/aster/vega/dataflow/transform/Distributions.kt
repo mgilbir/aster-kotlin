@@ -1,9 +1,7 @@
 package dev.aster.vega.dataflow.transform
 
-import kotlin.math.PI
+import dev.aster.vega.expression.Statistics
 import kotlin.math.abs
-import kotlin.math.exp
-import kotlin.math.ln
 import kotlin.math.pow
 import kotlin.math.sqrt
 
@@ -17,42 +15,40 @@ import kotlin.math.sqrt
  */
 internal object Distributions {
 
-  private val SQRT2PI = sqrt(2 * PI)
-
   internal interface Distribution {
     fun pdf(x: Double): Double
 
     fun cdf(x: Double): Double
+
+    /** The inverse CDF: the value below which probability [p] of the distribution lies. */
+    fun icdf(p: Double): Double
   }
 
   internal fun normal(mean: Double = 0.0, stdev: Double = 1.0): Distribution =
     object : Distribution {
-      override fun pdf(x: Double): Double = densityNormal(x, mean, stdev)
+      override fun pdf(x: Double): Double = Statistics.densityNormal(x, mean, stdev)
 
-      override fun cdf(x: Double): Double = cumulativeNormal(x, mean, stdev)
+      override fun cdf(x: Double): Double = Statistics.cumulativeNormal(x, mean, stdev)
+
+      override fun icdf(p: Double): Double = Statistics.quantileNormal(p, mean, stdev)
     }
 
   internal fun logNormal(mean: Double = 0.0, stdev: Double = 1.0): Distribution =
     object : Distribution {
-      override fun pdf(x: Double): Double {
-        if (x <= 0) return 0.0
-        val z = (ln(x) - mean) / stdev
-        return exp(-0.5 * z * z) / (stdev * SQRT2PI * x)
-      }
+      override fun pdf(x: Double): Double = Statistics.densityLogNormal(x, mean, stdev)
 
-      override fun cdf(x: Double): Double = cumulativeNormal(ln(x), mean, stdev)
+      override fun cdf(x: Double): Double = Statistics.cumulativeLogNormal(x, mean, stdev)
+
+      override fun icdf(p: Double): Double = Statistics.quantileLogNormal(p, mean, stdev)
     }
 
   internal fun uniform(min: Double = 0.0, max: Double = 1.0): Distribution =
     object : Distribution {
-      override fun pdf(x: Double): Double = if (x in min..max) 1.0 / (max - min) else 0.0
+      override fun pdf(x: Double): Double = Statistics.densityUniform(x, min, max)
 
-      override fun cdf(x: Double): Double =
-        when {
-          x < min -> 0.0
-          x > max -> 1.0
-          else -> (x - min) / (max - min)
-        }
+      override fun cdf(x: Double): Double = Statistics.cumulativeUniform(x, min, max)
+
+      override fun icdf(p: Double): Double = Statistics.quantileUniform(p, min, max)
     }
 
   /**
@@ -68,15 +64,18 @@ internal object Distributions {
     return object : Distribution {
       override fun pdf(x: Double): Double {
         var y = 0.0
-        for (s in support) y += densityNormal((x - s) / h, 0.0, 1.0)
+        for (s in support) y += Statistics.densityNormal((x - s) / h, 0.0, 1.0)
         return y / h / n
       }
 
       override fun cdf(x: Double): Double {
         var y = 0.0
-        for (s in support) y += cumulativeNormal((x - s) / h, 0.0, 1.0)
+        for (s in support) y += Statistics.cumulativeNormal((x - s) / h, 0.0, 1.0)
         return y / n
       }
+
+      // A kernel estimate has no closed-form inverse, and upstream does not offer one either.
+      override fun icdf(p: Double): Double = Double.NaN
     }
   }
 
@@ -89,57 +88,10 @@ internal object Distributions {
       override fun pdf(x: Double): Double = parts.indices.sumOf { w[it] * parts[it].pdf(x) }
 
       override fun cdf(x: Double): Double = parts.indices.sumOf { w[it] * parts[it].cdf(x) }
-    }
-  }
 
-  private fun densityNormal(value: Double, mean: Double, stdev: Double): Double {
-    val z = (value - mean) / stdev
-    return exp(-0.5 * z * z) / (stdev * SQRT2PI)
-  }
-
-  /**
-   * The normal CDF, by West's (2009) rational approximation.
-   *
-   * There is no closed form for it, so this is a fitted one: two polynomials in Horner form below
-   * 7.07 standard deviations, a continued fraction above, and a flat zero past 37 where a double
-   * has no room left to hold the answer. The constants are transcribed, not derived, and the
-   * splitting points are part of the fit — moving either changes the result in the fifth digit.
-   */
-  private fun cumulativeNormal(value: Double, mean: Double, stdev: Double): Double {
-    val z = (value - mean) / stdev
-    val magnitude = abs(z)
-    val cd: Double
-    if (magnitude > 37) {
-      cd = 0.0
-    } else {
-      val e = exp(-magnitude * magnitude / 2)
-      if (magnitude < 7.07106781186547) {
-        var sum = 3.52624965998911e-02 * magnitude + 0.700383064443688
-        sum = sum * magnitude + 6.37396220353165
-        sum = sum * magnitude + 33.912866078383
-        sum = sum * magnitude + 112.079291497871
-        sum = sum * magnitude + 221.213596169931
-        sum = sum * magnitude + 220.206867912376
-        var numerator = e * sum
-        sum = 8.83883476483184e-02 * magnitude + 1.75566716318264
-        sum = sum * magnitude + 16.064177579207
-        sum = sum * magnitude + 86.7807322029461
-        sum = sum * magnitude + 296.564248779674
-        sum = sum * magnitude + 637.333633378831
-        sum = sum * magnitude + 793.826512519948
-        sum = sum * magnitude + 440.413735824752
-        numerator /= sum
-        cd = numerator
-      } else {
-        var sum = magnitude + 0.65
-        sum = magnitude + 4 / sum
-        sum = magnitude + 3 / sum
-        sum = magnitude + 2 / sum
-        sum = magnitude + 1 / sum
-        cd = e / sum / 2.506628274631
-      }
+      // A mixture's inverse is not the blend of the parts' inverses, and upstream leaves it out.
+      override fun icdf(p: Double): Double = Double.NaN
     }
-    return if (z > 0) 1 - cd else cd
   }
 
   /**
