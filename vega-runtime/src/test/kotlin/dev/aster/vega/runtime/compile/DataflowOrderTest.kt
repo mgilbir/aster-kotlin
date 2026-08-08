@@ -5,6 +5,7 @@ import dev.aster.vega.expression.VegaExpressionCompiler
 import dev.aster.vega.model.DiagnosticCodes
 import dev.aster.vega.model.DiagnosticCollector
 import dev.aster.vega.model.spec.SpecParser
+import dev.aster.vega.runtime.scale.LinearScale
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
@@ -151,6 +152,46 @@ class DataflowOrderTest {
     val cycle = diagnostics.diagnostics.single { it.code == DiagnosticCodes.SIGNAL_CYCLE }
     assertTrue(cycle.message.contains("dataset 't'"), cycle.message)
     assertTrue(cycle.message.contains("scale 'x'"), cycle.message)
+  }
+
+  /**
+   * A name identifies an operator, so a name declared twice is one operator, not two.
+   *
+   * Upstream refuses the specification outright — "Duplicate data set name" — and this reports it
+   * and lets the later definition win, which is how a duplicate *signal* has always been handled
+   * here. Counting the declarations instead of the names made the order shorter than the node list
+   * it was filling, which took the whole compile down with a `NoSuchElementException`.
+   */
+  @Test
+  fun `a duplicate name is one operator, reported, with the later definition winning`() {
+    val json =
+      """
+      {
+        "width": 100, "height": 50,
+        "data": [
+          {"name": "t", "values": [{"v": 1}]},
+          {"name": "t", "values": [{"v": 9}]}
+        ],
+        "scales": [
+          {"name": "x", "type": "linear", "domain": [0, 1], "range": [0, 10]},
+          {"name": "x", "type": "linear", "domain": [0, 2], "range": [0, 20]}
+        ]
+      }
+      """
+    val diagnostics = DiagnosticCollector()
+    assertEquals(listOf(Operator.Data("t"), Operator.Scale("x")), order(json, diagnostics))
+    assertEquals(
+      listOf(
+        "Duplicate dataset 't'; the later definition wins",
+        "Duplicate scale 'x'; the later definition wins",
+      ),
+      diagnostics.diagnostics.map { it.message },
+    )
+
+    // And the whole compile survives it, which is the part that did not.
+    val compiled = SpecCompiler().compileJson(json)
+    assertTrue(compiled.isUsable)
+    assertEquals(listOf(0.0, 2.0), (compiled.scales["x"] as LinearScale).domain)
   }
 
   @Test

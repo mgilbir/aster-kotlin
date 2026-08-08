@@ -66,10 +66,17 @@ internal class DataflowOrder(
       expressions: ExpressionCompiler,
       diagnostics: DiagnosticCollector,
     ): DataflowOrder {
+      // Distinct, because a name is what identifies an operator and a specification may declare the
+      // same one twice. Upstream refuses that outright — "Duplicate data set name" — and this
+      // reports it and lets the later definition win, which is how a duplicate *signal* has always
+      // been handled here and leaves a chart to draw rather than nothing.
       val nodes =
-        signals.map { Operator.Signal(it.name) } +
-          data.map { Operator.Data(it.name) } +
-          scales.map { Operator.Scale(it.name) }
+        (signals.map { Operator.Signal(it.name) } +
+            data.map { Operator.Data(it.name) } +
+            scales.map { Operator.Scale(it.name) })
+          .distinct()
+      reportDuplicates(data.map { it.name }, "dataset", diagnostics)
+      reportDuplicates(scales.map { it.name }, "scale", diagnostics)
       val reader = Reader(data, scales, signals, expressions)
       val dependencies = nodes.associateWith { node ->
         // A declaration may not read itself; `{"name": "x", "update": "x + 1"}` is a self
@@ -109,6 +116,22 @@ internal class DataflowOrder(
         emitted.add(next)
       }
       return DataflowOrder(order, dependencies)
+    }
+
+    private fun reportDuplicates(
+      names: List<String>,
+      kind: String,
+      diagnostics: DiagnosticCollector,
+    ) {
+      for ((name, count) in names.groupingBy { it }.eachCount()) {
+        if (count > 1) {
+          diagnostics.warn(
+            DiagnosticCodes.PARSE_UNKNOWN_PROPERTY,
+            "Duplicate $kind '$name'; the later definition wins",
+            operator = name,
+          )
+        }
+      }
     }
 
     /** `signal 'x'`, for a message a reader has to act on. */
