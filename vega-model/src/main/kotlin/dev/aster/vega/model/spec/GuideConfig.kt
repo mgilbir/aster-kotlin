@@ -74,6 +74,9 @@ public class GuideConfig(private val blocks: Map<String, VegaValue.Obj>) {
   /** A legend has one block, over the same guide styles. */
   public fun legendDefaults(): List<VegaValue.Obj> = listOf(guideStyleDefaults(), block("legend"))
 
+  /** `config.title` — the chart's own heading, which has no guide-style layer beneath it. */
+  public fun titleDefaults(): List<VegaValue.Obj> = listOf(block("title"))
+
   /**
    * `style["guide-label"]` and `style["guide-title"]` rewritten in guide property names.
    *

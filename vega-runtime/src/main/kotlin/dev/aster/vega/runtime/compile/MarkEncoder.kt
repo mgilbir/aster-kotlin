@@ -988,7 +988,25 @@ public class MarkEncoder(
    * parallel-coordinates plot choosing a scale per row is `datum`. None is known until now.
    */
   private fun scaleNameOf(channel: ChannelValue.Scaled, datum: VegaValue): String =
-    channel.scaleRef?.let { datum.fieldOf(it).asString() } ?: channel.scale
+    channel.scaleRef?.let { scaleName(it, datum) } ?: channel.scale
+
+  /**
+   * The scale a `{"scale": {"datum": ...}}` reference names.
+   *
+   * One lookup, not two. The same object under `field` means "the field *named by* `datum.d`", so
+   * reading it that way looks the value up twice; under `scale` it is the name itself. A
+   * parallel-coordinates plot puts a different scale on every row this way, and the second lookup
+   * gave it a scale called "null" on all of them.
+   */
+  private fun scaleName(ref: FieldRef, datum: VegaValue): String =
+    when (ref) {
+      is FieldRef.ParentOf -> scope.signal("parent").field(scaleName(ref.name, datum)).asString()
+      is FieldRef.Plain -> ref.path
+      is FieldRef.Group -> scope.signal(ref.path).asString()
+      is FieldRef.Parent -> scope.signal("parent").field(ref.path).asString()
+      is FieldRef.Signal -> signalText(ref.expression) ?: ""
+      is FieldRef.Datum -> datum.field(ref.path).asString()
+    }
 
   private fun VegaValue.fieldOf(ref: FieldRef): VegaValue =
     when (ref) {
@@ -1000,6 +1018,7 @@ public class MarkEncoder(
         if (name == null) VegaValue.Null else field(name)
       }
       is FieldRef.Datum -> field(field(ref.path).asString())
+      is FieldRef.ParentOf -> scope.signal("parent").field(scaleName(ref.name, this))
     }
 
   /** Evaluates a signal that supplies a field *name*; a broken one is reported once. */
@@ -1178,7 +1197,19 @@ public class MarkEncoder(
     datum: VegaValue,
     channel: String,
     centerChannel: String,
-  ): Double? = position(channels[centerChannel], datum) ?: position(channels[channel], datum)
+  ): Double? =
+    position(channels[centerChannel], datum)
+      ?: position(channels[channel], datum)
+      // An `x2` or `y2` with no start is still a position, and upstream's `adjustSpatial` reads it
+      // as one: `start = end - extent`, and a mark with no extent of its own leaves the end where
+      // it
+      // is. Vega's stock index chart labels its index date that way — `y2` a fixed distance below
+      // the plot and no `y` — and dropping the mark lost the label *and*, because a `fit` chart is
+      // sized by how far it reaches, shrank the whole chart by less than upstream shrank it.
+      ?: position(channels[END_OF[channel] ?: return null], datum)
+
+  /** The far edge that stands in for a missing start, per axis. */
+  private val END_OF = mapOf("x" to "x2", "y" to "y2")
 
   /** Resolves a positional channel to a number, applying its scale and band offset. */
   private fun position(channel: ChannelValue?, datum: VegaValue): Double? =

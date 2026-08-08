@@ -16,10 +16,17 @@ import kotlinx.datetime.toInstant
  * milliseconds, which is what lets a time scale be an ordinary continuous scale with an unusual way
  * of choosing ticks.
  *
- * Only ISO 8601 is read, and deliberately: upstream falls back to the host's `Date` parser for
- * anything else, which is famously inconsistent between browsers, so a specification relying on it
- * would render differently in two places. An unreadable value is reported by the caller rather than
- * silently becoming an epoch-zero date at the far left of the chart.
+ * ISO 8601 is read, and so is the **month-name** form that JavaScript's own `Date` accepts — `Jan 1
+ * 2000`, `January 1, 2000`, `1 Jan 2000`, optionally with a time. Upstream's `format.parse` hands
+ * the string to `new Date()`, and two of Vega's own examples ship a CSV whose dates are written
+ * that way; refusing them left those charts with no time axis at all.
+ *
+ * The two forms are read in **different zones**, which is JavaScript's rule rather than a choice
+ * made here: a bare ISO date is UTC, and a month-name date is local — `new Date('Jan 1 2000')` is
+ * local midnight. Anything neither form describes is refused rather than guessed at, because the
+ * host parsers disagree past that point and a specification relying on one would render differently
+ * in two places. An unreadable value is reported by the caller rather than silently becoming an
+ * epoch-zero date at the far left of the chart.
  */
 public object DateValues {
 
@@ -30,7 +37,10 @@ public object DateValues {
   ): VegaValue? =
     when (value) {
       is VegaValue.Num -> value
-      is VegaValue.Str -> parseIso(value.value, local)?.let { VegaValue.Num(it) }
+      is VegaValue.Str ->
+        (parseIso(value.value, local) ?: parseTextual(value.value, local))?.let {
+          VegaValue.Num(it)
+        }
       else -> null
     }
 
@@ -91,6 +101,84 @@ public object DateValues {
   /** `.5` is 500 milliseconds, not 5; pad rather than truncate. */
   private fun millisFrom(fraction: String): Int =
     if (fraction.isEmpty()) 0 else fraction.padEnd(3, '0').take(3).toInt()
+
+  /**
+   * `Jan 1 2000`, `January 1, 2000`, `1 Jan 2000`, `Jan 2000`, any of them with a trailing time.
+   *
+   * Read in the **local** zone, as JavaScript reads them. The parse is deliberately loose about
+   * order — a month name, a year and an optional day in any arrangement — because that is what the
+   * host parsers agree on, and strict about everything else: no month name, no year, or a token
+   * that is neither means the value is refused rather than guessed at.
+   */
+  public fun parseTextual(
+    text: String,
+    local: TimeZone = TimeZone.currentSystemDefault(),
+  ): Double? {
+    val tokens = text.trim().split(Regex("[\\s,]+")).filter { it.isNotEmpty() }
+    if (tokens.isEmpty()) return null
+
+    var month: Int? = null
+    var year: Int? = null
+    var day: Int? = null
+    var time: LocalTime? = null
+
+    for (token in tokens) {
+      val lower = token.lowercase()
+      val named = MONTHS.indexOfFirst { it.startsWith(lower) && lower.length >= 3 }
+      when {
+        named >= 0 && month == null -> month = named + 1
+        token.contains(':') -> time = parseClock(token) ?: return null
+        token.all { it.isDigit() } ->
+          when {
+            token.length == 4 && year == null -> year = token.toInt()
+            token.length <= 2 && day == null -> day = token.toInt()
+            else -> return null
+          }
+        // A trailing zone name or offset is more than this reads; refuse rather than drop it.
+        else -> return null
+      }
+    }
+    if (month == null || year == null) return null
+
+    val date =
+      try {
+        LocalDate(year, month, day ?: 1)
+      } catch (_: IllegalArgumentException) {
+        return null
+      }
+    return if (time == null) {
+      date.atStartOfDayIn(local).toEpochMilliseconds().toDouble()
+    } else {
+      LocalDateTime(date, time).toInstant(local).toEpochMilliseconds().toDouble()
+    }
+  }
+
+  private fun parseClock(token: String): LocalTime? {
+    val parts = token.split(':')
+    if (parts.size !in 2..3 || parts.any { it.isEmpty() || !it.all { c -> c.isDigit() } })
+      return null
+    return try {
+      LocalTime(parts[0].toInt(), parts[1].toInt(), parts.getOrNull(2)?.toInt() ?: 0)
+    } catch (_: IllegalArgumentException) {
+      null
+    }
+  }
+
+  private val MONTHS =
+    listOf(
+      "january",
+      "february",
+      "march",
+      "april",
+      "may",
+      "june",
+      "july",
+      "august",
+      "september",
+      "october",
+      "november",
+      "december",
+    )
 
   private val ISO =
     Regex(

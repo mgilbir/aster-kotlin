@@ -49,6 +49,7 @@ private val CONFIG_HONOURED =
     "axisRight",
     "axisBand",
     "legend",
+    "title",
   )
 
 /**
@@ -146,13 +147,8 @@ private val AXIS_UNSUPPORTED =
     "translate" to "Overriding the axis's half-pixel translation is not implemented",
     "minExtent" to "A minimum axis extent is not implemented; the axis is measured by its contents",
     "maxExtent" to "A maximum axis extent is not implemented; the axis is measured by its contents",
-    "titleAlign" to "Explicit axis title alignment is not implemented; the anchor decides it",
-    "titleBaseline" to "Explicit axis title baselines are not implemented; the orientation sets it",
-    "titleAngle" to "Explicit axis title angles are not implemented; a vertical axis turns its own",
     "titleLimit" to "Axis title truncation is not implemented; the title is drawn in full",
     "titleLineHeight" to "Multi-line axis titles are not implemented",
-    "titleX" to "Absolute axis title placement is not implemented",
-    "titleY" to "Absolute axis title placement is not implemented",
     "aria" to "Accessibility attributes on a guide are not implemented",
     "description" to "Accessibility descriptions on a guide are not implemented",
   )
@@ -239,6 +235,10 @@ private val TITLE_CONSUMED =
     "offset",
     "subtitlePadding",
     "fontSize",
+    "fontWeight",
+    "font",
+    "dx",
+    "dy",
     "subtitleFontSize",
     "zindex",
   )
@@ -283,6 +283,9 @@ private val RESOLVED_GUIDE_CHANNELS =
     // An axis label's position, which no property can say.
     "labels.update.x",
     "labels.update.y",
+    // A label's own nudge, and the text it draws when a scale supplies it rather than a format.
+    "labels.update.dx",
+    "labels.update.dy",
     // A legend label's text, which is how an id becomes a name — read through a scale, so there is
     // nothing constant to fold.
     "labels.update.text",
@@ -1309,6 +1312,15 @@ public class SpecParser {
       labelPadding = obj.numberOrSignal("labelPadding", "$path.labelPadding"),
       labelFontSize = obj.numberOrSignal("labelFontSize", "$path.labelFontSize"),
       offset = obj.numberOrSignal("offset", "$path.offset"),
+      titleX = obj.numberOrSignal("titleX", "$path.titleX"),
+      titleY = obj.numberOrSignal("titleY", "$path.titleY"),
+      titleAngle = obj.numberOrSignal("titleAngle", "$path.titleAngle"),
+      titleAlign = obj.fields["titleAlign"]?.takeIf { it is VegaValue.Str }?.asString(),
+      titleBaseline = obj.fields["titleBaseline"]?.takeIf { it is VegaValue.Str }?.asString(),
+      offsetChannel =
+        (obj.fields["offset"] as? VegaValue.Obj)
+          ?.takeIf { it.fields["signal"] == null }
+          ?.let { parseChannel("offset", it, "$path.offset") },
       zindex = (obj.fields["zindex"] as? VegaValue.Num)?.value?.toInt() ?: 0,
       values = (obj.fields["values"] as? VegaValue.Arr)?.values,
       labelOverlap = obj.fields["labelOverlap"]?.asString(),
@@ -1443,9 +1455,36 @@ public class SpecParser {
    * Vega accepts either a bare string or an object, and both mean the same thing; `encode`
    * overrides and the styling properties beyond font size are reported rather than partly honoured.
    */
+  /**
+   * A title's `dx` or `dy`, from the property or from its own `encode.update`.
+   *
+   * Upstream takes either; a specification that writes one usually writes it in the encode block,
+   * because that is where every other guide's overrides go.
+   */
+  private fun titleNudge(obj: VegaValue.Obj, channel: String, path: String): NumberValue? {
+    obj.numberOrSignal(channel, "$path.$channel")?.let {
+      return it
+    }
+    val update = (obj.fields["encode"] as? VegaValue.Obj)?.fields?.get("update") as? VegaValue.Obj
+    val entry = update?.fields?.get(channel) as? VegaValue.Obj ?: return null
+    return entry.numberOrSignal("value", "$path.encode.update.$channel")
+  }
+
   private fun parseTitle(value: VegaValue, path: String): TitleSpec? {
-    if (value is VegaValue.Str) return TitleSpec(text = value.value)
-    val obj = value as? VegaValue.Obj ?: return unexpected("a title definition", path)
+    // `config.title` supplies what the title does not say for itself — a theme setting the chart's
+    // heading in one place. Merged the way an axis merges its own config, so a property written on
+    // the title still wins.
+    if (value is VegaValue.Str) {
+      return parseTitle(
+        GuideConfig.merge(
+          VegaValue.Obj(linkedMapOf("text" to VegaValue.Str(value.value))),
+          config.titleDefaults(),
+        ),
+        path,
+      )
+    }
+    val own = value as? VegaValue.Obj ?: return unexpected("a title definition", path)
+    val obj = GuideConfig.merge(own, config.titleDefaults())
 
     val textField = obj.fields["text"]
     val expression = (textField as? VegaValue.Obj)?.fields?.get("signal")?.asString()
@@ -1459,16 +1498,14 @@ public class SpecParser {
       return null
     }
 
-    obj.reportUnhandled(
+    own.reportUnhandled(
       "Title",
       path,
       TITLE_CONSUMED,
       mapOf(
-        "encode" to "Title encode overrides are not implemented",
+        "encode" to "Only 'dx' and 'dy' are read from a title's encode block; the rest was ignored",
         "style" to "Title styles are not implemented",
         "limit" to "Title text limits are not implemented",
-        "dx" to "Title dx is not implemented",
-        "dy" to "Title dy is not implemented",
         "align" to "Title alignment follows 'anchor'; an explicit align is not implemented",
         "angle" to "Title rotation follows 'orient'; an explicit angle is not implemented",
       ),
@@ -1486,6 +1523,14 @@ public class SpecParser {
       offset = obj.numberOrSignal("offset", "$path.offset"),
       subtitlePadding = obj.numberOrSignal("subtitlePadding", "$path.subtitlePadding"),
       fontSize = obj.numberOrSignal("fontSize", "$path.fontSize"),
+      dx = titleNudge(obj, "dx", path),
+      dy = titleNudge(obj, "dy", path),
+      fontWeight =
+        when (val weight = obj.fields["fontWeight"]) {
+          is VegaValue.Str -> weight.value
+          is VegaValue.Num -> weight.value.takeIf { it.isFinite() }?.toInt()?.toString()
+          else -> null
+        },
       subtitleFontSize = obj.numberOrSignal("subtitleFontSize", "$path.subtitleFontSize"),
       zindex = (obj.fields["zindex"] as? VegaValue.Num)?.value?.toInt() ?: 0,
     )
@@ -1683,13 +1728,31 @@ public class SpecParser {
         jsonPath = "$path.transform",
       )
     }
-    if (obj.fields["sort"] != null) {
-      diagnostics.warn(
-        DiagnosticCodes.TRANSFORM_NOT_IMPLEMENTED,
-        "Mark sort is not implemented; data order is preserved",
-        jsonPath = "$path.sort",
-      )
-    }
+    val sort =
+      (obj.fields["sort"] as? VegaValue.Obj)?.let { block ->
+        val fields =
+          when (val f = block.fields["field"]) {
+            is VegaValue.Arr -> f.values.map { it.asString() }
+            null -> emptyList()
+            else -> listOf(f.asString())
+          }.filter { it.isNotEmpty() }
+        val orders =
+          when (val o = block.fields["order"]) {
+            is VegaValue.Arr -> o.values.map { it.asString() }
+            null -> emptyList()
+            else -> listOf(o.asString())
+          }
+        if (fields.isEmpty()) {
+          diagnostics.warn(
+            DiagnosticCodes.TRANSFORM_NOT_IMPLEMENTED,
+            "Mark sort needs a 'field'; data order is preserved",
+            jsonPath = "$path.sort",
+          )
+          null
+        } else {
+          MarkSort(fields, orders)
+        }
+      }
 
     if (type == MarkType.GROUP) reportUnsupportedGroupScope(obj, path)
     obj.reportUnhandled("Mark", path, MARK_CONSUMED)
@@ -1701,6 +1764,7 @@ public class SpecParser {
       name = obj.fields["name"]?.asString(),
       role = obj.fields["role"]?.takeIf { it is VegaValue.Str }?.asString(),
       from = from?.let { FromSpec(data = it.fields["data"]?.asString(), facet = facet) },
+      sort = sort,
       encode = parseEncode(obj.fields["encode"], "$path.encode"),
       marks = parseArray(obj, "marks", path) { child, childPath -> parseMark(child, childPath) },
       axes = parseArray(obj, "axes", path) { child, childPath -> parseAxis(child, childPath) },
@@ -1771,15 +1835,29 @@ public class SpecParser {
       diagnostics.error(DiagnosticCodes.TRANSFORM_NOT_IMPLEMENTED, reason, jsonPath = path)
       return null
     }
-    if (obj.fields["aggregate"] != null) {
-      diagnostics.warn(
-        DiagnosticCodes.TRANSFORM_NOT_IMPLEMENTED,
-        "Extra facet aggregates are not implemented; each group's datum carries only the " +
-          "groupby fields and 'count'",
-        jsonPath = "$path.aggregate",
+    val aggregate = (obj.fields["aggregate"] as? VegaValue.Obj)
+    val ops =
+      (aggregate?.fields?.get("ops") as? VegaValue.Arr)?.values?.map { it.asString() }.orEmpty()
+    val aggFields =
+      (aggregate?.fields?.get("fields") as? VegaValue.Arr)
+        ?.values
+        ?.map {
+          it.asString().takeIf { name -> name.isNotEmpty() && it !is VegaValue.Null }
+        }
+        .orEmpty()
+    val names =
+      (aggregate?.fields?.get("as") as? VegaValue.Arr)?.values?.map { it.asString() }.orEmpty()
+    val measures = ops.mapIndexed { index, op ->
+      val field = aggFields.getOrNull(index)
+      FacetMeasure(
+        op = op,
+        field = field,
+        name =
+          names.getOrNull(index)?.takeIf { it.isNotEmpty() }
+            ?: if (field == null) op else "${'$'}{op}_${'$'}field",
       )
     }
-    return FacetSpec(name = name, data = data, groupby = groupby)
+    return FacetSpec(name = name, data = data, groupby = groupby, aggregate = measures)
   }
 
   /**
@@ -1986,6 +2064,11 @@ public class SpecParser {
       null -> null
       is VegaValue.Str -> FieldRef.Plain(value.value)
       is VegaValue.Obj -> {
+        // `{"parent": {...}}` names the parent's column with another reference rather than a
+        // literal, so it recurses before anything is read as a string.
+        (value.fields["parent"] as? VegaValue.Obj)?.let { nested ->
+          return fieldPath(nested, "$path.parent")?.let { FieldRef.ParentOf(it) }
+        }
         val group = value.fields["group"]?.asString()
         val parent = value.fields["parent"]?.asString()
         val signal = value.fields["signal"]?.asString()

@@ -640,6 +640,56 @@
   "caption": "Gradient legend titled 'Ramp' for fill color with values from −35 to 44"
  },
  {
+  "fixture": "overview-plus-detail",
+  "kind": "axis",
+  "caption": "X-axis for a time scale with values from Saturday, 01 January 2000, 12:00:00 AM to Monday, 01 March 2010, 12:00:00 AM"
+ },
+ {
+  "fixture": "overview-plus-detail",
+  "kind": "axis",
+  "caption": "Y-axis for a linear scale with values from 0 to 1,600"
+ },
+ {
+  "fixture": "overview-plus-detail",
+  "kind": "axis",
+  "caption": "X-axis for a time scale with values from Saturday, 01 January 2000, 12:00:00 AM to Monday, 01 March 2010, 12:00:00 AM"
+ },
+ {
+  "fixture": "parallel-coordinates",
+  "kind": "axis",
+  "caption": "Y-axis titled 'Cylinders' for a linear scale with values from 3 to 8"
+ },
+ {
+  "fixture": "parallel-coordinates",
+  "kind": "axis",
+  "caption": "Y-axis titled 'Displacement' for a linear scale with values from 50 to 500"
+ },
+ {
+  "fixture": "parallel-coordinates",
+  "kind": "axis",
+  "caption": "Y-axis titled 'Weight_in_lbs' for a linear scale with values from 1,500 to 5,500"
+ },
+ {
+  "fixture": "parallel-coordinates",
+  "kind": "axis",
+  "caption": "Y-axis titled 'Horsepower' for a linear scale with values from 40 to 240"
+ },
+ {
+  "fixture": "parallel-coordinates",
+  "kind": "axis",
+  "caption": "Y-axis titled 'Acceleration' for a linear scale with values from 8 to 26"
+ },
+ {
+  "fixture": "parallel-coordinates",
+  "kind": "axis",
+  "caption": "Y-axis titled 'Miles_per_Gallon' for a linear scale with values from 5 to 50"
+ },
+ {
+  "fixture": "parallel-coordinates",
+  "kind": "axis",
+  "caption": "Y-axis titled 'Year' for a linear scale with values from 1970 to 1982"
+ },
+ {
   "fixture": "path-marks",
   "kind": "axis",
   "caption": "X-axis for a discrete scale with 4 values: 0, 1, 2, 3"
@@ -850,6 +900,11 @@
   "caption": "Y-axis for a linear scale with values from 0 to 70"
  },
  {
+  "fixture": "stock-index-chart",
+  "kind": "axis",
+  "caption": "Y-axis for a linear scale with values from −100% to 500%"
+ },
+ {
   "fixture": "time-axis",
   "kind": "axis",
   "caption": "X-axis for a utc scale with values from Thursday, 15 January 2026, 12:00:00 AM UTC to Wednesday, 05 August 2026, 12:00:00 AM UTC"
@@ -933,6 +988,16 @@
   "fixture": "trend-lines",
   "kind": "axis",
   "caption": "Y-axis for a linear scale with values from 0 to 100"
+ },
+ {
+  "fixture": "u-district-cuisine",
+  "kind": "axis",
+  "caption": "Y-axis for a discrete scale with 19 values: coffee, drinks, bubbletea, vietnamese, thai, ending with latin"
+ },
+ {
+  "fixture": "u-district-cuisine",
+  "kind": "title",
+  "caption": "Title text 'A Mile-Long Global Food Market: Mapping Cuisine from “The Ave”'"
  },
  {
   "fixture": "window",

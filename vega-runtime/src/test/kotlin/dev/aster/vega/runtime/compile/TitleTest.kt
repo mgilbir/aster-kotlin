@@ -169,10 +169,10 @@ class TitleTest {
 
   @Test
   fun `unimplemented title properties are reported by name`() {
-    val compiled =
-      compile(spec("""{"text": "Tt", "align": "left", "angle": 45, "limit": 20, "dx": 3}"""))
+    val compiled = compile(spec("""{"text": "Tt", "align": "left", "angle": 45, "limit": 20}"""))
     val messages = compiled.diagnostics.map { it.message }
-    for (name in listOf("align", "angle", "limit", "dx")) {
+    // `dx` was on this list and is implemented; it moves the whole surface with it.
+    for (name in listOf("align", "angle", "limit")) {
       assertTrue(messages.any { it.contains("'$name'") }, "$name not reported in $messages")
     }
   }

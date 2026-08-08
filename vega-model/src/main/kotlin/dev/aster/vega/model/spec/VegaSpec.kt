@@ -506,6 +506,23 @@ public data class TitleSpec(
   val offset: NumberValue? = null,
   val subtitlePadding: NumberValue? = null,
   val fontSize: NumberValue? = null,
+  /**
+   * `fontWeight`, which a theme sets far more often than a title does.
+   *
+   * It changes the *measurement*, not only the look: a heading set at 500 rather than the default
+   * bold is narrower, and on a chart wide enough for its title to decide the surface that is the
+   * difference between matching upstream and being a unit out.
+   */
+  val fontWeight: String? = null,
+  /**
+   * `dx`/`dy` — a nudge applied after the anchor has placed the title.
+   *
+   * Written either as a property or inside the title's own `encode.update`, which is where a
+   * specification puts it when it wants a heading optically aligned with the axis beneath it. One
+   * unit, and it moves the edge of the whole surface with it.
+   */
+  val dx: NumberValue? = null,
+  val dy: NumberValue? = null,
   val subtitleFontSize: NumberValue? = null,
   val zindex: Int = 0,
 )
@@ -526,6 +543,27 @@ public data class AxisSpec(
   val labelPadding: NumberValue? = null,
   val labelFontSize: NumberValue? = null,
   val offset: NumberValue? = null,
+  /**
+   * `offset` written as a full value reference rather than a number — `{"scale": "ord", "value":
+   * "Cylinders", "mult": -1}`.
+   *
+   * That is how a parallel-coordinates plot places one axis per column: every axis is `orient:
+   * "left"` and each is pushed across by the position its own name scales to. There is no number to
+   * write down, because the positions come from the data.
+   */
+  val offsetChannel: ChannelValue? = null,
+  /**
+   * Absolute placement and orientation for the axis title, overriding what the anchor would choose.
+   *
+   * All five are in the axis group's own coordinates, so `titleX: -2` on a left axis pushed to x =
+   * 2.5 draws the title at 0.5. A parallel-coordinates plot sets them in `config.axisY` to lay
+   * every column's title flat along the bottom instead of turned up the side.
+   */
+  val titleX: NumberValue? = null,
+  val titleY: NumberValue? = null,
+  val titleAngle: NumberValue? = null,
+  val titleAlign: String? = null,
+  val titleBaseline: String? = null,
   val zindex: Int = 0,
   /**
    * Explicit tick values, replacing the ones the scale would generate.
@@ -808,7 +846,31 @@ public data class FromSpec(val data: String? = null, val facet: FacetSpec? = nul
  * That datum shape is not a convention this engine chose: upstream implements faceting by inserting
  * an `aggregate` transform with the same `groupby`, so the group sees an aggregate tuple.
  */
-public data class FacetSpec(val name: String, val data: String, val groupby: List<String>)
+/**
+ * `sort` on a mark: the order its *items* are built and painted in.
+ *
+ * The fields name encoded properties of the item, not columns of the data — `{"field": "y"}` sorts
+ * the group items by where they ended up. A ridgeline plot uses it to lay its bands out top to
+ * bottom whatever order the categories arrived in.
+ */
+public data class MarkSort(val fields: List<String>, val orders: List<String> = emptyList())
+
+public data class FacetSpec(
+  val name: String,
+  val data: String,
+  val groupby: List<String>,
+  /**
+   * Extra summaries computed per group and written onto the group's own datum.
+   *
+   * `{"ops": ["min", "max", "count"], "fields": ["lat", "lat", "lat"], "as": [...]}` gives every
+   * cell the extent of its own rows, which is how a ridgeline plot scales each band by how many
+   * points are in it — the cell's marks read them off `parent`.
+   */
+  val aggregate: List<FacetMeasure> = emptyList(),
+)
+
+/** One `facet.aggregate` entry: an operation, the field it reads, and the name it writes. */
+public data class FacetMeasure(val op: String, val field: String?, val name: String)
 
 /**
  * One channel's value in an encode block.
@@ -839,6 +901,16 @@ public sealed interface FieldRef {
 
   /** `{"datum": "which"}` — the name of the column is itself held in a column. */
   public data class Datum(val path: String) : FieldRef
+
+  /**
+   * `{"parent": {"datum": "which"}}` — read off the parent, under a name another reference
+   * supplies.
+   *
+   * A parallel-coordinates plot is written exactly this way: one line per car, one point per axis,
+   * and each point reads whichever column that axis stands for off the car. Neither half can be
+   * written down in advance, so the name is a reference too.
+   */
+  public data class ParentOf(val name: FieldRef) : FieldRef
 
   /** The literal column name, for the plain case that most callers only ever see. */
   public val plainPath: String?
@@ -967,6 +1039,8 @@ public data class MarkSpec(
    */
   val role: String? = null,
   val from: FromSpec? = null,
+  /** `sort` — the order this mark's items are built and painted in; see [MarkSort]. */
+  val sort: MarkSort? = null,
   val encode: EncodeSpec = EncodeSpec(),
   /** Nested marks, for a group mark. */
   val marks: List<MarkSpec> = emptyList(),

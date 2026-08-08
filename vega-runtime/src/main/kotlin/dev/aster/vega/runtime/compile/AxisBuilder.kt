@@ -147,7 +147,7 @@ public class AxisBuilder(
     val tickStroke = GuideStyle.stroke(spec.tickStyle, AxisDefaults.tickColor)
     val gridStroke = GuideStyle.stroke(spec.gridStyle, AxisDefaults.gridColor)
     // How far the axis itself is pushed off the plot, which the gridlines have to undo.
-    val gridOffset = numbers.resolve(spec.offset, spec.scale) ?: 0.0
+    val gridOffset = offsetOf(spec)
 
     // A gridline runs back across the plot, away from the side its axis is on: up from a bottom
     // axis, down from a top one, right from a left one, left from a right one.
@@ -221,9 +221,12 @@ public class AxisBuilder(
       val labelAngle = numbers.resolve(spec.labelAngle, spec.scale) ?: 0.0
       val labels = mutableListOf<TextNode>()
       for (tick in ticks) {
+        // The label's own `encode` may replace the *text* as well as its position — read through a
+        // scale, which is how a chart labels a key with a display name it keeps in a second scale.
+        // There is no axis property that could say it, because the mapping lives in the data.
         val run =
           TextRun(
-            text = tick.label,
+            text = labelText(spec, tick) ?: tick.label,
             style = labelStyle,
             align = alignOf(spec.labelAlign) ?: labelAlign(spec.orient),
             baseline = baselineOf(spec.labelBaseline) ?: labelBaseline(spec.orient),
@@ -241,8 +244,12 @@ public class AxisBuilder(
         // band's centre, at the tick's raw scale position. The datum is the tick: `datum.value` is
         // what the axis is labelling, `datum.label` the text it drew for it, which is what
         // upstream binds too.
-        val x = labelChannel(spec, "x", tick) ?: defaultX
-        val y = labelChannel(spec, "y", tick) ?: defaultY
+        // `dx` and `dy` nudge the label without changing what it is anchored to, so they are added
+        // to whatever placed it rather than replacing it.
+        val x =
+          (labelChannel(spec, "x", tick) ?: defaultX) + (labelChannel(spec, "dx", tick) ?: 0.0)
+        val y =
+          (labelChannel(spec, "y", tick) ?: defaultY) + (labelChannel(spec, "dy", tick) ?: 0.0)
         labels +=
           TextNode(
             id = ids.allocate(),
@@ -410,29 +417,37 @@ public class AxisBuilder(
         Anchor.MIDDLE -> (from + to) / 2.0
       }
 
+    // `titleX`, `titleY`, `titleAngle`, `titleAlign` and `titleBaseline` each replace what the
+    // anchor and orientation would have chosen, in the axis group's own coordinates. A
+    // parallel-coordinates plot sets all five in `config.axisY` so that every column's title lies
+    // flat along the bottom rather than turned up the side of its own axis.
     val run =
       TextRun(
         text = text,
         style = GuideStyle.text(spec.titleStyle, fontSize, AxisDefaults.TITLE_FONT_WEIGHT),
         align =
-          when (anchor) {
-            Anchor.START -> TextAlign.LEFT
-            Anchor.END -> TextAlign.RIGHT
-            Anchor.MIDDLE -> TextAlign.CENTER
-          },
-        baseline = if (spec.orient == Orient.BOTTOM) TextBaseline.TOP else TextBaseline.BOTTOM,
+          alignOf(spec.titleAlign)
+            ?: when (anchor) {
+              Anchor.START -> TextAlign.LEFT
+              Anchor.END -> TextAlign.RIGHT
+              Anchor.MIDDLE -> TextAlign.CENTER
+            },
+        baseline =
+          baselineOf(spec.titleBaseline)
+            ?: if (spec.orient == Orient.BOTTOM) TextBaseline.TOP else TextBaseline.BOTTOM,
       )
     return TextNode(
       id = ids.allocate(),
-      x = if (spec.orient.isVertical) away else along,
-      y = if (spec.orient.isVertical) along else away,
+      x = numbers.resolve(spec.titleX, spec.scale) ?: if (spec.orient.isVertical) away else along,
+      y = numbers.resolve(spec.titleY, spec.scale) ?: if (spec.orient.isVertical) along else away,
       layout = textEngine.layout(run),
       angleDegrees =
-        when (spec.orient) {
-          Orient.LEFT -> -90.0
-          Orient.RIGHT -> 90.0
-          else -> 0.0
-        },
+        numbers.resolve(spec.titleAngle, spec.scale)
+          ?: when (spec.orient) {
+            Orient.LEFT -> -90.0
+            Orient.RIGHT -> 90.0
+            else -> 0.0
+          },
       fill = GuideStyle.fill(spec.titleStyle, AxisDefaults.titleColor),
       metadata = NodeMetadata(role = "axis-title", markName = spec.scale),
     )
@@ -445,7 +460,7 @@ public class AxisBuilder(
    * on pixel centres instead of straddling two pixels.
    */
   private fun groupTransform(spec: AxisSpec, extent: PlotSize): Transform2D {
-    val offset = numbers.resolve(spec.offset, spec.scale) ?: 0.0
+    val offset = offsetOf(spec)
     return when (spec.orient) {
       Orient.BOTTOM ->
         Transform2D.translate(
@@ -523,6 +538,18 @@ public class AxisBuilder(
    * which is none, and both labels read as whole numbers. Reproduced, because a specification
    * written against upstream is looking at those labels.
    */
+  /**
+   * How far the axis is pushed off the plotting area's edge.
+   *
+   * Usually a number, and sometimes a whole value reference: a parallel-coordinates plot writes
+   * `{"scale": "ord", "value": "Cylinders", "mult": -1}` and places one `orient: "left"` axis per
+   * column at the position that column's own name scales to. There is no number to write down.
+   */
+  private fun offsetOf(spec: AxisSpec): Double =
+    spec.offsetChannel?.let { channels?.channelNumber(it, VegaValue.EmptyObject) }
+      ?: numbers.resolve(spec.offset, spec.scale)
+      ?: 0.0
+
   private fun ticksFor(scale: VegaScale, spec: AxisSpec): List<Tick>? {
     // A scale with `bins` has its tick values already decided: upstream's `tickValues` returns the
     // boundaries themselves rather than asking the scale to generate any. An axis that *also* names
@@ -584,6 +611,15 @@ public class AxisBuilder(
    * `update` over `enter`, as everywhere else. Returns null when the block says nothing about this
    * channel, which leaves the label where the orientation put it.
    */
+  /** A label's `encode` text, when the specification replaces it rather than formatting it. */
+  private fun labelText(spec: AxisSpec, tick: Tick): String? {
+    val encoder = channels ?: return null
+    val entry = spec.encode["labels"]?.update?.get("text") ?: return null
+    val datum =
+      VegaValue.Obj(linkedMapOf("value" to tick.value, "label" to VegaValue.Str(tick.label)))
+    return encoder.channelText(entry, datum)
+  }
+
   private fun labelChannel(spec: AxisSpec, channel: String, tick: Tick): Double? {
     val encoder = channels ?: return null
     val block = spec.encode["labels"] ?: return null

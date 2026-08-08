@@ -304,6 +304,22 @@ public class ScaleResolver(
       else -> range
     }
 
+  /**
+   * A domain written out as an array, with any `{"signal": ...}` among its elements resolved.
+   *
+   * `"domain": [0, {"signal": "domainMax"}]` is how a chart pins one end of a scale and lets a
+   * control move the other, and it is not rare. Left unresolved the element reads as nothing, both
+   * ends collapse to the same number, and every value maps to the middle of the range — a chart
+   * with all its marks stacked on one line, drawn confidently and reported nowhere.
+   */
+  private fun literalDomain(values: List<VegaValue>, scaleName: String): List<VegaValue> =
+    values.map { value ->
+      val reference =
+        (value as? VegaValue.Obj)?.takeIf { it.fields.size == 1 }?.fields?.get("signal")
+      if (reference !is VegaValue.Str) value
+      else numbers.resolveValue(reference.value, scaleName) ?: VegaValue.Null
+    }
+
   private fun resolveRangeElement(spec: ScaleSpec, value: VegaValue): VegaValue {
     val reference = (value as? VegaValue.Obj)?.takeIf { it.fields.size == 1 }?.fields?.get("signal")
     if (reference !is VegaValue.Str) return value
@@ -705,7 +721,7 @@ public class ScaleResolver(
   private fun fullNumericDomain(spec: ScaleSpec): List<Double>? {
     val values =
       when (val domain = spec.domain) {
-        is DomainSpec.Literal -> domain.values
+        is DomainSpec.Literal -> literalDomain(domain.values, spec.name)
         is DomainSpec.FromField -> fieldValues(domain.data, listOf(domain.field), spec.name)
         is DomainSpec.FromFields -> fieldValues(domain.data, domain.fields, spec.name)
         is DomainSpec.Union -> unionValues(domain.parts, spec.name)
@@ -764,7 +780,7 @@ public class ScaleResolver(
   private fun unionValues(parts: List<DomainSpec>, scaleName: String): List<VegaValue> =
     parts.flatMap { part ->
       when (part) {
-        is DomainSpec.Literal -> part.values
+        is DomainSpec.Literal -> literalDomain(part.values, scaleName)
         is DomainSpec.FromField -> fieldValues(part.data, listOf(part.field), scaleName)
         is DomainSpec.FromFields -> fieldValues(part.data, part.fields, scaleName)
         is DomainSpec.Union -> unionValues(part.parts, scaleName)
@@ -782,7 +798,7 @@ public class ScaleResolver(
         is DomainSpec.FromField -> fieldValues(domain.data, listOf(domain.field), scaleName)
         is DomainSpec.FromFields -> fieldValues(domain.data, domain.fields, scaleName)
         is DomainSpec.Union -> unionValues(domain.parts, scaleName)
-        is DomainSpec.Literal -> domain.values
+        is DomainSpec.Literal -> literalDomain(domain.values, scaleName)
         is DomainSpec.FromSignal -> signalDomain(domain, scaleName) ?: return null
         DomainSpec.Unset -> {
           diagnostics.error(
@@ -810,7 +826,7 @@ public class ScaleResolver(
       when (domain) {
         // An explicit domain is never sorted, whatever `sort` says: upstream reads the array
         // straight through and only the data-driven branches ever see a sort.
-        is DomainSpec.Literal -> domain.values
+        is DomainSpec.Literal -> literalDomain(domain.values, scaleName)
         is DomainSpec.FromField ->
           orderedDomain(domain.data, listOf(domain.field), domain.sort, scaleName) ?: return null
         is DomainSpec.FromFields ->

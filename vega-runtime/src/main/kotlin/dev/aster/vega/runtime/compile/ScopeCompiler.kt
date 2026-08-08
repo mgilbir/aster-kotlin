@@ -1,5 +1,7 @@
 package dev.aster.vega.runtime.compile
 
+import dev.aster.vega.dataflow.transform.AggregateOp
+import dev.aster.vega.dataflow.transform.aggregateOver
 import dev.aster.vega.dataflow.transform.groupTuples
 import dev.aster.vega.expression.ExpressionCompiler
 import dev.aster.vega.model.DiagnosticCodes
@@ -10,6 +12,7 @@ import dev.aster.vega.model.spec.AxisSpec
 import dev.aster.vega.model.spec.FacetSpec
 import dev.aster.vega.model.spec.LayoutSpec
 import dev.aster.vega.model.spec.LegendSpec
+import dev.aster.vega.model.spec.MarkSort
 import dev.aster.vega.model.spec.MarkSpec
 import dev.aster.vega.model.spec.MarkType
 import dev.aster.vega.model.spec.ScaleType
@@ -266,6 +269,38 @@ internal class ScopeCompiler(
    * so asking the finished [GroupNode] how big it is would quietly reintroduce the half-pixel crisp
    * offset that everything outside the cell is careful to exclude.
    */
+  /**
+   * The order a mark's items are taken in, as indices into the built list.
+   *
+   * Identity when the mark declares no `sort`. A field this cannot read leaves the order alone
+   * rather than inventing one — the properties an item exposes here are its position, and a
+   * specification sorting on anything else is asking for something that is not in the scene.
+   */
+  private fun sortOrder(sort: MarkSort?, nodes: List<SceneNode>): List<Int> {
+    if (sort == null || nodes.isEmpty()) return nodes.indices.toList()
+    val comparator =
+      Comparator<Int> { a, b ->
+        for ((index, field) in sort.fields.withIndex()) {
+          val descending = sort.orders.getOrNull(index)?.startsWith("desc") == true
+          val left = itemPosition(nodes[a], field)
+          val right = itemPosition(nodes[b], field)
+          if (left == null || right == null) continue
+          val comparison = left.compareTo(right)
+          if (comparison != 0) return@Comparator if (descending) -comparison else comparison
+        }
+        0
+      }
+    return nodes.indices.sortedWith(comparator)
+  }
+
+  /** An item's `x` or `y` as the sort sees it: where the node was placed. */
+  private fun itemPosition(node: SceneNode, field: String): Double? =
+    when (field) {
+      "x" -> node.transform.apply(0.0, 0.0).x
+      "y" -> node.transform.apply(0.0, 0.0).y
+      else -> null
+    }
+
   private fun group(spec: MarkSpec, outer: CompileScope, encoder: MarkEncoder): BuiltGroup {
     val partitions = partition(spec, outer)
     val inner = arrayOfNulls<RectD>(partitions.size)
@@ -285,16 +320,26 @@ internal class ScopeCompiler(
         scoped.nodes
       }
 
-    val reaches = nodes.mapIndexed { index, node ->
-      var reach = inner[index] ?: RectD.Empty
+    // `sort` orders the *items*, not the data, so it happens after encoding: its fields name
+    // encoded
+    // properties — `{"field": "y"}` is where the group ended up, not a column of the row. Upstream
+    // sorts the item array in place, so the order changes what is drawn where *and* the order the
+    // marks are painted in.
+    val order = sortOrder(spec.sort, nodes)
+    val sorted = order.map { nodes[it] }
+    val sortedPartitions = order.map { partitions[it] }
+    val sortedInner = order.map { inner[it] }
+
+    val reaches = sorted.mapIndexed { index, node ->
+      var reach = sortedInner[index] ?: RectD.Empty
       (node as? GroupNode)?.stroke?.let { reach = reach.expand(it.halfWidth) }
       reach
     }
     var bounds = RectD.Empty
-    nodes.forEachIndexed { index, node ->
+    sorted.forEachIndexed { index, node ->
       bounds = bounds.union(node.transform.mapBounds(reaches[index]))
     }
-    return BuiltGroup(ScopeContent(nodes, bounds, reaches), partitions.map { it.datum })
+    return BuiltGroup(ScopeContent(sorted, bounds, reaches), sortedPartitions.map { it.datum })
   }
 
   /**
@@ -524,6 +569,23 @@ internal class ScopeCompiler(
       val fields = LinkedHashMap<String, VegaValue>(facet.groupby.size + 1)
       facet.groupby.forEachIndexed { index, field -> fields[field] = key[index] }
       fields["count"] = VegaValue.Num(rows.size.toDouble())
+      // `facet.aggregate` measures each group and writes the answers onto the group's own datum, so
+      // the marks inside read them off `parent`. A ridgeline plot scales every band by the number
+      // of
+      // points in it that way, and there is nowhere else the count could come from — the cell's own
+      // data has been reshaped into a density curve by then.
+      for (measure in facet.aggregate) {
+        val op = AggregateOp.fromName(measure.op)
+        if (op == null) {
+          diagnostics.error(
+            DiagnosticCodes.TRANSFORM_INVALID_PARAMETER,
+            "Facet aggregate '${measure.op}' is not implemented",
+            operator = spec.name,
+          )
+          continue
+        }
+        fields[measure.name] = aggregateOver(op, measure.field, rows)
+      }
       Partition(datum = VegaValue.Obj(fields), rows = rows, boundName = facet.name)
     }
   }
@@ -556,6 +618,11 @@ internal class ScopeCompiler(
         signalValues,
         inherited,
         deferredSignals = spec.signals.map { it.name }.toSet() - signalValues.keys,
+        // The enclosing scope's scales, which exist by now — a group is reached long after the
+        // chart's scales are built. That is what lets a group's own transform read
+        // `domain('xscale')`
+        // off an outer scale, which is how a chart sizes a cell from the axis around it.
+        scales = outer.scales,
       )
     val datasets = resolved.datasets
     // The scales below are the *enclosing* scope's, and they exist by now: a group is reached long

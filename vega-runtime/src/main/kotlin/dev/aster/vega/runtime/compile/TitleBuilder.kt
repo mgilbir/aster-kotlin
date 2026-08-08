@@ -91,12 +91,17 @@ internal class TitleBuilder(
 
     // A trellis header takes its words from the row it labels, so the text may be a signal.
     val text = spec.textExpression?.let { numbers.resolveText(it, "title") } ?: spec.text
+    // `dx`/`dy` shift the title after the anchor has placed it, and they move the surface with it:
+    // a heading nudged one unit left to line up with an axis makes the whole drawing one unit
+    // wider.
+    val nudgeX = numbers.resolve(spec.dx, "title") ?: 0.0
+    val nudgeY = numbers.resolve(spec.dy, "title") ?: 0.0
     val title =
       TextNode(
         id = ids.allocate(),
-        x = 0.0,
-        y = 0.0,
-        layout = textEngine.layout(run(text, fontSize, TitleDefaults.FONT_WEIGHT, align)),
+        x = nudgeX,
+        y = nudgeY,
+        layout = textEngine.layout(run(text, fontSize, titleWeight(spec), align)),
         angleDegrees = angle,
         fill = Fill.of(TitleDefaults.color),
         metadata =
@@ -152,11 +157,16 @@ internal class TitleBuilder(
       }
 
     val box = children.fold(RectD.Empty) { acc, node -> acc.union(node.transformedBounds) }
-    val frame =
+    // `frame` decides what the title is *anchored along* — the plotting area under `"group"`, the
+    // whole drawing otherwise. It does **not** decide how far out the title sits: upstream's
+    // `titleLayout` reads `frame` only for the anchor and always measures the gap from
+    // `viewBounds`, so a title over a chart whose marks overflow their plot clears the marks
+    // whichever frame it names.
+    val anchorFrame =
       if (spec.frame == TitleDefaults.FRAME_GROUP) RectD(0.0, 0.0, extent.width, extent.height)
       else content
 
-    val position = position(spec, frame, box, offset, extent)
+    val position = position(spec, anchorFrame, content, box, offset, extent)
     return GroupNode(
       id = ids.allocate(),
       children = children,
@@ -175,12 +185,17 @@ internal class TitleBuilder(
    */
   private fun position(
     spec: TitleSpec,
+    /** What the title is anchored along; `frame` chooses it. */
     frame: RectD,
+    /** How far the drawing reaches, which always decides the gap. */
+    content: RectD,
     box: RectD,
     offset: Double,
     extent: PlotSize,
   ): Pair<Double, Double> {
-    val bounds = if (frame.isEmpty) RectD(0.0, 0.0, extent.width, extent.height) else frame
+    val plot = RectD(0.0, 0.0, extent.width, extent.height)
+    val bounds = if (frame.isEmpty) plot else frame
+    val reach = if (content.isEmpty) plot else content
     val (start, end) =
       when (spec.orient) {
         Orient.LEFT -> bounds.bottom to bounds.top
@@ -194,12 +209,24 @@ internal class TitleBuilder(
         Anchor.MIDDLE -> (start + end) / 2.0
       }
     return when (spec.orient) {
-      Orient.TOP -> along to bounds.top - box.height - offset
-      Orient.BOTTOM -> along to bounds.bottom + offset
-      Orient.LEFT -> bounds.left - box.width - offset to along
-      Orient.RIGHT -> bounds.right + box.width + offset to along
+      Orient.TOP -> along to reach.top - box.height - offset
+      Orient.BOTTOM -> along to reach.bottom + offset
+      Orient.LEFT -> reach.left - box.width - offset to along
+      Orient.RIGHT -> reach.right + box.width + offset to along
     }
   }
+
+  /** The title's own `fontWeight`, or a theme's, falling back to Vega's bold default. */
+  private fun titleWeight(spec: TitleSpec): Int =
+    spec.fontWeight?.let { named ->
+      when (named.lowercase()) {
+        "normal" -> 400
+        "bold" -> 700
+        "lighter" -> 300
+        "bolder" -> 800
+        else -> named.toIntOrNull()
+      }
+    } ?: TitleDefaults.FONT_WEIGHT
 
   private fun run(text: String, fontSize: Double, weight: Int, align: TextAlign) =
     TextRun(
