@@ -454,7 +454,7 @@ produces a chart that is plausible and wrong.
 every fixture with upstream and checks two things:
 
 1. `VegaLiteFixtureTest` compares the Vega this compiler emits against upstream's, property by
-   property. Twenty fixtures, and all twenty match exactly — every transform, scale, signal, axis,
+   property. Twenty-six fixtures, and all of them match exactly — every transform, scale, signal, axis,
    legend and mark encoding, down to the accessibility description string.
 2. `VegaLiteFixtureDifferentialTest` runs that output through this engine's own runtime and compares
    the scene against the one upstream draws. Every mark of every fixture matches.
@@ -535,6 +535,26 @@ Get any one of them wrong and the bars overlap or the chart is the wrong width.
 Both went in against the fixtures rather than ahead of them: `donut` failed on its hole (a mark
 property named the way *Vega* names the channel, `innerRadius`, which has no Vega-Lite name of its
 own) and `grouped-bar` on the step arithmetic.
+
+### Where the compiler stands, and what it still refuses
+
+Twenty-six fixtures, each matching upstream's compiler property for property and drawing the chart
+upstream draws. The grammar covered: a single view or a layer of them, eleven marks including `arc`,
+the Cartesian and polar position pairs, nested offsets, fourteen of fifteen transforms, sorting,
+binning, time units, stacking, legends, axes, and a user `config` carried through as a theme.
+
+What it still refuses, by name, with the reason each is refused rather than approximated:
+
+- **`facet` / `row` / `column`, `hconcat` / `vconcat` / `concat`, `repeat`.** Each needs a cell group
+  faceted from a domain dataset, header and footer groups carrying the titles and the axes, and a
+  `layout` block to grid them. The runtime has all the machinery — `trellis-layout` and
+  `trellis-headers` pass — so this is compiler work, and it is the largest single piece left.
+- **`params`.** Selections and bound inputs; conditional encodings depend on them.
+- **Composite marks** (`boxplot`, `errorbar`, `errorband`), which upstream normalizes into layered
+  views before compiling. The layers already work; the normalizer is what is missing.
+- **`lookup`**, whose joined dataset has to be assembled and named beside the view's own.
+- Geographic projections and the `geoshape` mark, which are out of scope for the first release for
+  the same reason they are in Vega.
 
 ### One difference is still open
 
