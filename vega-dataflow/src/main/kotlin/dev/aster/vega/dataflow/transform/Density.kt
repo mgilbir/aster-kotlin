@@ -135,9 +135,22 @@ public object DensityTransform : Transform {
     val low = extent?.get(0) ?: clean.minOrNull()
     val high = extent?.get(1) ?: clean.maxOrNull()
     if (low == null || high == null) {
+      // Two different problems, and telling them apart is the whole value of the message: a
+      // distribution with no data of its own genuinely needs an `extent` written down, while one
+      // whose `extent` was *given* and did not resolve is an ordering problem and not a missing
+      // parameter. The second is the common case — `{"signal": "domain('xscale')"}` reaches for a
+      // scale, and this engine builds scales after the data — and reporting it as "needs an extent"
+      // sends a reader looking for something that is already there.
+      val given = params.fields["extent"] != null
       context.diagnostics.error(
         DiagnosticCodes.TRANSFORM_INVALID_PARAMETER,
-        "density needs an 'extent'; only a kde distribution can take one from its own data",
+        if (given) {
+          "density has an 'extent' that resolved to nothing. A `domain()` or `range()` of a scale " +
+            "cannot be read here: this engine builds scales after the data, so a transform cannot " +
+            "see one. Write the extent out, or compute it with an 'extent' transform"
+        } else {
+          "density needs an 'extent'; only a kde distribution can take one from its own data"
+        },
         operator = type,
       )
       return input

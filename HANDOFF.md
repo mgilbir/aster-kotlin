@@ -169,8 +169,22 @@ listed here exactly:
   x = 0 instead of x = 288. Its groups carry no `x`, so something places them: check whether the
   top-level `layout` is doing it and what our trellis path does with a group that declares its own
   `width` signal.
-- `probability-density` — a `density` transform taking its extent from its own data for
-  distributions other than `kde`.
+- `probability-density` — **not a small fix, and worth reading before picking anything else.** The
+  diagnostic says "density needs an 'extent'", and the extent is right there:
+  `{"signal": "domain('xscale')"}`. The real problem is the **compile order**. This engine runs three
+  fixed phases — all data, then signals, then scales — and this chart needs them interleaved:
+  `xscale`'s domain is `{"data": "points", "field": "u"}`, so it cannot be built before the `points`
+  dataset; and the `density` dataset's own transform needs `domain('xscale')`, so it cannot run
+  before the scale. Upstream has no phases at all, it ranks one dataflow, and that ordering is
+  exactly what it buys.
+  
+  Two smaller pieces of that have already been done and are the shape of the rest: signals that
+  reach for no dataset resolve before the data, and scales that wait on no signal are built before
+  the signals. The remaining step is the general one — order datasets, scales and signals together by
+  dependency — and it is the last big structural difference from upstream. It would unblock this
+  example and probably several of the interaction-heavy ones below it. Do not paper over it with a
+  special case for `density`; the diagnostic is currently blaming the wrong thing, which is the only
+  part of it that is cheap to fix.
 - `donut-chart-labelled` — the `pluck` expression function, and a dataset sourcing from *several*
   named datasets at once (`"source": ["a", "b"]`), which the parser currently reads as one name.
 - `histogram-null-values` — a range written as an array whose *elements* are signals,

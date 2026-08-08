@@ -679,6 +679,19 @@ boundary, which was enough to make the tallest column one dot short and the char
 short — and nothing else in the chart was wrong, which is why it took a signal-by-signal comparison
 to see at all.
 
+`probability-density` was taken up next and set down deliberately, because what it needs is
+structural rather than a feature. Its diagnostic reads "density needs an 'extent'" and the extent is
+plainly there — `{"signal": "domain('xscale')"}`. What is missing is the **compile order**: this
+engine runs three fixed phases, all data then signals then scales, and that chart needs them
+interleaved. `xscale`'s domain is data-driven, so it cannot be built before the `points` dataset; the
+`density` dataset's transform needs `domain('xscale')`, so it cannot run before the scale. Upstream
+has no phases — it ranks one dataflow — and that ordering is what it buys.
+
+Two pieces of that have already been taken, and they are the shape of the rest: signals reaching for
+no dataset now resolve before the data, and scales waiting on no signal are built before the signals.
+The general form — ordering datasets, scales and signals together by dependency — is the last big
+structural difference from upstream and is recorded in HANDOFF as such rather than patched around.
+
 `domain-limits` found one more, in a corner nothing had reached before: a symbol sized to **zero**
 was bounded as nothing at all, where upstream bounds it as a degenerate point at its anchor. A test
 had asserted the empty form deliberately, with no upstream evidence behind it. It matters under
