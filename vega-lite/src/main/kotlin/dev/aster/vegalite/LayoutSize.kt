@@ -15,6 +15,13 @@ internal class LayoutSize(
   scales: Map<String, ScaleComponent>,
   config: Config,
   spec: VegaValue.Obj,
+  /**
+   * `child_` inside a facet, where `width` is the whole grid and this sizes one cell of it.
+   *
+   * A cell's size is also always a *signal*, never a top-level property: the grid's own width is
+   * whatever the layout makes of the cells, so there is no number to write down.
+   */
+  private val prefix: String = "",
 ) {
   val signals: List<VegaValue>
   val width: VegaValue?
@@ -26,9 +33,9 @@ internal class LayoutSize(
     var heightValue: VegaValue? = null
 
     for (channel in listOf("x", "y")) {
-      val sizeName = if (channel == "x") "width" else "height"
+      val sizeName = prefix + if (channel == "x") "width" else "height"
       val declared =
-        spec.fields[sizeName]
+        spec.fields[if (channel == "x") "width" else "height"]
           ?: views.firstOrNull()?.spec?.let { if (channel == "x") it.width else it.height }
       val scale = scales[channel]
       val discrete = scale != null && (scale.type == "band" || scale.type == "point")
@@ -76,7 +83,18 @@ internal class LayoutSize(
             }
             null
           }
-          else -> num(if (channel == "x") config.continuousWidth else config.continuousHeight)
+          else -> {
+            val size = if (channel == "x") config.continuousWidth else config.continuousHeight
+            if (prefix.isEmpty()) {
+              num(size)
+            } else {
+              emitted += obj {
+                put("name", sizeName)
+                put("value", size)
+              }
+              null
+            }
+          }
         }
 
       if (channel == "x") widthValue = value else heightValue = value

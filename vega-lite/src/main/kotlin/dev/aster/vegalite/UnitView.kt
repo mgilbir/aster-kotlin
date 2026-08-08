@@ -24,8 +24,37 @@ internal class UnitView(
   /** The merged scale components themselves, which a baseline consults for its zero. */
   var scaleComponents: Map<String, ScaleComponent> = emptyMap()
 
+  /**
+   * The fields this view is faceted by, which every grouping in its data flow has to carry.
+   *
+   * A stack accumulated without them would run across the cells rather than within each, which is
+   * the difference between a trellis and one chart drawn several times over.
+   */
+  var facetFields: List<String> = emptyList()
+
+  /**
+   * The prefix on the size signals this view measures against.
+   *
+   * Empty for a plain chart, `child_` inside a facet — where `width` is the whole grid and the
+   * plotting area is one cell of it. Everything that mentions a size goes through here: a scale's
+   * range, an axis's tick count, a mark's midpoint.
+   */
+  var sizePrefix: String = ""
+
+  fun sizeSignal(channel: String): String =
+    sizePrefix + if (channel == "x" || channel == "width") "width" else "height"
+
   /** The dataset a mark reads, once the data flow has been assembled and named. */
   var mainData: String = ""
+
+  /**
+   * The dataset the *marks* read, which inside a facet is the cell's own partition.
+   *
+   * Everything else — a scale domain, the facet's own value list — still reads the whole table, so
+   * every cell is scaled alike and the grid holds one column per value rather than per cell.
+   */
+  var markData: String = ""
+    get() = field.ifEmpty { mainData }
 
   /** The dataset before aggregation, which a sorted domain reads. */
   var rawData: String = ""

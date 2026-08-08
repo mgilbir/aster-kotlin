@@ -68,11 +68,23 @@ private class Compilation(
   private val config = Config(spec.obj("config") ?: VegaValue.EmptyObject)
   private val parser = Parse(config, diagnostics)
 
+  /** `config.facet.spacing` and the gap a header title keeps from its cells. */
+  private val FACET_SPACING = 20.0
+  private val HEADER_OFFSET = 10.0
+
+  /** The `row` or `column` this chart is gridded by, if any. */
+  private var facet: Facet? = null
+
   fun run(): VegaLiteCompilation {
     reportUnsupportedTopLevel()
 
-    val views = views() ?: return VegaLiteCompilation(null, diagnostics.diagnostics)
-    if (views.isEmpty()) return VegaLiteCompilation(null, diagnostics.diagnostics)
+    val parsed = views() ?: return VegaLiteCompilation(null, diagnostics.diagnostics)
+    if (parsed.isEmpty()) return VegaLiteCompilation(null, diagnostics.diagnostics)
+
+    // A facet channel does not encode anything *within* a cell, so it is lifted out of the encoding
+    // before the scales are built — and everything inside then measures a cell rather than the
+    // surface.
+    val views = liftFacet(parsed)
 
     val scales = mergeScales(views)
     val scaleTypes = scales.mapValues { it.value.type }
@@ -81,12 +93,15 @@ private class Compilation(
       it.scaleComponents = scales
     }
 
-    val data = assembleData(views)
+    val data = assembleData(views).toMutableList()
     fillScaleDomains(views, scales)
+    // The facet's own values, which the layout counts and the headers title themselves from.
+    facet?.let { data += it.domainDataset(views.first().mainData) }
 
     val axes = assembleAxes(views, scales)
     val legends = assembleLegends(views, scales)
-    val layout = LayoutSize(views, scales, config, spec)
+    val layout =
+      LayoutSize(views, scales, config, spec, prefix = if (facet != null) "child_" else "")
 
     val vega = obj {
       put("\$schema", "https://vega.github.io/schema/vega/v6.json")
@@ -97,18 +112,24 @@ private class Compilation(
       put("width", layout.width)
       put("height", layout.height)
       // `cell` is the bordered plotting area; a chart with no Cartesian position — a pie — has no
-      // plotting area to border, and upstream styles it as a plain `view` instead.
-      put(
-        "style",
-        if (views.any { it.spec.encoding["x"] != null || it.spec.encoding["y"] != null }) "cell"
-        else "view",
-      )
+      // plotting area to border, and upstream styles it as a plain `view` instead. A faceted chart
+      // has no plotting area of its own at all: each of its cells carries the style.
+      if (facet == null) {
+        put(
+          "style",
+          if (views.any { it.spec.encoding["x"] != null || it.spec.encoding["y"] != null }) "cell"
+          else "view",
+        )
+      }
       title()?.let { put("title", it) }
       put("data", arr(data))
       if (layout.signals.isNotEmpty()) put("signals", arr(layout.signals))
-      put("marks", arr(views.flatMap { Marks.marks(it) }))
+      facet?.let { put("layout", it.layout(FACET_SPACING, HEADER_OFFSET)) }
+      put("marks", arr(marks(views, axes)))
       if (scales.isNotEmpty()) put("scales", arr(scales.values.map { assembleScale(it) }))
-      if (axes.isNotEmpty()) put("axes", arr(axes))
+      // A faceted chart has no axes of its own: the gridlines live in every cell and the labelled
+      // axis in a header drawn once for the whole grid.
+      if (facet == null && axes.isNotEmpty()) put("axes", arr(axes))
       if (legends.isNotEmpty()) put("legends", arr(legends))
       // The theme, as Vega takes it. Without this a chart's guides are drawn in the engine's own
       // colours however carefully the specification restyled them.
@@ -175,6 +196,124 @@ private class Compilation(
 
     val unit = parser.unit(spec, "$") ?: return null
     return listOf(UnitView(unit, config, ""))
+  }
+
+  /**
+   * Takes the facet channel out of every view's encoding, and makes the views children of a cell.
+   *
+   * Their marks are then named `child_marks` and their sizes `child_width`/`child_height`, which is
+   * upstream's naming and is load-bearing: `width` still exists and means the whole grid.
+   */
+  private fun liftFacet(views: List<UnitView>): List<UnitView> {
+    val found =
+      views.firstNotNullOfOrNull { view ->
+        Channels.FACET_CHANNELS.firstNotNullOfOrNull { channel ->
+          view.spec.encoding[channel]?.takeIf { it.isFieldDef }?.let { Facet(channel, it) }
+        }
+      } ?: return views
+    facet = found
+
+    return views.map { view ->
+      val withoutFacet = view.spec.encoding.filterKeys { it !in Channels.FACET_CHANNELS }
+      UnitView(
+          UnitSpec(
+            markDef = view.spec.markDef,
+            encoding = withoutFacet,
+            data = view.spec.data,
+            transforms = view.spec.transforms,
+            width = view.spec.width,
+            height = view.spec.height,
+          ),
+          config,
+          if (view.name.isEmpty()) "child" else "child_${view.name}",
+        )
+        .also {
+          it.sizePrefix = "child_"
+          it.facetFields = listOf(found.field)
+          // The cell's marks read the partition Vega facets out for them, named `facet`; the
+          // scales still read the whole table, so every cell is scaled alike.
+          it.markData = "facet"
+        }
+    }
+  }
+
+  /**
+   * The mark list: the views' own marks, or the cell and its headers when the chart is faceted.
+   *
+   * The axes split here. Gridlines belong in the cell, beside the data they measure; the labelled
+   * axis belongs to a footer or header drawn once, or a trellis repeats its tick labels under every
+   * cell.
+   */
+  private fun marks(views: List<UnitView>, axes: List<VegaValue>): List<VegaValue> {
+    val childMarks = views.flatMap { Marks.marks(it) }
+    val current = facet ?: return childMarks
+
+    val gridAxes = axes.filter { (it["grid"] as? VegaValue.Bool)?.value == true }
+    val mainAxes = axes.filter { (it["grid"] as? VegaValue.Bool)?.value != true }
+    val horizontal = mainAxes.filter {
+      it.string("orient") == "bottom" || it.string("orient") == "top"
+    }
+    val vertical = mainAxes - horizontal.toSet()
+
+    val out = mutableListOf<VegaValue>()
+    val title = Fields.title(current.def, config) as? VegaValue.Str
+    if (title != null) out += current.titleGroup(title.value, HEADER_OFFSET)
+
+    // A column-faceted chart captions each column above it and shares one x axis below the grid;
+    // a row-faceted one captions each row beside it and shares one y axis to the left.
+    if (current.isColumn) {
+      out +=
+        listOfNotNull(
+          current.headerGroup(
+            "header",
+            vertical,
+            perCell = false,
+            captioned = false,
+            "child_height",
+            HEADER_OFFSET,
+          ),
+          current.headerGroup(
+            "header",
+            emptyList(),
+            perCell = true,
+            captioned = true,
+            "child_width",
+            HEADER_OFFSET,
+          ),
+          current.headerGroup(
+            "footer",
+            horizontal,
+            perCell = true,
+            captioned = false,
+            "child_width",
+            HEADER_OFFSET,
+          ),
+        )
+    } else {
+      out +=
+        listOfNotNull(
+          current.headerGroup(
+            "header",
+            vertical,
+            perCell = true,
+            captioned = true,
+            "child_height",
+            HEADER_OFFSET,
+          ),
+          current.headerGroup(
+            "header",
+            horizontal,
+            perCell = false,
+            captioned = false,
+            "child_width",
+            HEADER_OFFSET,
+          ),
+        )
+    }
+
+    out +=
+      current.cellGroup(views.first().mainData, childMarks, gridAxes, "child_width", "child_height")
+    return out
   }
 
   private fun reportUnsupportedTopLevel() {

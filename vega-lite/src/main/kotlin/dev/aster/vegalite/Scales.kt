@@ -232,9 +232,9 @@ internal object Scales {
           }
         }
         if (channel == "y" && hasContinuousDomain(type)) {
-          arr(signalRef("height"), num(0))
+          arr(signalRef(view.sizeSignal("y")), num(0))
         } else {
-          arr(num(0), signalRef(if (channel == "x") "width" else "height"))
+          arr(num(0), signalRef(view.sizeSignal(channel)))
         }
       }
       "size" -> arr(num(sizeRangeMin(view)), num(sizeRangeMax(view)))
@@ -249,7 +249,7 @@ internal object Scales {
         )
       // A full turn, and a radius that fits whichever half-extent is smaller.
       "theta" -> arr(num(0), num(2 * kotlin.math.PI))
-      "radius" -> arr(num(0), signalRef("min(width,height)/2"))
+      "radius" -> arr(num(0), signalRef("min(${view.sizeSignal("x")},${view.sizeSignal("y")})/2"))
       "shape" -> str("symbol")
       "color",
       "fill",

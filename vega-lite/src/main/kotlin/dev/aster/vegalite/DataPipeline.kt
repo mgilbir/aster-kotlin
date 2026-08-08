@@ -140,6 +140,7 @@ internal class DataPipeline(
       }
     }
 
+    for (field in view.facetFields) dimensions += field
     return AggregateNode(dimensions.toList(), ops, fields, outputs)
   }
 
@@ -152,7 +153,8 @@ internal class DataPipeline(
     val order = if (stack.fieldChannel == "y") "descending" else "ascending"
     return StackNode(
       field = Fields.vgField(def),
-      groupby = stack.groupbyFields,
+      // The facet's own fields group every accumulation, so a stack stays inside its cell.
+      groupby = stack.groupbyFields + view.facetFields.filterNot { it in stack.groupbyFields },
       sortFields = stackBy,
       sortOrders = stackBy.map { order },
       output =

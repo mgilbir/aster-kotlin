@@ -145,7 +145,7 @@ internal object Marks {
       // A line or an area is drawn in the order its points arrive, so the dimension has to be
       // sorted or the path doubles back on itself.
       sortOrder(view)?.let { put("sort", it) }
-      put("from", obj { put("data", view.mainData) })
+      put("from", obj { put("data", view.markData) })
       put("encode", obj { put("update", encodeEntry(view)) })
     }
   }
@@ -565,7 +565,7 @@ internal object Marks {
             // twelve o'clock position all the way round.
             "radius" ->
               if (defaultPos == "zeroOrMin") obj { put("value", 0) }
-              else signalRef("min(width,height)/2")
+              else signalRef("min(${view.sizeSignal("x")},${view.sizeSignal("y")})/2")
             "theta" -> if (defaultPos == "zeroOrMin") obj { put("value", 0) } else signalRef("2*PI")
             else -> null
           }
@@ -576,7 +576,7 @@ internal object Marks {
       "mid" -> {
         // The size signal halved — not the enclosing group's width, which is the same number here
         // and a different one inside a facet.
-        val size = if (main == "x") "width" else "height"
+        val size = view.sizeSignal(main)
         obj {
           put("signal", size)
           put("mult", num(0.5))

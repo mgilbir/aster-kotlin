@@ -186,7 +186,7 @@ internal object Guides {
     type: String,
   ): VegaValue? {
     if (Scales.hasDiscreteDomain(type) || type == "log") return null
-    val size = if (channel == "x") "width" else "height"
+    val size = view.sizeSignal(channel)
     if (def.bin is Binning.Bin) return signalRef("ceil($size/10)")
     if (def.timeUnit in setOf("month", "hours", "day", "quarter")) return null
     return signalRef("ceil($size/40)")

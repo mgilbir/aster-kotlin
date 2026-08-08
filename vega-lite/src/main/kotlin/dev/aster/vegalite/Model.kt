@@ -232,6 +232,9 @@ internal object Channels {
       "order",
     )
 
+  /** The channels that grid a chart into cells rather than encoding anything within one. */
+  val FACET_CHANNELS = listOf("row", "column")
+
   /** Channels whose definition may be an array, so the parser has to keep every entry. */
   val MULTI_DEF_CHANNELS = setOf("detail", "order", "tooltip")
 }

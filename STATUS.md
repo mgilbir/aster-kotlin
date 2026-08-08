@@ -545,16 +545,33 @@ binning, time units, stacking, legends, axes, and a user `config` carried throug
 
 What it still refuses, by name, with the reason each is refused rather than approximated:
 
-- **`facet` / `row` / `column`, `hconcat` / `vconcat` / `concat`, `repeat`.** Each needs a cell group
-  faceted from a domain dataset, header and footer groups carrying the titles and the axes, and a
-  `layout` block to grid them. The runtime has all the machinery — `trellis-layout` and
-  `trellis-headers` pass — so this is compiler work, and it is the largest single piece left.
+- **`hconcat` / `vconcat` / `concat`, `repeat`** and the `facet` operator with its own `spec`.
+  `row` and `column` are implemented (below); these remaining forms compose several *different*
+  views rather than repeating one, so each needs its own layout.
 - **`params`.** Selections and bound inputs; conditional encodings depend on them.
 - **Composite marks** (`boxplot`, `errorbar`, `errorband`), which upstream normalizes into layered
   views before compiling. The layers already work; the normalizer is what is missing.
 - **`lookup`**, whose joined dataset has to be assembled and named beside the view's own.
 - Geographic projections and the `geoshape` mark, which are out of scope for the first release for
   the same reason they are in Vega.
+
+### Faceting: the compiler's half is done, the runtime's is not
+
+`row` and `column` compile. The `faceted` fixture's emitted Vega matches upstream's property for
+property — the cell group faceted from the data, the `column_domain` dataset the layout counts and
+the headers title themselves from, the `layout` block, the `child_width`/`child_height` signals, the
+facet field joining every grouping so a stack stays inside its cell, and the axes *split*: the
+gridlines stay in each cell where the data is, and the labelled axis moves out to a header drawn
+once for the whole grid.
+
+What does not yet match is where this engine's layout **puts** the cells. Its column header and
+title take room upstream's do not, so every cell is shifted and the surface comes out wider. The
+fixture is kept and the two placement comparisons are skipped by name, with the reason in the test:
+it still has to compile without errors and produce the same marks in the same numbers and roles, so
+only the coordinates are pending. Dropping the fixture instead would leave a compiler emitting
+faceted specifications nobody had checked draw anything.
+
+The next step is that grid layout, in the runtime rather than the compiler.
 
 ### One difference is still open
 
