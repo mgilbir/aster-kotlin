@@ -21,7 +21,7 @@ end to end — expressions, signals, 33 of upstream's 40 data transforms, every 
 and an event handler that recompiles the chart — and are verified against upstream Vega by
 differential tests.
 
-Eighty-five differential fixtures pass, all matching upstream exactly on every mark and scale output:
+Eighty-six differential fixtures pass, all matching upstream exactly on every mark and scale output:
 
 | Fixture | Marks | Covers |
 | --- | --- | --- |
@@ -108,6 +108,7 @@ Eighty-five differential fixtures pass, all matching upstream exactly on every m
 | `autosize-fit` | 30 | the plotting area shrunk so the drawing comes out the declared size, with angled labels and two axis titles overhanging |
 | `autosize-fit-x` | 30 | the same on the horizontal axis only, the vertical growing the way `pad` does |
 | `autosize-fit-y` | 30 | and the same the other way round |
+| `multi-source-pluck` | 12 | a dataset concatenating two sources, and a signal plucking one column out of the result |
 | `interactive-legend` | 454 | a brush `rect` with no `x` until someone drags one, and a legend swatch whose opacity is a conditional rule |
 | `histogram-null-values` | 47 | Vega's film-rating histogram: a scale whose ticks are `bin`'s own boundaries, a second band scale for the null bar, `fit` sizing, and 3,201 rows from a relative `url` |
 
@@ -169,7 +170,7 @@ substantive compatibility items:
 | 6. View and Compose APIs | Yes |
 | 7. SVG, PNG, PDF export | Yes |
 | 8. TalkBack can describe and navigate | Partial — virtual nodes are tested by instrumentation, not with TalkBack itself |
-| 9. At least 100 compatibility fixtures pass | 85 of 100 |
+| 9. At least 100 compatibility fixtures pass | 86 of 100 |
 | 10. Core runtime has no Android dependency | Yes |
 | 11. Renders without WebView | Yes |
 | 12. Build and test loop runs from the terminal | Yes |
@@ -506,7 +507,7 @@ each example a deadline.
 
 ## Known failing fixtures
 
-None. Eighty-five fixtures exist and all eighty-five pass — and that sentence became worth
+None. Eighty-six fixtures exist and all eighty-six pass — and that sentence became worth
 something only once the gate could no longer skip itself, below.
 
 **The gate could report success without running.** `FixtureDifferentialTest` reads the fixtures and

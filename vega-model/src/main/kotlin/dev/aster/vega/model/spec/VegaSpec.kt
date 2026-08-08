@@ -182,7 +182,15 @@ public data class DataSpec(
   val urlSignal: String? = null,
   /** Raw transform definitions, resolved by the runtime so it can report unsupported operators. */
   val transform: List<VegaValue> = emptyList(),
-  val source: String? = null,
+  /**
+   * The dataset or datasets this one starts from, in order.
+   *
+   * A list because upstream accepts one: `"source": ["a", "b"]` concatenates both, in the order
+   * written, and everything after it — a transform pipeline, a scale domain — sees the whole. A
+   * labelled donut builds its label positions that way, joining a left-hand run and a right-hand
+   * one into a single dataset to place.
+   */
+  val sources: List<String> = emptyList(),
   /**
    * `format.parse`: how to read each named field, e.g. `{"when": "date"}`.
    *

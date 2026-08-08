@@ -264,18 +264,27 @@ internal class DataResolver(
       // A dataset that sources from another starts with that one's tree as well as its rows, which
       // is what lets `treelinks` sit in a dataset of its own.
       var tree: TreeSource? = null
-      if (spec.source != null) {
-        val upstream = result[spec.source]
-        if (upstream == null) {
-          diagnostics.error(
-            DiagnosticCodes.PARSE_UNKNOWN_PROPERTY,
-            "Dataset '${spec.name}' sources from unknown dataset '${spec.source}'",
-            operator = spec.name,
-          )
-        } else {
-          values = upstream
-          tree = trees[spec.source]
+      if (spec.sources.isNotEmpty()) {
+        // Several sources concatenate, in the order written; one is just the short case of that.
+        val rows = mutableListOf<VegaValue>()
+        var found = false
+        for (name in spec.sources) {
+          val upstream = result[name]
+          if (upstream == null) {
+            diagnostics.error(
+              DiagnosticCodes.PARSE_UNKNOWN_PROPERTY,
+              "Dataset '${spec.name}' sources from unknown dataset '$name'",
+              operator = spec.name,
+            )
+            continue
+          }
+          found = true
+          rows.addAll(upstream)
+          // A tree belongs to one dataset, so only a single source can pass one on; concatenating
+          // two would leave the structure describing rows that are no longer all there.
+          if (spec.sources.size == 1) tree = trees[name]
         }
+        if (found) values = rows
       }
       if (spec.parse.isNotEmpty()) values = values.map { parseFields(it, spec) }
       if (spec.transform.isNotEmpty()) {

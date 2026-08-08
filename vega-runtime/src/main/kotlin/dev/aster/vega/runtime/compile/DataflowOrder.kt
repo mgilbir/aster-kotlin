@@ -243,7 +243,7 @@ internal class DataflowOrder(
      */
     private fun dependenciesOf(spec: DataSpec): Set<Operator> {
       val result = mutableSetOf<Operator>()
-      spec.source?.let { if (it in dataSpecs) result.add(Operator.Data(it)) }
+      for (source in spec.sources) if (source in dataSpecs) result.add(Operator.Data(source))
       spec.urlSignal?.let { result.addAll(readsOf(it)) }
       for (transform in spec.transform) collectSignalReferences(transform, result)
       return result

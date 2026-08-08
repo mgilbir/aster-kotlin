@@ -962,7 +962,12 @@ public class SpecParser {
       property = format?.fields?.get("property")?.asString()?.takeIf { it.isNotEmpty() },
       delimiter = format?.fields?.get("delimiter")?.asString()?.takeIf { it.isNotEmpty() },
       transform = (obj.fields["transform"] as? VegaValue.Arr)?.values ?: emptyList(),
-      source = obj.fields["source"]?.asString(),
+      sources =
+        when (val source = obj.fields["source"]) {
+          is VegaValue.Arr -> source.values.map { it.asString() }.filter { it.isNotEmpty() }
+          null -> emptyList()
+          else -> listOfNotNull(source.asString().takeIf { it.isNotEmpty() })
+        },
       parse = parse,
     )
   }

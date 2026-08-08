@@ -3,6 +3,7 @@ package dev.aster.vega.expression
 import dev.aster.vega.model.MINUS_SIGN
 import dev.aster.vega.model.PlatformDecimals
 import dev.aster.vega.model.VegaValue
+import dev.aster.vega.model.field
 import dev.aster.vega.model.roundHalfUp
 import dev.aster.vega.model.time.DateValues
 import dev.aster.vega.model.time.TimeFormat
@@ -368,6 +369,21 @@ public object Functions {
       val array = args.at(0) as? VegaValue.Arr ?: return@ExpressionFunction VegaValue.Null
       // Upstream sorts in natural ascending order; a comparator argument is not supported.
       VegaValue.Arr(array.values.sortedWith(NATURAL_ORDER))
+    }
+
+    /**
+     * `pluck(array, 'field')` — one column out of a list of objects.
+     *
+     * Upstream applies its ordinary field accessor to each element, so a dotted or bracketed path
+     * works and a missing field gives null. A value that is not an array has the accessor applied
+     * to it directly, which is upstream's own fallback rather than an error.
+     */
+    map["pluck"] = ExpressionFunction { args ->
+      val path = args.string(1)
+      when (val data = args.at(0)) {
+        is VegaValue.Arr -> VegaValue.Arr(data.values.map { it.field(path) })
+        else -> data.field(path)
+      }
     }
 
     // ---- ranges -------------------------------------------------------------
