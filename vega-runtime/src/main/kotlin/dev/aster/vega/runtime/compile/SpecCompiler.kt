@@ -105,7 +105,13 @@ public class SpecCompiler(
 
     val declaredWidth = spec.width ?: DEFAULT_WIDTH
     val declaredHeight = spec.height ?: DEFAULT_HEIGHT
-    if (spec.width == null || spec.height == null) {
+    // `width` and `height` are signals as well as properties, and a specification may declare
+    // either as a signal instead — a trellis whose height is `6 * (offset + cellHeight)` has no
+    // sensible number to write down. Upstream merges such a declaration into the built-in signal,
+    // so the property is only a seed and the signal is the answer; the size is therefore settled
+    // below, once the signals have resolved.
+    val sized = spec.signals.mapTo(mutableSetOf()) { it.name }
+    if ((spec.width == null && "width" !in sized) || (spec.height == null && "height" !in sized)) {
       diagnostics.warn(
         DiagnosticCodes.PARSE_MISSING_PROPERTY,
         "Specification has no width or height; using ${DEFAULT_WIDTH}x$DEFAULT_HEIGHT",
@@ -124,7 +130,6 @@ public class SpecCompiler(
     val height =
       if (containsPadding) declaredHeight - spec.padding.top - spec.padding.bottom
       else declaredHeight
-    val plot = PlotSize(width, height)
 
     // Vega exposes width, height and padding as implicit signals, so expressions can size things
     // relative to the chart. Verified: a signal with `update: "width/2"` resolves without declaring
@@ -181,6 +186,11 @@ public class SpecCompiler(
           // more precise thing to say than "no scale exists yet".
           pendingScales = spec.scales.mapTo(mutableSetOf()) { it.name },
         )
+
+    // The plotting area, now that a declared `width` or `height` signal has had its say. Everything
+    // downstream measures against this: a `"width"` scale range, an axis's extent, the surface.
+    val plot =
+      PlotSize(numberSignal(signals, "width") ?: width, numberSignal(signals, "height") ?: height)
 
     val numbers = NumberResolver(expressions, signals, diagnostics)
     val scales = ScaleResolver(datasets, plot, diagnostics, numbers).resolve(spec.scales)
@@ -354,6 +364,10 @@ public class SpecCompiler(
       }
     }
   }
+
+  /** A signal's value as a usable number, or null if it is not one. */
+  private fun numberSignal(signals: SignalScope, name: String): Double? =
+    (signals[name] as? VegaValue.Num)?.value?.takeIf { it.isFinite() }
 
   public companion object {
     private val EMPTY_SIGNALS = SignalScope(emptyMap(), emptyMap())

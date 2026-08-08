@@ -396,12 +396,15 @@ internal class LegendBuilder(
    * A legend that maps no colour still gets an explicit transparent fill rather than none, which is
    * what upstream does — a `size` legend's swatches are outlines, and saying "transparent" says so
    * where saying nothing would leave it to whatever default the renderer has.
+   *
+   * The test is on the **fill** channel alone (`config.symbolBaseFillColor`, applied by upstream
+   * under `if (!spec.fill)`), not on whether the legend maps any colour at all. A legend over a
+   * `stroke` scale therefore gets the transparent fill too — it draws the same either way, but a
+   * comparison against upstream can see the difference and a stroke-only legend is common.
    */
   private fun symbolFill(spec: LegendSpec, value: VegaValue): Fill? {
     val fillScale = spec.fill?.let { scales[it] }
-    if (fillScale == null) {
-      return if (spec.stroke == null) Fill.of(SceneColor.Transparent) else null
-    }
+    if (fillScale == null) return Fill.of(SceneColor.Transparent)
     val colour = SceneColor.parse(fillScale.scale(value).asString()) ?: return null
     return Fill.of(colour)
   }

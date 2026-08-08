@@ -164,7 +164,6 @@ class AxisStyleTest {
         "\"titleLimit\": 40",
         "\"titleX\": 5",
         "\"titleY\": 5",
-        "\"encode\": {}",
         "\"aria\": false",
         "\"description\": \"d\"",
       )
@@ -176,6 +175,29 @@ class AxisStyleTest {
       }
       assertTrue(reported.isNotEmpty(), "'$name' was not reported: $diagnostics")
     }
+  }
+
+  @Test
+  fun `an axis encode block folds into the properties it duplicates`() {
+    // Reported by name rather than dropped: a part nobody implements, a channel that part has no
+    // property for, and a channel that would need the axis's own datum to resolve.
+    val diagnostics =
+      compile(
+          """{"orient": "bottom", "scale": "x", "grid": true, "encode": {
+              "grid": {"enter": {"strokeDash": {"value": [3, 3]},
+                                 "x": {"value": 4},
+                                 "strokeWidth": {"signal": "1 + 1"}}},
+              "axis": {"enter": {"fill": {"value": "red"}}}}}"""
+        )
+        .diagnostics
+    assertTrue(diagnostics.any { it.jsonPath?.endsWith("encode.axis") == true }, "$diagnostics")
+    assertTrue(diagnostics.any { it.jsonPath?.endsWith("grid.enter.x") == true }, "$diagnostics")
+    assertTrue(
+      diagnostics.any { it.jsonPath?.endsWith("grid.enter.strokeWidth") == true },
+      "$diagnostics",
+    )
+    // The one it can honour says nothing at all.
+    assertTrue(diagnostics.none { it.jsonPath?.endsWith("strokeDash") == true }, "$diagnostics")
   }
 
   @Test

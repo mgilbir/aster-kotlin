@@ -163,27 +163,28 @@ internal class ScopeCompiler(
     // z-order says, so the nodes are collected per declaration and emitted afterwards.
     val built = arrayOfNulls<List<SceneNode>>(marks.size)
     marks.forEachIndexed { index, mark ->
+      // After building, not before: the items only exist once the channels have been resolved, and
+      // a mark cannot read back its own output.
+      fun expose(rows: List<VegaValue>) {
+        mark.name
+          ?.takeIf { it in readBack }
+          ?.let { scope = scope.withMarkItems(it, encoder.items(mark, rows)) }
+      }
       if (mark.type == MarkType.GROUP) {
         val group = group(mark, scope, encoder)
+        expose(group.datums)
         if (layout != null) {
-          trellisParts += TrellisRole.of(mark.role) to group
+          trellisParts += TrellisRole.of(mark.role) to group.content
         } else {
-          built[index] = group.nodes
-          content = content.union(group.bounds)
-          markReach = markReach.union(group.bounds)
+          built[index] = group.content.nodes
+          content = content.union(group.content.bounds)
+          markReach = markReach.union(group.content.bounds)
         }
       } else {
         val rows = markData(mark, scope)
-        val nodes = encoder.encode(mark, rows)
-        // After encoding, not before: the items only exist once the channels have been resolved,
-        // and a mark cannot read back its own output.
-        mark.name
-          ?.takeIf { it in readBack }
-          ?.let {
-            scope = scope.withMarkItems(it, encoder.items(mark, rows))
-          }
-        built[index] = nodes
-        for (node in nodes) content = content.union(node.transformedBounds)
+        built[index] = encoder.encode(mark, rows)
+        expose(rows)
+        for (node in built[index].orEmpty()) content = content.union(node.transformedBounds)
       }
     }
     for (index in paintOrder(marks)) built[index]?.let { children += it }
@@ -194,9 +195,14 @@ internal class ScopeCompiler(
       content = content.union(placed.bounds)
       markReach = markReach.union(placed.bounds)
     }
+    // A raised axis is built here, with the others, because a legend is placed past however far
+    // every axis reaches — but it is *emitted* after the legends, because that is where `zindex`
+    // puts it: everything at zero paints in declaration order, legends included, and only then the
+    // raised ones. The two orders are different and both matter.
+    val raised = mutableListOf<SceneNode>()
     for (axis in overlay) {
       val built = axisBuilder.build(axis, extent, scope.rangeSize) ?: continue
-      children += built.node
+      raised += built.node
       guides = guides.including(axis, built.guideBounds)
       content = content.union(built.guideBounds)
     }
@@ -208,6 +214,7 @@ internal class ScopeCompiler(
           GuideBounds(guides.horizontal.union(markReach), guides.vertical.union(markReach)),
         )
     children += legendNodes
+    children += raised
     for (node in legendNodes) content = content.union(node.transformedBounds)
 
     // Last, because a title is placed against everything else: it centres over the chart *and* its
@@ -242,13 +249,22 @@ internal class ScopeCompiler(
   )
 
   /**
+   * A built group mark: its cells, and the datum each cell was encoded from.
+   *
+   * The datums are kept because a group mark is addressable by name like any other — a trellis
+   * titles each cell from a text mark drawn from the group itself — and by the time the cells are
+   * [GroupNode]s the tuple behind each one is gone.
+   */
+  private data class BuiltGroup(val content: ScopeContent, val datums: List<VegaValue>)
+
+  /**
    * Compiles a group mark, keeping each cell's *reach* as well as its nodes.
    *
    * A cell's reach is not the same as its node bounds: the axes inside it measure by their extent,
    * so asking the finished [GroupNode] how big it is would quietly reintroduce the half-pixel crisp
    * offset that everything outside the cell is careful to exclude.
    */
-  private fun group(spec: MarkSpec, outer: CompileScope, encoder: MarkEncoder): ScopeContent {
+  private fun group(spec: MarkSpec, outer: CompileScope, encoder: MarkEncoder): BuiltGroup {
     val partitions = partition(spec, outer)
     val inner = arrayOfNulls<RectD>(partitions.size)
     val nodes =
@@ -276,7 +292,7 @@ internal class ScopeCompiler(
     nodes.forEachIndexed { index, node ->
       bounds = bounds.union(node.transform.mapBounds(reaches[index]))
     }
-    return ScopeContent(nodes, bounds, reaches)
+    return BuiltGroup(ScopeContent(nodes, bounds, reaches), partitions.map { it.datum })
   }
 
   /**

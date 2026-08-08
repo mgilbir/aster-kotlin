@@ -21,7 +21,7 @@ end to end — expressions, signals, 33 of upstream's 40 data transforms, every 
 and an event handler that recompiles the chart — and are verified against upstream Vega by
 differential tests.
 
-Seventy-one differential fixtures pass, all matching upstream exactly on every mark and scale output:
+Seventy-two differential fixtures pass, all matching upstream exactly on every mark and scale output:
 
 | Fixture | Marks | Covers |
 | --- | --- | --- |
@@ -96,6 +96,7 @@ Seventy-one differential fixtures pass, all matching upstream exactly on every m
 | `curves-closed` | 3 | the three closed curve families over one ring of points |
 | `autosize-none` | 19 | a `none` chart inset by its padding, refusing to grow for the labels hanging off it |
 | `grouped-bar` | 56 | `round` on a continuous scale, `mult`/`offset` value references, `contrast()`, labels from the bars' own scene items |
+| `barley-trellis` | 468 | a chart sized by a `height` signal, cells titled from the group mark that made them, axis and legend `encode` blocks, a raised axis painting over the legend |
 
 The gate is wired into `./scripts/oracle.sh`, so every further scale, mark and transform is built
 against a harness that can say we are wrong — which golden tests cannot.
@@ -155,7 +156,7 @@ substantive compatibility items:
 | 6. View and Compose APIs | Yes |
 | 7. SVG, PNG, PDF export | Yes |
 | 8. TalkBack can describe and navigate | Partial — virtual nodes are tested by instrumentation, not with TalkBack itself |
-| 9. At least 100 compatibility fixtures pass | 71 of 100 |
+| 9. At least 100 compatibility fixtures pass | 72 of 100 |
 | 10. Core runtime has no Android dependency | Yes |
 | 11. Renders without WebView | Yes |
 | 12. Build and test loop runs from the terminal | Yes |
@@ -492,7 +493,7 @@ each example a deadline.
 
 ## Known failing fixtures
 
-None. Seventy-one fixtures exist and all seventy-one pass — and that sentence became worth
+None. Seventy-two fixtures exist and all seventy-two pass — and that sentence became worth
 something only once the gate could no longer skip itself, below.
 
 **The gate could report success without running.** `FixtureDifferentialTest` reads the fixtures and
@@ -572,6 +573,28 @@ put it at the bar's top edge instead of its middle. Neither was reported. And `c
 genuinely absent and said so, which is the behaviour that is supposed to happen; it is now
 implemented, with the margin between white and black on Vega's default blue coming out under 1%, so
 an approximation right to two digits would still pick the wrong label colour.
+
+`barley-trellis` — Vega's barley small multiples, the third example taken end to end — found four
+more, and one of them was a whole class. **`width` and `height` are signals, not just properties**,
+and this chart declares its height as `6 * (offset + cellHeight)`; the size was being fixed from the
+properties before the signals ran, so the bottom axis sat at 200 in a chart 690 tall. A mark could
+not be drawn from a **group** mark, only from a plain one, so the six cell titles were missing.
+Guide `encode` blocks were reported and not honoured, which cost the dashed gridlines and left every
+legend symbol the wrong size — and, because a legend's rows are measured from its symbols, every
+legend label two units out of place. And a legend over a `stroke` scale was not getting upstream's
+explicit `transparent` fill, a test that turns out to be on the **fill** channel alone rather than
+on whether the legend maps any colour at all.
+
+The guide-encode gap is the class. Upstream builds each part of a guide from an encode block and
+*extends* it with the specification's, so `encode.grid.enter.strokeDash` and `gridDash` are one
+thing written two ways — which means the block can be folded into the properties rather than
+overlaid on the finished nodes, and folding is what lets it participate in measurement.
+
+`barley-trellis` also caught a paint-order difference the comparison still cannot see, because the
+comparison matches marks positionally *within* each type and two guides never interleave: a
+`zindex: 1` axis paints after the legends upstream and was painting before them here. It was found
+by putting the two SVGs side by side, which is now the third time that has been the thing that
+found it.
 
 `domain-limits` found one more, in a corner nothing had reached before: a symbol sized to **zero**
 was bounded as nothing at all, where upstream bounds it as a degenerate point at its anchor. A test

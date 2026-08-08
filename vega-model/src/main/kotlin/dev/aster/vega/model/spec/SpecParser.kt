@@ -103,6 +103,7 @@ private val AXIS_CONSUMED =
     "labelAlign",
     "labelBaseline",
     "labelLimit",
+    "encode",
   ) + guideStyleKeys("label", "tick", "grid", "domain", "title")
 
 /**
@@ -122,7 +123,6 @@ private val AXIS_UNSUPPORTED =
   mapOf(
     "format" to "Axis label format strings are not implemented; default formatting is used",
     "formatType" to "Axis label format types are not implemented; default formatting is used",
-    "encode" to "Axis encode overrides are not implemented",
     "labelBound" to "Bounding axis labels to the plotting area is not implemented",
     "labelFlush" to "Flushing the first and last axis label to the range ends is not implemented",
     "labelFlushOffset" to "Axis label flush offsets are not implemented; they need labelFlush",
@@ -225,6 +225,7 @@ private val LEGEND_CONSUMED =
     "labelOverlap",
     "labelSeparation",
     "labelLimit",
+    "encode",
   ) + guideStyleKeys("label", "title", "symbolStroke")
 
 /** Title properties this engine reads. */
@@ -240,6 +241,68 @@ private val TITLE_CONSUMED =
     "fontSize",
     "subtitleFontSize",
     "zindex",
+  )
+
+/**
+ * Which guide property each `encode` channel is another spelling of.
+ *
+ * Upstream's guide parsers build the same channel from either, so this is the mapping that already
+ * exists there, written down: `gridDash` and `encode.grid.enter.strokeDash` are one thing. Note the
+ * asymmetry that is upstream's and not a simplification — a *label's* colour is a fill and every
+ * other part's is a stroke, so the two spellings of "colour" differ by part.
+ */
+private fun strokeEncodeMap(prefix: String): Map<String, String> =
+  mapOf(
+    "stroke" to "${prefix}Color",
+    "strokeWidth" to "${prefix}Width",
+    "strokeDash" to "${prefix}Dash",
+    "strokeOpacity" to "${prefix}Opacity",
+    "opacity" to "${prefix}Opacity",
+  )
+
+private fun textEncodeMap(prefix: String): Map<String, String> =
+  mapOf(
+    "fill" to "${prefix}Color",
+    "fillOpacity" to "${prefix}Opacity",
+    "opacity" to "${prefix}Opacity",
+    "font" to "${prefix}Font",
+    "fontSize" to "${prefix}FontSize",
+    "fontWeight" to "${prefix}FontWeight",
+    "fontStyle" to "${prefix}FontStyle",
+  )
+
+private val AXIS_ENCODE_PARTS: Map<String, Map<String, String>> =
+  mapOf(
+    "grid" to strokeEncodeMap("grid"),
+    "ticks" to strokeEncodeMap("tick"),
+    "domain" to strokeEncodeMap("domain"),
+    "labels" to
+      textEncodeMap("label") +
+        mapOf(
+          "limit" to "labelLimit",
+          "align" to "labelAlign",
+          "baseline" to "labelBaseline",
+          "angle" to "labelAngle",
+        ),
+    "title" to textEncodeMap("title"),
+  )
+
+private val LEGEND_ENCODE_PARTS: Map<String, Map<String, String>> =
+  mapOf(
+    // A legend symbol keeps its dash and opacity under names of their own rather than under the
+    // `symbolStroke` prefix the colour and width use, which is why this one is written out.
+    "symbols" to
+      mapOf(
+        "stroke" to "symbolStrokeColor",
+        "strokeWidth" to "symbolStrokeWidth",
+        "strokeDash" to "symbolDash",
+        "strokeOpacity" to "symbolOpacity",
+        "opacity" to "symbolOpacity",
+        "size" to "symbolSize",
+        "shape" to "symbolType",
+      ),
+    "labels" to textEncodeMap("label") + mapOf("limit" to "labelLimit"),
+    "title" to textEncodeMap("title"),
   )
 
 /** Mark properties this engine reads. */
@@ -1151,6 +1214,7 @@ public class SpecParser {
 
     val obj =
       GuideConfig.merge(own, config.axisDefaults(orient, scaleTypes[scale] == ScaleType.BAND))
+        .withGuideEncode(AXIS_ENCODE_PARTS, "Axis", path)
 
     return AxisSpec(
       scale = scale,
@@ -1182,6 +1246,66 @@ public class SpecParser {
       domainStyle = obj.guideStroke("domain"),
       titleStyle = obj.guideStroke("title"),
     )
+  }
+
+  /**
+   * Folds a guide's `encode` block into the properties it is another spelling of.
+   *
+   * Upstream builds each part of an axis or a legend from an encode block of its own and *extends*
+   * it with whatever the specification wrote, so `{"grid": {"enter": {"strokeDash": {"value":
+   * [3,3]}}}}` and `"gridDash": [3,3]` end up as the same channel on the same mark. Rewriting the
+   * first into the second is therefore not an approximation — it is the same merge, done a step
+   * earlier — and it means the encode block participates in *measurement* too, which matters: a
+   * legend symbol resized through `encode` moves every label beside it.
+   *
+   * Only constants fold. A `signal`, a `field` or a conditional would need the guide's own datum,
+   * which does not exist until the axis has been laid out, and each is reported by name rather than
+   * dropped. `update` beats `enter`, as everywhere else.
+   */
+  private fun VegaValue.Obj.withGuideEncode(
+    parts: Map<String, Map<String, String>>,
+    subject: String,
+    path: String,
+  ): VegaValue.Obj {
+    val encode = fields["encode"] as? VegaValue.Obj ?: return this
+    val folded = LinkedHashMap(fields)
+    for ((part, block) in encode.fields) {
+      val channels = parts[part]
+      if (channels == null) {
+        diagnostics.warn(
+          DiagnosticCodes.PARSE_UNKNOWN_PROPERTY,
+          "$subject encode block '$part' is not implemented; it was ignored",
+          jsonPath = "$path.encode.$part",
+        )
+        continue
+      }
+      val entry = block as? VegaValue.Obj ?: continue
+      // `enter` first, then `update` over it, matching the effective set everywhere else.
+      for (pass in listOf("enter", "update")) {
+        val set = entry.fields[pass] as? VegaValue.Obj ?: continue
+        for ((channel, value) in set.fields) {
+          val property = channels[channel]
+          val constant = (value as? VegaValue.Obj)?.fields?.get("value")
+          when {
+            property == null ->
+              diagnostics.warn(
+                DiagnosticCodes.PARSE_UNKNOWN_PROPERTY,
+                "$subject encode channel '$channel' on '$part' is not implemented; it was ignored",
+                jsonPath = "$path.encode.$part.$pass.$channel",
+              )
+            constant == null ->
+              diagnostics.warn(
+                DiagnosticCodes.PARSE_UNKNOWN_PROPERTY,
+                "$subject encode channel '$channel' on '$part' is only implemented as a constant " +
+                  "'value'; it was ignored",
+                jsonPath = "$path.encode.$part.$pass.$channel",
+              )
+            else -> folded[property] = constant
+          }
+        }
+      }
+    }
+    return VegaValue.Obj(folded)
   }
 
   /**
@@ -1280,7 +1404,9 @@ public class SpecParser {
    */
   private fun parseLegend(value: VegaValue, path: String): LegendSpec? {
     val own = value as? VegaValue.Obj ?: return unexpected("a legend definition", path)
-    val obj = GuideConfig.merge(own, config.legendDefaults())
+    val obj =
+      GuideConfig.merge(own, config.legendDefaults())
+        .withGuideEncode(LEGEND_ENCODE_PARTS, "Legend", path)
 
     val spec =
       LegendSpec(
@@ -1351,7 +1477,6 @@ public class SpecParser {
       path,
       LEGEND_CONSUMED,
       mapOf(
-        "encode" to "Legend encode overrides are not implemented",
         "format" to "Legend label format specifiers are not implemented",
         "formatType" to "Legend label format types are not implemented",
         "symbolLimit" to "Legend entry limits are not implemented; every entry is shown",
