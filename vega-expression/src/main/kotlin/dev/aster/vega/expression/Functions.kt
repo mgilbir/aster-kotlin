@@ -235,6 +235,11 @@ public object Functions {
     map.predicate("isValid") {
       it !is VegaValue.Null && !(it is VegaValue.Num && it.value.isNaN())
     }
+    // `Number.isFinite`, not the global `isFinite` — `vega-expression` maps it to the former, so
+    // there is **no coercion**: `isFinite('5')` is false, and so is `isFinite(null)` where the
+    // global would have said true. The distinction is load-bearing for `bin`, whose out-of-extent
+    // rows carry an infinity rather than a null, and which a specification filters out with this.
+    map.predicate("isFinite") { it is VegaValue.Num && it.value.isFinite() }
 
     // ---- coercion -----------------------------------------------------------
     map["toNumber"] = ExpressionFunction { args ->

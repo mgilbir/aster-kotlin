@@ -182,6 +182,23 @@ Worth knowing before touching it:
   the time a group is reached. If an example ever does, `DataflowOrder` is reusable as-is —
   `ScopeCompiler.nest` is where it would go.
 
+## A gap found while binning, and not taken
+
+`bin-settings` was going to draw a value that falls outside an anchored bin grid, and could not:
+upstream draws a rect for it and this engine drops the mark. The scaled channel resolves to nothing,
+and where upstream simply **omits the property** — its scene item has no `x`, no `x2` and no `width`,
+and paints nothing — this reports `Rect mark has no x, x2, width or xc channel` and skips the item
+entirely, so the mark count is one short.
+
+Verified upstream with a two-row dataset whose first row has `lo: null`: the first item comes back as
+`{y: 0, width: null, height: 6}` with no `x` at all, the second fully positioned. So the rule is that
+a scaled value of null yields no channel rather than no item, and "this mark has no horizontal
+channel" should only fire when the specification *named* none.
+
+Not taken because that error guards genuinely malformed specifications and changing it reaches every
+mark type, which wants a fixture of its own. The fixture works around it with a filter, so nothing
+here depends on the current behaviour.
+
 ## Pick the next example the same way
 
 The method that worked seven times: take one real example, add it as a differential fixture *first*, let
@@ -211,10 +228,8 @@ this list and are now passing fixtures (`global-development`, `qq-plot`); the re
      `pad` with a diagnostic and needs a second layout pass. The compiler is a pure function of the
      spec, so running it twice — measure, adjust the `width`/`height` seeds, compile again — may be
      most of the implementation. Probe upstream's `viewSizeLayout` before committing to that.
-  2. **`bin` publishing its `signal`.** `binCount` is `(bins.stop - bins.start) / bins.step` and
-     `bins` is written by `{"type": "bin", "signal": "bins"}`. Only `extent` publishes today; every
-     other transform now *reports* the request rather than dropping it, so the diagnostic will name
-     this. Upstream publishes the bin settings object it chose — `{start, stop, step, ...}`.
+  2. ~~`bin` publishing its `signal`~~ — **done**, along with two other things found while doing it;
+     see `bin-settings`. What remains for this example is `fit` alone.
 
   Verified upstream for when you pick it up: `maxbins` 10, `binCount` 9, `nullGap` 10, `barStep` 33,
   `extent` `[1.4, 9.2]`, `width` 340, `height` 178, `xscale` range `[43, 340]` domain `[1, 10]`,

@@ -15,11 +15,25 @@ import kotlin.math.pow
 /**
  * `bin`: assigns each tuple to a bin, writing the bin's bounds to `bin0` and `bin1`.
  *
- * Values outside the extent get `null` bounds rather than being clamped into the end bins —
- * verified against upstream, and the opposite of what a clamping implementation would produce.
+ * Values outside the extent are **not** clamped into the end bins: they get an infinity on the side
+ * they fell off, which is what upstream's binning function returns. Only a missing value bins to
+ * null. Verified against upstream — `bin` over `[0, 10]` puts `0.2` at `-Infinity` and `11` at
+ * `+Infinity` — and it matters because `datum.bin0 != null` then keeps the first and drops a
+ * missing one.
  */
 public object BinTransform : Transform {
   override val type: String = "bin"
+
+  /**
+   * The bin settings it chose, as `{start, stop, step, fields}`.
+   *
+   * A histogram reads these to size itself: `(bins.stop - bins.start) / bins.step` is the bin
+   * count, and a bar's width follows from it. Upstream publishes the *binning function* with
+   * `start`, `stop` and `step` hung off it as properties, plus the accessor's `fields`; nothing can
+   * call a function from an expression here, and no specification does, so the properties alone are
+   * published and the three a chart actually reads carry upstream's values exactly.
+   */
+  override val publishesSignal: Boolean = true
 
   override fun apply(
     input: List<VegaValue>,
@@ -76,7 +90,22 @@ public object BinTransform : Transform {
         divide = params.numberList("divide").takeIf { it.isNotEmpty() } ?: listOf(5.0, 2.0),
         minstep = params.number("minstep") ?: 0.0,
         nice = params.boolean("nice") ?: true,
+        anchor = params.number("anchor"),
       )
+
+    params.string("signal")?.let { signal ->
+      context.setSignal(
+        signal,
+        VegaValue.Obj(
+          linkedMapOf(
+            "start" to VegaValue.Num(settings.start),
+            "stop" to VegaValue.Num(settings.stop),
+            "step" to VegaValue.Num(settings.step),
+            "fields" to VegaValue.Arr(listOf(VegaValue.Str(path))),
+          )
+        ),
+      )
+    }
 
     val names = params.stringList("as")
     val lowName = names.getOrNull(0) ?: "bin0"
@@ -85,8 +114,21 @@ public object BinTransform : Transform {
     return input.map { datum ->
       val value = datum.field(path)
       val number = if (value.isMissing) Double.NaN else JsSemantics.toNumber(value)
-      if (!number.isFinite() || number < settings.start || number > settings.stop) {
+      // A missing value bins to null; a value *outside* the extent bins to an infinity on the side
+      // it fell off. That is upstream's own binning function — `v < start ? -Infinity : v > stop ?
+      // +Infinity` — and the difference is not cosmetic: `datum.bin0 != null` keeps an out-of-range
+      // row and drops a missing one, so a specification filtering on it gets different rows
+      // depending on which this writes. Both bounds take the infinity, since the high one is the
+      // low
+      // one plus a step.
+      if (value.isMissing || number.isNaN()) {
         datum.withFields(mapOf(lowName to VegaValue.Null, highName to VegaValue.Null))
+      } else if (number < settings.start || number > settings.stop) {
+        val edge =
+          VegaValue.Num(
+            if (number < settings.start) Double.NEGATIVE_INFINITY else Double.POSITIVE_INFINITY
+          )
+        datum.withFields(mapOf(lowName to edge, highName to edge))
       } else {
         // Upstream's arithmetic, and the epsilon is the whole of it: a value that lands *exactly*
         // on a boundary divides to a whole number only in exact arithmetic. In doubles
@@ -140,6 +182,8 @@ public object BinTransform : Transform {
     divide: List<Double>,
     minstep: Double,
     nice: Boolean,
+    /** A value a bin boundary must land on; slides the whole grid so that one does. */
+    anchor: Double? = null,
   ): BinSettings {
     val logBase = ln(base)
     val span = (max - min).takeIf { it != 0.0 } ?: abs(min).takeIf { it != 0.0 } ?: 1.0
@@ -169,6 +213,26 @@ public object BinTransform : Transform {
       start = if (start < snapped) snapped - chosen else snapped
       stop = ceil(stop / chosen) * chosen
     }
-    return BinSettings(start, if (stop == start) start + chosen else stop, chosen)
+    if (stop == start) stop = start + chosen
+
+    // Upstream splits this in two: `vega-statistics`' `bin` returns everything above, and the `bin`
+    // *transform* then does these last two steps. Both belong to the settings, so they live here.
+    //
+    // The stop is realigned to a whole number of steps from the start. Under `nice` it already is,
+    // which is why this was invisible — but with `nice: false` the extent is taken as given, and an
+    // extent of `[1, 24]` at step 2 has eleven and a half bins in it. Upstream opens the twelfth
+    // and
+    // stops at 25; this stopped at 24, so a value of 24 was clamped back into `[21, 23]` where
+    // upstream puts it in `[23, 25]`.
+    stop = start + ceil((stop - start) / chosen) * chosen
+
+    // `anchor` names a value a bin boundary must fall on, and slides the whole grid to put one
+    // there: `anchor: 0.3` with step 1 bins from 0.3, so 0.2 falls outside the extent entirely.
+    if (anchor != null) {
+      val shift = anchor - (start + chosen * floor((anchor - start) / chosen))
+      start += shift
+      stop += shift
+    }
+    return BinSettings(start, stop, chosen)
   }
 }

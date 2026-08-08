@@ -21,7 +21,7 @@ end to end — expressions, signals, 33 of upstream's 40 data transforms, every 
 and an event handler that recompiles the chart — and are verified against upstream Vega by
 differential tests.
 
-Seventy-nine differential fixtures pass, all matching upstream exactly on every mark and scale output:
+Eighty differential fixtures pass, all matching upstream exactly on every mark and scale output:
 
 | Fixture | Marks | Covers |
 | --- | --- | --- |
@@ -104,6 +104,7 @@ Seventy-nine differential fixtures pass, all matching upstream exactly on every 
 | `budget-forecasts` | 77 | `argmin` over a filtered group, a scaled channel taking its value from a signal, `bandPosition`, a label placed by an axis `encode` block |
 | `probability-density` | 533 | a scale over a dataset and two datasets over that scale — the case no fixed order of the phases resolves; a `normal` density whose mean and stdev come from another dataset's aggregate |
 | `published-signals` | 11 | a signal reading a signal an `extent` transform *published*, sizing a scale range and a mark width |
+| `bin-settings` | 36 | `bin` publishing the settings it chose, a `nice: false` extent that does not divide evenly, an anchored grid, and a value that falls off it |
 
 The gate is wired into `./scripts/oracle.sh`, so every further scale, mark and transform is built
 against a harness that can say we are wrong — which golden tests cannot.
@@ -163,7 +164,7 @@ substantive compatibility items:
 | 6. View and Compose APIs | Yes |
 | 7. SVG, PNG, PDF export | Yes |
 | 8. TalkBack can describe and navigate | Partial — virtual nodes are tested by instrumentation, not with TalkBack itself |
-| 9. At least 100 compatibility fixtures pass | 79 of 100 |
+| 9. At least 100 compatibility fixtures pass | 80 of 100 |
 | 10. Core runtime has no Android dependency | Yes |
 | 11. Renders without WebView | Yes |
 | 12. Build and test loop runs from the terminal | Yes |
@@ -500,7 +501,7 @@ each example a deadline.
 
 ## Known failing fixtures
 
-None. Seventy-nine fixtures exist and all seventy-nine pass — and that sentence became worth
+None. Eighty fixtures exist and all eighty pass — and that sentence became worth
 something only once the gate could no longer skip itself, below.
 
 **The gate could report success without running.** `FixtureDifferentialTest` reads the fixtures and
