@@ -111,6 +111,16 @@ internal enum class TrellisRole {
   CELL,
   ROW_HEADER,
   COLUMN_HEADER,
+  /**
+   * The far side of the grid, where a *shared* axis is drawn.
+   *
+   * Vega-Lite puts a trellis's labelled x axis in a column footer and its y axis in a row header,
+   * so the tick labels appear once for the whole grid rather than under every cell. Without this
+   * role the footer is taken for a cell and joins the grid, which shifts every real cell along and
+   * widens the chart by a whole column.
+   */
+  ROW_FOOTER,
+  COLUMN_FOOTER,
   ROW_TITLE,
   COLUMN_TITLE;
 
@@ -119,6 +129,8 @@ internal enum class TrellisRole {
       when (role) {
         "row-header" -> ROW_HEADER
         "column-header" -> COLUMN_HEADER
+        "row-footer" -> ROW_FOOTER
+        "column-footer" -> COLUMN_FOOTER
         "row-title" -> ROW_TITLE
         "column-title" -> COLUMN_TITLE
         else -> CELL

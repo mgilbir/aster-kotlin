@@ -564,14 +564,21 @@ facet field joining every grouping so a stack stays inside its cell, and the axe
 gridlines stay in each cell where the data is, and the labelled axis moves out to a header drawn
 once for the whole grid.
 
-What does not yet match is where this engine's layout **puts** the cells. Its column header and
-title take room upstream's do not, so every cell is shifted and the surface comes out wider. The
-fixture is kept and the two placement comparisons are skipped by name, with the reason in the test:
-it still has to compile without errors and produce the same marks in the same numbers and roles, so
-only the coordinates are pending. Dropping the fixture instead would leave a compiler emitting
-faceted specifications nobody had checked draw anything.
+What does not yet match is where this engine's layout **puts** the guides around the cells. Two
+causes have been found and fixed, and both were silences of the same kind as the rest:
 
-The next step is that grid layout, in the runtime rather than the compiler.
+- **A `column-footer` was taken for a cell** and joined the grid, shifting every real cell along and
+  widening the chart by a whole column. Vega-Lite puts a trellis's shared x axis in a column footer
+  and its y axis in a row header, so the tick labels are drawn once rather than under every cell;
+  the runtime knew the header roles and not the footer ones.
+- **A sized group did not give its own `width` to what was inside it.** A gridline in a cell spanned
+  the *chart's* width rather than the cell's, because the subscope's size came only from a group's
+  own signal declarations and a Vega-Lite cell states its size in an `encode` block instead.
+
+What is left is the axis groups' half-unit crisp offset inside a header, and the room the row header
+takes: the surface is still about a hundred units wider than upstream's. The fixture is kept and only
+the two placement comparisons are skipped, by name and with the reason in the test — it still has to
+compile without errors and produce the same marks in the same numbers and roles.
 
 ### One difference is still open
 

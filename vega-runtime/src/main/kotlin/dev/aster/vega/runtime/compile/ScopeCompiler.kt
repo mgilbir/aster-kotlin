@@ -320,6 +320,24 @@ internal class ScopeCompiler(
     val inner = arrayOfNulls<RectD>(partitions.size)
     val nodes =
       encoder.encodeGroup(spec, partitions.map { it.datum }) { _, index, extent ->
+        // A group that *encodes* its own size redefines `width` and `height` for everything inside
+        // it, not only where its marks are drawn: a gridline in a trellis cell spans the cell, and
+        // a `"width"` range inside one is the cell's width. Vega gives every group scope its own
+        // size signals; this is that, for the case a specification actually writes — a cell sized
+        // `{"signal": "child_width"}`, which no group-level signal declaration would reveal.
+        val nested = nest(spec, partitions[index], outer)
+        val sized =
+          if (encodesSize(spec)) {
+            CompileScope(
+              nested.data,
+              nested.signals,
+              nested.scales,
+              PlotSize(extent.width, extent.height),
+              nested.scaleTypes,
+            )
+          } else {
+            nested
+          }
         val scoped =
           compile(
             spec.marks,
@@ -327,7 +345,7 @@ internal class ScopeCompiler(
             spec.legends,
             spec.title,
             spec.layout,
-            nest(spec, partitions[index], outer),
+            sized,
             PlotSize(extent.width, extent.height),
           )
         inner[index] = scoped.bounds
@@ -398,6 +416,11 @@ internal class ScopeCompiler(
           cellNodes[it].transform.e + cellBoxes[it].left
         } ?: 0.0
     val top = cellNodes.indices.minOfOrNull { cellNodes[it].transform.f + cellBoxes[it].top } ?: 0.0
+    // And where it ends, which is what a *footer* hangs off — the shared axis of a trellis.
+    val right =
+      cellNodes.indices.maxOfOrNull { cellNodes[it].transform.e + cellBoxes[it].right } ?: 0.0
+    val bottom =
+      cellNodes.indices.maxOfOrNull { cellNodes[it].transform.f + cellBoxes[it].bottom } ?: 0.0
 
     // Headers first, because a title is placed just outside whatever they reached. The results are
     // kept per declaration so the scene can be emitted in specification order, which is the order
@@ -416,6 +439,30 @@ internal class ScopeCompiler(
           else {
             val at =
               if (alongRows) PointD(left, cell.transform.f) else PointD(cell.transform.e, top)
+            val node2 = moveTo(node, at)
+            val box = node2.transform.mapBounds(part.boxOf(position))
+            bounds = bounds.union(box)
+            edge = edge.union(box)
+            node2
+          }
+        }
+      edges[role] = edge
+      placed[index] = moved
+    }
+
+    // Footers, on the far side: a column's below the grid, a row's to its right. Each is aligned
+    // with the cell it belongs to on the other axis, exactly as a header is.
+    gridded.forEachIndexed { index, (role, part) ->
+      if (role != TrellisRole.ROW_FOOTER && role != TrellisRole.COLUMN_FOOTER) return@forEachIndexed
+      val alongRows = role == TrellisRole.ROW_FOOTER
+      var edge = edges[role] ?: RectD.Empty
+      val moved =
+        part.nodes.mapIndexedNotNull { position, node ->
+          val cell = cellNodes.getOrNull(if (alongRows) position * columns else position)
+          if (cell == null) null
+          else {
+            val at =
+              if (alongRows) PointD(right, cell.transform.f) else PointD(cell.transform.e, bottom)
             val node2 = moveTo(node, at)
             val box = node2.transform.mapBounds(part.boxOf(position))
             bounds = bounds.union(box)
@@ -694,6 +741,12 @@ internal class ScopeCompiler(
       outer.scaleTypes + spec.scales.associate { it.name to it.type },
     )
   }
+
+  /** Whether a group mark states its own `width` or `height` in any of its encode blocks. */
+  private fun encodesSize(spec: MarkSpec): Boolean =
+    listOf(spec.encode.enter, spec.encode.update).any {
+      it.containsKey("width") || it.containsKey("height")
+    }
 
   private fun numberSignal(signals: SignalScope, name: String): Double? =
     (signals[name] as? VegaValue.Num)?.value?.takeIf { !it.isNaN() }
