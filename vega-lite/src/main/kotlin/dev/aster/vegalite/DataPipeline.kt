@@ -65,6 +65,9 @@ internal class DataPipeline(
    */
   private fun implicitParse(): ParseNode? {
     val parse = LinkedHashMap<String, String>()
+    // A filter's comparisons say what type its column holds, and that has to be settled before the
+    // filter runs — so these parses belong with the encoding's, not after them.
+    parse.putAll(Transforms(diagnostics).implicitParses(view.spec.transforms))
     for ((_, def) in view.spec.encoding) {
       if (!def.isFieldDef || def.field == null) continue
       // A time unit buckets a *date*, so the column still has to be read as one first.
@@ -194,62 +197,9 @@ internal class DataPipeline(
     return if (expressions.isEmpty()) null else FilterInvalidNode(expressions.distinct())
   }
 
-  /** The `transform` block, translated one entry at a time. Anything unimplemented is reported. */
+  /** The `transform` block, translated by [Transforms]. */
   private fun userTransforms(): PassThroughNode? {
-    val transforms = mutableListOf<VegaValue>()
-    view.spec.transforms.forEachIndexed { index, transform ->
-      val path = "$.transform[$index]"
-      when {
-        transform.has("calculate") -> transforms += obj {
-            put("type", "formula")
-            put("expr", transform.string("calculate"))
-            put("as", transform.string("as"))
-          }
-        transform.has("filter") -> {
-          val filter = transform["filter"]
-          if (filter is VegaValue.Str) {
-            transforms += obj {
-              put("type", "filter")
-              put("expr", filter.value)
-            }
-          } else {
-            diagnostics.error(
-              VegaLiteDiagnostics.UNSUPPORTED_TRANSFORM,
-              "Only an expression `filter` is implemented; a field predicate object is not. Write " +
-                "the test as an expression string instead.",
-              jsonPath = path,
-            )
-          }
-        }
-        transform.has("aggregate") -> {
-          val entries = transform.array("aggregate").orEmpty()
-          transforms += obj {
-            put("type", "aggregate")
-            put(
-              "groupby",
-              strings(
-                transform.array("groupby").orEmpty().mapNotNull { (it as? VegaValue.Str)?.value }
-              ),
-            )
-            put("ops", strings(entries.mapNotNull { it.string("op") }))
-            put(
-              "fields",
-              arr(
-                entries.map { entry -> entry.string("field")?.let { str(it) } ?: VegaValue.Null }
-              ),
-            )
-            put("as", strings(entries.mapNotNull { it.string("as") }))
-          }
-        }
-        else ->
-          diagnostics.error(
-            VegaLiteDiagnostics.UNSUPPORTED_TRANSFORM,
-            "This transform is not implemented: ${transform.asObject?.fields?.keys?.joinToString(", ")}. " +
-              "`calculate`, an expression `filter` and `aggregate` are.",
-            jsonPath = path,
-          )
-      }
-    }
+    val transforms = Transforms(diagnostics).translate(view.spec.transforms, "$.transform")
     return if (transforms.isEmpty()) null else PassThroughNode(transforms)
   }
 }
