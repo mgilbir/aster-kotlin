@@ -209,7 +209,7 @@ internal class ScopeCompiler(
       content = content.union(built.guideBounds)
     }
     val legendNodes =
-      LegendBuilder(scope.scales, ids, textEngine, diagnostics, numbers)
+      LegendBuilder(scope.scales, ids, textEngine, diagnostics, numbers, encoder)
         .build(
           legends,
           extent,
@@ -309,9 +309,11 @@ internal class ScopeCompiler(
     parts: List<Pair<TrellisRole, ScopeContent>>,
     numbers: NumberResolver,
   ): ScopeContent {
-    val gridded = parts.map { (role, part) ->
-      role to if (role == TrellisRole.CELL) grid(layout, part, numbers, null) else part
-    }
+    // Every cell in the scope goes on **one** grid, whichever group mark produced it. Gridding each
+    // group separately looks the same whenever there is only one — which every trellis fixture had
+    // — and puts two of them on top of each other: Vega's quantile-quantile plot is two group marks
+    // side by side under `columns: 2`, and both landed at the origin.
+    val gridded = gridTogether(layout, parts, numbers)
     val cells = gridded.filter { it.first == TrellisRole.CELL }.map { it.second }
     val cellNodes = cells.flatMap { it.nodes }
     val cellBoxes = cells.flatMap { part -> part.nodes.indices.map { part.boxOf(it) } }
@@ -387,6 +389,49 @@ internal class ScopeCompiler(
 
     val nodes = gridded.flatMapIndexed { index, (_, part) -> placed[index] ?: part.nodes }
     return ScopeContent(nodes, bounds)
+  }
+
+  /**
+   * Places every cell of every part on a single grid, keeping the parts separate afterwards.
+   *
+   * The grid has to see all the cells at once — its wrapping and its column widths are decided by
+   * the whole sequence — but the caller still needs them per part, because a header is matched to a
+   * cell by position within its own part and the scene is emitted in declaration order.
+   */
+  private fun gridTogether(
+    layout: LayoutSpec,
+    parts: List<Pair<TrellisRole, ScopeContent>>,
+    numbers: NumberResolver,
+  ): List<Pair<TrellisRole, ScopeContent>> {
+    val cellParts = parts.withIndex().filter { it.value.first == TrellisRole.CELL }
+    if (cellParts.isEmpty()) return parts
+
+    val boxes = cellParts.flatMap { (_, entry) ->
+      entry.second.nodes.indices.map { entry.second.boxOf(it) }
+    }
+    val options =
+      GridLayout.Options(
+        columns = numbers.resolveInt(layout.columns, "layout")?.coerceAtLeast(1) ?: boxes.size,
+        rowPadding = numbers.resolve(layout.rowPadding, "layout") ?: 0.0,
+        columnPadding = numbers.resolve(layout.columnPadding, "layout") ?: 0.0,
+      )
+    val offsets = GridLayout.place(boxes, options)
+
+    val result = parts.toMutableList()
+    var cursor = 0
+    for ((index, entry) in cellParts) {
+      val (role, part) = entry
+      var bounds = RectD.Empty
+      val placed =
+        part.nodes.mapIndexed { position, node ->
+          val moved = moveTo(node, offsets[cursor + position])
+          bounds = bounds.union(moved.transform.mapBounds(part.boxOf(position)))
+          moved
+        }
+      cursor += part.nodes.size
+      result[index] = role to ScopeContent(placed, bounds, part.cellReach)
+    }
+    return result
   }
 
   private fun moveTo(node: SceneNode, at: PointD): SceneNode =

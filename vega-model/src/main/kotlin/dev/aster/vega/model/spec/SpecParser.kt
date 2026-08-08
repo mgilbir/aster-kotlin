@@ -278,7 +278,19 @@ private fun textEncodeMap(prefix: String): Map<String, String> =
  * budget example moves its labels to the start of each band with `{"scale": "x", "field":
  * "value"}`.
  */
-private val RESOLVED_GUIDE_CHANNELS = setOf("labels.update.x", "labels.update.y")
+private val RESOLVED_GUIDE_CHANNELS =
+  setOf(
+    // An axis label's position, which no property can say.
+    "labels.update.x",
+    "labels.update.y",
+    // A legend label's text, which is how an id becomes a name — read through a scale, so there is
+    // nothing constant to fold.
+    "labels.update.text",
+    // A legend swatch's fill opacity. Upstream has `symbolOpacity`, which fades the outline with
+    // the swatch; this fades only what is inside it, and there is no property for that.
+    "symbols.enter.fillOpacity",
+    "symbols.update.fillOpacity",
+  )
 
 /**
  * Channels a guide writes into `update` itself, so a specification's `enter` never survives.
@@ -1488,6 +1500,10 @@ public class SpecParser {
         labelOverlap = obj.fields["labelOverlap"]?.asString(),
         labelSeparation = obj.numberOrSignal("labelSeparation", "$path.labelSeparation"),
         labelLimit = obj.numberOrSignal("labelLimit", "$path.labelLimit"),
+        encode =
+          (obj.fields["encode"] as? VegaValue.Obj)?.fields.orEmpty().mapValues { (part, block) ->
+            parseEncode(block, "$path.encode.$part")
+          },
         labelStyle = obj.guideStroke("label"),
         titleStyle = obj.guideStroke("title"),
         // `symbolStrokeColor`/`symbolStrokeWidth` rather than `symbolColor`/`symbolWidth`, so the

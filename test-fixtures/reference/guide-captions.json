@@ -370,6 +370,21 @@
   "caption": "Y-axis for a linear scale with values from 0 to 18"
  },
  {
+  "fixture": "global-development",
+  "kind": "axis",
+  "caption": "X-axis titled 'Fertility' for a linear scale with values from 0 to 9"
+ },
+ {
+  "fixture": "global-development",
+  "kind": "axis",
+  "caption": "Y-axis titled 'Life Expectancy' for a linear scale with values from 25 to 85"
+ },
+ {
+  "fixture": "global-development",
+  "kind": "legend",
+  "caption": "Symbol legend titled 'Region' for fill color with 6 values: 0, 3, 4, 1, 5, 2"
+ },
+ {
   "fixture": "grouped-bar",
   "kind": "axis",
   "caption": "X-axis for a linear scale with values from 0.0 to 1.1"
@@ -553,6 +568,26 @@
   "fixture": "pie",
   "kind": "legend",
   "caption": "Symbol legend titled 'Slice' for fill color with 4 values: alpha, beta, gamma, delta"
+ },
+ {
+  "fixture": "qq-plot",
+  "kind": "axis",
+  "caption": "Y-axis titled 'Empirical Data Quantiles' for a linear scale with values from −0.6 to 0.6"
+ },
+ {
+  "fixture": "qq-plot",
+  "kind": "axis",
+  "caption": "X-axis titled 'Theoretical Uniform Quantiles' for a linear scale with values from 0.0 to 1.0"
+ },
+ {
+  "fixture": "qq-plot",
+  "kind": "axis",
+  "caption": "Y-axis for a linear scale with values from −0.6 to 0.6"
+ },
+ {
+  "fixture": "qq-plot",
+  "kind": "axis",
+  "caption": "X-axis titled 'Theoretical Normal Quantiles' for a linear scale with values from −3 to 3"
  },
  {
   "fixture": "reshape-matrix",

@@ -146,6 +146,8 @@ public class AxisBuilder(
     val measured = mutableListOf<SceneNode>()
     val tickStroke = GuideStyle.stroke(spec.tickStyle, AxisDefaults.tickColor)
     val gridStroke = GuideStyle.stroke(spec.gridStyle, AxisDefaults.gridColor)
+    // How far the axis itself is pushed off the plot, which the gridlines have to undo.
+    val gridOffset = numbers.resolve(spec.offset, spec.scale) ?: 0.0
 
     // A gridline runs back across the plot, away from the side its axis is on: up from a bottom
     // axis, down from a top one, right from a left one, left from a right one.
@@ -154,6 +156,17 @@ public class AxisBuilder(
     // Gridlines first so they sit under the ticks, matching Vega's ordering.
     if (spec.grid) {
       val gridMeta = NodeMetadata(role = "axis-grid")
+      // An `offset` moves the axis away from the plot, and the gridlines *back*: upstream gives
+      // every gridline endpoint an offset of `sign * axis.offset`, which cancels the translation
+      // the axis group carries. Without it a gridline is dragged along with its axis and floats
+      // clear of the data it is there to measure.
+      val undoOffset =
+        when (spec.orient) {
+          Orient.LEFT,
+          Orient.TOP -> gridOffset
+          Orient.RIGHT,
+          Orient.BOTTOM -> -gridOffset
+        }
       for (tick in ticks) {
         val at = AxisDefaults.crispRound(tick.position)
         children +=
@@ -163,9 +176,9 @@ public class AxisBuilder(
               RuleNode(
                 ids.allocate(),
                 at,
-                0.0,
+                undoOffset,
                 at,
-                gridSign * gridSize.height,
+                gridSign * gridSize.height + undoOffset,
                 gridStroke,
                 metadata = gridMeta,
               )
@@ -173,9 +186,9 @@ public class AxisBuilder(
             Orient.RIGHT ->
               RuleNode(
                 ids.allocate(),
-                0.0,
+                undoOffset,
                 at,
-                gridSign * gridSize.width,
+                gridSign * gridSize.width + undoOffset,
                 at,
                 gridStroke,
                 metadata = gridMeta,

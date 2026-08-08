@@ -691,6 +691,15 @@ public data class LegendSpec(
   val labelSeparation: NumberValue? = null,
   /** As for an axis, but Vega's legend default is 160. */
   val labelLimit: NumberValue? = null,
+  /**
+   * The `encode` blocks as written, per part, for the channels no property can express.
+   *
+   * The same arrangement an axis has: most of a legend's `encode` folds into the properties beside
+   * it, and a few channels have no property behind them. A legend **label read through a scale** is
+   * the one that matters — `{"scale": "label", "field": "value"}` turns a cluster's id into its
+   * name — and there is no `legendLabelText` to fold that into.
+   */
+  val encode: Map<String, EncodeSpec> = emptyMap(),
 ) {
   /**
    * The scale this legend describes.

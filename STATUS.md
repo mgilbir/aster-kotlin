@@ -21,7 +21,7 @@ end to end — expressions, signals, 33 of upstream's 40 data transforms, every 
 and an event handler that recompiles the chart — and are verified against upstream Vega by
 differential tests.
 
-Seventy-four differential fixtures pass, all matching upstream exactly on every mark and scale output:
+Seventy-six differential fixtures pass, all matching upstream exactly on every mark and scale output:
 
 | Fixture | Marks | Covers |
 | --- | --- | --- |
@@ -98,6 +98,8 @@ Seventy-four differential fixtures pass, all matching upstream exactly on every 
 | `grouped-bar` | 56 | `round` on a continuous scale, `mult`/`offset` value references, `contrast()`, labels from the bars' own scene items |
 | `barley-trellis` | 468 | a chart sized by a `height` signal, cells titled from the group mark that made them, axis and legend `encode` blocks, a raised axis painting over the legend, and 120 rows loaded from a relative `url` |
 | `connected-scatter` | 146 | labels nudged by an ordinal scale with a numeric range, a currency-formatted price axis, data from a relative `url` |
+| `global-development` | 175 | an ordinal scale whose range is a data column, a legend label read through it, a legend swatch's fill opacity |
+| `qq-plot` | 332 | two plots gridded side by side, a url from a signal, `quantileNormal`, gridlines that undo an axis offset |
 | `budget-forecasts` | 77 | `argmin` over a filtered group, a scaled channel taking its value from a signal, `bandPosition`, a label placed by an axis `encode` block |
 
 The gate is wired into `./scripts/oracle.sh`, so every further scale, mark and transform is built
@@ -158,7 +160,7 @@ substantive compatibility items:
 | 6. View and Compose APIs | Yes |
 | 7. SVG, PNG, PDF export | Yes |
 | 8. TalkBack can describe and navigate | Partial — virtual nodes are tested by instrumentation, not with TalkBack itself |
-| 9. At least 100 compatibility fixtures pass | 74 of 100 |
+| 9. At least 100 compatibility fixtures pass | 76 of 100 |
 | 10. Core runtime has no Android dependency | Yes |
 | 11. Renders without WebView | Yes |
 | 12. Build and test loop runs from the terminal | Yes |
@@ -495,7 +497,7 @@ each example a deadline.
 
 ## Known failing fixtures
 
-None. Seventy-four fixtures exist and all seventy-four pass — and that sentence became worth
+None. Seventy-six fixtures exist and all seventy-six pass — and that sentence became worth
 something only once the gate could no longer skip itself, below.
 
 **The gate could report success without running.** `FixtureDifferentialTest` reads the fixtures and
@@ -644,6 +646,19 @@ a rule that is Vega's.
 derives by bootstrap — a thousand resamples drawn with `Math.random()` — so the same data gives a
 different chart every run. It belongs with the examples refused for reproducibility, and the
 diagnostic now says which of the two it is rather than only "not implemented".
+
+`global-development` and `qq-plot` came next and were each one gap from passing once the scale range,
+the signal url and the distribution functions were in. `global-development` needed the legend
+counterpart of the axis-label encode: a label read through a scale, `{"scale": "label", "field":
+"value"}`, turning a cluster's id into its name, plus a swatch `fillOpacity` — which is *not*
+`symbolOpacity`, that one fading the outline along with the swatch.
+
+`qq-plot` found two, and the second had been sitting in plain sight since the trellis was written.
+An axis `offset` was dragging its gridlines with it, where upstream gives every gridline endpoint an
+offset of `sign * axis.offset` so they stay on the plot. And **every cell in a scope has to go on one
+grid, whichever group mark produced it.** Gridding each group mark separately looks identical
+whenever there is only one, which is what every trellis fixture had; this chart is two group marks
+under `columns: 2`, and both landed at the origin on top of each other.
 
 `domain-limits` found one more, in a corner nothing had reached before: a symbol sized to **zero**
 was bounded as nothing at all, where upstream bounds it as a degenerate point at its anchor. A test

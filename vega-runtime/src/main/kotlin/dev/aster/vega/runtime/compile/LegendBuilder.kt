@@ -83,7 +83,35 @@ internal class LegendBuilder(
   private val textEngine: TextEngine,
   private val diagnostics: DiagnosticCollector,
   private val numbers: NumberResolver,
+  /**
+   * Resolves a legend `encode` channel that has no property behind it — a label read through a
+   * scale, a swatch's fill opacity. Optional, because a legend built without one still draws.
+   */
+  private val channels: MarkEncoder? = null,
 ) {
+
+  /** The datum a legend part's `encode` block is resolved against: the entry it is drawing. */
+  private fun entryDatum(entry: Entry): VegaValue =
+    VegaValue.Obj(linkedMapOf("value" to entry.value, "label" to VegaValue.Str(entry.label)))
+
+  /**
+   * One channel of a legend part's `encode`, resolved against the entry, as a number.
+   *
+   * `enter` and `update` both, unlike an axis label's position: a legend writes its swatch's paint
+   * in `enter` and leaves it there, so an `enter` block survives where an axis label's would not.
+   */
+  private fun entryNumber(spec: LegendSpec, part: String, channel: String, entry: Entry): Double? {
+    val encoder = channels ?: return null
+    val block = spec.encode[part] ?: return null
+    return encoder.channelNumber(block.effective[channel] ?: return null, entryDatum(entry))
+  }
+
+  /** The same, as text — which is what turns a legend entry's id into its name. */
+  private fun entryText(spec: LegendSpec, part: String, channel: String, entry: Entry): String? {
+    val encoder = channels ?: return null
+    val block = spec.encode[part] ?: return null
+    return encoder.channelText(block.effective[channel] ?: return null, entryDatum(entry))
+  }
 
   /**
    * One legend, sized but not yet placed.
@@ -276,7 +304,7 @@ internal class LegendBuilder(
       val labelX = anchor + LegendDefaults.SYMBOL_OFFSET + labelOffset
       val run =
         TextRun(
-          text = entry.label,
+          text = entryText(spec, "labels", "text", entry) ?: entry.label,
           style = labelStyle,
           align = TextAlign.LEFT,
           baseline = TextBaseline.MIDDLE,
@@ -289,7 +317,14 @@ internal class LegendBuilder(
           y = centre,
           size = sizes[index],
           shape = shape,
-          fill = symbolFill(spec, entry.value),
+          fill =
+            symbolFill(spec, entry.value)?.let { fill ->
+              // `fillOpacity` fades what is inside the swatch and leaves its outline alone, which
+              // is not what `symbolOpacity` does — that fades both. There is no property for the
+              // first, so it comes from the encode block or not at all.
+              entryNumber(spec, "symbols", "fillOpacity", entry)?.let { fill.copy(opacity = it) }
+                ?: fill
+            },
           stroke = symbolStroke(spec, entry.value, strokeWidth),
           // `symbolOpacity` is the item's overall opacity upstream, not a fill or stroke opacity —
           // it fades the outline with the swatch rather than only what is inside it.
@@ -502,7 +537,7 @@ internal class LegendBuilder(
       // against the chart edge.
       val run =
         TextRun(
-          text = entry.label,
+          text = entryText(spec, "labels", "text", entry) ?: entry.label,
           style = labelStyle,
           align =
             if (vertical) TextAlign.LEFT

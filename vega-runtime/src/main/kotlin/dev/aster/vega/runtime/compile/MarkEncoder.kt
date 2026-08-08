@@ -126,6 +126,9 @@ public class MarkEncoder(
   public fun channelNumber(channel: ChannelValue, datum: VegaValue): Double? =
     position(channel, datum)
 
+  /** The same, as text: a legend label read through a scale turns an id into a name. */
+  public fun channelText(channel: ChannelValue, datum: VegaValue): String? = string(channel, datum)
+
   /**
    * A mark's scene items, as data another mark can be drawn from.
    *
