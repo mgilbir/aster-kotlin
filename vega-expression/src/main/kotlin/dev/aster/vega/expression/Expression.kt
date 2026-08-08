@@ -124,6 +124,17 @@ public interface ExpressionScope {
    * what a bare expression evaluated outside a chart should do.
    */
   public fun setDataset(name: String, rows: List<VegaValue>) {}
+
+  /**
+   * `treePath('name', from, to)` — the rows between two nodes of a stratified dataset.
+   *
+   * A scope with no tree of that name returns null, which is what upstream returns for a link whose
+   * ends are not both in the tree.
+   */
+  public fun treePath(name: String, from: VegaValue, to: VegaValue): VegaValue = VegaValue.Null
+
+  /** `treeAncestors('name', node)` — that node's row and every ancestor's, the root last. */
+  public fun treeAncestors(name: String, node: VegaValue): VegaValue = VegaValue.Null
 }
 
 /**

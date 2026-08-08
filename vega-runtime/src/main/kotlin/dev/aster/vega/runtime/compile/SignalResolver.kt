@@ -1,5 +1,6 @@
 package dev.aster.vega.runtime.compile
 
+import dev.aster.vega.dataflow.transform.TreeSource
 import dev.aster.vega.expression.CachingExpressionCompiler
 import dev.aster.vega.expression.ExpressionCompiler
 import dev.aster.vega.expression.ExpressionEvaluationException
@@ -12,6 +13,7 @@ import dev.aster.vega.model.DiagnosticCodes
 import dev.aster.vega.model.DiagnosticCollector
 import dev.aster.vega.model.VegaValue
 import dev.aster.vega.model.asDouble
+import dev.aster.vega.model.asString
 import dev.aster.vega.model.spec.SignalSpec
 import dev.aster.vega.runtime.scale.BandScale
 import dev.aster.vega.runtime.scale.BinnedScale
@@ -73,10 +75,31 @@ public class SignalScope(
    * dataset to replace.
    */
   private val datasetSink: ((String, List<VegaValue>) -> Unit)? = null,
+  /** The hierarchy each stratified dataset built, for `treePath` and `treeAncestors`. */
+  private val trees: Map<String, TreeSource> = emptyMap(),
 ) : ExpressionScope {
 
   override fun setDataset(name: String, rows: List<VegaValue>) {
     datasetSink?.invoke(name, rows)
+  }
+
+  override fun treePath(name: String, from: VegaValue, to: VegaValue): VegaValue =
+    rowsAt(name, trees[name]?.pathBetween(from.asString(), to.asString()))
+
+  override fun treeAncestors(name: String, node: VegaValue): VegaValue =
+    rowsAt(name, trees[name]?.ancestorsOf(node.asString()))
+
+  /**
+   * The dataset's rows at the given positions, **as they stand now**.
+   *
+   * A tree records positions rather than rows because this engine's transforms copy: the rows the
+   * hierarchy was built from no longer carry what the formulas after it wrote, and a path drawn
+   * from them would have every node at the origin.
+   */
+  private fun rowsAt(name: String, positions: List<Int>?): VegaValue {
+    if (positions == null) return VegaValue.Null
+    val rows = datasets[name] ?: return VegaValue.Null
+    return VegaValue.Arr(positions.map { rows.getOrNull(it) ?: VegaValue.Null })
   }
 
   override fun signal(name: String): VegaValue = values[name] ?: VegaValue.Null
@@ -180,6 +203,7 @@ public class SignalScope(
       indataIndexes,
       pendingScales,
       datasetSink,
+      trees,
     )
 
   /** Adds the scales once they exist, which is after every signal has resolved. */
@@ -196,6 +220,7 @@ public class SignalScope(
       indataIndexes,
       pendingScales,
       datasetSink,
+      trees,
     )
 
   public val names: Set<String>

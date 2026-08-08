@@ -7,6 +7,7 @@ import dev.aster.vega.expression.ExpressionCompiler
 import dev.aster.vega.model.DiagnosticCodes
 import dev.aster.vega.model.DiagnosticCollector
 import dev.aster.vega.model.VegaValue
+import dev.aster.vega.model.field
 import dev.aster.vega.model.roundHalfUp
 import dev.aster.vega.model.spec.AxisSpec
 import dev.aster.vega.model.spec.FacetSpec
@@ -584,6 +585,19 @@ internal class ScopeCompiler(
         operator = spec.name,
       )
       return emptyList()
+    }
+
+    // Pre-faceted data: the grouping is already in the rows, and `field` names the column holding
+    // each group's own list. One cell per row, and the cell's datum is that row — an edge-bundling
+    // diagram draws one line per dependency along the tree path the dependency carries.
+    facet.field?.let { field ->
+      return source.map { row ->
+        Partition(
+          datum = row,
+          rows = (row.field(field) as? VegaValue.Arr)?.values.orEmpty(),
+          boundName = facet.name,
+        )
+      }
     }
 
     return groupTuples(source, facet.groupby).map { (key, rows) ->

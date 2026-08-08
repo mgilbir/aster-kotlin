@@ -874,6 +874,14 @@ public data class FacetSpec(
    * points are in it — the cell's marks read them off `parent`.
    */
   val aggregate: List<FacetMeasure> = emptyList(),
+  /**
+   * `facet.field` — the data is **already** grouped, and this names the column holding each group.
+   *
+   * Every row of [data] becomes one cell, and the rows of that cell are the array in this field
+   * rather than something a `groupby` worked out. An edge-bundling diagram is built this way: each
+   * dependency carries the path through the tree it takes, and the cell draws that path.
+   */
+  val field: String? = null,
 )
 
 /** One `facet.aggregate` entry: an operation, the field it reads, and the name it writes. */

@@ -26,6 +26,64 @@ internal class TreeNode(index: Int, val datum: VegaValue?) : TreeSource {
     index = value
   }
 
+  /**
+   * How a key names a node, kept on the root by `stratify`.
+   *
+   * Only `treePath` and `treeAncestors` need it, and only from the root — every other consumer
+   * walks the structure it was handed rather than looking a node up by name.
+   */
+  var byKey: Map<String, TreeNode>? = null
+
+  override fun pathBetween(fromKey: String, toKey: String): List<Int>? {
+    val index = byKey ?: return null
+    val from = index[fromKey] ?: return null
+    val to = index[toKey] ?: return null
+    val ancestor = leastCommonAncestor(from, to) ?: return null
+
+    // d3's `node.path`: walk up from the start, then splice the end's chain in behind it, so the
+    // result reads start … ancestor … end with no node repeated.
+    val nodes = mutableListOf(from)
+    var walk = from
+    while (walk !== ancestor) {
+      walk = walk.parent ?: return null
+      nodes.add(walk)
+    }
+    val turn = nodes.size
+    var back = to
+    while (back !== ancestor) {
+      nodes.add(turn, back)
+      back = back.parent ?: return null
+    }
+    return nodes.map { it.index }
+  }
+
+  override fun ancestorsOf(key: String): List<Int>? {
+    val node = byKey?.get(key) ?: return null
+    val out = mutableListOf<Int>()
+    var walk: TreeNode? = node
+    while (walk != null) {
+      out.add(walk.index)
+      walk = walk.parent
+    }
+    return out
+  }
+
+  private fun leastCommonAncestor(a: TreeNode, b: TreeNode): TreeNode? {
+    if (a === b) return a
+    val seen = HashSet<TreeNode>()
+    var walk: TreeNode? = a
+    while (walk != null) {
+      seen.add(walk)
+      walk = walk.parent
+    }
+    walk = b
+    while (walk != null) {
+      if (walk in seen) return walk
+      walk = walk.parent
+    }
+    return null
+  }
+
   var parent: TreeNode? = null
   var children: MutableList<TreeNode>? = null
   var depth: Int = 0

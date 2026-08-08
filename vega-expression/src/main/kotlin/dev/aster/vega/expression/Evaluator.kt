@@ -154,6 +154,30 @@ public class Evaluator(
       return VegaValue.Num(1.0)
     }
 
+    if (name == "treePath" || name == "treeAncestors") {
+      val needed = if (name == "treePath") 3 else 2
+      if (node.arguments.size < needed) {
+        throw ExpressionEvaluationException(
+          VegaDiagnostic(
+            severity = DiagnosticSeverity.ERROR,
+            code = DiagnosticCodes.EXPRESSION_UNSUPPORTED_FUNCTION,
+            message = "$name() takes a dataset name and the node(s) to walk between",
+            operator = name,
+          )
+        )
+      }
+      val dataName = evaluate(node.arguments[0], scope).asString()
+      return if (name == "treePath") {
+        scope.treePath(
+          dataName,
+          evaluate(node.arguments[1], scope),
+          evaluate(node.arguments[2], scope),
+        )
+      } else {
+        scope.treeAncestors(dataName, evaluate(node.arguments[1], scope))
+      }
+    }
+
     if (name == "data") {
       val dataset = scope.dataset(evaluate(node.arguments.first(), scope).asString())
       return VegaValue.Arr(dataset)

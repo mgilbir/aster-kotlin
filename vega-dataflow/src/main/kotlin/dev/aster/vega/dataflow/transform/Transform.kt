@@ -51,7 +51,25 @@ public interface TransformContext {
  * layout wrote onto the rows, never the structure — so this carries no members. Widening it later
  * is easy; narrowing a published node type would not be.
  */
-public interface TreeSource
+public interface TreeSource {
+  /**
+   * The rows on the shortest path from one node to another, as `treePath()` reports them.
+   *
+   * Up from the first node to the least common ancestor and back down to the second, inclusive at
+   * both ends — d3-hierarchy's `node.path`, which is what upstream calls. Null when either key
+   * names no node in this tree, which is how `treePath` reports a link to something that was
+   * filtered out.
+   *
+   * **Positions**, not rows. Upstream mutates its tuples, so a node's datum gains whatever later
+   * transforms wrote on it; this engine copies, so the rows the tree was built from are stale by
+   * the time anything asks. The index is a position in the dataset as it stands now, which is how
+   * every other consumer of a tree finds a row too.
+   */
+  public fun pathBetween(fromKey: String, toKey: String): List<Int>? = null
+
+  /** A node's own row and every ancestor's, the root last. */
+  public fun ancestorsOf(key: String): List<Int>? = null
+}
 
 /**
  * One data transform.

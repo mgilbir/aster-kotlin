@@ -474,24 +474,41 @@ class GroupMarkTest {
     )
   }
 
+  /**
+   * `facet.field` groups nothing: the rows are already grouped and the field holds each group.
+   *
+   * One cell per row of the source, and the cell's own data is the array in that column. An
+   * edge-bundling diagram is built this way — each dependency carries the path it takes through the
+   * tree, and the cell draws it.
+   */
   @Test
-  fun `pre-faceted data is reported rather than guessed at`() {
+  fun `pre-faceted data makes one cell per row from the column it names`() {
     val compiled =
       compile(
         """
         {
           "width": 100, "height": 100, "padding": 0,
-          "data": [$table],
+          "data": [{"name": "t", "values": [
+            {"k": "a", "rows": [{"n": 1}, {"n": 2}]},
+            {"k": "b", "rows": [{"n": 3}]}
+          ]}],
           "marks": [{"type": "group",
-            "from": {"facet": {"name": "cell", "data": "t", "field": "v"}},
-            "encode": {"enter": {"width": {"value": 1}, "height": {"value": 1}}}}]
+            "from": {"facet": {"name": "cell", "data": "t", "field": "rows"}},
+            "encode": {"enter": {"width": {"value": 10}, "height": {"value": 10}}},
+            "marks": [{"type": "rect", "from": {"data": "cell"},
+              "encode": {"enter": {"x": {"field": "n"}, "width": {"value": 1},
+                                   "y": {"value": 0}, "height": {"value": 1}}}}]}]
         }
         """
       )
     assertTrue(
-      compiled.diagnostics.any { it.message.contains("Pre-faceted") },
+      compiled.diagnostics.none { it.severity >= DiagnosticSeverity.ERROR },
       compiled.diagnostics.toString(),
     )
+    // Two cells, holding two rows and one: three rects in all, at the `n` of each row.
+    val rects =
+      requireNotNull(compiled.scene).flatten().map { it.node }.filterIsInstance<RectNode>()
+    assertEquals(listOf(1.0, 2.0, 3.0), rects.map { it.x })
   }
 
   @Test

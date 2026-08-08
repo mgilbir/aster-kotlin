@@ -113,6 +113,9 @@ public object StratifyTransform : Transform {
     }
 
     root.sourceSize = input.size
+    // Kept so `treePath` and `treeAncestors` can name a node: every other consumer walks the
+    // structure rather than looking one up.
+    root.byKey = byKey.filterValues { it != null }.mapValues { it.value!! }
     context.tree = root
     return input
   }

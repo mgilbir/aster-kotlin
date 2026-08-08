@@ -1826,14 +1826,11 @@ public class SpecParser {
 
     val groupby = obj.fields["groupby"]?.let { stringList(it) }
     if (groupby.isNullOrEmpty()) {
-      val reason =
-        if (obj.fields["field"] != null) {
-          "Pre-faceted data ('facet.field') is not implemented; use 'groupby' instead"
-        } else {
-          "A facet needs a 'groupby'"
-        }
-      diagnostics.error(DiagnosticCodes.TRANSFORM_NOT_IMPLEMENTED, reason, jsonPath = path)
-      return null
+      val reason = if (obj.fields["field"] != null) null else "A facet needs a 'groupby'"
+      if (reason != null) {
+        diagnostics.error(DiagnosticCodes.TRANSFORM_NOT_IMPLEMENTED, reason, jsonPath = path)
+        return null
+      }
     }
     val aggregate = (obj.fields["aggregate"] as? VegaValue.Obj)
     val ops =
@@ -1857,7 +1854,13 @@ public class SpecParser {
             ?: if (field == null) op else "${'$'}{op}_${'$'}field",
       )
     }
-    return FacetSpec(name = name, data = data, groupby = groupby, aggregate = measures)
+    return FacetSpec(
+      name = name,
+      data = data,
+      groupby = groupby.orEmpty(),
+      aggregate = measures,
+      field = obj.fields["field"]?.asString()?.takeIf { it.isNotEmpty() },
+    )
   }
 
   /**

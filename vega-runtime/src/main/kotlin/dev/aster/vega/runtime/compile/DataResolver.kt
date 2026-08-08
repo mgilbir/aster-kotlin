@@ -298,6 +298,7 @@ internal class DataResolver(
             deferredSignals,
             spec.name,
             scales,
+            trees,
           )
         values = pipeline.run(values, spec.transform, context)
         tree = context.tree
@@ -363,6 +364,8 @@ internal class DataResolver(
     private val deferredSignals: Set<String>,
     private val dataset: String,
     private val scales: Map<String, VegaScale>,
+    /** Every stratified dataset's hierarchy, for a `treePath` inside a transform expression. */
+    private val trees: Map<String, TreeSource>,
   ) : TransformContext {
 
     /** One diagnostic per signal per dataset; the expression runs once a row. */
@@ -376,7 +379,7 @@ internal class DataResolver(
 
     override fun scopeFor(datum: VegaValue): ExpressionScope =
       DeferredSignalScope(
-        SignalScope(signals, datasets, datum, scales, diagnostics),
+        SignalScope(signals, datasets, datum, scales, diagnostics, trees = trees),
         ::reportDeferred,
       )
 
