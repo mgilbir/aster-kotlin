@@ -21,7 +21,7 @@ end to end — expressions, signals, 33 of upstream's 40 data transforms, every 
 and an event handler that recompiles the chart — and are verified against upstream Vega by
 differential tests.
 
-Seventy-seven differential fixtures pass, all matching upstream exactly on every mark and scale output:
+Seventy-eight differential fixtures pass, all matching upstream exactly on every mark and scale output:
 
 | Fixture | Marks | Covers |
 | --- | --- | --- |
@@ -102,6 +102,7 @@ Seventy-seven differential fixtures pass, all matching upstream exactly on every
 | `global-development` | 175 | an ordinal scale whose range is a data column, a legend label read through it, a legend swatch's fill opacity |
 | `qq-plot` | 332 | two plots gridded side by side, a url from a signal, `quantileNormal`, gridlines that undo an axis offset |
 | `budget-forecasts` | 77 | `argmin` over a filtered group, a scaled channel taking its value from a signal, `bandPosition`, a label placed by an axis `encode` block |
+| `probability-density` | 533 | a scale over a dataset and two datasets over that scale — the case no fixed order of the phases resolves; a `normal` density whose mean and stdev come from another dataset's aggregate |
 
 The gate is wired into `./scripts/oracle.sh`, so every further scale, mark and transform is built
 against a harness that can say we are wrong — which golden tests cannot.
@@ -161,7 +162,7 @@ substantive compatibility items:
 | 6. View and Compose APIs | Yes |
 | 7. SVG, PNG, PDF export | Yes |
 | 8. TalkBack can describe and navigate | Partial — virtual nodes are tested by instrumentation, not with TalkBack itself |
-| 9. At least 100 compatibility fixtures pass | 77 of 100 |
+| 9. At least 100 compatibility fixtures pass | 78 of 100 |
 | 10. Core runtime has no Android dependency | Yes |
 | 11. Renders without WebView | Yes |
 | 12. Build and test loop runs from the terminal | Yes |
@@ -498,7 +499,7 @@ each example a deadline.
 
 ## Known failing fixtures
 
-None. Seventy-seven fixtures exist and all seventy-seven pass — and that sentence became worth
+None. Seventy-eight fixtures exist and all seventy-eight pass — and that sentence became worth
 something only once the gate could no longer skip itself, below.
 
 **The gate could report success without running.** `FixtureDifferentialTest` reads the fixtures and
@@ -679,18 +680,44 @@ boundary, which was enough to make the tallest column one dot short and the char
 short — and nothing else in the chart was wrong, which is why it took a signal-by-signal comparison
 to see at all.
 
-`probability-density` was taken up next and set down deliberately, because what it needs is
-structural rather than a feature. Its diagnostic reads "density needs an 'extent'" and the extent is
-plainly there — `{"signal": "domain('xscale')"}`. What is missing is the **compile order**: this
-engine runs three fixed phases, all data then signals then scales, and that chart needs them
-interleaved. `xscale`'s domain is data-driven, so it cannot be built before the `points` dataset; the
-`density` dataset's transform needs `domain('xscale')`, so it cannot run before the scale. Upstream
-has no phases — it ranks one dataflow — and that ordering is what it buys.
+## The three compile phases are gone
 
-Two pieces of that have already been taken, and they are the shape of the rest: signals reaching for
-no dataset now resolve before the data, and scales waiting on no signal are built before the signals.
-The general form — ordering datasets, scales and signals together by dependency — is the last big
-structural difference from upstream and is recorded in HANDOFF as such rather than patched around.
+`probability-density` needed something structural rather than a feature, and it is the last big
+structural difference from upstream to close. The engine ran three fixed phases — all data, then all
+signals, then all scales — and that chart cannot be resolved by any fixed order of the three:
+`xscale`'s domain is `{"data": "points", "field": "u"}`, so the scale waits on a dataset, and the
+`density` dataset's `extent` is `{"signal": "domain('xscale')"}`, so a dataset waits on that scale.
+Its diagnostic said "density needs an 'extent'" while the extent was plainly there.
+
+`DataflowOrder` replaces the phases with one dependency ranking over all three kinds, which is what
+upstream gets for free: `vega-parser` puts every dataset, scale and signal into a single dataflow and
+the topological rank decides what runs when. The edges come from the same places upstream's do —
+`dataVisitor` and `scaleVisitor` read the string literal a `data()` or `scale()` is handed, so
+`Expression` now reports `dataDependencies` and `scaleDependencies` by name instead of one "reads
+something deferred" flag. That flag had a hole worth recording: `domain` and `range` are scaleVisitor
+functions upstream and were missing from its list, so a signal reading `domain('xscale')` looked free
+of both data and scales and was resolved before either existed.
+
+Ties are broken towards signals, then datasets, then scales. That is not only determinism: it is what
+preserves the property the old phases had, that a signal reaching for no dataset resolves before every
+dataset, so a transform parameter written as a signal reads a number. It also strengthens it — every
+signal that has *become* resolvable is resolved before the next dataset runs, so a transform can now
+read a signal computed from an earlier dataset. Upstream agrees: `{"name": "rows", "update":
+"length(data('t'))"}` read by a later dataset's `formula` gives `p: 2`, and did give null here.
+
+Three special cases went away with the phases: `SpecCompiler.dataFreeSignals`, `ScaleSpec.isSignalFree`
+and the "a scale cannot be read while signals are resolving" diagnostic, which was describing the old
+ordering rather than anything true. A genuine cycle is still reported, now as the path that closed it
+across all three kinds, and one operator on it is placed anyway so the chart draws and says it is
+wrong rather than not drawing.
+
+What the graph still cannot see is a signal read through a transform's **expression** parameter —
+`filter`'s `expr`, `formula`'s `expr`, `cross`'s `filter`, which are the only three upstream declares
+as `type: 'expr'`. Those are per-row expressions rather than `{"signal": ...}` references, so a dataset
+carrying one is not held back for the signal it reads, and the "read a signal whose value is not known
+yet" warning in `DataResolver` is still the only thing that says so. A group mark also still resolves
+its own data, then signals, then scales in three phases; nothing in the corpus needs them interleaved,
+because the enclosing scope's signals and scales are all settled by the time a group is reached.
 
 `domain-limits` found one more, in a corner nothing had reached before: a symbol sized to **zero**
 was bounded as nothing at all, where upstream bounds it as a degenerate point at its anchor. A test

@@ -308,18 +308,16 @@ class SignalCompileTest {
   }
 
   /**
-   * A transform runs before the signals are resolved, so a computed signal reads as null there —
-   * and null is zero to arithmetic, which draws a chart in the wrong place rather than failing.
+   * A transform can read a signal that was computed *from an earlier dataset*.
    *
-   * Vega's own radial tree example is written this way: `originX` has an `update`, and every node's
-   * `x` is `originX + radius * cos(...)`, so the whole diagram collapsed onto the origin with
-   * nothing said. Only a signal with a plain `value` can be seeded before the data, because a
-   * signal's `update` may itself read a dataset.
+   * `rows` is `length(data('t'))`, so it cannot be known before `t` — but it can be known before
+   * `u`, and the order puts it there. Every signal that has become resolvable is resolved before
+   * the next dataset runs, which is what maximises how much a transform can see.
+   *
+   * Verified against upstream: `u` comes out as `{"v": 1, "p": 2}`.
    */
   @Test
-  fun `a transform reading a signal computed from data is reported by name`() {
-    // `rows` cannot be known before the data, because it *is* the data. A transform reading it gets
-    // nothing, and nothing is zero to arithmetic — so the name has to be said out loud.
+  fun `a transform reading a signal computed from an earlier dataset sees its value`() {
     val compiled =
       compile(
         """
@@ -333,6 +331,56 @@ class SignalCompileTest {
               "source": "t",
               "transform": [{"type": "formula", "expr": "rows + datum.v", "as": "p"}]
             }
+          ],
+          "marks": [{
+            "type": "rect", "from": {"data": "u"},
+            "encode": {"enter": {
+              "x": {"field": "p"}, "y": {"value": 0},
+              "width": {"value": 1}, "height": {"value": 1}
+            }}
+          }]
+        }
+        """
+          .trimIndent()
+      )
+    assertTrue(
+      compiled.diagnostics.none { it.message.contains("signal 'rows'") },
+      compiled.diagnostics.toString(),
+    )
+    // `rows` is 1 and `v` is 1, so a transform that saw the signal wrote 2 and one that did not
+    // wrote 1 — the two are a pixel apart, which is exactly the kind of wrong this used to be.
+    val bars = requireNotNull(compiled.scene).flatten().map { it.node }.filterIsInstance<RectNode>()
+    assertEquals(listOf(2.0), bars.map { it.x })
+  }
+
+  /**
+   * And the case the order cannot fix: the signal's dataset comes *after* the transform reading it.
+   *
+   * `u` sources from nothing and is declared first, so it runs before `t` exists and therefore
+   * before `rows` can be worked out. A transform's expression parameter is not in the dependency
+   * graph — `formula`'s `expr` is a per-row expression, not a `{"signal": ...}` reference — so
+   * nothing holds `u` back, and the read comes out null. Null is zero to arithmetic, which draws a
+   * chart in the wrong place rather than failing, so the name has to be said out loud.
+   *
+   * Vega's own radial tree example fails this way: `originX` has an `update`, and every node's `x`
+   * is `originX + radius * cos(...)`, so the whole diagram collapsed onto the origin with nothing
+   * said.
+   */
+  @Test
+  fun `a transform reading a signal from a later dataset is reported by name`() {
+    val compiled =
+      compile(
+        """
+        {
+          "width": 100, "height": 50, "padding": 0,
+          "signals": [{"name": "rows", "update": "length(data('t'))"}],
+          "data": [
+            {
+              "name": "u",
+              "values": [{"v": 1}],
+              "transform": [{"type": "formula", "expr": "rows + datum.v", "as": "p"}]
+            },
+            {"name": "t", "values": [{"v": 1}]}
           ],
           "marks": []
         }

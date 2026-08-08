@@ -39,9 +39,9 @@ public class SignalScope(
   /**
    * The chart's scales, for `scale('x', datum.v)` inside an expression.
    *
-   * Empty while the signals themselves are being resolved, because scales are built *from* signals
-   * and do not exist yet — which is upstream's ordering too, and why a signal's own `update` cannot
-   * call `scale()` while a mark encoding can.
+   * Holds whatever exists *by the point this scope was made*, which for a top-level signal is every
+   * scale the dependency order put ahead of it. So a signal may call `scale()` on a scale that does
+   * not wait on it, and only a genuine cycle leaves one unavailable.
    */
   private val scales: Map<String, VegaScale> = emptyMap(),
   /**
@@ -142,17 +142,15 @@ public class SignalScope(
     if (scale == null) {
       diagnostics?.error(
         DiagnosticCodes.SCALE_UNSUPPORTED_TYPE,
-        // Three different failures, and telling them apart is the whole value of the message. Only
-        // the last is a typo; the first two are questions asked too early, and answering them with
-        // "no such scale" sends the reader hunting for a misspelling that is not there.
+        // Two different failures, and telling them apart is the whole value of the message. Only
+        // the second is a typo; the first is a question asked too early, and answering it with "no
+        // such scale" sends the reader hunting for a misspelling that is not there.
         when {
           name in pendingScales ->
-            "$function() names scale '$name', which this scope defines but has not built yet: a " +
-              "scale is built *from* the signals of its own scope, so a signal cannot read one " +
-              "declared beside it"
-          scales.isEmpty() ->
-            "$function() cannot be used while signals are resolving: a scale is built *from* " +
-              "signals — its domain or range may be signal-valued — so none exists yet"
+            "$function() names scale '$name', which this scope defines but has not built yet — it " +
+              "comes later in the dependency order. At the top level that means a cycle, reported " +
+              "on its own; inside a group mark it means reading one of the group's own scales, " +
+              "which are built from the very signals being resolved"
           else -> "$function() names scale '$name', which this specification does not define"
         },
         operator = name,
@@ -224,20 +222,43 @@ public class SignalResolver(
      * premature rather than as a typo.
      */
     pendingScales: Set<String> = emptySet(),
-  ): SignalScope =
-    Resolution(signals, datasets, implicit, pinned, enclosingScales, pendingScales).run()
+  ): SignalScope {
+    val session = session(signals, LinkedHashMap(implicit), pinned)
+    for (signal in signals) session.resolve(signal.name, datasets, enclosingScales, pendingScales)
+    return session.scope(datasets, enclosingScales)
+  }
 
-  /** One resolution pass. Holds the mutable bookkeeping so the resolver itself stays reusable. */
-  private inner class Resolution(
+  /**
+   * A resolution the caller drives one signal at a time.
+   *
+   * The batch [resolve] above is the whole of a group scope's needs: its signals resolve together,
+   * against data and scales that already exist. The top level is not like that — a signal may sit
+   * between a dataset and a scale in dependency order — so [SpecCompiler] interleaves the three and
+   * asks for one signal at a time, handing over the datasets and scales that exist by then.
+   *
+   * @param values the map to fill, seeded with whatever is already known. Shared rather than
+   *   copied, because a transform may *publish* a signal — `extent` writes its result to one — and
+   *   the caller resolving datasets into the same map is how that becomes visible here.
+   */
+  public fun session(
     signals: List<SignalSpec>,
-    private val datasets: Map<String, List<VegaValue>>,
-    implicit: Map<String, VegaValue>,
+    values: MutableMap<String, VegaValue>,
+    pinned: Map<String, VegaValue> = emptyMap(),
+  ): Resolution = Resolution(signals, values, pinned)
+
+  /**
+   * One resolution pass. Holds the mutable bookkeeping so the resolver itself stays reusable.
+   *
+   * The datasets and scales are arguments to [resolve] rather than fields because they grow while a
+   * resolution is in progress: what a signal can read depends on where it sits in the order.
+   */
+  public inner class Resolution
+  internal constructor(
+    signals: List<SignalSpec>,
+    private val values: MutableMap<String, VegaValue>,
     pinned: Map<String, VegaValue>,
-    private val enclosingScales: Map<String, VegaScale>,
-    private val pendingScales: Set<String>,
   ) {
     private val specs = LinkedHashMap<String, SignalSpec>()
-    private val values = LinkedHashMap<String, VegaValue>(implicit)
     private val settled = mutableSetOf<String>()
     private val inProgress = LinkedHashSet<String>()
 
@@ -271,12 +292,18 @@ public class SignalResolver(
       }
     }
 
-    fun run(): SignalScope {
-      for (name in specs.keys) resolve(name)
-      return SignalScope(values, datasets, diagnostics = diagnostics, scales = enclosingScales)
-    }
+    /** Everything resolved so far, as a scope an expression can read. */
+    public fun scope(
+      datasets: Map<String, List<VegaValue>>,
+      scales: Map<String, VegaScale> = emptyMap(),
+    ): SignalScope = SignalScope(values, datasets, diagnostics = diagnostics, scales = scales)
 
-    private fun resolve(name: String) {
+    public fun resolve(
+      name: String,
+      datasets: Map<String, List<VegaValue>>,
+      scales: Map<String, VegaScale> = emptyMap(),
+      pendingScales: Set<String> = emptySet(),
+    ) {
       if (name in settled) return
       val spec = specs[name] ?: return
 
@@ -292,14 +319,19 @@ public class SignalResolver(
       }
 
       try {
-        values[name] = evaluate(spec)
+        values[name] = evaluate(spec, datasets, scales, pendingScales)
         settled.add(name)
       } finally {
         inProgress.remove(name)
       }
     }
 
-    private fun evaluate(spec: SignalSpec): VegaValue {
+    private fun evaluate(
+      spec: SignalSpec,
+      datasets: Map<String, List<VegaValue>>,
+      scales: Map<String, VegaScale>,
+      pendingScales: Set<String>,
+    ): VegaValue {
       val source = spec.expression ?: return spec.value ?: VegaValue.Null
 
       return when (val compiled = expressions.compile(source)) {
@@ -308,9 +340,10 @@ public class SignalResolver(
           spec.value ?: VegaValue.Null
         }
         is ExpressionResult.Compiled -> {
-          // Resolve everything this signal reads before reading it.
+          // Resolve everything this signal reads before reading it. Already done when the caller
+          // drives the order itself, and the settled check makes that a no-op.
           for (dependency in compiled.expression.signalDependencies) {
-            if (dependency != spec.name) resolve(dependency)
+            if (dependency != spec.name) resolve(dependency, datasets, scales, pendingScales)
           }
           try {
             compiled.expression.evaluate(
@@ -318,7 +351,7 @@ public class SignalResolver(
                 values,
                 datasets,
                 diagnostics = diagnostics,
-                scales = enclosingScales,
+                scales = scales,
                 pendingScales = pendingScales,
               )
             )

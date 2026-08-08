@@ -61,20 +61,6 @@ public interface Expression {
    */
   public val readsUnnamedScale: Boolean
 
-  /**
-   * Whether this expression reaches for anything built after it — a dataset or a scale.
-   *
-   * True exactly when one of the four above is non-empty. A specification may name a signal `data`
-   * or write `datum.scale`, and neither is a call, which is why this asks the parsed expression
-   * rather than its text.
-   */
-  public val readsDataOrScales: Boolean
-    get() =
-      dataDependencies.isNotEmpty() ||
-        scaleDependencies.isNotEmpty() ||
-        readsUnnamedDataset ||
-        readsUnnamedScale
-
   public fun evaluate(scope: ExpressionScope): VegaValue
 }
 

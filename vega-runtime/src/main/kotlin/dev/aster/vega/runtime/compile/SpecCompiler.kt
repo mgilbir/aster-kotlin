@@ -2,7 +2,6 @@ package dev.aster.vega.runtime.compile
 
 import dev.aster.vega.expression.CachingExpressionCompiler
 import dev.aster.vega.expression.ExpressionCompiler
-import dev.aster.vega.expression.ExpressionResult
 import dev.aster.vega.expression.VegaExpressionCompiler
 import dev.aster.vega.model.DiagnosticCodes
 import dev.aster.vega.model.DiagnosticCollector
@@ -13,7 +12,6 @@ import dev.aster.vega.model.spec.ChannelValue
 import dev.aster.vega.model.spec.EncodeSpec
 import dev.aster.vega.model.spec.MarkSpec
 import dev.aster.vega.model.spec.MarkType
-import dev.aster.vega.model.spec.SignalSpec
 import dev.aster.vega.model.spec.SpecParser
 import dev.aster.vega.model.spec.VegaSpec
 import dev.aster.vega.runtime.load.DataLoader
@@ -58,10 +56,11 @@ public data class CompiledSpec(
 /**
  * Compiles a parsed Vega specification into a scene.
  *
- * This walks the pipeline in the order the stages depend on each other: data, signals, scales, mark
- * encoding, axes and layout. It executes the subset the runtime supports and reports the rest,
- * which is what lets the differential harness compare against upstream on a real specification
- * instead of on hand-authored scenes.
+ * The datasets, scales and signals are resolved in one dependency order rather than in three fixed
+ * phases — see [DataflowOrder], which is this compiler's stand-in for upstream's dataflow ranking.
+ * Mark encoding, axes and layout follow, in that order. It executes the subset the runtime supports
+ * and reports the rest, which is what lets the differential harness compare against upstream on a
+ * real specification instead of on hand-authored scenes.
  *
  * Nesting lives in [ScopeCompiler]: a group mark carries a whole scope of its own, and this class
  * only sets up the outermost one. Legends and titles are not implemented; the parser reports them.
@@ -152,90 +151,76 @@ public class SpecCompiler(
       )
     val expressions = CachingExpressionCompiler(VegaExpressionCompiler())
 
-    // Data first, because a signal may read a dataset. But a transform may equally read a signal —
-    // `"ops": [{"signal": "op"}]` is how a chart lets a control choose which aggregate to compute —
-    // and resolving every signal after the data left those reading null, silently, since an unknown
-    // name is not an error to an expression.
+    // Datasets, scales and signals are resolved in **one dependency order**, not in three phases.
     //
-    // So the signals that cannot possibly depend on a dataset go in first: those with a plain
-    // `value` and neither `init` nor `update`. They are constants, so seeding them cannot conflict
-    // with what the full pass works out for them, and they are what a transform parameter actually
-    // reads. A signal whose value is computed still resolves after the data, and a specification
-    // that needs one *inside* a transform needs the full dataflow.
-    val transformSignals = LinkedHashMap<String, VegaValue>(implicitSignals)
-    for (signal in spec.signals) {
-      if (signal.init == null && signal.update == null) {
-        signal.value?.let { transformSignals[signal.name] = it }
+    // Phases cannot express what real specifications ask for. A transform parameter may be a signal
+    // — `"ops": [{"signal": "op"}]` is how a chart lets a control choose an aggregate — so signals
+    // have to come before data; a scale domain may name a dataset, so data has to come before
+    // scales; and a transform parameter may be `{"signal": "domain('xscale')"}`, so a scale has to
+    // come before data. `probability-density` needs all three at once and no fixed order supplies
+    // it. Upstream never had the problem: `vega-parser` puts every dataset, scale and signal into
+    // one dataflow and the topological ranking decides. [DataflowOrder] is that ranking.
+    val order = DataflowOrder.of(spec.data, spec.scales, spec.signals, expressions, diagnostics)
+
+    // The state the order fills in, and the reason each piece is shared rather than copied:
+    // `signalValues` because a transform may *publish* a signal, and everything after it must see
+    // that; the datasets and scales because whatever resolves next may read either.
+    val signalValues = LinkedHashMap<String, VegaValue>(implicitSignals)
+    // A handler's value is the current one, and everything downstream — a transform included —
+    // should read that rather than the declared value it is replacing.
+    val session =
+      SignalResolver(diagnostics, expressions).session(spec.signals, signalValues, signalOverrides)
+    val scales = LinkedHashMap<String, VegaScale>()
+    var resolved = ScopeData.Empty
+
+    val dataSpecs = spec.data.associateBy { it.name }
+    val scaleSpecs = spec.scales.associateBy { it.name }
+    // What is *still* waiting, so a premature read can be named as premature. Both shrink as the
+    // order is walked, which is what makes each report specific to where it happened.
+    val unresolvedSignals = spec.signals.mapTo(mutableSetOf()) { it.name }
+    val unbuiltScales = spec.scales.mapTo(mutableSetOf()) { it.name }
+
+    val data = DataResolver(diagnostics, expressions, loader)
+    for (operator in order.order) {
+      when (operator) {
+        is Operator.Signal -> {
+          session.resolve(operator.name, resolved.datasets, scales, unbuiltScales)
+          unresolvedSignals.remove(operator.name)
+        }
+        is Operator.Data ->
+          dataSpecs[operator.name]?.let {
+            resolved = data.resolve(listOf(it), signalValues, resolved, unresolvedSignals, scales)
+          }
+        is Operator.Scale ->
+          scaleSpecs[operator.name]?.let {
+            // The scales built so far are in scope, so a domain written as `{"signal":
+            // "domain('other')"}` reads a real one rather than nothing.
+            val scope =
+              SignalScope(
+                signalValues,
+                resolved.datasets,
+                scales = scales,
+                diagnostics = diagnostics,
+              )
+            scales.putAll(
+              ScaleResolver(
+                  resolved.datasets,
+                  plotSize(signalValues, width, height),
+                  diagnostics,
+                  NumberResolver(expressions, scope, diagnostics),
+                )
+                .resolve(listOf(it))
+            )
+            unbuiltScales.remove(operator.name)
+          }
       }
     }
-    // A handler's value is the current one, and a transform should read that rather than the
-    // initial value it is replacing.
-    transformSignals.putAll(signalOverrides.filterKeys { transformSignals.containsKey(it) })
-    // Then the *computed* signals that still cannot depend on a dataset: those whose expression
-    // calls none of `data`, `indata`, `scale`, `invert` or `bandwidth`, and every one of whose own
-    // dependencies is likewise. `clamp(handleYear, 1980, 2010)` is the ordinary shape — a control's
-    // position derived from another signal — and a `filter` reading it needs the number, not the
-    // nothing it used to get. Upstream reaches the same order by ranking the dataflow: a signal
-    // that depends on no data operator is evaluated before every data operator.
-    //
-    // The pass runs against a *throwaway* collector: whatever it cannot work out is worked out
-    // again below, with the data present, and reporting the same problem twice would be noise.
-    val dataFree = dataFreeSignals(spec.signals, expressions)
-    if (dataFree.isNotEmpty()) {
-      val seeded =
-        SignalResolver(DiagnosticCollector(), expressions)
-          .resolve(dataFree, emptyMap(), transformSignals, signalOverrides)
-      for (signal in dataFree) seeded[signal.name]?.let { transformSignals[signal.name] = it }
-    }
-    // Everything the specification declares that the seeding above could not supply. A transform
-    // reading one of these gets null, which arithmetic turns into zero, so it has to be named.
-    val deferredSignals = spec.signals.map { it.name }.toSet() - transformSignals.keys
-    val data = DataResolver(diagnostics, expressions, loader, deferredSignals)
-    val resolved = data.resolve(spec.data, transformSignals)
+
     val datasets = resolved.datasets
-    // Scales that wait on no declared signal are built *first*, so a signal may call `scale()` on
-    // one: `scale('x', step) - scale('x', 0)` turns a step in data units into a size in pixels, and
-    // a chart that sizes its marks that way is ordinary. Upstream reaches the same order by ranking
-    // its dataflow — a scale depending on no signal operator is built before every signal that
-    // depends on a scale.
-    //
-    // A throwaway collector, because these same scales are built again below with the full signals
-    // and would otherwise report everything twice.
-    val early = spec.scales.filter { it.isSignalFree(sized) }
-    val earlyScales =
-      if (early.isEmpty()) {
-        emptyMap()
-      } else {
-        ScaleResolver(
-            datasets,
-            PlotSize(width, height),
-            DiagnosticCollector(),
-            NumberResolver(expressions, SignalScope(transformSignals, datasets), diagnostics),
-          )
-          .resolve(early)
-      }
-
-    val signals =
-      SignalResolver(diagnostics, expressions)
-        .resolve(
-          spec.signals,
-          datasets,
-          transformSignals,
-          signalOverrides,
-          enclosingScales = earlyScales,
-          // Only the scales still waiting on a signal are pending — which is the precise thing to
-          // say, and narrower than it used to be.
-          pendingScales =
-            spec.scales.filterNot { it.isSignalFree(sized) }.mapTo(mutableSetOf()) { it.name },
-        )
-
+    val signals = session.scope(datasets, scales)
     // The plotting area, now that a declared `width` or `height` signal has had its say. Everything
-    // downstream measures against this: a `"width"` scale range, an axis's extent, the surface.
-    val plot =
-      PlotSize(numberSignal(signals, "width") ?: width, numberSignal(signals, "height") ?: height)
-
-    val numbers = NumberResolver(expressions, signals, diagnostics)
-    val scales = ScaleResolver(datasets, plot, diagnostics, numbers).resolve(spec.scales)
+    // downstream measures against this: an axis's extent, the surface.
+    val plot = plotSize(signalValues, width, height)
 
     val root =
       CompileScope(resolved, signals, scales, plot, spec.scales.associate { it.name to it.type })
@@ -408,46 +393,24 @@ public class SpecCompiler(
   }
 
   /**
-   * The signals whose value cannot possibly depend on a dataset, in declaration order.
+   * The plotting area as the `width` and `height` signals currently have it.
    *
-   * A signal qualifies when its expression reaches for none of the things built after the data — no
-   * `data`, `indata`, `scale`, `invert` or `bandwidth` — and every signal it reads qualifies too.
-   * The recursion is what makes it useful: one signal in the chain touching data disqualifies
-   * everything downstream of it, which is exactly right, and a cycle disqualifies itself rather
-   * than looping.
-   *
-   * Signals with a plain value are excluded because the caller has already seeded them.
+   * Read from the live values rather than settled once, because a scale with a `"width"` range is
+   * built at whatever point the order reaches it — after the `width` signal, which is the edge
+   * [DataflowOrder] adds for exactly this.
    */
-  private fun dataFreeSignals(
-    signals: List<SignalSpec>,
-    expressions: ExpressionCompiler,
-  ): List<SignalSpec> {
-    val declared = signals.associateBy { it.name }
-    val verdicts = HashMap<String, Boolean>()
-
-    fun free(name: String, visiting: MutableSet<String>): Boolean {
-      verdicts[name]?.let {
-        return it
-      }
-      val spec = declared[name] ?: return true // not a signal: a constant or an implicit one
-      val source = spec.expression ?: return true // a literal
-      // A cycle is reported by the real pass; here it only has to not hang.
-      if (!visiting.add(name)) return false
-      val compiled = expressions.compile(source)
-      val answer =
-        compiled is ExpressionResult.Compiled &&
-          !compiled.expression.readsDataOrScales &&
-          compiled.expression.signalDependencies.all { it == name || free(it, visiting) }
-      visiting.remove(name)
-      verdicts[name] = answer
-      return answer
-    }
-
-    return signals.filter { it.expression != null && free(it.name, mutableSetOf()) }
-  }
+  private fun plotSize(
+    signals: Map<String, VegaValue>,
+    declaredWidth: Double,
+    declaredHeight: Double,
+  ): PlotSize =
+    PlotSize(
+      numberSignal(signals, "width") ?: declaredWidth,
+      numberSignal(signals, "height") ?: declaredHeight,
+    )
 
   /** A signal's value as a usable number, or null if it is not one. */
-  private fun numberSignal(signals: SignalScope, name: String): Double? =
+  private fun numberSignal(signals: Map<String, VegaValue>, name: String): Double? =
     (signals[name] as? VegaValue.Num)?.value?.takeIf { it.isFinite() }
 
   public companion object {

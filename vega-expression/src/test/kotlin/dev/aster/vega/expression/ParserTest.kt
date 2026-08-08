@@ -204,12 +204,15 @@ class ParserTest {
   }
 
   @Test
-  fun `reading nothing deferred is distinguished from reading a scale or a dataset`() {
-    // A signal *named* `data`, and a field *called* `scale`; neither is a call.
-    assertEquals(false, compiled("data + datum.scale").readsDataOrScales)
-    assertEquals(false, compiled("clamp(year, 1980, 2010)").readsDataOrScales)
-    assertEquals(true, compiled("domain('xscale')").readsDataOrScales)
-    assertEquals(true, compiled("data('summary')[0].mean").readsDataOrScales)
+  fun `a name that is not a call is not a dependency`() {
+    // A signal *named* `data`, and a field *called* `scale`; neither is a call, and reading the
+    // source text rather than the tree would take both for one.
+    val expression = compiled("data + datum.scale")
+    assertEquals(emptySet<String>(), expression.dataDependencies)
+    assertEquals(emptySet<String>(), expression.scaleDependencies)
+    assertEquals(false, expression.readsUnnamedDataset)
+    assertEquals(false, expression.readsUnnamedScale)
+    assertEquals(setOf("data"), expression.signalDependencies)
   }
 
   @Test

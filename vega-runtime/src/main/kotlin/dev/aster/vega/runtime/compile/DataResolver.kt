@@ -18,6 +18,7 @@ import dev.aster.vega.model.time.DateValues
 import dev.aster.vega.runtime.load.DataLoader
 import dev.aster.vega.runtime.load.DenyLoader
 import dev.aster.vega.runtime.load.LoadDeniedException
+import dev.aster.vega.runtime.scale.VegaScale
 
 /**
  * The datasets visible at one point in a specification, and the tree each of them carries.
@@ -56,15 +57,6 @@ internal class DataResolver(
   private val expressions: ExpressionCompiler,
   /** Refuses everything unless the host opted in; see [DataLoader]. */
   private val loader: DataLoader = DenyLoader,
-  /**
-   * Signals the specification declares whose value is computed rather than written down.
-   *
-   * Signals resolve *after* the data, because a signal's `update` may read a dataset, so only the
-   * plain constants can be seeded beforehand. A transform reaching for one of these therefore gets
-   * nothing — and nothing is zero to arithmetic, which draws a chart rather than failing to. Naming
-   * them is what turns that into a diagnostic; see [TransformScope].
-   */
-  private val deferredSignals: Set<String> = emptySet(),
 ) {
 
   /**
@@ -237,6 +229,24 @@ internal class DataResolver(
     specs: List<DataSpec>,
     signals: MutableMap<String, VegaValue>,
     inherited: ScopeData = ScopeData.Empty,
+    /**
+     * Signals this scope declares that have no value *yet*.
+     *
+     * A transform reaching for one gets nothing — and nothing is zero to arithmetic, which draws a
+     * chart rather than failing to. Naming them is what turns that into a diagnostic; see
+     * [TransformScope]. The set shrinks as a compile proceeds, because a dataset resolved late in
+     * the dependency order can see signals an earlier one could not.
+     */
+    deferredSignals: Set<String> = emptySet(),
+    /**
+     * The scales built so far, for a transform parameter that reads one.
+     *
+     * `{"extent": {"signal": "domain('xscale')"}}` is how a density is computed over exactly the
+     * span an axis will show, and it needs the scale to exist by the time the dataset runs — which
+     * is what [DataflowOrder] arranges. Empty at a group scope, where the enclosing scales are
+     * passed instead.
+     */
+    scales: Map<String, VegaScale> = emptyMap(),
   ): ScopeData {
     if (specs.isEmpty()) return inherited
 
@@ -278,6 +288,7 @@ internal class DataResolver(
             tree,
             deferredSignals,
             spec.name,
+            scales,
           )
         values = pipeline.run(values, spec.transform, context)
         tree = context.tree
@@ -342,6 +353,7 @@ internal class DataResolver(
     override var tree: TreeSource?,
     private val deferredSignals: Set<String>,
     private val dataset: String,
+    private val scales: Map<String, VegaScale>,
   ) : TransformContext {
 
     /** One diagnostic per signal per dataset; the expression runs once a row. */
@@ -354,7 +366,10 @@ internal class DataResolver(
     }
 
     override fun scopeFor(datum: VegaValue): ExpressionScope =
-      DeferredSignalScope(SignalScope(signals, datasets, datum), ::reportDeferred)
+      DeferredSignalScope(
+        SignalScope(signals, datasets, datum, scales, diagnostics),
+        ::reportDeferred,
+      )
 
     /**
      * A transform read a signal whose value is not known until after the data.
@@ -363,9 +378,12 @@ internal class DataResolver(
      * something rather than failing, and the chart is drawn in the wrong place with nothing said.
      * Vega's own radial tree example is written exactly this way: `originX` has an `update`, and
      * every node's `x` is `originX + radius * cos(...)`, so the whole diagram collapsed onto the
-     * origin. Reporting it is not the same as resolving it — the ordering that would resolve it
-     * needs a real dataflow, which is a separate piece of work — but it is the difference between a
-     * chart that is wrong and one that is wrong and says so.
+     * origin.
+     *
+     * What is left after [DataflowOrder] is the case it cannot see: a signal read through a
+     * transform's *expression* parameter — `filter`'s `expr`, `formula`'s `expr` — rather than
+     * through a `{"signal": "..."}` reference. Those are not in the graph, so a dataset carrying
+     * one is not held back for the signal, and the report is still the only warning a reader gets.
      */
     private fun reportDeferred(name: String) {
       if (name in signals || name !in deferredSignals || !reported.add(name)) return

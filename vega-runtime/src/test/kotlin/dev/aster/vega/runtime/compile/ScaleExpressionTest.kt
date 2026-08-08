@@ -134,14 +134,16 @@ class ScaleExpressionTest {
   }
 
   /**
-   * The half that is still circular, and still reported.
+   * A signal may read a scale that itself waits on a *different* signal.
    *
-   * A scale whose own domain comes from a signal cannot be built before the signals, so a signal
-   * reading *it* is asking for something that does not exist yet. Refusing that is not a limitation
-   * — there is no order in which it could work.
+   * There is an order that works — `top`, then `x`, then `mid` — and finding it is what ordering
+   * the three kinds together buys. This was refused while scales were built in one phase after the
+   * signals: the whole phase came too late for `mid` and too early for nothing.
+   *
+   * Verified against upstream, which reports `mid` as 100 and draws that as the text.
    */
   @Test
-  fun `a signal cannot reach a scale that waits on a signal`() {
+  fun `a signal can reach a scale that waits on another signal`() {
     val compiled =
       SpecCompiler()
         .compileJson(
@@ -161,9 +163,9 @@ class ScaleExpressionTest {
           """
             .trimIndent()
         )
-    assertEquals(VegaValue.Null, compiled.signals["mid"])
+    assertEquals(VegaValue.Num(100.0), compiled.signals["mid"])
     assertTrue(
-      compiled.diagnostics.any { it.message.contains("defines but has not built yet") },
+      compiled.diagnostics.none { it.message.contains("has not built yet") },
       compiled.diagnostics.toString(),
     )
   }

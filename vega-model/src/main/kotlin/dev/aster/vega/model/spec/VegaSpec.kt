@@ -397,43 +397,7 @@ public data class ScaleSpec(
   val constant: NumberValue? = null,
   /** Colour interpolation space for a colour range, e.g. `"rgb"` or `"lab"`. */
   val interpolate: String? = null,
-) {
-  /**
-   * True when nothing about this scale waits on a signal the specification declares.
-   *
-   * Such a scale can be built **before** the signals are resolved, which is what lets a signal call
-   * `scale()` on it — `scale('x', step) - scale('x', 0)` is how a chart turns a step in data units
-   * into a size in pixels, and it is ordinary. Upstream reaches the same order by ranking its
-   * dataflow: a scale that depends on no signal operator is built before every signal that does.
-   *
-   * The implicit `width` and `height` do not count *unless the specification declares one of them*
-   * — a chart whose height is `max(ddh, hdh)` has a `"height"` range that waits on exactly the
-   * signals this predicate exists to order around, and treating it as free would size the scale
-   * from the declared default instead.
-   */
-  public fun isSignalFree(declaredSignals: Set<String>): Boolean =
-    listOf(
-        domainMin,
-        domainMax,
-        domainMid,
-        padding,
-        paddingInner,
-        paddingOuter,
-        align,
-        base,
-        exponent,
-        constant,
-      )
-      .none { it is NumberValue.Signal } &&
-      domain !is DomainSpec.FromSignal &&
-      (domain as? DomainSpec.Union)?.parts?.none { it is DomainSpec.FromSignal } != false &&
-      range !is RangeSpec.Signal &&
-      (range as? RangeSpec.Step)?.step !is NumberValue.Signal &&
-      (range as? RangeSpec.Scheme)?.scheme !is SchemeRef.Signal &&
-      (range as? RangeSpec.Named)?.name?.lowercase().let {
-        it == null || it !in declaredSignals
-      }
-}
+)
 
 public enum class Orient {
   LEFT,

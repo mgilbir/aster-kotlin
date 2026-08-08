@@ -546,7 +546,17 @@ internal class ScopeCompiler(
       } else {
         outer.data
       }
-    val resolved = data.resolve(spec.data, signalValues, inherited)
+    // A group still resolves its data, then its signals, then its scales: nothing in the corpus
+    // needs them interleaved the way the top level does, and the enclosing scope's signals and
+    // scales are all settled by the time a group is reached. Its *own* signals are not, so a
+    // transform reading one of those is reported the same way the top level reports it.
+    val resolved =
+      data.resolve(
+        spec.data,
+        signalValues,
+        inherited,
+        deferredSignals = spec.signals.map { it.name }.toSet() - signalValues.keys,
+      )
     val datasets = resolved.datasets
     // The scales below are the *enclosing* scope's, and they exist by now: a group is reached long
     // after the chart's scales are built. That is what lets a cell say `bandwidth('yscale')` and
