@@ -9,7 +9,7 @@ Branch `milestone-0-bootstrap`. Working tree clean, both gates green:
 - `./scripts/check.sh` — format, all tests, lint, demo APK
 - `./scripts/oracle.sh` — regenerates upstream references and runs the differential comparison
 
-**73 differential fixtures pass, all matching upstream exactly.** That is the only number here
+**78 differential fixtures pass, all matching upstream exactly.** That is the only number here
 that means what it says.
 
 ## Read this before trusting the other number
@@ -143,9 +143,42 @@ them. What found it was printing every signal from both engines side by side —
 `size`, `ddext`, `hdext`, `ddh`, `hdh`, `height` — and seeing that only `hdext` differed, by one.
 That technique is cheap and worked immediately where reading the transforms did not.
 
+## The compile phases are gone, and so is `probability-density`
+
+The last big structural difference from upstream is closed. The engine ran three fixed phases — all
+data, then all signals, then all scales — and `probability-density` cannot be resolved by any fixed
+order of them: `xscale`'s domain names the `points` dataset, and the `density` dataset's `extent` is
+`{"signal": "domain('xscale')"}`. `DataflowOrder` replaces the phases with one dependency ranking
+over all three kinds, which is what upstream gets from putting every operator into a single dataflow.
+
+Worth knowing before touching it:
+
+- Edges come from where upstream's come from. `Expression` now reports `dataDependencies` and
+  `scaleDependencies` **by name**, read off the string literal a `data()` or `scale()` is handed,
+  exactly as `vega-functions`' `dataVisitor` and `scaleVisitor` do at parse time.
+- Ties break towards signals, then datasets, then scales, and that is load-bearing rather than
+  cosmetic. It is what keeps a signal reading no dataset ahead of every dataset — the property the
+  old seeding pass existed for — and it means every signal that has *become* resolvable resolves
+  before the next dataset runs.
+- `dataFreeSignals` and `ScaleSpec.isSignalFree` are gone. Do not reintroduce a predicate of that
+  shape; the general order subsumes both, and `isSignalFree` had a hole (it never looked inside a
+  range array) that only showed up once the graph did the same job properly.
+- **The residual gap is transform expression parameters.** `filter`'s `expr`, `formula`'s `expr` and
+  `cross`'s `filter` are the only three parameters upstream declares as `type: 'expr'` (probe it with
+  `T.Definition.params` over `vega.transforms`). They are per-row expressions rather than
+  `{"signal": ...}` references, so they are *not* edges, and a dataset carrying one is not held back
+  for the signal it reads. It usually works anyway because of the tie-break; when it does not, the
+  warning in `DataResolver` is the only thing that says so. Adding those three as edges is the
+  obvious next increment and is small — the risk is that a new edge turns a chart that happened to
+  work into a reported cycle, so do it behind the gate.
+- **A group mark still has three phases**: its own data, then its own signals, then its own scales.
+  Nothing in the corpus needs them interleaved, because the enclosing scope is entirely settled by
+  the time a group is reached. If an example ever does, `DataflowOrder` is reusable as-is —
+  `ScopeCompiler.nest` is where it would go.
+
 ## Pick the next example the same way
 
-The method that worked six times: take one real example, add it as a differential fixture *first*, let
+The method that worked seven times: take one real example, add it as a differential fixture *first*, let
 it fail, fix what it names, then open `build/fixture-svg/<name>.ours.svg` next to
 `build/oracle-reference/<name>.svg` and look at them. The fixture tells you the geometry is right;
 only the SVG tells you the chart is. Note that upstream draws a `rect` mark as an SVG `<path>` and
@@ -169,22 +202,6 @@ listed here exactly:
   x = 0 instead of x = 288. Its groups carry no `x`, so something places them: check whether the
   top-level `layout` is doing it and what our trellis path does with a group that declares its own
   `width` signal.
-- `probability-density` — **not a small fix, and worth reading before picking anything else.** The
-  diagnostic says "density needs an 'extent'", and the extent is right there:
-  `{"signal": "domain('xscale')"}`. The real problem is the **compile order**. This engine runs three
-  fixed phases — all data, then signals, then scales — and this chart needs them interleaved:
-  `xscale`'s domain is `{"data": "points", "field": "u"}`, so it cannot be built before the `points`
-  dataset; and the `density` dataset's own transform needs `domain('xscale')`, so it cannot run
-  before the scale. Upstream has no phases at all, it ranks one dataflow, and that ordering is
-  exactly what it buys.
-  
-  Two smaller pieces of that have already been done and are the shape of the rest: signals that
-  reach for no dataset resolve before the data, and scales that wait on no signal are built before
-  the signals. The remaining step is the general one — order datasets, scales and signals together by
-  dependency — and it is the last big structural difference from upstream. It would unblock this
-  example and probably several of the interaction-heavy ones below it. Do not paper over it with a
-  special case for `density`; the diagnostic is currently blaming the wrong thing, which is the only
-  part of it that is cheap to fix.
 - `donut-chart-labelled` — the `pluck` expression function, and a dataset sourcing from *several*
   named datasets at once (`"source": ["a", "b"]`), which the parser currently reads as one name.
 - `histogram-null-values` — a range written as an array whose *elements* are signals,
