@@ -242,6 +242,8 @@ private val TITLE_CONSUMED =
     "subtitleFontSize",
     "fontStyle",
     "subtitleFontStyle",
+    "color",
+    "subtitleColor",
     "zindex",
   )
 
@@ -1598,6 +1600,8 @@ public class SpecParser {
       fontStyle = obj.fields["fontStyle"]?.takeIf { it is VegaValue.Str }?.asString(),
       subtitleFontStyle =
         obj.fields["subtitleFontStyle"]?.takeIf { it is VegaValue.Str }?.asString(),
+      color = obj.fields["color"]?.takeIf { it is VegaValue.Str }?.asString(),
+      subtitleColor = obj.fields["subtitleColor"]?.takeIf { it is VegaValue.Str }?.asString(),
       zindex = (obj.fields["zindex"] as? VegaValue.Num)?.value?.toInt() ?: 0,
     )
   }

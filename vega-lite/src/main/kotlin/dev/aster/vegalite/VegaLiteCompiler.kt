@@ -110,6 +110,9 @@ private class Compilation(
       if (scales.isNotEmpty()) put("scales", arr(scales.values.map { assembleScale(it) }))
       if (axes.isNotEmpty()) put("axes", arr(axes))
       if (legends.isNotEmpty()) put("legends", arr(legends))
+      // The theme, as Vega takes it. Without this a chart's guides are drawn in the engine's own
+      // colours however carefully the specification restyled them.
+      config.forVega()?.let { put("config", it) }
     }
 
     return VegaLiteCompilation(vega, diagnostics.diagnostics)
@@ -210,7 +213,16 @@ private class Compilation(
 
   private fun title(): VegaValue? {
     val declared = spec.fields["title"] ?: return null
-    return if (declared is VegaValue.Str) obj { put("text", declared) } else declared
+    // A title is anchored to the *group* rather than to the whole surface, which is what keeps it
+    // over the plotting area when an axis widens the drawing to its left.
+    return if (declared is VegaValue.Str) {
+      obj {
+        put("text", declared)
+        put("frame", "group")
+      }
+    } else {
+      declared
+    }
   }
 
   // -----------------------------------------------------------------------------------------

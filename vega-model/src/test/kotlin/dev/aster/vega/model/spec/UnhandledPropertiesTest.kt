@@ -94,9 +94,10 @@ class UnhandledPropertiesTest {
       )
     // `fontWeight`, `font` and `fontStyle` are read now — a theme setting the heading in
     // `config.title` is ordinary, and both the weight and the slant change the *measurement*, not
-    // only the look.
+    // only the look. `color` and `subtitleColor` are read too: a Vega-Lite theme states the
+    // heading's colour and nothing else was carrying it, so a themed title drew black.
     assertEquals(
-      listOf("color", "lineHeight", "subtitleColor", "baseline").sorted(),
+      listOf("lineHeight", "baseline").sorted(),
       reported.sorted(),
     )
   }

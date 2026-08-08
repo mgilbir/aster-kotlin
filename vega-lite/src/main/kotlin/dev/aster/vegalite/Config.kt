@@ -56,7 +56,125 @@ internal class Config(private val user: VegaValue.Obj = VegaValue.EmptyObject) {
   /** `config.style.<name>`, which a mark's `style` list pulls in as well as its own block. */
   fun style(name: String): VegaValue.Obj? = user.obj("style")?.obj(name)
 
+  /**
+   * The user's configuration, as *Vega* takes it — `stripAndRedirectConfig` upstream.
+   *
+   * Three things happen on the way through, and a chart drawn in somebody else's theme depends on
+   * all of them:
+   *
+   * - Vega-Lite-only keys are dropped. Some of them have already been applied here (`background`
+   *   became a top-level property, `countTitle` named a field) and the rest mean nothing to Vega.
+   * - A per-mark-type block is **redirected into `config.style`**, because Vega-Lite's `bar` and
+   *   `rect` are the same Vega mark: left in `config.rect`, a rect theme would repaint every bar.
+   * - `config.title` becomes the `group-title` style, with `color` rewritten as `fill`, since a
+   *   style block names its properties the way a mark does.
+   *
+   * Anything not recognised passes through untouched rather than being dropped: Vega has guide
+   * configuration this compiler never reads, and a theme that sets it should still reach the
+   * renderer.
+   */
+  fun forVega(): VegaValue.Obj? {
+    val out = LinkedHashMap<String, VegaValue>()
+    val styles = LinkedHashMap<String, VegaValue>()
+
+    for ((key, value) in user.fields) {
+      when {
+        key in VEGA_LITE_ONLY -> Unit
+        key == "style" -> (value as? VegaValue.Obj)?.fields?.forEach { (k, v) -> styles[k] = v }
+        key == "mark" -> out["mark"] = value
+        key in MARK_TYPES ->
+          if (value is VegaValue.Obj && value.fields.isNotEmpty()) styles[key] = value
+        key == "title" -> titleStyle(value)?.let { styles["group-title"] = it }
+        key == "view" -> viewStyle(value)?.let { styles["view"] = it }
+        else -> out[key] = value
+      }
+    }
+
+    if (styles.isNotEmpty()) out["style"] = VegaValue.Obj(styles)
+    return if (out.isEmpty()) null else VegaValue.Obj(out)
+  }
+
+  /** `config.title` names its colour `color`; a style block names it `fill`. */
+  private fun titleStyle(value: VegaValue): VegaValue.Obj? {
+    val block = value as? VegaValue.Obj ?: return null
+    val fields = LinkedHashMap<String, VegaValue>()
+    for ((key, property) in block.fields) {
+      // The non-mark title properties are written on the title directive itself, not on a style.
+      if (key in setOf("anchor", "frame", "offset", "orient", "angle", "limit")) continue
+      if (key.startsWith("subtitle")) continue
+      fields[if (key == "color") "fill" else key] = property
+    }
+    return if (fields.isEmpty()) null else VegaValue.Obj(fields)
+  }
+
+  /** Only the view's own paint reaches Vega; its sizes are Vega-Lite's own arithmetic. */
+  private fun viewStyle(value: VegaValue): VegaValue.Obj? {
+    val block = value as? VegaValue.Obj ?: return null
+    val fields = LinkedHashMap<String, VegaValue>()
+    for ((key, property) in block.fields) {
+      if (
+        key in
+          setOf("continuousWidth", "continuousHeight", "discreteWidth", "discreteHeight", "step")
+      ) {
+        continue
+      }
+      fields[key] = property
+    }
+    return if (fields.isEmpty()) null else VegaValue.Obj(fields)
+  }
+
   private companion object {
+    /** Keys Vega has no use for: this compiler has already applied them, or they mean nothing. */
+    val VEGA_LITE_ONLY =
+      setOf(
+        "color",
+        "fontSize",
+        "background",
+        "padding",
+        "facet",
+        "concat",
+        "numberFormat",
+        "numberFormatType",
+        "normalizedNumberFormat",
+        "normalizedNumberFormatType",
+        "timeFormat",
+        "timeFormatType",
+        "countTitle",
+        "fieldTitle",
+        "header",
+        "headerRow",
+        "headerColumn",
+        "headerFacet",
+        "selection",
+        "customFormatTypes",
+        "axisQuantitative",
+        "axisTemporal",
+        "axisDiscrete",
+        "axisPoint",
+        "boxplot",
+        "errorbar",
+        "errorband",
+      )
+
+    /** The per-mark-type blocks, which are redirected into `style` rather than passed through. */
+    val MARK_TYPES =
+      setOf(
+        "arc",
+        "area",
+        "bar",
+        "circle",
+        "geoshape",
+        "image",
+        "line",
+        "point",
+        "rect",
+        "rule",
+        "square",
+        "text",
+        "tick",
+        "trail",
+      )
+
     /** `defaultMarkConfig`. `invalid` and `timeUnitBandSize` are carried for completeness. */
     val DEFAULT_MARK: VegaValue.Obj = obj { put("color", "#4c78a8") }
 

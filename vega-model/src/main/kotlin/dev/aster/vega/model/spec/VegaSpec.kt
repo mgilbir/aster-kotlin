@@ -558,6 +558,15 @@ public data class TitleSpec(
   val fontStyle: String? = null,
   val subtitleFontStyle: String? = null,
   /**
+   * The heading's colour, and its subtitle's.
+   *
+   * A Vega-Lite theme states it as `config.title.color` and its compiler redirects that into the
+   * `group-title` style; both arrive here as `color`, because a title names its own properties the
+   * way a guide does.
+   */
+  val color: String? = null,
+  val subtitleColor: String? = null,
+  /**
    * `dx`/`dy` — a nudge applied after the anchor has placed the title.
    *
    * Written either as a property or inside the title's own `encode.update`, which is where a

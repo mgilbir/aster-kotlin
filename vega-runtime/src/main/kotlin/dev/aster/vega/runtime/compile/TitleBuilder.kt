@@ -97,6 +97,11 @@ internal class TitleBuilder(
     // wider.
     val nudgeX = numbers.resolve(spec.dx, "title") ?: 0.0
     val nudgeY = numbers.resolve(spec.dy, "title") ?: 0.0
+    // A themed heading states its own colour, through `config.title.color` or the `group-title`
+    // style a Vega-Lite theme redirects that into.
+    val titleColor = spec.color?.let { SceneColor.parse(it) } ?: TitleDefaults.color
+    val subtitleColor = spec.subtitleColor?.let { SceneColor.parse(it) } ?: titleColor
+
     val title =
       TextNode(
         id = ids.allocate(),
@@ -105,7 +110,7 @@ internal class TitleBuilder(
         layout =
           textEngine.layout(run(text, fontSize, titleWeight(spec), align, styleOf(spec.fontStyle))),
         angleDegrees = angle,
-        fill = Fill.of(TitleDefaults.color),
+        fill = Fill.of(titleColor),
         metadata =
           NodeMetadata(
             role = "title-text",
@@ -150,7 +155,7 @@ internal class TitleBuilder(
                 )
               ),
             angleDegrees = angle,
-            fill = Fill.of(TitleDefaults.color),
+            fill = Fill.of(subtitleColor),
             metadata =
               NodeMetadata(
                 role = "title-subtitle",

@@ -100,8 +100,23 @@ public class GuideConfig(private val blocks: Map<String, VegaValue.Obj>) {
   /** A legend has one block, over the same guide styles. */
   public fun legendDefaults(): List<VegaValue.Obj> = listOf(guideStyleDefaults(), block("legend"))
 
-  /** `config.title` — the chart's own heading, which has no guide-style layer beneath it. */
-  public fun titleDefaults(): List<VegaValue.Obj> = listOf(block("title"))
+  /**
+   * `config.title`, over the `group-title` style Vega keeps its own heading defaults in.
+   *
+   * The style names its properties the way a *mark* does — `fill`, not `color` — so it is
+   * translated on the way through, exactly as the guide styles are. This is where a Vega-Lite
+   * theme's title colour arrives: its compiler redirects `config.title.color` into
+   * `style["group-title"].fill`, and reading only `config.title` leaves a themed title black.
+   */
+  public fun titleDefaults(): List<VegaValue.Obj> = listOf(groupTitleDefaults(), block("title"))
+
+  private fun groupTitleDefaults(): VegaValue.Obj {
+    val style = style("group-title")
+    if (style.fields.isEmpty()) return EMPTY
+    val fields = LinkedHashMap<String, VegaValue>(style.fields.size)
+    for ((key, value) in style.fields) fields[if (key == "fill") "color" else key] = value
+    return VegaValue.Obj(fields)
+  }
 
   /**
    * `style["guide-label"]` and `style["guide-title"]` rewritten in guide property names.
