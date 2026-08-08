@@ -25,6 +25,17 @@ public interface Expression {
   /** Datum field paths this expression reads. */
   public val fieldDependencies: Set<String>
 
+  /**
+   * Functions this expression calls that need something built after it.
+   *
+   * `data` and `indata` read a dataset; `scale`, `invert` and `bandwidth` read a scale, which is
+   * itself built from data. A signal calling none of them can be resolved *before* the data, which
+   * is how a filter reading `currentYear` sees a number rather than nothing — and the reason to ask
+   * the expression rather than guess from its text is that a specification may name a signal `data`
+   * or write `datum.scale`, neither of which is a call.
+   */
+  public val readsDataOrScales: Boolean
+
   public fun evaluate(scope: ExpressionScope): VegaValue
 }
 

@@ -152,7 +152,6 @@ class AxisStyleTest {
         "\"gridScale\": \"x\"",
         "\"gridDashOffset\": 2",
         "\"domainCap\": \"round\"",
-        "\"bandPosition\": 0.2",
         "\"position\": 10",
         "\"translate\": 0",
         "\"minExtent\": 20",

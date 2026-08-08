@@ -38,6 +38,9 @@ public object AxisDefaults {
    */
   public const val CRISP_OFFSET: Double = 0.5
 
+  /** Where a tick sits along its band: the centre, unless `bandPosition` says otherwise. */
+  public const val BAND_POSITION: Double = 0.5
+
   /**
    * Rounds a tick coordinate the way Vega does.
    *

@@ -21,7 +21,7 @@ end to end — expressions, signals, 33 of upstream's 40 data transforms, every 
 and an event handler that recompiles the chart — and are verified against upstream Vega by
 differential tests.
 
-Seventy-three differential fixtures pass, all matching upstream exactly on every mark and scale output:
+Seventy-four differential fixtures pass, all matching upstream exactly on every mark and scale output:
 
 | Fixture | Marks | Covers |
 | --- | --- | --- |
@@ -98,6 +98,7 @@ Seventy-three differential fixtures pass, all matching upstream exactly on every
 | `grouped-bar` | 56 | `round` on a continuous scale, `mult`/`offset` value references, `contrast()`, labels from the bars' own scene items |
 | `barley-trellis` | 468 | a chart sized by a `height` signal, cells titled from the group mark that made them, axis and legend `encode` blocks, a raised axis painting over the legend, and 120 rows loaded from a relative `url` |
 | `connected-scatter` | 146 | labels nudged by an ordinal scale with a numeric range, a currency-formatted price axis, data from a relative `url` |
+| `budget-forecasts` | 77 | `argmin` over a filtered group, a scaled channel taking its value from a signal, `bandPosition`, a label placed by an axis `encode` block |
 
 The gate is wired into `./scripts/oracle.sh`, so every further scale, mark and transform is built
 against a harness that can say we are wrong — which golden tests cannot.
@@ -157,7 +158,7 @@ substantive compatibility items:
 | 6. View and Compose APIs | Yes |
 | 7. SVG, PNG, PDF export | Yes |
 | 8. TalkBack can describe and navigate | Partial — virtual nodes are tested by instrumentation, not with TalkBack itself |
-| 9. At least 100 compatibility fixtures pass | 73 of 100 |
+| 9. At least 100 compatibility fixtures pass | 74 of 100 |
 | 10. Core runtime has no Android dependency | Yes |
 | 11. Renders without WebView | Yes |
 | 12. Build and test loop runs from the terminal | Yes |
@@ -494,7 +495,7 @@ each example a deadline.
 
 ## Known failing fixtures
 
-None. Seventy-three fixtures exist and all seventy-three pass — and that sentence became worth
+None. Seventy-four fixtures exist and all seventy-four pass — and that sentence became worth
 something only once the gate could no longer skip itself, below.
 
 **The gate could report success without running.** `FixtureDifferentialTest` reads the fixtures and
@@ -615,6 +616,34 @@ it belongs to, so every label in the chart sat on top of its own dot. And an axi
 reported and ignored, so a price axis read `1.5` where upstream reads `$1.50`; the currency symbol
 turned out to be a slot of its own in d3's grammar, and the caption a screen reader hears follows
 each axis's own format rather than the scale's.
+
+`budget-forecasts` found five, and the first is the one with the widest reach. **A signal computed
+from other signals was not available to a transform.** Only signals written down as a literal were
+resolved before the data; anything with an `update` waited until after it, so a filter reading
+`clamp(handleYear, 1980, 2010)` saw nothing, nothing is zero to arithmetic, and the filter dropped
+every row in the chart. A signal that reaches for none of `data`, `indata`, `scale`, `invert` or
+`bandwidth` — and none of whose own dependencies do — is now resolved first, which is the order
+upstream's dataflow ranking produces anyway.
+
+Then: `argmin` and `argmax`, which return the **whole tuple** at the extreme rather than the value.
+An **aggregate over no rows** was producing a row of nulls where upstream produces no rows at all,
+which drew a tooltip frame at the origin of a chart nobody was pointing at. A channel with both a
+scale and a signal — `{"scale": "x", "signal": "currentYear"}` — was reading the signal and dropping
+the scale, putting a draggable handle 2010 pixels from the left of a chart 700 wide; upstream builds
+the base value *then* wraps it in the scale, so the scale has to be read first. And `bandPosition`,
+which puts a tick at the start of its band instead of its centre.
+
+The last one needed a guide `encode` block that could not fold into a property: a label placed by
+`{"scale": "x", "field": "value"}`. Resolving it against the tick as a datum turned up a rule worth
+writing down — a guide writes its own `text` and position into `update` on **every pass**, so a
+specification's `enter` for one of those is overwritten before anything is drawn. Upstream ignores
+such a block too, so the diagnostic now says it changes nothing rather than blaming this engine for
+a rule that is Vega's.
+
+`error-bars` was taken up and then **deliberately dropped**. It computes `ci0`/`ci1`, which upstream
+derives by bootstrap — a thousand resamples drawn with `Math.random()` — so the same data gives a
+different chart every run. It belongs with the examples refused for reproducibility, and the
+diagnostic now says which of the two it is rather than only "not implemented".
 
 `domain-limits` found one more, in a corner nothing had reached before: a symbol sized to **zero**
 was bounded as nothing at all, where upstream bounds it as a degenerate point at its anchor. A test

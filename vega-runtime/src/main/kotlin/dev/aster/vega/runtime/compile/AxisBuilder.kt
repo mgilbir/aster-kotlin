@@ -64,10 +64,28 @@ public class AxisBuilder(
   private val diagnostics: DiagnosticCollector,
   /** Resolves axis properties that a specification supplied as signals. */
   private val numbers: NumberResolver,
+  /**
+   * Resolves a guide `encode` channel that has no property behind it — a label's own position.
+   *
+   * Optional because most callers have no encode to resolve, and because an axis built without one
+   * still lays its labels out the way it always has.
+   */
+  private val channels: MarkEncoder? = null,
 ) {
 
   /** One tick's label text and its position along the axis. */
-  private data class Tick(val label: String, val position: Double)
+  /**
+   * One tick: what it says, where it goes, and the domain value behind it.
+   *
+   * The value is carried because a label's `encode` block is resolved against the tick as a datum,
+   * and `datum.value` is the whole point of such a block — placing the label by the scale rather
+   * than by the tick's own position.
+   */
+  private data class Tick(
+    val label: String,
+    val position: Double,
+    val value: VegaValue = VegaValue.Null,
+  )
 
   /**
    * An axis, and the rectangle everything else measures it by.
@@ -199,13 +217,19 @@ public class AxisBuilder(
             limit = labelLimit,
           )
         val layout = textEngine.layout(run)
-        val (x, y) =
+        val (defaultX, defaultY) =
           when (spec.orient) {
             Orient.BOTTOM -> tick.position to labelOffset
             Orient.TOP -> tick.position to -labelOffset
             Orient.LEFT -> -labelOffset to tick.position
             Orient.RIGHT -> labelOffset to tick.position
           }
+        // A label's own `encode` block may place it somewhere the properties cannot say — off the
+        // band's centre, at the tick's raw scale position. The datum is the tick: `datum.value` is
+        // what the axis is labelling, `datum.label` the text it drew for it, which is what
+        // upstream binds too.
+        val x = labelChannel(spec, "x", tick) ?: defaultX
+        val y = labelChannel(spec, "y", tick) ?: defaultY
         labels +=
           TextNode(
             id = ids.allocate(),
@@ -504,7 +528,7 @@ public class AxisBuilder(
         .filter { (_, at) -> at.isFinite() && at >= low && at <= high }
         .sortedWith(if (descending) compareByDescending { it.second } else compareBy { it.second })
     return thin(placed, count).map { (value, at) ->
-      Tick(label(value), at + bandOffset(scale))
+      Tick(label(value), at + bandOffset(scale, spec), value)
     }
   }
 
@@ -530,8 +554,30 @@ public class AxisBuilder(
    * Half a pixel comes back off, the same shift the generated band ticks carry, so the labels stay
    * centred on the band while the ticks stay crisp.
    */
-  private fun bandOffset(scale: PositionScale): Double =
-    if (scale is BandScale) scale.bandwidth / 2.0 - AxisDefaults.CRISP_OFFSET else 0.0
+  /**
+   * One channel of the axis's `encode.labels` block, resolved against the tick being labelled.
+   *
+   * `update` over `enter`, as everywhere else. Returns null when the block says nothing about this
+   * channel, which leaves the label where the orientation put it.
+   */
+  private fun labelChannel(spec: AxisSpec, channel: String, tick: Tick): Double? {
+    val encoder = channels ?: return null
+    val block = spec.encode["labels"] ?: return null
+    // `update` only. A guide writes its own position into `update` every pass, so a specification's
+    // `enter` is overwritten before anything is drawn — verified upstream, where an axis label with
+    // `enter: {x: 99}` does not move. Honouring `enter` here would place a label upstream leaves
+    // where it was.
+    val entry = block.update[channel] ?: return null
+    val datum =
+      VegaValue.Obj(linkedMapOf("value" to tick.value, "label" to VegaValue.Str(tick.label)))
+    return encoder.channelNumber(entry, datum)
+  }
+
+  private fun bandOffset(scale: PositionScale, spec: AxisSpec): Double {
+    if (scale !is BandScale) return 0.0
+    val position = numbers.resolve(spec.bandPosition, spec.scale) ?: AxisDefaults.BAND_POSITION
+    return scale.bandwidth * position - AxisDefaults.CRISP_OFFSET
+  }
 
   /**
    * How an explicit value is labelled.
@@ -575,11 +621,11 @@ public class AxisBuilder(
     when (scale) {
       is BandScale ->
         scale.domain.zip(scale.centers()).map { (label, centre) ->
-          Tick(label, centre - AxisDefaults.CRISP_OFFSET)
+          Tick(label, centre - AxisDefaults.CRISP_OFFSET, VegaValue.Str(label))
         }
       is PointScale ->
         scale.domain.map { label ->
-          Tick(label, scale.position(VegaValue.Str(label)))
+          Tick(label, scale.position(VegaValue.Str(label)), VegaValue.Str(label))
         }
       is LinearScale -> {
         val count =
@@ -589,7 +635,11 @@ public class AxisBuilder(
         // crowded ones and only it knows which.
         val format = labeller(scale, count, spec.format)
         scale.ticks(count).zip(scale.tickLabels(count)).map { (value, label) ->
-          Tick(if (spec.format == null) label else format(VegaValue.Num(value)), scale.apply(value))
+          Tick(
+            if (spec.format == null) label else format(VegaValue.Num(value)),
+            scale.apply(value),
+            VegaValue.Num(value),
+          )
         }
       }
       is TransformedScale -> {
@@ -597,14 +647,18 @@ public class AxisBuilder(
           numbers.resolveInt(spec.tickCount, spec.scale) ?: AxisDefaults.DEFAULT_TICK_COUNT
         val format = labeller(scale, count, spec.format)
         scale.ticks(count).zip(scale.tickLabels(count)).map { (value, label) ->
-          Tick(if (spec.format == null) label else format(VegaValue.Num(value)), scale.apply(value))
+          Tick(
+            if (spec.format == null) label else format(VegaValue.Num(value)),
+            scale.apply(value),
+            VegaValue.Num(value),
+          )
         }
       }
       is TimeScale -> {
         val count =
           numbers.resolveInt(spec.tickCount, spec.scale) ?: AxisDefaults.DEFAULT_TICK_COUNT
         scale.ticks(count).zip(scale.tickLabels(count)).map { (value, label) ->
-          Tick(label, scale.apply(value))
+          Tick(label, scale.apply(value), VegaValue.Num(value))
         }
       }
       else -> null

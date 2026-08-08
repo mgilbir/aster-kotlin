@@ -499,6 +499,25 @@ public data class AxisSpec(
    * coerces them to strings without consulting this.
    */
   val format: String? = null,
+  /**
+   * Where along a band a tick and its gridline sit, as a fraction: 0 the start, 0.5 the centre.
+   *
+   * Only ticks and gridlines. A *label* is always at the band's centre upstream — `axis-labels.js`
+   * writes `band: 0.5` outright — so a chart that wants its labels moved as well says so in an
+   * `encode` block, which is what Vega's own budget example does.
+   */
+  val bandPosition: NumberValue? = null,
+  /**
+   * The `encode` blocks as written, per part, for the channels that are not another spelling of a
+   * property.
+   *
+   * Most of a guide's `encode` folds into the properties beside it — `encode.grid.enter.strokeDash`
+   * *is* `gridDash` — and folding is what lets it take part in measurement. A few channels have no
+   * property behind them, and a label's **position** is the one that matters: Vega's own budget
+   * example moves its labels off the band centre with `{"scale": "x", "field": "value"}`, which no
+   * property can say. Those are kept here and resolved against the tick they belong to.
+   */
+  val encode: Map<String, EncodeSpec> = emptyMap(),
   /** Appearance of the four parts, each defaulting to Vega's own when unstated. */
   val labelStyle: GuideStroke = GuideStroke(),
   val tickStyle: GuideStroke = GuideStroke(),
@@ -778,6 +797,17 @@ public sealed interface ChannelValue {
     val scaleRef: FieldRef? = null,
     val field: FieldRef? = null,
     val value: VegaValue? = null,
+    /**
+     * An expression supplying the value the scale is applied to.
+     *
+     * `{"scale": "x", "signal": "currentYear"}` is how a chart puts a mark where a *control* says,
+     * rather than where a datum says — a draggable handle, a threshold rule. Upstream builds the
+     * base value from `signal`, `field` or `value` and then wraps whichever it found in the scale,
+     * so a signal beside a scale is scaled like anything else; reading the signal and stopping
+     * there puts the mark at the raw domain value, which on a band scale over years is 2010 pixels
+     * from the left.
+     */
+    val signal: String? = null,
     val band: Double? = null,
   ) : ChannelValue
 

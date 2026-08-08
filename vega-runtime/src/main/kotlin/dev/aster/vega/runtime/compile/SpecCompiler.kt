@@ -2,6 +2,7 @@ package dev.aster.vega.runtime.compile
 
 import dev.aster.vega.expression.CachingExpressionCompiler
 import dev.aster.vega.expression.ExpressionCompiler
+import dev.aster.vega.expression.ExpressionResult
 import dev.aster.vega.expression.VegaExpressionCompiler
 import dev.aster.vega.model.DiagnosticCodes
 import dev.aster.vega.model.DiagnosticCollector
@@ -12,6 +13,7 @@ import dev.aster.vega.model.spec.ChannelValue
 import dev.aster.vega.model.spec.EncodeSpec
 import dev.aster.vega.model.spec.MarkSpec
 import dev.aster.vega.model.spec.MarkType
+import dev.aster.vega.model.spec.SignalSpec
 import dev.aster.vega.model.spec.SpecParser
 import dev.aster.vega.model.spec.VegaSpec
 import dev.aster.vega.runtime.load.DataLoader
@@ -169,6 +171,22 @@ public class SpecCompiler(
     // A handler's value is the current one, and a transform should read that rather than the
     // initial value it is replacing.
     transformSignals.putAll(signalOverrides.filterKeys { transformSignals.containsKey(it) })
+    // Then the *computed* signals that still cannot depend on a dataset: those whose expression
+    // calls none of `data`, `indata`, `scale`, `invert` or `bandwidth`, and every one of whose own
+    // dependencies is likewise. `clamp(handleYear, 1980, 2010)` is the ordinary shape — a control's
+    // position derived from another signal — and a `filter` reading it needs the number, not the
+    // nothing it used to get. Upstream reaches the same order by ranking the dataflow: a signal
+    // that depends on no data operator is evaluated before every data operator.
+    //
+    // The pass runs against a *throwaway* collector: whatever it cannot work out is worked out
+    // again below, with the data present, and reporting the same problem twice would be noise.
+    val dataFree = dataFreeSignals(spec.signals, expressions)
+    if (dataFree.isNotEmpty()) {
+      val seeded =
+        SignalResolver(DiagnosticCollector(), expressions)
+          .resolve(dataFree, emptyMap(), transformSignals, signalOverrides)
+      for (signal in dataFree) seeded[signal.name]?.let { transformSignals[signal.name] = it }
+    }
     // Everything the specification declares that the seeding above could not supply. A transform
     // reading one of these gets null, which arithmetic turns into zero, so it has to be named.
     val deferredSignals = spec.signals.map { it.name }.toSet() - transformSignals.keys
@@ -363,6 +381,45 @@ public class SpecCompiler(
         )
       }
     }
+  }
+
+  /**
+   * The signals whose value cannot possibly depend on a dataset, in declaration order.
+   *
+   * A signal qualifies when its expression reaches for none of the things built after the data — no
+   * `data`, `indata`, `scale`, `invert` or `bandwidth` — and every signal it reads qualifies too.
+   * The recursion is what makes it useful: one signal in the chain touching data disqualifies
+   * everything downstream of it, which is exactly right, and a cycle disqualifies itself rather
+   * than looping.
+   *
+   * Signals with a plain value are excluded because the caller has already seeded them.
+   */
+  private fun dataFreeSignals(
+    signals: List<SignalSpec>,
+    expressions: ExpressionCompiler,
+  ): List<SignalSpec> {
+    val declared = signals.associateBy { it.name }
+    val verdicts = HashMap<String, Boolean>()
+
+    fun free(name: String, visiting: MutableSet<String>): Boolean {
+      verdicts[name]?.let {
+        return it
+      }
+      val spec = declared[name] ?: return true // not a signal: a constant or an implicit one
+      val source = spec.expression ?: return true // a literal
+      // A cycle is reported by the real pass; here it only has to not hang.
+      if (!visiting.add(name)) return false
+      val compiled = expressions.compile(source)
+      val answer =
+        compiled is ExpressionResult.Compiled &&
+          !compiled.expression.readsDataOrScales &&
+          compiled.expression.signalDependencies.all { it == name || free(it, visiting) }
+      visiting.remove(name)
+      verdicts[name] = answer
+      return answer
+    }
+
+    return signals.filter { it.expression != null && free(it.name, mutableSetOf()) }
   }
 
   /** A signal's value as a usable number, or null if it is not one. */

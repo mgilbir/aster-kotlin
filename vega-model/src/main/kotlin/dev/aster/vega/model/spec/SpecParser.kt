@@ -105,6 +105,7 @@ private val AXIS_CONSUMED =
     "labelLimit",
     "encode",
     "format",
+    "bandPosition",
   ) + guideStyleKeys("label", "tick", "grid", "domain", "title")
 
 /**
@@ -141,7 +142,6 @@ private val AXIS_UNSUPPORTED =
     "domainCap" to "Domain line caps are not implemented",
     "domainDashOffset" to
       "Dash offsets are not implemented; the dash pattern starts at the line end",
-    "bandPosition" to "Moving a label off a band's centre is not implemented",
     "position" to "Positioning an axis along its own dimension is not implemented",
     "translate" to "Overriding the axis's half-pixel translation is not implemented",
     "minExtent" to "A minimum axis extent is not implemented; the axis is measured by its contents",
@@ -270,6 +270,23 @@ private fun textEncodeMap(prefix: String): Map<String, String> =
     "fontWeight" to "${prefix}FontWeight",
     "fontStyle" to "${prefix}FontStyle",
   )
+
+/**
+ * Guide encode channels resolved against the item rather than folded into a property.
+ *
+ * Only a label's position so far, which is the one a specification cannot say any other way: Vega's
+ * budget example moves its labels to the start of each band with `{"scale": "x", "field":
+ * "value"}`.
+ */
+private val RESOLVED_GUIDE_CHANNELS = setOf("labels.update.x", "labels.update.y")
+
+/**
+ * Channels a guide writes into `update` itself, so a specification's `enter` never survives.
+ *
+ * Verified upstream: an axis label given `enter: {text: {value: 'E'}}` still reads its tick's own
+ * text, and the same block under `update` does replace it.
+ */
+private val GUIDE_UPDATE_CHANNELS = setOf("text", "x", "y")
 
 private val AXIS_ENCODE_PARTS: Map<String, Map<String, String>> =
   mapOf(
@@ -1241,6 +1258,11 @@ public class SpecParser {
       labelAlign = obj.fields["labelAlign"]?.takeIf { it is VegaValue.Str }?.asString(),
       labelBaseline = obj.fields["labelBaseline"]?.takeIf { it is VegaValue.Str }?.asString(),
       format = obj.fields["format"]?.takeIf { it is VegaValue.Str }?.asString(),
+      bandPosition = obj.numberOrSignal("bandPosition", "$path.bandPosition"),
+      encode =
+        (obj.fields["encode"] as? VegaValue.Obj)?.fields.orEmpty().mapValues { (part, block) ->
+          parseEncode(block, "$path.encode.$part")
+        },
       labelStyle = obj.guideStroke("label"),
       tickStyle = obj.guideStroke("tick"),
       gridStyle = obj.guideStroke("grid"),
@@ -1288,6 +1310,21 @@ public class SpecParser {
           val property = channels[channel]
           val constant = (value as? VegaValue.Obj)?.fields?.get("value")
           when {
+            // Resolved later, against the item the guide is drawing, so nothing to say here.
+            "$part.$pass.$channel" in RESOLVED_GUIDE_CHANNELS -> Unit
+            // A guide writes its own text and position into `update` on every pass, so a
+            // specification's `enter` for one of those is overwritten before anything is drawn.
+            // Upstream ignores it too — `enter: {text: {value: 'E'}}` on an axis label leaves the
+            // tick's own text — so saying "not implemented" would blame this engine for a rule
+            // that is Vega's.
+            pass == "enter" && channel in GUIDE_UPDATE_CHANNELS ->
+              diagnostics.warn(
+                DiagnosticCodes.PARSE_UNKNOWN_PROPERTY,
+                "$subject encode sets '$channel' on '$part' in 'enter', which changes nothing: " +
+                  "the guide writes that channel in 'update' on every pass and overwrites it. " +
+                  "Move it to 'update'",
+                jsonPath = "$path.encode.$part.$pass.$channel",
+              )
             property == null ->
               diagnostics.warn(
                 DiagnosticCodes.PARSE_UNKNOWN_PROPERTY,
@@ -1806,10 +1843,9 @@ public class SpecParser {
     val obj =
       value as? VegaValue.Obj ?: return ChannelValue.Constant(value) // a bare literal is a constant
 
-    obj.fields["signal"]?.let {
-      return adjusted(ChannelValue.Signal(it.asString()), obj, path)
-    }
-
+    // The scale comes first, because it *wraps* whatever supplies the value rather than competing
+    // with it: upstream builds the base from `signal`, `field` or `value` and then runs it through
+    // the scale. Reading `signal` first would drop the scale on `{"scale": "x", "signal": "year"}`.
     val scale = obj.fields["scale"]
     if (scale != null) {
       val scaleRef = if (scale is VegaValue.Str) null else fieldPath(scale, "$path.scale")
@@ -1820,11 +1856,16 @@ public class SpecParser {
           scaleRef = scaleRef,
           field = fieldPath(obj.fields["field"], "$path.field"),
           value = obj.fields["value"],
+          signal = obj.fields["signal"]?.asString()?.takeIf { it.isNotEmpty() },
           band = obj.optionalNumber("band", "$path.band"),
         ),
         obj,
         path,
       )
+    }
+
+    obj.fields["signal"]?.let {
+      return adjusted(ChannelValue.Signal(it.asString()), obj, path)
     }
 
     obj.fields["value"]?.let {

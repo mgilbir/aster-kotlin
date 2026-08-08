@@ -116,8 +116,6 @@ internal class ScopeCompiler(
     val readBack = sourceNames(marks)
 
     val numbers = NumberResolver(expressions, scope.signals, diagnostics)
-    val axisBuilder =
-      AxisBuilder(scope.scales, scope.scaleTypes, ids, textEngine, diagnostics, numbers)
     val encoder =
       MarkEncoder(
         scope.scales,
@@ -129,6 +127,10 @@ internal class ScopeCompiler(
         expressions,
         textEngine,
       )
+    // The encoder goes to the axis builder as well: a label's `encode` block resolves through the
+    // same channel machinery a mark's does, over the tick as its datum.
+    val axisBuilder =
+      AxisBuilder(scope.scales, scope.scaleTypes, ids, textEngine, diagnostics, numbers, encoder)
 
     val children = mutableListOf<SceneNode>()
     // How far the drawing reaches, which is what a title is placed against. It starts as the

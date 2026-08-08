@@ -32,6 +32,18 @@ public enum class AggregateOp(public val opName: String, public val needsField: 
   VARIANCEP("variancep", needsField = true),
   STDEV("stdev", needsField = true),
   STDEVP("stdevp", needsField = true),
+  /** The standard error of the mean: the sample standard deviation over `sqrt(n)`. */
+  STDERR("stderr", needsField = true),
+  /**
+   * The **whole tuple** holding the smallest value of the field, not the value itself.
+   *
+   * That is what makes it useful and what makes it unlike every other operation here: a chart
+   * labels its last point by aggregating with `argmax` over the date and then reading any column of
+   * the row that came back. The output is therefore an object, and a specification reads through it
+   * — `argmax_date.value` rather than `argmax_date`.
+   */
+  ARGMIN("argmin", needsField = true),
+  ARGMAX("argmax", needsField = true),
   Q1("q1", needsField = true),
   Q3("q3", needsField = true),
   VALUES("values", needsField = false);
@@ -64,7 +76,15 @@ public object AggregateTransform : Transform {
     return groups.map { (key, tuples) ->
       val output = LinkedHashMap<String, VegaValue>(groupBy.size + measures.size)
       groupBy.forEachIndexed { index, path -> output[path] = key[index] }
-      for (measure in measures) output[measure.outputName] = measure.compute(tuples)
+      for (measure in measures) {
+        // A measure with no answer is *absent* from the row rather than null: upstream's operations
+        // return `undefined` when they cannot be computed — `stderr` of one value, `min` of nothing
+        // numeric — and an undefined property never reaches the tuple. The difference shows in a
+        // `formula` reading the field, where absent and null coerce alike, and in an `isValid`
+        // test, where they do not.
+        val value = measure.compute(tuples)
+        if (value !is VegaValue.Null) output[measure.outputName] = value
+      }
       VegaValue.Obj(output)
     }
   }
@@ -136,6 +156,26 @@ internal class Measure(
 
     val present = raw.filterNot { it.isMissing }
     if (op == AggregateOp.VALID) return VegaValue.Num(present.size.toDouble())
+    // The arg operations pick a *tuple*, so they run over the rows rather than over the values the
+    // rows hold, and a row whose field is missing cannot win. Upstream keeps the first row at the
+    // extreme, which is why this compares strictly.
+    if (op == AggregateOp.ARGMIN || op == AggregateOp.ARGMAX) {
+      var best: VegaValue? = null
+      var bestValue = 0.0
+      for (tuple in tuples) {
+        val value = tuple.field(path)
+        if (value.isMissing) continue
+        val number = JsSemantics.toNumber(value)
+        if (!number.isFinite()) continue
+        val better =
+          best == null || if (op == AggregateOp.ARGMIN) number < bestValue else number > bestValue
+        if (better) {
+          best = tuple
+          bestValue = number
+        }
+      }
+      return best ?: VegaValue.Null
+    }
     if (op == AggregateOp.DISTINCT) {
       return VegaValue.Num(present.map { it.asComparableKey() }.distinct().size.toDouble())
     }
@@ -159,11 +199,18 @@ internal class Measure(
       AggregateOp.VARIANCEP -> VegaValue.Num(variance(numbers, sample = false))
       AggregateOp.STDEV -> VegaValue.Num(sqrt(variance(numbers, sample = true)))
       AggregateOp.STDEVP -> VegaValue.Num(sqrt(variance(numbers, sample = false)))
+      // `sqrt(dev / (n * (n - 1)))`, upstream's own arrangement — the sample standard deviation
+      // divided by `sqrt(n)`, which is what an error bar's half-length is.
+      AggregateOp.STDERR ->
+        if (numbers.size < 2) VegaValue.Null
+        else VegaValue.Num(sqrt(variance(numbers, sample = true) / numbers.size))
       // Handled before the numeric filter above; listed so the `when` stays exhaustive.
       AggregateOp.COUNT,
       AggregateOp.VALID,
       AggregateOp.MISSING,
       AggregateOp.DISTINCT,
+      AggregateOp.ARGMIN,
+      AggregateOp.ARGMAX,
       AggregateOp.VALUES -> VegaValue.Null
     }
   }
@@ -215,7 +262,7 @@ internal fun measures(params: VegaValue.Obj, context: TransformContext): List<Me
     if (op == null) {
       context.diagnostics.error(
         DiagnosticCodes.TRANSFORM_NOT_IMPLEMENTED,
-        "Aggregate operation '$opName' is not implemented",
+        "Aggregate operation '$opName' is not implemented" + (REFUSED[opName.lowercase()] ?: ""),
         operator = opName,
       )
       return null
@@ -237,6 +284,26 @@ internal fun measures(params: VegaValue.Obj, context: TransformContext): List<Me
 }
 
 /**
+ * Operations that are missing on purpose, and why, so a reader is not left waiting for them.
+ *
+ * `ci0` and `ci1` are the interesting pair: they look like ordinary summary statistics and are not.
+ * Upstream computes them by **bootstrap** — a thousand resamples of the group drawn with
+ * `Math.random()`, then the 2.5th and 97.5th percentiles of those means — so the same data gives a
+ * different answer every run. A scene has to be reproducible (PROJECT_BRIEF.md 18.2), which is the
+ * same reason `random()` itself is refused, so implementing these would mean either a chart that
+ * moves when nothing changed or a quietly different statistic under the same name.
+ */
+private val REFUSED =
+  mapOf(
+    "ci0" to
+      ": it is a bootstrap over 1,000 random resamples, so it differs run to run and a scene has " +
+        "to be reproducible. 'stderr' is implemented and is what a symmetric error bar needs",
+    "ci1" to
+      ": it is a bootstrap over 1,000 random resamples, so it differs run to run and a scene has " +
+        "to be reproducible. 'stderr' is implemented and is what a symmetric error bar needs",
+  )
+
+/**
  * Groups tuples by the `groupby` field values, preserving first-seen group order.
  *
  * Public because faceting needs the same partitioning: upstream implements a faceted group mark by
@@ -247,6 +314,12 @@ public fun groupTuples(
   input: List<VegaValue>,
   groupBy: List<String>,
 ): Map<List<VegaValue>, List<VegaValue>> {
+  // No `groupby` means one group over everything — but only if there is something. An aggregate
+  // over nothing produces **no rows**, not a row of nulls: upstream never invents a group it saw no
+  // tuples for, with or without a groupby. The difference shows wherever a filter can empty a
+  // dataset, which is every tooltip and every brush — a row of nulls there draws the tooltip's
+  // frame at the origin over a chart nobody is pointing at.
+  if (input.isEmpty()) return emptyMap()
   if (groupBy.isEmpty()) return mapOf(emptyList<VegaValue>() to input)
   val groups = LinkedHashMap<List<VegaValue>, MutableList<VegaValue>>()
   for (datum in input) {

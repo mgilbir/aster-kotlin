@@ -22,6 +22,15 @@ public class ParsedExpression(
 
   override val fieldDependencies: Set<String> by lazy { collectFields() }
 
+  override val readsDataOrScales: Boolean by lazy {
+    var found = false
+    ast.walk { node ->
+      val callee = (node as? Node.Call)?.callee
+      if (callee is Node.Identifier && callee.name in DEFERRED_FUNCTIONS) found = true
+    }
+    found
+  }
+
   override fun evaluate(scope: ExpressionScope): VegaValue = evaluator.evaluate(ast, scope)
 
   /**
@@ -63,6 +72,11 @@ public class ParsedExpression(
     return fields
       .filterNot { candidate -> fields.any { it != candidate && it.startsWith("$candidate.") } }
       .toSet()
+  }
+
+  private companion object {
+    /** The functions that reach for something the compiler has not built yet. */
+    private val DEFERRED_FUNCTIONS = setOf("data", "indata", "scale", "invert", "bandwidth")
   }
 }
 

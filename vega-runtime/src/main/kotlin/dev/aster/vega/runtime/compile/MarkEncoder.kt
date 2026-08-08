@@ -115,6 +115,18 @@ public class MarkEncoder(
     }
 
   /**
+   * Resolves one channel to a number against a datum of the caller's making.
+   *
+   * For the guides, which encode items this class never builds: an axis label placed by `{"scale":
+   * "x", "field": "value"}` needs exactly the channel resolution a mark's `x` gets — scales,
+   * signals, conditionals, `mult` and `offset` — over a datum that is the tick rather than a row.
+   * Exposing the resolution rather than copying it is the point; the copy is where the two would
+   * drift.
+   */
+  public fun channelNumber(channel: ChannelValue, datum: VegaValue): Double? =
+    position(channel, datum)
+
+  /**
    * A mark's scene items, as data another mark can be drawn from.
    *
    * Vega marks share a namespace with datasets, so `"from": {"data": "category-line"}` names the
@@ -681,7 +693,7 @@ public class MarkEncoder(
       is ChannelValue.Adjusted -> adjusted(channel, datum)?.let { JsSemantics.truthy(it) }
       is ChannelValue.Scaled -> {
         val scale = scales[scaleNameOf(channel, datum)]
-        val input = channel.field?.let { datum.fieldOf(it) } ?: channel.value
+        val input = scaledInput(channel, datum)
         if (scale != null && input != null) JsSemantics.truthy(scale.scale(input)) else null
       }
     }
@@ -1051,7 +1063,7 @@ public class MarkEncoder(
       is ChannelValue.Adjusted -> adjusted(channel, datum)?.asString()
       is ChannelValue.Scaled -> {
         val scale = scales[scaleNameOf(channel, datum)]
-        val input = channel.field?.let { datum.fieldOf(it) } ?: channel.value
+        val input = scaledInput(channel, datum)
         if (scale != null && input != null) scale.scale(input).asString() else null
       }
     }
@@ -1213,18 +1225,11 @@ public class MarkEncoder(
 
     // `{"scale": "x", "band": 1}` with no field means "a whole band", i.e. the bar's width.
     val band = channel.band
-    if (channel.field == null && channel.value == null && band != null) {
+    if (channel.field == null && channel.value == null && channel.signal == null && band != null) {
       return scale.bandwidth * band
     }
 
-    val fieldPath = channel.field
-    val constant = channel.value
-    val input =
-      when {
-        fieldPath != null -> datum.fieldOf(fieldPath)
-        constant != null -> constant
-        else -> return null
-      }
+    val input = scaledInput(channel, datum) ?: return null
     val base = scale.position(input)
     if (base.isNaN()) return null
     val bandOffset = if (band != null) scale.bandwidth * band else 0.0
@@ -1254,7 +1259,7 @@ public class MarkEncoder(
           // `band` and `offset`; anything else maps its input straight through.
           is PositionScale -> scaledPosition(channel, datum)?.let { VegaValue.Num(it) }
           else -> {
-            val input = channel.field?.let { datum.fieldOf(it) } ?: channel.value
+            val input = scaledInput(channel, datum)
             input?.let { scale.scale(it) }
           }
         }
@@ -1280,6 +1285,18 @@ public class MarkEncoder(
   /** The same, as a [VegaValue], for the resolvers that do not know what type they want. */
   private fun adjusted(channel: ChannelValue.Adjusted, datum: VegaValue): VegaValue? =
     adjustedNumber(channel, datum)?.let { VegaValue.Num(it) }
+
+  /**
+   * What a scaled channel feeds its scale.
+   *
+   * Upstream's order — `signal`, then `field`, then `value` — because that is the order it builds
+   * the base value in before wrapping it in the scale. `null` means the channel named no source at
+   * all, which is the `{"scale": "x", "band": 1}` form the caller handles separately.
+   */
+  private fun scaledInput(channel: ChannelValue.Scaled, datum: VegaValue): VegaValue? =
+    channel.signal?.let { evaluateExpression(it, datum) }
+      ?: channel.field?.let { datum.fieldOf(it) }
+      ?: channel.value
 
   /** Reports a scale whose output cannot place a mark, and leaves the channel unset. */
   private fun unpositionable(channel: ChannelValue.Scaled, datum: VegaValue): Double? {
@@ -1325,7 +1342,7 @@ public class MarkEncoder(
             )
             return null
           }
-          val input = channel.field?.let { datum.fieldOf(it) } ?: channel.value ?: return null
+          val input = scaledInput(channel, datum) ?: return null
           scale.scale(input).asString()
         }
         is ChannelValue.Signal ->

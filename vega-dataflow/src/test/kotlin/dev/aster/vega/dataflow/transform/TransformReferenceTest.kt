@@ -201,6 +201,60 @@ class TransformReferenceTest {
     assertEquals("""[{"count":5}]""", run("""[{"type": "aggregate"}]"""))
   }
 
+  /**
+   * `argmin` and `argmax` return the **whole tuple** at the extreme, not the value.
+   *
+   * That is what makes them useful and is easy to implement as the value by mistake: a chart labels
+   * a point by aggregating with one and then reading any column of the row that came back —
+   * `datum.lo.c`, not `datum.lo`.
+   */
+  @Test
+  fun `argmin and argmax return the tuple, and stderr the standard error`() {
+    assertEquals(
+      """[{"g":"x","hi":{"c":"b","g":"x","v":4},"lo":{"c":"a","g":"x","v":1},"se":1.5},""" +
+        """{"g":"y","hi":{"c":"d","g":"y","v":16},"lo":{"c":"c","g":"y","v":9},"se":3.5}]""",
+      run(
+        """[{"type": "aggregate", "groupby": ["g"], "fields": ["v", "v", "v"],
+             "ops": ["argmin", "argmax", "stderr"], "as": ["lo", "hi", "se"]}]"""
+      ),
+    )
+  }
+
+  @Test
+  fun `argmin and argmax over the whole dataset skip the row whose field is missing`() {
+    assertEquals(
+      """[{"hi":{"c":"d","g":"y","v":16},"lo":{"c":"a","g":"x","v":1},"se":3.278719262151}]""",
+      run(
+        """[{"type": "aggregate", "fields": ["v", "v", "v"],
+             "ops": ["argmin", "argmax", "stderr"], "as": ["lo", "hi", "se"]}]"""
+      ),
+    )
+  }
+
+  /** One value has no spread, so upstream leaves the field off the row entirely. */
+  @Test
+  fun `stderr of a single value is absent rather than zero`() {
+    assertEquals(
+      """[{}]""",
+      run(
+        """[{"type": "filter", "expr": "datum.c === 'a'"},
+            {"type": "aggregate", "fields": ["v"], "ops": ["stderr"], "as": ["se"]}]"""
+      ),
+    )
+  }
+
+  /** An aggregate over nothing produces no rows, not a row of nulls. */
+  @Test
+  fun `aggregate over an empty input produces no rows`() {
+    assertEquals(
+      """[]""",
+      run(
+        """[{"type": "filter", "expr": "false"},
+            {"type": "aggregate", "fields": ["v"], "ops": ["argmin"], "as": ["lo"]}]"""
+      ),
+    )
+  }
+
   @Test
   fun `aggregate groups and counts`() {
     assertEquals(

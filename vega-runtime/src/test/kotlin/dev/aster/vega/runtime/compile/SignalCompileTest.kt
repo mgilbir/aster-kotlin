@@ -317,18 +317,21 @@ class SignalCompileTest {
    * signal's `update` may itself read a dataset.
    */
   @Test
-  fun `a transform reading a computed signal is reported by name`() {
+  fun `a transform reading a signal computed from data is reported by name`() {
+    // `rows` cannot be known before the data, because it *is* the data. A transform reading it gets
+    // nothing, and nothing is zero to arithmetic — so the name has to be said out loud.
     val compiled =
       compile(
         """
         {
           "width": 100, "height": 50, "padding": 0,
-          "signals": [{"name": "origin", "update": "width / 2"}],
+          "signals": [{"name": "rows", "update": "length(data('t'))"}],
           "data": [
+            {"name": "t", "values": [{"v": 1}]},
             {
-              "name": "t",
-              "values": [{"v": 1}],
-              "transform": [{"type": "formula", "expr": "origin + datum.v", "as": "p"}]
+              "name": "u",
+              "source": "t",
+              "transform": [{"type": "formula", "expr": "rows + datum.v", "as": "p"}]
             }
           ],
           "marks": []
@@ -336,9 +339,51 @@ class SignalCompileTest {
         """
           .trimIndent()
       )
-    val reported = compiled.diagnostics.filter { it.message.contains("signal 'origin'") }
+    val reported = compiled.diagnostics.filter { it.message.contains("signal 'rows'") }
     assertEquals(1, reported.size, compiled.diagnostics.toString())
     assertEquals(DiagnosticCodes.TRANSFORM_INVALID_PARAMETER, reported.single().code)
+  }
+
+  /**
+   * A signal computed from *other signals* is available to a transform, and says nothing.
+   *
+   * It cannot depend on a dataset, so there is no reason to make the transform wait for one —
+   * upstream reaches the same order by ranking its dataflow. This is the shape a control has:
+   * `clamp(handleYear, 1980, 2010)` filtering rows by a draggable year.
+   */
+  @Test
+  fun `a transform reading a signal computed from other signals sees its value`() {
+    val compiled =
+      compile(
+        """
+        {
+          "width": 100, "height": 50, "padding": 0,
+          "signals": [
+            {"name": "half", "update": "width / 2"},
+            {"name": "cutoff", "update": "half - 10"}
+          ],
+          "data": [
+            {
+              "name": "t",
+              "values": [{"v": 1}, {"v": 2}],
+              "transform": [
+                {"type": "formula", "expr": "cutoff + datum.v", "as": "p"},
+                {"type": "filter", "expr": "datum.p > 41"}
+              ]
+            }
+          ],
+          "marks": []
+        }
+        """
+          .trimIndent()
+      )
+    assertTrue(
+      compiled.diagnostics.none { it.message.contains("cutoff") },
+      compiled.diagnostics.toString(),
+    )
+    // 100/2 - 10 = 40, so the rows carry 41 and 42 and the filter keeps one.
+    val rows = compiled.spec?.let { _ -> compiled.signals["cutoff"] }
+    assertEquals(VegaValue.Num(40.0), rows)
   }
 
   /** A signal written down as a constant is available, so it must not be reported. */

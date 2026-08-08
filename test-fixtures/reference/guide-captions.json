@@ -195,6 +195,16 @@
   "caption": "X-axis for a linear scale with values from 5 to 50"
  },
  {
+  "fixture": "budget-forecasts",
+  "kind": "axis",
+  "caption": "X-axis for a discrete scale with 41 values: 1980, 1981, 1982, 1983, 1984, ending with 2020"
+ },
+ {
+  "fixture": "budget-forecasts",
+  "kind": "axis",
+  "caption": "Y-axis for a linear scale with values from −1.8 to 0.5"
+ },
+ {
   "fixture": "colour-ramps",
   "kind": "axis",
   "caption": "X-axis for a discrete scale with 8 values: 0, 1, 2, 3, 4, ending with 7"
