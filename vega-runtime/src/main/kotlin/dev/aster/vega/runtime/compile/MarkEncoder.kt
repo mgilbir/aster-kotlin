@@ -591,7 +591,12 @@ public class MarkEncoder(
       x = anchorX + offset.x,
       y = anchorY + offset.y,
       layout = textEngine.layout(run),
-      fill = style.fill ?: Fill.of(MarkDefaults.TEXT_FILL),
+      // No fallback fill, for the same reason the arc has none: `style` has already applied the
+      // pairing rule, so a label drawn as a bare outline stays one. And a text mark can be
+      // *stroked* — a halo under a label on a busy background is written that way, and dropping the
+      // stroke left the label unreadable in exactly the charts that asked for it.
+      fill = style.fill,
+      stroke = style.stroke,
       angleDegrees = angle,
       opacity = style.opacity,
       metadata = metadata(spec, datum, index, channels),

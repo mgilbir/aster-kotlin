@@ -223,6 +223,32 @@ public object Functions {
     map["pow"] = ExpressionFunction { args -> VegaValue.Num(args.number(0).pow(args.number(1))) }
 
     /**
+     * `extent(array)` — `[min, max]`, skipping null and NaN.
+     *
+     * Not a numeric function: upstream compares the values with `<` and `>` as they are, so an
+     * array of strings gives its lexicographic ends and an array of instants gives its earliest and
+     * latest. Both ends are null for an array with nothing usable in it, which is what a scale
+     * pointed at an empty dataset has to cope with.
+     */
+    map["extent"] = ExpressionFunction { args ->
+      val values =
+        (args.at(0) as? VegaValue.Arr)?.values ?: return@ExpressionFunction VegaValue.Null
+      val usable = values.filterNot {
+        it is VegaValue.Null || (it is VegaValue.Num && it.value.isNaN())
+      }
+      if (usable.isEmpty()) {
+        return@ExpressionFunction VegaValue.Arr(listOf(VegaValue.Null, VegaValue.Null))
+      }
+      var low = usable.first()
+      var high = usable.first()
+      for (value in usable) {
+        if ((JsSemantics.compare(value, low) ?: 0) < 0) low = value
+        if ((JsSemantics.compare(value, high) ?: 0) > 0) high = value
+      }
+      VegaValue.Arr(listOf(low, high))
+    }
+
+    /**
      * `hypot(...)` — `Math.hypot`, which is **variadic** and not the two-argument function its name
      * suggests. A Monte Carlo estimate of pi is `hypot(datum.x, datum.y) <= 1` and nothing else.
      *

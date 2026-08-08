@@ -21,7 +21,7 @@ end to end — expressions, signals, 33 of upstream's 40 data transforms, every 
 and an event handler that recompiles the chart — and are verified against upstream Vega by
 differential tests.
 
-One hundred and three differential fixtures pass, all matching upstream exactly on every mark and scale output:
+One hundred and four differential fixtures pass, all matching upstream exactly on every mark and scale output:
 
 | Fixture | Marks | Covers |
 | --- | --- | --- |
@@ -127,6 +127,7 @@ One hundred and three differential fixtures pass, all matching upstream exactly 
 | `watch` | 92 | The same face drawn from arcs, and the second example built on `now()` |
 | `error-bars` | 61 | Vega's error bars: `ci0`/`ci1` by bootstrap, and a band axis whose ticks sit on the band edges with one more pegged to the leading one |
 | `hypothetical-outcome-plots` | 60 | Twelve bars whose heights are twelve draws from the chart's stream, in the order upstream draws them |
+| `serpentine-timeline` | 80 | Vega's serpentine timeline: a scale reached from a `formula`, a `reverse` chosen by a signal, and eleven labels haloed by a text stroke |
 | `pi-monte-carlo` | 2148 | Vega's Monte Carlo estimate of pi: two styled cells laid out `align: none` and `bounds: flush`, a grid driven by a second scale, flushed end labels, and 2,000 seeded points |
 
 The gate is wired into `./scripts/oracle.sh`, so every further scale, mark and transform is built
@@ -524,7 +525,7 @@ each example a deadline.
 
 ## Known failing fixtures
 
-None. One hundred and three fixtures exist and all of them pass — and that sentence became worth
+None. One hundred and four fixtures exist and all of them pass — and that sentence became worth
 something only once the gate could no longer skip itself, below.
 
 **The gate could report success without running.** `FixtureDifferentialTest` reads the fixtures and
@@ -842,6 +843,37 @@ With that, `histogram-null-values` passes, and it took four separate pieces to g
 dependency order, `bin` publishing its settings, `autosize: fit`, and this. Each of them turned up a
 defect in code that was already passing.
 
+## A transform's expression parameter is an edge after all
+
+This was written down here as a known gap and as the "obvious next increment", with the reasoning
+that `filter`'s `expr`, `formula`'s `expr` and `cross`'s `filter` are *per-row* expressions rather
+than `{"signal": ...}` references and therefore not dependencies. The first half is true and the
+conclusion was wrong.
+
+Upstream's `parseExpression` walks **every** expression's AST and lets the `scale`, `data` and
+`indata` visitors register what they find as operator **parameters**. A `formula` calling
+`scale('x', datum.v)` is wired to that scale exactly as a signal-valued parameter would be. Vega's
+serpentine timeline is written that way — a `formula` that scales a column — and without the edge
+the scale was asked for before it had been built, which this engine reported as a scale the
+specification "does not define".
+
+The three parameters are now read for their dependencies. Two things came out of it that are worth
+knowing:
+
+- **A diagnostic disappeared, and that is the fix.** `SignalCompileTest` had a case asserting that a
+  transform reading a computed signal from a *later* dataset came out null and was reported by name.
+  It resolves correctly now. The diagnostic existed because the edge was missing; what survives it
+  is the report for a signal nothing can supply at all.
+- **The risk named here — that a new edge turns a working chart into a reported cycle — did not
+  materialise.** All 103 existing fixtures were unaffected.
+
+Two smaller things came with the same chart. A scale's `reverse` may be a **signal**, which is how a
+timeline offers to run right-to-left, and it was being read as a constant. And a **text mark can be
+stroked** — a halo under a label on a busy background — which this engine dropped and, worse, which
+the comparison could not see: `textMark` emitted a fill and never a stroke. That is the *seventh*
+channel to have been invisible to the harness. Before trusting a green fixture on a new kind of
+property, check that both `normalize.js` and `Differential.kt` emit it.
+
 ## Six gaps behind one chart
 
 `pi-monte-carlo` looked like a layout problem — two `group/scope` marks short — and was six
@@ -945,7 +977,9 @@ them said what:
   one chart" below.
 - **`bar-line-toggle`** — 155 marks against upstream's 100: a signal-driven toggle, which needs the
   `on` handler machinery rather than anything stochastic.
-- **`serpentine-timeline`** — scale ranges reversed and a different width; a layout problem.
+- **`serpentine-timeline`** — done. Not a layout problem: a `formula` calling `scale('sS1', ...)`
+  was running before that scale existed, because a transform's *expression* parameter was not an
+  edge in the dependency graph. It is now — see below — and `reverse` can come from a signal.
 - **`word-cloud`** — upstream's own headless output is degenerate (`fontSize: 0`, a width of
   `-Infinity`), because the `wordcloud` transform measures text against a canvas that is not there.
   There is nothing to compare against; this one needs a different kind of evidence.

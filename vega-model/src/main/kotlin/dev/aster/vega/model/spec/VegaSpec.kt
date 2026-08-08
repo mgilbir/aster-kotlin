@@ -444,6 +444,13 @@ public data class ScaleSpec(
   val domainMid: NumberValue? = null,
   val range: RangeSpec,
   val reverse: Boolean = false,
+  /**
+   * `reverse: {"signal": "..."}` — a control flips the scale.
+   *
+   * A timeline that can run right-to-left is written this way, and there is nothing constant to
+   * write down. Resolved when the scale is built, like every other signal-valued scale property.
+   */
+  val reverseSignal: String? = null,
   val round: Boolean = false,
   val clamp: Boolean = false,
   val nice: Boolean = false,

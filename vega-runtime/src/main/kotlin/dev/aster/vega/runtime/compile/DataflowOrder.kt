@@ -226,6 +226,15 @@ internal class DataflowOrder(
         }
         .toMap()
 
+    /**
+     * Which parameter of each transform holds a per-row expression, by transform type.
+     *
+     * Three, and they are upstream's three: probe `T.Definition.params` over `vega.transforms` for
+     * `type: 'expr'` and nothing else comes back.
+     */
+    private val EXPRESSION_PARAMETERS =
+      mapOf("filter" to "expr", "formula" to "expr", "cross" to "filter")
+
     private val publishers: Map<String, String> =
       data
         .flatMap { spec ->
@@ -263,8 +272,30 @@ internal class DataflowOrder(
       val result = mutableSetOf<Operator>()
       for (source in spec.sources) if (source in dataSpecs) result.add(Operator.Data(source))
       spec.urlSignal?.let { result.addAll(readsOf(it)) }
-      for (transform in spec.transform) collectSignalReferences(transform, result)
+      for (transform in spec.transform) {
+        collectSignalReferences(transform, result)
+        collectTransformExpressions(transform, result)
+      }
       return result
+    }
+
+    /**
+     * The transform parameters upstream declares as `type: 'expr'`, which are edges after all.
+     *
+     * `filter`'s `expr`, `formula`'s `expr` and `cross`'s `filter` are per-row expressions rather
+     * than `{"signal": ...}` references, and it is tempting to conclude they cannot be
+     * dependencies. Upstream's `parseExpression` says otherwise: it walks *every* expression's AST
+     * and lets the `scale`, `data` and `indata` visitors register what they find as operator
+     * **parameters**, so a `formula` calling `scale('x', datum.v)` waits for that scale exactly as
+     * a signal-valued parameter would. Vega's serpentine timeline is written that way, and without
+     * the edge its scale is asked for before it exists.
+     */
+    private fun collectTransformExpressions(transform: VegaValue, into: MutableSet<Operator>) {
+      val obj = transform as? VegaValue.Obj ?: return
+      val type = (obj.fields["type"] as? VegaValue.Str)?.value?.lowercase()
+      val parameter = EXPRESSION_PARAMETERS[type] ?: return
+      val source = (obj.fields[parameter] as? VegaValue.Str)?.value ?: return
+      into.addAll(readsOf(source))
     }
 
     /**

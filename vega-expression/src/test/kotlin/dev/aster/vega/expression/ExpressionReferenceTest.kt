@@ -140,6 +140,13 @@ class ExpressionReferenceTest {
         // `hypot` is variadic, not the two-argument function its name suggests, and with no
         // arguments it is zero.
         "hypot(3,4)|5",
+        // `extent` compares the values as they are, so strings give lexicographic ends; null and
+        // NaN are skipped, and an array with nothing usable in it gives two nulls.
+        "extent([3,1,2])|[1,3]",
+        "extent([])|[null,null]",
+        "extent(['b','a','c'])|[\"a\",\"c\"]",
+        "extent([1,null,5])|[1,5]",
+        "extent([null])|[null,null]",
         "hypot()|0",
         "hypot(1)|1",
         "hypot(1,2,2)|3",

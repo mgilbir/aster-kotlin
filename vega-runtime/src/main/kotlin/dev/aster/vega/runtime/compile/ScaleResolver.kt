@@ -117,7 +117,7 @@ public class ScaleResolver(
     return LinearScale(
       spec.name,
       domain,
-      oriented(range, spec.reverse),
+      oriented(range, reversed(spec)),
       spec.clamp,
       spec.round,
       binBoundaries(spec, domain),
@@ -232,7 +232,7 @@ public class ScaleResolver(
     return SequentialColorScale(
       name = spec.name,
       domain = domain,
-      colors = if (spec.reverse) colors.reversed() else colors,
+      colors = if (reversed(spec)) colors.reversed() else colors,
       space = space,
     )
   }
@@ -420,7 +420,7 @@ public class ScaleResolver(
     if (spec.nice) domain = Ticks.niceLog(domain, base)
 
     val scale =
-      LogScale(spec.name, domain, oriented(range, spec.reverse), base, spec.clamp, spec.round)
+      LogScale(spec.name, domain, oriented(range, reversed(spec)), base, spec.clamp, spec.round)
     if (!scale.isValid) {
       diagnostics.error(
         DiagnosticCodes.SCALE_INVALID_DOMAIN,
@@ -443,7 +443,7 @@ public class ScaleResolver(
     return PowScale(
       spec.name,
       domain,
-      oriented(range, spec.reverse),
+      oriented(range, reversed(spec)),
       exponent,
       spec.clamp,
       spec.round,
@@ -460,7 +460,7 @@ public class ScaleResolver(
     return SymlogScale(
       spec.name,
       domain,
-      oriented(range, spec.reverse),
+      oriented(range, reversed(spec)),
       constant,
       spec.clamp,
       spec.round,
@@ -565,7 +565,14 @@ public class ScaleResolver(
       } else {
         domain
       }
-    return TimeScale(spec.name, niced, oriented(range, spec.reverse), zone, spec.clamp, spec.round)
+    return TimeScale(
+      spec.name,
+      niced,
+      oriented(range, reversed(spec)),
+      zone,
+      spec.clamp,
+      spec.round,
+    )
   }
 
   private fun buildBand(spec: ScaleSpec): BandScale? {
@@ -576,7 +583,7 @@ public class ScaleResolver(
     return BandScale(
       name = spec.name,
       domain = domain,
-      range = oriented(range, spec.reverse),
+      range = oriented(range, reversed(spec)),
       paddingInner = numbers.resolve(spec.paddingInner, spec.name) ?: padding ?: 0.0,
       paddingOuter = numbers.resolve(spec.paddingOuter, spec.name) ?: padding ?: 0.0,
       align = numbers.resolve(spec.align, spec.name) ?: 0.5,
@@ -590,7 +597,7 @@ public class ScaleResolver(
     return PointScale(
       name = spec.name,
       domain = domain,
-      range = oriented(range, spec.reverse),
+      range = oriented(range, reversed(spec)),
       padding =
         numbers.resolve(spec.paddingOuter, spec.name)
           ?: numbers.resolve(spec.padding, spec.name)
@@ -652,12 +659,12 @@ public class ScaleResolver(
    */
   private fun binnedRange(spec: ScaleSpec, buckets: Int?): List<VegaValue>? =
     when (val r = effectiveRange(spec)) {
-      is RangeSpec.Literal -> if (spec.reverse) r.values.reversed() else r.values
+      is RangeSpec.Literal -> if (reversed(spec)) r.values.reversed() else r.values
       is RangeSpec.Scheme -> {
         val colors = colorRange(spec) ?: return null
         val wanted = r.count ?: buckets ?: colors.size
         val taken = if (colors.size > wanted) sampleEvenly(colors, wanted) else colors
-        (if (spec.reverse) taken.reversed() else taken).map { VegaValue.Str(it.toCssHex()) }
+        (if (reversed(spec)) taken.reversed() else taken).map { VegaValue.Str(it.toCssHex()) }
       }
       else -> {
         diagnostics.error(
@@ -766,6 +773,15 @@ public class ScaleResolver(
    */
   private fun oriented(range: List<Double>, reverse: Boolean): List<Double> =
     if (reverse) range.reversed() else range
+
+  /**
+   * `reverse`, which a specification may compute: a timeline that can run right-to-left says so
+   * with `{"signal": "..."}` and has no constant to write down.
+   */
+  private fun reversed(spec: ScaleSpec): Boolean =
+    spec.reverseSignal?.let {
+      JsSemantics.truthy(numbers.resolveValue(it, spec.name) ?: VegaValue.Null)
+    } ?: spec.reverse
 
   private fun niceOf(domain: List<Double>, spec: ScaleSpec): List<Double> =
     dev.aster.vega.runtime.scale.Ticks.nice(

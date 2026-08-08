@@ -261,6 +261,15 @@ public object Differential {
       solidColour(fill.paint)?.let { strings["fill"] = it.toCssHex() }
       numbers["fillOpacity"] = fill.opacity
     }
+    // A text mark can be *stroked*, and this comparison could not see it — the seventh channel to
+    // have been invisible here. A halo under a label on a busy background is exactly that stroke,
+    // and a label drawn without one is unreadable while agreeing on every other channel.
+    node.stroke?.let { stroke ->
+      solidColour(stroke.paint)?.let { strings["stroke"] = it.toCssHex() }
+      numbers["strokeWidth"] = stroke.width
+      numbers["strokeOpacity"] = stroke.opacity
+      dashOf(stroke)?.let { strings["strokeDash"] = it }
+    }
     return Mark("text", node.metadata.role, numbers, strings)
   }
 

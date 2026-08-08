@@ -9,7 +9,7 @@ Branch `milestone-0-bootstrap`. Working tree clean, both gates green:
 - `./scripts/check.sh` — format, all tests, lint, demo APK
 - `./scripts/oracle.sh` — regenerates upstream references and runs the differential comparison
 
-**103 differential fixtures pass, all matching upstream exactly.** That is the only number here
+**104 differential fixtures pass, all matching upstream exactly.** That is the only number here
 that means what it says.
 
 ## Read this before trusting the other number
@@ -233,14 +233,11 @@ when the work lands; until then, read them as history rather than as policy.
 upstream, so these charts can have references at all. `clock` and `watch` are fixtures and match
 exactly. The other six in the category were scouted and only one of them is actually stochastic:
 
-- `error-bars` — `ci0`/`ci1` done and pinned; the chart's ten bars and ten points already land
-  exactly right. Blocked on `tickExtra` and `tickOffset`, which STATUS.md describes in detail
-  including the NaN-positioned empty label upstream emits. **This is the closest example to green.**
-- `hypothetical-outcome-plots` — the right *number* of marks, wrong values. The generator agrees;
-  the dataflow does not ask for its numbers in upstream's order. Diagnosing that order is the task.
-- `pi-monte-carlo` — two `group/scope` marks short: a layout gap, not a random one.
-- `bar-line-toggle` — 155 marks against upstream's 100. Needs the `on`-handler machinery.
-- `serpentine-timeline` — scale ranges reversed and a different width; a layout problem.
+`error-bars`, `hypothetical-outcome-plots`, `pi-monte-carlo` and `serpentine-timeline` are all
+fixtures now and all pass; STATUS.md records what each one needed. Two are left in this category:
+
+- `bar-line-toggle` — 155 marks against upstream's 100. Needs the `on`-handler machinery, which is
+  the one genuinely structural gap left outside geo and raster.
 - `word-cloud` — **upstream's own headless output is degenerate**: `fontSize: 0` on every word and a
   surface width of `-Infinity`, because the `wordcloud` transform measures text against a canvas
   that is not there. There is nothing to compare against. This one needs evidence of another kind,
