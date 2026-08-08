@@ -362,7 +362,14 @@ public fun compareFieldValues(left: VegaValue, right: VegaValue): Int {
 /** Builds a comparator from Vega's `{field, order}` sort parameter, accepting arrays for both. */
 internal fun sortComparator(sort: VegaValue?): Comparator<VegaValue>? {
   val spec = sort as? VegaValue.Obj ?: return null
-  val fields = spec.stringList("field")
+  // An **empty** field name orders nothing. It reaches here from a specification that offers
+  // sorting
+  // as an option and leaves it switched off — `{"field": {"signal": "sortField"}}` with `sortField`
+  // an empty string — and upstream reads it as a property no row has, so every comparison is a tie
+  // and the declared order survives. This engine reads an empty path as *the datum itself*, which
+  // compares two whole objects and reorders the data; a labelled donut then draws its slices in the
+  // wrong places, and nothing says so.
+  val fields = spec.stringList("field").filter { it.isNotEmpty() }
   if (fields.isEmpty()) return null
   val orders = spec.stringList("order")
   return Comparator { a, b ->

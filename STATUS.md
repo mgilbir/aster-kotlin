@@ -21,7 +21,7 @@ end to end — expressions, signals, 33 of upstream's 40 data transforms, every 
 and an event handler that recompiles the chart — and are verified against upstream Vega by
 differential tests.
 
-Eighty-six differential fixtures pass, all matching upstream exactly on every mark and scale output:
+Eighty-seven differential fixtures pass, all matching upstream exactly on every mark and scale output:
 
 | Fixture | Marks | Covers |
 | --- | --- | --- |
@@ -108,6 +108,7 @@ Eighty-six differential fixtures pass, all matching upstream exactly on every ma
 | `autosize-fit` | 30 | the plotting area shrunk so the drawing comes out the declared size, with angled labels and two axis titles overhanging |
 | `autosize-fit-x` | 30 | the same on the horizontal axis only, the vertical growing the way `pad` does |
 | `autosize-fit-y` | 30 | and the same the other way round |
+| `donut-chart-labelled` | 108 | Vega's labelled donut: 33 label slots of which nine are filled, leader lines with no outline, and debug rectangles left invisible |
 | `multi-source-pluck` | 12 | a dataset concatenating two sources, and a signal plucking one column out of the result |
 | `interactive-legend` | 454 | a brush `rect` with no `x` until someone drags one, and a legend swatch whose opacity is a conditional rule |
 | `histogram-null-values` | 47 | Vega's film-rating histogram: a scale whose ticks are `bin`'s own boundaries, a second band scale for the null bar, `fit` sizing, and 3,201 rows from a relative `url` |
@@ -170,7 +171,7 @@ substantive compatibility items:
 | 6. View and Compose APIs | Yes |
 | 7. SVG, PNG, PDF export | Yes |
 | 8. TalkBack can describe and navigate | Partial — virtual nodes are tested by instrumentation, not with TalkBack itself |
-| 9. At least 100 compatibility fixtures pass | 86 of 100 |
+| 9. At least 100 compatibility fixtures pass | 87 of 100 |
 | 10. Core runtime has no Android dependency | Yes |
 | 11. Renders without WebView | Yes |
 | 12. Build and test loop runs from the terminal | Yes |
@@ -507,7 +508,7 @@ each example a deadline.
 
 ## Known failing fixtures
 
-None. Eighty-six fixtures exist and all eighty-six pass — and that sentence became worth
+None. Eighty-seven fixtures exist and all eighty-seven pass — and that sentence became worth
 something only once the gate could no longer skip itself, below.
 
 **The gate could report success without running.** `FixtureDifferentialTest` reads the fixtures and
@@ -853,6 +854,37 @@ The second half of that fixture was the legend swatch's `opacity`, which is a co
 dim the swatch when its series is deselected — and no `symbolOpacity` property can express one. It is
 resolved against the entry now, and the "only implemented as a constant" warning it used to draw is
 gone with it.
+
+## The labelled donut, and four defects behind it
+
+`donut-chart-labelled` was the last official example not passing and not refused. It needed `pluck`
+and multi-source datasets, which HANDOFF knew about, and four things it did not — each of them wrong
+in code that every other fixture was happy with.
+
+**An empty sort field sorted.** The chart offers sorting as an option and leaves it off:
+`{"field": {"signal": "sortField"}}` with `sortField` an empty string. Upstream reads that as a
+property no row has, so every comparison ties and the declared order survives. This engine read an
+empty path as *the datum itself*, compared two whole objects, and reordered the data — so every slice
+was the wrong size, and nothing said so. Fixing it corrected all nine arcs at once.
+
+**A `path` mark with no outline was dropped.** The leader lines are drawn from the same 33 label
+slots as the labels, and only the nine belonging to a slice carry a path. Upstream makes an item
+regardless; this engine made nine. The same rule as the brush rect before it, one mark type over.
+
+**A stroke widened the bounds of an invisible mark.** Upstream's `boundStroke` tests the *item's*
+opacity as well as the stroke's — `item.stroke && item.opacity !== 0 && item.strokeOpacity !== 0` —
+and the chart lays its bins out with debug rectangles left at `opacity: 0`. Counting their two-unit
+stroke made the whole surface a unit taller than upstream's.
+
+**A Vega null was drawn as the word "null".** This one the mark comparison could not see, and the
+rendered SVG showed it immediately: a text mark is compared by its anchor, not its content, so 33
+labels matched upstream perfectly while 24 of them printed "null" across the chart. Upstream's
+`textValue` is `line == null ? '' : (line + '').trim()`; this engine was stringifying the null.
+Fixed at the source — a channel holding a Vega null now resolves to nothing rather than to four
+letters, which also means a `fill` of null is no longer a colour nobody can parse.
+
+That last one is the fourth time the rendered SVG has caught something the comparison could not, and
+the first where the fixture was already green when the picture was wrong.
 
 ## Performance observations
 

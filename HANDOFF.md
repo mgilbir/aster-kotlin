@@ -9,7 +9,7 @@ Branch `milestone-0-bootstrap`. Working tree clean, both gates green:
 - `./scripts/check.sh` — format, all tests, lint, demo APK
 - `./scripts/oracle.sh` — regenerates upstream references and runs the differential comparison
 
-**86 differential fixtures pass, all matching upstream exactly.** That is the only number here
+**87 differential fixtures pass, all matching upstream exactly.** That is the only number here
 that means what it says.
 
 ## Read this before trusting the other number
@@ -195,31 +195,16 @@ those before comparing, they paint nothing.
 its datasets are fetched into `test-fixtures/data/` and committed. Discount every loader diagnostic
 when judging how far an example is from passing.
 
-What is left, by the engine gap behind it. `global-development` and `quantile-quantile-plot` were on
-this list and are now passing fixtures, and so are `histogram-null-values` and `interactive-legend`.
-One is left:
+**Every official example that is not refused now passes.** The list that used to live here is empty:
+`global-development`, `quantile-quantile-plot`, `probability-density`, `histogram-null-values`,
+`interactive-legend` and `donut-chart-labelled` are all fixtures. What remains of the 93 is the
+refused set below plus the families named at the end.
 
-- `donut-chart-labelled` — **needs more than this list used to say.** `pluck` and multi-source
-  datasets are both done (see `multi-source-pluck`), and the chart still does not match: it now draws
-  88 marks to upstream's 108. What is actually left, with the upstream numbers to check against:
-
-  1. **The arcs are wrong before any label work**, so start there. Upstream's `table` comes out of
-     its pipeline with `startAngle: 0` and `endAngle: 0.1904` on the first row — value 1 of a total
-     of 33, so 2π/33 — and this engine's first arc spans far more than that. The first transform is
-     a `collect` sorting by `{"field": {"signal": "sortField"}}` where `sortField` is the **empty
-     string**; upstream's field accessor for an empty name reads undefined on every row, so the
-     order is left as declared. Check whether `collect` sorts at all in that case here.
-  2. Everything after it follows from the angles: `middleAngle` decides `side`, `side` decides the
-     label bins. Upstream's `leftRightCount` is `{right: 16, left: 17}` and its `labelPositions` has
-     33 rows; this engine has `{right: 15, left: 20}` and 35 rows, which is the same defect one step
-     downstream rather than a second one.
-  3. The **timer does not matter** for a static render, which is worth knowing before being scared
-     off by it: upstream's `counter` is 0 and `p1` is `{right: 0, left: 0}` after `runAsync`, so the
-     animated label-shifting loop contributes nothing to the reference.
-
-  One trap when probing it: `runAsync` on this specification **never settles**, because the timer
-  signal keeps the dataflow alive. Read the values you need and kill the process, or call
-  `view.finalize()`.
+The corpus is no longer the place to look for the next task, so the method that found all of them is
+worth restating: none of those six needed only the feature it appeared to need. Every one of them
+turned up at least one defect in code that every other fixture was happy with — an unaligned bin
+stop, a silently dropped `anchor`, a sort that sorted when asked not to, a stroke counted on an
+invisible mark. Adding a *fixture* is what found those; adding the feature would not have.
 
 **Refused, not missing**, and now reported as such: `error-bars`, `bar-line-toggle`, `clock`,
 `hypothetical-outcome-plots` and `pi-monte-carlo` all need `random()` or `now()`. `error-bars` is the

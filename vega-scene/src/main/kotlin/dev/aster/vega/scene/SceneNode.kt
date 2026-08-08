@@ -163,9 +163,22 @@ public data class GroupNode(
         if (child.visible) result = result.union(child.transformedBounds)
       }
       if (clip != null) result = intersect(result, clip)
-      (stroke?.let { result.expand(it.halfWidth) } ?: result).normalized()
+      (stroke.wideningAt(opacity)?.let { result.expand(it.halfWidth) } ?: result).normalized()
     }
 }
+
+/**
+ * Whether a stroke widens a node's bounds.
+ *
+ * Upstream's `boundStroke` tests the **item's** own opacity as well as the stroke's — `item.stroke
+ * && item.opacity !== 0 && item.strokeOpacity !== 0` — so a mark drawn at zero opacity reaches
+ * exactly as far as its geometry and no further. It matters wherever an invisible mark sits at the
+ * edge of a chart: Vega's labelled donut lays its label bins out with debug rectangles left at
+ * `opacity: 0`, and counting their two-unit stroke made the whole surface a unit taller than
+ * upstream's.
+ */
+internal fun Stroke?.wideningAt(opacity: Double): Stroke? =
+  if (this != null && isVisible && opacity != 0.0) this else null
 
 private fun intersect(a: RectD, b: RectD): RectD {
   if (a.isEmpty || b.isEmpty) return RectD.Empty
@@ -206,7 +219,7 @@ public data class RectNode(
   override val bounds: RectD by
     lazy(LazyThreadSafetyMode.NONE) {
       val base = rect
-      (if (stroke != null && stroke.isVisible) base.expand(stroke.halfWidth) else base).normalized()
+      (stroke.wideningAt(opacity)?.let { base.expand(it.halfWidth) } ?: base).normalized()
     }
 }
 
@@ -228,7 +241,7 @@ public data class RuleNode(
   override val bounds: RectD by
     lazy(LazyThreadSafetyMode.NONE) {
       RectD(minOf(x1, x2), minOf(y1, y2), maxOf(x1, x2), maxOf(y1, y2))
-        .expand(if (stroke.isVisible) stroke.halfWidth else 0.0)
+        .expand(stroke.wideningAt(opacity)?.halfWidth ?: 0.0)
         .normalized()
     }
 }
@@ -251,11 +264,10 @@ public data class PathNode(
       val base = path.bounds
       // A miter join can extend past halfWidth; the miter limit bounds how far.
       val expansion =
-        if (stroke != null && stroke.isVisible) {
-          if (stroke.join == StrokeJoin.MITER)
-            stroke.halfWidth * stroke.miterLimit.coerceAtLeast(1.0)
-          else stroke.halfWidth
-        } else 0.0
+        stroke.wideningAt(opacity)?.let {
+          if (it.join == StrokeJoin.MITER) it.halfWidth * it.miterLimit.coerceAtLeast(1.0)
+          else it.halfWidth
+        } ?: 0.0
       (if (expansion > 0.0) base.expand(expansion) else base).normalized()
     }
 }
@@ -322,9 +334,9 @@ public data class SymbolNode(
       // a
       // circle, which is over-generous; reproducing it keeps our bounds comparable with upstream's.
       val expansion =
-        if (stroke != null && stroke.isVisible) {
-          maxOf(stroke.halfWidth, stroke.miterLimit.coerceAtLeast(1.0) * stroke.halfWidth)
-        } else 0.0
+        stroke.wideningAt(opacity)?.let {
+          maxOf(it.halfWidth, it.miterLimit.coerceAtLeast(1.0) * it.halfWidth)
+        } ?: 0.0
       (if (expansion > 0.0) base.expand(expansion) else base).normalized()
     }
 }

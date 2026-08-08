@@ -12,6 +12,7 @@ import dev.aster.vega.scene.FontStyle
 import dev.aster.vega.scene.GroupNode
 import dev.aster.vega.scene.ImageNode
 import dev.aster.vega.scene.PathNode
+import dev.aster.vega.scene.RectD
 import dev.aster.vega.scene.RectNode
 import dev.aster.vega.scene.RuleNode
 import dev.aster.vega.scene.Scene
@@ -270,6 +271,35 @@ public object Differential {
    * symbols with its own, sized so every shape fits a `sqrt(size)` box rather than by area.
    * Comparing the outline extent is what makes that visible.
    */
+  /**
+   * The four extent channels, written the way upstream's `Bounds` writes them.
+   *
+   * An empty bounds is not geometry, and the two engines spell it differently. Upstream leaves its
+   * `Bounds` at the `±Number.MAX_VALUE` it starts from, so the reference records a left of
+   * 1.7976931348623157e308 and a width of `-Infinity` — the subtraction overflows. This engine has
+   * an explicit empty rectangle instead. Written out upstream's way so the two agree on "nothing
+   * here" rather than comparing two different spellings of it.
+   *
+   * It is not a rare case: a labelled donut draws a leader line for every label slot and only the
+   * nine belonging to a slice have an outline, so two thirds of that mark is empty by design.
+   */
+  private fun extentChannels(bounds: RectD): Map<String, Double> =
+    if (bounds.isEmpty) {
+      linkedMapOf(
+        "shapeLeft" to Double.MAX_VALUE,
+        "shapeTop" to Double.MAX_VALUE,
+        "shapeWidth" to Double.NEGATIVE_INFINITY,
+        "shapeHeight" to Double.NEGATIVE_INFINITY,
+      )
+    } else {
+      linkedMapOf(
+        "shapeLeft" to bounds.left,
+        "shapeTop" to bounds.top,
+        "shapeWidth" to bounds.width,
+        "shapeHeight" to bounds.height,
+      )
+    }
+
   private fun symbolMark(node: SymbolNode, world: Transform2D): Mark {
     val centre = world.apply(node.x, node.y)
     val extent = world.mapBounds(node.bounds)
@@ -278,11 +308,7 @@ public object Differential {
         "x" to centre.x,
         "y" to centre.y,
         "size" to node.size,
-        "shapeLeft" to extent.left,
-        "shapeTop" to extent.top,
-        "shapeWidth" to extent.width,
-        "shapeHeight" to extent.height,
-      )
+      ) + extentChannels(extent)
     return Mark("symbol", node.metadata.role, numbers + paintNumbers(node), paintStrings(node))
   }
 
@@ -299,13 +325,7 @@ public object Differential {
       // An arc is compared by the wedge it drew rather than by a centre point, which says nothing
       // about its radii or its sweep.
       val bounds = world.mapBounds(node.bounds)
-      val numbers =
-        linkedMapOf(
-          "shapeLeft" to bounds.left,
-          "shapeTop" to bounds.top,
-          "shapeWidth" to bounds.width,
-          "shapeHeight" to bounds.height,
-        )
+      val numbers = LinkedHashMap(extentChannels(bounds))
       // A `path` mark also reports the anchor it was placed at, which upstream carries as the
       // item's own x and y — the outline itself is in the path string's coordinates.
       if (kind == "path") {
@@ -568,10 +588,25 @@ public object Differential {
       // Checked as zero rather than skipped: a real number here is still a difference, so this says
       // the two agree on what gets painted without giving up the channel.
       if (channel in GEOMETRY_CHANNELS && wanted in NON_FINITE) {
-        val painted = actual.numbers[channel]
-        if (painted == null || painted != 0.0) {
+        // What this side must hold depends on which non-finite it is, and the two mean different
+        // things:
+        //
+        // `NaN` is a channel upstream never set — `x2 - x` with both undefined — which its renderer
+        // paints as zero. `interactive-legend`'s brush rect has `width: NaN` in the scene and draws
+        // `M0,0h0v200h0Z` in upstream's own SVG. A scene node here holds numbers a renderer can use
+        // rather than the arithmetic that produced them, so it holds that zero.
+        //
+        // An infinity is an **empty bounds**, and `extentChannels` writes this side's in upstream's
+        // own spelling, so the two match exactly.
+        val required = if (wanted == "NaN") 0.0 else wanted.toDouble()
+        val held = actual.numbers[channel]
+        if (held == null || held != required) {
           out.add(
-            Difference("$where.$channel", "$wanted (painted as 0)", painted?.let(::fmt) ?: "absent")
+            Difference(
+              "$where.$channel",
+              "$wanted (as ${fmt(required)})",
+              held?.let(::fmt) ?: "absent",
+            )
           )
         }
         continue
@@ -738,7 +773,21 @@ public object Differential {
 
   /** The channels that carry a position or an extent, and so have a painted equivalent of zero. */
   private val GEOMETRY_CHANNELS =
-    setOf("x", "y", "x2", "y2", "width", "height", "size", "innerRadius", "outerRadius")
+    setOf(
+      "x",
+      "y",
+      "x2",
+      "y2",
+      "width",
+      "height",
+      "size",
+      "innerRadius",
+      "outerRadius",
+      "shapeLeft",
+      "shapeTop",
+      "shapeWidth",
+      "shapeHeight",
+    )
 
   /** What `canonicalNumber` writes where a number is not finite. */
   private val NON_FINITE = setOf("NaN", "Infinity", "-Infinity")

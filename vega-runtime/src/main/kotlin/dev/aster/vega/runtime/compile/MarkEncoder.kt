@@ -325,9 +325,13 @@ public class MarkEncoder(
    */
   private fun path(spec: MarkSpec, datum: VegaValue, index: Int): SceneNode? {
     val channels = spec.encode.effective
-    val source = string(channels["path"], datum) ?: return null
+    // A `path` channel that resolves to nothing still makes an item, as upstream does — it simply
+    // has no outline and paints nothing. A labelled donut relies on it: its leader lines are drawn
+    // from the same 33 label slots as the labels, and only the nine that belong to a slice carry a
+    // path, so dropping the empty ones loses two thirds of the mark.
+    val source = string(channels["path"], datum) ?: ""
     val parsed = SvgPath.parse(source)
-    if (!parsed.complete) {
+    if (source.isNotEmpty() && !parsed.complete) {
       reportOnce(
         "path:$source",
         dev.aster.vega.model.VegaDiagnostic(
@@ -339,8 +343,6 @@ public class MarkEncoder(
         ),
       )
     }
-    if (parsed.path.isEmpty) return null
-
     val x = centred(channels, datum, "x", "xc") ?: 0.0
     val y = centred(channels, datum, "y", "yc") ?: 0.0
     val scaleX = number(channels["scaleX"], datum) ?: 1.0
@@ -515,7 +517,14 @@ public class MarkEncoder(
     val channels = spec.encode.effective
     val anchorX = centred(channels, datum, "x", "xc") ?: return null
     val anchorY = centred(channels, datum, "y", "yc") ?: return null
-    val content = string(channels["text"], datum) ?: return null
+    // Upstream's `textValue`: `line == null ? '' : (line + '').trim()`. Both halves matter. A text
+    // channel that resolves to nothing draws *nothing* — this engine was stringifying the null and
+    // printing the word "null", which the mark comparison cannot see because a text mark is
+    // compared
+    // by its anchor rather than its content. Vega's labelled donut lays out 33 label slots and
+    // fills
+    // only the nine that belong to a slice, so it printed "null" twenty-four times.
+    val content = textOf(channels["text"], datum)
     val angle = number(channels["angle"], datum) ?: 0.0
     // `dx` and `dy` shift the anchor without affecting alignment — but for rotated text upstream
     // applies them *after* the rotation, so an offset runs along the text rather than along the
@@ -1056,18 +1065,39 @@ public class MarkEncoder(
     }
 
   /** Resolves a channel to a string, following the same rules as the numeric resolution. */
+  /**
+   * A text mark's content, resolved the way upstream's `textValue` resolves it.
+   *
+   * Null and absent alike become the empty string rather than the word "null", and what is left is
+   * trimmed — upstream trims before measuring or drawing, so a label written with a trailing space
+   * is centred as though it had none.
+   */
+  private fun textOf(channel: ChannelValue?, datum: VegaValue): String =
+    string(channel, datum)?.trim() ?: ""
+
+  /**
+   * A channel as text, or null when it holds nothing.
+   *
+   * A Vega null is *nothing*, not the four letters that spell it. Stringifying it gave a text mark
+   * reading "null" and a fill of "null" that no colour parser could read — both of them a value the
+   * specification never asked for, drawn where upstream draws nothing at all.
+   */
   private fun string(channel: ChannelValue?, datum: VegaValue): String? =
+    value(channel, datum)?.takeUnless { it is VegaValue.Null }?.asString()
+
+  /** The same, before it is turned into text. */
+  private fun value(channel: ChannelValue?, datum: VegaValue): VegaValue? =
     when (channel) {
       null -> null
-      is ChannelValue.Constant -> channel.value.asString()
-      is ChannelValue.Field -> datum.fieldOf(channel.ref).asString()
-      is ChannelValue.Signal -> evaluateExpression(channel.expression, datum)?.asString()
-      is ChannelValue.Conditional -> string(selectRule(channel, datum), datum)
-      is ChannelValue.Adjusted -> adjusted(channel, datum)?.asString()
+      is ChannelValue.Constant -> channel.value
+      is ChannelValue.Field -> datum.fieldOf(channel.ref)
+      is ChannelValue.Signal -> evaluateExpression(channel.expression, datum)
+      is ChannelValue.Conditional -> value(selectRule(channel, datum), datum)
+      is ChannelValue.Adjusted -> adjusted(channel, datum)
       is ChannelValue.Scaled -> {
         val scale = scales[scaleNameOf(channel, datum)]
         val input = scaledInput(channel, datum)
-        if (scale != null && input != null) scale.scale(input).asString() else null
+        if (scale != null && input != null) scale.scale(input) else null
       }
     }
 
