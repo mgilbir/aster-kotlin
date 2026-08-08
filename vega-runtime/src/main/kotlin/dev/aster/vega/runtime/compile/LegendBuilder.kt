@@ -322,7 +322,7 @@ internal class LegendBuilder(
           size = sizes[index],
           shape = shapes[index],
           fill =
-            symbolFill(spec, entry.value)?.let { fill ->
+            symbolFill(spec, entry)?.let { fill ->
               // `fillOpacity` fades what is inside the swatch and leaves its outline alone, which
               // is not what `symbolOpacity` does — that fades both. There is no property for the
               // first, so it comes from the encode block or not at all.
@@ -336,7 +336,10 @@ internal class LegendBuilder(
           // that dims when its series is deselected writes a conditional rule here, and there is no
           // property that could express one.
           opacity =
-            entryNumber(spec, "symbols", "opacity", entry) ?: spec.symbolStyle.opacity ?: 1.0,
+            entryNumber(spec, "symbols", "opacity", entry)
+              ?: symbolOpacity(spec, entry.value)
+              ?: spec.symbolStyle.opacity
+              ?: 1.0,
           metadata = NodeMetadata(role = "legend-symbol", markName = scaleName, datumIndex = index),
         ),
         TextNode(
@@ -466,11 +469,31 @@ internal class LegendBuilder(
    * `stroke` scale therefore gets the transparent fill too — it draws the same either way, but a
    * comparison against upstream can see the difference and a stroke-only legend is common.
    */
-  private fun symbolFill(spec: LegendSpec, value: VegaValue): Fill? {
+  private fun symbolFill(spec: LegendSpec, entry: Entry): Fill? {
+    // A swatch's own `encode` block beats every scale: it is how a legend that explains *some
+    // other*
+    // channel still shows the colour its marks are drawn in.
+    entryText(spec, "symbols", "fill", entry)
+      ?.let { SceneColor.parse(it) }
+      ?.let {
+        return Fill.of(it)
+      }
     val fillScale = spec.fill?.let { scales[it] }
     if (fillScale == null) return Fill.of(SceneColor.Transparent)
-    val colour = SceneColor.parse(fillScale.scale(value).asString()) ?: return null
+    val colour = SceneColor.parse(fillScale.scale(entry.value).asString()) ?: return null
     return Fill.of(colour)
+  }
+
+  /**
+   * A legend over an *opacity* scale fades each swatch by the value it stands for.
+   *
+   * The same idea as a size legend growing its swatches: the legend has to demonstrate the channel
+   * it is explaining, and a column of equally solid symbols beside a fading scale explains nothing.
+   */
+  private fun symbolOpacity(spec: LegendSpec, value: VegaValue): Double? {
+    val scale = spec.opacity?.let { scales[it] } ?: return null
+    val mapped = (scale.scale(value) as? VegaValue.Num)?.value ?: return null
+    return if (mapped.isFinite()) mapped else null
   }
 
   /**

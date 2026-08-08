@@ -116,6 +116,14 @@ internal class Parse(private val config: Config, private val diagnostics: Diagno
       val def = channelDef(channel, single, "$path.$channel") ?: continue
       result[channel] = def
     }
+    // A secondary channel takes its type from the channel it bounds. `{"x2": {"field": "end"}}` is
+    // how every ranged mark is written, and reading it as an untyped — therefore nominal — field
+    // would format the number as a category and put a discrete scale under it.
+    for ((channel, def) in result.toList()) {
+      val main = mainChannel(channel)
+      if (main == channel || def.type != null) continue
+      result[channel] = def.copy(type = result[main]?.type)
+    }
     return result
   }
 
@@ -215,6 +223,7 @@ internal class Parse(private val config: Config, private val diagnostics: Diagno
       channel in setOf("latitude", "longitude") -> MeasureType.QUANTITATIVE
       datum is VegaValue.Num -> MeasureType.QUANTITATIVE
       datum != null -> MeasureType.NOMINAL
+      channel != mainChannel(channel) -> null
       else -> {
         diagnostics.warn(
           VegaLiteDiagnostics.INFERRED_TYPE,

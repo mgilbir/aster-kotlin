@@ -16,21 +16,46 @@ internal class DataPipeline(
   private val diagnostics: DiagnosticCollector,
 ) {
 
-  fun build(source: SourceNode): OutputNode {
+  /** The two named points a view exposes: the table before aggregation, and the one marks read. */
+  class Outputs(val raw: OutputNode?, val main: OutputNode)
+
+  fun build(source: SourceNode): Outputs {
     var head: DataNode = source
 
     userTransforms()?.let { head = head.then(it) }
     implicitParse()?.let { head = head.then(it) }
     binNode()?.let { head = head.then(it) }
     timeUnitNode()?.let { head = head.then(it) }
+
+    // The pre-aggregation table, named only when something reads it. A domain sorted by an
+    // aggregate of another field is that something: the ordering has to be computed from the rows
+    // themselves, independently of the aggregation being drawn. Upstream always creates this node
+    // and lets its optimizer drop it again; creating it only when it is used comes to the same
+    // output, and the output is what is being compared.
+    val raw =
+      if (needsRawTable()) {
+        OutputNode(view.prefixed("raw")).also {
+          head.then(it)
+          head = it
+        }
+      } else {
+        null
+      }
+
     aggregateNode()?.let { head = head.then(it) }
     stackNode()?.let { head = head.then(it) }
     filterInvalidNode()?.let { head = head.then(it) }
 
-    val output = OutputNode(view.prefixed("main"))
-    head.then(output)
-    return output
+    val main = OutputNode(view.prefixed("main"))
+    head.then(main)
+    return Outputs(raw, main)
   }
+
+  private fun needsRawTable(): Boolean =
+    view.scaledChannels().any { (channel, def) ->
+      val type = view.scaleType(channel) ?: return@any false
+      Scales.hasDiscreteDomain(type) && def.sort is VegaValue.Obj
+    }
 
   /**
    * A temporal field arrives as text and has to become a date before a time scale can read it.
@@ -42,9 +67,8 @@ internal class DataPipeline(
     val parse = LinkedHashMap<String, String>()
     for ((_, def) in view.spec.encoding) {
       if (!def.isFieldDef || def.field == null) continue
-      if (def.type == MeasureType.TEMPORAL && def.timeUnit == null && def.aggregate == null) {
-        parse[def.field] = "date"
-      }
+      // A time unit buckets a *date*, so the column still has to be read as one first.
+      if (def.type == MeasureType.TEMPORAL && def.aggregate == null) parse[def.field] = "date"
     }
     return if (parse.isEmpty()) null else ParseNode(parse)
   }
@@ -101,8 +125,11 @@ internal class DataPipeline(
       val aggregate = def.aggregate
       if (aggregate == null) {
         dimensions += Fields.vgField(def)
-        // A binned dimension groups by both edges, so the bin survives the aggregation intact.
-        if (def.bin is Binning.Bin) dimensions += Fields.vgField(def, suffix = "end")
+        // A binned or bucketed dimension groups by both edges, so the span survives the
+        // aggregation intact — the scale and the axis both read the end as well as the start.
+        if (def.bin is Binning.Bin || def.timeUnit != null) {
+          dimensions += Fields.vgField(def, suffix = "end")
+        }
       } else {
         ops += aggregate
         fields += if (aggregate == "count") null else def.field

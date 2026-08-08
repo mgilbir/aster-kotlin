@@ -734,6 +734,15 @@ public class AxisBuilder(
         }
       }
     }
+    // A time scale formats its labels as *times* whether or not a `formatType` says so: the scale
+    // already knows they are instants, and upstream's own axis passes the specifier straight to
+    // `timeFormat` for it.
+    if (format != null && scale is TimeScale) {
+      return { value ->
+        val instant = value.asDouble()
+        if (instant.isNaN()) value.asString() else TimeFormat.format(instant, format, scale.zone)
+      }
+    }
     // An explicit specifier replaces the precision the scale would have chosen, and applies only
     // where there is a number to format: upstream coerces a discrete domain's own values to strings
     // and never consults it, so a band axis keeps its labels whatever this says.
@@ -817,8 +826,18 @@ public class AxisBuilder(
       is TimeScale -> {
         val count =
           numbers.resolveInt(spec.tickCount, spec.scale) ?: AxisDefaults.DEFAULT_TICK_COUNT
+        // A stated format replaces the scale's own multi-format labelling, which otherwise writes
+        // each tick at its own granularity — a January tick carrying its year while the rest carry
+        // month names. Every Vega-Lite chart over a bucketed instant states one, and dropping it
+        // was how an axis of months came out reading "2012, February, March".
+        val format = labeller(scale, count, specifier, spec.formatType)
         scale.ticks(count).zip(scale.tickLabels(count)).map { (value, label) ->
-          Tick(label, scale.apply(value), VegaValue.Num(value))
+          Tick(
+            if (specifier == null && spec.formatType == null) label
+            else format(VegaValue.Num(value)),
+            scale.apply(value),
+            VegaValue.Num(value),
+          )
         }
       }
       else -> null

@@ -93,6 +93,57 @@ internal object Fields {
 
   fun timeUnitToString(timeUnit: String): String = timeUnit
 
+  /**
+   * `timeUnitSpecifier(...)`: the format specifier a bucketed instant is labelled with.
+   *
+   * Vega picks the specifier at render time from the units present and the span being shown, which
+   * is why this is an expression rather than a `%b`. The second argument is Vega-Lite's own
+   * override table — a month within one year reads `Jan`, a month spanning several reads `Jan
+   * 2009`.
+   */
+  fun timeUnitSpecifier(timeUnit: String): String {
+    val parts = timeUnitParts(timeUnit).joinToString(",") { "\"$it\"" }
+    return "timeUnitSpecifier([$parts], " +
+      "{\"year-month\":\"%b %Y \",\"year-month-date\":\"%b %d, %Y \"})"
+  }
+
+  /**
+   * The length of one bucket, as an expression — `durationExpr` upstream.
+   *
+   * An axis over bucketed instants must not tick more finely than the buckets themselves, and there
+   * is no constant that says how long a month is, so the difference between two dates in a
+   * deliberately non-leap year is what says it.
+   */
+  fun timeUnitDuration(timeUnit: String): String? {
+    val smallest = timeUnitParts(timeUnit).lastOrNull() ?: return null
+    if (smallest == "day") return null
+    // `datetime` takes a zero-based month, which is why January is 0 and the step lands on 1.
+    val fields = listOf("year", "month", "date", "hours", "minutes", "seconds", "milliseconds")
+    val start =
+      mutableMapOf(
+        "year" to 2001,
+        "month" to 0,
+        "date" to 1,
+        "hours" to 0,
+        "minutes" to 0,
+        "seconds" to 0,
+        "milliseconds" to 0,
+      )
+    val (part, step) =
+      when (smallest) {
+        "dayofyear" -> "date" to 1
+        "quarter" -> "month" to 3
+        "week" -> "date" to 7
+        else -> smallest to 1
+      }
+    if (part !in start) return null
+    val end = start.toMutableMap()
+    end[part] = start.getValue(part) + step
+    fun expr(values: Map<String, Int>) =
+      "datetime(" + fields.joinToString(", ") { values.getValue(it).toString() } + ")"
+    return "${expr(end)} - ${expr(start)}"
+  }
+
   /** `yearmonth` reads as `year-month` in a title. */
   fun timeUnitParts(timeUnit: String): List<String> {
     val units =

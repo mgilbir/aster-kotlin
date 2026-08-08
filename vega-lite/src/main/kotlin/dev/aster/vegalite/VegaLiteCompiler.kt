@@ -126,12 +126,27 @@ private class Compilation(
           )
           return@mapIndexedNotNull null
         }
-        // A layer inherits the chart's data and size unless it states its own.
+        // A layer inherits the chart's data, size, transforms and *encoding* unless it states its
+        // own. The encoding matters most: writing the shared channels once above the layers and the
+        // differences inside them is the ordinary way to author a layered chart, and a layer that
+        // did not inherit them would draw its mark with no position at all.
         val merged = obj {
           put("data", spec.fields["data"])
           put("width", spec.fields["width"])
           put("height", spec.fields["height"])
+          put("transform", spec.fields["transform"])
           putAll(child)
+          val inherited = spec.obj("encoding")
+          if (inherited != null) {
+            // Channel by channel, so a layer overriding `y` keeps the shared `x`.
+            put(
+              "encoding",
+              obj {
+                putAll(inherited)
+                putAll(child.obj("encoding"))
+              },
+            )
+          }
         }
         parser.unit(merged, "$.layer[$index]")?.let { UnitView(it, config, "layer_$index") }
       }
@@ -211,8 +226,8 @@ private class Compilation(
     val outputs = views.map { view -> DataPipeline(view, diagnostics).build(source) }
     val datasets = DataAssembler().assemble(source)
     views.forEachIndexed { index, view ->
-      view.mainData = outputs[index].source ?: ""
-      view.rawData = outputs[index].source ?: ""
+      view.mainData = outputs[index].main.source ?: ""
+      view.rawData = outputs[index].raw?.source ?: view.mainData
     }
     return datasets
   }
@@ -268,20 +283,37 @@ private class Compilation(
   /** One domain passes through; several become a `fields` union, which is what a layer needs. */
   private fun domainValue(component: ScaleComponent): VegaValue? {
     val domains = component.domains
-    return when {
-      domains.isEmpty() -> null
-      domains.size == 1 -> domains.first()
-      // Several fields of one dataset collapse into a single reference with a field list.
-      domains.all {
-        it is VegaValue.Obj &&
-          it.string("data") == domains.first().string("data") &&
-          it.has("field")
-      } && domains.none { it.has("sort") } ->
-        obj {
-          put("data", domains.first().string("data"))
-          put("fields", strings(domains.map { it.string("field")!! }))
+    if (domains.isEmpty()) return null
+    if (domains.size == 1) return domains.first()
+
+    // A sort every entry agrees on belongs to the union rather than to each of its parts: sorting
+    // the pieces separately and concatenating them is a different answer from sorting the whole.
+    val sorts = domains.map { it["sort"] }.distinct()
+    val sharedSort = if (sorts.size == 1) sorts.single() else null
+    val entries =
+      if (sharedSort == null) {
+        domains
+      } else {
+        domains.map { entry ->
+          obj { (entry as VegaValue.Obj).fields.forEach { (k, v) -> if (k != "sort") put(k, v) } }
         }
-      else -> obj { put("fields", arr(domains)) }
+      }
+
+    // Several fields of one dataset collapse further, into one reference with a field list.
+    val sameData = entries.all {
+      it is VegaValue.Obj && it.string("data") == entries.first().string("data") && it.has("field")
+    }
+    return if (sameData) {
+      obj {
+        put("data", entries.first().string("data"))
+        put("fields", strings(entries.map { it.string("field")!! }))
+        put("sort", sharedSort)
+      }
+    } else {
+      obj {
+        put("fields", arr(entries))
+        put("sort", sharedSort)
+      }
     }
   }
 

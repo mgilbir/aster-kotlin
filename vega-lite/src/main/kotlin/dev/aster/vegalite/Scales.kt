@@ -121,10 +121,45 @@ internal object Scales {
       return listOf(signalRef("[$signal.start, $signal.stop]"))
     }
 
+    // A ranged position contributes *both* of its fields: the scale has to cover the whole span,
+    // not the ends the first channel happens to name.
+    val secondary = secondaryChannel(channel)?.let { view.spec.fieldDef(it) }
+    if (secondary != null) {
+      return listOf(
+        obj {
+          put("data", dataName)
+          put("field", Fields.vgField(def))
+        },
+        obj {
+          put("data", dataName)
+          put("field", Fields.vgField(secondary))
+        },
+      )
+    }
+
+    // A `timeUnit` buckets an instant into a span, and the scale covers the span: the bucket's
+    // start
+    // and the end the transform computed beside it.
+    if (def.timeUnit != null && (type == "time" || type == "utc")) {
+      return listOf(
+        obj {
+          put("data", dataName)
+          put("field", Fields.vgField(def))
+        },
+        obj {
+          put("data", dataName)
+          put("field", Fields.vgField(def, suffix = "end"))
+        },
+      )
+    }
+
     val sort = domainSort(view, channel, def, type)
+    // Sorting by an aggregate of some *other* field has to be computed independently of the
+    // aggregation being drawn, so upstream reads the pre-aggregation table for it.
+    val source = if (sort is VegaValue.Obj) view.rawData else dataName
     return listOf(
       obj {
-        put("data", dataName)
+        put("data", source)
         put("field", Fields.vgField(def))
         put("sort", sort)
       }

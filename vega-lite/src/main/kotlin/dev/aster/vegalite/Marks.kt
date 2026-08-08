@@ -403,7 +403,10 @@ internal object Marks {
       def.type == MeasureType.TEMPORAL -> {
         val timeUnit = def.timeUnit
         if (timeUnit != null) {
-          "timeFormat($accessor, '${timeUnitFormat(timeUnit)}')"
+          // A bucketed instant is spoken with the specifier Vega chooses at render time, the same
+          // one its axis labels use — so the description and the axis never disagree.
+          val utc = timeUnit.startsWith("utc")
+          "${if (utc) "utc" else "time"}Format($accessor, ${Fields.timeUnitSpecifier(timeUnit)})"
         } else {
           "timeFormat($accessor, \"${view.config.timeFormat}\")"
         }
@@ -417,17 +420,6 @@ internal object Marks {
 
   /** The en dash upstream puts between a bin's two edges. */
   private const val BIN_RANGE_DELIMITER = "–"
-
-  private fun timeUnitFormat(timeUnit: String): String =
-    when (timeUnit) {
-      "year" -> "%Y"
-      "yearmonth" -> "%Y-%m"
-      "month" -> "%b"
-      "day" -> "%a"
-      "date" -> "%d"
-      "hours" -> "%H"
-      else -> "%b %d, %Y"
-    }
 
   /** `defined`: what breaks a path, rather than filtering the row out of the data. */
   private fun defined(view: UnitView): VegaValue? {

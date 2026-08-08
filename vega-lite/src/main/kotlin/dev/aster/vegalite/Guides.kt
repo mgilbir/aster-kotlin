@@ -124,8 +124,12 @@ internal object Guides {
     if (grid && hasOtherPosition) axis.set("gridScale", str(if (channel == "x") "y" else "x"))
     axis.set("grid", bool(grid))
 
-    Fields.title(def, view.config)?.let { title ->
-      (title as? VegaValue.Str)?.let { axis.titles += it.value }
+    // A ranged position is titled by *both* of its fields — `start, end` — because the axis is
+    // measuring the span rather than either end of it.
+    for (channelDef in
+      listOfNotNull(def, secondaryChannel(channel)?.let { view.spec.fieldDef(it) })) {
+      val title = Fields.title(channelDef, view.config) as? VegaValue.Str ?: continue
+      if (title.value !in axis.titles) axis.titles += title.value
     }
 
     // A nominal category on the horizontal axis is turned on its side, because side-by-side labels
@@ -147,9 +151,18 @@ internal object Guides {
     }
 
     // A continuous axis may drop labels that would overlap; a nominal one may not, because a reader
-    // cannot infer the category that went missing.
+    // cannot infer the category that went missing. A log axis drops them *greedily* rather than by
+    // parity: its labels are unevenly spaced, so hiding every other one thins the dense end and
+    // leaves the sparse end untouched.
     if (def.type != MeasureType.NOMINAL && def.type != MeasureType.ORDINAL) {
-      axis.set("labelOverlap", bool(true))
+      val greedy = type == "log" || type == "symlog"
+      axis.set("labelOverlap", if (greedy) str("greedy") else bool(true))
+    }
+
+    // Labels for a bucketed instant, and a tick step no finer than the bucket.
+    if (def.timeUnit != null) {
+      axis.set("format", signalRef(Fields.timeUnitSpecifier(def.timeUnit)))
+      Fields.timeUnitDuration(def.timeUnit)?.let { axis.set("tickMinStep", signalRef(it)) }
     }
 
     tickCount(view, channel, def, type)?.let { axis.set("tickCount", it) }
@@ -333,6 +346,19 @@ internal object Guides {
             null
           }
       if (opacity != null) fields["opacity"] = obj { put("value", opacity) }
+    }
+
+    // A swatch that is filled and not stroked is stroked *transparently*, so that Vega's own legend
+    // configuration cannot outline it. Only where the legend is not the stroke's own legend, and
+    // only where the fill is a real colour — a hollow point's transparent fill is left alone.
+    val fill = fields["fill"]
+    if (
+      fill != null &&
+        fill["value"] != VegaValue.Str("transparent") &&
+        !fields.containsKey("stroke") &&
+        channel != "stroke"
+    ) {
+      fields["stroke"] = obj { put("value", "transparent") }
     }
 
     return if (fields.isEmpty()) null else VegaValue.Obj(fields)

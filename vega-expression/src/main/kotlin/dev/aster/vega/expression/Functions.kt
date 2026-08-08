@@ -255,6 +255,11 @@ public object Functions {
     map.predicate("isObject") { it is VegaValue.Obj }
     map.predicate("isString") { it is VegaValue.Str }
     map.predicate("isDefined") { it !is VegaValue.Null }
+    // Upstream tests `value instanceof Date`, so a *number* of milliseconds is not a date to it
+    // either — which is answerable here only because an instant is its own type in this value
+    // model. Every Vega-Lite chart over a temporal field filters with
+    // `isDate(f) || (isValid(f) && isFinite(+f))`, so without this the whole scale collapses.
+    map.predicate("isDate") { it is VegaValue.Timestamp }
     // `isValid` is narrower than truthiness: it rejects null and NaN but accepts 0 and "".
     map.predicate("isValid") {
       it !is VegaValue.Null && !(it is VegaValue.Num && it.value.isNaN())

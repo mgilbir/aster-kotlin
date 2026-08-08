@@ -454,7 +454,7 @@ produces a chart that is plausible and wrong.
 every fixture with upstream and checks two things:
 
 1. `VegaLiteFixtureTest` compares the Vega this compiler emits against upstream's, property by
-   property. Twelve fixtures, and all twelve match exactly — every transform, scale, signal, axis,
+   property. Twenty fixtures, and all twenty match exactly — every transform, scale, signal, axis,
    legend and mark encoding, down to the accessibility description string.
 2. `VegaLiteFixtureDifferentialTest` runs that output through this engine's own runtime and compares
    the scene against the one upstream draws. Every mark of every fixture matches.
@@ -486,6 +486,36 @@ compilation writes the constructs that expose them:
 - **A shape legend drew every entry as a circle.** The entries have to be drawn with the shapes the
   `shape` scale gives them; a column of identical swatches is not a smaller version of the right
   answer, it is a legend that says nothing.
+
+### The second eight fixtures found seven more compiler rules and four more runtime defects
+
+The first twelve were written to cover the grammar. The next eight were aimed at *combinations* —
+a bucketed instant, a domain sorted by an aggregate of another field, a ranged bar, a layer sharing
+its parent's encoding — and seven of the eight failed on arrival, which is the corpus doing its job.
+
+In the compiler: a layer inherits its parent's `encoding` and `transform`, not only its data and
+size; a secondary channel (`x2`) takes its type from the channel it bounds, without which `{"field":
+"end"}` reads as a category; a ranged position contributes *both* fields to its scale and both names
+to its axis title; a `timeUnit` contributes the bucket's end as well as its start, and groups the
+aggregate by both; a domain sorted by an aggregate of some other field reads the pre-aggregation
+table, which has to be named for it; a sort every part of a merged domain agrees on belongs to the
+union rather than to each part; and a log axis thins its labels *greedily* rather than by parity.
+
+In the runtime, four more silences of the same kind as the first five:
+
+- **`isDate` was missing from the expression language.** Every Vega-Lite chart over a temporal field
+  filters with `isDate(f) || (isValid(f) && isFinite(+f))`, so the whole x scale collapsed and took
+  the marks and one axis with it. It is answerable here only because an instant is its own type in
+  this value model; upstream tests `value instanceof Date`, so a bare number of milliseconds is not
+  a date to it either, and probing that was what settled the implementation.
+- **A time scale ignored an axis `format`.** Its labels always came from the scale's own
+  multi-format, which writes each tick at its own granularity — so an axis of months read "2012,
+  February, March" where upstream read "Jan, Feb, Mar".
+- **A legend ignored the fill in its own `encode.symbols` block**, which is how a legend explaining
+  some *other* channel still shows the colour its marks are drawn in.
+- **A legend over an opacity scale did not fade its swatches.** A column of equally solid symbols
+  beside a fading scale explains nothing, and the legend's whole job is to demonstrate the channel
+  it names.
 
 ### One difference is still open
 

@@ -46,8 +46,8 @@ class FixtureSvgTest {
   /**
    * The same for the Vega-Lite fixtures, compiled the whole way through this engine.
    *
-   * Worth having separately: these go through two compilers, so a picture that comes out wrong
-   * says nothing about *which* one until it is put beside the upstream render of the same fixture
+   * Worth having separately: these go through two compilers, so a picture that comes out wrong says
+   * nothing about *which* one until it is put beside the upstream render of the same fixture
    * (`build/vega-lite-svg/`, written by `scripts/vega-lite-oracle.sh`).
    */
   @Test
