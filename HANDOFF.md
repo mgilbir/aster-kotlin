@@ -9,7 +9,7 @@ Branch `milestone-0-bootstrap`. Working tree clean, both gates green:
 - `./scripts/check.sh` — format, all tests, lint, demo APK
 - `./scripts/oracle.sh` — regenerates upstream references and runs the differential comparison
 
-**78 differential fixtures pass, all matching upstream exactly.** That is the only number here
+**83 differential fixtures pass, all matching upstream exactly.** That is the only number here
 that means what it says.
 
 ## Read this before trusting the other number
@@ -222,14 +222,15 @@ this list and are now passing fixtures (`global-development`, `qq-plot`); the re
   hold directory. Its `data/movies.json` is **not** committed — at 1.4 MB it is fourteen times the
   next largest file in `test-fixtures/data/` and the fixture that needs it is not in the tree, so
   `./scripts/oracle.sh` fetches it when the fixture comes back. What it needs now:
-  1. **`autosize: {"type": "fit", "resize": true}`**, which is the bigger one. Upstream shrinks the
-     plotting area so the *whole surface* matches the declared size: `width` goes 400 → 340 and
-     `height` 200 → 178, which moves every scale range and every mark. `fit` currently falls back to
-     `pad` with a diagnostic and needs a second layout pass. The compiler is a pure function of the
-     spec, so running it twice — measure, adjust the `width`/`height` seeds, compile again — may be
-     most of the implementation. Probe upstream's `viewSizeLayout` before committing to that.
-  2. ~~`bin` publishing its `signal`~~ — **done**, along with two other things found while doing it;
-     see `bin-settings`. What remains for this example is `fit` alone.
+  1. ~~`autosize: fit`~~ — **done**; see `autosize-fit`, `autosize-fit-x` and `autosize-fit-y`.
+  2. ~~`bin` publishing its `signal`~~ — **done**; see `bin-settings`.
+  3. What is left is the **`bins` property on a scale**, which is reported as unimplemented today.
+     `xscale` carries `"bins": {"signal": "bins"}`, and upstream's `includeZero` is
+     `!scale.bins && (Linear || Pow || Sqrt)` — so a scale with `bins` does **not** get the `zero`
+     default, which is why upstream's domain is `[1, 10]` and this engine's is `[0, 10]`. The bins
+     also become the axis ticks: upstream's `xscale.bins` is `[1, 2, … 10]` and its ticks are the
+     same array. Three of the four scale differences fall out of that one property; the fourth is the
+     tick count that follows from it.
 
   Verified upstream for when you pick it up: `maxbins` 10, `binCount` 9, `nullGap` 10, `barStep` 33,
   `extent` `[1.4, 9.2]`, `width` 340, `height` 178, `xscale` range `[43, 340]` domain `[1, 10]`,

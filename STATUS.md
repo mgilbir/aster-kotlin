@@ -21,7 +21,7 @@ end to end — expressions, signals, 33 of upstream's 40 data transforms, every 
 and an event handler that recompiles the chart — and are verified against upstream Vega by
 differential tests.
 
-Eighty differential fixtures pass, all matching upstream exactly on every mark and scale output:
+Eighty-three differential fixtures pass, all matching upstream exactly on every mark and scale output:
 
 | Fixture | Marks | Covers |
 | --- | --- | --- |
@@ -105,6 +105,9 @@ Eighty differential fixtures pass, all matching upstream exactly on every mark a
 | `probability-density` | 533 | a scale over a dataset and two datasets over that scale — the case no fixed order of the phases resolves; a `normal` density whose mean and stdev come from another dataset's aggregate |
 | `published-signals` | 11 | a signal reading a signal an `extent` transform *published*, sizing a scale range and a mark width |
 | `bin-settings` | 36 | `bin` publishing the settings it chose, a `nice: false` extent that does not divide evenly, an anchored grid, and a value that falls off it |
+| `autosize-fit` | 30 | the plotting area shrunk so the drawing comes out the declared size, with angled labels and two axis titles overhanging |
+| `autosize-fit-x` | 30 | the same on the horizontal axis only, the vertical growing the way `pad` does |
+| `autosize-fit-y` | 30 | and the same the other way round |
 
 The gate is wired into `./scripts/oracle.sh`, so every further scale, mark and transform is built
 against a harness that can say we are wrong — which golden tests cannot.
@@ -164,7 +167,7 @@ substantive compatibility items:
 | 6. View and Compose APIs | Yes |
 | 7. SVG, PNG, PDF export | Yes |
 | 8. TalkBack can describe and navigate | Partial — virtual nodes are tested by instrumentation, not with TalkBack itself |
-| 9. At least 100 compatibility fixtures pass | 80 of 100 |
+| 9. At least 100 compatibility fixtures pass | 83 of 100 |
 | 10. Core runtime has no Android dependency | Yes |
 | 11. Renders without WebView | Yes |
 | 12. Build and test loop runs from the terminal | Yes |
@@ -501,7 +504,7 @@ each example a deadline.
 
 ## Known failing fixtures
 
-None. Eighty fixtures exist and all eighty pass — and that sentence became worth
+None. Eighty-three fixtures exist and all eighty-three pass — and that sentence became worth
 something only once the gate could no longer skip itself, below.
 
 **The gate could report success without running.** `FixtureDifferentialTest` reads the fixtures and
@@ -766,6 +769,37 @@ is measured by its extent rather than by the items it drew, gridlines are exclud
 measurement, and a stroked path reserves four stroke widths for a miter join rather than the ten a
 canvas defaults to. Building titles is what forced the issue — a title is placed against that
 measurement, so it could not be approximated.
+
+## `autosize: fit` is implemented
+
+`fit` shrinks the plotting area so the whole drawing comes out the declared size, where `pad` grows
+the surface instead. It had been falling back to `pad` with a diagnostic, because the size cannot be
+known until the drawing has been measured and there was no second pass.
+
+Upstream does have one, and it is not iterative: `viewSizeLayout` measures once, sets the `width` and
+`height` signals to what is left, and re-runs the dataflow with the layout step short-circuited, so
+the second pass never re-measures. This compiler is a pure function of the specification, so it does
+the same thing by compiling twice. The first pass exists only to be measured and its diagnostics are
+discarded — the second pass reports the same ones against the size actually drawn.
+
+Three things about it were worth taking from the source rather than guessing:
+
+- The overhang is **rounded outward** before it is subtracted: a label reaching 30.5 units to the
+  left costs the plotting area 31.
+- The origin the content is translated by comes from the **first** pass, not the second.
+- The surface is *not* the declared size. It is measured exactly as `pad` measures it, from the
+  frame's own bounds — and because the shrink reserved a whole unit for a fractional overhang, the
+  drawing comes back a fraction smaller than the room made for it. Upstream's references carry the
+  fraction: 159.660254 where the declared height was 150 and the padding 10.
+
+That last one cost a wrong turn worth recording. `viewSizeLayout` rounds its overhang outward, so the
+`pad` path was changed to round as well — and that broke the surface size of thirteen fixtures. The
+rounding is real, but it sizes the *canvas*; the surface the harness compares is the frame's bounds
+plus the padding, which is fractional whenever a label ends on a fraction. Both quantities exist
+upstream and only one of them is being compared.
+
+The cost is a second compile for a `fit` chart and nothing at all for the others, against a budget
+where the heaviest fixture takes 366 microseconds (below).
 
 ## Performance observations
 

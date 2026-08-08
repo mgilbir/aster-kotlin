@@ -1,0 +1,340 @@
+{
+  "marks": [
+    {
+      "opacity": 1,
+      "role": "axis-tick",
+      "stroke": "#888",
+      "strokeWidth": 1,
+      "type": "rule",
+      "x": 0.5,
+      "x2": -4.5,
+      "y": 99.5,
+      "y2": 99.5
+    },
+    {
+      "opacity": 1,
+      "role": "axis-tick",
+      "stroke": "#888",
+      "strokeWidth": 1,
+      "type": "rule",
+      "x": 0.5,
+      "x2": -4.5,
+      "y": 69.5,
+      "y2": 69.5
+    },
+    {
+      "opacity": 1,
+      "role": "axis-tick",
+      "stroke": "#888",
+      "strokeWidth": 1,
+      "type": "rule",
+      "x": 0.5,
+      "x2": -4.5,
+      "y": 38.5,
+      "y2": 38.5
+    },
+    {
+      "opacity": 1,
+      "role": "axis-tick",
+      "stroke": "#888",
+      "strokeWidth": 1,
+      "type": "rule",
+      "x": 0.5,
+      "x2": -4.5,
+      "y": 8.5,
+      "y2": 8.5
+    },
+    {
+      "align": "right",
+      "angle": 0,
+      "baseline": "middle",
+      "fill": "#000",
+      "font": "sans-serif",
+      "fontSize": 10,
+      "opacity": 1,
+      "role": "axis-label",
+      "text": "0",
+      "type": "text",
+      "x": -6.5,
+      "y": 99.5
+    },
+    {
+      "align": "right",
+      "angle": 0,
+      "baseline": "middle",
+      "fill": "#000",
+      "font": "sans-serif",
+      "fontSize": 10,
+      "opacity": 1,
+      "role": "axis-label",
+      "text": "20,000",
+      "type": "text",
+      "x": -6.5,
+      "y": 69.038462
+    },
+    {
+      "align": "right",
+      "angle": 0,
+      "baseline": "middle",
+      "fill": "#000",
+      "font": "sans-serif",
+      "fontSize": 10,
+      "opacity": 1,
+      "role": "axis-label",
+      "text": "40,000",
+      "type": "text",
+      "x": -6.5,
+      "y": 38.576923
+    },
+    {
+      "align": "right",
+      "angle": 0,
+      "baseline": "middle",
+      "fill": "#000",
+      "font": "sans-serif",
+      "fontSize": 10,
+      "opacity": 1,
+      "role": "axis-label",
+      "text": "60,000",
+      "type": "text",
+      "x": -6.5,
+      "y": 8.115385
+    },
+    {
+      "opacity": 1,
+      "role": "axis-domain",
+      "stroke": "#888",
+      "strokeWidth": 1,
+      "type": "rule",
+      "x": 0.5,
+      "x2": 0.5,
+      "y": 99.5,
+      "y2": 0.5
+    },
+    {
+      "align": "center",
+      "angle": -90,
+      "baseline": "bottom",
+      "fill": "#000",
+      "font": "sans-serif",
+      "fontSize": 11,
+      "fontWeight": "bold",
+      "opacity": 1,
+      "role": "axis-title",
+      "text": "amount",
+      "type": "text",
+      "x": -58.5,
+      "y": 50
+    },
+    {
+      "opacity": 1,
+      "role": "axis-tick",
+      "stroke": "#888",
+      "strokeWidth": 1,
+      "type": "rule",
+      "x": 40.5,
+      "x2": 40.5,
+      "y": 99.5,
+      "y2": 104.5
+    },
+    {
+      "opacity": 1,
+      "role": "axis-tick",
+      "stroke": "#888",
+      "strokeWidth": 1,
+      "type": "rule",
+      "x": 113.5,
+      "x2": 113.5,
+      "y": 99.5,
+      "y2": 104.5
+    },
+    {
+      "opacity": 1,
+      "role": "axis-tick",
+      "stroke": "#888",
+      "strokeWidth": 1,
+      "type": "rule",
+      "x": 186.5,
+      "x2": 186.5,
+      "y": 99.5,
+      "y2": 104.5
+    },
+    {
+      "opacity": 1,
+      "role": "axis-tick",
+      "stroke": "#888",
+      "strokeWidth": 1,
+      "type": "rule",
+      "x": 259.5,
+      "x2": 259.5,
+      "y": 99.5,
+      "y2": 104.5
+    },
+    {
+      "align": "right",
+      "angle": -30,
+      "baseline": "top",
+      "fill": "#000",
+      "font": "sans-serif",
+      "fontSize": 10,
+      "opacity": 1,
+      "role": "axis-label",
+      "text": "alpha",
+      "type": "text",
+      "x": 40.243902,
+      "y": 106.5
+    },
+    {
+      "align": "right",
+      "angle": -30,
+      "baseline": "top",
+      "fill": "#000",
+      "font": "sans-serif",
+      "fontSize": 10,
+      "opacity": 1,
+      "role": "axis-label",
+      "text": "beta",
+      "type": "text",
+      "x": 113.414634,
+      "y": 106.5
+    },
+    {
+      "align": "right",
+      "angle": -30,
+      "baseline": "top",
+      "fill": "#000",
+      "font": "sans-serif",
+      "fontSize": 10,
+      "opacity": 1,
+      "role": "axis-label",
+      "text": "gamma",
+      "type": "text",
+      "x": 186.585366,
+      "y": 106.5
+    },
+    {
+      "align": "right",
+      "angle": -30,
+      "baseline": "top",
+      "fill": "#000",
+      "font": "sans-serif",
+      "fontSize": 10,
+      "opacity": 1,
+      "role": "axis-label",
+      "text": "delta",
+      "type": "text",
+      "x": 259.756098,
+      "y": 106.5
+    },
+    {
+      "opacity": 1,
+      "role": "axis-domain",
+      "stroke": "#888",
+      "strokeWidth": 1,
+      "type": "rule",
+      "x": 0.5,
+      "x2": 300.5,
+      "y": 99.5,
+      "y2": 99.5
+    },
+    {
+      "align": "center",
+      "angle": 0,
+      "baseline": "top",
+      "fill": "#000",
+      "font": "sans-serif",
+      "fontSize": 11,
+      "fontWeight": "bold",
+      "opacity": 1,
+      "role": "axis-title",
+      "text": "category",
+      "type": "text",
+      "x": 150.5,
+      "y": 139.160254
+    },
+    {
+      "fill": "steelblue",
+      "height": 18.276923,
+      "role": "mark",
+      "type": "rect",
+      "width": 65.853659,
+      "x": 7.317073,
+      "y": 80.723077
+    },
+    {
+      "fill": "steelblue",
+      "height": 68.538462,
+      "role": "mark",
+      "type": "rect",
+      "width": 65.853659,
+      "x": 80.487805,
+      "y": 30.461538
+    },
+    {
+      "fill": "steelblue",
+      "height": 42.646154,
+      "role": "mark",
+      "type": "rect",
+      "width": 65.853659,
+      "x": 153.658537,
+      "y": 56.353846
+    },
+    {
+      "fill": "steelblue",
+      "height": 92.907692,
+      "role": "mark",
+      "type": "rect",
+      "width": 65.853659,
+      "x": 226.829268,
+      "y": 6.092308
+    }
+  ],
+  "scales": {
+    "x": {
+      "bandwidth": 65.853659,
+      "domain": [
+        "alpha",
+        "beta",
+        "gamma",
+        "delta"
+      ],
+      "range": [
+        0,
+        300
+      ],
+      "step": 73.170732
+    },
+    "y": {
+      "domain": [
+        0,
+        65000
+      ],
+      "range": [
+        99,
+        0
+      ],
+      "ticks": [
+        0,
+        5000,
+        10000,
+        15000,
+        20000,
+        25000,
+        30000,
+        35000,
+        40000,
+        45000,
+        50000,
+        55000,
+        60000,
+        65000
+      ]
+    }
+  },
+  "size": {
+    "height": 159.660254,
+    "width": 380
+  },
+  "spec": "autosize-fit-y.vg.json",
+  "vegaVersion": "6.3.1"
+}

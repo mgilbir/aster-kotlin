@@ -27,6 +27,7 @@ import dev.aster.vega.scene.SceneNode
 import dev.aster.vega.scene.SceneNodeIdAllocator
 import dev.aster.vega.scene.TextEngine
 import dev.aster.vega.scene.Transform2D
+import kotlin.math.ceil
 
 /** A compiled specification: the scene, the scales it built, and everything it could not honour. */
 public data class CompiledSpec(
@@ -101,7 +102,56 @@ public class SpecCompiler(
     spec: VegaSpec,
     signalOverrides: Map<String, VegaValue> = emptyMap(),
   ): CompiledSpec {
-    val diagnostics = DiagnosticCollector()
+    // `fit` shrinks the plotting area so the *whole drawing* comes out the declared size, which
+    // cannot be known until the drawing has been measured. Upstream measures, sets the `width` and
+    // `height` signals to what is left, and re-runs its dataflow; this compiler is a pure function
+    // of the specification, so it does the same thing by compiling twice. The first pass exists
+    // only
+    // to be measured — its diagnostics are thrown away, because the second pass reports the same
+    // ones against the size that is actually drawn.
+    val fit =
+      if (spec.autosize.type.isFit) {
+        measure(compileOnce(spec, signalOverrides, DiagnosticCollector(), null))
+      } else {
+        null
+      }
+    return compileOnce(spec, signalOverrides, DiagnosticCollector(), fit).compiled
+  }
+
+  /** One compile, with what a later pass needs to measure it. */
+  private class Pass(val compiled: CompiledSpec, val reach: RectD, val plot: PlotSize)
+
+  /**
+   * How far a first pass reached past its plotting area, on each side.
+   *
+   * Upstream's `viewSizeLayout` rounds each of these **outward** before subtracting, so a label
+   * hanging 30.5 units to the left costs the plotting area 31.
+   */
+  private data class Overflow(
+    val left: Double,
+    val top: Double,
+    val right: Double,
+    val bottom: Double,
+  )
+
+  private fun measure(pass: Pass): Overflow {
+    val reach =
+      if (pass.reach.isEmpty) RectD(0.0, 0.0, pass.plot.width, pass.plot.height) else pass.reach
+    return Overflow(
+      left = maxOf(0.0, ceil(-reach.left)),
+      top = maxOf(0.0, ceil(-reach.top)),
+      right = maxOf(0.0, ceil(reach.right - pass.plot.width)),
+      bottom = maxOf(0.0, ceil(reach.bottom - pass.plot.height)),
+    )
+  }
+
+  private fun compileOnce(
+    spec: VegaSpec,
+    signalOverrides: Map<String, VegaValue>,
+    diagnostics: DiagnosticCollector,
+    /** What the first pass measured, or null when this *is* the first pass. */
+    fit: Overflow?,
+  ): Pass {
     val ids = SceneNodeIdAllocator()
 
     val declaredWidth = spec.width ?: DEFAULT_WIDTH
@@ -126,11 +176,32 @@ public class SpecCompiler(
     val containsPadding =
       spec.autosize.contains.equals("padding", ignoreCase = true) &&
         spec.autosize.type != AutosizeType.PAD
-    val width =
+    // What the surface is measured against, before any fitting: upstream's
+    // `viewWidth`/`viewHeight`.
+    val viewWidth =
       if (containsPadding) declaredWidth - spec.padding.left - spec.padding.right else declaredWidth
-    val height =
+    val viewHeight =
       if (containsPadding) declaredHeight - spec.padding.top - spec.padding.bottom
       else declaredHeight
+
+    // A `fit` chart's plotting area is what is left of the declared size once the drawing's
+    // overhang
+    // has been taken out of it — `fit-x` and `fit-y` do that on one axis and let the other grow the
+    // way `pad` does. This is the whole of the second pass: seed `width` and `height` with the
+    // fitted numbers and everything downstream follows, because a scale range, an axis extent and a
+    // mark position are all measured against them.
+    val width =
+      if (fit != null && spec.autosize.type != AutosizeType.FIT_Y) {
+        maxOf(0.0, viewWidth - fit.left - fit.right)
+      } else {
+        viewWidth
+      }
+    val height =
+      if (fit != null && spec.autosize.type != AutosizeType.FIT_X) {
+        maxOf(0.0, viewHeight - fit.top - fit.bottom)
+      } else {
+        viewHeight
+      }
 
     // Vega exposes width, height and padding as implicit signals, so expressions can size things
     // relative to the chart. Verified: a signal with `update: "width/2"` resolves without declaring
@@ -230,8 +301,12 @@ public class SpecCompiler(
 
     val content = frame(spec, scope.nodes, plot, root, ids, diagnostics, expressions)
 
-    val scene = layout(spec, scope.bounds, content, plot, ids, diagnostics)
-    return CompiledSpec(scene, scales, signals, diagnostics.diagnostics, spec)
+    val scene = layout(spec, scope.bounds, content, plot, ids, diagnostics, fit)
+    return Pass(
+      CompiledSpec(scene, scales, signals, diagnostics.diagnostics, spec),
+      scope.bounds,
+      plot,
+    )
   }
 
   /**
@@ -316,6 +391,8 @@ public class SpecCompiler(
     plot: PlotSize,
     ids: SceneNodeIdAllocator,
     diagnostics: DiagnosticCollector,
+    /** The first pass's overhang, for a `fit` chart. Null for every other type. */
+    fit: Overflow?,
   ): Scene {
     val padding = spec.padding
     val background = spec.background?.let { SceneColor.parse(it) }
@@ -326,34 +403,52 @@ public class SpecCompiler(
       )
     }
 
+    // How far this pass hangs outside its own plotting area. **Not** rounded, unlike the overhang
+    // that decides a `fit`: `viewSizeLayout` rounds outward because it is sizing a canvas, and a
+    // canvas is whole pixels, but the surface compared against upstream is the frame's own bounds
+    // plus the padding — which is fractional whenever a label ends on a fraction, and upstream's
+    // references have the fractions in them to prove it.
+    val bounds = if (reach.isEmpty) RectD(0.0, 0.0, plot.width, plot.height) else reach
+    val over =
+      Overflow(
+        left = maxOf(0.0, -bounds.left),
+        top = maxOf(0.0, -bounds.top),
+        right = maxOf(0.0, bounds.right - plot.width),
+        bottom = maxOf(0.0, bounds.bottom - plot.height),
+      )
+    // A `fit` chart's origin is the **first** pass's rounded overhang, because that is what
+    // upstream
+    // hands to `resizeView`: it measures once, sets the size signals, and re-runs the dataflow with
+    // the layout step short-circuited, so the second pass never re-measures.
+    val origin = fit ?: over
+
+    fun scene(width: Double, height: Double): Scene =
+      Scene(
+        width = padding.left + width + padding.right,
+        height = padding.top + height + padding.bottom,
+        background = background,
+        root =
+          GroupNode(
+            id = ids.allocate(),
+            children = listOf(content),
+            transform = Transform2D.translate(padding.left + origin.left, padding.top + origin.top),
+            metadata = NodeMetadata(role = "root"),
+          ),
+        revision = 1L,
+      )
+
     return when (spec.autosize.type) {
-      AutosizeType.PAD -> {
-        // Content bounds include everything drawn, so overflow to the left or above shows up as a
-        // negative edge and becomes extra translation.
-        val bounds = if (reach.isEmpty) RectD(0.0, 0.0, plot.width, plot.height) else reach
-        val overflowLeft = maxOf(0.0, -bounds.left)
-        val overflowTop = maxOf(0.0, -bounds.top)
-        val overflowRight = maxOf(0.0, bounds.right - plot.width)
-        val overflowBottom = maxOf(0.0, bounds.bottom - plot.height)
-        Scene(
-          width = padding.left + overflowLeft + plot.width + overflowRight + padding.right,
-          height = padding.top + overflowTop + plot.height + overflowBottom + padding.bottom,
-          background = background,
-          root =
-            GroupNode(
-              id = ids.allocate(),
-              children = listOf(content),
-              transform =
-                Transform2D.translate(padding.left + overflowLeft, padding.top + overflowTop),
-              metadata = NodeMetadata(role = "root"),
-            ),
-          revision = 1L,
-        )
-      }
+      // `pad` grows the surface so the content plus its overhang fits inside the padding: axis
+      // labels hang outside the plotting area, so the surface ends up larger than `width`/`height`.
+      // Verified against upstream, which renders the 344x196 bar fixture into a 385x228 surface
+      // because the y-axis labels extend 31 units to the left.
+      AutosizeType.PAD ->
+        scene(over.left + plot.width + over.right, over.top + plot.height + over.bottom)
       // `none` takes the plotting area as given and lets anything outside it overflow. The padding
       // is still there: upstream sizes the surface as the view plus its padding and translates the
       // content into it, so a `none` chart with padding is inset exactly like a `pad` one — it
-      // simply never grows to make room for what hangs out.
+      // simply never grows to make room for what hangs out. Its origin is the padding alone, with
+      // no room made for the overhang, which is the whole difference from `pad`.
       AutosizeType.NONE ->
         Scene(
           width = padding.left + plot.width + padding.right,
@@ -368,27 +463,16 @@ public class SpecCompiler(
             ),
           revision = 1L,
         )
+      // A fitted chart is measured exactly like a padded one, because the fitting already happened:
+      // the plotting area was shrunk *before* anything was drawn, so what is left to do is add on
+      // whatever still hangs outside it. The result is close to the declared size but not equal to
+      // it — the shrink reserves a whole unit for an overhang of 30.5, so the drawing comes back a
+      // fraction smaller than the room made for it, and upstream's own references carry that
+      // fraction.
       AutosizeType.FIT,
       AutosizeType.FIT_X,
-      AutosizeType.FIT_Y -> {
-        // `fit` shrinks the plotting area so the total matches the declared size, which means
-        // recomputing scale ranges and re-encoding. That needs a second layout pass the compiler
-        // does
-        // not have yet, so it falls back to `pad` and says so.
-        diagnostics.warn(
-          DiagnosticCodes.PARSE_UNKNOWN_PROPERTY,
-          "autosize '${spec.autosize.type.name.lowercase()}' needs a second layout pass and is not " +
-            "implemented; laid out as 'pad', so the surface may exceed the declared size",
-        )
-        layout(
-          spec.copy(autosize = spec.autosize.copy(type = AutosizeType.PAD)),
-          reach,
-          content,
-          plot,
-          ids,
-          diagnostics,
-        )
-      }
+      AutosizeType.FIT_Y ->
+        scene(over.left + plot.width + over.right, over.top + plot.height + over.bottom)
     }
   }
 
@@ -415,6 +499,9 @@ public class SpecCompiler(
 
   public companion object {
     private val EMPTY_SIGNALS = SignalScope(emptyMap(), emptyMap())
+
+    /** A stand-in where only the reach and the plot size of a [Pass] are wanted. */
+    private val EMPTY_COMPILED = CompiledSpec(null, emptyMap(), EMPTY_SIGNALS, emptyList())
 
     public const val DEFAULT_WIDTH: Double = 200.0
     public const val DEFAULT_HEIGHT: Double = 200.0

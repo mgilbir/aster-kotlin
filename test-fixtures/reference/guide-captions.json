@@ -10,6 +10,36 @@
   "caption": "Y-axis for a linear scale with values from 0 to 36"
  },
  {
+  "fixture": "autosize-fit-x",
+  "kind": "axis",
+  "caption": "Y-axis titled 'amount' for a linear scale with values from 0 to 65,000"
+ },
+ {
+  "fixture": "autosize-fit-x",
+  "kind": "axis",
+  "caption": "X-axis titled 'category' for a discrete scale with 4 values: alpha, beta, gamma, delta"
+ },
+ {
+  "fixture": "autosize-fit-y",
+  "kind": "axis",
+  "caption": "Y-axis titled 'amount' for a linear scale with values from 0 to 65,000"
+ },
+ {
+  "fixture": "autosize-fit-y",
+  "kind": "axis",
+  "caption": "X-axis titled 'category' for a discrete scale with 4 values: alpha, beta, gamma, delta"
+ },
+ {
+  "fixture": "autosize-fit",
+  "kind": "axis",
+  "caption": "Y-axis titled 'amount' for a linear scale with values from 0 to 65,000"
+ },
+ {
+  "fixture": "autosize-fit",
+  "kind": "axis",
+  "caption": "X-axis titled 'category' for a discrete scale with 4 values: alpha, beta, gamma, delta"
+ },
+ {
   "fixture": "autosize-none",
   "kind": "axis",
   "caption": "X-axis for a discrete scale with 3 values: alpha, beta, gamma"

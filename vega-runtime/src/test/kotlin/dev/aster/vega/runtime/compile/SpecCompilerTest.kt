@@ -301,12 +301,36 @@ class SpecCompilerTest {
     )
   }
 
+  /**
+   * `fit` shrinks the plotting area so the drawing comes out no larger than the declared size,
+   * where `pad` grows the surface instead. It used to fall back to `pad` with a diagnostic; the
+   * diagnostic is gone with the fallback, and its absence is part of the assertion.
+   */
   @Test
-  fun `autosize fit falls back to pad and says so`() {
-    val fit = minimalBar.replace("\"padding\": 0,", "\"padding\": 0, \"autosize\": \"fit\",")
-    val compiled = compile(fit)
-    assertTrue(compiled.isUsable)
-    assertTrue(compiled.diagnostics.any { it.message.contains("autosize 'fit'") })
+  fun `autosize fit shrinks the chart rather than growing the surface`() {
+    // An axis is what makes the two differ: its labels hang outside the plotting area, and that
+    // overhang is what `pad` adds to the surface and `fit` takes out of the chart.
+    val withAxis =
+      minimalBar.replace(
+        "\"marks\":",
+        "\"axes\": [{\"orient\": \"left\", \"scale\": \"y\"}], \"marks\":",
+      )
+    val padded = compile(withAxis)
+    val fitted =
+      compile(withAxis.replace("\"padding\": 0,", "\"padding\": 0, \"autosize\": \"fit\","))
+
+    assertTrue(fitted.isUsable)
+    assertTrue(
+      fitted.diagnostics.none { it.message.contains("autosize") },
+      fitted.diagnostics.toString(),
+    )
+    // The axis labels hang outside the plotting area, so `pad` grows past the declared 100 and
+    // `fit`
+    // does not.
+    val padWidth = requireNotNull(padded.scene).width
+    val fitWidth = requireNotNull(fitted.scene).width
+    assertTrue(padWidth > 100.0, "pad should grow: $padWidth")
+    assertTrue(fitWidth <= 100.0, "fit should not grow: $fitWidth")
   }
 
   @Test

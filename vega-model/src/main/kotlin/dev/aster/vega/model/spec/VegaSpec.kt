@@ -143,7 +143,17 @@ public enum class AutosizeType {
   FIT_X,
   FIT_Y,
   /** Use the declared size verbatim and let content overflow. */
-  NONE,
+  NONE;
+
+  /**
+   * The three types whose plotting area is decided by measuring the drawing, not by the
+   * declaration.
+   *
+   * They are the only ones that need a chart compiled twice: once to find out how far it reaches,
+   * and once at the size that leaves.
+   */
+  public val isFit: Boolean
+    get() = this == FIT || this == FIT_X || this == FIT_Y
 }
 
 public data class Autosize(
