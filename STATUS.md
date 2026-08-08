@@ -21,7 +21,7 @@ end to end — expressions, signals, 33 of upstream's 40 data transforms, every 
 and an event handler that recompiles the chart — and are verified against upstream Vega by
 differential tests.
 
-Eighty-four differential fixtures pass, all matching upstream exactly on every mark and scale output:
+Eighty-five differential fixtures pass, all matching upstream exactly on every mark and scale output:
 
 | Fixture | Marks | Covers |
 | --- | --- | --- |
@@ -108,6 +108,7 @@ Eighty-four differential fixtures pass, all matching upstream exactly on every m
 | `autosize-fit` | 30 | the plotting area shrunk so the drawing comes out the declared size, with angled labels and two axis titles overhanging |
 | `autosize-fit-x` | 30 | the same on the horizontal axis only, the vertical growing the way `pad` does |
 | `autosize-fit-y` | 30 | and the same the other way round |
+| `interactive-legend` | 454 | a brush `rect` with no `x` until someone drags one, and a legend swatch whose opacity is a conditional rule |
 | `histogram-null-values` | 47 | Vega's film-rating histogram: a scale whose ticks are `bin`'s own boundaries, a second band scale for the null bar, `fit` sizing, and 3,201 rows from a relative `url` |
 
 The gate is wired into `./scripts/oracle.sh`, so every further scale, mark and transform is built
@@ -168,7 +169,7 @@ substantive compatibility items:
 | 6. View and Compose APIs | Yes |
 | 7. SVG, PNG, PDF export | Yes |
 | 8. TalkBack can describe and navigate | Partial — virtual nodes are tested by instrumentation, not with TalkBack itself |
-| 9. At least 100 compatibility fixtures pass | 84 of 100 |
+| 9. At least 100 compatibility fixtures pass | 85 of 100 |
 | 10. Core runtime has no Android dependency | Yes |
 | 11. Renders without WebView | Yes |
 | 12. Build and test loop runs from the terminal | Yes |
@@ -505,7 +506,7 @@ each example a deadline.
 
 ## Known failing fixtures
 
-None. Eighty-four fixtures exist and all eighty-four pass — and that sentence became worth
+None. Eighty-five fixtures exist and all eighty-five pass — and that sentence became worth
 something only once the gate could no longer skip itself, below.
 
 **The gate could report success without running.** `FixtureDifferentialTest` reads the fixtures and
@@ -822,6 +823,35 @@ Bin boundaries are never thinned. Upstream raises the tick count to the number o
 With that, `histogram-null-values` passes, and it took four separate pieces to get there: the
 dependency order, `bin` publishing its settings, `autosize: fit`, and this. Each of them turned up a
 defect in code that was already passing.
+
+## A mark whose channel resolves to nothing
+
+`interactive-legend` draws a brush `rect` whose `x` is `brush[0]`, and there is no brush until
+someone drags one. This engine reported "Rect mark has no x, x2, width or xc channel" and dropped the
+item; upstream keeps it, leaves the property off, and paints nothing. The mark has to be in the scene
+to be dragged at all, so dropping it is not a smaller version of the chart — it is a chart that
+cannot be used.
+
+The distinction is between a channel that is *absent* and one that is *declared and unresolved*. The
+first is still a malformed specification and still reported; the second now yields a zero extent,
+which paints nothing for the same reason upstream's does.
+
+**A harness change came with it, and it is the kind worth reading rather than trusting.** Upstream's
+scene item carries `width: NaN` — `x2 - x` with both undefined — and `canonicalNumber` writes that
+into the reference as the *string* `"NaN"`, deliberately, so that a NaN stays visible instead of
+being rounded away. This engine's scene node is the painted form, so it holds the zero its renderer
+would draw. Upstream's own SVG proves the two agree: the item with `width: NaN` renders as
+`M0,0h0v200h0Z`.
+
+`Differential` now says so explicitly — a reference geometry channel of `NaN` or an infinity is
+checked against **zero** on this side. Checked, not skipped: a real number there is still a
+difference. Before this the channel could not be compared at all, since a string never matches a
+number, so this is a channel gained rather than a check dropped.
+
+The second half of that fixture was the legend swatch's `opacity`, which is a conditional rule —
+dim the swatch when its series is deselected — and no `symbolOpacity` property can express one. It is
+resolved against the entry now, and the "only implemented as a constant" warning it used to draw is
+gone with it.
 
 ## Performance observations
 

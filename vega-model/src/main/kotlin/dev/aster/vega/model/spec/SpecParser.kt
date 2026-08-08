@@ -290,6 +290,11 @@ private val RESOLVED_GUIDE_CHANNELS =
     // the swatch; this fades only what is inside it, and there is no property for that.
     "symbols.enter.fillOpacity",
     "symbols.update.fillOpacity",
+    // A legend swatch's overall opacity. `symbolOpacity` says the same thing as a constant, but an
+    // interactive legend writes a *conditional rule* here — a swatch dims when its series is
+    // deselected — and no property can express one, so it is resolved against the entry instead.
+    "symbols.enter.opacity",
+    "symbols.update.opacity",
   )
 
 /**

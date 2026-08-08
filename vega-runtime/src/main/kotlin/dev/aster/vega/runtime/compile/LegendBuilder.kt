@@ -327,8 +327,12 @@ internal class LegendBuilder(
             },
           stroke = symbolStroke(spec, entry.value, strokeWidth),
           // `symbolOpacity` is the item's overall opacity upstream, not a fill or stroke opacity —
-          // it fades the outline with the swatch rather than only what is inside it.
-          opacity = spec.symbolStyle.opacity ?: 1.0,
+          // it fades the outline with the swatch rather than only what is inside it. The `encode`
+          // block wins over the property, and it is where an *interactive* legend lives: a swatch
+          // that dims when its series is deselected writes a conditional rule here, and there is no
+          // property that could express one.
+          opacity =
+            entryNumber(spec, "symbols", "opacity", entry) ?: spec.symbolStyle.opacity ?: 1.0,
           metadata = NodeMetadata(role = "legend-symbol", markName = scaleName, datumIndex = index),
         ),
         TextNode(

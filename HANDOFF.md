@@ -9,7 +9,7 @@ Branch `milestone-0-bootstrap`. Working tree clean, both gates green:
 - `./scripts/check.sh` — format, all tests, lint, demo APK
 - `./scripts/oracle.sh` — regenerates upstream references and runs the differential comparison
 
-**84 differential fixtures pass, all matching upstream exactly.** That is the only number here
+**85 differential fixtures pass, all matching upstream exactly.** That is the only number here
 that means what it says.
 
 ## Read this before trusting the other number
@@ -182,23 +182,6 @@ Worth knowing before touching it:
   the time a group is reached. If an example ever does, `DataflowOrder` is reusable as-is —
   `ScopeCompiler.nest` is where it would go.
 
-## A gap found while binning, and not taken
-
-`bin-settings` was going to draw a value that falls outside an anchored bin grid, and could not:
-upstream draws a rect for it and this engine drops the mark. The scaled channel resolves to nothing,
-and where upstream simply **omits the property** — its scene item has no `x`, no `x2` and no `width`,
-and paints nothing — this reports `Rect mark has no x, x2, width or xc channel` and skips the item
-entirely, so the mark count is one short.
-
-Verified upstream with a two-row dataset whose first row has `lo: null`: the first item comes back as
-`{y: 0, width: null, height: 6}` with no `x` at all, the second fully positioned. So the rule is that
-a scaled value of null yields no channel rather than no item, and "this mark has no horizontal
-channel" should only fire when the specification *named* none.
-
-Not taken because that error guards genuinely malformed specifications and changing it reaches every
-mark type, which wants a fixture of its own. The fixture works around it with a filter, so nothing
-here depends on the current behaviour.
-
 ## Pick the next example the same way
 
 The method that worked seven times: take one real example, add it as a differential fixture *first*, let
@@ -213,14 +196,11 @@ its datasets are fetched into `test-fixtures/data/` and committed. Discount ever
 when judging how far an example is from passing.
 
 What is left, by the engine gap behind it. `global-development` and `quantile-quantile-plot` were on
-this list and are now passing fixtures, and so is `histogram-null-values`; the remaining two are:
+this list and are now passing fixtures, and so are `histogram-null-values` and `interactive-legend`.
+One is left:
 
 - `donut-chart-labelled` — the `pluck` expression function, and a dataset sourcing from *several*
   named datasets at once (`"source": ["a", "b"]`), which the parser currently reads as one name.
-- `interactive-legend` — a `rect` brush with no `x` at rest; upstream draws 454 marks to our 452.
-  Related to the gap recorded above under "A gap found while binning": a scaled channel that resolves
-  to nothing should leave the property off the item rather than drop the item, which is worth reading
-  before starting this one.
 
 **Refused, not missing**, and now reported as such: `error-bars`, `bar-line-toggle`, `clock`,
 `hypothetical-outcome-plots` and `pi-monte-carlo` all need `random()` or `now()`. `error-bars` is the

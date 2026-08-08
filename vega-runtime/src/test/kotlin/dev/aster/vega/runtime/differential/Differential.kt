@@ -555,6 +555,27 @@ public object Differential {
     }
     for ((channel, wanted) in expected.strings) {
       if (channel in ignored) continue
+      // A geometry channel the reference records as `NaN` or an infinity. It is a *string* there
+      // because JSON has no such literal and `canonicalNumber` stringifies it on purpose, so that
+      // upstream producing one stays visible rather than being rounded away.
+      //
+      // It means upstream's scene item carries no usable number, which its renderer then paints as
+      // zero: `interactive-legend`'s brush rect has `width: NaN` in the scene and draws
+      // `M0,0h0v200h0Z` in upstream's own SVG. This engine's scene *is* the painted form — a scene
+      // node holds numbers a renderer can use, not the arithmetic that produced them — so it stores
+      // the zero directly.
+      //
+      // Checked as zero rather than skipped: a real number here is still a difference, so this says
+      // the two agree on what gets painted without giving up the channel.
+      if (channel in GEOMETRY_CHANNELS && wanted in NON_FINITE) {
+        val painted = actual.numbers[channel]
+        if (painted == null || painted != 0.0) {
+          out.add(
+            Difference("$where.$channel", "$wanted (painted as 0)", painted?.let(::fmt) ?: "absent")
+          )
+        }
+        continue
+      }
       val got = actual.strings[channel]
       if (got == null) {
         out.add(Difference("$where.$channel", wanted, "absent"))
@@ -714,4 +735,11 @@ public object Differential {
   private val CURVE_EXTENT_TYPES = setOf("arc", "trail", "path")
 
   private val COLOUR_CHANNELS = setOf("fill", "stroke")
+
+  /** The channels that carry a position or an extent, and so have a painted equivalent of zero. */
+  private val GEOMETRY_CHANNELS =
+    setOf("x", "y", "x2", "y2", "width", "height", "size", "innerRadius", "outerRadius")
+
+  /** What `canonicalNumber` writes where a number is not finite. */
+  private val NON_FINITE = setOf("NaN", "Infinity", "-Infinity")
 }

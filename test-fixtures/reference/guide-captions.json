@@ -475,6 +475,21 @@
   "caption": "X-axis for a discrete scale with 6 values: a, b, c, d, 3, true"
  },
  {
+  "fixture": "interactive-legend",
+  "kind": "axis",
+  "caption": "X-axis titled 'Horsepower' for a linear scale with values from 0 to 240"
+ },
+ {
+  "fixture": "interactive-legend",
+  "kind": "axis",
+  "caption": "Y-axis titled 'Miles_per_Gallon' for a linear scale with values from 0 to 50"
+ },
+ {
+  "fixture": "interactive-legend",
+  "kind": "legend",
+  "caption": "Symbol legend titled 'Origin' for stroke color with 3 values: USA, Japan, Europe"
+ },
+ {
   "fixture": "label-limit",
   "kind": "axis",
   "caption": "Y-axis for a discrete scale with 3 values: a-really-quite-long-category-name-here, another-long-one-that-runs-on-and-on, short"

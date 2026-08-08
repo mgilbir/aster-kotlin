@@ -1116,6 +1116,16 @@ public class MarkEncoder(
 
     if (start == null) {
       if (size != null) return Span(0.0, size)
+      // A channel that is *declared* but resolves to nothing is not a malformed specification, and
+      // upstream does not treat it as one: it leaves the property off the scene item, which paints
+      // nothing, and the item still exists. An interactive chart depends on that — a brush `rect`
+      // whose `x` is `brush[0]` has no brush until someone drags one, and the mark has to be in the
+      // scene to be dragged. A zero extent is how that is expressed here, since a scene node
+      // carries
+      // numbers rather than absences, and it paints nothing for the same reason.
+      val declared =
+        listOf(startChannel, endChannel, sizeChannel, centerChannel).any { channels[it] != null }
+      if (declared) return Span(0.0, 0.0)
       diagnostics.error(
         DiagnosticCodes.PARSE_MISSING_PROPERTY,
         "Rect mark '${spec.name ?: "(unnamed)"}' datum $index has no " +
