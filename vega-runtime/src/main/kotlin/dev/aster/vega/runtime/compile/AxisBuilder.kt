@@ -312,7 +312,10 @@ public class AxisBuilder(
         }
     }
 
-    val titleNode = spec.title?.let { title(spec, it, scale, tickAndLabelReach) }
+    // A title may be a signal: a chart that lets a control choose the measure retitles the axis
+    // with the choice, and there is no constant to write down.
+    val titleText = spec.title ?: spec.titleExpression?.let { numbers.resolveText(it, spec.scale) }
+    val titleNode = titleText?.let { title(spec, it, scale, tickAndLabelReach) }
     titleNode?.let { children += it }
 
     val placement = groupTransform(spec, extent)
@@ -329,7 +332,7 @@ public class AxisBuilder(
             accessibility =
               GuideCaption.axis(
                   spec.orient.name.lowercase(),
-                  spec.title,
+                  titleText,
                   scale,
                   scaleTypes[spec.scale],
                   spec.format,

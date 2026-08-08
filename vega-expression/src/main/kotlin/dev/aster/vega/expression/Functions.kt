@@ -7,6 +7,8 @@ import dev.aster.vega.model.field
 import dev.aster.vega.model.roundHalfUp
 import dev.aster.vega.model.time.DateValues
 import dev.aster.vega.model.time.TimeFormat
+import dev.aster.vega.model.time.TimeInterval
+import dev.aster.vega.model.time.TimeStepper
 import dev.aster.vega.model.withTypographicMinus
 import dev.aster.vega.scene.SceneColor
 import kotlin.math.abs
@@ -104,6 +106,28 @@ public object Functions {
       "vlSelectionTest" to "selection helpers require the signal and selection subsystems",
       "vlSelectionResolve" to "selection helpers require the signal and selection subsystems",
     )
+
+  /** A runaway step cannot spin forever; no axis has this many boundaries. */
+  private const val MAX_SEQUENCE: Int = 100_000
+
+  /** The stepper a unit name asks for, or null when it names none. */
+  private fun stepperFor(unit: String, zone: TimeZone): TimeStepper? =
+    when (unit.lowercase()) {
+      "millisecond",
+      "milliseconds" -> TimeInterval.MILLISECOND
+      "second",
+      "seconds" -> TimeInterval.SECOND
+      "minute",
+      "minutes" -> TimeInterval.MINUTE
+      "hour",
+      "hours" -> TimeInterval.HOUR
+      "day",
+      "date" -> TimeInterval.DAY
+      "week" -> TimeInterval.WEEK
+      "month" -> TimeInterval.MONTH
+      "year" -> TimeInterval.YEAR
+      else -> null
+    }?.let { TimeStepper(it, 1, zone) }
 
   public val functions: Map<String, ExpressionFunction> = buildFunctions()
 
@@ -382,6 +406,52 @@ public object Functions {
         is VegaValue.Arr -> VegaValue.Arr(data.values.map { it.field(path) })
         else -> data.field(path)
       }
+    }
+
+    // ---- time arithmetic ----------------------------------------------------
+
+    /**
+     * `timeOffset(unit, date, step)` — a date moved by whole calendar units.
+     *
+     * Whole *units*, not milliseconds: a month later is the same day of the next month, and a day
+     * later across a clock change is still the same wall-clock time.
+     */
+    map["timeOffset"] = ExpressionFunction { args ->
+      val stepper =
+        stepperFor(args.string(0), TimeZone.currentSystemDefault())
+          ?: return@ExpressionFunction VegaValue.Null
+      val at = JsSemantics.toNumber(args.at(1))
+      if (!at.isFinite()) return@ExpressionFunction VegaValue.Null
+      val by = JsSemantics.toNumber(args.at(2)).takeIf { it.isFinite() } ?: 1.0
+      VegaValue.Num(stepper.offset(at, by.toInt()))
+    }
+
+    /**
+     * `timeSequence(unit, start, stop[, step])` — every boundary in a span, `stop` exclusive.
+     *
+     * The sequence starts at `start` itself rather than at the unit boundary below it, which is
+     * upstream's behaviour and worth knowing: a sequence from the middle of a day steps by days
+     * from the middle of the day.
+     */
+    map["timeSequence"] = ExpressionFunction { args ->
+      val stepper =
+        stepperFor(args.string(0), TimeZone.currentSystemDefault())
+          ?: return@ExpressionFunction VegaValue.Arr(emptyList())
+      val start = JsSemantics.toNumber(args.at(1))
+      val stop = JsSemantics.toNumber(args.at(2))
+      if (!start.isFinite() || !stop.isFinite()) {
+        return@ExpressionFunction VegaValue.Arr(emptyList())
+      }
+      val by = JsSemantics.toNumber(args.at(3)).takeIf { it.isFinite() && it != 0.0 } ?: 1.0
+      val out = mutableListOf<VegaValue>()
+      var at = start
+      var guard = 0
+      while (at < stop && guard < MAX_SEQUENCE) {
+        out.add(VegaValue.Num(at))
+        at = stepper.offset(at, by.toInt())
+        guard++
+      }
+      VegaValue.Arr(out)
     }
 
     // ---- colour -------------------------------------------------------------

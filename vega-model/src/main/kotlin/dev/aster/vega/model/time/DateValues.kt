@@ -38,9 +38,10 @@ public object DateValues {
     when (value) {
       is VegaValue.Num -> value
       is VegaValue.Str ->
-        (parseIso(value.value, local) ?: parseTextual(value.value, local))?.let {
-          VegaValue.Num(it)
-        }
+        (parseIso(value.value, local)
+            ?: parseSlashes(value.value, local)
+            ?: parseTextual(value.value, local))
+          ?.let { VegaValue.Num(it) }
       else -> null
     }
 
@@ -179,6 +180,42 @@ public object DateValues {
       "november",
       "december",
     )
+
+  /**
+   * `2001/01/01`, optionally with a time — the form a flight log writes.
+   *
+   * Read in the **local** zone whether or not it carries a time, which is where it differs from the
+   * ISO form: a bare `2001-01-01` is UTC and a bare `2001/01/01` is local. That is JavaScript's
+   * split, not a choice made here, and it is a whole hour of difference on a chart bucketing by
+   * day.
+   */
+  public fun parseSlashes(
+    text: String,
+    local: TimeZone = TimeZone.currentSystemDefault(),
+  ): Double? {
+    val match = SLASHES.matchEntire(text.trim()) ?: return null
+    val g = match.groupValues
+    val date =
+      try {
+        LocalDate(g[1].toInt(), g[2].toInt(), g[3].toInt())
+      } catch (_: IllegalArgumentException) {
+        return null
+      }
+    val time =
+      try {
+        LocalTime(
+          g[4].ifEmpty { "0" }.toInt(),
+          g[5].ifEmpty { "0" }.toInt(),
+          g[6].ifEmpty { "0" }.toInt(),
+        )
+      } catch (_: IllegalArgumentException) {
+        return null
+      }
+    return LocalDateTime(date, time).toInstant(local).toEpochMilliseconds().toDouble()
+  }
+
+  private val SLASHES =
+    Regex("(\\d{4})/(\\d{1,2})/(\\d{1,2})(?:[T ](\\d{1,2}):(\\d{2})(?::(\\d{2}))?)?")
 
   private val ISO =
     Regex(

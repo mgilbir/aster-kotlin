@@ -206,6 +206,14 @@ public data class DataSpec(
    */
   val parse: Map<String, String> = emptyMap(),
   /**
+   * `format.parse: "auto"` — work out each column's type from its values.
+   *
+   * Upstream tries boolean, then integer, then number, then date, and keeps the first that holds
+   * for every value in the column; anything else stays a string. A CSV has no types at all and a
+   * JSON log writes its dates as text, so without this a time axis is a column of strings.
+   */
+  val parseAuto: Boolean = false,
+  /**
    * `format.type`: how to read what the URL returned — `json`, `csv`, `tsv` or `dsv`.
    *
    * Defaults to `json`, which is also what upstream infers from a `.json` extension. A tabular
@@ -538,6 +546,13 @@ public data class AxisSpec(
   val scale: String,
   val orient: Orient,
   val title: String? = null,
+  /**
+   * `title: {"signal": "..."}` — the axis names itself from a signal.
+   *
+   * A chart offering a choice of measure retitles its axis with the choice, and there is nothing
+   * constant to write down.
+   */
+  val titleExpression: String? = null,
   val titlePadding: NumberValue? = null,
   val titleFontSize: NumberValue? = null,
   val titleAnchor: Anchor? = null,

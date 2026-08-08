@@ -272,7 +272,12 @@ public class TransformRegistry(transforms: List<Transform>) {
 internal fun VegaValue.Obj.stringList(key: String): List<String> {
   val value = fields[key] ?: return emptyList()
   return when (value) {
-    is VegaValue.Arr -> value.values.map { it.asString() }
+    // A `null` *element* is a deliberate blank, not the four letters that spell it: `"fields":
+    // [null, "delay"]` beside `"ops": ["count", "average"]` says the count has no field while
+    // keeping the two lists aligned. Reading it as the name "null" gave `count` a column no row
+    // has,
+    // and it counted nothing.
+    is VegaValue.Arr -> value.values.map { if (it is VegaValue.Null) "" else it.asString() }
     is VegaValue.Null -> emptyList()
     else -> listOf(value.asString())
   }

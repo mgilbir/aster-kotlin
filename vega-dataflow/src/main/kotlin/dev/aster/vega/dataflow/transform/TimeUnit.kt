@@ -7,11 +7,14 @@ import dev.aster.vega.model.time.DateValues
 import dev.aster.vega.model.time.TimeFormat
 import dev.aster.vega.model.time.TimeInterval
 import dev.aster.vega.model.time.TimeStepper
+import kotlinx.datetime.DateTimeUnit
 import kotlinx.datetime.LocalDate
 import kotlinx.datetime.LocalDateTime
 import kotlinx.datetime.LocalTime
 import kotlinx.datetime.TimeZone
+import kotlinx.datetime.isoDayNumber
 import kotlinx.datetime.number
+import kotlinx.datetime.plus
 import kotlinx.datetime.toInstant
 
 /**
@@ -32,6 +35,9 @@ import kotlinx.datetime.toInstant
 public object TimeUnitTransform : Transform {
   override val type: String = "timeunit"
 
+  /** `{unit, units, step, start, stop}` — what a chart reads to label and size its buckets. */
+  override val publishesSignal: Boolean = true
+
   /** Upstream's reference year for a bucketing that does not include one. */
   private const val CYCLE_YEAR = 2012
 
@@ -49,9 +55,6 @@ public object TimeUnitTransform : Transform {
       "seconds",
       "milliseconds",
     )
-
-  /** Units whose flooring needs week numbering, which this engine does not implement. */
-  private val WEEK_BASED = setOf("week", "day", "dayofyear")
 
   override fun apply(
     input: List<VegaValue>,
@@ -106,16 +109,6 @@ public object TimeUnitTransform : Transform {
       )
       return input
     }
-    val weekBased = units.filter { it in WEEK_BASED }
-    if (weekBased.isNotEmpty()) {
-      context.diagnostics.error(
-        DiagnosticCodes.TRANSFORM_NOT_IMPLEMENTED,
-        "timeunit unit(s) ${weekBased.joinToString(", ")} need week numbering, which is not " +
-          "implemented; bucket by 'date' instead",
-        operator = type,
-      )
-      return input
-    }
 
     val zone =
       when ((params.fields["timezone"] as? VegaValue.Str)?.value?.lowercase()) {
@@ -138,21 +131,43 @@ public object TimeUnitTransform : Transform {
     val startName = names.getOrNull(0) ?: "unit0"
     val endName = names.getOrNull(1) ?: "unit1"
 
-    return input.map { datum ->
+    var lowest = Double.POSITIVE_INFINITY
+    var highest = Double.NEGATIVE_INFINITY
+    val bucketed = input.map { datum ->
       val instant = (DateValues.parse(datum.field(fieldPath)) as? VegaValue.Num)?.value
       if (instant == null || !instant.isFinite()) {
         datum.withFields(mapOf(startName to VegaValue.Null, endName to VegaValue.Null))
       } else {
         val start = floor(instant, present, zone)
-        datum.withFields(
-          mapOf(
-            startName to VegaValue.Num(start),
-            endName to VegaValue.Num(stepper.offset(start, 1)),
-          )
-        )
+        val end = stepper.offset(start, 1)
+        if (start < lowest) lowest = start
+        if (end > highest) highest = end
+        datum.withFields(mapOf(startName to VegaValue.Num(start), endName to VegaValue.Num(end)))
       }
     }
+
+    // What upstream publishes: the units it was given, the finest of them, the step, and the span
+    // the buckets actually cover. A chart reads `tbin.unit` to pick a label format and
+    // `tbin.start`/`tbin.stop` to size the axis it draws them on.
+    params.string("signal")?.let { signal ->
+      context.setSignal(
+        signal,
+        VegaValue.Obj(
+          linkedMapOf(
+            "unit" to VegaValue.Str(finestOf(present)),
+            "units" to VegaValue.Arr(units.map { VegaValue.Str(it) }),
+            "step" to VegaValue.Num(params.number("step") ?: 1.0),
+            "start" to VegaValue.Num(if (lowest.isFinite()) lowest else Double.NaN),
+            "stop" to VegaValue.Num(if (highest.isFinite()) highest else Double.NaN),
+          )
+        ),
+      )
+    }
+    return bucketed
   }
+
+  /** The finest unit named, which is the one a bucket is a bucket *of*. */
+  private fun finestOf(units: Set<String>): String = KNOWN.last { it in units }
 
   /**
    * Rebuilds an instant from only the units the specification asked for.
@@ -170,6 +185,38 @@ public object TimeUnitTransform : Transform {
         "quarter" in units -> (at.month.number - 1) / 3 * 3 + 1
         else -> 1
       }
+    // A week-based unit gives a **day of the year** rather than a day of the month, and the date is
+    // rebuilt from January the 1st plus that many days — which is upstream's own arrangement, since
+    // its `localDate(y, m, d, ...)` lets the day overflow the month and JavaScript normalises it.
+    //
+    // `weekday(week, day, firstDay) = day + week * 7 - (firstDay + 6) % 7` is the whole of it. With
+    // `day` alone the week is 1, so a Monday in a year beginning on a Sunday lands on the 2nd; with
+    // `week` alone the day is 0, so every date in a week lands on that week's first day.
+    val firstDay = LocalDate(year, 1, 1).dayOfWeek.isoDayNumber % 7
+    val dayOfYear =
+      when {
+        "week" in units && "day" in units ->
+          weekday(weekNumber(at, zone), at.dayOfWeek.isoDayNumber % 7, firstDay)
+        "week" in units -> weekday(weekNumber(at, zone), 0, firstDay)
+        "day" in units -> weekday(1, at.dayOfWeek.isoDayNumber % 7, firstDay)
+        "dayofyear" in units -> at.dayOfYear
+        else -> null
+      }
+    if (dayOfYear != null) {
+      val base = LocalDate(year, 1, 1).plus(dayOfYear - 1, DateTimeUnit.DAY)
+      return LocalDateTime(
+          base,
+          LocalTime(
+            if ("hours" in units) at.hour else 0,
+            if ("minutes" in units) at.minute else 0,
+            if ("seconds" in units) at.second else 0,
+            if ("milliseconds" in units) at.nanosecond / 1_000_000 * 1_000_000 else 0,
+          ),
+        )
+        .toInstant(zone)
+        .toEpochMilliseconds()
+        .toDouble()
+    }
     val day = if ("date" in units) at.day else 1
     val hour = if ("hours" in units) at.hour else 0
     val minute = if ("minutes" in units) at.minute else 0
@@ -183,6 +230,21 @@ public object TimeUnitTransform : Transform {
       .toInstant(zone)
       .toEpochMilliseconds()
       .toDouble()
+  }
+
+  /** Upstream's own helper, transcribed: which day of the year a week-and-weekday pair names. */
+  private fun weekday(week: Int, day: Int, firstDay: Int): Int = day + week * 7 - (firstDay + 6) % 7
+
+  /**
+   * How many Sundays have passed since the 1st of January, counting one on the day itself.
+   *
+   * d3's `timeSunday.count(startOfYear, date)`, which is what upstream's week number is.
+   */
+  private fun weekNumber(at: LocalDateTime, zone: TimeZone): Int {
+    val start = LocalDate(at.year, 1, 1)
+    val firstSundayOffset = (7 - start.dayOfWeek.isoDayNumber % 7) % 7
+    val dayOfYear = at.dayOfYear - 1
+    return if (dayOfYear < firstSundayOffset) 0 else (dayOfYear - firstSundayOffset) / 7 + 1
   }
 
   private fun daysInMonth(year: Int, month: Int): Int =
@@ -208,7 +270,14 @@ public object TimeUnitTransform : Transform {
       "seconds" in units -> TimeStepper(TimeInterval.SECOND, 1, zone)
       "minutes" in units -> TimeStepper(TimeInterval.MINUTE, 1, zone)
       "hours" in units -> TimeStepper(TimeInterval.HOUR, 1, zone)
+      // A day-of-week or day-of-year bucket is one day wide, the same as a day-of-month; a week
+      // bucket is seven. Without these the finest unit fell through to a year, and a chart
+      // bucketing
+      // by weekday drew seven buckets a year apart.
       "date" in units -> TimeStepper(TimeInterval.DAY, 1, zone)
+      "day" in units -> TimeStepper(TimeInterval.DAY, 1, zone)
+      "dayofyear" in units -> TimeStepper(TimeInterval.DAY, 1, zone)
+      "week" in units -> TimeStepper(TimeInterval.WEEK, 1, zone)
       "month" in units -> TimeStepper(TimeInterval.MONTH, 1, zone)
       "quarter" in units -> TimeStepper(TimeInterval.MONTH, 3, zone)
       else -> TimeStepper(TimeInterval.YEAR, 1, zone)

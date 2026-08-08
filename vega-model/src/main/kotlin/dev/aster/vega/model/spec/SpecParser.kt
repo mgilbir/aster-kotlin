@@ -922,15 +922,20 @@ public class SpecParser {
     val url = if (urlSignal == null) urlValue?.asString() else null
     val format = obj.fields["format"] as? VegaValue.Obj
     val parse = LinkedHashMap<String, String>()
+    var parseAuto = false
     if (format != null) {
       for ((key, value) in format.fields) {
         if (key == "type" || key == "property" || key == "delimiter") continue
         if (key == "parse") {
+          if (value is VegaValue.Str && value.value.equals("auto", ignoreCase = true)) {
+            parseAuto = true
+            continue
+          }
           val fields = value as? VegaValue.Obj
           if (fields == null) {
             diagnostics.warn(
               DiagnosticCodes.PARSE_UNKNOWN_PROPERTY,
-              "'format.parse' must name each field and how to read it",
+              "'format.parse' must be \"auto\" or name each field and how to read it",
               jsonPath = "$path.format.parse",
             )
             continue
@@ -972,6 +977,7 @@ public class SpecParser {
           else -> listOfNotNull(source.asString().takeIf { it.isNotEmpty() })
         },
       parse = parse,
+      parseAuto = parseAuto,
     )
   }
 
@@ -1300,6 +1306,7 @@ public class SpecParser {
       scale = scale,
       orient = orient,
       title = obj.fields["title"]?.takeIf { it is VegaValue.Str }?.asString(),
+      titleExpression = (obj.fields["title"] as? VegaValue.Obj)?.fields?.get("signal")?.asString(),
       titlePadding = obj.numberOrSignal("titlePadding", "$path.titlePadding"),
       titleFontSize = obj.numberOrSignal("titleFontSize", "$path.titleFontSize"),
       titleAnchor = obj.enumOrNull("titleAnchor", path, "title anchor") { Anchor.fromName(it) },

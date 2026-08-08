@@ -157,12 +157,15 @@ class TimeUnitTransformTest {
   }
 
   @Test
-  fun `week-based units are reported rather than approximated`() {
-    val (_, diagnostics) = bucket("""["year","week"]""")
-    assertTrue(
-      diagnostics.diagnostics.any { it.message.contains("week numbering") },
-      diagnostics.diagnostics.toString(),
-    )
+  fun `a week-based unit buckets by week number`() {
+    // Upstream's own arithmetic: the week number counts Sundays from the 1st of January, and the
+    // bucket is that week's first day. 2012-01-08 is in the second such week of 2012, whose first
+    // day is the 8th itself — Jan 1 2012 being a Sunday.
+    val (buckets, diagnostics) = bucket("""["year","week"]""")
+    assertTrue(diagnostics.diagnostics.isEmpty(), diagnostics.diagnostics.toString())
+    // 2026-01-15 falls in the third week of 2026 by that count; the bucket is a whole week wide.
+    assertEquals("2026-01-11T00:00..2026-01-18T00:00", buckets[0])
+    assertEquals("2026-01-25T00:00..2026-02-01T00:00", buckets[1])
   }
 
   @Test

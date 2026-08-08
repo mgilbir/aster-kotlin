@@ -13,6 +13,7 @@ import dev.aster.vega.model.VegaJson
 import dev.aster.vega.model.VegaValue
 import dev.aster.vega.model.asDouble
 import dev.aster.vega.model.asString
+import dev.aster.vega.model.isMissing
 import dev.aster.vega.model.spec.DataSpec
 import dev.aster.vega.model.time.DateValues
 import dev.aster.vega.runtime.load.DataLoader
@@ -286,6 +287,7 @@ internal class DataResolver(
         }
         if (found) values = rows
       }
+      if (spec.parseAuto) values = inferred(values)
       if (spec.parse.isNotEmpty()) values = values.map { parseFields(it, spec) }
       if (spec.transform.isNotEmpty()) {
         val context =
@@ -307,6 +309,70 @@ internal class DataResolver(
       if (tree == null) trees.remove(spec.name) else trees[spec.name] = tree
     }
     return ScopeData(result, trees)
+  }
+
+  /**
+   * `format.parse: "auto"` — each column read as the narrowest type that fits every one of its
+   * values.
+   *
+   * Upstream tries boolean, then integer, then number, then date, in that order, and keeps the
+   * first that holds throughout; a column where none does stays as it came. The order matters:
+   * `"1"` is an integer before it is a number, and a column of `"true"`/`"false"` is boolean before
+   * either.
+   *
+   * A missing value votes for nothing, so a column of numbers with a gap is still numeric.
+   */
+  private fun inferred(rows: List<VegaValue>): List<VegaValue> {
+    val objects = rows.filterIsInstance<VegaValue.Obj>()
+    if (objects.isEmpty()) return rows
+    val columns = LinkedHashSet<String>().apply { objects.forEach { addAll(it.fields.keys) } }
+
+    val kinds = LinkedHashMap<String, String>()
+    for (column in columns) {
+      var boolean = true
+      var integer = true
+      var number = true
+      var date = true
+      var seen = false
+      for (row in objects) {
+        val value = row.fields[column] ?: continue
+        if (value.isMissing) continue
+        seen = true
+        val text = value.asString()
+        if (boolean && !(text == "true" || text == "false")) boolean = false
+        val numeric = value as? VegaValue.Num ?: text.toDoubleOrNull()?.let { VegaValue.Num(it) }
+        if (number && numeric == null) number = false
+        if (integer && (numeric == null || numeric.value != kotlin.math.floor(numeric.value))) {
+          integer = false
+        }
+        if (date && DateValues.parse(value) == null) date = false
+        if (!boolean && !integer && !number && !date) break
+      }
+      if (!seen) continue
+      when {
+        boolean -> kinds[column] = "boolean"
+        integer -> kinds[column] = "number"
+        number -> kinds[column] = "number"
+        date -> kinds[column] = "date"
+      }
+    }
+    if (kinds.isEmpty()) return rows
+
+    return rows.map { row ->
+      val obj = row as? VegaValue.Obj ?: return@map row
+      val fields = LinkedHashMap(obj.fields)
+      for ((column, kind) in kinds) {
+        val raw = fields[column] ?: continue
+        if (raw.isMissing) continue
+        fields[column] =
+          when (kind) {
+            "boolean" -> VegaValue.Bool(JsSemantics.truthy(raw) && raw.asString() != "false")
+            "number" -> VegaValue.Num(raw.asDouble())
+            else -> DateValues.parse(raw) ?: raw
+          }
+      }
+      VegaValue.Obj(fields)
+    }
   }
 
   /**
