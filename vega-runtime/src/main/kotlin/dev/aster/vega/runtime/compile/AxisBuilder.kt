@@ -171,6 +171,26 @@ public class AxisBuilder(
     // axis, down from a top one, right from a left one, left from a right one.
     val gridSign = if (spec.orient == Orient.TOP || spec.orient == Orient.LEFT) 1.0 else -1.0
 
+    // `gridScale` spans a *second* scale's range instead of the plotting area, which is how a grid
+    // is drawn across a cell that is not the size of its own plot. Upstream takes the two ends in
+    // that scale's own order — `range(gridScale)[0]` then `[1]` — so a descending range gives a
+    // gridline whose start is the far end, which the plain form never does.
+    val gridRange =
+      spec.gridScale?.let { name ->
+        val other = scales[name]
+        if (other is PositionScale) {
+          other.range.first() * gridSign to other.range.last() * gridSign
+        } else {
+          diagnostics.warn(
+            DiagnosticCodes.SCALE_UNSUPPORTED_TYPE,
+            "Axis 'gridScale' names '$name', which is not a scale with a range; the gridlines " +
+              "span the plotting area instead",
+            operator = spec.scale,
+          )
+          null
+        }
+      } ?: (0.0 to gridSign * (if (spec.orient.isVertical) gridSize.width else gridSize.height))
+
     // Gridlines first so they sit under the ticks, matching Vega's ordering.
     if (spec.grid) {
       val gridMeta = NodeMetadata(role = "axis-grid")
@@ -194,9 +214,9 @@ public class AxisBuilder(
               RuleNode(
                 ids.allocate(),
                 at,
-                undoOffset,
+                gridRange.first + undoOffset,
                 at,
-                gridSign * gridSize.height + undoOffset,
+                gridRange.second + undoOffset,
                 gridStroke,
                 metadata = gridMeta,
               )
@@ -204,9 +224,9 @@ public class AxisBuilder(
             Orient.RIGHT ->
               RuleNode(
                 ids.allocate(),
-                undoOffset,
+                gridRange.first + undoOffset,
                 at,
-                gridSign * gridSize.width + undoOffset,
+                gridRange.second + undoOffset,
                 at,
                 gridStroke,
                 metadata = gridMeta,
@@ -242,12 +262,24 @@ public class AxisBuilder(
         // The label's own `encode` may replace the *text* as well as its position — read through a
         // scale, which is how a chart labels a key with a display name it keeps in a second scale.
         // There is no axis property that could say it, because the mapping lives in the data.
+        // `labelFlush` pushes the first and last labels inwards so they sit inside the plot
+        // instead of hanging off its corners. It is an *alignment* rule, decided per label from
+        // how close that label's scaled value is to an end of the range — and it moves the
+        // alignment on the axis's own dimension only, so a bottom axis flushes its `align` and a
+        // left one its `baseline`.
+        val flushed = flushAnchor(spec, scale, tick)
         val run =
           TextRun(
             text = labelText(spec, tick) ?: tick.label,
             style = labelStyle,
-            align = alignOf(spec.labelAlign) ?: labelAlign(spec.orient),
-            baseline = baselineOf(spec.labelBaseline) ?: labelBaseline(spec.orient),
+            align =
+              alignOf(spec.labelAlign)
+                ?: (if (spec.orient.isVertical) null else flushed?.let(::flushAlign))
+                ?: labelAlign(spec.orient),
+            baseline =
+              baselineOf(spec.labelBaseline)
+                ?: (if (spec.orient.isVertical) flushed?.let(::flushBaseline) else null)
+                ?: labelBaseline(spec.orient),
             limit = labelLimit,
           )
         val layout = textEngine.layout(run)
@@ -415,7 +447,10 @@ public class AxisBuilder(
       Orient.TOP -> -reach.top
       Orient.LEFT -> -reach.left
       Orient.RIGHT -> reach.right
-    }.coerceIn(AxisDefaults.TITLE_MIN_EXTENT, AxisDefaults.TITLE_MAX_EXTENT)
+    }.coerceIn(
+      numbers.resolve(spec.minExtent, spec.scale) ?: AxisDefaults.TITLE_MIN_EXTENT,
+      numbers.resolve(spec.maxExtent, spec.scale) ?: AxisDefaults.TITLE_MAX_EXTENT,
+    )
 
   /**
    * The axis title.
@@ -687,6 +722,44 @@ public class AxisBuilder(
       VegaValue.Obj(linkedMapOf("value" to tick.value, "label" to VegaValue.Str(tick.label)))
     return encoder.channelNumber(entry, datum)
   }
+
+  /**
+   * Which end of the range a label is being flushed to, or null when it is not.
+   *
+   * Upstream's `flush(range, value, threshold, left, right, center)`, and the parts that are easy
+   * to get wrong are the tie-break and the reversal: the ends are sorted before the comparison, so
+   * a descending range still flushes its *low* end to the start; and the nearer end wins with `l <
+   * r`, so a label exactly between two ends of an equally short range takes the far one.
+   */
+  private fun flushAnchor(spec: AxisSpec, scale: VegaScale, tick: Tick): FlushEnd? {
+    val threshold = spec.labelFlush ?: return null
+    val positional = scale as? PositionScale ?: return null
+    val range = positional.range
+    if (range.size < 2) return null
+    val low = minOf(range.first(), range.last())
+    val high = maxOf(range.first(), range.last())
+    val at = positional.position(tick.value)
+    if (!at.isFinite()) return null
+    val fromLow = kotlin.math.abs(at - low)
+    val fromHigh = kotlin.math.abs(high - at)
+    return when {
+      fromLow < fromHigh && fromLow <= threshold -> FlushEnd.START
+      fromHigh <= threshold -> FlushEnd.END
+      else -> null
+    }
+  }
+
+  /** Which end of the range a flushed label was pulled towards. */
+  private enum class FlushEnd {
+    START,
+    END,
+  }
+
+  private fun flushAlign(end: FlushEnd): TextAlign =
+    if (end == FlushEnd.START) TextAlign.LEFT else TextAlign.RIGHT
+
+  private fun flushBaseline(end: FlushEnd): TextBaseline =
+    if (end == FlushEnd.START) TextBaseline.TOP else TextBaseline.BOTTOM
 
   private fun bandOffset(scale: PositionScale, spec: AxisSpec): Double {
     if (scale !is BandScale) return 0.0

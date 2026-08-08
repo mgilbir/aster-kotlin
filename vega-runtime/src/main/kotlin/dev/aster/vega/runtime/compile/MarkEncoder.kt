@@ -88,7 +88,24 @@ public class MarkEncoder(
   private val expressions: ExpressionCompiler = CachingExpressionCompiler(VegaExpressionCompiler()),
   /** Measures text marks. Must be the engine the surface will draw with (docs/adr/0006). */
   private val textEngine: TextEngine = MetricTextEngine(),
+  /**
+   * The **enclosing group item's** extent, which `{"field": {"group": "width"}}` reads.
+   *
+   * Not the `width` signal, though the two agree at the top level and that is why reading the
+   * signal survived so long. Upstream compiles the reference to `item.mark.group.width` — the size
+   * the group item was *encoded* with — so a cell declaring `width: {signal: height}` gives a rule
+   * that spans the cell rather than one that spans the chart.
+   */
+  private val groupExtent: PlotSize = PlotSize(0.0, 0.0),
 ) {
+
+  /** `width` and `height` off the enclosing group item; anything else is a signal lookup. */
+  private fun groupProperty(path: String): VegaValue =
+    when (path) {
+      "width" -> VegaValue.Num(groupExtent.width)
+      "height" -> VegaValue.Num(groupExtent.height)
+      else -> scope.signal(path)
+    }
 
   public fun encode(spec: MarkSpec, data: List<VegaValue>): List<SceneNode> =
     when (spec.type) {
@@ -405,7 +422,11 @@ public class MarkEncoder(
     return PathNode(
       id = ids.allocate(),
       path = path,
-      fill = style.fill ?: Fill.of(MarkDefaults.DEFAULT_FILL),
+      // No fallback fill. The pairing rule in `style` has already decided: a mark that encodes
+      // *either* paint channel gets neither default, so an arc drawn as a bare outline — Vega's
+      // Monte Carlo quadrant is one — stays unfilled instead of being flooded with the built-in
+      // blue.
+      fill = style.fill,
       stroke = style.stroke,
       opacity = style.opacity,
       metadata = metadata(spec, datum, index, channels).copy(markKind = "arc"),
@@ -1006,7 +1027,7 @@ public class MarkEncoder(
     when (ref) {
       is FieldRef.ParentOf -> scope.signal("parent").field(scaleName(ref.name, datum)).asString()
       is FieldRef.Plain -> ref.path
-      is FieldRef.Group -> scope.signal(ref.path).asString()
+      is FieldRef.Group -> groupProperty(ref.path).asString()
       is FieldRef.Parent -> scope.signal("parent").field(ref.path).asString()
       is FieldRef.Signal -> signalText(ref.expression) ?: ""
       is FieldRef.Datum -> datum.field(ref.path).asString()
@@ -1015,7 +1036,7 @@ public class MarkEncoder(
   private fun VegaValue.fieldOf(ref: FieldRef): VegaValue =
     when (ref) {
       is FieldRef.Plain -> field(ref.path)
-      is FieldRef.Group -> scope.signal(ref.path)
+      is FieldRef.Group -> groupProperty(ref.path)
       is FieldRef.Parent -> scope.signal("parent").field(ref.path)
       is FieldRef.Signal -> {
         val name = signalText(ref.expression)

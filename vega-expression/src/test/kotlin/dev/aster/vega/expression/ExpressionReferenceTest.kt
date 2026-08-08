@@ -137,6 +137,13 @@ class ExpressionReferenceTest {
       [
         // ---- math ----
         "abs(-3)|3",
+        // `hypot` is variadic, not the two-argument function its name suggests, and with no
+        // arguments it is zero.
+        "hypot(3,4)|5",
+        "hypot()|0",
+        "hypot(1)|1",
+        "hypot(1,2,2)|3",
+        "isFinite(hypot(-3,-4))|true",
         "floor(2.7)|2",
         "ceil(2.1)|3",
         "sqrt(16)|4",

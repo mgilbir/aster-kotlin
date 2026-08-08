@@ -715,6 +715,16 @@
   "caption": "Y-axis titled 'Count' for a linear scale with values from 0 to 8"
  },
  {
+  "fixture": "hypothetical-outcome-plots",
+  "kind": "axis",
+  "caption": "Y-axis for a linear scale with values from 0 to 10"
+ },
+ {
+  "fixture": "hypothetical-outcome-plots",
+  "kind": "axis",
+  "caption": "X-axis for a discrete scale with 12 values: Jan, Feb, Mar, Apr, May, ending with Dec"
+ },
+ {
   "fixture": "indata-membership",
   "kind": "axis",
   "caption": "X-axis for a discrete scale with 6 values: a, b, c, d, 3, true"
@@ -943,6 +953,56 @@
   "fixture": "path-marks",
   "kind": "axis",
   "caption": "Y-axis for a linear scale with values from 0 to 100"
+ },
+ {
+  "fixture": "pi-monte-carlo",
+  "kind": "axis",
+  "caption": "X-axis for a linear scale with values from 0.0 to 1.0"
+ },
+ {
+  "fixture": "pi-monte-carlo",
+  "kind": "axis",
+  "caption": "Y-axis for a linear scale with values from 0.0 to 1.0"
+ },
+ {
+  "fixture": "pi-monte-carlo",
+  "kind": "title",
+  "caption": "Title text 'In Points and Out Points'"
+ },
+ {
+  "fixture": "pi-monte-carlo",
+  "kind": "axis",
+  "caption": "X-axis titled 'x' for a linear scale with values from 0.0 to 1.0"
+ },
+ {
+  "fixture": "pi-monte-carlo",
+  "kind": "axis",
+  "caption": "Y-axis titled 'y' for a linear scale with values from 0.0 to 1.0"
+ },
+ {
+  "fixture": "pi-monte-carlo",
+  "kind": "axis",
+  "caption": "X-axis for a linear scale with values from 0 to 1,000"
+ },
+ {
+  "fixture": "pi-monte-carlo",
+  "kind": "axis",
+  "caption": "Y-axis for a linear scale with values from 2.0 to 4.0"
+ },
+ {
+  "fixture": "pi-monte-carlo",
+  "kind": "title",
+  "caption": "Title text 'π Estimate'"
+ },
+ {
+  "fixture": "pi-monte-carlo",
+  "kind": "axis",
+  "caption": "X-axis titled 'Number of Points' for a linear scale with values from 0 to 1,000"
+ },
+ {
+  "fixture": "pi-monte-carlo",
+  "kind": "axis",
+  "caption": "Y-axis titled 'Estimated π Value' for a linear scale with values from 2.0 to 4.0"
  },
  {
   "fixture": "pie",

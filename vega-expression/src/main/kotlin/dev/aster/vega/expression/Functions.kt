@@ -222,6 +222,25 @@ public object Functions {
     }
     map["pow"] = ExpressionFunction { args -> VegaValue.Num(args.number(0).pow(args.number(1))) }
 
+    /**
+     * `hypot(...)` — `Math.hypot`, which is **variadic** and not the two-argument function its name
+     * suggests. A Monte Carlo estimate of pi is `hypot(datum.x, datum.y) <= 1` and nothing else.
+     *
+     * `Math.hypot()` with no arguments is 0, and any infinite argument makes the result infinite
+     * even beside a NaN — JavaScript's own order of tests, and the reason this is not a plain
+     * `sqrt` of a sum of squares.
+     */
+    map["hypot"] = ExpressionFunction { args ->
+      val numbers = args.map { JsSemantics.toNumber(it) }
+      VegaValue.Num(
+        when {
+          numbers.any { it.isInfinite() } -> Double.POSITIVE_INFINITY
+          numbers.any { it.isNaN() } -> Double.NaN
+          else -> sqrt(numbers.sumOf { it * it })
+        }
+      )
+    }
+
     // JavaScript's Math.round rounds halves toward +Infinity: round(-2.5) === -2, not -3.
     map.unary("round") { value ->
       if (value.isNaN() || value.isInfinite()) value else floor(value + 0.5)

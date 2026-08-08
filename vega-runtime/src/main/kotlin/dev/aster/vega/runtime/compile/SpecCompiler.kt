@@ -280,7 +280,7 @@ public class SpecCompiler(
     val unresolvedSignals = spec.signals.mapTo(mutableSetOf()) { it.name }
     val unbuiltScales = spec.scales.mapTo(mutableSetOf()) { it.name }
 
-    val data = DataResolver(diagnostics, expressions, loader)
+    val data = DataResolver(diagnostics, expressions, loader, stream, clock)
     for (operator in order.order) {
       when (operator) {
         is Operator.Signal -> {

@@ -141,6 +141,7 @@ internal class ScopeCompiler(
         scope.signals.withScales(scope.scales, diagnostics),
         expressions,
         textEngine,
+        extent,
       )
     // The encoder goes to the axis builder as well: a label's `encode` block resolves through the
     // same channel machinery a mark's does, over the tick as its datum.
@@ -521,14 +522,26 @@ internal class ScopeCompiler(
     val cellParts = parts.withIndex().filter { it.value.first == TrellisRole.CELL }
     if (cellParts.isEmpty()) return parts
 
+    // `bounds: "flush"` measures a cell by its **declared** extent rather than by how far its
+    // contents reach, so an axis label hanging off to the left is allowed to collide with the cell
+    // beside it instead of pushing it across. Upstream's `bboxFlush` is `(0, 0, width, height)`,
+    // and a group that declared no size falls back to what it drew — there is nothing else to use.
+    val flush = layout.bounds == "flush"
     val boxes = cellParts.flatMap { (_, entry) ->
-      entry.second.nodes.indices.map { entry.second.boxOf(it) }
+      entry.second.nodes.indices.map { position ->
+        val node = entry.second.nodes[position]
+        val declared = (node as? GroupNode)?.size
+        if (flush && declared != null) RectD(0.0, 0.0, declared.width, declared.height)
+        else entry.second.boxOf(position)
+      }
     }
     val options =
       GridLayout.Options(
         columns = numbers.resolveInt(layout.columns, "layout")?.coerceAtLeast(1) ?: boxes.size,
         rowPadding = numbers.resolve(layout.rowPadding, "layout") ?: 0.0,
         columnPadding = numbers.resolve(layout.columnPadding, "layout") ?: 0.0,
+        alignColumn = GridLayout.Align.fromName(layout.alignColumn),
+        alignRow = GridLayout.Align.fromName(layout.alignRow),
       )
     val offsets = GridLayout.place(boxes, options)
 

@@ -112,6 +112,10 @@ private val AXIS_CONSUMED =
     // reported as unimplemented, which is the stale half of "nothing silently ignored".
     "tickOffset",
     "tickExtra",
+    "gridScale",
+    "labelFlush",
+    "minExtent",
+    "maxExtent",
     "titleX",
     "titleY",
     "titleAngle",
@@ -135,7 +139,6 @@ private fun guideStyleKeys(vararg prefixes: String): Set<String> =
 private val AXIS_UNSUPPORTED =
   mapOf(
     "labelBound" to "Bounding axis labels to the plotting area is not implemented",
-    "labelFlush" to "Flushing the first and last axis label to the range ends is not implemented",
     "labelFlushOffset" to "Axis label flush offsets are not implemented; they need labelFlush",
     "labelOffset" to "Axis label offsets along the axis are not implemented",
     "labelLineHeight" to "Multi-line axis labels are not implemented",
@@ -146,14 +149,11 @@ private val AXIS_UNSUPPORTED =
     "tickDashOffset" to "Dash offsets are not implemented; the dash pattern starts at the line end",
     "gridCap" to "Gridline caps are not implemented",
     "gridDashOffset" to "Dash offsets are not implemented; the dash pattern starts at the line end",
-    "gridScale" to "Gridlines driven by a second scale are not implemented",
     "domainCap" to "Domain line caps are not implemented",
     "domainDashOffset" to
       "Dash offsets are not implemented; the dash pattern starts at the line end",
     "position" to "Positioning an axis along its own dimension is not implemented",
     "translate" to "Overriding the axis's half-pixel translation is not implemented",
-    "minExtent" to "A minimum axis extent is not implemented; the axis is measured by its contents",
-    "maxExtent" to "A maximum axis extent is not implemented; the axis is measured by its contents",
     "titleLimit" to "Axis title truncation is not implemented; the title is drawn in full",
     "titleLineHeight" to "Multi-line axis titles are not implemented",
     "aria" to "Accessibility attributes on a guide are not implemented",
@@ -1358,6 +1358,10 @@ public class SpecParser {
       bandPosition = obj.numberOrSignal("bandPosition", "$path.bandPosition"),
       tickOffset = obj.numberOrSignal("tickOffset", "$path.tickOffset"),
       tickExtra = obj.fields["tickExtra"]?.asBoolean() ?: false,
+      gridScale = obj.fields["gridScale"]?.takeIf { it is VegaValue.Str }?.asString(),
+      labelFlush = flushThreshold(obj.fields["labelFlush"]),
+      minExtent = obj.numberOrSignal("minExtent", "$path.minExtent"),
+      maxExtent = obj.numberOrSignal("maxExtent", "$path.maxExtent"),
       encode =
         (obj.fields["encode"] as? VegaValue.Obj)?.fields.orEmpty().mapValues { (part, block) ->
           parseEncode(block, "$path.encode.$part")
@@ -1959,8 +1963,6 @@ public class SpecParser {
         "headerBand" to "Layout header bands are not implemented",
         "footerBand" to "Layout footer bands are not implemented",
         "titleBand" to "Layout title bands are not implemented",
-        "align" to "Only per-cell ('each') grid alignment is implemented",
-        "bounds" to "Only full-bounds grid layout is implemented",
         "center" to "Centring cells within their row or column is not implemented",
         "offset" to "Layout offsets are not implemented",
       )
@@ -1986,12 +1988,41 @@ public class SpecParser {
       columnPadding = both
     }
 
+    // `align` and `bounds` take the same shape as `padding`: one value for both directions, or a
+    // per-direction object. `bounds` has no per-direction form upstream, so it is read as one.
+    val align = obj.fields["align"]
     return LayoutSpec(
       columns = obj.numberOrSignal("columns", "$path.columns"),
       rowPadding = rowPadding,
       columnPadding = columnPadding,
+      alignRow = layoutAlign(align, "row"),
+      alignColumn = layoutAlign(align, "column"),
+      bounds = obj.fields["bounds"]?.takeIf { it is VegaValue.Str }?.asString()?.lowercase(),
     )
   }
+
+  /**
+   * `labelFlush` as the distance it really is: `true` is one pixel, a number is itself.
+   *
+   * Upstream's own test is `flush === 0 || !!flush`, so **zero counts** and `false` does not — a
+   * zero threshold still flushes a label that lands exactly on the range's end, where `false`
+   * flushes nothing.
+   */
+  private fun flushThreshold(value: VegaValue?): Double? =
+    when (value) {
+      null -> null
+      is VegaValue.Bool -> if (value.value) 1.0 else null
+      is VegaValue.Num -> value.value.takeIf { it.isFinite() }
+      else -> null
+    }
+
+  /** One direction of `layout.align`, which is either a bare name or a `{row, column}` object. */
+  private fun layoutAlign(value: VegaValue?, direction: String): String? =
+    when (value) {
+      null -> null
+      is VegaValue.Obj -> value.fields[direction]?.asString()
+      else -> value.asString()
+    }
 
   /** Reports the parts of a group's scope that the runtime cannot build. */
   private fun reportUnsupportedGroupScope(obj: VegaValue.Obj, path: String) {

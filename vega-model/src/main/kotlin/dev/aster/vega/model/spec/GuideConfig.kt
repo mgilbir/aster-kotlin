@@ -31,8 +31,12 @@ public class GuideConfig(private val blocks: Map<String, VegaValue.Obj>) {
   /** The named `config` block, or an empty one. */
   public fun block(name: String): VegaValue.Obj = blocks[name] ?: EMPTY
 
-  private fun style(name: String): VegaValue.Obj =
-    (blocks["style"]?.fields?.get(name) as? VegaValue.Obj) ?: EMPTY
+  private fun style(name: String): VegaValue.Obj {
+    val declared = (blocks["style"]?.fields?.get(name) as? VegaValue.Obj)?.fields.orEmpty()
+    val builtIn = BUILT_IN_STYLES[name]?.fields.orEmpty()
+    if (builtIn.isEmpty()) return VegaValue.Obj(declared)
+    return VegaValue.Obj(LinkedHashMap(builtIn).apply { putAll(declared) })
+  }
 
   /**
    * The defaults behind one axis, weakest first.
@@ -94,6 +98,51 @@ public class GuideConfig(private val blocks: Map<String, VegaValue.Obj>) {
     public val Empty: GuideConfig = GuideConfig(emptyMap())
 
     private val EMPTY = VegaValue.Obj(emptyMap())
+
+    /**
+     * Upstream's own `config.style` blocks, which a specification can override but rarely defines.
+     *
+     * They are not decoration. `cell` is what makes a `style: "cell"` group *painted* — a
+     * transparent fill and a light grey outline — and a group that paints nothing is not a mark at
+     * all, so a chart laid out from styled cells came out two marks short of upstream's. `point`,
+     * `circle` and `square` are the Vega-Lite symbol styles, and they carry a **size of 30** where
+     * a bare symbol's is 100.
+     *
+     * `guide-label`, `guide-title`, `group-title` and `group-subtitle` live here too, but this
+     * engine already carries their values as its own axis, legend and title defaults, so restating
+     * them here would be two sources for one number.
+     */
+    private val BUILT_IN_STYLES: Map<String, VegaValue.Obj> =
+      mapOf(
+        "point" to
+          VegaValue.Obj(
+            linkedMapOf(
+              "size" to VegaValue.Num(30.0),
+              "strokeWidth" to VegaValue.Num(2.0),
+              "shape" to VegaValue.Str("circle"),
+            )
+          ),
+        "circle" to
+          VegaValue.Obj(
+            linkedMapOf("size" to VegaValue.Num(30.0), "strokeWidth" to VegaValue.Num(2.0))
+          ),
+        "square" to
+          VegaValue.Obj(
+            linkedMapOf(
+              "size" to VegaValue.Num(30.0),
+              "strokeWidth" to VegaValue.Num(2.0),
+              "shape" to VegaValue.Str("square"),
+            )
+          ),
+        "cell" to
+          VegaValue.Obj(
+            linkedMapOf(
+              "fill" to VegaValue.Str("transparent"),
+              "stroke" to VegaValue.Str("#ddd"),
+            )
+          ),
+        "view" to VegaValue.Obj(linkedMapOf("fill" to VegaValue.Str("transparent"))),
+      )
 
     /** `fill` becomes `{prefix}Color`; everything else takes the prefix and keeps its own name. */
     private fun prefixed(style: VegaValue.Obj, prefix: String): Map<String, VegaValue> {

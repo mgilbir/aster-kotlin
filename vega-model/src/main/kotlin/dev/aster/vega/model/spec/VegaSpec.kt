@@ -681,6 +681,32 @@ public data class AxisSpec(
    */
   val tickExtra: Boolean = false,
   /**
+   * `gridScale` — a second scale whose **range** the gridlines span, instead of the plotting area.
+   *
+   * How a chart draws a grid across a cell that is not the size of its own plot: the gridline runs
+   * the length of the *other* axis's scale rather than the group's `width` or `height`. Upstream
+   * spans `range(gridScale)[0]` to `range(gridScale)[1]`, which is why the two ends come out in the
+   * other scale's own order and not always low-to-high.
+   */
+  val gridScale: String? = null,
+  /**
+   * `labelFlush` — how close to an end of the scale's range a label has to be to be pushed inwards.
+   *
+   * A threshold in pixels, and `true` means one. A label within it of the range's start is aligned
+   * to its *left* rather than centred, and one within it of the end to its right, so the first and
+   * last labels sit inside the plot instead of hanging off the corners. Null is upstream's "off",
+   * and **zero is not**: a zero threshold still flushes a label that lands exactly on an end.
+   */
+  val labelFlush: Double? = null,
+  /**
+   * `minExtent`/`maxExtent` — how deep the axis is allowed to be, whatever its contents measure.
+   *
+   * Upstream clamps its measured depth into this range with defaults of 0 and 200, so a chart with
+   * one very long label does not lose half its plot to the axis.
+   */
+  val minExtent: NumberValue? = null,
+  val maxExtent: NumberValue? = null,
+  /**
    * The `encode` blocks as written, per part, for the channels that are not another spelling of a
    * property.
    *
@@ -1116,6 +1142,24 @@ public data class LayoutSpec(
   val columns: NumberValue? = null,
   val rowPadding: NumberValue? = null,
   val columnPadding: NumberValue? = null,
+  /**
+   * `align` — how the cells line up, per axis, as `"each"`, `"all"` or `"none"`.
+   *
+   * `each` is the default and the only one whose name describes what it does to a reader: every
+   * column gets the same lead-in, so the columns line up with each other. `all` makes every column
+   * the width of the widest cell anywhere. `none` lets each cell keep its own overhang, so nothing
+   * lines up and no space is wasted — which is what a pair of square plots side by side wants.
+   */
+  val alignColumn: String? = null,
+  val alignRow: String? = null,
+  /**
+   * `bounds` — which box the grid measures a cell by: `"full"` or `"flush"`.
+   *
+   * `full` is the cell's own bounds, so an axis label hanging off to its left is made room for.
+   * `flush` is its *declared* extent, so it is not, and the cells sit at exactly their own size
+   * with the overhang allowed to collide. A chart with an axis on every cell reads better flush.
+   */
+  val bounds: String? = null,
 )
 
 /**

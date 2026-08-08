@@ -21,7 +21,7 @@ end to end — expressions, signals, 33 of upstream's 40 data transforms, every 
 and an event handler that recompiles the chart — and are verified against upstream Vega by
 differential tests.
 
-One hundred and one differential fixtures pass, all matching upstream exactly on every mark and scale output:
+One hundred and three differential fixtures pass, all matching upstream exactly on every mark and scale output:
 
 | Fixture | Marks | Covers |
 | --- | --- | --- |
@@ -126,6 +126,8 @@ One hundred and one differential fixtures pass, all matching upstream exactly on
 | `clock` | 93 | Vega's world clock, on a stopped clock: `now()` pinned to the same instant on both sides |
 | `watch` | 92 | The same face drawn from arcs, and the second example built on `now()` |
 | `error-bars` | 61 | Vega's error bars: `ci0`/`ci1` by bootstrap, and a band axis whose ticks sit on the band edges with one more pegged to the leading one |
+| `hypothetical-outcome-plots` | 60 | Twelve bars whose heights are twelve draws from the chart's stream, in the order upstream draws them |
+| `pi-monte-carlo` | 2148 | Vega's Monte Carlo estimate of pi: two styled cells laid out `align: none` and `bounds: flush`, a grid driven by a second scale, flushed end labels, and 2,000 seeded points |
 
 The gate is wired into `./scripts/oracle.sh`, so every further scale, mark and transform is built
 against a harness that can say we are wrong — which golden tests cannot.
@@ -522,7 +524,7 @@ each example a deadline.
 
 ## Known failing fixtures
 
-None. One hundred and one fixtures exist and all of them pass — and that sentence became worth
+None. One hundred and three fixtures exist and all of them pass — and that sentence became worth
 something only once the gate could no longer skip itself, below.
 
 **The gate could report success without running.** `FixtureDifferentialTest` reads the fixtures and
@@ -840,6 +842,38 @@ With that, `histogram-null-values` passes, and it took four separate pieces to g
 dependency order, `bin` publishing its settings, `autosize: fit`, and this. Each of them turned up a
 defect in code that was already passing.
 
+## Six gaps behind one chart
+
+`pi-monte-carlo` looked like a layout problem — two `group/scope` marks short — and was six
+independent gaps, each of which had been quietly reported for a long time.
+
+- **`hypot`** was missing from the expression functions. It is variadic, not the two-argument
+  function its name suggests, and with no arguments it is zero.
+- **Upstream's own `config.style` blocks were missing.** `cell` is `{fill: 'transparent', stroke:
+  '#ddd'}`, and it is what makes a `style: "cell"` group *painted* — a group that paints nothing is
+  not a mark at all, which is exactly why the chart came out two marks short. `point`, `circle` and
+  `square` came with it, and they carry a **size of 30** where a bare symbol's is 100.
+- **`layout.align` and `layout.bounds`.** `align: "none"` lets each cell keep its own overhang
+  instead of pooling the widest per column, and `bounds: "flush"` measures a cell by its *declared*
+  extent rather than by how far its contents reach. `GridLayout.place` is now a port of upstream's
+  `gridLayout` rather than an implementation of the one alignment that had been needed, because the
+  three differ only in how the per-cell lead-in is pooled and that is easy to get subtly wrong.
+- **`gridScale`.** A gridline spans a *second* scale's range instead of the plotting area, and it
+  takes the two ends in **that scale's own order** — so a descending range gives a gridline whose
+  start is the far end, which the plain form never does. Ours ran the other way.
+- **`labelFlush`.** A label within the threshold of an end of the range is aligned to that end
+  rather than centred, so the first and last sit inside the plot. `true` means one pixel, and
+  **zero is not off**: upstream's test is `flush === 0 || !!flush`.
+- **`{"field": {"group": "width"}}` was reading the `width` *signal*.** Upstream compiles it to
+  `item.mark.group.width` — the size the enclosing group item was encoded with. The two agree at the
+  top level, which is why reading the signal survived so long, and they do not inside a cell that
+  declares a width of its own: a rule meant to span the cell spanned the chart instead.
+
+And one forced default: the arc encoder fell back to the built-in blue when `style` gave it no
+fill, which defeated the pairing rule sitting right above it — a mark that encodes *either* paint
+channel gets neither default. Vega's Monte Carlo quadrant is a bare outline, and it was coming out
+as a filled quarter-disc.
+
 ## A label that is nowhere, three times over
 
 `error-bars` sets `config.axisBand: {bandPosition: 1, tickExtra: true, tickOffset: 0}`, and getting
@@ -900,11 +934,15 @@ charts that were "impossible to verify" now have references that hold to the las
 Six of the eight examples in this category need more than the clock and the generator, and scouting
 them said what:
 
-- **`hypothetical-outcome-plots`** — the right *number* of marks, wrong values. The draw order
-  differs from upstream's, which is the interesting failure: it means the generator agrees and the
-  dataflow does not ask for its numbers in the same sequence.
+- **`hypothetical-outcome-plots`** — done. Not a draw-*order* problem at all: `DataResolver` built a
+  scope per row without passing the chart's stream, so each row got a fresh generator and every one
+  of the twelve bars was the *same* first draw. The tell was in the numbers — twelve identical
+  values where upstream had twelve different ones — and it says something worth keeping: a shared
+  stream has to be threaded through every scope, and the place it will be forgotten is the one that
+  builds a scope per datum.
 - **`error-bars`** — done, and a fixture. See "A label that is nowhere, three times over" below.
-- **`pi-monte-carlo`** — two `group/scope` marks short, so a layout gap rather than a random one.
+- **`pi-monte-carlo`** — done, and it was six unrelated gaps rather than one. See "Six gaps behind
+  one chart" below.
 - **`bar-line-toggle`** — 155 marks against upstream's 100: a signal-driven toggle, which needs the
   `on` handler machinery rather than anything stochastic.
 - **`serpentine-timeline`** — scale ranges reversed and a different width; a layout problem.
