@@ -14,7 +14,10 @@
 import { canonicalNumber, DEFAULT_PRECISION } from './canonical.js';
 import {
   curveBasis,
+  curveBasisClosed,
   curveCardinal,
+  curveCardinalClosed,
+  curveLinearClosed,
   curveMonotoneX,
   curveMonotoneY,
   curveNatural,
@@ -23,6 +26,7 @@ import {
   curveStepBefore,
   line,
 } from 'd3-shape';
+import { sceneVisit } from 'vega-scenegraph';
 
 /** Channels compared per mark type. Anything not listed here is ignored on both sides. */
 const GEOMETRY_CHANNELS = {
@@ -113,7 +117,12 @@ function walkMarktype(marktype, dx, dy, out, precision) {
       if (item.fill || item.stroke) {
         out.push(record('group', marktype.role, item, ox - (item.x || 0), oy - (item.y || 0), precision));
       }
-      for (const child of item.items || []) walkMarktype(child, ox, oy, out, precision);
+      // Paint order, not declaration order: a mark's `zindex` decides which of two overlapping
+      // marks is on top, and this list is compared positionally, so emitting it any other way would
+      // let a chart whose grid lines paint over its data match a reference where they do not.
+      // `sceneVisit` is Vega's own traversal rather than a reimplementation of its rule, which is
+      // less obvious than it looks — a negative `zindex` raises a mark rather than sinking it.
+      sceneVisit(item, child => walkMarktype(child, ox, oy, out, precision));
     } else {
       out.push(record(type, marktype.role, item, dx, dy, precision));
     }
@@ -133,6 +142,9 @@ const CURVES = {
   'basis': curveBasis,
   'cardinal': curveCardinal,
   'natural': curveNatural,
+  'linear-closed': curveLinearClosed,
+  'basis-closed': curveBasisClosed,
+  'cardinal-closed': curveCardinalClosed,
 };
 
 /** The return leg of an area steps the opposite way round; every other curve is symmetric. */
@@ -156,8 +168,9 @@ function curveFor(interpolate, orient) {
  * comparison's tolerance.
  */
 function expandCurve(points, curve) {
-  if (!curve) return points;
+  if (!curve) return {points, closed: false};
   const collected = [];
+  let closed = false;
   const context = {
     moveTo: (x, y) => collected.push([x, y]),
     lineTo: (x, y) => collected.push([x, y]),
@@ -165,10 +178,15 @@ function expandCurve(points, curve) {
     // different shapes, and comparing anchors alone would not see it.
     bezierCurveTo: (x1, y1, x2, y2, x, y) =>
       collected.push([x1, y1], [x2, y2], [x, y]),
-    closePath: () => {},
+    // Whether the outline joins back onto itself, which no point list can express. `linear-closed`
+    // emits exactly the same points as `linear` and draws a polygon rather than a polyline, so
+    // without this the comparison cannot tell the two apart. Read from d3 rather than inferred from
+    // the method's name: the closed *splines* wrap their control window instead of emitting a `Z`,
+    // and only d3 knows which does which.
+    closePath: () => { closed = true; },
   };
   line().curve(curve).x(p => p[0]).y(p => p[1]).context(context)(points);
-  return collected.length ? collected : points;
+  return {points: collected.length ? collected : points, closed};
 }
 
 /**
@@ -221,15 +239,21 @@ function seriesRecord(type, marktype, dx, dy, precision) {
   const curve = curveFor(first.interpolate, first.orient);
 
   const primary = items.map(i => [i.x || 0, i.y || 0]);
-  for (const [x, y] of curve ? expandCurve(primary, curve) : primary) push(x, y);
+  const drawn = expandCurve(primary, curve);
+  for (const [x, y] of drawn.points) push(x, y);
   if (type === 'area') {
     const secondary = [...items]
       .reverse()
       .map(i => [i.x2 !== undefined ? i.x2 : i.x || 0, i.y2 !== undefined ? i.y2 : i.y || 0]);
-    const back = curve
-      ? expandCurve(secondary, curveFor(MIRRORED[first.interpolate] || first.interpolate, first.orient))
-      : secondary;
-    for (const [x, y] of back) push(x, y);
+    const back = expandCurve(
+      secondary,
+      curveFor(MIRRORED[first.interpolate] || first.interpolate, first.orient)
+    );
+    for (const [x, y] of back.points) push(x, y);
+  } else {
+    // An area's outline is closed on both sides by construction, so the flag would say nothing
+    // there; on a line it is the whole difference between a polyline and a polygon.
+    entry.closed = drawn.closed ? 1 : 0;
   }
   entry.points = points.join(' ');
   if (first.interpolate) entry.interpolate = first.interpolate;

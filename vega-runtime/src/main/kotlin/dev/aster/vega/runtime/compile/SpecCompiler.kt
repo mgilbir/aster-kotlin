@@ -1,12 +1,17 @@
 package dev.aster.vega.runtime.compile
 
 import dev.aster.vega.expression.CachingExpressionCompiler
+import dev.aster.vega.expression.ExpressionCompiler
 import dev.aster.vega.expression.VegaExpressionCompiler
 import dev.aster.vega.model.DiagnosticCodes
 import dev.aster.vega.model.DiagnosticCollector
 import dev.aster.vega.model.VegaDiagnostic
 import dev.aster.vega.model.VegaValue
 import dev.aster.vega.model.spec.AutosizeType
+import dev.aster.vega.model.spec.ChannelValue
+import dev.aster.vega.model.spec.EncodeSpec
+import dev.aster.vega.model.spec.MarkSpec
+import dev.aster.vega.model.spec.MarkType
 import dev.aster.vega.model.spec.SpecParser
 import dev.aster.vega.model.spec.VegaSpec
 import dev.aster.vega.runtime.load.DataLoader
@@ -18,6 +23,7 @@ import dev.aster.vega.scene.NodeMetadata
 import dev.aster.vega.scene.RectD
 import dev.aster.vega.scene.Scene
 import dev.aster.vega.scene.SceneColor
+import dev.aster.vega.scene.SceneNode
 import dev.aster.vega.scene.SceneNodeIdAllocator
 import dev.aster.vega.scene.TextEngine
 import dev.aster.vega.scene.Transform2D
@@ -97,14 +103,27 @@ public class SpecCompiler(
     val diagnostics = DiagnosticCollector()
     val ids = SceneNodeIdAllocator()
 
-    val width = spec.width ?: DEFAULT_WIDTH
-    val height = spec.height ?: DEFAULT_HEIGHT
+    val declaredWidth = spec.width ?: DEFAULT_WIDTH
+    val declaredHeight = spec.height ?: DEFAULT_HEIGHT
     if (spec.width == null || spec.height == null) {
       diagnostics.warn(
         DiagnosticCodes.PARSE_MISSING_PROPERTY,
         "Specification has no width or height; using ${DEFAULT_WIDTH}x$DEFAULT_HEIGHT",
       )
     }
+    // `autosize: {"contains": "padding"}` measures the declared size to the *outside* of the
+    // padding, so the plotting area is what is left after it — and the `width` signal shrinks with
+    // it, which is how a 400-wide radar chart with 40 padding ends up with a radius of 160 rather
+    // than 200. Upstream subtracts it in `viewSizeLayout` and then overwrites the result for `pad`,
+    // where the surface grows to fit anyway, so the setting only bites on the other types.
+    val containsPadding =
+      spec.autosize.contains.equals("padding", ignoreCase = true) &&
+        spec.autosize.type != AutosizeType.PAD
+    val width =
+      if (containsPadding) declaredWidth - spec.padding.left - spec.padding.right else declaredWidth
+    val height =
+      if (containsPadding) declaredHeight - spec.padding.top - spec.padding.bottom
+      else declaredHeight
     val plot = PlotSize(width, height)
 
     // Vega exposes width, height and padding as implicit signals, so expressions can size things
@@ -172,16 +191,74 @@ public class SpecCompiler(
       ScopeCompiler(ids, textEngine, diagnostics, expressions, data)
         .compile(spec.marks, spec.axes, spec.legends, spec.title, spec.layout, root, plot)
 
-    val content =
-      GroupNode(
-        id = ids.allocate(),
-        children = scope.nodes,
-        metadata = NodeMetadata(role = "frame", markName = "root"),
-      )
+    val content = frame(spec, scope.nodes, plot, root, ids, diagnostics, expressions)
 
     val scene = layout(spec, scope.bounds, content, plot, ids, diagnostics)
     return CompiledSpec(scene, scales, signals, diagnostics.diagnostics, spec)
   }
+
+  /**
+   * The chart's own group item: the frame every mark hangs inside.
+   *
+   * Upstream wraps a specification in a root group and encodes it like any other group mark, from
+   * the top-level `encode` block over two defaults of its own — an origin at (0,0) and an extent of
+   * the plotting area. A specification that overrides the origin moves every coordinate in the
+   * chart with it, which is how a polar plot puts its centre in the middle of the surface instead
+   * of in the top-left corner.
+   */
+  private fun frame(
+    spec: VegaSpec,
+    children: List<SceneNode>,
+    plot: PlotSize,
+    scope: CompileScope,
+    ids: SceneNodeIdAllocator,
+    diagnostics: DiagnosticCollector,
+    expressions: ExpressionCompiler,
+  ): GroupNode {
+    val encoder =
+      MarkEncoder(
+        scope.scales,
+        ids,
+        diagnostics,
+        scope.signals.withScales(scope.scales, diagnostics),
+        expressions,
+        textEngine,
+      )
+    val encoded =
+      encoder.encodeGroup(
+        MarkSpec(type = MarkType.GROUP, name = "root", encode = rootEncode(spec, plot)),
+        listOf(VegaValue.EmptyObject),
+      ) { _, _, _ ->
+        children
+      }
+    val node = encoded.single() as GroupNode
+    // `encodeGroup` labels every group "scope", which is what upstream calls a group *mark*. The
+    // chart's own group is a frame, and the differential harness finds it by that name.
+    return node.copy(metadata = node.metadata.copy(role = "frame", markName = "root"))
+  }
+
+  /**
+   * The specification's `encode` over the two channels upstream always supplies.
+   *
+   * `enter` is defaulted rather than forced, so a specification's own `x` wins; `width` and
+   * `height` come from `update`, which is where upstream puts them, and are the plotting area
+   * rather than the declared size — the two differ under `autosize.contains: "padding"`.
+   */
+  private fun rootEncode(spec: VegaSpec, plot: PlotSize): EncodeSpec =
+    EncodeSpec(
+      enter =
+        mapOf(
+          "x" to ChannelValue.Constant(VegaValue.Num(0.0)),
+          "y" to ChannelValue.Constant(VegaValue.Num(0.0)),
+        ) + spec.encode.enter,
+      update =
+        mapOf(
+          "width" to ChannelValue.Constant(VegaValue.Num(plot.width)),
+          "height" to ChannelValue.Constant(VegaValue.Num(plot.height)),
+        ) + spec.encode.update,
+      exit = spec.encode.exit,
+      hover = spec.encode.hover,
+    )
 
   /**
    * Places the content group and sizes the scene, implementing `autosize`.
@@ -236,15 +313,20 @@ public class SpecCompiler(
           revision = 1L,
         )
       }
+      // `none` takes the plotting area as given and lets anything outside it overflow. The padding
+      // is still there: upstream sizes the surface as the view plus its padding and translates the
+      // content into it, so a `none` chart with padding is inset exactly like a `pad` one — it
+      // simply never grows to make room for what hangs out.
       AutosizeType.NONE ->
         Scene(
-          width = plot.width,
-          height = plot.height,
+          width = padding.left + plot.width + padding.right,
+          height = padding.top + plot.height + padding.bottom,
           background = background,
           root =
             GroupNode(
               id = ids.allocate(),
               children = listOf(content),
+              transform = Transform2D.translate(padding.left, padding.top),
               metadata = NodeMetadata(role = "root"),
             ),
           revision = 1L,

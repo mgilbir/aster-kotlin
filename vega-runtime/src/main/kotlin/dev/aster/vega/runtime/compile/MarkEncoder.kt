@@ -113,6 +113,84 @@ public class MarkEncoder(
     }
 
   /**
+   * A mark's scene items, as data another mark can be drawn from.
+   *
+   * Vega marks share a namespace with datasets, so `"from": {"data": "category-line"}` names the
+   * *items the line mark produced* rather than anything in the specification's `data`. Each item is
+   * the mark's resolved channels plus `datum`, the row it came from — which is why a label reading
+   * back a line says `datum.x` for the vertex and `datum.datum.value` for the number behind it.
+   * Verified against upstream, whose items carry exactly the encoded channels and nothing else.
+   *
+   * This is a second pass over the same channels rather than a by-product of [encode], because a
+   * line collapses its whole series into one node here and there would be no per-item anything left
+   * to read. Diagnostics are not repeated: [encode] has already run over these channels, and a
+   * channel that could not resolve is left off the item the same way upstream leaves it undefined.
+   */
+  public fun items(spec: MarkSpec, data: List<VegaValue>): List<VegaValue> {
+    val channels = spec.encode.effective
+    return data.map { datum ->
+      val fields = LinkedHashMap<String, VegaValue>(channels.size + 1)
+      for ((name, channel) in channels) {
+        val value = channelValue(channel, datum)
+        if (value != null && value !is VegaValue.Null) fields[name] = value
+      }
+      adjustSpatial(fields, channels, spec.type)
+      fields["datum"] = datum
+      VegaValue.Obj(fields)
+    }
+  }
+
+  /**
+   * Upstream's `adjustSpatial`, which is what puts an `x` on an item encoded only with `xc` or
+   * `x2`.
+   *
+   * A `rule` is exempt — it keeps its `x2` as an endpoint and never gains a width — and the three
+   * mark types with a box swap a start written past its end rather than carrying a negative extent.
+   */
+  private fun adjustSpatial(
+    fields: LinkedHashMap<String, VegaValue>,
+    channels: EncodeEntry,
+    type: MarkType,
+  ) {
+    if (type == MarkType.RULE) return
+    val swap = type == MarkType.GROUP || type == MarkType.IMAGE || type == MarkType.RECT
+    fun read(name: String): Double? = fields[name]?.asDouble()?.takeIf { !it.isNaN() }
+    fun put(name: String, value: Double) {
+      fields[name] = VegaValue.Num(value)
+    }
+
+    for ((start, end, centre, extent) in SPATIAL_AXES) {
+      if (channels.containsKey(end)) {
+        if (channels.containsKey(start)) {
+          var near = read(start)
+          var far = read(end)
+          if (swap && near != null && far != null && near > far) {
+            val held = near
+            near = far
+            far = held
+            put(start, near)
+            put(end, far)
+          }
+          if (near != null && far != null) put(extent, far - near)
+        } else {
+          read(end)?.let { put(start, it - (read(extent) ?: 0.0)) }
+        }
+      }
+      if (channels.containsKey(centre)) {
+        read(centre)?.let { put(start, it - (read(extent) ?: 0.0) / 2) }
+      }
+    }
+  }
+
+  /** One axis of the spatial adjustment: its start, end, centre and extent channel names. */
+  private data class SpatialAxis(
+    val start: String,
+    val end: String,
+    val centre: String,
+    val extent: String,
+  )
+
+  /**
    * Encodes a group mark: one translated container per datum, holding whatever [contents] builds.
    *
    * The nested scene is a callback rather than a parameter because building it needs the group's
@@ -493,7 +571,11 @@ public class MarkEncoder(
       stroke =
         style.stroke
           ?: Stroke(ScenePaint.Solid(MarkDefaults.DEFAULT_FILL), MarkDefaults.LINE_STROKE_WIDTH),
-      fill = null,
+      // A line is stroked by default but is not *only* strokeable: upstream fills the path whenever
+      // the mark encodes a fill, which is what shades the inside of a closed radar polygon. There
+      // is
+      // no default fill for a line, so an ordinary series is unaffected.
+      fill = style.fill,
       opacity = style.opacity,
       metadata = metadata(spec, data.first(), 0, channels).copy(interpolate = interpolate),
     )
@@ -1135,6 +1217,35 @@ public class MarkEncoder(
     return base + bandOffset + (channel.offset ?: 0.0)
   }
 
+  /**
+   * A channel resolved to whatever type it happens to be, for [items].
+   *
+   * The typed resolvers above each know what they want; this one does not, because a scene item
+   * carries a number where the mark asked for a number and a colour where it asked for a colour. A
+   * scale that was never built returns nothing rather than reporting: [encode] has already run over
+   * the same channels and said so once.
+   */
+  private fun channelValue(channel: ChannelValue?, datum: VegaValue): VegaValue? =
+    when (channel) {
+      null -> null
+      is ChannelValue.Constant -> channel.value
+      is ChannelValue.Field -> datum.fieldOf(channel.ref)
+      is ChannelValue.Signal -> evaluateExpression(channel.expression, datum)
+      is ChannelValue.Conditional -> channelValue(selectRule(channel, datum), datum)
+      is ChannelValue.Scaled -> {
+        when (val scale = scales[scaleNameOf(channel, datum)]) {
+          null -> null
+          // A positional scale goes through the shared path, which is the one that knows about
+          // `band` and `offset`; anything else maps its input straight through.
+          is PositionScale -> scaledPosition(channel, datum)?.let { VegaValue.Num(it) }
+          else -> {
+            val input = channel.field?.let { datum.fieldOf(it) } ?: channel.value
+            input?.let { scale.scale(it) }
+          }
+        }
+      }
+    }
+
   private fun number(channel: ChannelValue?, datum: VegaValue): Double? =
     when (channel) {
       null -> null
@@ -1242,5 +1353,11 @@ public class MarkEncoder(
       role = role,
       focusable = true,
     )
+  }
+
+  private companion object {
+    /** The two axes the spatial adjustment runs over, in upstream's order. */
+    private val SPATIAL_AXES =
+      listOf(SpatialAxis("x", "x2", "xc", "width"), SpatialAxis("y", "y2", "yc", "height"))
   }
 }

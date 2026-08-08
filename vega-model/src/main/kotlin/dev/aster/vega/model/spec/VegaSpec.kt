@@ -29,6 +29,15 @@ public data class VegaSpec(
   val layout: LayoutSpec?,
   val marks: List<MarkSpec>,
   /**
+   * The chart's own group item: the frame every mark is drawn inside.
+   *
+   * Upstream wraps a specification's marks in a root group and encodes it from this block, which is
+   * how a polar chart moves the origin to the middle of the plot — `{"x": radius, "y": radius}` and
+   * every coordinate afterwards is measured from the centre. Without it a radar chart draws around
+   * (0,0) with three of its four quadrants off the surface.
+   */
+  val encode: EncodeSpec = EncodeSpec(),
+  /**
    * What the chart *is*, for a reader who cannot see it.
    *
    * Every fixture in this repository already carries one and nothing read it. A screen reader

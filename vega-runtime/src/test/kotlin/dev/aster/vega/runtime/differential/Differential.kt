@@ -336,6 +336,13 @@ public object Differential {
     strings["points"] = vertices.joinToString(" ") { "${fmt(it.x)} ${fmt(it.y)}" }
     node.metadata.interpolate?.let { strings["interpolate"] = it }
     val numbers = LinkedHashMap<String, Double>()
+    // Whether the outline joins back onto itself. Nothing else here can see it: `linear-closed`
+    // draws exactly the points `linear` does and closes the polygon, so a line left open would
+    // otherwise match its reference on every channel and render with one side missing.
+    if (kind == "line") {
+      val closed = node.path.commands.any { it is dev.aster.vega.scene.PathCommand.Close }
+      numbers["closed"] = if (closed) 1.0 else 0.0
+    }
     node.fill?.let { f ->
       solidColour(f.paint)?.let { strings["fill"] = it.toCssHex() }
       numbers["fillOpacity"] = f.opacity

@@ -28,7 +28,23 @@ public enum class CurveKind {
    * method exists to fix.
    */
   MONOTONE,
-  NATURAL;
+  NATURAL,
+
+  /**
+   * The closed variants, which join the last point back to the first.
+   *
+   * Not a decoration on the open forms. Only [LINEAR_CLOSED] is the open curve plus a `Z`; the two
+   * splines wrap their control-point window right round the series, so the segment either side of
+   * the join is computed from points at the other end of the list. Drawing the open spline and
+   * closing it would leave a visible corner exactly where the method exists to remove one.
+   */
+  LINEAR_CLOSED,
+  BASIS_CLOSED,
+  CARDINAL_CLOSED;
+
+  /** True when this curve joins its last point back to its first. */
+  public val isClosed: Boolean
+    get() = this == LINEAR_CLOSED || this == BASIS_CLOSED || this == CARDINAL_CLOSED
 
   public companion object {
     public fun fromName(name: String?): CurveKind? =
@@ -42,6 +58,9 @@ public enum class CurveKind {
         "cardinal" -> CARDINAL
         "monotone" -> MONOTONE
         "natural" -> NATURAL
+        "linear-closed" -> LINEAR_CLOSED
+        "basis-closed" -> BASIS_CLOSED
+        "cardinal-closed" -> CARDINAL_CLOSED
         else -> null
       }
   }
@@ -70,6 +89,9 @@ public fun PathBuilder.curve(
       } else {
         monotone(points, reflect = false)
       }
+    CurveKind.LINEAR_CLOSED -> polyline(points, closePath = true)
+    CurveKind.BASIS_CLOSED -> basisClosed(points)
+    CurveKind.CARDINAL_CLOSED -> cardinalClosed(points, tension)
   }
   return this
 }
@@ -106,6 +128,73 @@ private fun PathBuilder.basisSegment(p0: PointD, p1: PointD, next: PointD) {
     (p0.x + 4.0 * p1.x + next.x) / 6.0,
     (p0.y + 4.0 * p1.y + next.y) / 6.0,
   )
+}
+
+/**
+ * A cubic B-spline wrapped right round the series, so there is no first or last segment.
+ *
+ * d3 achieves that by holding the opening three points back and replaying them after the rest: the
+ * window that produces each segment therefore straddles the join, and the curve closes onto itself
+ * smoothly. Note what it does *not* do — for three points or more it never emits a `Z`, because the
+ * wrap already brings the outline back to where it started. Only the degenerate one- and two-point
+ * cases close explicitly, and those are the ones a reading of the picture would never predict.
+ */
+private fun PathBuilder.basisClosed(points: List<PointD>) {
+  var x0 = Double.NaN
+  var y0 = Double.NaN
+  var x1 = Double.NaN
+  var y1 = Double.NaN
+  var x2 = Double.NaN
+  var y2 = Double.NaN
+  var x3 = Double.NaN
+  var y3 = Double.NaN
+  var x4 = Double.NaN
+  var y4 = Double.NaN
+  var stage = 0
+
+  fun feed(x: Double, y: Double) {
+    when (stage) {
+      0 -> {
+        stage = 1
+        x2 = x
+        y2 = y
+      }
+      1 -> {
+        stage = 2
+        x3 = x
+        y3 = y
+      }
+      2 -> {
+        stage = 3
+        x4 = x
+        y4 = y
+        moveTo((x0 + 4.0 * x1 + x) / 6.0, (y0 + 4.0 * y1 + y) / 6.0)
+      }
+      else -> basisSegment(PointD(x0, y0), PointD(x1, y1), PointD(x, y))
+    }
+    x0 = x1
+    x1 = x
+    y0 = y1
+    y1 = y
+  }
+
+  for (point in points) feed(point.x, point.y)
+  when (stage) {
+    1 -> {
+      moveTo(x2, y2)
+      close()
+    }
+    2 -> {
+      moveTo((x2 + 2.0 * x3) / 3.0, (y2 + 2.0 * y3) / 3.0)
+      lineTo((x3 + 2.0 * x2) / 3.0, (y3 + 2.0 * y2) / 3.0)
+      close()
+    }
+    3 -> {
+      feed(x2, y2)
+      feed(x3, y3)
+      feed(x4, y4)
+    }
+  }
 }
 
 // ---- cardinal ---------------------------------------------------------------
@@ -166,6 +255,83 @@ private fun PathBuilder.cardinal(points: List<PointD>, tension: Double) {
   when (stage) {
     2 -> lineTo(x2, y2)
     3 -> segment(x1, y1)
+  }
+}
+
+/**
+ * The cardinal spline wrapped round the series, the same way [basisClosed] wraps the B-spline.
+ *
+ * Three points are held back and replayed at the end, so each tangent near the join is taken from
+ * neighbours on the other side of it. As with the closed B-spline, a series of three points or more
+ * emits no `Z`: the wrap lands the outline back on its own start.
+ */
+private fun PathBuilder.cardinalClosed(points: List<PointD>, tension: Double) {
+  val k = (1.0 - tension) / 6.0
+  var x0 = Double.NaN
+  var y0 = Double.NaN
+  var x1 = Double.NaN
+  var y1 = Double.NaN
+  var x2 = Double.NaN
+  var y2 = Double.NaN
+  var x3 = Double.NaN
+  var y3 = Double.NaN
+  var x4 = Double.NaN
+  var y4 = Double.NaN
+  var x5 = Double.NaN
+  var y5 = Double.NaN
+  var stage = 0
+
+  fun feed(x: Double, y: Double) {
+    when (stage) {
+      0 -> {
+        stage = 1
+        x3 = x
+        y3 = y
+      }
+      1 -> {
+        stage = 2
+        x4 = x
+        y4 = y
+        moveTo(x, y)
+      }
+      2 -> {
+        stage = 3
+        x5 = x
+        y5 = y
+      }
+      else ->
+        cubicTo(
+          x1 + k * (x2 - x0),
+          y1 + k * (y2 - y0),
+          x2 + k * (x1 - x),
+          y2 + k * (y1 - y),
+          x2,
+          y2,
+        )
+    }
+    x0 = x1
+    x1 = x2
+    x2 = x
+    y0 = y1
+    y1 = y2
+    y2 = y
+  }
+
+  for (point in points) feed(point.x, point.y)
+  when (stage) {
+    1 -> {
+      moveTo(x3, y3)
+      close()
+    }
+    2 -> {
+      lineTo(x3, y3)
+      close()
+    }
+    3 -> {
+      feed(x3, y3)
+      feed(x4, y4)
+      feed(x5, y5)
+    }
   }
 }
 

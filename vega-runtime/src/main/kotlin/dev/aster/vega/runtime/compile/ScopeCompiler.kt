@@ -51,6 +51,16 @@ internal class CompileScope(
 ) {
   val datasets: Map<String, List<VegaValue>>
     get() = data.datasets
+
+  /**
+   * The same scope with a named mark's scene items readable as a dataset.
+   *
+   * Marks and datasets share one namespace in Vega, so a mark drawn from `"category-line"` gets the
+   * items that mark produced. Adding them to the scope rather than to a side table is what lets a
+   * group's contents see a mark declared outside it, the way every other name here nests.
+   */
+  fun withMarkItems(name: String, items: List<VegaValue>): CompileScope =
+    CompileScope(data.withDataset(name, items), signals, scales, rangeSize, scaleTypes)
 }
 
 /**
@@ -94,9 +104,17 @@ internal class ScopeCompiler(
     legends: List<LegendSpec>,
     title: TitleSpec?,
     layout: LayoutSpec?,
-    scope: CompileScope,
+    enclosing: CompileScope,
     extent: PlotSize,
   ): ScopeContent {
+    // Grows as named marks are encoded: a mark drawn from another mark's output needs the items the
+    // earlier one produced, and specification order is the order they become available in.
+    var scope = enclosing
+    // Only the marks something actually reads back are turned into items. Resolving every named
+    // mark's channels a second time would be work nobody asked for, and on a chart with a
+    // ten-thousand-row scatter it would be a lot of it.
+    val readBack = sourceNames(marks)
+
     val numbers = NumberResolver(expressions, scope.signals, diagnostics)
     val axisBuilder =
       AxisBuilder(scope.scales, scope.scaleTypes, ids, textEngine, diagnostics, numbers)
@@ -140,22 +158,35 @@ internal class ScopeCompiler(
     // A `layout` cannot place anything until every group in the scope is built, because the cells
     // decide the grid and the headers are placed against it. So they are collected first.
     val trellisParts = mutableListOf<Pair<TrellisRole, ScopeContent>>()
-    for (mark in marks) {
+    // Built in specification order, painted in `zindex` order. The two are not the same and cannot
+    // be merged: a mark drawn from another mark's output has to be encoded after it whatever their
+    // z-order says, so the nodes are collected per declaration and emitted afterwards.
+    val built = arrayOfNulls<List<SceneNode>>(marks.size)
+    marks.forEachIndexed { index, mark ->
       if (mark.type == MarkType.GROUP) {
-        val built = group(mark, scope, encoder)
+        val group = group(mark, scope, encoder)
         if (layout != null) {
-          trellisParts += TrellisRole.of(mark.role) to built
+          trellisParts += TrellisRole.of(mark.role) to group
         } else {
-          children += built.nodes
-          content = content.union(built.bounds)
-          markReach = markReach.union(built.bounds)
+          built[index] = group.nodes
+          content = content.union(group.bounds)
+          markReach = markReach.union(group.bounds)
         }
       } else {
-        val nodes = encoder.encode(mark, markData(mark, scope))
-        children += nodes
+        val rows = markData(mark, scope)
+        val nodes = encoder.encode(mark, rows)
+        // After encoding, not before: the items only exist once the channels have been resolved,
+        // and a mark cannot read back its own output.
+        mark.name
+          ?.takeIf { it in readBack }
+          ?.let {
+            scope = scope.withMarkItems(it, encoder.items(mark, rows))
+          }
+        built[index] = nodes
         for (node in nodes) content = content.union(node.transformedBounds)
       }
     }
+    for (index in paintOrder(marks)) built[index]?.let { children += it }
     if (layout != null) {
       val placed =
         trellis(layout, trellisParts, NumberResolver(expressions, scope.signals, diagnostics))
@@ -394,7 +425,7 @@ internal class ScopeCompiler(
     if (rows == null) {
       diagnostics.error(
         DiagnosticCodes.PARSE_UNKNOWN_PROPERTY,
-        "Group mark refers to unknown dataset '$dataName'",
+        unknownSource(dataName, "Group mark"),
         operator = spec.name,
       )
       return emptyList()
@@ -499,11 +530,60 @@ internal class ScopeCompiler(
     if (rows == null) {
       diagnostics.error(
         DiagnosticCodes.PARSE_UNKNOWN_PROPERTY,
-        "Mark refers to unknown dataset '$dataName'",
+        unknownSource(dataName),
         operator = mark.name,
       )
       return emptyList()
     }
     return rows
   }
+
+  /**
+   * The order this scope's marks are painted in, as indices into the declaration list.
+   *
+   * Upstream's rule, and it is not the obvious one: everything with `zindex: 0` is painted first in
+   * specification order, and only then the rest, sorted by `zindex` and then by declaration. So a
+   * **negative** `zindex` does not sink a mark below its neighbours — it raises it above all of
+   * them, and among the raised ones puts it at the bottom. Read off `zorder` in
+   * `vega-scenegraph/src/util/visit.js`, which partitions on `if (item.zindex)` rather than sorting
+   * the whole list; a plain sort would agree everywhere except on that sign.
+   */
+  private fun paintOrder(marks: List<MarkSpec>): List<Int> {
+    if (marks.none { it.zindex != 0 }) return marks.indices.toList()
+    val level = marks.indices.filter { marks[it].zindex == 0 }
+    val raised =
+      marks.indices
+        .filter { marks[it].zindex != 0 }
+        .sortedWith(compareBy({ marks[it].zindex }, { it }))
+    return level + raised
+  }
+
+  /**
+   * Every name the marks in this scope draw from, however deeply nested.
+   *
+   * Nested too, because a mark inside a group may source one declared outside it — the scopes nest
+   * the same way every other name here does.
+   */
+  private fun sourceNames(marks: List<MarkSpec>): Set<String> {
+    val names = mutableSetOf<String>()
+    fun walk(list: List<MarkSpec>) {
+      for (mark in list) {
+        mark.from?.data?.let(names::add)
+        mark.from?.facet?.data?.let(names::add)
+        walk(mark.marks)
+      }
+    }
+    walk(marks)
+    return names
+  }
 }
+
+/**
+ * What to say about a name that resolves to nothing.
+ *
+ * Not "unknown dataset": marks and datasets share one namespace, so the name may have been meant as
+ * a mark's output, and sending a reader to hunt through `data` for something that was never going
+ * to be there costs more than the sentence saves.
+ */
+internal fun unknownSource(name: String, subject: String = "Mark"): String =
+  "$subject refers to '$name', which is neither a dataset nor a mark drawn before it in this scope"

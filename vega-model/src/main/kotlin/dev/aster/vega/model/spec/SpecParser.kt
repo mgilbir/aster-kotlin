@@ -440,6 +440,7 @@ public class SpecParser {
         title = root.fields["title"]?.let { parseTitle(it, "$.title") },
         layout = root.fields["layout"]?.let { parseLayout(it, "$.layout") },
         marks = parseArray(root, "marks") { value, path -> parseMark(value, path) },
+        encode = parseEncode(root.fields["encode"], "$.encode"),
         description = root.fields["description"]?.asString()?.takeIf { it.isNotBlank() },
       )
 
@@ -519,7 +520,6 @@ public class SpecParser {
     val unsupported =
       mapOf(
         "projections" to "Geographic projections are out of scope",
-        "encode" to "Top-level encode blocks are not implemented",
         "usermeta" to "usermeta is ignored",
       )
     for ((key, reason) in unsupported) {

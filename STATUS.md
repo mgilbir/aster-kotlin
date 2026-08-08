@@ -21,7 +21,7 @@ end to end — expressions, signals, 33 of upstream's 40 data transforms, every 
 and an event handler that recompiles the chart — and are verified against upstream Vega by
 differential tests.
 
-Sixty-seven differential fixtures pass, all matching upstream exactly on every mark and scale output:
+Seventy differential fixtures pass, all matching upstream exactly on every mark and scale output:
 
 | Fixture | Marks | Covers |
 | --- | --- | --- |
@@ -92,6 +92,9 @@ Sixty-seven differential fixtures pass, all matching upstream exactly on every m
 | `indata-membership` | 25 | `indata()` against a second dataset, matching a number and a boolean by string coercion, and printing the count it returns |
 | `container-size` | 2 | `containerSize()` with no container, measured and fallen back on the way a responsive specification writes it |
 | `link-paths` | 77 | one tree joined four ways: diagonal, orthogonal and curved links, and a radial fan |
+| `radar` | 31 | top-level `encode`, marks drawn from earlier marks' scene items, `linear-closed`, `autosize.contains: "padding"`, mark `zindex` |
+| `curves-closed` | 3 | the three closed curve families over one ring of points |
+| `autosize-none` | 19 | a `none` chart inset by its padding, refusing to grow for the labels hanging off it |
 
 The gate is wired into `./scripts/oracle.sh`, so every further scale, mark and transform is built
 against a harness that can say we are wrong — which golden tests cannot.
@@ -151,7 +154,7 @@ substantive compatibility items:
 | 6. View and Compose APIs | Yes |
 | 7. SVG, PNG, PDF export | Yes |
 | 8. TalkBack can describe and navigate | Partial — virtual nodes are tested by instrumentation, not with TalkBack itself |
-| 9. At least 100 compatibility fixtures pass | 67 of 100 |
+| 9. At least 100 compatibility fixtures pass | 70 of 100 |
 | 10. Core runtime has no Android dependency | Yes |
 | 11. Renders without WebView | Yes |
 | 12. Build and test loop runs from the terminal | Yes |
@@ -488,7 +491,7 @@ each example a deadline.
 
 ## Known failing fixtures
 
-None. Sixty-seven fixtures exist and all sixty-seven pass — and that sentence became worth
+None. Seventy fixtures exist and all seventy pass — and that sentence became worth
 something only once the gate could no longer skip itself, below.
 
 **The gate could report success without running.** `FixtureDifferentialTest` reads the fixtures and
@@ -537,6 +540,26 @@ styling family is implemented. Writing the fixture first showed the harness coul
 `strokeDash` was not compared at all, so a dashed gridline and a solid one were indistinguishable to
 it, the same way a symbol's outline once was. That makes four things the normalizer has had to be
 taught to see.
+
+`radar` — Vega's own radar chart, added because a user reported it rendering wrong — found four
+gaps in the engine and **two more in the harness**, which is the higher number worth noticing. The
+engine's four: the top-level `encode` block was ignored, so every polar coordinate was drawn around
+(0,0) with three quadrants off the surface; `autosize.contains: "padding"` was parsed and not
+applied, so the radius was 200 where upstream's was 160; a mark could not be drawn from another
+mark's scene items, which cost two of the five marks outright; and a `line` was never filled, so the
+polygons were outlines where upstream shades them.
+
+The harness's two are the interesting ones, because the fixture passed the moment those four were
+fixed and the chart was still visibly wrong. **Nothing compared whether a line closes.** A
+`linear-closed` line emits exactly the points a `linear` one does — the join is a `Z`, not a vertex —
+so an unclosed polygon matched its reference on every channel. And **nothing compared paint order**:
+marks were flattened in declaration order on both sides, so the grey radial grid painting *over* the
+data instead of under it was invisible to a comparison that matches marks positionally within each
+type. Mark `zindex` had been parsed and silently dropped since it was first read. Both are now
+compared, the second by walking Vega's own `sceneVisit` rather than by writing the rule out again —
+a negative `zindex` raises a mark rather than sinking it, which no second copy would have guessed.
+That makes six things the normalizer has had to be taught to see, and it keeps being the case that
+a fixture's first pass is worth less than the look at the rendered SVG that follows it.
 
 `domain-limits` found one more, in a corner nothing had reached before: a symbol sized to **zero**
 was bounded as nothing at all, where upstream bounds it as a degenerate point at its anchor. A test
