@@ -9,7 +9,7 @@ Branch `milestone-0-bootstrap`. Working tree clean, both gates green:
 - `./scripts/check.sh` — format, all tests, lint, demo APK
 - `./scripts/oracle.sh` — regenerates upstream references and runs the differential comparison
 
-**87 differential fixtures pass, all matching upstream exactly.** That is the only number here
+**88 differential fixtures pass, all matching upstream exactly.** That is the only number here
 that means what it says.
 
 ## Read this before trusting the other number
@@ -195,16 +195,37 @@ those before comparing, they paint nothing.
 its datasets are fetched into `test-fixtures/data/` and committed. Discount every loader diagnostic
 when judging how far an example is from passing.
 
-**Every official example that is not refused now passes.** The list that used to live here is empty:
-`global-development`, `quantile-quantile-plot`, `probability-density`, `histogram-null-values`,
-`interactive-legend` and `donut-chart-labelled` are all fixtures. What remains of the 93 is the
-refused set below plus the families named at the end.
+**A previous version of this file claimed every non-refused example now passed. That was wrong**, and
+it was wrong because it trusted this list instead of the corpus. Running `ExampleTriage` over all 93
+gives the real picture: **61 compile clean, 32 still report errors.** Of those 32, twenty-one are
+refused by design and eleven are not:
 
-The corpus is no longer the place to look for the next task, so the method that found all of them is
-worth restating: none of those six needed only the feature it appeared to need. Every one of them
-turned up at least one defect in code that every other fixture was happy with — an unaligned bin
-stop, a silently dropped `anchor`, a sort that sorted when asked not to, a stroke counted on an
-invisible mark. Adding a *fixture* is what found those; adding the feature would not have.
+- `calendar-view` — `timeunit` over `week` and `day`, which need week numbering, plus `timeOffset`.
+- `time-units` — `timeunit` publishing its signal (the mechanism exists; only this transform's own
+  value is missing), `day` numbering again, and `timeSequence`.
+- `crossfilter-flights` — the `crossfilter` and `resolvefilter` transforms.
+- `edge-bundling` — pre-faceted data (`facet.field`) and `treePath`.
+- `pacman` — `setdata`.
+- `platformer` — `hsl`.
+- `parallel-coordinates` — an encoding naming scale `"null"`; the scale name itself resolves to
+  nothing, so this is likely the same null-stringification that made a text mark read "null".
+- `serpentine-timeline` — `now` (refused) but also an `extent` *expression* function and a scale
+  named from a signal.
+- `overview-plus-detail`, `stock-index-chart`, `u-district-cuisine` — three different "scale was not
+  built" symptoms that are **not** one root cause; `stock-index-chart` is diagnosed below.
+
+Two defects found while diagnosing that last group, neither yet fixed:
+
+1. **A date that is not ISO 8601 does not parse.** `stock-index-chart` declares
+   `format.parse: {"date": "date"}` over a CSV whose dates read `Jan 1 2000`. Upstream uses
+   JavaScript's `new Date(string)`, which reads that; this engine's `DateValues.parse` is ISO-only,
+   so every date comes back null, the `x` scale finds no finite value in its domain, and the chart
+   loses its time axis. This is the whole of that example's failure.
+2. **A message that lies.** `numericExtent` warns "Scale 'x' has no finite numeric values in its
+   domain; using [0, 1]" and then returns null, so the scale is not built at all and only the
+   *encodings* complain. Either build it with the fallback the message promises or say it was
+   skipped — as it stands the one diagnostic naming the scale describes something that did not
+   happen.
 
 **Refused, not missing**, and now reported as such: `error-bars`, `bar-line-toggle`, `clock`,
 `hypothetical-outcome-plots` and `pi-monte-carlo` all need `random()` or `now()`. `error-bars` is the

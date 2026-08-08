@@ -21,7 +21,7 @@ end to end — expressions, signals, 33 of upstream's 40 data transforms, every 
 and an event handler that recompiles the chart — and are verified against upstream Vega by
 differential tests.
 
-Eighty-seven differential fixtures pass, all matching upstream exactly on every mark and scale output:
+Eighty-eight differential fixtures pass, all matching upstream exactly on every mark and scale output:
 
 | Fixture | Marks | Covers |
 | --- | --- | --- |
@@ -108,6 +108,7 @@ Eighty-seven differential fixtures pass, all matching upstream exactly on every 
 | `autosize-fit` | 30 | the plotting area shrunk so the drawing comes out the declared size, with angled labels and two axis titles overhanging |
 | `autosize-fit-x` | 30 | the same on the horizontal axis only, the vertical growing the way `pad` does |
 | `autosize-fit-y` | 30 | and the same the other way round |
+| `radial-tree-layout` | 552 | Vega's radial tree: every node placed by a transform reading a computed signal, which used to draw the whole diagram on the origin |
 | `donut-chart-labelled` | 108 | Vega's labelled donut: 33 label slots of which nine are filled, leader lines with no outline, and debug rectangles left invisible |
 | `multi-source-pluck` | 12 | a dataset concatenating two sources, and a signal plucking one column out of the result |
 | `interactive-legend` | 454 | a brush `rect` with no `x` until someone drags one, and a legend swatch whose opacity is a conditional rule |
@@ -171,7 +172,7 @@ substantive compatibility items:
 | 6. View and Compose APIs | Yes |
 | 7. SVG, PNG, PDF export | Yes |
 | 8. TalkBack can describe and navigate | Partial — virtual nodes are tested by instrumentation, not with TalkBack itself |
-| 9. At least 100 compatibility fixtures pass | 87 of 100 |
+| 9. At least 100 compatibility fixtures pass | 88 of 100 |
 | 10. Core runtime has no Android dependency | Yes |
 | 11. Renders without WebView | Yes |
 | 12. Build and test loop runs from the terminal | Yes |
@@ -508,7 +509,7 @@ each example a deadline.
 
 ## Known failing fixtures
 
-None. Eighty-seven fixtures exist and all eighty-seven pass — and that sentence became worth
+None. Eighty-eight fixtures exist and all eighty-eight pass — and that sentence became worth
 something only once the gate could no longer skip itself, below.
 
 **The gate could report success without running.** `FixtureDifferentialTest` reads the fixtures and
@@ -1043,23 +1044,24 @@ depends on them. Each has a test and a comment; this is the index.
    covered". That is the right sentence in the wrong place. Either the fixtures grow a second,
    reader-facing description, or the demo's bundled specifications stop being fixture files. The
    engine is not at fault; the demo reads badly and a user would notice before any of us did.
-3. **Keep growing the fixture corpus.** 58 of the brief's 100. Aiming it at *combinations* the
+3. **Keep growing the fixture corpus.** 88 of the brief's 100. Aiming it at *combinations* the
    engine has not met rather than at more variations of a single feature is what makes it find
    things: that is how `scale()` in an expression turned up missing. Untried combinations that
    remain include an axis on a discretizing scale, a group whose signals shadow the outer scope's,
    and a `timeunit` transform feeding a `time` scale across the same daylight-saving boundary the
    `local-time-dst` fixture crosses.
 
-A fourth candidate turned up while `treelinks` was being added, and is stated here rather than
-ranked because whoever re-decides the list should weigh it. **A transform cannot read a computed
-signal**, because signals resolve after the data and only the plain constants are seeded first. It
-is now reported by name, which it was not — but reporting is not resolving, and Vega's own
-`radial-tree-layout` is written on exactly that dependency: every node sits at
-`originX + radius * cos(...)` where `originX` has an `update`, so the whole diagram is drawn on the
-origin. It is the only known case of the engine producing a confidently wrong *picture* rather than
-a missing feature, and no fixture can cover it — upstream draws it correctly, so a fixture written
-around it would only record the disagreement. Resolving it needs the signal pass to run in
-dependency order across the data boundary, which is most of a real dataflow.
+~~A fourth candidate: **a transform cannot read a computed signal**.~~ **Resolved**, by the
+dependency ordering that replaced the compile phases. It was described here as needing "the signal
+pass to run in dependency order across the data boundary, which is most of a real dataflow", and
+that was the right diagnosis — `DataflowOrder` is that ordering.
+
+Two things about it are worth keeping. The chart named as the evidence, Vega's `radial-tree-layout`,
+is now a fixture and matches upstream exactly; it had been drawing its whole diagram on the origin.
+And the reasoning that no fixture could cover it — "upstream draws it correctly, so a fixture written
+around it would only record the disagreement" — was **wrong**, and expensively so. Recording the
+disagreement is precisely what a differential fixture is for: it fails, it names the gap, and it
+passes when the gap closes. Every example taken up since has followed that route.
 
 One item still needs something this environment does not have: performance on **physical hardware**
 (PROJECT_BRIEF.md 19, criterion 13). The emulator is available and useful for behaviour, but
