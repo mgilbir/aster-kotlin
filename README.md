@@ -65,6 +65,21 @@ Planned: expressions and signals, the 40 data transforms, the remaining eleven m
 and titles (Milestones 3-5), signal-driven interaction (6), richer accessibility (7), performance work
 (9).
 
+### Vega-Lite
+
+`VegaLiteInput` accepts either grammar and hands back Vega, which is what a host that shows a chart
+from text a user supplied actually needs — the user pasted a chart, not a dialect:
+
+```kotlin
+val converted = VegaLiteInput.toVega(text)   // routes on `$schema`, then on shape
+val compiled = controller.setSpec(converted.vegaJson ?: text)
+// converted.wasVegaLite says which way it went; converted.diagnostics is what the
+// Vega-Lite compiler could not honour, ahead of anything the runtime reports.
+```
+
+`VegaLiteCompiler` is the compiler itself, if a host already knows which grammar it has. The demo's
+"Paste your own" screen takes either, and its "Spec: Vega-Lite" entry is a bundled one.
+
 `SUPPORTED_FEATURES.md` has the per-feature matrix with test references and known differences.
 
 ## Installation

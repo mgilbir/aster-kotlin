@@ -46,6 +46,8 @@ dependencies {
   implementation(project(":vega-compose"))
   implementation(project(":test-fixtures"))
   implementation(project(":vega-android-canvas"))
+  // So a pasted Vega-Lite specification draws rather than being reported as unparseable Vega.
+  implementation(project(":vega-lite"))
   // The JVM loader seam, so a pasted specification's `"url": "data/..."` resolves.
   implementation(project(":vega-loader"))
   implementation(libs.androidx.core.ktx)

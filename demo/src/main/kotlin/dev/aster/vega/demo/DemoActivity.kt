@@ -45,6 +45,7 @@ import dev.aster.vega.model.DiagnosticSeverity
 import dev.aster.vega.runtime.ChartEvent
 import dev.aster.vega.runtime.VegaChartController
 import dev.aster.vega.svg.toSvg
+import dev.aster.vegalite.VegaLiteInput
 import java.io.File
 import kotlinx.coroutines.delay
 
@@ -105,7 +106,7 @@ private fun DemoScreen() {
     if (chart.isPasted) {
       if (pasted.isBlank()) {
         report = null
-        status = "Paste a Vega specification, or type one."
+        status = "Paste a Vega or Vega-Lite specification, or type one."
       } else {
         // Wait for the typing to stop before compiling.
         //
@@ -116,13 +117,18 @@ private fun DemoScreen() {
         // and an ANR.
         delay(PASTE_DEBOUNCE_MILLIS)
         status = "Compiling…"
-        val compiled = controller.setSpecAsync(pasted)
-        report = PasteReport.of(compiled)
+        // Either grammar. Someone pasting a chart has pasted a chart, not a dialect, so the
+        // decision is made here and then *said* — the report leads with which one it took the text
+        // for, because a Vega-Lite specification read as Vega would otherwise fail for a reason
+        // that reads like nonsense.
+        val converted = VegaLiteInput.toVega(pasted)
+        val compiled = controller.setSpecAsync(converted.vegaJson ?: pasted)
+        report = PasteReport.of(compiled, converted)
         status = report!!.headline
       }
     } else if (asset != null) {
       val json = context.assets.open(asset).bufferedReader().use { it.readText() }
-      val compiled = controller.setSpecAsync(json)
+      val compiled = controller.setSpecAsync(VegaLiteInput.toVega(json).vegaJson ?: json)
       val errors = compiled.diagnostics.count { it.severity >= DiagnosticSeverity.ERROR }
       status =
         if (!compiled.isUsable) "$asset did not compile; see diagnostics"

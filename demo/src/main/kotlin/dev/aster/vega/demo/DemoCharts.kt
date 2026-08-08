@@ -8,10 +8,10 @@ import dev.aster.vega.scene.TextEngine
  * The chart catalogue the demo renders.
  *
  * Two kinds of entry, deliberately side by side. The hand-authored ones build a [Scene] directly
- * and are what the renderer was developed against; the [specAsset] ones load Vega JSON from the
- * app's assets and compile it, which is what a user of this library actually does. Both go through
- * the same controller and the same surface, so switching between them shows whether the compiler
- * produces scenes the rest of the stack is happy with.
+ * and are what the renderer was developed against; the [specAsset] ones load Vega or Vega-Lite JSON
+ * from the app's assets and compile it, which is what a user of this library actually does. Both go
+ * through the same controller and the same surface, so switching between them shows whether the
+ * compiler produces scenes the rest of the stack is happy with.
  */
 public enum class DemoChart(
   public val label: String,
@@ -33,6 +33,10 @@ public enum class DemoChart(
   SPEC_TITLES("Spec: titles", "titles.vg.json"),
   SPEC_LEGENDS("Spec: legends", "legends.vg.json"),
   SPEC_FACETS("Spec: facets", "facet-trellis.vg.json"),
+  // A Vega-Lite specification, compiled to Vega before the runtime ever sees it — a layered chart,
+  // so what is on screen is something the Vega-Lite grammar states in six lines and the Vega one
+  // does not state at all.
+  SPEC_VEGA_LITE("Spec: Vega-Lite", "layered.vl.json"),
   PASTED("Paste your own", isPasted = true);
 
   /** True when this entry is compiled from a specification rather than built by hand. */
@@ -59,6 +63,7 @@ public enum class DemoChart(
       SPEC_TITLES,
       SPEC_LEGENDS,
       SPEC_FACETS,
+      SPEC_VEGA_LITE,
       PASTED -> null
     }
   }
