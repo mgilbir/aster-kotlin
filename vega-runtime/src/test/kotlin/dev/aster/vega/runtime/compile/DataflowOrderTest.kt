@@ -194,6 +194,53 @@ class DataflowOrderTest {
     assertEquals(listOf(0.0, 2.0), (compiled.scales["x"] as LinearScale).domain)
   }
 
+  /**
+   * A transform's `signal` names a signal it **writes**, so reading it waits for that dataset.
+   *
+   * Nothing declares the name, which is what made it invisible: `span` looked like a signal reading
+   * nothing and went first, against a name with no value. Upstream has no such gap —
+   * `parseTransform` does `scope.addSignal(spec.signal, scope.proxy(t))`, so the published name is
+   * an operator standing in for the transform.
+   */
+  @Test
+  fun `a signal reading a signal a transform published waits for that dataset`() {
+    val json =
+      """
+      {
+        "signals": [{"name": "span", "update": "vals[1] - vals[0]"}],
+        "data": [
+          {"name": "t", "values": [{"v": 3}, {"v": 11}],
+           "transform": [{"type": "extent", "field": "v", "signal": "vals"}]}
+        ]
+      }
+      """
+    assertEquals(listOf(Operator.Data("t"), Operator.Signal("span")), order(json))
+  }
+
+  /**
+   * And a dataset reading a signal an *earlier* dataset published waits for it too.
+   *
+   * The same edge, reached through a `{"signal": ...}` transform parameter rather than through a
+   * declared signal's expression.
+   */
+  @Test
+  fun `a dataset reading another dataset's published signal waits for it`() {
+    val json =
+      """
+      {
+        "data": [
+          {"name": "later", "values": [{"v": 1}],
+           "transform": [{"type": "filter", "expr": "true"},
+                         {"type": "formula", "as": "w", "expr": "1"},
+                         {"type": "collect", "sort": {"field": {"signal": "vals[0]"}}}]},
+          {"name": "first", "values": [{"v": 3}],
+           "transform": [{"type": "extent", "field": "v", "signal": "vals"}]}
+        ]
+      }
+      """
+    assertEquals(listOf(Operator.Data("first"), Operator.Data("later")), order(json))
+  }
+
   @Test
   fun `a range element written as a signal is an edge like any other`() {
     // `[{"signal": "barStep"}, {"signal": "width"}]` — the array is not a reference, but each of

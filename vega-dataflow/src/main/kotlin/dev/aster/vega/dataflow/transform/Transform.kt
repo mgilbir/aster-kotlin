@@ -65,6 +65,19 @@ public interface Transform {
   /** The `type` name in a specification, e.g. `"filter"`. */
   public val type: String
 
+  /**
+   * Whether this transform honours a top-level `"signal"` naming a signal it **writes**.
+   *
+   * Upstream accepts one on *every* transform — `parseTransform` does `scope.addSignal(spec.signal,
+   * scope.proxy(t))` — and what gets published is the transform operator's own value, which differs
+   * by transform: `extent` publishes `[min, max]`, `bin` publishes the bin settings it chose, most
+   * publish their tuples. There is no uniform value to hand over here, so each transform says for
+   * itself, and [TransformPipeline] reports the ones that would otherwise drop the request
+   * silently.
+   */
+  public val publishesSignal: Boolean
+    get() = false
+
   public fun apply(
     input: List<VegaValue>,
     params: VegaValue.Obj,
@@ -117,6 +130,18 @@ public class TransformPipeline(
           operator = type,
         )
         return current
+      }
+      // A top-level `"signal"` names a signal this transform is expected to *write*. Only a string
+      // counts: `{"signal": "..."}` as the sole field is a reference to read, and `resolveSignals`
+      // has already replaced it above.
+      val published = (params.fields["signal"] as? VegaValue.Str)?.value
+      if (published != null && !transform.publishesSignal) {
+        context.diagnostics.error(
+          DiagnosticCodes.TRANSFORM_NOT_IMPLEMENTED,
+          "Transform '$type' was asked to publish signal '$published', which is not implemented; " +
+            "the signal keeps whatever value it already had, and anything reading it reads that",
+          operator = type,
+        )
       }
       current = transform.apply(current, resolved, context)
     }

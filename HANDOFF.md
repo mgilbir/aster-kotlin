@@ -160,6 +160,12 @@ Worth knowing before touching it:
   cosmetic. It is what keeps a signal reading no dataset ahead of every dataset — the property the
   old seeding pass existed for — and it means every signal that has *become* resolvable resolves
   before the next dataset runs.
+- **A transform can *publish* a signal**, and reading one is an edge to the dataset that writes it.
+  `{"type": "extent", "signal": "vals"}` is the shape. This is required, not an improvement: the old
+  phases resolved every signal again after all the data, so a wrong early value was overwritten;
+  resolving each signal exactly once removes that safety net. `dot-plot-wilkinson` covered the
+  pattern only by luck (its `ddh` reaches the data through `size` and a scale), so
+  `published-signals` isolates it — it fails without the edge.
 - `dataFreeSignals` and `ScaleSpec.isSignalFree` are gone. Do not reintroduce a predicate of that
   shape; the general order subsumes both, and `isSignalFree` had a hole (it never looked inside a
   range array) that only showed up once the graph did the same job properly.
@@ -189,24 +195,30 @@ those before comparing, they paint nothing.
 its datasets are fetched into `test-fixtures/data/` and committed. Discount every loader diagnostic
 when judging how far an example is from passing.
 
-What is left, by the engine gap behind it. **Two are one gap each from passing** and were taken to
-that point before being set down — their data is already fetched and their remaining differences are
-listed here exactly:
+What is left, by the engine gap behind it. `global-development` and `quantile-quantile-plot` were on
+this list and are now passing fixtures (`global-development`, `qq-plot`); the remaining three are:
 
-- `global-development` — compiles cleanly; 12 mark differences, all in the legend. It needs two
-  legend `encode` channels: `symbols.enter.fillOpacity` (a constant, but there is no upstream
-  `symbolFillOpacity` property to fold it into, so it needs a target inventing) and
-  `labels.update.text` with `{"scale": "label", "field": "value"}` — the legend counterpart of the
-  axis-label encode that `budget-forecasts` needed, and the same shape of fix in `LegendBuilder`.
-- `quantile-quantile-plot` — compiles cleanly; the second of its two side-by-side plots is drawn at
-  x = 0 instead of x = 288. Its groups carry no `x`, so something places them: check whether the
-  top-level `layout` is doing it and what our trellis path does with a group that declares its own
-  `width` signal.
 - `donut-chart-labelled` — the `pluck` expression function, and a dataset sourcing from *several*
   named datasets at once (`"source": ["a", "b"]`), which the parser currently reads as one name.
-- `histogram-null-values` — a range written as an array whose *elements* are signals,
-  `[{"signal": "barStep + nullGap"}, {"signal": "width"}]`. The scale is not built at all, which
-  cascades into three more reports about the axes and encodings that referred to it.
+- `histogram-null-values` — **two gaps, and the range array is no longer one of them.** It was added
+  as a fixture, taken as far as the ordering work reached, and set down; the spec is in the scratchpad
+  hold directory. Its `data/movies.json` is **not** committed — at 1.4 MB it is fourteen times the
+  next largest file in `test-fixtures/data/` and the fixture that needs it is not in the tree, so
+  `./scripts/oracle.sh` fetches it when the fixture comes back. What it needs now:
+  1. **`autosize: {"type": "fit", "resize": true}`**, which is the bigger one. Upstream shrinks the
+     plotting area so the *whole surface* matches the declared size: `width` goes 400 → 340 and
+     `height` 200 → 178, which moves every scale range and every mark. `fit` currently falls back to
+     `pad` with a diagnostic and needs a second layout pass. The compiler is a pure function of the
+     spec, so running it twice — measure, adjust the `width`/`height` seeds, compile again — may be
+     most of the implementation. Probe upstream's `viewSizeLayout` before committing to that.
+  2. **`bin` publishing its `signal`.** `binCount` is `(bins.stop - bins.start) / bins.step` and
+     `bins` is written by `{"type": "bin", "signal": "bins"}`. Only `extent` publishes today; every
+     other transform now *reports* the request rather than dropping it, so the diagnostic will name
+     this. Upstream publishes the bin settings object it chose — `{start, stop, step, ...}`.
+
+  Verified upstream for when you pick it up: `maxbins` 10, `binCount` 9, `nullGap` 10, `barStep` 33,
+  `extent` `[1.4, 9.2]`, `width` 340, `height` 178, `xscale` range `[43, 340]` domain `[1, 10]`,
+  `xscale-null` range `[0, 33]` domain `[null]`, `yscale` range `[178, 0]`.
 - `interactive-legend` — a `rect` brush with no `x` at rest; upstream draws 454 marks to our 452.
 
 **Refused, not missing**, and now reported as such: `error-bars`, `bar-line-toggle`, `clock`,

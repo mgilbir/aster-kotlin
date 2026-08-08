@@ -21,7 +21,7 @@ end to end — expressions, signals, 33 of upstream's 40 data transforms, every 
 and an event handler that recompiles the chart — and are verified against upstream Vega by
 differential tests.
 
-Seventy-eight differential fixtures pass, all matching upstream exactly on every mark and scale output:
+Seventy-nine differential fixtures pass, all matching upstream exactly on every mark and scale output:
 
 | Fixture | Marks | Covers |
 | --- | --- | --- |
@@ -103,6 +103,7 @@ Seventy-eight differential fixtures pass, all matching upstream exactly on every
 | `qq-plot` | 332 | two plots gridded side by side, a url from a signal, `quantileNormal`, gridlines that undo an axis offset |
 | `budget-forecasts` | 77 | `argmin` over a filtered group, a scaled channel taking its value from a signal, `bandPosition`, a label placed by an axis `encode` block |
 | `probability-density` | 533 | a scale over a dataset and two datasets over that scale — the case no fixed order of the phases resolves; a `normal` density whose mean and stdev come from another dataset's aggregate |
+| `published-signals` | 11 | a signal reading a signal an `extent` transform *published*, sizing a scale range and a mark width |
 
 The gate is wired into `./scripts/oracle.sh`, so every further scale, mark and transform is built
 against a harness that can say we are wrong — which golden tests cannot.
@@ -162,7 +163,7 @@ substantive compatibility items:
 | 6. View and Compose APIs | Yes |
 | 7. SVG, PNG, PDF export | Yes |
 | 8. TalkBack can describe and navigate | Partial — virtual nodes are tested by instrumentation, not with TalkBack itself |
-| 9. At least 100 compatibility fixtures pass | 78 of 100 |
+| 9. At least 100 compatibility fixtures pass | 79 of 100 |
 | 10. Core runtime has no Android dependency | Yes |
 | 11. Renders without WebView | Yes |
 | 12. Build and test loop runs from the terminal | Yes |
@@ -499,7 +500,7 @@ each example a deadline.
 
 ## Known failing fixtures
 
-None. Seventy-eight fixtures exist and all seventy-eight pass — and that sentence became worth
+None. Seventy-nine fixtures exist and all seventy-nine pass — and that sentence became worth
 something only once the gate could no longer skip itself, below.
 
 **The gate could report success without running.** `FixtureDifferentialTest` reads the fixtures and
@@ -710,6 +711,21 @@ and the "a scale cannot be read while signals are resolving" diagnostic, which w
 ordering rather than anything true. A genuine cycle is still reported, now as the path that closed it
 across all three kinds, and one operator on it is placed anyway so the chart draws and says it is
 wrong rather than not drawing.
+
+One kind of edge was missing and is worth recording, because the phases had been hiding it. A
+transform may **publish** a signal: `{"type": "extent", "field": "v", "signal": "vals"}` writes `vals`,
+and `{"type": "bin", "signal": "bins"}` writes the bin settings it chose. Nothing declares those names,
+so a signal reading one looked like a signal reading nothing and was resolved first, against a name
+with no value. Upstream has no such gap — `parseTransform` does `scope.addSignal(spec.signal,
+scope.proxy(t))`, so the published name *is* an operator standing in for the transform — so reading one
+now waits for the dataset whose pipeline writes it.
+
+The old phases were insulated from this by accident: every signal was resolved again after all the
+data, so a wrong early value was overwritten. Resolving each signal exactly once at its ordered
+position removes that safety net, which is why the edge is required rather than an improvement.
+`dot-plot-wilkinson` was the only fixture covering the pattern and covered it by luck — its `ddh`
+reaches the data through a second path, via `size` and a scale — so `published-signals` isolates it:
+it fails without the edge and passes with it.
 
 What the graph still cannot see is a signal read through a transform's **expression** parameter —
 `filter`'s `expr`, `formula`'s `expr`, `cross`'s `filter`, which are the only three upstream declares

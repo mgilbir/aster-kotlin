@@ -148,6 +148,9 @@ public object IdentifierTransform : Transform {
 public object ExtentTransform : Transform {
   override val type: String = "extent"
 
+  /** `[min, max]`, which is what upstream's extent operator holds. */
+  override val publishesSignal: Boolean = true
+
   override fun apply(
     input: List<VegaValue>,
     params: VegaValue.Obj,

@@ -194,6 +194,31 @@ internal class DataflowOrder(
     private val scaleSpecs = scales.associateBy { it.name }
     private val signalSpecs = signals.associateBy { it.name }
 
+    /**
+     * Signals a transform **writes**, mapped to the dataset whose pipeline writes them.
+     *
+     * `{"type": "extent", "field": "v", "signal": "span"}` publishes `span`; `{"type": "bin",
+     * "signal": "bins"}` publishes the bin settings it chose. Upstream treats these as ordinary
+     * signals — `parseTransform` does `scope.addSignal(spec.signal, scope.proxy(t))`, so the signal
+     * is an operator standing in for the transform — which puts everything reading one behind the
+     * dataset that produces it.
+     *
+     * They are not declared anywhere, so without this a signal reading `bins` looked like a signal
+     * reading nothing and was resolved first, against a name that had no value yet. `bin`'s own
+     * `signal` is a plain string beside the other parameters, which is exactly how the transform
+     * pipeline tells a *written* signal from a `{"signal": "..."}` reference it should read.
+     */
+    private val publishers: Map<String, String> =
+      data
+        .flatMap { spec ->
+          spec.transform.mapNotNull { transform ->
+            ((transform as? VegaValue.Obj)?.fields?.get("signal") as? VegaValue.Str)?.value?.let {
+              it to spec.name
+            }
+          }
+        }
+        .toMap()
+
     fun dependencies(operator: Operator): Set<Operator> =
       when (operator) {
         is Operator.Data -> dataSpecs[operator.name]?.let(::dependenciesOf) ?: emptySet()
@@ -318,7 +343,10 @@ internal class DataflowOrder(
       val expression = compiled.expression
       val result = mutableSetOf<Operator>()
       for (name in expression.signalDependencies) {
+        // A declared signal is its own operator. One a transform publishes stands for that
+        // transform, so reading it means waiting for the dataset that runs it.
         if (name in signalSpecs) result.add(Operator.Signal(name))
+        else publishers[name]?.let { result.add(Operator.Data(it)) }
       }
       for (name in expression.dataDependencies) {
         if (name in dataSpecs) result.add(Operator.Data(name))

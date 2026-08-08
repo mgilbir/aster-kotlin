@@ -590,6 +590,11 @@
   "caption": "Symbol legend for fill color with 2 values: Normal Estimate, Kernel Density Estimate"
  },
  {
+  "fixture": "published-signals",
+  "kind": "axis",
+  "caption": "X-axis for a linear scale with values from 0 to 11"
+ },
+ {
   "fixture": "qq-plot",
   "kind": "axis",
   "caption": "Y-axis titled 'Empirical Data Quantiles' for a linear scale with values from −0.6 to 0.6"
