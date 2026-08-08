@@ -19,6 +19,50 @@ internal sealed class DataNode {
     children += child
     return child
   }
+
+  /**
+   * Hoists the parse every branch agrees on above the fork — upstream's `MergeParse` optimizer.
+   *
+   * Each view builds its own chain, so two layers over one dataset each ask for their own parse and
+   * the tree forks straight after the source. Upstream inserts a single parse below the fork and
+   * re-parents **every** branch onto it, including a branch that asked for no parse of its own:
+   * parsing a column twice is the same column, and a branch that did not ask still gets a value it
+   * can read. That last part is what places a layer's own transforms after the shared parse rather
+   * than beside it, and the dataset numbering follows from the shape.
+   *
+   * A field two branches want parsed *differently* stays where it was, in both.
+   */
+  fun mergeParse() {
+    // Bottom up, so a fork nested inside a branch is settled before the branch above it.
+    children.forEach { it.mergeParse() }
+    if (children.size <= 1) return
+    val common = LinkedHashMap<String, String>()
+    val conflicting = mutableSetOf<String>()
+    for (child in children.filterIsInstance<ParseNode>()) {
+      for ((field, type) in child.parse) {
+        val seen = common.put(field, type)
+        if (seen != null && seen != type) conflicting += field
+      }
+    }
+    conflicting.forEach { common.remove(it) }
+    if (common.isEmpty()) return
+
+    val merged = ParseNode(common)
+    val branches = children.toList()
+    children.clear()
+    children += merged
+    for (branch in branches) {
+      if (branch is ParseNode) {
+        common.keys.forEach { branch.parse.remove(it) }
+        // A parse with nothing left in it is not a step, so its own children take its place.
+        if (branch.parse.isEmpty()) {
+          merged.children += branch.children
+          continue
+        }
+      }
+      merged.children += branch
+    }
+  }
 }
 
 internal class SourceNode(val data: VegaValue, val name: String? = null) : DataNode() {
@@ -33,7 +77,7 @@ internal class SourceNode(val data: VegaValue, val name: String? = null) : DataN
  * dataset read from a URL it becomes a `format.parse` entry, and on inline values — which Vega has
  * already ingested — it becomes a `toDate` formula instead.
  */
-internal class ParseNode(val parse: Map<String, String>) : DataNode() {
+internal class ParseNode(val parse: MutableMap<String, String>) : DataNode() {
   fun formatParse(): VegaValue.Obj = obj { parse.forEach { (field, type) -> put(field, type) } }
 
   fun transforms(): List<VegaValue> = parse.map { (field, type) ->

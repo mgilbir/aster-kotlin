@@ -58,10 +58,13 @@ internal class DataPipeline(
     }
 
   /**
-   * A temporal field arrives as text and has to become a date before a time scale can read it.
+   * A field arrives as text and has to become what the encoding says it is before anything orders
+   * it.
    *
    * Upstream calls this the implicit parse, as against the `format.parse` a specification writes
-   * itself. It is implicit but not optional: without it a time axis sorts its dates as strings.
+   * itself. It is implicit but not optional, and every case here is a *comparison* that would
+   * otherwise be made between strings: a time axis sorting its dates alphabetically, a `min` over
+   * "10" and "9" answering "10", a line joining its points in the order 1, 10, 2.
    */
   private fun implicitParse(): ParseNode? {
     val parse = LinkedHashMap<String, String>()
@@ -69,9 +72,27 @@ internal class DataPipeline(
     // filter runs — so these parses belong with the encoding's, not after them.
     parse.putAll(Transforms(diagnostics).implicitParses(view.spec.transforms))
     for ((_, def) in view.spec.encoding) {
-      if (!def.isFieldDef || def.field == null) continue
+      val field = def.field
+      if (!def.isFieldDef || field == null) continue
       // A time unit buckets a *date*, so the column still has to be read as one first.
-      if (def.type == MeasureType.TEMPORAL && def.aggregate == null) parse[def.field] = "date"
+      if (def.type == MeasureType.TEMPORAL && def.aggregate == null) {
+        parse[field] = "date"
+      } else if (def.type == MeasureType.QUANTITATIVE && def.aggregate in MIN_MAX_OPS) {
+        // Upstream's own comment: "we need to parse numbers to support correct min and max". Every
+        // other aggregate arithmetic-coerces on the way; these two only compare.
+        parse[field] = "Number"
+      }
+    }
+    // A path mark joins its points in the order its rows arrive, so the dimension it runs along is
+    // sorted first — and sorting numerals held as text draws the line through them in the wrong
+    // order. Upstream skips this when an `order` channel says how to join them instead, which is
+    // how a connected scatter plot is written (`getImplicitFromEncoding`, `data/formatparse.ts`).
+    if (view.spec.mark in PATH_MARKS && view.spec.encoding["order"] == null) {
+      val def = view.spec.encoding[if (view.markDef.orient == "horizontal") "y" else "x"]
+      val field = def?.field
+      if (def != null && def.isFieldDef && field != null && def.type == MeasureType.QUANTITATIVE) {
+        parse.getOrPut(field) { "Number" }
+      }
     }
     return if (parse.isEmpty()) null else ParseNode(parse)
   }

@@ -454,7 +454,7 @@ produces a chart that is plausible and wrong.
 every fixture with upstream and checks two things:
 
 1. `VegaLiteFixtureTest` compares the Vega this compiler emits against upstream's, property by
-   property. Twenty-nine fixtures, and all of them match exactly — every transform, scale, signal,
+   property. Thirty-three fixtures, and all of them match exactly — every transform, scale, signal,
    axis, legend and mark encoding, down to the accessibility description string.
 2. `VegaLiteFixtureDifferentialTest` runs that output through this engine's own runtime and compares
    the scene against the one upstream draws. Every mark of every fixture matches, and nothing is
@@ -539,18 +539,20 @@ own) and `grouped-bar` on the step arithmetic.
 
 ### Where the compiler stands, and what it still refuses
 
-Twenty-nine fixtures, each matching upstream's compiler property for property and drawing the chart
+Thirty-three fixtures, each matching upstream's compiler property for property and drawing the chart
 upstream draws. The grammar covered: a single view or a layer of them, eleven marks including `arc`,
 the Cartesian and polar position pairs, nested offsets, fourteen of fifteen transforms, sorting,
-binning, time units, stacking, faceting by `row` and `column`, legends, axes, and a user `config`
-carried through as a theme.
+binning, time units, stacking, faceting by `row` and `column`, conditional encodings, a line or an
+area that draws its own points, legends, axes, and a user `config` carried through as a theme.
 
 What it still refuses, by name, with the reason each is refused rather than approximated:
 
 - **`hconcat` / `vconcat` / `concat`, `repeat`** and the `facet` operator with its own `spec`.
   `row` and `column` are implemented (below); these remaining forms compose several *different*
   views rather than repeating one, so each needs its own layout.
-- **`params`.** Selections and bound inputs; conditional encodings depend on them.
+- **`params`.** Selections and bound inputs. A conditional encoding whose condition is a **`test`**
+  now compiles — that is a predicate on the row and needs nothing to be selected — so only a
+  condition naming a `param` is refused, by itself, leaving the rest of the definition standing.
 - **Composite marks** (`boxplot`, `errorbar`, `errorband`), which upstream normalizes into layered
   views before compiling. The layers already work; the normalizer is what is missing.
 - **`lookup`**, whose joined dataset has to be assembled and named beside the view's own.
@@ -612,6 +614,49 @@ upside down for a row facet.
 What is left is `align` and `bounds`. This engine grids cells the way `align: "each"` does and
 Vega-Lite asks for `"all"`; the two agree whenever the cells are the same size, which they are on
 every fixture here, and both are still reported by name rather than assumed away.
+
+### Four fixtures aimed at combinations, six more silences
+
+`line-points`, `conditional-test`, `scale-overrides` and `stack-center` were written to cover
+constructs the corpus had never combined, and all four failed on arrival:
+
+- **A condition on a `test` was refused as though it needed a selection.** It does not: a `test` is
+  a predicate on the row, written in a `filter`'s own grammar, and it compiles to a Vega production
+  rule — an array of `{test, …}` entries with the unconditional one last. Both sides now go through
+  the same predicate compiler, which is what keeps `oneOf` spelled `indexof(…) !== -1` in one place
+  rather than two. A condition naming a `param` is still refused, on its own, and the rest of the
+  definition still stands.
+- **A line that draws its own points was drawn as a line with a `point: true` encode channel** —
+  a property Vega has never heard of, reported by nobody. Upstream normalizes it into a *layer*
+  before compiling, and that pass now exists (`Normalize.kt`): the base mark with the overlay
+  properties stripped, then the overlay marks over the same encoding. An area fades to 0.7 first so
+  what is drawn over it stays legible, the overlay inherits the stack offset (a `point` does not
+  stack of its own accord, and without it the points sit at the raw values rather than on the band
+  they belong to), and `x2`/`y2` are dropped because a line given a second position becomes a rule.
+- **Two layers over one dataset each parsed it separately**, so the second layer's chain hung off
+  the source rather than off the first's parse — a different dataset, differently numbered, and one
+  of them never coerced at all. Upstream's `MergeParse` optimizer hoists the parse every branch
+  agrees on above the fork and re-parents **every** branch onto it, including a branch that asked
+  for no parse; that is now `DataNode.mergeParse`.
+- **A quantitative column was never coerced to a number.** Two rules, both upstream's, both about
+  *comparison*: a `min` or `max` aggregate needs numbers or it answers with the alphabetically
+  smallest, and a path mark sorts its rows along its dimension, so a line through 1, 10, 2 is drawn
+  in that order. Neither shows on a chart whose data happens to arrive typed.
+- **A point scale was measured as if its inner padding were zero.** It is always 1 — n points have
+  n−1 steps between them — and its `padding` is the *outer* one: vega-scale builds `point()` as
+  `pointish(band().paddingInner(1))`, where `pointish` renames `padding` to `paddingOuter` and
+  deletes `paddingInner`. Wrong in *both* engines here, in the same direction and by different
+  amounts: the compiler wrote the wrong `bandspace` into the width signal and the runtime measured
+  the wrong step range, so a point chart came out a whole step too wide.
+- **A legend swatch repainted a colour it could not know.** Upstream builds the swatch from the
+  mark's *own* colour encoding and then removes what would say the wrong thing: the channel this
+  legend explains, and any colour that is a scaled field, since a swatch has no datum to scale.
+  Building it from the mark's *default* colour instead looks identical whenever the mark has no
+  colour encoding, and paints a size legend's swatches in the default blue on every chart that does.
+
+And one that is not a silence but a wrong reader: **a mark's spoken description was assembled from
+the guide titles**, so hiding an axis title with `axis: {title: null}` — a restyling — dropped the
+whole channel out of what a screen reader says. Upstream reads the *field's* own title there.
 
 ### One difference is still open
 

@@ -144,41 +144,29 @@ private class Compilation(
   // -----------------------------------------------------------------------------------------
 
   private fun views(): List<UnitView>? {
+    val normalize = Normalize(config, diagnostics)
     val layers = spec.array("layer")
     if (layers != null) {
-      return layers.mapIndexedNotNull { index, layer ->
-        val child = layer as? VegaValue.Obj ?: return@mapIndexedNotNull null
+      // Each declared layer may itself normalize into more than one — a line that draws its own
+      // points is two marks — so the list is expanded first and only then numbered. The numbering
+      // is what names `layer_0_marks`, so it has to count the views that actually exist.
+      val units = mutableListOf<Pair<VegaValue.Obj, String>>()
+      layers.forEachIndexed { index, layer ->
+        val child = layer as? VegaValue.Obj ?: return@forEachIndexed
         if (child.fields.containsKey("layer")) {
           diagnostics.error(
             VegaLiteDiagnostics.UNSUPPORTED_COMPOSITION,
             "A layer inside a layer is not implemented; flatten the layers into one list.",
             jsonPath = "$.layer[$index]",
           )
-          return@mapIndexedNotNull null
+          return@forEachIndexed
         }
-        // A layer inherits the chart's data, size, transforms and *encoding* unless it states its
-        // own. The encoding matters most: writing the shared channels once above the layers and the
-        // differences inside them is the ordinary way to author a layered chart, and a layer that
-        // did not inherit them would draw its mark with no position at all.
-        val merged = obj {
-          put("data", spec.fields["data"])
-          put("width", spec.fields["width"])
-          put("height", spec.fields["height"])
-          put("transform", spec.fields["transform"])
-          putAll(child)
-          val inherited = spec.obj("encoding")
-          if (inherited != null) {
-            // Channel by channel, so a layer overriding `y` keeps the shared `x`.
-            put(
-              "encoding",
-              obj {
-                putAll(inherited)
-                putAll(child.obj("encoding"))
-              },
-            )
-          }
-        }
-        parser.unit(merged, "$.layer[$index]")?.let { UnitView(it, config, "layer_$index") }
+        val merged = inherited(child)
+        val expanded = normalize.pathOverlay(merged) ?: listOf(merged)
+        expanded.forEach { units += it to "$.layer[$index]" }
+      }
+      return units.mapIndexedNotNull { index, (unit, path) ->
+        parser.unit(unit, path)?.let { UnitView(it, config, "layer_$index") }
       }
     }
 
@@ -194,8 +182,43 @@ private class Compilation(
       }
     }
 
+    // A single view that normalizes into several becomes a layer of them, which is exactly what
+    // upstream does: the normalizer hands its result back to the compiler as a layer spec.
+    normalize.pathOverlay(spec)?.let { expanded ->
+      return expanded.mapIndexedNotNull { index, unit ->
+        parser.unit(unit, "$")?.let { UnitView(it, config, "layer_$index") }
+      }
+    }
+
     val unit = parser.unit(spec, "$") ?: return null
     return listOf(UnitView(unit, config, ""))
+  }
+
+  /**
+   * A layer's own definition over the chart's.
+   *
+   * A layer inherits the chart's data, size, transforms and *encoding* unless it states its own.
+   * The encoding matters most: writing the shared channels once above the layers and the
+   * differences inside them is the ordinary way to author a layered chart, and a layer that did not
+   * inherit them would draw its mark with no position at all.
+   */
+  private fun inherited(child: VegaValue.Obj): VegaValue.Obj = obj {
+    put("data", spec.fields["data"])
+    put("width", spec.fields["width"])
+    put("height", spec.fields["height"])
+    put("transform", spec.fields["transform"])
+    putAll(child)
+    val shared = spec.obj("encoding")
+    if (shared != null) {
+      // Channel by channel, so a layer overriding `y` keeps the shared `x`.
+      put(
+        "encoding",
+        obj {
+          putAll(shared)
+          putAll(child.obj("encoding"))
+        },
+      )
+    }
   }
 
   /**
@@ -348,6 +371,9 @@ private class Compilation(
 
     val source = SourceNode(data)
     val outputs = views.map { view -> DataPipeline(view, diagnostics).build(source) }
+    // Every view built its own chain onto the one source, so the tree forks there; the shared parse
+    // is hoisted above the fork before the tree is named and flattened.
+    source.mergeParse()
     val datasets = DataAssembler().assemble(source)
     views.forEachIndexed { index, view ->
       view.mainData = outputs[index].main.source ?: ""

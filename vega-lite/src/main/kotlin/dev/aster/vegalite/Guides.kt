@@ -313,48 +313,46 @@ internal object Guides {
   /**
    * The symbol's own colours.
    *
-   * The channel being explained is removed — a colour legend does not repaint its own swatch — and
-   * what is left is whatever the mark would have looked like otherwise, which is how the size
-   * legend for a hollow point comes out hollow.
+   * The swatch starts as *the mark's own* colour encoding, and upstream then takes away whatever
+   * would say the wrong thing (`compile/legend/encode.ts`):
+   *
+   * - the channel this legend explains, because a colour legend does not repaint its own swatch —
+   *   which is how the size legend for a hollow point comes out hollow;
+   * - a colour that is a **scaled field**, because the swatch has no datum to scale. A stroke is
+   *   simply dropped and a fill becomes black at the mark's opacity. Building the swatch from the
+   *   mark's *default* colour instead looks identical whenever the mark has no colour encoding, and
+   *   paints a size legend's swatches in the default blue on every chart that does.
    */
   private fun symbolEncode(view: UnitView, channel: String): VegaValue.Obj? {
     val filled = view.markDef.filled
-    val markConfig = view.config.markConfig(view.spec.mark)
-    val markColor = view.markDef.raw.fields["color"] ?: markConfig.fields["color"]
-    val transparent = view.spec.mark in setOf("bar", "point", "circle", "square")
+    val colors = Marks.colorEncode(view)
 
     val fields = LinkedHashMap<String, VegaValue>()
-    if (filled) {
-      if (channel != "fill" && channel != "color") fields["fill"] = obj { put("value", markColor) }
-    } else {
-      if (transparent) fields["fill"] = obj { put("value", "transparent") }
-      if (channel != "stroke" && channel != "color") {
-        markColor?.let { fields["stroke"] = obj { put("value", it) } }
+    val fill = colors["fill"]
+    if (fill != null && !(channel == "fill" || (filled && channel == "color"))) {
+      if (scaled(fill)) {
+        fields["fill"] = obj { put("value", "black") }
+        fields["fillOpacity"] = obj { put("value", symbolOpacity(view) ?: 1.0) }
+      } else {
+        fields["fill"] = fill
       }
+    }
+    val stroke = colors["stroke"]
+    if (stroke != null && !(channel == "stroke" || (!filled && channel == "color"))) {
+      if (!scaled(stroke)) fields["stroke"] = stroke
     }
 
     if (channel != "opacity") {
-      val opacity =
-        (view.spec.encoding["opacity"]?.value as? VegaValue.Num)?.value
-          ?: view.markDef.number("opacity")
-          ?: if (
-            view.spec.mark in setOf("point", "tick", "circle", "square") &&
-              !Stack.isAggregate(view.spec)
-          ) {
-            0.7
-          } else {
-            null
-          }
-      if (opacity != null) fields["opacity"] = obj { put("value", opacity) }
+      symbolOpacity(view)?.let { fields["opacity"] = obj { put("value", it) } }
     }
 
     // A swatch that is filled and not stroked is stroked *transparently*, so that Vega's own legend
     // configuration cannot outline it. Only where the legend is not the stroke's own legend, and
     // only where the fill is a real colour — a hollow point's transparent fill is left alone.
-    val fill = fields["fill"]
+    val painted = fields["fill"]
     if (
-      fill != null &&
-        fill["value"] != VegaValue.Str("transparent") &&
+      painted != null &&
+        painted["value"] != VegaValue.Str("transparent") &&
         !fields.containsKey("stroke") &&
         channel != "stroke"
     ) {
@@ -363,4 +361,27 @@ internal object Guides {
 
     return if (fields.isEmpty()) null else VegaValue.Obj(fields)
   }
+
+  /** Whether a colour reference reads the data, in which case a swatch cannot resolve it. */
+  private fun scaled(ref: VegaValue?): Boolean =
+    when (ref) {
+      is VegaValue.Obj -> ref.fields.containsKey("field")
+      // A conditional colour is a rule array; upstream takes the first condition's own value, and
+      // it can only do that when the condition names one rather than a field.
+      is VegaValue.Arr -> ref.values.any { scaled(it) }
+      else -> false
+    }
+
+  /** How solid a swatch is drawn, which is the mark's own opacity where it has one. */
+  private fun symbolOpacity(view: UnitView): Double? =
+    (view.spec.encoding["opacity"]?.value as? VegaValue.Num)?.value
+      ?: view.markDef.number("opacity")
+      ?: if (
+        view.spec.mark in setOf("point", "tick", "circle", "square") &&
+          !Stack.isAggregate(view.spec)
+      ) {
+        0.7
+      } else {
+        null
+      }
 }

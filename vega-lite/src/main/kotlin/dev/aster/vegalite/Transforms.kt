@@ -278,20 +278,34 @@ internal class Transforms(private val diagnostics: DiagnosticCollector) {
     )
   }
 
-  private fun predicateExpression(predicate: VegaValue?, path: String): String? =
+  /**
+   * A predicate as an expression, for anything that *tests* a row rather than filtering on it.
+   *
+   * A conditional encoding's `test` is written in the same grammar as a `filter` and compiles to
+   * the same expression, so it goes through the same function. Two spellings of `oneOf` would agree
+   * until one of them was corrected.
+   */
+  fun testExpression(predicate: VegaValue?, path: String): String? =
+    predicateExpression(predicate, path, subject = "test")
+
+  private fun predicateExpression(
+    predicate: VegaValue?,
+    path: String,
+    subject: String = "filter",
+  ): String? =
     when {
       predicate is VegaValue.Str -> predicate.value
       predicate is VegaValue.Obj && predicate.has("and") ->
-        composite(predicate.array("and").orEmpty(), " && ", path)
+        composite(predicate.array("and").orEmpty(), " && ", path, subject)
       predicate is VegaValue.Obj && predicate.has("or") ->
-        composite(predicate.array("or").orEmpty(), " || ", path)
+        composite(predicate.array("or").orEmpty(), " || ", path, subject)
       predicate is VegaValue.Obj && predicate.has("not") ->
-        predicateExpression(predicate.fields["not"], path)?.let { "!($it)" }
+        predicateExpression(predicate.fields["not"], path, subject)?.let { "!($it)" }
       predicate is VegaValue.Obj && predicate.has("field") -> fieldPredicate(predicate, path)
       else -> {
         diagnostics.error(
           VegaLiteDiagnostics.UNSUPPORTED_TRANSFORM,
-          "A `filter` must be an expression, a field predicate, or `and`/`or`/`not` over them. " +
+          "A `$subject` must be an expression, a field predicate, or `and`/`or`/`not` over them. " +
             "A selection predicate needs parameters, which are not implemented.",
           jsonPath = path,
         )
@@ -299,8 +313,13 @@ internal class Transforms(private val diagnostics: DiagnosticCollector) {
       }
     }
 
-  private fun composite(parts: List<VegaValue>, joiner: String, path: String): String? {
-    val expressions = parts.mapNotNull { predicateExpression(it, path) }
+  private fun composite(
+    parts: List<VegaValue>,
+    joiner: String,
+    path: String,
+    subject: String,
+  ): String? {
+    val expressions = parts.mapNotNull { predicateExpression(it, path, subject) }
     if (expressions.isEmpty()) return null
     return expressions.joinToString(joiner) { "($it)" }
   }

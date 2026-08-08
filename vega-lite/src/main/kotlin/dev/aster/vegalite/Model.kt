@@ -55,6 +55,16 @@ internal data class ChannelDef(
   val sort: VegaValue? = null,
   val stack: VegaValue? = null,
   val explicitTitle: VegaValue? = null,
+  /**
+   * `condition` — the definitions that apply only when their own test passes, in order.
+   *
+   * Each is an ordinary channel definition with a [test] beside it, because a condition may name a
+   * field, a datum or a value exactly as the unconditional part does; upstream builds both through
+   * the same function and only prepends the test (`compile/mark/encode/conditional.ts`).
+   */
+  val conditions: List<ChannelDef> = emptyList(),
+  /** The expression this definition is gated on, when it is one of a channel's [conditions]. */
+  val test: String? = null,
 ) {
   val isFieldDef: Boolean = field != null || aggregate == "count"
 
@@ -238,6 +248,20 @@ internal object Channels {
   /** Channels whose definition may be an array, so the parser has to keep every entry. */
   val MULTI_DEF_CHANNELS = setOf("detail", "order", "tooltip")
 }
+
+/**
+ * The marks that join their rows into one shape, which is why the *order* of those rows matters to
+ * them and to nothing else.
+ */
+internal val PATH_MARKS = setOf("line", "area", "trail")
+
+/**
+ * The aggregates that compare their input rather than accumulating it.
+ *
+ * Every other operation coerces on the way through; these two would answer with the alphabetically
+ * smallest of a column of numerals still held as text.
+ */
+internal val MIN_MAX_OPS = setOf("min", "max")
 
 internal fun channelIsPosition(channel: String): Boolean = channel == "x" || channel == "y"
 

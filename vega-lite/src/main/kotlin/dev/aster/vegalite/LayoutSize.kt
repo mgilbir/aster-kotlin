@@ -45,8 +45,19 @@ internal class LayoutSize(
         when {
           declared is VegaValue.Num -> declared
           discrete -> {
-            val paddingInner = (scale.properties["paddingInner"] as? VegaValue.Num)?.value ?: 0.0
-            val paddingOuter = (scale.properties["paddingOuter"] as? VegaValue.Num)?.value ?: 0.0
+            val padding = (scale.properties["padding"] as? VegaValue.Num)?.value
+            // Only a *band* scale has a real inner padding. A **point** scale counts as 1, because
+            // n points have n−1 steps between them — upstream's `sizeExpr` says so in those words,
+            // citing vega-scale's own band arithmetic. With 0 instead, a chart on a point scale
+            // comes out a whole step too wide.
+            val paddingInner =
+              if (scale.type == "band") {
+                (scale.properties["paddingInner"] as? VegaValue.Num)?.value ?: padding ?: 0.0
+              } else {
+                1.0
+              }
+            val paddingOuter =
+              (scale.properties["paddingOuter"] as? VegaValue.Num)?.value ?: padding ?: 0.0
             // With marks nested inside the band, the step is no longer one mark wide: it has to
             // hold as many as the inner scale has, and is then divided by what the outer padding
             // takes away. That arithmetic is the whole width of a grouped bar chart.

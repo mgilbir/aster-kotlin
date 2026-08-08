@@ -1080,10 +1080,19 @@ public class ScaleResolver(
    */
   private fun stepRange(spec: ScaleSpec, step: Double): List<Double>? {
     val domain = discreteDomain(spec.domain, spec.name) ?: return null
+    // A **point** scale is a band scale with its inner padding pinned at 1 — n points have n−1
+    // steps between them — and its `padding` is the *outer* one. vega-scale builds `point()` as
+    // `pointish(band().paddingInner(1))`, and `pointish` renames `padding` to `paddingOuter` and
+    // deletes `paddingInner` outright. Reading `padding` as an inner padding here made a point
+    // chart with `padding: 0.5` come out half a step wider than the space it asked for.
     val inner =
-      numbers.resolve(spec.paddingInner, spec.name)
-        ?: numbers.resolve(spec.padding, spec.name)
-        ?: 0.0
+      if (spec.type == ScaleType.POINT) {
+        1.0
+      } else {
+        numbers.resolve(spec.paddingInner, spec.name)
+          ?: numbers.resolve(spec.padding, spec.name)
+          ?: 0.0
+      }
     val outer =
       numbers.resolve(spec.paddingOuter, spec.name)
         ?: numbers.resolve(spec.padding, spec.name)

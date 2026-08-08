@@ -65,8 +65,6 @@ internal object Marks {
       "trail",
     )
 
-  private val PATH_MARKS = setOf("line", "area", "trail")
-
   fun marks(view: UnitView): List<VegaValue> {
     val mark = markGroup(view)
     // A path mark split by a category is one line per group, which Vega draws by faceting the data
@@ -258,7 +256,7 @@ internal object Marks {
   /** `baseEncodeEntry`: the properties every mark shares, in upstream's order. */
   private fun baseEncode(view: UnitView): VegaValue.Obj = obj {
     putAll(markDefProperties(view))
-    putAll(color(view))
+    putAll(colorEncode(view))
     putAll(nonPosition(view, "opacity", "opacity"))
     putAll(nonPosition(view, "fillOpacity", "fillOpacity"))
     putAll(nonPosition(view, "strokeOpacity", "strokeOpacity"))
@@ -311,6 +309,10 @@ internal object Marks {
       "timeUnitBandPosition",
       "invalid",
       "tooltip",
+      // Consumed by the overlay normalizer before a mark is built. A `point: false` that reached
+      // here would be emitted as an encode channel Vega has never heard of.
+      "point",
+      "line",
       "x",
       "y",
       "x2",
@@ -322,12 +324,15 @@ internal object Marks {
     )
 
   /**
-   * `color()`: which of `fill` and `stroke` carries the colour.
+   * `colorEncode()`: which of `fill` and `stroke` carries the colour.
+   *
+   * A legend's swatch starts from this too, so it is shared rather than approximated — the swatch
+   * has to know whether the mark's colour is a constant or a scaled field, and only this knows.
    *
    * A filled mark takes its colour in the fill and a hollow one in the stroke, and the *other*
    * channel is set to transparent on a bar or a point so that a hollow point still has a hit area.
    */
-  private fun color(view: UnitView): VegaValue.Obj {
+  fun colorEncode(view: UnitView): VegaValue.Obj {
     val filled = view.markDef.filled
     val markConfig = view.config.markConfig(view.spec.mark)
     val declaredColor =
@@ -351,26 +356,49 @@ internal object Marks {
     }
   }
 
-  /** A non-position channel: scaled when it has a field, a literal when it has a value. */
+  /**
+   * A non-position channel: scaled when it has a field, a literal when it has a value.
+   *
+   * A channel with `condition`s becomes a Vega **production rule** — an array whose entries are
+   * tried in order and whose last has no test. Each condition is built by the same reference
+   * builder as the unconditional part, because a condition may name a field, a datum or a value
+   * just as freely (`wrapCondition`, `compile/mark/encode/conditional.ts`).
+   */
   private fun nonPosition(view: UnitView, channel: String, vgChannel: String): VegaValue.Obj {
     val def = view.spec.encoding[channel] ?: return VegaValue.EmptyObject
-    val ref =
-      when {
-        def.isValueDef -> obj { put("value", def.value) }
-        def.datum != null ->
+    val rules =
+      def.conditions.mapNotNull { condition ->
+        valueRef(view, channel, condition)?.let { ref ->
           obj {
-            put("scale", scaleName(view, channel))
-            put("value", def.datum)
+            put("test", condition.test)
+            putAll(ref)
           }
-        def.isFieldDef ->
-          obj {
-            put("scale", scaleName(view, channel))
-            put("field", Fields.vgField(def))
-          }
-        else -> return VegaValue.EmptyObject
+        }
       }
-    return obj { put(vgChannel, ref) }
+    val main = valueRef(view, channel, def)
+    if (rules.isEmpty())
+      return if (main == null) VegaValue.EmptyObject else obj { put(vgChannel, main) }
+    // The array form is used even for a single entry with a test, or Vega has no rule to fall back
+    // to when the test fails.
+    return obj { put(vgChannel, arr(rules + listOfNotNull(main))) }
   }
+
+  /** One entry of a channel's encoding: a value, a datum through the scale, or a scaled field. */
+  private fun valueRef(view: UnitView, channel: String, def: ChannelDef): VegaValue.Obj? =
+    when {
+      def.isValueDef -> obj { put("value", def.value) }
+      def.datum != null ->
+        obj {
+          put("scale", scaleName(view, channel))
+          put("value", def.datum)
+        }
+      def.isFieldDef ->
+        obj {
+          put("scale", scaleName(view, channel))
+          put("field", Fields.vgField(def))
+        }
+      else -> null
+    }
 
   private fun scaleName(view: UnitView, channel: String): String? =
     if (view.hasScale(channel)) channel else null
@@ -405,7 +433,11 @@ internal object Marks {
     for ((channel, def) in view.spec.encoding) {
       if (!def.isFieldDef) continue
       if (channel == "tooltip" || channel == "description") continue
-      val title = Fields.title(def, view.config)
+      // The *field's* own title, not its guide's: upstream reads `fieldDef.title ||
+      // defaultTitle(fieldDef)` here, so hiding an axis title with `axis: {title: null}` restyles
+      // the chart and leaves what a screen reader says about it alone. Reading the guide's title
+      // dropped the channel from the description entirely.
+      val title = def.explicitTitle ?: Fields.defaultTitle(def, view.config)?.let(VegaValue::Str)
       val key = (title as? VegaValue.Str)?.value ?: continue
       if (out.containsKey(key)) continue
       out[key] = fieldExpression(view, def)

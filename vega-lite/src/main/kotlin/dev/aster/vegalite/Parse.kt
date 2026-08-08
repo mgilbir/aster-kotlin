@@ -142,14 +142,7 @@ internal class Parse(private val config: Config, private val diagnostics: Diagno
     val timeUnit = value.string("timeUnit")
     val bin = binning(value.fields["bin"], path)
 
-    if (value.fields["condition"] != null) {
-      diagnostics.error(
-        VegaLiteDiagnostics.UNSUPPORTED_ENCODING_PROPERTY,
-        "A conditional encoding needs a parameter to test, and parameters are not implemented; " +
-          "the condition is ignored and the unconditional part of the definition is used.",
-        jsonPath = "$path.condition",
-      )
-    }
+    val conditions = conditions(channel, value.fields["condition"], "$path.condition")
     if (value.fields["impute"] != null) {
       diagnostics.error(
         VegaLiteDiagnostics.UNSUPPORTED_ENCODING_PROPERTY,
@@ -176,7 +169,49 @@ internal class Parse(private val config: Config, private val diagnostics: Diagno
       sort = value.fields["sort"],
       stack = value.fields["stack"],
       explicitTitle = value.fields["title"],
+      conditions = conditions,
     )
+  }
+
+  /**
+   * `condition` — one definition, or a list of them, each gated on its own `test`.
+   *
+   * A condition is an ordinary channel definition: it may name a field, a datum or a value, and it
+   * is compiled by exactly the code the unconditional part is, with the test put in front of it.
+   * The test itself is a `filter`'s grammar — an expression or a field predicate — so it goes
+   * through the same compiler, which is what keeps `oneOf` spelled one way.
+   *
+   * A condition naming a `param` is a *selection*, and that is still refused by name: it needs the
+   * signal a selection publishes, and there is nothing to gate on without it.
+   */
+  private fun conditions(channel: String, value: VegaValue?, path: String): List<ChannelDef> {
+    if (value == null || value is VegaValue.Null) return emptyList()
+    val entries = (value as? VegaValue.Arr)?.values ?: listOf(value)
+    return entries.mapIndexedNotNull { index, entry ->
+      val at = if (value is VegaValue.Arr) "$path[$index]" else path
+      val obj = entry as? VegaValue.Obj
+      if (obj == null) {
+        diagnostics.error(
+          VegaLiteDiagnostics.INVALID_ENCODING,
+          "A condition must be an object.",
+          jsonPath = at,
+        )
+        return@mapIndexedNotNull null
+      }
+      if (obj.fields["param"] != null) {
+        diagnostics.error(
+          VegaLiteDiagnostics.UNSUPPORTED_ENCODING_PROPERTY,
+          "A condition on a selection parameter needs `params`, which are not implemented; this " +
+            "condition is dropped and the unconditional part of the definition is used.",
+          jsonPath = at,
+        )
+        return@mapIndexedNotNull null
+      }
+      val test =
+        Transforms(diagnostics).testExpression(obj.fields["test"], "$at.test")
+          ?: return@mapIndexedNotNull null
+      channelDef(channel, obj, at)?.copy(test = test)
+    }
   }
 
   /**
