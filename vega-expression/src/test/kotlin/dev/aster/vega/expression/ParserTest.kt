@@ -170,6 +170,49 @@ class ParserTest {
   }
 
   @Test
+  fun `a dataset named as a literal is reported as a dependency`() {
+    assertEquals(setOf("summary"), compiled("data('summary')[0].mean").dataDependencies)
+    assertEquals(setOf("table"), compiled("indata('table', 'k', 1)").dataDependencies)
+    assertEquals(false, compiled("data('summary')").readsUnnamedDataset)
+  }
+
+  @Test
+  fun `a dataset named by an expression is reported as unnamed`() {
+    // No name to record, so anything ordering against this has to wait for every dataset.
+    val expression = compiled("data(chosen)")
+    assertEquals(emptySet<String>(), expression.dataDependencies)
+    assertEquals(true, expression.readsUnnamedDataset)
+  }
+
+  @Test
+  fun `every function that takes a scale name reports it`() {
+    // `domain` and `range` belong on this list as much as `scale` does; a signal reading
+    // `domain('xscale')` waits on that scale exactly the way one calling `scale('xscale', 0)` does.
+    assertEquals(setOf("x"), compiled("scale('x', datum.v)").scaleDependencies)
+    assertEquals(setOf("x"), compiled("invert('x', 10)").scaleDependencies)
+    assertEquals(setOf("xscale"), compiled("domain('xscale')").scaleDependencies)
+    assertEquals(setOf("xscale"), compiled("range('xscale')").scaleDependencies)
+    assertEquals(setOf("y"), compiled("bandwidth('y')").scaleDependencies)
+    assertEquals(setOf("x", "y"), compiled("scale('x', 0) + bandwidth('y')").scaleDependencies)
+  }
+
+  @Test
+  fun `a scale named by an expression is reported as unnamed`() {
+    val expression = compiled("scale(which, datum.v)")
+    assertEquals(emptySet<String>(), expression.scaleDependencies)
+    assertEquals(true, expression.readsUnnamedScale)
+  }
+
+  @Test
+  fun `reading nothing deferred is distinguished from reading a scale or a dataset`() {
+    // A signal *named* `data`, and a field *called* `scale`; neither is a call.
+    assertEquals(false, compiled("data + datum.scale").readsDataOrScales)
+    assertEquals(false, compiled("clamp(year, 1980, 2010)").readsDataOrScales)
+    assertEquals(true, compiled("domain('xscale')").readsDataOrScales)
+    assertEquals(true, compiled("data('summary')[0].mean").readsDataOrScales)
+  }
+
+  @Test
   fun `parsing is reusable across evaluations`() {
     val expression = compiled("datum.v * 2")
     val first = expression.evaluate(scopeOf("v" to VegaValue.Num(3.0)))

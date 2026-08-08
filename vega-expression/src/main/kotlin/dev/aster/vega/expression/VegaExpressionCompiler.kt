@@ -22,14 +22,19 @@ public class ParsedExpression(
 
   override val fieldDependencies: Set<String> by lazy { collectFields() }
 
-  override val readsDataOrScales: Boolean by lazy {
-    var found = false
-    ast.walk { node ->
-      val callee = (node as? Node.Call)?.callee
-      if (callee is Node.Identifier && callee.name in DEFERRED_FUNCTIONS) found = true
-    }
-    found
-  }
+  private val deferred by lazy { collectDeferred() }
+
+  override val dataDependencies: Set<String>
+    get() = deferred.datasets
+
+  override val readsUnnamedDataset: Boolean
+    get() = deferred.unnamedDataset
+
+  override val scaleDependencies: Set<String>
+    get() = deferred.scales
+
+  override val readsUnnamedScale: Boolean
+    get() = deferred.unnamedScale
 
   override fun evaluate(scope: ExpressionScope): VegaValue = evaluator.evaluate(ast, scope)
 
@@ -74,9 +79,78 @@ public class ParsedExpression(
       .toSet()
   }
 
+  /** What one walk of the tree found about the datasets and scales this expression reaches for. */
+  private class Deferred(
+    val datasets: Set<String>,
+    val unnamedDataset: Boolean,
+    val scales: Set<String>,
+    val unnamedScale: Boolean,
+  )
+
+  /**
+   * Reads the dataset and scale names out of the tree, as upstream's visitors do.
+   *
+   * A name counts only when it is written as a string literal, because that is the only case where
+   * it is knowable before the expression runs. Anything else is recorded as a nameless read, which
+   * an ordering has to satisfy by building everything of that kind first.
+   */
+  private fun collectDeferred(): Deferred {
+    val datasets = mutableSetOf<String>()
+    val scales = mutableSetOf<String>()
+    var unnamedDataset = false
+    var unnamedScale = false
+    ast.walk { node ->
+      if (node !is Node.Call) return@walk
+      val callee = node.callee
+      if (callee !is Node.Identifier) return@walk
+      val into =
+        when (callee.name) {
+          in DATA_FUNCTIONS -> datasets
+          in SCALE_FUNCTIONS -> scales
+          else -> return@walk
+        }
+      val first = node.arguments.firstOrNull()
+      val literal = (first as? Node.Literal)?.value?.let { it as? VegaValue.Str }?.value
+      when {
+        literal != null -> into.add(literal)
+        into === datasets -> unnamedDataset = true
+        else -> unnamedScale = true
+      }
+    }
+    return Deferred(datasets, unnamedDataset, scales, unnamedScale)
+  }
+
   private companion object {
-    /** The functions that reach for something the compiler has not built yet. */
-    private val DEFERRED_FUNCTIONS = setOf("data", "indata", "scale", "invert", "bandwidth")
+    /**
+     * Functions taking a dataset name, matching upstream's `dataVisitor` registrations.
+     *
+     * `treePath` and `treeAncestors` are on the list because upstream puts them there; this engine
+     * does not evaluate them, so they only ever contribute an ordering nobody uses.
+     */
+    private val DATA_FUNCTIONS = setOf("data", "indata", "treePath", "treeAncestors")
+
+    /**
+     * Functions taking a scale name, matching upstream's `scaleVisitor` registrations.
+     *
+     * `domain` and `range` belong here and were missing while the only question asked of this walk
+     * was "does it read anything deferred": a signal reading `domain('xscale')` looked free of both
+     * data and scales, and so was resolved before either existed.
+     */
+    private val SCALE_FUNCTIONS =
+      setOf(
+        "scale",
+        "invert",
+        "domain",
+        "range",
+        "bandwidth",
+        "copy",
+        "gradient",
+        "geoArea",
+        "geoBounds",
+        "geoCentroid",
+        "geoShape",
+        "geoScale",
+      )
   }
 }
 

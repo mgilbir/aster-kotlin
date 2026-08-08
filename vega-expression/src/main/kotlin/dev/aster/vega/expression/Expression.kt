@@ -26,15 +26,54 @@ public interface Expression {
   public val fieldDependencies: Set<String>
 
   /**
-   * Functions this expression calls that need something built after it.
+   * Datasets this expression names outright: the string literal a `data()` or `indata()` is given.
    *
-   * `data` and `indata` read a dataset; `scale`, `invert` and `bandwidth` read a scale, which is
-   * itself built from data. A signal calling none of them can be resolved *before* the data, which
-   * is how a filter reading `currentYear` sees a number rather than nothing — and the reason to ask
-   * the expression rather than guess from its text is that a specification may name a signal `data`
-   * or write `datum.scale`, neither of which is a call.
+   * Upstream's `dataVisitor` reads the same argument at parse time and turns it into a parameter of
+   * the operator the expression belongs to, which is what puts the dataset ahead of it in the
+   * dataflow's ranking. Naming them here buys the same ordering, so a scale domain or a transform
+   * parameter written as an expression can be resolved after the datasets it reads.
+   */
+  public val dataDependencies: Set<String>
+
+  /**
+   * True when a dataset is named by an expression rather than a literal, as in `data(chosen)`.
+   *
+   * There is no name to record, so anything ordering itself against this expression has to wait for
+   * *every* dataset. Upstream refuses the case outright — "First argument to data functions must be
+   * a string literal" — and this engine evaluates it instead, so the ordering has to cover it.
+   */
+  public val readsUnnamedDataset: Boolean
+
+  /**
+   * Scales this expression names outright, through `scale`, `invert`, `domain`, `range` or
+   * `bandwidth`.
+   *
+   * The counterpart of [dataDependencies] for upstream's `scaleVisitor`, and the reason a signal
+   * reading `domain('xscale')` can be resolved once that one scale exists rather than not at all.
+   */
+  public val scaleDependencies: Set<String>
+
+  /**
+   * True when a scale is named by an expression rather than a literal, as in `scale(which, v)`.
+   *
+   * Upstream's `scaleVisitor` makes *every* scale in the enclosing scope a dependency in this case,
+   * because there is no way to tell which one will be asked for.
+   */
+  public val readsUnnamedScale: Boolean
+
+  /**
+   * Whether this expression reaches for anything built after it — a dataset or a scale.
+   *
+   * True exactly when one of the four above is non-empty. A specification may name a signal `data`
+   * or write `datum.scale`, and neither is a call, which is why this asks the parsed expression
+   * rather than its text.
    */
   public val readsDataOrScales: Boolean
+    get() =
+      dataDependencies.isNotEmpty() ||
+        scaleDependencies.isNotEmpty() ||
+        readsUnnamedDataset ||
+        readsUnnamedScale
 
   public fun evaluate(scope: ExpressionScope): VegaValue
 }
