@@ -21,7 +21,7 @@ end to end — expressions, signals, 33 of upstream's 40 data transforms, every 
 and an event handler that recompiles the chart — and are verified against upstream Vega by
 differential tests.
 
-One hundred differential fixtures pass, all matching upstream exactly on every mark and scale output:
+One hundred and one differential fixtures pass, all matching upstream exactly on every mark and scale output:
 
 | Fixture | Marks | Covers |
 | --- | --- | --- |
@@ -125,6 +125,7 @@ One hundred differential fixtures pass, all matching upstream exactly on every m
 | `crossfilter-flights` | 171 | Vega's cross-filter: 200,000 rows binned three ways, `crossfilter` recording which range query each fails and `resolvefilter` reading those verdicts back per histogram |
 | `clock` | 93 | Vega's world clock, on a stopped clock: `now()` pinned to the same instant on both sides |
 | `watch` | 92 | The same face drawn from arcs, and the second example built on `now()` |
+| `error-bars` | 61 | Vega's error bars: `ci0`/`ci1` by bootstrap, and a band axis whose ticks sit on the band edges with one more pegged to the leading one |
 
 The gate is wired into `./scripts/oracle.sh`, so every further scale, mark and transform is built
 against a harness that can say we are wrong — which golden tests cannot.
@@ -521,7 +522,7 @@ each example a deadline.
 
 ## Known failing fixtures
 
-None. One hundred fixtures exist and all one hundred pass — and that sentence became worth
+None. One hundred and one fixtures exist and all of them pass — and that sentence became worth
 something only once the gate could no longer skip itself, below.
 
 **The gate could report success without running.** `FixtureDifferentialTest` reads the fixtures and
@@ -839,6 +840,36 @@ With that, `histogram-null-values` passes, and it took four separate pieces to g
 dependency order, `bin` publishing its settings, `autosize: fit`, and this. Each of them turned up a
 defect in code that was already passing.
 
+## A label that is nowhere, three times over
+
+`error-bars` sets `config.axisBand: {bandPosition: 1, tickExtra: true, tickOffset: 0}`, and getting
+that right needed four things — one of which is the same fact stated three ways.
+
+- **`tickOffset`** is not zero by default. Upstream's `config.axisBand` carries a `-0.5` that
+  corrects the half-pixel an axis group's own translation adds, and it applies to a **band** scale
+  only — a point or ordinal axis never sees that block. This engine had the `-0.5` hard-coded inside
+  the band tick placement, so a specification aiming its ticks at the band boundaries could not
+  switch it off.
+- **A band axis's labels sit at the band's centre whatever its ticks do.** Upstream's label mark
+  hard-codes `band: 0.5` and takes only the *offset* from the shared band settings, so
+  `bandPosition: 1` moves the ticks to the edges and leaves the labels alone. A `Tick` now carries
+  its own label position.
+- **`tickExtra`** appends one more tick at the *start* of the first tick's band. Upstream's datum
+  carries `{extra: {value: <first tick's value>}}` and no `value` of its own, and the scaled-value
+  codegen reads the first as "that value's position, with no bandwidth added".
+- And then the same fact three times. That datum has no `value`, so its **label** scales something
+  absent. Upstream's scene records `y: NaN`; its `anchorPoint` reads `item.y || 0` and **`NaN` is
+  falsy**, so the *bounds* are the box an empty string occupies at the origin; and its SVG contains
+  no element for it at all. All three have to be reproduced together, and each one on its own is
+  wrong in a different direction: keeping the `NaN` out of the bounds loses five units of chart
+  height, letting it into a `min` or a `max` poisons every measurement above it, and drawing the
+  element puts an empty `<text>` in the output upstream does not have.
+
+The comparison harness now accepts a `NaN` on either side where the reference records one. It is
+not a relaxation: a reference holding a real number still demands that number, and this only says
+that where *upstream* has no usable value, this engine may hold the painted zero — which is what an
+extent does — or the same absence, which is what a position that was never computed does.
+
 ## `random()` and `now()` are implemented, and the refusal is lifted
 
 Both were refused for reproducibility (PROJECT_BRIEF.md 18.2): a chart that draws a different
@@ -872,17 +903,7 @@ them said what:
 - **`hypothetical-outcome-plots`** — the right *number* of marks, wrong values. The draw order
   differs from upstream's, which is the interesting failure: it means the generator agrees and the
   dataflow does not ask for its numbers in the same sequence.
-- **`error-bars`** — `ci0`/`ci1` are implemented and pinned against upstream vectors, and the chart's
-  ten error bars and ten points land **exactly** where upstream puts them, which is the evidence the
-  bootstrap is right. It is not a fixture yet because of something unrelated: it sets
-  `config.axisBand: {bandPosition: 1, tickExtra: true, tickOffset: 0}`, and `tickExtra` and
-  `tickOffset` are the two axis properties still reported as unimplemented. Upstream's `tickExtra`
-  appends a datum carrying `{extra: {value: ticks[0].value}}` and no `value` at all, which the
-  scaled-value codegen reads as "the first tick's band *start*, with no bandwidth added" — and the
-  matching **label** has empty text at a NaN position, because the label mark does not pass `extra`
-  and so scales an absent value. Reproducing that NaN is the fiddly part: it must not widen any
-  bounds, which upstream gets for free because every NaN comparison is false. 59 marks against
-  upstream's 61, and the two missing ones are that tick and that label.
+- **`error-bars`** — done, and a fixture. See "A label that is nowhere, three times over" below.
 - **`pi-monte-carlo`** — two `group/scope` marks short, so a layout gap rather than a random one.
 - **`bar-line-toggle`** — 155 marks against upstream's 100: a signal-driven toggle, which needs the
   `on` handler machinery rather than anything stochastic.

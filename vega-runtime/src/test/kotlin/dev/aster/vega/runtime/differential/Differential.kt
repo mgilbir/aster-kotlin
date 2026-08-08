@@ -600,7 +600,14 @@ public object Differential {
         // own spelling, so the two match exactly.
         val required = if (wanted == "NaN") 0.0 else wanted.toDouble()
         val held = actual.numbers[channel]
-        if (held == null || held != required) {
+        // A `NaN` is accepted either way round, and the two spellings say the same thing. Where the
+        // channel is an *extent* this engine holds the painted zero, because a scene node carries
+        // numbers a renderer can use. Where it is a *position* that upstream never computed, it
+        // holds the same absence: an axis's `tickExtra` label scales a value its datum does not
+        // carry, and upstream's own SVG contains no element for it. Neither form is a relaxation —
+        // a reference holding a real number still demands that number.
+        val agrees = held != null && (held == required || (wanted == "NaN" && held.isNaN()))
+        if (!agrees) {
           out.add(
             Difference(
               "$where.$channel",

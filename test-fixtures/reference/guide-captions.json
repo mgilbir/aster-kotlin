@@ -605,6 +605,16 @@
   "caption": "Symbol legend titled 'Dependencies' for stroke color with 2 values: depends on, imported by"
  },
  {
+  "fixture": "error-bars",
+  "kind": "axis",
+  "caption": "X-axis titled 'Barley Yield' for a linear scale with values from 20 to 55"
+ },
+ {
+  "fixture": "error-bars",
+  "kind": "axis",
+  "caption": "Y-axis for a discrete scale with 10 values: Trebi, Wisconsin No. 38, No. 457, No. 462, Peatland, ending with Svansota"
+ },
+ {
   "fixture": "expressions",
   "kind": "axis",
   "caption": "X-axis for a discrete scale with 4 values: a, b, d, e"

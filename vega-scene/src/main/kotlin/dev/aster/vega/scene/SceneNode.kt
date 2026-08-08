@@ -362,8 +362,17 @@ public data class TextNode(
 
   override val bounds: RectD by
     lazy(LazyThreadSafetyMode.NONE) {
-      val placed = layout.bounds.translate(x, y)
-      if (angleDegrees == 0.0) placed.normalized() else rotatedAbout(placed, x, y).normalized()
+      // Upstream's `anchorPoint` reads `item.x || 0`, and `NaN` is falsy — so a text item whose
+      // position was never computed is *measured* at the origin even though nothing is drawn there.
+      // An axis's `tickExtra` label is exactly that: it scales a value its datum does not carry, so
+      // its scene position is `NaN`, its bounds are the box an empty string occupies at the origin,
+      // and its renderer emits no element at all. All three have to be reproduced together —
+      // keeping the `NaN` out of the bounds loses five units of chart height, and letting it into a
+      // `min` or a `max` poisons every measurement above it.
+      val ax = if (x.isNaN()) 0.0 else x
+      val ay = if (y.isNaN()) 0.0 else y
+      val placed = layout.bounds.translate(ax, ay)
+      if (angleDegrees == 0.0) placed.normalized() else rotatedAbout(placed, ax, ay).normalized()
     }
 
   /**

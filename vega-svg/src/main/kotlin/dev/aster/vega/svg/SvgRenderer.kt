@@ -260,6 +260,9 @@ public class SvgRenderer(private val options: SvgOptions = SvgOptions()) {
   }
 
   private fun renderText(node: TextNode, out: StringBuilder, defs: Defs, depth: Int) {
+    // A text item with no usable anchor draws nothing, which is what upstream's own SVG contains:
+    // its `tickExtra` label has a `NaN` position in the scene and no element in the output at all.
+    if (!node.x.isFinite() || !node.y.isFinite()) return
     val run = node.layout.run
     val style = run.style
     newline(out, depth)

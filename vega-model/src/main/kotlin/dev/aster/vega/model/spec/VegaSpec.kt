@@ -662,6 +662,25 @@ public data class AxisSpec(
    */
   val bandPosition: NumberValue? = null,
   /**
+   * How far a tick and its gridline are nudged along the axis, after [bandPosition] has placed it.
+   *
+   * Zero on an ordinary axis and **-0.5 on a band one**, which is upstream's `config.axisBand`
+   * correcting the half-pixel the axis group's own translation adds. A specification that wants
+   * ticks on the band boundaries sets `bandPosition: 1` *and* `tickOffset: 0`, because the
+   * correction would otherwise pull them half a pixel off the edge they were aimed at.
+   */
+  val tickOffset: NumberValue? = null,
+  /**
+   * `tickExtra` — one more tick, pegged to the *start* of the first band.
+   *
+   * A band axis draws one tick per band, so ticks placed at the band ends leave the very first edge
+   * unmarked. Upstream appends a datum carrying only `{extra: {value: <first tick's value>}}`,
+   * which the scaled-value codegen reads as "that value's band start, with no bandwidth added". Its
+   * **label** is empty and lands nowhere: the label mark does not pass `extra` on, so it scales a
+   * value the datum does not have, and upstream's scene records a `NaN` position for it.
+   */
+  val tickExtra: Boolean = false,
+  /**
    * The `encode` blocks as written, per part, for the channels that are not another spelling of a
    * property.
    *

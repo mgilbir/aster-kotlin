@@ -110,6 +110,8 @@ private val AXIS_CONSUMED =
     "bandPosition",
     // Read by the axis builder since the parallel-coordinates work; they were still being
     // reported as unimplemented, which is the stale half of "nothing silently ignored".
+    "tickOffset",
+    "tickExtra",
     "titleX",
     "titleY",
     "titleAngle",
@@ -138,9 +140,7 @@ private val AXIS_UNSUPPORTED =
     "labelOffset" to "Axis label offsets along the axis are not implemented",
     "labelLineHeight" to "Multi-line axis labels are not implemented",
     "tickMinStep" to "A minimum tick step is not implemented; the scale's own tick count is used",
-    "tickExtra" to "Adding a tick at the range end is not implemented",
     "tickRound" to "Suppressing tick rounding is not implemented; ticks are always rounded",
-    "tickOffset" to "Axis tick offsets are not implemented",
     "tickBand" to "Placing band-scale ticks at band edges is not implemented; they sit at centres",
     "tickCap" to "Axis tick line caps are not implemented",
     "tickDashOffset" to "Dash offsets are not implemented; the dash pattern starts at the line end",
@@ -1356,6 +1356,8 @@ public class SpecParser {
         (obj.fields["format"] as? VegaValue.Obj)?.fields?.get("signal")?.asString(),
       formatType = axisFormatType(obj.fields["formatType"], "$path.formatType"),
       bandPosition = obj.numberOrSignal("bandPosition", "$path.bandPosition"),
+      tickOffset = obj.numberOrSignal("tickOffset", "$path.tickOffset"),
+      tickExtra = obj.fields["tickExtra"]?.asBoolean() ?: false,
       encode =
         (obj.fields["encode"] as? VegaValue.Obj)?.fields.orEmpty().mapValues { (part, block) ->
           parseEncode(block, "$path.encode.$part")

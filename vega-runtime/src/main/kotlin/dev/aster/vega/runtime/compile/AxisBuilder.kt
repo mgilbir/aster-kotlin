@@ -88,6 +88,17 @@ public class AxisBuilder(
     val label: String,
     val position: Double,
     val value: VegaValue = VegaValue.Null,
+    /**
+     * Where the *label* goes, which is not always where the tick goes.
+     *
+     * Upstream places a band axis's ticks at `bandPosition` and its labels at the band's centre
+     * regardless, so a chart that puts its ticks on the band edges still reads its labels from the
+     * middle. Null means upstream has no number here at all — the extra tick `tickExtra` appends
+     * carries no value, so its label scales an absent one and lands at `NaN`. Such a label is drawn
+     * at the origin, which is what upstream's renderer paints, and is left out of the measurement,
+     * which is what upstream's `NaN` gets for free.
+     */
+    val labelPosition: Double? = position,
   )
 
   /**
@@ -122,7 +133,7 @@ public class AxisBuilder(
     // down, and a chart bound to a granularity control does exactly that.
     val specifier =
       spec.format ?: spec.formatExpression?.let { numbers.resolveText(it, spec.scale) }
-    val ticks = ticksFor(scale, spec, specifier)
+    val ticks = ticksFor(scale, spec, specifier)?.let { withExtraTick(it, scale, spec) }
     if (ticks == null) {
       diagnostics.error(
         DiagnosticCodes.SCALE_UNSUPPORTED_TYPE,
@@ -240,12 +251,18 @@ public class AxisBuilder(
             limit = labelLimit,
           )
         val layout = textEngine.layout(run)
+        // A label sits where *it* was placed, which on a band axis is the band's centre whatever
+        // `bandPosition` did to the ticks. A null one is upstream's `NaN` — the extra tick carries
+        // no value for the label to scale — and it stays a `NaN` here: a text node with no usable
+        // anchor covers nothing and draws nothing, which is what upstream's scene and its own SVG
+        // both say.
+        val along = tick.labelPosition ?: Double.NaN
         val (defaultX, defaultY) =
           when (spec.orient) {
-            Orient.BOTTOM -> tick.position to labelOffset
-            Orient.TOP -> tick.position to -labelOffset
-            Orient.LEFT -> -labelOffset to tick.position
-            Orient.RIGHT -> labelOffset to tick.position
+            Orient.BOTTOM -> along to labelOffset
+            Orient.TOP -> along to -labelOffset
+            Orient.LEFT -> -labelOffset to along
+            Orient.RIGHT -> labelOffset to along
           }
         // A label's own `encode` block may place it somewhere the properties cannot say — off the
         // band's centre, at the tick's raw scale position. The datum is the tick: `datum.value` is
@@ -294,6 +311,8 @@ public class AxisBuilder(
       for (label in labels) {
         if (label in kept) {
           drawn += label
+          // A label with no anchor has empty bounds, so measuring it changes nothing — which is
+          // what upstream's `NaN` gets for free, every comparison against it being false.
           measured += label
         } else {
           drawn += label.copy(opacity = 0.0)
@@ -566,6 +585,24 @@ public class AxisBuilder(
       ?: numbers.resolve(spec.offset, spec.scale)
       ?: 0.0
 
+  /**
+   * `tickExtra`: one more tick at the **start** of the first tick's band, labelled with nothing.
+   *
+   * Upstream appends a datum that carries `{extra: {value: <first tick's value>}}` and no `value`
+   * of its own, and the scaled-value codegen reads the first as "that value's position, with no
+   * bandwidth added" — so the extra tick lands on the leading edge that per-band ticks leave
+   * unmarked. The datum's missing `value` is what makes its *label* land at `NaN`, carried here as
+   * a null [Tick.labelPosition] rather than as a NaN, because an absence stays out of the
+   * arithmetic downstream where a NaN would have to be kept out of it by hand.
+   */
+  private fun withExtraTick(ticks: List<Tick>, scale: VegaScale, spec: AxisSpec): List<Tick> {
+    if (!spec.tickExtra || ticks.isEmpty()) return ticks
+    val positional = scale as? PositionScale ?: return ticks
+    val at = positional.position(ticks.first().value)
+    if (!at.isFinite()) return ticks
+    return ticks + Tick("", at + tickOffset(positional, spec), VegaValue.Null, labelPosition = null)
+  }
+
   private fun ticksFor(scale: VegaScale, spec: AxisSpec, specifier: String?): List<Tick>? {
     // A scale with `bins` has its tick values already decided: upstream's `tickValues` returns the
     // boundaries themselves rather than asking the scale to generate any. An axis that *also* names
@@ -654,8 +691,31 @@ public class AxisBuilder(
   private fun bandOffset(scale: PositionScale, spec: AxisSpec): Double {
     if (scale !is BandScale) return 0.0
     val position = numbers.resolve(spec.bandPosition, spec.scale) ?: AxisDefaults.BAND_POSITION
-    return scale.bandwidth * position - AxisDefaults.CRISP_OFFSET
+    return scale.bandwidth * position + tickOffset(scale, spec)
   }
+
+  /**
+   * `tickOffset`: how far a tick is nudged along the axis once its band position has placed it.
+   *
+   * The default is upstream's, and it is **not** zero for a band scale: `config.axisBand` carries a
+   * `-0.5` that corrects the half-pixel the axis group's own translation adds, and it applies to a
+   * band scale only — a point or ordinal axis never sees that block. A specification aiming ticks
+   * at the band boundaries has to switch it off explicitly, which is why the property exists.
+   */
+  private fun tickOffset(scale: PositionScale, spec: AxisSpec): Double =
+    numbers.resolve(spec.tickOffset, spec.scale)
+      ?: if (scale is BandScale) -AxisDefaults.CRISP_OFFSET else 0.0
+
+  /**
+   * Where a band axis's label sits, which is the band's **centre** whatever the ticks do.
+   *
+   * Upstream's label mark hard-codes `band: 0.5` and takes only the tick *offset* from the shared
+   * band settings, so `bandPosition: 1` moves the ticks to the edges and leaves the labels where
+   * they were.
+   */
+  private fun labelOffsetAlong(scale: PositionScale, spec: AxisSpec): Double =
+    if (scale !is BandScale) 0.0
+    else scale.bandwidth * AxisDefaults.BAND_POSITION + tickOffset(scale, spec)
 
   /**
    * How an explicit value is labelled.
@@ -734,11 +794,15 @@ public class AxisBuilder(
       // which is the only way a band scale over instants reads as dates rather than as numbers.
       is BandScale -> {
         val label = labeller(scale, scale.domain.size, specifier, spec.formatType)
-        scale.domain.zip(scale.centers()).map { (value, centre) ->
+        val alongTick = bandOffset(scale, spec)
+        val alongLabel = labelOffsetAlong(scale, spec)
+        scale.domain.map { value ->
+          val start = scale.position(VegaValue.Str(value))
           Tick(
             label(VegaValue.Str(value)),
-            centre - AxisDefaults.CRISP_OFFSET,
+            start + alongTick,
             VegaValue.Str(value),
+            labelPosition = start + alongLabel,
           )
         }
       }
