@@ -46,6 +46,8 @@ dependencies {
   implementation(project(":vega-compose"))
   implementation(project(":test-fixtures"))
   implementation(project(":vega-android-canvas"))
+  // The JVM loader seam, so a pasted specification's `"url": "data/..."` resolves.
+  implementation(project(":vega-loader"))
   implementation(libs.androidx.core.ktx)
   implementation(libs.androidx.activity.compose)
   implementation(platform(libs.compose.bom))

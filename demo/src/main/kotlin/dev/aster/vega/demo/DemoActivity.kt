@@ -40,6 +40,7 @@ import dev.aster.vega.android.AndroidTextEngine
 import dev.aster.vega.android.BitmapExportOptions
 import dev.aster.vega.android.SceneExporter
 import dev.aster.vega.compose.VegaChart
+import dev.aster.vega.loader.VegaDataLoaders
 import dev.aster.vega.model.DiagnosticSeverity
 import dev.aster.vega.runtime.ChartEvent
 import dev.aster.vega.runtime.VegaChartController
@@ -80,7 +81,24 @@ private fun DemoScreen() {
   // touched by two threads at once.
   val textEngine = remember { AndroidTextEngine() }
   val exporter = remember { SceneExporter() }
-  val controller = remember { VegaChartController(textEngine = AndroidTextEngine()) }
+  // The demo opts in to loading, which no host gets by default, and states exactly what it is
+  // opening. A pasted specification's `"url": "data/cars.json"` is resolved against the cache
+  // directory first and fetched from `vega.github.io` when it is not there yet, then written to the
+  // cache so the next paste of the same example needs no network at all.
+  //
+  // The allowlist is that one host — `directoryThenNetwork`'s default — and it is the whole of the
+  // safety argument here. This screen compiles text a *user pasted*, so an unrestricted loader
+  // would
+  // let a specification aim this process at any address it liked, which is a request forgery
+  // primitive; `169.254.169.254` is cloud credentials and `localhost` is whatever the device runs.
+  // Private addresses are refused as well, so the one allowed host cannot be rebound onto the
+  // loopback interface.
+  val loader =
+    remember(context) {
+      VegaDataLoaders.directoryThenNetwork(context.cacheDir, cacheDownloads = true)
+    }
+  val controller =
+    remember(loader) { VegaChartController(textEngine = AndroidTextEngine(), loader = loader) }
 
   LaunchedEffect(chart, dark, pasted) {
     val asset = chart.specAsset

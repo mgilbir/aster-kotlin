@@ -1,6 +1,14 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
+    <!--
+        For the data a pasted specification names by URL. The loader restricts it to one host,
+        vega.github.io, which is where the Vega project publishes the data its gallery examples
+        refer to; see VegaDataLoaders. Without this permission a pasted gallery example draws its
+        axes and nothing else.
+    -->
+    <uses-permission android:name="android.permission.INTERNET" />
+
     <application
         android:dataExtractionRules="@xml/data_extraction_rules"
         android:fullBackupContent="@xml/backup_rules"

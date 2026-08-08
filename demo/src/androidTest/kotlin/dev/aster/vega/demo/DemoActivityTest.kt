@@ -4,12 +4,17 @@ import androidx.test.core.app.ActivityScenario
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import dev.aster.vega.android.AndroidTextEngine
+import dev.aster.vega.loader.VegaDataLoaders
 import dev.aster.vega.model.DiagnosticSeverity
 import dev.aster.vega.runtime.VegaChartController
+import dev.aster.vega.scene.flatten
 import dev.aster.vega.scene.toCanonicalJson
+import java.io.File
+import java.io.IOException
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertTrue
+import org.junit.Assume
 import org.junit.Test
 import org.junit.runner.RunWith
 
@@ -21,6 +26,55 @@ class DemoActivityTest {
     ActivityScenario.launch(DemoActivity::class.java).use { scenario ->
       scenario.onActivity { activity -> assertTrue(!activity.isFinishing) }
     }
+  }
+
+  /**
+   * The loader the demo wires, doing the thing it is wired for: fetching a gallery example's data.
+   *
+   * On the device, over a real socket, because that is the part that cannot be proved anywhere else
+   * — the JVM tests use a fake transport, and a missing `INTERNET` permission or an Android policy
+   * the desktop JVM does not have would show up here and nowhere before here.
+   *
+   * Skipped rather than failed when the device has no route out: an emulator without networking is
+   * a fact about the machine, not a regression in the demo.
+   */
+  @Test
+  fun aPastedSpecificationLoadsItsDataFromTheGallery() {
+    val context = InstrumentationRegistry.getInstrumentation().targetContext
+    val cache = File(context.cacheDir, "loader-test").apply { deleteRecursively() }
+    val loader = VegaDataLoaders.directoryThenNetwork(cache, cacheDownloads = true)
+
+    val rows =
+      try {
+        loader.load("data/barley.json")
+      } catch (unreachable: IOException) {
+        Assume.assumeNoException("no route to vega.github.io from this device", unreachable)
+        return
+      }
+    assertTrue("fetched nothing", rows.contains("\"variety\""))
+
+    // Cached where the next load will find it, so the second read needs no network.
+    assertTrue("nothing was cached", File(cache, "data/barley.json").isFile)
+
+    // And the whole way through: a specification naming that URL compiles into marks.
+    val controller = VegaChartController(textEngine = AndroidTextEngine(), loader = loader)
+    val compiled =
+      controller.setSpec(
+        """
+        {"width": 200, "height": 100, "padding": 5,
+         "data": [{"name": "barley", "url": "data/barley.json"}],
+         "scales": [{"name": "x", "type": "linear", "range": "width",
+                     "domain": {"data": "barley", "field": "yield"}}],
+         "marks": [{"type": "symbol", "from": {"data": "barley"},
+                    "encode": {"enter": {"x": {"scale": "x", "field": "yield"},
+                                         "y": {"value": 50}}}}]}
+        """
+      )
+    assertTrue(
+      "compiled with errors: ${compiled.diagnostics}",
+      compiled.diagnostics.none { it.severity >= DiagnosticSeverity.ERROR },
+    )
+    assertEquals(120, controller.snapshot.scene.flatten().count { it.node.metadata.role == "mark" })
   }
 
   @Test

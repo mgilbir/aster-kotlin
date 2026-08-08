@@ -114,6 +114,16 @@ engines have to read the same bytes.
 `ExampleTriage` uses the network half with caching, so a corpus of bare specifications fills itself
 in on the first run. It is a survey run by hand, not a gate.
 
+The **demo** wires it too — `directoryThenNetwork(cacheDir, cacheDownloads = true)` — so pasting a
+gallery example with `"url": "data/..."` draws the chart. It needs `INTERNET` in the manifest, and
+`DemoActivityTest.aPastedSpecificationLoadsItsDataFromTheGallery` proves it on the device over a real
+socket, which is the only place a missing permission would show up.
+
+**Pre-existing, unrelated:** `DemoActivityTest.theClipboardIsReadBackAsTextWhileTheAppHasFocus` fails
+on this emulator — the clipboard needs foreground focus on Android 10 and later, which the run does
+not reliably give. It fails identically on the commit before the loader work, and connected tests are
+not part of `check.sh`.
+
 ## Pick the next example the same way
 
 The method that worked four times: take one real example, add it as a differential fixture *first*, let
