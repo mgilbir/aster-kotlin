@@ -2,10 +2,12 @@ package dev.aster.vega.runtime.compile
 
 import dev.aster.vega.dataflow.transform.TreeSource
 import dev.aster.vega.expression.CachingExpressionCompiler
+import dev.aster.vega.expression.Clock
 import dev.aster.vega.expression.ExpressionCompiler
 import dev.aster.vega.expression.ExpressionEvaluationException
 import dev.aster.vega.expression.ExpressionResult
 import dev.aster.vega.expression.ExpressionScope
+import dev.aster.vega.expression.RandomStream
 import dev.aster.vega.expression.VegaExpressionCompiler
 import dev.aster.vega.expression.indataCounts
 import dev.aster.vega.expression.indataLookup
@@ -77,7 +79,19 @@ public class SignalScope(
   private val datasetSink: ((String, List<VegaValue>) -> Unit)? = null,
   /** The hierarchy each stratified dataset built, for `treePath` and `treeAncestors`. */
   private val trees: Map<String, TreeSource> = emptyMap(),
+  /**
+   * The chart's one random stream, shared by every scope derived from this one.
+   *
+   * Shared on purpose: upstream's generator is module-level, so a view's draws form a single
+   * sequence and the picture depends on the order the expressions run in. A scope that copied the
+   * stream would restart it for every datum and every mark.
+   */
+  override val random: RandomStream = RandomStream(),
+  /** What `now()` answers, pinned by default so a compile is a pure function. */
+  private val clock: Clock = Clock.Fixed,
 ) : ExpressionScope {
+
+  override fun now(): Double = clock.now()
 
   override fun setDataset(name: String, rows: List<VegaValue>) {
     datasetSink?.invoke(name, rows)
@@ -204,6 +218,8 @@ public class SignalScope(
       pendingScales,
       datasetSink,
       trees,
+      random,
+      clock,
     )
 
   /** Adds the scales once they exist, which is after every signal has resolved. */
@@ -221,6 +237,8 @@ public class SignalScope(
       pendingScales,
       datasetSink,
       trees,
+      random,
+      clock,
     )
 
   public val names: Set<String>
@@ -248,6 +266,9 @@ public class SignalResolver(
   private val diagnostics: DiagnosticCollector,
   /** Shared so the same expression text is parsed once across signals, encodings and axes. */
   private val expressions: ExpressionCompiler = CachingExpressionCompiler(VegaExpressionCompiler()),
+  /** The one stream every scope this resolver builds draws from; see [SignalScope.random]. */
+  private val random: RandomStream = RandomStream(),
+  private val clock: Clock = Clock.Fixed,
 ) {
 
   /**
@@ -361,6 +382,8 @@ public class SignalResolver(
         diagnostics = diagnostics,
         scales = scales,
         datasetSink = datasetSink,
+        random = random,
+        clock = clock,
       )
 
     public fun resolve(
@@ -426,6 +449,8 @@ public class SignalResolver(
                 scales = scales,
                 pendingScales = pendingScales,
                 datasetSink = datasetSink,
+                random = random,
+                clock = clock,
               )
             )
           } catch (e: ExpressionEvaluationException) {

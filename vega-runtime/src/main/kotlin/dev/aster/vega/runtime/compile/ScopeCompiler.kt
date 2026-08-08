@@ -4,7 +4,9 @@ import dev.aster.vega.dataflow.transform.AggregateOp
 import dev.aster.vega.dataflow.transform.aggregateOver
 import dev.aster.vega.dataflow.transform.compareFieldValues
 import dev.aster.vega.dataflow.transform.groupTuples
+import dev.aster.vega.expression.Clock
 import dev.aster.vega.expression.ExpressionCompiler
+import dev.aster.vega.expression.RandomStream
 import dev.aster.vega.model.DiagnosticCodes
 import dev.aster.vega.model.DiagnosticCollector
 import dev.aster.vega.model.VegaValue
@@ -82,6 +84,14 @@ internal class ScopeCompiler(
   private val diagnostics: DiagnosticCollector,
   private val expressions: ExpressionCompiler,
   private val data: DataResolver,
+  /**
+   * The chart's one random stream and its clock, passed down rather than remade.
+   *
+   * A group that started a stream of its own would restart the sequence per cell, and upstream's is
+   * one generator for the whole view.
+   */
+  private val random: RandomStream = RandomStream(),
+  private val clock: Clock = Clock.Fixed,
 ) {
 
   /**
@@ -704,7 +714,7 @@ internal class ScopeCompiler(
     // they are built from these very signals, a few lines down — so naming one of those is
     // reported as premature rather than as a scale nobody defined.
     val signals =
-      SignalResolver(diagnostics, expressions)
+      SignalResolver(diagnostics, expressions, random, clock)
         .resolve(
           spec.signals,
           datasets,

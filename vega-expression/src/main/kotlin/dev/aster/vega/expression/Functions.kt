@@ -87,11 +87,6 @@ public object Functions {
    */
   public val knownUnsupported: Map<String, String> =
     mapOf(
-      "random" to "produces a non-reproducible scene",
-      "sampleNormal" to "produces a non-reproducible scene",
-      "sampleLogNormal" to "produces a non-reproducible scene",
-      "sampleUniform" to "produces a non-reproducible scene",
-      "now" to "produces a non-reproducible scene",
       "timeParse" to
         "parsing a date against a format string needs a strptime the engine does not have; " +
           "an ISO 8601 string works through toDate",

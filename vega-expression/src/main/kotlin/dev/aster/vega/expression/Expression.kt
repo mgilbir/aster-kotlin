@@ -135,7 +135,31 @@ public interface ExpressionScope {
 
   /** `treeAncestors('name', node)` — that node's row and every ancestor's, the root last. */
   public fun treeAncestors(name: String, node: VegaValue): VegaValue = VegaValue.Null
+
+  /**
+   * The stream `random()` and the `sample*` family draw from.
+   *
+   * On the scope rather than in [Functions] because it is the one family whose answer depends on
+   * how many times it has already been asked, and per-evaluation state is what a scope is for.
+   * Upstream shares one module-level generator across a whole view, so a chart's picture depends on
+   * the order its expressions run in as much as on the generator; handing out a fresh stream per
+   * call would be reproducible and would not be upstream.
+   */
+  public val random: RandomStream
+    get() = DetachedStream
+
+  /** `now()` — the instant this compile is pinned to; see [Clock]. */
+  public fun now(): Double = Clock.PINNED
 }
+
+/**
+ * The stream a scope that is not compiling a chart draws from.
+ *
+ * Shared, and so *not* reproducible across evaluations — which is the point: it exists for a bare
+ * expression evaluated in a test, where nothing downstream depends on the sequence. Every scope the
+ * runtime builds owns a stream of its own, seeded per compile.
+ */
+private val DetachedStream = RandomStream()
 
 /**
  * The index upstream's `indata` looks a value up in: string-coerced field value to row count.

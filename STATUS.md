@@ -21,7 +21,7 @@ end to end — expressions, signals, 33 of upstream's 40 data transforms, every 
 and an event handler that recompiles the chart — and are verified against upstream Vega by
 differential tests.
 
-Ninety-eight differential fixtures pass, all matching upstream exactly on every mark and scale output:
+One hundred differential fixtures pass, all matching upstream exactly on every mark and scale output:
 
 | Fixture | Marks | Covers |
 | --- | --- | --- |
@@ -123,6 +123,8 @@ Ninety-eight differential fixtures pass, all matching upstream exactly on every 
 | `time-units` | 40 | Vega's time-unit bar chart: a scale domain whose *field name* comes from a signal, a band axis of instants labelled by `formatType: "time"` with a specifier `timeUnitSpecifier` chose, and an italic subtitle |
 | `calendar-view` | 6311 | Vega's calendar view: 21 faceted years ordered by a `sort` over the *datum*, `timeOffset` moving a week's Sunday to its Monday, axis labels hidden by a rule of their own, and a legend whose title stands beside its ramp |
 | `crossfilter-flights` | 171 | Vega's cross-filter: 200,000 rows binned three ways, `crossfilter` recording which range query each fails and `resolvefilter` reading those verdicts back per histogram |
+| `clock` | 93 | Vega's world clock, on a stopped clock: `now()` pinned to the same instant on both sides |
+| `watch` | 92 | The same face drawn from arcs, and the second example built on `now()` |
 
 The gate is wired into `./scripts/oracle.sh`, so every further scale, mark and transform is built
 against a harness that can say we are wrong — which golden tests cannot.
@@ -182,7 +184,7 @@ substantive compatibility items:
 | 6. View and Compose APIs | Yes |
 | 7. SVG, PNG, PDF export | Yes |
 | 8. TalkBack can describe and navigate | Partial — virtual nodes are tested by instrumentation, not with TalkBack itself |
-| 9. At least 100 compatibility fixtures pass | 98 of 100 |
+| 9. At least 100 compatibility fixtures pass | **Yes** — 100 |
 | 10. Core runtime has no Android dependency | Yes |
 | 11. Renders without WebView | Yes |
 | 12. Build and test loop runs from the terminal | Yes |
@@ -519,7 +521,7 @@ each example a deadline.
 
 ## Known failing fixtures
 
-None. Ninety-eight fixtures exist and all ninety-eight pass — and that sentence became worth
+None. One hundred fixtures exist and all one hundred pass — and that sentence became worth
 something only once the gate could no longer skip itself, below.
 
 **The gate could report success without running.** `FixtureDifferentialTest` reads the fixtures and
@@ -836,6 +838,49 @@ Bin boundaries are never thinned. Upstream raises the tick count to the number o
 With that, `histogram-null-values` passes, and it took four separate pieces to get there: the
 dependency order, `bin` publishing its settings, `autosize: fit`, and this. Each of them turned up a
 defect in code that was already passing.
+
+## `random()` and `now()` are implemented, and the refusal is lifted
+
+Both were refused for reproducibility (PROJECT_BRIEF.md 18.2): a chart that draws a different
+picture every run cannot be compared with anything, including itself. That reasoning was right and
+the conclusion was not. Both are ordinary non-determinism with an injection point at each end, and
+pinning both ends makes them *more* testable than most of what is already here.
+
+- `RandomStream` is upstream's `randomLCG`, arithmetic included. The multiplier overflows 2^53 —
+  `1103515245 * seed` reaches 2.4e18 — so JavaScript loses low bits and the sequence that follows is
+  a property of that loss. It is computed in doubles for exactly that reason; doing it correctly in
+  a `Long` gives a different and arguably better generator that is not upstream's.
+- The stream is **one per compile**, shared by every scope, because upstream's is a module-level
+  binding shared by a whole view. A chart's picture therefore depends on the *order* its expressions
+  run in as much as on the generator, and `sampleNormal` keeps Box–Muller's second value between
+  calls, so three normals cost two pairs of uniforms rather than three. Both are reproduced.
+- `oracle-js/src/determinism.js` puts the same generator into upstream with
+  `vega.setRandom(vega.randomLCG(42))` and stops `Date.now` at 2026-01-01T00:00:00Z. The seed and
+  the instant are duplicated in `RandomStream.DEFAULT_SEED` and `Clock.PINNED`; they have to agree,
+  and the comparison is only meaningful because they do.
+- `SpecCompiler` takes a `randomSeed` and a `Clock`, both defaulting to the pinned values. A host
+  that wants a genuinely stochastic chart, or a live clock, passes its own; nothing else reads
+  either. The default keeps the property 18.2 was protecting — a compile is a pure function of its
+  specification — while making the chart *possible*.
+
+`clock` and `watch` are fixtures and pass exactly. That is the whole point of the exercise: two
+charts that were "impossible to verify" now have references that hold to the last decimal.
+
+Six of the eight examples in this category need more than the clock and the generator, and scouting
+them said what:
+
+- **`hypothetical-outcome-plots`** — the right *number* of marks, wrong values. The draw order
+  differs from upstream's, which is the interesting failure: it means the generator agrees and the
+  dataflow does not ask for its numbers in the same sequence.
+- **`error-bars`** — needs the `ci0`/`ci1` aggregate operations. `RandomStream.bootstrapConfidence`
+  is implemented and pinned to upstream's algorithm; the aggregate does not offer them yet.
+- **`pi-monte-carlo`** — two `group/scope` marks short, so a layout gap rather than a random one.
+- **`bar-line-toggle`** — 155 marks against upstream's 100: a signal-driven toggle, which needs the
+  `on` handler machinery rather than anything stochastic.
+- **`serpentine-timeline`** — scale ranges reversed and a different width; a layout problem.
+- **`word-cloud`** — upstream's own headless output is degenerate (`fontSize: 0`, a width of
+  `-Infinity`), because the `wordcloud` transform measures text against a canvas that is not there.
+  There is nothing to compare against; this one needs a different kind of evidence.
 
 ## `crossfilter-flights`, and a mark count that meant the opposite of what it said
 
@@ -1176,7 +1221,7 @@ depends on them. Each has a test and a comment; this is the index.
    covered". That is the right sentence in the wrong place. Either the fixtures grow a second,
    reader-facing description, or the demo's bundled specifications stop being fixture files. The
    engine is not at fault; the demo reads badly and a user would notice before any of us did.
-3. **Keep growing the fixture corpus.** 98 of the brief's 100. Aiming it at *combinations* the
+3. **Keep growing the fixture corpus.** The brief's 100 is reached; the corpus is now aimed at the three categories the brief used to rule out. Aiming it at *combinations* the
    engine has not met rather than at more variations of a single feature is what makes it find
    things: that is how `scale()` in an expression turned up missing. Untried combinations that
    remain include an axis on a discretizing scale, a group whose signals shadow the outer scope's,
