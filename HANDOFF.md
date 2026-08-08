@@ -195,10 +195,12 @@ those before comparing, they paint nothing.
 its datasets are fetched into `test-fixtures/data/` and committed. Discount every loader diagnostic
 when judging how far an example is from passing.
 
-**Where the corpus stands, from `ExampleTriage` rather than from memory: 70 of the 93 compile clean,
-23 still report errors.** Twenty-two of those 23 are refused by design — eleven geo/topojson, eight
-needing `random()` or `now()`, three needing the raster family. **`crossfilter-flights` is the only
-non-refused example still reporting an error.**
+**Where the corpus stands, from `ExampleTriage` rather than from memory: 71 of the 93 compile clean,
+22 still report errors** — and every one of the 22 was refused by design until this session: eleven
+geo/topojson, eight needing `random()` or `now()`, three needing the raster family. **The owner has
+since asked for all three refusals to be overturned**, so they are targets now rather than non-goals;
+PROJECT_BRIEF.md §3.3 and §18.2 are stale on this point and should be amended when the work lands.
+Nothing outside those three categories reports an error.
 
 **`time-units` is done** and is a fixture; STATUS.md describes the five things it needed. The
 handoff's prediction was right as far as it went — the domain field is a `FieldRef` now — but the two
