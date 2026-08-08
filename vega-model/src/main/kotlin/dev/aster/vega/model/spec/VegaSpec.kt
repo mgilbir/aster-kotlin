@@ -308,10 +308,17 @@ public sealed interface DomainSpec {
   /** An explicit domain written into the specification. */
   public data class Literal(val values: List<VegaValue>) : DomainSpec
 
-  /** `{"data": "table", "field": "amount"}` — resolved from a dataset. */
+  /**
+   * `{"data": "table", "field": "amount"}` — resolved from a dataset.
+   *
+   * The column is a [FieldRef] rather than a name because upstream's `Scope.fieldRef` accepts
+   * `{"signal": ...}` here, and that is how a chart offers a measure picker: one scale over
+   * whichever column the control selected. It is the *name* the signal supplies, so it is one
+   * lookup, not two — the same distinction a `{"scale": {...}}` reference makes.
+   */
   public data class FromField(
     val data: String,
-    val field: String,
+    val field: FieldRef,
     val sort: DomainSort? = null,
   ) : DomainSpec
 
@@ -530,6 +537,15 @@ public data class TitleSpec(
    */
   val fontWeight: String? = null,
   /**
+   * `fontStyle`/`subtitleFontStyle` — `"italic"` or `"normal"`.
+   *
+   * Vega's own subtitle style in several examples, and it is not decoration alone: an italic face
+   * is measured as well as drawn, so a chart whose subtitle is its widest line is a different size
+   * without it.
+   */
+  val fontStyle: String? = null,
+  val subtitleFontStyle: String? = null,
+  /**
    * `dx`/`dy` — a nudge applied after the anchor has placed the title.
    *
    * Written either as a property or inside the title's own `encode.update`, which is where a
@@ -618,10 +634,25 @@ public data class AxisSpec(
   /**
    * A d3-format specifier for the tick labels, which is how a price axis reads `$1.50`.
    *
-   * Only meaningful on a numeric scale: a discrete domain's labels are its own values and upstream
-   * coerces them to strings without consulting this.
+   * Only meaningful on a numeric scale unless [formatType] says otherwise: a discrete domain's
+   * labels are its own values and upstream coerces them to strings without consulting this.
    */
   val format: String? = null,
+  /**
+   * `format: {"signal": "..."}` — the specifier is chosen while the chart runs.
+   *
+   * A chart whose time granularity is bound to a control has no constant to write down: the format
+   * follows the units, and `timeUnitSpecifier` is what turns one into the other.
+   */
+  val formatExpression: String? = null,
+  /**
+   * `formatType`: which grammar [format] is written in — `number`, `time` or `utc`.
+   *
+   * It overrides what the scale would have chosen, and that is the point: a `band` scale over
+   * instants has no formatter of its own, so `time` is the only thing that makes its labels read as
+   * dates rather than as epoch milliseconds.
+   */
+  val formatType: String? = null,
   /**
    * Where along a band a tick and its gridline sit, as a fraction: 0 the start, 0.5 the centre.
    *

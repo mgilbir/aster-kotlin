@@ -370,6 +370,26 @@ class ExpressionReferenceTest {
         "utcFormat(utc(2026, 0, 5), '%j')|\"005\"",
         "utcFormat(utc(2026, 6, 4, 13, 7), '%I:%M %p')|\"01:07 PM\"",
         "utcFormat(utc(2026, 6, 4), '%y')|\"26\"",
+        // `%q` is Vega's own directive and `%U` counts Sunday boundaries from the year's start, so
+        // a year opening on a Sunday has no week 0 and one opening on a Tuesday does.
+        "utcFormat(utc(2012, 4, 15), 'Q%q W%U')|\"Q2 W20\"",
+        "utcFormat(utc(2012, 0, 1), 'W%U')|\"W01\"",
+        "utcFormat(utc(2013, 0, 1), 'W%U')|\"W00\"",
+        "utcFormat(utc(2013, 0, 5), 'W%U')|\"W00\"",
+        "utcFormat(utc(2013, 0, 6), 'W%U')|\"W01\"",
+        "utcFormat(utc(2026, 11, 31), 'Q%q W%U')|\"Q4 W52\"",
+        // ---- the format a set of time units is labelled with ----
+        // The longest recognised *run* wins, which is what collapses three units into one field,
+        // and the units are put in calendar order before the runs are matched.
+        "timeUnitSpecifier(['day'], {hours:'%H'})|\"%a\"",
+        "timeUnitSpecifier(['year','month'])|\"%Y-%m\"",
+        "timeUnitSpecifier(['date','year','month'])|\"%Y-%m-%d\"",
+        "timeUnitSpecifier(['quarter'])|\"Q%q\"",
+        "timeUnitSpecifier(['week'])|\"W%U\"",
+        "timeUnitSpecifier(['hours','minutes'])|\"%H:%M\"",
+        "timeUnitSpecifier(['date','hours'])|\"%d %H:00\"",
+        "timeUnitSpecifier(['seconds'])|\":%S\"",
+        "timeUnitSpecifier('month')|\"%b\"",
         // ---- reading ----
         "toDate('2026-01-05T00:00:00Z')|1767571200000",
         "utcyear(toDate('2026-01-05T00:00:00Z'))|2026",

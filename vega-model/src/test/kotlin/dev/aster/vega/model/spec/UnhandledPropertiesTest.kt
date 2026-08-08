@@ -92,10 +92,11 @@ class UnhandledPropertiesTest {
               "baseline": "top"}"""
         )
       )
-    // `fontWeight` and `font` are read now — a theme setting the heading in `config.title` is
-    // ordinary, and the weight changes the *measurement*, not only the look.
+    // `fontWeight`, `font` and `fontStyle` are read now — a theme setting the heading in
+    // `config.title` is ordinary, and both the weight and the slant change the *measurement*, not
+    // only the look.
     assertEquals(
-      listOf("color", "fontStyle", "lineHeight", "subtitleColor", "baseline").sorted(),
+      listOf("color", "lineHeight", "subtitleColor", "baseline").sorted(),
       reported.sorted(),
     )
   }

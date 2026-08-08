@@ -62,6 +62,8 @@ internal object GuideCaption {
      * says "from 1.2 to 3.4".
      */
     format: String? = null,
+    /** The axis's `formatType`, which decides whether [format] is read as a date or a number. */
+    formatType: String? = null,
   ): String? {
     if (scale == null) return null
     val axis = if (orient == "left" || orient == "right") "Y-axis" else "X-axis"
@@ -69,7 +71,7 @@ internal object GuideCaption {
       append(axis)
       if (!title.isNullOrBlank()) append(" titled '$title'")
       append(" for a ${typeName(scale, declaredType)} scale")
-      append(" with ${domain(scale, format)}")
+      append(" with ${domain(scale, format, formatType)}")
     }
   }
 
@@ -114,15 +116,15 @@ internal object GuideCaption {
    * ranges and the boundaries are what a reader needs to place a mark. A **discrete** scale reads
    * its values, truncated. A **continuous** one reads its two ends.
    */
-  private fun domain(scale: VegaScale, format: String? = null): String =
+  private fun domain(scale: VegaScale, format: String? = null, formatType: String? = null): String =
     when (scale) {
       is BinnedScale -> {
         val cuts = scale.thresholds.map { formatTickLabel(it, decimalsFor(scale.thresholds)) }
         "${cuts.size} boundar${if (cuts.size == 1) "y" else "ies"}: ${cuts.joinToString(", ")}"
       }
-      is BandScale -> discrete(scale.domain)
-      is PointScale -> discrete(scale.domain)
-      is OrdinalScale -> discrete(scale.domain)
+      is BandScale -> discrete(scale.domain.map { spoken(it, format, formatType) })
+      is PointScale -> discrete(scale.domain.map { spoken(it, format, formatType) })
+      is OrdinalScale -> discrete(scale.domain.map { spoken(it, format, formatType) })
       is TimeScale -> {
         val suffix = if (scale.zone == TimeZone.UTC) " UTC" else ""
         val from = TimeFormat.format(scale.domain.first(), DATE_PATTERN, scale.zone)
@@ -161,6 +163,25 @@ internal object GuideCaption {
         values.joinToString(", ")
       }
     return "$n value${if (n == 1) "" else "s"}: $body"
+  }
+
+  /**
+   * One discrete value, as a listener hears it.
+   *
+   * Upstream expands the abbreviating directives before reading a caption out — `%a` becomes `%A`
+   * and `%b` becomes `%B` — so an axis whose labels say "Sun" is described as "Sunday". Without a
+   * format type there is nothing temporal to expand and the value stands as it is written.
+   */
+  private fun spoken(value: String, format: String?, formatType: String?): String {
+    val zone =
+      when (formatType) {
+        "time" -> TimeZone.currentSystemDefault()
+        "utc" -> TimeZone.UTC
+        else -> return value
+      }
+    val instant = value.toDoubleOrNull() ?: return value
+    val pattern = format?.replace("%a", "%A")?.replace("%b", "%B") ?: DATE_PATTERN
+    return TimeFormat.format(instant, pattern, zone)
   }
 
   private fun continuous(low: Double, high: Double, format: (Double, Int) -> String): String =

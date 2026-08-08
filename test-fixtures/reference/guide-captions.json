@@ -920,6 +920,26 @@
   "caption": "X-axis for a utc scale with values from Friday, 01 May 2026, 12:00:00 AM UTC to Saturday, 02 May 2026, 12:00:00 AM UTC"
  },
  {
+  "fixture": "time-units",
+  "kind": "axis",
+  "caption": "X-axis for a discrete scale with 7 values: Sunday, Monday, Tuesday, Wednesday, Thursday, Friday, Saturday"
+ },
+ {
+  "fixture": "time-units",
+  "kind": "axis",
+  "caption": "Y-axis titled 'Average Delay (min)' for a linear scale with values from 0 to 12"
+ },
+ {
+  "fixture": "time-units",
+  "kind": "title",
+  "caption": "Title text 'U.S. Flight Statistics'"
+ },
+ {
+  "fixture": "time-units",
+  "kind": "subtitle",
+  "caption": "Subtitle text '20k Sample, January - March 2001'"
+ },
+ {
   "fixture": "timeunit",
   "kind": "axis",
   "caption": "X-axis for a utc scale with values from Thursday, 01 January 2026, 12:00:00 AM UTC to Tuesday, 05 May 2026, 12:00:00 AM UTC"

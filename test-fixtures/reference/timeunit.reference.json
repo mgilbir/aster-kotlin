@@ -302,8 +302,8 @@
   "scales": {
     "x": {
       "domain": [
-        "Thu Jan 01 2026 01:00:00 GMT+0100 (Central European Standard Time)",
-        "Tue May 05 2026 02:00:00 GMT+0200 (Central European Summer Time)"
+        1767225600000,
+        1777939200000
       ],
       "range": [
         0,

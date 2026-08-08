@@ -9,7 +9,7 @@ Branch `milestone-0-bootstrap`. Working tree clean, both gates green:
 - `./scripts/check.sh` — format, all tests, lint, demo APK
 - `./scripts/oracle.sh` — regenerates upstream references and runs the differential comparison
 
-**95 differential fixtures pass, all matching upstream exactly.** That is the only number here
+**96 differential fixtures pass, all matching upstream exactly.** That is the only number here
 that means what it says.
 
 ## Read this before trusting the other number
@@ -200,15 +200,16 @@ when judging how far an example is from passing.
 needing `random()` or `now()`, three needing the raster family. **`crossfilter-flights` is the only
 non-refused example still reporting an error.**
 
-Two more compile clean but do not yet *match*, and are parked in the scratchpad hold directory with
-their data already fetched:
+**`time-units` is done** and is a fixture; STATUS.md describes the five things it needed. The
+handoff's prediction was right as far as it went — the domain field is a `FieldRef` now — but the two
+"small residuals" were not small and were not what they looked like. The missing tick and the wrong
+width were **one** defect each, and neither was arithmetic on ticks: the tick came back the moment the
+domain was no longer empty, and the width was a floating-point crumb in a rotated text mark's bounds
+that `Math.ceil` turned into a whole unit of plotting area. Read the STATUS section before assuming
+anything similar is a rounding tolerance.
 
-- **`time-units`** — down to one gap and it is a specific one: `"domain": {"data": "flights",
-  "field": {"signal": "measure"}}`. A scale domain whose **field name comes from a signal**.
-  `DomainSpec.FromField` holds `field: String`, so the object does not parse into a name, the domain
-  comes out empty, and every bar is drawn at zero height. Widening that field to a `FieldRef` the way
-  `ChannelValue.Scaled.field` already is should be the whole of it. After that, two small residuals:
-  one axis tick short of upstream's fourteen, and a surface 3.5 units wide of 600.
+One example remains parked in the scratchpad hold directory with its data already fetched:
+
 - **`calendar-view`** — further out. Its `y` scale domain is a list of `datetime(...)` values and the
   marks come out transposed against upstream's (`x` and `y` swapped), so start by comparing one
   rect's encode against what upstream places. It also wants `timeOffset`, which is now implemented,

@@ -10,6 +10,7 @@ import dev.aster.vega.model.spec.Anchor
 import dev.aster.vega.model.spec.AxisSpec
 import dev.aster.vega.model.spec.Orient
 import dev.aster.vega.model.spec.ScaleType
+import dev.aster.vega.model.time.TimeFormat
 import dev.aster.vega.runtime.scale.BandScale
 import dev.aster.vega.runtime.scale.LinearScale
 import dev.aster.vega.runtime.scale.PointScale
@@ -32,6 +33,7 @@ import dev.aster.vega.scene.TextNode
 import dev.aster.vega.scene.TextRun
 import dev.aster.vega.scene.Transform2D
 import dev.aster.vega.scene.transformedBounds
+import kotlinx.datetime.TimeZone
 
 /**
  * Generates axis scene nodes: ticks, labels, gridlines and the domain line.
@@ -115,7 +117,11 @@ public class AxisBuilder(
       return null
     }
 
-    val ticks = ticksFor(scale, spec)
+    // The label specifier, resolved once: a specification may compute it rather than write it
+    // down, and a chart bound to a granularity control does exactly that.
+    val specifier =
+      spec.format ?: spec.formatExpression?.let { numbers.resolveText(it, spec.scale) }
+    val ticks = ticksFor(scale, spec, specifier)
     if (ticks == null) {
       diagnostics.error(
         DiagnosticCodes.SCALE_UNSUPPORTED_TYPE,
@@ -335,7 +341,8 @@ public class AxisBuilder(
                   titleText,
                   scale,
                   scaleTypes[spec.scale],
-                  spec.format,
+                  specifier,
+                  spec.formatType,
                 )
                 ?.let {
                   AccessibilityDescriptor(label = it, role = "graphics-symbol", focusable = true)
@@ -553,13 +560,15 @@ public class AxisBuilder(
       ?: numbers.resolve(spec.offset, spec.scale)
       ?: 0.0
 
-  private fun ticksFor(scale: VegaScale, spec: AxisSpec): List<Tick>? {
+  private fun ticksFor(scale: VegaScale, spec: AxisSpec, specifier: String?): List<Tick>? {
     // A scale with `bins` has its tick values already decided: upstream's `tickValues` returns the
     // boundaries themselves rather than asking the scale to generate any. An axis that *also* names
     // `values` still wins, as it does upstream, where `values` is checked first.
     val explicit =
-      spec.values ?: scale.bins?.map { VegaValue.Num(it) } ?: return generatedTicks(scale, spec)
-    if (scale !is PositionScale) return generatedTicks(scale, spec)
+      spec.values
+        ?: scale.bins?.map { VegaValue.Num(it) }
+        ?: return generatedTicks(scale, spec, specifier)
+    if (scale !is PositionScale) return generatedTicks(scale, spec, specifier)
 
     // Bin boundaries are never thinned: upstream raises the count to the number of bins first, so
     // the halving that a long `values` list gets never applies to them.
@@ -569,7 +578,7 @@ public class AxisBuilder(
       } else {
         numbers.resolveInt(spec.tickCount, spec.scale) ?: explicit.size.coerceAtLeast(1)
       }
-    val label = labeller(scale, count, spec.format)
+    val label = labeller(scale, count, specifier, spec.formatType)
 
     val range = scale.range
     val low = kotlin.math.floor(minOf(range.first(), range.last()))
@@ -652,7 +661,30 @@ public class AxisBuilder(
     scale: PositionScale,
     count: Int,
     format: String? = null,
+    formatType: String? = null,
   ): (VegaValue) -> String {
+    // `formatType` decides the *grammar* before the scale gets a say, which is upstream's order in
+    // `vega-scale`'s `tickFormat`: a time type wins over every scale type, including the discrete
+    // ones whose labels would otherwise be their own values. It is what a chart uses to label a
+    // band of instants, since there is no temporal scale anywhere to infer it from.
+    val zone =
+      when (formatType) {
+        "time" -> TimeZone.currentSystemDefault()
+        "utc" -> TimeZone.UTC
+        else -> null
+      }
+    if (zone != null) {
+      return { value ->
+        val instant = value.asDouble()
+        when {
+          instant.isNaN() -> value.asString()
+          // No specifier means upstream's *multi*-format, which picks its own granularity per
+          // value rather than formatting them all alike.
+          format == null -> TimeTicks.label(instant, zone)
+          else -> TimeFormat.format(instant, format, zone)
+        }
+      }
+    }
     // An explicit specifier replaces the precision the scale would have chosen, and applies only
     // where there is a number to format: upstream coerces a discrete domain's own values to strings
     // and never consults it, so a band axis keeps its labels whatever this says.
@@ -680,26 +712,41 @@ public class AxisBuilder(
     }
   }
 
-  private fun generatedTicks(scale: VegaScale, spec: AxisSpec): List<Tick>? =
+  private fun generatedTicks(scale: VegaScale, spec: AxisSpec, specifier: String?): List<Tick>? =
     when (scale) {
-      is BandScale ->
-        scale.domain.zip(scale.centers()).map { (label, centre) ->
-          Tick(label, centre - AxisDefaults.CRISP_OFFSET, VegaValue.Str(label))
+      // A discrete domain's values *are* its labels unless a format type says how to read them,
+      // which is the only way a band scale over instants reads as dates rather than as numbers.
+      is BandScale -> {
+        val label = labeller(scale, scale.domain.size, specifier, spec.formatType)
+        scale.domain.zip(scale.centers()).map { (value, centre) ->
+          Tick(
+            label(VegaValue.Str(value)),
+            centre - AxisDefaults.CRISP_OFFSET,
+            VegaValue.Str(value),
+          )
         }
-      is PointScale ->
-        scale.domain.map { label ->
-          Tick(label, scale.position(VegaValue.Str(label)), VegaValue.Str(label))
+      }
+      is PointScale -> {
+        val label = labeller(scale, scale.domain.size, specifier, spec.formatType)
+        scale.domain.map { value ->
+          Tick(
+            label(VegaValue.Str(value)),
+            scale.position(VegaValue.Str(value)),
+            VegaValue.Str(value),
+          )
         }
+      }
       is LinearScale -> {
         val count =
           numbers.resolveInt(spec.tickCount, spec.scale) ?: AxisDefaults.DEFAULT_TICK_COUNT
         // Labels come from the scale rather than being formatted here, because a log scale blanks
         // the
         // crowded ones and only it knows which.
-        val format = labeller(scale, count, spec.format)
+        val format = labeller(scale, count, specifier, spec.formatType)
         scale.ticks(count).zip(scale.tickLabels(count)).map { (value, label) ->
           Tick(
-            if (spec.format == null) label else format(VegaValue.Num(value)),
+            if (specifier == null && spec.formatType == null) label
+            else format(VegaValue.Num(value)),
             scale.apply(value),
             VegaValue.Num(value),
           )
@@ -708,10 +755,11 @@ public class AxisBuilder(
       is TransformedScale -> {
         val count =
           numbers.resolveInt(spec.tickCount, spec.scale) ?: AxisDefaults.DEFAULT_TICK_COUNT
-        val format = labeller(scale, count, spec.format)
+        val format = labeller(scale, count, specifier, spec.formatType)
         scale.ticks(count).zip(scale.tickLabels(count)).map { (value, label) ->
           Tick(
-            if (spec.format == null) label else format(VegaValue.Num(value)),
+            if (specifier == null && spec.formatType == null) label
+            else format(VegaValue.Num(value)),
             scale.apply(value),
             VegaValue.Num(value),
           )

@@ -345,6 +345,19 @@ function record(type, role, item, dx, dy, precision) {
   return entry;
 }
 
+/**
+ * One value of a scale's domain or range, as something the two engines can be held to.
+ *
+ * A `Date` becomes the instant it denotes. `String(date)` would otherwise pin the comparison to
+ * Node's own wording of the machine's zone — "Sun Jan 01 2012 00:00:00 GMT+0100 (Central European
+ * Standard Time)" — which says nothing a reference should assert and hides the number underneath.
+ * The instant is exactly as strict and is what a temporal domain actually is.
+ */
+function scaleValue(value, precision) {
+  if (value instanceof Date) return canonicalNumber(+value, precision);
+  return typeof value === 'number' ? canonicalNumber(value, precision) : String(value);
+}
+
 /** Scale outputs, compared exactly: they are pure arithmetic with no rendering in the way. */
 export function normalizeScales(view, names, precision = DEFAULT_PRECISION) {
   const result = {};
@@ -357,8 +370,8 @@ export function normalizeScales(view, names, precision = DEFAULT_PRECISION) {
     }
     if (!scale) continue;
     const entry = {
-      domain: scale.domain().map((d) => (typeof d === 'number' ? canonicalNumber(d, precision) : String(d))),
-      range: scale.range().map((r) => (typeof r === 'number' ? canonicalNumber(r, precision) : String(r))),
+      domain: scale.domain().map((d) => scaleValue(d, precision)),
+      range: scale.range().map((r) => scaleValue(r, precision)),
     };
     if (typeof scale.bandwidth === 'function') {
       entry.bandwidth = canonicalNumber(scale.bandwidth(), precision);

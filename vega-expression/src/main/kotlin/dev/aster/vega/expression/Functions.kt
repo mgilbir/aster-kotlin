@@ -9,6 +9,7 @@ import dev.aster.vega.model.time.DateValues
 import dev.aster.vega.model.time.TimeFormat
 import dev.aster.vega.model.time.TimeInterval
 import dev.aster.vega.model.time.TimeStepper
+import dev.aster.vega.model.time.TimeUnits
 import dev.aster.vega.model.withTypographicMinus
 import dev.aster.vega.scene.SceneColor
 import kotlin.math.abs
@@ -568,6 +569,26 @@ public object Functions {
     dateField(map, "minutes") { it.minute.toDouble() }
     dateField(map, "seconds") { it.second.toDouble() }
     dateField(map, "milliseconds") { (it.nanosecond / 1_000_000).toDouble() }
+
+    /**
+     * `timeUnitSpecifier(units[, specifiers])` — the format the buckets of a `timeunit` read as.
+     *
+     * A chart that lets a control choose the granularity cannot write its axis format down, because
+     * the format *is* the choice: `["day"]` wants `%a` and `["year", "month"]` wants `%Y-%m`. This
+     * is how it asks for whichever one applies, and the second argument shortens a single unit
+     * without restating the rest.
+     */
+    map["timeUnitSpecifier"] = ExpressionFunction { args ->
+      val units =
+        when (val given = args.at(0)) {
+          is VegaValue.Arr -> given.values.map { JsSemantics.toStringValue(it) }
+          VegaValue.Null -> emptyList()
+          else -> listOf(JsSemantics.toStringValue(given))
+        }
+      val overrides =
+        (args.at(1) as? VegaValue.Obj)?.fields?.mapValues { (_, v) -> JsSemantics.toStringValue(v) }
+      VegaValue.Str(TimeUnits.specifier(units, overrides.orEmpty()))
+    }
 
     map["timeFormat"] = ExpressionFunction { args -> formatted(args, localZone()) }
     map["utcFormat"] = ExpressionFunction { args -> formatted(args, TimeZone.UTC) }

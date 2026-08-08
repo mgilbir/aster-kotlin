@@ -14,6 +14,7 @@ import dev.aster.vega.model.isMissing
 import dev.aster.vega.model.spec.BinsSpec
 import dev.aster.vega.model.spec.DomainSort
 import dev.aster.vega.model.spec.DomainSpec
+import dev.aster.vega.model.spec.FieldRef
 import dev.aster.vega.model.spec.NumberValue
 import dev.aster.vega.model.spec.RangeSpec
 import dev.aster.vega.model.spec.ScaleSpec
@@ -722,7 +723,8 @@ public class ScaleResolver(
     val values =
       when (val domain = spec.domain) {
         is DomainSpec.Literal -> literalDomain(domain.values, spec.name)
-        is DomainSpec.FromField -> fieldValues(domain.data, listOf(domain.field), spec.name)
+        is DomainSpec.FromField ->
+          fieldValues(domain.data, domainFields(domain.field, spec.name), spec.name)
         is DomainSpec.FromFields -> fieldValues(domain.data, domain.fields, spec.name)
         is DomainSpec.Union -> unionValues(domain.parts, spec.name)
         is DomainSpec.FromSignal -> signalDomain(domain, spec.name) ?: return null
@@ -781,7 +783,8 @@ public class ScaleResolver(
     parts.flatMap { part ->
       when (part) {
         is DomainSpec.Literal -> literalDomain(part.values, scaleName)
-        is DomainSpec.FromField -> fieldValues(part.data, listOf(part.field), scaleName)
+        is DomainSpec.FromField ->
+          fieldValues(part.data, domainFields(part.field, scaleName), scaleName)
         is DomainSpec.FromFields -> fieldValues(part.data, part.fields, scaleName)
         is DomainSpec.Union -> unionValues(part.parts, scaleName)
         is DomainSpec.FromSignal -> signalDomain(part, scaleName) ?: emptyList()
@@ -795,7 +798,8 @@ public class ScaleResolver(
   ): ClosedFloatingPointRange<Double>? {
     val values =
       when (domain) {
-        is DomainSpec.FromField -> fieldValues(domain.data, listOf(domain.field), scaleName)
+        is DomainSpec.FromField ->
+          fieldValues(domain.data, domainFields(domain.field, scaleName), scaleName)
         is DomainSpec.FromFields -> fieldValues(domain.data, domain.fields, scaleName)
         is DomainSpec.Union -> unionValues(domain.parts, scaleName)
         is DomainSpec.Literal -> literalDomain(domain.values, scaleName)
@@ -828,7 +832,8 @@ public class ScaleResolver(
         // straight through and only the data-driven branches ever see a sort.
         is DomainSpec.Literal -> literalDomain(domain.values, scaleName)
         is DomainSpec.FromField ->
-          orderedDomain(domain.data, listOf(domain.field), domain.sort, scaleName) ?: return null
+          orderedDomain(domain.data, domainFields(domain.field, scaleName), domain.sort, scaleName)
+            ?: return null
         is DomainSpec.FromFields ->
           orderedDomain(domain.data, domain.fields, domain.sort, scaleName) ?: return null
         is DomainSpec.FromSignal -> signalDomain(domain, scaleName) ?: return null
@@ -995,6 +1000,36 @@ public class ScaleResolver(
     }
     return dataset
   }
+
+  /**
+   * The column a data-driven domain reads, when the specification does not write its name down.
+   *
+   * Upstream's `Scope.fieldRef` takes a string or `{"signal": ...}` here and errors on anything
+   * else, and the signal supplies the **name** — one lookup, not the two the same object makes
+   * under a mark's `field`. That is how a chart offers a measure picker: one scale over whichever
+   * column the control selected. The remaining reference forms need a datum or an enclosing group,
+   * neither of which exists where a scale is built, so they are reported rather than guessed at.
+   *
+   * Returned as a list because an unresolvable name contributes no column at all, which is what
+   * every caller wants and what leaves the domain reporting itself as empty.
+   */
+  private fun domainFields(field: FieldRef, scaleName: String): List<String> =
+    when (field) {
+      is FieldRef.Plain -> listOf(field.path)
+      is FieldRef.Signal -> listOfNotNull(numbers.resolveText(field.expression, scaleName))
+      is FieldRef.Group,
+      is FieldRef.Parent,
+      is FieldRef.Datum,
+      is FieldRef.ParentOf -> {
+        diagnostics.error(
+          DiagnosticCodes.SCALE_INVALID_DOMAIN,
+          "Scale '$scaleName' names its domain field with a reference only an encode block can " +
+            "resolve; a scale domain takes a name or a signal holding one",
+          operator = scaleName,
+        )
+        emptyList()
+      }
+    }
 
   /** Field by field rather than row by row, which is the order upstream's grouping produces. */
   private fun fieldValues(

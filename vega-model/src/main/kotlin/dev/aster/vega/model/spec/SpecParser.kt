@@ -106,6 +106,7 @@ private val AXIS_CONSUMED =
     "labelLimit",
     "encode",
     "format",
+    "formatType",
     "bandPosition",
   ) + guideStyleKeys("label", "tick", "grid", "domain", "title")
 
@@ -124,7 +125,6 @@ private fun guideStyleKeys(vararg prefixes: String): Set<String> =
 
 private val AXIS_UNSUPPORTED =
   mapOf(
-    "formatType" to "Axis label format types are not implemented; default formatting is used",
     "labelBound" to "Bounding axis labels to the plotting area is not implemented",
     "labelFlush" to "Flushing the first and last axis label to the range ends is not implemented",
     "labelFlushOffset" to "Axis label flush offsets are not implemented; they need labelFlush",
@@ -240,6 +240,8 @@ private val TITLE_CONSUMED =
     "dx",
     "dy",
     "subtitleFontSize",
+    "fontStyle",
+    "subtitleFontStyle",
     "zindex",
   )
 
@@ -1089,7 +1091,7 @@ public class SpecParser {
           return DomainSpec.FromSignal(it.asString())
         }
         val data = domain.fields["data"]?.asString()
-        val field = domain.fields["field"]?.asString()
+        val field = fieldPath(domain.fields["field"], "$path.field")
         val rawFields = (domain.fields["fields"] as? VegaValue.Arr)?.values
         // With no `data` of its own, each entry of `fields` names its own source — a union across
         // datasets rather than across columns of one. An entry may also be a literal array, which
@@ -1337,6 +1339,9 @@ public class SpecParser {
       labelAlign = obj.fields["labelAlign"]?.takeIf { it is VegaValue.Str }?.asString(),
       labelBaseline = obj.fields["labelBaseline"]?.takeIf { it is VegaValue.Str }?.asString(),
       format = obj.fields["format"]?.takeIf { it is VegaValue.Str }?.asString(),
+      formatExpression =
+        (obj.fields["format"] as? VegaValue.Obj)?.fields?.get("signal")?.asString(),
+      formatType = axisFormatType(obj.fields["formatType"], "$path.formatType"),
       bandPosition = obj.numberOrSignal("bandPosition", "$path.bandPosition"),
       encode =
         (obj.fields["encode"] as? VegaValue.Obj)?.fields.orEmpty().mapValues { (part, block) ->
@@ -1348,6 +1353,39 @@ public class SpecParser {
       domainStyle = obj.guideStroke("domain"),
       titleStyle = obj.guideStroke("title"),
     )
+  }
+
+  /**
+   * `formatType`, which upstream's schema restricts to `number`, `time` and `utc`.
+   *
+   * A signal may choose it, and that form is reported rather than read: the specifier it selects
+   * changes what every label *says*, so guessing `number` would produce a chart full of epoch
+   * milliseconds that looks finished.
+   */
+  private fun axisFormatType(value: VegaValue?, path: String): String? {
+    val name =
+      when (value) {
+        null -> return null
+        is VegaValue.Str -> value.value.lowercase()
+        else -> {
+          diagnostics.error(
+            DiagnosticCodes.PARSE_UNKNOWN_PROPERTY,
+            "A label format type chosen by a signal is not implemented; write one of " +
+              "'number', 'time' or 'utc'",
+            jsonPath = path,
+          )
+          return null
+        }
+      }
+    if (name !in setOf("number", "time", "utc")) {
+      diagnostics.error(
+        DiagnosticCodes.PARSE_UNKNOWN_PROPERTY,
+        "Label format type '$name' is not one of 'number', 'time' or 'utc'",
+        jsonPath = path,
+      )
+      return null
+    }
+    return name
   }
 
   /**
@@ -1539,6 +1577,9 @@ public class SpecParser {
           else -> null
         },
       subtitleFontSize = obj.numberOrSignal("subtitleFontSize", "$path.subtitleFontSize"),
+      fontStyle = obj.fields["fontStyle"]?.takeIf { it is VegaValue.Str }?.asString(),
+      subtitleFontStyle =
+        obj.fields["subtitleFontStyle"]?.takeIf { it is VegaValue.Str }?.asString(),
       zindex = (obj.fields["zindex"] as? VegaValue.Num)?.value?.toInt() ?: 0,
     )
   }

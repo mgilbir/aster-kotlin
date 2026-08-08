@@ -1,6 +1,6 @@
 # Status
 
-Last updated: 2026-08-07
+Last updated: 2026-08-08
 
 ## Picking this up
 
@@ -21,7 +21,7 @@ end to end — expressions, signals, 33 of upstream's 40 data transforms, every 
 and an event handler that recompiles the chart — and are verified against upstream Vega by
 differential tests.
 
-Ninety-five differential fixtures pass, all matching upstream exactly on every mark and scale output:
+Ninety-six differential fixtures pass, all matching upstream exactly on every mark and scale output:
 
 | Fixture | Marks | Covers |
 | --- | --- | --- |
@@ -120,6 +120,7 @@ Ninety-five differential fixtures pass, all matching upstream exactly on every m
 | `multi-source-pluck` | 12 | a dataset concatenating two sources, and a signal plucking one column out of the result |
 | `interactive-legend` | 454 | a brush `rect` with no `x` until someone drags one, and a legend swatch whose opacity is a conditional rule |
 | `histogram-null-values` | 47 | Vega's film-rating histogram: a scale whose ticks are `bin`'s own boundaries, a second band scale for the null bar, `fit` sizing, and 3,201 rows from a relative `url` |
+| `time-units` | 40 | Vega's time-unit bar chart: a scale domain whose *field name* comes from a signal, a band axis of instants labelled by `formatType: "time"` with a specifier `timeUnitSpecifier` chose, and an italic subtitle |
 
 The gate is wired into `./scripts/oracle.sh`, so every further scale, mark and transform is built
 against a harness that can say we are wrong — which golden tests cannot.
@@ -179,7 +180,7 @@ substantive compatibility items:
 | 6. View and Compose APIs | Yes |
 | 7. SVG, PNG, PDF export | Yes |
 | 8. TalkBack can describe and navigate | Partial — virtual nodes are tested by instrumentation, not with TalkBack itself |
-| 9. At least 100 compatibility fixtures pass | 95 of 100 |
+| 9. At least 100 compatibility fixtures pass | 96 of 100 |
 | 10. Core runtime has no Android dependency | Yes |
 | 11. Renders without WebView | Yes |
 | 12. Build and test loop runs from the terminal | Yes |
@@ -516,7 +517,7 @@ each example a deadline.
 
 ## Known failing fixtures
 
-None. Ninety-five fixtures exist and all ninety-five pass — and that sentence became worth
+None. Ninety-six fixtures exist and all ninety-six pass — and that sentence became worth
 something only once the gate could no longer skip itself, below.
 
 **The gate could report success without running.** `FixtureDifferentialTest` reads the fixtures and
@@ -834,6 +835,46 @@ With that, `histogram-null-values` passes, and it took four separate pieces to g
 dependency order, `bin` publishing its settings, `autosize: fit`, and this. Each of them turned up a
 defect in code that was already passing.
 
+## `time-units`, and the crumb that cost a whole unit
+
+`time-units` is Vega's time-unit bar chart, and it needed five things. The first was the one the
+handoff predicted; the rest were behind it.
+
+- **A scale domain's `field` may be a signal.** `{"data": "flights", "field": {"signal": "measure"}}`
+  is how a chart offers a measure picker: one scale over whichever column the control chose.
+  `DomainSpec.FromField` held a `String`, so the object never parsed into a name, the domain came out
+  empty and every bar was drawn at zero height. It is a [FieldRef] now, resolved the way
+  `MarkEncoder.scaleName` resolves one — the signal supplies the **name**, so it is one lookup and
+  not the two the same object makes under a mark's `field`. It is also an edge in `DataflowOrder`:
+  the scale cannot be built before the signal that names its column.
+- **Axis `formatType`.** Upstream's `tickFormat` checks it *before* the scale type, so `time` wins
+  over every scale including the discrete ones whose labels are otherwise their own values. That is
+  the only thing that makes a band scale of instants read as `Sun, Mon, Tue` rather than as epoch
+  milliseconds, since there is no temporal scale anywhere to infer it from. An axis `format` written
+  as `{"signal": ...}` was parsed and dropped too, which is the same failure mode `zindex` had.
+- **`timeUnitSpecifier(units, specifiers)`**, and `%q` and `%U` with it. The specifier is chosen from
+  the longest recognised *run* of units, which is what collapses `["year", "month", "date"]` into one
+  `%Y-%m-%d` instead of three fields, and the units are put in calendar order first so
+  `["date", "year", "month"]` gives the same answer.
+- **`title.fontStyle` and `subtitleFontStyle`.** Italic is measured as well as drawn.
+- **One floating-point crumb, worth a whole unit of plotting area.** `cos(-90°)` is 6.1e-17 rather
+  than zero, so a rotated corner carries a crumb wherever it is multiplied. Upstream rotates the
+  corner's **absolute** position about the anchor, where the crumb is absorbed by a coordinate two
+  orders of magnitude larger and the sum lands exactly on the integer; this engine rotated the offset
+  from the anchor and translated afterwards, which keeps the crumb. The y-axis title reached
+  -38.00000000000001 instead of -38, `viewSizeLayout` takes `Math.ceil` of that, and the chart came
+  out 599 units wide over a plotting area a unit too narrow. `TextNode.bounds` now copies upstream's
+  arithmetic rather than merely matching it in exact terms. This is the second time a last bit has
+  decided a chart — the first was the `1e-14` inside `bin`'s floor.
+
+One harness change came with it, and it is a strengthening rather than a loosening. A scale domain's
+`Date` was recorded as `String(date)`, which pins a reference to Node's own wording of the machine's
+zone — `"Sun Jan 01 2012 00:00:00 GMT+0100 (Central European Standard Time)"` — and hides the number
+underneath. It is the instant now, which is exactly as strict, is what a temporal domain *is*, and
+made five existing references shorter. Note that `Differential.compareScales` still has no branch for
+a `TimeScale`, so those domains are recorded and not yet compared; that branch is now writable and
+was not before.
+
 ## A mark whose channel resolves to nothing
 
 `interactive-legend` draws a brush `rect` whose `x` is `brush[0]`, and there is no brush until
@@ -1051,7 +1092,7 @@ depends on them. Each has a test and a comment; this is the index.
    covered". That is the right sentence in the wrong place. Either the fixtures grow a second,
    reader-facing description, or the demo's bundled specifications stop being fixture files. The
    engine is not at fault; the demo reads badly and a user would notice before any of us did.
-3. **Keep growing the fixture corpus.** 95 of the brief's 100. Aiming it at *combinations* the
+3. **Keep growing the fixture corpus.** 96 of the brief's 100. Aiming it at *combinations* the
    engine has not met rather than at more variations of a single feature is what makes it find
    things: that is how `scale()` in an expression turned up missing. Untried combinations that
    remain include an axis on a discretizing scale, a group whose signals shadow the outer scope's,

@@ -394,8 +394,8 @@
   "scales": {
     "hx": {
       "domain": [
-        "Fri May 01 2026 02:00:00 GMT+0200 (Central European Summer Time)",
-        "Sat May 02 2026 02:00:00 GMT+0200 (Central European Summer Time)"
+        1777593600000,
+        1777680000000
       ],
       "range": [
         0,
@@ -440,8 +440,8 @@
     },
     "x": {
       "domain": [
-        "Thu Jan 15 2026 01:00:00 GMT+0100 (Central European Standard Time)",
-        "Wed Aug 05 2026 02:00:00 GMT+0200 (Central European Summer Time)"
+        1768435200000,
+        1785888000000
       ],
       "range": [
         0,

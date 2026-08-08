@@ -1,9 +1,11 @@
 package dev.aster.vega.model.time
 
 import kotlin.time.Instant
+import kotlinx.datetime.DateTimeUnit
 import kotlinx.datetime.LocalDateTime
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.isoDayNumber
+import kotlinx.datetime.minus
 import kotlinx.datetime.number
 import kotlinx.datetime.toLocalDateTime
 
@@ -65,6 +67,9 @@ public object TimeFormat {
         'd' -> out.append(pad(at.day, 2))
         'e' -> out.append(at.day.toString().padStart(2, ' '))
         'j' -> out.append(pad(at.date.dayOfYear, 3))
+        // Vega's own addition to d3's directives, and the only way to write a quarter.
+        'q' -> out.append((at.month.number - 1) / 3 + 1)
+        'U' -> out.append(pad(sundayWeek(at), 2))
         'H' -> out.append(pad(at.hour, 2))
         // Twelve-hour clock, where midnight and noon both read 12 rather than 0.
         'I' -> out.append(pad((at.hour % 12).let { if (it == 0) 12 else it }, 2))
@@ -83,6 +88,20 @@ public object TimeFormat {
       i += 2
     }
     return out.toString()
+  }
+
+  /**
+   * `%U` — how many Sundays this year has reached, which is d3's week number.
+   *
+   * d3 counts Sunday *boundaries* from the instant before January 1, so the days before the year's
+   * first Sunday are week 0 and the first Sunday itself starts week 1. A year beginning on a Sunday
+   * therefore has no week 0 at all.
+   */
+  private fun sundayWeek(at: LocalDateTime): Int {
+    val januaryFirst = at.date.minus(at.date.dayOfYear - 1, DateTimeUnit.DAY)
+    val firstSunday = 1 + (7 - januaryFirst.dayOfWeek.isoDayNumber % 7) % 7
+    val day = at.date.dayOfYear
+    return if (day < firstSunday) 0 else (day - firstSunday) / 7 + 1
   }
 
   private fun pad(value: Int, width: Int): String = value.toString().padStart(width, '0')

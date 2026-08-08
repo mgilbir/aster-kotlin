@@ -7,6 +7,7 @@ import dev.aster.vega.model.DiagnosticCollector
 import dev.aster.vega.model.VegaValue
 import dev.aster.vega.model.spec.DataSpec
 import dev.aster.vega.model.spec.DomainSpec
+import dev.aster.vega.model.spec.FieldRef
 import dev.aster.vega.model.spec.NumberValue
 import dev.aster.vega.model.spec.RangeSpec
 import dev.aster.vega.model.spec.ScaleSpec
@@ -298,8 +299,12 @@ internal class DataflowOrder(
 
     private fun collectDomain(domain: DomainSpec, into: MutableSet<Operator>) {
       when (domain) {
-        is DomainSpec.FromField ->
+        is DomainSpec.FromField -> {
           if (domain.data in dataSpecs) into.add(Operator.Data(domain.data))
+          // The *name* of the column may itself come from a signal, so the scale cannot be built
+          // until that signal has a value.
+          (domain.field as? FieldRef.Signal)?.let { into.addAll(readsOf(it.expression)) }
+        }
         is DomainSpec.FromFields ->
           if (domain.data in dataSpecs) into.add(Operator.Data(domain.data))
         is DomainSpec.Union -> domain.parts.forEach { collectDomain(it, into) }

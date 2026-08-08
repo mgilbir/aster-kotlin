@@ -6,6 +6,7 @@ import dev.aster.vega.model.spec.Orient
 import dev.aster.vega.model.spec.TitleSpec
 import dev.aster.vega.scene.AccessibilityDescriptor
 import dev.aster.vega.scene.Fill
+import dev.aster.vega.scene.FontStyle
 import dev.aster.vega.scene.GroupNode
 import dev.aster.vega.scene.NodeMetadata
 import dev.aster.vega.scene.RectD
@@ -101,7 +102,8 @@ internal class TitleBuilder(
         id = ids.allocate(),
         x = nudgeX,
         y = nudgeY,
-        layout = textEngine.layout(run(text, fontSize, titleWeight(spec), align)),
+        layout =
+          textEngine.layout(run(text, fontSize, titleWeight(spec), align, styleOf(spec.fontStyle))),
         angleDegrees = angle,
         fill = Fill.of(TitleDefaults.color),
         metadata =
@@ -139,7 +141,13 @@ internal class TitleBuilder(
             y = sy,
             layout =
               textEngine.layout(
-                run(text, subtitleFontSize, TitleDefaults.SUBTITLE_FONT_WEIGHT, align)
+                run(
+                  text,
+                  subtitleFontSize,
+                  TitleDefaults.SUBTITLE_FONT_WEIGHT,
+                  align,
+                  styleOf(spec.subtitleFontStyle),
+                )
               ),
             angleDegrees = angle,
             fill = Fill.of(TitleDefaults.color),
@@ -228,7 +236,17 @@ internal class TitleBuilder(
       }
     } ?: TitleDefaults.FONT_WEIGHT
 
-  private fun run(text: String, fontSize: Double, weight: Int, align: TextAlign) =
+  /** `"italic"` slants the face; anything else, including nothing, leaves it upright. */
+  private fun styleOf(name: String?): FontStyle =
+    if (name.equals("italic", ignoreCase = true)) FontStyle.ITALIC else FontStyle.NORMAL
+
+  private fun run(
+    text: String,
+    fontSize: Double,
+    weight: Int,
+    align: TextAlign,
+    fontStyle: FontStyle = FontStyle.NORMAL,
+  ) =
     TextRun(
       text = text,
       style =
@@ -236,6 +254,7 @@ internal class TitleBuilder(
           fontFamily = TitleDefaults.FONT_FAMILY,
           fontSize = fontSize,
           fontWeight = weight,
+          fontStyle = fontStyle,
         ),
       align = align,
       baseline = TextBaseline.TOP,

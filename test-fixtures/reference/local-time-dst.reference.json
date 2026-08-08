@@ -435,8 +435,8 @@
   "scales": {
     "x": {
       "domain": [
-        "Fri Mar 27 2026 00:00:00 GMT+0100 (Central European Standard Time)",
-        "Tue Mar 31 2026 00:00:00 GMT+0200 (Central European Summer Time)"
+        1774566000000,
+        1774908000000
       ],
       "range": [
         0,
@@ -456,8 +456,8 @@
     },
     "xu": {
       "domain": [
-        "Fri Mar 27 2026 00:00:00 GMT+0100 (Central European Standard Time)",
-        "Tue Mar 31 2026 00:00:00 GMT+0200 (Central European Summer Time)"
+        1774566000000,
+        1774908000000
       ],
       "range": [
         0,

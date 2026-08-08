@@ -362,16 +362,38 @@ public data class TextNode(
 
   override val bounds: RectD by
     lazy(LazyThreadSafetyMode.NONE) {
-      val local = layout.bounds
-      if (angleDegrees == 0.0) {
-        local.translate(x, y).normalized()
-      } else {
-        Transform2D.translate(x, y)
-          .concat(Transform2D.rotateDegrees(angleDegrees))
-          .mapBounds(local)
-          .normalized()
-      }
+      val placed = layout.bounds.translate(x, y)
+      if (angleDegrees == 0.0) placed.normalized() else rotatedAbout(placed, x, y).normalized()
     }
+
+  /**
+   * The corners of [rect] turned about ([px], [py]), in upstream's own arithmetic.
+   *
+   * The arithmetic is copied rather than merely equivalent, because the last bit decides a chart's
+   * size. `cos(-90°)` is 6.1e-17 and not zero, so a corner's coordinate carries a crumb wherever it
+   * is multiplied; upstream rotates the corner's **absolute** position, where the crumb is absorbed
+   * by a number two orders of magnitude larger and the result lands exactly on the integer.
+   * Rotating the offset from the anchor first and translating afterwards leaves the crumb intact,
+   * and a title whose reach is 38.000000000000014 rather than 38 costs the plotting area a whole
+   * unit — `viewSizeLayout` takes the ceiling of it.
+   */
+  private fun rotatedAbout(rect: RectD, px: Double, py: Double): RectD {
+    val radians = angleDegrees * kotlin.math.PI / 180.0
+    val cos = kotlin.math.cos(radians)
+    val sin = kotlin.math.sin(radians)
+    val cx = px - px * cos + py * sin
+    val cy = py - px * sin - py * cos
+    fun corner(x1: Double, y1: Double): PointD =
+      PointD(cos * x1 - sin * y1 + cx, sin * x1 + cos * y1 + cy)
+    return RectD.fromPoints(
+      listOf(
+        corner(rect.left, rect.top),
+        corner(rect.left, rect.bottom),
+        corner(rect.right, rect.top),
+        corner(rect.right, rect.bottom),
+      )
+    )
+  }
 }
 
 /** How an image fills its destination rectangle. */
