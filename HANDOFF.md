@@ -9,7 +9,7 @@ Branch `milestone-0-bootstrap`. Working tree clean, both gates green:
 - `./scripts/check.sh` — format, all tests, lint, demo APK
 - `./scripts/oracle.sh` — regenerates upstream references and runs the differential comparison
 
-**83 differential fixtures pass, all matching upstream exactly.** That is the only number here
+**84 differential fixtures pass, all matching upstream exactly.** That is the only number here
 that means what it says.
 
 ## Read this before trusting the other number
@@ -213,29 +213,14 @@ its datasets are fetched into `test-fixtures/data/` and committed. Discount ever
 when judging how far an example is from passing.
 
 What is left, by the engine gap behind it. `global-development` and `quantile-quantile-plot` were on
-this list and are now passing fixtures (`global-development`, `qq-plot`); the remaining three are:
+this list and are now passing fixtures, and so is `histogram-null-values`; the remaining two are:
 
 - `donut-chart-labelled` — the `pluck` expression function, and a dataset sourcing from *several*
   named datasets at once (`"source": ["a", "b"]`), which the parser currently reads as one name.
-- `histogram-null-values` — **two gaps, and the range array is no longer one of them.** It was added
-  as a fixture, taken as far as the ordering work reached, and set down; the spec is in the scratchpad
-  hold directory. Its `data/movies.json` is **not** committed — at 1.4 MB it is fourteen times the
-  next largest file in `test-fixtures/data/` and the fixture that needs it is not in the tree, so
-  `./scripts/oracle.sh` fetches it when the fixture comes back. What it needs now:
-  1. ~~`autosize: fit`~~ — **done**; see `autosize-fit`, `autosize-fit-x` and `autosize-fit-y`.
-  2. ~~`bin` publishing its `signal`~~ — **done**; see `bin-settings`.
-  3. What is left is the **`bins` property on a scale**, which is reported as unimplemented today.
-     `xscale` carries `"bins": {"signal": "bins"}`, and upstream's `includeZero` is
-     `!scale.bins && (Linear || Pow || Sqrt)` — so a scale with `bins` does **not** get the `zero`
-     default, which is why upstream's domain is `[1, 10]` and this engine's is `[0, 10]`. The bins
-     also become the axis ticks: upstream's `xscale.bins` is `[1, 2, … 10]` and its ticks are the
-     same array. Three of the four scale differences fall out of that one property; the fourth is the
-     tick count that follows from it.
-
-  Verified upstream for when you pick it up: `maxbins` 10, `binCount` 9, `nullGap` 10, `barStep` 33,
-  `extent` `[1.4, 9.2]`, `width` 340, `height` 178, `xscale` range `[43, 340]` domain `[1, 10]`,
-  `xscale-null` range `[0, 33]` domain `[null]`, `yscale` range `[178, 0]`.
 - `interactive-legend` — a `rect` brush with no `x` at rest; upstream draws 454 marks to our 452.
+  Related to the gap recorded above under "A gap found while binning": a scaled channel that resolves
+  to nothing should leave the property off the item rather than drop the item, which is worth reading
+  before starting this one.
 
 **Refused, not missing**, and now reported as such: `error-bars`, `bar-line-toggle`, `clock`,
 `hypothetical-outcome-plots` and `pi-monte-carlo` all need `random()` or `now()`. `error-bars` is the

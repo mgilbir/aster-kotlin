@@ -3,6 +3,7 @@ package dev.aster.vega.runtime.compile
 import dev.aster.vega.dataflow.transform.AggregateOp
 import dev.aster.vega.dataflow.transform.aggregateOver
 import dev.aster.vega.dataflow.transform.compareFieldValues
+import dev.aster.vega.expression.JsSemantics
 import dev.aster.vega.model.DiagnosticCodes
 import dev.aster.vega.model.DiagnosticCollector
 import dev.aster.vega.model.VegaValue
@@ -10,8 +11,10 @@ import dev.aster.vega.model.asDouble
 import dev.aster.vega.model.asString
 import dev.aster.vega.model.field
 import dev.aster.vega.model.isMissing
+import dev.aster.vega.model.spec.BinsSpec
 import dev.aster.vega.model.spec.DomainSort
 import dev.aster.vega.model.spec.DomainSpec
+import dev.aster.vega.model.spec.NumberValue
 import dev.aster.vega.model.spec.RangeSpec
 import dev.aster.vega.model.spec.ScaleSpec
 import dev.aster.vega.model.spec.ScaleType
@@ -35,6 +38,8 @@ import dev.aster.vega.runtime.scale.TimeTicks
 import dev.aster.vega.runtime.scale.VegaScale
 import dev.aster.vega.scene.ColorSpaces
 import dev.aster.vega.scene.SceneColor
+import kotlin.math.ceil
+import kotlin.math.floor
 import kotlinx.datetime.TimeZone
 
 /** The chart's plotting size, which named ranges like `"width"` resolve against. */
@@ -100,11 +105,101 @@ public class ScaleResolver(
   private fun buildLinear(spec: ScaleSpec): LinearScale? {
     val range = numericRange(spec) ?: return null
     // `zero` defaults to true for a linear scale whether or not the domain was written out —
-    // upstream keys it off the scale type, so `domain: [10, 20]` still starts at 0.
+    // upstream keys it off the scale type, so `domain: [10, 20]` still starts at 0. Unless the
+    // scale
+    // has `bins`: upstream's test is `!scale.bins && (linear || pow || sqrt)`, and a binned axis
+    // that quietly grew a zeroth bin would be showing a bin the data never had.
     var domain =
-      continuousDomain(spec, zeroDefault = true, fallback = listOf(0.0, 1.0)) ?: return null
+      continuousDomain(spec, zeroDefault = spec.bins == null, fallback = listOf(0.0, 1.0))
+        ?: return null
     if (spec.nice) domain = niceOf(domain, spec)
-    return LinearScale(spec.name, domain, oriented(range, spec.reverse), spec.clamp, spec.round)
+    return LinearScale(
+      spec.name,
+      domain,
+      oriented(range, spec.reverse),
+      spec.clamp,
+      spec.round,
+      binBoundaries(spec, domain),
+    )
+  }
+
+  /**
+   * The boundaries a scale's `bins` describes, resolved against its finished domain.
+   *
+   * Upstream's `configureBins`, and the clamping in it is the part worth naming: a `start` below
+   * the domain is pulled up to the first whole step inside it and a `stop` above it is pulled down,
+   * so a binning computed over a wider extent than the axis shows does not hang ticks off either
+   * end.
+   */
+  private fun binBoundaries(spec: ScaleSpec, domain: List<Double>): List<Double>? {
+    val bins = spec.bins ?: return null
+    val low = domain.first()
+    val high = domain.last()
+
+    val resolved: BinsSpec =
+      when (bins) {
+        is BinsSpec.Signal -> {
+          // The signal may hold either form. `bin` publishes the `{start, stop, step}` one, which
+          // is
+          // why a histogram can point its axis at whatever the binning worked out.
+          val value = numbers.resolveValue(bins.expression, spec.name)
+          when (value) {
+            is VegaValue.Arr -> BinsSpec.Values(value.values)
+            is VegaValue.Obj ->
+              BinsSpec.Steps(
+                start = value.fields["start"]?.let { NumberValue.Constant(it.asDouble()) },
+                stop = value.fields["stop"]?.let { NumberValue.Constant(it.asDouble()) },
+                step = value.fields["step"]?.let { NumberValue.Constant(it.asDouble()) },
+              )
+            else -> {
+              diagnostics.error(
+                DiagnosticCodes.SCALE_INVALID_DOMAIN,
+                "Scale '${spec.name}' takes its bins from '${bins.expression}', which resolved to " +
+                  "neither an array of boundaries nor a {start, stop, step} object",
+                operator = spec.name,
+              )
+              return null
+            }
+          }
+        }
+        else -> bins
+      }
+
+    val values =
+      when (resolved) {
+        is BinsSpec.Values ->
+          resolved.values.map { JsSemantics.toNumber(resolveRangeElement(spec, it)) }
+        is BinsSpec.Steps -> {
+          val step = numbers.resolve(resolved.step, spec.name)
+          if (step == null || step == 0.0) {
+            diagnostics.error(
+              DiagnosticCodes.SCALE_INVALID_DOMAIN,
+              "Scale '${spec.name}' has 'bins' with no usable 'step'",
+              operator = spec.name,
+            )
+            return null
+          }
+          var start = numbers.resolve(resolved.start, spec.name) ?: low
+          var stop = numbers.resolve(resolved.stop, spec.name) ?: high
+          if (start < low) start = step * ceil(low / step)
+          if (stop > high) stop = step * floor(high / step)
+          val out = mutableListOf<Double>()
+          var index = 0
+          // `sequence(start, stop + step / 2, step)` upstream: the half step is what makes the last
+          // boundary land *on* `stop` rather than a rounding short of it. Counted from `start`
+          // rather than accumulated, so a fractional step does not drift.
+          while (true) {
+            val value = start + index * step
+            if (value >= stop + step / 2) break
+            out.add(value)
+            index++
+            if (index > MAX_BINS) break
+          }
+          out
+        }
+        is BinsSpec.Signal -> return null // unreachable: replaced above
+      }
+    return values.filter { it.isFinite() }.takeIf { it.isNotEmpty() }
   }
 
   /** True when the scale's range is colours rather than numbers. */
@@ -324,7 +419,8 @@ public class ScaleResolver(
   private fun buildPow(spec: ScaleSpec, defaultExponent: Double): PowScale? {
     val range = numericRange(spec) ?: return null
     var domain =
-      continuousDomain(spec, zeroDefault = true, fallback = listOf(0.0, 1.0)) ?: return null
+      continuousDomain(spec, zeroDefault = spec.bins == null, fallback = listOf(0.0, 1.0))
+        ?: return null
     if (spec.nice) domain = niceOf(domain, spec)
     val exponent = numbers.resolve(spec.exponent, spec.name) ?: defaultExponent
     return PowScale(
@@ -1017,4 +1113,9 @@ public class ScaleResolver(
         null
       }
     }
+
+  private companion object {
+    /** A runaway `step` cannot spin forever; no real axis has this many boundaries. */
+    private const val MAX_BINS: Int = 10_000
+  }
 }

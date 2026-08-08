@@ -374,6 +374,31 @@ public sealed interface RangeSpec {
   public data object Unset : RangeSpec
 }
 
+/**
+ * `bins` — the boundaries a scale's ticks and labels land on.
+ *
+ * Three forms, because upstream accepts three: the boundaries written out, a `{start, stop, step}`
+ * description they are generated from, and a signal holding either. The `bin` transform publishes
+ * exactly the middle one, so a histogram points its axis straight at what the binning chose.
+ *
+ * Setting it does more than move the ticks: upstream's `includeZero` is `!scale.bins && ...`, so a
+ * scale with bins loses the `zero` default a linear scale otherwise has.
+ */
+public sealed interface BinsSpec {
+  /** `[1, 2, 3]` — the boundaries themselves. An element may be a signal reference. */
+  public data class Values(val values: List<VegaValue>) : BinsSpec
+
+  /** `{"start": 1, "stop": 10, "step": 1}`, each of which may be signal-valued. */
+  public data class Steps(
+    val start: NumberValue? = null,
+    val stop: NumberValue? = null,
+    val step: NumberValue? = null,
+  ) : BinsSpec
+
+  /** `{"signal": "bins"}` — resolves to either of the other two once the signal has a value. */
+  public data class Signal(val expression: String) : BinsSpec
+}
+
 public data class ScaleSpec(
   val name: String,
   val type: ScaleType,
@@ -407,6 +432,8 @@ public data class ScaleSpec(
   val constant: NumberValue? = null,
   /** Colour interpolation space for a colour range, e.g. `"rgb"` or `"lab"`. */
   val interpolate: String? = null,
+  /** Explicit bin boundaries; see [BinsSpec]. */
+  val bins: BinsSpec? = null,
 )
 
 public enum class Orient {

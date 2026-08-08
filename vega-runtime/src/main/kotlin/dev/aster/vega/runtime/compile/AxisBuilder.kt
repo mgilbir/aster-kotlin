@@ -524,10 +524,21 @@ public class AxisBuilder(
    * written against upstream is looking at those labels.
    */
   private fun ticksFor(scale: VegaScale, spec: AxisSpec): List<Tick>? {
-    val explicit = spec.values ?: return generatedTicks(scale, spec)
+    // A scale with `bins` has its tick values already decided: upstream's `tickValues` returns the
+    // boundaries themselves rather than asking the scale to generate any. An axis that *also* names
+    // `values` still wins, as it does upstream, where `values` is checked first.
+    val explicit =
+      spec.values ?: scale.bins?.map { VegaValue.Num(it) } ?: return generatedTicks(scale, spec)
     if (scale !is PositionScale) return generatedTicks(scale, spec)
 
-    val count = numbers.resolveInt(spec.tickCount, spec.scale) ?: explicit.size.coerceAtLeast(1)
+    // Bin boundaries are never thinned: upstream raises the count to the number of bins first, so
+    // the halving that a long `values` list gets never applies to them.
+    val count =
+      if (spec.values == null && scale.bins != null) {
+        maxOf(numbers.resolveInt(spec.tickCount, spec.scale) ?: 0, explicit.size)
+      } else {
+        numbers.resolveInt(spec.tickCount, spec.scale) ?: explicit.size.coerceAtLeast(1)
+      }
     val label = labeller(scale, count, spec.format)
 
     val range = scale.range

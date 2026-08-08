@@ -21,7 +21,7 @@ end to end — expressions, signals, 33 of upstream's 40 data transforms, every 
 and an event handler that recompiles the chart — and are verified against upstream Vega by
 differential tests.
 
-Eighty-three differential fixtures pass, all matching upstream exactly on every mark and scale output:
+Eighty-four differential fixtures pass, all matching upstream exactly on every mark and scale output:
 
 | Fixture | Marks | Covers |
 | --- | --- | --- |
@@ -108,6 +108,7 @@ Eighty-three differential fixtures pass, all matching upstream exactly on every 
 | `autosize-fit` | 30 | the plotting area shrunk so the drawing comes out the declared size, with angled labels and two axis titles overhanging |
 | `autosize-fit-x` | 30 | the same on the horizontal axis only, the vertical growing the way `pad` does |
 | `autosize-fit-y` | 30 | and the same the other way round |
+| `histogram-null-values` | 47 | Vega's film-rating histogram: a scale whose ticks are `bin`'s own boundaries, a second band scale for the null bar, `fit` sizing, and 3,201 rows from a relative `url` |
 
 The gate is wired into `./scripts/oracle.sh`, so every further scale, mark and transform is built
 against a harness that can say we are wrong — which golden tests cannot.
@@ -167,7 +168,7 @@ substantive compatibility items:
 | 6. View and Compose APIs | Yes |
 | 7. SVG, PNG, PDF export | Yes |
 | 8. TalkBack can describe and navigate | Partial — virtual nodes are tested by instrumentation, not with TalkBack itself |
-| 9. At least 100 compatibility fixtures pass | 83 of 100 |
+| 9. At least 100 compatibility fixtures pass | 84 of 100 |
 | 10. Core runtime has no Android dependency | Yes |
 | 11. Renders without WebView | Yes |
 | 12. Build and test loop runs from the terminal | Yes |
@@ -504,7 +505,7 @@ each example a deadline.
 
 ## Known failing fixtures
 
-None. Eighty-three fixtures exist and all eighty-three pass — and that sentence became worth
+None. Eighty-four fixtures exist and all eighty-four pass — and that sentence became worth
 something only once the gate could no longer skip itself, below.
 
 **The gate could report success without running.** `FixtureDifferentialTest` reads the fixtures and
@@ -800,6 +801,27 @@ upstream and only one of them is being compared.
 
 The cost is a second compile for a `fit` chart and nothing at all for the others, against a budget
 where the heaviest fixture takes 366 microseconds (below).
+
+## Scale `bins`, and `histogram-null-values` with it
+
+A scale's `bins` names the boundaries its ticks land on, and setting it does one more thing that is
+easy to miss: upstream's `includeZero` is `!scale.bins && (linear || pow || sqrt)`, so a scale with
+bins loses the `zero` a linear scale otherwise includes. That single property accounted for three of
+the four scale differences the fixture had left — the domain was `[0, 10]` against upstream's
+`[1, 10]`, and the tick count followed from it.
+
+The boundaries themselves come from `configureBins`: an array is taken as it stands, and a
+`{start, stop, step}` description is expanded, with `start` pulled up to the first whole step inside
+the domain and `stop` pulled down to the last, so a binning computed over a wider extent than the
+axis shows does not hang ticks off either end. The `bin` transform publishes exactly that
+description, which is how a histogram points its axis at whatever the binning worked out.
+
+Bin boundaries are never thinned. Upstream raises the tick count to the number of bins before
+`validTicks` runs, so the halving a long `values` list gets never applies to them.
+
+With that, `histogram-null-values` passes, and it took four separate pieces to get there: the
+dependency order, `bin` publishing its settings, `autosize: fit`, and this. Each of them turned up a
+defect in code that was already passing.
 
 ## Performance observations
 

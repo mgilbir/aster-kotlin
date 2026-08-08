@@ -445,6 +445,21 @@
   "caption": "Y-axis for a discrete scale with 3 values: A, B, C"
  },
  {
+  "fixture": "histogram-null-values",
+  "kind": "axis",
+  "caption": "X-axis for a linear scale with values from 1 to 10"
+ },
+ {
+  "fixture": "histogram-null-values",
+  "kind": "axis",
+  "caption": "X-axis for a discrete scale with 1 value: null"
+ },
+ {
+  "fixture": "histogram-null-values",
+  "kind": "axis",
+  "caption": "Y-axis for a linear scale with values from 0 to 1,000"
+ },
+ {
   "fixture": "histogram",
   "kind": "axis",
   "caption": "X-axis titled 'Value' for a linear scale with values from 0 to 20"

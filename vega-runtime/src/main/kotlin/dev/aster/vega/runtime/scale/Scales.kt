@@ -27,6 +27,16 @@ import kotlin.math.roundToInt
 public sealed interface VegaScale {
   public val name: String
 
+  /**
+   * The boundaries the specification's `bins` named, or null when it named none.
+   *
+   * They are the scale's tick values wherever they exist — upstream's `tickValues` short-circuits
+   * to them — and their presence is also what drops the `zero` a linear scale would otherwise
+   * include.
+   */
+  public val bins: List<Double>?
+    get() = null
+
   /** Maps a data value into range space. Returns [VegaValue.Null] for an unmappable value. */
   public fun scale(value: VegaValue): VegaValue
 }
@@ -80,6 +90,8 @@ public class LinearScale(
    * unaffected for the same reason, and reads back the unrounded value.
    */
   public val round: Boolean = false,
+  /** See [VegaScale.bins]; only a continuous scale is given them in practice. */
+  override val bins: List<Double>? = null,
 ) : PositionScale, InvertibleScale {
 
   init {

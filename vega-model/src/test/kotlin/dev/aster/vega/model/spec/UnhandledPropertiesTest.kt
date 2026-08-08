@@ -41,8 +41,9 @@ class UnhandledPropertiesTest {
       .trimIndent()
 
   /**
-   * Three of upstream's 23 scale properties remain. `domainMin`, `domainMax` and `domainMid` were
-   * the ones in wide use, and are implemented rather than reported.
+   * Two of upstream's 23 scale properties remain. `domainMin`, `domainMax` and `domainMid` were the
+   * ones in wide use, and `bins` was the last one a real example needed; all four are implemented
+   * rather than reported.
    */
   @Test
   fun `a scale reports the domain overrides it cannot honour`() {
@@ -55,7 +56,8 @@ class UnhandledPropertiesTest {
               "domainRaw": [1, 2], "domainImplicit": true, "bins": [0, 5, 10]}]"""
         )
       )
-    assertEquals(listOf("bins", "domainImplicit", "domainRaw").sorted(), reported.sorted())
+    // `bins` was on this list and is implemented; the two left are genuinely unread.
+    assertEquals(listOf("domainImplicit", "domainRaw").sorted(), reported.sorted())
   }
 
   /**

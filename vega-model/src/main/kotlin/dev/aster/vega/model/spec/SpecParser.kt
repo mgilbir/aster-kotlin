@@ -180,13 +180,13 @@ private val SCALE_CONSUMED =
     "exponent",
     "constant",
     "interpolate",
+    "bins",
   )
 
 private val SCALE_UNSUPPORTED =
   mapOf(
     "domainRaw" to "Overriding a resolved domain with 'domainRaw' is not implemented",
     "domainImplicit" to "Extending an ordinal domain with unseen values is not implemented",
-    "bins" to "Scale bin boundaries are not implemented",
   )
 
 /** Legend properties this engine reads. */
@@ -1011,8 +1011,40 @@ public class SpecParser {
       exponent = obj.numberOrSignal("exponent", "$path.exponent"),
       constant = obj.numberOrSignal("constant", "$path.constant"),
       interpolate = obj.fields["interpolate"]?.takeIf { it is VegaValue.Str }?.asString(),
+      bins = parseBins(obj.fields["bins"], "$path.bins"),
     )
   }
+
+  /**
+   * `bins`, in each of the three forms upstream's `parseScaleBins` accepts.
+   *
+   * A signal or an array is taken as it comes; anything else is read as the `{start, stop, step}`
+   * description, whose properties may each be signal-valued.
+   */
+  private fun parseBins(value: VegaValue?, path: String): BinsSpec? =
+    when (value) {
+      null -> null
+      is VegaValue.Arr -> BinsSpec.Values(value.values)
+      is VegaValue.Obj ->
+        (value.fields["signal"] as? VegaValue.Str)
+          ?.takeIf { value.fields.size == 1 }
+          ?.let {
+            BinsSpec.Signal(it.value)
+          }
+          ?: BinsSpec.Steps(
+            start = value.numberOrSignal("start", "$path.start"),
+            stop = value.numberOrSignal("stop", "$path.stop"),
+            step = value.numberOrSignal("step", "$path.step"),
+          )
+      else -> {
+        diagnostics.error(
+          DiagnosticCodes.PARSE_UNKNOWN_PROPERTY,
+          "Scale 'bins' must be an array, a {start, stop, step} object or a signal",
+          jsonPath = path,
+        )
+        null
+      }
+    }
 
   private fun parseNice(value: VegaValue?, path: String): Boolean =
     when (value) {
