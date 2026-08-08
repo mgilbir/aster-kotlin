@@ -634,7 +634,7 @@ class TransformReferenceTest {
   }
 
   @Test
-  fun `the registry covers the transforms the brief lists, plus twenty-three more`() {
+  fun `the registry covers the transforms the brief lists, plus twenty-five more`() {
     val fromTheBrief =
       setOf(
         "filter",
@@ -659,6 +659,9 @@ class TransformReferenceTest {
     // a matrix, a long table made wide, and the word counts a cloud is drawn from. `quantile`,
     // `regression`, `loess`, `kde`, `density` and `dotbin` are the statistical family. `treelinks`
     // and `linkpath` are what turns a laid-out tree into the edges drawn between its nodes.
+    // `crossfilter` and `resolvefilter` are the pair an interactive cross-filter is built from:
+    // one records which range query each row fails, the other keeps the rows every dimension but
+    // its own admits.
     assertEquals(
       fromTheBrief +
         "timeunit" +
@@ -683,7 +686,9 @@ class TransformReferenceTest {
         "pack" +
         "tree" +
         "treelinks" +
-        "linkpath",
+        "linkpath" +
+        "crossfilter" +
+        "resolvefilter",
       TransformRegistry.Default.types,
     )
   }

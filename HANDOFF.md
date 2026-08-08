@@ -9,7 +9,7 @@ Branch `milestone-0-bootstrap`. Working tree clean, both gates green:
 - `./scripts/check.sh` — format, all tests, lint, demo APK
 - `./scripts/oracle.sh` — regenerates upstream references and runs the differential comparison
 
-**97 differential fixtures pass, all matching upstream exactly.** That is the only number here
+**98 differential fixtures pass, all matching upstream exactly.** That is the only number here
 that means what it says.
 
 ## Read this before trusting the other number
@@ -213,10 +213,12 @@ marks were not transposed, the *facets* were in the opposite order because a mar
 `datum.year` could only read `x` and `y` and silently tied. And `timeOffset` was implemented but
 returning its argument. STATUS.md has the six things it needed.
 
-- **`crossfilter-flights`** — needs the `crossfilter` and `resolvefilter` transforms, and **it cannot
-  be a fixture as the harness stands**: it draws 600,098 scene nodes and the differential run dies
-  with `Java heap space`. Raising the test JVM's heap is a decision for whoever takes it, not
-  something to do silently — and its reference JSON would be enormous besides.
+**`crossfilter-flights` is done** and is a fixture. The note that used to sit here said it could not
+be one because it draws 600,098 scene nodes; **upstream draws 171**. The 600,098 was this engine
+drawing every unfiltered row three times over because the two transforms were missing. A triage node
+count measures how wrong we are, not how big the chart is — do not size a decision off one. The test
+heap is pinned at 2 GB now, for the unrelated reason that 200,000 rows through three `bin`
+transforms is a large live set when transforms copy rather than mutate.
 
 **Refused, not missing**, and reported as such: `error-bars`, `bar-line-toggle`, `clock`, `watch`,
 `word-cloud`, `serpentine-timeline`, `hypothetical-outcome-plots` and `pi-monte-carlo` all need

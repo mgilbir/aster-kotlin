@@ -437,8 +437,8 @@ public class MarkEncoder(
 
   private fun symbol(spec: MarkSpec, datum: VegaValue, index: Int): SceneNode? {
     val channels = spec.encode.effective
-    val x = centred(channels, datum, "x", "xc") ?: return null
-    val y = centred(channels, datum, "y", "yc") ?: return null
+    val x = centred(channels, datum, "x", "xc") ?: 0.0
+    val y = centred(channels, datum, "y", "yc") ?: 0.0
     val style = style(channels, datum, spec)
     val shapeName = string(channels["shape"], datum)
     val shape = shapeName?.let { symbolShape(it, spec) }
@@ -515,8 +515,12 @@ public class MarkEncoder(
 
   private fun text(spec: MarkSpec, datum: VegaValue, index: Int): SceneNode? {
     val channels = spec.encode.effective
-    val anchorX = centred(channels, datum, "x", "xc") ?: return null
-    val anchorY = centred(channels, datum, "y", "yc") ?: return null
+    // An axis the specification never mentions is the origin, not a reason to drop the mark:
+    // upstream's `anchorPoint` reads `item.x || 0`, and a heading written as `{"y": -5}` with no
+    // `x` is drawn hard against the left of the group it is in. Every other mark encoder here
+    // already defaults the same way.
+    val anchorX = centred(channels, datum, "x", "xc") ?: 0.0
+    val anchorY = centred(channels, datum, "y", "yc") ?: 0.0
     // Upstream's `textValue`: `line == null ? '' : (line + '').trim()`. Both halves matter. A text
     // channel that resolves to nothing draws *nothing* — this engine was stringifying the null and
     // printing the word "null", which the mark comparison cannot see because a text mark is

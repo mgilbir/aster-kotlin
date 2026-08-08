@@ -21,7 +21,7 @@ end to end — expressions, signals, 33 of upstream's 40 data transforms, every 
 and an event handler that recompiles the chart — and are verified against upstream Vega by
 differential tests.
 
-Ninety-seven differential fixtures pass, all matching upstream exactly on every mark and scale output:
+Ninety-eight differential fixtures pass, all matching upstream exactly on every mark and scale output:
 
 | Fixture | Marks | Covers |
 | --- | --- | --- |
@@ -122,6 +122,7 @@ Ninety-seven differential fixtures pass, all matching upstream exactly on every 
 | `histogram-null-values` | 47 | Vega's film-rating histogram: a scale whose ticks are `bin`'s own boundaries, a second band scale for the null bar, `fit` sizing, and 3,201 rows from a relative `url` |
 | `time-units` | 40 | Vega's time-unit bar chart: a scale domain whose *field name* comes from a signal, a band axis of instants labelled by `formatType: "time"` with a specifier `timeUnitSpecifier` chose, and an italic subtitle |
 | `calendar-view` | 6311 | Vega's calendar view: 21 faceted years ordered by a `sort` over the *datum*, `timeOffset` moving a week's Sunday to its Monday, axis labels hidden by a rule of their own, and a legend whose title stands beside its ramp |
+| `crossfilter-flights` | 171 | Vega's cross-filter: 200,000 rows binned three ways, `crossfilter` recording which range query each fails and `resolvefilter` reading those verdicts back per histogram |
 
 The gate is wired into `./scripts/oracle.sh`, so every further scale, mark and transform is built
 against a harness that can say we are wrong — which golden tests cannot.
@@ -181,7 +182,7 @@ substantive compatibility items:
 | 6. View and Compose APIs | Yes |
 | 7. SVG, PNG, PDF export | Yes |
 | 8. TalkBack can describe and navigate | Partial — virtual nodes are tested by instrumentation, not with TalkBack itself |
-| 9. At least 100 compatibility fixtures pass | 97 of 100 |
+| 9. At least 100 compatibility fixtures pass | 98 of 100 |
 | 10. Core runtime has no Android dependency | Yes |
 | 11. Renders without WebView | Yes |
 | 12. Build and test loop runs from the terminal | Yes |
@@ -518,7 +519,7 @@ each example a deadline.
 
 ## Known failing fixtures
 
-None. Ninety-seven fixtures exist and all ninety-seven pass — and that sentence became worth
+None. Ninety-eight fixtures exist and all ninety-eight pass — and that sentence became worth
 something only once the gate could no longer skip itself, below.
 
 **The gate could report success without running.** `FixtureDifferentialTest` reads the fixtures and
@@ -836,6 +837,42 @@ With that, `histogram-null-values` passes, and it took four separate pieces to g
 dependency order, `bin` publishing its settings, `autosize: fit`, and this. Each of them turned up a
 defect in code that was already passing.
 
+## `crossfilter-flights`, and a mark count that meant the opposite of what it said
+
+This was recorded as unfixturable: "it draws 600,098 scene nodes and the differential run dies with
+`Java heap space`", with a note that raising the test heap was a decision for whoever took it. Both
+halves were wrong in the same way. **Upstream draws 171 marks.** The 600,098 was *this* engine
+drawing every one of the 200,000 unfiltered rows three times over, because `crossfilter` and
+`resolvefilter` were missing and the histograms' datasets came through unaggregated. A node count
+from the triage is a measure of how wrong we are, not of how big the chart is.
+
+The heap did have to move, but for an unrelated reason and by a much smaller amount: 200,000 rows
+through three `bin` transforms and a `crossfilter` is a large live set when every transform copies
+its rows instead of mutating them. `maxHeapSize = "2g"` is pinned in `build.gradle.kts` — the JVM
+default is a quarter of physical memory, so without pinning it the gate means something different
+on every machine.
+
+The two transforms are simple once the incremental machinery is set aside. `crossfilter` records,
+per row, one bit per dimension whose range query the row falls outside; `resolvefilter` keeps the
+rows whose verdict is zero once the `ignore` mask is cleared, which is how a delay histogram shows
+everything the *time* and *distance* brushes admit including the bars its own brush excludes. Two
+details are upstream's and not obvious: the range is half-open, `[lo, hi)`, because upstream bisects
+a sorted index with `bisectLeft` at both ends; and a set bit means *rejected*, which is why the test
+is for zero. Upstream's sorted indices, previous/current bitmaps and changed-dimension mask all
+exist to avoid rescanning 200,000 rows when a brush moves a pixel, and none of it is observable in
+a single compile.
+
+The verdicts ride on the rows rather than in a side table. Upstream keys its bitmap by an `_index`
+it stamps on every tuple; these transforms are pure functions over copied rows, so there is no
+stable index to key by, and a column on the row survives being sourced into another dataset exactly
+as the row does.
+
+One silent drop came out of it. A `text` or `symbol` mark that names **no** `x` at all was dropped
+entirely, where upstream reads `item.x || 0` and draws it at the origin — which is how each
+histogram's heading, written as `{"y": -5}` and nothing else, is placed hard against the left of its
+group. Every other mark encoder in the file already defaulted the same way; these two returned null,
+and without a diagnostic.
+
 ## `calendar-view`, and a function that had been returning its argument
 
 `calendar-view` draws 21 years of the S&P 500 as a wall calendar: 6,311 rects, two axes per year,
@@ -1139,7 +1176,7 @@ depends on them. Each has a test and a comment; this is the index.
    covered". That is the right sentence in the wrong place. Either the fixtures grow a second,
    reader-facing description, or the demo's bundled specifications stop being fixture files. The
    engine is not at fault; the demo reads badly and a user would notice before any of us did.
-3. **Keep growing the fixture corpus.** 97 of the brief's 100. Aiming it at *combinations* the
+3. **Keep growing the fixture corpus.** 98 of the brief's 100. Aiming it at *combinations* the
    engine has not met rather than at more variations of a single feature is what makes it find
    things: that is how `scale()` in an expression turned up missing. Untried combinations that
    remain include an axis on a discretizing scale, a group whose signals shadow the outer scope's,

@@ -261,6 +261,8 @@ public class TransformRegistry(transforms: List<Transform>) {
           TreeTransform,
           TreeLinksTransform,
           LinkPathTransform,
+          CrossFilterTransform,
+          ResolveFilterTransform,
         )
       )
   }
