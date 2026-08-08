@@ -9,7 +9,7 @@ Branch `milestone-0-bootstrap`. Working tree clean, both gates green:
 - `./scripts/check.sh` — format, all tests, lint, demo APK
 - `./scripts/oracle.sh` — regenerates upstream references and runs the differential comparison
 
-**88 differential fixtures pass, all matching upstream exactly.** That is the only number here
+**95 differential fixtures pass, all matching upstream exactly.** That is the only number here
 that means what it says.
 
 ## Read this before trusting the other number
@@ -195,42 +195,36 @@ those before comparing, they paint nothing.
 its datasets are fetched into `test-fixtures/data/` and committed. Discount every loader diagnostic
 when judging how far an example is from passing.
 
-**A previous version of this file claimed every non-refused example now passed. That was wrong**, and
-it was wrong because it trusted this list instead of the corpus. Running `ExampleTriage` over all 93
-gives the real picture: **61 compile clean, 32 still report errors.** Of those 32, twenty-one are
-refused by design and eleven are not:
+**Where the corpus stands, from `ExampleTriage` rather than from memory: 70 of the 93 compile clean,
+23 still report errors.** Twenty-two of those 23 are refused by design — eleven geo/topojson, eight
+needing `random()` or `now()`, three needing the raster family. **`crossfilter-flights` is the only
+non-refused example still reporting an error.**
 
-- `calendar-view` — `timeunit` over `week` and `day`, which need week numbering, plus `timeOffset`.
-- `time-units` — `timeunit` publishing its signal (the mechanism exists; only this transform's own
-  value is missing), `day` numbering again, and `timeSequence`.
-- `crossfilter-flights` — the `crossfilter` and `resolvefilter` transforms.
-- `edge-bundling` — pre-faceted data (`facet.field`) and `treePath`.
-- `pacman` — `setdata`.
-- `platformer` — `hsl`.
-- `parallel-coordinates` — an encoding naming scale `"null"`; the scale name itself resolves to
-  nothing, so this is likely the same null-stringification that made a text mark read "null".
-- `serpentine-timeline` — `now` (refused) but also an `extent` *expression* function and a scale
-  named from a signal.
-- `overview-plus-detail`, `stock-index-chart`, `u-district-cuisine` — three different "scale was not
-  built" symptoms that are **not** one root cause; `stock-index-chart` is diagnosed below.
+Two more compile clean but do not yet *match*, and are parked in the scratchpad hold directory with
+their data already fetched:
 
-Two defects found while diagnosing that last group, neither yet fixed:
+- **`time-units`** — down to one gap and it is a specific one: `"domain": {"data": "flights",
+  "field": {"signal": "measure"}}`. A scale domain whose **field name comes from a signal**.
+  `DomainSpec.FromField` holds `field: String`, so the object does not parse into a name, the domain
+  comes out empty, and every bar is drawn at zero height. Widening that field to a `FieldRef` the way
+  `ChannelValue.Scaled.field` already is should be the whole of it. After that, two small residuals:
+  one axis tick short of upstream's fourteen, and a surface 3.5 units wide of 600.
+- **`calendar-view`** — further out. Its `y` scale domain is a list of `datetime(...)` values and the
+  marks come out transposed against upstream's (`x` and `y` swapped), so start by comparing one
+  rect's encode against what upstream places. It also wants `timeOffset`, which is now implemented,
+  so re-read its diagnostics before assuming anything from this note.
 
-1. **A date that is not ISO 8601 does not parse.** `stock-index-chart` declares
-   `format.parse: {"date": "date"}` over a CSV whose dates read `Jan 1 2000`. Upstream uses
-   JavaScript's `new Date(string)`, which reads that; this engine's `DateValues.parse` is ISO-only,
-   so every date comes back null, the `x` scale finds no finite value in its domain, and the chart
-   loses its time axis. This is the whole of that example's failure.
-2. **A message that lies.** `numericExtent` warns "Scale 'x' has no finite numeric values in its
-   domain; using [0, 1]" and then returns null, so the scale is not built at all and only the
-   *encodings* complain. Either build it with the fallback the message promises or say it was
-   skipped — as it stands the one diagnostic naming the scale describes something that did not
-   happen.
+- **`crossfilter-flights`** — needs the `crossfilter` and `resolvefilter` transforms, and **it cannot
+  be a fixture as the harness stands**: it draws 600,098 scene nodes and the differential run dies
+  with `Java heap space`. Raising the test JVM's heap is a decision for whoever takes it, not
+  something to do silently — and its reference JSON would be enormous besides.
 
-**Refused, not missing**, and now reported as such: `error-bars`, `bar-line-toggle`, `clock`,
-`hypothetical-outcome-plots` and `pi-monte-carlo` all need `random()` or `now()`. `error-bars` is the
-subtle one — its `ci0`/`ci1` *look* like ordinary summary statistics and are a bootstrap over 1,000
-random resamples.
+**Refused, not missing**, and reported as such: `error-bars`, `bar-line-toggle`, `clock`, `watch`,
+`word-cloud`, `serpentine-timeline`, `hypothetical-outcome-plots` and `pi-monte-carlo` all need
+`random()` or `now()`. `error-bars` is the subtle one — its `ci0`/`ci1` *look* like ordinary summary
+statistics and are a bootstrap over 1,000 random resamples. `serpentine-timeline` is worth naming
+too: its scale domain is derived from `now()`, so any reference generated for it would be correct for
+one day only.
 
 The scouting trick: copy the candidates into `test-fixtures/specs/` with a `scout-` prefix, generate
 references, run the differential once, read the distinct diagnostics, then delete them all. Much
