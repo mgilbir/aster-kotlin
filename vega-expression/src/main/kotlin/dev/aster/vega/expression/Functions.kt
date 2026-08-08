@@ -95,11 +95,6 @@ public object Functions {
         "parsing a date against a format string needs a strptime the engine does not have; " +
           "an ISO 8601 string works through toDate",
       "gradient" to "gradients cannot be produced from an expression yet",
-      // `luminance` is implemented; `contrast` is not, and saying so by name is the difference
-      // between a chart that reports one missing function and one that reports "unknown".
-      "contrast" to
-        "the contrast ratio of two colours is not implemented; luminance() of each is, and the " +
-          "ratio is (max + 0.05) / (min + 0.05)",
       "rgb" to "colour helpers are not implemented",
       "hsl" to "colour helpers are not implemented",
       "lab" to "colour helpers are not implemented",
@@ -475,16 +470,26 @@ public object Functions {
      * zero — so `luminance('transparent')` is NaN rather than the 0 that black would give.
      */
     map["luminance"] = ExpressionFunction { args ->
-      val color = SceneColor.parse(args.string(0))
-      if (color == null || color.alpha <= 0.0) {
-        VegaValue.Num(Double.NaN)
-      } else {
-        VegaValue.Num(
-          0.2126 * expandGamma(color.red) +
-            0.7152 * expandGamma(color.green) +
-            0.0722 * expandGamma(color.blue)
-        )
-      }
+      VegaValue.Num(relativeLuminance(args.string(0)))
+    }
+
+    /**
+     * `contrast(a, b)` — the WCAG contrast ratio between two colours.
+     *
+     * `(lighter + 0.05) / (darker + 0.05)`, where each side is [luminance]. The order of the
+     * arguments does not matter: the brighter of the two always goes on top, so the result is at
+     * least 1 whichever way round it is written. That is what lets the common idiom work —
+     * `contrast('white', datum.fill) > contrast('black', datum.fill)` picks whichever of white or
+     * black reads better on a bar, without knowing which is lighter.
+     *
+     * An unparseable or fully transparent colour makes its luminance NaN, and `max`/`min` of a NaN
+     * are NaN, so the ratio is NaN and every comparison against it is false. Upstream behaves the
+     * same way for the same reason.
+     */
+    map["contrast"] = ExpressionFunction { args ->
+      val first = relativeLuminance(args.string(0))
+      val second = relativeLuminance(args.string(1))
+      VegaValue.Num((maxOf(first, second) + 0.05) / (minOf(first, second) + 0.05))
     }
 
     // ---- the embedding page -------------------------------------------------
@@ -524,6 +529,15 @@ public object Functions {
    */
   private fun expandGamma(channel: Double): Double =
     if (channel <= 0.03928) channel / 12.92 else ((channel + 0.055) / 1.055).pow(2.4)
+
+  /** The WCAG relative luminance of a colour name, shared by `luminance` and `contrast`. */
+  private fun relativeLuminance(text: String): Double {
+    val color = SceneColor.parse(text)
+    if (color == null || color.alpha <= 0.0) return Double.NaN
+    return 0.2126 * expandGamma(color.red) +
+      0.7152 * expandGamma(color.green) +
+      0.0722 * expandGamma(color.blue)
+  }
 
   /**
    * Registers a date accessor and its `utc` twin.

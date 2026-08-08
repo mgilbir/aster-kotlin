@@ -104,7 +104,7 @@ public class ScaleResolver(
     var domain =
       continuousDomain(spec, zeroDefault = true, fallback = listOf(0.0, 1.0)) ?: return null
     if (spec.nice) domain = niceOf(domain, spec)
-    return LinearScale(spec.name, domain, oriented(range, spec.reverse), spec.clamp)
+    return LinearScale(spec.name, domain, oriented(range, spec.reverse), spec.clamp, spec.round)
   }
 
   /** True when the scale's range is colours rather than numbers. */
@@ -307,7 +307,8 @@ public class ScaleResolver(
       continuousDomain(spec, zeroDefault = false, fallback = listOf(1.0, 10.0)) ?: return null
     if (spec.nice) domain = Ticks.niceLog(domain, base)
 
-    val scale = LogScale(spec.name, domain, oriented(range, spec.reverse), base, spec.clamp)
+    val scale =
+      LogScale(spec.name, domain, oriented(range, spec.reverse), base, spec.clamp, spec.round)
     if (!scale.isValid) {
       diagnostics.error(
         DiagnosticCodes.SCALE_INVALID_DOMAIN,
@@ -326,7 +327,14 @@ public class ScaleResolver(
       continuousDomain(spec, zeroDefault = true, fallback = listOf(0.0, 1.0)) ?: return null
     if (spec.nice) domain = niceOf(domain, spec)
     val exponent = numbers.resolve(spec.exponent, spec.name) ?: defaultExponent
-    return PowScale(spec.name, domain, oriented(range, spec.reverse), exponent, spec.clamp)
+    return PowScale(
+      spec.name,
+      domain,
+      oriented(range, spec.reverse),
+      exponent,
+      spec.clamp,
+      spec.round,
+    )
   }
 
   private fun buildSymlog(spec: ScaleSpec): SymlogScale? {
@@ -336,7 +344,14 @@ public class ScaleResolver(
       continuousDomain(spec, zeroDefault = false, fallback = listOf(0.0, 1.0)) ?: return null
     if (spec.nice) domain = niceOf(domain, spec)
     val constant = numbers.resolve(spec.constant, spec.name) ?: 1.0
-    return SymlogScale(spec.name, domain, oriented(range, spec.reverse), constant, spec.clamp)
+    return SymlogScale(
+      spec.name,
+      domain,
+      oriented(range, spec.reverse),
+      constant,
+      spec.clamp,
+      spec.round,
+    )
   }
 
   /**
@@ -437,7 +452,7 @@ public class ScaleResolver(
       } else {
         domain
       }
-    return TimeScale(spec.name, niced, oriented(range, spec.reverse), zone, spec.clamp)
+    return TimeScale(spec.name, niced, oriented(range, spec.reverse), zone, spec.clamp, spec.round)
   }
 
   private fun buildBand(spec: ScaleSpec): BandScale? {

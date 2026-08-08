@@ -270,6 +270,16 @@
   "caption": "Y-axis for a linear scale with values from 0 to 18"
  },
  {
+  "fixture": "grouped-bar",
+  "kind": "axis",
+  "caption": "X-axis for a linear scale with values from 0.0 to 1.1"
+ },
+ {
+  "fixture": "grouped-bar",
+  "kind": "axis",
+  "caption": "Y-axis for a discrete scale with 3 values: A, B, C"
+ },
+ {
   "fixture": "histogram",
   "kind": "axis",
   "caption": "X-axis titled 'Value' for a linear scale with values from 0 to 20"

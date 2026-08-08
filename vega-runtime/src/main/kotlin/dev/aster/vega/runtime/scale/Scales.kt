@@ -70,6 +70,16 @@ public class LinearScale(
   public val domain: List<Double>,
   override val range: List<Double>,
   public val clamp: Boolean = false,
+  /**
+   * Rounds every *output* to a whole unit, so a bar's edge lands on a pixel.
+   *
+   * Not the same `round` a band scale has, which rounds the step and the band width and so changes
+   * where every band starts. Here nothing about the scale changes: upstream cannot call `round` on
+   * a continuous d3 scale — there is no such method — so it swaps the range interpolator for
+   * `interpolateRound` and the arithmetic is untouched right up to the last step. `invert` is
+   * unaffected for the same reason, and reads back the unrounded value.
+   */
+  public val round: Boolean = false,
 ) : PositionScale, InvertibleScale {
 
   init {
@@ -90,7 +100,9 @@ public class LinearScale(
     return if (result.isNaN()) VegaValue.Null else VegaValue.Num(result)
   }
 
-  public fun apply(x: Double): Double {
+  public fun apply(x: Double): Double = if (round) roundHalfUp(unrounded(x)) else unrounded(x)
+
+  private fun unrounded(x: Double): Double {
     if (x.isNaN()) return Double.NaN
     // A zero-extent domain has no gradient; d3 returns the range midpoint rather than dividing by
     // 0.
@@ -316,6 +328,8 @@ public abstract class TransformedScale(
   public val domain: List<Double>,
   override val range: List<Double>,
   public val clamp: Boolean,
+  /** Rounds every output to a whole unit. See [LinearScale.round]. */
+  public val round: Boolean = false,
 ) : PositionScale, InvertibleScale {
 
   init {
@@ -339,7 +353,9 @@ public abstract class TransformedScale(
     return if (result.isNaN()) VegaValue.Null else VegaValue.Num(result)
   }
 
-  public fun apply(x: Double): Double {
+  public fun apply(x: Double): Double = if (round) roundHalfUp(unrounded(x)) else unrounded(x)
+
+  private fun unrounded(x: Double): Double {
     if (x.isNaN()) return Double.NaN
     val d0 = forward(domain.first())
     val d1 = forward(domain.last())
@@ -389,7 +405,8 @@ public class LogScale(
   range: List<Double>,
   public val base: Double = 10.0,
   clamp: Boolean = false,
-) : TransformedScale(name, domain, range, clamp) {
+  round: Boolean = false,
+) : TransformedScale(name, domain, range, clamp, round) {
 
   private val logBase = ln(base)
 
@@ -464,7 +481,8 @@ public class PowScale(
   range: List<Double>,
   public val exponent: Double = 1.0,
   clamp: Boolean = false,
-) : TransformedScale(name, domain, range, clamp) {
+  round: Boolean = false,
+) : TransformedScale(name, domain, range, clamp, round) {
 
   override fun forward(value: Double): Double = signedPow(value, exponent)
 
@@ -488,7 +506,8 @@ public class SymlogScale(
   range: List<Double>,
   public val constant: Double = 1.0,
   clamp: Boolean = false,
-) : TransformedScale(name, domain, range, clamp) {
+  round: Boolean = false,
+) : TransformedScale(name, domain, range, clamp, round) {
 
   override fun forward(value: Double): Double {
     val scaled = value / constant
@@ -515,6 +534,8 @@ public class TimeScale(
   override val range: List<Double>,
   public val zone: kotlinx.datetime.TimeZone,
   public val clamp: Boolean = false,
+  /** Rounds every output to a whole unit. See [LinearScale.round]. */
+  public val round: Boolean = false,
 ) : PositionScale, InvertibleScale {
 
   init {
@@ -522,7 +543,7 @@ public class TimeScale(
     require(range.size >= 2) { "$name needs at least two range values, got $range" }
   }
 
-  private val linear = LinearScale(name, domain, range, clamp)
+  private val linear = LinearScale(name, domain, range, clamp, round)
 
   override val bandwidth: Double
     get() = 0.0

@@ -249,6 +249,24 @@ class ExpressionReferenceTest {
         "luminance('transparent')|null",
         "luminance('none')|null",
         "luminance('rgba(255, 0, 0, 0)')|null",
+        // ---- contrast ----
+        // The WCAG ratio, which is symmetric: the brighter colour always goes on top, so writing
+        // the pair either way round gives the same answer and it is never below 1.
+        "contrast('#000000','#ffffff')|21",
+        "contrast('#ffffff','#000000')|21",
+        "contrast('steelblue','steelblue')|1",
+        // The pair the grouped-bar chart asks about, and why the answer is not obvious: white and
+        // black are within 1% of each other against Vega's default blue, so an approximation that
+        // is right to two digits still picks the wrong label colour.
+        "contrast('white','#4c78a8')|4.6059511274406955",
+        "contrast('black','#4c78a8')|4.559318893960711",
+        "contrast('white','#f58518')|2.5452396422570263",
+        "contrast('black','#f58518')|8.250696575422642",
+        "contrast('hsl(210, 50%, 40%)','#0a0a0a')|3.3009085250613452",
+        // A luminance of NaN carries through both the max and the min, so the ratio is NaN and
+        // every comparison against it is false — which is how an unreadable colour behaves.
+        "contrast('nonsense','white')|null",
+        "contrast('transparent','white')|null",
         // ---- containerSize ----
         // No DOM, so this is upstream's own headless answer: two absent values, not [0, 0].
         "containerSize()|[null,null]",

@@ -12,6 +12,7 @@ import dev.aster.vega.model.VegaValue
 import dev.aster.vega.model.asDouble
 import dev.aster.vega.model.asString
 import dev.aster.vega.model.field
+import dev.aster.vega.model.roundHalfUp
 import dev.aster.vega.model.spec.ChannelValue
 import dev.aster.vega.model.spec.EncodeEntry
 import dev.aster.vega.model.spec.FieldRef
@@ -60,6 +61,7 @@ import dev.aster.vega.scene.TrailPath
 import dev.aster.vega.scene.Transform2D
 import dev.aster.vega.scene.curve
 import dev.aster.vega.scene.spokenNumber
+import kotlin.math.pow
 
 /**
  * Turns a mark specification plus its data into scene nodes.
@@ -676,6 +678,7 @@ public class MarkEncoder(
       is ChannelValue.Signal ->
         evaluateExpression(channel.expression, datum)?.let { JsSemantics.truthy(it) }
       is ChannelValue.Conditional -> boolean(selectRule(channel, datum), datum)
+      is ChannelValue.Adjusted -> adjusted(channel, datum)?.let { JsSemantics.truthy(it) }
       is ChannelValue.Scaled -> {
         val scale = scales[scaleNameOf(channel, datum)]
         val input = channel.field?.let { datum.fieldOf(it) } ?: channel.value
@@ -875,6 +878,9 @@ public class MarkEncoder(
         is ChannelValue.Signal -> evaluateExpression(channel.expression, datum) ?: return null
         is ChannelValue.Conditional -> return numberList(selectRule(channel, datum), datum)
         is ChannelValue.Scaled -> return null
+        // A dash pattern is a list, and arithmetic on a list is not a thing upstream does either:
+        // its generated expression would produce `[4,2]*2`, which is NaN.
+        is ChannelValue.Adjusted -> return null
       }
     val values = (value as? VegaValue.Arr)?.values?.map { it.asDouble() } ?: return null
     return values.takeIf { list -> list.isNotEmpty() && list.all { it.isFinite() && it >= 0.0 } }
@@ -1042,6 +1048,7 @@ public class MarkEncoder(
       is ChannelValue.Field -> datum.fieldOf(channel.ref).asString()
       is ChannelValue.Signal -> evaluateExpression(channel.expression, datum)?.asString()
       is ChannelValue.Conditional -> string(selectRule(channel, datum), datum)
+      is ChannelValue.Adjusted -> adjusted(channel, datum)?.asString()
       is ChannelValue.Scaled -> {
         val scale = scales[scaleNameOf(channel, datum)]
         val input = channel.field?.let { datum.fieldOf(it) } ?: channel.value
@@ -1128,6 +1135,7 @@ public class MarkEncoder(
         evaluateExpression(channel.expression, datum)?.asDouble()?.takeIf { !it.isNaN() }
       is ChannelValue.Conditional -> position(selectRule(channel, datum), datum)
       is ChannelValue.Scaled -> scaledPosition(channel, datum)
+      is ChannelValue.Adjusted -> adjustedNumber(channel, datum)
     }
 
   /**
@@ -1200,7 +1208,7 @@ public class MarkEncoder(
     // `{"scale": "x", "band": 1}` with no field means "a whole band", i.e. the bar's width.
     val band = channel.band
     if (channel.field == null && channel.value == null && band != null) {
-      return scale.bandwidth * band + (channel.offset ?: 0.0)
+      return scale.bandwidth * band
     }
 
     val fieldPath = channel.field
@@ -1214,7 +1222,7 @@ public class MarkEncoder(
     val base = scale.position(input)
     if (base.isNaN()) return null
     val bandOffset = if (band != null) scale.bandwidth * band else 0.0
-    return base + bandOffset + (channel.offset ?: 0.0)
+    return base + bandOffset
   }
 
   /**
@@ -1232,6 +1240,7 @@ public class MarkEncoder(
       is ChannelValue.Field -> datum.fieldOf(channel.ref)
       is ChannelValue.Signal -> evaluateExpression(channel.expression, datum)
       is ChannelValue.Conditional -> channelValue(selectRule(channel, datum), datum)
+      is ChannelValue.Adjusted -> adjusted(channel, datum)
       is ChannelValue.Scaled -> {
         when (val scale = scales[scaleNameOf(channel, datum)]) {
           null -> null
@@ -1246,6 +1255,26 @@ public class MarkEncoder(
       }
     }
 
+  /**
+   * The arithmetic a value reference may carry, in upstream's order: `round(pow(v, e) * m + o)`.
+   *
+   * Each adjustment is a value reference of its own, so an offset can be read from the datum — a
+   * label centred in its bar is `{"field": "y", "offset": {"field": "height", "mult": 0.5}}`. An
+   * unresolvable base leaves the channel unset rather than defaulting to zero, which is what the
+   * rest of this encoder does with a channel it cannot read.
+   */
+  private fun adjustedNumber(channel: ChannelValue.Adjusted, datum: VegaValue): Double? {
+    var value = number(channel.base, datum) ?: return null
+    channel.exponent?.let { number(it, datum)?.let { power -> value = value.pow(power) } }
+    channel.mult?.let { number(it, datum)?.let { factor -> value *= factor } }
+    channel.offset?.let { number(it, datum)?.let { shift -> value += shift } }
+    return if (channel.round) roundHalfUp(value) else value
+  }
+
+  /** The same, as a [VegaValue], for the resolvers that do not know what type they want. */
+  private fun adjusted(channel: ChannelValue.Adjusted, datum: VegaValue): VegaValue? =
+    adjustedNumber(channel, datum)?.let { VegaValue.Num(it) }
+
   private fun number(channel: ChannelValue?, datum: VegaValue): Double? =
     when (channel) {
       null -> null
@@ -1255,6 +1284,7 @@ public class MarkEncoder(
       is ChannelValue.Signal ->
         evaluateExpression(channel.expression, datum)?.asDouble()?.takeIf { !it.isNaN() }
       is ChannelValue.Conditional -> number(selectRule(channel, datum), datum)
+      is ChannelValue.Adjusted -> adjustedNumber(channel, datum)
     }
 
   private fun paint(
@@ -1287,6 +1317,9 @@ public class MarkEncoder(
           val selected = selectRule(channel, datum) ?: return null
           return paint(selected, datum, channelName, spec)
         }
+        // Arithmetic on a colour is arithmetic on a string, which upstream turns into NaN. The
+        // adjustments are dropped rather than applied so at least the colour survives.
+        is ChannelValue.Adjusted -> return paint(channel.base, datum, channelName, spec)
       }
     val colour = SceneColor.parse(text)
     if (colour == null) {

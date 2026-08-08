@@ -1681,29 +1681,32 @@ public class SpecParser {
       value as? VegaValue.Obj ?: return ChannelValue.Constant(value) // a bare literal is a constant
 
     obj.fields["signal"]?.let {
-      return ChannelValue.Signal(it.asString())
+      return adjusted(ChannelValue.Signal(it.asString()), obj, path)
     }
 
     val scale = obj.fields["scale"]
     if (scale != null) {
       val scaleRef = if (scale is VegaValue.Str) null else fieldPath(scale, "$path.scale")
       if (scale !is VegaValue.Str && scaleRef == null) return null
-      return ChannelValue.Scaled(
-        scale = (scale as? VegaValue.Str)?.value ?: "",
-        scaleRef = scaleRef,
-        field = fieldPath(obj.fields["field"], "$path.field"),
-        value = obj.fields["value"],
-        band = obj.optionalNumber("band", "$path.band"),
-        offset = obj.optionalNumber("offset", "$path.offset"),
+      return adjusted(
+        ChannelValue.Scaled(
+          scale = (scale as? VegaValue.Str)?.value ?: "",
+          scaleRef = scaleRef,
+          field = fieldPath(obj.fields["field"], "$path.field"),
+          value = obj.fields["value"],
+          band = obj.optionalNumber("band", "$path.band"),
+        ),
+        obj,
+        path,
       )
     }
 
     obj.fields["value"]?.let {
-      return ChannelValue.Constant(it)
+      return adjusted(ChannelValue.Constant(it), obj, path)
     }
     obj.fields["field"]?.let {
       val resolved = fieldPath(it, "$path.field") ?: return null
-      return ChannelValue.Field(resolved)
+      return adjusted(ChannelValue.Field(resolved), obj, path)
     }
 
     diagnostics.warn(
@@ -1713,6 +1716,28 @@ public class SpecParser {
     )
     return null
   }
+
+  /**
+   * Wraps [base] in whatever arithmetic the value reference asked for.
+   *
+   * `exponent`, `mult`, `offset` and `round` are part of *every* value reference, not just a scaled
+   * one — upstream appends them to the generated expression after the scale has been applied — so
+   * they are read here rather than on any one form. A reference with none of them is left alone, so
+   * the common case allocates nothing extra.
+   */
+  private fun adjusted(base: ChannelValue, obj: VegaValue.Obj, path: String): ChannelValue {
+    val exponent = obj.fields["exponent"]?.let { adjustment(it, "$path.exponent") }
+    val mult = obj.fields["mult"]?.let { adjustment(it, "$path.mult") }
+    val offset = obj.fields["offset"]?.let { adjustment(it, "$path.offset") }
+    val round = obj.fields["round"]?.asBoolean() ?: false
+    if (exponent == null && mult == null && offset == null && !round) return base
+    return ChannelValue.Adjusted(base, exponent, mult, offset, round)
+  }
+
+  /** One of those adjustments, which is itself a value reference and not necessarily a number. */
+  private fun adjustment(value: VegaValue, path: String): ChannelValue? =
+    if (value is VegaValue.Obj) parseChannel("(adjustment)", value, path)
+    else ChannelValue.Constant(value)
 
   /**
    * Resolves a field reference, which Vega allows to be a string or `{"group": ...}` / `{"datum":

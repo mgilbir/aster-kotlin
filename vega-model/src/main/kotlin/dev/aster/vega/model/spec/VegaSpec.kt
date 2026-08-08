@@ -772,7 +772,26 @@ public sealed interface ChannelValue {
     val field: FieldRef? = null,
     val value: VegaValue? = null,
     val band: Double? = null,
-    val offset: Double? = null,
+  ) : ChannelValue
+
+  /**
+   * A channel with Vega's arithmetic applied on top of it.
+   *
+   * Every value reference — scaled or not — accepts `exponent`, `mult`, `offset` and `round`, and
+   * upstream applies them in that order after the scale, as `round(pow(v, e) * m + o)`. Modelling
+   * them as a wrapper rather than as fields on the scaled form is what lets `{"field": "x2",
+   * "offset": -5}` work, which is how a label is placed just inside the end of the bar it belongs
+   * to and which was previously read as a plain field with the offset dropped.
+   *
+   * Each of the three is itself a value reference, so `{"field": "y", "offset": {"field": "height",
+   * "mult": 0.5}}` centres a label in a band whose height only the datum knows.
+   */
+  public data class Adjusted(
+    val base: ChannelValue,
+    val exponent: ChannelValue? = null,
+    val mult: ChannelValue? = null,
+    val offset: ChannelValue? = null,
+    val round: Boolean = false,
   ) : ChannelValue
 
   public data class Signal(val expression: String) : ChannelValue

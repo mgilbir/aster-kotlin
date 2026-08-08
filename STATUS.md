@@ -21,7 +21,7 @@ end to end — expressions, signals, 33 of upstream's 40 data transforms, every 
 and an event handler that recompiles the chart — and are verified against upstream Vega by
 differential tests.
 
-Seventy differential fixtures pass, all matching upstream exactly on every mark and scale output:
+Seventy-one differential fixtures pass, all matching upstream exactly on every mark and scale output:
 
 | Fixture | Marks | Covers |
 | --- | --- | --- |
@@ -95,6 +95,7 @@ Seventy differential fixtures pass, all matching upstream exactly on every mark 
 | `radar` | 31 | top-level `encode`, marks drawn from earlier marks' scene items, `linear-closed`, `autosize.contains: "padding"`, mark `zindex` |
 | `curves-closed` | 3 | the three closed curve families over one ring of points |
 | `autosize-none` | 19 | a `none` chart inset by its padding, refusing to grow for the labels hanging off it |
+| `grouped-bar` | 56 | `round` on a continuous scale, `mult`/`offset` value references, `contrast()`, labels from the bars' own scene items |
 
 The gate is wired into `./scripts/oracle.sh`, so every further scale, mark and transform is built
 against a harness that can say we are wrong — which golden tests cannot.
@@ -154,7 +155,7 @@ substantive compatibility items:
 | 6. View and Compose APIs | Yes |
 | 7. SVG, PNG, PDF export | Yes |
 | 8. TalkBack can describe and navigate | Partial — virtual nodes are tested by instrumentation, not with TalkBack itself |
-| 9. At least 100 compatibility fixtures pass | 70 of 100 |
+| 9. At least 100 compatibility fixtures pass | 71 of 100 |
 | 10. Core runtime has no Android dependency | Yes |
 | 11. Renders without WebView | Yes |
 | 12. Build and test loop runs from the terminal | Yes |
@@ -491,7 +492,7 @@ each example a deadline.
 
 ## Known failing fixtures
 
-None. Seventy fixtures exist and all seventy pass — and that sentence became worth
+None. Seventy-one fixtures exist and all seventy-one pass — and that sentence became worth
 something only once the gate could no longer skip itself, below.
 
 **The gate could report success without running.** `FixtureDifferentialTest` reads the fixtures and
@@ -560,6 +561,17 @@ compared, the second by walking Vega's own `sceneVisit` rather than by writing t
 a negative `zindex` raises a mark rather than sinking it, which no second copy would have guessed.
 That makes six things the normalizer has had to be taught to see, and it keeps being the case that
 a fixture's first pass is worth less than the look at the rendered SVG that follows it.
+
+`grouped-bar` — Vega's own grouped bar chart — was the next example taken end to end, and it found
+three more silences. A **`round: true` on a continuous scale had been parsed and dropped**, so every
+bar in the chart was a fraction of a unit wide and every axis label a fraction of a unit out of
+place. `mult`, `offset`, `exponent` and `round` were read only on a *scaled* value reference, where
+upstream appends them to every one — so `{"field": "x2", "offset": -5}` put each label at the end of
+its bar instead of just inside it, and `{"field": "y", "offset": {"field": "height", "mult": 0.5}}`
+put it at the bar's top edge instead of its middle. Neither was reported. And `contrast()` was
+genuinely absent and said so, which is the behaviour that is supposed to happen; it is now
+implemented, with the margin between white and black on Vega's default blue coming out under 1%, so
+an approximation right to two digits would still pick the wrong label colour.
 
 `domain-limits` found one more, in a corner nothing had reached before: a symbol sized to **zero**
 was bounded as nothing at all, where upstream bounds it as a degenerate point at its anchor. A test

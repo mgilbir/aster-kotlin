@@ -9,7 +9,7 @@ Branch `milestone-0-bootstrap`. Working tree clean, both gates green:
 - `./scripts/check.sh` — format, all tests, lint, demo APK
 - `./scripts/oracle.sh` — regenerates upstream references and runs the differential comparison
 
-**70 differential fixtures pass, all matching upstream exactly.** That is the only number here
+**71 differential fixtures pass, all matching upstream exactly.** That is the only number here
 that means what it says.
 
 ## Read this before trusting the other number
@@ -50,12 +50,33 @@ failing fixtures". In short:
 Two new fixtures came with it: `curves-closed`, because the radar only exercises one of the three
 closed families, and `autosize-none`, because nothing else covered a `none` chart with padding.
 
+## So is the grouped bar chart
+
+`grouped-bar.vg.json` is Vega's `grouped-bar-chart` example, taken the same way, and it found three
+more silences:
+
+- `round: true` on a **continuous** scale was parsed and dropped, so every bar was a fraction of a
+  unit wide. It is the output that rounds, not the scale — upstream swaps the range interpolator.
+- `mult`, `offset`, `exponent` and `round` were read only on a *scaled* value reference. Upstream
+  appends them to every one, and each is itself a value reference, so `{"field": "y", "offset":
+  {"field": "height", "mult": 0.5}}` centres a label in a band.
+- `contrast()` is implemented. White and black are within 1% of each other against Vega's default
+  blue, so this is not a place to approximate.
+
 ## Pick the next example the same way
 
-The method that worked: take one real example, add it as a differential fixture *first*, let it
-fail, fix what it names, then open `build/fixture-svg/<name>.ours.svg` next to
+The method that worked twice: take one real example, add it as a differential fixture *first*, let
+it fail, fix what it names, then open `build/fixture-svg/<name>.ours.svg` next to
 `build/oracle-reference/<name>.svg` and look at them. The fixture tells you the geometry is right;
-only the SVG tells you the chart is.
+only the SVG tells you the chart is. Note that upstream draws a `rect` mark as an SVG `<path>` and
+scatters zero-extent `class="background"` and `class="foreground"` paths through its output — strip
+those before comparing, they paint nothing.
+
+The triage's shortlist of examples that fail on few distinct things: `dot-plot` (2), `budget-forecasts`
+(1), `barley-trellis-plot` (1), `quantile-quantile-plot` (1), `probability-density` (1),
+`donut-chart-labelled` (4), `histogram-null-values`, `error-bars`, `connected-scatter-plot`. Check the
+count of *distinct* messages, not the raw error count — one unimplemented function reported per datum
+looks like a hundred failures and is one.
 
 ## Unfinished work parked elsewhere
 
