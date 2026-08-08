@@ -230,6 +230,52 @@ The scouting trick: copy the candidates into `test-fixtures/specs/` with a `scou
 references, run the differential once, read the distinct diagnostics, then delete them all. Much
 faster than reading specs.
 
+## Possible future work: a timer used as a `for` loop
+
+`donut-chart-labelled` passes the differential and still looks wrong in the demo: its three most
+crowded labels — United States, France, Germany — are drawn on top of each other, where the gallery
+shows them spread down the page.
+
+**The fixture is not lying.** Upstream's static scene stacks them too; the reference has all three at
+`y = -9.501909, x = 228`. What the gallery shows is a *later frame*.
+
+The reason there are frames at all is worth understanding before anyone touches it: the timer is not
+animating anything, it is standing in for a loop Vega's expression language cannot express.
+
+| signal | role |
+| --- | --- |
+| `shiftArray` | how far each label must move to clear the one above it |
+| `counter` | `counter < length(data('labelPositions')) ? counter + 1 : counter`, fired by a `{"type": "timer"}` — the loop variable |
+| `p1` | on each `counter` change, `shiftArray[counter-1] + p1` clamped at 0 — the accumulator |
+| `p2` | on each `p1` change, `p1 + ',' + p2` — the output array, built by string concatenation |
+| `shiftArrayRunning` | `reverse(split(p2, ','))` — that string turned back into an array |
+| `labelPositionsFinal` | `shiftArrayRunning[index-1] + bin` — each label's final `y` |
+
+Each label's offset is the running total of every overlap above it: a prefix sum. The giveaway that
+this is a workaround rather than a design is `p2` accumulating an array by joining with commas and
+splitting again, because there is no append either — and `p1` carrying `"force": true`, which a loop
+needs and an animation would not.
+
+**So this probably does not need a scheduler.** The loop has a termination condition: `counter` stops
+at 33 and everything downstream stops with it. A bounded iteration with a fixed point can be run to
+convergence at *compile* time — fire the `on` handlers whose source is a signal or a timer, repeatedly,
+until nothing changes — with no wall clock, no repainting, and the chart still a pure function of the
+specification.
+
+Three things to weigh first, none of them checked:
+
+- **Not every timer loop converges.** `clock` and `watch` read `now()` and never settle. They are
+  already refused, but a convergence pass needs an iteration cap so a non-converging specification
+  stops at an arbitrary frame rather than hanging.
+- **The differential harness cannot verify the settled state.** The oracle captures upstream after
+  `runAsync`, which is the unshifted frame. Pinning the converged layout needs evidence of another
+  kind — and `runAsync` on this specification never returns, because the timer keeps the dataflow
+  alive.
+- It would change what a compile *is*. Today a signal's `on` handlers are applied only by the
+  interaction layer, on a real event; running them at compile time until they settle is a different
+  contract, and STATUS's "Next three tasks" item 1 describes the neighbouring gaps in the same
+  machinery.
+
 ## Unfinished work parked elsewhere
 
 `kde2d` + `isocontour` are checkpointed at `6ef5428` on branch
