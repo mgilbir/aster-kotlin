@@ -208,6 +208,23 @@ internal class DataflowOrder(
      * `signal` is a plain string beside the other parameters, which is exactly how the transform
      * pipeline tells a *written* signal from a `{"signal": "..."}` reference it should read.
      */
+    /**
+     * Datasets a *signal* replaces with `setdata`, mapped to the signal that does it.
+     *
+     * The write happens when the signal resolves, so everything reading that dataset has to be
+     * ordered behind the signal as well as behind the dataset's own declaration. Vega's pacman
+     * builds each ghost's next move that way, in a signal, into a dataset a mark then draws.
+     */
+    private val dataWriters: Map<String, String> =
+      signals
+        .flatMap { signal ->
+          val source = signal.expression ?: return@flatMap emptyList()
+          val compiled = expressions.compile(source)
+          if (compiled !is ExpressionResult.Compiled) return@flatMap emptyList()
+          compiled.expression.writtenDatasets.map { it to signal.name }
+        }
+        .toMap()
+
     private val publishers: Map<String, String> =
       data
         .flatMap { spec ->
@@ -350,6 +367,8 @@ internal class DataflowOrder(
       }
       for (name in expression.dataDependencies) {
         if (name in dataSpecs) result.add(Operator.Data(name))
+        // A dataset something else *writes* is only complete once that writer has run.
+        dataWriters[name]?.let { result.add(Operator.Signal(it)) }
       }
       if (expression.readsUnnamedDataset) {
         dataSpecs.keys.forEach { result.add(Operator.Data(it)) }

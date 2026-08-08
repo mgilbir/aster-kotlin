@@ -129,7 +129,14 @@ public data class Padding(
   val bottom: Double = 0.0,
 ) {
   public companion object {
-    public val Default: Padding = Padding(5.0, 5.0, 5.0, 5.0)
+    /**
+     * **Zero**, which is upstream's `config.padding`, and not the 5 that every example writes.
+     *
+     * Nearly every specification in Vega's own gallery sets `"padding": 5` for itself, which is why
+     * a wrong default here survived so long: it only shows on a chart that leaves it out, and then
+     * it shows as ten units of surface nobody asked for.
+     */
+    public val Default: Padding = Padding(0.0, 0.0, 0.0, 0.0)
 
     public fun uniform(value: Double): Padding = Padding(value, value, value, value)
   }

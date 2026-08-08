@@ -856,7 +856,7 @@ public class SpecParser {
       else -> {
         diagnostics.warn(
           DiagnosticCodes.PARSE_UNKNOWN_PROPERTY,
-          "padding must be a number or an object; using the default of 5",
+          "padding must be a number or an object; using the default of none",
           jsonPath = path,
         )
         Padding.Default

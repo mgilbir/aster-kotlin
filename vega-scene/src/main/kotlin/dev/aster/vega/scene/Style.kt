@@ -29,6 +29,39 @@ public data class SceneColor(
       channel(blue)
   }
 
+  /**
+   * `rgb(r, g, b)` — the form every colour prints in upstream, whichever space it was built in.
+   *
+   * Channels are rounded to whole numbers, which is what d3's own `toString` does.
+   */
+  public fun toCssRgb(): String {
+    fun channel(v: Double): Int = (v.coerceIn(0.0, 1.0) * 255.0).roundToInt()
+    return "rgb(${channel(red)}, ${channel(green)}, ${channel(blue)})"
+  }
+
+  /**
+   * The colour's hue, saturation and lightness, as d3 reads them.
+   *
+   * Hue in degrees, saturation and lightness as fractions. A grey has no hue to speak of and d3
+   * reports `NaN`; zero is used instead, because an expression reading `.h` off one and adding to
+   * it should not turn the whole result into nothing.
+   */
+  public fun toHsl(): Triple<Double, Double, Double> {
+    val max = maxOf(red, green, blue)
+    val min = minOf(red, green, blue)
+    val lightness = (max + min) / 2.0
+    if (max == min) return Triple(0.0, 0.0, lightness)
+    val span = max - min
+    val saturation = if (lightness < 0.5) span / (max + min) else span / (2.0 - max - min)
+    val hue =
+      when (max) {
+        red -> (green - blue) / span + (if (green < blue) 6.0 else 0.0)
+        green -> (blue - red) / span + 2.0
+        else -> (red - green) / span + 4.0
+      } * 60.0
+    return Triple(hue, saturation, lightness)
+  }
+
   /** Lowercase `#rrggbb`, or `#rrggbbaa` when not fully opaque. */
   public fun toCssHex(): String {
     fun hex(v: Double): String =

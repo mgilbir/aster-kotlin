@@ -239,10 +239,21 @@ public class SpecCompiler(
     val signalValues = LinkedHashMap<String, VegaValue>(implicitSignals)
     // A handler's value is the current one, and everything downstream — a transform included —
     // should read that rather than the declared value it is replacing.
-    val session =
-      SignalResolver(diagnostics, expressions).session(spec.signals, signalValues, signalOverrides)
     val scales = LinkedHashMap<String, VegaScale>()
     var resolved = ScopeData.Empty
+    // `setdata` in a signal's expression replaces a dataset outright, so the write has to land
+    // where
+    // everything after it will read: the accumulated scope data, not a copy of it. The ordering
+    // puts
+    // every reader of that dataset behind the signal.
+    val session =
+      SignalResolver(diagnostics, expressions).session(
+        spec.signals,
+        signalValues,
+        signalOverrides,
+      ) { name, rows ->
+        resolved = resolved.withDataset(name, rows)
+      }
 
     val dataSpecs = spec.data.associateBy { it.name }
     val scaleSpecs = spec.scales.associateBy { it.name }

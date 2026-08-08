@@ -96,8 +96,6 @@ public object Functions {
         "parsing a date against a format string needs a strptime the engine does not have; " +
           "an ISO 8601 string works through toDate",
       "gradient" to "gradients cannot be produced from an expression yet",
-      "rgb" to "colour helpers are not implemented",
-      "hsl" to "colour helpers are not implemented",
       "lab" to "colour helpers are not implemented",
       "hcl" to "colour helpers are not implemented",
       "geoArea" to "geographic functions are out of scope for the first release",
@@ -384,6 +382,55 @@ public object Functions {
         is VegaValue.Arr -> VegaValue.Arr(data.values.map { it.field(path) })
         else -> data.field(path)
       }
+    }
+
+    // ---- colour -------------------------------------------------------------
+
+    /**
+     * `hsl(h, s, l)` builds a colour; `hsl(value)` reads one apart.
+     *
+     * Upstream returns one object that does both — d3's, whose `h`, `s` and `l` can be read and
+     * whose string form is `rgb(r, g, b)`. A [VegaValue] is either an object or a string and cannot
+     * be both, so the two uses are split by arity: three numbers give the CSS colour, one value
+     * gives the components. That covers what a specification actually does with it — Vega's
+     * platformer reads a colour apart, shifts its saturation and lightness, and puts it back
+     * together — and anything relying on the object *also* printing as a colour is the difference.
+     *
+     * `s` and `l` are fractions here, not percentages, which is d3's convention and not CSS's.
+     */
+    map["hsl"] = ExpressionFunction { args ->
+      if (args.size >= 3) {
+        val h = JsSemantics.toNumber(args.at(0))
+        val s = JsSemantics.toNumber(args.at(1))
+        val l = JsSemantics.toNumber(args.at(2))
+        val colour = SceneColor.parse("hsl(${'$'}h, ${'$'}{s * 100}%, ${'$'}{l * 100}%)")
+        if (colour == null) VegaValue.Null else VegaValue.Str(colour.toCssRgb())
+      } else {
+        val colour = SceneColor.parse(args.string(0)) ?: return@ExpressionFunction VegaValue.Null
+        val (h, s, l) = colour.toHsl()
+        VegaValue.Obj(
+          linkedMapOf(
+            "h" to VegaValue.Num(h),
+            "s" to VegaValue.Num(s),
+            "l" to VegaValue.Num(l),
+          )
+        )
+      }
+    }
+
+    /** `rgb(r, g, b)` — the same shape, and the form every colour prints in. */
+    map["rgb"] = ExpressionFunction { args ->
+      val colour =
+        if (args.size >= 3) {
+          SceneColor.parse(
+            "rgb(${'$'}{JsSemantics.toNumber(args.at(0))}, " +
+              "${'$'}{JsSemantics.toNumber(args.at(1))}, " +
+              "${'$'}{JsSemantics.toNumber(args.at(2))})"
+          )
+        } else {
+          SceneColor.parse(args.string(0))
+        }
+      if (colour == null) VegaValue.Null else VegaValue.Str(colour.toCssRgb())
     }
 
     // ---- ranges -------------------------------------------------------------

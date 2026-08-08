@@ -61,6 +61,14 @@ public interface Expression {
    */
   public val readsUnnamedScale: Boolean
 
+  /**
+   * Datasets this expression *replaces*, through `setdata`.
+   *
+   * The mirror of [dataDependencies]: anything reading one of these has to be ordered behind the
+   * expression rather than in front of it.
+   */
+  public val writtenDatasets: Set<String>
+
   public fun evaluate(scope: ExpressionScope): VegaValue
 }
 
@@ -107,6 +115,15 @@ public interface ExpressionScope {
 
   /** `bandwidth('name')` — a band scale's band width, or zero for a scale that has none. */
   public fun scaleBandwidth(name: String): VegaValue = VegaValue.Num(0.0)
+
+  /**
+   * `setdata('name', rows)` — replaces a dataset's contents outright.
+   *
+   * The one expression function that *writes*. Upstream pulses a changeset that removes everything
+   * and inserts the new rows, and returns 1. A scope with nowhere to put them ignores it, which is
+   * what a bare expression evaluated outside a chart should do.
+   */
+  public fun setDataset(name: String, rows: List<VegaValue>) {}
 }
 
 /**

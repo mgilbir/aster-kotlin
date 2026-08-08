@@ -36,6 +36,9 @@ public class ParsedExpression(
   override val readsUnnamedScale: Boolean
     get() = deferred.unnamedScale
 
+  override val writtenDatasets: Set<String>
+    get() = deferred.written
+
   override fun evaluate(scope: ExpressionScope): VegaValue = evaluator.evaluate(ast, scope)
 
   /**
@@ -85,6 +88,7 @@ public class ParsedExpression(
     val unnamedDataset: Boolean,
     val scales: Set<String>,
     val unnamedScale: Boolean,
+    val written: Set<String>,
   )
 
   /**
@@ -97,6 +101,7 @@ public class ParsedExpression(
   private fun collectDeferred(): Deferred {
     val datasets = mutableSetOf<String>()
     val scales = mutableSetOf<String>()
+    val written = mutableSetOf<String>()
     var unnamedDataset = false
     var unnamedScale = false
     ast.walk { node ->
@@ -107,6 +112,7 @@ public class ParsedExpression(
         when (callee.name) {
           in DATA_FUNCTIONS -> datasets
           in SCALE_FUNCTIONS -> scales
+          "setdata" -> written
           else -> return@walk
         }
       val first = node.arguments.firstOrNull()
@@ -114,10 +120,11 @@ public class ParsedExpression(
       when {
         literal != null -> into.add(literal)
         into === datasets -> unnamedDataset = true
+        into === written -> Unit // nothing can be ordered around a name nobody wrote down
         else -> unnamedScale = true
       }
     }
-    return Deferred(datasets, unnamedDataset, scales, unnamedScale)
+    return Deferred(datasets, unnamedDataset, scales, unnamedScale, written)
   }
 
   private companion object {

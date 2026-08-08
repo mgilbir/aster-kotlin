@@ -269,6 +269,19 @@ internal class ScopeCompiler(
    * so asking the finished [GroupNode] how big it is would quietly reintroduce the half-pixel crisp
    * offset that everything outside the cell is careful to exclude.
    */
+  /** A clipped group's reach: what its contents cover, cut back to the window it declares. */
+  private fun intersectReach(reach: RectD, clip: RectD): RectD {
+    if (reach.isEmpty || clip.isEmpty) return RectD.Empty
+    val cut =
+      RectD(
+        maxOf(reach.left, clip.left),
+        maxOf(reach.top, clip.top),
+        minOf(reach.right, clip.right),
+        minOf(reach.bottom, clip.bottom),
+      )
+    return if (cut.isEmpty) RectD.Empty else cut
+  }
+
   /**
    * The order a mark's items are taken in, as indices into the built list.
    *
@@ -333,6 +346,14 @@ internal class ScopeCompiler(
     val reaches = sorted.mapIndexed { index, node ->
       var reach = sortedInner[index] ?: RectD.Empty
       (node as? GroupNode)?.stroke?.let { reach = reach.expand(it.halfWidth) }
+      // A clipped group reaches no further than its own extent, whatever its contents do. Upstream
+      // overrides the aggregated bounds the same way. Vega's platformer relies on it: the level
+      // scrolls past the edge of a 400-wide window, and without the clip the chart is measured
+      // around the whole level.
+      val group = node as? GroupNode
+      if (group?.clip != null) {
+        reach = intersectReach(reach, group.clip!!)
+      }
       reach
     }
     var bounds = RectD.Empty

@@ -135,6 +135,25 @@ public class Evaluator(
       }
     }
 
+    // The one function that writes rather than reads: it empties the named dataset and inserts the
+    // rows it is given. Upstream returns 1 from it, and a specification chains on that.
+    if (name == "setdata") {
+      if (node.arguments.size < 2) {
+        throw ExpressionEvaluationException(
+          VegaDiagnostic(
+            severity = DiagnosticSeverity.ERROR,
+            code = DiagnosticCodes.EXPRESSION_UNSUPPORTED_FUNCTION,
+            message = "setdata() takes a dataset name and an array of rows",
+            operator = name,
+          )
+        )
+      }
+      val target = evaluate(node.arguments[0], scope).asString()
+      val rows = evaluate(node.arguments[1], scope)
+      scope.setDataset(target, (rows as? VegaValue.Arr)?.values ?: listOf(rows))
+      return VegaValue.Num(1.0)
+    }
+
     if (name == "data") {
       val dataset = scope.dataset(evaluate(node.arguments.first(), scope).asString())
       return VegaValue.Arr(dataset)

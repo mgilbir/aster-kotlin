@@ -66,7 +66,18 @@ public class SignalScope(
    * the reader hunting for a typo that is not there.
    */
   private val pendingScales: Set<String> = emptySet(),
+  /**
+   * Where `setdata` puts what it is given, when this scope belongs to a chart being compiled.
+   *
+   * Null everywhere else, and then the write is ignored — a scope with no chart behind it has no
+   * dataset to replace.
+   */
+  private val datasetSink: ((String, List<VegaValue>) -> Unit)? = null,
 ) : ExpressionScope {
+
+  override fun setDataset(name: String, rows: List<VegaValue>) {
+    datasetSink?.invoke(name, rows)
+  }
 
   override fun signal(name: String): VegaValue = values[name] ?: VegaValue.Null
 
@@ -160,13 +171,32 @@ public class SignalScope(
   }
 
   public fun withDatum(datum: VegaValue): SignalScope =
-    SignalScope(values, datasets, datum, scales, diagnostics, indataIndexes)
+    SignalScope(
+      values,
+      datasets,
+      datum,
+      scales,
+      diagnostics,
+      indataIndexes,
+      pendingScales,
+      datasetSink,
+    )
 
   /** Adds the scales once they exist, which is after every signal has resolved. */
   public fun withScales(
     scales: Map<String, VegaScale>,
     diagnostics: DiagnosticCollector,
-  ): SignalScope = SignalScope(values, datasets, datum, scales, diagnostics, indataIndexes)
+  ): SignalScope =
+    SignalScope(
+      values,
+      datasets,
+      datum,
+      scales,
+      diagnostics,
+      indataIndexes,
+      pendingScales,
+      datasetSink,
+    )
 
   public val names: Set<String>
     get() = values.keys
@@ -244,7 +274,9 @@ public class SignalResolver(
     signals: List<SignalSpec>,
     values: MutableMap<String, VegaValue>,
     pinned: Map<String, VegaValue> = emptyMap(),
-  ): Resolution = Resolution(signals, values, pinned)
+    /** Where a `setdata` in one of these signals puts its rows. */
+    datasetSink: ((String, List<VegaValue>) -> Unit)? = null,
+  ): Resolution = Resolution(signals, values, pinned, datasetSink)
 
   /**
    * One resolution pass. Holds the mutable bookkeeping so the resolver itself stays reusable.
@@ -257,6 +289,7 @@ public class SignalResolver(
     signals: List<SignalSpec>,
     private val values: MutableMap<String, VegaValue>,
     pinned: Map<String, VegaValue>,
+    private val datasetSink: ((String, List<VegaValue>) -> Unit)? = null,
   ) {
     private val specs = LinkedHashMap<String, SignalSpec>()
     private val settled = mutableSetOf<String>()
@@ -296,7 +329,14 @@ public class SignalResolver(
     public fun scope(
       datasets: Map<String, List<VegaValue>>,
       scales: Map<String, VegaScale> = emptyMap(),
-    ): SignalScope = SignalScope(values, datasets, diagnostics = diagnostics, scales = scales)
+    ): SignalScope =
+      SignalScope(
+        values,
+        datasets,
+        diagnostics = diagnostics,
+        scales = scales,
+        datasetSink = datasetSink,
+      )
 
     public fun resolve(
       name: String,
@@ -319,6 +359,13 @@ public class SignalResolver(
       }
 
       try {
+        // A signal's `update` may read *itself*: `dashing ? frame : lastFrameDashing` holds the
+        // last
+        // frame a thing happened on and leaves it alone otherwise. Upstream's operator holds its
+        // previous value, so on the first pass that is the declared `value` — seeded here, because
+        // reading it as null turns "leave it alone" into "reset it to zero", and a chart written
+        // that way then draws a state it was never in.
+        if (name !in values) values[name] = spec.value ?: VegaValue.Null
         values[name] = evaluate(spec, datasets, scales, pendingScales)
         settled.add(name)
       } finally {
@@ -353,6 +400,7 @@ public class SignalResolver(
                 diagnostics = diagnostics,
                 scales = scales,
                 pendingScales = pendingScales,
+                datasetSink = datasetSink,
               )
             )
           } catch (e: ExpressionEvaluationException) {
