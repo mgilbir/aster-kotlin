@@ -15,6 +15,7 @@ import dev.aster.vega.runtime.scale.BandScale
 import dev.aster.vega.runtime.scale.LinearScale
 import dev.aster.vega.runtime.scale.PointScale
 import dev.aster.vega.runtime.scale.PositionScale
+import dev.aster.vega.runtime.scale.Ticks
 import dev.aster.vega.runtime.scale.TimeScale
 import dev.aster.vega.runtime.scale.TimeTicks
 import dev.aster.vega.runtime.scale.TransformedScale
@@ -266,6 +267,11 @@ public class AxisBuilder(
             // them, so a turned label pivots about its anchor rather than being re-hung from it.
             angleDegrees = labelAngle,
             fill = GuideStyle.fill(spec.labelStyle, AxisDefaults.labelColor),
+            // A label's own `encode` may hide it on a rule the axis has no property for — a
+            // calendar shows the month name on the first week of each month and blanks the rest.
+            // It still measures: upstream bounds a text item from its geometry whatever its
+            // opacity, and only overlap removal takes one out of the measurement.
+            opacity = labelChannel(spec, "opacity", tick) ?: 1.0,
             metadata = NodeMetadata(role = "axis-label"),
           )
       }
@@ -689,9 +695,19 @@ public class AxisBuilder(
     // where there is a number to format: upstream coerces a discrete domain's own values to strings
     // and never consults it, so a band axis keeps its labels whatever this says.
     if (format != null && scale !is BandScale && scale !is PointScale) {
+      // Upstream resolves the specifier against the *span* being labelled, so a specifier that
+      // names no precision takes as many decimals as the tick step needs rather than d3's fixed
+      // six.
+      val numeric =
+        when (scale) {
+          is LinearScale -> scale.domain
+          is TransformedScale -> scale.domain
+          is TimeScale -> scale.domain
+        }
+      val resolved = Ticks.spanSpecifier(format, numeric.first(), numeric.last(), count)
       return { value ->
         val number = value.asDouble()
-        if (number.isNaN()) value.asString() else NumberFormatSubset.format(number, format)
+        if (number.isNaN()) value.asString() else NumberFormatSubset.format(number, resolved)
       }
     }
     return when (scale) {

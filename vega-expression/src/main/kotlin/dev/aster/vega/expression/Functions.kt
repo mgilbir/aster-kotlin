@@ -416,6 +416,11 @@ public object Functions {
      *
      * Whole *units*, not milliseconds: a month later is the same day of the next month, and a day
      * later across a clock change is still the same wall-clock time.
+     *
+     * The step defaults to **one**, and it has to be read as absent rather than coerced: `Number()`
+     * of a missing argument is 0, which offsets by nothing and returns the date it was handed. That
+     * is d3's rule — `step == null ? 1 : Math.floor(step)` — and it matters because the
+     * two-argument form is the one specifications actually write.
      */
     map["timeOffset"] = ExpressionFunction { args ->
       val stepper =
@@ -423,8 +428,8 @@ public object Functions {
           ?: return@ExpressionFunction VegaValue.Null
       val at = JsSemantics.toNumber(args.at(1))
       if (!at.isFinite()) return@ExpressionFunction VegaValue.Null
-      val by = JsSemantics.toNumber(args.at(2)).takeIf { it.isFinite() } ?: 1.0
-      VegaValue.Num(stepper.offset(at, by.toInt()))
+      val by = args.numberOr(2, 1.0).takeIf { it.isFinite() } ?: 1.0
+      VegaValue.Num(stepper.offset(at, floor(by).toInt()))
     }
 
     /**

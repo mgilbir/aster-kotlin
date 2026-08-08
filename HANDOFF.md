@@ -9,7 +9,7 @@ Branch `milestone-0-bootstrap`. Working tree clean, both gates green:
 - `./scripts/check.sh` — format, all tests, lint, demo APK
 - `./scripts/oracle.sh` — regenerates upstream references and runs the differential comparison
 
-**96 differential fixtures pass, all matching upstream exactly.** That is the only number here
+**97 differential fixtures pass, all matching upstream exactly.** That is the only number here
 that means what it says.
 
 ## Read this before trusting the other number
@@ -208,12 +208,10 @@ domain was no longer empty, and the width was a floating-point crumb in a rotate
 that `Math.ceil` turned into a whole unit of plotting area. Read the STATUS section before assuming
 anything similar is a rounding tolerance.
 
-One example remains parked in the scratchpad hold directory with its data already fetched:
-
-- **`calendar-view`** — further out. Its `y` scale domain is a list of `datetime(...)` values and the
-  marks come out transposed against upstream's (`x` and `y` swapped), so start by comparing one
-  rect's encode against what upstream places. It also wants `timeOffset`, which is now implemented,
-  so re-read its diagnostics before assuming anything from this note.
+**`calendar-view` is done** too, and the old note above it was wrong in an instructive way: the
+marks were not transposed, the *facets* were in the opposite order because a mark `sort` over
+`datum.year` could only read `x` and `y` and silently tied. And `timeOffset` was implemented but
+returning its argument. STATUS.md has the six things it needed.
 
 - **`crossfilter-flights`** — needs the `crossfilter` and `resolvefilter` transforms, and **it cannot
   be a fixture as the harness stands**: it draws 600,098 scene nodes and the differential run dies

@@ -793,10 +793,28 @@ public data class LegendSpec(
   val title: String? = null,
   /** Explicit entry values, overriding whatever the scale would generate. */
   val values: List<VegaValue>? = null,
+  /**
+   * A d3-format specifier for the entry labels, which is how a ramp over fractions reads `6%`.
+   *
+   * Resolved against the *span* the legend covers, as upstream's `formatSpan` does: a specifier
+   * naming no precision takes as many decimals as the tick step needs, not d3's fixed six.
+   */
+  val format: String? = null,
   val tickCount: NumberValue? = null,
   val offset: NumberValue? = null,
   val padding: NumberValue? = null,
   val titlePadding: NumberValue? = null,
+  /**
+   * `titleOrient` — which side of the entries the title sits on.
+   *
+   * `"top"` by default. `"left"` turns a legend into a labelled strip: the title runs down the
+   * left, vertically centred against the entries, and every entry is pushed past it. It also
+   * changes the title's own anchoring — upstream reads a left or right title as `middle`-anchored
+   * where a top one is `start`-anchored — so it is not only a translation.
+   */
+  val titleOrient: String? = null,
+  /** How wide the title may be drawn before it is truncated. Upstream's legend default is 180. */
+  val titleLimit: NumberValue? = null,
   val titleFontSize: NumberValue? = null,
   val labelFontSize: NumberValue? = null,
   val labelOffset: NumberValue? = null,

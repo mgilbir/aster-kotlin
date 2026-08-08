@@ -21,7 +21,7 @@ end to end — expressions, signals, 33 of upstream's 40 data transforms, every 
 and an event handler that recompiles the chart — and are verified against upstream Vega by
 differential tests.
 
-Ninety-six differential fixtures pass, all matching upstream exactly on every mark and scale output:
+Ninety-seven differential fixtures pass, all matching upstream exactly on every mark and scale output:
 
 | Fixture | Marks | Covers |
 | --- | --- | --- |
@@ -121,6 +121,7 @@ Ninety-six differential fixtures pass, all matching upstream exactly on every ma
 | `interactive-legend` | 454 | a brush `rect` with no `x` until someone drags one, and a legend swatch whose opacity is a conditional rule |
 | `histogram-null-values` | 47 | Vega's film-rating histogram: a scale whose ticks are `bin`'s own boundaries, a second band scale for the null bar, `fit` sizing, and 3,201 rows from a relative `url` |
 | `time-units` | 40 | Vega's time-unit bar chart: a scale domain whose *field name* comes from a signal, a band axis of instants labelled by `formatType: "time"` with a specifier `timeUnitSpecifier` chose, and an italic subtitle |
+| `calendar-view` | 6311 | Vega's calendar view: 21 faceted years ordered by a `sort` over the *datum*, `timeOffset` moving a week's Sunday to its Monday, axis labels hidden by a rule of their own, and a legend whose title stands beside its ramp |
 
 The gate is wired into `./scripts/oracle.sh`, so every further scale, mark and transform is built
 against a harness that can say we are wrong — which golden tests cannot.
@@ -180,7 +181,7 @@ substantive compatibility items:
 | 6. View and Compose APIs | Yes |
 | 7. SVG, PNG, PDF export | Yes |
 | 8. TalkBack can describe and navigate | Partial — virtual nodes are tested by instrumentation, not with TalkBack itself |
-| 9. At least 100 compatibility fixtures pass | 96 of 100 |
+| 9. At least 100 compatibility fixtures pass | 97 of 100 |
 | 10. Core runtime has no Android dependency | Yes |
 | 11. Renders without WebView | Yes |
 | 12. Build and test loop runs from the terminal | Yes |
@@ -517,7 +518,7 @@ each example a deadline.
 
 ## Known failing fixtures
 
-None. Ninety-six fixtures exist and all ninety-six pass — and that sentence became worth
+None. Ninety-seven fixtures exist and all ninety-seven pass — and that sentence became worth
 something only once the gate could no longer skip itself, below.
 
 **The gate could report success without running.** `FixtureDifferentialTest` reads the fixtures and
@@ -835,6 +836,52 @@ With that, `histogram-null-values` passes, and it took four separate pieces to g
 dependency order, `bin` publishing its settings, `autosize: fit`, and this. Each of them turned up a
 defect in code that was already passing.
 
+## `calendar-view`, and a function that had been returning its argument
+
+`calendar-view` draws 21 years of the S&P 500 as a wall calendar: 6,311 rects, two axes per year,
+and a legend across the top. It needed six things, and the first two were both *silences* rather
+than gaps.
+
+- **`timeOffset('day', d)` moved nothing.** The step defaults to one, and the default was read by
+  coercing the missing argument — `Number(undefined)` is 0, so the function handed back the date it
+  was given. d3's rule is `step == null ? 1 : Math.floor(step)`, which distinguishes absent from
+  zero, and the two-argument form is the one specifications actually write. It had been "supported"
+  since the transform work. What it cost here was invisible for most of the year: every week was
+  labelled by its Sunday instead of its Monday, so only the weeks that straddle a month boundary
+  came out under the wrong month name.
+- **A mark `sort` could only read `x` and `y`.** `{"field": "datum.year", "order": "descending"}` is
+  a path into the scene *item*, not a channel — upstream has no special case, `vega-util`'s `field`
+  walks it and the item happens to carry both its geometry and its datum. Anything it could not
+  read was silently a tie, which leaves the items in declaration order and looks exactly like a
+  sort that worked; the calendar came out oldest-year-first. Unreadable paths are reported now, and
+  the descending test is upstream's exact `=== 'descending'` rather than a prefix match.
+- **An axis label's `encode` may set its `opacity`**, which is how the calendar names only the first
+  week of each month and blanks the other forty-eight. It is a rule over the tick's own value, so no
+  axis property could express it. A label hidden this way still *measures*, unlike one dropped by
+  overlap removal.
+- **`formatSpan`.** A format specifier naming no precision does not mean "no decimals": upstream
+  resolves it against the span being labelled, so `"%"` over a `[-0.06, 0.06]` ramp reads `−6%` and
+  not `−6.000000%`. `Ticks.spanSpecifier` is that rule, and it applies to axis labels, legend
+  labels and the spoken caption alike — the axis had the same gap and only explicit-precision
+  specifiers had ever been tried.
+- **A legend title beside its entries** (`titleOrient: "left"`), which also changes the title's own
+  anchoring: upstream reads a left or right title as `middle`-anchored where a top one is
+  `start`-anchored, so it is centred against the **bar alone** rather than against the labels under
+  it. With it came the legend's own `titleLimit`, which defaults to 180 and nothing had to ask for:
+  the title here is truncated, and since its width is what pushes the entries across, an
+  untruncated one moved the whole legend by 29 units.
+- **A legend measures as its own box.** Upstream's `legendBounds` anchors the aggregate at the
+  legend's padding and then *sets* the item's bounds to the resulting rectangle, so anything
+  hanging above or left of the origin is drawn and not measured. A vertically centred title
+  reaches three quarters of a unit above the legend's top edge, and measuring it there made the
+  chart a unit taller.
+
+Two stale diagnostics went with it. `titleX`, `titleY`, `titleAngle`, `titleAlign` and
+`titleBaseline` on an axis have been honoured since the parallel-coordinates work and were still
+being reported as unimplemented — the other half of "nothing silently ignored", and the third time
+it has happened. And the caption harness compared the XML *spelling* of an `aria-label`, so a legend
+title containing an ampersand could never match; it unescapes now.
+
 ## `time-units`, and the crumb that cost a whole unit
 
 `time-units` is Vega's time-unit bar chart, and it needed five things. The first was the one the
@@ -1092,7 +1139,7 @@ depends on them. Each has a test and a comment; this is the index.
    covered". That is the right sentence in the wrong place. Either the fixtures grow a second,
    reader-facing description, or the demo's bundled specifications stop being fixture files. The
    engine is not at fault; the demo reads badly and a user would notice before any of us did.
-3. **Keep growing the fixture corpus.** 96 of the brief's 100. Aiming it at *combinations* the
+3. **Keep growing the fixture corpus.** 97 of the brief's 100. Aiming it at *combinations* the
    engine has not met rather than at more variations of a single feature is what makes it find
    things: that is how `scale()` in an expression turned up missing. Untried combinations that
    remain include an axis on a discretizing scale, a group whose signals shadow the outer scope's,

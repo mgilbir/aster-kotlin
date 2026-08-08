@@ -108,6 +108,13 @@ private val AXIS_CONSUMED =
     "format",
     "formatType",
     "bandPosition",
+    // Read by the axis builder since the parallel-coordinates work; they were still being
+    // reported as unimplemented, which is the stale half of "nothing silently ignored".
+    "titleX",
+    "titleY",
+    "titleAngle",
+    "titleAlign",
+    "titleBaseline",
   ) + guideStyleKeys("label", "tick", "grid", "domain", "title")
 
 /**
@@ -194,6 +201,7 @@ private val LEGEND_CONSUMED =
     "shape",
     "opacity",
     "type",
+    "format",
     "orient",
     "direction",
     "title",
@@ -202,6 +210,8 @@ private val LEGEND_CONSUMED =
     "offset",
     "padding",
     "titlePadding",
+    "titleOrient",
+    "titleLimit",
     "titleFontSize",
     "labelFontSize",
     "labelOffset",
@@ -288,6 +298,9 @@ private val RESOLVED_GUIDE_CHANNELS =
     // A label's own nudge, and the text it draws when a scale supplies it rather than a format.
     "labels.update.dx",
     "labels.update.dy",
+    // An axis label's own visibility, which a calendar uses to name only the first week of each
+    // month. It is a rule over the tick's own value, so no property could say it.
+    "labels.update.opacity",
     // A legend label's text, which is how an id becomes a name — read through a scale, so there is
     // nothing constant to fold.
     "labels.update.text",
@@ -1356,6 +1369,24 @@ public class SpecParser {
   }
 
   /**
+   * `titleOrient`, of which only `top` and `left` are implemented.
+   *
+   * `right` and `bottom` are reported: each needs its own anchoring rule — a bottom title is
+   * `end`-anchored against the entries and a right one is measured from their far edge — and a
+   * legend that quietly put its title on the wrong side would look finished.
+   */
+  private fun legendTitleOrient(value: VegaValue?, path: String): String? {
+    val name = (value as? VegaValue.Str)?.value?.lowercase() ?: return null
+    if (name == "top" || name == "left") return name
+    diagnostics.warn(
+      DiagnosticCodes.PARSE_UNKNOWN_PROPERTY,
+      "A legend title on the '$name' is not implemented; it is drawn above the entries",
+      jsonPath = path,
+    )
+    return null
+  }
+
+  /**
    * `formatType`, which upstream's schema restricts to `number`, `time` and `utc`.
    *
    * A signal may choose it, and that form is reported rather than read: the specifier it selects
@@ -1614,10 +1645,13 @@ public class SpecParser {
           obj.enumOrNull("direction", path, "legend direction") { Direction.fromName(it) },
         title = obj.fields["title"]?.takeIf { it is VegaValue.Str }?.asString(),
         values = (obj.fields["values"] as? VegaValue.Arr)?.values,
+        format = obj.fields["format"]?.takeIf { it is VegaValue.Str }?.asString(),
         tickCount = obj.numberOrSignal("tickCount", "$path.tickCount"),
         offset = obj.numberOrSignal("offset", "$path.offset"),
         padding = obj.numberOrSignal("padding", "$path.padding"),
         titlePadding = obj.numberOrSignal("titlePadding", "$path.titlePadding"),
+        titleOrient = legendTitleOrient(obj.fields["titleOrient"], "$path.titleOrient"),
+        titleLimit = obj.numberOrSignal("titleLimit", "$path.titleLimit"),
         titleFontSize = obj.numberOrSignal("titleFontSize", "$path.titleFontSize"),
         labelFontSize = obj.numberOrSignal("labelFontSize", "$path.labelFontSize"),
         labelOffset = obj.numberOrSignal("labelOffset", "$path.labelOffset"),
@@ -1672,10 +1706,8 @@ public class SpecParser {
       path,
       LEGEND_CONSUMED,
       mapOf(
-        "format" to "Legend label format specifiers are not implemented",
         "formatType" to "Legend label format types are not implemented",
         "symbolLimit" to "Legend entry limits are not implemented; every entry is shown",
-        "titleOrient" to "Only a legend title above the entries is implemented",
         "gradientOpacity" to "Legend gradient opacity is not implemented",
         "titleAnchor" to "Legend title anchoring is not implemented",
       ),

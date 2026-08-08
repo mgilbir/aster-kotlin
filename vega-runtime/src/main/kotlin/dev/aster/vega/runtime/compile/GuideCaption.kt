@@ -9,6 +9,7 @@ import dev.aster.vega.runtime.scale.LinearScale
 import dev.aster.vega.runtime.scale.OrdinalScale
 import dev.aster.vega.runtime.scale.PointScale
 import dev.aster.vega.runtime.scale.SequentialColorScale
+import dev.aster.vega.runtime.scale.Ticks
 import dev.aster.vega.runtime.scale.TimeScale
 import dev.aster.vega.runtime.scale.TransformedScale
 import dev.aster.vega.runtime.scale.VegaScale
@@ -84,13 +85,15 @@ internal object GuideCaption {
     title: String?,
     channels: List<String>,
     scale: VegaScale?,
+    /** The legend's own label format, so a reader hears the domain the way the entries read it. */
+    format: String? = null,
   ): String? {
     if (scale == null || channels.isEmpty()) return null
     return buildString {
       append("$kind legend".trim().replaceFirstChar { it.uppercase() })
       if (!title.isNullOrBlank()) append(" titled '$title'")
       append(" for ${channelNames(channels)}")
-      append(" with ${domain(scale)}")
+      append(" with ${domain(scale, format)}")
     }
   }
 
@@ -133,18 +136,15 @@ internal object GuideCaption {
       }
       is TransformedScale ->
         continuous(scale.domain.first(), scale.domain.last()) { v, _ ->
-          if (format != null) NumberFormatSubset.format(v, format)
-          else scale.formatTick(v, CAPTION_TICK_COUNT)
+          spelled(format, scale.domain)?.invoke(v) ?: scale.formatTick(v, CAPTION_TICK_COUNT)
         }
       is SequentialColorScale ->
         continuous(scale.domain.first(), scale.domain.last()) { v, _ ->
-          if (format != null) NumberFormatSubset.format(v, format)
-          else scale.formatTick(v, CAPTION_TICK_COUNT)
+          spelled(format, scale.domain)?.invoke(v) ?: scale.formatTick(v, CAPTION_TICK_COUNT)
         }
       is LinearScale ->
         continuous(scale.domain.first(), scale.domain.last()) { v, _ ->
-          if (format != null) NumberFormatSubset.format(v, format)
-          else scale.formatTick(v, CAPTION_TICK_COUNT)
+          spelled(format, scale.domain)?.invoke(v) ?: scale.formatTick(v, CAPTION_TICK_COUNT)
         }
     }
 
@@ -163,6 +163,19 @@ internal object GuideCaption {
         values.joinToString(", ")
       }
     return "$n value${if (n == 1) "" else "s"}: $body"
+  }
+
+  /**
+   * A numeric format resolved against the span it describes, as upstream's caption resolves it.
+   *
+   * The same `formatSpan` an axis or a legend label goes through, at the caption's own tick count
+   * of five: a specifier naming no precision takes as many decimals as the step needs, so a ramp
+   * over fractions is read out as "−6% to 6%" and not "−0.060000% to 0.060000%".
+   */
+  private fun spelled(format: String?, domain: List<Double>): ((Double) -> String)? {
+    if (format == null) return null
+    val resolved = Ticks.spanSpecifier(format, domain.first(), domain.last(), CAPTION_TICK_COUNT)
+    return { value -> NumberFormatSubset.format(value, resolved) }
   }
 
   /**

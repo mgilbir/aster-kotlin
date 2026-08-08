@@ -155,12 +155,7 @@ class AxisStyleTest {
         "\"translate\": 0",
         "\"minExtent\": 20",
         "\"maxExtent\": 40",
-        "\"titleAlign\": \"left\"",
-        "\"titleAngle\": 30",
-        "\"titleBaseline\": \"top\"",
         "\"titleLimit\": 40",
-        "\"titleX\": 5",
-        "\"titleY\": 5",
         "\"aria\": false",
         "\"description\": \"d\"",
       )

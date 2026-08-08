@@ -2,6 +2,7 @@ package dev.aster.vega.runtime.compile
 
 import dev.aster.vega.dataflow.transform.AggregateOp
 import dev.aster.vega.dataflow.transform.aggregateOver
+import dev.aster.vega.dataflow.transform.compareFieldValues
 import dev.aster.vega.dataflow.transform.groupTuples
 import dev.aster.vega.expression.ExpressionCompiler
 import dev.aster.vega.model.DiagnosticCodes
@@ -221,7 +222,7 @@ internal class ScopeCompiler(
         )
     children += legendNodes
     children += raised
-    for (node in legendNodes) content = content.union(node.transformedBounds)
+    for (node in legendNodes) content = content.union(legendBox(node))
 
     // Last, because a title is placed against everything else: it centres over the chart *and* its
     // axes and legends, not over the plotting area.
@@ -290,16 +291,35 @@ internal class ScopeCompiler(
    * rather than inventing one — the properties an item exposes here are its position, and a
    * specification sorting on anything else is asking for something that is not in the scene.
    */
-  private fun sortOrder(sort: MarkSort?, nodes: List<SceneNode>): List<Int> {
+  /**
+   * A legend measures as its own box rather than as the union of what it drew.
+   *
+   * Upstream's `legendBounds` anchors the aggregate at the legend's padding and then *sets* the
+   * item's bounds to the resulting rectangle, so anything hanging above or to the left of the
+   * origin is drawn and not measured. A title beside the entries is exactly that case: it is
+   * vertically centred, so its text reaches a fraction above the legend's own top edge, and
+   * measuring it there pushes the whole chart down by a unit.
+   */
+  private fun legendBox(node: SceneNode): RectD =
+    (node as? GroupNode)?.size?.let {
+      node.transform.mapBounds(RectD(0.0, 0.0, it.width, it.height))
+    } ?: node.transformedBounds
+
+  private fun sortOrder(
+    sort: MarkSort?,
+    nodes: List<SceneNode>,
+    datums: List<VegaValue>,
+  ): List<Int> {
     if (sort == null || nodes.isEmpty()) return nodes.indices.toList()
     val comparator =
       Comparator<Int> { a, b ->
         for ((index, field) in sort.fields.withIndex()) {
-          val descending = sort.orders.getOrNull(index)?.startsWith("desc") == true
-          val left = itemPosition(nodes[a], field)
-          val right = itemPosition(nodes[b], field)
-          if (left == null || right == null) continue
-          val comparison = left.compareTo(right)
+          // Upstream's `orders[i] === 'descending' ? -1 : 1`, and exactly that: anything else,
+          // "desc" included, ascends.
+          val descending = sort.orders.getOrNull(index) == "descending"
+          val left = itemValue(nodes[a], datums.getOrNull(a), field) ?: continue
+          val right = itemValue(nodes[b], datums.getOrNull(b), field) ?: continue
+          val comparison = compareFieldValues(left, right)
           if (comparison != 0) return@Comparator if (descending) -comparison else comparison
         }
         0
@@ -307,12 +327,30 @@ internal class ScopeCompiler(
     return nodes.indices.sortedWith(comparator)
   }
 
-  /** An item's `x` or `y` as the sort sees it: where the node was placed. */
-  private fun itemPosition(node: SceneNode, field: String): Double? =
-    when (field) {
-      "x" -> node.transform.apply(0.0, 0.0).x
-      "y" -> node.transform.apply(0.0, 0.0).y
-      else -> null
+  /**
+   * One sort key, read off the item.
+   *
+   * The fields are a **path into the scene item**, not a column of the data — which is why
+   * `{"field": "y"}` sorts by where the item ended up and `{"field": "datum.year"}` reaches through
+   * it to the row that produced it. Upstream has no special case for either: `vega-util`'s `field`
+   * walks the path, and the item happens to carry both its geometry and its datum. A path this
+   * scene graph cannot follow is reported rather than treated as a tie, because a tie leaves the
+   * items in declaration order and looks exactly like a sort that worked.
+   */
+  private fun itemValue(node: SceneNode, datum: VegaValue?, field: String): VegaValue? =
+    when {
+      field == "x" -> VegaValue.Num(node.transform.apply(0.0, 0.0).x)
+      field == "y" -> VegaValue.Num(node.transform.apply(0.0, 0.0).y)
+      field == "datum" -> datum ?: VegaValue.Null
+      field.startsWith("datum.") -> (datum ?: VegaValue.Null).field(field.removePrefix("datum."))
+      else -> {
+        diagnostics.warn(
+          DiagnosticCodes.TRANSFORM_NOT_IMPLEMENTED,
+          "Mark sort reads '$field' off each item, which this scene graph does not carry; " +
+            "only 'x', 'y' and a 'datum.' path are available, so the declared order is kept",
+        )
+        null
+      }
     }
 
   private fun group(spec: MarkSpec, outer: CompileScope, encoder: MarkEncoder): BuiltGroup {
@@ -339,7 +377,7 @@ internal class ScopeCompiler(
     // properties — `{"field": "y"}` is where the group ended up, not a column of the row. Upstream
     // sorts the item array in place, so the order changes what is drawn where *and* the order the
     // marks are painted in.
-    val order = sortOrder(spec.sort, nodes)
+    val order = sortOrder(spec.sort, nodes, partitions.map { it.datum })
     val sorted = order.map { nodes[it] }
     val sortedPartitions = order.map { partitions[it] }
     val sortedInner = order.map { inner[it] }

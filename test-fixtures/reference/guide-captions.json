@@ -245,6 +245,221 @@
   "caption": "Y-axis for a linear scale with values from −1.8 to 0.5"
  },
  {
+  "fixture": "calendar-view",
+  "kind": "axis",
+  "caption": "Y-axis titled '2020' for a discrete scale with 5 values: Monday, Tuesday, Wednesday, Thursday, Friday"
+ },
+ {
+  "fixture": "calendar-view",
+  "kind": "axis",
+  "caption": "X-axis for a discrete scale with 16 values: December, January, January, January, January, ending with April"
+ },
+ {
+  "fixture": "calendar-view",
+  "kind": "axis",
+  "caption": "Y-axis titled '2019' for a discrete scale with 5 values: Monday, Tuesday, Wednesday, Thursday, Friday"
+ },
+ {
+  "fixture": "calendar-view",
+  "kind": "axis",
+  "caption": "X-axis for a discrete scale with 53 values: December, January, January, January, January, ending with December"
+ },
+ {
+  "fixture": "calendar-view",
+  "kind": "axis",
+  "caption": "Y-axis titled '2018' for a discrete scale with 5 values: Monday, Tuesday, Wednesday, Thursday, Friday"
+ },
+ {
+  "fixture": "calendar-view",
+  "kind": "axis",
+  "caption": "X-axis for a discrete scale with 53 values: January, January, January, January, January, ending with December"
+ },
+ {
+  "fixture": "calendar-view",
+  "kind": "axis",
+  "caption": "Y-axis titled '2017' for a discrete scale with 5 values: Monday, Tuesday, Wednesday, Thursday, Friday"
+ },
+ {
+  "fixture": "calendar-view",
+  "kind": "axis",
+  "caption": "X-axis for a discrete scale with 52 values: January, January, January, January, January, ending with December"
+ },
+ {
+  "fixture": "calendar-view",
+  "kind": "axis",
+  "caption": "Y-axis titled '2016' for a discrete scale with 5 values: Monday, Tuesday, Wednesday, Thursday, Friday"
+ },
+ {
+  "fixture": "calendar-view",
+  "kind": "axis",
+  "caption": "X-axis for a discrete scale with 53 values: December, January, January, January, January, ending with December"
+ },
+ {
+  "fixture": "calendar-view",
+  "kind": "axis",
+  "caption": "Y-axis titled '2015' for a discrete scale with 5 values: Monday, Tuesday, Wednesday, Thursday, Friday"
+ },
+ {
+  "fixture": "calendar-view",
+  "kind": "axis",
+  "caption": "X-axis for a discrete scale with 53 values: December, January, January, January, January, ending with December"
+ },
+ {
+  "fixture": "calendar-view",
+  "kind": "axis",
+  "caption": "Y-axis titled '2014' for a discrete scale with 5 values: Monday, Tuesday, Wednesday, Thursday, Friday"
+ },
+ {
+  "fixture": "calendar-view",
+  "kind": "axis",
+  "caption": "X-axis for a discrete scale with 53 values: December, January, January, January, January, ending with December"
+ },
+ {
+  "fixture": "calendar-view",
+  "kind": "axis",
+  "caption": "Y-axis titled '2013' for a discrete scale with 5 values: Monday, Tuesday, Wednesday, Thursday, Friday"
+ },
+ {
+  "fixture": "calendar-view",
+  "kind": "axis",
+  "caption": "X-axis for a discrete scale with 53 values: December, January, January, January, January, ending with December"
+ },
+ {
+  "fixture": "calendar-view",
+  "kind": "axis",
+  "caption": "Y-axis titled '2012' for a discrete scale with 5 values: Monday, Tuesday, Wednesday, Thursday, Friday"
+ },
+ {
+  "fixture": "calendar-view",
+  "kind": "axis",
+  "caption": "X-axis for a discrete scale with 53 values: January, January, January, January, January, ending with December"
+ },
+ {
+  "fixture": "calendar-view",
+  "kind": "axis",
+  "caption": "Y-axis titled '2011' for a discrete scale with 5 values: Monday, Tuesday, Wednesday, Thursday, Friday"
+ },
+ {
+  "fixture": "calendar-view",
+  "kind": "axis",
+  "caption": "X-axis for a discrete scale with 52 values: December, January, January, January, January, ending with December"
+ },
+ {
+  "fixture": "calendar-view",
+  "kind": "axis",
+  "caption": "Y-axis titled '2010' for a discrete scale with 5 values: Monday, Tuesday, Wednesday, Thursday, Friday"
+ },
+ {
+  "fixture": "calendar-view",
+  "kind": "axis",
+  "caption": "X-axis for a discrete scale with 53 values: December, January, January, January, January, ending with December"
+ },
+ {
+  "fixture": "calendar-view",
+  "kind": "axis",
+  "caption": "Y-axis titled '2009' for a discrete scale with 5 values: Monday, Tuesday, Wednesday, Thursday, Friday"
+ },
+ {
+  "fixture": "calendar-view",
+  "kind": "axis",
+  "caption": "X-axis for a discrete scale with 53 values: December, January, January, January, January, ending with December"
+ },
+ {
+  "fixture": "calendar-view",
+  "kind": "axis",
+  "caption": "Y-axis titled '2008' for a discrete scale with 5 values: Monday, Tuesday, Wednesday, Thursday, Friday"
+ },
+ {
+  "fixture": "calendar-view",
+  "kind": "axis",
+  "caption": "X-axis for a discrete scale with 53 values: December, January, January, January, January, ending with December"
+ },
+ {
+  "fixture": "calendar-view",
+  "kind": "axis",
+  "caption": "Y-axis titled '2007' for a discrete scale with 5 values: Monday, Tuesday, Wednesday, Thursday, Friday"
+ },
+ {
+  "fixture": "calendar-view",
+  "kind": "axis",
+  "caption": "X-axis for a discrete scale with 53 values: January, January, January, January, January, ending with December"
+ },
+ {
+  "fixture": "calendar-view",
+  "kind": "axis",
+  "caption": "Y-axis titled '2006' for a discrete scale with 5 values: Monday, Tuesday, Wednesday, Thursday, Friday"
+ },
+ {
+  "fixture": "calendar-view",
+  "kind": "axis",
+  "caption": "X-axis for a discrete scale with 52 values: January, January, January, January, January, ending with December"
+ },
+ {
+  "fixture": "calendar-view",
+  "kind": "axis",
+  "caption": "Y-axis titled '2005' for a discrete scale with 5 values: Monday, Tuesday, Wednesday, Thursday, Friday"
+ },
+ {
+  "fixture": "calendar-view",
+  "kind": "axis",
+  "caption": "X-axis for a discrete scale with 52 values: December, January, January, January, January, ending with December"
+ },
+ {
+  "fixture": "calendar-view",
+  "kind": "axis",
+  "caption": "Y-axis titled '2004' for a discrete scale with 5 values: Monday, Tuesday, Wednesday, Thursday, Friday"
+ },
+ {
+  "fixture": "calendar-view",
+  "kind": "axis",
+  "caption": "X-axis for a discrete scale with 53 values: December, January, January, January, January, ending with December"
+ },
+ {
+  "fixture": "calendar-view",
+  "kind": "axis",
+  "caption": "Y-axis titled '2003' for a discrete scale with 5 values: Monday, Tuesday, Wednesday, Thursday, Friday"
+ },
+ {
+  "fixture": "calendar-view",
+  "kind": "axis",
+  "caption": "X-axis for a discrete scale with 53 values: December, January, January, January, January, ending with December"
+ },
+ {
+  "fixture": "calendar-view",
+  "kind": "axis",
+  "caption": "Y-axis titled '2002' for a discrete scale with 5 values: Monday, Tuesday, Wednesday, Thursday, Friday"
+ },
+ {
+  "fixture": "calendar-view",
+  "kind": "axis",
+  "caption": "X-axis for a discrete scale with 53 values: December, January, January, January, January, ending with December"
+ },
+ {
+  "fixture": "calendar-view",
+  "kind": "axis",
+  "caption": "Y-axis titled '2001' for a discrete scale with 5 values: Monday, Tuesday, Wednesday, Thursday, Friday"
+ },
+ {
+  "fixture": "calendar-view",
+  "kind": "axis",
+  "caption": "X-axis for a discrete scale with 53 values: January, January, January, January, January, ending with December"
+ },
+ {
+  "fixture": "calendar-view",
+  "kind": "axis",
+  "caption": "Y-axis titled '2000' for a discrete scale with 5 values: Monday, Tuesday, Wednesday, Thursday, Friday"
+ },
+ {
+  "fixture": "calendar-view",
+  "kind": "axis",
+  "caption": "X-axis for a discrete scale with 52 values: December, January, January, January, January, ending with December"
+ },
+ {
+  "fixture": "calendar-view",
+  "kind": "legend",
+  "caption": "Gradient legend titled 'Daily Change, S&P 500' for fill color with values from −6% to 6%"
+ },
+ {
   "fixture": "colour-ramps",
   "kind": "axis",
   "caption": "X-axis for a discrete scale with 8 values: 0, 1, 2, 3, 4, ending with 7"

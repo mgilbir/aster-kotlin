@@ -157,6 +157,49 @@ public object Ticks {
   }
 
   /**
+   * A format specifier with the precision the span implies, when the specification left it out.
+   *
+   * This is upstream's `formatSpan`, and it is what makes `"format": "%"` on a legend read `−6%`
+   * rather than `−6.000000%`: a specifier with no precision does not mean "no decimals", it means
+   * "as many as the tick step needs", and the number of them depends on the domain being labelled.
+   * A percent format takes **two fewer**, because the value is multiplied by a hundred first.
+   *
+   * A specifier that already names a precision is left exactly as written, and so is `s`, whose
+   * precision is decided by an SI prefix this engine does not implement.
+   */
+  public fun spanSpecifier(specifier: String, start: Double, stop: Double, count: Int): String {
+    if (specifier.contains('.')) return specifier
+    val type = specifier.lastOrNull()?.takeIf { it.isLetter() || it == '%' }
+    if (type == 's' || type == 'd') return specifier
+    val step = stepFrom(tickIncrement(start, stop, count))
+    if (!step.isFinite() || step <= 0.0) return specifier
+    val magnitude = maxOf(abs(start), abs(stop))
+    val precision =
+      when (type) {
+        'f',
+        '%' -> precisionForStep(step) - (if (type == '%') 2 else 0)
+        'e' -> precisionForRound(step, magnitude) - 1
+        null,
+        'g',
+        'p',
+        'r' -> precisionForRound(step, magnitude)
+        else -> return specifier
+      }
+    // d3's `FormatSpecifier` clamps a precision into `[0, 20]` as it stores it, so a percent
+    // format over a coarse step does not come out with a negative one.
+    val clamped = precision.coerceIn(0, 20)
+    return if (type == null) "$specifier.$clamped" else specifier.dropLast(1) + ".$clamped" + type
+  }
+
+  /**
+   * d3's `precisionRound`: significant digits enough to tell values [step] apart at [magnitude].
+   */
+  private fun precisionForRound(step: Double, magnitude: Double): Int {
+    if (step <= 0.0 || !step.isFinite() || magnitude <= 0.0 || !magnitude.isFinite()) return 0
+    return maxOf(0.0, floor(log10(magnitude)) - floor(log10(abs(step)))).toInt() + 1
+  }
+
+  /**
    * Tick values for a log scale, ported from `d3.scaleLog().ticks()`.
    *
    * Two behaviours are easy to miss. When the domain spans few enough octaves, the ticks are the
