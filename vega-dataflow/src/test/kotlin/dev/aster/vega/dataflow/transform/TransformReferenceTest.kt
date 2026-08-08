@@ -194,6 +194,44 @@ class TransformReferenceTest {
     )
   }
 
+  /**
+   * `dotbin` places dots on a grid of its own, and `smooth` moves some of them.
+   *
+   * Both passes are pinned because the second is the kind of thing that looks right and is not: it
+   * swaps dots between neighbouring stacks within a quarter step, so a single misplaced dot changes
+   * one column's height and nothing else. These are the 48 points of Vega's own dot plot, and every
+   * value came out of upstream.
+   */
+  @Test
+  fun `dotbin places dots the way upstream does, smoothed and not`() {
+    val pts =
+      "[6.3,2.1,9.1,15.8,5.2,10.9,8.3,11.0,3.2,7.6,6.3,8.6,6.6,9.5,4.8,12.0,3.3,11.0,4.7,10.4," +
+        "7.4,2.1,7.7,17.9,6.1,8.2,8.4,11.9,10.8,13.8,14.3,15.2,10.0,11.9,6.5,7.5,10.6,7.4,8.4," +
+        "5.7,4.9,3.2,8.1,11.0,4.9,13.2,9.7,12.8]"
+    val rows =
+      (VegaJson.parse(pts) as VegaValue.Arr).values.map {
+        VegaValue.Obj(linkedMapOf("data" to it))
+      }
+    val expected =
+      mapOf(
+        false to
+          "6,2.1,9.4,15.5,4.95,10.9,8.35,10.9,3.25,7.55,6,8.35,6.55,9.4,4.95,11.95,3.25,10.9," +
+            "4.95,10.3,7.55,2.1,7.55,17.9,6,8.35,8.35,11.95,10.9,14.05,14.05,15.5,10.3,11.95," +
+            "6.55,7.55,10.3,7.55,8.35,6,4.95,3.25,8.35,10.9,4.95,13,9.4,13",
+        true to
+          "6,2.1,9.4,15.5,4.95,10.3,8.35,10.9,3.25,7.55,6.55,8.35,6.55,9.4,4.95,11.95,3.25,10.9," +
+            "4.95,10.3,7.55,2.1,7.55,17.9,6,8.35,8.35,11.95,10.9,14.05,14.05,15.5,10.3,11.95," +
+            "6.55,7.55,10.3,7.55,8.35,6,4.95,3.25,8.35,10.9,4.95,13,9.4,13",
+      )
+    for ((smooth, want) in expected) {
+      val params =
+        VegaJson.parse("""{"type":"dotbin","field":"data","smooth":$smooth,"step":0.65}""")
+          as VegaValue.Obj
+      val result = pipeline.run(rows, listOf(params), TestContext())
+      assertEquals(want, result.joinToString(",") { it.field("bin").asString() }, "smooth=$smooth")
+    }
+  }
+
   // ---- aggregate ------------------------------------------------------------
 
   @Test

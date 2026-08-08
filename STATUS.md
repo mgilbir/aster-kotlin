@@ -669,8 +669,10 @@ of bare values** was left unwrapped: upstream's `ingest` turns a non-object row 
 which is why that example reads `"field": "data"` over data that appears to have no such column.
 
 What it stalled on is recorded rather than guessed at: with both fixed, the chart's height is 100.5
-against upstream's 110.25 — exactly one dot-stack short, so one dot lands in a different bin. That is
-inside `dotbin`'s smoothing pass, and the fixture is not committed.
+against upstream's 110.25 — exactly one `size`, so one column is a dot short. `dotbin` was the
+obvious suspect and turned out to be innocent: its output is identical to upstream's for all 48
+points, smoothed and unsmoothed, which is now a pinned vector test rather than an assumption. The
+difference is downstream of it, and the fixture is not committed.
 
 `domain-limits` found one more, in a corner nothing had reached before: a symbol sized to **zero**
 was bounded as nothing at all, where upstream bounds it as a degenerate point at its anchor. A test

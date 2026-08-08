@@ -157,13 +157,16 @@ listed here exactly:
 - `histogram-null-values` — a range written as an array whose *elements* are signals,
   `[{"signal": "barStep + nullGap"}, {"signal": "width"}]`. The scale is not built at all, which
   cascades into three more reports about the axes and encodings that referred to it.
-- `dot-plot` — **one gap left, and it is measured.** A top-level signal calling `scale()` and a
-  dataset of bare values are both implemented now; with those in, the chart's height comes out 100.5
-  against upstream's 110.25, which is exactly one dot-stack (`size` = 9.75). So one dot lands in a
-  different bin than upstream puts it in, somewhere in `dotbin` — most likely the `smooth` pass,
-  which swaps dots between neighbouring stacks within a quarter step. Start by comparing our `bin`
-  column against upstream's for the 48 points with `smooth: true` and again with `smooth: false`;
-  if only the smoothed run differs, the pass is the whole of it.
+- `dot-plot` — **one gap left, measured, and `dotbin` is ruled out.** A top-level signal calling
+  `scale()` and a dataset of bare values are both implemented; with those in, the chart's height is
+  100.5 against upstream's 110.25 — exactly one `size` (9.75), so one column is a dot short.
+  `dotbin` was the obvious suspect and is **not** it: our `bin` column is identical to upstream's for
+  all 48 points, smoothed and unsmoothed, and that is now a pinned vector test
+  (`TransformReferenceTest.dotbin places dots the way upstream does`). So the difference is
+  downstream of it — in the `stack` with `groupby: ["bin"]`, or in the `extent` transform that
+  publishes `ddext`/`hdext`, or in `max(ddh, hdh)` picking the other branch. Next step: print both
+  extents from both engines; the spec has two independent stacks (a dot plot and a histogram) and
+  only one of them needs to be wrong.
 - `interactive-legend` — a `rect` brush with no `x` at rest; upstream draws 454 marks to our 452.
 
 **Refused, not missing**, and now reported as such: `error-bars`, `bar-line-toggle`, `clock`,
