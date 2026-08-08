@@ -281,7 +281,19 @@ internal class Parse(private val config: Config, private val diagnostics: Diagno
   companion object {
     /** The primitive marks this compiler emits. Composite marks normalize into these upstream. */
     val SUPPORTED_MARKS =
-      setOf("bar", "circle", "square", "tick", "line", "area", "point", "rect", "rule", "text")
+      setOf(
+        "arc",
+        "area",
+        "bar",
+        "circle",
+        "line",
+        "point",
+        "rect",
+        "rule",
+        "square",
+        "text",
+        "tick",
+      )
 
     /**
      * Channels a specification may legitimately use that this compiler does not implement. Named
@@ -297,12 +309,6 @@ internal class Parse(private val config: Config, private val diagnostics: Diagno
         "latitude2",
         "longitude2",
         "geojson",
-        "theta",
-        "theta2",
-        "radius",
-        "radius2",
-        "xOffset",
-        "yOffset",
         "xError",
         "yError",
         "strokeDash",

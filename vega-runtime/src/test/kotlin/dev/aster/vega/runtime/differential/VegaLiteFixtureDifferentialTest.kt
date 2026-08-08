@@ -6,6 +6,7 @@ import dev.aster.vega.model.DiagnosticSeverity
 import dev.aster.vega.model.VegaJson
 import dev.aster.vega.runtime.compile.CompiledSpec
 import dev.aster.vega.runtime.compile.SpecCompiler
+import dev.aster.vega.scene.flatten
 import dev.aster.vegalite.VegaLiteCompiler
 import java.io.File
 import org.junit.jupiter.api.Assertions.assertEquals
@@ -97,6 +98,17 @@ class VegaLiteFixtureDifferentialTest {
   ) {
     val (reference, compiled) = compile(name)
     val scene = requireNotNull(compiled.scene)
+    // A drawing whose reach is set by a curve gets the allowance the Vega fixtures give it:
+    // upstream measures a true arc from its centre and radii, where this scene graph has only the
+    // cubics that approximate one. A thousandth of a unit on a 150-unit radius.
+    val curved =
+      scene
+        .flatten()
+        .map { it.node }
+        .any {
+          it.metadata.markKind == "arc" || it.metadata.markKind == "trail"
+        }
+    val over = if (curved) Differential.CURVE_EXTENT_TOLERANCE else Differential.GEOMETRY_TOLERANCE
     for ((dimension, pair) in
       mapOf(
         "width" to (reference.width to scene.width),
@@ -104,7 +116,7 @@ class VegaLiteFixtureDifferentialTest {
       )) {
       val (theirs, ours) = pair
       assertTrue(
-        ours <= theirs + Differential.GEOMETRY_TOLERANCE,
+        ours <= theirs + over,
         "$name $dimension is larger than upstream: $ours against $theirs",
       )
       // The unit, plus the rounding the reference is stored at — a difference of exactly one unit

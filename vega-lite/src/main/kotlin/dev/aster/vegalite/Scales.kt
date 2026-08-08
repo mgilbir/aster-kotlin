@@ -58,6 +58,8 @@ internal object Scales {
       MeasureType.NOMINAL,
       MeasureType.ORDINAL -> {
         if (channel in COLOR_CHANNELS || channel in DISCRETE_RANGE_CHANNELS) return "ordinal"
+        // An offset scale is always a band: it is the span the nested marks divide between them.
+        if (channel == "xOffset" || channel == "yOffset") return "band"
         if (channelIsPosition(channel)) {
           // A rect, a bar, a rule or a tick occupies a band; anything else is placed at a point,
           // which is why a scatter plot's categories sit on the tick and a bar spans between them.
@@ -216,6 +218,10 @@ internal object Scales {
     }
     val config = view.config
     return when (channel) {
+      // An offset scale's range is a step per nested mark, stated plainly rather than by signal:
+      // it is the *inner* band, and the outer one's step is computed from it.
+      "xOffset",
+      "yOffset" -> obj { put("step", num(view.config.step)) }
       "x",
       "y" -> {
         if (type == "point" || type == "band") {
@@ -241,6 +247,9 @@ internal object Scales {
           num(config.scaleConfig("minStrokeWidth")!!),
           num(config.scaleConfig("maxStrokeWidth")!!),
         )
+      // A full turn, and a radius that fits whichever half-extent is smaller.
+      "theta" -> arr(num(0), num(2 * kotlin.math.PI))
+      "radius" -> arr(num(0), signalRef("min(width,height)/2"))
       "shape" -> str("symbol")
       "color",
       "fill",
@@ -362,14 +371,25 @@ internal object Scales {
         set("padding", num(config.scaleConfig("pointPadding")!!))
       } else if (type == "band") {
         val inner =
-          when (view.spec.mark) {
-            "bar" -> config.scaleConfig("barBandPaddingInner")!!
-            "tick" -> config.scaleConfig("tickBandPaddingInner")!!
-            else -> config.scaleConfig("rectBandPaddingInner")!!
+          if (view.hasNestedOffset(channel)) {
+            // A band holding several bars is padded more generously than one holding a single bar,
+            // because the gap now separates *groups* rather than bars.
+            config.scaleConfig("bandWithNestedOffsetPaddingInner")!!
+          } else {
+            when (view.spec.mark) {
+              "bar" -> config.scaleConfig("barBandPaddingInner")!!
+              "tick" -> config.scaleConfig("tickBandPaddingInner")!!
+              else -> config.scaleConfig("rectBandPaddingInner")!!
+            }
           }
         set("paddingInner", num(inner))
-        // Half the inner padding, so that a band's step stays a whole number of units.
-        set("paddingOuter", num(inner / 2))
+        // Half the inner padding, so that a band's step stays a whole number of units — except
+        // around a nested group, where upstream pads both sides alike.
+        val outer =
+          if (view.hasNestedOffset(channel))
+            config.scaleConfig("bandWithNestedOffsetPaddingOuter")!!
+          else inner / 2
+        set("paddingOuter", num(outer))
       } else if (
         view.spec.mark == "bar" &&
           def.bin == null &&
@@ -412,7 +432,7 @@ internal object Scales {
 
     if (channel == "size" && def.type == MeasureType.QUANTITATIVE) return true
 
-    if (def.bin == null && channelIsPosition(channel)) {
+    if (def.bin == null && (channelIsPosition(channel) || channelIsPolar(channel))) {
       val mark = view.spec.mark
       val orient = view.markDef.orient
       // The dimension of a bar or a line is not forced through zero — only its measure is.

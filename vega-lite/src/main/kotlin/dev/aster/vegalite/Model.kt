@@ -238,6 +238,17 @@ internal object Channels {
 
 internal fun channelIsPosition(channel: String): Boolean = channel == "x" || channel == "y"
 
+/** `xOffset` nests inside `x`, which is what puts several bars inside one band. */
+internal fun offsetChannelFor(channel: String): String? =
+  when (channel) {
+    "x" -> "xOffset"
+    "y" -> "yOffset"
+    else -> null
+  }
+
+/** The polar pair, which positions an arc the way `x`/`y` position a rect. */
+internal fun channelIsPolar(channel: String): Boolean = channel == "theta" || channel == "radius"
+
 /** `x` pairs with `x2`, `y` with `y2` — the secondary channel that makes a mark ranged. */
 internal fun secondaryChannel(channel: String): String? =
   when (channel) {

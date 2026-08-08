@@ -517,6 +517,25 @@ In the runtime, four more silences of the same kind as the first five:
   beside a fading scale explains nothing, and the legend's whole job is to demonstrate the channel
   it names.
 
+### Arcs, and bars side by side
+
+Three more fixtures — `pie`, `donut`, `grouped-bar` — and the two channel families behind them.
+
+An arc is compiled as a *rectangle in polar coordinates*, which is upstream's own framing and not a
+simplification: the same rect positioning rules serve both coordinate systems, with `theta` and
+`radius` written out as Vega's `startAngle`/`endAngle` and `outerRadius`/`innerRadius`. Stacking
+follows into polar, so a pie is a stacked bar bent round a circle, which is what it is.
+
+`xOffset` is the channel that puts several bars inside one band, and four rules follow from it: the
+offset is a band scale of its own, the outer band takes the wider padding meant for groups, the
+bar's width comes from the *inner* scale, and the outer step becomes as many marks as the group
+holds divided by what the padding takes — `20 * bandspace(domain('xOffset').length, 0, 0) / (1-0.2)`.
+Get any one of them wrong and the bars overlap or the chart is the wrong width.
+
+Both went in against the fixtures rather than ahead of them: `donut` failed on its hole (a mark
+property named the way *Vega* names the channel, `innerRadius`, which has no Vega-Lite name of its
+own) and `grouped-bar` on the step arithmetic.
+
 ### One difference is still open
 
 Every mark matches exactly and the surface around them is still between half a unit and a unit small

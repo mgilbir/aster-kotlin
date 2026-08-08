@@ -29,11 +29,19 @@ internal object Stack {
     val mark = spec.mark
     if (mark !in STACKABLE) return null
 
-    val fieldChannel = potentialStackedChannel(spec) ?: return null
+    // Cartesian first, then polar: a text mark can be stacked in either, and an arc only in polar.
+    val fieldChannel =
+      potentialStackedChannel(spec, "x") ?: potentialStackedChannel(spec, "theta") ?: return null
     val stackedDef = spec.encoding[fieldChannel] ?: return null
     val stackedField = if (stackedDef.isFieldDef) Fields.vgField(stackedDef) else null
 
-    val dimensionChannel = if (fieldChannel == "x") "y" else "x"
+    val dimensionChannel =
+      when (fieldChannel) {
+        "x" -> "y"
+        "y" -> "x"
+        "theta" -> "radius"
+        else -> "theta"
+      }
     val groupbyChannels = mutableListOf<String>()
     val groupbyFields = mutableListOf<String>()
     val dimensionDef = spec.encoding[dimensionChannel]
@@ -44,6 +52,17 @@ internal object Stack {
       if (dimensionField != null && dimensionField != stackedField) {
         groupbyChannels += dimensionChannel
         groupbyFields += dimensionField
+      }
+    }
+
+    // The offset divides a band, so it groups the stack too: without it every bar in a group would
+    // accumulate onto the one beside it.
+    val dimensionOffset = offsetChannelFor(dimensionChannel)?.let { spec.fieldDef(it) }
+    if (dimensionOffset != null) {
+      val offsetField = Fields.vgField(dimensionOffset)
+      if (offsetField != stackedField) {
+        groupbyChannels += offsetChannelFor(dimensionChannel)!!
+        groupbyFields += offsetField
       }
     }
 
@@ -97,37 +116,38 @@ internal object Stack {
    * because that is the one with several rows behind a single position; with neither aggregated, a
    * bar or an area falls back to its orientation.
    */
-  private fun potentialStackedChannel(spec: UnitSpec): String? {
+  private fun potentialStackedChannel(spec: UnitSpec, first: String): String? {
     val mark = spec.mark
     val orient = spec.markDef.orient
-    val isCartesianBarOrArea = mark == "bar" || mark == "area"
-    val x = spec.encoding["x"]
-    val y = spec.encoding["y"]
+    val second = if (first == "x") "y" else "radius"
+    val isCartesianBarOrArea = first == "x" && (mark == "bar" || mark == "area")
+    val x = spec.encoding[first]
+    val y = spec.encoding[second]
 
     if (x?.isFieldDef == true && y?.isFieldDef == true) {
       if (x.isUnbinnedQuantitative && y.isUnbinnedQuantitative) {
-        if (x.stack != null) return "x"
-        if (y.stack != null) return "y"
+        if (x.stack != null) return first
+        if (y.stack != null) return second
         val xAggregate = x.aggregate != null
         val yAggregate = y.aggregate != null
-        if (xAggregate != yAggregate) return if (xAggregate) "x" else "y"
+        if (xAggregate != yAggregate) return if (xAggregate) first else second
         if (isCartesianBarOrArea) {
-          if (orient == "vertical") return "y"
-          if (orient == "horizontal") return "x"
+          if (orient == "vertical") return second
+          if (orient == "horizontal") return first
         }
         return null
       }
-      if (x.isUnbinnedQuantitative) return "x"
-      if (y.isUnbinnedQuantitative) return "y"
+      if (x.isUnbinnedQuantitative) return first
+      if (y.isUnbinnedQuantitative) return second
       return null
     }
     if (x?.isUnbinnedQuantitative == true) {
       if (isCartesianBarOrArea && orient == "vertical") return null
-      return "x"
+      return first
     }
     if (y?.isUnbinnedQuantitative == true) {
       if (isCartesianBarOrArea && orient == "horizontal") return null
-      return "y"
+      return second
     }
     return null
   }

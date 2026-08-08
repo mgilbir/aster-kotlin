@@ -96,7 +96,13 @@ private class Compilation(
       autosize()?.let { put("autosize", it) }
       put("width", layout.width)
       put("height", layout.height)
-      put("style", "cell")
+      // `cell` is the bordered plotting area; a chart with no Cartesian position — a pie — has no
+      // plotting area to border, and upstream styles it as a plain `view` instead.
+      put(
+        "style",
+        if (views.any { it.spec.encoding["x"] != null || it.spec.encoding["y"] != null }) "cell"
+        else "view",
+      )
       title()?.let { put("title", it) }
       put("data", arr(data))
       if (layout.signals.isNotEmpty()) put("signals", arr(layout.signals))

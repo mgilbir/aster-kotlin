@@ -1,0 +1,136 @@
+{
+  "$schema": "https://vega.github.io/schema/vega/v6.json",
+  "description": "A donut: the same arc with an inner radius, so the ring is hollow.",
+  "background": "white",
+  "padding": 5,
+  "width": 300,
+  "height": 300,
+  "style": "view",
+  "data": [
+    {
+      "name": "source_0",
+      "values": [
+        {
+          "category": "A",
+          "value": 4
+        },
+        {
+          "category": "B",
+          "value": 6
+        },
+        {
+          "category": "C",
+          "value": 10
+        }
+      ]
+    },
+    {
+      "name": "data_0",
+      "source": "source_0",
+      "transform": [
+        {
+          "type": "stack",
+          "groupby": [],
+          "field": "value",
+          "sort": {
+            "field": [
+              "category"
+            ],
+            "order": [
+              "ascending"
+            ]
+          },
+          "as": [
+            "value_start",
+            "value_end"
+          ],
+          "offset": "zero"
+        },
+        {
+          "type": "filter",
+          "expr": "isValid(datum[\"value\"]) && isFinite(+datum[\"value\"])"
+        }
+      ]
+    }
+  ],
+  "marks": [
+    {
+      "name": "marks",
+      "type": "arc",
+      "style": [
+        "arc"
+      ],
+      "from": {
+        "data": "data_0"
+      },
+      "encode": {
+        "update": {
+          "innerRadius": {
+            "value": 50
+          },
+          "fill": {
+            "scale": "color",
+            "field": "category"
+          },
+          "description": {
+            "signal": "\"value: \" + (format(datum[\"value\"], \"\")) + \"; category: \" + (isValid(datum[\"category\"]) ? isArray(datum[\"category\"]) ? join(datum[\"category\"], ' ') : datum[\"category\"] : \"\"+datum[\"category\"])"
+          },
+          "x": {
+            "signal": "width",
+            "mult": 0.5
+          },
+          "y": {
+            "signal": "height",
+            "mult": 0.5
+          },
+          "outerRadius": {
+            "signal": "min(width,height)/2"
+          },
+          "startAngle": {
+            "scale": "theta",
+            "field": "value_end"
+          },
+          "endAngle": {
+            "scale": "theta",
+            "field": "value_start"
+          }
+        }
+      }
+    }
+  ],
+  "scales": [
+    {
+      "name": "theta",
+      "type": "linear",
+      "domain": {
+        "data": "data_0",
+        "fields": [
+          "value_start",
+          "value_end"
+        ]
+      },
+      "range": [
+        0,
+        6.283185307179586
+      ],
+      "zero": true
+    },
+    {
+      "name": "color",
+      "type": "ordinal",
+      "domain": {
+        "data": "data_0",
+        "field": "category",
+        "sort": true
+      },
+      "range": "category"
+    }
+  ],
+  "legends": [
+    {
+      "fill": "color",
+      "symbolType": "circle",
+      "title": "category"
+    }
+  ]
+}

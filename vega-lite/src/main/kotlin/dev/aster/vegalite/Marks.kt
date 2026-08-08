@@ -26,7 +26,25 @@ internal object Marks {
       "area" to "area",
       "rule" to "rule",
       "text" to "text",
+      "arc" to "arc",
     )
+
+  /**
+   * The Vega channel a Vega-Lite position channel is written as.
+   *
+   * A polar position has no channel of its own in Vega: an arc is a *rectangle in polar
+   * coordinates*, so its two angles are `startAngle`/`endAngle` and its two radii are
+   * `outerRadius`/`innerRadius`. Keeping the mapping in one place is what lets the same rect
+   * positioning rules serve both coordinate systems, which is how upstream compiles an arc too.
+   */
+  private fun vgPositionChannel(channel: String): String =
+    when (channel) {
+      "theta" -> "startAngle"
+      "theta2" -> "endAngle"
+      "radius" -> "outerRadius"
+      "radius2" -> "innerRadius"
+      else -> channel
+    }
 
   /**
    * Marks Vega already names in its own accessibility vocabulary, so no role description is added.
@@ -215,6 +233,14 @@ internal object Marks {
           val thickness =
             view.markDef.number("thickness") ?: view.config.markConfig("tick").number("thickness")
           put(if (horizontal) "height" else "width", obj { put("value", thickness) })
+        }
+        "arc" -> {
+          // An arc is a rect in polar coordinates: its centre comes from the plotting area and its
+          // extent from the two polar channel pairs.
+          putAll(pointPosition(view, "x", "mid", null))
+          putAll(pointPosition(view, "y", "mid", null))
+          putAll(rectPosition(view, "radius"))
+          putAll(rectPosition(view, "theta"))
         }
         "text" -> {
           putAll(pointPosition(view, "x", "mid", null))
@@ -455,7 +481,7 @@ internal object Marks {
     vgChannel: String?,
   ): VegaValue.Obj {
     val ref = positionRef(view, channel, defaultPos) ?: return VegaValue.EmptyObject
-    return obj { put(vgChannel ?: channel, ref) }
+    return obj { put(vgChannel ?: vgPositionChannel(channel), ref) }
   }
 
   private fun positionRef(view: UnitView, channel: String, defaultPos: String?): VegaValue? {
@@ -535,6 +561,12 @@ internal object Marks {
           when (main) {
             "x" -> if (defaultPos == "zeroOrMin") obj { put("value", 0) } else groupField("width")
             "y" -> if (defaultPos == "zeroOrMin") groupField("height") else obj { put("value", 0) }
+            // A radius runs from the centre to whichever half-extent fits, and an angle from the
+            // twelve o'clock position all the way round.
+            "radius" ->
+              if (defaultPos == "zeroOrMin") obj { put("value", 0) }
+              else signalRef("min(width,height)/2")
+            "theta" -> if (defaultPos == "zeroOrMin") obj { put("value", 0) } else signalRef("2*PI")
             else -> null
           }
         } else {
@@ -542,9 +574,11 @@ internal object Marks {
         }
       }
       "mid" -> {
+        // The size signal halved — not the enclosing group's width, which is the same number here
+        // and a different one inside a facet.
         val size = if (main == "x") "width" else "height"
         obj {
-          put("field", obj { put("group", size) })
+          put("signal", size)
           put("mult", num(0.5))
         }
       }
@@ -581,7 +615,7 @@ internal object Marks {
     val pos2 = position2Ref(view, channel, channel2, defaultPos2)
     return obj {
       putAll(pointPosition(view, channel, defaultPos, null))
-      if (pos2 != null) put(channel2, pos2)
+      if (pos2 != null) put(vgPositionChannel(channel2), pos2)
     }
   }
 
@@ -611,6 +645,11 @@ internal object Marks {
     view.spec.encoding[channel2]?.let {
       return midPoint(view, channel2, it, view.scaleType(channel))
     }
+    // The mark's own property, named the way *Vega* names the channel: a donut states its hole as
+    // `innerRadius`, which is `radius2` here and has no Vega-Lite name of its own.
+    view.markDef.raw.fields[vgPositionChannel(channel2)]?.let {
+      return obj { put("value", it) }
+    }
     return defaultPositionRef(view, channel, defaultPos2)
   }
 
@@ -627,7 +666,9 @@ internal object Marks {
     val channel2 = secondaryChannel(channel)!!
     val def2 = view.spec.encoding[channel2]
     val scaleType = view.scaleType(channel)
-    val sizeChannel = if (channel == "x") "width" else "height"
+    // Only a Cartesian position has a size channel; a polar one is bounded by its second angle or
+    // radius instead, so it always takes the ranged path below.
+    val sizeChannel = if (channel == "x") "width" else if (channel == "y") "height" else null
 
     val isBarOrTickBand =
       (mark == "bar" && (if (channel == "x") orient == "vertical" else orient == "horizontal")) ||
@@ -647,8 +688,10 @@ internal object Marks {
     }
 
     if (
-      (def != null && scaleType != null && Scales.hasDiscreteDomain(scaleType) ||
-        isBarOrTickBand) && def2 == null
+      sizeChannel != null &&
+        (def != null && scaleType != null && Scales.hasDiscreteDomain(scaleType) ||
+          isBarOrTickBand) &&
+        def2 == null
     ) {
       return positionAndSize(view, channel, def, sizeChannel)
     }
@@ -687,7 +730,10 @@ internal object Marks {
           nonPosition(view, "size", sizeChannel).fields[sizeChannel] ?: VegaValue.EmptyObject
         markSize != null && useVlSizeChannel -> obj { put("value", markSize) }
         scaleType == "band" -> {
-          val bandwidth = "bandwidth('$channel')"
+          // The width of one *nested* mark where there is an offset scale, and of the whole band
+          // where there is not.
+          val band = offsetChannelFor(channel)?.takeIf { view.hasScale(it) } ?: channel
+          val bandwidth = "bandwidth('$band')"
           signalRef(if (minBandSize != null) "max($minBandSize, $bandwidth)" else bandwidth)
         }
         else -> {
@@ -735,6 +781,20 @@ internal object Marks {
       put("field", Fields.vgField(def))
       // A bar starts at the band's edge and fills it; a centred mark asks for the middle instead.
       if (scaleType == "band" && centred) put("band", num(0.5))
+      // A nested offset moves the mark within its band, which is what puts the second bar of a
+      // group beside the first rather than on top of it.
+      offsetChannelFor(channel)
+        ?.takeIf { view.hasScale(it) }
+        ?.let { offsetChannel ->
+          val offsetDef = view.spec.encoding.getValue(offsetChannel)
+          put(
+            "offset",
+            obj {
+              put("scale", offsetChannel)
+              put("field", Fields.vgField(offsetDef))
+            },
+          )
+        }
     }
   }
 

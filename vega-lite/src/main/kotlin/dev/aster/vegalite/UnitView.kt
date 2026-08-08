@@ -35,6 +35,16 @@ internal class UnitView(
   fun scaleType(channel: String): String? = if (hasScale(channel)) scaleTypes[channel] else null
 
   /**
+   * Whether a position channel has an offset scale nested inside it.
+   *
+   * This is what turns one band per category into several bars side by side, and it changes more
+   * than the mark: the outer band takes a wider padding, its step is computed from how many bars
+   * have to fit, and the bar's width comes from the *inner* scale.
+   */
+  fun hasNestedOffset(channel: String): Boolean =
+    offsetChannelFor(channel)?.let { hasScale(it) } == true
+
+  /**
    * Whether *this* view scales a channel, as against the chart as a whole.
    *
    * The distinction only shows up in a layer, and it decides where a mark goes: a rule that encodes

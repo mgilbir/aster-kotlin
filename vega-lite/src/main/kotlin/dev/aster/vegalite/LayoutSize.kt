@@ -40,10 +40,32 @@ internal class LayoutSize(
           discrete -> {
             val paddingInner = (scale.properties["paddingInner"] as? VegaValue.Num)?.value ?: 0.0
             val paddingOuter = (scale.properties["paddingOuter"] as? VegaValue.Num)?.value ?: 0.0
-            emitted += obj {
-              put("name", "${channel}_step")
-              put("value", step ?: config.step)
-            }
+            // With marks nested inside the band, the step is no longer one mark wide: it has to
+            // hold as many as the inner scale has, and is then divided by what the outer padding
+            // takes away. That arithmetic is the whole width of a grouped bar chart.
+            val offset = scales[if (channel == "x") "xOffset" else "yOffset"]
+            emitted +=
+              if (offset == null) {
+                obj {
+                  put("name", "${channel}_step")
+                  put("value", step ?: config.step)
+                }
+              } else {
+                val nestedInner =
+                  (offset.properties["paddingInner"] as? VegaValue.Num)?.value ?: 0.0
+                val nestedOuter =
+                  (offset.properties["paddingOuter"] as? VegaValue.Num)?.value ?: 0.0
+                obj {
+                  put("name", "${channel}_step")
+                  put(
+                    "update",
+                    "${number(step ?: config.step)} * " +
+                      "bandspace(domain('${offset.channel}').length, " +
+                      "${number(nestedInner)}, ${number(nestedOuter)})" +
+                      " / (1-${number(paddingInner)})",
+                  )
+                }
+              }
             emitted += obj {
               put("name", sizeName)
               put(
