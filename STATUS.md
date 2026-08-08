@@ -127,6 +127,7 @@ One hundred and five differential fixtures pass, all matching upstream exactly o
 | `watch` | 92 | The same face drawn from arcs, and the second example built on `now()` |
 | `error-bars` | 61 | Vega's error bars: `ci0`/`ci1` by bootstrap, and a band axis whose ticks sit on the band edges with one more pegged to the leading one |
 | `hypothetical-outcome-plots` | 60 | Twelve bars whose heights are twelve draws from the chart's stream, in the order upstream draws them |
+| `bar-line-toggle` | 100 | A chart that switches views by emptying one of two datasets, so half its scales have no domain at all |
 | `serpentine-timeline` | 80 | Vega's serpentine timeline: a scale reached from a `formula`, a `reverse` chosen by a signal, and eleven labels haloed by a text stroke |
 | `pi-monte-carlo` | 2148 | Vega's Monte Carlo estimate of pi: two styled cells laid out `align: none` and `bounds: flush`, a grid driven by a second scale, flushed end labels, and 2,000 seeded points |
 
@@ -843,6 +844,32 @@ With that, `histogram-null-values` passes, and it took four separate pieces to g
 dependency order, `bin` publishing its settings, `autosize: fit`, and this. Each of them turned up a
 defect in code that was already passing.
 
+## A scale over no data is not a scale over `[0, 1]`
+
+`bar-line-toggle` switches between a column chart and a line chart by *emptying* one of two
+datasets: `{"type": "filter", "expr": "DataPoints<=50"}` on one and the negation on the other. With
+25 points the line dataset has no rows, so the two scales built from it have no domain.
+
+This engine warned and fell back to `[0, 1]`. Upstream does not: the extent of nothing is
+`[undefined, undefined]`, its own arithmetic turns that into `[NaN, NaN]`, and a scale with a `NaN`
+domain generates **no ticks**. So upstream draws one axis and this engine drew both, with 47 ticks
+where upstream had 25 — a whole second chart's worth of furniture over the one that was asked for.
+`domainMin` and `domainMax` still replace their end, which is how such a scale keeps `[NaN, 100]`
+rather than nothing at all.
+
+Two smaller things came out of the same chart, and both were in the *harness*.
+
+- **A numeric channel written as a string.** The specification says `"labelFontSize": "12"`, and
+  upstream carries the string onto the scene item and hands it to a renderer that emits
+  `font-size="12px"`. This engine parses it once and stores 12. Comparing `"12"` against `12` as
+  different *types* reported a difference that did not exist — and hid any real one on that channel,
+  since the string matched nothing on the other side either. `normalize.js` reads a numeric-looking
+  string as the number it is, on the channels it already treats as numbers and nowhere else.
+- **The decimals a label keeps when the tick step says nothing.** Six, and it is d3's rather than a
+  choice: a degenerate span makes `precisionFixed` return `NaN`, so the `,f` specifier keeps no
+  precision at all and d3's default for `f` applies. The axis over `[NaN, 100]` reads `100.000000`,
+  and only the accessibility caption could see that this engine was saying `100`.
+
 ## A transform's expression parameter is an edge after all
 
 This was written down here as a known gap and as the "obvious next increment", with the reasoning
@@ -975,8 +1002,8 @@ them said what:
 - **`error-bars`** — done, and a fixture. See "A label that is nowhere, three times over" below.
 - **`pi-monte-carlo`** — done, and it was six unrelated gaps rather than one. See "Six gaps behind
   one chart" below.
-- **`bar-line-toggle`** — 155 marks against upstream's 100: a signal-driven toggle, which needs the
-  `on` handler machinery rather than anything stochastic.
+- **`bar-line-toggle`** — done, and it needed nothing to do with `on` handlers. See "A scale over
+  no data is not a scale over [0, 1]" below.
 - **`serpentine-timeline`** — done. Not a layout problem: a `formula` calling `scale('sS1', ...)`
   was running before that scale existed, because a transform's *expression* parameter was not an
   edge in the dependency graph. It is now — see below — and `reverse` can come from a signal.
