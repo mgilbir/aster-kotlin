@@ -222,12 +222,43 @@ count measures how wrong we are, not how big the chart is — do not size a deci
 heap is pinned at 2 GB now, for the unrelated reason that 200,000 rows through three `bin`
 transforms is a large live set when transforms copy rather than mutate.
 
-**Refused, not missing**, and reported as such: `error-bars`, `bar-line-toggle`, `clock`, `watch`,
-`word-cloud`, `serpentine-timeline`, `hypothetical-outcome-plots` and `pi-monte-carlo` all need
-`random()` or `now()`. `error-bars` is the subtle one — its `ci0`/`ci1` *look* like ordinary summary
-statistics and are a bootstrap over 1,000 random resamples. `serpentine-timeline` is worth naming
-too: its scale domain is derived from `now()`, so any reference generated for it would be correct for
-one day only.
+## The three refusals are lifted, and here is where each stands
+
+The owner has asked for all three of the brief's scope refusals to be overturned and for every
+example to pass. **PROJECT_BRIEF.md §3.3 and §18.2 are stale on this point** and should be amended
+when the work lands; until then, read them as history rather than as policy.
+
+**1. `random()` and `now()` — done, and the category is open.** `RandomStream` is upstream's
+`randomLCG` and `oracle-js/src/determinism.js` puts the same generator and a stopped clock into
+upstream, so these charts can have references at all. `clock` and `watch` are fixtures and match
+exactly. The other six in the category were scouted and only one of them is actually stochastic:
+
+- `error-bars` — `ci0`/`ci1` done and pinned; the chart's ten bars and ten points already land
+  exactly right. Blocked on `tickExtra` and `tickOffset`, which STATUS.md describes in detail
+  including the NaN-positioned empty label upstream emits. **This is the closest example to green.**
+- `hypothetical-outcome-plots` — the right *number* of marks, wrong values. The generator agrees;
+  the dataflow does not ask for its numbers in upstream's order. Diagnosing that order is the task.
+- `pi-monte-carlo` — two `group/scope` marks short: a layout gap, not a random one.
+- `bar-line-toggle` — 155 marks against upstream's 100. Needs the `on`-handler machinery.
+- `serpentine-timeline` — scale ranges reversed and a different width; a layout problem.
+- `word-cloud` — **upstream's own headless output is degenerate**: `fontSize: 0` on every word and a
+  surface width of `-Infinity`, because the `wordcloud` transform measures text against a canvas
+  that is not there. There is nothing to compare against. This one needs evidence of another kind,
+  and is the one example where a differential fixture cannot be the answer.
+
+**2. The raster family — not started.** `contour-plot`, `density-heatmaps` and `volcano-contours`
+need `heatmap` (rasterises a grid to an image; no raster path exists in the scene graph), plus
+`isocontour` and `kde2d`. Those last two are already written and checkpointed at `6ef5428` on branch
+`worktree-agent-a9f49f94103bacad5` — **numerically unverified**, no fixture, no upstream vector. They
+were parked because nothing could draw their output; that is still true, so `heatmap` and a raster
+mark come first. Note `contour-plot` also wants `geopath`.
+
+**3. Geo — not started, and much the largest.** Eleven examples, and the first error every one of
+them reports is `Data format 'topojson' is not implemented`. In rough dependency order: topojson
+decoding, then d3-geo projections (mercator, albers, albersUsa, orthographic, conicEqualArea,
+equalEarth and the rest), then `geoPath` with its adaptive resampling and antimeridian clipping,
+then the `geoshape`/`geopoint`/`geojson` transforms and `graticule`. The resampling and clipping are
+where the numeric fidelity will be hard-won; everything before them is mechanical.
 
 The scouting trick: copy the candidates into `test-fixtures/specs/` with a `scout-` prefix, generate
 references, run the differential once, read the distinct diagnostics, then delete them all. Much
@@ -342,6 +373,12 @@ Three things to weigh first, none of them checked:
 - Survey: `./gradlew :vega-runtime:test --tests '*ExampleTriage*' -Dexamples.dir=<dir> --rerun-tasks -q`,
   writes `triage-report.txt` into that directory. `--rerun-tasks` matters; Gradle will otherwise
   call it up to date.
-- Out of reach by design, so do not count them as targets: ~14 geo/projections/topojson, 3 force
-  layout, 4 using `now()`/`random()` (deliberately refused for reproducibility), plus the raster
-  family above.
+- **Everything is a target now.** The categories that used to be out of reach — geo/projections/
+  topojson, the raster family, `now()`/`random()` — were reopened by the owner; see "The three
+  refusals are lifted" above for where each stands. Force layout is the one thing nobody has ruled
+  on either way: `force-directed-layout` compiles clean today because its layout transform is
+  reported and the marks still draw, so it is *quietly* wrong rather than refused.
+- **Do not size a decision off a triage node count.** `crossfilter-flights` was written off as
+  unfixturable because it "draws 600,098 scene nodes"; upstream draws 171, and the 600,098 was this
+  engine drawing every unfiltered row because two transforms were missing. The count measures how
+  wrong we are.
