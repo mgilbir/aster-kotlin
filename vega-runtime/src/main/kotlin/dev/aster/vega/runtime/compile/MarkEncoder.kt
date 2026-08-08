@@ -346,7 +346,13 @@ public class MarkEncoder(
     // has no outline and paints nothing. A labelled donut relies on it: its leader lines are drawn
     // from the same 33 label slots as the labels, and only the nine that belong to a slice carry a
     // path, so dropping the empty ones loses two thirds of the mark.
-    val source = string(channels["path"], datum) ?: ""
+    // A mark-level `geopath` writes the outline onto the *row* rather than through an encode
+    // channel — upstream writes it onto the scene item and its renderer reads the item's own
+    // `path` — so a mark with no `path` channel falls back to the row's own column.
+    val source =
+      string(channels["path"], datum)
+        ?: datum.field("path").takeIf { it is VegaValue.Str }?.asString()
+        ?: ""
     val parsed = SvgPath.parse(source)
     if (source.isNotEmpty() && !parsed.complete) {
       reportOnce(

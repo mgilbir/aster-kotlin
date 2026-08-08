@@ -1,6 +1,8 @@
 package dev.aster.vega.runtime.compile
 
 import dev.aster.vega.dataflow.transform.AggregateOp
+import dev.aster.vega.dataflow.transform.TransformContext
+import dev.aster.vega.dataflow.transform.TransformPipeline
 import dev.aster.vega.dataflow.transform.aggregateOver
 import dev.aster.vega.dataflow.transform.compareFieldValues
 import dev.aster.vega.dataflow.transform.groupTuples
@@ -199,7 +201,7 @@ internal class ScopeCompiler(
           markReach = markReach.union(group.content.bounds)
         }
       } else {
-        val rows = markData(mark, scope)
+        val rows = markTransformed(mark, markData(mark, scope), scope)
         built[index] = encoder.encode(mark, rows)
         expose(rows)
         for (node in built[index].orEmpty()) content = content.union(node.transformedBounds)
@@ -560,6 +562,45 @@ internal class ScopeCompiler(
       result[index] = role to ScopeContent(placed, bounds, part.cellReach)
     }
     return result
+  }
+
+  /**
+   * A mark's own `transform` block, run over its rows.
+   *
+   * Upstream calls these post-encoding transforms and runs them over the scene *items*, writing
+   * onto each. `geopath` — the case that matters — reads the item's datum and writes the item's
+   * `path`, and nothing between the encoding and the drawing reads anything it touches, so running
+   * it over the rows and writing the same column draws the same picture. Doing it before the
+   * encoding is also what lets the outline reach the `path` mark at all, since a scene node here
+   * holds a parsed path rather than a mutable property bag.
+   */
+  private fun markTransformed(
+    spec: MarkSpec,
+    rows: List<VegaValue>,
+    scope: CompileScope,
+  ): List<VegaValue> {
+    if (spec.transform.isEmpty()) return rows
+    val context = MarkTransformScope(diagnostics, expressions, scope)
+    return TransformPipeline().run(rows, spec.transform, context)
+  }
+
+  /** What a mark's own transforms may read: this scope's signals, datasets and scales. */
+  private class MarkTransformScope(
+    override val diagnostics: DiagnosticCollector,
+    override val expressions: ExpressionCompiler,
+    private val outer: CompileScope,
+  ) : TransformContext {
+    override var tree: dev.aster.vega.dataflow.transform.TreeSource? = null
+
+    override val scope: dev.aster.vega.expression.ExpressionScope = scopeFor(VegaValue.Null)
+
+    override fun setSignal(name: String, value: VegaValue) {
+      // A mark's transform runs after every signal has settled, so there is nothing left that
+      // could read one it published. Upstream has the same shape and the same silence.
+    }
+
+    override fun scopeFor(datum: VegaValue): dev.aster.vega.expression.ExpressionScope =
+      outer.signals.withScales(outer.scales, diagnostics).withDatum(datum)
   }
 
   private fun moveTo(node: SceneNode, at: PointD): SceneNode =

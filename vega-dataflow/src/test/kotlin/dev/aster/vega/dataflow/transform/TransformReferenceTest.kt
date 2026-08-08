@@ -680,7 +680,7 @@ class TransformReferenceTest {
     VegaValue.Obj(linkedMapOf("g" to VegaValue.Str(group), "v" to VegaValue.Num(value)))
 
   @Test
-  fun `the registry covers the transforms the brief lists, plus twenty-five more`() {
+  fun `the registry covers the transforms the brief lists, plus twenty-seven more`() {
     val fromTheBrief =
       setOf(
         "filter",
@@ -707,7 +707,8 @@ class TransformReferenceTest {
     // and `linkpath` are what turns a laid-out tree into the edges drawn between its nodes.
     // `crossfilter` and `resolvefilter` are the pair an interactive cross-filter is built from:
     // one records which range query each row fails, the other keeps the rows every dimension but
-    // its own admits.
+    // its own admits. `isocontour` and `geopath` are the raster pair: marching squares over a
+    // grid, and the GeoJSON it produces written out as an outline.
     assertEquals(
       fromTheBrief +
         "timeunit" +
@@ -734,7 +735,9 @@ class TransformReferenceTest {
         "treelinks" +
         "linkpath" +
         "crossfilter" +
-        "resolvefilter",
+        "resolvefilter" +
+        "isocontour" +
+        "geopath",
       TransformRegistry.Default.types,
     )
   }

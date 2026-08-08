@@ -263,6 +263,8 @@ public class TransformRegistry(transforms: List<Transform>) {
           LinkPathTransform,
           CrossFilterTransform,
           ResolveFilterTransform,
+          IsocontourTransform,
+          GeoPathTransform,
         )
       )
   }

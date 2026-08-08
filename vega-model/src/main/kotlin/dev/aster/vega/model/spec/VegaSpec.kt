@@ -1190,6 +1190,16 @@ public data class MarkSpec(
   val from: FromSpec? = null,
   /** `sort` — the order this mark's items are built and painted in; see [MarkSort]. */
   val sort: MarkSort? = null,
+  /**
+   * `transform` on a **mark**, which runs after the data and before the drawing.
+   *
+   * Upstream calls these post-encoding transforms and runs them over the scene *items*, writing
+   * onto each one; `geopath` turning a GeoJSON feature into an outline is the case that matters,
+   * and it reads the item's datum and writes the item's `path`. This engine's transforms are pure
+   * functions over rows, so they run over the rows and write the same column — which draws the same
+   * picture, because nothing between the two reads anything a mark transform touches.
+   */
+  val transform: List<VegaValue> = emptyList(),
   val encode: EncodeSpec = EncodeSpec(),
   /** Nested marks, for a group mark. */
   val marks: List<MarkSpec> = emptyList(),

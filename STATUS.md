@@ -21,7 +21,7 @@ end to end — expressions, signals, 33 of upstream's 40 data transforms, every 
 and an event handler that recompiles the chart — and are verified against upstream Vega by
 differential tests.
 
-One hundred and five differential fixtures pass, all matching upstream exactly on every mark and scale output:
+One hundred and six differential fixtures pass, all matching upstream exactly on every mark and scale output:
 
 | Fixture | Marks | Covers |
 | --- | --- | --- |
@@ -127,6 +127,7 @@ One hundred and five differential fixtures pass, all matching upstream exactly o
 | `watch` | 92 | The same face drawn from arcs, and the second example built on `now()` |
 | `error-bars` | 61 | Vega's error bars: `ci0`/`ci1` by bootstrap, and a band axis whose ticks sit on the band edges with one more pegged to the leading one |
 | `hypothetical-outcome-plots` | 60 | Twelve bars whose heights are twelve draws from the chart's stream, in the order upstream draws them |
+| `volcano-contours` | 21 | Vega's contour plot of Maungawhau: marching squares over a 61 x 87 raster grid, drawn through a mark-level `geopath` |
 | `bar-line-toggle` | 100 | A chart that switches views by emptying one of two datasets, so half its scales have no domain at all |
 | `serpentine-timeline` | 80 | Vega's serpentine timeline: a scale reached from a `formula`, a `reverse` chosen by a signal, and eleven labels haloed by a text stroke |
 | `pi-monte-carlo` | 2148 | Vega's Monte Carlo estimate of pi: two styled cells laid out `align: none` and `bounds: flush`, a grid driven by a second scale, flushed end labels, and 2,000 seeded points |
@@ -526,7 +527,7 @@ each example a deadline.
 
 ## Known failing fixtures
 
-None. One hundred and five fixtures exist and all of them pass — and that sentence became worth
+None. One hundred and six fixtures exist and all of them pass — and that sentence became worth
 something only once the gate could no longer skip itself, below.
 
 **The gate could report success without running.** `FixtureDifferentialTest` reads the fixtures and
@@ -843,6 +844,36 @@ Bin boundaries are never thinned. Upstream raises the tick count to the number o
 With that, `histogram-null-values` passes, and it took four separate pieces to get there: the
 dependency order, `bin` publishing its settings, `autosize: fit`, and this. Each of them turned up a
 defect in code that was already passing.
+
+## The raster family, first third: `isocontour` and `geopath`
+
+`volcano-contours` is the smallest of the three raster examples and needed three things, none of
+which is the raster image the other two want.
+
+- **`isocontour`** — marching squares over a grid, ported line for line from
+  `vega-geo/src/util/contours.js` rather than reimplemented. Two parts are not what a fresh
+  implementation would arrive at. Rings are **stitched** from isolines through a fragment table
+  keyed on `x * 2 + y * (dx + 1) * 4`, so a contour closing on itself is recognised as the same
+  fragment arriving from both ends. And a ring is classified by its **signed** area — positive is an
+  exterior ring, negative a hole — after which each hole is assigned to the first polygon containing
+  it. Getting either wrong gives a picture that looks like contours and is not these contours.
+- **`geopath` with no projection**, which is what upstream falls back to: d3 then passes the
+  coordinates straight through, with no spherical clipping, no adaptive resampling and no
+  antimeridian cutting. Exactly right here, where the "geometry" is a contour on a raster grid whose
+  coordinates are already in chart units. A specification naming a `projection` is still refused and
+  says why.
+- **Mark-level `transform`**, which had been reported and dropped. Upstream calls these
+  post-encoding transforms and runs them over the scene *items*; this engine runs them over the
+  rows, because nothing between the encoding and the drawing reads anything a mark transform
+  touches, and because a scene node here holds a parsed path rather than a mutable property bag.
+
+One thing the port needed that the source does not say out loud: `smoothLinear` reads
+`values[yt * dx + xt]` **before** the guards that decide whether to use it, so a point on the grid's
+far edge indexes past the end. JavaScript gives `undefined` there and the guards then skip the
+interpolation; Kotlin throws. The absence is spelled out.
+
+That the fixture matches exactly is worth more than most: contour geometry is about as sensitive as
+this corpus gets, and 21 paths of it agree to the last decimal.
 
 ## A scale over no data is not a scale over `[0, 1]`
 

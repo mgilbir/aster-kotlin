@@ -1808,13 +1808,7 @@ public class SpecParser {
 
     val from = obj.fields["from"] as? VegaValue.Obj
     val facet = from?.fields?.get("facet")?.let { parseFacet(it, "$path.from.facet", type) }
-    if (obj.fields["transform"] != null) {
-      diagnostics.warn(
-        DiagnosticCodes.TRANSFORM_NOT_IMPLEMENTED,
-        "Mark-level transforms are not implemented",
-        jsonPath = "$path.transform",
-      )
-    }
+    val markTransforms = (obj.fields["transform"] as? VegaValue.Arr)?.values.orEmpty()
     val sort =
       (obj.fields["sort"] as? VegaValue.Obj)?.let { block ->
         val fields =
@@ -1852,6 +1846,7 @@ public class SpecParser {
       role = obj.fields["role"]?.takeIf { it is VegaValue.Str }?.asString(),
       from = from?.let { FromSpec(data = it.fields["data"]?.asString(), facet = facet) },
       sort = sort,
+      transform = markTransforms,
       encode = parseEncode(obj.fields["encode"], "$path.encode"),
       marks = parseArray(obj, "marks", path) { child, childPath -> parseMark(child, childPath) },
       axes = parseArray(obj, "axes", path) { child, childPath -> parseAxis(child, childPath) },
