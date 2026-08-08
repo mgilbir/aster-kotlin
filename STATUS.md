@@ -872,8 +872,17 @@ them said what:
 - **`hypothetical-outcome-plots`** — the right *number* of marks, wrong values. The draw order
   differs from upstream's, which is the interesting failure: it means the generator agrees and the
   dataflow does not ask for its numbers in the same sequence.
-- **`error-bars`** — needs the `ci0`/`ci1` aggregate operations. `RandomStream.bootstrapConfidence`
-  is implemented and pinned to upstream's algorithm; the aggregate does not offer them yet.
+- **`error-bars`** — `ci0`/`ci1` are implemented and pinned against upstream vectors, and the chart's
+  ten error bars and ten points land **exactly** where upstream puts them, which is the evidence the
+  bootstrap is right. It is not a fixture yet because of something unrelated: it sets
+  `config.axisBand: {bandPosition: 1, tickExtra: true, tickOffset: 0}`, and `tickExtra` and
+  `tickOffset` are the two axis properties still reported as unimplemented. Upstream's `tickExtra`
+  appends a datum carrying `{extra: {value: ticks[0].value}}` and no `value` at all, which the
+  scaled-value codegen reads as "the first tick's band *start*, with no bandwidth added" — and the
+  matching **label** has empty text at a NaN position, because the label mark does not pass `extra`
+  and so scales an absent value. Reproducing that NaN is the fiddly part: it must not widen any
+  bounds, which upstream gets for free because every NaN comparison is false. 59 marks against
+  upstream's 61, and the two missing ones are that tick and that label.
 - **`pi-monte-carlo`** — two `group/scope` marks short, so a layout gap rather than a random one.
 - **`bar-line-toggle`** — 155 marks against upstream's 100: a signal-driven toggle, which needs the
   `on` handler machinery rather than anything stochastic.
