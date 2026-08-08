@@ -124,9 +124,28 @@ on this emulator — the clipboard needs foreground focus on Android 10 and late
 not reliably give. It fails identically on the commit before the loader work, and connected tests are
 not part of `check.sh`.
 
+## And so is the Wilkinson dot plot
+
+`dot-plot-wilkinson.vg.json` needed three things, and the third took two wrong guesses to find:
+
+- A top-level signal calling `scale()` — `scale('x', step) - scale('x', 0)`, a step in data units
+  turned into pixels. Signal-free scales are now built before the signals.
+- A dataset of bare numbers, wrapped as `{"data": value}` the way upstream's `ingest` does.
+- **One epsilon.** A value landing exactly on a bin boundary divides to a whole number only in exact
+  arithmetic: `(9.1 - 1.95) / 0.65` is 10.999999999999998 in doubles, so flooring it put the row one
+  column to the left. Upstream adds `1e-14` inside the floor. Three of the 48 points sit on a
+  boundary — enough to make the tallest column one dot short and the chart 9.75 units too short, and
+  nothing else in the chart was wrong.
+
+Both wrong guesses are worth knowing: `dotbin` is innocent (identical output, smoothed and not) and
+so is `nice` (already defaulting to true). Both are pinned now, so the next person does not re-check
+them. What found it was printing every signal from both engines side by side —
+`size`, `ddext`, `hdext`, `ddh`, `hdh`, `height` — and seeing that only `hdext` differed, by one.
+That technique is cheap and worked immediately where reading the transforms did not.
+
 ## Pick the next example the same way
 
-The method that worked four times: take one real example, add it as a differential fixture *first*, let
+The method that worked six times: take one real example, add it as a differential fixture *first*, let
 it fail, fix what it names, then open `build/fixture-svg/<name>.ours.svg` next to
 `build/oracle-reference/<name>.svg` and look at them. The fixture tells you the geometry is right;
 only the SVG tells you the chart is. Note that upstream draws a `rect` mark as an SVG `<path>` and
@@ -157,16 +176,6 @@ listed here exactly:
 - `histogram-null-values` — a range written as an array whose *elements* are signals,
   `[{"signal": "barStep + nullGap"}, {"signal": "width"}]`. The scale is not built at all, which
   cascades into three more reports about the axes and encodings that referred to it.
-- `dot-plot` — **one gap left, measured, and `dotbin` is ruled out.** A top-level signal calling
-  `scale()` and a dataset of bare values are both implemented; with those in, the chart's height is
-  100.5 against upstream's 110.25 — exactly one `size` (9.75), so one column is a dot short.
-  `dotbin` was the obvious suspect and is **not** it: our `bin` column is identical to upstream's for
-  all 48 points, smoothed and unsmoothed, and that is now a pinned vector test
-  (`TransformReferenceTest.dotbin places dots the way upstream does`). So the difference is
-  downstream of it — in the `stack` with `groupby: ["bin"]`, or in the `extent` transform that
-  publishes `ddext`/`hdext`, or in `max(ddh, hdh)` picking the other branch. Next step: print both
-  extents from both engines; the spec has two independent stacks (a dot plot and a histogram) and
-  only one of them needs to be wrong.
 - `interactive-legend` — a `rect` brush with no `x` at rest; upstream draws 454 marks to our 452.
 
 **Refused, not missing**, and now reported as such: `error-bars`, `bar-line-toggle`, `clock`,

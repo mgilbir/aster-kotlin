@@ -232,6 +232,37 @@ class TransformReferenceTest {
     }
   }
 
+  /**
+   * A value landing exactly on a bin boundary belongs to the bin it opens, not the one below.
+   *
+   * In exact arithmetic `(9.1 - 1.95) / 0.65` is 11; in doubles it is 10.999999999999998, and
+   * flooring that puts the row one column to the left. Upstream adds 1e-14 inside the floor for
+   * this, and three of these 48 points land on a boundary — enough to change which column of a
+   * histogram is the tallest, and nothing else about the chart.
+   */
+  @Test
+  fun `a value on a bin boundary lands in the bin it opens`() {
+    val pts =
+      "[6.3,2.1,9.1,15.8,5.2,10.9,8.3,11.0,3.2,7.6,6.3,8.6,6.6,9.5,4.8,12.0,3.3,11.0,4.7,10.4," +
+        "7.4,2.1,7.7,17.9,6.1,8.2,8.4,11.9,10.8,13.8,14.3,15.2,10.0,11.9,6.5,7.5,10.6,7.4,8.4," +
+        "5.7,4.9,3.2,8.1,11.0,4.9,13.2,9.7,12.8]"
+    val rows =
+      (VegaJson.parse(pts) as VegaValue.Arr).values.map {
+        VegaValue.Obj(linkedMapOf("data" to it))
+      }
+    val params =
+      VegaJson.parse("""{"type":"bin","field":"data","step":0.65,"extent":[2.1,17.9]}""")
+        as VegaValue.Obj
+    val result = pipeline.run(rows, listOf(params), TestContext())
+    // Every one from upstream. 9.1, 10.4 and 6.5 are the three on a boundary.
+    assertEquals(
+      "5.85,1.95,9.1,15.6,5.2,10.4,7.8,10.4,2.6,7.15,5.85,8.45,6.5,9.1,4.55,11.7,3.25,10.4," +
+        "4.55,10.4,7.15,1.95,7.15,17.55,5.85,7.8,7.8,11.7,10.4,13.65,14.3,14.95,9.75,11.7,6.5," +
+        "7.15,10.4,7.15,7.8,5.2,4.55,2.6,7.8,10.4,4.55,13,9.1,12.35",
+      result.joinToString(",") { it.field("bin0").asString() },
+    )
+  }
+
   // ---- aggregate ------------------------------------------------------------
 
   @Test

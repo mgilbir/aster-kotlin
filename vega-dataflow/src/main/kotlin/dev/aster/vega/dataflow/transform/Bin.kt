@@ -88,10 +88,20 @@ public object BinTransform : Transform {
       if (!number.isFinite() || number < settings.start || number > settings.stop) {
         datum.withFields(mapOf(lowName to VegaValue.Null, highName to VegaValue.Null))
       } else {
-        val index = floor((number - settings.start) / settings.step)
-        // A value exactly on the upper bound belongs to the last bin, not a new one past the end.
-        val clamped = minOf(index, ceil((settings.stop - settings.start) / settings.step) - 1)
-        val low = settings.start + clamped * settings.step
+        // Upstream's arithmetic, and the epsilon is the whole of it: a value that lands *exactly*
+        // on a boundary divides to a whole number only in exact arithmetic. In doubles
+        // `(9.1 - 1.95) / 0.65` is 10.999999999999998, and flooring that drops the value a bin
+        // short — one row in the wrong column of a histogram, which is invisible until something
+        // measures the tallest one. Vega adds 1e-14 inside the floor for exactly this.
+        //
+        // The clamp is upstream's too, and comes first: a value at the very top is pulled back to
+        // the last bin's start rather than opening a bin past the end.
+        val clamped =
+          number
+            .coerceIn(settings.start, settings.stop - settings.step)
+            .coerceAtLeast(settings.start)
+        val index = floor(BIN_EPSILON + (clamped - settings.start) / settings.step)
+        val low = settings.start + index * settings.step
         datum.withFields(
           mapOf(
             lowName to VegaValue.Num(low),
@@ -104,6 +114,9 @@ public object BinTransform : Transform {
 
   /** Vega's default; the transform's own default, not the 10 that `maxbins` suggests elsewhere. */
   public const val DEFAULT_MAXBINS: Int = 20
+
+  /** Upstream's `EPSILON`, added inside the floor so a boundary value lands in the right bin. */
+  private const val BIN_EPSILON: Double = 1e-14
 
   public data class BinSettings(val start: Double, val stop: Double, val step: Double)
 

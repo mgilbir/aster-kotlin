@@ -21,7 +21,7 @@ end to end — expressions, signals, 33 of upstream's 40 data transforms, every 
 and an event handler that recompiles the chart — and are verified against upstream Vega by
 differential tests.
 
-Seventy-six differential fixtures pass, all matching upstream exactly on every mark and scale output:
+Seventy-seven differential fixtures pass, all matching upstream exactly on every mark and scale output:
 
 | Fixture | Marks | Covers |
 | --- | --- | --- |
@@ -98,6 +98,7 @@ Seventy-six differential fixtures pass, all matching upstream exactly on every m
 | `grouped-bar` | 56 | `round` on a continuous scale, `mult`/`offset` value references, `contrast()`, labels from the bars' own scene items |
 | `barley-trellis` | 468 | a chart sized by a `height` signal, cells titled from the group mark that made them, axis and legend `encode` blocks, a raised axis painting over the legend, and 120 rows loaded from a relative `url` |
 | `connected-scatter` | 146 | labels nudged by an ordinal scale with a numeric range, a currency-formatted price axis, data from a relative `url` |
+| `dot-plot-wilkinson` | 120 | a dataset of bare numbers, `dotbin` smoothed, a signal reading a scale, a bin boundary in the right column |
 | `global-development` | 175 | an ordinal scale whose range is a data column, a legend label read through it, a legend swatch's fill opacity |
 | `qq-plot` | 332 | two plots gridded side by side, a url from a signal, `quantileNormal`, gridlines that undo an axis offset |
 | `budget-forecasts` | 77 | `argmin` over a filtered group, a scaled channel taking its value from a signal, `bandPosition`, a label placed by an axis `encode` block |
@@ -160,7 +161,7 @@ substantive compatibility items:
 | 6. View and Compose APIs | Yes |
 | 7. SVG, PNG, PDF export | Yes |
 | 8. TalkBack can describe and navigate | Partial — virtual nodes are tested by instrumentation, not with TalkBack itself |
-| 9. At least 100 compatibility fixtures pass | 76 of 100 |
+| 9. At least 100 compatibility fixtures pass | 77 of 100 |
 | 10. Core runtime has no Android dependency | Yes |
 | 11. Renders without WebView | Yes |
 | 12. Build and test loop runs from the terminal | Yes |
@@ -497,7 +498,7 @@ each example a deadline.
 
 ## Known failing fixtures
 
-None. Seventy-six fixtures exist and all seventy-six pass — and that sentence became worth
+None. Seventy-seven fixtures exist and all seventy-seven pass — and that sentence became worth
 something only once the gate could no longer skip itself, below.
 
 **The gate could report success without running.** `FixtureDifferentialTest` reads the fixtures and
@@ -668,11 +669,15 @@ from a signal is still refused, because there is no order in which that could wo
 of bare values** was left unwrapped: upstream's `ingest` turns a non-object row into `{"data": value}`,
 which is why that example reads `"field": "data"` over data that appears to have no such column.
 
-What it stalled on is recorded rather than guessed at: with both fixed, the chart's height is 100.5
-against upstream's 110.25 — exactly one `size`, so one column is a dot short. `dotbin` was the
-obvious suspect and turned out to be innocent: its output is identical to upstream's for all 48
-points, smoothed and unsmoothed, which is now a pinned vector test rather than an assumption. The
-difference is downstream of it, and the fixture is not committed.
+The third took two wrong guesses to find, and both are worth recording. `dotbin` was the obvious
+suspect and is innocent — its output is identical to upstream's for all 48 points, smoothed and
+unsmoothed. So was `nice`, which already defaulted to true as upstream does. What was actually wrong
+was **one epsilon**: a value landing exactly on a bin boundary divides to a whole number only in
+exact arithmetic, and `(9.1 - 1.95) / 0.65` is 10.999999999999998 in doubles, so flooring it put the
+row one column to the left. Upstream adds `1e-14` inside the floor. Three of those 48 points sit on a
+boundary, which was enough to make the tallest column one dot short and the chart 9.75 units too
+short — and nothing else in the chart was wrong, which is why it took a signal-by-signal comparison
+to see at all.
 
 `domain-limits` found one more, in a corner nothing had reached before: a symbol sized to **zero**
 was bounded as nothing at all, where upstream bounds it as a degenerate point at its anchor. A test
