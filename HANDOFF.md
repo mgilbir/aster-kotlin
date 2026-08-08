@@ -195,12 +195,21 @@ those before comparing, they paint nothing.
 its datasets are fetched into `test-fixtures/data/` and committed. Discount every loader diagnostic
 when judging how far an example is from passing.
 
-**Where the corpus stands, from `ExampleTriage` rather than from memory: 71 of the 93 compile clean,
-22 still report errors** — and every one of the 22 was refused by design until this session: eleven
-geo/topojson, eight needing `random()` or `now()`, three needing the raster family. **The owner has
-since asked for all three refusals to be overturned**, so they are targets now rather than non-goals;
-PROJECT_BRIEF.md §3.3 and §18.2 are stale on this point and should be amended when the work lands.
-Nothing outside those three categories reports an error.
+**Where the corpus stands, from `ExampleTriage` rather than from memory: 75 of the 93 compile clean,
+18 report errors.** Read the *movement* rather than the number: it went 70 → 79 as the stochastic and
+crossfilter work landed, and then **79 → 75 when mark-level `transform` was implemented**. That drop
+is the survey becoming honest. Five examples — `beeswarm-plot`, `force-directed-layout`,
+`labeled-scatter-plot`, `packed-bubble-chart`, `word-cloud` — carry a `transform` on a *mark*, which
+used to be one warning and a block that was dropped whole. The pipeline now runs it and reports
+`force`, `label` and `wordcloud` by name, which is what those charts were quietly missing all along.
+One of the five improved outright: `force-directed-layout`'s `linkpath` is implemented and now
+actually runs.
+
+The 18 break down as: **11 geo/topojson**, **2 raster** (`contour-plot`, `density-heatmaps` — both
+want `kde2d` and `heatmap`), **4 needing a mark-level layout transform** (`force` ×3, `label`,
+`wordcloud` — `word-cloud` is also in the geo-free set), and nothing else. All of them were refused
+by design until this session; **the owner has asked for the three refusals to be overturned**, so
+they are targets rather than non-goals, and PROJECT_BRIEF.md §3.3 and §18.2 are stale on the point.
 
 **`time-units` is done** and is a fixture; STATUS.md describes the five things it needed. The
 handoff's prediction was right as far as it went — the domain field is a `FieldRef` now — but the two
@@ -243,12 +252,25 @@ fixtures now and all pass; STATUS.md records what each one needed. Two are left 
   that is not there. There is nothing to compare against. This one needs evidence of another kind,
   and is the one example where a differential fixture cannot be the answer.
 
-**2. The raster family — not started.** `contour-plot`, `density-heatmaps` and `volcano-contours`
-need `heatmap` (rasterises a grid to an image; no raster path exists in the scene graph), plus
-`isocontour` and `kde2d`. Those last two are already written and checkpointed at `6ef5428` on branch
-`worktree-agent-a9f49f94103bacad5` — **numerically unverified**, no fixture, no upstream vector. They
-were parked because nothing could draw their output; that is still true, so `heatmap` and a raster
-mark come first. Note `contour-plot` also wants `geopath`.
+**2. The raster family — one of three done.** `volcano-contours` is a fixture and matches exactly:
+`isocontour`, `geopath` without a projection, and mark-level `transform` all landed with it. The
+parked `worktree-agent-a9f49f94103bacad5` branch is now **superseded** for `isocontour` — this port
+is verified against upstream where that one never was — and should be dropped rather than merged.
+
+`contour-plot` and `density-heatmaps` both want two more things:
+
+- **`kde2d`** — a 2D kernel density over points, producing the same `{width, height, values}` grid
+  `isocontour` already reads. `Grid` in `Isocontour.kt` is the shape to fill; upstream's `KDE2D.js`
+  is about 90 lines.
+- **`heatmap`** — rasterises a grid to an **image**, which the scene graph cannot carry: `ImageNode`
+  holds a `url`. This needs a raster payload (RGBA plus width and height), an SVG renderer that
+  emits it as a base64 data URL, and the Android canvas equivalent.
+
+**Do not add a heatmap fixture without first strengthening the harness.** `normalize.js` compares an
+image mark on `['x','y','width','height']` and nothing else — *the pixels are not compared at all*,
+so a fixture would go green over a blank image. Upstream's canvas can be read back with
+`getImageData`, so a digest of the pixel data on both sides is the honest addition, and it has to
+come first.
 
 **3. Geo — not started, and much the largest.** Eleven examples, and the first error every one of
 them reports is `Data format 'topojson' is not implemented`. In rough dependency order: topojson
@@ -256,6 +278,17 @@ decoding, then d3-geo projections (mercator, albers, albersUsa, orthographic, co
 equalEarth and the rest), then `geoPath` with its adaptive resampling and antimeridian clipping,
 then the `geoshape`/`geopoint`/`geojson` transforms and `graticule`. The resampling and clipping are
 where the numeric fidelity will be hard-won; everything before them is mechanical.
+
+Two things already exist that shorten it. `GeoPathTransform` writes GeoJSON out as an outline and
+refuses a `projection` by name, so the *path-building* half is done and only the projection stream
+has to be threaded through it. And mark-level `transform` runs, which is how `geoshape` and
+`geopath` reach a mark at all.
+
+**4. The mark-level layout transforms** — `force` (three examples), `label` and `wordcloud`. These
+are the four remaining non-geo, non-raster errors. `word-cloud` is the one that cannot be a
+differential fixture whatever happens: **upstream's own headless output is degenerate**, `fontSize:
+0` on every word and a surface width of `-Infinity`, because `wordcloud` measures text against a
+canvas that is not there.
 
 The scouting trick: copy the candidates into `test-fixtures/specs/` with a `scout-` prefix, generate
 references, run the differential once, read the distinct diagnostics, then delete them all. Much

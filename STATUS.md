@@ -845,6 +845,19 @@ With that, `histogram-null-values` passes, and it took four separate pieces to g
 dependency order, `bin` publishing its settings, `autosize: fit`, and this. Each of them turned up a
 defect in code that was already passing.
 
+## What the survey says now, and why it went down
+
+`ExampleTriage` reports **75 of the 93 clean**. Read the movement rather than the number. It went
+70 → 79 as the stochastic, cross-filter and layout work landed, and then **79 → 75 when mark-level
+`transform` was implemented** — which is the survey becoming honest rather than the engine getting
+worse. Five examples carry a `transform` on a *mark*; that used to be one warning and a block
+dropped whole, and the pipeline now runs it and reports `force`, `label` and `wordcloud` by name.
+One of the five improved outright: `force-directed-layout`'s `linkpath` is implemented and now
+actually runs, and its node count went up accordingly.
+
+The 18 remaining split cleanly: 11 geo/topojson, 2 raster wanting `kde2d` and `heatmap`, 4 wanting a
+mark-level layout transform, and nothing else.
+
 ## The raster family, first third: `isocontour` and `geopath`
 
 `volcano-contours` is the smallest of the three raster examples and needed three things, none of
