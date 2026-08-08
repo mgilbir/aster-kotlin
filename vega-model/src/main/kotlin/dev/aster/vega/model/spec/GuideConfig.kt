@@ -31,8 +31,20 @@ public class GuideConfig(private val blocks: Map<String, VegaValue.Obj>) {
   /** The named `config` block, or an empty one. */
   public fun block(name: String): VegaValue.Obj = blocks[name] ?: EMPTY
 
-  private fun style(name: String): VegaValue.Obj =
-    (blocks["style"]?.fields?.get(name) as? VegaValue.Obj) ?: EMPTY
+  /**
+   * A `config.style` block, over the two blocks Vega's own default configuration already fills in.
+   *
+   * `cell` and `view` are those two, and they exist for Vega-Lite: every chart it compiles carries
+   * `"style": "cell"` on its root group and gets the plotting area's thin grey border from here,
+   * without the specification mentioning a colour anywhere. A specification's own `config.style`
+   * still wins, property by property.
+   */
+  private fun style(name: String): VegaValue.Obj {
+    val declared = blocks["style"]?.fields?.get(name) as? VegaValue.Obj
+    val builtIn = BUILT_IN_STYLES[name] ?: return declared ?: EMPTY
+    if (declared == null) return builtIn
+    return VegaValue.Obj(LinkedHashMap(builtIn.fields).apply { putAll(declared.fields) })
+  }
 
   /**
    * The defaults behind one axis, weakest first.
@@ -71,6 +83,20 @@ public class GuideConfig(private val blocks: Map<String, VegaValue.Obj>) {
   /** A named `config.style` block, which a mark opts into through its own `style` property. */
   public fun styleBlock(name: String): VegaValue.Obj = style(name)
 
+  /**
+   * The named style blocks alone, merged in order, with nothing from `config.mark` beneath them.
+   *
+   * This is what the chart's own group takes. A group mark reads `config.mark` as well, but the
+   * chart's frame does not: it is not a mark anybody wrote, so a `config.mark.fill` meant for the
+   * bars would otherwise paint the whole plotting area with it.
+   */
+  public fun styleDefaults(styles: List<String>): VegaValue.Obj {
+    if (styles.isEmpty()) return EMPTY
+    val fields = LinkedHashMap<String, VegaValue>()
+    for (name in styles) fields.putAll(styleBlock(name).fields)
+    return VegaValue.Obj(fields)
+  }
+
   /** A legend has one block, over the same guide styles. */
   public fun legendDefaults(): List<VegaValue.Obj> = listOf(guideStyleDefaults(), block("legend"))
 
@@ -94,6 +120,47 @@ public class GuideConfig(private val blocks: Map<String, VegaValue.Obj>) {
     public val Empty: GuideConfig = GuideConfig(emptyMap())
 
     private val EMPTY = VegaValue.Obj(emptyMap())
+
+    /**
+     * The `config.style` blocks Vega ships with, copied from its own `config.js`.
+     *
+     * All five exist for Vega-Lite, which is why they are reached by *name* rather than by mark
+     * type: a specification says `"style": ["point"]` and gets a symbol a third the size of Vega's
+     * own default, stroked twice as thick. The rest of Vega's default configuration lives in
+     * `MarkDefaults`, next to the built-in per-mark-type values it belongs with.
+     */
+    private val BUILT_IN_STYLES: Map<String, VegaValue.Obj> =
+      mapOf(
+        "point" to
+          VegaValue.Obj(
+            linkedMapOf(
+              "size" to VegaValue.Num(30.0),
+              "strokeWidth" to VegaValue.Num(2.0),
+              "shape" to VegaValue.Str("circle"),
+            )
+          ),
+        "circle" to
+          VegaValue.Obj(
+            linkedMapOf("size" to VegaValue.Num(30.0), "strokeWidth" to VegaValue.Num(2.0))
+          ),
+        "square" to
+          VegaValue.Obj(
+            linkedMapOf(
+              "size" to VegaValue.Num(30.0),
+              "strokeWidth" to VegaValue.Num(2.0),
+              "shape" to VegaValue.Str("square"),
+            )
+          ),
+        "cell" to
+          VegaValue.Obj(
+            linkedMapOf(
+              "fill" to VegaValue.Str("transparent"),
+              // Vega's `lightGray`. The border a Vega-Lite plotting area is drawn inside.
+              "stroke" to VegaValue.Str("#ddd"),
+            )
+          ),
+        "view" to VegaValue.Obj(linkedMapOf("fill" to VegaValue.Str("transparent"))),
+      )
 
     /** `fill` becomes `{prefix}Color`; everything else takes the prefix and keeps its own name. */
     private fun prefixed(style: VegaValue.Obj, prefix: String): Map<String, VegaValue> {

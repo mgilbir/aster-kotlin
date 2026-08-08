@@ -45,6 +45,18 @@ public data class VegaSpec(
    * the difference between a list of numbers and a chart.
    */
   val description: String? = null,
+  /**
+   * The chart's own group styled from `config.style`, through the top-level `style` property.
+   *
+   * Every Vega-Lite chart writes `"style": "cell"` here, and Vega's default configuration gives
+   * that block a transparent fill and a light grey stroke — the thin border around the plotting
+   * area. Being a border it is also half a unit of surface on each side, which is how leaving it
+   * out makes a chart come out a unit smaller than upstream's while looking almost right.
+   *
+   * Only the named style blocks, never `config.mark`: the frame is not a mark anybody wrote, so a
+   * `config.mark.fill` meant for the bars must not paint the whole plotting area.
+   */
+  val styleAboveDefaults: Map<String, VegaValue> = emptyMap(),
 )
 
 /**
@@ -617,6 +629,24 @@ public data class AxisSpec(
    * its config sits in the `legend` block, not the `axis` one.
    */
   val labelOverlap: String? = null,
+  /**
+   * `labelFlush`: how close to an end of the range a label has to be to be hung from that end.
+   *
+   * `true` means one unit, a number means that many, and `false` — or an absent value — means the
+   * labels at the ends straddle them like every other label. Vega-Lite asks for it on every
+   * continuous horizontal axis, which is why a chart it compiled has its first and last label
+   * tucked inside the plot.
+   */
+  val labelFlush: Double? = null,
+  /**
+   * `gridScale`: the scale whose range this axis's gridlines span.
+   *
+   * An axis's gridlines cross the plot, so their length is the *other* scale's range — and their
+   * direction is that range's direction. A Vega-Lite chart names it on every gridline axis, which
+   * is how a horizontal axis's gridlines come out running from the top of the plot down to the axis
+   * rather than the other way about.
+   */
+  val gridScale: String? = null,
   val labelSeparation: NumberValue? = null,
   /**
    * `labelAngle`, in degrees, turning each label about its own anchor.

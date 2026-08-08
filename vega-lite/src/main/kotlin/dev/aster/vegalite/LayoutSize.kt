@@ -1,0 +1,74 @@
+package dev.aster.vegalite
+
+import dev.aster.vega.model.VegaValue
+
+/**
+ * How large the plotting area is, and whether that is a number or a computation.
+ *
+ * This is the rule that makes a Vega-Lite bar chart come out the size of its data: a discrete
+ * position has no width of its own, so the chart is *derived* from a step per category, and the
+ * width becomes a signal rather than a constant. A continuous position takes the configured 300.
+ * `bandspace` is Vega's own count of how many steps a padded band scale needs.
+ */
+internal class LayoutSize(
+  views: List<UnitView>,
+  scales: Map<String, ScaleComponent>,
+  config: Config,
+  spec: VegaValue.Obj,
+) {
+  val signals: List<VegaValue>
+  val width: VegaValue?
+  val height: VegaValue?
+
+  init {
+    val emitted = mutableListOf<VegaValue>()
+    var widthValue: VegaValue? = null
+    var heightValue: VegaValue? = null
+
+    for (channel in listOf("x", "y")) {
+      val sizeName = if (channel == "x") "width" else "height"
+      val declared =
+        spec.fields[sizeName]
+          ?: views.firstOrNull()?.spec?.let { if (channel == "x") it.width else it.height }
+      val scale = scales[channel]
+      val discrete = scale != null && (scale.type == "band" || scale.type == "point")
+      val step = (declared as? VegaValue.Obj)?.number("step")
+
+      val value: VegaValue? =
+        when {
+          declared is VegaValue.Num -> declared
+          discrete -> {
+            val paddingInner = (scale.properties["paddingInner"] as? VegaValue.Num)?.value ?: 0.0
+            val paddingOuter = (scale.properties["paddingOuter"] as? VegaValue.Num)?.value ?: 0.0
+            emitted += obj {
+              put("name", "${channel}_step")
+              put("value", step ?: config.step)
+            }
+            emitted += obj {
+              put("name", sizeName)
+              put(
+                "update",
+                "bandspace(domain('$channel').length, ${number(paddingInner)}, ${number(paddingOuter)})" +
+                  " * ${channel}_step",
+              )
+            }
+            null
+          }
+          else -> num(if (channel == "x") config.continuousWidth else config.continuousHeight)
+        }
+
+      if (channel == "x") widthValue = value else heightValue = value
+    }
+
+    signals = emitted
+    width = widthValue
+    height = heightValue
+  }
+
+  /**
+   * JavaScript's number-to-text, so `0.1` and `0` read as upstream writes them in an expression.
+   */
+  private fun number(value: Double): String =
+    if (value % 1.0 == 0.0 && kotlin.math.abs(value) < 1e21) value.toLong().toString()
+    else value.toString()
+}

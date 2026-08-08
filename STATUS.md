@@ -437,6 +437,72 @@ ordering), and the pipeline is now verified end to end on one fixture, but the b
 - **`VegaHeadlessTextEngine`** reproduces upstream's canvas-free text estimate so layout is comparable
   on the JVM. A comparison engine only.
 
+## Vega-Lite compiles to Vega, in Kotlin
+
+`vega-lite` is new: `VegaLiteCompiler` turns a Vega-Lite specification into a Vega one, in the value
+model the runtime already parses, so a Vega-Lite chart takes exactly the path a Vega chart does from
+that point on. It depends on `vega-model` alone — it emits a specification, it does not execute one.
+
+The rules are ported from upstream's own TypeScript sources, which ship inside the pinned npm package
+(`oracle-js/node_modules/vega-lite/src`), rather than inferred from the documentation. That matters
+because Vega-Lite is *almost entirely* defaults: a specification names a field and gets a scale type,
+a stack transform, a plot sized from its own categories, a tick count that follows that size, a label
+angle, a grid, a legend and a spoken description. Each of those is one rule, and a rule that drifts
+produces a chart that is plausible and wrong.
+
+**The gate is the emitted specification, not the picture.** `scripts/vega-lite-oracle.sh` compiles
+every fixture with upstream and checks two things:
+
+1. `VegaLiteFixtureTest` compares the Vega this compiler emits against upstream's, property by
+   property. Twelve fixtures, and all twelve match exactly — every transform, scale, signal, axis,
+   legend and mark encoding, down to the accessibility description string.
+2. `VegaLiteFixtureDifferentialTest` runs that output through this engine's own runtime and compares
+   the scene against the one upstream draws. Every mark of every fixture matches.
+
+Comparing the specification is what makes a failure legible: it names the rule that drifted, where a
+scene comparison would only say that some marks moved.
+
+### What the fixtures found in the runtime
+
+Five defects, none of which any Vega fixture could have found, because nothing but a Vega-Lite
+compilation writes the constructs that expose them:
+
+- **A top-level `style` was ignored.** Every Vega-Lite chart carries `"style": "cell"` on its root
+  group, and Vega's own default configuration gives that block a transparent fill and a `#ddd`
+  stroke — the thin border around a plotting area. It was drawing without one. Being a border it is
+  also half a unit of surface on each side, so those charts came out a unit small as well.
+- **Vega's built-in `config.style` blocks were missing.** `point`, `circle` and `square` set a symbol
+  size of 30 and a stroke width of 2, so every Vega-Lite scatter plot drew its points at Vega's own
+  default size instead — noticeably too large.
+- **`labelFlush` was reported and dropped.** It hangs the labels at the ends of a range from those
+  ends rather than straddling them. Vega-Lite asks for it on every continuous horizontal axis, and
+  without it those two labels hang outside the plotting area and the whole surface grows to hold
+  them.
+- **`gridScale` was reported and dropped.** A gridline named by a `gridScale` spans *that* scale's
+  range, in that range's direction — so a horizontal axis's gridlines run from the top of the plot
+  back down to the axis, because a vertical scale's range starts at the bottom. The same line drawn
+  the other way round, which is exactly the kind of difference that survives unnoticed until a dashed
+  gridline starts its pattern at the wrong end.
+- **A shape legend drew every entry as a circle.** The entries have to be drawn with the shapes the
+  `shape` scale gives them; a column of identical swatches is not a smaller version of the right
+  answer, it is a legend that says nothing.
+
+### One difference is still open
+
+Every mark matches exactly and the surface around them is still between half a unit and a unit small
+in each direction, uniformly, on every fixture. Because nothing drawn has moved, the shortfall has to
+be in a guide *extent* — the one input to the surface that the mark comparison cannot see, since text
+bounds are excluded by design (docs/adr/0006). `VegaLiteFixtureDifferentialTest` asserts the shape of
+the discrepancy rather than tolerating it silently: never larger than upstream, never more than a unit
+smaller, so a regression past that still fails.
+
+There is a second, stranger one, recorded here so the next person does not spend the afternoon on it.
+With `labelOverlap: true` **and** `labelFlush: true` on the same axis, upstream hides every other
+label at a spacing where the final label bounds do not overlap at all — the same axis with either
+property alone keeps them. It is an artifact of Vega's incremental dataflow rather than a rule; this
+compiler is a pure function and has no earlier pass to inherit it from. With `labelFlush` implemented
+the two engines now agree on these fixtures anyway, but the mechanism is not the same one.
+
 ## Verification
 
 - 1,348 JVM tests pass (`./scripts/test-core.sh`, `./gradlew test`).

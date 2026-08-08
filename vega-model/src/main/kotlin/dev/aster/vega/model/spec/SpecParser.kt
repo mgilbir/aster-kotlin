@@ -98,7 +98,9 @@ private val AXIS_CONSUMED =
     "offset",
     "zindex",
     "values",
+    "gridScale",
     "labelOverlap",
+    "labelFlush",
     "labelSeparation",
     "labelAngle",
     "labelAlign",
@@ -126,7 +128,6 @@ private fun guideStyleKeys(vararg prefixes: String): Set<String> =
 private val AXIS_UNSUPPORTED =
   mapOf(
     "labelBound" to "Bounding axis labels to the plotting area is not implemented",
-    "labelFlush" to "Flushing the first and last axis label to the range ends is not implemented",
     "labelFlushOffset" to "Axis label flush offsets are not implemented; they need labelFlush",
     "labelOffset" to "Axis label offsets along the axis are not implemented",
     "labelLineHeight" to "Multi-line axis labels are not implemented",
@@ -139,7 +140,6 @@ private val AXIS_UNSUPPORTED =
     "tickDashOffset" to "Dash offsets are not implemented; the dash pattern starts at the line end",
     "gridCap" to "Gridline caps are not implemented",
     "gridDashOffset" to "Dash offsets are not implemented; the dash pattern starts at the line end",
-    "gridScale" to "Gridlines driven by a second scale are not implemented",
     "domainCap" to "Domain line caps are not implemented",
     "domainDashOffset" to
       "Dash offsets are not implemented; the dash pattern starts at the line end",
@@ -544,6 +544,9 @@ public class SpecParser {
         marks = parseArray(root, "marks") { value, path -> parseMark(value, path) },
         encode = parseEncode(root.fields["encode"], "$.encode"),
         description = root.fields["description"]?.asString()?.takeIf { it.isNotBlank() },
+        // The chart's own group takes the `config.style` blocks its `style` property names, and
+        // only those — see `GuideConfig.styleDefaults`.
+        styleAboveDefaults = config.styleDefaults(markStyles(root)).fields,
       )
 
     reportUnsupportedTopLevel(root)
@@ -1067,6 +1070,19 @@ public class SpecParser {
       }
     }
 
+  /**
+   * `labelFlush` as a distance: `true` is one unit, a number is itself, everything else is off.
+   *
+   * Upstream reads it through `+threshold`, where `true` becomes 1 — so the plain boolean form
+   * catches a label sitting on the range's end and nothing further in.
+   */
+  private fun labelFlushThreshold(value: VegaValue?): Double? =
+    when (value) {
+      is VegaValue.Bool -> if (value.value) 1.0 else null
+      is VegaValue.Num -> value.value
+      else -> null
+    }
+
   private fun parseNice(value: VegaValue?, path: String): Boolean =
     when (value) {
       null -> false
@@ -1333,6 +1349,8 @@ public class SpecParser {
       zindex = (obj.fields["zindex"] as? VegaValue.Num)?.value?.toInt() ?: 0,
       values = (obj.fields["values"] as? VegaValue.Arr)?.values,
       labelOverlap = obj.fields["labelOverlap"]?.asString(),
+      labelFlush = labelFlushThreshold(obj.fields["labelFlush"]),
+      gridScale = obj.fields["gridScale"]?.takeIf { it is VegaValue.Str }?.asString(),
       labelSeparation = obj.numberOrSignal("labelSeparation", "$path.labelSeparation"),
       labelAngle = obj.numberOrSignal("labelAngle", "$path.labelAngle"),
       labelLimit = obj.numberOrSignal("labelLimit", "$path.labelLimit"),

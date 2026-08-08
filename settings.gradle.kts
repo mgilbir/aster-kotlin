@@ -31,6 +31,9 @@ include(":vega-svg")
 
 include(":vega-loader")
 
+// Compiles Vega-Lite down to Vega. Emits a specification; it does not execute one.
+include(":vega-lite")
+
 include(":test-fixtures")
 
 // Android presentation layer.

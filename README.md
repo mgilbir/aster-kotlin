@@ -45,6 +45,15 @@ Fully supported today:
 - Accessibility: virtual accessibility descendants with labels, values, activation and selected state
 - APIs: `VegaChartView` and the `VegaChart` Composable
 
+Compiles from a **Vega-Lite** specification, property for property against upstream's own compiler:
+
+- a single view or a layer of views, over the `bar`, `point`, `circle`, `square`, `tick`, `line`,
+  `area`, `rect`, `rule` and `text` marks
+- the position, colour, size, shape, text, detail and order channels, with `aggregate`, `bin`,
+  `timeUnit`, sorting and stacking
+- the defaults that make Vega-Lite short: scale types and ranges, a plot sized from its own
+  categories, gridlines, tick counts, label angles, legends and titles
+
 Compiles from a Vega specification, verified against upstream:
 
 - `linear`, `band`, `point`, `ordinal` scales, with d3-exact tick generation and `nice`
@@ -175,8 +184,10 @@ lifecycleScope.launch {
   `VEGA_RENDER_UNSUPPORTED_BLEND_MODE`.
 - **No performance measurements yet.** The targets in PROJECT_BRIEF.md 19 are unverified; nothing has
   been run on physical hardware.
-- **No geographic projections, force layouts or Vega-Lite compilation.** Out of scope for the first
-  release.
+- **No geographic projections or force layouts.** Out of scope for the first release.
+- **Vega-Lite compiles a single view or a layer of them.** Faceting, concatenation, repetition,
+  selection parameters and the composite marks (`boxplot`, `errorbar`, `errorband`) are reported by
+  name rather than approximated. See `SUPPORTED_FEATURES.md`.
 
 ## Development
 
@@ -267,6 +278,8 @@ enforces it. See `CONTRIBUTING.md`.
 ## Architecture
 
 ```text
+Vega-Lite specification       vega-lite  ──┐
+                                           ↓
 JSON specification            vega-model
         ↓
 Runtime compiler              vega-runtime
@@ -284,7 +297,10 @@ Immutable scene snapshot      vega-scene
 Interaction and semantic accessibility trees
 ```
 
-`vega-model`, `vega-expression`, `vega-dataflow`, `vega-scene`, `vega-runtime`, `vega-svg` and
-`test-fixtures` contain no Android types; `NoAndroidTypesTest` enforces that.
+`vega-model`, `vega-expression`, `vega-dataflow`, `vega-scene`, `vega-runtime`, `vega-lite`,
+`vega-svg` and `test-fixtures` contain no Android types; `NoAndroidTypesTest` enforces that.
+
+`vega-lite` compiles Vega-Lite to Vega and depends on `vega-model` alone: it emits a specification,
+it does not execute one, so a Vega-Lite chart takes exactly the path a Vega chart does from there.
 
 Design decisions are recorded in [docs/adr/](docs/adr/).

@@ -284,6 +284,10 @@ internal class LegendBuilder(
     val shape = symbolShape(spec)
 
     val sizes = entries.map { symbolSizeFor(spec, it.value, declaredSize) }
+    // A legend over a *shape* scale draws each entry with the shape that scale gives it, rather
+    // than one symbol repeated down the column. The legend exists to say which outline means which
+    // category, so a column of identical circles is not a smaller version of the right answer.
+    val shapes = entries.map { symbolShapeFor(spec, it.value, shape) }
     // A row is as tall as the taller of its symbol and its label, and upstream rounds the symbol's
     // contribution up before comparing: this is the number every offset within a cell derives from.
     val boxes = sizes.map { maxOf(ceil(sqrt(it) + strokeWidth), labelFontSize) }
@@ -316,7 +320,7 @@ internal class LegendBuilder(
           x = anchor * 0.5 + LegendDefaults.SYMBOL_OFFSET,
           y = centre,
           size = sizes[index],
-          shape = shape,
+          shape = shapes[index],
           fill =
             symbolFill(spec, entry.value)?.let { fill ->
               // `fillOpacity` fades what is inside the swatch and leaves its outline alone, which
@@ -397,7 +401,20 @@ internal class LegendBuilder(
 
   private fun symbolShape(spec: LegendSpec): SymbolShape {
     val name = spec.symbolType ?: return SymbolShape.CIRCLE
-    return when (name.lowercase()) {
+    return namedShape(name)
+      ?: run {
+        diagnostics.warn(
+          DiagnosticCodes.PARSE_UNKNOWN_PROPERTY,
+          "Legend symbolType '$name' is not implemented; drawing a circle instead",
+          operator = spec.scale,
+        )
+        SymbolShape.CIRCLE
+      }
+  }
+
+  /** Vega's symbol names, which a `shape` scale's range and a legend's `symbolType` both use. */
+  private fun namedShape(name: String): SymbolShape? =
+    when (name.lowercase()) {
       "circle" -> SymbolShape.CIRCLE
       "square" -> SymbolShape.SQUARE
       "cross" -> SymbolShape.CROSS
@@ -410,18 +427,26 @@ internal class LegendBuilder(
       "stroke" -> SymbolShape.STROKE
       "arrow" -> SymbolShape.ARROW
       "wedge" -> SymbolShape.WEDGE
-      else -> {
-        diagnostics.warn(
-          DiagnosticCodes.PARSE_UNKNOWN_PROPERTY,
-          "Legend symbolType '$name' is not implemented; drawing a circle instead",
-          operator = spec.scale,
-        )
-        SymbolShape.CIRCLE
-      }
+      else -> null
     }
-  }
 
   /** A `size` legend takes each swatch's size from the scale; every other legend uses one size. */
+  /**
+   * The outline one legend entry draws with.
+   *
+   * A `shape` scale maps the entry's own value to a symbol name; anything else repeats the legend's
+   * `symbolType`. An unmappable value falls back to that too, rather than to a blank space.
+   */
+  private fun symbolShapeFor(
+    spec: LegendSpec,
+    value: VegaValue,
+    declared: SymbolShape,
+  ): SymbolShape {
+    val shapeScale = spec.shape?.let { scales[it] } ?: return declared
+    val mapped = (shapeScale.scale(value) as? VegaValue.Str)?.value ?: return declared
+    return namedShape(mapped) ?: declared
+  }
+
   private fun symbolSizeFor(spec: LegendSpec, value: VegaValue, declared: Double): Double {
     val sizeScale = spec.size?.let { scales[it] } ?: return declared
     val mapped = sizeScale.scale(value)

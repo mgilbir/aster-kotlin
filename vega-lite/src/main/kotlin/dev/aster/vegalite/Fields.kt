@@ -1,0 +1,191 @@
+package dev.aster.vegalite
+
+import dev.aster.vega.model.VegaValue
+import dev.aster.vega.model.canonicalNumberString
+
+/**
+ * The name a channel definition takes in the compiled Vega, and the title a guide shows for it.
+ *
+ * Both are derived rather than chosen, and both appear in several places at once: `mean_b` names
+ * the aggregate's output, the scale's domain field, the mark's encoding and the accessibility
+ * description, so a name that differs from upstream's differs in all four. This is `vgField` and
+ * `title` from `channeldef.ts`.
+ */
+internal object Fields {
+
+  /**
+   * The Vega field name for a definition.
+   *
+   * @param suffix appended after an underscore — `"end"` for the upper edge of a stack
+   * @param forAs true when the name is a transform's output, where a nested path is flattened
+   *   rather than escaped
+   */
+  fun vgField(def: ChannelDef, suffix: String? = null, forAs: Boolean = false): String {
+    var field = def.field
+    var effectiveSuffix = suffix
+
+    if (def.aggregate == "count") {
+      // Upstream reserves a double-underscore namespace for fields it invents.
+      field = "__count"
+    } else {
+      val function =
+        when {
+          def.bin is Binning.Bin -> {
+            effectiveSuffix = suffix
+            binToString(def.bin.params)
+          }
+          def.aggregate != null -> def.aggregate
+          def.timeUnit != null -> timeUnitToString(def.timeUnit)
+          else -> null
+        }
+      if (function != null) {
+        field = if (field != null) "${function}_$field" else function
+      }
+    }
+
+    if (effectiveSuffix != null) field = "${field}_$effectiveSuffix"
+    val resolved = field ?: ""
+    return if (forAs) removePathFromField(resolved) else replacePathInField(resolved)
+  }
+
+  /** `datum["mean_b"]`, the accessor an emitted expression uses to read the field. */
+  fun datumAccess(def: ChannelDef, suffix: String? = null, datum: String = "datum"): String =
+    "$datum[${quoted(removePathFromField(vgField(def, suffix)))}]"
+
+  /**
+   * The guide title, before a guide decides whether to show it.
+   *
+   * The verbal formatter is the default and is the reason a mean reads `Mean of b` rather than
+   * `mean_b`, and a count reads `Count of Records` — the one title that comes from configuration
+   * rather than from the field, because there is no field to name.
+   */
+  fun defaultTitle(def: ChannelDef, config: Config): String? {
+    if (def.aggregate == "count") return config.countTitle
+    if (def.bin is Binning.Bin) return "${def.field} (binned)"
+    if (def.timeUnit != null) {
+      val parts = timeUnitParts(def.timeUnit)
+      if (parts.isNotEmpty()) return "${def.field} (${parts.joinToString("-")})"
+    }
+    if (def.aggregate != null) return "${titleCase(def.aggregate)} of ${def.field}"
+    return def.field
+  }
+
+  /** The title actually written, honouring an explicit one and an explicit `null` that hides it. */
+  fun title(def: ChannelDef, config: Config): VegaValue? {
+    val guideTitle = def.axis?.fields?.get("title") ?: def.legend?.fields?.get("title")
+    if (guideTitle != null) return guideTitle
+    def.explicitTitle?.let {
+      return it
+    }
+    return defaultTitle(def, config)?.let { VegaValue.Str(it) }
+  }
+
+  /**
+   * `bin_maxbins_10`: the bin parameters spelled into the name, so two different binnings of one
+   * field cannot collide.
+   */
+  fun binToString(params: VegaValue.Obj): String = buildString {
+    append("bin")
+    for ((key, value) in params.fields) {
+      append(varName("_${key}_${literalText(value)}"))
+    }
+  }
+
+  fun timeUnitToString(timeUnit: String): String = timeUnit
+
+  /** `yearmonth` reads as `year-month` in a title. */
+  fun timeUnitParts(timeUnit: String): List<String> {
+    val units =
+      listOf(
+        "year",
+        "quarter",
+        "month",
+        "date",
+        "week",
+        "day",
+        "dayofyear",
+        "hours",
+        "minutes",
+        "seconds",
+        "milliseconds",
+      )
+    var rest = timeUnit.removePrefix("utc")
+    val parts = mutableListOf<String>()
+    while (rest.isNotEmpty()) {
+      val match = units.firstOrNull { rest.startsWith(it) } ?: break
+      parts += match
+      rest = rest.substring(match.length)
+    }
+    return parts
+  }
+
+  private fun titleCase(text: String): String =
+    if (text.isEmpty()) text else text.substring(0, 1).uppercase() + text.substring(1)
+
+  /** What JavaScript's template interpolation writes for a bin parameter. */
+  private fun literalText(value: VegaValue): String =
+    when (value) {
+      is VegaValue.Num -> canonicalNumberString(value.value)
+      is VegaValue.Str -> value.value
+      is VegaValue.Bool -> value.value.toString()
+      is VegaValue.Arr -> value.values.joinToString(",") { literalText(it) }
+      else -> ""
+    }
+
+  private fun varName(text: String): String {
+    val cleaned = text.map { if (it.isLetterOrDigit() || it == '_') it else '_' }.joinToString("")
+    return if (text.firstOrNull()?.isDigit() == true) "_$cleaned" else cleaned
+  }
+
+  /** `a.b` stays one nested path in a transform's output; the dots are literal there. */
+  private fun removePathFromField(path: String): String = splitAccessPath(path).joinToString(".")
+
+  /** Everywhere else a dot is escaped, because Vega reads an unescaped one as a path step. */
+  private fun replacePathInField(path: String): String =
+    splitAccessPath(path).joinToString("\\.") { it.replace("\"", "\\\"") }
+
+  /** Splits `a.b`, `a["b"]` and `a['b']` the way `vega-util`'s `splitAccessPath` does. */
+  fun splitAccessPath(path: String): List<String> {
+    val parts = mutableListOf<String>()
+    val current = StringBuilder()
+    var index = 0
+    while (index < path.length) {
+      when (val ch = path[index]) {
+        '\\' -> {
+          if (index + 1 < path.length) {
+            current.append(path[index + 1])
+            index += 2
+          } else {
+            index += 1
+          }
+        }
+        '.' -> {
+          parts += current.toString()
+          current.setLength(0)
+          index += 1
+        }
+        '[' -> {
+          if (current.isNotEmpty()) {
+            parts += current.toString()
+            current.setLength(0)
+          }
+          val close = path.indexOf(']', index)
+          if (close < 0) {
+            current.append(path.substring(index))
+            index = path.length
+          } else {
+            parts +=
+              path.substring(index + 1, close).trim().removeSurrounding("\"").removeSurrounding("'")
+            index = close + 1
+          }
+        }
+        else -> {
+          current.append(ch)
+          index += 1
+        }
+      }
+    }
+    if (current.isNotEmpty()) parts += current.toString()
+    return if (parts.isEmpty()) listOf("") else parts
+  }
+}

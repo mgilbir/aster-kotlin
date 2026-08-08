@@ -173,32 +173,30 @@ public class AxisBuilder(
           Orient.RIGHT,
           Orient.BOTTOM -> -gridOffset
         }
+      // A gridline named a `gridScale` runs the length of *that* scale's range, in that range's own
+      // direction. It is the same line either way round, but upstream draws it from the range's
+      // start, and a vertical scale's range starts at the bottom — so the gridlines of a horizontal
+      // axis come out running upwards into the plot and back down to the axis.
+      val reversed = gridScaleReversed(spec)
       for (tick in ticks) {
         val at = AxisDefaults.crispRound(tick.position)
+        val far = { size: Double -> gridSign * size + undoOffset }
         children +=
           when (spec.orient) {
             Orient.BOTTOM,
-            Orient.TOP ->
-              RuleNode(
-                ids.allocate(),
-                at,
-                undoOffset,
-                at,
-                gridSign * gridSize.height + undoOffset,
-                gridStroke,
-                metadata = gridMeta,
-              )
+            Orient.TOP -> {
+              val near = undoOffset
+              val away = far(gridSize.height)
+              val (from, to) = if (reversed) away to near else near to away
+              RuleNode(ids.allocate(), at, from, at, to, gridStroke, metadata = gridMeta)
+            }
             Orient.LEFT,
-            Orient.RIGHT ->
-              RuleNode(
-                ids.allocate(),
-                undoOffset,
-                at,
-                gridSign * gridSize.width + undoOffset,
-                at,
-                gridStroke,
-                metadata = gridMeta,
-              )
+            Orient.RIGHT -> {
+              val near = undoOffset
+              val away = far(gridSize.width)
+              val (from, to) = if (reversed) away to near else near to away
+              RuleNode(ids.allocate(), from, at, to, at, gridStroke, metadata = gridMeta)
+            }
           }
       }
     }
@@ -230,12 +228,19 @@ public class AxisBuilder(
         // The label's own `encode` may replace the *text* as well as its position — read through a
         // scale, which is how a chart labels a key with a display name it keeps in a second scale.
         // There is no axis property that could say it, because the mapping lives in the data.
+        // `labelFlush` pulls the labels at the two ends of the range *inside* the plot, so the
+        // first and last read against the axis instead of straddling its ends. Every Vega-Lite
+        // chart with a continuous horizontal axis asks for it, and it is not only cosmetic: those
+        // two labels stop hanging outside the plotting area, so the surface stops growing to hold
+        // them.
+        val flushed = flushPlacement(spec, tick.position, extent)
         val run =
           TextRun(
             text = labelText(spec, tick) ?: tick.label,
             style = labelStyle,
-            align = alignOf(spec.labelAlign) ?: labelAlign(spec.orient),
-            baseline = baselineOf(spec.labelBaseline) ?: labelBaseline(spec.orient),
+            align = alignOf(spec.labelAlign) ?: flushed?.first ?: labelAlign(spec.orient),
+            baseline =
+              baselineOf(spec.labelBaseline) ?: flushed?.second ?: labelBaseline(spec.orient),
             limit = labelLimit,
           )
         val layout = textEngine.layout(run)
@@ -506,6 +511,50 @@ public class AxisBuilder(
       "alphabetic" -> TextBaseline.ALPHABETIC
       else -> null
     }
+
+  /**
+   * Whether this axis's gridlines are drawn from the far side of the plot back towards it.
+   *
+   * True when a `gridScale` names a scale whose range descends — a `y` scale, whose range runs from
+   * the bottom of the plot to the top. Without a `gridScale` the gridline simply spans the plot
+   * from the axis outwards, which is what upstream does when nothing says otherwise.
+   */
+  private fun gridScaleReversed(spec: AxisSpec): Boolean {
+    val name = spec.gridScale ?: return false
+    val range = (scales[name] as? PositionScale)?.range ?: return false
+    return range.size >= 2 && range.last() < range.first()
+  }
+
+  /**
+   * `labelFlush`: how the labels nearest the two ends of the range are hung.
+   *
+   * Upstream's `flush()`, which picks one of three placements by distance to the nearer end of the
+   * scale's range — inside the threshold at the low end, inside it at the high end, or neither.
+   * `labelFlush: true` is a threshold of one unit, so it catches only a label sitting *on* an end.
+   * A horizontal axis flushes its alignment and a vertical one its baseline.
+   *
+   * @return the alignment and baseline to use, or null when this label is not near an end.
+   */
+  private fun flushPlacement(
+    spec: AxisSpec,
+    position: Double,
+    extent: PlotSize,
+  ): Pair<TextAlign?, TextBaseline?>? {
+    val threshold = spec.labelFlush ?: return null
+    val horizontal = spec.orient == Orient.BOTTOM || spec.orient == Orient.TOP
+    val end = if (horizontal) extent.width else extent.height
+    val toStart = kotlin.math.abs(position - 0.0)
+    val toEnd = kotlin.math.abs(end - position)
+    val atStart = toStart < toEnd && toStart <= threshold
+    val atEnd = !atStart && toEnd <= threshold
+    if (!atStart && !atEnd) return null
+    return if (horizontal) {
+      (if (atStart) TextAlign.LEFT else TextAlign.RIGHT) to null
+    } else {
+      // A vertical axis runs downwards, so the range's low end is the *top* of the plot.
+      null to (if (atStart) TextBaseline.TOP else TextBaseline.BOTTOM)
+    }
+  }
 
   private fun labelAlign(orient: Orient): TextAlign =
     when (orient) {

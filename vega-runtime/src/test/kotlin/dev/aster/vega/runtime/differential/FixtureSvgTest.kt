@@ -4,6 +4,7 @@ import dev.aster.vega.fixtures.VegaHeadlessTextEngine
 import dev.aster.vega.loader.FileDataLoader
 import dev.aster.vega.runtime.compile.SpecCompiler
 import dev.aster.vega.svg.SvgRenderer
+import dev.aster.vegalite.VegaLiteCompiler
 import java.io.File
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
@@ -38,6 +39,39 @@ class FixtureSvgTest {
           .compileJson(spec.readText())
       val scene = requireNotNull(compiled.scene) { "${spec.name} produced no scene" }
       val name = spec.name.removeSuffix(".vg.json")
+      File(output, "$name.ours.svg").writeText(SvgRenderer().render(scene).svg)
+    }
+  }
+
+  /**
+   * The same for the Vega-Lite fixtures, compiled the whole way through this engine.
+   *
+   * Worth having separately: these go through two compilers, so a picture that comes out wrong
+   * says nothing about *which* one until it is put beside the upstream render of the same fixture
+   * (`build/vega-lite-svg/`, written by `scripts/vega-lite-oracle.sh`).
+   */
+  @Test
+  fun `every Vega-Lite fixture renders to SVG`() {
+    val output = File(repositoryRoot, "build/vega-lite-svg").apply { mkdirs() }
+    val specs =
+      requireNotNull(File(repositoryRoot, "test-fixtures/vega-lite").listFiles())
+        .filter { it.name.endsWith(".vl.json") }
+        .sortedBy { it.name }
+    assertTrue(specs.isNotEmpty(), "no Vega-Lite fixtures found")
+
+    for (spec in specs) {
+      val vega =
+        requireNotNull(VegaLiteCompiler().compileJson(spec.readText()).toJson()) {
+          "${spec.name} produced no Vega specification"
+        }
+      val compiled =
+        SpecCompiler(
+            VegaHeadlessTextEngine(),
+            FileDataLoader(File(repositoryRoot, "test-fixtures")),
+          )
+          .compileJson(vega)
+      val scene = requireNotNull(compiled.scene) { "${spec.name} produced no scene" }
+      val name = spec.name.removeSuffix(".vl.json")
       File(output, "$name.ours.svg").writeText(SvgRenderer().render(scene).svg)
     }
   }

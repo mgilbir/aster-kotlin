@@ -1,0 +1,171 @@
+{
+  "$schema": "https://vega.github.io/schema/vega/v6.json",
+  "background": "white",
+  "padding": 5,
+  "style": "cell",
+  "data": [
+    {
+      "name": "source_0",
+      "values": [
+        {
+          "x": "a",
+          "y": "p",
+          "v": 1
+        },
+        {
+          "x": "b",
+          "y": "p",
+          "v": 4
+        },
+        {
+          "x": "a",
+          "y": "q",
+          "v": 7
+        },
+        {
+          "x": "b",
+          "y": "q",
+          "v": 2
+        }
+      ]
+    },
+    {
+      "name": "data_0",
+      "source": "source_0",
+      "transform": [
+        {
+          "type": "filter",
+          "expr": "isValid(datum[\"v\"]) && isFinite(+datum[\"v\"])"
+        }
+      ]
+    }
+  ],
+  "signals": [
+    {
+      "name": "x_step",
+      "value": 20
+    },
+    {
+      "name": "width",
+      "update": "bandspace(domain('x').length, 0, 0) * x_step"
+    },
+    {
+      "name": "y_step",
+      "value": 20
+    },
+    {
+      "name": "height",
+      "update": "bandspace(domain('y').length, 0, 0) * y_step"
+    }
+  ],
+  "marks": [
+    {
+      "name": "marks",
+      "type": "rect",
+      "style": [
+        "rect"
+      ],
+      "from": {
+        "data": "data_0"
+      },
+      "encode": {
+        "update": {
+          "fill": {
+            "scale": "color",
+            "field": "v"
+          },
+          "description": {
+            "signal": "\"x: \" + (isValid(datum[\"x\"]) ? isArray(datum[\"x\"]) ? join(datum[\"x\"], ' ') : datum[\"x\"] : \"\"+datum[\"x\"]) + \"; y: \" + (isValid(datum[\"y\"]) ? isArray(datum[\"y\"]) ? join(datum[\"y\"], ' ') : datum[\"y\"] : \"\"+datum[\"y\"]) + \"; v: \" + (format(datum[\"v\"], \"\"))"
+          },
+          "x": {
+            "scale": "x",
+            "field": "x"
+          },
+          "width": {
+            "signal": "max(0.25, bandwidth('x'))"
+          },
+          "y": {
+            "scale": "y",
+            "field": "y"
+          },
+          "height": {
+            "signal": "max(0.25, bandwidth('y'))"
+          }
+        }
+      }
+    }
+  ],
+  "scales": [
+    {
+      "name": "x",
+      "type": "band",
+      "domain": {
+        "data": "data_0",
+        "field": "x",
+        "sort": true
+      },
+      "range": {
+        "step": {
+          "signal": "x_step"
+        }
+      },
+      "paddingInner": 0,
+      "paddingOuter": 0
+    },
+    {
+      "name": "y",
+      "type": "band",
+      "domain": {
+        "data": "data_0",
+        "field": "y",
+        "sort": true
+      },
+      "range": {
+        "step": {
+          "signal": "y_step"
+        }
+      },
+      "paddingInner": 0,
+      "paddingOuter": 0
+    },
+    {
+      "name": "color",
+      "type": "linear",
+      "domain": {
+        "data": "data_0",
+        "field": "v"
+      },
+      "range": "heatmap",
+      "interpolate": "hcl",
+      "zero": false
+    }
+  ],
+  "axes": [
+    {
+      "scale": "x",
+      "orient": "bottom",
+      "grid": false,
+      "title": "x",
+      "labelAlign": "right",
+      "labelAngle": 270,
+      "labelBaseline": "middle",
+      "zindex": 1
+    },
+    {
+      "scale": "y",
+      "orient": "left",
+      "grid": false,
+      "title": "y",
+      "zindex": 1
+    }
+  ],
+  "legends": [
+    {
+      "fill": "color",
+      "gradientLength": {
+        "signal": "clamp(height, 64, 200)"
+      },
+      "title": "v"
+    }
+  ]
+}

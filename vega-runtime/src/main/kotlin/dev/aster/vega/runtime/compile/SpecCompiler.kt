@@ -349,7 +349,14 @@ public class SpecCompiler(
       )
     val encoded =
       encoder.encodeGroup(
-        MarkSpec(type = MarkType.GROUP, name = "root", encode = rootEncode(spec, plot)),
+        MarkSpec(
+          type = MarkType.GROUP,
+          name = "root",
+          encode = rootEncode(spec, plot),
+          // The chart's own group takes `config.style`, which is where a Vega-Lite chart's plotting
+          // area gets its border — the specification says only `"style": "cell"`.
+          configAboveDefaults = spec.styleAboveDefaults,
+        ),
         listOf(VegaValue.EmptyObject),
       ) { _, _, _ ->
         children
@@ -382,6 +389,27 @@ public class SpecCompiler(
       exit = spec.encode.exit,
       hover = spec.encode.hover,
     )
+
+  /**
+   * Grows the measured reach to take in the chart frame's own outline.
+   *
+   * A stroke straddles the edge it is drawn on, so a framed plotting area reaches half a stroke
+   * width beyond its own corner on every side. Upstream measures the root group's painted bounds
+   * and sees that; measuring only what is *inside* the frame does not, and the surface comes out
+   * exactly one unit narrower and shorter than upstream's for every Vega-Lite chart — all of which
+   * carry a `cell` style with a one-unit border.
+   */
+  private fun strokedFrame(reach: RectD, content: GroupNode, plot: PlotSize): RectD {
+    val stroke = content.stroke ?: return reach
+    if (content.size == null) return reach
+    val half = stroke.width / 2.0
+    return RectD(
+      left = minOf(reach.left, -half),
+      top = minOf(reach.top, -half),
+      right = maxOf(reach.right, plot.width + half),
+      bottom = maxOf(reach.bottom, plot.height + half),
+    )
+  }
 
   /**
    * Places the content group and sizes the scene, implementing `autosize`.
@@ -419,7 +447,12 @@ public class SpecCompiler(
     // canvas is whole pixels, but the surface compared against upstream is the frame's own bounds
     // plus the padding — which is fractional whenever a label ends on a fraction, and upstream's
     // references have the fractions in them to prove it.
-    val bounds = if (reach.isEmpty) RectD(0.0, 0.0, plot.width, plot.height) else reach
+    val bounds =
+      strokedFrame(
+        if (reach.isEmpty) RectD(0.0, 0.0, plot.width, plot.height) else reach,
+        content,
+        plot,
+      )
     val over =
       Overflow(
         left = maxOf(0.0, -bounds.left),

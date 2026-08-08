@@ -93,6 +93,15 @@ subprojects {
         .dir(rootProject.layout.projectDirectory.dir("test-fixtures/reference"))
         .withPropertyName("differentialReferences")
         .withPathSensitivity(PathSensitivity.RELATIVE)
+      // The Vega-Lite fixtures and their two references, for the same reason.
+      inputs
+        .dir(rootProject.layout.projectDirectory.dir("test-fixtures/vega-lite"))
+        .withPropertyName("vegaLiteFixtures")
+        .withPathSensitivity(PathSensitivity.RELATIVE)
+      inputs
+        .dir(rootProject.layout.projectDirectory.dir("test-fixtures/vega-lite-reference"))
+        .withPropertyName("vegaLiteReferences")
+        .withPathSensitivity(PathSensitivity.RELATIVE)
       // Goldens are only rewritten when explicitly requested; see :updateGoldens.
       systemProperty(
         "vega.updateGoldens",
