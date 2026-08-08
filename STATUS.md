@@ -660,6 +660,18 @@ grid, whichever group mark produced it.** Gridding each group mark separately lo
 whenever there is only one, which is what every trellis fixture had; this chart is two group marks
 under `columns: 2`, and both landed at the origin on top of each other.
 
+`dot-plot` was taken up next and gave up two before stalling on a third. A **top-level signal could
+not call `scale()`** — the compiler built scales *from* signals and so refused it — where upstream
+ranks its dataflow and builds a scale that waits on no signal first. `scale('x', step) - scale('x',
+0)`, turning a step in data units into a size in pixels, is ordinary; a scale whose own domain comes
+from a signal is still refused, because there is no order in which that could work. And a **dataset
+of bare values** was left unwrapped: upstream's `ingest` turns a non-object row into `{"data": value}`,
+which is why that example reads `"field": "data"` over data that appears to have no such column.
+
+What it stalled on is recorded rather than guessed at: with both fixed, the chart's height is 100.5
+against upstream's 110.25 — exactly one dot-stack short, so one dot lands in a different bin. That is
+inside `dotbin`'s smoothing pass, and the fixture is not committed.
+
 `domain-limits` found one more, in a corner nothing had reached before: a symbol sized to **zero**
 was bounded as nothing at all, where upstream bounds it as a degenerate point at its anchor. A test
 had asserted the empty form deliberately, with no upstream evidence behind it. It matters under

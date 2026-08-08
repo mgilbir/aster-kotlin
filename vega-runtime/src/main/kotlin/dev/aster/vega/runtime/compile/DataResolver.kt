@@ -113,6 +113,23 @@ internal class DataResolver(
   }
 
   /**
+   * Wraps a row that is not an object as `{"data": value}`, which is upstream's `ingest`.
+   *
+   * A dataset may be a bare array of numbers or strings — Vega's dot plot writes `"values":
+   * [6.3, 2.1, ...]` — and every transform downstream reads *fields*, so there has to be a field to
+   * read. Upstream names it `data`, which is why that example's `dotbin` says `"field": "data"`
+   * over data that has no such column.
+   *
+   * Left alone otherwise, so an ordinary array of objects costs nothing.
+   */
+  private fun ingest(rows: List<VegaValue>): List<VegaValue> =
+    if (rows.none { it !is VegaValue.Obj }) rows
+    else
+      rows.map { row ->
+        if (row is VegaValue.Obj) row else VegaValue.Obj(linkedMapOf("data" to row))
+      }
+
+  /**
    * Fetches and reads one dataset's `url`.
    *
    * A refusal and a failure are reported the same way — as an error naming the dataset — because
@@ -181,7 +198,7 @@ internal class DataResolver(
     // specification reaches into an API response rather than a bare array.
     val rows = spec.property?.let { (document as? VegaValue.Obj)?.fields?.get(it) } ?: document
     return when (rows) {
-      is VegaValue.Arr -> rows.values
+      is VegaValue.Arr -> ingest(rows.values)
       // A single object is one row; upstream accepts that and several examples rely on it.
       is VegaValue.Obj -> listOf(rows)
       else -> {
@@ -228,7 +245,7 @@ internal class DataResolver(
     val pipeline = TransformPipeline()
 
     for (spec in specs) {
-      var values = spec.values ?: emptyList()
+      var values = ingest(spec.values ?: emptyList())
       // A `url` may itself be a signal — how a control swaps the file a chart is reading. It is
       // resolved here rather than at parse time because only now are the signals known, and a
       // signal that cannot be worked out before the data is one this cannot use.

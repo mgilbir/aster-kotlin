@@ -157,8 +157,13 @@ listed here exactly:
 - `histogram-null-values` — a range written as an array whose *elements* are signals,
   `[{"signal": "barStep + nullGap"}, {"signal": "width"}]`. The scale is not built at all, which
   cascades into three more reports about the axes and encodings that referred to it.
-- `dot-plot` — `scale()` called from a signal in the scope that defines the scale. Check whether
-  upstream really allows it before implementing; it may be a gotcha to reproduce rather than a gap.
+- `dot-plot` — **one gap left, and it is measured.** A top-level signal calling `scale()` and a
+  dataset of bare values are both implemented now; with those in, the chart's height comes out 100.5
+  against upstream's 110.25, which is exactly one dot-stack (`size` = 9.75). So one dot lands in a
+  different bin than upstream puts it in, somewhere in `dotbin` — most likely the `smooth` pass,
+  which swaps dots between neighbouring stacks within a quarter step. Start by comparing our `bin`
+  column against upstream's for the 48 points with `smooth: true` and again with `smooth: false`;
+  if only the smoothed run differs, the pass is the whole of it.
 - `interactive-legend` — a `rect` brush with no `x` at rest; upstream draws 454 marks to our 452.
 
 **Refused, not missing**, and now reported as such: `error-bars`, `bar-line-toggle`, `clock`,

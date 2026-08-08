@@ -107,7 +107,7 @@ class ScaleExpressionTest {
    * same way; this reports rather than resolving to null.
    */
   @Test
-  fun `a signal cannot reach a scale`() {
+  fun `a signal can reach a scale that waits on nothing`() {
     val compiled =
       SpecCompiler()
         .compileJson(
@@ -117,6 +117,44 @@ class ScaleExpressionTest {
             "signals": [{"name": "mid", "update": "scale('x', 50)"}],
             "data": [{"name": "t", "values": [{"v": 1}]}],
             "scales": [{"name": "x", "type": "linear", "domain": [0, 100], "range": [0, 200]}],
+            "marks": [{"type": "text", "from": {"data": "t"},
+                       "encode": {"enter": {"text": {"signal": "mid"}}}}]
+          }
+          """
+            .trimIndent()
+        )
+    // `x` has a literal domain and a literal range, so it is built before the signals and there is
+    // nothing circular about reading it. Vega's dot plot does exactly this to turn a step in data
+    // units into a size in pixels.
+    assertEquals(VegaValue.Num(100.0), compiled.signals["mid"])
+    assertTrue(
+      compiled.diagnostics.none { it.message.contains("defines but has not built yet") },
+      compiled.diagnostics.toString(),
+    )
+  }
+
+  /**
+   * The half that is still circular, and still reported.
+   *
+   * A scale whose own domain comes from a signal cannot be built before the signals, so a signal
+   * reading *it* is asking for something that does not exist yet. Refusing that is not a limitation
+   * — there is no order in which it could work.
+   */
+  @Test
+  fun `a signal cannot reach a scale that waits on a signal`() {
+    val compiled =
+      SpecCompiler()
+        .compileJson(
+          """
+          {
+            "width": 200, "height": 100,
+            "signals": [
+              {"name": "top", "value": 100},
+              {"name": "mid", "update": "scale('x', 50)"}
+            ],
+            "data": [{"name": "t", "values": [{"v": 1}]}],
+            "scales": [{"name": "x", "type": "linear",
+                        "domain": {"signal": "[0, top]"}, "range": [0, 200]}],
             "marks": [{"type": "text", "from": {"data": "t"},
                        "encode": {"enter": {"text": {"signal": "mid"}}}}]
           }

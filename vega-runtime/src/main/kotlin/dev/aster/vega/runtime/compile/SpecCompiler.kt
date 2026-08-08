@@ -193,6 +193,28 @@ public class SpecCompiler(
     val data = DataResolver(diagnostics, expressions, loader, deferredSignals)
     val resolved = data.resolve(spec.data, transformSignals)
     val datasets = resolved.datasets
+    // Scales that wait on no declared signal are built *first*, so a signal may call `scale()` on
+    // one: `scale('x', step) - scale('x', 0)` turns a step in data units into a size in pixels, and
+    // a chart that sizes its marks that way is ordinary. Upstream reaches the same order by ranking
+    // its dataflow — a scale depending on no signal operator is built before every signal that
+    // depends on a scale.
+    //
+    // A throwaway collector, because these same scales are built again below with the full signals
+    // and would otherwise report everything twice.
+    val early = spec.scales.filter { it.isSignalFree(sized) }
+    val earlyScales =
+      if (early.isEmpty()) {
+        emptyMap()
+      } else {
+        ScaleResolver(
+            datasets,
+            PlotSize(width, height),
+            DiagnosticCollector(),
+            NumberResolver(expressions, SignalScope(transformSignals, datasets), diagnostics),
+          )
+          .resolve(early)
+      }
+
     val signals =
       SignalResolver(diagnostics, expressions)
         .resolve(
@@ -200,9 +222,11 @@ public class SpecCompiler(
           datasets,
           transformSignals,
           signalOverrides,
-          // Nothing encloses the top level, so every scale here is still pending — which is the
-          // more precise thing to say than "no scale exists yet".
-          pendingScales = spec.scales.mapTo(mutableSetOf()) { it.name },
+          enclosingScales = earlyScales,
+          // Only the scales still waiting on a signal are pending — which is the precise thing to
+          // say, and narrower than it used to be.
+          pendingScales =
+            spec.scales.filterNot { it.isSignalFree(sized) }.mapTo(mutableSetOf()) { it.name },
         )
 
     // The plotting area, now that a declared `width` or `height` signal has had its say. Everything
