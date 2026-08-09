@@ -28,6 +28,8 @@ public data class VegaSpec(
   /** Automatic grid placement for this scope's group-mark cells. */
   val layout: LayoutSpec?,
   val marks: List<MarkSpec>,
+  /** Cartographic projections this scope defines, by name. */
+  val projections: List<ProjectionSpec> = emptyList(),
   /**
    * The chart's own group item: the frame every mark is drawn inside.
    *
@@ -934,6 +936,38 @@ public data class LegendSpec(
     get() = listOfNotNull(fill, stroke, size, shape, opacity).size
 }
 
+/**
+ * A cartographic projection: the rule that turns longitude and latitude into a place on the page.
+ *
+ * Named like a scale and used like one — a `geoshape` transform points at it by name — but it is
+ * not a scale: it takes two numbers and returns two, its output depends on both inputs together,
+ * and it cuts geometry as well as moving it. Every field here is signal-valued because a map that
+ * lets a reader turn the globe is the ordinary case.
+ */
+public data class ProjectionSpec(
+  val name: String,
+  /** `mercator` by default, which is what upstream falls back to. */
+  val type: String? = null,
+  /** `{"type": {"signal": "..."}}` — a chart that lets a reader choose the projection. */
+  val typeSignal: String? = null,
+  val scale: NumberValue? = null,
+  val translate: List<NumberValue> = emptyList(),
+  val center: List<NumberValue> = emptyList(),
+  val rotate: List<NumberValue> = emptyList(),
+  /** Post-projection rotation of the plane, in degrees. */
+  val angle: NumberValue? = null,
+  /** The subdivision threshold for adaptive resampling; `0` turns it off entirely. */
+  val precision: NumberValue? = null,
+  val clipAngle: NumberValue? = null,
+  val clipExtent: List<List<NumberValue>> = emptyList(),
+  val reflectX: NumberValue? = null,
+  val reflectY: NumberValue? = null,
+  /** `fit`/`extent`/`size`, which size the projection from the data rather than from a scale. */
+  val fit: VegaValue? = null,
+  val extent: List<List<NumberValue>> = emptyList(),
+  val size: List<NumberValue> = emptyList(),
+)
+
 public enum class MarkType {
   ARC,
   AREA,
@@ -1216,6 +1250,7 @@ public data class MarkSpec(
   val encode: EncodeSpec = EncodeSpec(),
   /** Nested marks, for a group mark. */
   val marks: List<MarkSpec> = emptyList(),
+  val projections: List<ProjectionSpec> = emptyList(),
   val axes: List<AxisSpec> = emptyList(),
   /** Datasets scoped to this group. */
   val data: List<DataSpec> = emptyList(),

@@ -136,6 +136,7 @@ One hundred and six differential fixtures pass, all matching upstream exactly on
 | `packed-bubble` | 32 | Vega's packed bubble chart: a force simulation left **running**, so the picture is the single tick upstream takes before its timer would |
 | `force-directed` | 331 | Vega's Les Miserables node-link diagram: 300 iterations of collide, centre, n-body and link over 77 nodes, and the edges drawn from the ends the simulation resolved |
 | `beeswarm` | 100 | Vega's beeswarm plot: 300 iterations of collide against two axis springs, each pulling towards a channel the mark encoded |
+| `world-map` | 178 | Vega's configurable world map: a TopoJSON file decoded, a mercator projection with rotation and centring, a graticule under it, and 177 countries cut at the antimeridian |
 
 The gate is wired into `./scripts/oracle.sh`, so every further scale, mark and transform is built
 against a harness that can say we are wrong — which golden tests cannot.

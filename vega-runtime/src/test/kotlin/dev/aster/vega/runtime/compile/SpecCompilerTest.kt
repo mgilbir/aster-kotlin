@@ -190,18 +190,33 @@ class SpecCompilerTest {
   }
 
   @Test
-  fun `an unimplemented mark type is reported and contributes nothing`() {
-    // `shape` is the last of the twelve without an encoder, and the only one that is a permanent
-    // non-goal rather than unfinished work: it draws a GeoJSON feature through a map projection,
-    // and projections are out of scope (PROJECT_BRIEF.md 3.5).
-    val withShape = minimalBar.replace("\"type\": \"rect\"", "\"type\": \"shape\"")
-    val compiled = compile(withShape)
-    assertTrue(
-      compiled.diagnostics.any {
-        it.code == DiagnosticCodes.TRANSFORM_NOT_IMPLEMENTED && it.message.contains("shape")
-      }
-    )
-    assertTrue(compiled.scene!!.flatten().none { it.node is RectNode })
+  fun `every mark type has an encoder`() {
+    // `shape` was the last of the twelve without one, and it was refused on the grounds that
+    // projections were out of scope. They are not: a `shape` mark draws whatever outline a
+    // `geoshape` transform put on it, which is the same node a `path` mark draws.
+    val types =
+      listOf(
+        "arc",
+        "area",
+        "image",
+        "line",
+        "path",
+        "rect",
+        "rule",
+        "shape",
+        "symbol",
+        "text",
+        "trail",
+      )
+    for (type in types) {
+      val compiled = compile(minimalBar.replace("\"type\": \"rect\"", "\"type\": \"$type\""))
+      assertTrue(
+        compiled.diagnostics.none {
+          it.code == DiagnosticCodes.TRANSFORM_NOT_IMPLEMENTED && it.message.contains("encoder")
+        },
+        "the '$type' mark reported no encoder",
+      )
+    }
   }
 
   @Test

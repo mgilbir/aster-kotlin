@@ -380,13 +380,32 @@ private val MARK_CONSUMED =
     // Both are read only to be reported, which reportUnhandled would otherwise duplicate.
     "transform",
     "sort",
-    // Reported by reportUnsupportedGroupScope, for the same reason.
     "style",
     "on",
   )
 
 /** The formats a loaded document can be read as. */
 private val READABLE_FORMATS = setOf("json", "csv", "tsv", "dsv", "topojson")
+
+/** Projection properties this engine reads. */
+private val PROJECTION_CONSUMED =
+  setOf(
+    "name",
+    "type",
+    "scale",
+    "translate",
+    "center",
+    "rotate",
+    "angle",
+    "precision",
+    "clipAngle",
+    "clipExtent",
+    "reflectX",
+    "reflectY",
+    "fit",
+    "extent",
+    "size",
+  )
 
 /** Data properties this engine reads. */
 private val DATA_CONSUMED = setOf("name", "values", "source", "transform", "format", "url")
@@ -555,6 +574,8 @@ public class SpecParser {
         title = root.fields["title"]?.let { parseTitle(it, "$.title") },
         layout = root.fields["layout"]?.let { parseLayout(it, "$.layout") },
         marks = parseArray(root, "marks") { value, path -> parseMark(value, path) },
+        projections =
+          parseArray(root, "projections") { value, path -> parseProjection(value, path) },
         encode = parseEncode(root.fields["encode"], "$.encode"),
         description = root.fields["description"]?.asString()?.takeIf { it.isNotBlank() },
       )
@@ -632,11 +653,7 @@ public class SpecParser {
    * it and look merely wrong rather than unsupported.
    */
   private fun reportUnsupportedTopLevel(root: VegaValue.Obj) {
-    val unsupported =
-      mapOf(
-        "projections" to "Geographic projections are out of scope",
-        "usermeta" to "usermeta is ignored",
-      )
+    val unsupported = mapOf("usermeta" to "usermeta is ignored")
     for ((key, reason) in unsupported) {
       val value = root.fields[key] ?: continue
       val empty = value is VegaValue.Arr && value.values.isEmpty()
@@ -1002,6 +1019,61 @@ public class SpecParser {
   }
 
   // ---- scales ---------------------------------------------------------------
+
+  /**
+   * A `projections` entry.
+   *
+   * Almost every property may be a signal, and the ones that are lists may be lists *of* signals —
+   * `"rotate": [{"signal": "r0"}, {"signal": "r1"}]` is how a map lets a reader turn the globe, and
+   * it is the common form rather than an exotic one.
+   */
+  private fun parseProjection(value: VegaValue, path: String): ProjectionSpec? {
+    val obj = value as? VegaValue.Obj ?: return unexpected("a projection definition", path)
+    val name = obj.fields["name"]?.asString()
+    if (name.isNullOrEmpty()) {
+      diagnostics.error(
+        DiagnosticCodes.PARSE_MISSING_PROPERTY,
+        "A projection needs a name",
+        jsonPath = path,
+      )
+      return null
+    }
+    val typeValue = obj.fields["type"]
+    val typeSignal = (typeValue as? VegaValue.Obj)?.fields?.get("signal")?.asString()
+    obj.reportUnhandled("Projection", path, PROJECTION_CONSUMED)
+    return ProjectionSpec(
+      name = name,
+      type = if (typeSignal == null) typeValue?.asString()?.takeIf { it.isNotEmpty() } else null,
+      typeSignal = typeSignal,
+      scale = obj.numberOrSignal("scale", "$path.scale"),
+      translate = numberList(obj.fields["translate"], "$path.translate"),
+      center = numberList(obj.fields["center"], "$path.center"),
+      rotate = numberList(obj.fields["rotate"], "$path.rotate"),
+      angle = obj.numberOrSignal("angle", "$path.angle"),
+      precision = obj.numberOrSignal("precision", "$path.precision"),
+      clipAngle = obj.numberOrSignal("clipAngle", "$path.clipAngle"),
+      clipExtent = numberPairs(obj.fields["clipExtent"], "$path.clipExtent"),
+      reflectX = obj.numberOrSignal("reflectX", "$path.reflectX"),
+      reflectY = obj.numberOrSignal("reflectY", "$path.reflectY"),
+      fit = obj.fields["fit"],
+      extent = numberPairs(obj.fields["extent"], "$path.extent"),
+      size = numberList(obj.fields["size"], "$path.size"),
+    )
+  }
+
+  /** A list whose entries may each be a signal, which is how a rotation is usually written. */
+  private fun numberList(value: VegaValue?, path: String): List<NumberValue> {
+    val array = value as? VegaValue.Arr ?: return emptyList()
+    return array.values.mapIndexedNotNull { index, entry ->
+      val holder = VegaValue.Obj(linkedMapOf("v" to entry))
+      holder.numberOrSignal("v", "$path[$index]")
+    }
+  }
+
+  private fun numberPairs(value: VegaValue?, path: String): List<List<NumberValue>> {
+    val array = value as? VegaValue.Arr ?: return emptyList()
+    return array.values.mapIndexed { index, entry -> numberList(entry, "$path[$index]") }
+  }
 
   private fun parseScale(value: VegaValue, path: String): ScaleSpec? {
     val obj = value as? VegaValue.Obj ?: return unexpected("a scale definition", path)
@@ -1842,7 +1914,6 @@ public class SpecParser {
         }
       }
 
-    if (type == MarkType.GROUP) reportUnsupportedGroupScope(obj, path)
     obj.reportUnhandled("Mark", path, MARK_CONSUMED)
 
     val (below, above) = config.markDefaults(typeName.lowercase(), markStyles(obj))
@@ -1856,6 +1927,10 @@ public class SpecParser {
       transform = markTransforms,
       encode = parseEncode(obj.fields["encode"], "$path.encode"),
       marks = parseArray(obj, "marks", path) { child, childPath -> parseMark(child, childPath) },
+      projections =
+        parseArray(obj, "projections", path) { child, childPath ->
+          parseProjection(child, childPath)
+        },
       axes = parseArray(obj, "axes", path) { child, childPath -> parseAxis(child, childPath) },
       data = parseArray(obj, "data", path) { child, childPath -> parseData(child, childPath) },
       signals =
@@ -2026,20 +2101,6 @@ public class SpecParser {
       is VegaValue.Obj -> value.fields[direction]?.asString()
       else -> value.asString()
     }
-
-  /** Reports the parts of a group's scope that the runtime cannot build. */
-  private fun reportUnsupportedGroupScope(obj: VegaValue.Obj, path: String) {
-    val unsupported = mapOf("projections" to "Geographic projections are out of scope")
-    for ((key, reason) in unsupported) {
-      val value = obj.fields[key] ?: continue
-      if (value is VegaValue.Arr && value.values.isEmpty()) continue
-      diagnostics.warn(
-        DiagnosticCodes.PARSE_UNKNOWN_PROPERTY,
-        "$reason; '$key' on this group was ignored",
-        jsonPath = "$path.$key",
-      )
-    }
-  }
 
   /** Vega accepts a single string or an array of them wherever a field list is allowed. */
   private fun stringList(value: VegaValue): List<String> =

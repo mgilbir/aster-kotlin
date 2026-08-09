@@ -323,7 +323,15 @@ public class SpecCompiler(
     val plot = plotSize(signalValues, width, height)
 
     val root =
-      CompileScope(resolved, signals, scales, plot, spec.scales.associate { it.name to it.type })
+      CompileScope(
+        resolved,
+        signals,
+        scales,
+        plot,
+        spec.scales.associate { it.name to it.type },
+        ProjectionResolver(NumberResolver(expressions, signals, diagnostics), diagnostics)
+          .resolve(spec.projections),
+      )
     val scope =
       ScopeCompiler(ids, textEngine, diagnostics, expressions, data, stream, clock)
         .compile(spec.marks, spec.axes, spec.legends, spec.title, spec.layout, root, plot)

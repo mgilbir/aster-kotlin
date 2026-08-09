@@ -141,6 +141,8 @@ public class MarkEncoder(
       MarkType.AREA -> listOfNotNull(area(spec, data))
       MarkType.ARC -> data.mapIndexedNotNull { index, datum -> arc(at(index), datum, index) }
       MarkType.PATH -> data.mapIndexedNotNull { index, datum -> path(at(index), datum, index) }
+      MarkType.SHAPE ->
+        data.mapIndexedNotNull { index, datum -> path(at(index), datum, index, "shape") }
       MarkType.TRAIL -> listOfNotNull(trail(spec, data))
       MarkType.IMAGE -> data.mapIndexedNotNull { index, datum -> image(at(index), datum, index) }
       else -> {
@@ -364,7 +366,19 @@ public class MarkEncoder(
    * The string is in its own coordinates and the mark's `x`/`y` translate it, so the same outline
    * can be placed once per datum. `scaleX`, `scaleY` and `angle` transform it about that anchor.
    */
-  private fun path(spec: MarkSpec, datum: VegaValue, index: Int): SceneNode? {
+  private fun path(
+    spec: MarkSpec,
+    datum: VegaValue,
+    index: Int,
+    /**
+     * `path` for a path mark and `shape` for a shape mark.
+     *
+     * The two are the same node with the outline read from a different place. Upstream's `shape`
+     * mark holds a *generator* the renderer calls; here a `geoshape` transform has already run it,
+     * so what is on the item is the same string a path mark would carry.
+     */
+    channel: String = "path",
+  ): SceneNode? {
     val channels = spec.encode.effective
     // A `path` channel that resolves to nothing still makes an item, as upstream does — it simply
     // has no outline and paints nothing. A labelled donut relies on it: its leader lines are drawn
@@ -373,7 +387,7 @@ public class MarkEncoder(
     // A mark-level `geopath` writes the outline onto the *row* rather than through an encode
     // channel — upstream writes it onto the scene item and its renderer reads the item's own
     // `path` — so a mark with no `path` channel falls back to the row's own column.
-    val declared = channels["path"]?.let { value(it, datum) } ?: datum.field("path")
+    val declared = channels[channel]?.let { value(it, datum) } ?: datum.field(channel)
     val source = (declared as? VegaValue.Str)?.value ?: ""
     // A path the specification never produced at all measures as a zero rectangle rather than as
     // nothing; see [PathNode.absent].
@@ -411,7 +425,9 @@ public class MarkEncoder(
       fill = style.fill,
       stroke = style.stroke,
       opacity = style.opacity,
-      metadata = metadata(spec, datum, index, channels).copy(markKind = "path"),
+      // `path` or `shape`, whichever the specification wrote: the node is the same and the name
+      // is not, and a comparison that could not tell them apart would be a weaker one.
+      metadata = metadata(spec, datum, index, channels).copy(markKind = channel),
     )
   }
 

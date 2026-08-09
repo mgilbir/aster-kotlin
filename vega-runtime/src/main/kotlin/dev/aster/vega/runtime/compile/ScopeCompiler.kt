@@ -1,6 +1,7 @@
 package dev.aster.vega.runtime.compile
 
 import dev.aster.vega.dataflow.transform.AggregateOp
+import dev.aster.vega.dataflow.transform.ProjectionDefinition
 import dev.aster.vega.dataflow.transform.TransformContext
 import dev.aster.vega.dataflow.transform.TransformPipeline
 import dev.aster.vega.dataflow.transform.aggregateOver
@@ -57,6 +58,13 @@ internal class CompileScope(
    * from a screen reader. Carried alongside the scales because a group scope shadows both together.
    */
   val scaleTypes: Map<String, ScaleType> = emptyMap(),
+  /**
+   * The cartographic projections visible here, with their signals resolved.
+   *
+   * Nested like everything else in a scope: a group may declare its own, and a `geoshape` inside it
+   * sees those before the ones outside.
+   */
+  val projections: Map<String, ProjectionDefinition> = emptyMap(),
 ) {
   val datasets: Map<String, List<VegaValue>>
     get() = data.datasets
@@ -69,7 +77,14 @@ internal class CompileScope(
    * group's contents see a mark declared outside it, the way every other name here nests.
    */
   fun withMarkItems(name: String, items: List<VegaValue>): CompileScope =
-    CompileScope(data.withDataset(name, items), signals, scales, rangeSize, scaleTypes)
+    CompileScope(
+      data.withDataset(name, items),
+      signals,
+      scales,
+      rangeSize,
+      scaleTypes,
+      projections,
+    )
 }
 
 /**
@@ -635,6 +650,8 @@ internal class ScopeCompiler(
     override fun scopeFor(datum: VegaValue): dev.aster.vega.expression.ExpressionScope =
       Replacing(outer.signals.withScales(outer.scales, diagnostics).withDatum(datum), replaced)
 
+    override fun projection(name: String): ProjectionDefinition? = outer.projections[name]
+
     /** The scope the marks after this one see, with any dataset a transform rewrote in it. */
     fun published(scope: CompileScope): CompileScope =
       replaced.entries.fold(scope) { current, (name, rows) -> current.withMarkItems(name, rows) }
@@ -841,6 +858,7 @@ internal class ScopeCompiler(
       scales,
       rangeSize,
       outer.scaleTypes + spec.scales.associate { it.name to it.type },
+      outer.projections + ProjectionResolver(numbers, diagnostics).resolve(spec.projections),
     )
   }
 
