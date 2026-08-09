@@ -385,8 +385,8 @@ private val MARK_CONSUMED =
     "on",
   )
 
-/** The formats a loaded document can be read as. `topojson` needs projections and is a non-goal. */
-private val READABLE_FORMATS = setOf("json", "csv", "tsv", "dsv")
+/** The formats a loaded document can be read as. */
+private val READABLE_FORMATS = setOf("json", "csv", "tsv", "dsv", "topojson")
 
 /** Data properties this engine reads. */
 private val DATA_CONSUMED = setOf("name", "values", "source", "transform", "format", "url")
@@ -941,6 +941,8 @@ public class SpecParser {
     if (format != null) {
       for ((key, value) in format.fields) {
         if (key == "type" || key == "property" || key == "delimiter") continue
+        // The TopoJSON three: which object in the file, and — for a mesh — which of its arcs.
+        if (key == "feature" || key == "mesh" || key == "filter") continue
         if (key == "parse") {
           if (value is VegaValue.Str && value.value.equals("auto", ignoreCase = true)) {
             parseAuto = true
@@ -983,6 +985,9 @@ public class SpecParser {
       urlSignal = urlSignal,
       formatType = formatType,
       property = format?.fields?.get("property")?.asString()?.takeIf { it.isNotEmpty() },
+      feature = format?.fields?.get("feature")?.asString()?.takeIf { it.isNotEmpty() },
+      mesh = format?.fields?.get("mesh")?.asString()?.takeIf { it.isNotEmpty() },
+      meshFilter = format?.fields?.get("filter")?.asString()?.takeIf { it.isNotEmpty() },
       delimiter = format?.fields?.get("delimiter")?.asString()?.takeIf { it.isNotEmpty() },
       transform = (obj.fields["transform"] as? VegaValue.Arr)?.values ?: emptyList(),
       sources =

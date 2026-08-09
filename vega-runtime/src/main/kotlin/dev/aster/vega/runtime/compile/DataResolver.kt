@@ -11,6 +11,7 @@ import dev.aster.vega.expression.RandomStream
 import dev.aster.vega.model.DelimitedText
 import dev.aster.vega.model.DiagnosticCodes
 import dev.aster.vega.model.DiagnosticCollector
+import dev.aster.vega.model.TopoJson
 import dev.aster.vega.model.VegaJson
 import dev.aster.vega.model.VegaValue
 import dev.aster.vega.model.asDouble
@@ -179,11 +180,69 @@ internal class DataResolver(
         }
       }
       "json" -> readJson(spec, text)
+      "topojson" -> readTopoJson(spec, text)
       else -> {
         // Reported by the parser already; nothing further to add here.
         emptyList()
       }
     }
+  }
+
+  /**
+   * A TopoJSON document, decoded into the features or the mesh a map mark draws.
+   *
+   * `format.feature` and `format.mesh` are alternatives and one of them is required — a TopoJSON
+   * file holds several named objects and nothing in it says which one this dataset wants.
+   */
+  private fun readTopoJson(spec: DataSpec, text: String): List<VegaValue> {
+    val document =
+      try {
+        VegaJson.parse(text)
+      } catch (failure: Exception) {
+        diagnostics.error(
+          DiagnosticCodes.PARSE_INVALID_JSON,
+          "Dataset '${spec.name}' is not valid JSON: ${failure.message}",
+          operator = spec.name,
+        )
+        return emptyList()
+      }
+    val name = spec.feature ?: spec.mesh
+    if (name == null) {
+      diagnostics.error(
+        DiagnosticCodes.PARSE_UNKNOWN_PROPERTY,
+        "Dataset '${spec.name}' is TopoJSON but names neither 'format.feature' nor " +
+          "'format.mesh'; a TopoJSON file holds several objects and nothing says which",
+        operator = spec.name,
+      )
+      return emptyList()
+    }
+    val filter =
+      when (spec.meshFilter) {
+        "interior" -> TopoJson.MeshFilter.INTERIOR
+        "exterior" -> TopoJson.MeshFilter.EXTERIOR
+        null -> TopoJson.MeshFilter.ALL
+        else -> {
+          diagnostics.error(
+            DiagnosticCodes.PARSE_UNKNOWN_PROPERTY,
+            "Dataset '${spec.name}' has 'format.filter: ${spec.meshFilter}'; " +
+              "the only filters are 'interior' and 'exterior'",
+            operator = spec.name,
+          )
+          TopoJson.MeshFilter.ALL
+        }
+      }
+    val decoded =
+      if (spec.feature != null) TopoJson.feature(document, name)
+      else TopoJson.mesh(document, name, filter)
+    if (decoded == null) {
+      diagnostics.error(
+        DiagnosticCodes.PARSE_UNKNOWN_PROPERTY,
+        "Dataset '${spec.name}' names TopoJSON object '$name', which the file does not contain",
+        operator = spec.name,
+      )
+      return emptyList()
+    }
+    return ingest(decoded)
   }
 
   private fun readJson(spec: DataSpec, text: String): List<VegaValue> {

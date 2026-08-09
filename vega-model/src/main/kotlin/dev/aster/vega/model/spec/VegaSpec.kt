@@ -226,6 +226,12 @@ public data class DataSpec(
   val property: String? = null,
   /** `format.delimiter` for a `dsv` file. */
   val delimiter: String? = null,
+  /** `format.feature`: which object of a TopoJSON file to decode, as one feature per geometry. */
+  val feature: String? = null,
+  /** `format.mesh`: the same object's arcs as a single line string, each drawn once. */
+  val mesh: String? = null,
+  /** `format.filter` for a mesh: `interior` for the shared borders, `exterior` for the outline. */
+  val meshFilter: String? = null,
 )
 
 public enum class ScaleType {
