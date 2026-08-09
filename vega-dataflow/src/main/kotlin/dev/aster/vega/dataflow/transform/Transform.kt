@@ -267,6 +267,7 @@ public class TransformRegistry(transforms: List<Transform>) {
           GeoPathTransform,
           Kde2dTransform,
           HeatmapTransform,
+          ForceTransform,
         )
       )
   }

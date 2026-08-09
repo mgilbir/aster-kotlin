@@ -185,11 +185,10 @@ internal class ScopeCompiler(
     marks.forEachIndexed { index, mark ->
       // After building, not before: the items only exist once the channels have been resolved, and
       // a mark cannot read back its own output.
-      fun expose(rows: List<VegaValue>) {
-        mark.name
-          ?.takeIf { it in readBack }
-          ?.let { scope = scope.withMarkItems(it, encoder.items(mark, rows)) }
+      fun exposeItems(items: List<VegaValue>) {
+        mark.name?.takeIf { it in readBack }?.let { scope = scope.withMarkItems(it, items) }
       }
+      fun expose(rows: List<VegaValue>) = exposeItems(encoder.items(mark, rows))
       if (mark.type == MarkType.GROUP) {
         val group = group(mark, scope, encoder)
         expose(group.datums)
@@ -201,9 +200,13 @@ internal class ScopeCompiler(
           markReach = markReach.union(group.content.bounds)
         }
       } else {
-        val rows = markTransformed(mark, markData(mark, scope), scope)
-        built[index] = encoder.encode(mark, rows)
-        expose(rows)
+        val rows = markData(mark, scope)
+        val transformed = markTransformed(mark, rows, scope, encoder)
+        scope = transformed.scope
+        built[index] = encoder.encode(mark, rows, transformed.written)
+        // The items a mark's own transforms produced, not the ones its encoding alone would: a
+        // label drawn from a force-directed mark reads the position the simulation settled on.
+        exposeItems(transformed.items ?: encoder.items(mark, rows))
         for (node in built[index].orEmpty()) content = content.union(node.transformedBounds)
       }
     }
@@ -578,26 +581,39 @@ internal class ScopeCompiler(
     spec: MarkSpec,
     rows: List<VegaValue>,
     scope: CompileScope,
-  ): List<VegaValue> {
-    if (spec.transform.isEmpty()) return rows
+    encoder: MarkEncoder,
+  ): MarkTransformResult {
+    if (spec.transform.isEmpty()) return MarkTransformResult(scope, emptyList(), null)
     val context = MarkTransformScope(diagnostics, expressions, scope)
-    // A mark transform sees **items**, and an item carries its row under `datum` — which is why
-    // these are written `{"field": "datum.contour"}` and `scale('color', datum.datum.Origin)`. The
-    // rows are wrapped to look like that, and whatever the transforms wrote is merged back onto the
-    // row afterwards, so the encoding that follows sees one object rather than two.
-    val items = rows.map { VegaValue.Obj(linkedMapOf("datum" to it)) }
-    return TransformPipeline().run(items, spec.transform, context).map { item ->
-      val row = item.field("datum")
-      val written = (item as? VegaValue.Obj)?.fields?.filterKeys { it != "datum" }.orEmpty()
-      if (written.isEmpty()) row
-      else
-        VegaValue.Obj(
-          LinkedHashMap((row as? VegaValue.Obj)?.fields.orEmpty()).apply {
-            putAll(written)
-          }
-        )
+    // The **items**, encoded: `{"field": "datum.contour"}` reaches for the row under `datum`, and
+    // `{"force": "x", "x": "xfocus"}` reaches for a channel the encoding resolved. Running these
+    // over the rows instead would answer the first and silently miss the second.
+    val before = encoder.items(spec, rows)
+    val after = TransformPipeline().run(before, spec.transform, context)
+    val written = after.mapIndexed { index, item ->
+      val was = (before.getOrNull(index) as? VegaValue.Obj)?.fields.orEmpty()
+      (item as? VegaValue.Obj)
+        ?.fields
+        ?.filterKeys { it != "datum" }
+        ?.filter { (name, value) -> was[name] != value }
+        .orEmpty()
     }
+    return MarkTransformResult(context.published(scope), written, after)
   }
+
+  /**
+   * What a mark's transforms changed: the channels they wrote, and any dataset they replaced.
+   *
+   * The second is not a detail. A `link` force resolves each edge's ends to the nodes it just laid
+   * out, and the mark that draws the edges reads them back — upstream by mutating the shared tuple,
+   * here by republishing the dataset, which is the same dependency said out loud.
+   */
+  private class MarkTransformResult(
+    val scope: CompileScope,
+    val written: List<Map<String, VegaValue>>,
+    /** The items themselves, for a mark that another mark is drawn from. Null when nothing ran. */
+    val items: List<VegaValue>?,
+  )
 
   /** What a mark's own transforms may read: this scope's signals, datasets and scales. */
   private class MarkTransformScope(
@@ -607,6 +623,8 @@ internal class ScopeCompiler(
   ) : TransformContext {
     override var tree: dev.aster.vega.dataflow.transform.TreeSource? = null
 
+    private val replaced = LinkedHashMap<String, List<VegaValue>>()
+
     override val scope: dev.aster.vega.expression.ExpressionScope = scopeFor(VegaValue.Null)
 
     override fun setSignal(name: String, value: VegaValue) {
@@ -615,7 +633,21 @@ internal class ScopeCompiler(
     }
 
     override fun scopeFor(datum: VegaValue): dev.aster.vega.expression.ExpressionScope =
-      outer.signals.withScales(outer.scales, diagnostics).withDatum(datum)
+      Replacing(outer.signals.withScales(outer.scales, diagnostics).withDatum(datum), replaced)
+
+    /** The scope the marks after this one see, with any dataset a transform rewrote in it. */
+    fun published(scope: CompileScope): CompileScope =
+      replaced.entries.fold(scope) { current, (name, rows) -> current.withMarkItems(name, rows) }
+
+    /** Records a `setdata`, which a [CompileScope] cannot take because it does not change. */
+    private class Replacing(
+      private val inner: dev.aster.vega.expression.ExpressionScope,
+      private val sink: MutableMap<String, List<VegaValue>>,
+    ) : dev.aster.vega.expression.ExpressionScope by inner {
+      override fun setDataset(name: String, rows: List<VegaValue>) {
+        sink[name] = rows
+      }
+    }
   }
 
   private fun moveTo(node: SceneNode, at: PointD): SceneNode =

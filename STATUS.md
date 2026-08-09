@@ -133,6 +133,9 @@ One hundred and six differential fixtures pass, all matching upstream exactly on
 | `pi-monte-carlo` | 2148 | Vega's Monte Carlo estimate of pi: two styled cells laid out `align: none` and `bounds: flush`, a grid driven by a second scale, flushed end labels, and 2,000 seeded points |
 | `density-heatmaps` | 89 | Vega's density heatmaps: `kde2d` over a scatter, painted as an image by `heatmap` — three grids, one per series, each with its own colour |
 | `contour-plot` | 460 | Vega's contour plot: the same three densities under their contour lines, so the raster and the vector reading of one grid have to agree |
+| `packed-bubble` | 32 | Vega's packed bubble chart: a force simulation left **running**, so the picture is the single tick upstream takes before its timer would |
+| `force-directed` | 331 | Vega's Les Miserables node-link diagram: 300 iterations of collide, centre, n-body and link over 77 nodes, and the edges drawn from the ends the simulation resolved |
+| `beeswarm` | 100 | Vega's beeswarm plot: 300 iterations of collide against two axis springs, each pulling towards a channel the mark encoded |
 
 The gate is wired into `./scripts/oracle.sh`, so every further scale, mark and transform is built
 against a harness that can say we are wrong — which golden tests cannot.

@@ -109,19 +109,40 @@ public class MarkEncoder(
       else -> scope.signal(path)
     }
 
-  public fun encode(spec: MarkSpec, data: List<VegaValue>): List<SceneNode> =
-    when (spec.type) {
-      MarkType.RECT -> data.mapIndexedNotNull { index, datum -> rect(spec, datum, index) }
-      MarkType.RULE -> data.mapIndexedNotNull { index, datum -> rule(spec, datum, index) }
-      MarkType.SYMBOL -> data.mapIndexedNotNull { index, datum -> symbol(spec, datum, index) }
-      MarkType.TEXT -> data.mapIndexedNotNull { index, datum -> text(spec, datum, index) }
+  /**
+   * @param overrides what a mark's own `transform` wrote onto each item, per row.
+   *
+   * Upstream runs those transforms *after* the encoding and lets them write straight onto the item,
+   * so whatever they set wins over whatever the encoding said — a `force` layout's whole purpose is
+   * to replace the `x` and `y` a mark was encoded with. They arrive here as extra `update` channels
+   * holding the values already resolved, which is the same statement in this engine's vocabulary.
+   */
+  public fun encode(
+    spec: MarkSpec,
+    data: List<VegaValue>,
+    overrides: List<Map<String, VegaValue>> = emptyList(),
+  ): List<SceneNode> {
+    fun at(index: Int): MarkSpec {
+      val written = overrides.getOrNull(index)?.takeIf { it.isNotEmpty() } ?: return spec
+      return spec.copy(
+        encode =
+          spec.encode.copy(
+            update = spec.encode.update + written.mapValues { ChannelValue.Constant(it.value) }
+          )
+      )
+    }
+    return when (spec.type) {
+      MarkType.RECT -> data.mapIndexedNotNull { index, datum -> rect(at(index), datum, index) }
+      MarkType.RULE -> data.mapIndexedNotNull { index, datum -> rule(at(index), datum, index) }
+      MarkType.SYMBOL -> data.mapIndexedNotNull { index, datum -> symbol(at(index), datum, index) }
+      MarkType.TEXT -> data.mapIndexedNotNull { index, datum -> text(at(index), datum, index) }
       // One node for the whole series, not one per datum.
       MarkType.LINE -> listOfNotNull(line(spec, data))
       MarkType.AREA -> listOfNotNull(area(spec, data))
-      MarkType.ARC -> data.mapIndexedNotNull { index, datum -> arc(spec, datum, index) }
-      MarkType.PATH -> data.mapIndexedNotNull { index, datum -> path(spec, datum, index) }
+      MarkType.ARC -> data.mapIndexedNotNull { index, datum -> arc(at(index), datum, index) }
+      MarkType.PATH -> data.mapIndexedNotNull { index, datum -> path(at(index), datum, index) }
       MarkType.TRAIL -> listOfNotNull(trail(spec, data))
-      MarkType.IMAGE -> data.mapIndexedNotNull { index, datum -> image(spec, datum, index) }
+      MarkType.IMAGE -> data.mapIndexedNotNull { index, datum -> image(at(index), datum, index) }
       else -> {
         diagnostics.error(
           DiagnosticCodes.TRANSFORM_NOT_IMPLEMENTED,
@@ -132,6 +153,7 @@ public class MarkEncoder(
         emptyList()
       }
     }
+  }
 
   /**
    * Resolves one channel to a number against a datum of the caller's making.

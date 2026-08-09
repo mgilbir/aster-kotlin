@@ -334,6 +334,51 @@ public class ScaleResolver(
    * palette picker offering "Viridis" finds `viridis`. Stops written out inline are not looked up
    * at all — they are already the table every named scheme resolves to.
    */
+  /**
+   * The stops of a scheme that is a **ramp**, or null for one that is a palette.
+   *
+   * The distinction is upstream's own and it decides everything downstream: `isFunction(scheme)`
+   * separates an interpolator from a list, and only the interpolator gets quantized.
+   */
+  private fun rampFor(spec: ScaleSpec, range: RangeSpec.Scheme): List<SceneColor>? {
+    val name = schemeName(spec, range)?.lowercase() ?: return null
+    if (ColorSchemes.categoricalOrNull(name) != null) return null
+    return ColorSchemes.rampOrNull(name)
+  }
+
+  /**
+   * `quantizeInterpolator`: [count] colours read off a ramp at `i / (count + 1)`.
+   *
+   * Not evenly spread from end to end — the endpoints are deliberately left out, so a categorical
+   * legend of two never comes out as "the palest blue and the darkest". Upstream's loop is
+   * `samples[i] = interpolator(++i / n)` with `n = count + 1`, and every colour depends on it.
+   */
+  private fun quantizeRamp(stops: List<SceneColor>, count: Int): List<SceneColor> {
+    if (count <= 0) return emptyList()
+    return (1..count).map { ColorSpaces.sample(stops, it.toDouble() / (count + 1)) }
+  }
+
+  /** A scheme's name, whether it was written down or arrived through a signal. */
+  private fun schemeName(spec: ScaleSpec, range: RangeSpec.Scheme): String? =
+    when (val scheme = range.scheme) {
+      is SchemeRef.Named -> scheme.name
+      is SchemeRef.Signal ->
+        numbers
+          .resolveValue(scheme.expression, spec.name)
+          ?.takeIf { it !is VegaValue.Null }
+          ?.asString()
+          ?: run {
+            diagnostics.error(
+              DiagnosticCodes.SCALE_UNSUPPORTED_TYPE,
+              "Scheme signal '${scheme.expression}' produced no scheme name (scale '${spec.name}')",
+              operator = spec.name,
+            )
+            null
+          }
+      // Stops written out inline are already the table a named scheme resolves to.
+      is SchemeRef.Colors -> null
+    }
+
   private fun schemeColors(spec: ScaleSpec, range: RangeSpec.Scheme): List<SceneColor>? {
     if (range.scheme is SchemeRef.Colors) {
       val values = (range.scheme as SchemeRef.Colors).values
@@ -348,25 +393,7 @@ public class ScaleResolver(
       }
       return colors.ifEmpty { null }
     }
-    val name =
-      when (val scheme = range.scheme) {
-        is SchemeRef.Named -> scheme.name
-        is SchemeRef.Signal ->
-          numbers
-            .resolveValue(scheme.expression, spec.name)
-            ?.takeIf { it !is VegaValue.Null }
-            ?.asString()
-            ?: run {
-              diagnostics.error(
-                DiagnosticCodes.SCALE_UNSUPPORTED_TYPE,
-                "Scheme signal '${scheme.expression}' produced no scheme name (scale " +
-                  "'${spec.name}')",
-                operator = spec.name,
-              )
-              return null
-            }
-        is SchemeRef.Colors -> return null // handled above
-      }.lowercase()
+    val name = schemeName(spec, range)?.lowercase() ?: return null
 
     val palette = ColorSchemes.categoricalOrNull(name)
     // A ramp's stops are a colour list like any other; the scale interpolates between them.
@@ -632,8 +659,14 @@ public class ScaleResolver(
     val range =
       when (val r = effectiveRange(spec)) {
         is RangeSpec.Literal -> r.values
-        // A categorical scheme is exactly an ordinal range, so resolve it to one.
-        is RangeSpec.Scheme -> colorRange(spec)?.map { VegaValue.Str(it.toCssHex()) } ?: return null
+        // A categorical scheme is exactly an ordinal range, so resolve it to one. A **continuous**
+        // one is not: it is a function, and upstream samples it once per domain value rather than
+        // cycling its stops — which is the difference between sixteen shades of blue and the same
+        // eleven twice over.
+        is RangeSpec.Scheme ->
+          (rampFor(spec, r)?.let { quantizeRamp(it, domain.size) } ?: colorRange(spec))?.map {
+            VegaValue.Str(it.toCssHex())
+          } ?: return null
         // A column of the data, read the way a data-driven *domain* is: the scale becomes a lookup
         // table the rows themselves define — `id` in, `name` out. Distinct values in first-seen
         // order, so it lines up with a domain read the same way from the same rows.

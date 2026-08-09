@@ -680,7 +680,7 @@ class TransformReferenceTest {
     VegaValue.Obj(linkedMapOf("g" to VegaValue.Str(group), "v" to VegaValue.Num(value)))
 
   @Test
-  fun `the registry covers the transforms the brief lists, plus twenty-nine more`() {
+  fun `the registry covers the transforms the brief lists, plus thirty more`() {
     val fromTheBrief =
       setOf(
         "filter",
@@ -709,7 +709,9 @@ class TransformReferenceTest {
     // one records which range query each row fails, the other keeps the rows every dimension but
     // its own admits. `isocontour`, `geopath`, `kde2d` and `heatmap` are the raster family: a
     // density estimated over a grid, marching squares over that grid, the GeoJSON it produces
-    // written out as an outline, and the grid itself painted as an image.
+    // written out as an outline, and the grid itself painted as an image. `force` is the one
+    // transform that is a simulation rather than a calculation: it places the nodes of a graph by
+    // running d3-force to a standstill.
     assertEquals(
       fromTheBrief +
         "timeunit" +
@@ -740,7 +742,8 @@ class TransformReferenceTest {
         "isocontour" +
         "geopath" +
         "kde2d" +
-        "heatmap",
+        "heatmap" +
+        "force",
       TransformRegistry.Default.types,
     )
   }
