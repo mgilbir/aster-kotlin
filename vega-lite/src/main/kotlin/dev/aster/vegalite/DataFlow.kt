@@ -40,6 +40,91 @@ internal sealed class DataNode {
    * dataset of its own where upstream has them sharing one. The last of the siblings is the one
    * kept, and the others' remaining steps hang below it, which is what decides the numbering.
    */
+  /**
+   * Folds identical sibling branches into one — upstream's `MergeIdenticalNodes`.
+   *
+   * Two layers that ask the same thing of one table are one question. Left apart they each get a
+   * dataset, and every scale domain then reads a *union* of two names where upstream reads one —
+   * the same rows, described twice. Identity is by the transforms a node emits, which is what the
+   * comparison is over anyway.
+   */
+  fun mergeIdentical() {
+    children.forEach { it.mergeIdentical() }
+    if (children.size <= 1) return
+    val kept = LinkedHashMap<String, DataNode>()
+    val folded = mutableListOf<DataNode>()
+    for (child in children) {
+      val key = child.identity() ?: continue
+      val first = kept.putIfAbsent(key, child)
+      if (first != null) {
+        first.children += child.children
+        folded += child
+      }
+    }
+    children.removeAll(folded)
+    // A branch that just gained children may now have identical ones of its own.
+    if (folded.isNotEmpty()) children.forEach { it.mergeIdentical() }
+  }
+
+  /**
+   * What makes two nodes the same question, or null for a node that is never merged.
+   *
+   * An [OutputNode] is excluded on purpose: it is a *name* something else reads by, and merging two
+   * of them would leave one of the readers pointing at a name that is no longer there.
+   */
+  private fun identity(): String? =
+    when (this) {
+      is ParseNode -> "parse:$parse"
+      is FilterInvalidNode -> "filter-invalid:$expressions"
+      is PassThroughNode -> "transforms:${transforms.map { it.toString() }}"
+      else -> null
+    }
+
+  /**
+   * Collapses a fork that has a **named output** in it — upstream's `MergeOutputs`.
+   *
+   * An output node is only a name: it adds no transform, so a branch that is one has nothing of its
+   * own between it and the table. Everything else at the fork therefore belongs *below* it rather
+   * than beside it, and the fork disappears. It matters because a fork spends a dataset name on the
+   * table it splits, so a chart whose second layer reads the raw rows — a rule at a constant, say —
+   * had every one of its datasets numbered one too high.
+   *
+   * Where several outputs meet, they chain in reverse: the last declared sits above, and the first
+   * is the one everything else hangs from.
+   */
+  fun mergeOutputs() {
+    children.forEach { it.mergeOutputs() }
+    if (children.size <= 1) return
+    val outputs = children.filterIsInstance<OutputNode>()
+    if (outputs.isEmpty()) return
+
+    // The bottom of each branch that is nothing but outputs; what hangs below them moves.
+    val tails = outputs.map { start ->
+      var last = start
+      while (last.children.size == 1 && last.children.single() is OutputNode) {
+        last = last.children.single() as OutputNode
+      }
+      last
+    }
+    val below = mutableListOf<DataNode>()
+    for (tail in tails) {
+      below += tail.children
+      tail.children.clear()
+    }
+    for (child in children) if (child !is OutputNode) below += child
+
+    val main = tails.first()
+    children.clear()
+    // `out_n → … → out_2 → out_1`, with the first declared at the bottom holding everything else.
+    var head: DataNode? = null
+    for (index in outputs.indices.reversed()) {
+      val output = outputs[index]
+      if (head == null) children += output else head.children += output
+      head = tails[index]
+    }
+    main.children += below
+  }
+
   fun mergeAggregates() {
     children.forEach { it.mergeAggregates() }
     if (children.size <= 1) return

@@ -186,6 +186,9 @@ internal object Guides {
     type: String,
   ): VegaValue? {
     if (Scales.hasDiscreteDomain(type) || type == "log") return null
+    // An axis told which ticks to show has been told how many, and asking for a count beside the
+    // list is a second answer to a settled question — `if (!vals && ...)` in `defaultTickCount`.
+    if (def.axis?.fields?.get("values") != null) return null
     val size = view.sizeSignal(channel)
     if (def.bin is Binning.Bin) return signalRef("ceil($size/10)")
     // A bucket that cycles has a known, small number of values — twelve months, twenty-four hours
