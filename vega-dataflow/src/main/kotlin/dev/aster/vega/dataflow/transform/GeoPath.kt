@@ -1,6 +1,5 @@
 package dev.aster.vega.dataflow.transform
 
-import dev.aster.vega.model.DiagnosticCodes
 import dev.aster.vega.model.VegaValue
 import dev.aster.vega.model.asDouble
 import dev.aster.vega.model.field
@@ -26,15 +25,18 @@ public object GeoPathTransform : Transform {
     params: VegaValue.Obj,
     context: TransformContext,
   ): List<VegaValue> {
-    if (params.fields["projection"] != null) {
-      context.diagnostics.error(
-        DiagnosticCodes.TRANSFORM_NOT_IMPLEMENTED,
-        "geopath with a 'projection' is not implemented; the outline would be drawn with the " +
-          "wrong maths rather than merely in the wrong place. Without one the coordinates are " +
-          "used as they are, which is what a contour over a raster grid needs",
-        operator = type,
+    val projectionName = params.string("projection")
+    if (projectionName != null) {
+      // With a projection this is `geoshape` under another name, so it is the same code.
+      return GeoShapeTransform.apply(
+        input,
+        VegaValue.Obj(
+          LinkedHashMap(params.fields).apply {
+            put("as", VegaValue.Str(params.string("as") ?: "path"))
+          }
+        ),
+        context,
       )
-      return input
     }
     val path = params.string("field")
     val as0 = params.string("as") ?: "path"

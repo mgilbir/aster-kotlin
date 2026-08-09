@@ -28,7 +28,7 @@ class GeoProjectionTest {
 
   @Test
   fun `mercator draws a plain polygon`() {
-    val projection = Projections.mercator().scale(150.0).translate(450.0, 250.0)
+    val projection = Projections.byName("mercator")!!.scale(150.0).translate(450.0, 250.0)
     assertEquals(
       "M423.82,276.314L476.18,276.314L463.398,236.843L450,196.543L436.602,236.843ZM921.239,-221.239L921.239,-202.002L921.239,-97.668L921.239,7.766L921.239,117.794L921.239,189.52L921.239,250L921.239,310.48L921.239,382.206L921.239,492.234L921.239,721.239L921.239,721.239L-21.239,721.239L-21.239,721.239L-21.239,492.234L-21.239,382.206L-21.239,310.48L-21.239,250L-21.239,189.52L-21.239,117.794L-21.239,7.766L-21.239,-97.668L-21.239,-202.002L-21.239,-221.239L-21.239,-221.239L921.239,-221.239Z",
       path(
@@ -40,7 +40,7 @@ class GeoProjectionTest {
 
   @Test
   fun `mercator draws a polygon across the antimeridian`() {
-    val projection = Projections.mercator().scale(150.0).translate(450.0, 250.0)
+    val projection = Projections.byName("mercator")!!.scale(150.0).translate(450.0, 250.0)
     assertEquals(
       "M-21.239,223.284L4.941,223.686L4.941,276.314L-21.239,276.716L-21.239,223.284ZM921.239,276.716L895.059,276.314L895.059,223.686L895.059,223.686L921.239,223.284L921.239,276.716Z",
       path(
@@ -52,7 +52,7 @@ class GeoProjectionTest {
 
   @Test
   fun `mercator draws a long line, resampled along the great circle`() {
-    val projection = Projections.mercator().scale(150.0).translate(450.0, 250.0)
+    val projection = Projections.byName("mercator")!!.scale(150.0).translate(450.0, 250.0)
     assertEquals(
       "M135.841,117.794L107.879,131.399L83.301,147.09L61.698,163.853L42.491,181.059L8.976,215.648L-21.239,250M921.239,250L891.024,284.352L857.509,318.941L838.302,336.147L816.699,352.91L792.121,368.601L764.159,382.206",
       path(projection, "{\"type\":\"LineString\",\"coordinates\":[[-120,45],[120,-45]]}"),
@@ -61,7 +61,7 @@ class GeoProjectionTest {
 
   @Test
   fun `mercator draws a bare point, drawn as a circle`() {
-    val projection = Projections.mercator().scale(150.0).translate(450.0, 250.0)
+    val projection = Projections.byName("mercator")!!.scale(150.0).translate(450.0, 250.0)
     assertEquals(
       "M476.18,196.543m0,4.5a4.5,4.5 0 1,1 0,-9a4.5,4.5 0 1,1 0,9z",
       path(projection, "{\"type\":\"Point\",\"coordinates\":[10,20]}"),
@@ -70,7 +70,7 @@ class GeoProjectionTest {
 
   @Test
   fun `mercator draws a rectangle wider than the map`() {
-    val projection = Projections.mercator().scale(150.0).translate(450.0, 250.0)
+    val projection = Projections.byName("mercator")!!.scale(150.0).translate(450.0, 250.0)
     assertEquals(
       "M-21.239,721.239L-21.239,699.352L2.749,697.436L25.581,691.962L46.404,683.641L64.798,673.349L80.716,661.895L94.343,649.913L115.884,625.947L131.711,603.293L143.609,582.486L160.051,546.264L170.767,515.956L178.288,490.081L188.201,447.544L188.201,332.396L188.201,250L188.201,167.604L188.201,52.456L188.201,52.456L178.288,9.919L170.767,-15.956L160.051,-46.264L143.609,-82.486L131.711,-103.293L115.884,-125.947L94.343,-149.913L80.716,-161.895L64.798,-173.349L46.404,-183.641L25.581,-191.962L2.749,-197.436L-21.239,-199.352L-21.239,-221.239L-21.239,-221.239L921.239,-221.239L921.239,-221.239L921.239,-199.352L921.239,-199.352L897.251,-197.436L874.419,-191.962L853.596,-183.641L835.202,-173.349L819.284,-161.895L805.657,-149.913L784.116,-125.947L768.289,-103.293L756.391,-82.486L739.949,-46.264L729.233,-15.956L721.712,9.919L711.799,52.456L711.799,167.604L711.799,250L711.799,332.396L711.799,447.544L721.712,490.081L729.233,515.956L739.949,546.264L756.391,582.486L768.289,603.293L784.116,625.947L805.657,649.913L819.284,661.895L835.202,673.349L853.596,683.641L874.419,691.962L897.251,697.436L921.239,699.352L921.239,721.239L921.239,721.239L-21.239,721.239Z",
       path(
@@ -83,8 +83,7 @@ class GeoProjectionTest {
   @Test
   fun `a rotated and recentred mercator draws a plain polygon`() {
     val projection =
-      Projections.mercator()
-        .scale(200.0)
+      Projections.byName("mercator")!!.scale(200.0)
         .translate(400.0, 300.0)
         .rotate(doubleArrayOf(-40.0, 20.0, 10.0))
         .center(15.0, 5.0)
@@ -100,8 +99,7 @@ class GeoProjectionTest {
   @Test
   fun `a rotated and recentred mercator draws a polygon across the antimeridian`() {
     val projection =
-      Projections.mercator()
-        .scale(200.0)
+      Projections.byName("mercator")!!.scale(200.0)
         .translate(400.0, 300.0)
         .rotate(doubleArrayOf(-40.0, 20.0, 10.0))
         .center(15.0, 5.0)
@@ -117,8 +115,7 @@ class GeoProjectionTest {
   @Test
   fun `a rotated and recentred mercator draws a long line, resampled along the great circle`() {
     val projection =
-      Projections.mercator()
-        .scale(200.0)
+      Projections.byName("mercator")!!.scale(200.0)
         .translate(400.0, 300.0)
         .rotate(doubleArrayOf(-40.0, 20.0, 10.0))
         .center(15.0, 5.0)
@@ -131,8 +128,7 @@ class GeoProjectionTest {
   @Test
   fun `a rotated and recentred mercator draws a bare point, drawn as a circle`() {
     val projection =
-      Projections.mercator()
-        .scale(200.0)
+      Projections.byName("mercator")!!.scale(200.0)
         .translate(400.0, 300.0)
         .rotate(doubleArrayOf(-40.0, 20.0, 10.0))
         .center(15.0, 5.0)
@@ -145,8 +141,7 @@ class GeoProjectionTest {
   @Test
   fun `a rotated and recentred mercator draws a rectangle wider than the map`() {
     val projection =
-      Projections.mercator()
-        .scale(200.0)
+      Projections.byName("mercator")!!.scale(200.0)
         .translate(400.0, 300.0)
         .rotate(doubleArrayOf(-40.0, 20.0, 10.0))
         .center(15.0, 5.0)
@@ -161,7 +156,7 @@ class GeoProjectionTest {
 
   @Test
   fun `equirectangular draws a plain polygon`() {
-    val projection = Projections.equirectangular().scale(120.0).translate(400.0, 250.0)
+    val projection = Projections.byName("equirectangular")!!.scale(120.0).translate(400.0, 250.0)
     assertEquals(
       "M379.056,270.944L420.944,270.944L410.718,239.488L400,208.112L389.282,239.488ZM23.009,61.504L400,61.504L776.991,61.504L776.991,108.628L776.991,155.752L776.991,202.876L776.991,250L776.991,297.124L776.991,344.248L776.991,391.372L776.991,438.496L400,438.496L23.009,438.496L23.009,391.372L23.009,344.248L23.009,297.124L23.009,250L23.009,202.876L23.009,155.752L23.009,108.628L23.009,61.504Z",
       path(
@@ -173,7 +168,7 @@ class GeoProjectionTest {
 
   @Test
   fun `equirectangular draws a polygon across the antimeridian`() {
-    val projection = Projections.equirectangular().scale(120.0).translate(400.0, 250.0)
+    val projection = Projections.byName("equirectangular")!!.scale(120.0).translate(400.0, 250.0)
     assertEquals(
       "M23.009,228.74L43.953,229.056L43.953,270.944L23.009,271.26L23.009,228.74ZM776.991,271.26L756.047,270.944L756.047,229.056L756.047,229.056L776.991,228.74L776.991,271.26Z",
       path(
@@ -185,7 +180,7 @@ class GeoProjectionTest {
 
   @Test
   fun `equirectangular draws a long line, resampled along the great circle`() {
-    val projection = Projections.equirectangular().scale(120.0).translate(400.0, 250.0)
+    val projection = Projections.byName("equirectangular")!!.scale(120.0).translate(400.0, 250.0)
     assertEquals(
       "M148.673,155.752L126.303,163.695L106.641,173.461L89.358,184.586L73.992,196.692L47.181,222.755L23.009,250M776.991,250L752.819,277.245L726.008,303.308L710.642,315.414L693.359,326.539L673.697,336.305L651.327,344.248",
       path(projection, "{\"type\":\"LineString\",\"coordinates\":[[-120,45],[120,-45]]}"),
@@ -194,7 +189,7 @@ class GeoProjectionTest {
 
   @Test
   fun `equirectangular draws a bare point, drawn as a circle`() {
-    val projection = Projections.equirectangular().scale(120.0).translate(400.0, 250.0)
+    val projection = Projections.byName("equirectangular")!!.scale(120.0).translate(400.0, 250.0)
     assertEquals(
       "M420.944,208.112m0,4.5a4.5,4.5 0 1,1 0,-9a4.5,4.5 0 1,1 0,9z",
       path(projection, "{\"type\":\"Point\",\"coordinates\":[10,20]}"),
@@ -203,7 +198,7 @@ class GeoProjectionTest {
 
   @Test
   fun `equirectangular draws a rectangle wider than the map`() {
-    val projection = Projections.equirectangular().scale(120.0).translate(400.0, 250.0)
+    val projection = Projections.byName("equirectangular")!!.scale(120.0).translate(400.0, 250.0)
     assertEquals(
       "M776.991,73.495L708.162,75.76L667.293,81.038L645.113,87.557L631.96,94.593L623.386,101.875L617.37,109.292L609.44,124.336L609.44,187.168L609.44,250L609.44,312.832L609.44,375.664L617.37,390.708L623.386,398.125L631.96,405.407L645.113,412.443L667.293,418.962L708.162,424.24L776.991,426.505L776.991,438.496L400,438.496L23.009,438.496L23.009,426.505L91.838,424.24L132.707,418.962L154.887,412.443L168.04,405.407L176.614,398.125L182.63,390.708L190.56,375.664L190.56,312.832L190.56,250L190.56,187.168L190.56,124.336L190.56,124.336L182.63,109.292L176.614,101.875L168.04,94.593L154.887,87.557L132.707,81.038L91.838,75.76L23.009,73.495L23.009,61.504L400,61.504L776.991,61.504Z",
       path(

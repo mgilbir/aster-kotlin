@@ -127,6 +127,17 @@ internal class Adder {
 internal abstract class GeoStream {
   abstract fun point(x: Double, y: Double)
 
+  /**
+   * A point carrying a **crossing marker**, which only circle clipping emits.
+   *
+   * `m` is 0 for an ordinary vertex, and 2 or 3 for one the clip put on the circle's edge. It
+   * survives into the buffered segments, where `clipRejoin` reads it to tell a ring that genuinely
+   * closes on itself from one whose two ends merely landed on the same place.
+   */
+  open fun point(x: Double, y: Double, m: Double) {
+    point(x, y)
+  }
+
   open fun lineStart() {}
 
   open fun lineEnd() {}
@@ -142,6 +153,8 @@ internal abstract class GeoStream {
 /** A stream that forwards everything to another; the base every stage here is built on. */
 internal open class DelegatingStream(protected val sink: GeoStream) : GeoStream() {
   override fun point(x: Double, y: Double) = sink.point(x, y)
+
+  override fun point(x: Double, y: Double, m: Double) = sink.point(x, y, m)
 
   override fun lineStart() = sink.lineStart()
 

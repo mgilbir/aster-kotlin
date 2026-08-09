@@ -9,7 +9,7 @@ Branch `milestone-0-bootstrap`. Working tree clean, both gates green:
 - `./scripts/check.sh` — format, all tests, lint, demo APK
 - `./scripts/oracle.sh` — regenerates upstream references and runs the differential comparison
 
-**111 differential fixtures pass, all matching upstream exactly.** That is the only number here
+**112 differential fixtures pass, all matching upstream exactly.** That is the only number here
 that means what it says.
 
 ## Read this before trusting the other number
@@ -195,13 +195,13 @@ those before comparing, they paint nothing.
 its datasets are fetched into `test-fixtures/data/` and committed. Discount every loader diagnostic
 when judging how far an example is from passing.
 
-**Where the corpus stands, from `ExampleTriage` rather than from memory: 80 of the 93 compile
-clean, 13 report errors.** Read the *movement* rather than the number: 70 → 79 as the stochastic and
+**Where the corpus stands, from `ExampleTriage` rather than from memory: 85 of the 93 compile
+clean, 8 report errors.** Read the *movement* rather than the number: 70 → 79 as the stochastic and
 crossfilter work landed, **79 → 75 when mark-level `transform` was implemented** — the survey
 becoming honest, because five charts had been dropping a whole block silently — and 75 → 80 as the
 raster family and `force` landed.
 
-The 13 that remain are **11 geographic** and **2 that have no oracle at all**. There is no third
+The 8 that remain are **6 geographic** and **2 that have no oracle at all**. There is no third
 category left.
 
 **`time-units` is done** and is a fixture; STATUS.md describes the five things it needed. The
@@ -252,33 +252,54 @@ is arithmetic. See SUPPORTED_FEATURES.md for the three behaviours that had to co
 rather than from its schema — in particular that **an omitted force parameter falls to d3's default,
 not the one Vega documents**, because Vega only forwards the parameters a specification wrote.
 
-## What is left: eleven maps, and two charts with no oracle
+## What is left: six maps, and two charts with no oracle
 
-**The eleven geographic examples.** `airport-connections`, `annual-precipitation`,
-`county-unemployment`, `distortion-comparison`, `dorling-cartogram`, `earthquakes`,
-`earthquakes-globe`, `map-with-tooltip`, `projections`, `world-map`, `zoomable-world-map`.
+**85 of the 93 examples compile clean.** The geographic category is open and mostly done:
+`world-map` is a fixture and matches exactly, and `earthquakes`, `earthquakes-globe`,
+`zoomable-world-map` and `county-unemployment` all compile clean.
 
-TopoJSON decoding is **done and verified** (`TopoJsonTest`, vectors from `topojson-client`), so none
-of them fails on loading any more; three now build most of a scene without drawing a map
-(`dorling-cartogram` 5 → 123 nodes, `distortion-comparison` 2 → 356). What is left, in dependency
-order:
+d3-geo is ported whole — rotation, antimeridian and circle pre-clipping, adaptive resampling,
+rectangular post-clip — and all fifteen of its projection types are pinned against upstream's own
+path strings in `GeoProjectionTypesTest`. Read the commit that added it before touching any of it;
+three of its subtleties are the kind that produce a plausible wrong map.
 
-- **`projection` definitions and d3-geo.** The corpus needs `mercator`, `albersUsa` and
-  `orthographic` by name, plus whatever `projections.vg.json` cycles through by signal — that one
-  reports 145 errors because it draws every projection type there is.
-- **The projection stream**: rotation, antimeridian clipping, circle clipping (`orthographic` needs
-  it), `clipExtent`, and adaptive resampling. This is where the numeric fidelity will be hard-won.
-  Everything before it is mechanical.
-- **`geoshape`, `geopoint`, `geojson`, `graticule`.** `geoshape` is 19 of the corpus's 25 geo
-  transform uses.
+Two of those 67 vectors are compared **within one printed digit** rather than exactly, and it is
+worth knowing why before assuming it is a defect. `azimuthalEqualArea` and `azimuthalEquidistant`
+clip at 179.999 degrees, where their scale factor is 114,591 and its derivative is 3.8e14 — so a
+one-ulp difference in `cos` between V8 and the JVM, which neither runtime promises to avoid, moves
+a coordinate by 1.3e-4 of a pixel. That is enough to cross a rounding boundary in the third decimal
+and nothing more. The arithmetic is in the test's comment.
 
-`GeoPathTransform` already writes GeoJSON out as an outline and refuses a `projection` by name, so
-the path-building half exists and only the projection stream has to be threaded through it. Mark-level
-`transform` runs over encoded items, which is how `geoshape` reaches a mark at all.
+### The six maps, and what each one is waiting for
 
-**`word-cloud` and `labeled-scatter-plot` cannot be differential fixtures, and this is now
-established rather than suspected.** Both transforms measure or rasterise against a `<canvas>`, and
-there is none under Node:
+- **`county-unemployment`, `annual-precipitation`, `map-with-tooltip` — a band legend.** All three
+  compile clean and the *map* in `county-unemployment` was verified mark-for-mark against upstream:
+  3,607 shapes, every coordinate and every fill. What stopped it becoming a fixture is its
+  **legend**: a discretizing scale gets a `legend-band` legend upstream — a stack of rects — and
+  this engine draws symbols. The analysis is done and is short:
+  - `legendType` gives `Discrete` (not `Gradient`, not `Symbols`) for any discretizing scale with a
+    single `fill` or `stroke`; see `vega-parser/src/parsers/legend.js`.
+  - The entries come from `LegendEntries`' third branch: `values = labelValues(scale, count)`, which
+    for a `quantize` scale is `[-Infinity, ...thresholds]`, and each row carries `perc` and `perc2`
+    from `labelFraction(scale)`. The **first label is null** — `formatDiscrete` returns null at
+    index 0 — and the last band's `perc2` is 1.
+  - The marks are `legend-gradient-discrete.js`: one rect per row, `y = (1 - perc) * length`,
+    `y2 = (1 - perc2) * length`, `width = gradientThickness`.
+  - `test-fixtures/data/us-10m.json` and `unemployment.tsv` are already checked in, so the fixture
+    is one feature away from being re-added and green.
+- **`dorling-cartogram`, `distortion-comparison`, `airport-connections` — `geoCentroid`.** Three
+  uses of one expression function, still reported as out of scope. `d3-geo`'s `centroid` is a
+  stream like every other consumer of a projection, so it fits where `PathBoundsSink` does.
+  `distortion-comparison` additionally names a projection from a *group* scope that does not
+  declare it — worth reading before assuming it is the same defect.
+- **`projections`** draws every projection there is, including the fifty in `d3-geo-projection`
+  (`airy`, `bertin1953`, …). That is a second library, not a gap in this one.
+
+### The two with no oracle
+
+**`word-cloud` and `labeled-scatter-plot` cannot be differential fixtures, and this is established
+rather than suspected.** Both transforms measure or rasterise against a `<canvas>`, and there is
+none under Node:
 
 - `wordcloud` measures text, and upstream's own headless output is degenerate — `fontSize: 0` on
   every word, a surface width of `-Infinity`.

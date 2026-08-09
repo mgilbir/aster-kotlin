@@ -694,9 +694,17 @@ public class ScaleResolver(
     when (val r = effectiveRange(spec)) {
       is RangeSpec.Literal -> if (reversed(spec)) r.values.reversed() else r.values
       is RangeSpec.Scheme -> {
-        val colors = colorRange(spec) ?: return null
-        val wanted = r.count ?: buckets ?: colors.size
-        val taken = if (colors.size > wanted) sampleEvenly(colors, wanted) else colors
+        // A **continuous** scheme is an interpolator, and upstream quantizes it rather than
+        // picking stops out of it: `count` colours read off at `i / (count + 1)`. A quantize scale
+        // with seven buckets over `blues` gets seven shades spread across the whole ramp, not the
+        // seven nearest stops. With no count at all upstream falls back to five, not to however
+        // many stops the ramp happens to have.
+        val ramp = rampFor(spec, r)
+        val wanted = r.count ?: buckets ?: ramp?.let { DEFAULT_SCHEME_COUNT } ?: 0
+        val colors =
+          if (ramp != null) quantizeRamp(ramp, wanted) else colorRange(spec) ?: return null
+        val taken =
+          if (ramp == null && colors.size > wanted) sampleEvenly(colors, wanted) else colors
         (if (reversed(spec)) taken.reversed() else taken).map { VegaValue.Str(it.toCssHex()) }
       }
       else -> {
@@ -709,6 +717,9 @@ public class ScaleResolver(
         null
       }
     }
+
+  /** Upstream's `DEFAULT_COUNT`: how many buckets a discretizing scheme gets when nobody says. */
+  private val DEFAULT_SCHEME_COUNT = 5
 
   /** Takes [count] colours spread across a ramp, so a bucketed scheme uses its whole range. */
   private fun sampleEvenly(colors: List<SceneColor>, count: Int): List<SceneColor> {

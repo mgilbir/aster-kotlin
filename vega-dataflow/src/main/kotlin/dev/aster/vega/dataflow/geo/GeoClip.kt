@@ -34,7 +34,7 @@ internal class ClipBuffer : GeoStream() {
     line?.add(doubleArrayOf(x, y, 0.0))
   }
 
-  fun point(x: Double, y: Double, m: Double) {
+  override fun point(x: Double, y: Double, m: Double) {
     line?.add(doubleArrayOf(x, y, m))
   }
 

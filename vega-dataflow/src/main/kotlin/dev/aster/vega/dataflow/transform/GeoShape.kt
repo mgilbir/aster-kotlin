@@ -1,9 +1,10 @@
 package dev.aster.vega.dataflow.transform
 
+import dev.aster.vega.dataflow.geo.AlbersUsa
 import dev.aster.vega.dataflow.geo.GeoJsonStream
+import dev.aster.vega.dataflow.geo.GeoProjector
 import dev.aster.vega.dataflow.geo.Graticule
 import dev.aster.vega.dataflow.geo.PathStringSink
-import dev.aster.vega.dataflow.geo.Projection
 import dev.aster.vega.dataflow.geo.Projections
 import dev.aster.vega.model.DiagnosticCodes
 import dev.aster.vega.model.VegaValue
@@ -32,7 +33,17 @@ public data class ProjectionDefinition(
 )
 
 /** Builds the projection a definition describes, or null for a type this engine does not have. */
-internal fun ProjectionDefinition.build(): Projection? {
+internal fun ProjectionDefinition.build(): GeoProjector? {
+  // A composite takes only the properties it exposes. Upstream has the same rule and states it the
+  // same way — `isFunction(proj[prop])` — so a `rotate` on an `albersUsa` is ignored there too.
+  Projections.compositeByName(type)?.let { composite ->
+    if (composite is AlbersUsa) {
+      scale?.let { composite.scale(it) }
+      if (translate.size >= 2) composite.translate(translate[0], translate[1])
+      precision?.let { composite.precision(it) }
+    }
+    return composite
+  }
   val projection = Projections.byName(type) ?: return null
   scale?.let { projection.scale(it) }
   if (translate.size >= 2) projection.translate(translate[0], translate[1])

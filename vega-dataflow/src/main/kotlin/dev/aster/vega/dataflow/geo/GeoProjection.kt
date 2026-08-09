@@ -10,6 +10,7 @@ import kotlin.math.asin
 import kotlin.math.atan2
 import kotlin.math.cos
 import kotlin.math.ln
+import kotlin.math.pow
 import kotlin.math.roundToLong
 import kotlin.math.sin
 import kotlin.math.sqrt
@@ -18,6 +19,19 @@ import kotlin.math.tan
 /** A point transform: longitude and latitude in radians to plane coordinates, or the reverse. */
 internal fun interface RawProjection {
   fun project(lambda: Double, phi: Double): DoubleArray
+}
+
+/**
+ * Anything a `geoshape` can draw through.
+ *
+ * Two implementations, and the second is why this exists at all: `albersUsa` is not a projection
+ * but *three*, each with its own clip rectangle, and geometry is pushed through all three at once.
+ */
+internal interface GeoProjector {
+  fun stream(sink: GeoStream): GeoStream
+
+  /** One point, for a `geopoint` transform; null when the point falls outside every piece. */
+  fun apply(lambda: Double, phi: Double): DoubleArray?
 }
 
 /**
@@ -261,7 +275,7 @@ internal class NoResampleStream(
  *
  * Ported from `d3-geo/src/projection/index.js`.
  */
-internal class Projection(private val raw: RawProjection) {
+internal class Projection(private var raw: RawProjection) : GeoProjector {
   var scale: Double = 150.0
     private set
 
@@ -312,16 +326,28 @@ internal class Projection(private val raw: RawProjection) {
     return recenter()
   }
 
+  /**
+   * `transverseMercator`, which is the same formula read down the page rather than across.
+   *
+   * Upstream expresses that by replacing the `center` and `rotate` accessors: a centre given as
+   * `[x, y]` is stored as `[-y, x]`, and a rotation gains a quarter turn. A specification that
+   * writes a longitude means a longitude whichever way the projection runs.
+   */
+  var swapsAxes: Boolean = false
+
   fun center(lambda: Double, phi: Double): Projection {
-    centreLambda = lambda % 360 * RADIANS
-    centrePhi = phi % 360 * RADIANS
+    val x = if (swapsAxes) -phi else lambda
+    val y = if (swapsAxes) lambda else phi
+    centreLambda = x % 360 * RADIANS
+    centrePhi = y % 360 * RADIANS
     return recenter()
   }
 
   fun rotate(values: DoubleArray): Projection {
     deltaLambda = values.getOrElse(0) { 0.0 } % 360 * RADIANS
     deltaPhi = values.getOrElse(1) { 0.0 } % 360 * RADIANS
-    deltaGamma = if (values.size > 2) values[2] % 360 * RADIANS else 0.0
+    val gamma = if (values.size > 2) values[2] else 0.0
+    deltaGamma = (if (swapsAxes) gamma + 90 else gamma) % 360 * RADIANS
     return recenter()
   }
 
@@ -330,10 +356,42 @@ internal class Projection(private val raw: RawProjection) {
     return recenter()
   }
 
+  /**
+   * The two standard parallels of a conic projection, which change the formula rather than tune it.
+   *
+   * A cone touching the globe at 29.5 and 45.5 degrees is a different surface from one touching at
+   * 0 and 60, so upstream rebuilds the raw projection rather than parameterising it.
+   */
+  fun parallels(y0: Double, y1: Double): Projection {
+    val builder = conic ?: return this
+    raw = builder(y0 * RADIANS, y1 * RADIANS)
+    return recenter()
+  }
+
+  /** Set for the conic family, which needs its raw projection rebuilt when the parallels move. */
+  var conic: ((Double, Double) -> RawProjection)? = null
+
   fun reflect(x: Boolean, y: Boolean): Projection {
     reflectX = if (x) -1.0 else 1.0
     reflectY = if (y) -1.0 else 1.0
     return recenter()
+  }
+
+  /**
+   * A clip angle in degrees: the circle beyond which the projection stops meaning anything.
+   *
+   * Zero restores antimeridian cutting, which is what a projection that covers the whole world uses
+   * instead.
+   */
+  fun clipAngle(value: Double): Projection {
+    preclip =
+      if (value != 0.0) {
+        val circle = ClipCircle(value * RADIANS)
+        ({ sink: GeoStream -> circle.stream(sink) })
+      } else {
+        ClipAntimeridian::stream
+      }
+    return this
   }
 
   fun precision(value: Double): Projection {
@@ -352,7 +410,7 @@ internal class Projection(private val raw: RawProjection) {
   }
 
   /** The full pipeline, wrapped around whatever will finally draw. */
-  fun stream(sink: GeoStream): GeoStream {
+  override fun stream(sink: GeoStream): GeoStream {
     val clipped = postclip?.invoke(sink) ?: sink
     val resampled: GeoStream =
       if (delta2 != 0.0) ResampleStream(clipped, transform, delta2)
@@ -362,7 +420,7 @@ internal class Projection(private val raw: RawProjection) {
   }
 
   /** One point, projected — what a `geopoint` transform needs and a path does not. */
-  fun apply(lambda: Double, phi: Double): DoubleArray {
+  override fun apply(lambda: Double, phi: Double): DoubleArray {
     val rotated = rotation.forward(lambda * RADIANS, phi * RADIANS)
     return transform(rotated[0], rotated[1])
   }
@@ -429,7 +487,13 @@ internal class Projection(private val raw: RawProjection) {
   }
 }
 
-/** The raw projections the corpus names, each one a formula and its inverse. */
+/**
+ * The raw projections: longitude and latitude in radians to a point on an abstract plane.
+ *
+ * Each is transcribed from d3-geo's own `projection` sources rather than from a textbook. The
+ * formulas agree with the textbooks; the *constants* often do not, and a projection is judged by
+ * whether it lands the same pixel as upstream.
+ */
 internal object RawProjections {
 
   val mercator = RawProjection { lambda, phi ->
@@ -437,22 +501,335 @@ internal object RawProjections {
   }
 
   val equirectangular = RawProjection { lambda, phi -> doubleArrayOf(lambda, phi) }
+
+  val orthographic = RawProjection { lambda, phi ->
+    doubleArrayOf(cos(phi) * sin(lambda), sin(phi))
+  }
+
+  val gnomonic = RawProjection { lambda, phi ->
+    val cy = cos(phi)
+    val k = cos(lambda) * cy
+    doubleArrayOf(cy * sin(lambda) / k, sin(phi) / k)
+  }
+
+  val stereographic = RawProjection { lambda, phi ->
+    val cy = cos(phi)
+    val k = 1 + cos(lambda) * cy
+    doubleArrayOf(cy * sin(lambda) / k, sin(phi) / k)
+  }
+
+  val azimuthalEqualArea = azimuthal { cxcy -> sqrt(2 / (1 + cxcy)) }
+
+  val azimuthalEquidistant = azimuthal { cxcy ->
+    val c = GeoMath.acos(cxcy)
+    if (c == 0.0) c else c / sin(c)
+  }
+
+  val transverseMercator = RawProjection { lambda, phi ->
+    doubleArrayOf(ln(tan((HALF_PI + phi) / 2)), -lambda)
+  }
+
+  val naturalEarth1 = RawProjection { lambda, phi ->
+    val phi2 = phi * phi
+    val phi4 = phi2 * phi2
+    doubleArrayOf(
+      lambda *
+        (0.8707 - 0.131979 * phi2 +
+          phi4 * (-0.013791 + phi4 * (0.003971 * phi2 - 0.001529 * phi4))),
+      phi * (1.007226 + phi2 * (0.015085 + phi4 * (-0.044475 + 0.028874 * phi2 - 0.005916 * phi4))),
+    )
+  }
+
+  val equalEarth = RawProjection { lambda, phi ->
+    val l = GeoMath.asin(EQUAL_EARTH_M * sin(phi))
+    val l2 = l * l
+    val l6 = l2 * l2 * l2
+    doubleArrayOf(
+      lambda * cos(l) / (EQUAL_EARTH_M * (A1 + 3 * A2 * l2 + l6 * (7 * A3 + 9 * A4 * l2))),
+      l * (A1 + A2 * l2 + l6 * (A3 + A4 * l2)),
+    )
+  }
+
+  /**
+   * The azimuthal family, which differ only in how far out a given angle is drawn.
+   *
+   * The `Infinity` guard is upstream's: `gnomonic` at ninety degrees divides by zero, and d3
+   * answers `[2, 0]` rather than a NaN that would poison every bound downstream.
+   */
+  private fun azimuthal(scale: (Double) -> Double): RawProjection = RawProjection { lambda, phi ->
+    val cx = cos(lambda)
+    val cy = cos(phi)
+    val k = scale(cx * cy)
+    if (k == Double.POSITIVE_INFINITY) doubleArrayOf(2.0, 0.0)
+    else doubleArrayOf(k * cy * sin(lambda), k * sin(phi))
+  }
+
+  fun conicEqualArea(y0: Double, y1: Double): RawProjection {
+    val sy0 = sin(y0)
+    val n = (sy0 + sin(y1)) / 2
+    // Parallels symmetric about the equator make the cone a cylinder, and the formula degenerates.
+    if (abs(n) < EPSILON) return cylindricalEqualArea(y0)
+    val c = 1 + sy0 * (2 * n - sy0)
+    val r0 = sqrt(c) / n
+    return RawProjection { lambda, phi ->
+      val r = sqrt(c - 2 * n * sin(phi)) / n
+      doubleArrayOf(r * sin(lambda * n), r0 - r * cos(lambda * n))
+    }
+  }
+
+  private fun cylindricalEqualArea(phi0: Double): RawProjection {
+    val cosPhi0 = cos(phi0)
+    return RawProjection { lambda, phi -> doubleArrayOf(lambda * cosPhi0, sin(phi) / cosPhi0) }
+  }
+
+  fun conicEquidistant(y0: Double, y1: Double): RawProjection {
+    val cy0 = cos(y0)
+    val n = if (y0 == y1) sin(y0) else (cy0 - cos(y1)) / (y1 - y0)
+    if (abs(n) < EPSILON) return equirectangular
+    val g = cy0 / n + y0
+    return RawProjection { lambda, phi ->
+      val gy = g - phi
+      val nl = n * lambda
+      doubleArrayOf(gy * sin(nl), g - gy * cos(nl))
+    }
+  }
+
+  fun conicConformal(y0: Double, y1: Double): RawProjection {
+    val cy0 = cos(y0)
+    val n = if (y0 == y1) sin(y0) else ln(cy0 / cos(y1)) / ln(tany(y1) / tany(y0))
+    val f = cy0 * pow(tany(y0), n) / n
+    // Parallels that make the cone a cylinder: the projection *is* mercator, not an approximation.
+    if (n == 0.0) return mercator
+    return RawProjection { lambda, phi ->
+      // The pole the cone opens away from is infinitely far, so it is clamped rather than refused.
+      var y = phi
+      if (f > 0) {
+        if (y < -HALF_PI + EPSILON) y = -HALF_PI + EPSILON
+      } else {
+        if (y > HALF_PI - EPSILON) y = HALF_PI - EPSILON
+      }
+      val r = f / pow(tany(y), n)
+      doubleArrayOf(r * sin(n * lambda), f - r * cos(n * lambda))
+    }
+  }
+
+  private fun tany(y: Double): Double = tan((HALF_PI + y) / 2)
+
+  private fun pow(base: Double, exponent: Double): Double = base.pow(exponent)
+
+  private const val A1 = 1.340264
+  private const val A2 = -0.081106
+  private const val A3 = 0.000893
+  private const val A4 = 0.003796
+  private val EQUAL_EARTH_M = sqrt(3.0) / 2
 }
 
-/** The projections a specification can name, each built with whatever extra rule it carries. */
+/**
+ * The projections a specification can name, each built with d3's own defaults for its type.
+ *
+ * The defaults matter as much as the formulas: `orthographic` is unusable without its 90-degree
+ * clip angle, `albers` is a conic whose standard parallels and centring make it a map of the United
+ * States rather than of a cone, and `transverseMercator` is a mercator turned on its side by a
+ * default rotation. A specification that names a type and nothing else expects all of it.
+ */
 internal object Projections {
 
-  fun mercator(): Projection = Projection(RawProjections.mercator).also { it.clipsToOneTurn = true }
+  /** d3's `90 + epsilon` clip angle. The epsilon is a plain 1e-6 and the angle is in degrees. */
+  private const val EPSILON_DEGREES = 1e-6
 
-  fun equirectangular(): Projection = Projection(RawProjections.equirectangular)
-
-  /** Null for a name this engine does not have, so a caller can say so rather than guess. */
   fun byName(name: String): Projection? =
     when (name.lowercase()) {
-      "mercator" -> mercator()
-      "equirectangular" -> equirectangular()
+      "mercator" -> Projection(RawProjections.mercator).apply { clipsToOneTurn = true }
+      "equirectangular" -> Projection(RawProjections.equirectangular).scale(152.63)
+      "orthographic" ->
+        Projection(RawProjections.orthographic).scale(249.5).clipAngle(90 + EPSILON_DEGREES)
+      "gnomonic" -> Projection(RawProjections.gnomonic).scale(144.049).clipAngle(60.0)
+      "stereographic" -> Projection(RawProjections.stereographic).scale(250.0).clipAngle(142.0)
+      "azimuthalequalarea" ->
+        Projection(RawProjections.azimuthalEqualArea).scale(124.75).clipAngle(180 - 1e-3)
+      "azimuthalequidistant" ->
+        Projection(RawProjections.azimuthalEquidistant).scale(79.4188).clipAngle(180 - 1e-3)
+      "naturalearth1" -> Projection(RawProjections.naturalEarth1).scale(175.295)
+      "equalearth" -> Projection(RawProjections.equalEarth).scale(177.158)
+      // A mercator turned on its side. The default rotation is applied **before** the axis swap
+      // is switched on, because upstream sets it through the accessor the swap replaces.
+      "transversemercator" ->
+        Projection(RawProjections.transverseMercator).apply {
+          clipsToOneTurn = true
+          rotate(doubleArrayOf(0.0, 0.0, 90.0))
+          scale(159.155)
+          swapsAxes = true
+        }
+      "conicequalarea" -> conic(RawProjections::conicEqualArea).scale(155.424).center(0.0, 33.6442)
+      "conicequidistant" ->
+        conic(RawProjections::conicEquidistant).scale(131.154).center(0.0, 13.9389)
+      "conicconformal" -> conic(RawProjections::conicConformal).scale(109.5).parallels(30.0, 30.0)
+      // `albers` is not a projection of its own: it is `conicEqualArea` pointed at the United
+      // States, and every one of these five numbers is part of what the name means.
+      "albers" ->
+        conic(RawProjections::conicEqualArea)
+          .parallels(29.5, 45.5)
+          .scale(1070.0)
+          .translate(480.0, 250.0)
+          .rotate(doubleArrayOf(96.0, 0.0))
+          .center(-0.6, 38.7)
       else -> null
     }
 
-  val names: Set<String> = setOf("mercator", "equirectangular")
+  private fun conic(builder: (Double, Double) -> RawProjection): Projection {
+    // d3's conic default: parallels at 0 and 60 degrees, which the caller usually replaces.
+    val projection = Projection(builder(0.0, PI_ / 3))
+    projection.conic = builder
+    return projection
+  }
+
+  /** The composite ones, which are not a [Projection] and so cannot be built like one. */
+  fun compositeByName(name: String): GeoProjector? =
+    when (name.lowercase()) {
+      "albersusa" -> AlbersUsa()
+      else -> null
+    }
+
+  val names: Set<String> =
+    setOf(
+      "albers",
+      "albersUsa",
+      "azimuthalEqualArea",
+      "azimuthalEquidistant",
+      "conicConformal",
+      "conicEqualArea",
+      "conicEquidistant",
+      "equalEarth",
+      "equirectangular",
+      "gnomonic",
+      "mercator",
+      "naturalEarth1",
+      "orthographic",
+      "stereographic",
+      "transverseMercator",
+    )
+}
+
+/**
+ * `albersUsa`: the United States drawn as one map, with Alaska and Hawaii moved into the corner.
+ *
+ * Three projections, not one — an Albers for the lower forty-eight and a conic equal-area apiece
+ * for Alaska and Hawaii — each clipped to its own rectangle so that only one of them ever draws a
+ * given point. Geometry is pushed through all three at once and the clipping decides which answers.
+ *
+ * Every constant here is upstream's, and they are not adjustable: the map is laid out for a 960 by
+ * 500 surface, and Alaska is drawn at 35% of the main scale, which is why it looks plausible rather
+ * than the size of the rest of the country put together.
+ */
+internal class AlbersUsa : GeoProjector {
+  private val lower48 = Projections.byName("albers")!!
+  private val alaska =
+    Projections.byName("conicEqualArea")!!.rotate(doubleArrayOf(154.0, 0.0))
+      .center(-2.0, 58.5)
+      .parallels(55.0, 65.0)
+  private val hawaii =
+    Projections.byName("conicEqualArea")!!.rotate(doubleArrayOf(157.0, 0.0))
+      .center(-3.0, 19.9)
+      .parallels(8.0, 18.0)
+
+  private var k = 1070.0
+  private var tx = 480.0
+  private var ty = 250.0
+
+  init {
+    scale(1070.0)
+  }
+
+  fun scale(value: Double): AlbersUsa {
+    k = value
+    lower48.scale(value)
+    alaska.scale(value * 0.35)
+    hawaii.scale(value)
+    return translate(tx, ty)
+  }
+
+  fun translate(x: Double, y: Double): AlbersUsa {
+    tx = x
+    ty = y
+    lower48.translate(x, y).clipExtent(x - 0.455 * k, y - 0.238 * k, x + 0.455 * k, y + 0.238 * k)
+    alaska
+      .translate(x - 0.307 * k, y + 0.201 * k)
+      .clipExtent(
+        x - 0.425 * k + GeoMath.EPSILON,
+        y + 0.120 * k + GeoMath.EPSILON,
+        x - 0.214 * k - GeoMath.EPSILON,
+        y + 0.234 * k - GeoMath.EPSILON,
+      )
+    hawaii
+      .translate(x - 0.205 * k, y + 0.212 * k)
+      .clipExtent(
+        x - 0.214 * k + GeoMath.EPSILON,
+        y + 0.166 * k + GeoMath.EPSILON,
+        x - 0.115 * k - GeoMath.EPSILON,
+        y + 0.234 * k - GeoMath.EPSILON,
+      )
+    return this
+  }
+
+  fun precision(value: Double): AlbersUsa {
+    lower48.precision(value)
+    alaska.precision(value)
+    hawaii.precision(value)
+    return this
+  }
+
+  override fun stream(sink: GeoStream): GeoStream =
+    Multiplex(listOf(lower48.stream(sink), alaska.stream(sink), hawaii.stream(sink)))
+
+  override fun apply(lambda: Double, phi: Double): DoubleArray? {
+    // Whichever piece admits the point; the clip rectangles make at most one of them do.
+    for (projection in listOf(lower48, alaska, hawaii)) {
+      val capture = Capture()
+      projection.stream(capture).point(lambda, phi)
+      capture.point?.let {
+        return it
+      }
+    }
+    return null
+  }
+
+  /** Pushes everything into every stream at once. */
+  private class Multiplex(private val streams: List<GeoStream>) : GeoStream() {
+    override fun point(x: Double, y: Double) {
+      for (s in streams) s.point(x, y)
+    }
+
+    override fun point(x: Double, y: Double, m: Double) {
+      for (s in streams) s.point(x, y, m)
+    }
+
+    override fun lineStart() {
+      for (s in streams) s.lineStart()
+    }
+
+    override fun lineEnd() {
+      for (s in streams) s.lineEnd()
+    }
+
+    override fun polygonStart() {
+      for (s in streams) s.polygonStart()
+    }
+
+    override fun polygonEnd() {
+      for (s in streams) s.polygonEnd()
+    }
+
+    override fun sphere() {
+      for (s in streams) s.sphere()
+    }
+  }
+
+  /** Catches the one point a piece emitted, if it emitted one. */
+  private class Capture : GeoStream() {
+    var point: DoubleArray? = null
+
+    override fun point(x: Double, y: Double) {
+      point = doubleArrayOf(x, y)
+    }
+  }
 }
