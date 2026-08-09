@@ -224,6 +224,16 @@ internal object Channels {
 
   val POSITION_CHANNELS = listOf("x", "y")
 
+  /**
+   * The channels a concatenation scales separately for each of its plots.
+   *
+   * `defaultScaleResolve` in `compile/resolve.ts`: two plots side by side measure separate things
+   * along their own axes, so `x`, `y` and their polar equivalents become `concat_0_x` beside
+   * `concat_1_x` — but everything a legend stands for stays shared, so one colour key covers the
+   * whole chart rather than one appearing under every plot.
+   */
+  val POSITION_SCALE_CHANNELS = listOf("x", "y", "theta", "radius")
+
   /** Channels that draw a legend when they are scaled. `shape` included, `detail` never scaled. */
   val LEGEND_CHANNELS =
     listOf(
@@ -237,6 +247,15 @@ internal object Channels {
       "strokeDash",
       "angle",
     )
+
+  /**
+   * The channels a legend can *be* — `LEGEND_SCALE_CHANNELS` in `legend.ts`.
+   *
+   * A swatch the legend paints by scale must not also be painted by a value, so anything named here
+   * is taken out of the symbol encoding once the legend has been assembled.
+   */
+  val LEGEND_SCALE_CHANNELS =
+    setOf("size", "shape", "fill", "stroke", "strokeDash", "strokeWidth", "opacity")
 
   val NONPOSITION_CHANNELS =
     listOf(

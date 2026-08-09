@@ -116,12 +116,13 @@ internal object Guides {
     val axis = AxisComponent(channel)
     val user = def.axis
 
-    axis.set("scale", str(channel))
+    axis.set("scale", str(view.scale(channel)))
     axis.set("orient", str(if (channel == "x") "bottom" else "left"))
 
     // The gridlines belong to *this* scale but are drawn across the other one's extent.
     val grid = !Scales.hasDiscreteDomain(type) && def.isFieldDef && def.bin == null
-    if (grid && hasOtherPosition) axis.set("gridScale", str(if (channel == "x") "y" else "x"))
+    if (grid && hasOtherPosition)
+      axis.set("gridScale", str(view.scale(if (channel == "x") "y" else "x")))
     axis.set("grid", bool(grid))
 
     // A ranged position is titled by *both* of its fields — `start, end` — because the axis is

@@ -879,8 +879,9 @@ public class ScaleResolver(
           orderedDomain(domain.data, domain.fields, domain.sort, scaleName) ?: return null
         is DomainSpec.FromSignal -> signalDomain(domain, scaleName) ?: return null
         // A discrete union keeps first-appearance order across every part, which is the same rule
-        // a single dataset's domain follows — the parts simply extend the sequence.
-        is DomainSpec.Union -> unionValues(domain.parts, scaleName)
+        // a single dataset's domain follows — the parts simply extend the sequence — until a
+        // `sort` orders the *combined* set, which is not the same as ordering each part.
+        is DomainSpec.Union -> sortedUnion(domain, scaleName)
         DomainSpec.Unset -> {
           diagnostics.error(
             DiagnosticCodes.SCALE_INVALID_DOMAIN,
@@ -931,6 +932,43 @@ public class ScaleResolver(
   }
 
   /**
+   * A union's values, ordered the way `ordinalMultipleDomain` orders them.
+   *
+   * The parts are counted separately and then *aggregated together* before anything is sorted, so a
+   * sorted union is one sequence rather than several laid end to end — which is the whole
+   * difference, and it shows the moment two plots of one table share a colour scale: sorting the
+   * halves separately would put the second plot's first category after the first plot's last.
+   *
+   * A sort by aggregate folds the parts the way upstream's `MULTIDOMAIN_SORT_OPS` does — a count of
+   * counts is their sum, a min of mins is a min — and those are the only three it allows here.
+   */
+  private fun sortedUnion(domain: DomainSpec.Union, scaleName: String): List<VegaValue> {
+    val keys = unionValues(domain.parts, scaleName).distinctBy { it.asString() }
+    return when (val sort = domain.sort) {
+      null -> keys
+      is DomainSort.ByValue -> keys.sortedWith(domainOrder(sort.descending) { it })
+      is DomainSort.ByAggregate -> {
+        val parts =
+          domain.parts.flatMap { part ->
+            when (part) {
+              is DomainSpec.FromField ->
+                dataset(part.data, scaleName)?.let { data ->
+                  domainFields(part.field, scaleName).map { data to it }
+                }
+              is DomainSpec.FromFields ->
+                dataset(part.data, scaleName)?.let { data -> part.fields.map { data to it } }
+              // A literal or a signal carries no rows to aggregate over, so it contributes its
+              // values to the domain and nothing to the order.
+              else -> emptyList()
+            } ?: return keys
+          }
+        val summaries = aggregateSortKeys(parts, sort, scaleName) ?: return keys
+        keys.sortedWith(domainOrder(sort.descending) { summaries[it.asString()] ?: VegaValue.Null })
+      }
+    }
+  }
+
+  /**
    * Vega's ascending comparator, negated for a descending sort.
    *
    * Negating rather than reversing is what upstream does — it multiplies the comparison by -1 — and
@@ -959,6 +997,12 @@ public class ScaleResolver(
     fields: List<String>,
     sort: DomainSort.ByAggregate,
     scaleName: String,
+  ): Map<String, VegaValue>? = aggregateSortKeys(fields.map { dataset to it }, sort, scaleName)
+
+  private fun aggregateSortKeys(
+    parts: List<Pair<List<VegaValue>, String>>,
+    sort: DomainSort.ByAggregate,
+    scaleName: String,
   ): Map<String, VegaValue>? {
     val op = AggregateOp.fromName(sort.op)
     if (op == null) {
@@ -980,7 +1024,7 @@ public class ScaleResolver(
       return null
     }
 
-    val perField = fields.map { path ->
+    val perField = parts.map { (dataset, path) ->
       val groups = LinkedHashMap<String, MutableList<VegaValue>>()
       for (datum in dataset) {
         val value = datum.field(path)

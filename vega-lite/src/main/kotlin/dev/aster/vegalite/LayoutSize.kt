@@ -16,24 +16,44 @@ internal class LayoutSize(
   config: Config,
   spec: VegaValue.Obj,
   /**
-   * `child_` inside a facet, where `width` is the whole grid and this sizes one cell of it.
+   * What this plot's two size signals are called.
    *
-   * A cell's size is also always a *signal*, never a top-level property: the grid's own width is
-   * whatever the layout makes of the cells, so there is no number to write down.
+   * `width` and `height` for a plain chart, `child_width`/`child_height` inside a facet — where
+   * `width` is the whole grid and this sizes one cell of it — and inside a concatenation whatever
+   * the sizes merged into. A signal named `width` or `height` that holds a plain *number* is
+   * hoisted to a top-level property instead of being written out, which is upstream's own last step
+   * in `assembleTopLevelModel`; anything else stays a signal, because there is no number to write.
    */
-  private val prefix: String = "",
+  private val names: Map<String, String> = mapOf("x" to "width", "y" to "height"),
+  /**
+   * What this plot's own scales are called, where a concatenation has renamed them.
+   *
+   * A step-derived width counts the categories in its *own* band scale, so the expression has to
+   * name `concat_1_x` rather than `x`, or every plot in a row comes out the width of the first.
+   */
+  private val scalePrefix: String = "",
 ) {
   val signals: List<VegaValue>
   val width: VegaValue?
   val height: VegaValue?
 
+  /**
+   * What each channel's size came out as, or null where it is derived from a step.
+   *
+   * A concatenation merges its plots' sizes into one signal only when they agree and none of them
+   * is a step — `parseNonUnitLayoutSizeForChannel` abandons the merge on either count — so this is
+   * what there is to compare.
+   */
+  val values: Map<String, VegaValue?>
+
   init {
     val emitted = mutableListOf<VegaValue>()
+    val sizes = LinkedHashMap<String, VegaValue?>()
     var widthValue: VegaValue? = null
     var heightValue: VegaValue? = null
 
     for (channel in listOf("x", "y")) {
-      val sizeName = prefix + if (channel == "x") "width" else "height"
+      val sizeName = names.getValue(channel)
       val declared =
         spec.fields[if (channel == "x") "width" else "height"]
           ?: views.firstOrNull()?.spec?.let { if (channel == "x") it.width else it.height }
@@ -43,8 +63,8 @@ internal class LayoutSize(
 
       val value: VegaValue? =
         when {
-          declared is VegaValue.Num -> declared
-          discrete -> {
+          !discrete || declared is VegaValue.Num -> value(views, scales, config, spec, channel)
+          else -> {
             val padding = (scale.properties["padding"] as? VegaValue.Num)?.value
             // Only a *band* scale has a real inner padding. A **point** scale counts as 1, because
             // n points have n−1 steps between them — upstream's `sizeExpr` says so in those words,
@@ -65,7 +85,7 @@ internal class LayoutSize(
             emitted +=
               if (offset == null) {
                 obj {
-                  put("name", "${channel}_step")
+                  put("name", "$scalePrefix${channel}_step")
                   put("value", step ?: config.step)
                 }
               } else {
@@ -74,11 +94,11 @@ internal class LayoutSize(
                 val nestedOuter =
                   (offset.properties["paddingOuter"] as? VegaValue.Num)?.value ?: 0.0
                 obj {
-                  put("name", "${channel}_step")
+                  put("name", "$scalePrefix${channel}_step")
                   put(
                     "update",
                     "${number(step ?: config.step)} * " +
-                      "bandspace(domain('${offset.channel}').length, " +
+                      "bandspace(domain('${offset.name()}').length, " +
                       "${number(nestedInner)}, ${number(nestedOuter)})" +
                       " / (1-${number(paddingInner)})",
                   )
@@ -88,32 +108,55 @@ internal class LayoutSize(
               put("name", sizeName)
               put(
                 "update",
-                "bandspace(domain('$channel').length, ${number(paddingInner)}, ${number(paddingOuter)})" +
-                  " * ${channel}_step",
+                "bandspace(domain('$scalePrefix$channel').length, ${number(paddingInner)}, " +
+                  "${number(paddingOuter)}) * $scalePrefix${channel}_step",
               )
             }
             null
           }
-          else -> {
-            val size = if (channel == "x") config.continuousWidth else config.continuousHeight
-            if (prefix.isEmpty()) {
-              num(size)
-            } else {
-              emitted += obj {
-                put("name", sizeName)
-                put("value", size)
-              }
-              null
-            }
-          }
         }
 
-      if (channel == "x") widthValue = value else heightValue = value
+      sizes[channel] = value
+      if (value == null) continue
+      if (sizeName == "width" || sizeName == "height") {
+        if (channel == "x") widthValue = value else heightValue = value
+      } else {
+        emitted += obj {
+          put("name", sizeName)
+          put("value", value)
+        }
+      }
     }
 
     signals = emitted
     width = widthValue
     height = heightValue
+    values = sizes
+  }
+
+  companion object {
+    /**
+     * The plain number a channel's size comes out as, or null where it is derived from a step.
+     *
+     * A concatenation has to know this *before* the sizes are named, because what it names them
+     * depends on whether its plots agree; and the answer needs nothing but the declared size and
+     * the kind of scale, both of which are settled long before a padding is.
+     */
+    fun value(
+      views: List<UnitView>,
+      scales: Map<String, ScaleComponent>,
+      config: Config,
+      spec: VegaValue.Obj,
+      channel: String,
+    ): VegaValue? {
+      val declared =
+        spec.fields[if (channel == "x") "width" else "height"]
+          ?: views.firstOrNull()?.spec?.let { if (channel == "x") it.width else it.height }
+      if (declared is VegaValue.Num) return declared
+      val scale = scales[channel]
+      if (scale != null && (scale.type == "band" || scale.type == "point")) return null
+      return num(if (channel == "x") config.continuousWidth else config.continuousHeight)
+    }
   }
 
   /**

@@ -1,0 +1,323 @@
+{
+  "$schema": "https://vega.github.io/schema/vega/v6.json",
+  "description": "A column of plots of unequal height, the lower one measuring only one axis.",
+  "background": "white",
+  "padding": 5,
+  "width": 200,
+  "data": [
+    {
+      "name": "source_0",
+      "values": [
+        {
+          "category": "Alpha",
+          "amount": 28,
+          "score": 3
+        },
+        {
+          "category": "Beta",
+          "amount": 55,
+          "score": 7
+        },
+        {
+          "category": "Gamma",
+          "amount": 43,
+          "score": 5
+        },
+        {
+          "category": "Delta",
+          "amount": 91,
+          "score": 2
+        }
+      ]
+    },
+    {
+      "name": "data_0",
+      "source": "source_0",
+      "transform": [
+        {
+          "type": "formula",
+          "expr": "toNumber(datum[\"score\"])",
+          "as": "score"
+        }
+      ]
+    },
+    {
+      "name": "data_1",
+      "source": "data_0",
+      "transform": [
+        {
+          "type": "filter",
+          "expr": "isValid(datum[\"amount\"]) && isFinite(+datum[\"amount\"])"
+        }
+      ]
+    }
+  ],
+  "signals": [
+    {
+      "name": "concat_0_height",
+      "value": 110
+    },
+    {
+      "name": "concat_1_height",
+      "value": 60
+    }
+  ],
+  "layout": {
+    "padding": 30,
+    "columns": 1,
+    "bounds": "full",
+    "align": "each"
+  },
+  "marks": [
+    {
+      "type": "group",
+      "name": "concat_0_group",
+      "style": "cell",
+      "encode": {
+        "update": {
+          "width": {
+            "signal": "width"
+          },
+          "height": {
+            "signal": "concat_0_height"
+          }
+        }
+      },
+      "marks": [
+        {
+          "name": "concat_0_marks",
+          "type": "line",
+          "style": [
+            "line"
+          ],
+          "sort": {
+            "field": "x"
+          },
+          "from": {
+            "data": "data_0"
+          },
+          "encode": {
+            "update": {
+              "stroke": {
+                "value": "#4c78a8"
+              },
+              "description": {
+                "signal": "\"score: \" + (format(datum[\"score\"], \"\")) + \"; amount: \" + (format(datum[\"amount\"], \"\"))"
+              },
+              "x": {
+                "scale": "concat_0_x",
+                "field": "score"
+              },
+              "y": {
+                "scale": "concat_0_y",
+                "field": "amount"
+              },
+              "defined": {
+                "signal": "isValid(datum[\"score\"]) && isFinite(+datum[\"score\"]) && isValid(datum[\"amount\"]) && isFinite(+datum[\"amount\"])"
+              }
+            }
+          }
+        }
+      ],
+      "axes": [
+        {
+          "scale": "concat_0_x",
+          "orient": "bottom",
+          "gridScale": "concat_0_y",
+          "grid": true,
+          "tickCount": {
+            "signal": "ceil(width/40)"
+          },
+          "domain": false,
+          "labels": false,
+          "aria": false,
+          "maxExtent": 0,
+          "minExtent": 0,
+          "ticks": false,
+          "zindex": 0
+        },
+        {
+          "scale": "concat_0_y",
+          "orient": "left",
+          "gridScale": "concat_0_x",
+          "grid": true,
+          "tickCount": {
+            "signal": "ceil(concat_0_height/40)"
+          },
+          "domain": false,
+          "labels": false,
+          "aria": false,
+          "maxExtent": 0,
+          "minExtent": 0,
+          "ticks": false,
+          "zindex": 0
+        },
+        {
+          "scale": "concat_0_x",
+          "orient": "bottom",
+          "grid": false,
+          "title": "score",
+          "labelFlush": true,
+          "labelOverlap": true,
+          "tickCount": {
+            "signal": "ceil(width/40)"
+          },
+          "zindex": 0
+        },
+        {
+          "scale": "concat_0_y",
+          "orient": "left",
+          "grid": false,
+          "title": "amount",
+          "labelOverlap": true,
+          "tickCount": {
+            "signal": "ceil(concat_0_height/40)"
+          },
+          "zindex": 0
+        }
+      ]
+    },
+    {
+      "type": "group",
+      "name": "concat_1_group",
+      "style": "cell",
+      "encode": {
+        "update": {
+          "width": {
+            "signal": "width"
+          },
+          "height": {
+            "signal": "concat_1_height"
+          }
+        }
+      },
+      "signals": [
+        {
+          "name": "height",
+          "update": "concat_1_height"
+        }
+      ],
+      "marks": [
+        {
+          "name": "concat_1_marks",
+          "type": "rect",
+          "style": [
+            "tick"
+          ],
+          "from": {
+            "data": "data_1"
+          },
+          "encode": {
+            "update": {
+              "opacity": {
+                "value": 0.7
+              },
+              "fill": {
+                "value": "#4c78a8"
+              },
+              "ariaRoleDescription": {
+                "value": "tick"
+              },
+              "description": {
+                "signal": "\"amount: \" + (format(datum[\"amount\"], \"\"))"
+              },
+              "yc": {
+                "signal": "concat_1_height",
+                "mult": 0.5
+              },
+              "height": {
+                "signal": "0.75 * height"
+              },
+              "xc": {
+                "scale": "concat_1_x",
+                "field": "amount"
+              },
+              "width": {
+                "value": 1
+              }
+            }
+          }
+        }
+      ],
+      "axes": [
+        {
+          "scale": "concat_1_x",
+          "orient": "bottom",
+          "grid": true,
+          "tickCount": {
+            "signal": "ceil(width/40)"
+          },
+          "domain": false,
+          "labels": false,
+          "aria": false,
+          "maxExtent": 0,
+          "minExtent": 0,
+          "ticks": false,
+          "zindex": 0
+        },
+        {
+          "scale": "concat_1_x",
+          "orient": "bottom",
+          "grid": false,
+          "title": "amount",
+          "labelFlush": true,
+          "labelOverlap": true,
+          "tickCount": {
+            "signal": "ceil(width/40)"
+          },
+          "zindex": 0
+        }
+      ]
+    }
+  ],
+  "scales": [
+    {
+      "name": "concat_0_x",
+      "type": "linear",
+      "domain": {
+        "data": "data_0",
+        "field": "score"
+      },
+      "range": [
+        0,
+        {
+          "signal": "width"
+        }
+      ],
+      "nice": true,
+      "zero": false
+    },
+    {
+      "name": "concat_0_y",
+      "type": "linear",
+      "domain": {
+        "data": "data_0",
+        "field": "amount"
+      },
+      "range": [
+        {
+          "signal": "concat_0_height"
+        },
+        0
+      ],
+      "nice": true,
+      "zero": true
+    },
+    {
+      "name": "concat_1_x",
+      "type": "linear",
+      "domain": {
+        "data": "data_1",
+        "field": "amount"
+      },
+      "range": [
+        0,
+        {
+          "signal": "width"
+        }
+      ],
+      "nice": true,
+      "zero": true
+    }
+  ]
+}

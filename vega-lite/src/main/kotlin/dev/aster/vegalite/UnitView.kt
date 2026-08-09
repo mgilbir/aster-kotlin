@@ -33,16 +33,33 @@ internal class UnitView(
   var facetFields: List<String> = emptyList()
 
   /**
-   * The prefix on the size signals this view measures against.
+   * The signals this view measures itself against.
    *
-   * Empty for a plain chart, `child_` inside a facet — where `width` is the whole grid and the
-   * plotting area is one cell of it. Everything that mentions a size goes through here: a scale's
-   * range, an axis's tick count, a mark's midpoint.
+   * `width` and `height` for a plain chart; `child_width`/`child_height` inside a facet, where
+   * `width` is the whole grid and the plotting area is one cell of it; and inside a concatenation
+   * whatever the sizes merged into — `childWidth` where every plot is the same width, and
+   * `concat_1_width` where they are not. Everything that mentions a size goes through here: a
+   * scale's range, an axis's tick count, a mark's midpoint.
    */
-  var sizePrefix: String = ""
+  var widthSignal: String = "width"
+
+  var heightSignal: String = "height"
 
   fun sizeSignal(channel: String): String =
-    sizePrefix + if (channel == "x" || channel == "width") "width" else "height"
+    if (channel == "x" || channel == "width") widthSignal else heightSignal
+
+  /**
+   * The prefix on the scale names this view reads.
+   *
+   * Empty everywhere except inside a concatenation, which gives each of its plots its own position
+   * scales — `concat_0_x` beside `concat_1_x` — because two plots standing side by side measure
+   * separate things unless something says they do not. Everything else a scale is named for stays
+   * shared, so one colour legend covers the whole chart.
+   */
+  var scalePrefix: String = ""
+
+  fun scale(channel: String): String =
+    if (channel in Channels.POSITION_SCALE_CHANNELS) scalePrefix + channel else channel
 
   /** The dataset a mark reads, once the data flow has been assembled and named. */
   var mainData: String = ""

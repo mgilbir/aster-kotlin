@@ -1,6 +1,7 @@
 package dev.aster.vegalite
 
 import dev.aster.vega.model.VegaValue
+import dev.aster.vega.model.canonicalNumberString
 
 /**
  * Turns a view's mark and encoding into a Vega mark, port of the files under `compile/mark`.
@@ -445,7 +446,7 @@ internal object Marks {
     }
 
   private fun scaleName(view: UnitView, channel: String): String? =
-    if (view.hasScale(channel)) channel else null
+    if (view.hasScale(channel)) view.scale(channel) else null
 
   /**
    * `aria()`: the role description and the spoken summary of a mark.
@@ -799,17 +800,16 @@ internal object Marks {
 
   private fun scaledZeroOrMinOrMax(view: UnitView, channel: String, mode: String): VegaValue {
     val component = view.scaleComponents[channel]
-    val domain = "domain('$channel')"
+    val scale = view.scale(channel)
+    val domain = "domain('$scale')"
     return when {
       component?.domainHasZero == true ->
         obj {
-          put("scale", channel)
+          put("scale", scale)
           put("value", 0)
         }
       else ->
-        signalRef(
-          "scale('$channel', ${if (mode == "zeroOrMin") "$domain[0]" else "peek($domain)"})"
-        )
+        signalRef("scale('$scale', ${if (mode == "zeroOrMin") "$domain[0]" else "peek($domain)"})")
     }
   }
 
@@ -942,15 +942,33 @@ internal object Marks {
           // The width of one *nested* mark where there is an offset scale, and of the whole band
           // where there is not.
           val band = offsetChannelFor(channel)?.takeIf { view.hasScale(it) } ?: channel
-          val bandwidth = "bandwidth('$band')"
+          val bandwidth = "bandwidth('${view.scale(band)}')"
           signalRef(if (minBandSize != null) "max($minBandSize, $bandwidth)" else bandwidth)
         }
         else -> {
           val discreteBandSize = markConfig.number("discreteBandSize")
-          if (discreteBandSize != null) {
-            obj { put("value", discreteBandSize) }
-          } else {
-            obj { put("value", view.config.step - 2) }
+          when {
+            discreteBandSize != null -> obj { put("value", discreteBandSize) }
+            // A rect-based mark with *nothing* encoded on this channel spans the plot rather than
+            // sitting somewhere in it at a default width — `defaultSizeRef`'s `!hasFieldDef`
+            // branch. It keeps back exactly what a band scale's inner padding would have kept
+            // back, so a lone row of ticks is as thick as one row of a trellis of them.
+            def == null -> {
+              val padding =
+                view.config.scaleConfig(
+                  when (view.spec.mark) {
+                    "bar" -> "barBandPaddingInner"
+                    "tick" -> "tickBandPaddingInner"
+                    else -> "rectBandPaddingInner"
+                  }
+                )!!
+              // The *plain* `width` or `height`, not this plot's own name for it: a plot with
+              // nothing on the other channel has no gridline scale, so its group already defines
+              // the plain name as an alias — `assembleAxisSignals` — and upstream writes the
+              // expression against that.
+              signalRef("${canonicalNumberString(1 - padding)} * $sizeChannel")
+            }
+            else -> obj { put("value", view.config.step - 2) }
           }
         }
       }
@@ -999,7 +1017,7 @@ internal object Marks {
           put(
             "offset",
             obj {
-              put("scale", offsetChannel)
+              put("scale", view.scale(offsetChannel))
               put("field", Fields.vgField(offsetDef))
             },
           )
@@ -1051,7 +1069,7 @@ internal object Marks {
       put(
         channel2,
         obj {
-          put("scale", channel)
+          put("scale", view.scale(channel))
           put("field", Fields.vgField(def))
           put("offset", offset(!startIsEnd))
         },
@@ -1059,7 +1077,7 @@ internal object Marks {
       put(
         channel,
         obj {
-          put("scale", channel)
+          put("scale", view.scale(channel))
           put("field", endField)
           put("offset", offset(startIsEnd))
         },

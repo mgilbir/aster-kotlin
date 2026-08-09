@@ -454,7 +454,7 @@ produces a chart that is plausible and wrong.
 every fixture with upstream and checks two things:
 
 1. `VegaLiteFixtureTest` compares the Vega this compiler emits against upstream's, property by
-   property. Fifty-three fixtures, and all of them match exactly — every transform, scale, signal,
+   property. Fifty-five fixtures, and all of them match exactly — every transform, scale, signal,
    axis, legend and mark encoding, down to the accessibility description string.
 2. `VegaLiteFixtureDifferentialTest` runs that output through this engine's own runtime and compares
    the scene against the one upstream draws. Every mark of every fixture matches, and nothing is
@@ -539,22 +539,63 @@ own) and `grouped-bar` on the step arithmetic.
 
 ### Where the compiler stands, and what it still refuses
 
-Fifty-three fixtures, each matching upstream's compiler property for property and drawing the chart
-upstream draws. The grammar covered: a single view or a layer of them, eleven marks including `arc`,
+Fifty-five fixtures, each matching upstream's compiler property for property and drawing the chart
+upstream draws. The grammar covered: a single view, a layer of them, a concatenation of either,
+eleven marks including `arc`,
 the Cartesian and polar position pairs, nested offsets, fourteen of fifteen transforms, sorting,
 binning, time units, stacking, faceting by `row` and `column`, conditional encodings, a line or an
 area that draws its own points, legends, axes, and a user `config` carried through as a theme.
 
 What it still refuses, by name, with the reason each is refused rather than approximated:
 
-- **`hconcat` / `vconcat` / `concat`, `repeat`** and the `facet` operator with its own `spec`.
-  `row` and `column` are implemented (below); these remaining forms compose several *different*
-  views rather than repeating one, so each needs its own layout.
+- **`repeat`** and the `facet` operator with its own `spec`. `row` and `column` are implemented
+  (below), and so is concatenation (below); these two remaining forms *generate* their views from a
+  template rather than being handed them, which is a normalization step neither has yet.
+- **A plot of a concatenation with its own `data`.** The plots share the chart's dataset, which is
+  what makes them one chart rather than several drawn near each other; a second source would have to
+  be assembled and numbered beside the first, as a `lookup`'s joined table is.
 - **`params`.** Selections and bound inputs. A conditional encoding whose condition is a **`test`**
   now compiles — that is a predicate on the row and needs nothing to be selected — so only a
   condition naming a `param` is refused, by itself, leaving the rest of the definition standing.
 - Geographic projections and the `geoshape` mark, which are out of scope for the first release for
   the same reason they are in Vega.
+
+### Concatenation: two plots, and what they do not share
+
+A concatenation is not a chart with more marks in it. Each of its plots keeps its **own position
+scales and its own axes** — `defaultScaleResolve` makes `x` and `y` independent and everything else
+shared — so `concat_0_x` stands beside `concat_1_x` and one colour legend covers both. That is the
+whole shape of it: the marks move into a group per plot, the axes go with them, and the top level
+keeps only the data, the shared scales, the legends and a `layout` that places the groups.
+
+`hconcat`, `vconcat` and `concat` are one construct here because they are one in upstream's compiler
+(`ConcatModel`); what differs is `columns`, and what `columns` decides is **which sizes can merge**.
+A row of plots shares a height and a column shares a width, so `parseConcatLayoutSize` names the
+merged size `height` or `width` where the plots stand along that axis and `childHeight`/`childWidth`
+where they do not — and abandons the merge entirely if the plots disagree or any of them is sized by
+a step, leaving `concat_0_height` beside `concat_1_height`. A merged size that is a plain number
+then leaves the signal list for the top level, which is upstream's own last step.
+
+Three defects came out of the two fixtures, and none of them is about concatenation as such:
+
+- **A shared legend showed only the first plot's half of itself.** Two marks coloured by one column
+  get *one* key between them, and it has to say both things: a bar fills its swatch and a point
+  strokes one, so the merged legend carries `fill` and `stroke` alike. Where they disagree the first
+  view's answer stands, with the two exceptions upstream names — a circle wins over any other glyph,
+  and two different titles are joined rather than one being dropped. Then the *merged* legend's own
+  channels decide what comes out of the symbol encoding: a point's `fill: transparent` is right on
+  its own and blanks every swatch once a scaled `fill` merges in beside it.
+- **A union domain was never sorted.** `{"fields": [...], "sort": true}` orders the *combined* set —
+  upstream counts each part, aggregates the counts together, and only then sorts — where this engine
+  had ordered each part and laid them end to end. With two plots of one table that puts the second
+  plot's first category after the first plot's last, and the colours come out shifted by one.
+- **A rect-based mark with nothing on one channel was 18 units tall.** `defaultSizeRef`'s
+  `!hasFieldDef` branch spans the plot instead, keeping back exactly what a band scale's inner
+  padding would have kept back — `0.75 * height` for a tick. It writes the *plain* size name rather
+  than the plot's own, relying on the alias a plot with no gridline scale already defines.
+
+The last of those is not about concatenation at all: a single-view tick plot with one encoded axis
+was equally wrong, and no fixture had drawn one.
 
 ### Faceting: both halves, in three fixtures
 
@@ -917,7 +958,7 @@ the whole time.
 
 ## Verification
 
-- 2,014 JVM tests pass and none is skipped (`./gradlew test`); the portable core is most of
+- 2,028 JVM tests pass and none is skipped (`./gradlew test`); the portable core is most of
   them, and `./scripts/test-core.sh` runs it without an Android SDK.
 - Android lint is clean with `warningsAsErrors` on every Android module.
 - 63 instrumented tests pass on an API 37 arm64 emulator (`./scripts/test-android.sh`): 49 in

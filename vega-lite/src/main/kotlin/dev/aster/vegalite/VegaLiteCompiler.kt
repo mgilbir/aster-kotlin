@@ -75,33 +75,69 @@ private class Compilation(
   /** The `row` and `column` this chart is gridded by, if either. */
   private var facet: FacetGrid? = null
 
+  /** The concatenation this chart is, if it is one. */
+  private var concat: Concat? = null
+
   fun run(): VegaLiteCompilation {
     reportUnsupportedTopLevel()
 
-    val parsed = views() ?: return VegaLiteCompilation(null, diagnostics.diagnostics)
-    if (parsed.isEmpty()) return VegaLiteCompilation(null, diagnostics.diagnostics)
+    concat = Concat.of(spec, diagnostics)
+    val plots = plots() ?: return failed()
+    if (plots.any { it.views.isEmpty() }) return failed()
 
     // A facet channel does not encode anything *within* a cell, so it is lifted out of the encoding
     // before the scales are built — and everything inside then measures a cell rather than the
     // surface.
-    val views = liftFacet(parsed)
+    if (concat == null) plots.single().views = liftFacet(plots.single().views)
 
-    val scales = mergeScales(views)
-    val scaleTypes = scales.mapValues { it.value.type }
-    views.forEach {
-      it.scaleTypes = scaleTypes
-      it.scaleComponents = scales
+    val views = plots.flatMap { it.views }
+    // A concatenation scales each of its plots separately along the axes and shares everything
+    // else — `defaultScaleResolve` — so the position scales are merged within a plot and the rest
+    // across the whole chart. That is why two plots side by side have their own `y` but one colour
+    // legend between them.
+    val shared = if (concat == null) null else mergeScales(views, "")
+    for (plot in plots) {
+      val own = mergeScales(plot.views, plot.prefix)
+      val visible = LinkedHashMap<String, ScaleComponent>()
+      own.forEach { (channel, scale) ->
+        if (shared == null || channel in Channels.POSITION_SCALE_CHANNELS) visible[channel] = scale
+      }
+      shared?.forEach { (channel, scale) ->
+        if (channel !in Channels.POSITION_SCALE_CHANNELS) visible[channel] = scale
+      }
+      plot.scales = visible
+      val scaleTypes = visible.mapValues { it.value.type }
+      plot.views.forEach {
+        it.scaleTypes = scaleTypes
+        it.scaleComponents = visible
+      }
     }
 
+    // The sizes are named before anything reads them, because what a concatenation calls them
+    // depends on whether its plots agree: a row of equally wide plots shares one `childWidth`,
+    // and a row of unequal ones keeps `concat_0_width` beside `concat_1_width`.
+    nameSizes(plots)
+
     val data = assembleData(views).toMutableList()
-    fillScaleDomains(views, scales)
+    for (plot in plots) fillScaleDomains(plot.views, plot.scales)
     // The facets' own values, which the layout counts and the headers title themselves from.
     facet?.let { data += it.domainDatasets(views.first().mainData) }
 
-    val axes = assembleAxes(views, scales)
-    val legends = assembleLegends(views, scales)
-    val layout =
-      LayoutSize(views, scales, config, spec, prefix = if (facet != null) "child_" else "")
+    for (plot in plots) {
+      plot.axes = assembleAxes(plot.views, plot.scales)
+      plot.size =
+        LayoutSize(plot.views, plot.scales, config, plot.spec, plot.sizeNames, plot.prefix)
+    }
+    // Every legend belongs to a shared scale, so a concatenation draws its own once for the whole
+    // chart rather than one under each plot.
+    val legends =
+      if (concat == null) assembleLegends(views, plots.single().scales)
+      else assembleLegends(views, shared!!)
+    // A merged size is written once, by the chart, rather than once by each plot that shares it.
+    val sizeSignals =
+      plots.flatMap { plot -> plot.size!!.signals.filter { it.string("name") !in merged } } +
+        mergedSizeSignals()
+    val root = plots.first().size!!
 
     val vega = obj {
       put("\$schema", "https://vega.github.io/schema/vega/v6.json")
@@ -109,27 +145,32 @@ private class Compilation(
       put("background", config.background)
       put("padding", config.padding)
       autosize()?.let { put("autosize", it) }
-      put("width", layout.width)
-      put("height", layout.height)
+      put("width", mergedSize("width") ?: if (concat == null) root.width else null)
+      put("height", mergedSize("height") ?: if (concat == null) root.height else null)
       // `cell` is the bordered plotting area; a chart with no Cartesian position — a pie — has no
       // plotting area to border, and upstream styles it as a plain `view` instead. A faceted chart
-      // has no plotting area of its own at all: each of its cells carries the style.
-      if (facet == null) {
-        put(
-          "style",
-          if (views.any { it.spec.encoding["x"] != null || it.spec.encoding["y"] != null }) "cell"
-          else "view",
-        )
-      }
+      // has no plotting area of its own at all: each of its cells carries the style, and neither
+      // does a concatenation, whose plots are each their own cell.
+      if (facet == null && concat == null) put("style", style(views))
       title()?.let { put("title", it) }
       put("data", arr(data))
-      if (layout.signals.isNotEmpty()) put("signals", arr(layout.signals))
+      if (sizeSignals.isNotEmpty()) put("signals", arr(sizeSignals))
       facet?.let { put("layout", it.layout(FACET_SPACING, HEADER_OFFSET, facetTitles())) }
-      put("marks", arr(marks(views, axes)))
-      if (scales.isNotEmpty()) put("scales", arr(scales.values.map { assembleScale(it) }))
+      concat?.let { put("layout", it.layout()) }
+      put("marks", arr(if (concat == null) marks(views, plots.single().axes) else groups(plots)))
+      val scales =
+        (shared?.values.orEmpty().filter { it.channel !in Channels.POSITION_SCALE_CHANNELS }) +
+          plots.flatMap { plot ->
+            plot.scales.values.filter {
+              concat == null || it.channel in Channels.POSITION_SCALE_CHANNELS
+            }
+          }
+      if (scales.isNotEmpty()) put("scales", arr(scales.map { assembleScale(it) }))
       // A faceted chart has no axes of its own: the gridlines live in every cell and the labelled
-      // axis in a header drawn once for the whole grid.
-      if (facet == null && axes.isNotEmpty()) put("axes", arr(axes))
+      // axis in a header drawn once for the whole grid. A concatenation's axes live in its plots.
+      if (facet == null && concat == null && plots.single().axes.isNotEmpty()) {
+        put("axes", arr(plots.single().axes))
+      }
       if (legends.isNotEmpty()) put("legends", arr(legends))
       // The theme, as Vega takes it. Without this a chart's guides are drawn in the engine's own
       // colours however carefully the specification restyled them.
@@ -139,11 +180,170 @@ private class Compilation(
     return VegaLiteCompilation(vega, diagnostics.diagnostics)
   }
 
+  private fun failed() = VegaLiteCompilation(null, diagnostics.diagnostics)
+
+  private fun style(views: List<UnitView>): String =
+    if (views.any { it.spec.encoding["x"] != null || it.spec.encoding["y"] != null }) "cell"
+    else "view"
+
+  // -----------------------------------------------------------------------------------------
+  // Plots
+  // -----------------------------------------------------------------------------------------
+
+  /**
+   * One plot being compiled: a whole chart, or one cell of a concatenation.
+   *
+   * A concatenation is not a chart with more marks in it — each of its plots has its own scales,
+   * its own axes and its own size, and only the data and the legends are shared. So everything from
+   * the scales onwards is held per plot rather than once for the specification.
+   */
+  private class Plot(val name: String, val spec: VegaValue.Obj) {
+    val prefix: String = if (name.isEmpty()) "" else "${name}_"
+    var views: List<UnitView> = emptyList()
+    var scales: LinkedHashMap<String, ScaleComponent> = LinkedHashMap()
+    var axes: List<VegaValue> = emptyList()
+    var size: LayoutSize? = null
+    var sizeNames: Map<String, String> = mapOf("x" to "width", "y" to "height")
+  }
+
+  private fun plots(): List<Plot>? {
+    val found = concat
+    val plots =
+      if (found == null) listOf(Plot("", spec))
+      else found.children.mapIndexed { index, child -> Plot("concat_$index", child) }
+    for (plot in plots) {
+      plot.views = views(plot.spec, plot.name) ?: return null
+      plot.views.forEach { it.scalePrefix = plot.prefix }
+    }
+    return plots
+  }
+
+  // -----------------------------------------------------------------------------------------
+  // Sizes
+  // -----------------------------------------------------------------------------------------
+
+  /** What each plot's two size signals are called, and what the merged ones are called. */
+  private val merged = LinkedHashMap<String, VegaValue>()
+
+  private fun nameSizes(plots: List<Plot>) {
+    val found = concat
+    if (found == null) {
+      val plot = plots.single()
+      val prefix = if (facet != null) "child_" else ""
+      plot.sizeNames = mapOf("x" to "${prefix}width", "y" to "${prefix}height")
+      plot.views.forEach {
+        it.widthSignal = plot.sizeNames.getValue("x")
+        it.heightSignal = plot.sizeNames.getValue("y")
+      }
+      return
+    }
+
+    // `parseConcatLayoutSize`: a row of plots shares one height and a column shares one width, so
+    // the merged size keeps the plain name there and becomes a `child` size where it does not.
+    val mergedName =
+      mapOf(
+        "x" to if (found.columns == 1) "width" else "childWidth",
+        "y" to if (found.columns == null) "height" else "childHeight",
+      )
+    for (channel in listOf("x", "y")) {
+      // Merge only where every plot agrees and none of them is sized by a step, which is what
+      // `parseNonUnitLayoutSizeForChannel` abandons the merge on.
+      val values = plots.map { LayoutSize.value(it.views, it.scales, config, it.spec, channel) }
+      val agreed = values.first()
+      val mergeable = agreed != null && values.all { it == agreed }
+      val name = if (mergeable) mergedName.getValue(channel) else null
+      for (plot in plots) {
+        val own = name ?: "${plot.prefix}${if (channel == "x") "width" else "height"}"
+        plot.sizeNames = plot.sizeNames + (channel to own)
+        plot.views.forEach { if (channel == "x") it.widthSignal = own else it.heightSignal = own }
+      }
+      if (mergeable) merged[mergedName.getValue(channel)] = agreed
+    }
+  }
+
+  /** A merged size that is a plain number and is called `width` or `height` goes to the top. */
+  private fun mergedSize(name: String): VegaValue? = merged[name]
+
+  private fun mergedSizeSignals(): List<VegaValue> =
+    merged.entries
+      .filter { it.key != "width" && it.key != "height" }
+      .map { (name, value) ->
+        obj {
+          put("name", name)
+          put("value", value)
+        }
+      }
+
+  // -----------------------------------------------------------------------------------------
+  // Concatenated plots
+  // -----------------------------------------------------------------------------------------
+
+  /**
+   * A group per plot: its marks, its axes, and the size it is drawn at.
+   *
+   * `ConcatModel.assembleMarks` — a concatenation has no marks of its own, and its layout places
+   * the groups rather than the marks inside them.
+   */
+  private fun groups(plots: List<Plot>): List<VegaValue> = plots.map { plot ->
+    obj {
+      put("type", "group")
+      put("name", "${plot.name}_group")
+      plot.spec.fields["title"]?.let {
+        put("title", if (it is VegaValue.Str) obj { put("text", it) } else it)
+      }
+      put("style", style(plot.views))
+      put(
+        "encode",
+        obj {
+          put(
+            "update",
+            obj {
+              put("width", signalRef(plot.sizeNames.getValue("x")))
+              put("height", signalRef(plot.sizeNames.getValue("y")))
+            },
+          )
+        },
+      )
+      val local = localSizeSignals(plot)
+      if (local.isNotEmpty()) put("signals", arr(local))
+      put("marks", arr(plot.views.flatMap { Marks.marks(it) }))
+      if (plot.axes.isNotEmpty()) put("axes", arr(plot.axes))
+    }
+  }
+
+  /**
+   * The size a plot's own axes read, where the plot is not called what they say.
+   *
+   * `assembleAxisSignals`: an axis draws its gridlines across the *other* scale's extent, and where
+   * there is no other scale it falls back to `width` or `height` by name. Inside a concatenation
+   * that name means the whole chart, so the plot aliases it to its own — without which a plot with
+   * one encoded axis draws its grid the height of everything beside it.
+   */
+  private fun localSizeSignals(plot: Plot): List<VegaValue> {
+    val out = LinkedHashMap<String, String>()
+    for (channel in Channels.POSITION_CHANNELS) {
+      val other = if (channel == "x") "y" else "x"
+      if (plot.scales[channel] == null || plot.scales[other] != null) continue
+      val name = if (other == "x") "width" else "height"
+      val update = plot.views.first().sizeSignal(other)
+      if (update != name) out[name] = update
+    }
+    return out.map { (name, update) ->
+      obj {
+        put("name", name)
+        put("update", update)
+      }
+    }
+  }
+
   // -----------------------------------------------------------------------------------------
   // Views
   // -----------------------------------------------------------------------------------------
 
-  private fun views(): List<UnitView>? {
+  private fun views(spec: VegaValue.Obj, namePrefix: String): List<UnitView>? {
+    fun named(suffix: String) =
+      listOf(namePrefix, suffix).filter { it.isNotEmpty() }.joinToString("_")
+
     val normalize = Normalize(config, diagnostics)
     val composite = Composite(config, diagnostics)
     // A composite mark stands for a layer of ordinary ones and names its parts relative to itself —
@@ -179,8 +379,8 @@ private class Compilation(
           )
           return@forEachIndexed
         }
-        val merged = inherited(child)
-        expand(merged, "layer_$index").forEach { units += it to "$.layer[$index]" }
+        val merged = inherited(spec, child)
+        expand(merged, named("layer_$index")).forEach { units += it to "$.layer[$index]" }
       }
       return units.mapNotNull { (named, path) ->
         val (name, unit) = named
@@ -188,12 +388,13 @@ private class Compilation(
       }
     }
 
-    for (composition in listOf("facet", "hconcat", "vconcat", "concat", "repeat")) {
+    for (composition in listOf("facet", "repeat")) {
       if (spec.fields.containsKey(composition)) {
         diagnostics.fatal(
           VegaLiteDiagnostics.UNSUPPORTED_COMPOSITION,
-          "`$composition` is not implemented. A single view or a `layer` of views compiles; a " +
-            "composition of several plots does not, and would need its own layout.",
+          "`$composition` is not implemented. A single view, a `layer` of views and a " +
+            "concatenation of either compile; this composition does not, and would need its own " +
+            "layout.",
           jsonPath = "$.$composition",
         )
         return null
@@ -204,13 +405,13 @@ private class Compilation(
     // upstream does: the normalizer hands its result back to the compiler as a layer spec. One
     // that normalizes into exactly one stays a single view, and keeps its unprefixed names.
     if (composite.normalize(spec) != null || normalize.pathOverlay(spec) != null) {
-      return expand(spec, "").mapNotNull { (name, unit) ->
+      return expand(spec, namePrefix).mapNotNull { (name, unit) ->
         parser.unit(unit, "$")?.let { UnitView(it, config, name) }
       }
     }
 
     val unit = parser.unit(spec, "$") ?: return null
-    return listOf(UnitView(unit, config, ""))
+    return listOf(UnitView(unit, config, namePrefix))
   }
 
   /**
@@ -221,7 +422,7 @@ private class Compilation(
    * differences inside them is the ordinary way to author a layered chart, and a layer that did not
    * inherit them would draw its mark with no position at all.
    */
-  private fun inherited(child: VegaValue.Obj): VegaValue.Obj = obj {
+  private fun inherited(spec: VegaValue.Obj, child: VegaValue.Obj): VegaValue.Obj = obj {
     put("data", spec.fields["data"])
     put("width", spec.fields["width"])
     put("height", spec.fields["height"])
@@ -271,7 +472,8 @@ private class Compilation(
           if (view.name.isEmpty()) "child" else "child_${view.name}",
         )
         .also {
-          it.sizePrefix = "child_"
+          it.widthSignal = "child_width"
+          it.heightSignal = "child_height"
           it.facetFields = found.fields
           // The cell's marks read the partition Vega facets out for them, named `facet`; the
           // scales still read the whole table, so every cell is scaled alike.
@@ -417,21 +619,24 @@ private class Compilation(
   // Scales
   // -----------------------------------------------------------------------------------------
 
-  private fun mergeScales(views: List<UnitView>): LinkedHashMap<String, ScaleComponent> {
+  private fun mergeScales(
+    views: List<UnitView>,
+    prefix: String,
+  ): LinkedHashMap<String, ScaleComponent> {
     val scales = LinkedHashMap<String, ScaleComponent>()
     for (view in views) {
       for ((channel, def) in view.scaledChannels()) {
         val type = Scales.scaleType(channel, def, view.spec.mark)
         val existing = scales[channel]
         if (existing == null) {
-          scales[channel] = ScaleComponent(channel, type)
+          scales[channel] = ScaleComponent(channel, type, prefix)
         } else if (existing.type != type) {
           // The *more capable* type wins rather than the first-declared one. Upstream ranks them
           // (`SCALE_PRECEDENCE_INDEX`) and puts `band` above `point` above everything continuous,
           // "as they support more types of data" and band "is better for interaction" — which is
           // how a box plot, whose parts are a bar, a rule and two ticks, ends up on one band.
           if (Scales.precedence(type) > Scales.precedence(existing.type)) {
-            scales[channel] = ScaleComponent(channel, type)
+            scales[channel] = ScaleComponent(channel, type, prefix)
           }
         }
       }
@@ -569,16 +774,76 @@ private class Compilation(
     views: List<UnitView>,
     scales: Map<String, ScaleComponent>,
   ): List<VegaValue> {
-    val legends = LinkedHashMap<String, VegaValue>()
+    val legends = LinkedHashMap<String, LinkedHashMap<String, VegaValue>>()
     for (view in views) {
       for (channel in Channels.LEGEND_CHANNELS) {
         val def = view.spec.encoding[channel] ?: continue
         if (!def.isFieldDef && def.datum == null) continue
         val component = scales[channel] ?: continue
-        if (legends.containsKey(channel)) continue
-        Guides.legend(view, channel, def, component.type)?.let { legends[channel] = it }
+        val built = Guides.legend(view, channel, def, component.type) as? VegaValue.Obj ?: continue
+        val existing = legends[channel]
+        if (existing == null) legends[channel] = LinkedHashMap(built.fields)
+        else merge(existing, built)
       }
     }
-    return legends.values.toList()
+    return legends.values.map { fields ->
+      settle(fields)
+      obj { fields.forEach { (key, value) -> put(key, value) } }
+    }
   }
+
+  /**
+   * "Remove properties that the legend is encoding" — `assembleLegend` in `legend/assemble.ts`.
+   *
+   * A swatch painted by a scale must not also be painted by a value: a point's legend carries
+   * `fill: transparent` because a hollow point is hollow, but the moment a bar merges into the same
+   * legend and brings a scaled `fill` with it, that transparent fill would blank every swatch. This
+   * runs after the merge, because it is the *merged* legend's own channels that decide it.
+   */
+  private fun settle(fields: LinkedHashMap<String, VegaValue>) {
+    val symbols = fields["encode"]?.get("symbols")?.get("update") as? VegaValue.Obj ?: return
+    val remaining =
+      symbols.fields.filterKeys { it !in Channels.LEGEND_SCALE_CHANNELS || !fields.containsKey(it) }
+    if (remaining.size == symbols.fields.size) return
+    fields["encode"] = obj {
+      put(
+        "symbols",
+        obj { put("update", obj { remaining.forEach { (key, value) -> put(key, value) } }) },
+      )
+    }
+  }
+
+  /**
+   * One legend where several views encode the same channel — `mergeLegendComponent`.
+   *
+   * A bar and a point coloured by the same column get **one** key between them, and it has to say
+   * both things: the bar fills its swatch and the point strokes one, so the merged legend carries
+   * `fill` and `stroke` alike. Where the two disagree the first view's answer stands, with two
+   * exceptions upstream names — a circle wins over any other glyph, being the plainer symbol, and
+   * two different titles are joined rather than one being dropped.
+   */
+  private fun merge(into: LinkedHashMap<String, VegaValue>, from: VegaValue.Obj) {
+    for ((key, value) in from.fields) {
+      val existing = into[key]
+      if (existing == null) {
+        into[key] = value
+        continue
+      }
+      if (existing == value) continue
+      when (key) {
+        "symbolType" -> if ((value as? VegaValue.Str)?.value == "circle") into[key] = value
+        "title" -> {
+          val titles = (existing.strings() + value.strings()).distinct()
+          into[key] = if (titles.size == 1) existing else str(titles.joinToString(", "))
+        }
+      }
+    }
+  }
+
+  private fun VegaValue.strings(): List<String> =
+    when (this) {
+      is VegaValue.Str -> listOf(value)
+      is VegaValue.Arr -> values.mapNotNull { (it as? VegaValue.Str)?.value }
+      else -> emptyList()
+    }
 }
