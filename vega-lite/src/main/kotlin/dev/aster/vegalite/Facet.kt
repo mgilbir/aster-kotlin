@@ -15,6 +15,34 @@ internal class Facet(val channel: String, val def: ChannelDef) {
 
   val field: String = Fields.vgField(def)
 
+  /**
+   * Which way the cells run — `facetSortOrder` in `compile/facet.ts`.
+   *
+   * A facet channel's `sort` orders the *cells*, not anything inside one, so it lands on the group
+   * mark that makes them and on the header bands beside it. `"descending"` is the whole of what a
+   * bare string can say; a sort **object** orders the cells by an aggregate of another column and a
+   * sort **array** by a written-out list, and both need a key computed onto the rows before the
+   * cells are made, which is data-flow work this compiler has not done — so they are reported
+   * rather than quietly ignored, which would leave the cells in the wrong order and say nothing.
+   */
+  val order: String =
+    if ((def.sort as? VegaValue.Str)?.value == "descending") "descending" else "ascending"
+
+  fun reportUnsupportedSort(diagnostics: dev.aster.vega.model.DiagnosticCollector) {
+    val sort = def.sort ?: return
+    if (sort is VegaValue.Str || sort == VegaValue.Null) return
+    diagnostics.error(
+      VegaLiteDiagnostics.UNSUPPORTED_ENCODING_PROPERTY,
+      "A `sort` on the `$channel` facet that names " +
+        (if (sort is VegaValue.Arr) "a list of values" else "an aggregate of another field") +
+        " is not implemented: the key it orders by has to be computed onto the rows before the " +
+        "cells are made. The cells run in the order of `$field` instead. A bare " +
+        "`\"ascending\"` or `\"descending\"` is honoured, and a column already in the order " +
+        "you want can be faceted on directly.",
+      jsonPath = "$.encoding.$channel.sort",
+    )
+  }
+
   /** `column_domain` — the facet's distinct values, which the layout counts and headers title. */
   val domainData: String = "${channel}_domain"
 
@@ -188,7 +216,7 @@ internal class FacetGrid(val row: Facet?, val column: Facet?) : FacetLayout {
           "sort",
           obj {
             put("field", "datum[${quoted(facet.field)}]")
-            put("order", "ascending")
+            put("order", facet.order)
           },
         )
         if (captioned) {
@@ -315,7 +343,7 @@ internal class FacetGrid(val row: Facet?, val column: Facet?) : FacetLayout {
       "sort",
       obj {
         put("field", strings(fields.map { "datum[${quoted(it)}]" }))
-        put("order", strings(fields.map { "ascending" }))
+        put("order", strings(listOfNotNull(row, column).map { it.order }))
       },
     )
     put(

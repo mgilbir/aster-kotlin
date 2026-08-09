@@ -454,7 +454,7 @@ produces a chart that is plausible and wrong.
 every fixture with upstream and checks two things:
 
 1. `VegaLiteFixtureTest` compares the Vega this compiler emits against upstream's, property by
-   property. Sixty-two fixtures, and all of them match exactly — every transform, scale, signal,
+   property. Sixty-three fixtures, and all of them match exactly — every transform, scale, signal,
    axis, legend and mark encoding, down to the accessibility description string.
 2. `VegaLiteFixtureDifferentialTest` runs that output through this engine's own runtime and compares
    the scene against the one upstream draws. Every mark of every fixture matches, and nothing is
@@ -539,7 +539,7 @@ own) and `grouped-bar` on the step arithmetic.
 
 ### Where the compiler stands, and what it still refuses
 
-Sixty-two fixtures, each matching upstream's compiler property for property and drawing the chart
+Sixty-three fixtures, each matching upstream's compiler property for property and drawing the chart
 upstream draws. The grammar covered: a single view, a layer of them, a concatenation of either, a
 repetition of any of those, both facet operators, eleven marks including `arc`,
 the Cartesian and polar position pairs, nested offsets, fourteen of fifteen transforms, sorting,
@@ -614,6 +614,26 @@ Three fixtures passing untouched is worth stating plainly rather than quietly: i
 port of the layer beneath is supposed to buy, and the one defect it did find was a rewrite compiled
 and then thrown away — the normalized specification has to *replace* the one being compiled, not
 stand beside it.
+
+### A trellis whose cells run backwards, and the two ways it was wrong
+
+A facet channel's `sort` orders the *cells*, not anything inside one, so it lands on the group mark
+that makes them and on the header bands beside it. Ours wrote `ascending` there unconditionally.
+A bare `"descending"` is now honoured; a sort **object** or a sort **array** on a facet channel
+needs a key computed onto the rows before the cells are made, which is data-flow work this compiler
+has not done, and both are now reported by name rather than quietly ignored — which had left the
+cells in the wrong order and said nothing.
+
+The fixture then found two more, both in the runtime and both about the cells this compiler had been
+emitting correctly all along:
+
+- **`aggregate: {cross: true}` was ignored**, so a trellis crossed by two fields lost the cells no
+  row carried and went ragged: the cells after a gap slide into it and every header beside them
+  names the wrong one. Vega crosses only where there is more than one dimension, and it *adds* the
+  missing cells after the ones the rows made rather than rebuilding the order.
+- **An empty cell drew its gridlines.** Vega instantiates a faceted group's subflow only for keys
+  that rows arrived under, so a cell `cross` invented to keep the grid rectangular is a group with
+  no contents at all — visibly different from an empty plotting area with axes ruled across it.
 
 ### More than one table, which had been silently one
 
@@ -1017,7 +1037,7 @@ the whole time.
 
 ## Verification
 
-- 2,077 JVM tests pass and none is skipped (`./gradlew test`); the portable core is most of
+- 2,084 JVM tests pass and none is skipped (`./gradlew test`); the portable core is most of
   them, and `./scripts/test-core.sh` runs it without an Android SDK.
 - Android lint is clean with `warningsAsErrors` on every Android module.
 - 63 instrumented tests pass on an API 37 arm64 emulator (`./scripts/test-android.sh`): 49 in

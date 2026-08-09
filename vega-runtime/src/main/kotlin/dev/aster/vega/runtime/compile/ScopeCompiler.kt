@@ -8,6 +8,7 @@ import dev.aster.vega.expression.ExpressionCompiler
 import dev.aster.vega.model.DiagnosticCodes
 import dev.aster.vega.model.DiagnosticCollector
 import dev.aster.vega.model.VegaValue
+import dev.aster.vega.model.asString
 import dev.aster.vega.model.field
 import dev.aster.vega.model.roundHalfUp
 import dev.aster.vega.model.spec.AxisSpec
@@ -356,6 +357,14 @@ internal class ScopeCompiler(
           } else {
             nested
           }
+        // An **empty** facet cell draws nothing at all — not even its gridlines. Vega instantiates
+        // a faceted group's subflow only for keys that rows arrived under, so a cell `cross`
+        // invented to keep the grid rectangular is a group with no contents, which is visibly
+        // different from an empty plotting area with axes drawn across it.
+        if (partitions[index].boundName != null && partitions[index].rows?.isEmpty() == true) {
+          inner[index] = RectD.Empty
+          return@encodeGroup emptyList()
+        }
         val scoped =
           compile(
             spec.marks,
@@ -655,6 +664,40 @@ internal class ScopeCompiler(
    * count: 2}` for a two-row partition. Group order is first appearance in the source data, not
    * sorted order.
    */
+  /**
+   * The grouping keys, with every *combination* filled in where `aggregate.cross` asks for it.
+   *
+   * A trellis crossed by two fields is a rectangle, and a combination no row carries still has to
+   * take its place in it — or the cells after it slide into the gap and every header beside them
+   * names the wrong one. Upstream crosses only where there is more than one dimension to cross, and
+   * it **adds** the missing cells after the ones the rows made rather than rebuilding the order:
+   * each dimension's values in the order the existing groups first showed them, the last dimension
+   * varying fastest.
+   */
+  private fun crossed(
+    groups: Map<List<VegaValue>, List<VegaValue>>,
+    facet: FacetSpec,
+  ): List<Pair<List<VegaValue>, List<VegaValue>>> {
+    val ordered = groups.entries.map { it.key to it.value }
+    if (!facet.crossed || facet.groupby.size < 2) return ordered
+    fun cellKey(key: List<VegaValue>): String = key.joinToString("|") { it.asString() }
+    val values =
+      facet.groupby.indices.map { dimension ->
+        ordered.map { it.first[dimension] }.distinctBy { value -> value.asString() }
+      }
+    val present = ordered.mapTo(mutableSetOf()) { cellKey(it.first) }
+    val filled = ordered.toMutableList()
+    fun generate(prefix: List<VegaValue>) {
+      if (prefix.size == facet.groupby.size) {
+        if (present.add(cellKey(prefix))) filled += prefix to emptyList()
+        return
+      }
+      for (value in values[prefix.size]) generate(prefix + value)
+    }
+    generate(emptyList())
+    return filled
+  }
+
   private fun facetPartitions(
     spec: MarkSpec,
     facet: FacetSpec,
@@ -683,7 +726,7 @@ internal class ScopeCompiler(
       }
     }
 
-    return groupTuples(source, facet.groupby).map { (key, rows) ->
+    return crossed(groupTuples(source, facet.groupby), facet).map { (key, rows) ->
       val fields = LinkedHashMap<String, VegaValue>(facet.groupby.size + 1)
       facet.groupby.forEachIndexed { index, field -> fields[field] = key[index] }
       fields["count"] = VegaValue.Num(rows.size.toDouble())

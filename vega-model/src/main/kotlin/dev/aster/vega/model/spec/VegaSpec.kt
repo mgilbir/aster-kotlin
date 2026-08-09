@@ -1003,6 +1003,16 @@ public data class FacetSpec(
    * dependency carries the path through the tree it takes, and the cell draws that path.
    */
   val field: String? = null,
+  /**
+   * `aggregate.cross` — every *combination* of the grouping values gets a cell, empty or not.
+   *
+   * A trellis crossed by two fields is a rectangle, and a combination no row carries still has to
+   * take up its place in it, or the cells after it shift into the gap and every label beside them
+   * names the wrong one. Vega's `Aggregate` only crosses when there is more than one dimension to
+   * cross, and it *adds* the missing cells after the ones the rows made rather than rebuilding the
+   * order.
+   */
+  val crossed: Boolean = false,
 )
 
 /** One `facet.aggregate` entry: an operation, the field it reads, and the name it writes. */

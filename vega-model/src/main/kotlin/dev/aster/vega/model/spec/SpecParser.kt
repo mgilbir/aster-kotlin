@@ -1949,6 +1949,7 @@ public class SpecParser {
       groupby = groupby.orEmpty(),
       aggregate = measures,
       field = obj.fields["field"]?.asString()?.takeIf { it.isNotEmpty() },
+      crossed = (aggregate?.fields?.get("cross") as? VegaValue.Bool)?.value == true,
     )
   }
 
