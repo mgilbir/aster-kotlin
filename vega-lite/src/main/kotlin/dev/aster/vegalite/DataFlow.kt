@@ -513,7 +513,11 @@ internal class DataAssembler {
     }
   }
 
-  fun assemble(root: SourceNode): List<VegaValue> {
+  /**
+   * @param joined the datasets a `lookup` brings in, which stand beside the view's own source
+   *   rather than below it — a join reads a second table, it does not derive from the first.
+   */
+  fun assemble(root: SourceNode, joined: List<VegaValue> = emptyList()): List<VegaValue> {
     val data = root.data
     val name = "source_${sourceIndex++}"
     val dataset =
@@ -523,8 +527,19 @@ internal class DataAssembler {
         url = data.string("url"),
         format = sourceFormat(data),
       )
+    val extras = joined.map {
+      MutableDataset(
+        name = "source_${sourceIndex++}",
+        values = it["values"],
+        url = it.string("url"),
+        format = sourceFormat(it),
+      )
+    }
     walk(root, dataset)
-    return datasets.map { it.build() }
+    // Immediately after the view's own source, which is where they were named.
+    val out = datasets.toMutableList()
+    out.addAll(if (out.isEmpty()) 0 else 1, extras)
+    return out.map { it.build() }
   }
 
   private fun sourceFormat(data: VegaValue): VegaValue.Obj? {

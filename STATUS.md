@@ -454,7 +454,7 @@ produces a chart that is plausible and wrong.
 every fixture with upstream and checks two things:
 
 1. `VegaLiteFixtureTest` compares the Vega this compiler emits against upstream's, property by
-   property. Fifty-two fixtures, and all of them match exactly — every transform, scale, signal,
+   property. Fifty-three fixtures, and all of them match exactly — every transform, scale, signal,
    axis, legend and mark encoding, down to the accessibility description string.
 2. `VegaLiteFixtureDifferentialTest` runs that output through this engine's own runtime and compares
    the scene against the one upstream draws. Every mark of every fixture matches, and nothing is
@@ -539,7 +539,7 @@ own) and `grouped-bar` on the step arithmetic.
 
 ### Where the compiler stands, and what it still refuses
 
-Fifty-two fixtures, each matching upstream's compiler property for property and drawing the chart
+Fifty-three fixtures, each matching upstream's compiler property for property and drawing the chart
 upstream draws. The grammar covered: a single view or a layer of them, eleven marks including `arc`,
 the Cartesian and polar position pairs, nested offsets, fourteen of fifteen transforms, sorting,
 binning, time units, stacking, faceting by `row` and `column`, conditional encodings, a line or an
@@ -553,7 +553,6 @@ What it still refuses, by name, with the reason each is refused rather than appr
 - **`params`.** Selections and bound inputs. A conditional encoding whose condition is a **`test`**
   now compiles — that is a predicate on the row and needs nothing to be selected — so only a
   condition naming a `param` is refused, by itself, leaving the rest of the definition standing.
-- **`lookup`**, whose joined dataset has to be assembled and named beside the view's own.
 - Geographic projections and the `geoshape` mark, which are out of scope for the first release for
   the same reason they are in Vega.
 
@@ -869,6 +868,24 @@ Four things had to exist for that:
   is white *unless* its box has no height, and the white has to come from somewhere for the rule to
   have anything to fall through to.
 
+### Joining a second table, and the row that finds no match
+
+`lookup` was the last refused transform, and the reason it was refused — the joined dataset has to
+be assembled and *named* beside the view's own — turned out to be the whole of the work: a join
+reads a second table, it does not derive from the first, so its data stands beside the source rather
+than below it and is numbered in the same sequence. The one thing to get right in the translation is
+that both grammars say `fields` and mean different things: Vega's `fields` are the rows' own columns
+to match on and its `values` are what to bring across, where Vega-Lite's `lookup` is the first and
+`from.fields` the second.
+
+The fixture then found a runtime defect of a kind worth naming, because it is the failure mode this
+project exists to catch. **A row that matched nothing disappeared from the axis while still being
+drawn.** A discrete domain was collected with the missing values filtered out, so a column whose
+join found no match had no band to stand in — and its bar was drawn anyway, at the origin, on top of
+whatever was there. Vega counts a null as a value: it gets a band of its own, at the front of the
+domain, labelled `null`. A chart that says a category has no name is honest; one that quietly draws
+it on top of another is not.
+
 ### One difference is still open
 
 Every mark matches exactly and the surface around them is still between half a unit and a unit small
@@ -900,7 +917,7 @@ the whole time.
 
 ## Verification
 
-- 2,007 JVM tests pass and none is skipped (`./gradlew test`); the portable core is most of
+- 2,014 JVM tests pass and none is skipped (`./gradlew test`); the portable core is most of
   them, and `./scripts/test-core.sh` runs it without an Android SDK.
 - Android lint is clean with `warningsAsErrors` on every Android module.
 - 63 instrumented tests pass on an API 37 arm64 emulator (`./scripts/test-android.sh`): 49 in

@@ -14,6 +14,8 @@ import dev.aster.vega.model.VegaValue
 internal class DataPipeline(
   private val view: UnitView,
   private val diagnostics: DiagnosticCollector,
+  /** Registers a `lookup`'s second dataset and answers with the name it was given. */
+  private val registerLookup: ((VegaValue) -> String)? = null,
 ) {
 
   /** The two named points a view exposes: the table before aggregation, and the one marks read. */
@@ -342,7 +344,8 @@ internal class DataPipeline(
    */
   private fun userTransforms(head: DataNode): DataNode {
     var last = head
-    for (transform in Transforms(diagnostics).translate(view.spec.transforms, "$.transform")) {
+    for (transform in
+      Transforms(diagnostics, registerLookup).translate(view.spec.transforms, "$.transform")) {
       last = last.then(PassThroughNode(listOf(transform)))
     }
     return last

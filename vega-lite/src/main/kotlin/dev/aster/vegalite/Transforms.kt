@@ -19,7 +19,18 @@ import dev.aster.vega.model.canonicalNumberString
  *
  * Anything not implemented is reported by name, with what a specification can do instead.
  */
-internal class Transforms(private val diagnostics: DiagnosticCollector) {
+internal class Transforms(
+  private val diagnostics: DiagnosticCollector,
+  /**
+   * Where a `lookup`'s second dataset goes, answering with the name it was given.
+   *
+   * A join is the one transform that needs something *outside* the flow it is in: a whole other
+   * dataset, declared beside this view's. The compilation owns the naming, so it hands in the way
+   * to register one; without it — as when this class is used only to compile a predicate — a
+   * `lookup` is reported instead.
+   */
+  private val registerLookup: ((VegaValue) -> String)? = null,
+) {
 
   fun translate(transforms: List<VegaValue>, path: String): List<VegaValue> {
     val out = mutableListOf<VegaValue>()
@@ -218,14 +229,52 @@ internal class Transforms(private val diagnostics: DiagnosticCollector) {
    * than a translation.
    */
   private fun lookup(transform: VegaValue, path: String): List<VegaValue> {
-    diagnostics.error(
-      VegaLiteDiagnostics.UNSUPPORTED_TRANSFORM,
-      "`lookup` is not implemented: the dataset it joins has to be assembled and named beside " +
-        "this view's, which is more than a translation. Join the data before it reaches the " +
-        "specification, or state both datasets in Vega.",
-      jsonPath = path,
+    val register = registerLookup
+    val from = transform.obj("from")
+    val data = from?.get("data")
+    if (register == null || from == null || data == null) {
+      diagnostics.error(
+        VegaLiteDiagnostics.UNSUPPORTED_TRANSFORM,
+        "A `lookup` needs a `from.data` naming the dataset to join, assembled and named beside " +
+          "this view's own.",
+        jsonPath = path,
+      )
+      return emptyList()
+    }
+    val key = from.string("key")
+    val values = from.array("fields")
+    if (key == null || values == null) {
+      diagnostics.error(
+        VegaLiteDiagnostics.UNSUPPORTED_TRANSFORM,
+        "A `lookup` needs `from.key` — the column to match on — and `from.fields` — the columns " +
+          "to bring across. A selection lookup, which has neither, is not implemented.",
+        jsonPath = path,
+      )
+      return emptyList()
+    }
+    val local = transform.string("lookup")
+    if (local == null) {
+      diagnostics.error(
+        VegaLiteDiagnostics.UNSUPPORTED_TRANSFORM,
+        "A `lookup` names the *local* column to match with; this one names none.",
+        jsonPath = path,
+      )
+      return emptyList()
+    }
+    // The two `fields` are different fields, which is the one thing to get right here: Vega's
+    // `fields` are the rows' own columns to match on and its `values` are what to bring across,
+    // while Vega-Lite's `lookup` is the first and `from.fields` the second.
+    return listOf(
+      obj {
+        put("type", "lookup")
+        put("from", register(data))
+        put("key", key)
+        put("fields", strings(listOf(local)))
+        put("values", strings(values.mapNotNull { (it as? VegaValue.Str)?.value }))
+        transform["as"]?.let { put("as", it) }
+        transform["default"]?.let { put("default", it) }
+      }
     )
-    return emptyList()
   }
 
   /**

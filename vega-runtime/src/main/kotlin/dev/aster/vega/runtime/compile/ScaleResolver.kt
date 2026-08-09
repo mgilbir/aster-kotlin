@@ -914,10 +914,12 @@ public class ScaleResolver(
     scaleName: String,
   ): List<VegaValue>? {
     val dataset = dataset(dataName, scaleName) ?: return null
+    // A **missing** value is a category like any other, and dropping it is what makes a row
+    // disappear from a chart that still draws its mark: a lookup that found no match leaves a
+    // column with nothing in it, and upstream gives that column a band of its own at the front of
+    // the domain rather than none at all. Vega's `distinct` counts a null as a value.
     val keys =
-      fields
-        .flatMap { path -> dataset.map { it.field(path) }.filterNot { it.isMissing } }
-        .distinctBy { it.asString() }
+      fields.flatMap { path -> dataset.map { it.field(path) } }.distinctBy { it.asString() }
     return when (sort) {
       null -> keys
       is DomainSort.ByValue -> keys.sortedWith(domainOrder(sort.descending) { it })

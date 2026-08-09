@@ -389,7 +389,15 @@ private class Compilation(
     }
 
     val source = SourceNode(data)
-    val outputs = views.map { view -> DataPipeline(view, diagnostics).build(source) }
+    // A `lookup`'s second dataset stands beside this view's source and is named in the same
+    // sequence, so the numbering is owned here rather than by the transform that asks for one.
+    val joined = mutableListOf<VegaValue>()
+    val register: (VegaValue) -> String = { table ->
+      val existing = joined.indexOf(table)
+      val at = if (existing >= 0) existing else joined.size.also { joined += table }
+      "source_${at + 1}"
+    }
+    val outputs = views.map { view -> DataPipeline(view, diagnostics, register).build(source) }
     // Every view built its own chain onto the one source, so the tree forks there; the shared parse
     // is hoisted above the fork before the tree is named and flattened.
     source.moveParseUp()
@@ -397,7 +405,7 @@ private class Compilation(
     source.mergeIdentical()
     source.mergeAggregates()
     source.mergeOutputs()
-    val datasets = DataAssembler().assemble(source)
+    val datasets = DataAssembler().assemble(source, joined)
     views.forEachIndexed { index, view ->
       view.mainData = outputs[index].main.source ?: ""
       view.rawData = outputs[index].raw?.source ?: view.mainData
