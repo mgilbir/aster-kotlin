@@ -514,32 +514,28 @@ internal class DataAssembler {
   }
 
   /**
-   * @param joined the datasets a `lookup` brings in, which stand beside the view's own source
-   *   rather than below it — a join reads a second table, it does not derive from the first.
+   * @param roots every table the chart reads, in the order that named them: a [SourceNode] where
+   *   something derives from it, and the table itself where nothing does — a `lookup`'s second
+   *   dataset stands beside a view's source rather than below it, a join reading a second table
+   *   rather than deriving from the first.
    */
-  fun assemble(root: SourceNode, joined: List<VegaValue> = emptyList()): List<VegaValue> {
-    val data = root.data
-    val name = "source_${sourceIndex++}"
-    val dataset =
-      MutableDataset(
-        name = name,
-        values = data["values"],
-        url = data.string("url"),
-        format = sourceFormat(data),
-      )
-    val extras = joined.map {
-      MutableDataset(
-        name = "source_${sourceIndex++}",
-        values = it["values"],
-        url = it.string("url"),
-        format = sourceFormat(it),
-      )
+  fun assemble(roots: List<Any>): List<VegaValue> {
+    for (root in roots) {
+      val data = if (root is SourceNode) root.data else root as VegaValue
+      val dataset =
+        MutableDataset(
+          name = "source_${sourceIndex++}",
+          values = data["values"],
+          url = data.string("url"),
+          format = sourceFormat(data),
+        )
+      if (root is SourceNode) walk(root, dataset) else datasets += dataset
     }
-    walk(root, dataset)
-    // Immediately after the view's own source, which is where they were named.
-    val out = datasets.toMutableList()
-    out.addAll(if (out.isEmpty()) 0 else 1, extras)
-    return out.map { it.build() }
+    // "Move sources without transforms to the beginning" — `assembleRootData`. A dataset that
+    // derives from nothing and does nothing is a table the chart was handed, and Vega has to have
+    // it before whatever joins against it. Stable, so the numbering still reads in order.
+    val (plain, derived) = datasets.partition { it.source == null && it.transform.isEmpty() }
+    return (plain + derived).map { it.build() }
   }
 
   private fun sourceFormat(data: VegaValue): VegaValue.Obj? {

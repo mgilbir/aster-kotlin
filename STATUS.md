@@ -454,7 +454,7 @@ produces a chart that is plausible and wrong.
 every fixture with upstream and checks two things:
 
 1. `VegaLiteFixtureTest` compares the Vega this compiler emits against upstream's, property by
-   property. Sixty fixtures, and all of them match exactly — every transform, scale, signal,
+   property. Sixty-two fixtures, and all of them match exactly — every transform, scale, signal,
    axis, legend and mark encoding, down to the accessibility description string.
 2. `VegaLiteFixtureDifferentialTest` runs that output through this engine's own runtime and compares
    the scene against the one upstream draws. Every mark of every fixture matches, and nothing is
@@ -539,7 +539,7 @@ own) and `grouped-bar` on the step arithmetic.
 
 ### Where the compiler stands, and what it still refuses
 
-Sixty fixtures, each matching upstream's compiler property for property and drawing the chart
+Sixty-two fixtures, each matching upstream's compiler property for property and drawing the chart
 upstream draws. The grammar covered: a single view, a layer of them, a concatenation of either, a
 repetition of any of those, both facet operators, eleven marks including `arc`,
 the Cartesian and polar position pairs, nested offsets, fourteen of fifteen transforms, sorting,
@@ -548,9 +548,6 @@ area that draws its own points, legends, axes, and a user `config` carried throu
 
 What it still refuses, by name, with the reason each is refused rather than approximated:
 
-- **A plot of a concatenation with its own `data`.** The plots share the chart's dataset, which is
-  what makes them one chart rather than several drawn near each other; a second source would have to
-  be assembled and numbered beside the first, as a `lookup`'s joined table is.
 - **`params`.** Selections and bound inputs. A conditional encoding whose condition is a **`test`**
   now compiles — that is a predicate on the row and needs nothing to be selected — so only a
   condition naming a `param` is refused, by itself, leaving the rest of the definition standing.
@@ -617,6 +614,23 @@ Three fixtures passing untouched is worth stating plainly rather than quietly: i
 port of the layer beneath is supposed to buy, and the one defect it did find was a rewrite compiled
 and then thrown away — the normalized specification has to *replace* the one being compiled, not
 stand beside it.
+
+### More than one table, which had been silently one
+
+A layer or a plot may name its own `data`, and this compiler had been building every view's chain
+onto the **first** view's source. A layered chart with a rule at a threshold from a second table
+drew that rule against the bars' rows: a chart that is wrong rather than one that is missing, and
+nothing reported it. It was found by asking what a construct already refused for a concatenation — a
+plot with its own dataset — did for a layer, where nothing refused it at all.
+
+The shape is upstream's. Every table the chart reads is a root, in the order it was first asked for,
+because that order *is* the numbering; a `lookup`'s joined table is a root here too, since a join
+reads a second table rather than deriving from the first. Then the last step of `assembleRootData`:
+"move sources without transforms to the beginning" — a dataset that derives from nothing and does
+nothing is a table the chart was handed, and Vega has to have it before whatever joins against it.
+That rule replaced the special case the `lookup` work had put in for exactly one joined table.
+
+With it, a concatenation's plots may each have their own dataset, and that refusal is gone.
 
 ### The facet operator: one rewrite and one layout
 
@@ -1003,7 +1017,7 @@ the whole time.
 
 ## Verification
 
-- 2,063 JVM tests pass and none is skipped (`./gradlew test`); the portable core is most of
+- 2,077 JVM tests pass and none is skipped (`./gradlew test`); the portable core is most of
   them, and `./scripts/test-core.sh` runs it without an Android SDK.
 - Android lint is clean with `warningsAsErrors` on every Android module.
 - 63 instrumented tests pass on an API 37 arm64 emulator (`./scripts/test-android.sh`): 49 in

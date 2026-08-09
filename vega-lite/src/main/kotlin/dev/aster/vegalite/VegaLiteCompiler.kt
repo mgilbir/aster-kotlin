@@ -599,8 +599,7 @@ private class Compilation(
   // -----------------------------------------------------------------------------------------
 
   private fun assembleData(views: List<UnitView>): List<VegaValue> {
-    val data = views.first().spec.data
-    if (data == null) {
+    if (views.any { it.spec.data == null }) {
       diagnostics.error(
         VegaLiteDiagnostics.UNSUPPORTED_TOP_LEVEL_PROPERTY,
         "The specification names no `data`, so there is nothing to draw.",
@@ -609,24 +608,32 @@ private class Compilation(
       return emptyList()
     }
 
-    val source = SourceNode(data)
-    // A `lookup`'s second dataset stands beside this view's source and is named in the same
-    // sequence, so the numbering is owned here rather than by the transform that asks for one.
-    val joined = mutableListOf<VegaValue>()
+    // Every table the chart reads, in the order it was first asked for, because that order *is*
+    // the numbering: `source_0`, `source_1`. A layer or a plot with its own `data` gets a root of
+    // its own — without which its marks are drawn against the first view's rows, which is a wrong
+    // chart rather than a missing one — and a `lookup`'s joined table is a root here too, since a
+    // join reads a second table rather than deriving from the first.
+    val order = mutableListOf<VegaValue>()
+    val roots = LinkedHashMap<VegaValue, SourceNode>()
     val register: (VegaValue) -> String = { table ->
-      val existing = joined.indexOf(table)
-      val at = if (existing >= 0) existing else joined.size.also { joined += table }
-      "source_${at + 1}"
+      val existing = order.indexOf(table)
+      "source_${if (existing >= 0) existing else order.size.also { order += table }}"
     }
-    val outputs = views.map { view -> DataPipeline(view, diagnostics, register).build(source) }
-    // Every view built its own chain onto the one source, so the tree forks there; the shared parse
-    // is hoisted above the fork before the tree is named and flattened.
-    source.moveParseUp()
-    source.mergeParse()
-    source.mergeIdentical()
-    source.mergeAggregates()
-    source.mergeOutputs()
-    val datasets = DataAssembler().assemble(source, joined)
+    val outputs = views.map { view ->
+      val data = view.spec.data!!
+      if (data !in order) order += data
+      DataPipeline(view, diagnostics, register).build(roots.getOrPut(data) { SourceNode(data) })
+    }
+    // Every view built its own chain onto its source, so a shared tree forks there; the shared
+    // parse is hoisted above the fork before the tree is named and flattened.
+    for (root in roots.values) {
+      root.moveParseUp()
+      root.mergeParse()
+      root.mergeIdentical()
+      root.mergeAggregates()
+      root.mergeOutputs()
+    }
+    val datasets = DataAssembler().assemble(order.map { roots[it] ?: it })
     views.forEachIndexed { index, view ->
       view.mainData = outputs[index].main.source ?: ""
       view.rawData = outputs[index].raw?.source ?: view.mainData

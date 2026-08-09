@@ -77,15 +77,6 @@ private constructor(
             return null
           }
         }
-        if (child.has("data")) {
-          diagnostics.fatal(
-            VegaLiteDiagnostics.UNSUPPORTED_COMPOSITION,
-            "A plot of a `$kind` with its own `data` is not implemented; the plots share the " +
-              "chart's dataset, which is what makes them one chart rather than several.",
-            jsonPath = "$.$kind[$index].data",
-          )
-          return null
-        }
         children +=
           child.string("name") to
             obj {
