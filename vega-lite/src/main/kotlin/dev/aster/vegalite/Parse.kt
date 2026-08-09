@@ -110,11 +110,16 @@ internal class Parse(private val config: Config, private val diagnostics: Diagno
         )
         continue
       }
-      // A multi-definition channel may hold an array. The first entry is what the rest of the
-      // compiler reads; the others still reach the data pipeline through the detail fields.
-      val single = (value as? VegaValue.Arr)?.values?.firstOrNull() ?: value
-      val def = channelDef(channel, single, "$path.$channel") ?: continue
-      result[channel] = def
+      // A multi-definition channel may hold an array. The first entry is the definition proper,
+      // because everything that reads a channel reads one; the others are kept beside it, and
+      // losing them loses every field but the first from a tooltip.
+      val entries = (value as? VegaValue.Arr)?.values ?: listOf(value)
+      val parsed = entries.mapIndexedNotNull { index, entry ->
+        val at = if (value is VegaValue.Arr) "$path.$channel[$index]" else "$path.$channel"
+        channelDef(channel, entry, at)
+      }
+      val def = parsed.firstOrNull() ?: continue
+      result[channel] = def.copy(siblings = parsed.drop(1))
     }
     // A secondary channel takes its type from the channel it bounds. `{"x2": {"field": "end"}}` is
     // how every ranged mark is written, and reading it as an untyped — therefore nominal — field

@@ -454,7 +454,7 @@ produces a chart that is plausible and wrong.
 every fixture with upstream and checks two things:
 
 1. `VegaLiteFixtureTest` compares the Vega this compiler emits against upstream's, property by
-   property. Forty-seven fixtures, and all of them match exactly — every transform, scale, signal,
+   property. Forty-eight fixtures, and all of them match exactly — every transform, scale, signal,
    axis, legend and mark encoding, down to the accessibility description string.
 2. `VegaLiteFixtureDifferentialTest` runs that output through this engine's own runtime and compares
    the scene against the one upstream draws. Every mark of every fixture matches, and nothing is
@@ -539,7 +539,7 @@ own) and `grouped-bar` on the step arithmetic.
 
 ### Where the compiler stands, and what it still refuses
 
-Forty-seven fixtures, each matching upstream's compiler property for property and drawing the chart
+Forty-eight fixtures, each matching upstream's compiler property for property and drawing the chart
 upstream draws. The grammar covered: a single view or a layer of them, eleven marks including `arc`,
 the Cartesian and polar position pairs, nested offsets, fourteen of fifteen transforms, sorting,
 binning, time units, stacking, faceting by `row` and `column`, conditional encodings, a line or an
@@ -794,6 +794,33 @@ it recognised. A fourth came out of the same reading — upstream's canonical-sc
 legend is `size, shape, fill, stroke, strokeWidth, strokeDash, opacity`, and this engine's began
 with `fill`, so a legend encoding both `fill` and `size` was titled from the wrong one.
 
+### What a mark says when you rest on it
+
+`tooltips`, written on the way to the composite marks, which need one. Three silences, and the
+first is the kind that is hardest to notice because the chart looks finished:
+
+- **An explicit `tooltip` encoding was dropped entirely.** A specification asking for three fields
+  in a tooltip got none, and nothing said so. There are three forms and they produce different
+  things: a **list** of fields becomes an object of title-to-value pairs, which reads as a small
+  table; a **single** field becomes that field's own value; and `tooltip: true` on the mark asks
+  for every encoded field. An array of values is joined with *line breaks* in a tooltip and with
+  spaces in a spoken description, which upstream does by building one and rewriting it.
+- **Only the first entry of a channel written as a list survived the parse.** `tooltip`, `detail`
+  and `order` all take one, and everything downstream read one definition — so a tooltip naming
+  three fields named one, and a series split by two details was split by one.
+- **A mark's `style` list left out its own type.** Upstream's `getStyles` is `[].concat(mark.type,
+  mark.style ?? [])`, and the order decides which block wins: a mark that names a style is styled
+  by its type *and then* by the name. Ours replaced the type with the name, so a `config.rule`
+  block stopped reaching a rule that named a style of its own. Nothing in the corpus named one —
+  the composite marks are what do, each part being `["rule", "errorbar-rule"]`.
+
+The composite marks themselves — `boxplot`, `errorbar`, `errorband` — are next, and the pieces they
+need are now all here: the normalization pass, layered views, the tooltip, and the style order. What
+remains is the rewriting proper: an `errorbar` is an aggregate of `stderr` and `mean` with two
+calculates over it and a rule from `lower` to `upper`; the extent chooses the aggregates (`stderr`
+and `stdev` extend from a centre, `ci` and `iqr` are two more aggregates), and each part is a layer
+that `config.errorbar` can switch off.
+
 ### One difference is still open
 
 Every mark matches exactly and the surface around them is still between half a unit and a unit small
@@ -825,7 +852,7 @@ the whole time.
 
 ## Verification
 
-- 1,972 JVM tests pass and none is skipped (`./gradlew test`); the portable core is most of
+- 1,979 JVM tests pass and none is skipped (`./gradlew test`); the portable core is most of
   them, and `./scripts/test-core.sh` runs it without an Android SDK.
 - Android lint is clean with `warningsAsErrors` on every Android module.
 - 63 instrumented tests pass on an API 37 arm64 emulator (`./scripts/test-android.sh`): 49 in

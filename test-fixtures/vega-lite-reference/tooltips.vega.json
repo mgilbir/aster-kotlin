@@ -1,0 +1,253 @@
+{
+  "$schema": "https://vega.github.io/schema/vega/v6.json",
+  "description": "Three ways of asking for a tooltip: a list, a single field, and everything.",
+  "background": "white",
+  "padding": 5,
+  "height": 300,
+  "style": "cell",
+  "data": [
+    {
+      "name": "source_0",
+      "values": [
+        {
+          "c": "a",
+          "v": 3,
+          "n": 10
+        },
+        {
+          "c": "b",
+          "v": 7,
+          "n": 4
+        },
+        {
+          "c": "d",
+          "v": 5,
+          "n": 8
+        }
+      ]
+    },
+    {
+      "name": "data_1",
+      "source": "source_0",
+      "transform": [
+        {
+          "type": "stack",
+          "groupby": [
+            "c"
+          ],
+          "field": "v",
+          "sort": {
+            "field": [],
+            "order": []
+          },
+          "as": [
+            "v_start",
+            "v_end"
+          ],
+          "offset": "zero"
+        },
+        {
+          "type": "filter",
+          "expr": "isValid(datum[\"v\"]) && isFinite(+datum[\"v\"])"
+        }
+      ]
+    },
+    {
+      "name": "data_2",
+      "source": "source_0",
+      "transform": [
+        {
+          "type": "filter",
+          "expr": "isValid(datum[\"n\"]) && isFinite(+datum[\"n\"])"
+        }
+      ]
+    }
+  ],
+  "signals": [
+    {
+      "name": "x_step",
+      "value": 20
+    },
+    {
+      "name": "width",
+      "update": "bandspace(domain('x').length, 0.1, 0.05) * x_step"
+    }
+  ],
+  "marks": [
+    {
+      "name": "layer_0_marks",
+      "type": "rect",
+      "style": [
+        "bar"
+      ],
+      "from": {
+        "data": "data_1"
+      },
+      "encode": {
+        "update": {
+          "fill": {
+            "value": "#4c78a8"
+          },
+          "tooltip": {
+            "signal": "{\"c\": isValid(datum[\"c\"]) ? isArray(datum[\"c\"]) ? join(datum[\"c\"], '\\n') : datum[\"c\"] : \"\"+datum[\"c\"], \"n\": format(datum[\"n\"], \".1f\")}"
+          },
+          "ariaRoleDescription": {
+            "value": "bar"
+          },
+          "description": {
+            "signal": "\"c: \" + (isValid(datum[\"c\"]) ? isArray(datum[\"c\"]) ? join(datum[\"c\"], ' ') : datum[\"c\"] : \"\"+datum[\"c\"]) + \"; v: \" + (format(datum[\"v\"], \"\")) + \"; n: \" + (format(datum[\"n\"], \".1f\"))"
+          },
+          "x": {
+            "scale": "x",
+            "field": "c"
+          },
+          "width": {
+            "signal": "max(0.25, bandwidth('x'))"
+          },
+          "y": {
+            "scale": "y",
+            "field": "v_end"
+          },
+          "y2": {
+            "scale": "y",
+            "field": "v_start"
+          }
+        }
+      }
+    },
+    {
+      "name": "layer_1_marks",
+      "type": "symbol",
+      "style": [
+        "point"
+      ],
+      "from": {
+        "data": "data_2"
+      },
+      "encode": {
+        "update": {
+          "opacity": {
+            "value": 0.7
+          },
+          "size": {
+            "value": 40
+          },
+          "fill": {
+            "value": "#4c78a8"
+          },
+          "tooltip": {
+            "signal": "format(datum[\"n\"], \"\")"
+          },
+          "ariaRoleDescription": {
+            "value": "point"
+          },
+          "description": {
+            "signal": "\"c: \" + (isValid(datum[\"c\"]) ? isArray(datum[\"c\"]) ? join(datum[\"c\"], ' ') : datum[\"c\"] : \"\"+datum[\"c\"]) + \"; n: \" + (format(datum[\"n\"], \"\"))"
+          },
+          "x": {
+            "scale": "x",
+            "field": "c",
+            "band": 0.5
+          },
+          "y": {
+            "scale": "y",
+            "field": "n"
+          }
+        }
+      }
+    }
+  ],
+  "scales": [
+    {
+      "name": "x",
+      "type": "band",
+      "domain": {
+        "fields": [
+          {
+            "data": "data_1",
+            "field": "c"
+          },
+          {
+            "data": "data_2",
+            "field": "c"
+          }
+        ],
+        "sort": true
+      },
+      "range": {
+        "step": {
+          "signal": "x_step"
+        }
+      },
+      "paddingInner": 0.1,
+      "paddingOuter": 0.05
+    },
+    {
+      "name": "y",
+      "type": "linear",
+      "domain": {
+        "fields": [
+          {
+            "data": "data_1",
+            "field": "v_start"
+          },
+          {
+            "data": "data_1",
+            "field": "v_end"
+          },
+          {
+            "data": "data_2",
+            "field": "n"
+          }
+        ]
+      },
+      "range": [
+        {
+          "signal": "height"
+        },
+        0
+      ],
+      "nice": true,
+      "zero": true
+    }
+  ],
+  "axes": [
+    {
+      "scale": "y",
+      "orient": "left",
+      "gridScale": "x",
+      "grid": true,
+      "tickCount": {
+        "signal": "ceil(height/40)"
+      },
+      "domain": false,
+      "labels": false,
+      "aria": false,
+      "maxExtent": 0,
+      "minExtent": 0,
+      "ticks": false,
+      "zindex": 0
+    },
+    {
+      "scale": "x",
+      "orient": "bottom",
+      "grid": false,
+      "title": "c",
+      "labelAlign": "right",
+      "labelAngle": 270,
+      "labelBaseline": "middle",
+      "zindex": 0
+    },
+    {
+      "scale": "y",
+      "orient": "left",
+      "grid": false,
+      "title": "v, n",
+      "labelOverlap": true,
+      "tickCount": {
+        "signal": "ceil(height/40)"
+      },
+      "zindex": 0
+    }
+  ]
+}

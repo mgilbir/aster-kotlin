@@ -148,13 +148,23 @@ internal object Marks {
     }
   }
 
+  /**
+   * The `style` list a mark carries, which is its **type first** and then whatever it named.
+   *
+   * `getStyles` upstream is `[].concat(mark.type, mark.style ?? [])`, and the order is what decides
+   * which block wins: a later style overrides an earlier one, so a mark that names a style is
+   * styled by its own type *and then* by the name — not by the name alone. A composite mark's parts
+   * are the case that shows it, each being `["rule", "errorbar-rule"]`.
+   */
   private fun styles(view: UnitView): List<String> {
     val declared = view.markDef.raw.fields["style"]
-    return when (declared) {
-      is VegaValue.Str -> listOf(declared.value)
-      is VegaValue.Arr -> declared.values.mapNotNull { (it as? VegaValue.Str)?.value }
-      else -> listOf(view.spec.mark)
-    }
+    val named =
+      when (declared) {
+        is VegaValue.Str -> listOf(declared.value)
+        is VegaValue.Arr -> declared.values.mapNotNull { (it as? VegaValue.Str)?.value }
+        else -> emptyList()
+      }
+    return listOf(view.spec.mark) + named
   }
 
   private fun sortOrder(view: UnitView): VegaValue? {
@@ -262,6 +272,7 @@ internal object Marks {
     putAll(nonPosition(view, "strokeOpacity", "strokeOpacity"))
     putAll(nonPosition(view, "strokeWidth", "strokeWidth"))
     putAll(nonPosition(view, "strokeDash", "strokeDash"))
+    tooltipChannel(view)?.let { put("tooltip", it) }
     putAll(aria(view))
   }
 
@@ -443,6 +454,57 @@ internal object Marks {
     if (description != null) put("description", signalRef(description))
   }
 
+  /**
+   * `tooltip` — what is shown when the pointer rests on a mark.
+   *
+   * Three forms, and they produce different things. A **list** of fields becomes an object of
+   * title-to-value pairs, which is what a reader sees as a small table. A **single** field becomes
+   * that field's own value, formatted the way its guide would format it — except that a discrete
+   * one joins an array with *line breaks* rather than spaces, this being a tooltip and not a
+   * sentence. And `tooltip: true` on the mark asks for every encoded field, which is the same
+   * object the first form builds by hand.
+   */
+  private fun tooltipChannel(view: UnitView): VegaValue? {
+    val def = view.spec.encoding["tooltip"]
+    if (def != null && view.spec.encoding["tooltip"]?.raw?.fields?.isEmpty() != true) {
+      if (def.isValueDef) return obj { put("value", def.value) }
+      val defs = listOf(def) + def.siblings
+      if (defs.size > 1) return tooltipObject(view, defs)
+      if (def.isFieldDef) return signalRef(fieldExpression(view, def, separator = "\\n"))
+      return null
+    }
+    // `{"type": "bar", "tooltip": true}` asks for the whole encoding.
+    val asked = view.markDef.raw.fields["tooltip"] ?: return null
+    if (asked == VegaValue.Bool(true)) return tooltipObject(view, null)
+    if (asked is VegaValue.Obj && asked.string("content") == "encoding") {
+      return tooltipObject(view, null)
+    }
+    if (asked is VegaValue.Obj && asked.string("content") == "data") return signalRef("datum")
+    if (asked is VegaValue.Str) return obj { put("value", asked.value) }
+    return null
+  }
+
+  /** `{"title": expression, …}` — the object a tooltip of several fields is. */
+  private fun tooltipObject(view: UnitView, defs: List<ChannelDef>?): VegaValue? {
+    val pairs =
+      if (defs == null) {
+        tooltipData(view, separator = "\\n")
+      } else {
+        val out = LinkedHashMap<String, String>()
+        for (def in defs) {
+          if (!def.isFieldDef) continue
+          val title =
+            def.explicitTitle ?: Fields.defaultTitle(def, view.config)?.let(VegaValue::Str)
+          val key = (title as? VegaValue.Str)?.value ?: continue
+          if (out.containsKey(key)) continue
+          out[key] = fieldExpression(view, def, separator = "\\n")
+        }
+        out
+      }
+    if (pairs.isEmpty()) return null
+    return signalRef(pairs.entries.joinToString(", ", "{", "}") { "\"${it.key}\": ${it.value}" })
+  }
+
   private fun descriptionSignal(view: UnitView): String? {
     val parts = tooltipData(view)
     if (parts.isEmpty()) return null
@@ -455,7 +517,7 @@ internal object Marks {
   }
 
   /** Title-to-expression pairs for every encoded field, in specification order. */
-  private fun tooltipData(view: UnitView): Map<String, String> {
+  private fun tooltipData(view: UnitView, separator: String = " "): Map<String, String> {
     val out = LinkedHashMap<String, String>()
     val skipped =
       view.spec.encoding.entries
@@ -464,47 +526,52 @@ internal object Marks {
         }
         .filter { view.spec.encoding[it]?.isFieldDef == true }
         .toSet()
-    for ((channel, def) in view.spec.encoding) {
-      if (!def.isFieldDef) continue
-      if (channel == "tooltip" || channel == "description") continue
-      // A pre-binned column is announced as the *span* it covers, and the channel naming the far
-      // edge is then not announced separately — upstream's `toSkip`. Without it a bar over a bin
-      // reads "lo: 0; n: 4; hi: 10", which names three things where there are two.
-      if (channel in skipped) continue
-      // The *field's* own title, not its guide's: upstream reads `fieldDef.title ||
-      // defaultTitle(fieldDef)` here, so hiding an axis title with `axis: {title: null}` restyles
-      // the chart and leaves what a screen reader says about it alone. Reading the guide's title
-      // dropped the channel from the description entirely.
-      val title = def.explicitTitle ?: Fields.defaultTitle(def, view.config)?.let(VegaValue::Str)
-      val key = (title as? VegaValue.Str)?.value ?: continue
-      if (out.containsKey(key)) continue
-      // A **normalized** stack is announced as the share it takes, not the number behind it: the
-      // position channel carrying the stack reads `end - start`, which is the fraction, and takes
-      // `config.normalizedNumberFormat` — a percentage. Reading the raw field there says 3 where
-      // the bar plainly shows three quarters.
-      val stack = view.stack
-      val normalized =
-        stack != null &&
-          stack.offset == "normalize" &&
-          channel == stack.fieldChannel &&
-          channel in NORMALIZABLE_CHANNELS
-      out[key] =
-        fieldExpression(
-          view,
-          def,
-          normalized,
-          binEnd =
-            when (def.bin) {
-              is Binning.Bin -> Fields.datumAccess(def, suffix = "end")
-              // A pre-binned column's far edge is the secondary channel's own field.
-              Binning.PreBinned ->
-                secondaryChannel(channel)
-                  ?.let { view.spec.encoding[it] }
-                  ?.takeIf { it.isFieldDef }
-                  ?.let { Fields.datumAccess(it) }
-              else -> null
-            },
-        )
+    for ((channel, first) in view.spec.encoding) {
+      if (channel == "description") continue
+      // Every entry of a channel written as a list, not only the first: a tooltip naming three
+      // fields describes three, and the mark's spoken description names the same three.
+      for (def in listOf(first) + first.siblings) {
+        if (!def.isFieldDef) continue
+        // A pre-binned column is announced as the *span* it covers, and the channel naming the far
+        // edge is then not announced separately — upstream's `toSkip`. Without it a bar over a bin
+        // reads "lo: 0; n: 4; hi: 10", which names three things where there are two.
+        if (channel in skipped) continue
+        // The *field's* own title, not its guide's: upstream reads `fieldDef.title ||
+        // defaultTitle(fieldDef)` here, so hiding an axis title with `axis: {title: null}` restyles
+        // the chart and leaves what a screen reader says about it alone. Reading the guide's title
+        // dropped the channel from the description entirely.
+        val title = def.explicitTitle ?: Fields.defaultTitle(def, view.config)?.let(VegaValue::Str)
+        val key = (title as? VegaValue.Str)?.value ?: continue
+        if (out.containsKey(key)) continue
+        // A **normalized** stack is announced as the share it takes, not the number behind it: the
+        // position channel carrying the stack reads `end - start`, which is the fraction, and takes
+        // `config.normalizedNumberFormat` — a percentage. Reading the raw field there says 3 where
+        // the bar plainly shows three quarters.
+        val stack = view.stack
+        val normalized =
+          stack != null &&
+            stack.offset == "normalize" &&
+            channel == stack.fieldChannel &&
+            channel in NORMALIZABLE_CHANNELS
+        out[key] =
+          fieldExpression(
+            view,
+            def,
+            normalized,
+            binEnd =
+              when (def.bin) {
+                is Binning.Bin -> Fields.datumAccess(def, suffix = "end")
+                // A pre-binned column's far edge is the secondary channel's own field.
+                Binning.PreBinned ->
+                  secondaryChannel(channel)
+                    ?.let { view.spec.encoding[it] }
+                    ?.takeIf { it.isFieldDef }
+                    ?.let { Fields.datumAccess(it) }
+                else -> null
+              },
+            separator = separator,
+          )
+      }
     }
     return out
   }
@@ -526,6 +593,14 @@ internal object Marks {
     normalizeStack: Boolean = false,
     /** Where the far edge of a bin is read from, when this definition is a binned one. */
     binEnd: String? = null,
+    /**
+     * What an array of values is joined with.
+     *
+     * A **tooltip** joins with line breaks, being a small table; a spoken description joins with
+     * spaces, being a sentence. Upstream builds one and rewrites it into the other, which comes to
+     * the same thing said once.
+     */
+    separator: String = " ",
   ): String {
     val stated = (def.format as? VegaValue.Str)?.value
     val accessor =
@@ -558,7 +633,8 @@ internal object Marks {
       }
       def.type == MeasureType.QUANTITATIVE || stated != null -> "format($accessor, \"$number\")"
       else ->
-        "isValid($accessor) ? isArray($accessor) ? join($accessor, ' ') : $accessor : \"\"+$accessor"
+        "isValid($accessor) ? isArray($accessor) ? join($accessor, '$separator') : $accessor : " +
+          "\"\"+$accessor"
     }
   }
 

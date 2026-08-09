@@ -65,6 +65,14 @@ internal data class ChannelDef(
   val conditions: List<ChannelDef> = emptyList(),
   /** The expression this definition is gated on, when it is one of a channel's [conditions]. */
   val test: String? = null,
+  /**
+   * The rest of a channel written as a *list* — `tooltip`, `detail` and `order` take one.
+   *
+   * The first entry is the definition proper, because everything that reads a channel reads one
+   * definition; these are the others, and dropping them loses every field but the first from a
+   * tooltip and every grouping but the first from a series.
+   */
+  val siblings: List<ChannelDef> = emptyList(),
 ) {
   val isFieldDef: Boolean = field != null || aggregate == "count"
 
