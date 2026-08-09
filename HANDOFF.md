@@ -9,7 +9,7 @@ Branch `milestone-0-bootstrap`. Working tree clean, both gates green:
 - `./scripts/check.sh` — format, all tests, lint, demo APK
 - `./scripts/oracle.sh` — regenerates upstream references and runs the differential comparison
 
-**106 differential fixtures pass, all matching upstream exactly.** That is the only number here
+**111 differential fixtures pass, all matching upstream exactly.** That is the only number here
 that means what it says.
 
 ## Read this before trusting the other number
@@ -195,21 +195,14 @@ those before comparing, they paint nothing.
 its datasets are fetched into `test-fixtures/data/` and committed. Discount every loader diagnostic
 when judging how far an example is from passing.
 
-**Where the corpus stands, from `ExampleTriage` rather than from memory: 75 of the 93 compile clean,
-18 report errors.** Read the *movement* rather than the number: it went 70 → 79 as the stochastic and
-crossfilter work landed, and then **79 → 75 when mark-level `transform` was implemented**. That drop
-is the survey becoming honest. Five examples — `beeswarm-plot`, `force-directed-layout`,
-`labeled-scatter-plot`, `packed-bubble-chart`, `word-cloud` — carry a `transform` on a *mark*, which
-used to be one warning and a block that was dropped whole. The pipeline now runs it and reports
-`force`, `label` and `wordcloud` by name, which is what those charts were quietly missing all along.
-One of the five improved outright: `force-directed-layout`'s `linkpath` is implemented and now
-actually runs.
+**Where the corpus stands, from `ExampleTriage` rather than from memory: 80 of the 93 compile
+clean, 13 report errors.** Read the *movement* rather than the number: 70 → 79 as the stochastic and
+crossfilter work landed, **79 → 75 when mark-level `transform` was implemented** — the survey
+becoming honest, because five charts had been dropping a whole block silently — and 75 → 80 as the
+raster family and `force` landed.
 
-The 18 break down as: **11 geo/topojson**, **2 raster** (`contour-plot`, `density-heatmaps` — both
-want `kde2d` and `heatmap`), **4 needing a mark-level layout transform** (`force` ×3, `label`,
-`wordcloud` — `word-cloud` is also in the geo-free set), and nothing else. All of them were refused
-by design until this session; **the owner has asked for the three refusals to be overturned**, so
-they are targets rather than non-goals, and PROJECT_BRIEF.md §3.3 and §18.2 are stale on the point.
+The 13 that remain are **11 geographic** and **2 that have no oracle at all**. There is no third
+category left.
 
 **`time-units` is done** and is a fixture; STATUS.md describes the five things it needed. The
 handoff's prediction was right as far as it went — the domain field is a `FieldRef` now — but the two
@@ -231,68 +224,74 @@ count measures how wrong we are, not how big the chart is — do not size a deci
 heap is pinned at 2 GB now, for the unrelated reason that 200,000 rows through three `bin`
 transforms is a large live set when transforms copy rather than mutate.
 
-## The three refusals are lifted, and here is where each stands
+## The three refusals are lifted; two are finished and one is not
 
-The owner has asked for all three of the brief's scope refusals to be overturned and for every
-example to pass. **PROJECT_BRIEF.md §3.3 and §18.2 are stale on this point** and should be amended
-when the work lands; until then, read them as history rather than as policy.
+The owner asked for all three of the brief's scope refusals to be overturned and for every example to
+pass. **PROJECT_BRIEF.md §3.3 and §18.2 are stale on this point** and should be amended when the geo
+work lands; until then, read them as history rather than as policy.
 
-**1. `random()` and `now()` — done, and the category is open.** `RandomStream` is upstream's
-`randomLCG` and `oracle-js/src/determinism.js` puts the same generator and a stopped clock into
-upstream, so these charts can have references at all. `clock` and `watch` are fixtures and match
-exactly. The other six in the category were scouted and only one of them is actually stochastic:
+**1. `random()` and `now()` — done.** `RandomStream` is upstream's `randomLCG` and
+`oracle-js/src/determinism.js` puts the same generator and a stopped clock into upstream, so these
+charts can have references at all. `clock`, `watch`, `error-bars`, `hypothetical-outcome-plots`,
+`pi-monte-carlo`, `serpentine-timeline` and `bar-line-toggle` are all fixtures and all pass.
 
-`error-bars`, `hypothetical-outcome-plots`, `pi-monte-carlo` and `serpentine-timeline` are all
-fixtures now and all pass; STATUS.md records what each one needed. Two are left in this category:
+**2. The raster family — done.** `volcano-contours`, `density-heatmaps` and `contour-plot` are
+fixtures and match exactly. `isocontour`, `geopath` without a projection, `kde2d`, `heatmap`, a
+raster payload on `ImageNode`, a PNG encoder and mark-level `transform` all landed with them. The
+parked `worktree-agent-a9f49f94103bacad5` branch is **superseded** for `isocontour` — this port is
+verified against upstream where that one never was — and should be dropped rather than merged.
 
-- `bar-line-toggle` — done, and it needed nothing to do with `on` handlers: it switches views by
-  *emptying* a dataset, and a scale over no data is `[NaN, NaN]` upstream rather than `[0, 1]`.
-- `word-cloud` — **upstream's own headless output is degenerate**: `fontSize: 0` on every word and a
-  surface width of `-Infinity`, because the `wordcloud` transform measures text against a canvas
-  that is not there. There is nothing to compare against. This one needs evidence of another kind,
-  and is the one example where a differential fixture cannot be the answer.
+The harness was strengthened first, as the previous handoff insisted: `normalize.js` now takes an
+FNV-1a digest of `getImageData` on the upstream side and the Kotlin side hashes its own pixels, so an
+image mark is compared by what it *draws*. A blank image cannot pass.
 
-**2. The raster family — one of three done.** `volcano-contours` is a fixture and matches exactly:
-`isocontour`, `geopath` without a projection, and mark-level `transform` all landed with it. The
-parked `worktree-agent-a9f49f94103bacad5` branch is now **superseded** for `isocontour` — this port
-is verified against upstream where that one never was — and should be dropped rather than merged.
+**3. Force layout — done, and it was never the irreproducible thing it is assumed to be.**
+`force-directed`, `beeswarm` and `packed-bubble` are fixtures. d3-force seeds a fixed LCG rather than
+reaching for `Math.random`, and a node with no position starts on a phyllotaxis spiral; what is left
+is arithmetic. See SUPPORTED_FEATURES.md for the three behaviours that had to come from upstream
+rather than from its schema — in particular that **an omitted force parameter falls to d3's default,
+not the one Vega documents**, because Vega only forwards the parameters a specification wrote.
 
-`contour-plot` and `density-heatmaps` both want two more things:
+## What is left: eleven maps, and two charts with no oracle
 
-- **`kde2d`** — a 2D kernel density over points, producing the same `{width, height, values}` grid
-  `isocontour` already reads. `Grid` in `Isocontour.kt` is the shape to fill; upstream's `KDE2D.js`
-  is about 90 lines.
-- **`heatmap`** — rasterises a grid to an **image**, which the scene graph cannot carry: `ImageNode`
-  holds a `url`. This needs a raster payload (RGBA plus width and height), an SVG renderer that
-  emits it as a base64 data URL, and the Android canvas equivalent.
+**The eleven geographic examples.** `airport-connections`, `annual-precipitation`,
+`county-unemployment`, `distortion-comparison`, `dorling-cartogram`, `earthquakes`,
+`earthquakes-globe`, `map-with-tooltip`, `projections`, `world-map`, `zoomable-world-map`.
 
-**Do not add a heatmap fixture without first strengthening the harness.** `normalize.js` compares an
-image mark on `['x','y','width','height']` and nothing else — *the pixels are not compared at all*,
-so a fixture would go green over a blank image. Upstream's canvas can be read back with
-`getImageData`, so a digest of the pixel data on both sides is the honest addition, and it has to
-come first.
+TopoJSON decoding is **done and verified** (`TopoJsonTest`, vectors from `topojson-client`), so none
+of them fails on loading any more; three now build most of a scene without drawing a map
+(`dorling-cartogram` 5 → 123 nodes, `distortion-comparison` 2 → 356). What is left, in dependency
+order:
 
-**3. Geo — not started, and much the largest.** Eleven examples, and the first error every one of
-them reports is `Data format 'topojson' is not implemented`. In rough dependency order: topojson
-decoding, then d3-geo projections (mercator, albers, albersUsa, orthographic, conicEqualArea,
-equalEarth and the rest), then `geoPath` with its adaptive resampling and antimeridian clipping,
-then the `geoshape`/`geopoint`/`geojson` transforms and `graticule`. The resampling and clipping are
-where the numeric fidelity will be hard-won; everything before them is mechanical.
+- **`projection` definitions and d3-geo.** The corpus needs `mercator`, `albersUsa` and
+  `orthographic` by name, plus whatever `projections.vg.json` cycles through by signal — that one
+  reports 145 errors because it draws every projection type there is.
+- **The projection stream**: rotation, antimeridian clipping, circle clipping (`orthographic` needs
+  it), `clipExtent`, and adaptive resampling. This is where the numeric fidelity will be hard-won.
+  Everything before it is mechanical.
+- **`geoshape`, `geopoint`, `geojson`, `graticule`.** `geoshape` is 19 of the corpus's 25 geo
+  transform uses.
 
-Two things already exist that shorten it. `GeoPathTransform` writes GeoJSON out as an outline and
-refuses a `projection` by name, so the *path-building* half is done and only the projection stream
-has to be threaded through it. And mark-level `transform` runs, which is how `geoshape` and
-`geopath` reach a mark at all.
+`GeoPathTransform` already writes GeoJSON out as an outline and refuses a `projection` by name, so
+the path-building half exists and only the projection stream has to be threaded through it. Mark-level
+`transform` runs over encoded items, which is how `geoshape` reaches a mark at all.
 
-**4. The mark-level layout transforms** — `force` (three examples), `label` and `wordcloud`. These
-are the four remaining non-geo, non-raster errors. `word-cloud` is the one that cannot be a
-differential fixture whatever happens: **upstream's own headless output is degenerate**, `fontSize:
-0` on every word and a surface width of `-Infinity`, because `wordcloud` measures text against a
-canvas that is not there.
+**`word-cloud` and `labeled-scatter-plot` cannot be differential fixtures, and this is now
+established rather than suspected.** Both transforms measure or rasterise against a `<canvas>`, and
+there is none under Node:
 
-The scouting trick: copy the candidates into `test-fixtures/specs/` with a `scout-` prefix, generate
-references, run the differential once, read the distinct diagnostics, then delete them all. Much
-faster than reading specs.
+- `wordcloud` measures text, and upstream's own headless output is degenerate — `fontSize: 0` on
+  every word, a surface width of `-Infinity`.
+- `label` calls `markBitmaps`, which *renders the avoided marks into a canvas* and reads the alpha
+  back. Under the oracle it throws inside the transform, Vega logs it and carries on, and the labels
+  are never placed. `oracle-js/src/canvas-shim.js` deliberately refuses every drawing call rather
+  than returning something plausible, which is why this is visible instead of silently wrong.
+
+Making either verifiable means installing the native `canvas` package — and then matching Cairo's
+antialiasing coverage exactly on the Kotlin side, since `label` treats *any* non-zero alpha as
+occupied. That is not a port, it is a rasteriser bake-off. **Implementing these two unverified would
+produce exactly the plausible-looking wrong answer this project exists to avoid.** If they are to be
+done, the decision to accept weaker evidence has to be the owner's and should be written down here.
 
 ## Possible future work: a timer used as a `for` loop
 
