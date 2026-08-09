@@ -339,8 +339,11 @@ function record(type, role, item, dx, dy, precision) {
       if (item[channel] !== undefined) entry[channel] = canonicalNumber(item[channel], precision);
     }
     // A text mark's content is whatever the field held, so a numeric field gives a numeric `text`.
-    // Both engines draw its string form, so compare that rather than its type.
-    if (entry.text !== undefined) entry.text = String(entry.text);
+    // Both engines draw its string form, so compare that rather than its type — except for `null`,
+    // which Vega's renderers draw as *nothing*. `String(null)` is the four letters "null", and
+    // writing those into the reference had this engine dutifully drawing them: the first band of a
+    // discretizing scale's legend has no lower bound, and its label is blank rather than the word.
+    if (entry.text !== undefined) entry.text = entry.text == null ? '' : String(entry.text);
   }
   return entry;
 }

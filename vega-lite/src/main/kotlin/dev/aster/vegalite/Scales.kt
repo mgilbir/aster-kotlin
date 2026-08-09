@@ -118,9 +118,15 @@ internal object Scales {
 
     if (def.datum != null) return listOf(arr(listOf(def.datum)))
 
-    if (def.bin is Binning.Bin && !hasDiscreteDomain(type)) {
-      val signal = binSignal(view, def)
-      return listOf(signalRef("[$signal.start, $signal.stop]"))
+    if (def.bin is Binning.Bin) {
+      // A `bin-ordinal` scale states no domain: Vega infers one from the `bins` property, and
+      // writing a data reference beside it names a column of bin *starts* where the entries are
+      // buckets.
+      if (type == "bin-ordinal") return emptyList()
+      if (!hasDiscreteDomain(type)) {
+        val signal = binSignal(view, def)
+        return listOf(signalRef("[$signal.start, $signal.stop]"))
+      }
     }
 
     // A ranged position contributes *both* of its fields: the scale has to cover the whole span,
@@ -140,9 +146,11 @@ internal object Scales {
     }
 
     // A `timeUnit` buckets an instant into a span, and the scale covers the span: the bucket's
-    // start
-    // and the end the transform computed beside it.
-    if (def.timeUnit != null && (type == "time" || type == "utc")) {
+    // start and the end the transform computed beside it — but only for a mark that *occupies* the
+    // span. Upstream decides that by whether the mark has a `timeUnitBandPosition`, which only the
+    // rect-shaped configurations define, so a bar over months reaches the end of December and a
+    // point over the same months sits on the first of it.
+    if (def.timeUnit != null && (type == "time" || type == "utc") && bandEnd(view)) {
       return listOf(
         obj {
           put("data", dataName)
@@ -367,7 +375,10 @@ internal object Scales {
       if (supportsProperty(type, name)) component.set(name, value)
     }
 
-    if (def.bin is Binning.Bin && !hasDiscreteDomain(type)) {
+    // The boundaries the `bin` transform chose, on **any** scale that takes them — a `bin-ordinal`
+    // most of all, since that is the only thing it has: its domain is left out entirely and read
+    // back from here.
+    if (def.bin is Binning.Bin) {
       set("bins", signalRef(binSignal(view, def)))
     }
 
@@ -481,4 +492,14 @@ internal object Scales {
    */
   private fun binSignal(view: UnitView, def: ChannelDef): String =
     view.prefixed("${Fields.binToString((def.bin as Binning.Bin).params)}_${def.field}_bins")
+
+  /**
+   * Whether this mark occupies the *span* a bucket covers rather than a point in it.
+   *
+   * Upstream asks for a `timeUnitBandPosition`, which only the rect-shaped mark configurations
+   * define (`defaultRectConfig`), so the question answers itself by mark type without a list of
+   * mark types anywhere.
+   */
+  private fun bandEnd(view: UnitView): Boolean =
+    view.config.markConfig(view.spec.mark).fields["timeUnitBandPosition"] != null
 }

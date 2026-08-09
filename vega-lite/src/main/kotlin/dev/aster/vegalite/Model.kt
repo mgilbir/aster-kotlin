@@ -70,6 +70,15 @@ internal data class ChannelDef(
 
   val isValueDef: Boolean = value != null
 
+  /**
+   * `impute` — how the gaps in this series are filled, when the specification says to fill them.
+   *
+   * Kept as written: the parameters go straight into Vega's own `impute` transform, and the one
+   * thing decided here is which of the two positions is being filled and which is the key.
+   */
+  val impute: VegaValue.Obj?
+    get() = raw["impute"] as? VegaValue.Obj
+
   /** The `scale` a user wrote, or null when they wrote none. `scale: null` disables it entirely. */
   val scale: VegaValue.Obj?
     get() = raw["scale"] as? VegaValue.Obj
@@ -262,6 +271,14 @@ internal val PATH_MARKS = setOf("line", "area", "trail")
  * smallest of a column of numerals still held as text.
  */
 internal val MIN_MAX_OPS = setOf("min", "max")
+
+/**
+ * The aggregates that count rather than measure, and so cannot produce an invalid value.
+ *
+ * `COUNTING_OPS` in `aggregate.ts`. Each answers with how many rows met a condition, which is a
+ * number whatever the column held.
+ */
+internal val COUNTING_OPS = setOf("count", "valid", "missing", "distinct")
 
 internal fun channelIsPosition(channel: String): Boolean = channel == "x" || channel == "y"
 

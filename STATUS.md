@@ -454,7 +454,7 @@ produces a chart that is plausible and wrong.
 every fixture with upstream and checks two things:
 
 1. `VegaLiteFixtureTest` compares the Vega this compiler emits against upstream's, property by
-   property. Thirty-seven fixtures, and all of them match exactly — every transform, scale, signal,
+   property. Forty-one fixtures, and all of them match exactly — every transform, scale, signal,
    axis, legend and mark encoding, down to the accessibility description string.
 2. `VegaLiteFixtureDifferentialTest` runs that output through this engine's own runtime and compares
    the scene against the one upstream draws. Every mark of every fixture matches, and nothing is
@@ -539,7 +539,7 @@ own) and `grouped-bar` on the step arithmetic.
 
 ### Where the compiler stands, and what it still refuses
 
-Thirty-seven fixtures, each matching upstream's compiler property for property and drawing the chart
+Forty-one fixtures, each matching upstream's compiler property for property and drawing the chart
 upstream draws. The grammar covered: a single view or a layer of them, eleven marks including `arc`,
 the Cartesian and polar position pairs, nested offsets, fourteen of fifteen transforms, sorting,
 binning, time units, stacking, faceting by `row` and `column`, conditional encodings, a line or an
@@ -688,6 +688,61 @@ when the comparison is property by property: a `count` has no field to count *of
 the default order, and a sort on the domain's own field is the natural order with at most a
 direction to it.
 
+### Four aimed at the runtime, through the compiler
+
+`impute-area`, `binned-legend`, `temporal-units` and `layer-independent` were written against
+constructs whose compiled Vega the runtime had never been handed. All four failed, and the failures
+split evenly between the two halves.
+
+In the compiler:
+
+- **`impute` was refused**, so a series with a hole in it was joined straight across the hole — a
+  value nobody measured, drawn as confidently as the ones they did. It is Vega's own `impute`
+  transform with the *other* position channel as its key and a path mark's series fields as its
+  grouping; a method other than `value` is a `window` beside it, written back over the nulls.
+- **A rule's own `size` was dropped.** With no encoding for a channel the *mark definition* still
+  speaks, and `size` is the Vega-Lite name for what Vega calls `strokeWidth` — that renaming being
+  exactly why it cannot pass through with the mark's other properties, and why it fell on the floor.
+- **A `utc` time unit did not say so.** Vega's `timeunit` transform takes a `timezone`, and without
+  it a midnight instant is bucketed against the viewer's own calendar rather than against UTC.
+- **An axis over a cyclic bucket asked for a tick every forty units.** Upstream compares the
+  *normalized* unit — the name with any `utc` taken off the front — against month, hours, day and
+  quarter, and asks for no count at all: twelve months want twelve ticks, not seven.
+- **A bucketed instant reached the end of its bucket on every mark**, where only a mark that
+  *occupies* the span should. Upstream decides by whether the mark has a `timeUnitBandPosition`,
+  which only the rect-shaped configurations define, so a bar over months reaches the end of December
+  and a point over the same months sits on the first of it.
+- **The invalid-value filter read the field's type rather than its scale.** A discrete scale shows
+  an invalid value as another category, so only the fields feeding a continuous domain are filtered;
+  ours filtered a binned colour column too. And the filter is keyed by the *raw* field, which is how
+  one column bucketed two ways on two channels leaves only one of them.
+- **A `bin-ordinal` scale wrote a domain it should not have.** Its domain is inferred from the
+  `bins` property; naming a column of bin starts beside it describes something else.
+
+In the runtime, four more, and every one of them a chart that drew:
+
+- **A path mark ignored its own `sort`.** A `sort` orders the *items* a mark draws, and a line has
+  only one — the whole series — so the ordering has to reach the points inside it. Without that, a
+  row inserted into the middle of a series (by an `impute`, say) was drawn last, and the line went
+  out to the end and doubled back to it.
+- **`tickMinStep` was reported and dropped.** It does not place ticks; it caps the *count*, and a
+  span holding one minimum step allows two ticks whatever was asked for. An axis over two months
+  offered sixteen.
+- **A `bin-ordinal` scale could not be built without a domain**, and its scheme was sampled at the
+  extremes. Upstream takes a continuous scheme's buckets from *inside* it —
+  `quantizeInterpolator` samples at (i+1)/(count+1) — so two buckets of `blues` are its thirds and
+  neither is the white end. A discrete palette is *sliced* rather than spread.
+- **A discretizing scale's legend was symbol swatches**, which the runtime said so about rather
+  than pretending otherwise. It is now the colour bar cut into its buckets: equal bands whatever the
+  cut points are worth, labelled at the joins between them. Probed against upstream on a four-bucket
+  `quantize` scale before a line of it was written.
+
+And the harness was wrong again, for the eighth time. The first band has no lower bound, and
+upstream's scene carries a literal `null` there which its renderers draw as nothing —
+`String(null)` had been writing the four letters "null" into the reference, and this engine drew
+them. Fixed in `oracle-js/src/normalize.js` as well as here, which is where CONTRIBUTING says to
+look when both sides agree and the picture does not.
+
 ### One difference is still open
 
 Every mark matches exactly and the surface around them is still between half a unit and a unit small
@@ -719,8 +774,8 @@ the whole time.
 
 ## Verification
 
-- 1,845 JVM tests pass and none is skipped (`./gradlew test`). 1,742 of them are the portable core,
-  which `./scripts/test-core.sh` runs without an Android SDK.
+- 1,930 JVM tests pass and none is skipped (`./gradlew test`); the portable core is most of
+  them, and `./scripts/test-core.sh` runs it without an Android SDK.
 - Android lint is clean with `warningsAsErrors` on every Android module.
 - 63 instrumented tests pass on an API 37 arm64 emulator (`./scripts/test-android.sh`): 49 in
   `vega-android-canvas`, 4 in `vega-compose`, 10 in `demo`. Three groups of them cover what no JVM

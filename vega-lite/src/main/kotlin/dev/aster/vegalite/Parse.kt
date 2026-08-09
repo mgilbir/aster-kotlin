@@ -143,13 +143,6 @@ internal class Parse(private val config: Config, private val diagnostics: Diagno
     val bin = binning(value.fields["bin"], path)
 
     val conditions = conditions(channel, value.fields["condition"], "$path.condition")
-    if (value.fields["impute"] != null) {
-      diagnostics.error(
-        VegaLiteDiagnostics.UNSUPPORTED_ENCODING_PROPERTY,
-        "`impute` is not implemented; missing values stay missing.",
-        jsonPath = "$path.impute",
-      )
-    }
 
     val declaredType = MeasureType.from(value.string("type"))
     val type =

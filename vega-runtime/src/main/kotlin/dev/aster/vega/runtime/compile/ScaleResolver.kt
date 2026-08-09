@@ -656,7 +656,20 @@ public class ScaleResolver(
       is RangeSpec.Scheme -> {
         val colors = colorRange(spec) ?: return null
         val wanted = r.count ?: buckets ?: colors.size
-        val taken = if (colors.size > wanted) sampleEvenly(colors, wanted) else colors
+        val taken =
+          when {
+            // A **continuous** scheme is a ramp, and upstream takes its buckets from *inside* it:
+            // `quantizeInterpolator` samples at (i+1)/(count+1), so two buckets of `blues` are its
+            // thirds and neither is the white end or the black one. Sampling the extremes instead
+            // gives a legend whose first swatch is nearly the page.
+            isRamp(spec, r) ->
+              (0 until wanted).map { i ->
+                ColorSpaces.sample(colors, (i + 1).toDouble() / (wanted + 1))
+              }
+            // A discrete palette is *sliced*, not spread: `scheme.slice(0, count)`.
+            colors.size > wanted -> colors.take(wanted)
+            else -> colors
+          }
         (if (spec.reverse) taken.reversed() else taken).map { VegaValue.Str(it.toCssHex()) }
       }
       else -> {
@@ -670,12 +683,21 @@ public class ScaleResolver(
       }
     }
 
-  /** Takes [count] colours spread across a ramp, so a bucketed scheme uses its whole range. */
-  private fun sampleEvenly(colors: List<SceneColor>, count: Int): List<SceneColor> {
-    if (count <= 1) return listOf(colors.first())
-    return (0 until count).map { i ->
-      colors[((i.toDouble() / (count - 1)) * (colors.size - 1)).toInt()]
-    }
+  /**
+   * Whether a scheme is a *ramp* — a continuous interpolator — rather than a palette of colours.
+   *
+   * Upstream asks the same question as `isFunction(scheme)`: a named ramp resolves to a function it
+   * can sample anywhere, and a named palette to a fixed array it can only slice.
+   */
+  private fun isRamp(spec: ScaleSpec, range: RangeSpec.Scheme): Boolean {
+    val name =
+      when (val scheme = range.scheme) {
+        is SchemeRef.Named -> scheme.name
+        is SchemeRef.Signal ->
+          numbers.resolveValue(scheme.expression, spec.name)?.asString() ?: return false
+        is SchemeRef.Colors -> return false
+      }.lowercase()
+    return ColorSchemes.categoricalOrNull(name) == null && ColorSchemes.rampOrNull(name) != null
   }
 
   private fun buildQuantize(spec: ScaleSpec): QuantizeScale? {
@@ -708,7 +730,26 @@ public class ScaleResolver(
   }
 
   private fun buildBinOrdinal(spec: ScaleSpec): BinOrdinalScale? {
-    val edges = fullNumericDomain(spec) ?: return null
+    // With no domain of its own, **the bins are the domain** — `configureBins` in `vega-encode`,
+    // where a `bin-ordinal` either states its edges as a domain or takes them from `bins`. That is
+    // how a Vega-Lite binned colour scale is written: it says only which bins the transform chose,
+    // because writing the edges out again would be the same numbers a second time.
+    val edges =
+      if (spec.domain == DomainSpec.Unset) {
+        // An unbounded domain, so the boundaries are taken as the bins state them: upstream clamps
+        // them into `scale.domain()`, and a scale with no domain has nothing to clamp them into.
+        binBoundaries(spec, listOf(Double.NEGATIVE_INFINITY, Double.POSITIVE_INFINITY))
+          ?: run {
+            diagnostics.error(
+              DiagnosticCodes.SCALE_INVALID_DOMAIN,
+              "Scale '${spec.name}' is bin-ordinal with neither a domain nor bins to take one from",
+              operator = spec.name,
+            )
+            return null
+          }
+      } else {
+        fullNumericDomain(spec) ?: return null
+      }
     val range = binnedRange(spec, buckets = maxOf(1, edges.size - 1)) ?: return null
     return BinOrdinalScale(spec.name, edges, range)
   }

@@ -115,7 +115,7 @@ internal object Marks {
   }
 
   /** The fields a path mark is grouped by: every non-position field that is not aggregated. */
-  private fun pathGroupingFields(view: UnitView): List<String> =
+  fun pathGroupingFields(view: UnitView): List<String> =
     view.spec.encoding.entries
       .filter { (channel, def) ->
         channel in
@@ -363,9 +363,14 @@ internal object Marks {
    * tried in order and whose last has no test. Each condition is built by the same reference
    * builder as the unconditional part, because a condition may name a field, a datum or a value
    * just as freely (`wrapCondition`, `compile/mark/encode/conditional.ts`).
+   *
+   * With no encoding at all the *mark definition* still speaks: `{"type": "rule", "size": 2}` is
+   * how a rule is thickened, and `size` is the Vega-Lite name for what Vega calls `strokeWidth`.
+   * That renaming is the reason it cannot simply pass through with the mark's other properties —
+   * and being Vega-Lite-only, it was dropped on the floor instead.
    */
   private fun nonPosition(view: UnitView, channel: String, vgChannel: String): VegaValue.Obj {
-    val def = view.spec.encoding[channel] ?: return VegaValue.EmptyObject
+    val def = view.spec.encoding[channel] ?: return markDefault(view, channel, vgChannel)
     val rules =
       def.conditions.mapNotNull { condition ->
         valueRef(view, channel, condition)?.let { ref ->
@@ -381,6 +386,27 @@ internal object Marks {
     // The array form is used even for a single entry with a test, or Vega has no rule to fall back
     // to when the test fails.
     return obj { put(vgChannel, arr(rules + listOfNotNull(main))) }
+  }
+
+  /**
+   * What a channel is worth when nothing encodes it — `getMarkPropOrConfig`.
+   *
+   * The mark's own property wins, under the *Vega* name if it uses one, and the configuration is
+   * consulted only where the two names differ. That last condition is upstream's `ignoreVgConfig`
+   * and it is what keeps the output concise: `config.point.size` is already the `point` style block
+   * Vega applies itself, so restating it here would be the same number written twice.
+   */
+  private fun markDefault(view: UnitView, channel: String, vgChannel: String): VegaValue.Obj {
+    val own = view.markDef.raw.fields[vgChannel] ?: view.markDef.raw.fields[channel]
+    val value =
+      own
+        ?: if (vgChannel != channel) {
+          view.config.markConfig(view.spec.mark).fields[vgChannel]
+        } else {
+          null
+        }
+    return if (value == null) VegaValue.EmptyObject
+    else obj { put(vgChannel, obj { put("value", value) }) }
   }
 
   /** One entry of a channel's encoding: a value, a datum through the scale, or a scaled field. */

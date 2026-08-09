@@ -171,7 +171,7 @@ internal class LegendBuilder(
       when (type) {
         LegendType.SYMBOL -> symbolEntries(spec, scale, scaleName)
         LegendType.GRADIENT -> gradientEntries(spec, scale, scaleName)
-        LegendType.DISCRETE -> null
+        LegendType.DISCRETE -> discreteEntries(spec, scale, scaleName)
       } ?: return null
 
     val body =
@@ -200,20 +200,113 @@ internal class LegendBuilder(
    */
   private fun resolveType(spec: LegendSpec, scale: VegaScale): LegendType? {
     val stated = spec.type
-    if (stated == LegendType.DISCRETE) {
-      diagnostics.warn(
-        DiagnosticCodes.TRANSFORM_NOT_IMPLEMENTED,
-        "Discrete (banded) gradient legends are not implemented; legend for scale " +
-          "'${spec.scale}' was skipped",
-        operator = spec.scale,
+    // A stated `gradient` over a *discretizing* scale is still drawn as bands: there is no ramp to
+    // draw, and upstream substitutes one for the other rather than refusing — `legendType` ends
+    // `type !== Gradient ? type : isDiscretizing(scaleType) ? Discrete : Gradient`.
+    if (stated != null) {
+      return if (stated == LegendType.GRADIENT && scale is BinnedScale) LegendType.DISCRETE
+      else stated
+    }
+
+    val colourOnly = spec.channelCount == 1 && (spec.fill != null || spec.stroke != null)
+    if (!colourOnly) return LegendType.SYMBOL
+    return when (scale) {
+      is SequentialColorScale -> LegendType.GRADIENT
+      // A quantize, quantile, threshold or bin-ordinal scale has buckets rather than a continuum,
+      // and its legend is the colour bar cut into them.
+      is BinnedScale -> LegendType.DISCRETE
+      else -> LegendType.SYMBOL
+    }
+  }
+
+  // ---- discrete (banded) legends ----------------------------------------------
+
+  /**
+   * The colour bar of a discretizing scale: one band per bucket, labelled at its lower edge.
+   *
+   * The bands are **equal**, whatever the cut points are worth — the buckets are categories, and a
+   * quantile scale's uneven thresholds would otherwise make a band's size say something about the
+   * data that it does not. Probed against upstream on a four-bucket `quantize` scale, whose bands
+   * come out at fifty units each over a two-hundred-unit ramp with the labels 25, 50 and 75 sitting
+   * on the joins between them.
+   *
+   * The first bucket has no lower bound, so its label has no text. Upstream's scene carries a
+   * literal `null` there and its renderers draw nothing for one; the harness had been stringifying
+   * that into the four letters "null", which is what a reference is for and also how a reference
+   * can be wrong.
+   */
+  private fun discreteEntries(
+    spec: LegendSpec,
+    scale: VegaScale,
+    scaleName: String,
+  ): List<SceneNode>? {
+    if (scale !is BinnedScale) {
+      diagnostics.error(
+        DiagnosticCodes.SCALE_UNSUPPORTED_TYPE,
+        "A banded legend needs a discretizing scale; '$scaleName' is not one",
+        operator = scaleName,
       )
       return null
     }
-    if (stated != null) return stated
+    val buckets = scale.rangeValues.size
+    if (buckets == 0) return null
 
-    val colourOnly = spec.channelCount == 1 && (spec.fill != null || spec.stroke != null)
-    return if (colourOnly && scale is SequentialColorScale) LegendType.GRADIENT
-    else LegendType.SYMBOL
+    val vertical = isVertical(spec)
+    val length = numbers.resolve(spec.gradientLength, scaleName) ?: LegendDefaults.GRADIENT_LENGTH
+    val thickness =
+      numbers.resolve(spec.gradientThickness, scaleName) ?: LegendDefaults.GRADIENT_THICKNESS
+    val labelFontSize =
+      numbers.resolve(spec.labelFontSize, scaleName) ?: LegendDefaults.LABEL_FONT_SIZE
+    val labelOffset =
+      numbers.resolve(spec.labelOffset, scaleName) ?: LegendDefaults.GRADIENT_LABEL_OFFSET
+    val band = length / buckets
+
+    val nodes = mutableListOf<SceneNode>()
+    for (index in 0 until buckets) {
+      val colour = SceneColor.parse(scale.rangeValues[index].asString()) ?: continue
+      nodes +=
+        RectNode(
+          id = ids.allocate(),
+          // A vertical bar runs bottom to top, so the first bucket is the lowest band.
+          x = if (vertical) 0.0 else index * band,
+          y = if (vertical) length - (index + 1) * band else 0.0,
+          width = if (vertical) thickness else band,
+          height = if (vertical) band else thickness,
+          fill = Fill(ScenePaint.Solid(colour)),
+          stroke =
+            Stroke(
+              paint = ScenePaint.Solid(LegendDefaults.gradientStrokeColor),
+              width = LegendDefaults.GRADIENT_STROKE_WIDTH,
+            ),
+          metadata = NodeMetadata(role = "legend-band", markName = scaleName, datumIndex = index),
+        )
+    }
+
+    val labelStyle = GuideStyle.text(spec.labelStyle, labelFontSize, defaultWeight = 400)
+    val decimals = decimalsFor(scale.thresholds)
+    for (index in 0 until buckets) {
+      val fraction = index.toDouble() / buckets
+      val bound = scale.thresholds.getOrNull(index - 1)
+      val run =
+        TextRun(
+          text = bound?.let { formatTickLabel(it, decimals) } ?: "",
+          style = labelStyle,
+          align = if (vertical) TextAlign.LEFT else TextAlign.CENTER,
+          baseline =
+            if (!vertical) TextBaseline.TOP
+            else if (fraction <= 0.0) TextBaseline.BOTTOM else TextBaseline.MIDDLE,
+        )
+      nodes +=
+        TextNode(
+          id = ids.allocate(),
+          x = if (vertical) thickness + labelOffset else fraction * length,
+          y = if (vertical) (1.0 - fraction) * length else thickness + labelOffset,
+          layout = textEngine.layout(run),
+          fill = GuideStyle.fill(spec.labelStyle, LegendDefaults.labelColor),
+          metadata = NodeMetadata(role = "legend-label", markName = scaleName, datumIndex = index),
+        )
+    }
+    return nodes
   }
 
   private fun titleNode(

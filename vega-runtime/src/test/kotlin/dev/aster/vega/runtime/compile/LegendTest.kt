@@ -476,10 +476,35 @@ class LegendTest {
   }
 
   @Test
-  fun `banded gradients are reported rather than approximated`() {
+  fun `a discretizing scale's legend is the colour bar cut into its buckets`() {
+    // Probed against upstream: four buckets over a two-hundred-unit ramp are four fifty-unit bands,
+    // labelled at the joins between them — 25, 50, 75 — and the first band, which has no lower
+    // bound, carries a label with nothing in it.
+    val compiled =
+      compile(
+        spec(
+          """{"fill": "s1"}""",
+          scales =
+            """
+            {"name": "s1", "type": "quantize", "domain": [0, 100],
+             "range": ["#eff3ff", "#bdd7e7", "#6baed6", "#2171b5"]}
+            """,
+        )
+      )
+    val nodes = requireNotNull(compiled.scene).flatten().map { it.node }
+    val bands = nodes.filterIsInstance<RectNode>().filter { it.metadata.role == "legend-band" }
+    assertEquals(4, bands.size, compiled.diagnostics.toString())
+    assertEquals(listOf(150.0, 100.0, 50.0, 0.0), bands.map { it.y })
+    bands.forEach { assertEquals(50.0, it.height, 1e-9) }
+    val labels = nodes.filterIsInstance<TextNode>().filter { it.metadata.role == "legend-label" }
+    assertEquals(listOf("", "25", "50", "75"), labels.map { it.layout.run.text })
+  }
+
+  @Test
+  fun `a banded legend over a scale with no buckets is reported`() {
     val compiled = compile(spec("""{"fill": "s1", "type": "discrete"}"""))
     assertTrue(
-      compiled.diagnostics.any { it.message.contains("Discrete (banded)") },
+      compiled.diagnostics.any { it.message.contains("banded legend needs a discretizing scale") },
       compiled.diagnostics.toString(),
     )
   }

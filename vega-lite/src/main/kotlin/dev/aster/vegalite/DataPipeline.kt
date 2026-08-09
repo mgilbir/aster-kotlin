@@ -44,6 +44,7 @@ internal class DataPipeline(
       }
 
     aggregateNode()?.let { head = head.then(it) }
+    imputeNode()?.let { head = head.then(it) }
     stackNode()?.let { head = head.then(it) }
     filterInvalidNode()?.let { head = head.then(it) }
 
@@ -169,7 +170,12 @@ internal class DataPipeline(
       view.spec.encoding.values.mapNotNull { def ->
         val timeUnit = def.timeUnit ?: return@mapNotNull null
         val field = def.field ?: return@mapNotNull null
-        TimeUnitComponent(field, Fields.timeUnitParts(timeUnit), Fields.vgField(def, forAs = true))
+        TimeUnitComponent(
+          field,
+          Fields.timeUnitParts(timeUnit),
+          Fields.vgField(def, forAs = true),
+          utc = timeUnit.startsWith("utc"),
+        )
       }
     return if (units.isEmpty()) null else TimeUnitNode(units)
   }
@@ -205,6 +211,41 @@ internal class DataPipeline(
 
     for (field in view.facetFields) dimensions += field
     return AggregateNode(dimensions.toList(), ops, fields, outputs)
+  }
+
+  /**
+   * `impute` on a position channel — the gaps in a series, filled so a path does not jump them.
+   *
+   * Both positions have to be fields: one of them says how to fill and the *other* is the key the
+   * filling is done over, which is what makes a hole a hole. The grouping is the same set of fields
+   * a path mark is split into series by, so one series' gaps are filled from its own rows.
+   */
+  private fun imputeNode(): ImputeNode? {
+    val x = view.spec.encoding["x"]?.takeIf { it.isFieldDef }
+    val y = view.spec.encoding["y"]?.takeIf { it.isFieldDef }
+    if (x == null || y == null) return null
+    val imputed = if (x.impute != null) x else if (y.impute != null) y else return null
+    val key = if (x.impute != null) y else x
+    val params = imputed.impute ?: return null
+    val method = params.string("method")
+    if (params.fields["keyvals"] is VegaValue.Obj) {
+      diagnostics.error(
+        VegaLiteDiagnostics.UNSUPPORTED_ENCODING_PROPERTY,
+        "An `impute.keyvals` written as a sequence is not implemented; write the keys out as a " +
+          "list, or the gaps stay where they are.",
+        jsonPath = "$.encoding.${imputed.channel}.impute.keyvals",
+      )
+      return null
+    }
+    return ImputeNode(
+      field = imputed.field ?: return null,
+      key = key.field ?: return null,
+      method = method,
+      value = params.fields["value"],
+      groupby = Marks.pathGroupingFields(view),
+      keyvals = params.fields["keyvals"],
+      frame = params.fields["frame"],
+    )
   }
 
   private fun stackNode(): StackNode? {
@@ -246,19 +287,30 @@ internal class DataPipeline(
   private fun filterInvalidNode(): FilterInvalidNode? {
     if (view.spec.mark in setOf("line", "area", "trail")) return null
 
-    val expressions =
-      view.spec.encoding.entries.mapNotNull { (channel, def) ->
-        if (channel !in Channels.SCALE_CHANNELS || !def.isFieldDef) return@mapNotNull null
-        // A count is never invalid: it is produced by the aggregate, not read from the data.
-        if (def.aggregate == "count") return@mapNotNull null
-        val accessor = Fields.datumAccess(def)
+    // Keyed by the **raw** field, which is how upstream's aggregator is keyed, so two channels
+    // reading one column through different buckets leave only the last of them: `d` bucketed by
+    // month on x and by hour on y is filtered on the hour alone.
+    val byField = LinkedHashMap<String, String>()
+    for ((channel, def) in view.spec.encoding) {
+      val field = def.field
+      if (channel !in Channels.SCALE_CHANNELS || !def.isFieldDef || field == null) continue
+      // A counting aggregate is never invalid: it is produced by the aggregate rather than read
+      // from the data, and it counts what is there.
+      if (def.aggregate in COUNTING_OPS) continue
+      // A **discrete** scale can always show an invalid value as another category, so only the
+      // fields feeding a continuous domain need filtering. Reading the field's own *type* instead
+      // filtered a binned colour column, whose scale is `bin-ordinal` and shows every bucket.
+      val type = view.scaleType(channel) ?: continue
+      if (!Scales.hasContinuousDomain(type)) continue
+      val accessor = Fields.datumAccess(def)
+      byField[field] =
         when (def.type) {
-          MeasureType.QUANTITATIVE -> "isValid($accessor) && isFinite(+$accessor)"
           MeasureType.TEMPORAL ->
             "(isDate($accessor) || (isValid($accessor) && isFinite(+$accessor)))"
-          else -> null
+          else -> "isValid($accessor) && isFinite(+$accessor)"
         }
-      }
+    }
+    val expressions = byField.values.toList()
     return if (expressions.isEmpty()) null else FilterInvalidNode(expressions.distinct())
   }
 

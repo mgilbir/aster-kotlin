@@ -188,7 +188,11 @@ internal object Guides {
     if (Scales.hasDiscreteDomain(type) || type == "log") return null
     val size = view.sizeSignal(channel)
     if (def.bin is Binning.Bin) return signalRef("ceil($size/10)")
-    if (def.timeUnit in setOf("month", "hours", "day", "quarter")) return null
+    // A bucket that cycles has a known, small number of values — twelve months, twenty-four hours
+    // — so asking for a tick per forty units would ask for ticks between them. Upstream compares
+    // the *normalized* unit, which is the name with any `utc` taken off the front: `utcmonth` is a
+    // month, and `yearmonth` is not one of these, being unbounded.
+    if (def.timeUnit?.removePrefix("utc") in setOf("month", "hours", "day", "quarter")) return null
     return signalRef("ceil($size/40)")
   }
 

@@ -96,12 +96,13 @@ public class MarkEncoder(
       MarkType.RULE -> data.mapIndexedNotNull { index, datum -> rule(spec, datum, index) }
       MarkType.SYMBOL -> data.mapIndexedNotNull { index, datum -> symbol(spec, datum, index) }
       MarkType.TEXT -> data.mapIndexedNotNull { index, datum -> text(spec, datum, index) }
-      // One node for the whole series, not one per datum.
-      MarkType.LINE -> listOfNotNull(line(spec, data))
-      MarkType.AREA -> listOfNotNull(area(spec, data))
+      // One node for the whole series, not one per datum — and the `sort` therefore has to order
+      // the *rows* here, since there are no items left to order afterwards.
+      MarkType.LINE -> listOfNotNull(line(spec, ordered(spec, data)))
+      MarkType.AREA -> listOfNotNull(area(spec, ordered(spec, data)))
       MarkType.ARC -> data.mapIndexedNotNull { index, datum -> arc(spec, datum, index) }
       MarkType.PATH -> data.mapIndexedNotNull { index, datum -> path(spec, datum, index) }
-      MarkType.TRAIL -> listOfNotNull(trail(spec, data))
+      MarkType.TRAIL -> listOfNotNull(trail(spec, ordered(spec, data)))
       MarkType.IMAGE -> data.mapIndexedNotNull { index, datum -> image(spec, datum, index) }
       else -> {
         diagnostics.error(
@@ -1192,6 +1193,45 @@ public class MarkEncoder(
    * Upstream runs the same spatial adjustment over these, but with no width to halve it reduces to
    * this: a centre channel is the position, and it wins over a start channel written beside it.
    */
+  /**
+   * A path mark's rows, in the order its `sort` asks for.
+   *
+   * A `sort` on a mark orders the *items* it draws, and for a line or an area there is only one
+   * item — the whole series — so the ordering has to reach the points inside it instead. That is
+   * what makes `{"sort": {"field": "x"}}` mean anything on a line: it is how a series with a row
+   * inserted into the middle of it (by an `impute`, say) is drawn through that row rather than
+   * doubling back to it from the end.
+   *
+   * The fields are the *item's* properties, which for a row is where that row resolves to.
+   */
+  private fun ordered(spec: MarkSpec, data: List<VegaValue>): List<VegaValue> {
+    val sort = spec.sort ?: return data
+    if (data.size < 2) return data
+    val channels = spec.encode.effective
+    return data.sortedWith { a, b ->
+      var result = 0
+      for ((index, field) in sort.fields.withIndex()) {
+        val left = rowPosition(channels, a, field) ?: continue
+        val right = rowPosition(channels, b, field) ?: continue
+        val comparison = left.compareTo(right)
+        if (comparison != 0) {
+          val descending = sort.orders.getOrNull(index)?.startsWith("desc") == true
+          result = if (descending) -comparison else comparison
+          break
+        }
+      }
+      result
+    }
+  }
+
+  /** Where a row lands on one axis, as the sort sees it. */
+  private fun rowPosition(channels: EncodeEntry, datum: VegaValue, field: String): Double? =
+    when (field) {
+      "x" -> centred(channels, datum, "x", "xc")
+      "y" -> centred(channels, datum, "y", "yc")
+      else -> null
+    }
+
   private fun centred(
     channels: EncodeEntry,
     datum: VegaValue,

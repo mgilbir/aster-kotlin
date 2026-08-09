@@ -15,6 +15,7 @@ import dev.aster.vega.runtime.scale.BandScale
 import dev.aster.vega.runtime.scale.LinearScale
 import dev.aster.vega.runtime.scale.PointScale
 import dev.aster.vega.runtime.scale.PositionScale
+import dev.aster.vega.runtime.scale.Ticks
 import dev.aster.vega.runtime.scale.TimeScale
 import dev.aster.vega.runtime.scale.TimeTicks
 import dev.aster.vega.runtime.scale.TransformedScale
@@ -33,6 +34,7 @@ import dev.aster.vega.scene.TextNode
 import dev.aster.vega.scene.TextRun
 import dev.aster.vega.scene.Transform2D
 import dev.aster.vega.scene.transformedBounds
+import kotlin.math.floor
 import kotlinx.datetime.TimeZone
 
 /**
@@ -609,6 +611,35 @@ public class AxisBuilder(
       ?: numbers.resolve(spec.offset, spec.scale)
       ?: 0.0
 
+  /**
+   * How many ticks to ask a continuous scale for, after `tickMinStep` has had its say.
+   *
+   * `tickMinStep` does not place ticks; it *caps the count* — `tickCount` in `vega-scale/ticks.js`.
+   * A span that holds only one minimum step allows two ticks, its two ends, whatever the axis asked
+   * for. Vega-Lite writes the step on every bucketed axis as one bucket's duration, so an axis over
+   * two months offers two ticks rather than the sixteen a request for ten would otherwise produce.
+   *
+   * @param refine whether to keep shrinking the count while the step d3 would choose is still under
+   *   the minimum. Upstream does that only for a plain numeric scale: `!scale.bins &&
+   *   !isLogarithmic && !isTemporal`, because those three do not shrink their step monotonically
+   *   with the count.
+   */
+  private fun tickCountFor(spec: AxisSpec, domain: List<Double>, refine: Boolean): Int {
+    var count = numbers.resolveInt(spec.tickCount, spec.scale) ?: AxisDefaults.DEFAULT_TICK_COUNT
+    val minStep = numbers.resolve(spec.tickMinStep, spec.scale) ?: return count
+    if (domain.isEmpty()) return count
+    val lo = minOf(domain.first(), domain.last())
+    val hi = maxOf(domain.first(), domain.last())
+    val spans = (hi - lo) / minStep
+    // `Math.floor((hi - lo) / minStep || 1) + 1`: a span of nothing still allows two ticks.
+    val allowed = floor(if (spans.isFinite() && spans != 0.0) spans else 1.0).toInt() + 1
+    count = minOf(count, allowed)
+    if (refine && lo < hi) {
+      while (count > 1 && Ticks.stepFrom(Ticks.tickIncrement(lo, hi, count)) < minStep) count--
+    }
+    return count.coerceAtLeast(1)
+  }
+
   private fun ticksFor(scale: VegaScale, spec: AxisSpec, specifier: String?): List<Tick>? {
     // A scale with `bins` has its tick values already decided: upstream's `tickValues` returns the
     // boundaries themselves rather than asking the scale to generate any. An axis that *also* names
@@ -795,8 +826,7 @@ public class AxisBuilder(
         }
       }
       is LinearScale -> {
-        val count =
-          numbers.resolveInt(spec.tickCount, spec.scale) ?: AxisDefaults.DEFAULT_TICK_COUNT
+        val count = tickCountFor(spec, scale.domain, refine = scale.bins == null)
         // Labels come from the scale rather than being formatted here, because a log scale blanks
         // the
         // crowded ones and only it knows which.
@@ -811,8 +841,7 @@ public class AxisBuilder(
         }
       }
       is TransformedScale -> {
-        val count =
-          numbers.resolveInt(spec.tickCount, spec.scale) ?: AxisDefaults.DEFAULT_TICK_COUNT
+        val count = tickCountFor(spec, scale.domain, refine = false)
         val format = labeller(scale, count, specifier, spec.formatType)
         scale.ticks(count).zip(scale.tickLabels(count)).map { (value, label) ->
           Tick(
@@ -824,8 +853,9 @@ public class AxisBuilder(
         }
       }
       is TimeScale -> {
-        val count =
-          numbers.resolveInt(spec.tickCount, spec.scale) ?: AxisDefaults.DEFAULT_TICK_COUNT
+        // A temporal scale is exempt from the step *refinement* below: its intervals are calendar
+        // ones and do not shrink monotonically with the count the way d3's numeric steps do.
+        val count = tickCountFor(spec, scale.domain, refine = false)
         // A stated format replaces the scale's own multi-format labelling, which otherwise writes
         // each tick at its own granularity — a January tick carrying its year while the rest carry
         // month names. Every Vega-Lite chart over a bucketed instant states one, and dropping it

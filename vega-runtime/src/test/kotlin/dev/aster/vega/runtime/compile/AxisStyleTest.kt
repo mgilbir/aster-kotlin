@@ -226,7 +226,6 @@ class AxisStyleTest {
       listOf(
         "\"labelBound\": true",
         "\"labelOffset\": 3",
-        "\"tickMinStep\": 5",
         "\"tickExtra\": true",
         "\"tickRound\": false",
         "\"tickOffset\": 2",

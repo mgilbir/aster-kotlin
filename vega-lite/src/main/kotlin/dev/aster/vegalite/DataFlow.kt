@@ -140,6 +140,9 @@ internal class TimeUnitNode(val units: List<TimeUnitComponent>) : DataNode() {
       put("type", "timeunit")
       put("field", it.field)
       put("units", strings(it.units))
+      // Which calendar the bucket is cut against. A `utcmonth` says so and a `month` says nothing,
+      // taking the viewer's own zone — and the two put a midnight instant in different months.
+      if (it.utc) put("timezone", "utc")
       put("as", strings(listOf(it.output, "${it.output}_end")))
     }
   }
@@ -149,6 +152,7 @@ internal data class TimeUnitComponent(
   val field: String,
   val units: List<String>,
   val output: String,
+  val utc: Boolean = false,
 )
 
 internal class AggregateNode(
@@ -207,6 +211,57 @@ internal class StackNode(
     )
     put("as", strings(output))
     put("offset", offset)
+  }
+}
+
+/**
+ * Fills the gaps in a series, so that every key has a row — `compile/data/impute.ts`.
+ *
+ * A line or an area drawn over a series with a hole in it joins straight across the hole, which
+ * reads as a value that was never measured. `impute` puts a row there instead, and the `groupby` is
+ * what keeps one series' gaps out of another's.
+ *
+ * The Vega transform's `method` is always `value`: anything else is computed by a `window` beside
+ * it and then written back over the nulls, because Vega's own impute methods work over the keys
+ * rather than over a frame of neighbours.
+ */
+internal class ImputeNode(
+  val field: String,
+  val key: String,
+  val method: String?,
+  val value: VegaValue?,
+  val groupby: List<String>,
+  val keyvals: VegaValue?,
+  val frame: VegaValue?,
+) : DataNode() {
+  fun transforms(): List<VegaValue> {
+    val impute = obj {
+      put("type", "impute")
+      put("field", field)
+      put("key", key)
+      keyvals?.let { put("keyvals", it) }
+      put("method", "value")
+      if (groupby.isNotEmpty()) put("groupby", strings(groupby))
+      put("value", if (method == null || method == "value") value else VegaValue.Null)
+    }
+    if (method == null || method == "value") return listOf(impute)
+    return listOf(
+      impute,
+      obj {
+        put("type", "window")
+        put("as", strings(listOf("imputed_${field}_value")))
+        put("ops", strings(listOf(method)))
+        put("fields", strings(listOf(field)))
+        put("frame", frame ?: arr(VegaValue.Null, VegaValue.Null))
+        put("ignorePeers", VegaValue.Bool(false))
+        if (groupby.isNotEmpty()) put("groupby", strings(groupby))
+      },
+      obj {
+        put("type", "formula")
+        put("expr", "datum.$field === null ? datum.imputed_${field}_value : datum.$field")
+        put("as", field)
+      },
+    )
   }
 }
 
@@ -316,6 +371,7 @@ internal class DataAssembler {
       is TimeUnitNode -> dataset.transform += node.transforms()
       is AggregateNode -> dataset.transform += node.transform()
       is StackNode -> dataset.transform += node.transforms()
+      is ImputeNode -> dataset.transform += node.transforms()
       is FilterInvalidNode -> dataset.transform += node.transform()
       is PassThroughNode -> dataset.transform += node.transforms
       is OutputNode -> {

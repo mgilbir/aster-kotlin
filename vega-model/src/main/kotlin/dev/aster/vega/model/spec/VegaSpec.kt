@@ -620,6 +620,14 @@ public data class AxisSpec(
   val labels: Boolean = true,
   val domainLine: Boolean = true,
   val tickCount: NumberValue? = null,
+  /**
+   * `tickMinStep` — the smallest gap between ticks the axis will accept.
+   *
+   * It does not *place* the ticks; it reduces the count until the step the scale would choose is at
+   * least this wide. Vega-Lite writes it on every bucketed axis as the duration of one bucket, so
+   * an axis of months does not offer a tick every other day.
+   */
+  val tickMinStep: NumberValue? = null,
   val tickSize: NumberValue? = null,
   val labelPadding: NumberValue? = null,
   val labelFontSize: NumberValue? = null,
