@@ -75,16 +75,30 @@ class VegaLiteFixtureTest {
 
   @Test
   fun `an unimplemented composition is refused by name rather than approximated`() {
+    // A plot of a concatenation with its own dataset: the plots share the chart's, and a second
+    // source would have to be assembled and numbered beside the first.
     val compiled =
       VegaLiteCompiler()
         .compileJson(
-          """{"data": {"values": [{"a": 1}]}, "facet": {"field": "a"}, "spec": {"mark": "bar"}}"""
+          """
+          {
+            "data": {"values": [{"a": 1}]},
+            "hconcat": [
+              {"mark": "bar", "encoding": {"x": {"field": "a", "type": "quantitative"}}},
+              {"data": {"values": [{"b": 2}]}, "mark": "bar"}
+            ]
+          }
+          """
+            .trimIndent()
         )
     val reported =
       compiled.diagnostics.filter { it.code == VegaLiteDiagnostics.UNSUPPORTED_COMPOSITION }
-    assertTrue(reported.isNotEmpty(), "faceting should be reported, got ${compiled.diagnostics}")
     assertTrue(
-      reported.first().message.contains("facet"),
+      reported.isNotEmpty(),
+      "the plot's own data should be reported, got ${compiled.diagnostics}",
+    )
+    assertTrue(
+      reported.first().message.contains("data"),
       "the report should name the construct: ${reported.first().message}",
     )
   }

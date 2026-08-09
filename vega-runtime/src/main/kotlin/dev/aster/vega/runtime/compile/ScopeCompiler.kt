@@ -2,6 +2,7 @@ package dev.aster.vega.runtime.compile
 
 import dev.aster.vega.dataflow.transform.AggregateOp
 import dev.aster.vega.dataflow.transform.aggregateOver
+import dev.aster.vega.dataflow.transform.compareFieldValues
 import dev.aster.vega.dataflow.transform.groupTuples
 import dev.aster.vega.expression.ExpressionCompiler
 import dev.aster.vega.model.DiagnosticCodes
@@ -289,20 +290,34 @@ internal class ScopeCompiler(
   /**
    * The order a mark's items are taken in, as indices into the built list.
    *
-   * Identity when the mark declares no `sort`. A field this cannot read leaves the order alone
-   * rather than inventing one — the properties an item exposes here are its position, and a
-   * specification sorting on anything else is asking for something that is not in the scene.
+   * Identity when the mark declares no `sort`. The fields are **field accessors on the scene
+   * item**, not expressions — Vega hands them to `vega-util`'s `field()`, which reads
+   * `datum["era"]` as the path `datum` → `era` — so `x` and `y` name where the item ended up and
+   * anything under `datum` names a column of the row it was bound to. A trellis whose cells go in
+   * alphabetical order rather than in the order the rows arrived depends entirely on the second:
+   * the group is sorted by its own facet key. A path neither can read leaves the order alone rather
+   * than inventing one.
    */
-  private fun sortOrder(sort: MarkSort?, nodes: List<SceneNode>): List<Int> {
+  private fun sortOrder(
+    sort: MarkSort?,
+    nodes: List<SceneNode>,
+    datums: List<VegaValue>,
+  ): List<Int> {
     if (sort == null || nodes.isEmpty()) return nodes.indices.toList()
+    val items = datums.map { VegaValue.Obj(mapOf("datum" to it)) }
     val comparator =
       Comparator<Int> { a, b ->
         for ((index, field) in sort.fields.withIndex()) {
           val descending = sort.orders.getOrNull(index)?.startsWith("desc") == true
           val left = itemPosition(nodes[a], field)
           val right = itemPosition(nodes[b], field)
-          if (left == null || right == null) continue
-          val comparison = left.compareTo(right)
+          val comparison =
+            if (left != null && right != null) left.compareTo(right)
+            else
+              compareFieldValues(
+                items.getOrNull(a)?.field(field) ?: VegaValue.Null,
+                items.getOrNull(b)?.field(field) ?: VegaValue.Null,
+              )
           if (comparison != 0) return@Comparator if (descending) -comparison else comparison
         }
         0
@@ -360,7 +375,7 @@ internal class ScopeCompiler(
     // properties — `{"field": "y"}` is where the group ended up, not a column of the row. Upstream
     // sorts the item array in place, so the order changes what is drawn where *and* the order the
     // marks are painted in.
-    val order = sortOrder(spec.sort, nodes)
+    val order = sortOrder(spec.sort, nodes, partitions.map { it.datum })
     val sorted = order.map { nodes[it] }
     val sortedPartitions = order.map { partitions[it] }
     val sortedInner = order.map { inner[it] }

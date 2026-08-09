@@ -280,7 +280,13 @@ internal object Channels {
     )
 
   /** The channels that grid a chart into cells rather than encoding anything within one. */
-  val FACET_CHANNELS = listOf("row", "column")
+  /**
+   * The channels that split a chart into cells rather than placing anything inside one.
+   *
+   * `facet` is the wrapped form's channel: a facet operator over a single field is written above
+   * the view, and moves into the encoding here so that everything downstream sees one construct.
+   */
+  val FACET_CHANNELS = listOf("row", "column", "facet")
 
   /** Channels whose definition may be an array, so the parser has to keep every entry. */
   val MULTI_DEF_CHANNELS = setOf("detail", "order", "tooltip")

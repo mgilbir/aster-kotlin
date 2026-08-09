@@ -90,21 +90,23 @@ class VegaLiteInputTest {
   /** A Vega-Lite specification the compiler cannot honour still reports, by name. */
   @Test
   fun `an unimplemented Vega-Lite construct is reported through the conversion`() {
-    val faceted =
+    val nested =
       """
       {
         "${'$'}schema": "https://vega.github.io/schema/vega-lite/v6.json",
         "data": {"values": [{"a": 1}]},
-        "facet": {"field": "a", "type": "nominal"},
-        "spec": {"mark": "bar"}
+        "hconcat": [
+          {"mark": "bar", "encoding": {"x": {"field": "a", "type": "quantitative"}}},
+          {"hconcat": [{"mark": "bar"}]}
+        ]
       }
       """
         .trimIndent()
-    val converted = VegaLiteInput.toVega(faceted)
+    val converted = VegaLiteInput.toVega(nested)
     assertTrue(converted.wasVegaLite)
     assertTrue(
       converted.diagnostics.any { it.code == VegaLiteDiagnostics.UNSUPPORTED_COMPOSITION },
-      "faceting should be reported: ${converted.diagnostics}",
+      "a concatenation inside a concatenation should be reported: ${converted.diagnostics}",
     )
   }
 }

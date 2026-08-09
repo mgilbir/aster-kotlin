@@ -454,7 +454,7 @@ produces a chart that is plausible and wrong.
 every fixture with upstream and checks two things:
 
 1. `VegaLiteFixtureTest` compares the Vega this compiler emits against upstream's, property by
-   property. Fifty-eight fixtures, and all of them match exactly — every transform, scale, signal,
+   property. Sixty fixtures, and all of them match exactly — every transform, scale, signal,
    axis, legend and mark encoding, down to the accessibility description string.
 2. `VegaLiteFixtureDifferentialTest` runs that output through this engine's own runtime and compares
    the scene against the one upstream draws. Every mark of every fixture matches, and nothing is
@@ -539,18 +539,15 @@ own) and `grouped-bar` on the step arithmetic.
 
 ### Where the compiler stands, and what it still refuses
 
-Fifty-eight fixtures, each matching upstream's compiler property for property and drawing the chart
+Sixty fixtures, each matching upstream's compiler property for property and drawing the chart
 upstream draws. The grammar covered: a single view, a layer of them, a concatenation of either, a
-repetition of any of those, eleven marks including `arc`,
+repetition of any of those, both facet operators, eleven marks including `arc`,
 the Cartesian and polar position pairs, nested offsets, fourteen of fifteen transforms, sorting,
 binning, time units, stacking, faceting by `row` and `column`, conditional encodings, a line or an
 area that draws its own points, legends, axes, and a user `config` carried through as a theme.
 
 What it still refuses, by name, with the reason each is refused rather than approximated:
 
-- The **`facet` operator** with its own `spec`. `row` and `column` are implemented (below), and so
-  are concatenation and repetition (below); this remaining form nests a whole spec under a facet
-  definition, which is a different composition from encoding the facet on the view.
 - **A plot of a concatenation with its own `data`.** The plots share the chart's dataset, which is
   what makes them one chart rather than several drawn near each other; a second source would have to
   be assembled and numbered beside the first, as a `lookup`'s joined table is.
@@ -620,6 +617,30 @@ Three fixtures passing untouched is worth stating plainly rather than quietly: i
 port of the layer beneath is supposed to buy, and the one defect it did find was a rewrite compiled
 and then thrown away — the normalized specification has to *replace* the one being compiled, not
 stand beside it.
+
+### The facet operator: one rewrite and one layout
+
+`{"facet": …, "spec": …}` is two constructs wearing one name, and only the first is a rewrite.
+
+A **`row`/`column`** facet operator is the same chart as the same two channels written in the view's
+encoding — compiled side by side, upstream's two outputs are byte for byte identical — so the
+channels move down into the encoding and nothing else changes.
+
+A **wrapped** facet, `{"facet": {"field": …}, "columns": n}`, is a layout of its own. A grid of two
+fields knows its shape: the columns are the column facet's values. A wrapped facet has one list and
+a number to wrap it at, so upstream *computes* both — `ceil(length(facet_domain) / columns)` rows and
+`min(length(facet_domain), columns)` columns, as two `sequence` datasets — and draws the shared axes
+once per **position** rather than once per value. The caption moves with it: there is no band of
+column headings to name a cell in, because the columns are places and not values, so every cell
+carries its own caption and the heading over the grid is a `column-title` naming the field.
+
+Both fixtures then failed on the same runtime defect, and it is the kind worth naming: **a trellis's
+cells came out in the order the rows arrived rather than in the order the specification asked for.**
+A mark's `sort` fields are *field accessors on the scene item* — Vega hands them to `vega-util`'s
+`field()`, so `datum["era"]` is the path `datum` → `era` — and this engine read only `x` and `y`,
+being the properties it could see an item having. Everything else was silently ignored, which for a
+faceted group means its own facet key: the one thing that decides which cell goes where. A chart with
+its categories already in order hid it completely, which is why every fixture up to now had.
 
 ### Faceting: both halves, in three fixtures
 
@@ -982,7 +1003,7 @@ the whole time.
 
 ## Verification
 
-- 2,049 JVM tests pass and none is skipped (`./gradlew test`); the portable core is most of
+- 2,063 JVM tests pass and none is skipped (`./gradlew test`); the portable core is most of
   them, and `./scripts/test-core.sh` runs it without an Android SDK.
 - Android lint is clean with `warningsAsErrors` on every Android module.
 - 63 instrumented tests pass on an API 37 arm64 emulator (`./scripts/test-android.sh`): 49 in

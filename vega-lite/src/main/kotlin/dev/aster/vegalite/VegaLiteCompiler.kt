@@ -76,8 +76,8 @@ private class Compilation(
   private val FACET_SPACING = 20.0
   private val HEADER_OFFSET = 10.0
 
-  /** The `row` and `column` this chart is gridded by, if either. */
-  private var facet: FacetGrid? = null
+  /** The grid this chart's cells are laid out in, if it is faceted at all. */
+  private var facet: FacetLayout? = null
 
   /** The concatenation this chart is, if it is one. */
   private var concat: Concat? = null
@@ -88,6 +88,9 @@ private class Compilation(
     // A repetition is rewritten into a concatenation before anything is compiled, exactly as
     // upstream normalizes it, so there is nothing further down that knows what `repeat` is.
     if (spec.has("repeat")) spec = Repeat.normalize(spec, diagnostics) ?: return failed()
+    // A `row`/`column` facet operator is the same chart as the same two channels written in the
+    // encoding, so it becomes one before anything else looks at it.
+    if (spec.has("facet")) spec = FacetOperator.normalize(spec, diagnostics) ?: return failed()
     concat = Concat.of(spec, diagnostics)
     val plots = plots() ?: return failed()
     if (plots.any { it.views.isEmpty() }) return failed()
@@ -127,9 +130,6 @@ private class Compilation(
 
     val data = assembleData(views).toMutableList()
     for (plot in plots) fillScaleDomains(plot.views, plot.scales)
-    // The facets' own values, which the layout counts and the headers title themselves from.
-    facet?.let { data += it.domainDatasets(views.first().mainData) }
-
     for (plot in plots) {
       plot.axes = assembleAxes(plot.views, plot.scales)
       plot.size =
@@ -145,6 +145,20 @@ private class Compilation(
       plots.flatMap { plot -> plot.size!!.signals.filter { it.string("name") !in merged } } +
         mergedSizeSignals()
     val root = plots.first().size!!
+    // The facets' own values, which the layout counts and the headers title themselves from — and,
+    // for a wrapped facet, only along the directions a shared axis was actually drawn in.
+    facet?.let { current ->
+      val main = plots.single().axes.filter { (it["grid"] as? VegaValue.Bool)?.value != true }
+      val horizontal = main.filter {
+        it.string("orient") == "bottom" || it.string("orient") == "top"
+      }
+      data +=
+        current.domainDatasets(
+          views.first().mainData,
+          vertical = (main - horizontal.toSet()).isNotEmpty(),
+          horizontal = horizontal.isNotEmpty(),
+        )
+    }
 
     val vega = obj {
       put("\$schema", "https://vega.github.io/schema/vega/v6.json")
@@ -162,7 +176,7 @@ private class Compilation(
       title()?.let { put("title", it) }
       put("data", arr(data))
       if (sizeSignals.isNotEmpty()) put("signals", arr(sizeSignals))
-      facet?.let { put("layout", it.layout(FACET_SPACING, HEADER_OFFSET, facetTitles())) }
+      facet?.let { put("layout", it.layout(FACET_SPACING, HEADER_OFFSET, config)) }
       concat?.let { put("layout", it.layout()) }
       put("marks", arr(if (concat == null) marks(views, plots.single().axes) else groups(plots)))
       val scales =
@@ -469,8 +483,13 @@ private class Compilation(
     }
     val row = channel("row")
     val column = channel("column")
-    if (row == null && column == null) return views
-    val found = FacetGrid(row, column)
+    val wrapped = views.firstNotNullOfOrNull { view ->
+      view.spec.encoding["facet"]?.takeIf { it.isFieldDef }
+    }
+    if (row == null && column == null && wrapped == null) return views
+    val found: FacetLayout =
+      if (wrapped != null) FacetWrap(wrapped, spec.number("columns")?.toInt())
+      else FacetGrid(row, column)
     facet = found
 
     return views.map { view ->
@@ -516,31 +535,15 @@ private class Compilation(
     }
     val vertical = mainAxes - horizontal.toSet()
 
-    val out = mutableListOf<VegaValue>()
-    // Both headings first, rows before columns, then the four bands of labels around the grid.
-    for (facetChannel in listOfNotNull(current.row, current.column)) {
-      val title = Fields.title(facetChannel.def, config) as? VegaValue.Str ?: continue
-      out += facetChannel.titleGroup(title.value, HEADER_OFFSET)
-    }
-    out += current.headerGroups(vertical, horizontal, HEADER_OFFSET)
-
-    out +=
-      current.cellGroup(views.first().mainData, childMarks, gridAxes, "child_width", "child_height")
-    return out
-  }
-
-  /**
-   * Which facet channels name themselves.
-   *
-   * The `layout` keeps a heading clear of the labels beneath it with `offset.rowTitle` or
-   * `offset.columnTitle`, and upstream writes the offset only where there is a heading to keep
-   * clear — `if (layoutHeaderComponent.title)` in `getHeaderLayoutMixins`.
-   */
-  private fun facetTitles(): Set<String> {
-    val current = facet ?: return emptySet()
-    return listOfNotNull(current.row, current.column)
-      .filter { Fields.title(it.def, config) is VegaValue.Str }
-      .mapTo(mutableSetOf()) { it.channel }
+    return current.groups(vertical, horizontal, HEADER_OFFSET, config) +
+      current.cellGroup(
+        views.first().mainData,
+        childMarks,
+        gridAxes,
+        "child_width",
+        "child_height",
+        HEADER_OFFSET,
+      )
   }
 
   private fun reportUnsupportedTopLevel() {

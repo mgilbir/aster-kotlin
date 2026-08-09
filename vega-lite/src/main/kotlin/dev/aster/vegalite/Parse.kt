@@ -334,7 +334,6 @@ internal class Parse(private val config: Config, private val diagnostics: Diagno
      */
     val UNSUPPORTED_CHANNELS =
       setOf(
-        "facet",
         "latitude",
         "longitude",
         "latitude2",
