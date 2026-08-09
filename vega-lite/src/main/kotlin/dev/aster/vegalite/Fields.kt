@@ -53,6 +53,15 @@ internal object Fields {
     "$datum[${quoted(removePathFromField(vgField(def, suffix)))}]"
 
   /**
+   * `x_c_sort_index` — the column a written-out `sort` order records each row's place in.
+   *
+   * Prefixed by the *channel*, because one field may be ordered one way along the axis and another
+   * in the legend, and each order is a column of its own.
+   */
+  fun sortIndexField(channel: String, def: ChannelDef, forAs: Boolean = false): String =
+    "${channel}_${vgField(def, suffix = "sort_index", forAs = forAs)}"
+
+  /**
    * The guide title, before a guide decides whether to show it.
    *
    * The verbal formatter is the default and is the reason a mean reads `Mean of b` rather than

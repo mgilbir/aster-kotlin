@@ -1,0 +1,286 @@
+{
+  "$schema": "https://vega.github.io/schema/vega/v6.json",
+  "description": "Labels formatted as currency and as a percentage, over a normalized stack.",
+  "background": "white",
+  "padding": 5,
+  "height": 300,
+  "style": "cell",
+  "data": [
+    {
+      "name": "source_0",
+      "values": [
+        {
+          "c": "a",
+          "s": "x",
+          "v": 3
+        },
+        {
+          "c": "a",
+          "s": "y",
+          "v": 1
+        },
+        {
+          "c": "b",
+          "s": "x",
+          "v": 2
+        },
+        {
+          "c": "b",
+          "s": "y",
+          "v": 6
+        }
+      ]
+    },
+    {
+      "name": "data_1",
+      "source": "source_0",
+      "transform": [
+        {
+          "type": "stack",
+          "groupby": [
+            "c"
+          ],
+          "field": "v",
+          "sort": {
+            "field": [
+              "s"
+            ],
+            "order": [
+              "descending"
+            ]
+          },
+          "as": [
+            "v_start",
+            "v_end"
+          ],
+          "offset": "normalize"
+        },
+        {
+          "type": "filter",
+          "expr": "isValid(datum[\"v\"]) && isFinite(+datum[\"v\"])"
+        }
+      ]
+    },
+    {
+      "name": "data_2",
+      "source": "source_0",
+      "transform": [
+        {
+          "type": "stack",
+          "groupby": [
+            "c"
+          ],
+          "field": "v",
+          "sort": {
+            "field": [
+              "v"
+            ],
+            "order": [
+              "descending"
+            ]
+          },
+          "as": [
+            "v_start",
+            "v_end"
+          ],
+          "offset": "normalize"
+        },
+        {
+          "type": "filter",
+          "expr": "isValid(datum[\"v\"]) && isFinite(+datum[\"v\"])"
+        }
+      ]
+    }
+  ],
+  "signals": [
+    {
+      "name": "x_step",
+      "value": 20
+    },
+    {
+      "name": "width",
+      "update": "bandspace(domain('x').length, 0.1, 0.05) * x_step"
+    }
+  ],
+  "marks": [
+    {
+      "name": "layer_0_marks",
+      "type": "rect",
+      "style": [
+        "bar"
+      ],
+      "from": {
+        "data": "data_1"
+      },
+      "encode": {
+        "update": {
+          "fill": {
+            "scale": "color",
+            "field": "s"
+          },
+          "ariaRoleDescription": {
+            "value": "bar"
+          },
+          "description": {
+            "signal": "\"c: \" + (isValid(datum[\"c\"]) ? isArray(datum[\"c\"]) ? join(datum[\"c\"], ' ') : datum[\"c\"] : \"\"+datum[\"c\"]) + \"; v: \" + (format(datum[\"v_end\"]-datum[\"v_start\"], \".0%\")) + \"; s: \" + (isValid(datum[\"s\"]) ? isArray(datum[\"s\"]) ? join(datum[\"s\"], ' ') : datum[\"s\"] : \"\"+datum[\"s\"])"
+          },
+          "x": {
+            "scale": "x",
+            "field": "c"
+          },
+          "width": {
+            "signal": "max(0.25, bandwidth('x'))"
+          },
+          "y": {
+            "scale": "y",
+            "field": "v_end"
+          },
+          "y2": {
+            "scale": "y",
+            "field": "v_start"
+          }
+        }
+      }
+    },
+    {
+      "name": "layer_1_marks",
+      "type": "text",
+      "style": [
+        "text"
+      ],
+      "from": {
+        "data": "data_2"
+      },
+      "encode": {
+        "update": {
+          "dy": {
+            "value": -4
+          },
+          "fill": {
+            "value": "black"
+          },
+          "description": {
+            "signal": "\"c: \" + (isValid(datum[\"c\"]) ? isArray(datum[\"c\"]) ? join(datum[\"c\"], ' ') : datum[\"c\"] : \"\"+datum[\"c\"]) + \"; v: \" + (format(datum[\"v_end\"]-datum[\"v_start\"], \".0%\"))"
+          },
+          "x": {
+            "scale": "x",
+            "field": "c",
+            "band": 0.5
+          },
+          "y": {
+            "scale": "y",
+            "field": "v_end"
+          },
+          "text": {
+            "signal": "format(datum[\"v\"], \"$.2f\")"
+          },
+          "align": {
+            "value": "center"
+          },
+          "baseline": {
+            "value": "middle"
+          }
+        }
+      }
+    }
+  ],
+  "scales": [
+    {
+      "name": "x",
+      "type": "band",
+      "domain": {
+        "fields": [
+          {
+            "data": "data_1",
+            "field": "c"
+          },
+          {
+            "data": "data_2",
+            "field": "c"
+          }
+        ],
+        "sort": true
+      },
+      "range": {
+        "step": {
+          "signal": "x_step"
+        }
+      },
+      "paddingInner": 0.1,
+      "paddingOuter": 0.05
+    },
+    {
+      "name": "y",
+      "type": "linear",
+      "domain": [
+        0,
+        1
+      ],
+      "range": [
+        {
+          "signal": "height"
+        },
+        0
+      ],
+      "nice": true,
+      "zero": true
+    },
+    {
+      "name": "color",
+      "type": "ordinal",
+      "domain": {
+        "data": "data_1",
+        "field": "s",
+        "sort": true
+      },
+      "range": "category"
+    }
+  ],
+  "axes": [
+    {
+      "scale": "y",
+      "orient": "left",
+      "gridScale": "x",
+      "grid": true,
+      "tickCount": {
+        "signal": "ceil(height/40)"
+      },
+      "domain": false,
+      "labels": false,
+      "aria": false,
+      "maxExtent": 0,
+      "minExtent": 0,
+      "ticks": false,
+      "zindex": 0
+    },
+    {
+      "scale": "x",
+      "orient": "bottom",
+      "grid": false,
+      "title": "c",
+      "labelAlign": "right",
+      "labelAngle": 270,
+      "labelBaseline": "middle",
+      "zindex": 0
+    },
+    {
+      "scale": "y",
+      "orient": "left",
+      "grid": false,
+      "title": "v",
+      "format": ".0%",
+      "labelOverlap": true,
+      "tickCount": {
+        "signal": "ceil(height/40)"
+      },
+      "zindex": 0
+    }
+  ],
+  "legends": [
+    {
+      "fill": "color",
+      "symbolType": "square",
+      "title": "s"
+    }
+  ]
+}

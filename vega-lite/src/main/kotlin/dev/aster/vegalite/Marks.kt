@@ -440,37 +440,68 @@ internal object Marks {
       val title = def.explicitTitle ?: Fields.defaultTitle(def, view.config)?.let(VegaValue::Str)
       val key = (title as? VegaValue.Str)?.value ?: continue
       if (out.containsKey(key)) continue
-      out[key] = fieldExpression(view, def)
+      // A **normalized** stack is announced as the share it takes, not the number behind it: the
+      // position channel carrying the stack reads `end - start`, which is the fraction, and takes
+      // `config.normalizedNumberFormat` — a percentage. Reading the raw field there says 3 where
+      // the bar plainly shows three quarters.
+      val stack = view.stack
+      val normalized =
+        stack != null &&
+          stack.offset == "normalize" &&
+          channel == stack.fieldChannel &&
+          channel in NORMALIZABLE_CHANNELS
+      out[key] = fieldExpression(view, def, normalized)
     }
     return out
   }
 
+  /** The position channels a stack can accumulate along, and so the ones a share is read from. */
+  private val NORMALIZABLE_CHANNELS = setOf("x", "y", "theta", "radius")
+
   /**
    * How one field's value reads as text: a number through `format`, a date through `timeFormat`, a
    * category through a validity test that also copes with an array of values.
+   *
+   * A `format` the definition states itself beats the configured default, which is `numberFormat` —
+   * or `normalizedNumberFormat` where the value being read is a *share* of a normalized stack
+   * rather than a quantity.
    */
-  private fun fieldExpression(view: UnitView, def: ChannelDef): String {
-    val accessor = Fields.datumAccess(def)
+  private fun fieldExpression(
+    view: UnitView,
+    def: ChannelDef,
+    normalizeStack: Boolean = false,
+  ): String {
+    val stated = (def.format as? VegaValue.Str)?.value
+    val accessor =
+      if (normalizeStack) {
+        "${Fields.datumAccess(def, suffix = "end")}-${Fields.datumAccess(def, suffix = "start")}"
+      } else {
+        Fields.datumAccess(def)
+      }
+    val number =
+      stated
+        ?: if (normalizeStack) view.config.normalizedNumberFormat
+        else view.config.numberFormat ?: ""
     return when {
       def.bin is Binning.Bin -> {
         val end = Fields.datumAccess(def, suffix = "end")
-        val format = view.config.numberFormat ?: ""
         "!isValid($accessor) || !isFinite(+$accessor) ? \"null\" : " +
-          "format($accessor, \"$format\") + \" $BIN_RANGE_DELIMITER \" + format($end, \"$format\")"
+          "format($accessor, \"$number\") + \" $BIN_RANGE_DELIMITER \" + format($end, \"$number\")"
       }
       def.type == MeasureType.TEMPORAL -> {
         val timeUnit = def.timeUnit
-        if (timeUnit != null) {
-          // A bucketed instant is spoken with the specifier Vega chooses at render time, the same
-          // one its axis labels use — so the description and the axis never disagree.
-          val utc = timeUnit.startsWith("utc")
-          "${if (utc) "utc" else "time"}Format($accessor, ${Fields.timeUnitSpecifier(timeUnit)})"
-        } else {
-          "timeFormat($accessor, \"${view.config.timeFormat}\")"
+        when {
+          timeUnit != null -> {
+            // A bucketed instant is spoken with the specifier Vega chooses at render time, the same
+            // one its axis labels use — so the description and the axis never disagree.
+            val utc = timeUnit.startsWith("utc")
+            "${if (utc) "utc" else "time"}Format($accessor, ${Fields.timeUnitSpecifier(timeUnit)})"
+          }
+          stated != null -> "timeFormat($accessor, \"$stated\")"
+          else -> "timeFormat($accessor, \"${view.config.timeFormat}\")"
         }
       }
-      def.type == MeasureType.QUANTITATIVE ->
-        "format($accessor, \"${view.config.numberFormat ?: ""}\")"
+      def.type == MeasureType.QUANTITATIVE || stated != null -> "format($accessor, \"$number\")"
       else ->
         "isValid($accessor) ? isArray($accessor) ? join($accessor, ' ') : $accessor : \"\"+$accessor"
     }

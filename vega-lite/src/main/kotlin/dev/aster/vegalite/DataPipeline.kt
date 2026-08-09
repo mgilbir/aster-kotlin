@@ -26,6 +26,7 @@ internal class DataPipeline(
     implicitParse()?.let { head = head.then(it) }
     binNode()?.let { head = head.then(it) }
     timeUnitNode()?.let { head = head.then(it) }
+    sortIndexNode()?.let { head = head.then(it) }
 
     // The pre-aggregation table, named only when something reads it. A domain sorted by an
     // aggregate of another field is that something: the ordering has to be computed from the rows
@@ -95,6 +96,47 @@ internal class DataPipeline(
       }
     }
     return if (parse.isEmpty()) null else ParseNode(parse)
+  }
+
+  /**
+   * `sort: ["d", "a", "e", "b"]` — a written-out order, turned into a number per row.
+   *
+   * Vega has no comparator that takes a list, so upstream computes each row's *place* in the list
+   * as a column and lets the domain sort on the smallest place each category carries
+   * (`CalculateNode.parseAllForSortIndex`). A value not in the list falls past the end, which is
+   * what puts it last. It runs after the bin and the time unit and before the pre-aggregation
+   * table, because the ordering is over the rows as they will be grouped.
+   */
+  private fun sortIndexNode(): PassThroughNode? {
+    val predicates = Transforms(diagnostics)
+    val transforms =
+      view.spec.encoding.entries.mapNotNull { (channel, def) ->
+        val order = def.sort as? VegaValue.Arr ?: return@mapNotNull null
+        val field = def.field ?: return@mapNotNull null
+        // Each step is the same equality a `filter` would compile, through the same compiler:
+        // upstream builds it as `fieldFilterExpression({field, timeUnit, equal: value})`, and a
+        // second spelling of "is this row that value" would drift the day one of them was fixed.
+        val cases =
+          order.values.mapIndexed { index, value ->
+            val test =
+              predicates.testExpression(
+                obj {
+                  put("field", field)
+                  def.timeUnit?.let { put("timeUnit", it) }
+                  put("equal", value)
+                },
+                "$.encoding.$channel.sort[$index]",
+              )
+            "$test ? $index : "
+          }
+        obj {
+          put("type", "formula")
+          // A value the list never names falls past the end, which is what puts it last.
+          put("expr", cases.joinToString("") + order.values.size)
+          put("as", Fields.sortIndexField(channel, def, forAs = true))
+        }
+      }
+    return if (transforms.isEmpty()) null else PassThroughNode(transforms)
   }
 
   private fun binNode(): BinNode? {

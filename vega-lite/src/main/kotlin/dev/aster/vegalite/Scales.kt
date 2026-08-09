@@ -119,7 +119,7 @@ internal object Scales {
     if (def.datum != null) return listOf(arr(listOf(def.datum)))
 
     if (def.bin is Binning.Bin && !hasDiscreteDomain(type)) {
-      val signal = "${Fields.binToString(def.bin.params)}_${def.field}_bins"
+      val signal = binSignal(view, def)
       return listOf(signalRef("[$signal.start, $signal.stop]"))
     }
 
@@ -195,6 +195,14 @@ internal object Scales {
           else -> bool(true)
         }
       VegaValue.Null -> null
+      // A written-out order is not a comparator Vega has; the order is turned into a *number* per
+      // row by a formula, and the domain then sorts on the smallest number each category carries.
+      is VegaValue.Arr ->
+        obj {
+          put("op", "min")
+          put("field", Fields.sortIndexField(channel, def))
+          put("order", "ascending")
+        }
       is VegaValue.Obj -> {
         // Sorting by another channel's aggregate reads the pre-aggregation table, so the ordering
         // is computed independently of the values being drawn.
@@ -202,13 +210,27 @@ internal object Scales {
         val field = sort.string("field") ?: encoding?.let { view.spec.fieldDef(it)?.field }
         val op = sort.string("op") ?: encoding?.let { view.spec.fieldDef(it)?.aggregate }
         obj {
-          put("op", op ?: "min")
+          put("op", op ?: defaultSortOp(view, field))
           put("field", field)
           put("order", sort.string("order"))
         }
       }
       else -> bool(true)
     }
+  }
+
+  /**
+   * The aggregate a sort falls back to: `min`, or `sum` over a **stacked measure**.
+   *
+   * The distinction is upstream's and it is the right one. Sorting bars by a field that is one of
+   * the stack's own dimensions means picking a value each category already has once, so the
+   * smallest is the value; sorting them by a field the stack accumulates means asking which column
+   * is tallest, and the smallest segment of a column says nothing about that.
+   */
+  private fun defaultSortOp(view: UnitView, field: String?): String {
+    val stack = view.stack ?: return "min"
+    val dimensions = stack.groupbyFields + stack.stackBy.mapNotNull { it.field }
+    return if (field != null && field !in dimensions) "sum" else "min"
   }
 
   /** `defaultRange()` in `compile/scale/range.ts`. */
@@ -346,7 +368,7 @@ internal object Scales {
     }
 
     if (def.bin is Binning.Bin && !hasDiscreteDomain(type)) {
-      set("bins", signalRef("${Fields.binToString(def.bin.params)}_${def.field}_bins"))
+      set("bins", signalRef(binSignal(view, def)))
     }
 
     if (channel in COLOR_CHANNELS && def.type != MeasureType.NOMINAL) {
@@ -449,4 +471,14 @@ internal object Scales {
     }
     return false
   }
+
+  /**
+   * The signal the `bin` transform publishes its chosen boundaries as.
+   *
+   * Named through the **view**, exactly as the transform names it. Inside a facet every view is
+   * `child_`, so a scale reading the unprefixed name reads a signal that is not there and a binned
+   * trellis loses its domain; the two spellings agreed for only as long as the prefix was empty.
+   */
+  private fun binSignal(view: UnitView, def: ChannelDef): String =
+    view.prefixed("${Fields.binToString((def.bin as Binning.Bin).params)}_${def.field}_bins")
 }

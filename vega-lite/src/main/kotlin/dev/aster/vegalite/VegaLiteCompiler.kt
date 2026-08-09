@@ -434,11 +434,18 @@ private class Compilation(
   private fun domainValue(component: ScaleComponent): VegaValue? {
     val domains = component.domains
     if (domains.isEmpty()) return null
-    if (domains.size == 1) return domains.first()
+    if (domains.size == 1) {
+      val only = domains.first() as? VegaValue.Obj ?: return domains.first()
+      val sort = simplifySort(only["sort"], only.string("field")) ?: return only
+      return obj {
+        only.fields.forEach { (key, value) -> if (key != "sort") put(key, value) }
+        put("sort", sort.takeUnless { it == VegaValue.Bool(true) && only["sort"] == null })
+      }
+    }
 
     // A sort every entry agrees on belongs to the union rather than to each of its parts: sorting
     // the pieces separately and concatenating them is a different answer from sorting the whole.
-    val sorts = domains.map { it["sort"] }.distinct()
+    val sorts = domains.map { simplifySort(it["sort"], null) ?: it["sort"] }.distinct()
     val sharedSort = if (sorts.size == 1) sorts.single() else null
     val entries =
       if (sharedSort == null) {
@@ -465,6 +472,35 @@ private class Compilation(
         put("sort", sharedSort)
       }
     }
+  }
+
+  /**
+   * The three ways a domain sort says less than it was built with — `assembleDomain` in
+   * `compile/scale/domain.ts`.
+   *
+   * Each removes something that is either implied or meaningless: a `count` has no field to count
+   * *of*, `ascending` is the default order, and a sort on the domain's own field is the natural
+   * order with at most a direction to it. They matter because the output is compared property by
+   * property, and a sort saying the same thing twice is a different specification.
+   *
+   * @param domainField the field this domain is *of*, or null where several are being merged and no
+   *   single one is.
+   * @return the simplified sort, or null when there was nothing to simplify.
+   */
+  private fun simplifySort(sort: VegaValue?, domainField: String?): VegaValue? {
+    val obj = sort as? VegaValue.Obj ?: return null
+    var simplified = obj
+    if (obj.string("op") == "count" && obj.has("field")) {
+      simplified = obj { simplified.fields.forEach { (k, v) -> if (k != "field") put(k, v) } }
+    }
+    if (simplified.string("order") == "ascending") {
+      simplified = obj { simplified.fields.forEach { (k, v) -> if (k != "order") put(k, v) } }
+    }
+    if (domainField != null && simplified.string("field") == domainField) {
+      val order = simplified.string("order")
+      simplified = if (order == null) return VegaValue.Bool(true) else obj { put("order", order) }
+    }
+    return if (simplified.fields == obj.fields) null else simplified
   }
 
   // -----------------------------------------------------------------------------------------

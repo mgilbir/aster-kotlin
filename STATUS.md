@@ -454,7 +454,7 @@ produces a chart that is plausible and wrong.
 every fixture with upstream and checks two things:
 
 1. `VegaLiteFixtureTest` compares the Vega this compiler emits against upstream's, property by
-   property. Thirty-three fixtures, and all of them match exactly — every transform, scale, signal,
+   property. Thirty-seven fixtures, and all of them match exactly — every transform, scale, signal,
    axis, legend and mark encoding, down to the accessibility description string.
 2. `VegaLiteFixtureDifferentialTest` runs that output through this engine's own runtime and compares
    the scene against the one upstream draws. Every mark of every fixture matches, and nothing is
@@ -539,7 +539,7 @@ own) and `grouped-bar` on the step arithmetic.
 
 ### Where the compiler stands, and what it still refuses
 
-Thirty-three fixtures, each matching upstream's compiler property for property and drawing the chart
+Thirty-seven fixtures, each matching upstream's compiler property for property and drawing the chart
 upstream draws. The grammar covered: a single view or a layer of them, eleven marks including `arc`,
 the Cartesian and polar position pairs, nested offsets, fourteen of fifteen transforms, sorting,
 binning, time units, stacking, faceting by `row` and `column`, conditional encodings, a line or an
@@ -657,6 +657,36 @@ constructs the corpus had never combined, and all four failed on arrival:
 And one that is not a silence but a wrong reader: **a mark's spoken description was assembled from
 the guide titles**, so hiding an axis title with `axis: {title: null}` — a restyling — dropped the
 whole channel out of what a screen reader says. Upstream reads the *field's* own title there.
+
+### Four more, aimed at the same places from a different angle
+
+`facet-legend`, `binned-facet`, `text-format` and `sort-array`. The first passed on arrival — a
+legend beside a trellis is placed against the whole grid and already was — and the other three
+found four more silences:
+
+- **A binned field inside a facet lost its domain.** The `bin` transform publishes the boundaries it
+  chose as a signal, and the transform names that signal through the *view* while the scale reading
+  it did not: inside a facet every view is `child_`, so the scale read a signal that was not there.
+  The two spellings agreed for exactly as long as the prefix was empty.
+- **A `format` on a channel was ignored.** `{"field": "v", "format": "$.2f"}` on a text mark drew
+  the bare number, because the text expression read `config.numberFormat` and never the definition's
+  own. Alongside it: the value a **normalized** stack announces is the share it takes, `end - start`
+  through `config.normalizedNumberFormat`, not the quantity behind it — a description that says 3
+  where the bar plainly shows three quarters.
+- **A written-out `sort` order was dropped entirely.** Vega has no comparator that takes a list, so
+  upstream computes each row's *place* in the list as a column and sorts the domain on the smallest
+  place a category carries; a value the list never names falls past the end, which is what puts it
+  last. Ours emitted `sort: true` and drew the categories alphabetically — a chart with the right
+  bars in the wrong order and nothing said about it.
+- **A sort with no `op` defaulted to `min` where upstream uses `sum`.** The distinction is whether
+  the sort field is one of the stack's own dimensions: sorting bars by a field each category already
+  has once means the smallest *is* the value, and sorting them by a field the stack accumulates
+  means asking which column is tallest, which the smallest segment says nothing about.
+
+Three simplifications the assembled domain makes were missing with it, and they are not cosmetic
+when the comparison is property by property: a `count` has no field to count *of*, `ascending` is
+the default order, and a sort on the domain's own field is the natural order with at most a
+direction to it.
 
 ### One difference is still open
 
