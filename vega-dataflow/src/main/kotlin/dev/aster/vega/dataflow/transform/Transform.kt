@@ -265,6 +265,8 @@ public class TransformRegistry(transforms: List<Transform>) {
           ResolveFilterTransform,
           IsocontourTransform,
           GeoPathTransform,
+          Kde2dTransform,
+          HeatmapTransform,
         )
       )
   }

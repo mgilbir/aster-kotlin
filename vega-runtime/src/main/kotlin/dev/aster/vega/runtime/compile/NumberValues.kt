@@ -69,6 +69,20 @@ public class NumberResolver(
         }
     }
 
+  /**
+   * A guide's title, which upstream lets a signal supply as **lines** rather than as one string.
+   *
+   * `['Local Density', '(Normalized)']` is a two-line title: upstream's `textLines` reads an array
+   * as the lines and collapses a one-element array to its element. Stringifying it instead joins
+   * the lines with a comma and draws them on one, which is a different chart and a wider legend.
+   */
+  public fun resolveLines(expression: String, owner: String): String? {
+    val value = resolveValue(expression, owner) ?: return null
+    if (value !is VegaValue.Arr) return JsSemantics.toStringValue(value)
+    if (value.values.size == 1) return JsSemantics.toStringValue(value.values.first())
+    return value.values.joinToString("\n") { JsSemantics.toStringValue(it) }
+  }
+
   /** The raw value of a signal, for a property whose shape depends on what the signal holds. */
   public fun resolveValue(expression: String, owner: String): VegaValue? =
     when (val compiled = expressions.compile(expression)) {

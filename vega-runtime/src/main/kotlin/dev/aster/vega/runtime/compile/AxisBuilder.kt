@@ -377,7 +377,9 @@ public class AxisBuilder(
 
     // A title may be a signal: a chart that lets a control choose the measure retitles the axis
     // with the choice, and there is no constant to write down.
-    val titleText = spec.title ?: spec.titleExpression?.let { numbers.resolveText(it, spec.scale) }
+    // `resolveLines`, not `resolveText`: an axis title given as an array is two lines, exactly as a
+    // legend's is, and stringifying it would join them with a comma on one line.
+    val titleText = spec.title ?: spec.titleExpression?.let { numbers.resolveLines(it, spec.scale) }
     val titleNode = titleText?.let { title(spec, it, scale, tickAndLabelReach) }
     titleNode?.let { children += it }
 
@@ -395,7 +397,8 @@ public class AxisBuilder(
             accessibility =
               GuideCaption.axis(
                   spec.orient.name.lowercase(),
-                  titleText,
+                  // Spoken as one phrase; see LegendBuilder.caption for why the newline goes.
+                  titleText?.replace("\n", " "),
                   scale,
                   scaleTypes[spec.scale],
                   specifier,

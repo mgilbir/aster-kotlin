@@ -9,6 +9,7 @@ import dev.aster.vega.scene.ImageNode
 import dev.aster.vega.scene.PathCommand
 import dev.aster.vega.scene.PathData
 import dev.aster.vega.scene.PathNode
+import dev.aster.vega.scene.PngEncoder
 import dev.aster.vega.scene.RectD
 import dev.aster.vega.scene.RectNode
 import dev.aster.vega.scene.RuleNode
@@ -320,7 +321,10 @@ public class SvgRenderer(private val options: SvgOptions = SvgOptions()) {
     warnings: MutableList<SvgExportWarning>,
     depth: Int,
   ) {
-    if (options.imagePolicy == SvgImagePolicy.REQUIRE_RESOLVED) {
+    // Pixels the mark carries are already resolved — there is nothing to fetch — so they are
+    // encoded straight into the document whatever the policy says about addresses.
+    val href = node.raster?.let { PngEncoder.dataUrl(it) }
+    if (href == null && options.imagePolicy == SvgImagePolicy.REQUIRE_RESOLVED) {
       warnings.add(
         SvgExportWarning(
           code = dev.aster.vega.model.DiagnosticCodes.EXPORT_IMAGE_UNRESOLVED,
@@ -341,7 +345,7 @@ public class SvgRenderer(private val options: SvgOptions = SvgOptions()) {
     out.append(if (node.fit == ImageFit.CONTAIN) "xMidYMid meet" else "none")
     out.append('"')
     if (!node.smooth) out.append(" image-rendering=\"pixelated\"")
-    out.append(" xlink:href=\"").append(escapeXml(node.url)).append('"')
+    out.append(" xlink:href=\"").append(escapeXml(href ?: node.url)).append('"')
     appendTransform(out, node.transform)
     appendOpacity(out, node.opacity)
     appendAccessibility(out, node)

@@ -39,15 +39,14 @@ public object GeoPathTransform : Transform {
     val path = params.string("field")
     val as0 = params.string("as") ?: "path"
     return input.map { datum ->
-      // `field` is written as an accessor — `"datum.contour"` — because upstream compiles it into
-      // one. The leading `datum.` is the accessor's own subject and not part of the column name.
-      val source =
-        when {
-          path == null -> datum
-          path.startsWith("datum.") -> datum.field(path.removePrefix("datum."))
-          else -> datum.field(path)
-        }
-      datum.withField(as0, VegaValue.Str(outline(source)))
+      // `field` is an accessor path — `"datum.contour"` on a mark transform, where the row is the
+      // scene item's own `datum`, and a plain column name on a dataset transform.
+      val source = if (path == null) datum else datum.field(path)
+      // **Null**, not an empty string, when the geometry produced nothing: d3's path generator
+      // returns null, and upstream's path mark measures a null path as `(0, 0, 0, 0)` where a
+      // string that draws nothing leaves the bounds empty. The two look identical and are not.
+      val drawn = outline(source)
+      datum.withField(as0, if (drawn.isEmpty()) VegaValue.Null else VegaValue.Str(drawn))
     }
   }
 

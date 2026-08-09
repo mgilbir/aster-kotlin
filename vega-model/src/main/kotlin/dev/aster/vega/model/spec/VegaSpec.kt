@@ -843,6 +843,13 @@ public data class LegendSpec(
   /** `null` means the per-orient default: vertical at the sides, horizontal above and below. */
   val direction: Direction? = null,
   val title: String? = null,
+  /**
+   * `title: {"signal": "..."}` — the legend names itself from a signal.
+   *
+   * The same shape an axis title takes, and for the same reason: a chart whose measure is chosen by
+   * a control has no constant to write down.
+   */
+  val titleExpression: String? = null,
   /** Explicit entry values, overriding whatever the scale would generate. */
   val values: List<VegaValue>? = null,
   /**

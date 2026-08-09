@@ -403,12 +403,23 @@ public object Differential {
         "y" to anchor.y,
         "width" to node.width,
         "height" to node.height,
-      ),
+      ) +
+        (node.raster?.let {
+          mapOf(
+            "rasterWidth" to it.width.toDouble(),
+            "rasterHeight" to it.height.toDouble(),
+          )
+        } ?: emptyMap()),
       linkedMapOf(
         "url" to node.url,
         "align" to node.align.name.lowercase(),
         "baseline" to node.baseline.name.lowercase(),
-      ),
+      ) +
+        // The pixels, as a digest. An image mark is otherwise compared by its box alone, so a
+        // heatmap that painted nothing would agree with one that painted the right thing in the
+        // right place. Written as a string on both sides because the hash is 64-bit and JSON's
+        // numbers are doubles.
+        (node.raster?.let { mapOf("rasterDigest" to it.digest.toString()) } ?: emptyMap()),
     )
   }
 

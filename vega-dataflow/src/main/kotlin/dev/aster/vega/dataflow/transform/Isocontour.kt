@@ -23,6 +23,11 @@ internal class Grid(
   val y1: Double = 0.0,
   val scale: Double? = null,
   val translate: List<Double>? = null,
+  /**
+   * The window of the grid a `heatmap` rasterises; the whole grid when a `kde2d` did not pad it.
+   */
+  val x2: Double? = null,
+  val y2: Double? = null,
 ) {
   companion object {
     fun from(value: VegaValue): Grid? {
@@ -39,6 +44,8 @@ internal class Grid(
         y1 = obj.fields["y1"]?.asDouble() ?: 0.0,
         scale = obj.fields["scale"]?.asDouble()?.takeIf { !it.isNaN() },
         translate = (obj.fields["translate"] as? VegaValue.Arr)?.values?.map { it.asDouble() },
+        x2 = obj.fields["x2"]?.asDouble()?.takeIf { !it.isNaN() },
+        y2 = obj.fields["y2"]?.asDouble()?.takeIf { !it.isNaN() },
       )
     }
   }
@@ -352,6 +359,20 @@ public object IsocontourTransform : Transform {
     val explicit =
       (params.fields["thresholds"] as? VegaValue.Arr)?.values?.map { JsSemantics.toNumber(it) }
 
+    // `resolve: "shared"` computes one set of thresholds for **every** grid, from the extent of
+    // their *maxima* rather than of their values — so three densities drawn together are cut at the
+    // same heights and can be read against each other. The default is per grid, where each is cut
+    // at its own.
+    val shared =
+      if (explicit != null || params.string("resolve") != "shared") {
+        null
+      } else {
+        val maxima = input.mapNotNull { datum ->
+          Grid.from(if (path == null) datum else datum.field(path))?.values?.maxOrNull()
+        }
+        quantize(maxima, params)
+      }
+
     val output = mutableListOf<VegaValue>()
     for (datum in input) {
       val source = if (path == null) datum else datum.field(path)
@@ -365,7 +386,7 @@ public object IsocontourTransform : Transform {
         )
         return input
       }
-      val thresholds = explicit ?: levels(grid, params)
+      val thresholds = explicit ?: shared ?: quantize(grid.values.asList(), params)
       for (value in thresholds) {
         val polygons = MarchingSquares.contour(grid.values, grid.width, grid.height, value, smooth)
         val placed = transformed(polygons, grid, datum, params, context)
@@ -390,11 +411,11 @@ public object IsocontourTransform : Transform {
    * `start + step` up to but **not including** `stop` — so ten levels are ten interior contours,
    * not ten boundaries.
    */
-  private fun levels(grid: Grid, params: VegaValue.Obj): List<Double> {
+  private fun quantize(values: List<Double>, params: VegaValue.Obj): List<Double> {
     val count = params.number("levels")?.toInt() ?: 10
     val nice = params.boolean("nice") ?: false
     val zero = params.boolean("zero") ?: true
-    val usable = grid.values.filter { !it.isNaN() }
+    val usable = values.filter { !it.isNaN() }
     if (usable.isEmpty()) return emptyList()
     val start = if (zero) minOf(usable.min(), 0.0) else usable.min()
     val stop = usable.max()

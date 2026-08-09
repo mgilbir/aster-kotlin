@@ -12,6 +12,7 @@ import dev.aster.vega.model.VegaValue
 import dev.aster.vega.model.asDouble
 import dev.aster.vega.model.asString
 import dev.aster.vega.model.field
+import dev.aster.vega.model.isMissing
 import dev.aster.vega.model.roundHalfUp
 import dev.aster.vega.model.spec.ChannelValue
 import dev.aster.vega.model.spec.EncodeEntry
@@ -37,6 +38,7 @@ import dev.aster.vega.scene.PathCommand
 import dev.aster.vega.scene.PathData
 import dev.aster.vega.scene.PathNode
 import dev.aster.vega.scene.PointD
+import dev.aster.vega.scene.RasterImage
 import dev.aster.vega.scene.RectD
 import dev.aster.vega.scene.RectNode
 import dev.aster.vega.scene.RuleNode
@@ -349,10 +351,11 @@ public class MarkEncoder(
     // A mark-level `geopath` writes the outline onto the *row* rather than through an encode
     // channel — upstream writes it onto the scene item and its renderer reads the item's own
     // `path` — so a mark with no `path` channel falls back to the row's own column.
-    val source =
-      string(channels["path"], datum)
-        ?: datum.field("path").takeIf { it is VegaValue.Str }?.asString()
-        ?: ""
+    val declared = channels["path"]?.let { value(it, datum) } ?: datum.field("path")
+    val source = (declared as? VegaValue.Str)?.value ?: ""
+    // A path the specification never produced at all measures as a zero rectangle rather than as
+    // nothing; see [PathNode.absent].
+    val absent = declared.isMissing
     val parsed = SvgPath.parse(source)
     if (source.isNotEmpty() && !parsed.complete) {
       reportOnce(
@@ -381,6 +384,7 @@ public class MarkEncoder(
     return PathNode(
       id = ids.allocate(),
       path = parsed.path,
+      absent = absent,
       transform = transform,
       fill = style.fill,
       stroke = style.stroke,
@@ -963,11 +967,18 @@ public class MarkEncoder(
    */
   private fun image(spec: MarkSpec, datum: VegaValue, index: Int): SceneNode? {
     val channels = spec.encode.effective
+    // An `image` channel carries the pixels themselves — a `heatmap`'s output — where `url` carries
+    // an address. Upstream distinguishes them the same way and its image mark takes either.
+    // A mark-level `heatmap` writes its pixels onto the *row* rather than through an encode
+    // channel, exactly as `geopath` writes an outline — upstream writes onto the scene item and its
+    // renderer reads the item's own `image`. So a mark with no `image` channel falls back to the
+    // row's own column.
+    val raster = rasterOf(channels["image"], datum) ?: rasterFrom(datum.field("image"))
     val url = string(channels["url"], datum)
-    if (url.isNullOrEmpty()) {
+    if (raster == null && url.isNullOrEmpty()) {
       diagnostics.error(
         DiagnosticCodes.PARSE_MISSING_PROPERTY,
-        "An image mark needs a 'url'; nothing was drawn for this row",
+        "An image mark needs a 'url' or an 'image'; nothing was drawn for this row",
         operator = spec.name ?: "image",
       )
       return null
@@ -977,7 +988,8 @@ public class MarkEncoder(
     if (width == null || height == null) {
       diagnostics.warn(
         DiagnosticCodes.EXPORT_IMAGE_UNRESOLVED,
-        "Image '$url' has no explicit ${if (width == null) "width" else "height"}; upstream takes " +
+        "Image '${url ?: "(pixels)"}' has no explicit " +
+          "${if (width == null) "width" else "height"}; upstream takes " +
           "it from the image's own pixels, which only the renderer has, so the mark was placed " +
           "with a zero extent",
         operator = spec.name ?: "image",
@@ -989,7 +1001,8 @@ public class MarkEncoder(
     val style = style(channels, datum, spec)
     return ImageNode(
       id = ids.allocate(),
-      url = url,
+      url = url ?: "",
+      raster = raster,
       x = number(channels["x"], datum) ?: 0.0,
       y = number(channels["y"], datum) ?: 0.0,
       width = w,
@@ -1072,6 +1085,24 @@ public class MarkEncoder(
           null
         }
     }
+
+  /**
+   * The pixels an `image` channel resolves to, as a `heatmap` writes them.
+   *
+   * `{width, height, pixels}` with each pixel packed `0xAARRGGBB`. Anything else is not an image
+   * and is left to the `url` path, which reports if there is nothing there either.
+   */
+  private fun rasterOf(channel: ChannelValue?, datum: VegaValue): RasterImage? =
+    rasterFrom(channel?.let { value(it, datum) } ?: VegaValue.Null)
+
+  private fun rasterFrom(value: VegaValue): RasterImage? {
+    val resolved = value as? VegaValue.Obj ?: return null
+    val width = resolved.fields["width"]?.asDouble()?.toInt() ?: return null
+    val height = resolved.fields["height"]?.asDouble()?.toInt() ?: return null
+    val pixels = (resolved.fields["pixels"] as? VegaValue.Arr)?.values ?: return null
+    if (width < 0 || height < 0 || pixels.size != width * height) return null
+    return RasterImage(width, height, IntArray(pixels.size) { pixels[it].asDouble().toInt() })
+  }
 
   private fun metadata(
     spec: MarkSpec,

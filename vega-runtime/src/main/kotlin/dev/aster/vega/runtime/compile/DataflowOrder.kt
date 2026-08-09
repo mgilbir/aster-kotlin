@@ -293,9 +293,29 @@ internal class DataflowOrder(
     private fun collectTransformExpressions(transform: VegaValue, into: MutableSet<Operator>) {
       val obj = transform as? VegaValue.Obj ?: return
       val type = (obj.fields["type"] as? VegaValue.Str)?.value?.lowercase()
-      val parameter = EXPRESSION_PARAMETERS[type] ?: return
-      val source = (obj.fields[parameter] as? VegaValue.Str)?.value ?: return
-      into.addAll(readsOf(source))
+      EXPRESSION_PARAMETERS[type]?.let { parameter ->
+        (obj.fields[parameter] as? VegaValue.Str)?.value?.let { into.addAll(readsOf(it)) }
+      }
+      collectExprObjects(obj, into)
+    }
+
+    /**
+     * Every `{"expr": "..."}` anywhere in a parameter tree, however deeply nested.
+     *
+     * The second of the two spellings a per-row expression takes. Three parameters hold one as a
+     * bare string because upstream declares them `type: 'expr'`; everywhere else it is this object
+     * standing in for a field accessor, which is how `kde2d` takes `{"x": {"expr": "scale('x',
+     * datum.Horsepower)"}}`. Walking the tree for it is what upstream's AST walk amounts to.
+     */
+    private fun collectExprObjects(value: VegaValue, into: MutableSet<Operator>) {
+      when (value) {
+        is VegaValue.Obj -> {
+          (value.fields["expr"] as? VegaValue.Str)?.value?.let { into.addAll(readsOf(it)) }
+          value.fields.values.forEach { collectExprObjects(it, into) }
+        }
+        is VegaValue.Arr -> value.values.forEach { collectExprObjects(it, into) }
+        else -> Unit
+      }
     }
 
     /**

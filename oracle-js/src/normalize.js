@@ -50,6 +50,35 @@ const STYLE_CHANNELS = ['fill', 'stroke', 'strokeWidth', 'opacity', 'fillOpacity
 const TEXT_CHANNELS = ['text', 'align', 'baseline', 'font', 'fontSize', 'fontWeight', 'fontStyle', 'angle'];
 
 /**
+ * FNV-1a over a canvas's pixels, in the packed `0xAARRGGBB` order the Kotlin scene stores.
+ *
+ * Read back with `getImageData`, which is the only way to see what a `heatmap` actually painted:
+ * upstream keeps a `<canvas>` on the scene item, and comparing an image mark by its box alone would
+ * let a blank one through. Returned as a *string*, because the value overflows a double's exact
+ * integer range and JSON would round it.
+ */
+function rasterDigest(image) {
+  if (!image || typeof image.getContext !== 'function') return undefined;
+  const { width, height } = image;
+  if (!width || !height) return undefined;
+  const pix = image.getContext('2d').getImageData(0, 0, width, height).data;
+  // BigInt, because the hash is 64-bit and a double loses the low bits after 2^53.
+  const MASK = (1n << 64n) - 1n;
+  let hash = 0xcbf29ce484222325n;
+  for (let i = 0; i < pix.length; i += 4) {
+    const packed = (BigInt(pix[i + 3]) << 24n) | (BigInt(pix[i]) << 16n) | (BigInt(pix[i + 1]) << 8n) | BigInt(pix[i + 2]);
+    let value = packed;
+    for (let b = 0; b < 4; ++b) {
+      hash = (hash ^ (value & 0xffn)) & MASK;
+      hash = (hash * 0x100000001b3n) & MASK;
+      value >>= 8n;
+    }
+  }
+  // As a signed 64-bit value, which is what a Kotlin `Long` prints.
+  return BigInt.asIntN(64, hash).toString();
+}
+
+/**
  * A numeric channel written as a string, read as the number it is.
  *
  * A specification may write `"labelFontSize": "12"`, and upstream carries that straight onto the
@@ -324,6 +353,16 @@ function record(type, role, item, dx, dy, precision) {
     entry.url = item.url;
     entry.align = item.align || 'left';
     entry.baseline = item.baseline || 'top';
+    // An image mark that carries *pixels* rather than an address — a `heatmap`'s output — is
+    // otherwise compared only by its box, so a blank raster in the right place would pass. The
+    // digest is a cheap stand-in for the pixels themselves, which no reference file should hold:
+    // the same FNV-1a over the same packed ARGB values the Kotlin side computes.
+    const digest = rasterDigest(item.image);
+    if (digest !== undefined) {
+      entry.rasterWidth = item.image.width;
+      entry.rasterHeight = item.image.height;
+      entry.rasterDigest = digest;
+    }
   }
 
   for (const channel of STYLE_CHANNELS) {
@@ -363,8 +402,12 @@ function record(type, role, item, dx, dy, precision) {
       }
     }
     // A text mark's content is whatever the field held, so a numeric field gives a numeric `text`.
-    // Both engines draw its string form, so compare that rather than its type.
-    if (entry.text !== undefined) entry.text = String(entry.text);
+    // Both engines draw its string form, so compare that rather than its type — and an **array** is
+    // upstream's multi-line form, so its lines are joined the way both engines lay them out rather
+    // than the way `String()` would, with commas.
+    if (entry.text !== undefined) {
+      entry.text = Array.isArray(entry.text) ? entry.text.join('\n') : String(entry.text);
+    }
   }
   return entry;
 }

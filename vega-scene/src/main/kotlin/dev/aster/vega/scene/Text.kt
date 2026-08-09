@@ -140,7 +140,10 @@ public class MetricTextEngine(
 
   override fun layout(text: TextRun, constraint: SizeD?): TextLayout {
     val style = text.style
-    val lineHeight = style.lineHeight ?: (style.fontSize * 1.2)
+    // Upstream's default is `fontSize + 2`, not a ratio — `vega-scenegraph`'s `lineHeight(item)`.
+    // The two agree at 10 point and part company everywhere else, which nothing noticed until a
+    // legend title arrived with two lines in it.
+    val lineHeight = style.lineHeight ?: (style.fontSize + 2.0)
     val ascent = style.fontSize * ascentRatio
     val descent = style.fontSize * descentRatio
 

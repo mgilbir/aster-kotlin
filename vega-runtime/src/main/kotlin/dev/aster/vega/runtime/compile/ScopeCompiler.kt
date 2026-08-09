@@ -581,7 +581,22 @@ internal class ScopeCompiler(
   ): List<VegaValue> {
     if (spec.transform.isEmpty()) return rows
     val context = MarkTransformScope(diagnostics, expressions, scope)
-    return TransformPipeline().run(rows, spec.transform, context)
+    // A mark transform sees **items**, and an item carries its row under `datum` — which is why
+    // these are written `{"field": "datum.contour"}` and `scale('color', datum.datum.Origin)`. The
+    // rows are wrapped to look like that, and whatever the transforms wrote is merged back onto the
+    // row afterwards, so the encoding that follows sees one object rather than two.
+    val items = rows.map { VegaValue.Obj(linkedMapOf("datum" to it)) }
+    return TransformPipeline().run(items, spec.transform, context).map { item ->
+      val row = item.field("datum")
+      val written = (item as? VegaValue.Obj)?.fields?.filterKeys { it != "datum" }.orEmpty()
+      if (written.isEmpty()) row
+      else
+        VegaValue.Obj(
+          LinkedHashMap((row as? VegaValue.Obj)?.fields.orEmpty()).apply {
+            putAll(written)
+          }
+        )
+    }
   }
 
   /** What a mark's own transforms may read: this scope's signals, datasets and scales. */

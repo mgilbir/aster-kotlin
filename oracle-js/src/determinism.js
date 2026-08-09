@@ -11,6 +11,7 @@
  * engines draw the *same* sequence from the *same* generator, in the same order.
  */
 import * as vega from 'vega';
+import { installCanvasShim } from './canvas-shim.js';
 
 /** Matches `RandomStream.DEFAULT_SEED`. */
 export const SEED = 42;
@@ -28,4 +29,8 @@ export const NOW = 1767225600000;
 export function pinDeterminism() {
   vega.setRandom(vega.randomLCG(SEED));
   Date.now = () => NOW;
+  // `heatmap` allocates a canvas and writes pixels into it. Plain Node has none, so the transform
+  // throws and the two examples built on it have no reference at all; see canvas-shim.js for why a
+  // buffer with no renderer behind it is a faithful oracle for that one transform.
+  installCanvasShim();
 }

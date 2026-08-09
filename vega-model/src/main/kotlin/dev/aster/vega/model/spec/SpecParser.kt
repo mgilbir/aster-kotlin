@@ -1651,6 +1651,8 @@ public class SpecParser {
         direction =
           obj.enumOrNull("direction", path, "legend direction") { Direction.fromName(it) },
         title = obj.fields["title"]?.takeIf { it is VegaValue.Str }?.asString(),
+        titleExpression =
+          (obj.fields["title"] as? VegaValue.Obj)?.fields?.get("signal")?.asString(),
         values = (obj.fields["values"] as? VegaValue.Arr)?.values,
         format = obj.fields["format"]?.takeIf { it is VegaValue.Str }?.asString(),
         tickCount = obj.numberOrSignal("tickCount", "$path.tickCount"),

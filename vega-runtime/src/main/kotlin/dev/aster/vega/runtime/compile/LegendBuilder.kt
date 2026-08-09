@@ -182,7 +182,11 @@ internal class LegendBuilder(
       if (type == LegendType.GRADIENT) entries.firstOrNull()?.transformedBounds?.bottom ?: 0.0
       else entries.fold(RectD.Empty) { acc, node -> acc.union(node.transformedBounds) }.bottom
     val title =
-      spec.title?.let { titleNode(spec, scaleName, it, padding, alongside, 0.5 * centreOver) }
+      // A legend may name itself from a signal, exactly as an axis does — a chart whose measure is
+      // chosen by a control has no constant to write down.
+      titleTextOf(spec, scaleName)?.let {
+        titleNode(spec, scaleName, it, padding, alongside, 0.5 * centreOver)
+      }
     val titleReach = title?.let { it.bounds.height + titlePadding } ?: 0.0
     val titleAside =
       if (alongside && title != null) ceil(title.bounds.width) + titlePadding else 0.0
@@ -237,6 +241,10 @@ internal class LegendBuilder(
    * @param alongside `titleOrient: "left"`, which also changes the title's anchor.
    * @param centre half the height the entries reach, for the vertical centring that anchor implies.
    */
+  /** The legend's title, whether written down or computed. */
+  private fun titleTextOf(spec: LegendSpec, scaleName: String): String? =
+    spec.title ?: spec.titleExpression?.let { numbers.resolveLines(it, scaleName) }
+
   private fun titleNode(
     spec: LegendSpec,
     scaleName: String,
@@ -830,7 +838,11 @@ internal class LegendBuilder(
     val scaleName = spec.scale ?: return null
     val scale = scales[scaleName] ?: return null
     val kind = if (resolveType(spec, scale) == LegendType.GRADIENT) "gradient" else "symbol"
-    return GuideCaption.legend(kind, spec.title, channels, scale, spec.format)
+    // A caption is spoken, not drawn, so a two-line title is read as one phrase: upstream's
+    // `array(item.text).join(' ')`. The lines reach here already joined by the newline the text
+    // node draws on, and turning them back into spaces is the same operation.
+    val title = titleTextOf(spec, scaleName)?.replace("\n", " ")
+    return GuideCaption.legend(kind, title, channels, scale, spec.format)
   }
 
   private fun node(built: Built, x: Double, y: Double): SceneNode =
