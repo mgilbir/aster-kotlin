@@ -60,16 +60,6 @@ internal class Parse(private val config: Config, private val diagnostics: Diagno
       )
       return null
     }
-    if (type == "boxplot") {
-      diagnostics.error(
-        VegaLiteDiagnostics.UNSUPPORTED_MARK,
-        "The `boxplot` composite mark is not implemented. `errorbar` and `errorband` are; a box " +
-          "plot needs the same summary plus a box, a median rule and the outliers that fall " +
-          "outside the whiskers, each of which is a layer of its own.",
-        jsonPath = "$path.mark",
-      )
-      return null
-    }
     if (type !in SUPPORTED_MARKS) {
       diagnostics.error(
         VegaLiteDiagnostics.UNSUPPORTED_MARK,

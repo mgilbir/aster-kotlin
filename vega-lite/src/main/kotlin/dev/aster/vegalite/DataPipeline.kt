@@ -22,7 +22,7 @@ internal class DataPipeline(
   fun build(source: SourceNode): Outputs {
     var head: DataNode = source
 
-    userTransforms()?.let { head = head.then(it) }
+    head = userTransforms(head)
     implicitParse()?.let { head = head.then(it) }
     binNode()?.let { head = head.then(it) }
     timeUnitNode()?.let { head = head.then(it) }
@@ -331,9 +331,20 @@ internal class DataPipeline(
     return if (expressions.isEmpty()) null else FilterInvalidNode(expressions.distinct())
   }
 
-  /** The `transform` block, translated by [Transforms]. */
-  private fun userTransforms(): PassThroughNode? {
-    val transforms = Transforms(diagnostics).translate(view.spec.transforms, "$.transform")
-    return if (transforms.isEmpty()) null else PassThroughNode(transforms)
+  /**
+   * The `transform` block, translated by [Transforms] — **one node per step**.
+   *
+   * A chain rather than a single node, because two views that begin with the same steps and then
+   * differ are one flow that forks, not two flows: only a per-step node lets the shared prefix be
+   * recognised as shared. It changes nothing where there is no fork, since consecutive steps land
+   * in the same dataset anyway; where there is one — a box plot's outliers and its whiskers both
+   * begin by finding the quartiles — it is the difference between computing them once and twice.
+   */
+  private fun userTransforms(head: DataNode): DataNode {
+    var last = head
+    for (transform in Transforms(diagnostics).translate(view.spec.transforms, "$.transform")) {
+      last = last.then(PassThroughNode(listOf(transform)))
+    }
+    return last
   }
 }

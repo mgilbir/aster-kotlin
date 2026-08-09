@@ -34,6 +34,26 @@ internal object Scales {
   fun hasDiscreteDomain(type: String): Boolean =
     type == "ordinal" || type == "band" || type == "point" || type == "bin-ordinal"
 
+  /**
+   * How capable a scale type is, for deciding which of two a shared channel takes.
+   *
+   * `SCALE_PRECEDENCE_INDEX` upstream, with its own reasons written in: the ordinal positions rank
+   * above the continuous ones "as they support more types of data", and `band` above `point`
+   * because it "is better for interaction".
+   */
+  fun precedence(type: String): Int =
+    when (type) {
+      "band" -> 11
+      "point" -> 10
+      "log",
+      "pow",
+      "sqrt",
+      "symlog",
+      "identity",
+      "sequential" -> 1
+      else -> 0
+    }
+
   fun hasContinuousDomain(type: String): Boolean =
     type in
       setOf(

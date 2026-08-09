@@ -454,7 +454,7 @@ produces a chart that is plausible and wrong.
 every fixture with upstream and checks two things:
 
 1. `VegaLiteFixtureTest` compares the Vega this compiler emits against upstream's, property by
-   property. Fifty-one fixtures, and all of them match exactly — every transform, scale, signal,
+   property. Fifty-two fixtures, and all of them match exactly — every transform, scale, signal,
    axis, legend and mark encoding, down to the accessibility description string.
 2. `VegaLiteFixtureDifferentialTest` runs that output through this engine's own runtime and compares
    the scene against the one upstream draws. Every mark of every fixture matches, and nothing is
@@ -539,7 +539,7 @@ own) and `grouped-bar` on the step arithmetic.
 
 ### Where the compiler stands, and what it still refuses
 
-Fifty-one fixtures, each matching upstream's compiler property for property and drawing the chart
+Fifty-two fixtures, each matching upstream's compiler property for property and drawing the chart
 upstream draws. The grammar covered: a single view or a layer of them, eleven marks including `arc`,
 the Cartesian and polar position pairs, nested offsets, fourteen of fifteen transforms, sorting,
 binning, time units, stacking, faceting by `row` and `column`, conditional encodings, a line or an
@@ -553,9 +553,6 @@ What it still refuses, by name, with the reason each is refused rather than appr
 - **`params`.** Selections and bound inputs. A conditional encoding whose condition is a **`test`**
   now compiles — that is a predicate on the row and needs nothing to be selected — so only a
   condition naming a `param` is refused, by itself, leaving the rest of the definition standing.
-- **`boxplot`**, the one composite mark still refused. `errorbar` and `errorband` compile and draw
-  (below); a box plot is the same summary plus a box, a median rule and the outliers falling
-  outside the whiskers, each a layer of its own.
 - **`lookup`**, whose joined dataset has to be assembled and named beside the view's own.
 - Geographic projections and the `geoshape` mark, which are out of scope for the first release for
   the same reason they are in Vega.
@@ -815,7 +812,7 @@ first is the kind that is hardest to notice because the chart looks finished:
   block stopped reaching a rule that named a style of its own. Nothing in the corpus named one —
   the composite marks are what do, each part being `["rule", "errorbar-rule"]`.
 
-### Two of the three composite marks
+### The composite marks
 
 `errorbar` and `errorband` compile and draw: `errorbar` (a standard error either side of a mean),
 `errorbar-iqr` (interquartile ranges, capped, drawn sideways) and `errorband` (a standard deviation
@@ -847,8 +844,30 @@ And one difference that is a deliberate refusal rather than a defect: an `extent
 scene has to be reproducible. The compiler emits it correctly; the runtime says why it cannot draw
 it, and `stderr` is what a symmetric error bar wants anyway.
 
-**`boxplot` is refused by name**, with what it needs written into the message: the same summary plus
-a box, a median rule and the outliers falling outside the whiskers, each a layer of its own.
+**`boxplot` compiles and draws too**, and it is the one that needed real machinery rather than more
+rules. A box plot is a *layer of layers*, and it has to be, because its parts read different tables:
+the quartiles are found first and joined back onto every row, which is what lets a row be compared
+with its own group's box; from there the flow forks, one branch keeping the rows outside the
+whiskers and drawing them as points, the other keeping the rows inside and taking their extremes as
+the whisker ends. The box itself is a third summary of the raw rows.
+
+Four things had to exist for that:
+
+- **Nested layer names.** A composite mark names its parts *relative to itself*, so a box plot's
+  whiskers are `layer_0_layer_1_layer_0`. The names are what a mark drawn from another mark reads
+  by, so flattening them is not cosmetic.
+- **One node per transform step.** Two views that begin with the same steps and then differ are one
+  flow that forks, not two flows — and only a per-step node lets the shared prefix be recognised as
+  shared. It changes nothing where there is no fork; where there is one, it is the difference
+  between finding the quartiles once and twice.
+- **The more capable scale type winning a shared channel.** A box plot's parts are a bar, two rules
+  and two ticks, and they share one x scale: upstream ranks the types and puts `band` above `point`
+  above everything continuous, "as they support more types of data". This engine had been keeping
+  whichever layer was declared first, which for a box plot is the outliers — a point scale, and a
+  chart whose boxes had no band to sit in.
+- **A conditional with no unconditional part falling back to the mark's own value.** A median tick
+  is white *unless* its box has no height, and the white has to come from somewhere for the rule to
+  have anything to fall through to.
 
 ### One difference is still open
 
@@ -881,7 +900,7 @@ the whole time.
 
 ## Verification
 
-- 2,000 JVM tests pass and none is skipped (`./gradlew test`); the portable core is most of
+- 2,007 JVM tests pass and none is skipped (`./gradlew test`); the portable core is most of
   them, and `./scripts/test-core.sh` runs it without an Android SDK.
 - Android lint is clean with `warningsAsErrors` on every Android module.
 - 63 instrumented tests pass on an API 37 arm64 emulator (`./scripts/test-android.sh`): 49 in

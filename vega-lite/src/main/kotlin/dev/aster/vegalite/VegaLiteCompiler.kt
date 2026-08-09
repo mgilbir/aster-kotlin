@@ -146,18 +146,29 @@ private class Compilation(
   private fun views(): List<UnitView>? {
     val normalize = Normalize(config, diagnostics)
     val composite = Composite(config, diagnostics)
-    // A composite mark stands for a whole layer of ordinary ones, and a path overlay may then apply
-    // to each of them — so the two passes compose, composite first.
-    fun expand(unit: VegaValue.Obj): List<VegaValue.Obj> =
-      (composite.normalize(unit) ?: listOf(unit)).flatMap {
-        normalize.pathOverlay(it) ?: listOf(it)
+    // A composite mark stands for a layer of ordinary ones and names its parts relative to itself —
+    // a box plot's whiskers are `layer_0_layer_1_layer_0`, being a layer inside a layer. A path
+    // overlay may then apply to each part and numbers its own results beneath that name.
+    fun expand(unit: VegaValue.Obj, prefix: String): List<Pair<String, VegaValue.Obj>> {
+      val parts = composite.normalize(unit) ?: listOf("" to unit)
+      return parts.flatMap { (name, part) ->
+        val here = listOf(prefix, name).filter { it.isNotEmpty() }.joinToString("_")
+        val overlaid = normalize.pathOverlay(part)
+        if (overlaid == null) {
+          listOf(here to part)
+        } else {
+          overlaid.mapIndexed { index, view ->
+            listOf(here, "layer_$index").filter { it.isNotEmpty() }.joinToString("_") to view
+          }
+        }
       }
+    }
     val layers = spec.array("layer")
     if (layers != null) {
       // Each declared layer may itself normalize into more than one — a line that draws its own
       // points is two marks — so the list is expanded first and only then numbered. The numbering
       // is what names `layer_0_marks`, so it has to count the views that actually exist.
-      val units = mutableListOf<Pair<VegaValue.Obj, String>>()
+      val units = mutableListOf<Pair<Pair<String, VegaValue.Obj>, String>>()
       layers.forEachIndexed { index, layer ->
         val child = layer as? VegaValue.Obj ?: return@forEachIndexed
         if (child.fields.containsKey("layer")) {
@@ -169,10 +180,11 @@ private class Compilation(
           return@forEachIndexed
         }
         val merged = inherited(child)
-        expand(merged).forEach { units += it to "$.layer[$index]" }
+        expand(merged, "layer_$index").forEach { units += it to "$.layer[$index]" }
       }
-      return units.mapIndexedNotNull { index, (unit, path) ->
-        parser.unit(unit, path)?.let { UnitView(it, config, "layer_$index") }
+      return units.mapNotNull { (named, path) ->
+        val (name, unit) = named
+        parser.unit(unit, path)?.let { UnitView(it, config, name) }
       }
     }
 
@@ -191,14 +203,9 @@ private class Compilation(
     // A single view that normalizes into several becomes a layer of them, which is exactly what
     // upstream does: the normalizer hands its result back to the compiler as a layer spec. One
     // that normalizes into exactly one stays a single view, and keeps its unprefixed names.
-    val composed = composite.normalize(spec) ?: normalize.pathOverlay(spec)?.let { it }
-    if (composed != null) {
-      val expanded = composed.flatMap { normalize.pathOverlay(it) ?: listOf(it) }
-      if (expanded.size == 1) {
-        return parser.unit(expanded.single(), "$")?.let { listOf(UnitView(it, config, "")) }
-      }
-      return expanded.mapIndexedNotNull { index, unit ->
-        parser.unit(unit, "$")?.let { UnitView(it, config, "layer_$index") }
+    if (composite.normalize(spec) != null || normalize.pathOverlay(spec) != null) {
+      return expand(spec, "").mapNotNull { (name, unit) ->
+        parser.unit(unit, "$")?.let { UnitView(it, config, name) }
       }
     }
 
@@ -411,11 +418,13 @@ private class Compilation(
         if (existing == null) {
           scales[channel] = ScaleComponent(channel, type)
         } else if (existing.type != type) {
-          diagnostics.warn(
-            VegaLiteDiagnostics.UNSUPPORTED_COMPOSITION,
-            "Two layers want different scale types on `$channel` (${existing.type} and $type); " +
-              "the first one wins, which is what a shared scale can do.",
-          )
+          // The *more capable* type wins rather than the first-declared one. Upstream ranks them
+          // (`SCALE_PRECEDENCE_INDEX`) and puts `band` above `point` above everything continuous,
+          // "as they support more types of data" and band "is better for interaction" — which is
+          // how a box plot, whose parts are a bar, a rule and two ticks, ends up on one band.
+          if (Scales.precedence(type) > Scales.precedence(existing.type)) {
+            scales[channel] = ScaleComponent(channel, type)
+          }
         }
       }
     }

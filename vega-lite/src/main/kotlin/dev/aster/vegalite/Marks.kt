@@ -395,7 +395,10 @@ internal object Marks {
           }
         }
       }
-    val main = valueRef(view, channel, def)
+    // With conditions but no unconditional part, the *mark* supplies the fallback — a median tick
+    // that is white unless its box has no height says only when it is not white, and the white has
+    // to come from somewhere for the rule to have anything to fall through to.
+    val main = valueRef(view, channel, def) ?: markDefault(view, channel, vgChannel)[vgChannel]
     if (rules.isEmpty())
       return if (main == null) VegaValue.EmptyObject else obj { put(vgChannel, main) }
     // The array form is used even for a single entry with a test, or Vega has no rule to fall back
@@ -457,7 +460,11 @@ internal object Marks {
     // are read as part of the bar, not as three separate objects.
     if (view.markDef.raw.fields["aria"] == VegaValue.Bool(false)) return@obj
     val mark = view.spec.mark
-    if (mark !in VG_MARK_NAMES) put("ariaRoleDescription", obj { put("value", mark) })
+    // A mark may say what it *is* rather than what it is drawn with: a box plot's box is a rect,
+    // and calling it a rect to a screen reader is naming the tool instead of the thing.
+    val stated = view.markDef.raw.fields["ariaRoleDescription"]
+    if (stated != null) put("ariaRoleDescription", obj { put("value", stated) })
+    else if (mark !in VG_MARK_NAMES) put("ariaRoleDescription", obj { put("value", mark) })
     val description = descriptionSignal(view)
     if (description != null) put("description", signalRef(description))
   }

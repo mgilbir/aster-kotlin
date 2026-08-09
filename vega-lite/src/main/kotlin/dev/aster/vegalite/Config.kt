@@ -216,6 +216,18 @@ internal class Config(private val user: VegaValue.Obj = VegaValue.EmptyObject) {
             put("band", obj { put("opacity", 0.3) })
             put("borders", VegaValue.Bool(false))
           },
+        // A box plot's parts, and the two numbers that decide its shape: how wide a box is, and how
+        // many interquartile ranges a whisker reaches before a point is an outlier.
+        "boxplot" to
+          obj {
+            put("size", 14)
+            put("extent", 1.5)
+            put("box", VegaValue.EmptyObject)
+            put("median", obj { put("color", "white") })
+            put("outliers", VegaValue.EmptyObject)
+            put("rule", VegaValue.EmptyObject)
+            put("ticks", VegaValue.Null)
+          },
       )
 
     /** `defaultScaleConfig`. */
