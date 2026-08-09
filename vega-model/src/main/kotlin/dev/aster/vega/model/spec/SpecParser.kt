@@ -193,6 +193,8 @@ private val LEGEND_CONSUMED =
     "size",
     "shape",
     "opacity",
+    "strokeWidth",
+    "strokeDash",
     "type",
     "orient",
     "direction",
@@ -1642,6 +1644,8 @@ public class SpecParser {
         size = obj.fields["size"]?.asString(),
         shape = obj.fields["shape"]?.asString(),
         opacity = obj.fields["opacity"]?.asString(),
+        strokeWidth = obj.fields["strokeWidth"]?.asString(),
+        strokeDash = obj.fields["strokeDash"]?.asString(),
         type = obj.enumOrNull("type", path, "legend type") { LegendType.fromName(it) },
         orient =
           obj.enumOrNull("orient", path, "legend orientation") { LegendOrient.fromName(it) }
@@ -1696,7 +1700,8 @@ public class SpecParser {
     if (spec.scale == null) {
       diagnostics.error(
         DiagnosticCodes.PARSE_MISSING_PROPERTY,
-        "A legend needs at least one of 'fill', 'stroke', 'size', 'shape' or 'opacity' to say " +
+        "A legend needs at least one of 'size', 'shape', 'fill', 'stroke', 'strokeWidth', " +
+          "'strokeDash' or 'opacity' to say " +
           "which scale it describes",
         jsonPath = path,
       )

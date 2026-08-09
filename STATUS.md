@@ -454,7 +454,7 @@ produces a chart that is plausible and wrong.
 every fixture with upstream and checks two things:
 
 1. `VegaLiteFixtureTest` compares the Vega this compiler emits against upstream's, property by
-   property. Forty-six fixtures, and all of them match exactly — every transform, scale, signal,
+   property. Forty-seven fixtures, and all of them match exactly — every transform, scale, signal,
    axis, legend and mark encoding, down to the accessibility description string.
 2. `VegaLiteFixtureDifferentialTest` runs that output through this engine's own runtime and compares
    the scene against the one upstream draws. Every mark of every fixture matches, and nothing is
@@ -539,7 +539,7 @@ own) and `grouped-bar` on the step arithmetic.
 
 ### Where the compiler stands, and what it still refuses
 
-Forty-six fixtures, each matching upstream's compiler property for property and drawing the chart
+Forty-seven fixtures, each matching upstream's compiler property for property and drawing the chart
 upstream draws. The grammar covered: a single view or a layer of them, eleven marks including `arc`,
 the Cartesian and polar position pairs, nested offsets, fourteen of fifteen transforms, sorting,
 binning, time units, stacking, faceting by `row` and `column`, conditional encodings, a line or an
@@ -784,11 +784,15 @@ drawn — and numbering is where a layered chart's datasets say who reads what:
   once `values` are given, and asking for a count beside the list is a second answer to a settled
   question.
 
-A third fixture was written for **`strokeDash`** and withdrawn: the channel is reported by name
-rather than drawn, which is a refusal and not a defect, and a fixture that cannot pass does not
-belong in a corpus where every fixture passes. It is the next channel worth adding, and what it
-needs is written down beside the refusal — an ordinal scale whose range values are *dash arrays*,
-and a legend that draws a stroke rather than a swatch.
+A third fixture was written for **`strokeDash`**, withdrawn when it turned out to name a refusal
+rather than a defect, and then put back once the refusal was gone. The channel tells two series
+apart by their *pattern* rather than by colour, which is what a reader who cannot rely on colour
+needs and what a chart printed in one ink has. Three things were missing and each was its own kind
+of silence: the compiler refused the channel outright; the runtime dropped a *scaled* dash array,
+drawing every series solid and identical; and a legend keyed on it was refused for naming no scale
+it recognised. A fourth came out of the same reading — upstream's canonical-scale order for a
+legend is `size, shape, fill, stroke, strokeWidth, strokeDash, opacity`, and this engine's began
+with `fill`, so a legend encoding both `fill` and `size` was titled from the wrong one.
 
 ### One difference is still open
 
@@ -821,7 +825,7 @@ the whole time.
 
 ## Verification
 
-- 1,965 JVM tests pass and none is skipped (`./gradlew test`); the portable core is most of
+- 1,972 JVM tests pass and none is skipped (`./gradlew test`); the portable core is most of
   them, and `./scripts/test-core.sh` runs it without an Android SDK.
 - Android lint is clean with `warningsAsErrors` on every Android module.
 - 63 instrumented tests pass on an API 37 arm64 emulator (`./scripts/test-android.sh`): 49 in

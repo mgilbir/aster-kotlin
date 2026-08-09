@@ -3,6 +3,7 @@ package dev.aster.vega.runtime.compile
 import dev.aster.vega.model.DiagnosticCodes
 import dev.aster.vega.model.DiagnosticCollector
 import dev.aster.vega.model.VegaValue
+import dev.aster.vega.model.asDouble
 import dev.aster.vega.model.asString
 import dev.aster.vega.model.spec.Direction
 import dev.aster.vega.model.spec.LegendOrient
@@ -596,7 +597,16 @@ internal class LegendBuilder(
    * swatch in grey and leaves it unfilled, rather than inventing a fill the scale never assigned.
    */
   private fun symbolStroke(spec: LegendSpec, value: VegaValue, width: Double): Stroke? {
-    val dash = spec.symbolStyle.dash ?: emptyList()
+    // A legend over a `strokeDash` scale draws each swatch in *its own* pattern — that is the whole
+    // of what it explains, and a column of identical solid strokes beside a chart of dashed ones
+    // says nothing. An explicit `symbolDash` still wins, as any stated property does.
+    val scaledDash: List<Double>? =
+      spec.strokeDash?.let { name ->
+        val scaled = scales[name]?.scale(value) as? VegaValue.Arr ?: return@let null
+        val pattern = scaled.values.map { it.asDouble() }
+        pattern.takeIf { it.isNotEmpty() && it.all { step -> step.isFinite() && step >= 0.0 } }
+      }
+    val dash = spec.symbolStyle.dash ?: scaledDash ?: emptyList()
     // An explicit `symbolStrokeColor` outlines every swatch, whatever the scales say.
     spec.symbolStyle.color
       ?.let { SceneColor.parse(it) }

@@ -337,7 +337,6 @@ internal class Parse(private val config: Config, private val diagnostics: Diagno
         "geojson",
         "xError",
         "yError",
-        "strokeDash",
         "angle",
         "url",
         "href",

@@ -261,6 +261,7 @@ internal object Marks {
     putAll(nonPosition(view, "fillOpacity", "fillOpacity"))
     putAll(nonPosition(view, "strokeOpacity", "strokeOpacity"))
     putAll(nonPosition(view, "strokeWidth", "strokeWidth"))
+    putAll(nonPosition(view, "strokeDash", "strokeDash"))
     putAll(aria(view))
   }
 

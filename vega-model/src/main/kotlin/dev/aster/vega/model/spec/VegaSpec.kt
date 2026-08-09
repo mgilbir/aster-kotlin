@@ -854,6 +854,12 @@ public data class LegendSpec(
   val size: String? = null,
   val shape: String? = null,
   val opacity: String? = null,
+  val strokeWidth: String? = null,
+  /**
+   * `strokeDash` — the channel that tells two series apart by their *pattern* rather than by
+   * colour, for a reader who cannot rely on colour or a chart that will be printed in one ink.
+   */
+  val strokeDash: String? = null,
   /** `null` means "derive from the scale type", which is what a specification usually wants. */
   val type: LegendType? = null,
   val orient: LegendOrient = LegendOrient.RIGHT,
@@ -913,11 +919,11 @@ public data class LegendSpec(
    * legend encoding both `fill` and `size` is titled and sized from the fill scale.
    */
   public val scale: String?
-    get() = fill ?: stroke ?: size ?: shape ?: opacity
+    get() = size ?: shape ?: fill ?: stroke ?: strokeWidth ?: strokeDash ?: opacity
 
   /** How many channels this legend maps, which is what decides whether the type can be derived. */
   public val channelCount: Int
-    get() = listOfNotNull(fill, stroke, size, shape, opacity).size
+    get() = listOfNotNull(fill, stroke, size, shape, opacity, strokeWidth, strokeDash).size
 }
 
 public enum class MarkType {

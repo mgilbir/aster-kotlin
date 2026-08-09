@@ -281,6 +281,17 @@ internal object Scales {
       "theta" -> arr(num(0), num(2 * kotlin.math.PI))
       "radius" -> arr(num(0), signalRef("min(${view.sizeSignal("x")},${view.sizeSignal("y")})/2"))
       "shape" -> str("symbol")
+      // Five patterns, written out rather than named: Vega has no `range.strokeDash` in its own
+      // configuration, so upstream carries the list itself and so must this. Solid first, because
+      // the first series should not look dashed.
+      "strokeDash" ->
+        arr(
+          arr(num(1), num(0)),
+          arr(num(4), num(2)),
+          arr(num(2), num(1)),
+          arr(num(1), num(1)),
+          arr(num(1), num(2), num(4), num(2)),
+        )
       "color",
       "fill",
       "stroke" ->

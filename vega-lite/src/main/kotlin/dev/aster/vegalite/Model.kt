@@ -208,6 +208,7 @@ internal object Channels {
       "strokeWidth",
       "size",
       "shape",
+      "strokeDash",
       "angle",
       "theta",
       "radius",
