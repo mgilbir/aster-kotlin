@@ -192,7 +192,7 @@ internal object Fields {
       else -> ""
     }
 
-  private fun varName(text: String): String {
+  fun varName(text: String): String {
     val cleaned = text.map { if (it.isLetterOrDigit() || it == '_') it else '_' }.joinToString("")
     return if (text.firstOrNull()?.isDigit() == true) "_$cleaned" else cleaned
   }

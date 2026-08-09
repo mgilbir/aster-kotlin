@@ -18,7 +18,8 @@ import dev.aster.vega.model.VegaValue
  */
 internal class Concat
 private constructor(
-  val children: List<VegaValue.Obj>,
+  /** Each plot and the name it is compiled under, which a *repetition* supplies for its copies. */
+  val children: List<Pair<String?, VegaValue.Obj>>,
   /**
    * How many plots to a row: 1 for a column, null for a row, and whatever `columns` says otherwise.
    *
@@ -62,7 +63,7 @@ private constructor(
         )
         return null
       }
-      val children = mutableListOf<VegaValue.Obj>()
+      val children = mutableListOf<Pair<String?, VegaValue.Obj>>()
       entries.forEachIndexed { index, entry ->
         val child = entry as? VegaValue.Obj ?: return@forEachIndexed
         for (nested in listOf("hconcat", "vconcat", "concat", "repeat", "facet")) {
@@ -85,11 +86,13 @@ private constructor(
           )
           return null
         }
-        children += obj {
-          put("data", spec.fields["data"])
-          put("transform", spec.fields["transform"])
-          putAll(child)
-        }
+        children +=
+          child.string("name") to
+            obj {
+              put("data", spec.fields["data"])
+              put("transform", spec.fields["transform"])
+              putAll(child)
+            }
       }
       val columns =
         when (kind) {

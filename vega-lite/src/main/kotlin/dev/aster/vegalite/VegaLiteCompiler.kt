@@ -61,7 +61,11 @@ public class VegaLiteCompiler {
 
 /** One compilation. Holds the counters and the components the whole chart shares. */
 private class Compilation(
-  private val spec: VegaValue.Obj,
+  /**
+   * The specification being compiled, which a `repeat` *replaces* with the concatenation it
+   * normalizes into before anything else looks at it.
+   */
+  private var spec: VegaValue.Obj,
   private val diagnostics: DiagnosticCollector,
 ) {
 
@@ -81,6 +85,9 @@ private class Compilation(
   fun run(): VegaLiteCompilation {
     reportUnsupportedTopLevel()
 
+    // A repetition is rewritten into a concatenation before anything is compiled, exactly as
+    // upstream normalizes it, so there is nothing further down that knows what `repeat` is.
+    if (spec.has("repeat")) spec = Repeat.normalize(spec, diagnostics) ?: return failed()
     concat = Concat.of(spec, diagnostics)
     val plots = plots() ?: return failed()
     if (plots.any { it.views.isEmpty() }) return failed()
@@ -210,7 +217,13 @@ private class Compilation(
     val found = concat
     val plots =
       if (found == null) listOf(Plot("", spec))
-      else found.children.mapIndexed { index, child -> Plot("concat_$index", child) }
+      else
+        found.children.mapIndexed { index, (name, child) ->
+          // A plot that names itself is compiled under that name, which is how a *repetition*'s
+          // copies come out `child__b` rather than `concat_0`: upstream's model takes `spec.name`
+          // over the name its parent offered it.
+          Plot(name ?: "concat_$index", child)
+        }
     for (plot in plots) {
       plot.views = views(plot.spec, plot.name) ?: return null
       plot.views.forEach { it.scalePrefix = plot.prefix }
@@ -380,7 +393,10 @@ private class Compilation(
           return@forEachIndexed
         }
         val merged = inherited(spec, child)
-        expand(merged, named("layer_$index")).forEach { units += it to "$.layer[$index]" }
+        // A layer that names itself is compiled under that name, which is what a `repeat` over
+        // `layer` relies on: its copies are `child__layer_b`, not `layer_0`.
+        val here = child.string("name") ?: named("layer_$index")
+        expand(merged, here).forEach { units += it to "$.layer[$index]" }
       }
       return units.mapNotNull { (named, path) ->
         val (name, unit) = named

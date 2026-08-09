@@ -454,7 +454,7 @@ produces a chart that is plausible and wrong.
 every fixture with upstream and checks two things:
 
 1. `VegaLiteFixtureTest` compares the Vega this compiler emits against upstream's, property by
-   property. Fifty-five fixtures, and all of them match exactly — every transform, scale, signal,
+   property. Fifty-eight fixtures, and all of them match exactly — every transform, scale, signal,
    axis, legend and mark encoding, down to the accessibility description string.
 2. `VegaLiteFixtureDifferentialTest` runs that output through this engine's own runtime and compares
    the scene against the one upstream draws. Every mark of every fixture matches, and nothing is
@@ -539,18 +539,18 @@ own) and `grouped-bar` on the step arithmetic.
 
 ### Where the compiler stands, and what it still refuses
 
-Fifty-five fixtures, each matching upstream's compiler property for property and drawing the chart
-upstream draws. The grammar covered: a single view, a layer of them, a concatenation of either,
-eleven marks including `arc`,
+Fifty-eight fixtures, each matching upstream's compiler property for property and drawing the chart
+upstream draws. The grammar covered: a single view, a layer of them, a concatenation of either, a
+repetition of any of those, eleven marks including `arc`,
 the Cartesian and polar position pairs, nested offsets, fourteen of fifteen transforms, sorting,
 binning, time units, stacking, faceting by `row` and `column`, conditional encodings, a line or an
 area that draws its own points, legends, axes, and a user `config` carried through as a theme.
 
 What it still refuses, by name, with the reason each is refused rather than approximated:
 
-- **`repeat`** and the `facet` operator with its own `spec`. `row` and `column` are implemented
-  (below), and so is concatenation (below); these two remaining forms *generate* their views from a
-  template rather than being handed them, which is a normalization step neither has yet.
+- The **`facet` operator** with its own `spec`. `row` and `column` are implemented (below), and so
+  are concatenation and repetition (below); this remaining form nests a whole spec under a facet
+  definition, which is a different composition from encoding the facet on the view.
 - **A plot of a concatenation with its own `data`.** The plots share the chart's dataset, which is
   what makes them one chart rather than several drawn near each other; a second source would have to
   be assembled and numbered beside the first, as a `lookup`'s joined table is.
@@ -596,6 +596,30 @@ Three defects came out of the two fixtures, and none of them is about concatenat
 
 The last of those is not about concatenation at all: a single-view tick plot with one encoded axis
 was equally wrong, and no fixture had drawn one.
+
+### Repetition: nothing but a rewrite
+
+`repeat` is not a compiler construct at all. Upstream normalizes it away before anything is compiled
+(`CoreNormalizer.mapNonLayerRepeat`), into a concatenation of the same view with `{"repeat": …}`
+replaced by a real column name in each copy — so once a concatenation compiled, the whole of `repeat`
+was a rewrite, and all three of its forms went in together and passed on arrival:
+
+- a **list** repeats over one variable and lays the copies out under `columns`;
+- **`row`/`column`** cross two lists into a scatter-plot matrix, and the grid's width is the number
+  of columns rather than `columns`, which upstream reports as unsupported there;
+- **`layer`** stacks the copies in one plot, so it stays a layer and never becomes a concatenation.
+
+Two details carry the naming. Each copy is *named* — `child__amount`, `child__row_amount_column_score`
+— and upstream's model takes a spec's own `name` over the one its parent offered it, which is why a
+repeated chart's scales read `child__amount_x` rather than `concat_0_x`; honouring a declared name in
+a concatenation's plots and in a layer's members is all that took. And the grid takes `align: "all"`
+where a plain concatenation takes `each`: the copies are one view drawn several times, so their rows
+do line up, and the normalizer says so in the spec it produces.
+
+Three fixtures passing untouched is worth stating plainly rather than quietly: it is what a faithful
+port of the layer beneath is supposed to buy, and the one defect it did find was a rewrite compiled
+and then thrown away — the normalized specification has to *replace* the one being compiled, not
+stand beside it.
 
 ### Faceting: both halves, in three fixtures
 
@@ -958,7 +982,7 @@ the whole time.
 
 ## Verification
 
-- 2,028 JVM tests pass and none is skipped (`./gradlew test`); the portable core is most of
+- 2,049 JVM tests pass and none is skipped (`./gradlew test`); the portable core is most of
   them, and `./scripts/test-core.sh` runs it without an Android SDK.
 - Android lint is clean with `warningsAsErrors` on every Android module.
 - 63 instrumented tests pass on an API 37 arm64 emulator (`./scripts/test-android.sh`): 49 in
