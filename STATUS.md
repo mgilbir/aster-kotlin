@@ -454,7 +454,7 @@ produces a chart that is plausible and wrong.
 every fixture with upstream and checks two things:
 
 1. `VegaLiteFixtureTest` compares the Vega this compiler emits against upstream's, property by
-   property. Forty-eight fixtures, and all of them match exactly — every transform, scale, signal,
+   property. Fifty-one fixtures, and all of them match exactly — every transform, scale, signal,
    axis, legend and mark encoding, down to the accessibility description string.
 2. `VegaLiteFixtureDifferentialTest` runs that output through this engine's own runtime and compares
    the scene against the one upstream draws. Every mark of every fixture matches, and nothing is
@@ -539,7 +539,7 @@ own) and `grouped-bar` on the step arithmetic.
 
 ### Where the compiler stands, and what it still refuses
 
-Forty-eight fixtures, each matching upstream's compiler property for property and drawing the chart
+Fifty-one fixtures, each matching upstream's compiler property for property and drawing the chart
 upstream draws. The grammar covered: a single view or a layer of them, eleven marks including `arc`,
 the Cartesian and polar position pairs, nested offsets, fourteen of fifteen transforms, sorting,
 binning, time units, stacking, faceting by `row` and `column`, conditional encodings, a line or an
@@ -553,8 +553,9 @@ What it still refuses, by name, with the reason each is refused rather than appr
 - **`params`.** Selections and bound inputs. A conditional encoding whose condition is a **`test`**
   now compiles — that is a predicate on the row and needs nothing to be selected — so only a
   condition naming a `param` is refused, by itself, leaving the rest of the definition standing.
-- **Composite marks** (`boxplot`, `errorbar`, `errorband`), which upstream normalizes into layered
-  views before compiling. The layers already work; the normalizer is what is missing.
+- **`boxplot`**, the one composite mark still refused. `errorbar` and `errorband` compile and draw
+  (below); a box plot is the same summary plus a box, a median rule and the outliers falling
+  outside the whiskers, each a layer of its own.
 - **`lookup`**, whose joined dataset has to be assembled and named beside the view's own.
 - Geographic projections and the `geoshape` mark, which are out of scope for the first release for
   the same reason they are in Vega.
@@ -814,12 +815,40 @@ first is the kind that is hardest to notice because the chart looks finished:
   block stopped reaching a rule that named a style of its own. Nothing in the corpus named one —
   the composite marks are what do, each part being `["rule", "errorbar-rule"]`.
 
-The composite marks themselves — `boxplot`, `errorbar`, `errorband` — are next, and the pieces they
-need are now all here: the normalization pass, layered views, the tooltip, and the style order. What
-remains is the rewriting proper: an `errorbar` is an aggregate of `stderr` and `mean` with two
-calculates over it and a rule from `lower` to `upper`; the extent chooses the aggregates (`stderr`
-and `stdev` extend from a centre, `ci` and `iqr` are two more aggregates), and each part is a layer
-that `config.errorbar` can switch off.
+### Two of the three composite marks
+
+`errorbar` and `errorband` compile and draw: `errorbar` (a standard error either side of a mean),
+`errorbar-iqr` (interquartile ranges, capped, drawn sideways) and `errorband` (a standard deviation
+as a filled band with its edges). They are one rewrite with different parts drawn from it — a
+summary of one continuous field per group, then a layer per part over that summary.
+
+The rule worth reading twice is how the **extent** chooses the aggregates, because getting it
+backwards gives error bars of a plausible size that mean something else. `stderr` and `stdev` are a
+*width* measured from a centre, so they aggregate the centre and the width and then add and
+subtract; `ci` and `iqr` are two *positions*, and so are two more aggregates. Which parts are drawn
+is configuration rather than code — `config.errorbar` has `rule: true, ticks: false`, so a plain
+error bar is one rule per group and asking for `ticks` adds the caps.
+
+Three more silences came out of building it:
+
+- **`aria: false` was ignored.** It takes a mark out of the accessibility tree, so there is nothing
+  to say about it — no role description and no spoken summary — and it is a *mark* property rather
+  than an encode channel. It is how a composite mark hides its own scaffolding: an error bar's two
+  caps are read as part of the bar rather than as three separate objects.
+- **An explicitly titled position still merged its title with the other end of the range.** An axis
+  over `lower_v` and `upper_v` read "v, upper_v" where upstream reads "v", because a *stated* title
+  short-circuits the merge (`getFieldDefTitle`).
+- **A parse stayed where the flow put it.** Upstream's `MoveParseUp` lifts it above every step that
+  does not *produce* a field it reads, which is where a composite mark's own aggregate sits — so
+  the coercion of a column happened after the summary that read it rather than before.
+
+And one difference that is a deliberate refusal rather than a defect: an `extent` of `ci` needs
+`ci0`/`ci1`, a bootstrap over a thousand random resamples, which this runtime declines because a
+scene has to be reproducible. The compiler emits it correctly; the runtime says why it cannot draw
+it, and `stderr` is what a symmetric error bar wants anyway.
+
+**`boxplot` is refused by name**, with what it needs written into the message: the same summary plus
+a box, a median rule and the outliers falling outside the whiskers, each a layer of its own.
 
 ### One difference is still open
 
@@ -852,7 +881,7 @@ the whole time.
 
 ## Verification
 
-- 1,979 JVM tests pass and none is skipped (`./gradlew test`); the portable core is most of
+- 2,000 JVM tests pass and none is skipped (`./gradlew test`); the portable core is most of
   them, and `./scripts/test-core.sh` runs it without an Android SDK.
 - Android lint is clean with `warningsAsErrors` on every Android module.
 - 63 instrumented tests pass on an API 37 arm64 emulator (`./scripts/test-android.sh`): 49 in

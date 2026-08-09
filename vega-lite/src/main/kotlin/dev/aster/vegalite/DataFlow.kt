@@ -92,6 +92,54 @@ internal sealed class DataNode {
    * Where several outputs meet, they chain in reverse: the last declared sits above, and the first
    * is the one everything else hangs from.
    */
+  /**
+   * Lifts a parse above the steps that do not depend on it — upstream's `MoveParseUp`.
+   *
+   * Parsing is reading a column as what it is, and nothing downstream of it changes that column, so
+   * it belongs as early as the flow allows: at the top, where every branch can share it. A step
+   * that *produces* a field the parse reads is the one thing it cannot climb past, since there
+   * would be nothing there to parse yet.
+   *
+   * Seen from here, the node being climbed past is a *child*: this is `swapWithParent` written from
+   * the grandparent, which is where the pointers are.
+   */
+  fun moveParseUp() {
+    children.forEach { it.moveParseUp() }
+    var moved = true
+    while (moved) {
+      moved = false
+      for ((index, below) in children.withIndex()) {
+        if (below is ParseNode) continue
+        val parse = below.children.singleOrNull() as? ParseNode ?: continue
+        if (below.producedFields().any { it in parse.parse.keys }) continue
+        val above = parse.children.toList()
+        parse.children.clear()
+        below.children.clear()
+        below.children += above
+        parse.children += below
+        children[index] = parse
+        moved = true
+      }
+    }
+  }
+
+  /** The columns a step writes, which is what a parse cannot climb past. */
+  private fun producedFields(): Set<String> =
+    when (this) {
+      is ParseNode -> parse.keys
+      is BinNode -> bins.flatMap { it.output }.toSet()
+      is TimeUnitNode -> units.flatMap { listOf(it.output, "${it.output}_end") }.toSet()
+      is AggregateNode -> outputs.toSet()
+      is StackNode -> output.toSet()
+      is ImputeNode -> setOf(field)
+      is PassThroughNode ->
+        transforms.mapNotNull { (it as? VegaValue.Obj)?.string("as") }.toSet() +
+          transforms
+            .flatMap { (it as? VegaValue.Obj)?.array("as").orEmpty() }
+            .mapNotNull { (it as? VegaValue.Str)?.value }
+      else -> emptySet()
+    }
+
   fun mergeOutputs() {
     children.forEach { it.mergeOutputs() }
     if (children.size <= 1) return

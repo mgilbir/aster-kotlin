@@ -202,6 +202,20 @@ internal class Config(private val user: VegaValue.Obj = VegaValue.EmptyObject) {
         // Both override the blue of the shared mark config rather than inheriting it.
         "rule" to obj { put("color", "black") },
         "text" to obj { put("color", "black") },
+        // The composite marks' own blocks, which say which of their parts are drawn. An error bar
+        // is a rule with no caps unless caps are asked for; an error band is a faded band with no
+        // edges. `center` is here rather than in the code because a theme may move it.
+        "errorbar" to
+          obj {
+            put("center", "mean")
+            put("rule", VegaValue.Bool(true))
+            put("ticks", VegaValue.Bool(false))
+          },
+        "errorband" to
+          obj {
+            put("band", obj { put("opacity", 0.3) })
+            put("borders", VegaValue.Bool(false))
+          },
       )
 
     /** `defaultScaleConfig`. */

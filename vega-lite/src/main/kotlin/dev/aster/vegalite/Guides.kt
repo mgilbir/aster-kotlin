@@ -125,11 +125,18 @@ internal object Guides {
     axis.set("grid", bool(grid))
 
     // A ranged position is titled by *both* of its fields — `start, end` — because the axis is
-    // measuring the span rather than either end of it.
-    for (channelDef in
-      listOfNotNull(def, secondaryChannel(channel)?.let { view.spec.fieldDef(it) })) {
-      val title = Fields.title(channelDef, view.config) as? VegaValue.Str ?: continue
-      if (title.value !in axis.titles) axis.titles += title.value
+    // measuring the span rather than either end of it. Unless one of them says what it is called:
+    // an **explicit** title short-circuits the merge (`getFieldDefTitle`), which is how a summary
+    // of `v` is titled `v` rather than `lower_v, upper_v`.
+    val secondary = secondaryChannel(channel)?.let { view.spec.fieldDef(it) }
+    val stated = listOfNotNull(def.explicitTitle, secondary?.explicitTitle)
+    if (stated.isNotEmpty()) {
+      stated.mapNotNull { (it as? VegaValue.Str)?.value }.forEach { axis.titles += it }
+    } else {
+      for (channelDef in listOfNotNull(def, secondary)) {
+        val title = Fields.title(channelDef, view.config) as? VegaValue.Str ?: continue
+        if (title.value !in axis.titles) axis.titles += title.value
+      }
     }
 
     // A nominal category on the horizontal axis is turned on its side, because side-by-side labels

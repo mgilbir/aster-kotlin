@@ -1,0 +1,310 @@
+{
+  "$schema": "https://vega.github.io/schema/vega/v6.json",
+  "description": "A band a standard deviation either side of the mean, with its edges drawn.",
+  "background": "white",
+  "padding": 5,
+  "width": 300,
+  "height": 300,
+  "style": "cell",
+  "data": [
+    {
+      "name": "source_0",
+      "values": [
+        {
+          "t": 1,
+          "v": 3
+        },
+        {
+          "t": 1,
+          "v": 5
+        },
+        {
+          "t": 1,
+          "v": 4
+        },
+        {
+          "t": 2,
+          "v": 6
+        },
+        {
+          "t": 2,
+          "v": 2
+        },
+        {
+          "t": 2,
+          "v": 7
+        },
+        {
+          "t": 3,
+          "v": 5
+        },
+        {
+          "t": 3,
+          "v": 9
+        },
+        {
+          "t": 3,
+          "v": 6
+        }
+      ]
+    },
+    {
+      "name": "data_0",
+      "source": "source_0",
+      "transform": [
+        {
+          "type": "formula",
+          "expr": "toNumber(datum[\"t\"])",
+          "as": "t"
+        },
+        {
+          "type": "aggregate",
+          "groupby": [
+            "t"
+          ],
+          "ops": [
+            "stdev",
+            "mean"
+          ],
+          "fields": [
+            "v",
+            "v"
+          ],
+          "as": [
+            "extent_v",
+            "center_v"
+          ]
+        },
+        {
+          "type": "formula",
+          "expr": "datum['center_v'] + datum['extent_v']",
+          "as": "upper_v"
+        },
+        {
+          "type": "formula",
+          "expr": "datum['center_v'] - datum['extent_v']",
+          "as": "lower_v"
+        }
+      ]
+    }
+  ],
+  "marks": [
+    {
+      "name": "layer_0_marks",
+      "type": "area",
+      "style": [
+        "area",
+        "errorband-band"
+      ],
+      "sort": {
+        "field": "x"
+      },
+      "from": {
+        "data": "data_0"
+      },
+      "encode": {
+        "update": {
+          "ariaRoleDescription": {
+            "value": "errorband"
+          },
+          "opacity": {
+            "value": 0.3
+          },
+          "orient": {
+            "value": "vertical"
+          },
+          "fill": {
+            "value": "#4c78a8"
+          },
+          "tooltip": {
+            "signal": "{\"Mean of v\": format(datum[\"center_v\"], \"\"), \"Mean + stdev of v\": format(datum[\"upper_v\"], \"\"), \"Mean - stdev of v\": format(datum[\"lower_v\"], \"\"), \"t\": format(datum[\"t\"], \"\")}"
+          },
+          "description": {
+            "signal": "\"t: \" + (format(datum[\"t\"], \"\")) + \"; v: \" + (format(datum[\"lower_v\"], \"\")) + \"; upper_v: \" + (format(datum[\"upper_v\"], \"\")) + \"; Mean of v: \" + (format(datum[\"center_v\"], \"\")) + \"; Mean + stdev of v: \" + (format(datum[\"upper_v\"], \"\")) + \"; Mean - stdev of v: \" + (format(datum[\"lower_v\"], \"\"))"
+          },
+          "x": {
+            "scale": "x",
+            "field": "t"
+          },
+          "y": {
+            "scale": "y",
+            "field": "lower_v"
+          },
+          "y2": {
+            "scale": "y",
+            "field": "upper_v"
+          },
+          "defined": {
+            "signal": "isValid(datum[\"t\"]) && isFinite(+datum[\"t\"]) && isValid(datum[\"lower_v\"]) && isFinite(+datum[\"lower_v\"])"
+          }
+        }
+      }
+    },
+    {
+      "name": "layer_1_marks",
+      "type": "line",
+      "style": [
+        "line",
+        "errorband-borders"
+      ],
+      "sort": {
+        "field": "x"
+      },
+      "aria": false,
+      "from": {
+        "data": "data_0"
+      },
+      "encode": {
+        "update": {
+          "stroke": {
+            "value": "#4c78a8"
+          },
+          "tooltip": {
+            "signal": "{\"Mean of v\": format(datum[\"center_v\"], \"\"), \"Mean + stdev of v\": format(datum[\"upper_v\"], \"\"), \"Mean - stdev of v\": format(datum[\"lower_v\"], \"\"), \"t\": format(datum[\"t\"], \"\")}"
+          },
+          "x": {
+            "scale": "x",
+            "field": "t"
+          },
+          "y": {
+            "scale": "y",
+            "field": "lower_v"
+          },
+          "defined": {
+            "signal": "isValid(datum[\"t\"]) && isFinite(+datum[\"t\"]) && isValid(datum[\"lower_v\"]) && isFinite(+datum[\"lower_v\"])"
+          }
+        }
+      }
+    },
+    {
+      "name": "layer_2_marks",
+      "type": "line",
+      "style": [
+        "line",
+        "errorband-borders"
+      ],
+      "sort": {
+        "field": "x"
+      },
+      "aria": false,
+      "from": {
+        "data": "data_0"
+      },
+      "encode": {
+        "update": {
+          "stroke": {
+            "value": "#4c78a8"
+          },
+          "tooltip": {
+            "signal": "{\"Mean of v\": format(datum[\"center_v\"], \"\"), \"Mean + stdev of v\": format(datum[\"upper_v\"], \"\"), \"Mean - stdev of v\": format(datum[\"lower_v\"], \"\"), \"t\": format(datum[\"t\"], \"\")}"
+          },
+          "x": {
+            "scale": "x",
+            "field": "t"
+          },
+          "y": {
+            "scale": "y",
+            "field": "upper_v"
+          },
+          "defined": {
+            "signal": "isValid(datum[\"t\"]) && isFinite(+datum[\"t\"]) && isValid(datum[\"upper_v\"]) && isFinite(+datum[\"upper_v\"])"
+          }
+        }
+      }
+    }
+  ],
+  "scales": [
+    {
+      "name": "x",
+      "type": "linear",
+      "domain": {
+        "data": "data_0",
+        "field": "t"
+      },
+      "range": [
+        0,
+        {
+          "signal": "width"
+        }
+      ],
+      "nice": true,
+      "zero": false
+    },
+    {
+      "name": "y",
+      "type": "linear",
+      "domain": {
+        "data": "data_0",
+        "fields": [
+          "lower_v",
+          "upper_v"
+        ]
+      },
+      "range": [
+        {
+          "signal": "height"
+        },
+        0
+      ],
+      "nice": true,
+      "zero": true
+    }
+  ],
+  "axes": [
+    {
+      "scale": "x",
+      "orient": "bottom",
+      "gridScale": "y",
+      "grid": true,
+      "tickCount": {
+        "signal": "ceil(width/40)"
+      },
+      "domain": false,
+      "labels": false,
+      "aria": false,
+      "maxExtent": 0,
+      "minExtent": 0,
+      "ticks": false,
+      "zindex": 0
+    },
+    {
+      "scale": "y",
+      "orient": "left",
+      "gridScale": "x",
+      "grid": true,
+      "tickCount": {
+        "signal": "ceil(height/40)"
+      },
+      "domain": false,
+      "labels": false,
+      "aria": false,
+      "maxExtent": 0,
+      "minExtent": 0,
+      "ticks": false,
+      "zindex": 0
+    },
+    {
+      "scale": "x",
+      "orient": "bottom",
+      "grid": false,
+      "title": "t",
+      "labelFlush": true,
+      "labelOverlap": true,
+      "tickCount": {
+        "signal": "ceil(width/40)"
+      },
+      "zindex": 0
+    },
+    {
+      "scale": "y",
+      "orient": "left",
+      "grid": false,
+      "title": "v",
+      "labelOverlap": true,
+      "tickCount": {
+        "signal": "ceil(height/40)"
+      },
+      "zindex": 0
+    }
+  ]
+}

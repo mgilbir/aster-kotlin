@@ -145,6 +145,13 @@ private class Compilation(
 
   private fun views(): List<UnitView>? {
     val normalize = Normalize(config, diagnostics)
+    val composite = Composite(config, diagnostics)
+    // A composite mark stands for a whole layer of ordinary ones, and a path overlay may then apply
+    // to each of them — so the two passes compose, composite first.
+    fun expand(unit: VegaValue.Obj): List<VegaValue.Obj> =
+      (composite.normalize(unit) ?: listOf(unit)).flatMap {
+        normalize.pathOverlay(it) ?: listOf(it)
+      }
     val layers = spec.array("layer")
     if (layers != null) {
       // Each declared layer may itself normalize into more than one — a line that draws its own
@@ -162,8 +169,7 @@ private class Compilation(
           return@forEachIndexed
         }
         val merged = inherited(child)
-        val expanded = normalize.pathOverlay(merged) ?: listOf(merged)
-        expanded.forEach { units += it to "$.layer[$index]" }
+        expand(merged).forEach { units += it to "$.layer[$index]" }
       }
       return units.mapIndexedNotNull { index, (unit, path) ->
         parser.unit(unit, path)?.let { UnitView(it, config, "layer_$index") }
@@ -183,8 +189,14 @@ private class Compilation(
     }
 
     // A single view that normalizes into several becomes a layer of them, which is exactly what
-    // upstream does: the normalizer hands its result back to the compiler as a layer spec.
-    normalize.pathOverlay(spec)?.let { expanded ->
+    // upstream does: the normalizer hands its result back to the compiler as a layer spec. One
+    // that normalizes into exactly one stays a single view, and keeps its unprefixed names.
+    val composed = composite.normalize(spec) ?: normalize.pathOverlay(spec)?.let { it }
+    if (composed != null) {
+      val expanded = composed.flatMap { normalize.pathOverlay(it) ?: listOf(it) }
+      if (expanded.size == 1) {
+        return parser.unit(expanded.single(), "$")?.let { listOf(UnitView(it, config, "")) }
+      }
       return expanded.mapIndexedNotNull { index, unit ->
         parser.unit(unit, "$")?.let { UnitView(it, config, "layer_$index") }
       }
@@ -373,6 +385,7 @@ private class Compilation(
     val outputs = views.map { view -> DataPipeline(view, diagnostics).build(source) }
     // Every view built its own chain onto the one source, so the tree forks there; the shared parse
     // is hoisted above the fork before the tree is named and flattened.
+    source.moveParseUp()
     source.mergeParse()
     source.mergeIdentical()
     source.mergeAggregates()

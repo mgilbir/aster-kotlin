@@ -140,6 +140,9 @@ internal object Marks {
       put("name", view.prefixed("marks"))
       put("type", VG_MARK[mark])
       put("style", strings(styles(view)))
+      if (view.markDef.raw.fields["aria"] == VegaValue.Bool(false)) {
+        put("aria", VegaValue.Bool(false))
+      }
       // A line or an area is drawn in the order its points arrive, so the dimension has to be
       // sorted or the path doubles back on itself.
       sortOrder(view)?.let { put("sort", it) }
@@ -448,6 +451,11 @@ internal object Marks {
    * would format it, which is why it is built here rather than left to the renderer.
    */
   private fun aria(view: UnitView): VegaValue.Obj = obj {
+    // `aria: false` takes the mark out of the accessibility tree, so there is nothing to say about
+    // it: no role description and no spoken summary. It is a *mark* property rather than an encode
+    // channel, and it is how a composite mark hides its own scaffolding — an error bar's two caps
+    // are read as part of the bar, not as three separate objects.
+    if (view.markDef.raw.fields["aria"] == VegaValue.Bool(false)) return@obj
     val mark = view.spec.mark
     if (mark !in VG_MARK_NAMES) put("ariaRoleDescription", obj { put("value", mark) })
     val description = descriptionSignal(view)
