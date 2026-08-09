@@ -32,6 +32,32 @@ internal sealed class DataNode {
    *
    * A field two branches want parsed *differently* stays where it was, in both.
    */
+  /**
+   * Folds sibling aggregates that group by the same fields into one — upstream's `MergeAggregates`.
+   *
+   * Two layers over one table, each aggregating it, ask for the same grouping twice; computing it
+   * twice is not only wasted work but a different *shape* of output, with each layer reading a
+   * dataset of its own where upstream has them sharing one. The last of the siblings is the one
+   * kept, and the others' remaining steps hang below it, which is what decides the numbering.
+   */
+  fun mergeAggregates() {
+    children.forEach { it.mergeAggregates() }
+    if (children.size <= 1) return
+    val grouped = LinkedHashMap<List<String>, MutableList<AggregateNode>>()
+    for (child in children.filterIsInstance<AggregateNode>()) {
+      grouped.getOrPut(child.dimensions.sorted()) { mutableListOf() } += child
+    }
+    for (group in grouped.values) {
+      if (group.size < 2) continue
+      val kept = group.removeAt(group.size - 1)
+      for (folded in group) {
+        kept.merge(folded)
+        children.remove(folded)
+        kept.children += folded.children
+      }
+    }
+  }
+
   fun mergeParse() {
     // Bottom up, so a fork nested inside a branch is settled before the branch above it.
     children.forEach { it.mergeParse() }
@@ -157,10 +183,49 @@ internal data class TimeUnitComponent(
 
 internal class AggregateNode(
   val dimensions: List<String>,
-  val ops: List<String>,
-  val fields: List<String?>,
-  val outputs: List<String>,
+  ops: List<String>,
+  fields: List<String?>,
+  outputs: List<String>,
 ) : DataNode() {
+  /**
+   * The measures, keyed by the field they read and then by the operation.
+   *
+   * Kept this way because merging two aggregates is a *union of measures*, and the emitted order
+   * follows the fields' first appearance rather than the order the operations were asked for —
+   * which is what puts a `count`, whose field is nothing at all, after every measure of a column.
+   */
+  private val measures = LinkedHashMap<String?, LinkedHashMap<String, String>>()
+
+  init {
+    for (index in ops.indices) {
+      measures.getOrPut(fields.getOrNull(index)) { LinkedHashMap() }[ops[index]] =
+        outputs.getOrElse(index) { "" }
+    }
+  }
+
+  val ops: List<String>
+    get() = measures.values.flatMap { it.keys }
+
+  val fields: List<String?>
+    get() = measures.entries.flatMap { (field, byOp) -> byOp.keys.map { field } }
+
+  val outputs: List<String>
+    get() = measures.values.flatMap { it.values }
+
+  /**
+   * Folds another aggregate's measures into this one — upstream's `mergeMeasures`.
+   *
+   * Only ever called where the two group by the same fields, which is the whole condition for the
+   * merge: two aggregates over one table with one grouping are one aggregate, and leaving them
+   * apart means the same grouping computed twice into two datasets.
+   */
+  fun merge(other: AggregateNode) {
+    for ((field, byOp) in other.measures) {
+      val into = measures.getOrPut(field) { LinkedHashMap() }
+      for ((op, output) in byOp) into.putIfAbsent(op, output)
+    }
+  }
+
   fun transform(): VegaValue = obj {
     put("type", "aggregate")
     put("groupby", strings(dimensions))

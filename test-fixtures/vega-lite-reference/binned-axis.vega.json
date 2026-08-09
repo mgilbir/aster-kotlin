@@ -1,0 +1,185 @@
+{
+  "$schema": "https://vega.github.io/schema/vega/v6.json",
+  "description": "A pre-binned column drawn as spans, beside a bin the compiler chooses itself.",
+  "background": "white",
+  "padding": 5,
+  "width": 300,
+  "height": 300,
+  "style": "cell",
+  "data": [
+    {
+      "name": "source_0",
+      "values": [
+        {
+          "lo": 0,
+          "hi": 10,
+          "n": 4
+        },
+        {
+          "lo": 10,
+          "hi": 20,
+          "n": 7
+        },
+        {
+          "lo": 20,
+          "hi": 30,
+          "n": 2
+        }
+      ]
+    },
+    {
+      "name": "data_0",
+      "source": "source_0",
+      "transform": [
+        {
+          "type": "stack",
+          "groupby": [
+            "lo",
+            "lo"
+          ],
+          "field": "n",
+          "sort": {
+            "field": [],
+            "order": []
+          },
+          "as": [
+            "n_start",
+            "n_end"
+          ],
+          "offset": "zero"
+        },
+        {
+          "type": "filter",
+          "expr": "isValid(datum[\"lo\"]) && isFinite(+datum[\"lo\"]) && isValid(datum[\"n\"]) && isFinite(+datum[\"n\"])"
+        }
+      ]
+    }
+  ],
+  "marks": [
+    {
+      "name": "marks",
+      "type": "rect",
+      "style": [
+        "bar"
+      ],
+      "from": {
+        "data": "data_0"
+      },
+      "encode": {
+        "update": {
+          "fill": {
+            "value": "#4c78a8"
+          },
+          "ariaRoleDescription": {
+            "value": "bar"
+          },
+          "description": {
+            "signal": "\"lo: \" + (!isValid(datum[\"lo\"]) || !isFinite(+datum[\"lo\"]) ? \"null\" : format(datum[\"lo\"], \"\") + \" – \" + format(datum[\"hi\"], \"\")) + \"; n: \" + (format(datum[\"n\"], \"\"))"
+          },
+          "x2": {
+            "scale": "x",
+            "field": "lo",
+            "offset": {
+              "signal": "0.5 + (abs(scale(\"x\", datum[\"lo_end\"]) - scale(\"x\", datum[\"lo\"])) < 0.25 ? -0.5 * (0.25 - (abs(scale(\"x\", datum[\"lo_end\"]) - scale(\"x\", datum[\"lo\"])))) : 0.5)"
+            }
+          },
+          "x": {
+            "scale": "x",
+            "field": "hi",
+            "offset": {
+              "signal": "0.5 + (abs(scale(\"x\", datum[\"lo_end\"]) - scale(\"x\", datum[\"lo\"])) < 0.25 ? 0.5 * (0.25 - (abs(scale(\"x\", datum[\"lo_end\"]) - scale(\"x\", datum[\"lo\"])))) : -0.5)"
+            }
+          },
+          "y": {
+            "scale": "y",
+            "field": "n_end"
+          },
+          "y2": {
+            "scale": "y",
+            "field": "n_start"
+          }
+        }
+      }
+    }
+  ],
+  "scales": [
+    {
+      "name": "x",
+      "type": "linear",
+      "domain": {
+        "data": "data_0",
+        "fields": [
+          "lo",
+          "hi"
+        ]
+      },
+      "range": [
+        0,
+        {
+          "signal": "width"
+        }
+      ],
+      "zero": false
+    },
+    {
+      "name": "y",
+      "type": "linear",
+      "domain": {
+        "data": "data_0",
+        "fields": [
+          "n_start",
+          "n_end"
+        ]
+      },
+      "range": [
+        {
+          "signal": "height"
+        },
+        0
+      ],
+      "nice": true,
+      "zero": true
+    }
+  ],
+  "axes": [
+    {
+      "scale": "y",
+      "orient": "left",
+      "gridScale": "x",
+      "grid": true,
+      "tickCount": {
+        "signal": "ceil(height/40)"
+      },
+      "domain": false,
+      "labels": false,
+      "aria": false,
+      "maxExtent": 0,
+      "minExtent": 0,
+      "ticks": false,
+      "zindex": 0
+    },
+    {
+      "scale": "x",
+      "orient": "bottom",
+      "grid": false,
+      "title": "lo, hi",
+      "labelFlush": true,
+      "labelOverlap": true,
+      "tickCount": {
+        "signal": "ceil(width/40)"
+      },
+      "zindex": 0
+    },
+    {
+      "scale": "y",
+      "orient": "left",
+      "grid": false,
+      "title": "n",
+      "labelOverlap": true,
+      "tickCount": {
+        "signal": "ceil(height/40)"
+      },
+      "zindex": 0
+    }
+  ]
+}

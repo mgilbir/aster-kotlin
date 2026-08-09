@@ -374,6 +374,7 @@ private class Compilation(
     // Every view built its own chain onto the one source, so the tree forks there; the shared parse
     // is hoisted above the fork before the tree is named and flattened.
     source.mergeParse()
+    source.mergeAggregates()
     val datasets = DataAssembler().assemble(source)
     views.forEachIndexed { index, view ->
       view.mainData = outputs[index].main.source ?: ""

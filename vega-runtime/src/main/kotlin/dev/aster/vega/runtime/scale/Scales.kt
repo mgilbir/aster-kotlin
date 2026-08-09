@@ -107,10 +107,16 @@ public class LinearScale(
 
   override fun position(value: VegaValue): Double = apply(value.asDouble())
 
-  override fun scale(value: VegaValue): VegaValue {
-    val result = position(value)
-    return if (result.isNaN()) VegaValue.Null else VegaValue.Num(result)
-  }
+  /**
+   * A continuous scale of something that is not a number is **not a number**, not nothing.
+   *
+   * The distinction only shows in arithmetic, and there it is the whole answer: JavaScript reads
+   * `null` as zero and propagates `NaN`, so `abs(scale(x, datum.missing) - scale(x, datum.lo))` is
+   * a real zero on one reading and no answer at all on the other. Vega-Lite writes exactly that
+   * expression to decide whether a bar is too thin to see, and a pre-binned column has no `_end` to
+   * give it — so a bar came out a quarter of a unit narrow and shifted along.
+   */
+  override fun scale(value: VegaValue): VegaValue = VegaValue.Num(position(value))
 
   public fun apply(x: Double): Double = if (round) roundHalfUp(unrounded(x)) else unrounded(x)
 
@@ -360,10 +366,16 @@ public abstract class TransformedScale(
 
   override fun position(value: VegaValue): Double = apply(value.asDouble())
 
-  override fun scale(value: VegaValue): VegaValue {
-    val result = position(value)
-    return if (result.isNaN()) VegaValue.Null else VegaValue.Num(result)
-  }
+  /**
+   * A continuous scale of something that is not a number is **not a number**, not nothing.
+   *
+   * The distinction only shows in arithmetic, and there it is the whole answer: JavaScript reads
+   * `null` as zero and propagates `NaN`, so `abs(scale(x, datum.missing) - scale(x, datum.lo))` is
+   * a real zero on one reading and no answer at all on the other. Vega-Lite writes exactly that
+   * expression to decide whether a bar is too thin to see, and a pre-binned column has no `_end` to
+   * give it — so a bar came out a quarter of a unit narrow and shifted along.
+   */
+  override fun scale(value: VegaValue): VegaValue = VegaValue.Num(position(value))
 
   public fun apply(x: Double): Double = if (round) roundHalfUp(unrounded(x)) else unrounded(x)
 

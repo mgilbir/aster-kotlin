@@ -456,9 +456,20 @@ internal object Marks {
   /** Title-to-expression pairs for every encoded field, in specification order. */
   private fun tooltipData(view: UnitView): Map<String, String> {
     val out = LinkedHashMap<String, String>()
+    val skipped =
+      view.spec.encoding.entries
+        .mapNotNull { (channel, def) ->
+          if (def.bin == Binning.PreBinned) secondaryChannel(channel) else null
+        }
+        .filter { view.spec.encoding[it]?.isFieldDef == true }
+        .toSet()
     for ((channel, def) in view.spec.encoding) {
       if (!def.isFieldDef) continue
       if (channel == "tooltip" || channel == "description") continue
+      // A pre-binned column is announced as the *span* it covers, and the channel naming the far
+      // edge is then not announced separately — upstream's `toSkip`. Without it a bar over a bin
+      // reads "lo: 0; n: 4; hi: 10", which names three things where there are two.
+      if (channel in skipped) continue
       // The *field's* own title, not its guide's: upstream reads `fieldDef.title ||
       // defaultTitle(fieldDef)` here, so hiding an axis title with `axis: {title: null}` restyles
       // the chart and leaves what a screen reader says about it alone. Reading the guide's title
@@ -476,7 +487,23 @@ internal object Marks {
           stack.offset == "normalize" &&
           channel == stack.fieldChannel &&
           channel in NORMALIZABLE_CHANNELS
-      out[key] = fieldExpression(view, def, normalized)
+      out[key] =
+        fieldExpression(
+          view,
+          def,
+          normalized,
+          binEnd =
+            when (def.bin) {
+              is Binning.Bin -> Fields.datumAccess(def, suffix = "end")
+              // A pre-binned column's far edge is the secondary channel's own field.
+              Binning.PreBinned ->
+                secondaryChannel(channel)
+                  ?.let { view.spec.encoding[it] }
+                  ?.takeIf { it.isFieldDef }
+                  ?.let { Fields.datumAccess(it) }
+              else -> null
+            },
+        )
     }
     return out
   }
@@ -496,6 +523,8 @@ internal object Marks {
     view: UnitView,
     def: ChannelDef,
     normalizeStack: Boolean = false,
+    /** Where the far edge of a bin is read from, when this definition is a binned one. */
+    binEnd: String? = null,
   ): String {
     val stated = (def.format as? VegaValue.Str)?.value
     val accessor =
@@ -509,10 +538,9 @@ internal object Marks {
         ?: if (normalizeStack) view.config.normalizedNumberFormat
         else view.config.numberFormat ?: ""
     return when {
-      def.bin is Binning.Bin -> {
-        val end = Fields.datumAccess(def, suffix = "end")
+      def.bin != null && binEnd != null -> {
         "!isValid($accessor) || !isFinite(+$accessor) ? \"null\" : " +
-          "format($accessor, \"$number\") + \" $BIN_RANGE_DELIMITER \" + format($end, \"$number\")"
+          "format($accessor, \"$number\") + \" $BIN_RANGE_DELIMITER \" + format($binEnd, \"$number\")"
       }
       def.type == MeasureType.TEMPORAL -> {
         val timeUnit = def.timeUnit
@@ -916,6 +944,17 @@ internal object Marks {
 
     // `x2` takes the bin's start and `x` its end, which is what makes the rect span the bin.
     val startIsEnd = channel == "x" || channel == "y2"
+    // Where the bin's far edge is read from. A bin *this* compiler asked for has an `_end` column
+    // beside it; a column that arrived **already binned** does not — its far edge is a second
+    // column of its own, named by the secondary channel, and that is the whole reason `bin:
+    // "binned"` requires an `x2`.
+    val endField =
+      if (def.bin == Binning.PreBinned) {
+        val def2 = view.spec.encoding[channel2]
+        if (def2?.isFieldDef == true) Fields.vgField(def2) else Fields.vgField(def, suffix = "end")
+      } else {
+        Fields.vgField(def, suffix = "end")
+      }
     return obj {
       put(
         channel2,
@@ -929,7 +968,7 @@ internal object Marks {
         channel,
         obj {
           put("scale", channel)
-          put("field", Fields.vgField(def, suffix = "end"))
+          put("field", endField)
           put("offset", offset(startIsEnd))
         },
       )

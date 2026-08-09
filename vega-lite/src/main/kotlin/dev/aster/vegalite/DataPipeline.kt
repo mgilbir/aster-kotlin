@@ -255,10 +255,27 @@ internal class DataPipeline(
     // Without an explicit order the segments are stacked in field order — downwards on a vertical
     // stack so that the first category ends up on top, and upwards on a horizontal one.
     val order = if (stack.fieldChannel == "y") "descending" else "ascending"
+    // A **binned** dimension groups by both of its edges, so two bins that happen to start at the
+    // same place are still two columns. For a column that arrived already binned the far edge has
+    // no `_end` name of its own, and upstream's `vgField(def, {binSuffix: 'end'})` gives the field
+    // back unchanged — so the groupby names it twice, which is what it emits.
+    val dimensions =
+      stack.groupbyChannels.flatMap { channel ->
+        val dimension = view.spec.fieldDef(channel) ?: return@flatMap emptyList()
+        if (dimension.bin != null) {
+          listOf(
+            Fields.vgField(dimension),
+            if (dimension.bin is Binning.Bin) Fields.vgField(dimension, suffix = "end")
+            else Fields.vgField(dimension),
+          )
+        } else {
+          listOf(Fields.vgField(dimension))
+        }
+      }
     return StackNode(
       field = Fields.vgField(def),
       // The facet's own fields group every accumulation, so a stack stays inside its cell.
-      groupby = stack.groupbyFields + view.facetFields.filterNot { it in stack.groupbyFields },
+      groupby = dimensions + view.facetFields.filterNot { it in dimensions },
       sortFields = stackBy,
       sortOrders = stackBy.map { order },
       output =

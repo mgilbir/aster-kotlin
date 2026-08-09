@@ -454,7 +454,7 @@ produces a chart that is plausible and wrong.
 every fixture with upstream and checks two things:
 
 1. `VegaLiteFixtureTest` compares the Vega this compiler emits against upstream's, property by
-   property. Forty-one fixtures, and all of them match exactly — every transform, scale, signal,
+   property. Forty-four fixtures, and all of them match exactly — every transform, scale, signal,
    axis, legend and mark encoding, down to the accessibility description string.
 2. `VegaLiteFixtureDifferentialTest` runs that output through this engine's own runtime and compares
    the scene against the one upstream draws. Every mark of every fixture matches, and nothing is
@@ -539,7 +539,7 @@ own) and `grouped-bar` on the step arithmetic.
 
 ### Where the compiler stands, and what it still refuses
 
-Forty-one fixtures, each matching upstream's compiler property for property and drawing the chart
+Forty-four fixtures, each matching upstream's compiler property for property and drawing the chart
 upstream draws. The grammar covered: a single view or a layer of them, eleven marks including `arc`,
 the Cartesian and polar position pairs, nested offsets, fourteen of fifteen transforms, sorting,
 binning, time units, stacking, faceting by `row` and `column`, conditional encodings, a line or an
@@ -743,6 +743,30 @@ upstream's scene carries a literal `null` there which its renderers draw as noth
 them. Fixed in `oracle-js/src/normalize.js` as well as here, which is where CONTRIBUTING says to
 look when both sides agree and the picture does not.
 
+### Three more, and a scale that answered the wrong kind of nothing
+
+`aggregate-ops`, `binned-axis` and `offset-facet`. The last passed on arrival — grouped bars inside
+a trellis are an offset band inside a faceted cell, and both already worked — and the other two
+found four things:
+
+- **Two layers aggregating one table did it twice.** Upstream's `MergeAggregates` folds sibling
+  aggregates that group by the same fields into one, and the union of their measures is a *union of
+  measures*: the emitted order follows each field's first appearance, which is what puts a `count`,
+  whose field is nothing at all, after every measure of a column. Left apart, each layer read a
+  dataset of its own and the whole numbering shifted.
+- **A pre-binned column had no far edge.** `bin: "binned"` says the data arrives already bucketed,
+  and the bucket's other end is a *second column* named by the secondary channel — which is the
+  whole reason the form requires an `x2`. This engine looked for an `_end` column that was never
+  computed. The same edge is what the row is announced by, as the span it covers rather than as two
+  separate numbers, and it groups the stack alongside the start so that two bins beginning at the
+  same place stay two columns.
+- **A continuous scale of something that is not a number answered `null`, where upstream answers
+  `NaN`.** The distinction only shows in arithmetic and there it is the whole answer: JavaScript
+  reads a null as zero and propagates a NaN. Vega-Lite decides whether a bar is too thin to see
+  with `abs(scale(x, a) - scale(x, b))`, and a pre-binned column has no `_end` to give it — so the
+  question came back as a real zero, the bar was judged too thin, and it came out a quarter of a
+  unit narrow and shifted along.
+
 ### One difference is still open
 
 Every mark matches exactly and the surface around them is still between half a unit and a unit small
@@ -774,7 +798,7 @@ the whole time.
 
 ## Verification
 
-- 1,930 JVM tests pass and none is skipped (`./gradlew test`); the portable core is most of
+- 1,951 JVM tests pass and none is skipped (`./gradlew test`); the portable core is most of
   them, and `./scripts/test-core.sh` runs it without an Android SDK.
 - Android lint is clean with `warningsAsErrors` on every Android module.
 - 63 instrumented tests pass on an API 37 arm64 emulator (`./scripts/test-android.sh`): 49 in
