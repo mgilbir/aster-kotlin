@@ -13,6 +13,16 @@ internal class UnitView(
   val config: Config,
   /** `layer_0` in a layered chart, empty for a chart that is a single view. */
   val name: String,
+  /**
+   * The name of the composition child this view belongs to, which may not be the view's own.
+   *
+   * A layer normalizing into several views — a line that draws its own points — names them
+   * `layer_1_layer_0` and `layer_1_layer_1`, but the layer `resolve` speaks about is still
+   * `layer_1`: what a composition resolves is *its children*, and a nested layer inside one of them
+   * is below the level being resolved. Naming an independent scale from the expanded view instead
+   * gives a line and its points a scale each and draws them apart.
+   */
+  val childName: String = name,
 ) {
   val markDef: MarkDef = spec.markDef
 
@@ -49,17 +59,16 @@ internal class UnitView(
     if (channel == "x" || channel == "width") widthSignal else heightSignal
 
   /**
-   * The prefix on the scale names this view reads.
+   * What each of this view's scales is called.
    *
-   * Empty everywhere except inside a concatenation, which gives each of its plots its own position
-   * scales — `concat_0_x` beside `concat_1_x` — because two plots standing side by side measure
-   * separate things unless something says they do not. Everything else a scale is named for stays
-   * shared, so one colour legend covers the whole chart.
+   * A shared scale keeps the channel's own name; one a composition resolves **independently** takes
+   * the name of the child that owns it — `concat_0_x` beside `concat_1_x`, because two plots side
+   * by side measure separate things, or `layer_0_y` beside `layer_1_y`, which is the whole of what
+   * makes a chart dual-axis. Everything that mentions a scale goes through here.
    */
-  var scalePrefix: String = ""
+  var scaleNames: Map<String, String> = emptyMap()
 
-  fun scale(channel: String): String =
-    if (channel in Channels.POSITION_SCALE_CHANNELS) scalePrefix + channel else channel
+  fun scale(channel: String): String = scaleNames[channel] ?: channel
 
   /** The dataset a mark reads, once the data flow has been assembled and named. */
   var mainData: String = ""

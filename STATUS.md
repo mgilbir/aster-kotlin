@@ -454,7 +454,7 @@ produces a chart that is plausible and wrong.
 every fixture with upstream and checks two things:
 
 1. `VegaLiteFixtureTest` compares the Vega this compiler emits against upstream's, property by
-   property. Sixty-three fixtures, and all of them match exactly — every transform, scale, signal,
+   property. Sixty-five fixtures, and all of them match exactly — every transform, scale, signal,
    axis, legend and mark encoding, down to the accessibility description string.
 2. `VegaLiteFixtureDifferentialTest` runs that output through this engine's own runtime and compares
    the scene against the one upstream draws. Every mark of every fixture matches, and nothing is
@@ -539,7 +539,7 @@ own) and `grouped-bar` on the step arithmetic.
 
 ### Where the compiler stands, and what it still refuses
 
-Sixty-three fixtures, each matching upstream's compiler property for property and drawing the chart
+Sixty-five fixtures, each matching upstream's compiler property for property and drawing the chart
 upstream draws. The grammar covered: a single view, a layer of them, a concatenation of either, a
 repetition of any of those, both facet operators, eleven marks including `arc`,
 the Cartesian and polar position pairs, nested offsets, fourteen of fifteen transforms, sorting,
@@ -614,6 +614,33 @@ Three fixtures passing untouched is worth stating plainly rather than quietly: i
 port of the layer beneath is supposed to buy, and the one defect it did find was a rewrite compiled
 and then thrown away — the normalized specification has to *replace* the one being compiled, not
 stand beside it.
+
+### `resolve`, which is what makes a chart dual-axis
+
+`resolve` decides which of a composition's scales and guides its children share. It is the whole
+difference between a layered chart and a **dual-axis** one — the same two marks over one `y` say they
+measure the same thing, and over `{"scale": {"y": "independent"}}` they each get a scale and an axis
+of their own — and it is what puts a colour key under every plot of a concatenation instead of one
+beside the whole chart.
+
+The naming is the mechanism, and it had already been half built: a concatenation names its plots'
+positions `concat_0_x`, and independence is the same idea one level down. So the scale prefix became
+an explicit **name per view per channel**, and everything that mentions a scale reads it from there.
+A shared channel keeps its plain name and one component takes every view's domain; an independent
+one is named for the child that owns it and each child gets a component of its own.
+
+Three rules came out of upstream with it:
+
+- **A resolve governs the outermost composition and nothing below it**, as it does upstream, where
+  every model carries its own. The child it names is a *composition child*, not an expanded view: a
+  line that draws its own points is two views under one layer, and naming the scale from the view
+  gives the line and its points a scale each and draws them apart.
+- **An independent scale forces an independent guide** — `parseGuideResolve` — since one axis cannot
+  label two scales.
+- Two independent axes on a channel would otherwise stack on the same side, so upstream counts how
+  many have landed on each and moves one across when they do not match, counting the side each
+  *asked* for rather than the side it ended on. And only the first rules gridlines: two sets across
+  one plot measure different things and say neither.
 
 ### A trellis whose cells run backwards, and the two ways it was wrong
 
@@ -1037,7 +1064,7 @@ the whole time.
 
 ## Verification
 
-- 2,084 JVM tests pass and none is skipped (`./gradlew test`); the portable core is most of
+- 2,098 JVM tests pass and none is skipped (`./gradlew test`); the portable core is most of
   them, and `./scripts/test-core.sh` runs it without an Android SDK.
 - Android lint is clean with `warningsAsErrors` on every Android module.
 - 63 instrumented tests pass on an API 37 arm64 emulator (`./scripts/test-android.sh`): 49 in

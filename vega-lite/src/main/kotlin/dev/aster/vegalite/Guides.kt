@@ -100,8 +100,21 @@ internal object Guides {
     val titles: MutableList<String> = mutableListOf()
     var disabled: Boolean = false
 
+    /**
+     * Whether the specification named the side itself.
+     *
+     * Two independent axes on one channel are moved apart, and one the specification placed is left
+     * where it was put — upstream's `!explicit` guard.
+     */
+    var explicitOrient: Boolean = false
+
     fun set(name: String, value: VegaValue?) {
       if (value != null && !properties.containsKey(name)) properties[name] = value
+    }
+
+    /** Overwrites what was already decided, which only the layer-level merge ever needs to do. */
+    fun override(name: String, value: VegaValue) {
+      properties[name] = value
     }
   }
 
@@ -117,6 +130,7 @@ internal object Guides {
     val user = def.axis
 
     axis.set("scale", str(view.scale(channel)))
+    axis.explicitOrient = user?.fields?.get("orient") != null
     axis.set("orient", str(if (channel == "x") "bottom" else "left"))
 
     // The gridlines belong to *this* scale but are drawn across the other one's extent.
@@ -284,7 +298,7 @@ internal object Guides {
     val gradient = channel in setOf("color", "fill", "stroke") && continuous
 
     return obj {
-      put(scaleChannel, channel)
+      put(scaleChannel, view.scale(channel))
       if (gradient) {
         // A colour ramp is drawn as a bar whose length follows the plot, within Vega's own limits.
         put("gradientLength", signalRef("clamp(height, 64, 200)"))

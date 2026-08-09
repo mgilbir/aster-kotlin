@@ -9,7 +9,7 @@ import dev.aster.vega.model.VegaValue
  * its layers — the domains union while the type and properties come from the first view that
  * declared them, which is why a bar and a rule drawn together share one y axis.
  */
-internal class ScaleComponent(val channel: String, val type: String, val prefix: String = "") {
+internal class ScaleComponent(val channel: String, val type: String, private val name: String) {
   val domains: MutableList<VegaValue> = mutableListOf()
   val properties: LinkedHashMap<String, VegaValue> = LinkedHashMap()
 
@@ -20,8 +20,7 @@ internal class ScaleComponent(val channel: String, val type: String, val prefix:
     if (value != null) properties[name] = value
   }
 
-  fun name(): String =
-    if (channel in Channels.POSITION_SCALE_CHANNELS) prefix + channel else channel
+  fun name(): String = name
 }
 
 internal object Scales {

@@ -59,6 +59,10 @@ public class VegaLiteCompiler {
   }
 }
 
+/** The side an axis moves to when two land on one channel — upstream's `OPPOSITE_ORIENT`. */
+private val OPPOSITE_ORIENT =
+  mapOf("bottom" to "top", "top" to "bottom", "left" to "right", "right" to "left")
+
 /** One compilation. Holds the counters and the components the whole chart shares. */
 private class Compilation(
   /**
@@ -70,6 +74,9 @@ private class Compilation(
 ) {
 
   private val config = Config(spec.obj("config") ?: VegaValue.EmptyObject)
+
+  /** Which of a composition's scales and guides its children share, and which they do not. */
+  private val resolve = Resolve(spec.obj("resolve"))
   private val parser = Parse(config, diagnostics)
 
   /** `config.facet.spacing` and the gap a header title keeps from its cells. */
@@ -105,22 +112,22 @@ private class Compilation(
     // else — `defaultScaleResolve` — so the position scales are merged within a plot and the rest
     // across the whole chart. That is why two plots side by side have their own `y` but one colour
     // legend between them.
-    val shared = if (concat == null) null else mergeScales(views, "")
+    // `resolve` governs the *outermost* composition and nothing below it, as it does upstream where
+    // every model carries its own: a top-level resolve settles a concatenation's plots against each
+    // other, or, with no concatenation, a layer's views against each other.
+    val allScales = mergeScales(views) { view, channel -> scaleName(view, channel) }
+    // Which plot each scale belongs to, or none where several share it. That is the whole of what
+    // decides where a scale and its legend are written: a shared one at the top, an independent one
+    // inside the plot that owns it.
+    val owner =
+      allScales.keys.associateWith { name ->
+        plots.filter { plot -> plot.views.any { name in it.scaleNames.values } }.singleOrNull()
+      }
     for (plot in plots) {
-      val own = mergeScales(plot.views, plot.prefix)
-      val visible = LinkedHashMap<String, ScaleComponent>()
-      own.forEach { (channel, scale) ->
-        if (shared == null || channel in Channels.POSITION_SCALE_CHANNELS) visible[channel] = scale
-      }
-      shared?.forEach { (channel, scale) ->
-        if (channel !in Channels.POSITION_SCALE_CHANNELS) visible[channel] = scale
-      }
-      plot.scales = visible
-      val scaleTypes = visible.mapValues { it.value.type }
-      plot.views.forEach {
-        it.scaleTypes = scaleTypes
-        it.scaleComponents = visible
-      }
+      plot.scales =
+        LinkedHashMap(
+          allScales.filterKeys { name -> plot.views.any { name in it.scaleNames.values } }
+        )
     }
 
     // The sizes are named before anything reads them, because what a concatenation calls them
@@ -129,17 +136,22 @@ private class Compilation(
     nameSizes(plots)
 
     val data = assembleData(views).toMutableList()
-    for (plot in plots) fillScaleDomains(plot.views, plot.scales)
+    fillScaleDomains(views)
     for (plot in plots) {
-      plot.axes = assembleAxes(plot.views, plot.scales)
+      plot.axes = assembleAxes(plot)
       plot.size =
-        LayoutSize(plot.views, plot.scales, config, plot.spec, plot.sizeNames, plot.prefix)
+        LayoutSize(plot.views, plot.byChannel(), config, plot.spec, plot.sizeNames, plot.prefix)
     }
-    // Every legend belongs to a shared scale, so a concatenation draws its own once for the whole
-    // chart rather than one under each plot.
-    val legends =
-      if (concat == null) assembleLegends(views, plots.single().scales)
-      else assembleLegends(views, shared!!)
+    // A legend belongs where its scale does. A concatenation whose plots share a colour scale draws
+    // one key beside the whole chart; one that resolves colour independently draws a key inside
+    // each plot, because two keys standing for different scales cannot be one.
+    val allLegends = assembleLegends(views)
+    for (plot in plots) {
+      plot.legends =
+        if (concat == null) emptyList()
+        else allLegends.filterKeys { owner[it] === plot }.values.toList()
+    }
+    val legends = allLegends.filterKeys { concat == null || owner[it] == null }.values.toList()
     // A merged size is written once, by the chart, rather than once by each plot that shares it.
     val sizeSignals =
       plots.flatMap { plot -> plot.size!!.signals.filter { it.string("name") !in merged } } +
@@ -179,13 +191,11 @@ private class Compilation(
       facet?.let { put("layout", it.layout(FACET_SPACING, HEADER_OFFSET, config)) }
       concat?.let { put("layout", it.layout()) }
       put("marks", arr(if (concat == null) marks(views, plots.single().axes) else groups(plots)))
+      // Shared scales first, then each plot's own, which is the order upstream's assembly walks the
+      // model tree in: the composition's own components before it recurses into its children.
       val scales =
-        (shared?.values.orEmpty().filter { it.channel !in Channels.POSITION_SCALE_CHANNELS }) +
-          plots.flatMap { plot ->
-            plot.scales.values.filter {
-              concat == null || it.channel in Channels.POSITION_SCALE_CHANNELS
-            }
-          }
+        allScales.values.filter { owner[it.name()] == null } +
+          plots.flatMap { plot -> allScales.values.filter { owner[it.name()] === plot } }
       if (scales.isNotEmpty()) put("scales", arr(scales.map { assembleScale(it) }))
       // A faceted chart has no axes of its own: the gridlines live in every cell and the labelled
       // axis in a header drawn once for the whole grid. A concatenation's axes live in its plots.
@@ -200,6 +210,29 @@ private class Compilation(
 
     return VegaLiteCompilation(vega, diagnostics.diagnostics)
   }
+
+  /**
+   * What one view's scale on a channel is called.
+   *
+   * A shared channel keeps its plain name; an independent one takes the name of the child that owns
+   * it, which is the plot inside a concatenation and the view inside a layer. A concatenation's
+   * positions are independent unless the specification says otherwise — `defaultScaleResolve` — and
+   * everything else, at either level, is shared unless it does.
+   */
+  private fun scaleName(view: UnitView, channel: String): String {
+    val independent =
+      resolve.scaleIsIndependent(
+        channel,
+        defaultIndependent = concat != null && channel in Channels.POSITION_SCALE_CHANNELS,
+      )
+    if (!independent) return channel
+    val owner = if (concat != null) plotOf(view) else view.childName
+    return if (owner.isEmpty()) channel else "${owner}_$channel"
+  }
+
+  private fun plotOf(view: UnitView): String = plotNames[view] ?: ""
+
+  private val plotNames = mutableMapOf<UnitView, String>()
 
   private fun failed() = VegaLiteCompilation(null, diagnostics.diagnostics)
 
@@ -223,8 +256,24 @@ private class Compilation(
     var views: List<UnitView> = emptyList()
     var scales: LinkedHashMap<String, ScaleComponent> = LinkedHashMap()
     var axes: List<VegaValue> = emptyList()
+    var legends: List<VegaValue> = emptyList()
     var size: LayoutSize? = null
     var sizeNames: Map<String, String> = mapOf("x" to "width", "y" to "height")
+
+    /**
+     * One scale per channel, the first view that owns one winning.
+     *
+     * The plotting area is measured against *a* scale on each position channel, and where two views
+     * resolve one independently the first is the one whose step the plot is derived from — which is
+     * upstream's own merge, taking the first child that answers.
+     */
+    fun byChannel(): Map<String, ScaleComponent> {
+      val out = LinkedHashMap<String, ScaleComponent>()
+      for (view in views) view.scaleComponents.forEach { (channel, scale) ->
+        out.putIfAbsent(channel, scale)
+      }
+      return out
+    }
   }
 
   private fun plots(): List<Plot>? {
@@ -240,7 +289,7 @@ private class Compilation(
         }
     for (plot in plots) {
       plot.views = views(plot.spec, plot.name) ?: return null
-      plot.views.forEach { it.scalePrefix = plot.prefix }
+      plot.views.forEach { plotNames[it] = plot.name }
     }
     return plots
   }
@@ -335,6 +384,7 @@ private class Compilation(
       if (local.isNotEmpty()) put("signals", arr(local))
       put("marks", arr(plot.views.flatMap { Marks.marks(it) }))
       if (plot.axes.isNotEmpty()) put("axes", arr(plot.axes))
+      if (plot.legends.isNotEmpty()) put("legends", arr(plot.legends))
     }
   }
 
@@ -350,7 +400,8 @@ private class Compilation(
     val out = LinkedHashMap<String, String>()
     for (channel in Channels.POSITION_CHANNELS) {
       val other = if (channel == "x") "y" else "x"
-      if (plot.scales[channel] == null || plot.scales[other] != null) continue
+      val byChannel = plot.byChannel()
+      if (byChannel[channel] == null || byChannel[other] != null) continue
       val name = if (other == "x") "width" else "height"
       val update = plot.views.first().sizeSignal(other)
       if (update != name) out[name] = update
@@ -395,7 +446,7 @@ private class Compilation(
       // Each declared layer may itself normalize into more than one — a line that draws its own
       // points is two marks — so the list is expanded first and only then numbered. The numbering
       // is what names `layer_0_marks`, so it has to count the views that actually exist.
-      val units = mutableListOf<Pair<Pair<String, VegaValue.Obj>, String>>()
+      val units = mutableListOf<Pair<Triple<String, VegaValue.Obj, String>, String>>()
       layers.forEachIndexed { index, layer ->
         val child = layer as? VegaValue.Obj ?: return@forEachIndexed
         if (child.fields.containsKey("layer")) {
@@ -410,11 +461,13 @@ private class Compilation(
         // A layer that names itself is compiled under that name, which is what a `repeat` over
         // `layer` relies on: its copies are `child__layer_b`, not `layer_0`.
         val here = child.string("name") ?: named("layer_$index")
-        expand(merged, here).forEach { units += it to "$.layer[$index]" }
+        expand(merged, here).forEach {
+          units += Triple(it.first, it.second, here) to "$.layer[$index]"
+        }
       }
       return units.mapNotNull { (named, path) ->
-        val (name, unit) = named
-        parser.unit(unit, path)?.let { UnitView(it, config, name) }
+        val (name, unit, child) = named
+        parser.unit(unit, path)?.let { UnitView(it, config, name, child) }
       }
     }
 
@@ -564,13 +617,6 @@ private class Compilation(
         jsonPath = "$.projection",
       )
     }
-    if (spec.fields.containsKey("resolve")) {
-      diagnostics.error(
-        VegaLiteDiagnostics.UNSUPPORTED_TOP_LEVEL_PROPERTY,
-        "`resolve` is not implemented; scales, axes and legends are always shared between layers.",
-        jsonPath = "$.resolve",
-      )
-    }
   }
 
   private fun autosize(): VegaValue? {
@@ -646,35 +692,46 @@ private class Compilation(
   // Scales
   // -----------------------------------------------------------------------------------------
 
+  /**
+   * Every scale a plot needs, keyed by the name it will carry, and each view's own map by channel.
+   *
+   * The name is the whole of what `resolve` decides. A shared channel keeps its plain name and one
+   * component takes every view's domain; an independent one is named for the child that owns it —
+   * the plot inside a concatenation, the view inside a layer — and each child gets a component of
+   * its own. Two views on one shared channel merge by *type* first, and the more capable type wins
+   * rather than the first-declared one: upstream ranks them (`SCALE_PRECEDENCE_INDEX`) and puts
+   * `band` above `point` above everything continuous, "as they support more types of data", which
+   * is how a box plot — a bar, a rule and two ticks — ends up on one band.
+   */
   private fun mergeScales(
     views: List<UnitView>,
-    prefix: String,
+    name: (UnitView, String) -> String,
   ): LinkedHashMap<String, ScaleComponent> {
     val scales = LinkedHashMap<String, ScaleComponent>()
     for (view in views) {
       for ((channel, def) in view.scaledChannels()) {
         val type = Scales.scaleType(channel, def, view.spec.mark)
-        val existing = scales[channel]
-        if (existing == null) {
-          scales[channel] = ScaleComponent(channel, type, prefix)
-        } else if (existing.type != type) {
-          // The *more capable* type wins rather than the first-declared one. Upstream ranks them
-          // (`SCALE_PRECEDENCE_INDEX`) and puts `band` above `point` above everything continuous,
-          // "as they support more types of data" and band "is better for interaction" — which is
-          // how a box plot, whose parts are a bar, a rule and two ticks, ends up on one band.
-          if (Scales.precedence(type) > Scales.precedence(existing.type)) {
-            scales[channel] = ScaleComponent(channel, type, prefix)
-          }
+        val key = name(view, channel)
+        val existing = scales[key]
+        if (existing == null || Scales.precedence(type) > Scales.precedence(existing.type)) {
+          scales[key] = ScaleComponent(channel, type, key)
         }
       }
+    }
+    for (view in views) {
+      view.scaleNames =
+        view.scaledChannels().associate { (channel, _) -> channel to name(view, channel) }
+      view.scaleComponents =
+        view.scaleNames.mapNotNull { (channel, key) -> scales[key]?.let { channel to it } }.toMap()
+      view.scaleTypes = view.scaleComponents.mapValues { it.value.type }
     }
     return scales
   }
 
-  private fun fillScaleDomains(views: List<UnitView>, scales: Map<String, ScaleComponent>) {
+  private fun fillScaleDomains(views: List<UnitView>) {
     for (view in views) {
       for ((channel, def) in view.scaledChannels()) {
-        val component = scales[channel] ?: continue
+        val component = view.scaleComponents[channel] ?: continue
         val domains = Scales.domain(view, channel, def, component.type, view.mainData)
         for (domain in domains) if (domain !in component.domains) component.domains += domain
         if (component.properties.isEmpty()) {
@@ -772,51 +829,95 @@ private class Compilation(
   // Guides
   // -----------------------------------------------------------------------------------------
 
-  private fun assembleAxes(
-    views: List<UnitView>,
-    scales: Map<String, ScaleComponent>,
-  ): List<VegaValue> {
-    val components = LinkedHashMap<String, Guides.AxisComponent>()
-    for (view in views) {
+  private fun assembleAxes(plot: Plot): List<VegaValue> {
+    // Keyed by whatever makes two axes *two*: a shared scale merges its views' axes into one, and
+    // an independently resolved guide keeps one per view. That is the whole of a dual-axis chart.
+    val components = LinkedHashMap<String, Pair<String, Guides.AxisComponent>>()
+    for (view in plot.views) {
       for (channel in Channels.POSITION_CHANNELS) {
         val def = view.spec.encoding[channel] ?: continue
         if (!def.isFieldDef && def.datum == null) continue
-        val component = scales[channel] ?: continue
-        val hasOther = scales.containsKey(if (channel == "x") "y" else "x")
+        val component = view.scaleComponents[channel] ?: continue
+        val hasOther = view.scaleComponents.containsKey(if (channel == "x") "y" else "x")
         val parsed = Guides.parseAxis(view, channel, def, component.type, hasOther) ?: continue
-        val existing = components[channel]
+        val key =
+          if (guideIsIndependent(channel)) "${view.childName}|$channel" else component.name()
+        val existing = components[key]
         if (existing == null) {
-          components[channel] = parsed
+          components[key] = channel to parsed
         } else {
-          parsed.titles.forEach { if (it !in existing.titles) existing.titles += it }
+          parsed.titles.forEach { if (it !in existing.second.titles) existing.second.titles += it }
         }
       }
     }
+    faceOff(components.values.toList())
+    val ordered = components.values.map { it.second }
     // Gridlines first, so they are painted behind every mark, then the axes themselves.
-    return components.values.mapNotNull { Guides.assembleAxis(it, "grid") } +
-      components.values.mapNotNull { Guides.assembleAxis(it, "main") }
+    return ordered.mapNotNull { Guides.assembleAxis(it, "grid") } +
+      ordered.mapNotNull { Guides.assembleAxis(it, "main") }
   }
 
-  private fun assembleLegends(
-    views: List<UnitView>,
-    scales: Map<String, ScaleComponent>,
-  ): List<VegaValue> {
+  private fun guideIsIndependent(channel: String): Boolean =
+    resolve.guideIsIndependent(
+      channel,
+      resolve.scaleIsIndependent(
+        channel,
+        defaultIndependent = concat != null && channel in Channels.POSITION_SCALE_CHANNELS,
+      ),
+    )
+
+  /**
+   * Puts the second axis of a channel on the other side, and stops it ruling its own gridlines.
+   *
+   * `parseLayerAxes`: two independent axes on one channel would otherwise stack on the left, so
+   * upstream counts how many have landed on each side and moves one across when they do not match —
+   * counting the side it *asked* for rather than the side it ended on. And "show gridlines for the
+   * first axis only for dual-axis chart": two sets of gridlines across one plot measure different
+   * things and say neither.
+   */
+  private fun faceOff(components: List<Pair<String, Guides.AxisComponent>>) {
+    for (channel in Channels.POSITION_CHANNELS) {
+      val onChannel = components.filter { it.first == channel }.map { it.second }
+      if (onChannel.size < 2) continue
+      val counts = mutableMapOf<String, Int>()
+      for (axis in onChannel) {
+        val orient = (axis.properties["orient"] as? VegaValue.Str)?.value ?: continue
+        val opposite = OPPOSITE_ORIENT[orient] ?: continue
+        if ((counts[orient] ?: 0) > 0 && !axis.explicitOrient) {
+          if ((counts[orient] ?: 0) > (counts[opposite] ?: 0))
+            axis.override("orient", str(opposite))
+        }
+        counts[orient] = (counts[orient] ?: 0) + 1
+      }
+      for ((index, axis) in onChannel.withIndex()) {
+        if (index > 0 && (axis.properties["grid"] as? VegaValue.Bool)?.value == true) {
+          axis.override("grid", bool(false))
+        }
+      }
+    }
+  }
+
+  private fun assembleLegends(views: List<UnitView>): LinkedHashMap<String, VegaValue> {
     val legends = LinkedHashMap<String, LinkedHashMap<String, VegaValue>>()
     for (view in views) {
       for (channel in Channels.LEGEND_CHANNELS) {
         val def = view.spec.encoding[channel] ?: continue
         if (!def.isFieldDef && def.datum == null) continue
-        val component = scales[channel] ?: continue
+        val component = view.scaleComponents[channel] ?: continue
         val built = Guides.legend(view, channel, def, component.type) as? VegaValue.Obj ?: continue
-        val existing = legends[channel]
-        if (existing == null) legends[channel] = LinkedHashMap(built.fields)
+        // Keyed by the *scale*, so two views on one shared scale get one key between them and two
+        // on independently resolved scales get one each.
+        val existing = legends[component.name()]
+        if (existing == null) legends[component.name()] = LinkedHashMap(built.fields)
         else merge(existing, built)
       }
     }
-    return legends.values.map { fields ->
+    val out = LinkedHashMap<String, VegaValue>()
+    legends.forEach { (name, fields) ->
       settle(fields)
-      obj { fields.forEach { (key, value) -> put(key, value) } }
+      out[name] = obj { fields.forEach { (key, value) -> put(key, value) } }
     }
+    return out
   }
 
   /**
