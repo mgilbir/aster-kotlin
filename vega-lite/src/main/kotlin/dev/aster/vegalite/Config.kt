@@ -37,6 +37,17 @@ internal class Config(private val user: VegaValue.Obj = VegaValue.EmptyObject) {
   /** One discrete step, from which a band-scaled plot's whole width is computed. */
   val step: Double = view.number("step") ?: 20.0
 
+  /**
+   * `view.discreteWidth`/`discreteHeight`: how deep a plot is along a channel with **no scale**.
+   *
+   * A plain number here replaces the step entirely — `getViewConfigDiscreteSize` takes the
+   * configured size first and only then falls back to `{step}` — which is how a themed chart makes
+   * every one-dimensional strip the same depth without mentioning a step.
+   */
+  val discreteWidth: Double? = view.number("width") ?: view.number("discreteWidth")
+
+  val discreteHeight: Double? = view.number("height") ?: view.number("discreteHeight")
+
   private val view: VegaValue.Obj
     get() = user.obj("view") ?: VegaValue.EmptyObject
 

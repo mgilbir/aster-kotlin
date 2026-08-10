@@ -140,6 +140,9 @@ internal object Marks {
     return obj {
       put("name", view.prefixed("marks"))
       put("type", VG_MARK[mark])
+      // `clip` is a Vega mark property, not a Vega-Lite-only one: it goes straight through, and it
+      // is what keeps a line inside its declared domain instead of running off the plot.
+      view.markDef.raw.fields["clip"]?.let { put("clip", it) }
       put("style", strings(styles(view)))
       if (view.markDef.raw.fields["aria"] == VegaValue.Bool(false)) {
         put("aria", VegaValue.Bool(false))
@@ -304,6 +307,9 @@ internal object Marks {
       put(key, obj { put("value", value) })
     }
   }
+
+  /** `isRectBasedMark`: the marks whose size along a channel is a *band* rather than a symbol. */
+  private val RECT_BASED_MARKS = setOf("rect", "bar", "image", "arc", "tick")
 
   private val VL_ONLY_MARK_PROPERTIES =
     setOf(
@@ -959,6 +965,15 @@ internal object Marks {
           val bandwidth = "bandwidth('${view.scale(band)}')"
           signalRef(if (minBandSize != null) "max($minBandSize, $bandwidth)" else bandwidth)
         }
+        // A rect-based mark on a **continuous** scale is `continuousBandSize` wide — five units for
+        // a bar — not a step less two. `getBandSize` asks the scale's kind first and only reaches
+        // `discreteBandSize` where the domain is discrete, so a bar against a quantitative axis had
+        // been coming out nearly four times too wide.
+        scaleType != null &&
+          !Scales.hasDiscreteDomain(scaleType) &&
+          view.spec.mark in RECT_BASED_MARKS &&
+          markConfig.number("continuousBandSize") != null ->
+          obj { put("value", markConfig.number("continuousBandSize")) }
         else -> {
           val discreteBandSize = markConfig.number("discreteBandSize")
           when {

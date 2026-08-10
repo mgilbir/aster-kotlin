@@ -155,6 +155,16 @@ internal class LayoutSize(
       if (declared is VegaValue.Num) return declared
       val scale = scales[channel]
       if (scale != null && (scale.type == "band" || scale.type == "point")) return null
+      // A channel with **no scale at all** is not a continuous one: `defaultUnitSize` falls to the
+      // *discrete* size for it, which is a step. That is what makes a one-dimensional chart — a
+      // strip of ticks, a bar chart of one measure — twenty units deep rather than three hundred,
+      // and it is the single most common way a gallery example came out the wrong size.
+      if (scale == null && views.none { it.spec.mark == "arc" }) {
+        val discrete =
+          if (channel == "x") config.discreteWidth ?: config.step
+          else config.discreteHeight ?: config.step
+        return num(discrete)
+      }
       return num(if (channel == "x") config.continuousWidth else config.continuousHeight)
     }
   }

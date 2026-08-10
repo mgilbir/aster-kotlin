@@ -474,7 +474,7 @@ produces a chart that is plausible and wrong.
 every fixture with upstream and checks two things:
 
 1. `VegaLiteFixtureTest` compares the Vega this compiler emits against upstream's, property by
-   property. Seventy fixtures, and all of them match exactly — every transform, scale, signal,
+   property. Seventy-one fixtures, and all of them match exactly — every transform, scale, signal,
    axis, legend and mark encoding, down to the accessibility description string.
 2. `VegaLiteFixtureDifferentialTest` runs that output through this engine's own runtime and compares
    the scene against the one upstream draws. Every mark of every fixture matches, and nothing is
@@ -559,7 +559,7 @@ own) and `grouped-bar` on the step arithmetic.
 
 ### Where the compiler stands, and what it still refuses
 
-Seventy fixtures, each matching upstream's compiler property for property and drawing the chart
+Seventy-one fixtures, each matching upstream's compiler property for property and drawing the chart
 upstream draws. The grammar covered: a single view, a layer of them to any depth, a concatenation of
 either to any depth, a
 repetition of any of those, both facet operators, eleven marks including `arc`,
@@ -669,6 +669,62 @@ Three rules came out of upstream with it:
   many have landed on each and moves one across when they do not match, counting the side each
   *asked* for rather than the side it ended on. And only the first rules gridlines: two sets across
   one plot measure different things and say neither.
+
+### The gallery, swept: 627 examples against upstream's own compiler
+
+Vega-Lite ships 627 example specifications, and compiling is a pure function of the specification —
+no data is needed to compare two compilers. So every one of them was compiled by upstream 6.4.3 and
+by this one, and the outputs compared property by property. That is a *measurement*, not a gate: the
+examples are not fixtures here, and nothing about them is checked in.
+
+**124 of 627 matched exactly** at the start. 16 were refused by name, and of those 8 are geographic,
+3 are a facet inside a facet, 2 a repeat inside a concatenation, and 2 are the `trail` mark — which
+this runtime draws and this compiler had simply not been told about.
+
+The value is the *ranking*. Clustered by root cause, by how many example files each one affects:
+
+| Files | Cause |
+| --- | --- |
+| 135 | the accessibility description string differs |
+| 86 | `as` defaults missing on `fold`/`flatten` |
+| 56 | `mark.clip` dropped |
+| 42 | a stack's `sort` block missing |
+| 41 | an explicit axis title should short-circuit the merge |
+| 36 | a one-dimensional chart sized 300, not 20 |
+| 24 | a bar on a continuous scale sized `step - 2`, not `continuousBandSize` |
+| 15 | `tickMinStep` on a binned axis |
+| 8 | a gradient legend's opacity encode |
+| 5 | `config.scale` leaking into the Vega config |
+| 2 | `toNumber` emitted as `tonumber` |
+
+Three were fixed here, and they were chosen for what they do to the *picture* rather than for
+frequency:
+
+- **`mark.clip` was being stripped** as a Vega-Lite-only property. It is a Vega mark property and
+  goes straight through; it is what keeps a line inside a domain narrower than its data.
+- **A channel with no scale at all is not a continuous one.** `defaultUnitSize` falls to the
+  *discrete* size for it, which is a step — so a strip of ticks or a single total is twenty units
+  deep, not three hundred. This was the most common way a gallery chart came out the wrong size.
+- **A rect-based mark on a continuous scale takes `continuousBandSize`** — five units for a bar —
+  where this compiler used `step - 2`, making it nearly four times too wide. `getBandSize` asks the
+  scale's kind first and reaches `discreteBandSize` only where the domain is discrete.
+
+The count went 124 → 138 clean, which understates it: a cause is fixed for every file that carries
+it, and most of those files carry several.
+
+The fixture written for the size rule then found a fourth, and it was this branch's own: the size
+merge looked scales up **by channel** in a map keyed by scale **name**, so inside a concatenation
+every plot looked scale-less and three plots of different depths merged into one signal. It had been
+invisible because every existing concat fixture declares its sizes.
+
+Two runtime gaps are recorded rather than fixed, both found by fixtures written here and both
+withdrawn from the corpus because a fixture has to pass:
+
+- **A non-group mark's `clip` is not applied in the runtime.** The compiler emits it now, but the
+  scene still measures the clipped-away points, so a clipped line makes the chart wider than
+  upstream's.
+- **A ranged bar (`x`/`x2`) inside a concatenation** places its rects and gridlines differently from
+  upstream. Its specification matches property for property, so this is the runtime's.
 
 ### Five defects behind one chart pasted into the demo
 
@@ -1197,7 +1253,7 @@ the whole time.
 
 ## Verification
 
-- 2,351 JVM tests pass and none is skipped (`./gradlew test`); the portable core is most of
+- 2,358 JVM tests pass and none is skipped (`./gradlew test`); the portable core is most of
   them, and `./scripts/test-core.sh` runs it without an Android SDK.
 - Android lint is clean with `warningsAsErrors` on every Android module.
 - 63 instrumented tests pass on an API 37 arm64 emulator (`./scripts/test-android.sh`): 49 in

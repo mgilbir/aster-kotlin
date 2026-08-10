@@ -372,7 +372,16 @@ private class Compilation(
   private fun sizeOf(node: Node, channel: String): VegaValue? =
     when (node) {
       is Node.Leaf ->
-        LayoutSize.value(node.plot.views, node.plot.scales, config, node.plot.spec, channel)
+        LayoutSize.value(
+          node.plot.views,
+          // Keyed by *channel*: `plot.scales` is keyed by scale name, and inside a concatenation
+          // those are `concat_0_x`, so looking a channel up in it finds nothing and every plot
+          // looks scale-less — which merged three plots of different depths into one signal.
+          node.plot.byChannel(),
+          config,
+          node.plot.spec,
+          channel,
+        )
       is Node.Nest -> nestSizes[node]?.get(channel)
     }
 
