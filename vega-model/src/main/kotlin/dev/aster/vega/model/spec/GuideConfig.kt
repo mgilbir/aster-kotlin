@@ -40,10 +40,10 @@ public class GuideConfig(private val blocks: Map<String, VegaValue.Obj>) {
    * still wins, property by property.
    */
   private fun style(name: String): VegaValue.Obj {
-    val declared = blocks["style"]?.fields?.get(name) as? VegaValue.Obj
-    val builtIn = BUILT_IN_STYLES[name] ?: return declared ?: EMPTY
-    if (declared == null) return builtIn
-    return VegaValue.Obj(LinkedHashMap(builtIn.fields).apply { putAll(declared.fields) })
+    val declared = (blocks["style"]?.fields?.get(name) as? VegaValue.Obj)?.fields.orEmpty()
+    val builtIn = BUILT_IN_STYLES[name]?.fields.orEmpty()
+    if (builtIn.isEmpty()) return VegaValue.Obj(declared)
+    return VegaValue.Obj(LinkedHashMap(builtIn).apply { putAll(declared) })
   }
 
   /**
@@ -142,18 +142,22 @@ public class GuideConfig(private val blocks: Map<String, VegaValue.Obj>) {
     private val EMPTY = VegaValue.Obj(emptyMap())
 
     /**
-     * The `config.style` blocks Vega ships with, copied from its own `config.js`.
+     * Upstream's own `config.style` blocks, which a specification can override but rarely defines.
      *
-     * `point`, `circle`, `square`, `cell` and `view` exist for Vega-Lite, which is why they are
-     * reached by *name* rather than by mark type: a specification says `"style": ["point"]` and
-     * gets a symbol a third the size of Vega's own default, stroked twice as thick. The rest of
-     * Vega's default configuration lives in `MarkDefaults`, next to the built-in per-mark-type
-     * values it belongs with.
+     * They are not decoration. `cell` is what makes a `style: "cell"` group *painted* — a
+     * transparent fill and a light grey outline — and a group that paints nothing is not a mark at
+     * all, so a chart laid out from styled cells came out two marks short of upstream's. `point`,
+     * `circle` and `square` are the Vega-Lite symbol styles, and they carry a **size of 30** where
+     * a bare symbol's is 100; they are reached by *name* rather than by mark type, a specification
+     * saying `"style": ["point"]` and getting a symbol a third the size stroked twice as thick. The
+     * rest of Vega's default configuration lives in `MarkDefaults`, next to the built-in
+     * per-mark-type values it belongs with.
      *
-     * The four guide styles carry the font every guide is drawn in, and they are here rather than
-     * only in `AxisDefaults` because anything may *name* one: a group mark's `title` does exactly
-     * that, and a trellis header set at a heading's thirteen points instead of a label's ten is
-     * both the wrong size and, being measured, the wrong amount of chart.
+     * The four guide styles carry the font every guide is drawn in. This engine also holds those
+     * numbers as its own axis, legend and title defaults, which is one number in two places — but
+     * they are needed *here* because anything may **name** a guide style: a group mark's `title`
+     * does exactly that, and a trellis header drawn at a heading's thirteen points instead of a
+     * label's ten is both the wrong size and, being measured, the wrong amount of chart.
      */
     private val BUILT_IN_STYLES: Map<String, VegaValue.Obj> =
       mapOf(

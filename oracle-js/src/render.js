@@ -12,6 +12,7 @@ import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname } from 'node:path';
 import { fileLoader, rootsFor } from './file-loader.js';
 import * as vega from 'vega';
+import { pinDeterminism } from './determinism.js';
 import { canonicalJson, canonicalSvg, summarizeScene } from './canonical.js';
 
 const [specPath, outputPrefix] = process.argv.slice(2);
@@ -22,6 +23,9 @@ if (!specPath || !outputPrefix) {
 }
 
 const spec = JSON.parse(readFileSync(specPath, 'utf8'));
+
+// Seed the generator and stop the clock before anything parses; see determinism.js.
+pinDeterminism();
 
 const view = new vega.View(vega.parse(spec), {
   renderer: 'none',

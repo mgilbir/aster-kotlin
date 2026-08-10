@@ -261,6 +261,15 @@ public object Differential {
       solidColour(fill.paint)?.let { strings["fill"] = it.toCssHex() }
       numbers["fillOpacity"] = fill.opacity
     }
+    // A text mark can be *stroked*, and this comparison could not see it — the seventh channel to
+    // have been invisible here. A halo under a label on a busy background is exactly that stroke,
+    // and a label drawn without one is unreadable while agreeing on every other channel.
+    node.stroke?.let { stroke ->
+      solidColour(stroke.paint)?.let { strings["stroke"] = it.toCssHex() }
+      numbers["strokeWidth"] = stroke.width
+      numbers["strokeOpacity"] = stroke.opacity
+      dashOf(stroke)?.let { strings["strokeDash"] = it }
+    }
     return Mark("text", node.metadata.role, numbers, strings)
   }
 
@@ -394,12 +403,23 @@ public object Differential {
         "y" to anchor.y,
         "width" to node.width,
         "height" to node.height,
-      ),
+      ) +
+        (node.raster?.let {
+          mapOf(
+            "rasterWidth" to it.width.toDouble(),
+            "rasterHeight" to it.height.toDouble(),
+          )
+        } ?: emptyMap()),
       linkedMapOf(
         "url" to node.url,
         "align" to node.align.name.lowercase(),
         "baseline" to node.baseline.name.lowercase(),
-      ),
+      ) +
+        // The pixels, as a digest. An image mark is otherwise compared by its box alone, so a
+        // heatmap that painted nothing would agree with one that painted the right thing in the
+        // right place. Written as a string on both sides because the hash is 64-bit and JSON's
+        // numbers are doubles.
+        (node.raster?.let { mapOf("rasterDigest" to it.digest.toString()) } ?: emptyMap()),
     )
   }
 
@@ -600,7 +620,14 @@ public object Differential {
         // own spelling, so the two match exactly.
         val required = if (wanted == "NaN") 0.0 else wanted.toDouble()
         val held = actual.numbers[channel]
-        if (held == null || held != required) {
+        // A `NaN` is accepted either way round, and the two spellings say the same thing. Where the
+        // channel is an *extent* this engine holds the painted zero, because a scene node carries
+        // numbers a renderer can use. Where it is a *position* that upstream never computed, it
+        // holds the same absence: an axis's `tickExtra` label scales a value its datum does not
+        // carry, and upstream's own SVG contains no element for it. Neither form is a relaxation —
+        // a reference holding a real number still demands that number.
+        val agrees = held != null && (held == required || (wanted == "NaN" && held.isNaN()))
+        if (!agrees) {
           out.add(
             Difference(
               "$where.$channel",

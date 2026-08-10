@@ -33,6 +33,15 @@ public object LegendDefaults {
 
   /** As for an axis, but 160 rather than 180 — upstream's `config.legend` carries its own. */
   public const val LABEL_LIMIT: Double = 160.0
+
+  /**
+   * The title's own limit, which is 180 where a label's is 160.
+   *
+   * Nothing has to ask for it: a legend title longer than this is truncated with an ellipsis by
+   * default, and since the title's width is what pushes a left-hand title's entries across, an
+   * untruncated one moves the whole legend.
+   */
+  public const val TITLE_LIMIT: Double = 180.0
   public const val LABEL_OFFSET: Double = 4.0
   public const val FONT_FAMILY: String = "sans-serif"
 

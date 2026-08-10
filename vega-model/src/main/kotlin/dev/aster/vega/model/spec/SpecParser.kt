@@ -111,6 +111,19 @@ private val AXIS_CONSUMED =
     "format",
     "formatType",
     "bandPosition",
+    // Read by the axis builder since the parallel-coordinates work; they were still being
+    // reported as unimplemented, which is the stale half of "nothing silently ignored".
+    "tickOffset",
+    "tickExtra",
+    "gridScale",
+    "labelFlush",
+    "minExtent",
+    "maxExtent",
+    "titleX",
+    "titleY",
+    "titleAngle",
+    "titleAlign",
+    "titleBaseline",
   ) + guideStyleKeys("label", "tick", "grid", "domain", "title")
 
 /**
@@ -132,9 +145,7 @@ private val AXIS_UNSUPPORTED =
     "labelFlushOffset" to "Axis label flush offsets are not implemented; they need labelFlush",
     "labelOffset" to "Axis label offsets along the axis are not implemented",
     "labelLineHeight" to "Multi-line axis labels are not implemented",
-    "tickExtra" to "Adding a tick at the range end is not implemented",
     "tickRound" to "Suppressing tick rounding is not implemented; ticks are always rounded",
-    "tickOffset" to "Axis tick offsets are not implemented",
     "tickBand" to "Placing band-scale ticks at band edges is not implemented; they sit at centres",
     "tickCap" to "Axis tick line caps are not implemented",
     "tickDashOffset" to "Dash offsets are not implemented; the dash pattern starts at the line end",
@@ -145,8 +156,6 @@ private val AXIS_UNSUPPORTED =
       "Dash offsets are not implemented; the dash pattern starts at the line end",
     "position" to "Positioning an axis along its own dimension is not implemented",
     "translate" to "Overriding the axis's half-pixel translation is not implemented",
-    "minExtent" to "A minimum axis extent is not implemented; the axis is measured by its contents",
-    "maxExtent" to "A maximum axis extent is not implemented; the axis is measured by its contents",
     "titleLimit" to "Axis title truncation is not implemented; the title is drawn in full",
     "titleLineHeight" to "Multi-line axis titles are not implemented",
     "aria" to "Accessibility attributes on a guide are not implemented",
@@ -196,6 +205,7 @@ private val LEGEND_CONSUMED =
     "strokeWidth",
     "strokeDash",
     "type",
+    "format",
     "orient",
     "direction",
     "title",
@@ -204,6 +214,8 @@ private val LEGEND_CONSUMED =
     "offset",
     "padding",
     "titlePadding",
+    "titleOrient",
+    "titleLimit",
     "titleFontSize",
     "labelFontSize",
     "labelOffset",
@@ -293,6 +305,9 @@ private val RESOLVED_GUIDE_CHANNELS =
     // A label's own nudge, and the text it draws when a scale supplies it rather than a format.
     "labels.update.dx",
     "labels.update.dy",
+    // An axis label's own visibility, which a calendar uses to name only the first week of each
+    // month. It is a rule over the tick's own value, so no property could say it.
+    "labels.update.opacity",
     // A legend label's text, which is how an id becomes a name — read through a scale, so there is
     // nothing constant to fold.
     "labels.update.text",
@@ -372,13 +387,32 @@ private val MARK_CONSUMED =
     // Both are read only to be reported, which reportUnhandled would otherwise duplicate.
     "transform",
     "sort",
-    // Reported by reportUnsupportedGroupScope, for the same reason.
     "style",
     "on",
   )
 
-/** The formats a loaded document can be read as. `topojson` needs projections and is a non-goal. */
-private val READABLE_FORMATS = setOf("json", "csv", "tsv", "dsv")
+/** The formats a loaded document can be read as. */
+private val READABLE_FORMATS = setOf("json", "csv", "tsv", "dsv", "topojson")
+
+/** Projection properties this engine reads. */
+private val PROJECTION_CONSUMED =
+  setOf(
+    "name",
+    "type",
+    "scale",
+    "translate",
+    "center",
+    "rotate",
+    "angle",
+    "precision",
+    "clipAngle",
+    "clipExtent",
+    "reflectX",
+    "reflectY",
+    "fit",
+    "extent",
+    "size",
+  )
 
 /** Data properties this engine reads. */
 private val DATA_CONSUMED = setOf("name", "values", "source", "transform", "format", "url")
@@ -547,6 +581,8 @@ public class SpecParser {
         title = root.fields["title"]?.let { parseTitle(it, "$.title") },
         layout = root.fields["layout"]?.let { parseLayout(it, "$.layout") },
         marks = parseArray(root, "marks") { value, path -> parseMark(value, path) },
+        projections =
+          parseArray(root, "projections") { value, path -> parseProjection(value, path) },
         encode = parseEncode(root.fields["encode"], "$.encode"),
         description = root.fields["description"]?.asString()?.takeIf { it.isNotBlank() },
         // The chart's own group takes the `config.style` blocks its `style` property names, and
@@ -627,11 +663,7 @@ public class SpecParser {
    * it and look merely wrong rather than unsupported.
    */
   private fun reportUnsupportedTopLevel(root: VegaValue.Obj) {
-    val unsupported =
-      mapOf(
-        "projections" to "Geographic projections are out of scope",
-        "usermeta" to "usermeta is ignored",
-      )
+    val unsupported = mapOf("usermeta" to "usermeta is ignored")
     for ((key, reason) in unsupported) {
       val value = root.fields[key] ?: continue
       val empty = value is VegaValue.Arr && value.values.isEmpty()
@@ -936,6 +968,8 @@ public class SpecParser {
     if (format != null) {
       for ((key, value) in format.fields) {
         if (key == "type" || key == "property" || key == "delimiter") continue
+        // The TopoJSON three: which object in the file, and — for a mesh — which of its arcs.
+        if (key == "feature" || key == "mesh" || key == "filter") continue
         if (key == "parse") {
           if (value is VegaValue.Str && value.value.equals("auto", ignoreCase = true)) {
             parseAuto = true
@@ -978,6 +1012,9 @@ public class SpecParser {
       urlSignal = urlSignal,
       formatType = formatType,
       property = format?.fields?.get("property")?.asString()?.takeIf { it.isNotEmpty() },
+      feature = format?.fields?.get("feature")?.asString()?.takeIf { it.isNotEmpty() },
+      mesh = format?.fields?.get("mesh")?.asString()?.takeIf { it.isNotEmpty() },
+      meshFilter = format?.fields?.get("filter")?.asString()?.takeIf { it.isNotEmpty() },
       delimiter = format?.fields?.get("delimiter")?.asString()?.takeIf { it.isNotEmpty() },
       transform = (obj.fields["transform"] as? VegaValue.Arr)?.values ?: emptyList(),
       sources =
@@ -992,6 +1029,61 @@ public class SpecParser {
   }
 
   // ---- scales ---------------------------------------------------------------
+
+  /**
+   * A `projections` entry.
+   *
+   * Almost every property may be a signal, and the ones that are lists may be lists *of* signals —
+   * `"rotate": [{"signal": "r0"}, {"signal": "r1"}]` is how a map lets a reader turn the globe, and
+   * it is the common form rather than an exotic one.
+   */
+  private fun parseProjection(value: VegaValue, path: String): ProjectionSpec? {
+    val obj = value as? VegaValue.Obj ?: return unexpected("a projection definition", path)
+    val name = obj.fields["name"]?.asString()
+    if (name.isNullOrEmpty()) {
+      diagnostics.error(
+        DiagnosticCodes.PARSE_MISSING_PROPERTY,
+        "A projection needs a name",
+        jsonPath = path,
+      )
+      return null
+    }
+    val typeValue = obj.fields["type"]
+    val typeSignal = (typeValue as? VegaValue.Obj)?.fields?.get("signal")?.asString()
+    obj.reportUnhandled("Projection", path, PROJECTION_CONSUMED)
+    return ProjectionSpec(
+      name = name,
+      type = if (typeSignal == null) typeValue?.asString()?.takeIf { it.isNotEmpty() } else null,
+      typeSignal = typeSignal,
+      scale = obj.numberOrSignal("scale", "$path.scale"),
+      translate = numberList(obj.fields["translate"], "$path.translate"),
+      center = numberList(obj.fields["center"], "$path.center"),
+      rotate = numberList(obj.fields["rotate"], "$path.rotate"),
+      angle = obj.numberOrSignal("angle", "$path.angle"),
+      precision = obj.numberOrSignal("precision", "$path.precision"),
+      clipAngle = obj.numberOrSignal("clipAngle", "$path.clipAngle"),
+      clipExtent = numberPairs(obj.fields["clipExtent"], "$path.clipExtent"),
+      reflectX = obj.numberOrSignal("reflectX", "$path.reflectX"),
+      reflectY = obj.numberOrSignal("reflectY", "$path.reflectY"),
+      fit = obj.fields["fit"],
+      extent = numberPairs(obj.fields["extent"], "$path.extent"),
+      size = numberList(obj.fields["size"], "$path.size"),
+    )
+  }
+
+  /** A list whose entries may each be a signal, which is how a rotation is usually written. */
+  private fun numberList(value: VegaValue?, path: String): List<NumberValue> {
+    val array = value as? VegaValue.Arr ?: return emptyList()
+    return array.values.mapIndexedNotNull { index, entry ->
+      val holder = VegaValue.Obj(linkedMapOf("v" to entry))
+      holder.numberOrSignal("v", "$path[$index]")
+    }
+  }
+
+  private fun numberPairs(value: VegaValue?, path: String): List<List<NumberValue>> {
+    val array = value as? VegaValue.Arr ?: return emptyList()
+    return array.values.mapIndexed { index, entry -> numberList(entry, "$path[$index]") }
+  }
 
   private fun parseScale(value: VegaValue, path: String): ScaleSpec? {
     val obj = value as? VegaValue.Obj ?: return unexpected("a scale definition", path)
@@ -1026,7 +1118,8 @@ public class SpecParser {
       domainMax = obj.numberOrSignal("domainMax", "$path.domainMax"),
       domainMid = obj.numberOrSignal("domainMid", "$path.domainMid"),
       range = parseRange(obj.fields["range"], "$path.range"),
-      reverse = obj.fields["reverse"]?.asBoolean() ?: false,
+      reverse = obj.fields["reverse"]?.takeIf { it !is VegaValue.Obj }?.asBoolean() ?: false,
+      reverseSignal = (obj.fields["reverse"] as? VegaValue.Obj)?.fields?.get("signal")?.asString(),
       round = obj.fields["round"]?.asBoolean() ?: false,
       clamp = obj.fields["clamp"]?.asBoolean() ?: false,
       nice = parseNice(obj.fields["nice"], "$path.nice"),
@@ -1073,19 +1166,6 @@ public class SpecParser {
         )
         null
       }
-    }
-
-  /**
-   * `labelFlush` as a distance: `true` is one unit, a number is itself, everything else is off.
-   *
-   * Upstream reads it through `+threshold`, where `true` becomes 1 — so the plain boolean form
-   * catches a label sitting on the range's end and nothing further in.
-   */
-  private fun labelFlushThreshold(value: VegaValue?): Double? =
-    when (value) {
-      is VegaValue.Bool -> if (value.value) 1.0 else null
-      is VegaValue.Num -> value.value
-      else -> null
     }
 
   private fun parseNice(value: VegaValue?, path: String): Boolean =
@@ -1355,8 +1435,6 @@ public class SpecParser {
       zindex = (obj.fields["zindex"] as? VegaValue.Num)?.value?.toInt() ?: 0,
       values = (obj.fields["values"] as? VegaValue.Arr)?.values,
       labelOverlap = obj.fields["labelOverlap"]?.asString(),
-      labelFlush = labelFlushThreshold(obj.fields["labelFlush"]),
-      gridScale = obj.fields["gridScale"]?.takeIf { it is VegaValue.Str }?.asString(),
       labelSeparation = obj.numberOrSignal("labelSeparation", "$path.labelSeparation"),
       labelAngle = obj.numberOrSignal("labelAngle", "$path.labelAngle"),
       labelLimit = obj.numberOrSignal("labelLimit", "$path.labelLimit"),
@@ -1367,6 +1445,12 @@ public class SpecParser {
         (obj.fields["format"] as? VegaValue.Obj)?.fields?.get("signal")?.asString(),
       formatType = axisFormatType(obj.fields["formatType"], "$path.formatType"),
       bandPosition = obj.numberOrSignal("bandPosition", "$path.bandPosition"),
+      tickOffset = obj.numberOrSignal("tickOffset", "$path.tickOffset"),
+      tickExtra = obj.fields["tickExtra"]?.asBoolean() ?: false,
+      gridScale = obj.fields["gridScale"]?.takeIf { it is VegaValue.Str }?.asString(),
+      labelFlush = flushThreshold(obj.fields["labelFlush"]),
+      minExtent = obj.numberOrSignal("minExtent", "$path.minExtent"),
+      maxExtent = obj.numberOrSignal("maxExtent", "$path.maxExtent"),
       encode =
         (obj.fields["encode"] as? VegaValue.Obj)?.fields.orEmpty().mapValues { (part, block) ->
           parseEncode(block, "$path.encode.$part")
@@ -1377,6 +1461,24 @@ public class SpecParser {
       domainStyle = obj.guideStroke("domain"),
       titleStyle = obj.guideStroke("title"),
     )
+  }
+
+  /**
+   * `titleOrient`, of which only `top` and `left` are implemented.
+   *
+   * `right` and `bottom` are reported: each needs its own anchoring rule — a bottom title is
+   * `end`-anchored against the entries and a right one is measured from their far edge — and a
+   * legend that quietly put its title on the wrong side would look finished.
+   */
+  private fun legendTitleOrient(value: VegaValue?, path: String): String? {
+    val name = (value as? VegaValue.Str)?.value?.lowercase() ?: return null
+    if (name == "top" || name == "left") return name
+    diagnostics.warn(
+      DiagnosticCodes.PARSE_UNKNOWN_PROPERTY,
+      "A legend title on the '$name' is not implemented; it is drawn above the entries",
+      jsonPath = path,
+    )
+    return null
   }
 
   /**
@@ -1653,11 +1755,16 @@ public class SpecParser {
         direction =
           obj.enumOrNull("direction", path, "legend direction") { Direction.fromName(it) },
         title = obj.fields["title"]?.takeIf { it is VegaValue.Str }?.asString(),
+        titleExpression =
+          (obj.fields["title"] as? VegaValue.Obj)?.fields?.get("signal")?.asString(),
         values = (obj.fields["values"] as? VegaValue.Arr)?.values,
+        format = obj.fields["format"]?.takeIf { it is VegaValue.Str }?.asString(),
         tickCount = obj.numberOrSignal("tickCount", "$path.tickCount"),
         offset = obj.numberOrSignal("offset", "$path.offset"),
         padding = obj.numberOrSignal("padding", "$path.padding"),
         titlePadding = obj.numberOrSignal("titlePadding", "$path.titlePadding"),
+        titleOrient = legendTitleOrient(obj.fields["titleOrient"], "$path.titleOrient"),
+        titleLimit = obj.numberOrSignal("titleLimit", "$path.titleLimit"),
         titleFontSize = obj.numberOrSignal("titleFontSize", "$path.titleFontSize"),
         labelFontSize = obj.numberOrSignal("labelFontSize", "$path.labelFontSize"),
         labelOffset = obj.numberOrSignal("labelOffset", "$path.labelOffset"),
@@ -1713,10 +1820,8 @@ public class SpecParser {
       path,
       LEGEND_CONSUMED,
       mapOf(
-        "format" to "Legend label format specifiers are not implemented",
         "formatType" to "Legend label format types are not implemented",
         "symbolLimit" to "Legend entry limits are not implemented; every entry is shown",
-        "titleOrient" to "Only a legend title above the entries is implemented",
         "gradientOpacity" to "Legend gradient opacity is not implemented",
         "titleAnchor" to "Legend title anchoring is not implemented",
       ),
@@ -1810,13 +1915,7 @@ public class SpecParser {
 
     val from = obj.fields["from"] as? VegaValue.Obj
     val facet = from?.fields?.get("facet")?.let { parseFacet(it, "$path.from.facet", type) }
-    if (obj.fields["transform"] != null) {
-      diagnostics.warn(
-        DiagnosticCodes.TRANSFORM_NOT_IMPLEMENTED,
-        "Mark-level transforms are not implemented",
-        jsonPath = "$path.transform",
-      )
-    }
+    val markTransforms = (obj.fields["transform"] as? VegaValue.Arr)?.values.orEmpty()
     val sort =
       (obj.fields["sort"] as? VegaValue.Obj)?.let { block ->
         val fields =
@@ -1843,7 +1942,6 @@ public class SpecParser {
         }
       }
 
-    if (type == MarkType.GROUP) reportUnsupportedGroupScope(obj, path)
     obj.reportUnhandled("Mark", path, MARK_CONSUMED)
 
     val (below, above) = config.markDefaults(typeName.lowercase(), markStyles(obj))
@@ -1854,8 +1952,13 @@ public class SpecParser {
       role = obj.fields["role"]?.takeIf { it is VegaValue.Str }?.asString(),
       from = from?.let { FromSpec(data = it.fields["data"]?.asString(), facet = facet) },
       sort = sort,
+      transform = markTransforms,
       encode = parseEncode(obj.fields["encode"], "$path.encode"),
       marks = parseArray(obj, "marks", path) { child, childPath -> parseMark(child, childPath) },
+      projections =
+        parseArray(obj, "projections", path) { child, childPath ->
+          parseProjection(child, childPath)
+        },
       axes = parseArray(obj, "axes", path) { child, childPath -> parseAxis(child, childPath) },
       data = parseArray(obj, "data", path) { child, childPath -> parseData(child, childPath) },
       signals =
@@ -1967,10 +2070,6 @@ public class SpecParser {
         "headerBand" to "Layout header bands are not implemented",
         "footerBand" to "Layout footer bands are not implemented",
         "titleBand" to "Layout title bands are not implemented",
-        "titleAnchor" to
-          "A grid title sits at the start of its band; an 'end' anchor is not implemented",
-        "align" to "Only per-cell ('each') grid alignment is implemented",
-        "bounds" to "Only full-bounds grid layout is implemented",
         "center" to "Centring cells within their row or column is not implemented",
       )
     for ((key, reason) in unsupported) {
@@ -1995,11 +2094,17 @@ public class SpecParser {
       columnPadding = both
     }
 
+    // `align` and `bounds` take the same shape as `padding`: one value for both directions, or a
+    // per-direction object. `bounds` has no per-direction form upstream, so it is read as one.
+    val align = obj.fields["align"]
     return LayoutSpec(
       columns = obj.numberOrSignal("columns", "$path.columns"),
       rowPadding = rowPadding,
       columnPadding = columnPadding,
       offset = parseLayoutOffset(obj, path),
+      alignRow = layoutAlign(align, "row"),
+      alignColumn = layoutAlign(align, "column"),
+      bounds = obj.fields["bounds"]?.takeIf { it is VegaValue.Str }?.asString()?.lowercase(),
     )
   }
 
@@ -2024,19 +2129,28 @@ public class SpecParser {
     )
   }
 
-  /** Reports the parts of a group's scope that the runtime cannot build. */
-  private fun reportUnsupportedGroupScope(obj: VegaValue.Obj, path: String) {
-    val unsupported = mapOf("projections" to "Geographic projections are out of scope")
-    for ((key, reason) in unsupported) {
-      val value = obj.fields[key] ?: continue
-      if (value is VegaValue.Arr && value.values.isEmpty()) continue
-      diagnostics.warn(
-        DiagnosticCodes.PARSE_UNKNOWN_PROPERTY,
-        "$reason; '$key' on this group was ignored",
-        jsonPath = "$path.$key",
-      )
+  /**
+   * `labelFlush` as the distance it really is: `true` is one pixel, a number is itself.
+   *
+   * Upstream's own test is `flush === 0 || !!flush`, so **zero counts** and `false` does not — a
+   * zero threshold still flushes a label that lands exactly on the range's end, where `false`
+   * flushes nothing.
+   */
+  private fun flushThreshold(value: VegaValue?): Double? =
+    when (value) {
+      null -> null
+      is VegaValue.Bool -> if (value.value) 1.0 else null
+      is VegaValue.Num -> value.value.takeIf { it.isFinite() }
+      else -> null
     }
-  }
+
+  /** One direction of `layout.align`, which is either a bare name or a `{row, column}` object. */
+  private fun layoutAlign(value: VegaValue?, direction: String): String? =
+    when (value) {
+      null -> null
+      is VegaValue.Obj -> value.fields[direction]?.asString()
+      else -> value.asString()
+    }
 
   /** Vega accepts a single string or an array of them wherever a field list is allowed. */
   private fun stringList(value: VegaValue): List<String> =

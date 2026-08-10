@@ -137,6 +137,20 @@ class ExpressionReferenceTest {
       [
         // ---- math ----
         "abs(-3)|3",
+        // `hypot` is variadic, not the two-argument function its name suggests, and with no
+        // arguments it is zero.
+        "hypot(3,4)|5",
+        // `extent` compares the values as they are, so strings give lexicographic ends; null and
+        // NaN are skipped, and an array with nothing usable in it gives two nulls.
+        "extent([3,1,2])|[1,3]",
+        "extent([])|[null,null]",
+        "extent(['b','a','c'])|[\"a\",\"c\"]",
+        "extent([1,null,5])|[1,5]",
+        "extent([null])|[null,null]",
+        "hypot()|0",
+        "hypot(1)|1",
+        "hypot(1,2,2)|3",
+        "isFinite(hypot(-3,-4))|true",
         "floor(2.7)|2",
         "ceil(2.1)|3",
         "sqrt(16)|4",
@@ -390,6 +404,16 @@ class ExpressionReferenceTest {
         "timeUnitSpecifier(['date','hours'])|\"%d %H:00\"",
         "timeUnitSpecifier(['seconds'])|\":%S\"",
         "timeUnitSpecifier('month')|\"%b\"",
+        // ---- moving a date by whole units ----
+        // The step defaults to one and is *floored*; an absent argument is not `Number()`-coerced
+        // to zero, which would hand the date straight back. Both forms below are the ones a
+        // specification writes, and the two-argument one is the common one.
+        "timeFormat(timeOffset('day', datetime(2019,2,31)), '%Y-%m-%d %H:%M')|\"2019-04-01 00:00\"",
+        "timeFormat(timeOffset('day', datetime(2019,2,31), 2), '%Y-%m-%d %H:%M')|\"2019-04-02 00:00\"",
+        "timeFormat(timeOffset('day', datetime(2019,2,31), 0), '%Y-%m-%d %H:%M')|\"2019-03-31 00:00\"",
+        "timeFormat(timeOffset('day', datetime(2019,2,31), null), '%Y-%m-%d %H:%M')|\"2019-04-01 00:00\"",
+        "timeFormat(timeOffset('day', datetime(2019,2,31), 1.7), '%Y-%m-%d %H:%M')|\"2019-04-01 00:00\"",
+        "timeFormat(timeOffset('day', datetime(2019,2,31), -1), '%Y-%m-%d %H:%M')|\"2019-03-30 00:00\"",
         // ---- reading ----
         "toDate('2026-01-05T00:00:00Z')|1767571200000",
         "utcyear(toDate('2026-01-05T00:00:00Z'))|2026",

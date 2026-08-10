@@ -178,6 +178,26 @@ public class Evaluator(
       }
     }
 
+    // The stochastic family and the clock go through the scope, because both are *state* rather
+    // than arithmetic: `random()` answers differently every time it is asked, and `now()` has to be
+    // able to stand still while a reference is being compared against. Upstream keeps the first in
+    // a module-level binding `setRandom` replaces and code-generates the second as `Date.now`;
+    // this engine puts a stream and a clock on the scope so a compile owns both.
+    if (name == "random" || name == "now") {
+      return VegaValue.Num(if (name == "now") scope.now() else scope.random.next())
+    }
+    if (name == "sampleNormal" || name == "sampleLogNormal" || name == "sampleUniform") {
+      val first = node.arguments.getOrNull(0)?.let { JsSemantics.toNumber(evaluate(it, scope)) }
+      val second = node.arguments.getOrNull(1)?.let { JsSemantics.toNumber(evaluate(it, scope)) }
+      return VegaValue.Num(
+        when (name) {
+          "sampleNormal" -> scope.random.sampleNormal(first, second)
+          "sampleLogNormal" -> scope.random.sampleLogNormal(first, second)
+          else -> scope.random.sampleUniform(first, second)
+        }
+      )
+    }
+
     if (name == "data") {
       val dataset = scope.dataset(evaluate(node.arguments.first(), scope).asString())
       return VegaValue.Arr(dataset)

@@ -69,6 +69,13 @@ subprojects {
 
     tasks.withType<Test>().configureEach {
       useJUnitPlatform()
+      // Vega's cross-filter example carries 200,000 rows through three `bin` transforms and a
+      // `crossfilter`, and this engine's transforms copy rather than mutate — so the peak live set
+      // is several times the input where upstream's is one array. The JVM's default heap is a
+      // quarter of physical memory, which is whatever the machine happens to have; pinning it makes
+      // the gate mean the same thing on a laptop and on CI, and 2 GB is roughly four times what
+      // that fixture actually needs.
+      maxHeapSize = "2g"
       // A `time` scale is *local*, so its output depends on the machine's zone. Pinning one makes
       // the differential references reproducible off this machine, and lets a fixture cross a
       // daylight-saving boundary deliberately — which is where local time scales actually break.

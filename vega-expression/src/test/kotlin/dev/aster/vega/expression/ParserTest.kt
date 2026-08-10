@@ -246,9 +246,9 @@ class ParserTest {
   @Test
   fun `a deliberately excluded function explains why`() {
     val failure =
-      assertThrows<ExpressionEvaluationException> { compiled("random()").evaluate(scopeOf()) }
+      assertThrows<ExpressionEvaluationException> { compiled("geoArea()").evaluate(scopeOf()) }
     assertTrue(
-      failure.diagnostic.message.contains("reproducible"),
+      failure.diagnostic.message.contains("geographic"),
       failure.diagnostic.message,
     )
   }
@@ -264,7 +264,7 @@ class ParserTest {
 
   @Test
   fun `evaluateOrNull converts a failure into a Result`() {
-    assertTrue(compiled("random()").evaluateOrNull(scopeOf()).isFailure)
+    assertTrue(compiled("geoArea()").evaluateOrNull(scopeOf()).isFailure)
     assertTrue(compiled("1 + 1").evaluateOrNull(scopeOf()).isSuccess)
   }
 }

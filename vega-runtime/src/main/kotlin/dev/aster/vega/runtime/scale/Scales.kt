@@ -181,7 +181,7 @@ public class LinearScale(
   /** Default label text for a tick, matching Vega's digits-from-step behaviour. */
   public fun formatTick(value: Double, count: Int = DEFAULT_TICK_COUNT): String {
     val step = Ticks.stepFrom(Ticks.tickIncrement(domain.first(), domain.last(), count))
-    val precision = if (step.isFinite()) Ticks.precisionForStep(step) else 0
+    val precision = if (step.isFinite()) Ticks.precisionForStep(step) else DEGENERATE_PRECISION
     return formatTickLabel(value, precision)
   }
 
@@ -408,7 +408,10 @@ public abstract class TransformedScale(
 
   public open fun formatTick(value: Double, count: Int = LinearScale.DEFAULT_TICK_COUNT): String {
     val step = Ticks.stepFrom(Ticks.tickIncrement(domain.first(), domain.last(), count))
-    return formatTickLabel(value, if (step.isFinite()) Ticks.precisionForStep(step) else 0)
+    return formatTickLabel(
+      value,
+      if (step.isFinite()) Ticks.precisionForStep(step) else DEGENERATE_PRECISION,
+    )
   }
 
   /** Labels aligned with [ticks]. Overridden where a scale suppresses some of them. */
@@ -858,12 +861,15 @@ public class SequentialColorScale(
   /** Default label text for [value], with the decimals the tick step implies. */
   public fun formatTick(value: Double, count: Int = LinearScale.DEFAULT_TICK_COUNT): String {
     val step = Ticks.stepFrom(Ticks.tickIncrement(domain.first(), domain.last(), count))
-    return formatTickLabel(value, if (step.isFinite()) Ticks.precisionForStep(step) else 0)
+    return formatTickLabel(
+      value,
+      if (step.isFinite()) Ticks.precisionForStep(step) else DEGENERATE_PRECISION,
+    )
   }
 
   public fun tickLabels(count: Int = LinearScale.DEFAULT_TICK_COUNT): List<String> {
     val step = Ticks.stepFrom(Ticks.tickIncrement(domain.first(), domain.last(), count))
-    val precision = if (step.isFinite()) Ticks.precisionForStep(step) else 0
+    val precision = if (step.isFinite()) Ticks.precisionForStep(step) else DEGENERATE_PRECISION
     return ticks(count).map { formatTickLabel(it, precision) }
   }
 }
@@ -878,6 +884,17 @@ public class SequentialColorScale(
  * labels are the domain's own strings — which is why the substitution lives here and not in
  * [formatNumber].
  */
+/**
+ * The decimals a label keeps when the tick step says nothing.
+ *
+ * Six, and it is d3's rather than a choice: upstream formats a label with `,f` and fills the
+ * precision in from `precisionFixed(tickStep(...))`. A degenerate span — a domain of `[NaN, 100]`,
+ * or one whose two ends are equal — makes that `NaN`, so the specifier keeps **no** precision and
+ * d3's default for `f` applies. A chart that switches views by emptying a dataset has exactly such
+ * a scale, and its axis reads `100.000000`.
+ */
+private const val DEGENERATE_PRECISION = 6
+
 public fun formatTickLabel(value: Double, decimals: Int): String =
   withTypographicMinus(groupThousands(formatNumber(value, decimals)))
 

@@ -1,7 +1,9 @@
 package dev.aster.vega.runtime.compile
 
 import dev.aster.vega.expression.CachingExpressionCompiler
+import dev.aster.vega.expression.Clock
 import dev.aster.vega.expression.ExpressionCompiler
+import dev.aster.vega.expression.RandomStream
 import dev.aster.vega.expression.VegaExpressionCompiler
 import dev.aster.vega.model.DiagnosticCodes
 import dev.aster.vega.model.DiagnosticCollector
@@ -78,6 +80,16 @@ public class SpecCompiler(
    * specification chose, so it is the host's decision and not the specification's.
    */
   private val loader: DataLoader = DenyLoader,
+  /**
+   * The seed `random()` draws from, and the instant `now()` reports.
+   *
+   * Both default to a constant, which is the whole point: a chart built on either has to be a pure
+   * function of its specification or nothing can be compared with it — not upstream, not a previous
+   * run, not itself. A host that wants a genuinely stochastic chart passes a seed of its own, and a
+   * host that wants a live clock passes one; nothing else in the engine reads either.
+   */
+  private val randomSeed: Long = RandomStream.DEFAULT_SEED,
+  private val clock: Clock = Clock.Fixed,
 ) {
 
   public fun compileJson(
@@ -236,6 +248,12 @@ public class SpecCompiler(
     // one dataflow and the topological ranking decides. [DataflowOrder] is that ranking.
     val order = DataflowOrder.of(spec.data, spec.scales, spec.signals, expressions, diagnostics)
 
+    // One stream for the whole compile, seeded the same way every time. Every scope built below
+    // shares it, so the draws form a single sequence the way upstream's module-level generator
+    // does. A `fit` chart compiles twice and each pass starts the sequence again, which is what
+    // makes the second pass draw the chart the first one measured.
+    val stream = RandomStream(randomSeed)
+
     // The state the order fills in, and the reason each piece is shared rather than copied:
     // `signalValues` because a transform may *publish* a signal, and everything after it must see
     // that; the datasets and scales because whatever resolves next may read either.
@@ -250,7 +268,7 @@ public class SpecCompiler(
     // puts
     // every reader of that dataset behind the signal.
     val session =
-      SignalResolver(diagnostics, expressions).session(
+      SignalResolver(diagnostics, expressions, stream, clock).session(
         spec.signals,
         signalValues,
         signalOverrides,
@@ -265,7 +283,7 @@ public class SpecCompiler(
     val unresolvedSignals = spec.signals.mapTo(mutableSetOf()) { it.name }
     val unbuiltScales = spec.scales.mapTo(mutableSetOf()) { it.name }
 
-    val data = DataResolver(diagnostics, expressions, loader)
+    val data = DataResolver(diagnostics, expressions, loader, stream, clock)
     for (operator in order.order) {
       when (operator) {
         is Operator.Signal -> {
@@ -308,9 +326,17 @@ public class SpecCompiler(
     val plot = plotSize(signalValues, width, height)
 
     val root =
-      CompileScope(resolved, signals, scales, plot, spec.scales.associate { it.name to it.type })
+      CompileScope(
+        resolved,
+        signals,
+        scales,
+        plot,
+        spec.scales.associate { it.name to it.type },
+        ProjectionResolver(NumberResolver(expressions, signals, diagnostics), diagnostics)
+          .resolve(spec.projections),
+      )
     val scope =
-      ScopeCompiler(ids, textEngine, diagnostics, expressions, data)
+      ScopeCompiler(ids, textEngine, diagnostics, expressions, data, stream, clock)
         .compile(spec.marks, spec.axes, spec.legends, spec.title, spec.layout, root, plot)
 
     val content = frame(spec, scope.nodes, plot, root, ids, diagnostics, expressions)

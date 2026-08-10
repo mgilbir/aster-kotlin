@@ -1,5 +1,6 @@
 package dev.aster.vega.runtime.compile
 
+import dev.aster.vega.expression.NumberFormatSubset
 import dev.aster.vega.model.DiagnosticCodes
 import dev.aster.vega.model.DiagnosticCollector
 import dev.aster.vega.model.VegaValue
@@ -15,6 +16,7 @@ import dev.aster.vega.runtime.scale.LinearScale
 import dev.aster.vega.runtime.scale.OrdinalScale
 import dev.aster.vega.runtime.scale.PointScale
 import dev.aster.vega.runtime.scale.SequentialColorScale
+import dev.aster.vega.runtime.scale.Ticks
 import dev.aster.vega.runtime.scale.TimeScale
 import dev.aster.vega.runtime.scale.TransformedScale
 import dev.aster.vega.runtime.scale.VegaScale
@@ -165,9 +167,6 @@ internal class LegendBuilder(
     val padding = numbers.resolve(spec.padding, scaleName) ?: LegendDefaults.PADDING
     val titlePadding = numbers.resolve(spec.titlePadding, scaleName) ?: LegendDefaults.TITLE_PADDING
 
-    val title = spec.title?.let { titleNode(spec, scaleName, it, padding) }
-    val titleReach = title?.let { it.bounds.height + titlePadding } ?: 0.0
-
     val entries =
       when (type) {
         LegendType.SYMBOL -> symbolEntries(spec, scale, scaleName)
@@ -175,11 +174,33 @@ internal class LegendBuilder(
         LegendType.DISCRETE -> discreteEntries(spec, scale, scaleName)
       } ?: return null
 
+    // A title on the left is centred against what the entries drew, so it cannot be placed until
+    // they exist — and for a gradient it is centred against the **bar alone**, not against the
+    // labels under it, which is upstream's `entry.items[0]` and the reason a ramp's title sits
+    // level with the colours rather than with the whole block.
+    val alongside = spec.titleOrient == "left"
+    val centreOver =
+      if (type == LegendType.GRADIENT) entries.firstOrNull()?.transformedBounds?.bottom ?: 0.0
+      else entries.fold(RectD.Empty) { acc, node -> acc.union(node.transformedBounds) }.bottom
+    val title =
+      // A legend may name itself from a signal, exactly as an axis does — a chart whose measure is
+      // chosen by a control has no constant to write down.
+      titleTextOf(spec, scaleName)?.let {
+        titleNode(spec, scaleName, it, padding, alongside, 0.5 * centreOver)
+      }
+    val titleReach = title?.let { it.bounds.height + titlePadding } ?: 0.0
+    val titleAside =
+      if (alongside && title != null) ceil(title.bounds.width) + titlePadding else 0.0
+
     val body =
       GroupNode(
         id = ids.allocate(),
         children = entries,
-        transform = Transform2D.translate(padding, padding + titleReach),
+        transform =
+          Transform2D.translate(
+            padding + titleAside,
+            padding + if (alongside) 0.0 else titleReach,
+          ),
         metadata = NodeMetadata(role = "legend-entry", markName = scaleName),
       )
 
@@ -310,11 +331,21 @@ internal class LegendBuilder(
     return nodes
   }
 
+  /**
+   * @param alongside `titleOrient: "left"`, which also changes the title's anchor.
+   * @param centre half the height the entries reach, for the vertical centring that anchor implies.
+   */
+  /** The legend's title, whether written down or computed. */
+  private fun titleTextOf(spec: LegendSpec, scaleName: String): String? =
+    spec.title ?: spec.titleExpression?.let { numbers.resolveLines(it, scaleName) }
+
   private fun titleNode(
     spec: LegendSpec,
     scaleName: String,
     text: String,
     padding: Double,
+    alongside: Boolean = false,
+    centre: Double = 0.0,
   ): TextNode {
     val fontSize = numbers.resolve(spec.titleFontSize, scaleName) ?: LegendDefaults.TITLE_FONT_SIZE
     val run =
@@ -322,12 +353,15 @@ internal class LegendBuilder(
         text = text,
         style = GuideStyle.text(spec.titleStyle, fontSize, LegendDefaults.TITLE_FONT_WEIGHT),
         align = TextAlign.LEFT,
-        baseline = TextBaseline.TOP,
+        limit = numbers.resolve(spec.titleLimit, scaleName) ?: LegendDefaults.TITLE_LIMIT,
+        // Upstream reads a left or right title as `middle`-anchored where a top one is
+        // `start`-anchored, and the baseline follows the anchor.
+        baseline = if (alongside) TextBaseline.MIDDLE else TextBaseline.TOP,
       )
     return TextNode(
       id = ids.allocate(),
       x = padding,
-      y = padding,
+      y = padding + if (alongside) centre else 0.0,
       layout = textEngine.layout(run),
       fill = GuideStyle.fill(spec.titleStyle, LegendDefaults.titleColor),
       metadata = NodeMetadata(role = "legend-title", markName = spec.scale),
@@ -769,14 +803,36 @@ internal class LegendBuilder(
     val count =
       numbers.resolveInt(spec.tickCount, scaleName) ?: maxOf(2, 2 * floor(length / 100.0).toInt())
     val values = scale.ticks(count)
-    val labels = scale.tickLabels(count)
+    val format = numberLabeller(spec, scale.domain.first(), scale.domain.last(), count)
+    val labels = format?.let { f -> values.map { f(it) } } ?: scale.tickLabels(count)
     // Two ticks across a whole ramp says almost nothing, so upstream labels the domain's own ends
     // instead — which is why a [0, 19] domain reads "0" and "19" rather than "0" and "10".
     if (values.size < 3 && scale.domain.first() != scale.domain.last()) {
       val ends = listOf(scale.domain.first(), scale.domain.last())
-      return ends.map { Entry(VegaValue.Num(it), scale.formatTick(it, count)) }
+      return ends.map {
+        Entry(VegaValue.Num(it), format?.invoke(it) ?: scale.formatTick(it, count))
+      }
     }
     return values.indices.map { Entry(VegaValue.Num(values[it]), labels[it]) }
+  }
+
+  /**
+   * The legend's own `format`, resolved against the span it labels.
+   *
+   * Null when the specification named none, which leaves the scale's own tick labels alone. The
+   * resolution is upstream's `formatSpan`: a specifier with no precision takes as many decimals as
+   * the tick step needs, which is what makes `"%"` over a `[-0.06, 0.06]` ramp read `−6%` instead
+   * of `−6.000000%`.
+   */
+  private fun numberLabeller(
+    spec: LegendSpec,
+    low: Double,
+    high: Double,
+    count: Int,
+  ): ((Double) -> String)? {
+    val specifier = spec.format ?: return null
+    val resolved = Ticks.spanSpecifier(specifier, low, high, count)
+    return { value -> NumberFormatSubset.format(value, resolved) }
   }
 
   // ---- entry values -----------------------------------------------------------
@@ -933,7 +989,11 @@ internal class LegendBuilder(
     val scaleName = spec.scale ?: return null
     val scale = scales[scaleName] ?: return null
     val kind = if (resolveType(spec, scale) == LegendType.GRADIENT) "gradient" else "symbol"
-    return GuideCaption.legend(kind, spec.title, channels, scale)
+    // A caption is spoken, not drawn, so a two-line title is read as one phrase: upstream's
+    // `array(item.text).join(' ')`. The lines reach here already joined by the newline the text
+    // node draws on, and turning them back into spaces is the same operation.
+    val title = titleTextOf(spec, scaleName)?.replace("\n", " ")
+    return GuideCaption.legend(kind, title, channels, scale, spec.format)
   }
 
   private fun node(built: Built, x: Double, y: Double): SceneNode =

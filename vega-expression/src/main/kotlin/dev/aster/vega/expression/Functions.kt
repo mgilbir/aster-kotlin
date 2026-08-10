@@ -87,11 +87,6 @@ public object Functions {
    */
   public val knownUnsupported: Map<String, String> =
     mapOf(
-      "random" to "produces a non-reproducible scene",
-      "sampleNormal" to "produces a non-reproducible scene",
-      "sampleLogNormal" to "produces a non-reproducible scene",
-      "sampleUniform" to "produces a non-reproducible scene",
-      "now" to "produces a non-reproducible scene",
       "timeParse" to
         "parsing a date against a format string needs a strptime the engine does not have; " +
           "an ISO 8601 string works through toDate",
@@ -226,6 +221,51 @@ public object Functions {
       VegaValue.Num(atan2(args.number(0), args.number(1)))
     }
     map["pow"] = ExpressionFunction { args -> VegaValue.Num(args.number(0).pow(args.number(1))) }
+
+    /**
+     * `extent(array)` — `[min, max]`, skipping null and NaN.
+     *
+     * Not a numeric function: upstream compares the values with `<` and `>` as they are, so an
+     * array of strings gives its lexicographic ends and an array of instants gives its earliest and
+     * latest. Both ends are null for an array with nothing usable in it, which is what a scale
+     * pointed at an empty dataset has to cope with.
+     */
+    map["extent"] = ExpressionFunction { args ->
+      val values =
+        (args.at(0) as? VegaValue.Arr)?.values ?: return@ExpressionFunction VegaValue.Null
+      val usable = values.filterNot {
+        it is VegaValue.Null || (it is VegaValue.Num && it.value.isNaN())
+      }
+      if (usable.isEmpty()) {
+        return@ExpressionFunction VegaValue.Arr(listOf(VegaValue.Null, VegaValue.Null))
+      }
+      var low = usable.first()
+      var high = usable.first()
+      for (value in usable) {
+        if ((JsSemantics.compare(value, low) ?: 0) < 0) low = value
+        if ((JsSemantics.compare(value, high) ?: 0) > 0) high = value
+      }
+      VegaValue.Arr(listOf(low, high))
+    }
+
+    /**
+     * `hypot(...)` — `Math.hypot`, which is **variadic** and not the two-argument function its name
+     * suggests. A Monte Carlo estimate of pi is `hypot(datum.x, datum.y) <= 1` and nothing else.
+     *
+     * `Math.hypot()` with no arguments is 0, and any infinite argument makes the result infinite
+     * even beside a NaN — JavaScript's own order of tests, and the reason this is not a plain
+     * `sqrt` of a sum of squares.
+     */
+    map["hypot"] = ExpressionFunction { args ->
+      val numbers = args.map { JsSemantics.toNumber(it) }
+      VegaValue.Num(
+        when {
+          numbers.any { it.isInfinite() } -> Double.POSITIVE_INFINITY
+          numbers.any { it.isNaN() } -> Double.NaN
+          else -> sqrt(numbers.sumOf { it * it })
+        }
+      )
+    }
 
     // JavaScript's Math.round rounds halves toward +Infinity: round(-2.5) === -2, not -3.
     map.unary("round") { value ->
@@ -421,6 +461,11 @@ public object Functions {
      *
      * Whole *units*, not milliseconds: a month later is the same day of the next month, and a day
      * later across a clock change is still the same wall-clock time.
+     *
+     * The step defaults to **one**, and it has to be read as absent rather than coerced: `Number()`
+     * of a missing argument is 0, which offsets by nothing and returns the date it was handed. That
+     * is d3's rule — `step == null ? 1 : Math.floor(step)` — and it matters because the
+     * two-argument form is the one specifications actually write.
      */
     map["timeOffset"] = ExpressionFunction { args ->
       val stepper =
@@ -428,8 +473,8 @@ public object Functions {
           ?: return@ExpressionFunction VegaValue.Null
       val at = JsSemantics.toNumber(args.at(1))
       if (!at.isFinite()) return@ExpressionFunction VegaValue.Null
-      val by = JsSemantics.toNumber(args.at(2)).takeIf { it.isFinite() } ?: 1.0
-      VegaValue.Num(stepper.offset(at, by.toInt()))
+      val by = args.numberOr(2, 1.0).takeIf { it.isFinite() } ?: 1.0
+      VegaValue.Num(stepper.offset(at, floor(by).toInt()))
     }
 
     /**

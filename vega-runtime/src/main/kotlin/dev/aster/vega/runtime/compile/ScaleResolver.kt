@@ -117,7 +117,7 @@ public class ScaleResolver(
     return LinearScale(
       spec.name,
       domain,
-      oriented(range, spec.reverse),
+      oriented(range, reversed(spec)),
       spec.clamp,
       spec.round,
       binBoundaries(spec, domain),
@@ -232,7 +232,7 @@ public class ScaleResolver(
     return SequentialColorScale(
       name = spec.name,
       domain = domain,
-      colors = if (spec.reverse) colors.reversed() else colors,
+      colors = if (reversed(spec)) colors.reversed() else colors,
       space = space,
     )
   }
@@ -334,6 +334,51 @@ public class ScaleResolver(
    * palette picker offering "Viridis" finds `viridis`. Stops written out inline are not looked up
    * at all — they are already the table every named scheme resolves to.
    */
+  /**
+   * The stops of a scheme that is a **ramp**, or null for one that is a palette.
+   *
+   * The distinction is upstream's own and it decides everything downstream: `isFunction(scheme)`
+   * separates an interpolator from a list, and only the interpolator gets quantized.
+   */
+  private fun rampFor(spec: ScaleSpec, range: RangeSpec.Scheme): List<SceneColor>? {
+    val name = schemeName(spec, range)?.lowercase() ?: return null
+    if (ColorSchemes.categoricalOrNull(name) != null) return null
+    return ColorSchemes.rampOrNull(name)
+  }
+
+  /**
+   * `quantizeInterpolator`: [count] colours read off a ramp at `i / (count + 1)`.
+   *
+   * Not evenly spread from end to end — the endpoints are deliberately left out, so a categorical
+   * legend of two never comes out as "the palest blue and the darkest". Upstream's loop is
+   * `samples[i] = interpolator(++i / n)` with `n = count + 1`, and every colour depends on it.
+   */
+  private fun quantizeRamp(stops: List<SceneColor>, count: Int): List<SceneColor> {
+    if (count <= 0) return emptyList()
+    return (1..count).map { ColorSpaces.sample(stops, it.toDouble() / (count + 1)) }
+  }
+
+  /** A scheme's name, whether it was written down or arrived through a signal. */
+  private fun schemeName(spec: ScaleSpec, range: RangeSpec.Scheme): String? =
+    when (val scheme = range.scheme) {
+      is SchemeRef.Named -> scheme.name
+      is SchemeRef.Signal ->
+        numbers
+          .resolveValue(scheme.expression, spec.name)
+          ?.takeIf { it !is VegaValue.Null }
+          ?.asString()
+          ?: run {
+            diagnostics.error(
+              DiagnosticCodes.SCALE_UNSUPPORTED_TYPE,
+              "Scheme signal '${scheme.expression}' produced no scheme name (scale '${spec.name}')",
+              operator = spec.name,
+            )
+            null
+          }
+      // Stops written out inline are already the table a named scheme resolves to.
+      is SchemeRef.Colors -> null
+    }
+
   private fun schemeColors(spec: ScaleSpec, range: RangeSpec.Scheme): List<SceneColor>? {
     if (range.scheme is SchemeRef.Colors) {
       val values = (range.scheme as SchemeRef.Colors).values
@@ -348,25 +393,7 @@ public class ScaleResolver(
       }
       return colors.ifEmpty { null }
     }
-    val name =
-      when (val scheme = range.scheme) {
-        is SchemeRef.Named -> scheme.name
-        is SchemeRef.Signal ->
-          numbers
-            .resolveValue(scheme.expression, spec.name)
-            ?.takeIf { it !is VegaValue.Null }
-            ?.asString()
-            ?: run {
-              diagnostics.error(
-                DiagnosticCodes.SCALE_UNSUPPORTED_TYPE,
-                "Scheme signal '${scheme.expression}' produced no scheme name (scale " +
-                  "'${spec.name}')",
-                operator = spec.name,
-              )
-              return null
-            }
-        is SchemeRef.Colors -> return null // handled above
-      }.lowercase()
+    val name = schemeName(spec, range)?.lowercase() ?: return null
 
     val palette = ColorSchemes.categoricalOrNull(name)
     // A ramp's stops are a colour list like any other; the scale interpolates between them.
@@ -420,7 +447,7 @@ public class ScaleResolver(
     if (spec.nice) domain = Ticks.niceLog(domain, base)
 
     val scale =
-      LogScale(spec.name, domain, oriented(range, spec.reverse), base, spec.clamp, spec.round)
+      LogScale(spec.name, domain, oriented(range, reversed(spec)), base, spec.clamp, spec.round)
     if (!scale.isValid) {
       diagnostics.error(
         DiagnosticCodes.SCALE_INVALID_DOMAIN,
@@ -443,7 +470,7 @@ public class ScaleResolver(
     return PowScale(
       spec.name,
       domain,
-      oriented(range, spec.reverse),
+      oriented(range, reversed(spec)),
       exponent,
       spec.clamp,
       spec.round,
@@ -460,7 +487,7 @@ public class ScaleResolver(
     return SymlogScale(
       spec.name,
       domain,
-      oriented(range, spec.reverse),
+      oriented(range, reversed(spec)),
       constant,
       spec.clamp,
       spec.round,
@@ -565,7 +592,14 @@ public class ScaleResolver(
       } else {
         domain
       }
-    return TimeScale(spec.name, niced, oriented(range, spec.reverse), zone, spec.clamp, spec.round)
+    return TimeScale(
+      spec.name,
+      niced,
+      oriented(range, reversed(spec)),
+      zone,
+      spec.clamp,
+      spec.round,
+    )
   }
 
   private fun buildBand(spec: ScaleSpec): BandScale? {
@@ -576,7 +610,7 @@ public class ScaleResolver(
     return BandScale(
       name = spec.name,
       domain = domain,
-      range = oriented(range, spec.reverse),
+      range = oriented(range, reversed(spec)),
       paddingInner = numbers.resolve(spec.paddingInner, spec.name) ?: padding ?: 0.0,
       paddingOuter = numbers.resolve(spec.paddingOuter, spec.name) ?: padding ?: 0.0,
       align = numbers.resolve(spec.align, spec.name) ?: 0.5,
@@ -590,7 +624,7 @@ public class ScaleResolver(
     return PointScale(
       name = spec.name,
       domain = domain,
-      range = oriented(range, spec.reverse),
+      range = oriented(range, reversed(spec)),
       padding =
         numbers.resolve(spec.paddingOuter, spec.name)
           ?: numbers.resolve(spec.padding, spec.name)
@@ -625,8 +659,14 @@ public class ScaleResolver(
     val range =
       when (val r = effectiveRange(spec)) {
         is RangeSpec.Literal -> r.values
-        // A categorical scheme is exactly an ordinal range, so resolve it to one.
-        is RangeSpec.Scheme -> colorRange(spec)?.map { VegaValue.Str(it.toCssHex()) } ?: return null
+        // A categorical scheme is exactly an ordinal range, so resolve it to one. A **continuous**
+        // one is not: it is a function, and upstream samples it once per domain value rather than
+        // cycling its stops — which is the difference between sixteen shades of blue and the same
+        // eleven twice over.
+        is RangeSpec.Scheme ->
+          (rampFor(spec, r)?.let { quantizeRamp(it, domain.size) } ?: colorRange(spec))?.map {
+            VegaValue.Str(it.toCssHex())
+          } ?: return null
         // A column of the data, read the way a data-driven *domain* is: the scale becomes a lookup
         // table the rows themselves define — `id` in, `name` out. Distinct values in first-seen
         // order, so it lines up with a domain read the same way from the same rows.
@@ -652,25 +692,20 @@ public class ScaleResolver(
    */
   private fun binnedRange(spec: ScaleSpec, buckets: Int?): List<VegaValue>? =
     when (val r = effectiveRange(spec)) {
-      is RangeSpec.Literal -> if (spec.reverse) r.values.reversed() else r.values
+      is RangeSpec.Literal -> if (reversed(spec)) r.values.reversed() else r.values
       is RangeSpec.Scheme -> {
-        val colors = colorRange(spec) ?: return null
-        val wanted = r.count ?: buckets ?: colors.size
+        // A **continuous** scheme is an interpolator, and upstream quantizes it rather than
+        // picking stops out of it: `count` colours read off at `i / (count + 1)`. A quantize scale
+        // with seven buckets over `blues` gets seven shades spread across the whole ramp, not the
+        // seven nearest stops. With no count at all upstream falls back to five, not to however
+        // many stops the ramp happens to have.
+        val ramp = rampFor(spec, r)
+        val wanted = r.count ?: buckets ?: ramp?.let { DEFAULT_SCHEME_COUNT } ?: 0
+        val colors =
+          if (ramp != null) quantizeRamp(ramp, wanted) else colorRange(spec) ?: return null
         val taken =
-          when {
-            // A **continuous** scheme is a ramp, and upstream takes its buckets from *inside* it:
-            // `quantizeInterpolator` samples at (i+1)/(count+1), so two buckets of `blues` are its
-            // thirds and neither is the white end or the black one. Sampling the extremes instead
-            // gives a legend whose first swatch is nearly the page.
-            isRamp(spec, r) ->
-              (0 until wanted).map { i ->
-                ColorSpaces.sample(colors, (i + 1).toDouble() / (wanted + 1))
-              }
-            // A discrete palette is *sliced*, not spread: `scheme.slice(0, count)`.
-            colors.size > wanted -> colors.take(wanted)
-            else -> colors
-          }
-        (if (spec.reverse) taken.reversed() else taken).map { VegaValue.Str(it.toCssHex()) }
+          if (ramp == null && colors.size > wanted) sampleEvenly(colors, wanted) else colors
+        (if (reversed(spec)) taken.reversed() else taken).map { VegaValue.Str(it.toCssHex()) }
       }
       else -> {
         diagnostics.error(
@@ -683,21 +718,15 @@ public class ScaleResolver(
       }
     }
 
-  /**
-   * Whether a scheme is a *ramp* — a continuous interpolator — rather than a palette of colours.
-   *
-   * Upstream asks the same question as `isFunction(scheme)`: a named ramp resolves to a function it
-   * can sample anywhere, and a named palette to a fixed array it can only slice.
-   */
-  private fun isRamp(spec: ScaleSpec, range: RangeSpec.Scheme): Boolean {
-    val name =
-      when (val scheme = range.scheme) {
-        is SchemeRef.Named -> scheme.name
-        is SchemeRef.Signal ->
-          numbers.resolveValue(scheme.expression, spec.name)?.asString() ?: return false
-        is SchemeRef.Colors -> return false
-      }.lowercase()
-    return ColorSchemes.categoricalOrNull(name) == null && ColorSchemes.rampOrNull(name) != null
+  /** Upstream's `DEFAULT_COUNT`: how many buckets a discretizing scheme gets when nobody says. */
+  private val DEFAULT_SCHEME_COUNT = 5
+
+  /** Takes [count] colours spread across a ramp, so a bucketed scheme uses its whole range. */
+  private fun sampleEvenly(colors: List<SceneColor>, count: Int): List<SceneColor> {
+    if (count <= 1) return listOf(colors.first())
+    return (0 until count).map { i ->
+      colors[((i.toDouble() / (count - 1)) * (colors.size - 1)).toInt()]
+    }
   }
 
   private fun buildQuantize(spec: ScaleSpec): QuantizeScale? {
@@ -808,6 +837,15 @@ public class ScaleResolver(
   private fun oriented(range: List<Double>, reverse: Boolean): List<Double> =
     if (reverse) range.reversed() else range
 
+  /**
+   * `reverse`, which a specification may compute: a timeline that can run right-to-left says so
+   * with `{"signal": "..."}` and has no constant to write down.
+   */
+  private fun reversed(spec: ScaleSpec): Boolean =
+    spec.reverseSignal?.let {
+      JsSemantics.truthy(numbers.resolveValue(it, spec.name) ?: VegaValue.Null)
+    } ?: spec.reverse
+
   private fun niceOf(domain: List<Double>, spec: ScaleSpec): List<Double> =
     dev.aster.vega.runtime.scale.Ticks.nice(
       domain,
@@ -856,12 +894,13 @@ public class ScaleResolver(
       }
     val numbers = values.map { it.asDouble() }.filter { it.isFinite() }
     if (numbers.isEmpty()) {
-      diagnostics.warn(
-        DiagnosticCodes.SCALE_INVALID_DOMAIN,
-        "Scale '$scaleName' has no finite numeric values in its domain; using [0, 1]",
-        operator = scaleName,
-      )
-      return null
+      // **Not** a fallback to `[0, 1]`. Upstream's extent of nothing is `[undefined, undefined]`,
+      // and its own arithmetic turns that into `[NaN, NaN]` — a scale that generates no ticks and
+      // positions nothing, so the axis over it draws nothing at all. That is the whole point in a
+      // chart that switches between two views by emptying one of the datasets: substituting a
+      // usable domain draws the axis of the view nobody asked for. `domainMin` and `domainMax`
+      // still replace their end, which is how such a scale keeps one real bound.
+      return Double.NaN..Double.NaN
     }
     return numbers.min()..numbers.max()
   }

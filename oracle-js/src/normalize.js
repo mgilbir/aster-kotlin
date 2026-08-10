@@ -50,6 +50,54 @@ const STYLE_CHANNELS = ['fill', 'stroke', 'strokeWidth', 'opacity', 'fillOpacity
 const TEXT_CHANNELS = ['text', 'align', 'baseline', 'font', 'fontSize', 'fontWeight', 'fontStyle', 'angle'];
 
 /**
+ * FNV-1a over a canvas's pixels, in the packed `0xAARRGGBB` order the Kotlin scene stores.
+ *
+ * Read back with `getImageData`, which is the only way to see what a `heatmap` actually painted:
+ * upstream keeps a `<canvas>` on the scene item, and comparing an image mark by its box alone would
+ * let a blank one through. Returned as a *string*, because the value overflows a double's exact
+ * integer range and JSON would round it.
+ */
+function rasterDigest(image) {
+  if (!image || typeof image.getContext !== 'function') return undefined;
+  const { width, height } = image;
+  if (!width || !height) return undefined;
+  const pix = image.getContext('2d').getImageData(0, 0, width, height).data;
+  // BigInt, because the hash is 64-bit and a double loses the low bits after 2^53.
+  const MASK = (1n << 64n) - 1n;
+  let hash = 0xcbf29ce484222325n;
+  for (let i = 0; i < pix.length; i += 4) {
+    const packed = (BigInt(pix[i + 3]) << 24n) | (BigInt(pix[i]) << 16n) | (BigInt(pix[i + 1]) << 8n) | BigInt(pix[i + 2]);
+    let value = packed;
+    for (let b = 0; b < 4; ++b) {
+      hash = (hash ^ (value & 0xffn)) & MASK;
+      hash = (hash * 0x100000001b3n) & MASK;
+      value >>= 8n;
+    }
+  }
+  // As a signed 64-bit value, which is what a Kotlin `Long` prints.
+  return BigInt.asIntN(64, hash).toString();
+}
+
+/**
+ * A numeric channel written as a string, read as the number it is.
+ *
+ * A specification may write `"labelFontSize": "12"`, and upstream carries that straight onto the
+ * scene item and hands the string to its renderer, which emits `font-size="12px"`. This engine
+ * parses it once and stores 12. The two agree on what gets drawn, and comparing `"12"` against `12`
+ * as different *types* reported a difference that does not exist — while quietly hiding any real
+ * one on that channel, since the string form matched nothing on the other side either.
+ *
+ * Deliberately narrow: only the channels this harness already treats as numbers, and only when the
+ * string parses as a finite number. `text` is not one of those — a label reading "12" is a label.
+ */
+function numericIfPossible(value) {
+  if (typeof value !== 'string') return value;
+  const trimmed = value.trim();
+  if (trimmed === '' || !Number.isFinite(+trimmed)) return value;
+  return +trimmed;
+}
+
+/**
  * A dash pattern, joined into one comparable string.
  *
  * Reported separately from the scalar channels because it is an array, and added because it was the
@@ -305,6 +353,16 @@ function record(type, role, item, dx, dy, precision) {
     entry.url = item.url;
     entry.align = item.align || 'left';
     entry.baseline = item.baseline || 'top';
+    // An image mark that carries *pixels* rather than an address — a `heatmap`'s output — is
+    // otherwise compared only by its box, so a blank raster in the right place would pass. The
+    // digest is a cheap stand-in for the pixels themselves, which no reference file should hold:
+    // the same FNV-1a over the same packed ARGB values the Kotlin side computes.
+    const digest = rasterDigest(item.image);
+    if (digest !== undefined) {
+      entry.rasterWidth = item.image.width;
+      entry.rasterHeight = item.image.height;
+      entry.rasterDigest = digest;
+    }
   }
 
   for (const channel of STYLE_CHANNELS) {
@@ -336,14 +394,24 @@ function record(type, role, item, dx, dy, precision) {
   }
   if (type === 'text') {
     for (const channel of TEXT_CHANNELS) {
-      if (item[channel] !== undefined) entry[channel] = canonicalNumber(item[channel], precision);
+      if (item[channel] !== undefined) {
+        entry[channel] =
+          channel === 'text'
+            ? item[channel]
+            : canonicalNumber(numericIfPossible(item[channel]), precision);
+      }
     }
     // A text mark's content is whatever the field held, so a numeric field gives a numeric `text`.
-    // Both engines draw its string form, so compare that rather than its type — except for `null`,
-    // which Vega's renderers draw as *nothing*. `String(null)` is the four letters "null", and
-    // writing those into the reference had this engine dutifully drawing them: the first band of a
-    // discretizing scale's legend has no lower bound, and its label is blank rather than the word.
-    if (entry.text !== undefined) entry.text = entry.text == null ? '' : String(entry.text);
+    // Both engines draw its string form, so compare that rather than its type. Two values are not
+    // their `String()`: an **array** is upstream's multi-line form, whose lines are joined the way
+    // both engines lay them out rather than with commas; and `null`, which Vega's renderers draw as
+    // *nothing* where `String(null)` is the four letters "null" — writing those into the reference
+    // had this engine dutifully drawing them, the first band of a discretizing scale's legend
+    // having no lower bound and so a blank label rather than the word.
+    if (entry.text !== undefined) {
+      entry.text =
+        entry.text == null ? '' : Array.isArray(entry.text) ? entry.text.join('\n') : String(entry.text);
+    }
   }
   return entry;
 }

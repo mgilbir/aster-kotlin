@@ -120,6 +120,21 @@
   "caption": "Y-axis for a linear scale with values from 0 to 19"
  },
  {
+  "fixture": "bar-line-toggle",
+  "kind": "axis",
+  "caption": "X-axis for a discrete scale with 25 values: 1, 2, 3, 4, 5, ending with 25"
+ },
+ {
+  "fixture": "bar-line-toggle",
+  "kind": "axis",
+  "caption": "X-axis for a linear scale with values from NaN to NaN"
+ },
+ {
+  "fixture": "bar-line-toggle",
+  "kind": "axis",
+  "caption": "Y-axis for a linear scale with values from NaN to 100.000000"
+ },
+ {
   "fixture": "bar",
   "kind": "axis",
   "caption": "X-axis for a discrete scale with 8 values: Jan, Feb, Mar, Apr, May, ending with Aug"
@@ -200,6 +215,11 @@
   "caption": "X-axis for a linear scale with values from 0 to 70"
  },
  {
+  "fixture": "beeswarm",
+  "kind": "axis",
+  "caption": "X-axis for a discrete scale with 11 values: 0, 1, 2, 3, 4, ending with 10"
+ },
+ {
   "fixture": "bin-settings",
   "kind": "axis",
   "caption": "X-axis for a linear scale with values from 0 to 25"
@@ -243,6 +263,221 @@
   "fixture": "budget-forecasts",
   "kind": "axis",
   "caption": "Y-axis for a linear scale with values from −1.8 to 0.5"
+ },
+ {
+  "fixture": "calendar-view",
+  "kind": "axis",
+  "caption": "Y-axis titled '2020' for a discrete scale with 5 values: Monday, Tuesday, Wednesday, Thursday, Friday"
+ },
+ {
+  "fixture": "calendar-view",
+  "kind": "axis",
+  "caption": "X-axis for a discrete scale with 16 values: December, January, January, January, January, ending with April"
+ },
+ {
+  "fixture": "calendar-view",
+  "kind": "axis",
+  "caption": "Y-axis titled '2019' for a discrete scale with 5 values: Monday, Tuesday, Wednesday, Thursday, Friday"
+ },
+ {
+  "fixture": "calendar-view",
+  "kind": "axis",
+  "caption": "X-axis for a discrete scale with 53 values: December, January, January, January, January, ending with December"
+ },
+ {
+  "fixture": "calendar-view",
+  "kind": "axis",
+  "caption": "Y-axis titled '2018' for a discrete scale with 5 values: Monday, Tuesday, Wednesday, Thursday, Friday"
+ },
+ {
+  "fixture": "calendar-view",
+  "kind": "axis",
+  "caption": "X-axis for a discrete scale with 53 values: January, January, January, January, January, ending with December"
+ },
+ {
+  "fixture": "calendar-view",
+  "kind": "axis",
+  "caption": "Y-axis titled '2017' for a discrete scale with 5 values: Monday, Tuesday, Wednesday, Thursday, Friday"
+ },
+ {
+  "fixture": "calendar-view",
+  "kind": "axis",
+  "caption": "X-axis for a discrete scale with 52 values: January, January, January, January, January, ending with December"
+ },
+ {
+  "fixture": "calendar-view",
+  "kind": "axis",
+  "caption": "Y-axis titled '2016' for a discrete scale with 5 values: Monday, Tuesday, Wednesday, Thursday, Friday"
+ },
+ {
+  "fixture": "calendar-view",
+  "kind": "axis",
+  "caption": "X-axis for a discrete scale with 53 values: December, January, January, January, January, ending with December"
+ },
+ {
+  "fixture": "calendar-view",
+  "kind": "axis",
+  "caption": "Y-axis titled '2015' for a discrete scale with 5 values: Monday, Tuesday, Wednesday, Thursday, Friday"
+ },
+ {
+  "fixture": "calendar-view",
+  "kind": "axis",
+  "caption": "X-axis for a discrete scale with 53 values: December, January, January, January, January, ending with December"
+ },
+ {
+  "fixture": "calendar-view",
+  "kind": "axis",
+  "caption": "Y-axis titled '2014' for a discrete scale with 5 values: Monday, Tuesday, Wednesday, Thursday, Friday"
+ },
+ {
+  "fixture": "calendar-view",
+  "kind": "axis",
+  "caption": "X-axis for a discrete scale with 53 values: December, January, January, January, January, ending with December"
+ },
+ {
+  "fixture": "calendar-view",
+  "kind": "axis",
+  "caption": "Y-axis titled '2013' for a discrete scale with 5 values: Monday, Tuesday, Wednesday, Thursday, Friday"
+ },
+ {
+  "fixture": "calendar-view",
+  "kind": "axis",
+  "caption": "X-axis for a discrete scale with 53 values: December, January, January, January, January, ending with December"
+ },
+ {
+  "fixture": "calendar-view",
+  "kind": "axis",
+  "caption": "Y-axis titled '2012' for a discrete scale with 5 values: Monday, Tuesday, Wednesday, Thursday, Friday"
+ },
+ {
+  "fixture": "calendar-view",
+  "kind": "axis",
+  "caption": "X-axis for a discrete scale with 53 values: January, January, January, January, January, ending with December"
+ },
+ {
+  "fixture": "calendar-view",
+  "kind": "axis",
+  "caption": "Y-axis titled '2011' for a discrete scale with 5 values: Monday, Tuesday, Wednesday, Thursday, Friday"
+ },
+ {
+  "fixture": "calendar-view",
+  "kind": "axis",
+  "caption": "X-axis for a discrete scale with 52 values: December, January, January, January, January, ending with December"
+ },
+ {
+  "fixture": "calendar-view",
+  "kind": "axis",
+  "caption": "Y-axis titled '2010' for a discrete scale with 5 values: Monday, Tuesday, Wednesday, Thursday, Friday"
+ },
+ {
+  "fixture": "calendar-view",
+  "kind": "axis",
+  "caption": "X-axis for a discrete scale with 53 values: December, January, January, January, January, ending with December"
+ },
+ {
+  "fixture": "calendar-view",
+  "kind": "axis",
+  "caption": "Y-axis titled '2009' for a discrete scale with 5 values: Monday, Tuesday, Wednesday, Thursday, Friday"
+ },
+ {
+  "fixture": "calendar-view",
+  "kind": "axis",
+  "caption": "X-axis for a discrete scale with 53 values: December, January, January, January, January, ending with December"
+ },
+ {
+  "fixture": "calendar-view",
+  "kind": "axis",
+  "caption": "Y-axis titled '2008' for a discrete scale with 5 values: Monday, Tuesday, Wednesday, Thursday, Friday"
+ },
+ {
+  "fixture": "calendar-view",
+  "kind": "axis",
+  "caption": "X-axis for a discrete scale with 53 values: December, January, January, January, January, ending with December"
+ },
+ {
+  "fixture": "calendar-view",
+  "kind": "axis",
+  "caption": "Y-axis titled '2007' for a discrete scale with 5 values: Monday, Tuesday, Wednesday, Thursday, Friday"
+ },
+ {
+  "fixture": "calendar-view",
+  "kind": "axis",
+  "caption": "X-axis for a discrete scale with 53 values: January, January, January, January, January, ending with December"
+ },
+ {
+  "fixture": "calendar-view",
+  "kind": "axis",
+  "caption": "Y-axis titled '2006' for a discrete scale with 5 values: Monday, Tuesday, Wednesday, Thursday, Friday"
+ },
+ {
+  "fixture": "calendar-view",
+  "kind": "axis",
+  "caption": "X-axis for a discrete scale with 52 values: January, January, January, January, January, ending with December"
+ },
+ {
+  "fixture": "calendar-view",
+  "kind": "axis",
+  "caption": "Y-axis titled '2005' for a discrete scale with 5 values: Monday, Tuesday, Wednesday, Thursday, Friday"
+ },
+ {
+  "fixture": "calendar-view",
+  "kind": "axis",
+  "caption": "X-axis for a discrete scale with 52 values: December, January, January, January, January, ending with December"
+ },
+ {
+  "fixture": "calendar-view",
+  "kind": "axis",
+  "caption": "Y-axis titled '2004' for a discrete scale with 5 values: Monday, Tuesday, Wednesday, Thursday, Friday"
+ },
+ {
+  "fixture": "calendar-view",
+  "kind": "axis",
+  "caption": "X-axis for a discrete scale with 53 values: December, January, January, January, January, ending with December"
+ },
+ {
+  "fixture": "calendar-view",
+  "kind": "axis",
+  "caption": "Y-axis titled '2003' for a discrete scale with 5 values: Monday, Tuesday, Wednesday, Thursday, Friday"
+ },
+ {
+  "fixture": "calendar-view",
+  "kind": "axis",
+  "caption": "X-axis for a discrete scale with 53 values: December, January, January, January, January, ending with December"
+ },
+ {
+  "fixture": "calendar-view",
+  "kind": "axis",
+  "caption": "Y-axis titled '2002' for a discrete scale with 5 values: Monday, Tuesday, Wednesday, Thursday, Friday"
+ },
+ {
+  "fixture": "calendar-view",
+  "kind": "axis",
+  "caption": "X-axis for a discrete scale with 53 values: December, January, January, January, January, ending with December"
+ },
+ {
+  "fixture": "calendar-view",
+  "kind": "axis",
+  "caption": "Y-axis titled '2001' for a discrete scale with 5 values: Monday, Tuesday, Wednesday, Thursday, Friday"
+ },
+ {
+  "fixture": "calendar-view",
+  "kind": "axis",
+  "caption": "X-axis for a discrete scale with 53 values: January, January, January, January, January, ending with December"
+ },
+ {
+  "fixture": "calendar-view",
+  "kind": "axis",
+  "caption": "Y-axis titled '2000' for a discrete scale with 5 values: Monday, Tuesday, Wednesday, Thursday, Friday"
+ },
+ {
+  "fixture": "calendar-view",
+  "kind": "axis",
+  "caption": "X-axis for a discrete scale with 52 values: December, January, January, January, January, ending with December"
+ },
+ {
+  "fixture": "calendar-view",
+  "kind": "legend",
+  "caption": "Gradient legend titled 'Daily Change, S&P 500' for fill color with values from −6% to 6%"
  },
  {
   "fixture": "colour-ramps",
@@ -315,6 +550,36 @@
   "caption": "Y-axis titled 'Price of a gallon of gasoline (adjusted for inflation)' for a linear scale with values from 1.2 to 3.4"
  },
  {
+  "fixture": "contour-plot",
+  "kind": "axis",
+  "caption": "X-axis titled 'Horsepower' for a linear scale with values from 0 to 240"
+ },
+ {
+  "fixture": "contour-plot",
+  "kind": "axis",
+  "caption": "Y-axis titled 'Miles_per_Gallon' for a linear scale with values from 0 to 50"
+ },
+ {
+  "fixture": "contour-plot",
+  "kind": "legend",
+  "caption": "Symbol legend for stroke color with 3 values: USA, Japan, Europe"
+ },
+ {
+  "fixture": "crossfilter-flights",
+  "kind": "axis",
+  "caption": "X-axis for a linear scale with values from −60 to 180"
+ },
+ {
+  "fixture": "crossfilter-flights",
+  "kind": "axis",
+  "caption": "X-axis for a linear scale with values from 0 to 24"
+ },
+ {
+  "fixture": "crossfilter-flights",
+  "kind": "axis",
+  "caption": "X-axis for a linear scale with values from 0 to 2,400"
+ },
+ {
   "fixture": "curves",
   "kind": "axis",
   "caption": "X-axis for a linear scale with values from 0 to 5"
@@ -323,6 +588,46 @@
   "fixture": "curves",
   "kind": "axis",
   "caption": "Y-axis for a linear scale with values from 0 to 70"
+ },
+ {
+  "fixture": "density-heatmaps",
+  "kind": "axis",
+  "caption": "Y-axis titled 'Miles per Gallon' for a linear scale with values from 0 to 50"
+ },
+ {
+  "fixture": "density-heatmaps",
+  "kind": "axis",
+  "caption": "X-axis titled 'Acceleration' for a linear scale with values from 0 to 26"
+ },
+ {
+  "fixture": "density-heatmaps",
+  "kind": "title",
+  "caption": "Title text 'Europe'"
+ },
+ {
+  "fixture": "density-heatmaps",
+  "kind": "axis",
+  "caption": "X-axis titled 'Acceleration' for a linear scale with values from 0 to 26"
+ },
+ {
+  "fixture": "density-heatmaps",
+  "kind": "title",
+  "caption": "Title text 'Japan'"
+ },
+ {
+  "fixture": "density-heatmaps",
+  "kind": "axis",
+  "caption": "X-axis titled 'Acceleration' for a linear scale with values from 0 to 26"
+ },
+ {
+  "fixture": "density-heatmaps",
+  "kind": "title",
+  "caption": "Title text 'USA'"
+ },
+ {
+  "fixture": "density-heatmaps",
+  "kind": "legend",
+  "caption": "Gradient legend titled 'Local Density (Normalized)' for fill color with values from 0.0 to 1.0"
  },
  {
   "fixture": "density-plot",
@@ -373,6 +678,16 @@
   "fixture": "edge-bundling",
   "kind": "legend",
   "caption": "Symbol legend titled 'Dependencies' for stroke color with 2 values: depends on, imported by"
+ },
+ {
+  "fixture": "error-bars",
+  "kind": "axis",
+  "caption": "X-axis titled 'Barley Yield' for a linear scale with values from 20 to 55"
+ },
+ {
+  "fixture": "error-bars",
+  "kind": "axis",
+  "caption": "Y-axis for a discrete scale with 10 values: Trebi, Wisconsin No. 38, No. 457, No. 462, Peatland, ending with Svansota"
  },
  {
   "fixture": "expressions",
@@ -473,6 +788,16 @@
   "fixture": "histogram",
   "kind": "axis",
   "caption": "Y-axis titled 'Count' for a linear scale with values from 0 to 8"
+ },
+ {
+  "fixture": "hypothetical-outcome-plots",
+  "kind": "axis",
+  "caption": "Y-axis for a linear scale with values from 0 to 10"
+ },
+ {
+  "fixture": "hypothetical-outcome-plots",
+  "kind": "axis",
+  "caption": "X-axis for a discrete scale with 12 values: Jan, Feb, Mar, Apr, May, ending with Dec"
  },
  {
   "fixture": "indata-membership",
@@ -703,6 +1028,56 @@
   "fixture": "path-marks",
   "kind": "axis",
   "caption": "Y-axis for a linear scale with values from 0 to 100"
+ },
+ {
+  "fixture": "pi-monte-carlo",
+  "kind": "axis",
+  "caption": "X-axis for a linear scale with values from 0.0 to 1.0"
+ },
+ {
+  "fixture": "pi-monte-carlo",
+  "kind": "axis",
+  "caption": "Y-axis for a linear scale with values from 0.0 to 1.0"
+ },
+ {
+  "fixture": "pi-monte-carlo",
+  "kind": "title",
+  "caption": "Title text 'In Points and Out Points'"
+ },
+ {
+  "fixture": "pi-monte-carlo",
+  "kind": "axis",
+  "caption": "X-axis titled 'x' for a linear scale with values from 0.0 to 1.0"
+ },
+ {
+  "fixture": "pi-monte-carlo",
+  "kind": "axis",
+  "caption": "Y-axis titled 'y' for a linear scale with values from 0.0 to 1.0"
+ },
+ {
+  "fixture": "pi-monte-carlo",
+  "kind": "axis",
+  "caption": "X-axis for a linear scale with values from 0 to 1,000"
+ },
+ {
+  "fixture": "pi-monte-carlo",
+  "kind": "axis",
+  "caption": "Y-axis for a linear scale with values from 2.0 to 4.0"
+ },
+ {
+  "fixture": "pi-monte-carlo",
+  "kind": "title",
+  "caption": "Title text 'π Estimate'"
+ },
+ {
+  "fixture": "pi-monte-carlo",
+  "kind": "axis",
+  "caption": "X-axis titled 'Number of Points' for a linear scale with values from 0 to 1,000"
+ },
+ {
+  "fixture": "pi-monte-carlo",
+  "kind": "axis",
+  "caption": "Y-axis titled 'Estimated π Value' for a linear scale with values from 2.0 to 4.0"
  },
  {
   "fixture": "pie",

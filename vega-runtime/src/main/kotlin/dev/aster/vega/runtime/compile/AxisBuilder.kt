@@ -89,6 +89,17 @@ public class AxisBuilder(
     val label: String,
     val position: Double,
     val value: VegaValue = VegaValue.Null,
+    /**
+     * Where the *label* goes, which is not always where the tick goes.
+     *
+     * Upstream places a band axis's ticks at `bandPosition` and its labels at the band's centre
+     * regardless, so a chart that puts its ticks on the band edges still reads its labels from the
+     * middle. Null means upstream has no number here at all — the extra tick `tickExtra` appends
+     * carries no value, so its label scales an absent one and lands at `NaN`. Such a label is drawn
+     * at the origin, which is what upstream's renderer paints, and is left out of the measurement,
+     * which is what upstream's `NaN` gets for free.
+     */
+    val labelPosition: Double? = position,
   )
 
   /**
@@ -123,7 +134,7 @@ public class AxisBuilder(
     // down, and a chart bound to a granularity control does exactly that.
     val specifier =
       spec.format ?: spec.formatExpression?.let { numbers.resolveText(it, spec.scale) }
-    val ticks = ticksFor(scale, spec, specifier)
+    val ticks = ticksFor(scale, spec, specifier)?.let { withExtraTick(it, scale, spec) }
     if (ticks == null) {
       diagnostics.error(
         DiagnosticCodes.SCALE_UNSUPPORTED_TYPE,
@@ -161,6 +172,26 @@ public class AxisBuilder(
     // axis, down from a top one, right from a left one, left from a right one.
     val gridSign = if (spec.orient == Orient.TOP || spec.orient == Orient.LEFT) 1.0 else -1.0
 
+    // `gridScale` spans a *second* scale's range instead of the plotting area, which is how a grid
+    // is drawn across a cell that is not the size of its own plot. Upstream takes the two ends in
+    // that scale's own order — `range(gridScale)[0]` then `[1]` — so a descending range gives a
+    // gridline whose start is the far end, which the plain form never does.
+    val gridRange =
+      spec.gridScale?.let { name ->
+        val other = scales[name]
+        if (other is PositionScale) {
+          other.range.first() * gridSign to other.range.last() * gridSign
+        } else {
+          diagnostics.warn(
+            DiagnosticCodes.SCALE_UNSUPPORTED_TYPE,
+            "Axis 'gridScale' names '$name', which is not a scale with a range; the gridlines " +
+              "span the plotting area instead",
+            operator = spec.scale,
+          )
+          null
+        }
+      } ?: (0.0 to gridSign * (if (spec.orient.isVertical) gridSize.width else gridSize.height))
+
     // Gridlines first so they sit under the ticks, matching Vega's ordering.
     if (spec.grid) {
       val gridMeta = NodeMetadata(role = "axis-grid")
@@ -175,30 +206,32 @@ public class AxisBuilder(
           Orient.RIGHT,
           Orient.BOTTOM -> -gridOffset
         }
-      // A gridline named a `gridScale` runs the length of *that* scale's range, in that range's own
-      // direction. It is the same line either way round, but upstream draws it from the range's
-      // start, and a vertical scale's range starts at the bottom — so the gridlines of a horizontal
-      // axis come out running upwards into the plot and back down to the axis.
-      val reversed = gridScaleReversed(spec)
       for (tick in ticks) {
         val at = AxisDefaults.crispRound(tick.position)
-        val far = { size: Double -> gridSign * size + undoOffset }
         children +=
           when (spec.orient) {
             Orient.BOTTOM,
-            Orient.TOP -> {
-              val near = undoOffset
-              val away = far(gridSize.height)
-              val (from, to) = if (reversed) away to near else near to away
-              RuleNode(ids.allocate(), at, from, at, to, gridStroke, metadata = gridMeta)
-            }
+            Orient.TOP ->
+              RuleNode(
+                ids.allocate(),
+                at,
+                gridRange.first + undoOffset,
+                at,
+                gridRange.second + undoOffset,
+                gridStroke,
+                metadata = gridMeta,
+              )
             Orient.LEFT,
-            Orient.RIGHT -> {
-              val near = undoOffset
-              val away = far(gridSize.width)
-              val (from, to) = if (reversed) away to near else near to away
-              RuleNode(ids.allocate(), from, at, to, at, gridStroke, metadata = gridMeta)
-            }
+            Orient.RIGHT ->
+              RuleNode(
+                ids.allocate(),
+                gridRange.first + undoOffset,
+                at,
+                gridRange.second + undoOffset,
+                at,
+                gridStroke,
+                metadata = gridMeta,
+              )
           }
       }
     }
@@ -230,28 +263,39 @@ public class AxisBuilder(
         // The label's own `encode` may replace the *text* as well as its position — read through a
         // scale, which is how a chart labels a key with a display name it keeps in a second scale.
         // There is no axis property that could say it, because the mapping lives in the data.
-        // `labelFlush` pulls the labels at the two ends of the range *inside* the plot, so the
-        // first and last read against the axis instead of straddling its ends. Every Vega-Lite
-        // chart with a continuous horizontal axis asks for it, and it is not only cosmetic: those
-        // two labels stop hanging outside the plotting area, so the surface stops growing to hold
-        // them.
-        val flushed = flushPlacement(spec, tick.position, extent)
+        // `labelFlush` pushes the first and last labels inwards so they sit inside the plot
+        // instead of hanging off its corners. It is an *alignment* rule, decided per label from
+        // how close that label's scaled value is to an end of the range — and it moves the
+        // alignment on the axis's own dimension only, so a bottom axis flushes its `align` and a
+        // left one its `baseline`.
+        val flushed = flushAnchor(spec, scale, tick)
         val run =
           TextRun(
             text = labelText(spec, tick) ?: tick.label,
             style = labelStyle,
-            align = alignOf(spec.labelAlign) ?: flushed?.first ?: labelAlign(spec.orient),
+            align =
+              alignOf(spec.labelAlign)
+                ?: (if (spec.orient.isVertical) null else flushed?.let(::flushAlign))
+                ?: labelAlign(spec.orient),
             baseline =
-              baselineOf(spec.labelBaseline) ?: flushed?.second ?: labelBaseline(spec.orient),
+              baselineOf(spec.labelBaseline)
+                ?: (if (spec.orient.isVertical) flushed?.let(::flushBaseline) else null)
+                ?: labelBaseline(spec.orient),
             limit = labelLimit,
           )
         val layout = textEngine.layout(run)
+        // A label sits where *it* was placed, which on a band axis is the band's centre whatever
+        // `bandPosition` did to the ticks. A null one is upstream's `NaN` — the extra tick carries
+        // no value for the label to scale — and it stays a `NaN` here: a text node with no usable
+        // anchor covers nothing and draws nothing, which is what upstream's scene and its own SVG
+        // both say.
+        val along = tick.labelPosition ?: Double.NaN
         val (defaultX, defaultY) =
           when (spec.orient) {
-            Orient.BOTTOM -> tick.position to labelOffset
-            Orient.TOP -> tick.position to -labelOffset
-            Orient.LEFT -> -labelOffset to tick.position
-            Orient.RIGHT -> labelOffset to tick.position
+            Orient.BOTTOM -> along to labelOffset
+            Orient.TOP -> along to -labelOffset
+            Orient.LEFT -> -labelOffset to along
+            Orient.RIGHT -> labelOffset to along
           }
         // A label's own `encode` block may place it somewhere the properties cannot say — off the
         // band's centre, at the tick's raw scale position. The datum is the tick: `datum.value` is
@@ -273,6 +317,11 @@ public class AxisBuilder(
             // them, so a turned label pivots about its anchor rather than being re-hung from it.
             angleDegrees = labelAngle,
             fill = GuideStyle.fill(spec.labelStyle, AxisDefaults.labelColor),
+            // A label's own `encode` may hide it on a rule the axis has no property for — a
+            // calendar shows the month name on the first week of each month and blanks the rest.
+            // It still measures: upstream bounds a text item from its geometry whatever its
+            // opacity, and only overlap removal takes one out of the measurement.
+            opacity = labelChannel(spec, "opacity", tick) ?: 1.0,
             metadata = NodeMetadata(role = "axis-label"),
           )
       }
@@ -295,6 +344,8 @@ public class AxisBuilder(
       for (label in labels) {
         if (label in kept) {
           drawn += label
+          // A label with no anchor has empty bounds, so measuring it changes nothing — which is
+          // what upstream's `NaN` gets for free, every comparison against it being false.
           measured += label
         } else {
           drawn += label.copy(opacity = 0.0)
@@ -327,7 +378,9 @@ public class AxisBuilder(
 
     // A title may be a signal: a chart that lets a control choose the measure retitles the axis
     // with the choice, and there is no constant to write down.
-    val titleText = spec.title ?: spec.titleExpression?.let { numbers.resolveText(it, spec.scale) }
+    // `resolveLines`, not `resolveText`: an axis title given as an array is two lines, exactly as a
+    // legend's is, and stringifying it would join them with a comma on one line.
+    val titleText = spec.title ?: spec.titleExpression?.let { numbers.resolveLines(it, spec.scale) }
     val titleNode = titleText?.let { title(spec, it, scale, tickAndLabelReach) }
     titleNode?.let { children += it }
 
@@ -345,7 +398,8 @@ public class AxisBuilder(
             accessibility =
               GuideCaption.axis(
                   spec.orient.name.lowercase(),
-                  titleText,
+                  // Spoken as one phrase; see LegendBuilder.caption for why the newline goes.
+                  titleText?.replace("\n", " "),
                   scale,
                   scaleTypes[spec.scale],
                   specifier,
@@ -397,7 +451,10 @@ public class AxisBuilder(
       Orient.TOP -> -reach.top
       Orient.LEFT -> -reach.left
       Orient.RIGHT -> reach.right
-    }.coerceIn(AxisDefaults.TITLE_MIN_EXTENT, AxisDefaults.TITLE_MAX_EXTENT)
+    }.coerceIn(
+      numbers.resolve(spec.minExtent, spec.scale) ?: AxisDefaults.TITLE_MIN_EXTENT,
+      numbers.resolve(spec.maxExtent, spec.scale) ?: AxisDefaults.TITLE_MAX_EXTENT,
+    )
 
   /**
    * The axis title.
@@ -514,50 +571,6 @@ public class AxisBuilder(
       else -> null
     }
 
-  /**
-   * Whether this axis's gridlines are drawn from the far side of the plot back towards it.
-   *
-   * True when a `gridScale` names a scale whose range descends — a `y` scale, whose range runs from
-   * the bottom of the plot to the top. Without a `gridScale` the gridline simply spans the plot
-   * from the axis outwards, which is what upstream does when nothing says otherwise.
-   */
-  private fun gridScaleReversed(spec: AxisSpec): Boolean {
-    val name = spec.gridScale ?: return false
-    val range = (scales[name] as? PositionScale)?.range ?: return false
-    return range.size >= 2 && range.last() < range.first()
-  }
-
-  /**
-   * `labelFlush`: how the labels nearest the two ends of the range are hung.
-   *
-   * Upstream's `flush()`, which picks one of three placements by distance to the nearer end of the
-   * scale's range — inside the threshold at the low end, inside it at the high end, or neither.
-   * `labelFlush: true` is a threshold of one unit, so it catches only a label sitting *on* an end.
-   * A horizontal axis flushes its alignment and a vertical one its baseline.
-   *
-   * @return the alignment and baseline to use, or null when this label is not near an end.
-   */
-  private fun flushPlacement(
-    spec: AxisSpec,
-    position: Double,
-    extent: PlotSize,
-  ): Pair<TextAlign?, TextBaseline?>? {
-    val threshold = spec.labelFlush ?: return null
-    val horizontal = spec.orient == Orient.BOTTOM || spec.orient == Orient.TOP
-    val end = if (horizontal) extent.width else extent.height
-    val toStart = kotlin.math.abs(position - 0.0)
-    val toEnd = kotlin.math.abs(end - position)
-    val atStart = toStart < toEnd && toStart <= threshold
-    val atEnd = !atStart && toEnd <= threshold
-    if (!atStart && !atEnd) return null
-    return if (horizontal) {
-      (if (atStart) TextAlign.LEFT else TextAlign.RIGHT) to null
-    } else {
-      // A vertical axis runs downwards, so the range's low end is the *top* of the plot.
-      null to (if (atStart) TextBaseline.TOP else TextBaseline.BOTTOM)
-    }
-  }
-
   private fun labelAlign(orient: Orient): TextAlign =
     when (orient) {
       Orient.BOTTOM,
@@ -638,6 +651,24 @@ public class AxisBuilder(
       while (count > 1 && Ticks.stepFrom(Ticks.tickIncrement(lo, hi, count)) < minStep) count--
     }
     return count.coerceAtLeast(1)
+  }
+
+  /**
+   * `tickExtra`: one more tick at the **start** of the first tick's band, labelled with nothing.
+   *
+   * Upstream appends a datum that carries `{extra: {value: <first tick's value>}}` and no `value`
+   * of its own, and the scaled-value codegen reads the first as "that value's position, with no
+   * bandwidth added" — so the extra tick lands on the leading edge that per-band ticks leave
+   * unmarked. The datum's missing `value` is what makes its *label* land at `NaN`, carried here as
+   * a null [Tick.labelPosition] rather than as a NaN, because an absence stays out of the
+   * arithmetic downstream where a NaN would have to be kept out of it by hand.
+   */
+  private fun withExtraTick(ticks: List<Tick>, scale: VegaScale, spec: AxisSpec): List<Tick> {
+    if (!spec.tickExtra || ticks.isEmpty()) return ticks
+    val positional = scale as? PositionScale ?: return ticks
+    val at = positional.position(ticks.first().value)
+    if (!at.isFinite()) return ticks
+    return ticks + Tick("", at + tickOffset(positional, spec), VegaValue.Null, labelPosition = null)
   }
 
   private fun ticksFor(scale: VegaScale, spec: AxisSpec, specifier: String?): List<Tick>? {
@@ -725,11 +756,72 @@ public class AxisBuilder(
     return encoder.channelNumber(entry, datum)
   }
 
+  /**
+   * Which end of the range a label is being flushed to, or null when it is not.
+   *
+   * Upstream's `flush(range, value, threshold, left, right, center)`, and the parts that are easy
+   * to get wrong are the tie-break and the reversal: the ends are sorted before the comparison, so
+   * a descending range still flushes its *low* end to the start; and the nearer end wins with `l <
+   * r`, so a label exactly between two ends of an equally short range takes the far one.
+   */
+  private fun flushAnchor(spec: AxisSpec, scale: VegaScale, tick: Tick): FlushEnd? {
+    val threshold = spec.labelFlush ?: return null
+    val positional = scale as? PositionScale ?: return null
+    val range = positional.range
+    if (range.size < 2) return null
+    val low = minOf(range.first(), range.last())
+    val high = maxOf(range.first(), range.last())
+    val at = positional.position(tick.value)
+    if (!at.isFinite()) return null
+    val fromLow = kotlin.math.abs(at - low)
+    val fromHigh = kotlin.math.abs(high - at)
+    return when {
+      fromLow < fromHigh && fromLow <= threshold -> FlushEnd.START
+      fromHigh <= threshold -> FlushEnd.END
+      else -> null
+    }
+  }
+
+  /** Which end of the range a flushed label was pulled towards. */
+  private enum class FlushEnd {
+    START,
+    END,
+  }
+
+  private fun flushAlign(end: FlushEnd): TextAlign =
+    if (end == FlushEnd.START) TextAlign.LEFT else TextAlign.RIGHT
+
+  private fun flushBaseline(end: FlushEnd): TextBaseline =
+    if (end == FlushEnd.START) TextBaseline.TOP else TextBaseline.BOTTOM
+
   private fun bandOffset(scale: PositionScale, spec: AxisSpec): Double {
     if (scale !is BandScale) return 0.0
     val position = numbers.resolve(spec.bandPosition, spec.scale) ?: AxisDefaults.BAND_POSITION
-    return scale.bandwidth * position - AxisDefaults.CRISP_OFFSET
+    return scale.bandwidth * position + tickOffset(scale, spec)
   }
+
+  /**
+   * `tickOffset`: how far a tick is nudged along the axis once its band position has placed it.
+   *
+   * The default is upstream's, and it is **not** zero for a band scale: `config.axisBand` carries a
+   * `-0.5` that corrects the half-pixel the axis group's own translation adds, and it applies to a
+   * band scale only — a point or ordinal axis never sees that block. A specification aiming ticks
+   * at the band boundaries has to switch it off explicitly, which is why the property exists.
+   */
+  private fun tickOffset(scale: PositionScale, spec: AxisSpec): Double =
+    numbers.resolve(spec.tickOffset, spec.scale)
+      ?: if (scale is BandScale) -AxisDefaults.CRISP_OFFSET else 0.0
+
+  /**
+   * Where a band axis's label sits, which is the band's **centre** whatever the ticks do.
+   *
+   * Upstream's label mark hard-codes `band: 0.5` and takes only the tick *offset* from the shared
+   * band settings, so `bandPosition: 1` moves the ticks to the edges and leaves the labels where
+   * they were.
+   */
+  private fun labelOffsetAlong(scale: PositionScale, spec: AxisSpec): Double =
+    if (scale !is BandScale) 0.0
+    else scale.bandwidth * AxisDefaults.BAND_POSITION + tickOffset(scale, spec)
 
   /**
    * How an explicit value is labelled.
@@ -778,9 +870,19 @@ public class AxisBuilder(
     // where there is a number to format: upstream coerces a discrete domain's own values to strings
     // and never consults it, so a band axis keeps its labels whatever this says.
     if (format != null && scale !is BandScale && scale !is PointScale) {
+      // Upstream resolves the specifier against the *span* being labelled, so a specifier that
+      // names no precision takes as many decimals as the tick step needs rather than d3's fixed
+      // six.
+      val numeric =
+        when (scale) {
+          is LinearScale -> scale.domain
+          is TransformedScale -> scale.domain
+          is TimeScale -> scale.domain
+        }
+      val resolved = Ticks.spanSpecifier(format, numeric.first(), numeric.last(), count)
       return { value ->
         val number = value.asDouble()
-        if (number.isNaN()) value.asString() else NumberFormatSubset.format(number, format)
+        if (number.isNaN()) value.asString() else NumberFormatSubset.format(number, resolved)
       }
     }
     return when (scale) {
@@ -807,11 +909,15 @@ public class AxisBuilder(
       // which is the only way a band scale over instants reads as dates rather than as numbers.
       is BandScale -> {
         val label = labeller(scale, scale.domain.size, specifier, spec.formatType)
-        scale.domain.zip(scale.centers()).map { (value, centre) ->
+        val alongTick = bandOffset(scale, spec)
+        val alongLabel = labelOffsetAlong(scale, spec)
+        scale.domain.map { value ->
+          val start = scale.position(VegaValue.Str(value))
           Tick(
             label(VegaValue.Str(value)),
-            centre - AxisDefaults.CRISP_OFFSET,
+            start + alongTick,
             VegaValue.Str(value),
+            labelPosition = start + alongLabel,
           )
         }
       }

@@ -3,6 +3,7 @@ package dev.aster.vega.runtime.compile
 import dev.aster.vega.model.DiagnosticCodes
 import dev.aster.vega.model.DiagnosticSeverity
 import dev.aster.vega.model.VegaValue
+import dev.aster.vega.model.asDouble
 import dev.aster.vega.scene.RectNode
 import dev.aster.vega.scene.SceneColor
 import dev.aster.vega.scene.ScenePaint
@@ -208,12 +209,12 @@ class SignalCompileTest {
 
   @Test
   fun `an unsupported function inside an encoding is reported once, not per datum`() {
-    val compiled = compile(spec(encode = """$basePosition, "opacity": {"signal": "random()"}"""))
+    val compiled = compile(spec(encode = """$basePosition, "opacity": {"signal": "geoArea()"}"""))
     val failures =
       compiled.diagnostics.filter { it.code == DiagnosticCodes.EXPRESSION_UNSUPPORTED_FUNCTION }
     // Two data rows, but the expression fails identically for both.
     assertEquals(1, failures.size, failures.toString())
-    assertTrue(failures.single().message.contains("reproducible"))
+    assertTrue(failures.single().message.contains("geographic"))
   }
 
   // ---- conditional production rules -----------------------------------------
@@ -354,20 +355,20 @@ class SignalCompileTest {
   }
 
   /**
-   * And the case the order cannot fix: the signal's dataset comes *after* the transform reading it.
+   * A transform's *expression* parameter is in the dependency graph, so this resolves.
    *
-   * `u` sources from nothing and is declared first, so it runs before `t` exists and therefore
-   * before `rows` can be worked out. A transform's expression parameter is not in the dependency
-   * graph — `formula`'s `expr` is a per-row expression, not a `{"signal": ...}` reference — so
-   * nothing holds `u` back, and the read comes out null. Null is zero to arithmetic, which draws a
-   * chart in the wrong place rather than failing, so the name has to be said out loud.
+   * `u` is declared first and sources from nothing, and its `formula` reads `rows`, which counts
+   * the rows of `t` — declared after it. It still comes out right, because the expression is an
+   * edge: upstream's `parseExpression` walks every expression's AST and registers what the `scale`,
+   * `data` and `indata` calls in it reach for as operator **parameters**, so a `formula` waits for
+   * them exactly as a `{"signal": ...}` parameter would.
    *
-   * Vega's own radial tree example fails this way: `originX` has an `update`, and every node's `x`
-   * is `originX + radius * cos(...)`, so the whole diagram collapsed onto the origin with nothing
-   * said.
+   * This test used to assert the opposite — that the read came out null and was reported by name.
+   * That diagnostic existed because the edge was missing; the edge is the fix, and the diagnostic
+   * that survives it is the one for a signal nothing can supply at all.
    */
   @Test
-  fun `a transform reading a signal from a later dataset is reported by name`() {
+  fun `a transform reading a signal from a later dataset still resolves`() {
     val compiled =
       compile(
         """
@@ -388,8 +389,8 @@ class SignalCompileTest {
           .trimIndent()
       )
     val reported = compiled.diagnostics.filter { it.message.contains("signal 'rows'") }
-    assertEquals(1, reported.size, compiled.diagnostics.toString())
-    assertEquals(DiagnosticCodes.TRANSFORM_INVALID_PARAMETER, reported.single().code)
+    assertEquals(emptyList<Any>(), reported, compiled.diagnostics.toString())
+    assertEquals(1.0, compiled.signals["rows"]?.asDouble())
   }
 
   /**

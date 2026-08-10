@@ -515,11 +515,11 @@ class LegendTest {
       compile(
         spec(
           """{"fill": "s1", "symbolLimit": 4,
-             "format": ".2f", "titleOrient": "left"}"""
+             "gradientOpacity": 0.5, "titleAnchor": "start"}"""
         )
       )
     val messages = compiled.diagnostics.map { it.message }
-    for (name in listOf("symbolLimit", "format", "titleOrient")) {
+    for (name in listOf("symbolLimit", "gradientOpacity", "titleAnchor")) {
       assertTrue(messages.any { it.contains("'$name'") }, "$name not reported in $messages")
     }
   }

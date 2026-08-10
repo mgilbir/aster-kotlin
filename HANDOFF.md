@@ -9,7 +9,7 @@ Branch `milestone-0-bootstrap`. Working tree clean, both gates green:
 - `./scripts/check.sh` — format, all tests, lint, demo APK
 - `./scripts/oracle.sh` — regenerates upstream references and runs the differential comparison
 
-**96 differential fixtures pass, all matching upstream exactly.** That is the only number here
+**112 differential fixtures pass, all matching upstream exactly.** That is the only number here
 that means what it says.
 
 ## Read this before trusting the other number
@@ -195,10 +195,14 @@ those before comparing, they paint nothing.
 its datasets are fetched into `test-fixtures/data/` and committed. Discount every loader diagnostic
 when judging how far an example is from passing.
 
-**Where the corpus stands, from `ExampleTriage` rather than from memory: 70 of the 93 compile clean,
-23 still report errors.** Twenty-two of those 23 are refused by design — eleven geo/topojson, eight
-needing `random()` or `now()`, three needing the raster family. **`crossfilter-flights` is the only
-non-refused example still reporting an error.**
+**Where the corpus stands, from `ExampleTriage` rather than from memory: 85 of the 93 compile
+clean, 8 report errors.** Read the *movement* rather than the number: 70 → 79 as the stochastic and
+crossfilter work landed, **79 → 75 when mark-level `transform` was implemented** — the survey
+becoming honest, because five charts had been dropping a whole block silently — and 75 → 80 as the
+raster family and `force` landed.
+
+The 8 that remain are **6 geographic** and **2 that have no oracle at all**. There is no third
+category left.
 
 **`time-units` is done** and is a fixture; STATUS.md describes the five things it needed. The
 handoff's prediction was right as far as it went — the domain field is a `FieldRef` now — but the two
@@ -208,28 +212,107 @@ domain was no longer empty, and the width was a floating-point crumb in a rotate
 that `Math.ceil` turned into a whole unit of plotting area. Read the STATUS section before assuming
 anything similar is a rounding tolerance.
 
-One example remains parked in the scratchpad hold directory with its data already fetched:
+**`calendar-view` is done** too, and the old note above it was wrong in an instructive way: the
+marks were not transposed, the *facets* were in the opposite order because a mark `sort` over
+`datum.year` could only read `x` and `y` and silently tied. And `timeOffset` was implemented but
+returning its argument. STATUS.md has the six things it needed.
 
-- **`calendar-view`** — further out. Its `y` scale domain is a list of `datetime(...)` values and the
-  marks come out transposed against upstream's (`x` and `y` swapped), so start by comparing one
-  rect's encode against what upstream places. It also wants `timeOffset`, which is now implemented,
-  so re-read its diagnostics before assuming anything from this note.
+**`crossfilter-flights` is done** and is a fixture. The note that used to sit here said it could not
+be one because it draws 600,098 scene nodes; **upstream draws 171**. The 600,098 was this engine
+drawing every unfiltered row three times over because the two transforms were missing. A triage node
+count measures how wrong we are, not how big the chart is — do not size a decision off one. The test
+heap is pinned at 2 GB now, for the unrelated reason that 200,000 rows through three `bin`
+transforms is a large live set when transforms copy rather than mutate.
 
-- **`crossfilter-flights`** — needs the `crossfilter` and `resolvefilter` transforms, and **it cannot
-  be a fixture as the harness stands**: it draws 600,098 scene nodes and the differential run dies
-  with `Java heap space`. Raising the test JVM's heap is a decision for whoever takes it, not
-  something to do silently — and its reference JSON would be enormous besides.
+## The three refusals are lifted; two are finished and one is not
 
-**Refused, not missing**, and reported as such: `error-bars`, `bar-line-toggle`, `clock`, `watch`,
-`word-cloud`, `serpentine-timeline`, `hypothetical-outcome-plots` and `pi-monte-carlo` all need
-`random()` or `now()`. `error-bars` is the subtle one — its `ci0`/`ci1` *look* like ordinary summary
-statistics and are a bootstrap over 1,000 random resamples. `serpentine-timeline` is worth naming
-too: its scale domain is derived from `now()`, so any reference generated for it would be correct for
-one day only.
+The owner asked for all three of the brief's scope refusals to be overturned and for every example to
+pass. **PROJECT_BRIEF.md §3.3 and §18.2 are stale on this point** and should be amended when the geo
+work lands; until then, read them as history rather than as policy.
 
-The scouting trick: copy the candidates into `test-fixtures/specs/` with a `scout-` prefix, generate
-references, run the differential once, read the distinct diagnostics, then delete them all. Much
-faster than reading specs.
+**1. `random()` and `now()` — done.** `RandomStream` is upstream's `randomLCG` and
+`oracle-js/src/determinism.js` puts the same generator and a stopped clock into upstream, so these
+charts can have references at all. `clock`, `watch`, `error-bars`, `hypothetical-outcome-plots`,
+`pi-monte-carlo`, `serpentine-timeline` and `bar-line-toggle` are all fixtures and all pass.
+
+**2. The raster family — done.** `volcano-contours`, `density-heatmaps` and `contour-plot` are
+fixtures and match exactly. `isocontour`, `geopath` without a projection, `kde2d`, `heatmap`, a
+raster payload on `ImageNode`, a PNG encoder and mark-level `transform` all landed with them. The
+parked `worktree-agent-a9f49f94103bacad5` branch is **superseded** for `isocontour` — this port is
+verified against upstream where that one never was — and should be dropped rather than merged.
+
+The harness was strengthened first, as the previous handoff insisted: `normalize.js` now takes an
+FNV-1a digest of `getImageData` on the upstream side and the Kotlin side hashes its own pixels, so an
+image mark is compared by what it *draws*. A blank image cannot pass.
+
+**3. Force layout — done, and it was never the irreproducible thing it is assumed to be.**
+`force-directed`, `beeswarm` and `packed-bubble` are fixtures. d3-force seeds a fixed LCG rather than
+reaching for `Math.random`, and a node with no position starts on a phyllotaxis spiral; what is left
+is arithmetic. See SUPPORTED_FEATURES.md for the three behaviours that had to come from upstream
+rather than from its schema — in particular that **an omitted force parameter falls to d3's default,
+not the one Vega documents**, because Vega only forwards the parameters a specification wrote.
+
+## What is left: six maps, and two charts with no oracle
+
+**85 of the 93 examples compile clean.** The geographic category is open and mostly done:
+`world-map` is a fixture and matches exactly, and `earthquakes`, `earthquakes-globe`,
+`zoomable-world-map` and `county-unemployment` all compile clean.
+
+d3-geo is ported whole — rotation, antimeridian and circle pre-clipping, adaptive resampling,
+rectangular post-clip — and all fifteen of its projection types are pinned against upstream's own
+path strings in `GeoProjectionTypesTest`. Read the commit that added it before touching any of it;
+three of its subtleties are the kind that produce a plausible wrong map.
+
+Two of those 67 vectors are compared **within one printed digit** rather than exactly, and it is
+worth knowing why before assuming it is a defect. `azimuthalEqualArea` and `azimuthalEquidistant`
+clip at 179.999 degrees, where their scale factor is 114,591 and its derivative is 3.8e14 — so a
+one-ulp difference in `cos` between V8 and the JVM, which neither runtime promises to avoid, moves
+a coordinate by 1.3e-4 of a pixel. That is enough to cross a rounding boundary in the third decimal
+and nothing more. The arithmetic is in the test's comment.
+
+### The six maps, and what each one is waiting for
+
+- **`county-unemployment`, `annual-precipitation`, `map-with-tooltip` — a band legend.** All three
+  compile clean and the *map* in `county-unemployment` was verified mark-for-mark against upstream:
+  3,607 shapes, every coordinate and every fill. What stopped it becoming a fixture is its
+  **legend**: a discretizing scale gets a `legend-band` legend upstream — a stack of rects — and
+  this engine draws symbols. The analysis is done and is short:
+  - `legendType` gives `Discrete` (not `Gradient`, not `Symbols`) for any discretizing scale with a
+    single `fill` or `stroke`; see `vega-parser/src/parsers/legend.js`.
+  - The entries come from `LegendEntries`' third branch: `values = labelValues(scale, count)`, which
+    for a `quantize` scale is `[-Infinity, ...thresholds]`, and each row carries `perc` and `perc2`
+    from `labelFraction(scale)`. The **first label is null** — `formatDiscrete` returns null at
+    index 0 — and the last band's `perc2` is 1.
+  - The marks are `legend-gradient-discrete.js`: one rect per row, `y = (1 - perc) * length`,
+    `y2 = (1 - perc2) * length`, `width = gradientThickness`.
+  - `test-fixtures/data/us-10m.json` and `unemployment.tsv` are already checked in, so the fixture
+    is one feature away from being re-added and green.
+- **`dorling-cartogram`, `distortion-comparison`, `airport-connections` — `geoCentroid`.** Three
+  uses of one expression function, still reported as out of scope. `d3-geo`'s `centroid` is a
+  stream like every other consumer of a projection, so it fits where `PathBoundsSink` does.
+  `distortion-comparison` additionally names a projection from a *group* scope that does not
+  declare it — worth reading before assuming it is the same defect.
+- **`projections`** draws every projection there is, including the fifty in `d3-geo-projection`
+  (`airy`, `bertin1953`, …). That is a second library, not a gap in this one.
+
+### The two with no oracle
+
+**`word-cloud` and `labeled-scatter-plot` cannot be differential fixtures, and this is established
+rather than suspected.** Both transforms measure or rasterise against a `<canvas>`, and there is
+none under Node:
+
+- `wordcloud` measures text, and upstream's own headless output is degenerate — `fontSize: 0` on
+  every word, a surface width of `-Infinity`.
+- `label` calls `markBitmaps`, which *renders the avoided marks into a canvas* and reads the alpha
+  back. Under the oracle it throws inside the transform, Vega logs it and carries on, and the labels
+  are never placed. `oracle-js/src/canvas-shim.js` deliberately refuses every drawing call rather
+  than returning something plausible, which is why this is visible instead of silently wrong.
+
+Making either verifiable means installing the native `canvas` package — and then matching Cairo's
+antialiasing coverage exactly on the Kotlin side, since `label` treats *any* non-zero alpha as
+occupied. That is not a port, it is a rasteriser bake-off. **Implementing these two unverified would
+produce exactly the plausible-looking wrong answer this project exists to avoid.** If they are to be
+done, the decision to accept weaker evidence has to be the owner's and should be written down here.
 
 ## Possible future work: a timer used as a `for` loop
 
@@ -340,6 +423,12 @@ Three things to weigh first, none of them checked:
 - Survey: `./gradlew :vega-runtime:test --tests '*ExampleTriage*' -Dexamples.dir=<dir> --rerun-tasks -q`,
   writes `triage-report.txt` into that directory. `--rerun-tasks` matters; Gradle will otherwise
   call it up to date.
-- Out of reach by design, so do not count them as targets: ~14 geo/projections/topojson, 3 force
-  layout, 4 using `now()`/`random()` (deliberately refused for reproducibility), plus the raster
-  family above.
+- **Everything is a target now.** The categories that used to be out of reach — geo/projections/
+  topojson, the raster family, `now()`/`random()` — were reopened by the owner; see "The three
+  refusals are lifted" above for where each stands. Force layout is the one thing nobody has ruled
+  on either way: `force-directed-layout` compiles clean today because its layout transform is
+  reported and the marks still draw, so it is *quietly* wrong rather than refused.
+- **Do not size a decision off a triage node count.** `crossfilter-flights` was written off as
+  unfixturable because it "draws 600,098 scene nodes"; upstream draws 171, and the 600,098 was this
+  engine drawing every unfiltered row because two transforms were missing. The count measures how
+  wrong we are.

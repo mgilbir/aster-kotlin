@@ -1,0 +1,1258 @@
+{
+  "marks": [
+    {
+      "fill": null,
+      "role": "mark",
+      "stroke": "#ddd",
+      "strokeDash": "0,0",
+      "strokeWidth": 1,
+      "type": "shape"
+    },
+    {
+      "fill": "#000",
+      "role": "mark",
+      "stroke": "#bbb",
+      "strokeWidth": 1,
+      "type": "shape"
+    },
+    {
+      "fill": "#000",
+      "role": "mark",
+      "stroke": "#bbb",
+      "strokeWidth": 1,
+      "type": "shape"
+    },
+    {
+      "fill": "#000",
+      "role": "mark",
+      "stroke": "#bbb",
+      "strokeWidth": 1,
+      "type": "shape"
+    },
+    {
+      "fill": "#000",
+      "role": "mark",
+      "stroke": "#bbb",
+      "strokeWidth": 1,
+      "type": "shape"
+    },
+    {
+      "fill": "#000",
+      "role": "mark",
+      "stroke": "#bbb",
+      "strokeWidth": 1,
+      "type": "shape"
+    },
+    {
+      "fill": "#000",
+      "role": "mark",
+      "stroke": "#bbb",
+      "strokeWidth": 1,
+      "type": "shape"
+    },
+    {
+      "fill": "#000",
+      "role": "mark",
+      "stroke": "#bbb",
+      "strokeWidth": 1,
+      "type": "shape"
+    },
+    {
+      "fill": "#000",
+      "role": "mark",
+      "stroke": "#bbb",
+      "strokeWidth": 1,
+      "type": "shape"
+    },
+    {
+      "fill": "#000",
+      "role": "mark",
+      "stroke": "#bbb",
+      "strokeWidth": 1,
+      "type": "shape"
+    },
+    {
+      "fill": "#000",
+      "role": "mark",
+      "stroke": "#bbb",
+      "strokeWidth": 1,
+      "type": "shape"
+    },
+    {
+      "fill": "#000",
+      "role": "mark",
+      "stroke": "#bbb",
+      "strokeWidth": 1,
+      "type": "shape"
+    },
+    {
+      "fill": "#000",
+      "role": "mark",
+      "stroke": "#bbb",
+      "strokeWidth": 1,
+      "type": "shape"
+    },
+    {
+      "fill": "#000",
+      "role": "mark",
+      "stroke": "#bbb",
+      "strokeWidth": 1,
+      "type": "shape"
+    },
+    {
+      "fill": "#000",
+      "role": "mark",
+      "stroke": "#bbb",
+      "strokeWidth": 1,
+      "type": "shape"
+    },
+    {
+      "fill": "#000",
+      "role": "mark",
+      "stroke": "#bbb",
+      "strokeWidth": 1,
+      "type": "shape"
+    },
+    {
+      "fill": "#000",
+      "role": "mark",
+      "stroke": "#bbb",
+      "strokeWidth": 1,
+      "type": "shape"
+    },
+    {
+      "fill": "#000",
+      "role": "mark",
+      "stroke": "#bbb",
+      "strokeWidth": 1,
+      "type": "shape"
+    },
+    {
+      "fill": "#000",
+      "role": "mark",
+      "stroke": "#bbb",
+      "strokeWidth": 1,
+      "type": "shape"
+    },
+    {
+      "fill": "#000",
+      "role": "mark",
+      "stroke": "#bbb",
+      "strokeWidth": 1,
+      "type": "shape"
+    },
+    {
+      "fill": "#000",
+      "role": "mark",
+      "stroke": "#bbb",
+      "strokeWidth": 1,
+      "type": "shape"
+    },
+    {
+      "fill": "#000",
+      "role": "mark",
+      "stroke": "#bbb",
+      "strokeWidth": 1,
+      "type": "shape"
+    },
+    {
+      "fill": "#000",
+      "role": "mark",
+      "stroke": "#bbb",
+      "strokeWidth": 1,
+      "type": "shape"
+    },
+    {
+      "fill": "#000",
+      "role": "mark",
+      "stroke": "#bbb",
+      "strokeWidth": 1,
+      "type": "shape"
+    },
+    {
+      "fill": "#000",
+      "role": "mark",
+      "stroke": "#bbb",
+      "strokeWidth": 1,
+      "type": "shape"
+    },
+    {
+      "fill": "#000",
+      "role": "mark",
+      "stroke": "#bbb",
+      "strokeWidth": 1,
+      "type": "shape"
+    },
+    {
+      "fill": "#000",
+      "role": "mark",
+      "stroke": "#bbb",
+      "strokeWidth": 1,
+      "type": "shape"
+    },
+    {
+      "fill": "#000",
+      "role": "mark",
+      "stroke": "#bbb",
+      "strokeWidth": 1,
+      "type": "shape"
+    },
+    {
+      "fill": "#000",
+      "role": "mark",
+      "stroke": "#bbb",
+      "strokeWidth": 1,
+      "type": "shape"
+    },
+    {
+      "fill": "#000",
+      "role": "mark",
+      "stroke": "#bbb",
+      "strokeWidth": 1,
+      "type": "shape"
+    },
+    {
+      "fill": "#000",
+      "role": "mark",
+      "stroke": "#bbb",
+      "strokeWidth": 1,
+      "type": "shape"
+    },
+    {
+      "fill": "#000",
+      "role": "mark",
+      "stroke": "#bbb",
+      "strokeWidth": 1,
+      "type": "shape"
+    },
+    {
+      "fill": "#000",
+      "role": "mark",
+      "stroke": "#bbb",
+      "strokeWidth": 1,
+      "type": "shape"
+    },
+    {
+      "fill": "#000",
+      "role": "mark",
+      "stroke": "#bbb",
+      "strokeWidth": 1,
+      "type": "shape"
+    },
+    {
+      "fill": "#000",
+      "role": "mark",
+      "stroke": "#bbb",
+      "strokeWidth": 1,
+      "type": "shape"
+    },
+    {
+      "fill": "#000",
+      "role": "mark",
+      "stroke": "#bbb",
+      "strokeWidth": 1,
+      "type": "shape"
+    },
+    {
+      "fill": "#000",
+      "role": "mark",
+      "stroke": "#bbb",
+      "strokeWidth": 1,
+      "type": "shape"
+    },
+    {
+      "fill": "#000",
+      "role": "mark",
+      "stroke": "#bbb",
+      "strokeWidth": 1,
+      "type": "shape"
+    },
+    {
+      "fill": "#000",
+      "role": "mark",
+      "stroke": "#bbb",
+      "strokeWidth": 1,
+      "type": "shape"
+    },
+    {
+      "fill": "#000",
+      "role": "mark",
+      "stroke": "#bbb",
+      "strokeWidth": 1,
+      "type": "shape"
+    },
+    {
+      "fill": "#000",
+      "role": "mark",
+      "stroke": "#bbb",
+      "strokeWidth": 1,
+      "type": "shape"
+    },
+    {
+      "fill": "#000",
+      "role": "mark",
+      "stroke": "#bbb",
+      "strokeWidth": 1,
+      "type": "shape"
+    },
+    {
+      "fill": "#000",
+      "role": "mark",
+      "stroke": "#bbb",
+      "strokeWidth": 1,
+      "type": "shape"
+    },
+    {
+      "fill": "#000",
+      "role": "mark",
+      "stroke": "#bbb",
+      "strokeWidth": 1,
+      "type": "shape"
+    },
+    {
+      "fill": "#000",
+      "role": "mark",
+      "stroke": "#bbb",
+      "strokeWidth": 1,
+      "type": "shape"
+    },
+    {
+      "fill": "#000",
+      "role": "mark",
+      "stroke": "#bbb",
+      "strokeWidth": 1,
+      "type": "shape"
+    },
+    {
+      "fill": "#000",
+      "role": "mark",
+      "stroke": "#bbb",
+      "strokeWidth": 1,
+      "type": "shape"
+    },
+    {
+      "fill": "#000",
+      "role": "mark",
+      "stroke": "#bbb",
+      "strokeWidth": 1,
+      "type": "shape"
+    },
+    {
+      "fill": "#000",
+      "role": "mark",
+      "stroke": "#bbb",
+      "strokeWidth": 1,
+      "type": "shape"
+    },
+    {
+      "fill": "#000",
+      "role": "mark",
+      "stroke": "#bbb",
+      "strokeWidth": 1,
+      "type": "shape"
+    },
+    {
+      "fill": "#000",
+      "role": "mark",
+      "stroke": "#bbb",
+      "strokeWidth": 1,
+      "type": "shape"
+    },
+    {
+      "fill": "#000",
+      "role": "mark",
+      "stroke": "#bbb",
+      "strokeWidth": 1,
+      "type": "shape"
+    },
+    {
+      "fill": "#000",
+      "role": "mark",
+      "stroke": "#bbb",
+      "strokeWidth": 1,
+      "type": "shape"
+    },
+    {
+      "fill": "#000",
+      "role": "mark",
+      "stroke": "#bbb",
+      "strokeWidth": 1,
+      "type": "shape"
+    },
+    {
+      "fill": "#000",
+      "role": "mark",
+      "stroke": "#bbb",
+      "strokeWidth": 1,
+      "type": "shape"
+    },
+    {
+      "fill": "#000",
+      "role": "mark",
+      "stroke": "#bbb",
+      "strokeWidth": 1,
+      "type": "shape"
+    },
+    {
+      "fill": "#000",
+      "role": "mark",
+      "stroke": "#bbb",
+      "strokeWidth": 1,
+      "type": "shape"
+    },
+    {
+      "fill": "#000",
+      "role": "mark",
+      "stroke": "#bbb",
+      "strokeWidth": 1,
+      "type": "shape"
+    },
+    {
+      "fill": "#000",
+      "role": "mark",
+      "stroke": "#bbb",
+      "strokeWidth": 1,
+      "type": "shape"
+    },
+    {
+      "fill": "#000",
+      "role": "mark",
+      "stroke": "#bbb",
+      "strokeWidth": 1,
+      "type": "shape"
+    },
+    {
+      "fill": "#000",
+      "role": "mark",
+      "stroke": "#bbb",
+      "strokeWidth": 1,
+      "type": "shape"
+    },
+    {
+      "fill": "#000",
+      "role": "mark",
+      "stroke": "#bbb",
+      "strokeWidth": 1,
+      "type": "shape"
+    },
+    {
+      "fill": "#000",
+      "role": "mark",
+      "stroke": "#bbb",
+      "strokeWidth": 1,
+      "type": "shape"
+    },
+    {
+      "fill": "#000",
+      "role": "mark",
+      "stroke": "#bbb",
+      "strokeWidth": 1,
+      "type": "shape"
+    },
+    {
+      "fill": "#000",
+      "role": "mark",
+      "stroke": "#bbb",
+      "strokeWidth": 1,
+      "type": "shape"
+    },
+    {
+      "fill": "#000",
+      "role": "mark",
+      "stroke": "#bbb",
+      "strokeWidth": 1,
+      "type": "shape"
+    },
+    {
+      "fill": "#000",
+      "role": "mark",
+      "stroke": "#bbb",
+      "strokeWidth": 1,
+      "type": "shape"
+    },
+    {
+      "fill": "#000",
+      "role": "mark",
+      "stroke": "#bbb",
+      "strokeWidth": 1,
+      "type": "shape"
+    },
+    {
+      "fill": "#000",
+      "role": "mark",
+      "stroke": "#bbb",
+      "strokeWidth": 1,
+      "type": "shape"
+    },
+    {
+      "fill": "#000",
+      "role": "mark",
+      "stroke": "#bbb",
+      "strokeWidth": 1,
+      "type": "shape"
+    },
+    {
+      "fill": "#000",
+      "role": "mark",
+      "stroke": "#bbb",
+      "strokeWidth": 1,
+      "type": "shape"
+    },
+    {
+      "fill": "#000",
+      "role": "mark",
+      "stroke": "#bbb",
+      "strokeWidth": 1,
+      "type": "shape"
+    },
+    {
+      "fill": "#000",
+      "role": "mark",
+      "stroke": "#bbb",
+      "strokeWidth": 1,
+      "type": "shape"
+    },
+    {
+      "fill": "#000",
+      "role": "mark",
+      "stroke": "#bbb",
+      "strokeWidth": 1,
+      "type": "shape"
+    },
+    {
+      "fill": "#000",
+      "role": "mark",
+      "stroke": "#bbb",
+      "strokeWidth": 1,
+      "type": "shape"
+    },
+    {
+      "fill": "#000",
+      "role": "mark",
+      "stroke": "#bbb",
+      "strokeWidth": 1,
+      "type": "shape"
+    },
+    {
+      "fill": "#000",
+      "role": "mark",
+      "stroke": "#bbb",
+      "strokeWidth": 1,
+      "type": "shape"
+    },
+    {
+      "fill": "#000",
+      "role": "mark",
+      "stroke": "#bbb",
+      "strokeWidth": 1,
+      "type": "shape"
+    },
+    {
+      "fill": "#000",
+      "role": "mark",
+      "stroke": "#bbb",
+      "strokeWidth": 1,
+      "type": "shape"
+    },
+    {
+      "fill": "#000",
+      "role": "mark",
+      "stroke": "#bbb",
+      "strokeWidth": 1,
+      "type": "shape"
+    },
+    {
+      "fill": "#000",
+      "role": "mark",
+      "stroke": "#bbb",
+      "strokeWidth": 1,
+      "type": "shape"
+    },
+    {
+      "fill": "#000",
+      "role": "mark",
+      "stroke": "#bbb",
+      "strokeWidth": 1,
+      "type": "shape"
+    },
+    {
+      "fill": "#000",
+      "role": "mark",
+      "stroke": "#bbb",
+      "strokeWidth": 1,
+      "type": "shape"
+    },
+    {
+      "fill": "#000",
+      "role": "mark",
+      "stroke": "#bbb",
+      "strokeWidth": 1,
+      "type": "shape"
+    },
+    {
+      "fill": "#000",
+      "role": "mark",
+      "stroke": "#bbb",
+      "strokeWidth": 1,
+      "type": "shape"
+    },
+    {
+      "fill": "#000",
+      "role": "mark",
+      "stroke": "#bbb",
+      "strokeWidth": 1,
+      "type": "shape"
+    },
+    {
+      "fill": "#000",
+      "role": "mark",
+      "stroke": "#bbb",
+      "strokeWidth": 1,
+      "type": "shape"
+    },
+    {
+      "fill": "#000",
+      "role": "mark",
+      "stroke": "#bbb",
+      "strokeWidth": 1,
+      "type": "shape"
+    },
+    {
+      "fill": "#000",
+      "role": "mark",
+      "stroke": "#bbb",
+      "strokeWidth": 1,
+      "type": "shape"
+    },
+    {
+      "fill": "#000",
+      "role": "mark",
+      "stroke": "#bbb",
+      "strokeWidth": 1,
+      "type": "shape"
+    },
+    {
+      "fill": "#000",
+      "role": "mark",
+      "stroke": "#bbb",
+      "strokeWidth": 1,
+      "type": "shape"
+    },
+    {
+      "fill": "#000",
+      "role": "mark",
+      "stroke": "#bbb",
+      "strokeWidth": 1,
+      "type": "shape"
+    },
+    {
+      "fill": "#000",
+      "role": "mark",
+      "stroke": "#bbb",
+      "strokeWidth": 1,
+      "type": "shape"
+    },
+    {
+      "fill": "#000",
+      "role": "mark",
+      "stroke": "#bbb",
+      "strokeWidth": 1,
+      "type": "shape"
+    },
+    {
+      "fill": "#000",
+      "role": "mark",
+      "stroke": "#bbb",
+      "strokeWidth": 1,
+      "type": "shape"
+    },
+    {
+      "fill": "#000",
+      "role": "mark",
+      "stroke": "#bbb",
+      "strokeWidth": 1,
+      "type": "shape"
+    },
+    {
+      "fill": "#000",
+      "role": "mark",
+      "stroke": "#bbb",
+      "strokeWidth": 1,
+      "type": "shape"
+    },
+    {
+      "fill": "#000",
+      "role": "mark",
+      "stroke": "#bbb",
+      "strokeWidth": 1,
+      "type": "shape"
+    },
+    {
+      "fill": "#000",
+      "role": "mark",
+      "stroke": "#bbb",
+      "strokeWidth": 1,
+      "type": "shape"
+    },
+    {
+      "fill": "#000",
+      "role": "mark",
+      "stroke": "#bbb",
+      "strokeWidth": 1,
+      "type": "shape"
+    },
+    {
+      "fill": "#000",
+      "role": "mark",
+      "stroke": "#bbb",
+      "strokeWidth": 1,
+      "type": "shape"
+    },
+    {
+      "fill": "#000",
+      "role": "mark",
+      "stroke": "#bbb",
+      "strokeWidth": 1,
+      "type": "shape"
+    },
+    {
+      "fill": "#000",
+      "role": "mark",
+      "stroke": "#bbb",
+      "strokeWidth": 1,
+      "type": "shape"
+    },
+    {
+      "fill": "#000",
+      "role": "mark",
+      "stroke": "#bbb",
+      "strokeWidth": 1,
+      "type": "shape"
+    },
+    {
+      "fill": "#000",
+      "role": "mark",
+      "stroke": "#bbb",
+      "strokeWidth": 1,
+      "type": "shape"
+    },
+    {
+      "fill": "#000",
+      "role": "mark",
+      "stroke": "#bbb",
+      "strokeWidth": 1,
+      "type": "shape"
+    },
+    {
+      "fill": "#000",
+      "role": "mark",
+      "stroke": "#bbb",
+      "strokeWidth": 1,
+      "type": "shape"
+    },
+    {
+      "fill": "#000",
+      "role": "mark",
+      "stroke": "#bbb",
+      "strokeWidth": 1,
+      "type": "shape"
+    },
+    {
+      "fill": "#000",
+      "role": "mark",
+      "stroke": "#bbb",
+      "strokeWidth": 1,
+      "type": "shape"
+    },
+    {
+      "fill": "#000",
+      "role": "mark",
+      "stroke": "#bbb",
+      "strokeWidth": 1,
+      "type": "shape"
+    },
+    {
+      "fill": "#000",
+      "role": "mark",
+      "stroke": "#bbb",
+      "strokeWidth": 1,
+      "type": "shape"
+    },
+    {
+      "fill": "#000",
+      "role": "mark",
+      "stroke": "#bbb",
+      "strokeWidth": 1,
+      "type": "shape"
+    },
+    {
+      "fill": "#000",
+      "role": "mark",
+      "stroke": "#bbb",
+      "strokeWidth": 1,
+      "type": "shape"
+    },
+    {
+      "fill": "#000",
+      "role": "mark",
+      "stroke": "#bbb",
+      "strokeWidth": 1,
+      "type": "shape"
+    },
+    {
+      "fill": "#000",
+      "role": "mark",
+      "stroke": "#bbb",
+      "strokeWidth": 1,
+      "type": "shape"
+    },
+    {
+      "fill": "#000",
+      "role": "mark",
+      "stroke": "#bbb",
+      "strokeWidth": 1,
+      "type": "shape"
+    },
+    {
+      "fill": "#000",
+      "role": "mark",
+      "stroke": "#bbb",
+      "strokeWidth": 1,
+      "type": "shape"
+    },
+    {
+      "fill": "#000",
+      "role": "mark",
+      "stroke": "#bbb",
+      "strokeWidth": 1,
+      "type": "shape"
+    },
+    {
+      "fill": "#000",
+      "role": "mark",
+      "stroke": "#bbb",
+      "strokeWidth": 1,
+      "type": "shape"
+    },
+    {
+      "fill": "#000",
+      "role": "mark",
+      "stroke": "#bbb",
+      "strokeWidth": 1,
+      "type": "shape"
+    },
+    {
+      "fill": "#000",
+      "role": "mark",
+      "stroke": "#bbb",
+      "strokeWidth": 1,
+      "type": "shape"
+    },
+    {
+      "fill": "#000",
+      "role": "mark",
+      "stroke": "#bbb",
+      "strokeWidth": 1,
+      "type": "shape"
+    },
+    {
+      "fill": "#000",
+      "role": "mark",
+      "stroke": "#bbb",
+      "strokeWidth": 1,
+      "type": "shape"
+    },
+    {
+      "fill": "#000",
+      "role": "mark",
+      "stroke": "#bbb",
+      "strokeWidth": 1,
+      "type": "shape"
+    },
+    {
+      "fill": "#000",
+      "role": "mark",
+      "stroke": "#bbb",
+      "strokeWidth": 1,
+      "type": "shape"
+    },
+    {
+      "fill": "#000",
+      "role": "mark",
+      "stroke": "#bbb",
+      "strokeWidth": 1,
+      "type": "shape"
+    },
+    {
+      "fill": "#000",
+      "role": "mark",
+      "stroke": "#bbb",
+      "strokeWidth": 1,
+      "type": "shape"
+    },
+    {
+      "fill": "#000",
+      "role": "mark",
+      "stroke": "#bbb",
+      "strokeWidth": 1,
+      "type": "shape"
+    },
+    {
+      "fill": "#000",
+      "role": "mark",
+      "stroke": "#bbb",
+      "strokeWidth": 1,
+      "type": "shape"
+    },
+    {
+      "fill": "#000",
+      "role": "mark",
+      "stroke": "#bbb",
+      "strokeWidth": 1,
+      "type": "shape"
+    },
+    {
+      "fill": "#000",
+      "role": "mark",
+      "stroke": "#bbb",
+      "strokeWidth": 1,
+      "type": "shape"
+    },
+    {
+      "fill": "#000",
+      "role": "mark",
+      "stroke": "#bbb",
+      "strokeWidth": 1,
+      "type": "shape"
+    },
+    {
+      "fill": "#000",
+      "role": "mark",
+      "stroke": "#bbb",
+      "strokeWidth": 1,
+      "type": "shape"
+    },
+    {
+      "fill": "#000",
+      "role": "mark",
+      "stroke": "#bbb",
+      "strokeWidth": 1,
+      "type": "shape"
+    },
+    {
+      "fill": "#000",
+      "role": "mark",
+      "stroke": "#bbb",
+      "strokeWidth": 1,
+      "type": "shape"
+    },
+    {
+      "fill": "#000",
+      "role": "mark",
+      "stroke": "#bbb",
+      "strokeWidth": 1,
+      "type": "shape"
+    },
+    {
+      "fill": "#000",
+      "role": "mark",
+      "stroke": "#bbb",
+      "strokeWidth": 1,
+      "type": "shape"
+    },
+    {
+      "fill": "#000",
+      "role": "mark",
+      "stroke": "#bbb",
+      "strokeWidth": 1,
+      "type": "shape"
+    },
+    {
+      "fill": "#000",
+      "role": "mark",
+      "stroke": "#bbb",
+      "strokeWidth": 1,
+      "type": "shape"
+    },
+    {
+      "fill": "#000",
+      "role": "mark",
+      "stroke": "#bbb",
+      "strokeWidth": 1,
+      "type": "shape"
+    },
+    {
+      "fill": "#000",
+      "role": "mark",
+      "stroke": "#bbb",
+      "strokeWidth": 1,
+      "type": "shape"
+    },
+    {
+      "fill": "#000",
+      "role": "mark",
+      "stroke": "#bbb",
+      "strokeWidth": 1,
+      "type": "shape"
+    },
+    {
+      "fill": "#000",
+      "role": "mark",
+      "stroke": "#bbb",
+      "strokeWidth": 1,
+      "type": "shape"
+    },
+    {
+      "fill": "#000",
+      "role": "mark",
+      "stroke": "#bbb",
+      "strokeWidth": 1,
+      "type": "shape"
+    },
+    {
+      "fill": "#000",
+      "role": "mark",
+      "stroke": "#bbb",
+      "strokeWidth": 1,
+      "type": "shape"
+    },
+    {
+      "fill": "#000",
+      "role": "mark",
+      "stroke": "#bbb",
+      "strokeWidth": 1,
+      "type": "shape"
+    },
+    {
+      "fill": "#000",
+      "role": "mark",
+      "stroke": "#bbb",
+      "strokeWidth": 1,
+      "type": "shape"
+    },
+    {
+      "fill": "#000",
+      "role": "mark",
+      "stroke": "#bbb",
+      "strokeWidth": 1,
+      "type": "shape"
+    },
+    {
+      "fill": "#000",
+      "role": "mark",
+      "stroke": "#bbb",
+      "strokeWidth": 1,
+      "type": "shape"
+    },
+    {
+      "fill": "#000",
+      "role": "mark",
+      "stroke": "#bbb",
+      "strokeWidth": 1,
+      "type": "shape"
+    },
+    {
+      "fill": "#000",
+      "role": "mark",
+      "stroke": "#bbb",
+      "strokeWidth": 1,
+      "type": "shape"
+    },
+    {
+      "fill": "#000",
+      "role": "mark",
+      "stroke": "#bbb",
+      "strokeWidth": 1,
+      "type": "shape"
+    },
+    {
+      "fill": "#000",
+      "role": "mark",
+      "stroke": "#bbb",
+      "strokeWidth": 1,
+      "type": "shape"
+    },
+    {
+      "fill": "#000",
+      "role": "mark",
+      "stroke": "#bbb",
+      "strokeWidth": 1,
+      "type": "shape"
+    },
+    {
+      "fill": "#000",
+      "role": "mark",
+      "stroke": "#bbb",
+      "strokeWidth": 1,
+      "type": "shape"
+    },
+    {
+      "fill": "#000",
+      "role": "mark",
+      "stroke": "#bbb",
+      "strokeWidth": 1,
+      "type": "shape"
+    },
+    {
+      "fill": "#000",
+      "role": "mark",
+      "stroke": "#bbb",
+      "strokeWidth": 1,
+      "type": "shape"
+    },
+    {
+      "fill": "#000",
+      "role": "mark",
+      "stroke": "#bbb",
+      "strokeWidth": 1,
+      "type": "shape"
+    },
+    {
+      "fill": "#000",
+      "role": "mark",
+      "stroke": "#bbb",
+      "strokeWidth": 1,
+      "type": "shape"
+    },
+    {
+      "fill": "#000",
+      "role": "mark",
+      "stroke": "#bbb",
+      "strokeWidth": 1,
+      "type": "shape"
+    },
+    {
+      "fill": "#000",
+      "role": "mark",
+      "stroke": "#bbb",
+      "strokeWidth": 1,
+      "type": "shape"
+    },
+    {
+      "fill": "#000",
+      "role": "mark",
+      "stroke": "#bbb",
+      "strokeWidth": 1,
+      "type": "shape"
+    },
+    {
+      "fill": "#000",
+      "role": "mark",
+      "stroke": "#bbb",
+      "strokeWidth": 1,
+      "type": "shape"
+    },
+    {
+      "fill": "#000",
+      "role": "mark",
+      "stroke": "#bbb",
+      "strokeWidth": 1,
+      "type": "shape"
+    },
+    {
+      "fill": "#000",
+      "role": "mark",
+      "stroke": "#bbb",
+      "strokeWidth": 1,
+      "type": "shape"
+    },
+    {
+      "fill": "#000",
+      "role": "mark",
+      "stroke": "#bbb",
+      "strokeWidth": 1,
+      "type": "shape"
+    },
+    {
+      "fill": "#000",
+      "role": "mark",
+      "stroke": "#bbb",
+      "strokeWidth": 1,
+      "type": "shape"
+    },
+    {
+      "fill": "#000",
+      "role": "mark",
+      "stroke": "#bbb",
+      "strokeWidth": 1,
+      "type": "shape"
+    },
+    {
+      "fill": "#000",
+      "role": "mark",
+      "stroke": "#bbb",
+      "strokeWidth": 1,
+      "type": "shape"
+    },
+    {
+      "fill": "#000",
+      "role": "mark",
+      "stroke": "#bbb",
+      "strokeWidth": 1,
+      "type": "shape"
+    },
+    {
+      "fill": "#000",
+      "role": "mark",
+      "stroke": "#bbb",
+      "strokeWidth": 1,
+      "type": "shape"
+    },
+    {
+      "fill": "#000",
+      "role": "mark",
+      "stroke": "#bbb",
+      "strokeWidth": 1,
+      "type": "shape"
+    },
+    {
+      "fill": "#000",
+      "role": "mark",
+      "stroke": "#bbb",
+      "strokeWidth": 1,
+      "type": "shape"
+    },
+    {
+      "fill": "#000",
+      "role": "mark",
+      "stroke": "#bbb",
+      "strokeWidth": 1,
+      "type": "shape"
+    },
+    {
+      "fill": "#000",
+      "role": "mark",
+      "stroke": "#bbb",
+      "strokeWidth": 1,
+      "type": "shape"
+    },
+    {
+      "fill": "#000",
+      "role": "mark",
+      "stroke": "#bbb",
+      "strokeWidth": 1,
+      "type": "shape"
+    },
+    {
+      "fill": "#000",
+      "role": "mark",
+      "stroke": "#bbb",
+      "strokeWidth": 1,
+      "type": "shape"
+    },
+    {
+      "fill": "#000",
+      "role": "mark",
+      "stroke": "#bbb",
+      "strokeWidth": 1,
+      "type": "shape"
+    }
+  ],
+  "scales": {},
+  "size": {
+    "height": 500,
+    "width": 900
+  },
+  "spec": "world-map.vg.json",
+  "vegaVersion": "6.3.1"
+}

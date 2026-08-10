@@ -12,6 +12,7 @@ import dev.aster.vega.model.VegaValue
 import dev.aster.vega.model.asDouble
 import dev.aster.vega.model.asString
 import dev.aster.vega.model.field
+import dev.aster.vega.model.isMissing
 import dev.aster.vega.model.roundHalfUp
 import dev.aster.vega.model.spec.ChannelValue
 import dev.aster.vega.model.spec.EncodeEntry
@@ -37,6 +38,7 @@ import dev.aster.vega.scene.PathCommand
 import dev.aster.vega.scene.PathData
 import dev.aster.vega.scene.PathNode
 import dev.aster.vega.scene.PointD
+import dev.aster.vega.scene.RasterImage
 import dev.aster.vega.scene.RectD
 import dev.aster.vega.scene.RectNode
 import dev.aster.vega.scene.RuleNode
@@ -88,22 +90,62 @@ public class MarkEncoder(
   private val expressions: ExpressionCompiler = CachingExpressionCompiler(VegaExpressionCompiler()),
   /** Measures text marks. Must be the engine the surface will draw with (docs/adr/0006). */
   private val textEngine: TextEngine = MetricTextEngine(),
+  /**
+   * The **enclosing group item's** extent, which `{"field": {"group": "width"}}` reads.
+   *
+   * Not the `width` signal, though the two agree at the top level and that is why reading the
+   * signal survived so long. Upstream compiles the reference to `item.mark.group.width` — the size
+   * the group item was *encoded* with — so a cell declaring `width: {signal: height}` gives a rule
+   * that spans the cell rather than one that spans the chart.
+   */
+  private val groupExtent: PlotSize = PlotSize(0.0, 0.0),
 ) {
 
-  public fun encode(spec: MarkSpec, data: List<VegaValue>): List<SceneNode> =
-    when (spec.type) {
-      MarkType.RECT -> data.mapIndexedNotNull { index, datum -> rect(spec, datum, index) }
-      MarkType.RULE -> data.mapIndexedNotNull { index, datum -> rule(spec, datum, index) }
-      MarkType.SYMBOL -> data.mapIndexedNotNull { index, datum -> symbol(spec, datum, index) }
-      MarkType.TEXT -> data.mapIndexedNotNull { index, datum -> text(spec, datum, index) }
+  /** `width` and `height` off the enclosing group item; anything else is a signal lookup. */
+  private fun groupProperty(path: String): VegaValue =
+    when (path) {
+      "width" -> VegaValue.Num(groupExtent.width)
+      "height" -> VegaValue.Num(groupExtent.height)
+      else -> scope.signal(path)
+    }
+
+  /**
+   * @param overrides what a mark's own `transform` wrote onto each item, per row.
+   *
+   * Upstream runs those transforms *after* the encoding and lets them write straight onto the item,
+   * so whatever they set wins over whatever the encoding said — a `force` layout's whole purpose is
+   * to replace the `x` and `y` a mark was encoded with. They arrive here as extra `update` channels
+   * holding the values already resolved, which is the same statement in this engine's vocabulary.
+   */
+  public fun encode(
+    spec: MarkSpec,
+    data: List<VegaValue>,
+    overrides: List<Map<String, VegaValue>> = emptyList(),
+  ): List<SceneNode> {
+    fun at(index: Int): MarkSpec {
+      val written = overrides.getOrNull(index)?.takeIf { it.isNotEmpty() } ?: return spec
+      return spec.copy(
+        encode =
+          spec.encode.copy(
+            update = spec.encode.update + written.mapValues { ChannelValue.Constant(it.value) }
+          )
+      )
+    }
+    return when (spec.type) {
+      MarkType.RECT -> data.mapIndexedNotNull { index, datum -> rect(at(index), datum, index) }
+      MarkType.RULE -> data.mapIndexedNotNull { index, datum -> rule(at(index), datum, index) }
+      MarkType.SYMBOL -> data.mapIndexedNotNull { index, datum -> symbol(at(index), datum, index) }
+      MarkType.TEXT -> data.mapIndexedNotNull { index, datum -> text(at(index), datum, index) }
       // One node for the whole series, not one per datum — and the `sort` therefore has to order
       // the *rows* here, since there are no items left to order afterwards.
       MarkType.LINE -> listOfNotNull(line(spec, ordered(spec, data)))
       MarkType.AREA -> listOfNotNull(area(spec, ordered(spec, data)))
-      MarkType.ARC -> data.mapIndexedNotNull { index, datum -> arc(spec, datum, index) }
-      MarkType.PATH -> data.mapIndexedNotNull { index, datum -> path(spec, datum, index) }
+      MarkType.ARC -> data.mapIndexedNotNull { index, datum -> arc(at(index), datum, index) }
+      MarkType.PATH -> data.mapIndexedNotNull { index, datum -> path(at(index), datum, index) }
+      MarkType.SHAPE ->
+        data.mapIndexedNotNull { index, datum -> path(at(index), datum, index, "shape") }
       MarkType.TRAIL -> listOfNotNull(trail(spec, ordered(spec, data)))
-      MarkType.IMAGE -> data.mapIndexedNotNull { index, datum -> image(spec, datum, index) }
+      MarkType.IMAGE -> data.mapIndexedNotNull { index, datum -> image(at(index), datum, index) }
       else -> {
         diagnostics.error(
           DiagnosticCodes.TRANSFORM_NOT_IMPLEMENTED,
@@ -114,6 +156,7 @@ public class MarkEncoder(
         emptyList()
       }
     }
+  }
 
   /**
    * Resolves one channel to a number against a datum of the caller's making.
@@ -324,13 +367,32 @@ public class MarkEncoder(
    * The string is in its own coordinates and the mark's `x`/`y` translate it, so the same outline
    * can be placed once per datum. `scaleX`, `scaleY` and `angle` transform it about that anchor.
    */
-  private fun path(spec: MarkSpec, datum: VegaValue, index: Int): SceneNode? {
+  private fun path(
+    spec: MarkSpec,
+    datum: VegaValue,
+    index: Int,
+    /**
+     * `path` for a path mark and `shape` for a shape mark.
+     *
+     * The two are the same node with the outline read from a different place. Upstream's `shape`
+     * mark holds a *generator* the renderer calls; here a `geoshape` transform has already run it,
+     * so what is on the item is the same string a path mark would carry.
+     */
+    channel: String = "path",
+  ): SceneNode? {
     val channels = spec.encode.effective
     // A `path` channel that resolves to nothing still makes an item, as upstream does — it simply
     // has no outline and paints nothing. A labelled donut relies on it: its leader lines are drawn
     // from the same 33 label slots as the labels, and only the nine that belong to a slice carry a
     // path, so dropping the empty ones loses two thirds of the mark.
-    val source = string(channels["path"], datum) ?: ""
+    // A mark-level `geopath` writes the outline onto the *row* rather than through an encode
+    // channel — upstream writes it onto the scene item and its renderer reads the item's own
+    // `path` — so a mark with no `path` channel falls back to the row's own column.
+    val declared = channels[channel]?.let { value(it, datum) } ?: datum.field(channel)
+    val source = (declared as? VegaValue.Str)?.value ?: ""
+    // A path the specification never produced at all measures as a zero rectangle rather than as
+    // nothing; see [PathNode.absent].
+    val absent = declared.isMissing
     val parsed = SvgPath.parse(source)
     if (source.isNotEmpty() && !parsed.complete) {
       reportOnce(
@@ -359,11 +421,14 @@ public class MarkEncoder(
     return PathNode(
       id = ids.allocate(),
       path = parsed.path,
+      absent = absent,
       transform = transform,
       fill = style.fill,
       stroke = style.stroke,
       opacity = style.opacity,
-      metadata = metadata(spec, datum, index, channels).copy(markKind = "path"),
+      // `path` or `shape`, whichever the specification wrote: the node is the same and the name
+      // is not, and a comparison that could not tell them apart would be a weaker one.
+      metadata = metadata(spec, datum, index, channels).copy(markKind = channel),
     )
   }
 
@@ -406,7 +471,11 @@ public class MarkEncoder(
     return PathNode(
       id = ids.allocate(),
       path = path,
-      fill = style.fill ?: Fill.of(MarkDefaults.DEFAULT_FILL),
+      // No fallback fill. The pairing rule in `style` has already decided: a mark that encodes
+      // *either* paint channel gets neither default, so an arc drawn as a bare outline — Vega's
+      // Monte Carlo quadrant is one — stays unfilled instead of being flooded with the built-in
+      // blue.
+      fill = style.fill,
       stroke = style.stroke,
       opacity = style.opacity,
       metadata = metadata(spec, datum, index, channels).copy(markKind = "arc"),
@@ -438,8 +507,8 @@ public class MarkEncoder(
 
   private fun symbol(spec: MarkSpec, datum: VegaValue, index: Int): SceneNode? {
     val channels = spec.encode.effective
-    val x = centred(channels, datum, "x", "xc") ?: return null
-    val y = centred(channels, datum, "y", "yc") ?: return null
+    val x = centred(channels, datum, "x", "xc") ?: 0.0
+    val y = centred(channels, datum, "y", "yc") ?: 0.0
     val style = style(channels, datum, spec)
     val shapeName = string(channels["shape"], datum)
     val shape = shapeName?.let { symbolShape(it, spec) }
@@ -516,8 +585,12 @@ public class MarkEncoder(
 
   private fun text(spec: MarkSpec, datum: VegaValue, index: Int): SceneNode? {
     val channels = spec.encode.effective
-    val anchorX = centred(channels, datum, "x", "xc") ?: return null
-    val anchorY = centred(channels, datum, "y", "yc") ?: return null
+    // An axis the specification never mentions is the origin, not a reason to drop the mark:
+    // upstream's `anchorPoint` reads `item.x || 0`, and a heading written as `{"y": -5}` with no
+    // `x` is drawn hard against the left of the group it is in. Every other mark encoder here
+    // already defaults the same way.
+    val anchorX = centred(channels, datum, "x", "xc") ?: 0.0
+    val anchorY = centred(channels, datum, "y", "yc") ?: 0.0
     // Upstream's `textValue`: `line == null ? '' : (line + '').trim()`. Both halves matter. A text
     // channel that resolves to nothing draws *nothing* — this engine was stringifying the null and
     // printing the word "null", which the mark comparison cannot see because a text mark is
@@ -567,7 +640,12 @@ public class MarkEncoder(
       x = anchorX + offset.x,
       y = anchorY + offset.y,
       layout = textEngine.layout(run),
-      fill = style.fill ?: Fill.of(MarkDefaults.TEXT_FILL),
+      // No fallback fill, for the same reason the arc has none: `style` has already applied the
+      // pairing rule, so a label drawn as a bare outline stays one. And a text mark can be
+      // *stroked* — a halo under a label on a busy background is written that way, and dropping the
+      // stroke left the label unreadable in exactly the charts that asked for it.
+      fill = style.fill,
+      stroke = style.stroke,
       angleDegrees = angle,
       opacity = style.opacity,
       metadata = metadata(spec, datum, index, channels),
@@ -936,11 +1014,18 @@ public class MarkEncoder(
    */
   private fun image(spec: MarkSpec, datum: VegaValue, index: Int): SceneNode? {
     val channels = spec.encode.effective
+    // An `image` channel carries the pixels themselves — a `heatmap`'s output — where `url` carries
+    // an address. Upstream distinguishes them the same way and its image mark takes either.
+    // A mark-level `heatmap` writes its pixels onto the *row* rather than through an encode
+    // channel, exactly as `geopath` writes an outline — upstream writes onto the scene item and its
+    // renderer reads the item's own `image`. So a mark with no `image` channel falls back to the
+    // row's own column.
+    val raster = rasterOf(channels["image"], datum) ?: rasterFrom(datum.field("image"))
     val url = string(channels["url"], datum)
-    if (url.isNullOrEmpty()) {
+    if (raster == null && url.isNullOrEmpty()) {
       diagnostics.error(
         DiagnosticCodes.PARSE_MISSING_PROPERTY,
-        "An image mark needs a 'url'; nothing was drawn for this row",
+        "An image mark needs a 'url' or an 'image'; nothing was drawn for this row",
         operator = spec.name ?: "image",
       )
       return null
@@ -950,7 +1035,8 @@ public class MarkEncoder(
     if (width == null || height == null) {
       diagnostics.warn(
         DiagnosticCodes.EXPORT_IMAGE_UNRESOLVED,
-        "Image '$url' has no explicit ${if (width == null) "width" else "height"}; upstream takes " +
+        "Image '${url ?: "(pixels)"}' has no explicit " +
+          "${if (width == null) "width" else "height"}; upstream takes " +
           "it from the image's own pixels, which only the renderer has, so the mark was placed " +
           "with a zero extent",
         operator = spec.name ?: "image",
@@ -962,7 +1048,8 @@ public class MarkEncoder(
     val style = style(channels, datum, spec)
     return ImageNode(
       id = ids.allocate(),
-      url = url,
+      url = url ?: "",
+      raster = raster,
       x = number(channels["x"], datum) ?: 0.0,
       y = number(channels["y"], datum) ?: 0.0,
       width = w,
@@ -1011,7 +1098,7 @@ public class MarkEncoder(
     when (ref) {
       is FieldRef.ParentOf -> scope.signal("parent").field(scaleName(ref.name, datum)).asString()
       is FieldRef.Plain -> ref.path
-      is FieldRef.Group -> scope.signal(ref.path).asString()
+      is FieldRef.Group -> groupProperty(ref.path).asString()
       is FieldRef.Parent -> scope.signal("parent").field(ref.path).asString()
       is FieldRef.Signal -> signalText(ref.expression) ?: ""
       is FieldRef.Datum -> datum.field(ref.path).asString()
@@ -1020,7 +1107,7 @@ public class MarkEncoder(
   private fun VegaValue.fieldOf(ref: FieldRef): VegaValue =
     when (ref) {
       is FieldRef.Plain -> field(ref.path)
-      is FieldRef.Group -> scope.signal(ref.path)
+      is FieldRef.Group -> groupProperty(ref.path)
       is FieldRef.Parent -> scope.signal("parent").field(ref.path)
       is FieldRef.Signal -> {
         val name = signalText(ref.expression)
@@ -1045,6 +1132,24 @@ public class MarkEncoder(
           null
         }
     }
+
+  /**
+   * The pixels an `image` channel resolves to, as a `heatmap` writes them.
+   *
+   * `{width, height, pixels}` with each pixel packed `0xAARRGGBB`. Anything else is not an image
+   * and is left to the `url` path, which reports if there is nothing there either.
+   */
+  private fun rasterOf(channel: ChannelValue?, datum: VegaValue): RasterImage? =
+    rasterFrom(channel?.let { value(it, datum) } ?: VegaValue.Null)
+
+  private fun rasterFrom(value: VegaValue): RasterImage? {
+    val resolved = value as? VegaValue.Obj ?: return null
+    val width = resolved.fields["width"]?.asDouble()?.toInt() ?: return null
+    val height = resolved.fields["height"]?.asDouble()?.toInt() ?: return null
+    val pixels = (resolved.fields["pixels"] as? VegaValue.Arr)?.values ?: return null
+    if (width < 0 || height < 0 || pixels.size != width * height) return null
+    return RasterImage(width, height, IntArray(pixels.size) { pixels[it].asDouble().toInt() })
+  }
 
   private fun metadata(
     spec: MarkSpec,

@@ -56,15 +56,23 @@ done
 # rather than geometry, so the mark comparison cannot see them; harvesting them from the same renders
 # gives them a reference of their own that stays in step with the fixtures.
 echo "==> Harvesting guide captions"
-python3 - "$SCENE_DIR" "$REFERENCE_DIR/guide-captions.json" <<'PYTHON'
-import glob, json, os, re, sys
-scene_dir, out = sys.argv[1], sys.argv[2]
+python3 - "$SCENE_DIR" "$REFERENCE_DIR/guide-captions.json" "$FIXTURES" <<'PYTHON'
+import glob, html, json, os, re, sys
+scene_dir, out, fixtures = sys.argv[1], sys.argv[2], sys.argv[3]
+# Only the fixtures that exist *now*. The scene directory is build output and is never cleaned, so a
+# fixture that has been deleted leaves its SVG behind and would keep contributing a caption nothing
+# can produce any more — a reference that fails for a chart nobody has.
+current = {os.path.basename(p)[:-len('.vg.json')] for p in glob.glob(os.path.join(fixtures, '*.vg.json'))}
 rows = []
 for path in sorted(glob.glob(os.path.join(scene_dir, '*.svg'))):
+    if os.path.basename(path)[:-4] not in current:
+        continue
     svg = open(path).read()
     for m in re.finditer(r'aria-roledescription="(axis|legend|title|subtitle)" aria-label="([^"]*)"', svg):
+        # The caption a reader hears, not its XML spelling: an ampersand in a legend title arrives
+        # here as `&amp;` because it came out of an attribute, and the engine never escapes one.
         rows.append({"fixture": os.path.basename(path)[:-4],
-                     "kind": m.group(1), "caption": m.group(2)})
+                     "kind": m.group(1), "caption": html.unescape(m.group(2))})
 json.dump(rows, open(out, 'w'), indent=1, ensure_ascii=False)
 print(f"Wrote {len(rows)} guide caption(s) to {out}")
 PYTHON

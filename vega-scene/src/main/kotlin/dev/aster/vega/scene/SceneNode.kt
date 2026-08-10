@@ -250,6 +250,16 @@ public data class RuleNode(
 public data class PathNode(
   override val id: SceneNodeId,
   val path: PathData,
+  /**
+   * Whether the mark has **no** outline at all, as against one that draws nothing.
+   *
+   * Upstream distinguishes the two and they measure differently: `item.path == null` gives bounds
+   * of exactly `(0, 0, 0, 0)`, while a non-null string that happens to draw nothing leaves the
+   * bounds empty. A `geopath` over a geometry with no coordinates is the first — d3's path
+   * generator returns null — and a `linkpath` writing an empty string is the second, which is why
+   * Vega's labelled donut and its contour plot disagree about the same-looking mark.
+   */
+  val absent: Boolean = false,
   val fill: Fill? = null,
   val stroke: Stroke? = null,
   override val transform: Transform2D = Transform2D.Identity,
@@ -261,6 +271,7 @@ public data class PathNode(
 
   override val bounds: RectD by
     lazy(LazyThreadSafetyMode.NONE) {
+      if (absent) return@lazy RectD(0.0, 0.0, 0.0, 0.0)
       val base = path.bounds
       // A miter join can extend past halfWidth; the miter limit bounds how far.
       val expansion =
@@ -362,8 +373,17 @@ public data class TextNode(
 
   override val bounds: RectD by
     lazy(LazyThreadSafetyMode.NONE) {
-      val placed = layout.bounds.translate(x, y)
-      if (angleDegrees == 0.0) placed.normalized() else rotatedAbout(placed, x, y).normalized()
+      // Upstream's `anchorPoint` reads `item.x || 0`, and `NaN` is falsy — so a text item whose
+      // position was never computed is *measured* at the origin even though nothing is drawn there.
+      // An axis's `tickExtra` label is exactly that: it scales a value its datum does not carry, so
+      // its scene position is `NaN`, its bounds are the box an empty string occupies at the origin,
+      // and its renderer emits no element at all. All three have to be reproduced together —
+      // keeping the `NaN` out of the bounds loses five units of chart height, and letting it into a
+      // `min` or a `max` poisons every measurement above it.
+      val ax = if (x.isNaN()) 0.0 else x
+      val ay = if (y.isNaN()) 0.0 else y
+      val placed = layout.bounds.translate(ax, ay)
+      if (angleDegrees == 0.0) placed.normalized() else rotatedAbout(placed, ax, ay).normalized()
     }
 
   /**
@@ -445,6 +465,14 @@ public enum class ImageFit {
 public data class ImageNode(
   override val id: SceneNodeId,
   val url: String,
+  /**
+   * Pixels the mark carries rather than an address it points at.
+   *
+   * A `heatmap` produces one. When it is set the [url] is empty and the renderer draws these
+   * directly — upstream's equivalent is a `<canvas>` on the scene item, which a renderer that has
+   * to work without one cannot use.
+   */
+  val raster: RasterImage? = null,
   val x: Double,
   val y: Double,
   val width: Double,

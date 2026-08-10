@@ -16,11 +16,11 @@ import dev.aster.vega.scene.displayText
  * Reproduces upstream Vega's text measurement when it runs without a canvas.
  *
  * Vega's `vega-scenegraph` falls back to `~~(0.8 * text.length * fontSize)` — truncated, not
- * rounded — with a line height of `fontSize` when no canvas is available, which is the situation in
- * the Node oracle. Matching it exactly is what lets differential tests compare **layout** as well
- * as geometry: under `autosize: pad` the surface size depends on how wide the axis labels are, so
- * without this the two engines would disagree on every chart's overall size for reasons that have
- * nothing to do with the port's correctness.
+ * rounded — with a line height of `fontSize + 2` when no canvas is available, which is the
+ * situation in the Node oracle. Matching it exactly is what lets differential tests compare
+ * **layout** as well as geometry: under `autosize: pad` the surface size depends on how wide the
+ * axis labels are, so without this the two engines would disagree on every chart's overall size for
+ * reasons that have nothing to do with the port's correctness.
  *
  * This is a comparison engine, not a rendering one. It deliberately matches a crude approximation
  * and must never be used to lay out a chart for display — real text metrics come from
@@ -36,7 +36,10 @@ public class VegaHeadlessTextEngine : TextEngine {
     val fontSize = text.style.fontSize
     // Vega's fallback ignores wrapping entirely; only explicit newlines break a line.
     val lines = text.displayText { estimateWidth(it, fontSize) }.split('\n')
-    val lineHeight = text.style.lineHeight ?: fontSize
+    // `fontSize + 2`, which is `vega-scenegraph`'s `lineHeight(item)`. It had been the font size
+    // alone, and nothing noticed until a legend title arrived with two lines in it: a chart with
+    // one line per label measures the same either way.
+    val lineHeight = text.style.lineHeight ?: (fontSize + 2.0)
 
     val measured = lines.map { line -> TextLine(line, estimateWidth(line, fontSize), 0.0) }
     val positioned = measured.mapIndexed { index, line ->

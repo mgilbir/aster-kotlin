@@ -34,6 +34,16 @@ public interface TransformContext {
   public fun scopeFor(datum: VegaValue): ExpressionScope
 
   /**
+   * A cartographic projection this scope defines, with its signals already resolved.
+   *
+   * Named like a scale and reached like one, but it is not one: a `geoshape` transform asks for it
+   * by name and gets a description rather than a function, because the projection itself is a
+   * stream pipeline this module builds. A scope with no projections answers null to everything,
+   * which is what a bare transform pipeline should do.
+   */
+  public fun projection(name: String): ProjectionDefinition? = null
+
+  /**
    * The tree a `stratify` or `nest` built, for a layout transform later in the same pipeline.
    *
    * It rides on the pipeline rather than on the tuples because that is where it lives: a
@@ -261,6 +271,15 @@ public class TransformRegistry(transforms: List<Transform>) {
           TreeTransform,
           TreeLinksTransform,
           LinkPathTransform,
+          CrossFilterTransform,
+          ResolveFilterTransform,
+          IsocontourTransform,
+          GeoPathTransform,
+          Kde2dTransform,
+          HeatmapTransform,
+          ForceTransform,
+          GeoShapeTransform,
+          GraticuleTransform,
         )
       )
   }

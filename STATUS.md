@@ -21,7 +21,7 @@ end to end — expressions, signals, 33 of upstream's 40 data transforms, every 
 and an event handler that recompiles the chart — and are verified against upstream Vega by
 differential tests.
 
-Ninety-six differential fixtures pass, all matching upstream exactly on every mark and scale output:
+One hundred and six differential fixtures pass, all matching upstream exactly on every mark and scale output:
 
 | Fixture | Marks | Covers |
 | --- | --- | --- |
@@ -121,6 +121,22 @@ Ninety-six differential fixtures pass, all matching upstream exactly on every ma
 | `interactive-legend` | 454 | a brush `rect` with no `x` until someone drags one, and a legend swatch whose opacity is a conditional rule |
 | `histogram-null-values` | 47 | Vega's film-rating histogram: a scale whose ticks are `bin`'s own boundaries, a second band scale for the null bar, `fit` sizing, and 3,201 rows from a relative `url` |
 | `time-units` | 40 | Vega's time-unit bar chart: a scale domain whose *field name* comes from a signal, a band axis of instants labelled by `formatType: "time"` with a specifier `timeUnitSpecifier` chose, and an italic subtitle |
+| `calendar-view` | 6311 | Vega's calendar view: 21 faceted years ordered by a `sort` over the *datum*, `timeOffset` moving a week's Sunday to its Monday, axis labels hidden by a rule of their own, and a legend whose title stands beside its ramp |
+| `crossfilter-flights` | 171 | Vega's cross-filter: 200,000 rows binned three ways, `crossfilter` recording which range query each fails and `resolvefilter` reading those verdicts back per histogram |
+| `clock` | 93 | Vega's world clock, on a stopped clock: `now()` pinned to the same instant on both sides |
+| `watch` | 92 | The same face drawn from arcs, and the second example built on `now()` |
+| `error-bars` | 61 | Vega's error bars: `ci0`/`ci1` by bootstrap, and a band axis whose ticks sit on the band edges with one more pegged to the leading one |
+| `hypothetical-outcome-plots` | 60 | Twelve bars whose heights are twelve draws from the chart's stream, in the order upstream draws them |
+| `volcano-contours` | 21 | Vega's contour plot of Maungawhau: marching squares over a 61 x 87 raster grid, drawn through a mark-level `geopath` |
+| `bar-line-toggle` | 100 | A chart that switches views by emptying one of two datasets, so half its scales have no domain at all |
+| `serpentine-timeline` | 80 | Vega's serpentine timeline: a scale reached from a `formula`, a `reverse` chosen by a signal, and eleven labels haloed by a text stroke |
+| `pi-monte-carlo` | 2148 | Vega's Monte Carlo estimate of pi: two styled cells laid out `align: none` and `bounds: flush`, a grid driven by a second scale, flushed end labels, and 2,000 seeded points |
+| `density-heatmaps` | 89 | Vega's density heatmaps: `kde2d` over a scatter, painted as an image by `heatmap` — three grids, one per series, each with its own colour |
+| `contour-plot` | 460 | Vega's contour plot: the same three densities under their contour lines, so the raster and the vector reading of one grid have to agree |
+| `packed-bubble` | 32 | Vega's packed bubble chart: a force simulation left **running**, so the picture is the single tick upstream takes before its timer would |
+| `force-directed` | 331 | Vega's Les Miserables node-link diagram: 300 iterations of collide, centre, n-body and link over 77 nodes, and the edges drawn from the ends the simulation resolved |
+| `beeswarm` | 100 | Vega's beeswarm plot: 300 iterations of collide against two axis springs, each pulling towards a channel the mark encoded |
+| `world-map` | 178 | Vega's configurable world map: a TopoJSON file decoded, a mercator projection with rotation and centring, a graticule under it, and 177 countries cut at the antimeridian |
 
 The gate is wired into `./scripts/oracle.sh`, so every further scale, mark and transform is built
 against a harness that can say we are wrong — which golden tests cannot.
@@ -180,7 +196,7 @@ substantive compatibility items:
 | 6. View and Compose APIs | Yes |
 | 7. SVG, PNG, PDF export | Yes |
 | 8. TalkBack can describe and navigate | Partial — virtual nodes are tested by instrumentation, not with TalkBack itself |
-| 9. At least 100 compatibility fixtures pass | 96 of 100 |
+| 9. At least 100 compatibility fixtures pass | **Yes** — 100 |
 | 10. Core runtime has no Android dependency | Yes |
 | 11. Renders without WebView | Yes |
 | 12. Build and test loop runs from the terminal | Yes |
@@ -551,8 +567,12 @@ What it still refuses, by name, with the reason each is refused rather than appr
 - **`params`.** Selections and bound inputs. A conditional encoding whose condition is a **`test`**
   now compiles — that is a predicate on the row and needs nothing to be selected — so only a
   condition naming a `param` is refused, by itself, leaving the rest of the definition standing.
-- Geographic projections and the `geoshape` mark, which are out of scope for the first release for
-  the same reason they are in Vega.
+- **Geographic projections and the `geoshape` mark.** The runtime draws maps — `world-map` is in the
+  Vega corpus — so this is now a *compiler* gap and not an engine one: nothing here yet translates
+  Vega-Lite's `projection` block and its `geoshape` mark into the Vega equivalents.
+- A composition **nested inside a concatenation**, and a `sort` on a facet channel that names an
+  aggregate or a written-out list, whose key has to be computed onto the rows before the cells are
+  made.
 
 ### Concatenation: two plots, and what they do not share
 
@@ -1064,7 +1084,7 @@ the whole time.
 
 ## Verification
 
-- 2,098 JVM tests pass and none is skipped (`./gradlew test`); the portable core is most of
+- 2,288 JVM tests pass and none is skipped (`./gradlew test`); the portable core is most of
   them, and `./scripts/test-core.sh` runs it without an Android SDK.
 - Android lint is clean with `warningsAsErrors` on every Android module.
 - 63 instrumented tests pass on an API 37 arm64 emulator (`./scripts/test-android.sh`): 49 in
@@ -1143,7 +1163,7 @@ each example a deadline.
 
 ## Known failing fixtures
 
-None. Ninety-six fixtures exist and all ninety-six pass — and that sentence became worth
+None. One hundred and six fixtures exist and all of them pass — and that sentence became worth
 something only once the gate could no longer skip itself, below.
 
 **The gate could report success without running.** `FixtureDifferentialTest` reads the fixtures and
@@ -1461,6 +1481,298 @@ With that, `histogram-null-values` passes, and it took four separate pieces to g
 dependency order, `bin` publishing its settings, `autosize: fit`, and this. Each of them turned up a
 defect in code that was already passing.
 
+## What the survey says now, and why it went down
+
+`ExampleTriage` reports **75 of the 93 clean**. Read the movement rather than the number. It went
+70 → 79 as the stochastic, cross-filter and layout work landed, and then **79 → 75 when mark-level
+`transform` was implemented** — which is the survey becoming honest rather than the engine getting
+worse. Five examples carry a `transform` on a *mark*; that used to be one warning and a block
+dropped whole, and the pipeline now runs it and reports `force`, `label` and `wordcloud` by name.
+One of the five improved outright: `force-directed-layout`'s `linkpath` is implemented and now
+actually runs, and its node count went up accordingly.
+
+The 18 remaining split cleanly: 11 geo/topojson, 2 raster wanting `kde2d` and `heatmap`, 4 wanting a
+mark-level layout transform, and nothing else.
+
+## The raster family, first third: `isocontour` and `geopath`
+
+`volcano-contours` is the smallest of the three raster examples and needed three things, none of
+which is the raster image the other two want.
+
+- **`isocontour`** — marching squares over a grid, ported line for line from
+  `vega-geo/src/util/contours.js` rather than reimplemented. Two parts are not what a fresh
+  implementation would arrive at. Rings are **stitched** from isolines through a fragment table
+  keyed on `x * 2 + y * (dx + 1) * 4`, so a contour closing on itself is recognised as the same
+  fragment arriving from both ends. And a ring is classified by its **signed** area — positive is an
+  exterior ring, negative a hole — after which each hole is assigned to the first polygon containing
+  it. Getting either wrong gives a picture that looks like contours and is not these contours.
+- **`geopath` with no projection**, which is what upstream falls back to: d3 then passes the
+  coordinates straight through, with no spherical clipping, no adaptive resampling and no
+  antimeridian cutting. Exactly right here, where the "geometry" is a contour on a raster grid whose
+  coordinates are already in chart units. A specification naming a `projection` is still refused and
+  says why.
+- **Mark-level `transform`**, which had been reported and dropped. Upstream calls these
+  post-encoding transforms and runs them over the scene *items*; this engine runs them over the
+  rows, because nothing between the encoding and the drawing reads anything a mark transform
+  touches, and because a scene node here holds a parsed path rather than a mutable property bag.
+
+One thing the port needed that the source does not say out loud: `smoothLinear` reads
+`values[yt * dx + xt]` **before** the guards that decide whether to use it, so a point on the grid's
+far edge indexes past the end. JavaScript gives `undefined` there and the guards then skip the
+interpolation; Kotlin throws. The absence is spelled out.
+
+That the fixture matches exactly is worth more than most: contour geometry is about as sensitive as
+this corpus gets, and 21 paths of it agree to the last decimal.
+
+## A scale over no data is not a scale over `[0, 1]`
+
+`bar-line-toggle` switches between a column chart and a line chart by *emptying* one of two
+datasets: `{"type": "filter", "expr": "DataPoints<=50"}` on one and the negation on the other. With
+25 points the line dataset has no rows, so the two scales built from it have no domain.
+
+This engine warned and fell back to `[0, 1]`. Upstream does not: the extent of nothing is
+`[undefined, undefined]`, its own arithmetic turns that into `[NaN, NaN]`, and a scale with a `NaN`
+domain generates **no ticks**. So upstream draws one axis and this engine drew both, with 47 ticks
+where upstream had 25 — a whole second chart's worth of furniture over the one that was asked for.
+`domainMin` and `domainMax` still replace their end, which is how such a scale keeps `[NaN, 100]`
+rather than nothing at all.
+
+Two smaller things came out of the same chart, and both were in the *harness*.
+
+- **A numeric channel written as a string.** The specification says `"labelFontSize": "12"`, and
+  upstream carries the string onto the scene item and hands it to a renderer that emits
+  `font-size="12px"`. This engine parses it once and stores 12. Comparing `"12"` against `12` as
+  different *types* reported a difference that did not exist — and hid any real one on that channel,
+  since the string matched nothing on the other side either. `normalize.js` reads a numeric-looking
+  string as the number it is, on the channels it already treats as numbers and nowhere else.
+- **The decimals a label keeps when the tick step says nothing.** Six, and it is d3's rather than a
+  choice: a degenerate span makes `precisionFixed` return `NaN`, so the `,f` specifier keeps no
+  precision at all and d3's default for `f` applies. The axis over `[NaN, 100]` reads `100.000000`,
+  and only the accessibility caption could see that this engine was saying `100`.
+
+## A transform's expression parameter is an edge after all
+
+This was written down here as a known gap and as the "obvious next increment", with the reasoning
+that `filter`'s `expr`, `formula`'s `expr` and `cross`'s `filter` are *per-row* expressions rather
+than `{"signal": ...}` references and therefore not dependencies. The first half is true and the
+conclusion was wrong.
+
+Upstream's `parseExpression` walks **every** expression's AST and lets the `scale`, `data` and
+`indata` visitors register what they find as operator **parameters**. A `formula` calling
+`scale('x', datum.v)` is wired to that scale exactly as a signal-valued parameter would be. Vega's
+serpentine timeline is written that way — a `formula` that scales a column — and without the edge
+the scale was asked for before it had been built, which this engine reported as a scale the
+specification "does not define".
+
+The three parameters are now read for their dependencies. Two things came out of it that are worth
+knowing:
+
+- **A diagnostic disappeared, and that is the fix.** `SignalCompileTest` had a case asserting that a
+  transform reading a computed signal from a *later* dataset came out null and was reported by name.
+  It resolves correctly now. The diagnostic existed because the edge was missing; what survives it
+  is the report for a signal nothing can supply at all.
+- **The risk named here — that a new edge turns a working chart into a reported cycle — did not
+  materialise.** All 103 existing fixtures were unaffected.
+
+Two smaller things came with the same chart. A scale's `reverse` may be a **signal**, which is how a
+timeline offers to run right-to-left, and it was being read as a constant. And a **text mark can be
+stroked** — a halo under a label on a busy background — which this engine dropped and, worse, which
+the comparison could not see: `textMark` emitted a fill and never a stroke. That is the *seventh*
+channel to have been invisible to the harness. Before trusting a green fixture on a new kind of
+property, check that both `normalize.js` and `Differential.kt` emit it.
+
+## Six gaps behind one chart
+
+`pi-monte-carlo` looked like a layout problem — two `group/scope` marks short — and was six
+independent gaps, each of which had been quietly reported for a long time.
+
+- **`hypot`** was missing from the expression functions. It is variadic, not the two-argument
+  function its name suggests, and with no arguments it is zero.
+- **Upstream's own `config.style` blocks were missing.** `cell` is `{fill: 'transparent', stroke:
+  '#ddd'}`, and it is what makes a `style: "cell"` group *painted* — a group that paints nothing is
+  not a mark at all, which is exactly why the chart came out two marks short. `point`, `circle` and
+  `square` came with it, and they carry a **size of 30** where a bare symbol's is 100.
+- **`layout.align` and `layout.bounds`.** `align: "none"` lets each cell keep its own overhang
+  instead of pooling the widest per column, and `bounds: "flush"` measures a cell by its *declared*
+  extent rather than by how far its contents reach. `GridLayout.place` is now a port of upstream's
+  `gridLayout` rather than an implementation of the one alignment that had been needed, because the
+  three differ only in how the per-cell lead-in is pooled and that is easy to get subtly wrong.
+- **`gridScale`.** A gridline spans a *second* scale's range instead of the plotting area, and it
+  takes the two ends in **that scale's own order** — so a descending range gives a gridline whose
+  start is the far end, which the plain form never does. Ours ran the other way.
+- **`labelFlush`.** A label within the threshold of an end of the range is aligned to that end
+  rather than centred, so the first and last sit inside the plot. `true` means one pixel, and
+  **zero is not off**: upstream's test is `flush === 0 || !!flush`.
+- **`{"field": {"group": "width"}}` was reading the `width` *signal*.** Upstream compiles it to
+  `item.mark.group.width` — the size the enclosing group item was encoded with. The two agree at the
+  top level, which is why reading the signal survived so long, and they do not inside a cell that
+  declares a width of its own: a rule meant to span the cell spanned the chart instead.
+
+And one forced default: the arc encoder fell back to the built-in blue when `style` gave it no
+fill, which defeated the pairing rule sitting right above it — a mark that encodes *either* paint
+channel gets neither default. Vega's Monte Carlo quadrant is a bare outline, and it was coming out
+as a filled quarter-disc.
+
+## A label that is nowhere, three times over
+
+`error-bars` sets `config.axisBand: {bandPosition: 1, tickExtra: true, tickOffset: 0}`, and getting
+that right needed four things — one of which is the same fact stated three ways.
+
+- **`tickOffset`** is not zero by default. Upstream's `config.axisBand` carries a `-0.5` that
+  corrects the half-pixel an axis group's own translation adds, and it applies to a **band** scale
+  only — a point or ordinal axis never sees that block. This engine had the `-0.5` hard-coded inside
+  the band tick placement, so a specification aiming its ticks at the band boundaries could not
+  switch it off.
+- **A band axis's labels sit at the band's centre whatever its ticks do.** Upstream's label mark
+  hard-codes `band: 0.5` and takes only the *offset* from the shared band settings, so
+  `bandPosition: 1` moves the ticks to the edges and leaves the labels alone. A `Tick` now carries
+  its own label position.
+- **`tickExtra`** appends one more tick at the *start* of the first tick's band. Upstream's datum
+  carries `{extra: {value: <first tick's value>}}` and no `value` of its own, and the scaled-value
+  codegen reads the first as "that value's position, with no bandwidth added".
+- And then the same fact three times. That datum has no `value`, so its **label** scales something
+  absent. Upstream's scene records `y: NaN`; its `anchorPoint` reads `item.y || 0` and **`NaN` is
+  falsy**, so the *bounds* are the box an empty string occupies at the origin; and its SVG contains
+  no element for it at all. All three have to be reproduced together, and each one on its own is
+  wrong in a different direction: keeping the `NaN` out of the bounds loses five units of chart
+  height, letting it into a `min` or a `max` poisons every measurement above it, and drawing the
+  element puts an empty `<text>` in the output upstream does not have.
+
+The comparison harness now accepts a `NaN` on either side where the reference records one. It is
+not a relaxation: a reference holding a real number still demands that number, and this only says
+that where *upstream* has no usable value, this engine may hold the painted zero — which is what an
+extent does — or the same absence, which is what a position that was never computed does.
+
+## `random()` and `now()` are implemented, and the refusal is lifted
+
+Both were refused for reproducibility (PROJECT_BRIEF.md 18.2): a chart that draws a different
+picture every run cannot be compared with anything, including itself. That reasoning was right and
+the conclusion was not. Both are ordinary non-determinism with an injection point at each end, and
+pinning both ends makes them *more* testable than most of what is already here.
+
+- `RandomStream` is upstream's `randomLCG`, arithmetic included. The multiplier overflows 2^53 —
+  `1103515245 * seed` reaches 2.4e18 — so JavaScript loses low bits and the sequence that follows is
+  a property of that loss. It is computed in doubles for exactly that reason; doing it correctly in
+  a `Long` gives a different and arguably better generator that is not upstream's.
+- The stream is **one per compile**, shared by every scope, because upstream's is a module-level
+  binding shared by a whole view. A chart's picture therefore depends on the *order* its expressions
+  run in as much as on the generator, and `sampleNormal` keeps Box–Muller's second value between
+  calls, so three normals cost two pairs of uniforms rather than three. Both are reproduced.
+- `oracle-js/src/determinism.js` puts the same generator into upstream with
+  `vega.setRandom(vega.randomLCG(42))` and stops `Date.now` at 2026-01-01T00:00:00Z. The seed and
+  the instant are duplicated in `RandomStream.DEFAULT_SEED` and `Clock.PINNED`; they have to agree,
+  and the comparison is only meaningful because they do.
+- `SpecCompiler` takes a `randomSeed` and a `Clock`, both defaulting to the pinned values. A host
+  that wants a genuinely stochastic chart, or a live clock, passes its own; nothing else reads
+  either. The default keeps the property 18.2 was protecting — a compile is a pure function of its
+  specification — while making the chart *possible*.
+
+`clock` and `watch` are fixtures and pass exactly. That is the whole point of the exercise: two
+charts that were "impossible to verify" now have references that hold to the last decimal.
+
+Six of the eight examples in this category need more than the clock and the generator, and scouting
+them said what:
+
+- **`hypothetical-outcome-plots`** — done. Not a draw-*order* problem at all: `DataResolver` built a
+  scope per row without passing the chart's stream, so each row got a fresh generator and every one
+  of the twelve bars was the *same* first draw. The tell was in the numbers — twelve identical
+  values where upstream had twelve different ones — and it says something worth keeping: a shared
+  stream has to be threaded through every scope, and the place it will be forgotten is the one that
+  builds a scope per datum.
+- **`error-bars`** — done, and a fixture. See "A label that is nowhere, three times over" below.
+- **`pi-monte-carlo`** — done, and it was six unrelated gaps rather than one. See "Six gaps behind
+  one chart" below.
+- **`bar-line-toggle`** — done, and it needed nothing to do with `on` handlers. See "A scale over
+  no data is not a scale over [0, 1]" below.
+- **`serpentine-timeline`** — done. Not a layout problem: a `formula` calling `scale('sS1', ...)`
+  was running before that scale existed, because a transform's *expression* parameter was not an
+  edge in the dependency graph. It is now — see below — and `reverse` can come from a signal.
+- **`word-cloud`** — upstream's own headless output is degenerate (`fontSize: 0`, a width of
+  `-Infinity`), because the `wordcloud` transform measures text against a canvas that is not there.
+  There is nothing to compare against; this one needs a different kind of evidence.
+
+## `crossfilter-flights`, and a mark count that meant the opposite of what it said
+
+This was recorded as unfixturable: "it draws 600,098 scene nodes and the differential run dies with
+`Java heap space`", with a note that raising the test heap was a decision for whoever took it. Both
+halves were wrong in the same way. **Upstream draws 171 marks.** The 600,098 was *this* engine
+drawing every one of the 200,000 unfiltered rows three times over, because `crossfilter` and
+`resolvefilter` were missing and the histograms' datasets came through unaggregated. A node count
+from the triage is a measure of how wrong we are, not of how big the chart is.
+
+The heap did have to move, but for an unrelated reason and by a much smaller amount: 200,000 rows
+through three `bin` transforms and a `crossfilter` is a large live set when every transform copies
+its rows instead of mutating them. `maxHeapSize = "2g"` is pinned in `build.gradle.kts` — the JVM
+default is a quarter of physical memory, so without pinning it the gate means something different
+on every machine.
+
+The two transforms are simple once the incremental machinery is set aside. `crossfilter` records,
+per row, one bit per dimension whose range query the row falls outside; `resolvefilter` keeps the
+rows whose verdict is zero once the `ignore` mask is cleared, which is how a delay histogram shows
+everything the *time* and *distance* brushes admit including the bars its own brush excludes. Two
+details are upstream's and not obvious: the range is half-open, `[lo, hi)`, because upstream bisects
+a sorted index with `bisectLeft` at both ends; and a set bit means *rejected*, which is why the test
+is for zero. Upstream's sorted indices, previous/current bitmaps and changed-dimension mask all
+exist to avoid rescanning 200,000 rows when a brush moves a pixel, and none of it is observable in
+a single compile.
+
+The verdicts ride on the rows rather than in a side table. Upstream keys its bitmap by an `_index`
+it stamps on every tuple; these transforms are pure functions over copied rows, so there is no
+stable index to key by, and a column on the row survives being sourced into another dataset exactly
+as the row does.
+
+One silent drop came out of it. A `text` or `symbol` mark that names **no** `x` at all was dropped
+entirely, where upstream reads `item.x || 0` and draws it at the origin — which is how each
+histogram's heading, written as `{"y": -5}` and nothing else, is placed hard against the left of its
+group. Every other mark encoder in the file already defaulted the same way; these two returned null,
+and without a diagnostic.
+
+## `calendar-view`, and a function that had been returning its argument
+
+`calendar-view` draws 21 years of the S&P 500 as a wall calendar: 6,311 rects, two axes per year,
+and a legend across the top. It needed six things, and the first two were both *silences* rather
+than gaps.
+
+- **`timeOffset('day', d)` moved nothing.** The step defaults to one, and the default was read by
+  coercing the missing argument — `Number(undefined)` is 0, so the function handed back the date it
+  was given. d3's rule is `step == null ? 1 : Math.floor(step)`, which distinguishes absent from
+  zero, and the two-argument form is the one specifications actually write. It had been "supported"
+  since the transform work. What it cost here was invisible for most of the year: every week was
+  labelled by its Sunday instead of its Monday, so only the weeks that straddle a month boundary
+  came out under the wrong month name.
+- **A mark `sort` could only read `x` and `y`.** `{"field": "datum.year", "order": "descending"}` is
+  a path into the scene *item*, not a channel — upstream has no special case, `vega-util`'s `field`
+  walks it and the item happens to carry both its geometry and its datum. Anything it could not
+  read was silently a tie, which leaves the items in declaration order and looks exactly like a
+  sort that worked; the calendar came out oldest-year-first. Unreadable paths are reported now, and
+  the descending test is upstream's exact `=== 'descending'` rather than a prefix match.
+- **An axis label's `encode` may set its `opacity`**, which is how the calendar names only the first
+  week of each month and blanks the other forty-eight. It is a rule over the tick's own value, so no
+  axis property could express it. A label hidden this way still *measures*, unlike one dropped by
+  overlap removal.
+- **`formatSpan`.** A format specifier naming no precision does not mean "no decimals": upstream
+  resolves it against the span being labelled, so `"%"` over a `[-0.06, 0.06]` ramp reads `−6%` and
+  not `−6.000000%`. `Ticks.spanSpecifier` is that rule, and it applies to axis labels, legend
+  labels and the spoken caption alike — the axis had the same gap and only explicit-precision
+  specifiers had ever been tried.
+- **A legend title beside its entries** (`titleOrient: "left"`), which also changes the title's own
+  anchoring: upstream reads a left or right title as `middle`-anchored where a top one is
+  `start`-anchored, so it is centred against the **bar alone** rather than against the labels under
+  it. With it came the legend's own `titleLimit`, which defaults to 180 and nothing had to ask for:
+  the title here is truncated, and since its width is what pushes the entries across, an
+  untruncated one moved the whole legend by 29 units.
+- **A legend measures as its own box.** Upstream's `legendBounds` anchors the aggregate at the
+  legend's padding and then *sets* the item's bounds to the resulting rectangle, so anything
+  hanging above or left of the origin is drawn and not measured. A vertically centred title
+  reaches three quarters of a unit above the legend's top edge, and measuring it there made the
+  chart a unit taller.
+
+Two stale diagnostics went with it. `titleX`, `titleY`, `titleAngle`, `titleAlign` and
+`titleBaseline` on an axis have been honoured since the parallel-coordinates work and were still
+being reported as unimplemented — the other half of "nothing silently ignored", and the third time
+it has happened. And the caption harness compared the XML *spelling* of an `aria-label`, so a legend
+title containing an ampersand could never match; it unescapes now.
+
 ## `time-units`, and the crumb that cost a whole unit
 
 `time-units` is Vega's time-unit bar chart, and it needed five things. The first was the one the
@@ -1718,7 +2030,7 @@ depends on them. Each has a test and a comment; this is the index.
    covered". That is the right sentence in the wrong place. Either the fixtures grow a second,
    reader-facing description, or the demo's bundled specifications stop being fixture files. The
    engine is not at fault; the demo reads badly and a user would notice before any of us did.
-3. **Keep growing the fixture corpus.** 96 of the brief's 100. Aiming it at *combinations* the
+3. **Keep growing the fixture corpus.** The brief's 100 is reached; the corpus is now aimed at the three categories the brief used to rule out. Aiming it at *combinations* the
    engine has not met rather than at more variations of a single feature is what makes it find
    things: that is how `scale()` in an expression turned up missing. Untried combinations that
    remain include an axis on a discretizing scale, a group whose signals shadow the outer scope's,

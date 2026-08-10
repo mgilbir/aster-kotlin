@@ -28,6 +28,8 @@ public data class VegaSpec(
   /** Automatic grid placement for this scope's group-mark cells. */
   val layout: LayoutSpec?,
   val marks: List<MarkSpec>,
+  /** Cartographic projections this scope defines, by name. */
+  val projections: List<ProjectionSpec> = emptyList(),
   /**
    * The chart's own group item: the frame every mark is drawn inside.
    *
@@ -238,6 +240,12 @@ public data class DataSpec(
   val property: String? = null,
   /** `format.delimiter` for a `dsv` file. */
   val delimiter: String? = null,
+  /** `format.feature`: which object of a TopoJSON file to decode, as one feature per geometry. */
+  val feature: String? = null,
+  /** `format.mesh`: the same object's arcs as a single line string, each drawn once. */
+  val mesh: String? = null,
+  /** `format.filter` for a mesh: `interior` for the shared borders, `exterior` for the outline. */
+  val meshFilter: String? = null,
 )
 
 public enum class ScaleType {
@@ -456,6 +464,13 @@ public data class ScaleSpec(
   val domainMid: NumberValue? = null,
   val range: RangeSpec,
   val reverse: Boolean = false,
+  /**
+   * `reverse: {"signal": "..."}` — a control flips the scale.
+   *
+   * A timeline that can run right-to-left is written this way, and there is nothing constant to
+   * write down. Resolved when the scale is built, like every other signal-valued scale property.
+   */
+  val reverseSignal: String? = null,
   val round: Boolean = false,
   val clamp: Boolean = false,
   val nice: Boolean = false,
@@ -668,24 +683,6 @@ public data class AxisSpec(
    * its config sits in the `legend` block, not the `axis` one.
    */
   val labelOverlap: String? = null,
-  /**
-   * `labelFlush`: how close to an end of the range a label has to be to be hung from that end.
-   *
-   * `true` means one unit, a number means that many, and `false` — or an absent value — means the
-   * labels at the ends straddle them like every other label. Vega-Lite asks for it on every
-   * continuous horizontal axis, which is why a chart it compiled has its first and last label
-   * tucked inside the plot.
-   */
-  val labelFlush: Double? = null,
-  /**
-   * `gridScale`: the scale whose range this axis's gridlines span.
-   *
-   * An axis's gridlines cross the plot, so their length is the *other* scale's range — and their
-   * direction is that range's direction. A Vega-Lite chart names it on every gridline axis, which
-   * is how a horizontal axis's gridlines come out running from the top of the plot down to the axis
-   * rather than the other way about.
-   */
-  val gridScale: String? = null,
   val labelSeparation: NumberValue? = null,
   /**
    * `labelAngle`, in degrees, turning each label about its own anchor.
@@ -730,6 +727,51 @@ public data class AxisSpec(
    * `encode` block, which is what Vega's own budget example does.
    */
   val bandPosition: NumberValue? = null,
+  /**
+   * How far a tick and its gridline are nudged along the axis, after [bandPosition] has placed it.
+   *
+   * Zero on an ordinary axis and **-0.5 on a band one**, which is upstream's `config.axisBand`
+   * correcting the half-pixel the axis group's own translation adds. A specification that wants
+   * ticks on the band boundaries sets `bandPosition: 1` *and* `tickOffset: 0`, because the
+   * correction would otherwise pull them half a pixel off the edge they were aimed at.
+   */
+  val tickOffset: NumberValue? = null,
+  /**
+   * `tickExtra` — one more tick, pegged to the *start* of the first band.
+   *
+   * A band axis draws one tick per band, so ticks placed at the band ends leave the very first edge
+   * unmarked. Upstream appends a datum carrying only `{extra: {value: <first tick's value>}}`,
+   * which the scaled-value codegen reads as "that value's band start, with no bandwidth added". Its
+   * **label** is empty and lands nowhere: the label mark does not pass `extra` on, so it scales a
+   * value the datum does not have, and upstream's scene records a `NaN` position for it.
+   */
+  val tickExtra: Boolean = false,
+  /**
+   * `gridScale` — a second scale whose **range** the gridlines span, instead of the plotting area.
+   *
+   * How a chart draws a grid across a cell that is not the size of its own plot: the gridline runs
+   * the length of the *other* axis's scale rather than the group's `width` or `height`. Upstream
+   * spans `range(gridScale)[0]` to `range(gridScale)[1]`, which is why the two ends come out in the
+   * other scale's own order and not always low-to-high.
+   */
+  val gridScale: String? = null,
+  /**
+   * `labelFlush` — how close to an end of the scale's range a label has to be to be pushed inwards.
+   *
+   * A threshold in pixels, and `true` means one. A label within it of the range's start is aligned
+   * to its *left* rather than centred, and one within it of the end to its right, so the first and
+   * last labels sit inside the plot instead of hanging off the corners. Null is upstream's "off",
+   * and **zero is not**: a zero threshold still flushes a label that lands exactly on an end.
+   */
+  val labelFlush: Double? = null,
+  /**
+   * `minExtent`/`maxExtent` — how deep the axis is allowed to be, whatever its contents measure.
+   *
+   * Upstream clamps its measured depth into this range with defaults of 0 and 200, so a chart with
+   * one very long label does not lose half its plot to the axis.
+   */
+  val minExtent: NumberValue? = null,
+  val maxExtent: NumberValue? = null,
   /**
    * The `encode` blocks as written, per part, for the channels that are not another spelling of a
    * property.
@@ -866,12 +908,37 @@ public data class LegendSpec(
   /** `null` means the per-orient default: vertical at the sides, horizontal above and below. */
   val direction: Direction? = null,
   val title: String? = null,
+  /**
+   * `title: {"signal": "..."}` — the legend names itself from a signal.
+   *
+   * The same shape an axis title takes, and for the same reason: a chart whose measure is chosen by
+   * a control has no constant to write down.
+   */
+  val titleExpression: String? = null,
   /** Explicit entry values, overriding whatever the scale would generate. */
   val values: List<VegaValue>? = null,
+  /**
+   * A d3-format specifier for the entry labels, which is how a ramp over fractions reads `6%`.
+   *
+   * Resolved against the *span* the legend covers, as upstream's `formatSpan` does: a specifier
+   * naming no precision takes as many decimals as the tick step needs, not d3's fixed six.
+   */
+  val format: String? = null,
   val tickCount: NumberValue? = null,
   val offset: NumberValue? = null,
   val padding: NumberValue? = null,
   val titlePadding: NumberValue? = null,
+  /**
+   * `titleOrient` — which side of the entries the title sits on.
+   *
+   * `"top"` by default. `"left"` turns a legend into a labelled strip: the title runs down the
+   * left, vertically centred against the entries, and every entry is pushed past it. It also
+   * changes the title's own anchoring — upstream reads a left or right title as `middle`-anchored
+   * where a top one is `start`-anchored — so it is not only a translation.
+   */
+  val titleOrient: String? = null,
+  /** How wide the title may be drawn before it is truncated. Upstream's legend default is 180. */
+  val titleLimit: NumberValue? = null,
   val titleFontSize: NumberValue? = null,
   val labelFontSize: NumberValue? = null,
   val labelOffset: NumberValue? = null,
@@ -925,6 +992,38 @@ public data class LegendSpec(
   public val channelCount: Int
     get() = listOfNotNull(fill, stroke, size, shape, opacity, strokeWidth, strokeDash).size
 }
+
+/**
+ * A cartographic projection: the rule that turns longitude and latitude into a place on the page.
+ *
+ * Named like a scale and used like one — a `geoshape` transform points at it by name — but it is
+ * not a scale: it takes two numbers and returns two, its output depends on both inputs together,
+ * and it cuts geometry as well as moving it. Every field here is signal-valued because a map that
+ * lets a reader turn the globe is the ordinary case.
+ */
+public data class ProjectionSpec(
+  val name: String,
+  /** `mercator` by default, which is what upstream falls back to. */
+  val type: String? = null,
+  /** `{"type": {"signal": "..."}}` — a chart that lets a reader choose the projection. */
+  val typeSignal: String? = null,
+  val scale: NumberValue? = null,
+  val translate: List<NumberValue> = emptyList(),
+  val center: List<NumberValue> = emptyList(),
+  val rotate: List<NumberValue> = emptyList(),
+  /** Post-projection rotation of the plane, in degrees. */
+  val angle: NumberValue? = null,
+  /** The subdivision threshold for adaptive resampling; `0` turns it off entirely. */
+  val precision: NumberValue? = null,
+  val clipAngle: NumberValue? = null,
+  val clipExtent: List<List<NumberValue>> = emptyList(),
+  val reflectX: NumberValue? = null,
+  val reflectY: NumberValue? = null,
+  /** `fit`/`extent`/`size`, which size the projection from the data rather than from a scale. */
+  val fit: VegaValue? = null,
+  val extent: List<List<NumberValue>> = emptyList(),
+  val size: List<NumberValue> = emptyList(),
+)
 
 public enum class MarkType {
   ARC,
@@ -1165,6 +1264,24 @@ public data class LayoutSpec(
   val rowPadding: NumberValue? = null,
   val columnPadding: NumberValue? = null,
   val offset: LayoutOffset = LayoutOffset(),
+  /**
+   * `align` — how the cells line up, per axis, as `"each"`, `"all"` or `"none"`.
+   *
+   * `each` is the default and the only one whose name describes what it does to a reader: every
+   * column gets the same lead-in, so the columns line up with each other. `all` makes every column
+   * the width of the widest cell anywhere. `none` lets each cell keep its own overhang, so nothing
+   * lines up and no space is wasted — which is what a pair of square plots side by side wants.
+   */
+  val alignColumn: String? = null,
+  val alignRow: String? = null,
+  /**
+   * `bounds` — which box the grid measures a cell by: `"full"` or `"flush"`.
+   *
+   * `full` is the cell's own bounds, so an axis label hanging off to its left is made room for.
+   * `flush` is its *declared* extent, so it is not, and the cells sit at exactly their own size
+   * with the overhang allowed to collide. A chart with an axis on every cell reads better flush.
+   */
+  val bounds: String? = null,
 )
 
 /**
@@ -1188,9 +1305,20 @@ public data class MarkSpec(
   val from: FromSpec? = null,
   /** `sort` — the order this mark's items are built and painted in; see [MarkSort]. */
   val sort: MarkSort? = null,
+  /**
+   * `transform` on a **mark**, which runs after the data and before the drawing.
+   *
+   * Upstream calls these post-encoding transforms and runs them over the scene *items*, writing
+   * onto each one; `geopath` turning a GeoJSON feature into an outline is the case that matters,
+   * and it reads the item's datum and writes the item's `path`. This engine's transforms are pure
+   * functions over rows, so they run over the rows and write the same column — which draws the same
+   * picture, because nothing between the two reads anything a mark transform touches.
+   */
+  val transform: List<VegaValue> = emptyList(),
   val encode: EncodeSpec = EncodeSpec(),
   /** Nested marks, for a group mark. */
   val marks: List<MarkSpec> = emptyList(),
+  val projections: List<ProjectionSpec> = emptyList(),
   val axes: List<AxisSpec> = emptyList(),
   /** Datasets scoped to this group. */
   val data: List<DataSpec> = emptyList(),

@@ -46,6 +46,17 @@ public enum class AggregateOp(public val opName: String, public val needsField: 
   ARGMAX("argmax", needsField = true),
   Q1("q1", needsField = true),
   Q3("q3", needsField = true),
+  /**
+   * The ends of a 95% confidence interval on the group's **mean**, by bootstrap.
+   *
+   * Not a summary statistic in the sense every other entry here is: upstream resamples the group a
+   * thousand times with replacement, takes the mean of each resample, and reports the 2.5th and
+   * 97.5th percentiles of those means. It therefore consumes 1,000 × n draws from the chart's
+   * random stream, and the two ends come from **one** bootstrap rather than two — asking for both
+   * does not run it twice, which is upstream's caching and is load-bearing for the sequence.
+   */
+  CI0("ci0", needsField = true),
+  CI1("ci1", needsField = true),
   VALUES("values", needsField = false);
 
   public companion object {
@@ -76,13 +87,29 @@ public object AggregateTransform : Transform {
     return groups.map { (key, tuples) ->
       val output = LinkedHashMap<String, VegaValue>(groupBy.size + measures.size)
       groupBy.forEachIndexed { index, path -> output[path] = key[index] }
+      // One bootstrap per group and field, memoized: `ci0` and `ci1` are two ends of the same
+      // interval, and upstream caches it on the cell for exactly that reason.
+      val intervals = HashMap<String, Pair<Double, Double>?>()
+      val confidence: (String) -> Pair<Double, Double>? = { path ->
+        intervals.getOrPut(path) {
+          // Upstream's `numbers`: not null, not the empty string, and not NaN. Infinity survives
+          // that test, so it is deliberately not filtered here either.
+          val values =
+            tuples
+              .map { it.field(path) }
+              .filterNot { it.isMissing || (it is VegaValue.Str && it.value.isEmpty()) }
+              .map { JsSemantics.toNumber(it) }
+              .filterNot { it.isNaN() }
+          context.scope.random.bootstrapConfidence(values)
+        }
+      }
       for (measure in measures) {
         // A measure with no answer is *absent* from the row rather than null: upstream's operations
         // return `undefined` when they cannot be computed — `stderr` of one value, `min` of nothing
         // numeric — and an undefined property never reaches the tuple. The difference shows in a
         // `formula` reading the field, where absent and null coerce alike, and in an `isValid`
         // test, where they do not.
-        val value = measure.compute(tuples)
+        val value = measure.compute(tuples, confidence)
         if (value !is VegaValue.Null) output[measure.outputName] = value
       }
       VegaValue.Obj(output)
@@ -140,11 +167,26 @@ internal class Measure(
   private val fieldPath: String?,
   val outputName: String,
 ) {
-  fun compute(tuples: List<VegaValue>): VegaValue {
+  fun compute(
+    tuples: List<VegaValue>,
+    /**
+     * The group's bootstrap, memoized per field by the caller.
+     *
+     * Passed in rather than computed here because `ci0` and `ci1` share one run: upstream caches it
+     * on the cell, so a group asking for both draws its 1,000 resamples once. Running it twice
+     * would give two different intervals *and* leave the stream in a different place for every
+     * group after it.
+     */
+    confidence: ((String) -> Pair<Double, Double>?)? = null,
+  ): VegaValue {
     if (op == AggregateOp.COUNT && fieldPath == null) {
       return VegaValue.Num(tuples.size.toDouble())
     }
     val path = fieldPath ?: return VegaValue.Null
+    if (op == AggregateOp.CI0 || op == AggregateOp.CI1) {
+      val interval = confidence?.invoke(path) ?: return VegaValue.Null
+      return VegaValue.Num(if (op == AggregateOp.CI0) interval.first else interval.second)
+    }
     val raw = tuples.map { it.field(path) }
 
     // `count` is deliberately computed before filtering: it counts tuples, not values.
@@ -211,6 +253,8 @@ internal class Measure(
       AggregateOp.DISTINCT,
       AggregateOp.ARGMIN,
       AggregateOp.ARGMAX,
+      AggregateOp.CI0,
+      AggregateOp.CI1,
       AggregateOp.VALUES -> VegaValue.Null
     }
   }
@@ -283,25 +327,8 @@ internal fun measures(params: VegaValue.Obj, context: TransformContext): List<Me
   return measures
 }
 
-/**
- * Operations that are missing on purpose, and why, so a reader is not left waiting for them.
- *
- * `ci0` and `ci1` are the interesting pair: they look like ordinary summary statistics and are not.
- * Upstream computes them by **bootstrap** — a thousand resamples of the group drawn with
- * `Math.random()`, then the 2.5th and 97.5th percentiles of those means — so the same data gives a
- * different answer every run. A scene has to be reproducible (PROJECT_BRIEF.md 18.2), which is the
- * same reason `random()` itself is refused, so implementing these would mean either a chart that
- * moves when nothing changed or a quietly different statistic under the same name.
- */
-private val REFUSED =
-  mapOf(
-    "ci0" to
-      ": it is a bootstrap over 1,000 random resamples, so it differs run to run and a scene has " +
-        "to be reproducible. 'stderr' is implemented and is what a symmetric error bar needs",
-    "ci1" to
-      ": it is a bootstrap over 1,000 random resamples, so it differs run to run and a scene has " +
-        "to be reproducible. 'stderr' is implemented and is what a symmetric error bar needs",
-  )
+/** Operations that are missing on purpose, and why, so a reader is not left waiting for them. */
+private val REFUSED = emptyMap<String, String>()
 
 /**
  * Groups tuples by the `groupby` field values, preserving first-seen group order.

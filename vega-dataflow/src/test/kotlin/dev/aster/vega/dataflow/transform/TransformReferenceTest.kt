@@ -4,6 +4,7 @@ import dev.aster.vega.expression.CachingExpressionCompiler
 import dev.aster.vega.expression.ExpressionCompiler
 import dev.aster.vega.expression.ExpressionScope
 import dev.aster.vega.expression.JsSemantics
+import dev.aster.vega.expression.RandomStream
 import dev.aster.vega.expression.VegaExpressionCompiler
 import dev.aster.vega.model.DiagnosticCodes
 import dev.aster.vega.model.DiagnosticCollector
@@ -48,6 +49,14 @@ class TransformReferenceTest {
     val signals = LinkedHashMap<String, VegaValue>()
     val tables = LinkedHashMap<String, List<VegaValue>>()
 
+    /**
+     * One stream for the whole context, as a compile has.
+     *
+     * `ci0`/`ci1` consume 1,000 x n draws per group, so a fresh stream per scope would give the
+     * second group the first group's numbers and the vectors below would not match upstream.
+     */
+    val stream = RandomStream()
+
     override val scope: ExpressionScope = scopeFor(VegaValue.Null)
 
     override fun setSignal(name: String, value: VegaValue) {
@@ -61,6 +70,8 @@ class TransformReferenceTest {
         override fun signal(name: String): VegaValue = signals[name] ?: VegaValue.Null
 
         override fun dataset(name: String): List<VegaValue> = tables[name] ?: emptyList()
+
+        override val random: RandomStream = stream
       }
   }
 
@@ -633,8 +644,43 @@ class TransformReferenceTest {
     )
   }
 
+  /**
+   * `ci0`/`ci1`, pinned against upstream with the same seeded generator on both sides.
+   *
+   * Two things this settles that reading the code cannot. The interval is a **bootstrap**, so it is
+   * a property of the draw sequence and not of the data alone — which is why it can be pinned at
+   * all only now that both engines share a generator. And the two ends come from *one* run: asking
+   * for both does not resample twice, so the second group's numbers depend on the first group
+   * having consumed exactly 1,000 x n draws and no more.
+   */
   @Test
-  fun `the registry covers the transforms the brief lists, plus twenty-three more`() {
+  fun `ci0 and ci1 are upstream's bootstrap`() {
+    val rows =
+      listOf(1.0, 2.0, 3.0, 9.0, 4.0).map { row("a", it) } +
+        listOf(10.0, 20.0, 30.0, 11.0, 12.0).map { row("b", it) }
+    val output =
+      AggregateTransform.apply(
+        rows,
+        VegaJson.parse(
+          """{"type": "aggregate", "groupby": ["g"], "fields": ["v", "v", "v"],
+              "ops": ["mean", "ci0", "ci1"], "as": ["mean", "ci0", "ci1"]}"""
+        ) as VegaValue.Obj,
+        context,
+      )
+    assertEquals(
+      listOf(
+        """{"ci0":1.8,"ci1":6.4,"g":"a","mean":3.8}""",
+        """{"ci0":10.8,"ci1":24,"g":"b","mean":16.6}""",
+      ),
+      output.map { asJson(it) },
+    )
+  }
+
+  private fun row(group: String, value: Double): VegaValue =
+    VegaValue.Obj(linkedMapOf("g" to VegaValue.Str(group), "v" to VegaValue.Num(value)))
+
+  @Test
+  fun `the registry covers the transforms the brief lists, plus thirty-two more`() {
     val fromTheBrief =
       setOf(
         "filter",
@@ -659,6 +705,14 @@ class TransformReferenceTest {
     // a matrix, a long table made wide, and the word counts a cloud is drawn from. `quantile`,
     // `regression`, `loess`, `kde`, `density` and `dotbin` are the statistical family. `treelinks`
     // and `linkpath` are what turns a laid-out tree into the edges drawn between its nodes.
+    // `crossfilter` and `resolvefilter` are the pair an interactive cross-filter is built from:
+    // one records which range query each row fails, the other keeps the rows every dimension but
+    // its own admits. `isocontour`, `geopath`, `kde2d` and `heatmap` are the raster family: a
+    // density estimated over a grid, marching squares over that grid, the GeoJSON it produces
+    // written out as an outline, and the grid itself painted as an image. `force` is the one
+    // transform that is a simulation rather than a calculation: it places the nodes of a graph by
+    // running d3-force to a standstill. `geoshape` and `graticule` are the map pair: a GeoJSON
+    // feature drawn through a projection, and the grid of meridians and parallels under it.
     assertEquals(
       fromTheBrief +
         "timeunit" +
@@ -683,7 +737,16 @@ class TransformReferenceTest {
         "pack" +
         "tree" +
         "treelinks" +
-        "linkpath",
+        "linkpath" +
+        "crossfilter" +
+        "resolvefilter" +
+        "isocontour" +
+        "geopath" +
+        "kde2d" +
+        "heatmap" +
+        "force" +
+        "geoshape" +
+        "graticule",
       TransformRegistry.Default.types,
     )
   }

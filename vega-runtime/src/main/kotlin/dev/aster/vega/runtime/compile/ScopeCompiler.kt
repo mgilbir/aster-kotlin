@@ -1,15 +1,21 @@
 package dev.aster.vega.runtime.compile
 
 import dev.aster.vega.dataflow.transform.AggregateOp
+import dev.aster.vega.dataflow.transform.ProjectionDefinition
+import dev.aster.vega.dataflow.transform.TransformContext
+import dev.aster.vega.dataflow.transform.TransformPipeline
 import dev.aster.vega.dataflow.transform.aggregateOver
 import dev.aster.vega.dataflow.transform.compareFieldValues
 import dev.aster.vega.dataflow.transform.groupTuples
+import dev.aster.vega.expression.Clock
 import dev.aster.vega.expression.ExpressionCompiler
+import dev.aster.vega.expression.RandomStream
 import dev.aster.vega.model.DiagnosticCodes
 import dev.aster.vega.model.DiagnosticCollector
 import dev.aster.vega.model.VegaValue
 import dev.aster.vega.model.asString
 import dev.aster.vega.model.field
+import dev.aster.vega.model.parseFieldPath
 import dev.aster.vega.model.roundHalfUp
 import dev.aster.vega.model.spec.AxisSpec
 import dev.aster.vega.model.spec.FacetSpec
@@ -57,6 +63,13 @@ internal class CompileScope(
    * from a screen reader. Carried alongside the scales because a group scope shadows both together.
    */
   val scaleTypes: Map<String, ScaleType> = emptyMap(),
+  /**
+   * The cartographic projections visible here, with their signals resolved.
+   *
+   * Nested like everything else in a scope: a group may declare its own, and a `geoshape` inside it
+   * sees those before the ones outside.
+   */
+  val projections: Map<String, ProjectionDefinition> = emptyMap(),
 ) {
   val datasets: Map<String, List<VegaValue>>
     get() = data.datasets
@@ -69,7 +82,14 @@ internal class CompileScope(
    * group's contents see a mark declared outside it, the way every other name here nests.
    */
   fun withMarkItems(name: String, items: List<VegaValue>): CompileScope =
-    CompileScope(data.withDataset(name, items), signals, scales, rangeSize, scaleTypes)
+    CompileScope(
+      data.withDataset(name, items),
+      signals,
+      scales,
+      rangeSize,
+      scaleTypes,
+      projections,
+    )
 }
 
 /**
@@ -86,6 +106,14 @@ internal class ScopeCompiler(
   private val diagnostics: DiagnosticCollector,
   private val expressions: ExpressionCompiler,
   private val data: DataResolver,
+  /**
+   * The chart's one random stream and its clock, passed down rather than remade.
+   *
+   * A group that started a stream of its own would restart the sequence per cell, and upstream's is
+   * one generator for the whole view.
+   */
+  private val random: RandomStream = RandomStream(),
+  private val clock: Clock = Clock.Fixed,
 ) {
 
   /**
@@ -135,6 +163,7 @@ internal class ScopeCompiler(
         scope.signals.withScales(scope.scales, diagnostics),
         expressions,
         textEngine,
+        extent,
       )
     // The encoder goes to the axis builder as well: a label's `encode` block resolves through the
     // same channel machinery a mark's does, over the tick as its datum.
@@ -176,11 +205,10 @@ internal class ScopeCompiler(
     marks.forEachIndexed { index, mark ->
       // After building, not before: the items only exist once the channels have been resolved, and
       // a mark cannot read back its own output.
-      fun expose(rows: List<VegaValue>) {
-        mark.name
-          ?.takeIf { it in readBack }
-          ?.let { scope = scope.withMarkItems(it, encoder.items(mark, rows)) }
+      fun exposeItems(items: List<VegaValue>) {
+        mark.name?.takeIf { it in readBack }?.let { scope = scope.withMarkItems(it, items) }
       }
+      fun expose(rows: List<VegaValue>) = exposeItems(encoder.items(mark, rows))
       if (mark.type == MarkType.GROUP) {
         val group = group(mark, scope, encoder)
         expose(group.datums)
@@ -193,8 +221,12 @@ internal class ScopeCompiler(
         }
       } else {
         val rows = markData(mark, scope)
-        built[index] = encoder.encode(mark, rows)
-        expose(rows)
+        val transformed = markTransformed(mark, rows, scope, encoder)
+        scope = transformed.scope
+        built[index] = encoder.encode(mark, rows, transformed.written)
+        // The items a mark's own transforms produced, not the ones its encoding alone would: a
+        // label drawn from a force-directed mark reads the position the simulation settled on.
+        exposeItems(transformed.items ?: encoder.items(mark, rows))
         for (node in built[index].orEmpty()) content = content.union(node.transformedBounds)
       }
     }
@@ -226,7 +258,7 @@ internal class ScopeCompiler(
         )
     children += legendNodes
     children += raised
-    for (node in legendNodes) content = content.union(node.transformedBounds)
+    for (node in legendNodes) content = content.union(legendBox(node))
 
     // Last, because a title is placed against everything else: it centres over the chart *and* its
     // axes and legends, not over the plotting area.
@@ -299,6 +331,20 @@ internal class ScopeCompiler(
    * the group is sorted by its own facet key. A path neither can read leaves the order alone rather
    * than inventing one.
    */
+  /**
+   * A legend measures as its own box rather than as the union of what it drew.
+   *
+   * Upstream's `legendBounds` anchors the aggregate at the legend's padding and then *sets* the
+   * item's bounds to the resulting rectangle, so anything hanging above or to the left of the
+   * origin is drawn and not measured. A title beside the entries is exactly that case: it is
+   * vertically centred, so its text reaches a fraction above the legend's own top edge, and
+   * measuring it there pushes the whole chart down by a unit.
+   */
+  private fun legendBox(node: SceneNode): RectD =
+    (node as? GroupNode)?.size?.let {
+      node.transform.mapBounds(RectD(0.0, 0.0, it.width, it.height))
+    } ?: node.transformedBounds
+
   private fun sortOrder(
     sort: MarkSort?,
     nodes: List<SceneNode>,
@@ -309,16 +355,12 @@ internal class ScopeCompiler(
     val comparator =
       Comparator<Int> { a, b ->
         for ((index, field) in sort.fields.withIndex()) {
-          val descending = sort.orders.getOrNull(index)?.startsWith("desc") == true
-          val left = itemPosition(nodes[a], field)
-          val right = itemPosition(nodes[b], field)
-          val comparison =
-            if (left != null && right != null) left.compareTo(right)
-            else
-              compareFieldValues(
-                items.getOrNull(a)?.field(field) ?: VegaValue.Null,
-                items.getOrNull(b)?.field(field) ?: VegaValue.Null,
-              )
+          // Upstream's `orders[i] === 'descending' ? -1 : 1`, and exactly that: anything else,
+          // "desc" included, ascends.
+          val descending = sort.orders.getOrNull(index) == "descending"
+          val left = itemValue(nodes[a], datums.getOrNull(a), field) ?: continue
+          val right = itemValue(nodes[b], datums.getOrNull(b), field) ?: continue
+          val comparison = compareFieldValues(left, right)
           if (comparison != 0) return@Comparator if (descending) -comparison else comparison
         }
         0
@@ -326,13 +368,35 @@ internal class ScopeCompiler(
     return nodes.indices.sortedWith(comparator)
   }
 
-  /** An item's `x` or `y` as the sort sees it: where the node was placed. */
-  private fun itemPosition(node: SceneNode, field: String): Double? =
-    when (field) {
-      "x" -> node.transform.apply(0.0, 0.0).x
-      "y" -> node.transform.apply(0.0, 0.0).y
-      else -> null
+  /**
+   * One sort key, read off the item.
+   *
+   * The fields are a **path into the scene item**, not a column of the data — which is why
+   * `{"field": "y"}` sorts by where the item ended up and `{"field": "datum.year"}` reaches through
+   * it to the row that produced it. Upstream has no special case for either: `vega-util`'s `field`
+   * walks the path, and the item happens to carry both its geometry and its datum. Walking it the
+   * same way is also what accepts `datum["year"]`, which is how Vega-Lite spells the same reach and
+   * is what orders a trellis's cells by their own facet key. A path this scene graph cannot follow
+   * is reported rather than treated as a tie, because a tie leaves the items in declaration order
+   * and looks exactly like a sort that worked.
+   */
+  private fun itemValue(node: SceneNode, datum: VegaValue?, field: String): VegaValue? {
+    val path = parseFieldPath(field)
+    return when {
+      path == listOf("x") -> VegaValue.Num(node.transform.apply(0.0, 0.0).x)
+      path == listOf("y") -> VegaValue.Num(node.transform.apply(0.0, 0.0).y)
+      path.firstOrNull() == "datum" ->
+        path.drop(1).fold(datum ?: VegaValue.Null) { value, segment -> value.field(segment) }
+      else -> {
+        diagnostics.warn(
+          DiagnosticCodes.TRANSFORM_NOT_IMPLEMENTED,
+          "Mark sort reads '$field' off each item, which this scene graph does not carry; " +
+            "only 'x', 'y' and a path under 'datum' are available, so the declared order is kept",
+        )
+        null
+      }
     }
+  }
 
   private fun group(spec: MarkSpec, outer: CompileScope, encoder: MarkEncoder): BuiltGroup {
     val partitions = partition(spec, outer)
@@ -565,14 +629,26 @@ internal class ScopeCompiler(
     val cellParts = parts.withIndex().filter { it.value.first == TrellisRole.CELL }
     if (cellParts.isEmpty()) return parts
 
+    // `bounds: "flush"` measures a cell by its **declared** extent rather than by how far its
+    // contents reach, so an axis label hanging off to the left is allowed to collide with the cell
+    // beside it instead of pushing it across. Upstream's `bboxFlush` is `(0, 0, width, height)`,
+    // and a group that declared no size falls back to what it drew — there is nothing else to use.
+    val flush = layout.bounds == "flush"
     val boxes = cellParts.flatMap { (_, entry) ->
-      entry.second.nodes.indices.map { entry.second.boxOf(it) }
+      entry.second.nodes.indices.map { position ->
+        val node = entry.second.nodes[position]
+        val declared = (node as? GroupNode)?.size
+        if (flush && declared != null) RectD(0.0, 0.0, declared.width, declared.height)
+        else entry.second.boxOf(position)
+      }
     }
     val options =
       GridLayout.Options(
         columns = numbers.resolveInt(layout.columns, "layout")?.coerceAtLeast(1) ?: boxes.size,
         rowPadding = numbers.resolve(layout.rowPadding, "layout") ?: 0.0,
         columnPadding = numbers.resolve(layout.columnPadding, "layout") ?: 0.0,
+        alignColumn = GridLayout.Align.fromName(layout.alignColumn),
+        alignRow = GridLayout.Align.fromName(layout.alignRow),
       )
     val offsets = GridLayout.place(boxes, options)
 
@@ -591,6 +667,91 @@ internal class ScopeCompiler(
       result[index] = role to ScopeContent(placed, bounds, part.cellReach)
     }
     return result
+  }
+
+  /**
+   * A mark's own `transform` block, run over its rows.
+   *
+   * Upstream calls these post-encoding transforms and runs them over the scene *items*, writing
+   * onto each. `geopath` — the case that matters — reads the item's datum and writes the item's
+   * `path`, and nothing between the encoding and the drawing reads anything it touches, so running
+   * it over the rows and writing the same column draws the same picture. Doing it before the
+   * encoding is also what lets the outline reach the `path` mark at all, since a scene node here
+   * holds a parsed path rather than a mutable property bag.
+   */
+  private fun markTransformed(
+    spec: MarkSpec,
+    rows: List<VegaValue>,
+    scope: CompileScope,
+    encoder: MarkEncoder,
+  ): MarkTransformResult {
+    if (spec.transform.isEmpty()) return MarkTransformResult(scope, emptyList(), null)
+    val context = MarkTransformScope(diagnostics, expressions, scope)
+    // The **items**, encoded: `{"field": "datum.contour"}` reaches for the row under `datum`, and
+    // `{"force": "x", "x": "xfocus"}` reaches for a channel the encoding resolved. Running these
+    // over the rows instead would answer the first and silently miss the second.
+    val before = encoder.items(spec, rows)
+    val after = TransformPipeline().run(before, spec.transform, context)
+    val written = after.mapIndexed { index, item ->
+      val was = (before.getOrNull(index) as? VegaValue.Obj)?.fields.orEmpty()
+      (item as? VegaValue.Obj)
+        ?.fields
+        ?.filterKeys { it != "datum" }
+        ?.filter { (name, value) -> was[name] != value }
+        .orEmpty()
+    }
+    return MarkTransformResult(context.published(scope), written, after)
+  }
+
+  /**
+   * What a mark's transforms changed: the channels they wrote, and any dataset they replaced.
+   *
+   * The second is not a detail. A `link` force resolves each edge's ends to the nodes it just laid
+   * out, and the mark that draws the edges reads them back — upstream by mutating the shared tuple,
+   * here by republishing the dataset, which is the same dependency said out loud.
+   */
+  private class MarkTransformResult(
+    val scope: CompileScope,
+    val written: List<Map<String, VegaValue>>,
+    /** The items themselves, for a mark that another mark is drawn from. Null when nothing ran. */
+    val items: List<VegaValue>?,
+  )
+
+  /** What a mark's own transforms may read: this scope's signals, datasets and scales. */
+  private class MarkTransformScope(
+    override val diagnostics: DiagnosticCollector,
+    override val expressions: ExpressionCompiler,
+    private val outer: CompileScope,
+  ) : TransformContext {
+    override var tree: dev.aster.vega.dataflow.transform.TreeSource? = null
+
+    private val replaced = LinkedHashMap<String, List<VegaValue>>()
+
+    override val scope: dev.aster.vega.expression.ExpressionScope = scopeFor(VegaValue.Null)
+
+    override fun setSignal(name: String, value: VegaValue) {
+      // A mark's transform runs after every signal has settled, so there is nothing left that
+      // could read one it published. Upstream has the same shape and the same silence.
+    }
+
+    override fun scopeFor(datum: VegaValue): dev.aster.vega.expression.ExpressionScope =
+      Replacing(outer.signals.withScales(outer.scales, diagnostics).withDatum(datum), replaced)
+
+    override fun projection(name: String): ProjectionDefinition? = outer.projections[name]
+
+    /** The scope the marks after this one see, with any dataset a transform rewrote in it. */
+    fun published(scope: CompileScope): CompileScope =
+      replaced.entries.fold(scope) { current, (name, rows) -> current.withMarkItems(name, rows) }
+
+    /** Records a `setdata`, which a [CompileScope] cannot take because it does not change. */
+    private class Replacing(
+      private val inner: dev.aster.vega.expression.ExpressionScope,
+      private val sink: MutableMap<String, List<VegaValue>>,
+    ) : dev.aster.vega.expression.ExpressionScope by inner {
+      override fun setDataset(name: String, rows: List<VegaValue>) {
+        sink[name] = rows
+      }
+    }
   }
 
   private fun moveTo(node: SceneNode, at: PointD): SceneNode =
@@ -792,7 +953,7 @@ internal class ScopeCompiler(
     // they are built from these very signals, a few lines down — so naming one of those is
     // reported as premature rather than as a scale nobody defined.
     val signals =
-      SignalResolver(diagnostics, expressions)
+      SignalResolver(diagnostics, expressions, random, clock)
         .resolve(
           spec.signals,
           datasets,
@@ -818,6 +979,7 @@ internal class ScopeCompiler(
       scales,
       rangeSize,
       outer.scaleTypes + spec.scales.associate { it.name to it.type },
+      outer.projections + ProjectionResolver(numbers, diagnostics).resolve(spec.projections),
     )
   }
 

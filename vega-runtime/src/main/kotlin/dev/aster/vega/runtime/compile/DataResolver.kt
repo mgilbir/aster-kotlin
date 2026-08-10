@@ -3,12 +3,15 @@ package dev.aster.vega.runtime.compile
 import dev.aster.vega.dataflow.transform.TransformContext
 import dev.aster.vega.dataflow.transform.TransformPipeline
 import dev.aster.vega.dataflow.transform.TreeSource
+import dev.aster.vega.expression.Clock
 import dev.aster.vega.expression.ExpressionCompiler
 import dev.aster.vega.expression.ExpressionScope
 import dev.aster.vega.expression.JsSemantics
+import dev.aster.vega.expression.RandomStream
 import dev.aster.vega.model.DelimitedText
 import dev.aster.vega.model.DiagnosticCodes
 import dev.aster.vega.model.DiagnosticCollector
+import dev.aster.vega.model.TopoJson
 import dev.aster.vega.model.VegaJson
 import dev.aster.vega.model.VegaValue
 import dev.aster.vega.model.asDouble
@@ -58,6 +61,15 @@ internal class DataResolver(
   private val expressions: ExpressionCompiler,
   /** Refuses everything unless the host opted in; see [DataLoader]. */
   private val loader: DataLoader = DenyLoader,
+  /**
+   * The chart's one random stream and its clock, shared with every other scope in the compile.
+   *
+   * A transform's expression is evaluated once per row, so a scope built fresh for each row with a
+   * stream of its own hands every row the *same* first draw — twelve identical bars where upstream
+   * has twelve different ones. The stream has to outlive the row.
+   */
+  private val random: RandomStream = RandomStream(),
+  private val clock: Clock = Clock.Fixed,
 ) {
 
   /**
@@ -168,11 +180,69 @@ internal class DataResolver(
         }
       }
       "json" -> readJson(spec, text)
+      "topojson" -> readTopoJson(spec, text)
       else -> {
         // Reported by the parser already; nothing further to add here.
         emptyList()
       }
     }
+  }
+
+  /**
+   * A TopoJSON document, decoded into the features or the mesh a map mark draws.
+   *
+   * `format.feature` and `format.mesh` are alternatives and one of them is required — a TopoJSON
+   * file holds several named objects and nothing in it says which one this dataset wants.
+   */
+  private fun readTopoJson(spec: DataSpec, text: String): List<VegaValue> {
+    val document =
+      try {
+        VegaJson.parse(text)
+      } catch (failure: Exception) {
+        diagnostics.error(
+          DiagnosticCodes.PARSE_INVALID_JSON,
+          "Dataset '${spec.name}' is not valid JSON: ${failure.message}",
+          operator = spec.name,
+        )
+        return emptyList()
+      }
+    val name = spec.feature ?: spec.mesh
+    if (name == null) {
+      diagnostics.error(
+        DiagnosticCodes.PARSE_UNKNOWN_PROPERTY,
+        "Dataset '${spec.name}' is TopoJSON but names neither 'format.feature' nor " +
+          "'format.mesh'; a TopoJSON file holds several objects and nothing says which",
+        operator = spec.name,
+      )
+      return emptyList()
+    }
+    val filter =
+      when (spec.meshFilter) {
+        "interior" -> TopoJson.MeshFilter.INTERIOR
+        "exterior" -> TopoJson.MeshFilter.EXTERIOR
+        null -> TopoJson.MeshFilter.ALL
+        else -> {
+          diagnostics.error(
+            DiagnosticCodes.PARSE_UNKNOWN_PROPERTY,
+            "Dataset '${spec.name}' has 'format.filter: ${spec.meshFilter}'; " +
+              "the only filters are 'interior' and 'exterior'",
+            operator = spec.name,
+          )
+          TopoJson.MeshFilter.ALL
+        }
+      }
+    val decoded =
+      if (spec.feature != null) TopoJson.feature(document, name)
+      else TopoJson.mesh(document, name, filter)
+    if (decoded == null) {
+      diagnostics.error(
+        DiagnosticCodes.PARSE_UNKNOWN_PROPERTY,
+        "Dataset '${spec.name}' names TopoJSON object '$name', which the file does not contain",
+        operator = spec.name,
+      )
+      return emptyList()
+    }
+    return ingest(decoded)
   }
 
   private fun readJson(spec: DataSpec, text: String): List<VegaValue> {
@@ -301,6 +371,8 @@ internal class DataResolver(
             spec.name,
             scales,
             trees,
+            random,
+            clock,
           )
         values = pipeline.run(values, spec.transform, context)
         tree = context.tree
@@ -432,6 +504,8 @@ internal class DataResolver(
     private val scales: Map<String, VegaScale>,
     /** Every stratified dataset's hierarchy, for a `treePath` inside a transform expression. */
     private val trees: Map<String, TreeSource>,
+    private val random: RandomStream,
+    private val clock: Clock,
   ) : TransformContext {
 
     /** One diagnostic per signal per dataset; the expression runs once a row. */
@@ -445,7 +519,16 @@ internal class DataResolver(
 
     override fun scopeFor(datum: VegaValue): ExpressionScope =
       DeferredSignalScope(
-        SignalScope(signals, datasets, datum, scales, diagnostics, trees = trees),
+        SignalScope(
+          signals,
+          datasets,
+          datum,
+          scales,
+          diagnostics,
+          trees = trees,
+          random = random,
+          clock = clock,
+        ),
         ::reportDeferred,
       )
 

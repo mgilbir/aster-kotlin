@@ -226,6 +226,15 @@ internal class DataflowOrder(
         }
         .toMap()
 
+    /**
+     * Which parameter of each transform holds a per-row expression, by transform type.
+     *
+     * Three, and they are upstream's three: probe `T.Definition.params` over `vega.transforms` for
+     * `type: 'expr'` and nothing else comes back.
+     */
+    private val EXPRESSION_PARAMETERS =
+      mapOf("filter" to "expr", "formula" to "expr", "cross" to "filter")
+
     private val publishers: Map<String, String> =
       data
         .flatMap { spec ->
@@ -263,8 +272,50 @@ internal class DataflowOrder(
       val result = mutableSetOf<Operator>()
       for (source in spec.sources) if (source in dataSpecs) result.add(Operator.Data(source))
       spec.urlSignal?.let { result.addAll(readsOf(it)) }
-      for (transform in spec.transform) collectSignalReferences(transform, result)
+      for (transform in spec.transform) {
+        collectSignalReferences(transform, result)
+        collectTransformExpressions(transform, result)
+      }
       return result
+    }
+
+    /**
+     * The transform parameters upstream declares as `type: 'expr'`, which are edges after all.
+     *
+     * `filter`'s `expr`, `formula`'s `expr` and `cross`'s `filter` are per-row expressions rather
+     * than `{"signal": ...}` references, and it is tempting to conclude they cannot be
+     * dependencies. Upstream's `parseExpression` says otherwise: it walks *every* expression's AST
+     * and lets the `scale`, `data` and `indata` visitors register what they find as operator
+     * **parameters**, so a `formula` calling `scale('x', datum.v)` waits for that scale exactly as
+     * a signal-valued parameter would. Vega's serpentine timeline is written that way, and without
+     * the edge its scale is asked for before it exists.
+     */
+    private fun collectTransformExpressions(transform: VegaValue, into: MutableSet<Operator>) {
+      val obj = transform as? VegaValue.Obj ?: return
+      val type = (obj.fields["type"] as? VegaValue.Str)?.value?.lowercase()
+      EXPRESSION_PARAMETERS[type]?.let { parameter ->
+        (obj.fields[parameter] as? VegaValue.Str)?.value?.let { into.addAll(readsOf(it)) }
+      }
+      collectExprObjects(obj, into)
+    }
+
+    /**
+     * Every `{"expr": "..."}` anywhere in a parameter tree, however deeply nested.
+     *
+     * The second of the two spellings a per-row expression takes. Three parameters hold one as a
+     * bare string because upstream declares them `type: 'expr'`; everywhere else it is this object
+     * standing in for a field accessor, which is how `kde2d` takes `{"x": {"expr": "scale('x',
+     * datum.Horsepower)"}}`. Walking the tree for it is what upstream's AST walk amounts to.
+     */
+    private fun collectExprObjects(value: VegaValue, into: MutableSet<Operator>) {
+      when (value) {
+        is VegaValue.Obj -> {
+          (value.fields["expr"] as? VegaValue.Str)?.value?.let { into.addAll(readsOf(it)) }
+          value.fields.values.forEach { collectExprObjects(it, into) }
+        }
+        is VegaValue.Arr -> value.values.forEach { collectExprObjects(it, into) }
+        else -> Unit
+      }
     }
 
     /**
