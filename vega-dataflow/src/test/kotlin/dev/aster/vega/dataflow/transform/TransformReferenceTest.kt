@@ -680,7 +680,7 @@ class TransformReferenceTest {
     VegaValue.Obj(linkedMapOf("g" to VegaValue.Str(group), "v" to VegaValue.Num(value)))
 
   @Test
-  fun `the registry covers the transforms the brief lists, plus thirty-four more`() {
+  fun `the registry covers the transforms the brief lists, plus thirty-five more`() {
     val fromTheBrief =
       setOf(
         "filter",
@@ -715,7 +715,9 @@ class TransformReferenceTest {
     // feature drawn through a projection, the grid of meridians and parallels under it, and a
     // longitude and latitude placed on the page. `voronoi` is the region of the plane nearest to
     // each point, which an interactive scatter plot draws invisibly so the pointer has something to
-    // hit.
+    // hit. `label` places a text mark beside the marks it annotates, dropping the ones that would
+    // collide — the one transform here whose fidelity is not established against upstream, because
+    // upstream's own needs a canvas Node has not got.
     assertEquals(
       fromTheBrief +
         "timeunit" +
@@ -751,7 +753,8 @@ class TransformReferenceTest {
         "geoshape" +
         "geopoint" +
         "graticule" +
-        "voronoi",
+        "voronoi" +
+        "label",
       TransformRegistry.Default.types,
     )
   }

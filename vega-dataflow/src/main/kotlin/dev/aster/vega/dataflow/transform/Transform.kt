@@ -44,6 +44,17 @@ public interface TransformContext {
   public fun projection(name: String): ProjectionDefinition? = null
 
   /**
+   * How wide a string is, in the same units a mark is measured in.
+   *
+   * Only `label` needs it, and it needs it for the same reason upstream does: a label's width
+   * decides whether it fits, and there is no way to know it without measuring. A context with no
+   * text engine falls back to upstream's own canvas-less approximation, which is what the
+   * differential harness measures with anyway.
+   */
+  public fun measureText(text: String, fontSize: Double): Double =
+    (0.8 * text.length * fontSize).toInt().toDouble()
+
+  /**
    * The tree a `stratify` or `nest` built, for a layout transform later in the same pipeline.
    *
    * It rides on the pipeline rather than on the tuples because that is where it lives: a
@@ -282,6 +293,7 @@ public class TransformRegistry(transforms: List<Transform>) {
           GeoPointTransform,
           GraticuleTransform,
           VoronoiTransform,
+          LabelTransform,
         )
       )
   }

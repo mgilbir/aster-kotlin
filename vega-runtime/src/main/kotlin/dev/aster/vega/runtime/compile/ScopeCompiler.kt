@@ -13,6 +13,7 @@ import dev.aster.vega.expression.RandomStream
 import dev.aster.vega.model.DiagnosticCodes
 import dev.aster.vega.model.DiagnosticCollector
 import dev.aster.vega.model.VegaValue
+import dev.aster.vega.model.asString
 import dev.aster.vega.model.field
 import dev.aster.vega.model.roundHalfUp
 import dev.aster.vega.model.spec.AxisSpec
@@ -599,7 +600,7 @@ internal class ScopeCompiler(
     encoder: MarkEncoder,
   ): MarkTransformResult {
     if (spec.transform.isEmpty()) return MarkTransformResult(scope, emptyList(), null)
-    val context = MarkTransformScope(diagnostics, expressions, scope)
+    val context = MarkTransformScope(diagnostics, expressions, scope, textEngine)
     // The **items**, encoded: `{"field": "datum.contour"}` reaches for the row under `datum`, and
     // `{"force": "x", "x": "xfocus"}` reaches for a channel the encoding resolved. Running these
     // over the rows instead would answer the first and silently miss the second.
@@ -635,6 +636,7 @@ internal class ScopeCompiler(
     override val diagnostics: DiagnosticCollector,
     override val expressions: ExpressionCompiler,
     private val outer: CompileScope,
+    private val textEngine: TextEngine,
   ) : TransformContext {
     override var tree: dev.aster.vega.dataflow.transform.TreeSource? = null
 
@@ -651,6 +653,18 @@ internal class ScopeCompiler(
       Replacing(outer.signals.withScales(outer.scales, diagnostics).withDatum(datum), replaced)
 
     override fun projection(name: String): ProjectionDefinition? = outer.projections[name]
+
+    /** The chart's own text engine, so a label is measured the way it will be drawn. */
+    override fun measureText(text: String, fontSize: Double): Double =
+      textEngine
+        .layout(
+          dev.aster.vega.scene.TextRun(
+            text = text,
+            style = dev.aster.vega.scene.TextStyle(fontSize = fontSize),
+          )
+        )
+        .bounds
+        .width
 
     /** The scope the marks after this one see, with any dataset a transform rewrote in it. */
     fun published(scope: CompileScope): CompileScope =
@@ -912,6 +926,16 @@ internal class ScopeCompiler(
       for (mark in list) {
         mark.from?.data?.let(names::add)
         mark.from?.facet?.data?.let(names::add)
+        // A mark-level transform may name another mark in a *parameter* rather than in `from`:
+        // `label`'s `avoidMarks` is the case, and the items it names have to be built for it.
+        for (definition in mark.transform) {
+          val avoid = (definition as? VegaValue.Obj)?.fields?.get("avoidMarks")
+          when (avoid) {
+            is VegaValue.Arr -> avoid.values.forEach { names.add(it.asString()) }
+            is VegaValue.Str -> names.add(avoid.value)
+            else -> Unit
+          }
+        }
         walk(mark.marks)
       }
     }
