@@ -195,13 +195,13 @@ those before comparing, they paint nothing.
 its datasets are fetched into `test-fixtures/data/` and committed. Discount every loader diagnostic
 when judging how far an example is from passing.
 
-**Where the corpus stands, from `ExampleTriage` rather than from memory: 90 of the 93 compile
-clean, 3 report errors.** Read the *movement* rather than the number: 70 → 79 as the stochastic and
+**Where the corpus stands, from `ExampleTriage` rather than from memory: 91 of the 93 compile
+clean, 2 report errors.** Read the *movement* rather than the number: 70 → 79 as the stochastic and
 crossfilter work landed, **79 → 75 when mark-level `transform` was implemented** — the survey
 becoming honest, because five charts had been dropping a whole block silently — and 75 → 80 as the
 raster family and `force` landed.
 
-The 3 that remain **cannot be verified against upstream at all**, and one of them upstream itself
+The 2 that remain **cannot be verified against upstream at all**, and one of them upstream itself
 refuses. There is no category of outstanding work left in the corpus.
 
 **`time-units` is done** and is a fixture; STATUS.md describes the five things it needed. The
@@ -252,38 +252,57 @@ is arithmetic. See SUPPORTED_FEATURES.md for the three behaviours that had to co
 rather than from its schema — in particular that **an omitted force parameter falls to d3's default,
 not the one Vega documents**, because Vega only forwards the parameters a specification wrote.
 
-## What is left: three examples, and none of them can be verified
+## What is left: two examples, and neither can be verified
 
-**117 differential fixtures pass. 90 of the 93 examples compile clean.** Everything that can be
-checked against upstream has been. The three that remain are not waiting on work in this engine.
+**117 differential fixtures pass. 91 of the 93 examples compile clean.** Everything that can be
+checked against upstream has been.
 
-- **`projections` is refused by upstream Vega too.** It names `airy`, `armadillo`, `baker`,
-  `berghaus`, `bottomley`, `collignon`, `eckert1`, `guyou`, `hammer`, `littrow`, `wagner6`,
-  `wiechel`, `winkel3` and the interrupted and polyhedral families — and `vega-projection` imports
-  exactly **one** projection from `d3-geo-projection`, `geoMollweide`, which this engine has. Running
-  the example through the pinned oracle gives `Error: Unrecognized projection type: airy`. The Vega
-  website registers those types itself before rendering that page; a bare Vega cannot draw it, and
-  our diagnostic says what upstream's says. **Do not read its error count as outstanding work.** If
-  the extended family is ever wanted, `Projections.byName` is where a type is added and
-  `GeoProjectionTypesTest` is how it is proved.
+### `projections` — upstream refuses it too
 
-- **`word-cloud` and `labeled-scatter-plot` have no oracle**, and this is established rather than
-  suspected. Both transforms measure or rasterise against a `<canvas>`, and there is none under Node:
-  - `wordcloud` measures text, and upstream's own headless output is degenerate — `fontSize: 0` on
-    every word, a surface width of `-Infinity`.
-  - `label` calls `markBitmaps`, which *renders the avoided marks into a canvas* and reads the alpha
-    back. Under the oracle it throws inside the transform, Vega logs it and carries on, and the
-    labels are never placed. `oracle-js/src/canvas-shim.js` deliberately refuses every drawing call
-    rather than returning something plausible, which is why this is visible instead of silently
-    wrong.
+It names `airy`, `armadillo`, `baker`, `berghaus`, `bottomley`, `collignon`, `eckert1`, `guyou`,
+`hammer`, `littrow`, `wagner6`, `wiechel`, `winkel3` and the interrupted and polyhedral families —
+and `vega-projection` imports exactly **one** projection from `d3-geo-projection`, `geoMollweide`,
+which this engine has. Running the example through the pinned oracle gives `Error: Unrecognized
+projection type: airy`. The Vega website registers those types itself before rendering that page; a
+bare Vega cannot draw it, and our diagnostic says what upstream's says. **Do not read its error count
+as outstanding work.** If the extended family is ever wanted, `Projections.byName` is where a type is
+added and `GeoProjectionTypesTest` is how it is proved.
 
-  Making either verifiable means installing the native `canvas` package — and then matching Cairo's
-  antialiasing coverage exactly on the Kotlin side, since `label` treats *any* non-zero alpha as
-  occupied. That is not a port, it is a rasteriser bake-off. **Implementing these two unverified
-  would produce exactly the plausible-looking wrong answer this project exists to avoid.** If they
-  are to be done, the decision to accept weaker evidence has to be the owner's, and it belongs here:
+### `word-cloud` — the one thing that was not attempted, and why
 
-  > Owner's decision on `label` and `wordcloud`: _not yet made._
+`labeled-scatter-plot` and `word-cloud` used to be a pair: both transforms reach for a `<canvas>`
+Node has not got. They are **not** the same case, and the difference is what decided one and not the
+other.
+
+`label` rasterises the marks it must avoid — circles, a line — and asks only whether a pixel got *any*
+coverage. That question has a geometric answer: does the shape overlap the pixel's square? So the
+transform is implemented, with the occupancy computed analytically, the two halves that *can* be
+pinned pinned (`BitmapTest`), and a warning on every use naming the one step that is not upstream's.
+The two answers differ only on pixels a shape barely grazes.
+
+`wordcloud` rasterises **glyphs**. `cloudSprite` sets a font, calls `fillText`, and reads the pixel
+mask back; the packing then slides each word along an Archimedean spiral until its *mask* stops
+colliding with the masks already placed. Words interlock into each other's gaps — a descender under a
+crossbar — and that interlocking is the whole visual character of a word cloud. There is no geometric
+answer to "which pixels does the word 'GRAMMARS' cover in 36px sans-serif": it depends on the font's
+outlines and the rasteriser's hinting.
+
+Substituting bounding boxes would produce a chart that looks like a word cloud and is not Vega's — a
+visibly looser packing, and unlike `label` there is no pinned half to stand behind it. Everything that
+determines the picture would be the invented part: the spiral is four lines and the generator is
+already shared. **So it is not implemented, and the transform is reported by name.**
+
+What would change that, in order of cost:
+
+1. Install the native `canvas` package in `oracle-js`. That gives upstream a real oracle for both
+   transforms — and costs the guarantee that references can be regenerated offline from a checked-out
+   tree, which PROJECT_BRIEF.md §21 asks for. An owner's call, not a mechanical one.
+2. With an oracle in hand, `label`'s analytic occupancy could be *measured* against a real
+   rasteriser's rather than reasoned about, and its warning either removed or made precise.
+3. `wordcloud` would still need a glyph rasteriser on the Kotlin side to match, which is a font engine
+   and not a port of Vega.
+
+  > Owner's decision on `wordcloud` and on adding a native canvas to the oracle: _not yet made._
 
 ### Where the numeric fidelity is hard-won, for whoever changes it next
 
