@@ -214,8 +214,14 @@ public class ScaleResolver(
 
   private fun buildSequentialColor(spec: ScaleSpec): SequentialColorScale? {
     val colors = colorRange(spec) ?: return null
+    // `nice` applies to a colour scale exactly as it does to a positional one: it rounds the
+    // *domain*. Skipping it leaves the ramp stretched over the raw extent, so every colour is a
+    // shade too dark and nothing about the geometry says so.
     val domain =
-      continuousDomain(spec, zeroDefault = false, fallback = listOf(0.0, 1.0)) ?: return null
+      (continuousDomain(spec, zeroDefault = false, fallback = listOf(0.0, 1.0)) ?: return null)
+        .let {
+          if (spec.nice) niceOf(it, spec) else it
+        }
     val space =
       spec.interpolate?.let { name ->
         ColorSpaces.Interpolation.fromName(name)

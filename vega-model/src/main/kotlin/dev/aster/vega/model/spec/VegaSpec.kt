@@ -893,6 +893,14 @@ public data class LegendSpec(
   val symbolType: String? = null,
   val symbolSize: NumberValue? = null,
   val symbolStrokeWidth: NumberValue? = null,
+  /**
+   * `clipHeight` — a fixed row height, so entries with very different symbol sizes still line up.
+   *
+   * A size legend whose largest swatch is 5,000 units across would otherwise give that row seventy
+   * units of height and the smallest row eight. Setting this makes every row the same and lets the
+   * large symbols overflow, which is what a cartogram's legend wants.
+   */
+  val clipHeight: NumberValue? = null,
   val gradientLength: NumberValue? = null,
   val gradientThickness: NumberValue? = null,
   val rowPadding: NumberValue? = null,
@@ -930,11 +938,13 @@ public data class LegendSpec(
   /**
    * The scale this legend describes.
    *
-   * Upstream picks the first channel present in this order and calls it the canonical scale, so a
-   * legend encoding both `fill` and `size` is titled and sized from the fill scale.
+   * Upstream's `LegendScales` order, first one present wins: **size** before shape before fill. A
+   * legend encoding both `fill` and `size` therefore takes its entry *values* from the size scale,
+   * and its colours follow from those values rather than the other way round. Reading `fill` first
+   * gives a legend with the right number of entries at the wrong values.
    */
   public val scale: String?
-    get() = fill ?: stroke ?: size ?: shape ?: opacity
+    get() = size ?: shape ?: fill ?: stroke ?: opacity
 
   /** How many channels this legend maps, which is what decides whether the type can be derived. */
   public val channelCount: Int

@@ -323,12 +323,17 @@ internal class LegendBuilder(
     val shape = symbolShape(spec)
 
     val sizes = entries.map { symbolSizeFor(spec, it.value, declaredSize) }
+    val clipHeight = numbers.resolve(spec.clipHeight, scaleName)
     // A row is as tall as the taller of its symbol and its label, and upstream rounds the symbol's
     // contribution up before comparing: this is the number every offset within a cell derives from.
-    val boxes = sizes.map { maxOf(ceil(sqrt(it) + strokeWidth), labelFontSize) }
+    val measured = sizes.map { maxOf(ceil(sqrt(it) + strokeWidth), labelFontSize) }
+    // `clipHeight` replaces that measurement **vertically only**. The horizontal anchor still comes
+    // from the real symbols — upstream's `datum.offset` is the widest of them whatever the rows are
+    // clipped to — so a clipped legend's labels still clear its biggest circle.
+    val boxes = measured.map { clipHeight ?: it }
     // A vertical legend aligns every label at the widest symbol; a horizontal one packs each entry
     // against its own symbol. That is upstream's `datum.offset` versus `datum.size`.
-    val widest = boxes.max()
+    val widest = measured.max()
 
     val labelStyle = GuideStyle.text(spec.labelStyle, labelFontSize, defaultWeight = 400)
     val labelLimit = numbers.resolve(spec.labelLimit, scaleName) ?: LegendDefaults.LABEL_LIMIT
@@ -338,7 +343,7 @@ internal class LegendBuilder(
     // before it can decide where the next one starts.
     val cells = entries.mapIndexed { index, entry ->
       val box = boxes[index]
-      val anchor = if (vertical) widest else box
+      val anchor = if (vertical) widest else measured[index]
       val centre = box * 0.5
       val labelX = anchor + LegendDefaults.SYMBOL_OFFSET + labelOffset
       val run =
@@ -393,7 +398,7 @@ internal class LegendBuilder(
     val columns =
       numbers.resolveInt(spec.columns, scaleName)?.coerceAtLeast(1)
         ?: if (vertical) 1 else cells.size
-    return place(cells, columns, rowPadding, columnPadding, scaleName)
+    return place(cells, columns, rowPadding, columnPadding, scaleName, clipHeight)
   }
 
   /**
@@ -408,11 +413,20 @@ internal class LegendBuilder(
     rowPadding: Double,
     columnPadding: Double,
     scaleName: String,
+    /**
+     * `clipHeight`: the row height the layout must use, whatever the symbols measure.
+     *
+     * Null for an ordinary legend, where a row is as tall as what is in it. With one set, a symbol
+     * larger than the row **overflows** it rather than pushing the next row down, which is the
+     * entire reason a specification sets one.
+     */
+    clipHeight: Double? = null,
   ): List<SceneNode> {
     val order = GridLayout.columnMajorOrder(cells.size, columns)
     val ordered = order.map { cells[it] }
     val boxes = ordered.map { cell ->
-      cell.fold(RectD.Empty) { acc, node -> acc.union(node.bounds) }
+      val measured = cell.fold(RectD.Empty) { acc, node -> acc.union(node.bounds) }
+      if (clipHeight == null) measured else RectD(measured.left, 0.0, measured.right, clipHeight)
     }
     val offsets = GridLayout.place(boxes, GridLayout.Options(columns, rowPadding, columnPadding))
 
@@ -422,6 +436,12 @@ internal class LegendBuilder(
         id = ids.allocate(),
         children = ordered[position],
         transform = Transform2D.translate(offset.x, offset.y),
+        // With a `clipHeight` the entry is a **clipped** box: a symbol larger than the row spills
+        // out of it, and the legend is sized as though it had not. That is what the property is
+        // for — a size legend whose largest swatch is 5,000 units would otherwise be seventy units
+        // tall per row and as wide as its biggest circle.
+        size = clipHeight?.let { SizeD(boxes[position].width, it) },
+        clip = clipHeight?.let { RectD(0.0, 0.0, boxes[position].width, it) },
         // Upstream calls this a "scope" group; naming it for what it is keeps a legend entry
         // distinguishable from a group mark's cell, which shares that role.
         metadata =
@@ -843,6 +863,19 @@ internal class LegendBuilder(
     return { value -> NumberFormatSubset.format(value, resolved) }
   }
 
+  /** Numeric entries, with the legend's own format applied when it named one. */
+  private fun numeric(
+    spec: LegendSpec,
+    values: List<Double>,
+    labels: List<String>,
+    count: Int,
+  ): List<Entry> {
+    val write = numberLabeller(spec, values.firstOrNull() ?: 0.0, values.lastOrNull() ?: 1.0, count)
+    return values.indices.map { index ->
+      Entry(VegaValue.Num(values[index]), write?.invoke(values[index]) ?: labels[index])
+    }
+  }
+
   // ---- entry values -----------------------------------------------------------
 
   /**
@@ -862,12 +895,11 @@ internal class LegendBuilder(
       is OrdinalScale -> scale.domain.map { Entry(VegaValue.Str(it), it) }
       is BandScale -> scale.domain.map { Entry(VegaValue.Str(it), it) }
       is PointScale -> scale.domain.map { Entry(VegaValue.Str(it), it) }
-      is LinearScale ->
-        scale.ticks(count).zip(scale.tickLabels(count)).map { (v, l) -> Entry(VegaValue.Num(v), l) }
-      is TransformedScale ->
-        scale.ticks(count).zip(scale.tickLabels(count)).map { (v, l) -> Entry(VegaValue.Num(v), l) }
-      is SequentialColorScale ->
-        scale.ticks(count).zip(scale.tickLabels(count)).map { (v, l) -> Entry(VegaValue.Num(v), l) }
+      // A legend's own `format` wins over the scale's tick labels, exactly as an axis's does: a
+      // rate scale labelled `.1%` reads "10.0%" and not "0.1".
+      is LinearScale -> numeric(spec, scale.ticks(count), scale.tickLabels(count), count)
+      is TransformedScale -> numeric(spec, scale.ticks(count), scale.tickLabels(count), count)
+      is SequentialColorScale -> numeric(spec, scale.ticks(count), scale.tickLabels(count), count)
       is TimeScale ->
         scale.ticks(count).zip(scale.tickLabels(count)).map { (v, l) -> Entry(VegaValue.Num(v), l) }
       // A banded legend, approximately. Upstream draws one as a *stacked colour bar* —
@@ -986,12 +1018,14 @@ internal class LegendBuilder(
    */
   private fun caption(built: Built): String? {
     val spec = built.spec
+    // Upstream's `LegendScales` order, which is also the order a caption reads them in: size
+    // first, then shape, then the two colours. "for size and fill color", not the reverse.
     val channels =
       listOfNotNull(
-        spec.fill?.let { "fill" },
-        spec.stroke?.let { "stroke" },
         spec.size?.let { "size" },
         spec.shape?.let { "shape" },
+        spec.fill?.let { "fill" },
+        spec.stroke?.let { "stroke" },
         spec.opacity?.let { "opacity" },
       )
     val scaleName = spec.scale ?: return null

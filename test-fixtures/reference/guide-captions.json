@@ -660,6 +660,11 @@
   "caption": "Y-axis titled 'Written out' for a linear scale with values from 0 to 60"
  },
  {
+  "fixture": "dorling-cartogram",
+  "kind": "legend",
+  "caption": "Symbol legend titled '% of Obese Adults' for size and fill color with values from 10.0% to 20.1%"
+ },
+ {
   "fixture": "dot-plot-wilkinson",
   "kind": "axis",
   "caption": "X-axis titled 'Density Dot Plot' for a linear scale with values from 0 to 20"

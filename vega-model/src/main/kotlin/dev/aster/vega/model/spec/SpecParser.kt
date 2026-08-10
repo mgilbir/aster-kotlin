@@ -1752,6 +1752,7 @@ public class SpecParser {
         symbolType = obj.fields["symbolType"]?.asString(),
         symbolSize = obj.numberOrSignal("symbolSize", "$path.symbolSize"),
         symbolStrokeWidth = obj.numberOrSignal("symbolStrokeWidth", "$path.symbolStrokeWidth"),
+        clipHeight = obj.numberOrSignal("clipHeight", "$path.clipHeight"),
         gradientLength = obj.numberOrSignal("gradientLength", "$path.gradientLength"),
         gradientThickness = obj.numberOrSignal("gradientThickness", "$path.gradientThickness"),
         rowPadding = obj.numberOrSignal("rowPadding", "$path.rowPadding"),

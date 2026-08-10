@@ -304,6 +304,23 @@ public class SignalScope(
     return VegaValue.Arr(listOf(VegaValue.Num(centre[0]), VegaValue.Num(centre[1])))
   }
 
+  /** `geoArea('name', feature)`, in square units of the page. */
+  override fun geoArea(projection: String?, geojson: VegaValue): VegaValue {
+    val definition =
+      if (projection == null) null
+      else
+        projections[projection]
+          ?: run {
+            diagnostics?.error(
+              DiagnosticCodes.SCALE_UNSUPPORTED_TYPE,
+              "geoArea() names projection '$projection', which this scope does not define",
+              operator = projection,
+            )
+            return VegaValue.Null
+          }
+    return VegaValue.Num(GeoMeasure.area(definition, geojson))
+  }
+
   public val names: Set<String>
     get() = values.keys
 

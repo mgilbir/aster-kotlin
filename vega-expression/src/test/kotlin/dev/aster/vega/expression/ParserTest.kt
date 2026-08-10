@@ -246,7 +246,7 @@ class ParserTest {
   @Test
   fun `a deliberately excluded function explains why`() {
     val failure =
-      assertThrows<ExpressionEvaluationException> { compiled("geoArea()").evaluate(scopeOf()) }
+      assertThrows<ExpressionEvaluationException> { compiled("geoBounds()").evaluate(scopeOf()) }
     assertTrue(
       failure.diagnostic.message.contains("geographic"),
       failure.diagnostic.message,

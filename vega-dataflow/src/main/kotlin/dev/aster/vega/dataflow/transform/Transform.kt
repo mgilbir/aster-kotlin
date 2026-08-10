@@ -279,6 +279,7 @@ public class TransformRegistry(transforms: List<Transform>) {
           HeatmapTransform,
           ForceTransform,
           GeoShapeTransform,
+          GeoPointTransform,
           GraticuleTransform,
         )
       )

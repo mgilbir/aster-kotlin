@@ -122,6 +122,9 @@ public interface ExpressionScope {
    */
   public fun geoCentroid(projection: String?, geojson: VegaValue): VegaValue = VegaValue.Null
 
+  /** `geoArea('projection', feature)` — how much of the page the shape covers. */
+  public fun geoArea(projection: String?, geojson: VegaValue): VegaValue = VegaValue.Null
+
   /** `bandwidth('name')` — a band scale's band width, or zero for a scale that has none. */
   public fun scaleBandwidth(name: String): VegaValue = VegaValue.Num(0.0)
 

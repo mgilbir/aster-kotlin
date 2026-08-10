@@ -139,6 +139,8 @@ One hundred and six differential fixtures pass, all matching upstream exactly on
 | `world-map` | 178 | Vega's configurable world map: a TopoJSON file decoded, a mercator projection with rotation and centring, a graticule under it, and 177 countries cut at the antimeridian |
 | `county-unemployment` | 3622 | Vega's county choropleth: `albersUsa` — three projections at once, with Alaska and Hawaii inset — over 3,100 counties, and a banded legend whose lowest band has no lower bound to write |
 | `map-with-tooltip` | 3623 | The same counties under a mercator, with `geoCentroid` placing a tooltip and `invert` reading the projection backwards |
+| `dorling-cartogram` | 113 | Vega's Dorling cartogram: states as circles sized by `geoArea` over `albersUsa`, and a size legend whose rows are clipped so its biggest swatches overlap |
+| `geo-points` | 30 | Six cities placed by `geopoint` under three projections at once, joined by rules so a misplaced point moves a line as well as a dot |
 
 The gate is wired into `./scripts/oracle.sh`, so every further scale, mark and transform is built
 against a harness that can say we are wrong — which golden tests cannot.

@@ -4,6 +4,7 @@ import dev.aster.vega.dataflow.geo.AlbersUsa
 import dev.aster.vega.dataflow.geo.GeoJsonStream
 import dev.aster.vega.dataflow.geo.GeoProjector
 import dev.aster.vega.dataflow.geo.Graticule
+import dev.aster.vega.dataflow.geo.PathAreaSink
 import dev.aster.vega.dataflow.geo.PathCentroidSink
 import dev.aster.vega.dataflow.geo.PathStringSink
 import dev.aster.vega.dataflow.geo.Projection
@@ -220,4 +221,80 @@ public object GeoMeasure {
    */
   public fun invert(definition: ProjectionDefinition, x: Double, y: Double): DoubleArray? =
     (definition.build() as? Projection)?.invert(x, y)
+
+  /**
+   * The area a geometry covers once drawn, in square units of the page.
+   *
+   * What a cartogram sizes its circles by. Each ring counts by the absolute value of its own signed
+   * area, so a hole adds rather than subtracts — upstream's choice, and the one a chart calibrated
+   * against it expects.
+   */
+  public fun area(definition: ProjectionDefinition?, geojson: VegaValue): Double {
+    val sink = PathAreaSink()
+    val stream = definition?.build()?.stream(sink) ?: sink
+    GeoJsonStream.stream(geojson, stream)
+    return sink.result()
+  }
+}
+
+/**
+ * `geopoint`: a longitude and a latitude placed on the page.
+ *
+ * The whole of what a projection does to a *point*, with none of what it does to a shape: no
+ * clipping, no resampling, no path. A city on a map is one of these; the country under it is a
+ * `geoshape`. Writing nothing where the point falls outside the projection is upstream's own
+ * behaviour, and it matters — a mark encoded from a missing `x` draws at the origin rather than
+ * being left out, which is visible as a cluster of points in the top-left corner.
+ */
+public object GeoPointTransform : Transform {
+  override val type: String = "geopoint"
+
+  override fun apply(
+    input: List<VegaValue>,
+    params: VegaValue.Obj,
+    context: TransformContext,
+  ): List<VegaValue> {
+    val fields = params.stringList("fields")
+    if (fields.size < 2) {
+      context.diagnostics.error(
+        DiagnosticCodes.TRANSFORM_INVALID_PARAMETER,
+        "geopoint needs 'fields' naming a longitude and a latitude",
+        operator = type,
+      )
+      return input
+    }
+    val outputs = params.stringList("as").takeIf { it.size >= 2 } ?: listOf("x", "y")
+    val name = params.string("projection")
+    val definition = name?.let { context.projection(it) }
+    if (definition == null) {
+      context.diagnostics.error(
+        DiagnosticCodes.TRANSFORM_INVALID_PARAMETER,
+        "geopoint names projection '${name ?: ""}', which this scope does not define",
+        operator = type,
+      )
+      return input
+    }
+    val projection = definition.build()
+    if (projection == null) {
+      context.diagnostics.error(
+        DiagnosticCodes.TRANSFORM_NOT_IMPLEMENTED,
+        "Projection type '${definition.type}' is not implemented, so projection " +
+          "'$name' placed nothing. Implemented: ${Projections.names.sorted().joinToString(", ")}",
+        operator = type,
+      )
+      return input
+    }
+
+    return input.map { row ->
+      val lon = row.field(fields[0]).asDouble()
+      val lat = row.field(fields[1]).asDouble()
+      val placed = if (lon.isNaN() || lat.isNaN()) null else projection.apply(lon, lat)
+      row.withFields(
+        linkedMapOf(
+          outputs[0] to (placed?.let { VegaValue.Num(it[0]) } ?: VegaValue.Null),
+          outputs[1] to (placed?.let { VegaValue.Num(it[1]) } ?: VegaValue.Null),
+        )
+      )
+    }
+  }
 }

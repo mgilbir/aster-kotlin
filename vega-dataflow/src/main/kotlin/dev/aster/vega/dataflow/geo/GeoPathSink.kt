@@ -218,3 +218,62 @@ internal class PathCentroidSink : GeoStream() {
       else -> null
     }
 }
+
+/**
+ * The area a drawn shape covers, `d3-geo/src/path/area.js`.
+ *
+ * Each ring contributes its own signed area and the **absolute** value of that is added, so a hole
+ * counts as much as the shape around it — which is upstream's choice and not obviously the right
+ * one, but it is what a chart sizing a circle by `geoArea` is calibrated against.
+ */
+internal class PathAreaSink : GeoStream() {
+  private var total = 0.0
+  private var ring = Adder()
+  private var firstX = 0.0
+  private var firstY = 0.0
+  private var previousX = 0.0
+  private var previousY = 0.0
+  private var inPolygon = false
+  private var atRingStart = false
+
+  override fun point(x: Double, y: Double) {
+    if (!inPolygon) return
+    if (atRingStart) {
+      atRingStart = false
+      firstX = x
+      firstY = y
+      previousX = x
+      previousY = y
+      return
+    }
+    step(x, y)
+  }
+
+  override fun lineStart() {
+    if (inPolygon) atRingStart = true
+  }
+
+  override fun lineEnd() {
+    // The ring closes back to where it started, which is the segment that shuts the area.
+    if (inPolygon && !atRingStart) step(firstX, firstY)
+  }
+
+  override fun polygonStart() {
+    inPolygon = true
+  }
+
+  override fun polygonEnd() {
+    inPolygon = false
+    total += kotlin.math.abs(ring.value())
+    ring = Adder()
+  }
+
+  private fun step(x: Double, y: Double) {
+    ring.add(previousY * x - previousX * y)
+    previousX = x
+    previousY = y
+  }
+
+  /** Half the summed cross products, which is the shoelace area. */
+  fun result(): Double = total / 2
+}
