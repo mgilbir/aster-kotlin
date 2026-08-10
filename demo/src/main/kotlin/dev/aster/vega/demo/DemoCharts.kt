@@ -46,6 +46,9 @@ public enum class DemoChart(
   SPEC_DUAL_AXIS("Spec: dual axis", "dual-axis.vl.json"),
   SPEC_DASHBOARD("Spec: nested concat", "nested-concat.vl.json"),
   SPEC_FACET_WRAP("Spec: wrapped facet", "facet-wrap.vl.json"),
+  // Vega-Lite's own population pyramid, which states no channel types at all — the chart that
+  // found five defects at once when it was pasted into the box below.
+  SPEC_PYRAMID("Spec: pyramid", "pyramid.vl.json"),
   PASTED("Paste your own", isPasted = true);
 
   /** True when this entry is compiled from a specification rather than built by hand. */
@@ -78,6 +81,7 @@ public enum class DemoChart(
       SPEC_DUAL_AXIS,
       SPEC_DASHBOARD,
       SPEC_FACET_WRAP,
+      SPEC_PYRAMID,
       PASTED -> null
     }
   }
