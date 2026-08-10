@@ -470,7 +470,7 @@ produces a chart that is plausible and wrong.
 every fixture with upstream and checks two things:
 
 1. `VegaLiteFixtureTest` compares the Vega this compiler emits against upstream's, property by
-   property. Sixty-five fixtures, and all of them match exactly — every transform, scale, signal,
+   property. Sixty-six fixtures, and all of them match exactly — every transform, scale, signal,
    axis, legend and mark encoding, down to the accessibility description string.
 2. `VegaLiteFixtureDifferentialTest` runs that output through this engine's own runtime and compares
    the scene against the one upstream draws. Every mark of every fixture matches, and nothing is
@@ -555,7 +555,7 @@ own) and `grouped-bar` on the step arithmetic.
 
 ### Where the compiler stands, and what it still refuses
 
-Sixty-five fixtures, each matching upstream's compiler property for property and drawing the chart
+Sixty-six fixtures, each matching upstream's compiler property for property and drawing the chart
 upstream draws. The grammar covered: a single view, a layer of them, a concatenation of either, a
 repetition of any of those, both facet operators, eleven marks including `arc`,
 the Cartesian and polar position pairs, nested offsets, fourteen of fifteen transforms, sorting,
@@ -570,9 +570,11 @@ What it still refuses, by name, with the reason each is refused rather than appr
 - **Geographic projections and the `geoshape` mark.** The runtime draws maps — `world-map` is in the
   Vega corpus — so this is now a *compiler* gap and not an engine one: nothing here yet translates
   Vega-Lite's `projection` block and its `geoshape` mark into the Vega equivalents.
-- A composition **nested inside a concatenation**, and a `sort` on a facet channel that names an
-  aggregate or a written-out list, whose key has to be computed onto the rows before the cells are
-  made.
+- A composition **nested inside a concatenation**.
+- A facet `sort` that names a **written-out list**, whose place in it has to be computed onto every
+  row as a column of its own; and one that names an aggregate on a facet gridded **both** ways,
+  where the key has to be written onto the rows first so each cell can take the greatest of its own.
+  An aggregate sort on a facet gridded one way is implemented (below).
 
 ### Concatenation: two plots, and what they do not share
 
@@ -661,6 +663,25 @@ Three rules came out of upstream with it:
   many have landed on each and moves one across when they do not match, counting the side each
   *asked* for rather than the side it ended on. And only the first rules gridlines: two sets across
   one plot measure different things and say neither.
+
+### Ordering a trellis by a total none of its rows carries
+
+A facet `sort` that names an aggregate — `{"field": "amount", "op": "sum", "order": "descending"}` —
+is the ordinary way to put the biggest column first, and it needs the key computed before anything
+can be ordered by it. Upstream computes it **twice**, under two names, and both are needed:
+
+- the **domain** dataset's aggregate gains `fields`/`ops`/`as` and holds it as `sum_amount`, which is
+  what the header bands sort on, each of their rows already being one cell's worth;
+- the **cell** group's own `from.facet.aggregate` computes it again over its own partition as
+  `sum_amount_by_era` — suffixed with the faceted field, so the two names cannot collide — which is
+  what the cells sort on.
+
+`DEFAULT_SORT_OP` is **`min`**, not the `sum` the encoding sorts might lead a reader to expect.
+
+Two forms are still reported by name: a sort by a written-out **list**, whose place in it has to be
+computed onto every row as a column of its own; and an aggregate sort on a facet gridded **both**
+ways, where upstream writes the key onto the rows first so that each cell can take the greatest of
+its own. Both are data-flow work rather than another name for the same aggregate.
 
 ### A trellis whose cells run backwards, and the two ways it was wrong
 
@@ -1084,7 +1105,7 @@ the whole time.
 
 ## Verification
 
-- 2,288 JVM tests pass and none is skipped (`./gradlew test`); the portable core is most of
+- 2,295 JVM tests pass and none is skipped (`./gradlew test`); the portable core is most of
   them, and `./scripts/test-core.sh` runs it without an Android SDK.
 - Android lint is clean with `warningsAsErrors` on every Android module.
 - 63 instrumented tests pass on an API 37 arm64 emulator (`./scripts/test-android.sh`): 49 in

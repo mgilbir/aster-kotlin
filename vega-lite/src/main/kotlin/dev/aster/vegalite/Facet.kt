@@ -15,30 +15,73 @@ internal class Facet(val channel: String, val def: ChannelDef) {
 
   val field: String = Fields.vgField(def)
 
+  /** The `sort` object this channel orders its cells by, where it names one. */
+  private val sortObject: VegaValue.Obj? = (def.sort as? VegaValue.Obj)?.takeIf { it.has("field") }
+
+  /** `DEFAULT_SORT_OP` is `min`, not the `sum` a reader might expect from the encoding sorts. */
+  private val sortOp: String? = sortObject?.let { it.string("op") ?: "min" }
+
+  private val sortSource: String? = sortObject?.string("field")
+
+  fun sortSourceField(): String = sortSource!!
+
+  fun sortOperation(): String = sortOp!!
+
+  /**
+   * What the *domain* dataset calls the aggregate the cells are ordered by — `sum_amount`.
+   *
+   * `vgField(sortField, {forAs: true})`: the plain aggregate name, which is what the header bands
+   * read, since they are drawn from that dataset and each of its rows is already one cell's worth.
+   */
+  val sortAggregate: String? = sortOp?.let { "${it}_$sortSource" }
+
+  /**
+   * What the *cell* group calls the same aggregate — `sum_amount_by_era`.
+   *
+   * `facetSortFieldName` suffixes it with the field being faceted on, because the facet computes it
+   * a second time over its own partition and the two names must not collide.
+   */
+  val cellSortAggregate: String? = sortAggregate?.let { "${it}_by_$field" }
+
   /**
    * Which way the cells run — `facetSortOrder` in `compile/facet.ts`.
    *
    * A facet channel's `sort` orders the *cells*, not anything inside one, so it lands on the group
-   * mark that makes them and on the header bands beside it. `"descending"` is the whole of what a
-   * bare string can say; a sort **object** orders the cells by an aggregate of another column and a
-   * sort **array** by a written-out list, and both need a key computed onto the rows before the
-   * cells are made, which is data-flow work this compiler has not done — so they are reported
-   * rather than quietly ignored, which would leave the cells in the wrong order and say nothing.
+   * mark that makes them and on the header bands beside it.
    */
   val order: String =
-    if ((def.sort as? VegaValue.Str)?.value == "descending") "descending" else "ascending"
+    when {
+      sortObject != null -> sortObject.string("order") ?: "ascending"
+      (def.sort as? VegaValue.Str)?.value == "descending" -> "descending"
+      else -> "ascending"
+    }
 
-  fun reportUnsupportedSort(diagnostics: dev.aster.vega.model.DiagnosticCollector) {
+  /** What the cells are ordered *by*: the facet's own column, or the aggregate standing for it. */
+  fun sortKey(inCell: Boolean): String = (if (inCell) cellSortAggregate else sortAggregate) ?: field
+
+  fun reportUnsupportedSort(
+    diagnostics: dev.aster.vega.model.DiagnosticCollector,
+    crossed: Boolean,
+  ) {
     val sort = def.sort ?: return
     if (sort is VegaValue.Str || sort == VegaValue.Null) return
+    val reason =
+      when {
+        sort is VegaValue.Arr ->
+          "names a list of values, whose place in it has to be computed onto every row as a " +
+            "column of its own before the cells are made"
+        sortObject == null -> "names no `field` to aggregate"
+        crossed ->
+          "names an aggregate on a facet that is crossed both ways, where the key has to be " +
+            "written onto the rows first so that each cell can take the greatest of its own"
+        else -> return
+      }
     diagnostics.error(
       VegaLiteDiagnostics.UNSUPPORTED_ENCODING_PROPERTY,
-      "A `sort` on the `$channel` facet that names " +
-        (if (sort is VegaValue.Arr) "a list of values" else "an aggregate of another field") +
-        " is not implemented: the key it orders by has to be computed onto the rows before the " +
-        "cells are made. The cells run in the order of `$field` instead. A bare " +
-        "`\"ascending\"` or `\"descending\"` is honoured, and a column already in the order " +
-        "you want can be faceted on directly.",
+      "A `sort` on the `$channel` facet that $reason is not implemented; the cells run in the " +
+        "order of `$field` instead. A bare `\"ascending\"` or `\"descending\"` is honoured, so " +
+        "is an aggregate of another column on a facet gridded one way, and a column already in " +
+        "the order you want can be faceted on directly.",
       jsonPath = "$.encoding.$channel.sort",
     )
   }
@@ -55,6 +98,14 @@ internal class Facet(val channel: String, val def: ChannelDef) {
         obj {
           put("type", "aggregate")
           put("groupby", strings(listOf(field)))
+          // The key the cells are ordered by, measured once per cell — which is what this dataset
+          // already holds a row of. `assembleRowColumnHeaderData` puts it here rather than leaving
+          // the header bands to sort on something they cannot see.
+          if (sortAggregate != null) {
+            put("fields", strings(listOf(sortSource!!)))
+            put("ops", strings(listOf(sortOp!!)))
+            put("as", strings(listOf(sortAggregate)))
+          }
         }
       ),
     )
@@ -215,7 +266,7 @@ internal class FacetGrid(val row: Facet?, val column: Facet?) : FacetLayout {
         put(
           "sort",
           obj {
-            put("field", "datum[${quoted(facet.field)}]")
+            put("field", "datum[${quoted(facet.sortKey(inCell = false))}]")
             put("order", facet.order)
           },
         )
@@ -332,8 +383,19 @@ internal class FacetGrid(val row: Facet?, val column: Facet?) : FacetLayout {
             put("name", "facet")
             put("data", dataName)
             put("groupby", strings(fields))
-            if (row != null && column != null) {
-              put("aggregate", obj { put("cross", VegaValue.Bool(true)) })
+            val sorted = listOfNotNull(row, column).filter { it.cellSortAggregate != null }
+            if (row != null && column != null || sorted.isNotEmpty()) {
+              put(
+                "aggregate",
+                obj {
+                  if (row != null && column != null) put("cross", VegaValue.Bool(true))
+                  if (sorted.isNotEmpty()) {
+                    put("fields", strings(sorted.map { it.sortSourceField() }))
+                    put("ops", strings(sorted.map { it.sortOperation() }))
+                    put("as", strings(sorted.map { it.cellSortAggregate!! }))
+                  }
+                },
+              )
             }
           },
         )
@@ -342,7 +404,10 @@ internal class FacetGrid(val row: Facet?, val column: Facet?) : FacetLayout {
     put(
       "sort",
       obj {
-        put("field", strings(fields.map { "datum[${quoted(it)}]" }))
+        put(
+          "field",
+          strings(listOfNotNull(row, column).map { "datum[${quoted(it.sortKey(inCell = true))}]" }),
+        )
         put("order", strings(listOfNotNull(row, column).map { it.order }))
       },
     )

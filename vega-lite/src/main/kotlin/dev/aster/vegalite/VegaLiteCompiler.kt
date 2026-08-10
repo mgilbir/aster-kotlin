@@ -540,7 +540,8 @@ private class Compilation(
       view.spec.encoding["facet"]?.takeIf { it.isFieldDef }
     }
     if (row == null && column == null && wrapped == null) return views
-    listOfNotNull(row, column).forEach { it.reportUnsupportedSort(diagnostics) }
+    val crossed = row != null && column != null
+    listOfNotNull(row, column).forEach { it.reportUnsupportedSort(diagnostics, crossed) }
     val found: FacetLayout =
       if (wrapped != null) FacetWrap(wrapped, spec.number("columns")?.toInt())
       else FacetGrid(row, column)
