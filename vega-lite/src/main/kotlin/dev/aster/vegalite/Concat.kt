@@ -66,12 +66,12 @@ private constructor(
       val children = mutableListOf<Pair<String?, VegaValue.Obj>>()
       entries.forEachIndexed { index, entry ->
         val child = entry as? VegaValue.Obj ?: return@forEachIndexed
-        for (nested in listOf("hconcat", "vconcat", "concat", "repeat", "facet")) {
+        for (nested in listOf("repeat", "facet")) {
           if (child.has(nested)) {
             diagnostics.fatal(
               VegaLiteDiagnostics.UNSUPPORTED_COMPOSITION,
               "A `$nested` inside a `$kind` is not implemented; a concatenation's plots are " +
-                "single views or layers of them.",
+                "single views, layers of them, or concatenations.",
               jsonPath = "$.$kind[$index].$nested",
             )
             return null

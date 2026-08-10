@@ -474,7 +474,7 @@ produces a chart that is plausible and wrong.
 every fixture with upstream and checks two things:
 
 1. `VegaLiteFixtureTest` compares the Vega this compiler emits against upstream's, property by
-   property. Sixty-eight fixtures, and all of them match exactly — every transform, scale, signal,
+   property. Sixty-nine fixtures, and all of them match exactly — every transform, scale, signal,
    axis, legend and mark encoding, down to the accessibility description string.
 2. `VegaLiteFixtureDifferentialTest` runs that output through this engine's own runtime and compares
    the scene against the one upstream draws. Every mark of every fixture matches, and nothing is
@@ -559,8 +559,9 @@ own) and `grouped-bar` on the step arithmetic.
 
 ### Where the compiler stands, and what it still refuses
 
-Sixty-eight fixtures, each matching upstream's compiler property for property and drawing the chart
-upstream draws. The grammar covered: a single view, a layer of them to any depth, a concatenation of either, a
+Sixty-nine fixtures, each matching upstream's compiler property for property and drawing the chart
+upstream draws. The grammar covered: a single view, a layer of them to any depth, a concatenation of
+either to any depth, a
 repetition of any of those, both facet operators, eleven marks including `arc`,
 the Cartesian and polar position pairs, nested offsets, fourteen of fifteen transforms, sorting,
 binning, time units, stacking, faceting by `row` and `column`, conditional encodings, a line or an
@@ -576,7 +577,6 @@ What it still refuses, by name, with the reason each is refused rather than appr
 - **Geographic projections and the `geoshape` mark.** The runtime draws maps — `world-map` is in the
   Vega corpus — so this is now a *compiler* gap and not an engine one: nothing here yet translates
   Vega-Lite's `projection` block and its `geoshape` mark into the Vega equivalents.
-- A composition **nested inside a concatenation**.
 - A facet `sort` that names a **written-out list**, whose place in it has to be computed onto every
   row as a column of its own; and one that names an aggregate on a facet gridded **both** ways,
   where the key has to be written onto the rows first so each cell can take the greatest of its own.
@@ -669,6 +669,27 @@ Three rules came out of upstream with it:
   many have landed on each and moves one across when they do not match, counting the side each
   *asked* for rather than the side it ended on. And only the first rules gridlines: two sets across
   one plot measure different things and say neither.
+
+### A concatenation inside a concatenation
+
+A dashboard is a column of rows, and it needed the flat list of plots to become a tree. Only the
+*shape* did: everything a plot has — views, scales, axes, a size — still belongs to the leaves, so
+the leaf list stays flat and nothing downstream knows about the nesting. What the tree carries is
+three things upstream does at every level rather than once:
+
+- **The names compose.** `concat_0_concat_1_x`, because `defaultScaleResolve` makes positions
+  independent at each level, and the level below inherits the name of the level above.
+- **The sizes merge per level, innermost first**, because a nested concatenation has to settle its
+  own size before the level above can ask what that size is. What a nested one contributes upwards
+  is whatever *its* children merged into — and nothing where they disagreed, which is what stops a
+  column holding a row of plots from claiming a width of its own. A level that merges takes the
+  name over from its children, so the signal is written once and at the level that settled it.
+- **The signals come out in tree order**: each level's own before it recurses, and within a level
+  `width`, `height`, `childWidth`, `childHeight`. That is `assembleLayoutSignals`, and it was the
+  only thing the first attempt got wrong — everything else matched on the first run.
+
+A nested concatenation's group carries a `layout` and nothing else: no style and no `encode`, because
+it is not a plotting area, only a place its plots are arranged in.
 
 ### A layer inside a layer, which the naming was already carrying
 
@@ -1140,7 +1161,7 @@ the whole time.
 
 ## Verification
 
-- 2,337 JVM tests pass and none is skipped (`./gradlew test`); the portable core is most of
+- 2,344 JVM tests pass and none is skipped (`./gradlew test`); the portable core is most of
   them, and `./scripts/test-core.sh` runs it without an Android SDK.
 - Android lint is clean with `warningsAsErrors` on every Android module.
 - 63 instrumented tests pass on an API 37 arm64 emulator (`./scripts/test-android.sh`): 49 in

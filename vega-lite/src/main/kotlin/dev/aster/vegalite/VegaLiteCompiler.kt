@@ -98,8 +98,8 @@ private class Compilation(
     // A `row`/`column` facet operator is the same chart as the same two channels written in the
     // encoding, so it becomes one before anything else looks at it.
     if (spec.has("facet")) spec = FacetOperator.normalize(spec, diagnostics) ?: return failed()
-    concat = Concat.of(spec, diagnostics)
     val plots = plots() ?: return failed()
+    concat = (plotTree as? Node.Nest)?.concat
     if (plots.any { it.views.isEmpty() }) return failed()
 
     // A facet channel does not encode anything *within* a cell, so it is lifted out of the encoding
@@ -152,13 +152,11 @@ private class Compilation(
         else allLegends.filterKeys { owner[it] === plot }.values.toList()
     }
     val legends = allLegends.filterKeys { concat == null || owner[it] == null }.values.toList()
-    // A merged size is written once, by the chart, rather than once by each plot that shares it.
-    // The layout's own signals first, then the parameters, which is upstream's order in
-    // `assembleTopLevelModel` — a parameter may read a size and not the other way about.
-    val sizeSignals =
-      plots.flatMap { plot -> plot.size!!.signals.filter { it.string("name") !in merged } } +
-        mergedSizeSignals() +
-        Params.signals(spec, diagnostics)
+    // In the order upstream's `assembleLayoutSignals` walks the model tree: each level's own sizes
+    // before it recurses, and within a level `width`, `height`, `childWidth`, `childHeight`. Then
+    // the parameters, which is `assembleTopLevelModel`'s order — a parameter may read a size and
+    // not the other way about.
+    val sizeSignals = sizeSignalsFor(plotTree) + Params.signals(spec, diagnostics)
     val root = plots.first().size!!
     // The facets' own values, which the layout counts and the headers title themselves from — and,
     // for a wrapped facet, only along the directions a shared axis was actually drawn in.
@@ -193,7 +191,7 @@ private class Compilation(
       if (sizeSignals.isNotEmpty()) put("signals", arr(sizeSignals))
       facet?.let { put("layout", it.layout(FACET_SPACING, HEADER_OFFSET, config)) }
       concat?.let { put("layout", it.layout()) }
-      put("marks", arr(if (concat == null) marks(views, plots.single().axes) else groups(plots)))
+      put("marks", arr(if (concat == null) marks(views, plots.single().axes) else groups(plotTree)))
       // Shared scales first, then each plot's own, which is the order upstream's assembly walks the
       // model tree in: the composition's own components before it recurses into its children.
       val scales =
@@ -279,23 +277,66 @@ private class Compilation(
     }
   }
 
+  /**
+   * How the plots nest, which is separate from what each plot holds.
+   *
+   * A concatenation may hold another, and then the names compose — `concat_0_concat_1_x` — and the
+   * inner one carries a `layout` of its own inside the outer one's group. Everything that a *plot*
+   * has (views, scales, axes, a size) still belongs to the leaves; this is only the shape they are
+   * arranged in, so the leaf list stays flat and nothing downstream has to know about the tree.
+   */
+  private sealed interface Node {
+    class Leaf(val plot: Plot) : Node
+
+    class Nest(val name: String, val concat: Concat, val children: List<Node>) : Node {
+      /** The size signal this level merged its children into, per channel, where it merged one. */
+      val owns: MutableMap<String, String> = mutableMapOf()
+    }
+  }
+
+  private lateinit var plotTree: Node
+
   private fun plots(): List<Plot>? {
-    val found = concat
-    val plots =
-      if (found == null) listOf(Plot("", spec))
-      else
-        found.children.mapIndexed { index, (name, child) ->
+    val leaves = mutableListOf<Plot>()
+
+    fun build(name: String, child: VegaValue.Obj): Node? {
+      val nested = Concat.of(child, diagnostics)
+      if (nested == null) {
+        val plot = Plot(name, child)
+        plot.views = views(plot.spec, plot.name) ?: return null
+        plot.views.forEach { plotNames[it] = plot.name }
+        leaves += plot
+        return Node.Leaf(plot)
+      }
+      val children =
+        nested.children.mapIndexed { index, (declared, entry) ->
           // A plot that names itself is compiled under that name, which is how a *repetition*'s
           // copies come out `child__b` rather than `concat_0`: upstream's model takes `spec.name`
-          // over the name its parent offered it.
-          Plot(name ?: "concat_$index", child)
+          // over the name its parent offered it. Below the first level the names compose.
+          val here =
+            declared ?: listOf(name, "concat_$index").filter { it.isNotEmpty() }.joinToString("_")
+          build(here, entry) ?: return null
         }
-    for (plot in plots) {
-      plot.views = views(plot.spec, plot.name) ?: return null
-      plot.views.forEach { plotNames[it] = plot.name }
+      return Node.Nest(name, nested, children)
     }
-    return plots
+
+    plotTree = build("", spec) ?: return null
+    return leaves
   }
+
+  /** Every concatenation in the tree, outermost first, which is the order the sizes merge in. */
+  private fun nests(node: Node = plotTree): List<Node.Nest> =
+    when (node) {
+      is Node.Leaf -> emptyList()
+      is Node.Nest -> listOf(node) + node.children.flatMap { nests(it) }
+    }
+
+  /** The leaves under a node, which are the plots whose sizes it merges. */
+  private fun leavesOf(node: Node): List<Plot> =
+    when (node) {
+      is Node.Leaf -> listOf(node.plot)
+      is Node.Nest -> node.children.flatMap { leavesOf(it) }
+    }
 
   // -----------------------------------------------------------------------------------------
   // Sizes
@@ -305,8 +346,7 @@ private class Compilation(
   private val merged = LinkedHashMap<String, VegaValue>()
 
   private fun nameSizes(plots: List<Plot>) {
-    val found = concat
-    if (found == null) {
+    if (concat == null) {
       val plot = plots.single()
       val prefix = if (facet != null) "child_" else ""
       plot.sizeNames = mapOf("x" to "${prefix}width", "y" to "${prefix}height")
@@ -317,31 +357,117 @@ private class Compilation(
       return
     }
 
+    // Every concatenation merges its *own* children, innermost first, because a nested one settles
+    // its size before the level above can ask what that size is.
+    for (nest in nests().reversed()) mergeSizes(nest)
+  }
+
+  /**
+   * The size a node contributes to the level above, or null where it has none to contribute.
+   *
+   * A leaf's is what its own scales and declared size make of it. A **concatenation's** is whatever
+   * its children merged into — and nothing where they did not agree, which is what stops a column
+   * holding a row of plots from claiming a width of its own.
+   */
+  private fun sizeOf(node: Node, channel: String): VegaValue? =
+    when (node) {
+      is Node.Leaf ->
+        LayoutSize.value(node.plot.views, node.plot.scales, config, node.plot.spec, channel)
+      is Node.Nest -> nestSizes[node]?.get(channel)
+    }
+
+  /** What each concatenation merged its children's sizes into, by channel. */
+  private val nestSizes = mutableMapOf<Node.Nest, MutableMap<String, VegaValue?>>()
+
+  private fun mergeSizes(nest: Node.Nest) {
     // `parseConcatLayoutSize`: a row of plots shares one height and a column shares one width, so
     // the merged size keeps the plain name there and becomes a `child` size where it does not.
     val mergedName =
       mapOf(
-        "x" to if (found.columns == 1) "width" else "childWidth",
-        "y" to if (found.columns == null) "height" else "childHeight",
+        "x" to if (nest.concat.columns == 1) "width" else "childWidth",
+        "y" to if (nest.concat.columns == null) "height" else "childHeight",
       )
+    val settled = nestSizes.getOrPut(nest) { mutableMapOf() }
     for (channel in listOf("x", "y")) {
-      // Merge only where every plot agrees and none of them is sized by a step, which is what
+      // Merge only where every child agrees and none of them is sized by a step, which is what
       // `parseNonUnitLayoutSizeForChannel` abandons the merge on.
-      val values = plots.map { LayoutSize.value(it.views, it.scales, config, it.spec, channel) }
+      val values = nest.children.map { sizeOf(it, channel) }
       val agreed = values.first()
       val mergeable = agreed != null && values.all { it == agreed }
-      val name = if (mergeable) mergedName.getValue(channel) else null
-      for (plot in plots) {
-        val own = name ?: "${plot.prefix}${if (channel == "x") "width" else "height"}"
-        plot.sizeNames = plot.sizeNames + (channel to own)
-        plot.views.forEach { if (channel == "x") it.widthSignal = own else it.heightSignal = own }
+      val plain = if (channel == "x") "width" else "height"
+      val name = if (mergeable) "${nest.prefix()}${mergedName.getValue(channel)}" else null
+      // The name a *leaf* measures against. A leaf under a merged level takes the merged name; one
+      // under an unmerged level keeps its own, which is what puts `concat_0_height` beside
+      // `concat_1_height` where two plots in a column are different heights.
+      for (child in nest.children) {
+        if (name == null && child is Node.Nest) continue
+        val own = name ?: "${nameOf(child)}_$plain"
+        when (child) {
+          is Node.Leaf -> {
+            child.plot.sizeNames = child.plot.sizeNames + (channel to own)
+            child.plot.views.forEach {
+              if (channel == "x") it.widthSignal = own else it.heightSignal = own
+            }
+          }
+          // A merged level renames its children's already-settled signals rather than adding one.
+          is Node.Nest -> renameSize(child, channel, own)
+        }
       }
-      if (mergeable) merged[mergedName.getValue(channel)] = agreed
+      // What this level contributes upwards, and the signal it writes if nothing above takes it.
+      settled[channel] = if (mergeable) agreed else null
+      if (mergeable) {
+        nest.owns[channel] = name!!
+        merged[name] = agreed
+        // A level that merges its children takes the name over from them, so the signal is written
+        // once and at the level that settled it.
+        for (child in nest.children) {
+          if (child is Node.Nest) child.owns.remove(channel)?.let { merged.remove(it) }
+        }
+      }
+    }
+  }
+
+  private fun nameOf(node: Node): String =
+    when (node) {
+      is Node.Leaf -> node.plot.name
+      is Node.Nest -> node.name
+    }
+
+  private fun Node.Nest.prefix(): String = if (name.isEmpty()) "" else "${name}_"
+
+  /** A level above renamed what this one merged, so everything under it follows. */
+  private fun renameSize(nest: Node.Nest, channel: String, name: String) {
+    for (plot in leavesOf(nest)) {
+      if (plot.sizeNames[channel]?.endsWith(if (channel == "x") "width" else "height") != true)
+        continue
+      plot.sizeNames = plot.sizeNames + (channel to name)
+      plot.views.forEach { if (channel == "x") it.widthSignal = name else it.heightSignal = name }
     }
   }
 
   /** A merged size that is a plain number and is called `width` or `height` goes to the top. */
   private fun mergedSize(name: String): VegaValue? = merged[name]
+
+  private fun sizeSignalsFor(node: Node): List<VegaValue> =
+    when (node) {
+      is Node.Leaf -> node.plot.size!!.signals.filter { it.string("name") !in merged }
+      is Node.Nest ->
+        listOf("x" to "width", "y" to "height", "x" to "childWidth", "y" to "childHeight")
+          .mapNotNull { (channel, kind) ->
+            node.owns[channel]?.takeIf { it == "${node.prefix()}$kind" }
+          }
+          // A merged size called plainly `width` or `height` is a top-level *property*, not a
+          // signal, which is upstream's own last step in `assembleTopLevelModel`.
+          .filter { it != "width" && it != "height" }
+          .mapNotNull { name ->
+            merged[name]?.let { value ->
+              obj {
+                put("name", name)
+                put("value", value)
+              }
+            }
+          } + node.children.flatMap { sizeSignalsFor(it) }
+    }
 
   private fun mergedSizeSignals(): List<VegaValue> =
     merged.entries
@@ -363,7 +489,31 @@ private class Compilation(
    * `ConcatModel.assembleMarks` — a concatenation has no marks of its own, and its layout places
    * the groups rather than the marks inside them.
    */
-  private fun groups(plots: List<Plot>): List<VegaValue> = plots.map { plot ->
+  /**
+   * A group per plot, and a group per concatenation holding them.
+   *
+   * A nested concatenation is a group with a `layout` and no size of its own: it is not a plotting
+   * area, only a place its plots are arranged in, so it carries neither a style nor an `encode`.
+   */
+  private fun groups(node: Node): List<VegaValue> =
+    when (node) {
+      is Node.Nest ->
+        node.children.flatMap { child ->
+          if (child !is Node.Nest) groups(child)
+          else
+            listOf(
+              obj {
+                put("type", "group")
+                put("name", "${child.name}_group")
+                put("layout", child.concat.layout())
+                put("marks", arr(groups(child)))
+              }
+            )
+        }
+      is Node.Leaf -> listOf(leafGroup(node.plot))
+    }
+
+  private fun leafGroup(plot: Plot): VegaValue = run {
     obj {
       put("type", "group")
       put("name", "${plot.name}_group")

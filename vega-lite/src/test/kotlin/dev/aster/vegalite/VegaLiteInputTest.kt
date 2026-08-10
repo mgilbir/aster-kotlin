@@ -97,7 +97,7 @@ class VegaLiteInputTest {
         "data": {"values": [{"a": 1}]},
         "hconcat": [
           {"mark": "bar", "encoding": {"x": {"field": "a", "type": "quantitative"}}},
-          {"hconcat": [{"mark": "bar"}]}
+          {"facet": {"column": {"field": "a"}}, "spec": {"mark": "bar"}}
         ]
       }
       """
@@ -106,7 +106,7 @@ class VegaLiteInputTest {
     assertTrue(converted.wasVegaLite)
     assertTrue(
       converted.diagnostics.any { it.code == VegaLiteDiagnostics.UNSUPPORTED_COMPOSITION },
-      "a concatenation inside a concatenation should be reported: ${converted.diagnostics}",
+      "a facet inside a concatenation should be reported: ${converted.diagnostics}",
     )
   }
 }
