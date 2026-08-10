@@ -170,7 +170,7 @@ public object Ticks {
   public fun spanSpecifier(specifier: String, start: Double, stop: Double, count: Int): String {
     if (specifier.contains('.')) return specifier
     val type = specifier.lastOrNull()?.takeIf { it.isLetter() || it == '%' }
-    if (type == 's' || type == 'd') return specifier
+    if (type == 'd') return specifier
     val step = stepFrom(tickIncrement(start, stop, count))
     if (!step.isFinite() || step <= 0.0) return specifier
     val magnitude = maxOf(abs(start), abs(stop))
@@ -179,6 +179,10 @@ public object Ticks {
         'f',
         '%' -> precisionForStep(step) - (if (type == '%') 2 else 0)
         'e' -> precisionForRound(step, magnitude) - 1
+        // d3's `precisionPrefix`: how many decimals are needed once the value has been divided by
+        // the SI prefix the *whole axis* shares. A step of 500 under a 1,000 magnitude leaves one,
+        // which is what makes the labels read `−1.0k` rather than `−1k`.
+        's' -> precisionPrefix(step, magnitude)
         null,
         'g',
         'p',
@@ -189,6 +193,23 @@ public object Ticks {
     // format over a coarse step does not come out with a negative one.
     val clamped = precision.coerceIn(0, 20)
     return if (type == null) "$specifier.$clamped" else specifier.dropLast(1) + ".$clamped" + type
+  }
+
+  /**
+   * d3's `precisionPrefix`: decimals needed after dividing by the SI prefix chosen for [magnitude].
+   */
+  private fun precisionPrefix(step: Double, magnitude: Double): Int {
+    if (magnitude <= 0.0 || !magnitude.isFinite() || step <= 0.0 || !step.isFinite()) return 0
+    val prefixExponent = siExponent(magnitude)
+    return maxOf(0, prefixExponent - floor(log10(abs(step))).toInt())
+  }
+
+  /**
+   * The exponent of the SI prefix d3 picks for a magnitude: a multiple of three, clamped to ±24.
+   */
+  public fun siExponent(magnitude: Double): Int {
+    if (magnitude <= 0.0 || !magnitude.isFinite()) return 0
+    return floor(log10(magnitude)).toInt().floorDiv(3).coerceIn(-8, 8) * 3
   }
 
   /**

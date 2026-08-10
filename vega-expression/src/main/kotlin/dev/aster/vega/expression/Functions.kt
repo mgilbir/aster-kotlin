@@ -1009,7 +1009,22 @@ public object NumberFormatSubset {
     }
   }
 
-  public fun format(value: Double, specifier: String): String {
+  /**
+   * d3's SI prefixes, from yocto to yotta, indexed by exponent/3 offset from zero.
+   *
+   * The empty entry is the one at 10^0, which is why a small number formatted with `s` reads as
+   * itself: `formatPrefix` divides by one and appends nothing.
+   */
+  private val SI_PREFIXES =
+    listOf("y", "z", "a", "f", "p", "n", "µ", "m", "", "k", "M", "G", "T", "P", "E", "Z", "Y")
+
+  /**
+   * @param prefixMagnitude the value the SI prefix is chosen from, where the whole axis shares one.
+   *   d3's `tickFormat` pins it to the largest tick so that every label reads in the same unit —
+   *   `−1.0k` beside `0.0k` — where formatting each value on its own would give `−1.0k` beside `0`.
+   *   Null asks for d3's plain `s`, which chooses per value.
+   */
+  public fun format(value: Double, specifier: String, prefixMagnitude: Double? = null): String {
     val spec = parse(specifier) ?: return withTypographicMinus(JsSemantics.numberToString(value))
     if (value.isNaN()) return "NaN"
     // d3-format spells these the way JavaScript does, then signs them like any other number.
@@ -1028,6 +1043,12 @@ public object NumberFormatSubset {
           val scaled = value * 100.0
           PlatformDecimals.fixed(scaled, spec.precision ?: 0) + "%"
         }
+        's' -> {
+          val exponent = siExponentOf(prefixMagnitude ?: value)
+          val scaled = value / tenTo(exponent)
+          val symbol = SI_PREFIXES.getOrElse(exponent / 3 + 8) { "" }
+          PlatformDecimals.fixed(scaled, spec.precision ?: 6) + symbol
+        }
         else -> PlatformDecimals.fixed(value, spec.precision ?: 6)
       }
     val text = if (spec.trim) trimInsignificantZeros(raw) else raw
@@ -1039,6 +1060,17 @@ public object NumberFormatSubset {
     // exponent's own hyphen alone: `.2e` of -0.005 is `−5.00e-3`, with two different characters.
     return withTypographicMinus(signed)
   }
+
+  /**
+   * The exponent of the SI prefix d3 picks for a magnitude: a multiple of three, clamped to ±24.
+   */
+  private fun siExponentOf(magnitude: Double): Int {
+    val size = kotlin.math.abs(magnitude)
+    if (size <= 0.0 || !size.isFinite()) return 0
+    return kotlin.math.floor(kotlin.math.log10(size)).toInt().floorDiv(3).coerceIn(-8, 8) * 3
+  }
+
+  private fun tenTo(exponent: Int): Double = 10.0.pow(exponent)
 
   /**
    * d3's `~`: drops trailing zeros from the fraction, and the point with them, leaving any exponent
@@ -1079,5 +1111,5 @@ public object NumberFormatSubset {
    * a width, which this subset does not implement, and refusing the whole specifier over it would
    * turn `$0.2f` into unformatted output.
    */
-  private val PATTERN = Regex("^(\\$?)(0?)(,?)(\\.\\d+)?([dfe%]?)$")
+  private val PATTERN = Regex("^(\\$?)(0?)(,?)(\\.\\d+)?([dfes%]?)$")
 }

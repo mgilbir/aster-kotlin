@@ -880,9 +880,16 @@ public class AxisBuilder(
           is TimeScale -> scale.domain
         }
       val resolved = Ticks.spanSpecifier(format, numeric.first(), numeric.last(), count)
+      // An `s` axis shares **one** SI prefix, chosen from its largest tick, so every label reads in
+      // the same unit; formatting each value alone would put `0` beside `−1.0k`.
+      val prefixMagnitude =
+        if (resolved.lastOrNull() == 's')
+          maxOf(kotlin.math.abs(numeric.first()), kotlin.math.abs(numeric.last()))
+        else null
       return { value ->
         val number = value.asDouble()
-        if (number.isNaN()) value.asString() else NumberFormatSubset.format(number, resolved)
+        if (number.isNaN()) value.asString()
+        else NumberFormatSubset.format(number, resolved, prefixMagnitude)
       }
     }
     return when (scale) {

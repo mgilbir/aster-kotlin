@@ -133,8 +133,14 @@ internal object Guides {
     axis.explicitOrient = user?.fields?.get("orient") != null
     axis.set("orient", str(if (channel == "x") "bottom" else "left"))
 
-    // The gridlines belong to *this* scale but are drawn across the other one's extent.
-    val grid = !Scales.hasDiscreteDomain(type) && def.isFieldDef && def.bin == null
+    // The gridlines belong to *this* scale but are drawn across the other one's extent. Whether
+    // there are any is a *default* — a continuous field-driven axis has them — and a theme saying
+    // `config.axis.grid: false` settles it for every axis at once, which is how a chart turns them
+    // all off in one line. Reading only the channel's own `axis` block left them on.
+    val grid =
+      (def.axis?.fields?.get("grid") ?: view.config.axisConfig("grid"))?.let {
+        (it as? VegaValue.Bool)?.value == true
+      } ?: (!Scales.hasDiscreteDomain(type) && def.isFieldDef && def.bin == null)
     if (grid && hasOtherPosition)
       axis.set("gridScale", str(view.scale(if (channel == "x") "y" else "x")))
     axis.set("grid", bool(grid))
@@ -306,6 +312,18 @@ internal object Guides {
         put("symbolType", defaultSymbolType(view, channel))
       }
       Fields.title(def, view.config)?.let { put("title", it) }
+      // A legend along the top or bottom of a chart runs **horizontally**; Vega's own default is
+      // vertical, and every other orientation keeps it — `defaultDirection`, with the inner
+      // corners taking it only for a gradient.
+      when (def.legend?.string("orient")) {
+        "top",
+        "bottom" -> put("direction", "horizontal")
+        "left",
+        "right",
+        "none",
+        null -> Unit
+        else -> if (gradient) put("direction", "horizontal")
+      }
       def.legend?.fields?.forEach { (key, value) -> put(key, value) }
       if (!gradient) {
         symbolEncode(view, channel)?.let {

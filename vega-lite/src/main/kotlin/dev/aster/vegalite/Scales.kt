@@ -186,7 +186,7 @@ internal object Scales {
     val sort = domainSort(view, channel, def, type)
     // Sorting by an aggregate of some *other* field has to be computed independently of the
     // aggregation being drawn, so upstream reads the pre-aggregation table for it.
-    val source = if (sort is VegaValue.Obj) view.rawData else dataName
+    val source = if (sortsFromRawTable(sort)) view.rawData else dataName
     return listOf(
       obj {
         put("data", source)
@@ -202,6 +202,22 @@ internal object Scales {
    * A `sort` of `null` leaves the domain in data order, and a descending sort becomes an explicit
    * minimum-of-field comparator rather than a flag.
    */
+  /**
+   * Whether a discrete domain is read from the **pre-aggregation** table.
+   *
+   * Upstream's test is `isBoolean(sort)` on the *settled* sort, not on what the specification
+   * wrote: a plain `true` orders the values as they come and reads the table being drawn, and
+   * anything else — an aggregate of another column, or the `{"order": "descending"}` a bare
+   * `"descending"` settles into — orders them independently of the aggregation and so has to read
+   * the rows themselves. Testing the written form instead misses the string spelling, which is the
+   * one a population pyramid uses to run its ages downwards.
+   */
+  fun sortsFromRawTable(sort: VegaValue?): Boolean =
+    sort != null && sort != VegaValue.Null && sort !is VegaValue.Bool
+
+  fun settledSort(view: UnitView, channel: String, def: ChannelDef, type: String): VegaValue? =
+    domainSort(view, channel, def, type)
+
   private fun domainSort(
     view: UnitView,
     channel: String,

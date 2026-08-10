@@ -474,7 +474,7 @@ produces a chart that is plausible and wrong.
 every fixture with upstream and checks two things:
 
 1. `VegaLiteFixtureTest` compares the Vega this compiler emits against upstream's, property by
-   property. Sixty-nine fixtures, and all of them match exactly — every transform, scale, signal,
+   property. Seventy fixtures, and all of them match exactly — every transform, scale, signal,
    axis, legend and mark encoding, down to the accessibility description string.
 2. `VegaLiteFixtureDifferentialTest` runs that output through this engine's own runtime and compares
    the scene against the one upstream draws. Every mark of every fixture matches, and nothing is
@@ -559,7 +559,7 @@ own) and `grouped-bar` on the step arithmetic.
 
 ### Where the compiler stands, and what it still refuses
 
-Sixty-nine fixtures, each matching upstream's compiler property for property and drawing the chart
+Seventy fixtures, each matching upstream's compiler property for property and drawing the chart
 upstream draws. The grammar covered: a single view, a layer of them to any depth, a concatenation of
 either to any depth, a
 repetition of any of those, both facet operators, eleven marks including `arc`,
@@ -669,6 +669,42 @@ Three rules came out of upstream with it:
   many have landed on each and moves one across when they do not match, counting the side each
   *asked* for rather than the side it ended on. And only the first rules gridlines: two sets across
   one plot measure different things and say neither.
+
+### Five defects behind one chart pasted into the demo
+
+A population pyramid — Vega-Lite's own example — pasted into the demo came out as a scatter of
+squares along a diagonal. It states **no channel types at all**, and this compiler had been falling
+straight through to `nominal`, which turns a summed measure into a category per distinct total.
+`defaultType` is not "look at the data" — nothing has read a row when it runs — it is read off the
+definition: a latitude is a number and a shape is a category whatever they carry; a `sort` written
+as a **list** makes a field ordinal; a `timeUnit` makes it temporal; a `bin` or **any aggregate
+except `argmin`/`argmax`** makes it quantitative; and a stated `scale.type` answers by category.
+Only `count` and `bin` were honoured here.
+
+Fixing that let the same chart name four more, none of which the corpus had reached:
+
+- **`config.view` becomes the `cell` style**, not a `view` one — "View's default style is `cell`",
+  renamed on the way through `stripAndRedirectConfig`. A chart telling its plotting area not to draw
+  a border was still drawing one.
+- **`config.axis.grid: false` was ignored.** Whether there are gridlines is a default, and a theme
+  settles it for every axis at once; reading only the channel's own `axis` block left them on.
+- **A legend along the top runs horizontally** (`defaultDirection`), and `"title": null` **drops the
+  property** rather than writing an empty one — `assembleLegend`, whose comment is "title schema
+  doesn't include null".
+- **A sorted discrete domain reads the pre-aggregation table**, and the test is `isBoolean` on the
+  *settled* sort rather than on what the specification wrote. A plain `true` reads the table being
+  drawn; an aggregate, or the `{"order": "descending"}` that a bare `"descending"` settles into,
+  reads the raw rows. Testing the written form missed the string spelling — which is the one a
+  pyramid uses to run its ages downwards — and with it the whole `data_0` that request creates.
+
+And one in the runtime: **`format: "s"` was not a format at all.** The specifier pattern accepted
+`d`, `f`, `e` and `%`, so `s` failed to parse and fell back to plain number text. An axis shares
+**one** SI prefix, chosen from its largest tick — d3's `tickFormat` pins it there — so the labels
+read `−1.0k` beside `0.0k`, where formatting each value alone would put `0` beside `−1.0k`. The
+precision comes from `precisionPrefix`: decimals enough to tell one step apart *after* the division.
+
+Five defects behind one pasted chart is the argument for the demo's paste box, and for a corpus
+written from upstream's own examples rather than from what this compiler already does.
 
 ### A concatenation inside a concatenation
 
@@ -1161,7 +1197,7 @@ the whole time.
 
 ## Verification
 
-- 2,344 JVM tests pass and none is skipped (`./gradlew test`); the portable core is most of
+- 2,351 JVM tests pass and none is skipped (`./gradlew test`); the portable core is most of
   them, and `./scripts/test-core.sh` runs it without an Android SDK.
 - Android lint is clean with `warningsAsErrors` on every Android module.
 - 63 instrumented tests pass on an API 37 arm64 emulator (`./scripts/test-android.sh`): 49 in

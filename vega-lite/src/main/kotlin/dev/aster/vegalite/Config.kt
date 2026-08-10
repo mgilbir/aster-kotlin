@@ -53,6 +53,9 @@ internal class Config(private val user: VegaValue.Obj = VegaValue.EmptyObject) {
 
   fun scaleConfig(name: String): Double? = user.obj("scale").number(name) ?: SCALE_DEFAULTS[name]
 
+  /** `config.axis.<name>`, which a theme uses to settle a property for every axis at once. */
+  fun axisConfig(name: String): VegaValue? = user.obj("axis")?.fields?.get(name)
+
   /** `config.style.<name>`, which a mark's `style` list pulls in as well as its own block. */
   fun style(name: String): VegaValue.Obj? = user.obj("style")?.obj(name)
 
@@ -85,7 +88,10 @@ internal class Config(private val user: VegaValue.Obj = VegaValue.EmptyObject) {
         key in MARK_TYPES ->
           if (value is VegaValue.Obj && value.fields.isNotEmpty()) styles[key] = value
         key == "title" -> titleStyle(value)?.let { styles["group-title"] = it }
-        key == "view" -> viewStyle(value)?.let { styles["view"] = it }
+        // `config.view` becomes the **`cell`** style, not a `view` one: "View's default style is
+        // `cell`" — `stripAndRedirectConfig` renames it on the way through, and a chart that told
+        // its plotting area not to draw a border was otherwise still drawing one.
+        key == "view" -> viewStyle(value)?.let { styles["cell"] = it }
         else -> out[key] = value
       }
     }

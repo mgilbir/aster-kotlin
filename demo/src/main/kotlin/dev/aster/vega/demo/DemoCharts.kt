@@ -37,6 +37,15 @@ public enum class DemoChart(
   // so what is on screen is something the Vega-Lite grammar states in six lines and the Vega one
   // does not state at all.
   SPEC_VEGA_LITE("Spec: Vega-Lite", "layered.vl.json"),
+  // The compositions, which are what Vega-Lite states in a few lines and Vega states in a group
+  // mark, a layout and a scale per plot. Each of these is a whole construct rather than a variation
+  // on the one above it: plots side by side, one template drawn once per column, two measures over
+  // one plot with a scale each, a column of rows, and one field wrapped into a grid.
+  SPEC_CONCAT("Spec: concat", "concat.vl.json"),
+  SPEC_REPEAT("Spec: repeat", "repeat-grid.vl.json"),
+  SPEC_DUAL_AXIS("Spec: dual axis", "dual-axis.vl.json"),
+  SPEC_DASHBOARD("Spec: nested concat", "nested-concat.vl.json"),
+  SPEC_FACET_WRAP("Spec: wrapped facet", "facet-wrap.vl.json"),
   PASTED("Paste your own", isPasted = true);
 
   /** True when this entry is compiled from a specification rather than built by hand. */
@@ -64,6 +73,11 @@ public enum class DemoChart(
       SPEC_LEGENDS,
       SPEC_FACETS,
       SPEC_VEGA_LITE,
+      SPEC_CONCAT,
+      SPEC_REPEAT,
+      SPEC_DUAL_AXIS,
+      SPEC_DASHBOARD,
+      SPEC_FACET_WRAP,
       PASTED -> null
     }
   }

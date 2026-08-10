@@ -1087,6 +1087,9 @@ private class Compilation(
    * runs after the merge, because it is the *merged* legend's own channels that decide it.
    */
   private fun settle(fields: LinkedHashMap<String, VegaValue>) {
+    // "title schema doesn't include null" — `assembleLegend` drops the property rather than
+    // writing an empty one, which is how `"legend": {"title": null}` takes a key's caption off.
+    if (fields["title"].let { it == null || it == VegaValue.Null }) fields.remove("title")
     val symbols = fields["encode"]?.get("symbols")?.get("update") as? VegaValue.Obj ?: return
     val remaining =
       symbols.fields.filterKeys { it !in Channels.LEGEND_SCALE_CHANNELS || !fields.containsKey(it) }

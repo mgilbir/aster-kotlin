@@ -150,9 +150,7 @@ internal class Parse(private val config: Config, private val diagnostics: Diagno
     val conditions = conditions(channel, value.fields["condition"], "$path.condition")
 
     val declaredType = MeasureType.from(value.string("type"))
-    val type =
-      declaredType
-        ?: inferType(channel, field, aggregate, timeUnit, bin, value.fields["datum"], path)
+    val type = declaredType ?: inferType(channel, field, aggregate, timeUnit, bin, value, path)
 
     return ChannelDef(
       channel = channel,
@@ -238,24 +236,46 @@ internal class Parse(private val config: Config, private val diagnostics: Diagno
       }
     }
 
-  /** `defaultType` from `channeldef.ts`, for the cases a specification is allowed to leave out. */
+  /**
+   * `defaultType` from `channeldef.ts`, for the cases a specification is allowed to leave out.
+   *
+   * Vega-Lite lets a channel omit its `type` and works one out, and the rules are **not** "look at
+   * the data" — nothing here has read a row yet. They are read off the definition itself, in
+   * upstream's own order, and every one of them matters:
+   *
+   * - some channels have only one sensible type whatever they carry: a latitude is a number, and a
+   *   shape or a facet is a category;
+   * - a `sort` written out as a **list** makes the field ordinal, the list being the order;
+   * - a `timeUnit` makes it temporal, and a `bin` or an **aggregate** makes it quantitative — any
+   *   aggregate except `argmin`/`argmax`, which answer with a whole row rather than a number;
+   * - a `scale.type` the specification stated answers by category: a numeric or discretizing scale
+   *   wants a quantitative field, a time scale a temporal one.
+   *
+   * Falling straight through to nominal — which is where this stopped before — turns a summed
+   * measure into a category per distinct total, and draws a bar chart as a scatter of squares along
+   * a diagonal. That is what a population pyramid pasted into the demo came out as.
+   */
   private fun inferType(
     channel: String,
     field: String?,
     aggregate: String?,
     timeUnit: String?,
     bin: Binning?,
-    datum: VegaValue?,
+    def: VegaValue.Obj,
     path: String,
   ): MeasureType? {
+    val datum = def.fields["datum"]
     if (field == null && aggregate == null && datum == null) return null
     return when {
-      aggregate == "count" || bin != null -> MeasureType.QUANTITATIVE
-      timeUnit != null -> MeasureType.TEMPORAL
-      channel in setOf("shape", "row", "column", "facet", "strokeDash") -> MeasureType.NOMINAL
       channel in setOf("latitude", "longitude") -> MeasureType.QUANTITATIVE
+      channel in setOf("shape", "row", "column", "facet", "strokeDash") -> MeasureType.NOMINAL
+      channel == "order" -> MeasureType.ORDINAL
+      def.fields["sort"] is VegaValue.Arr -> MeasureType.ORDINAL
+      timeUnit != null -> MeasureType.TEMPORAL
+      bin != null || (aggregate != null && aggregate !in ARGMINMAX) -> MeasureType.QUANTITATIVE
       datum is VegaValue.Num -> MeasureType.QUANTITATIVE
       datum != null -> MeasureType.NOMINAL
+      scaleCategory(def) != null -> scaleCategory(def)
       channel != mainChannel(channel) -> null
       else -> {
         diagnostics.warn(
@@ -268,6 +288,24 @@ internal class Parse(private val config: Config, private val diagnostics: Diagno
       }
     }
   }
+
+  /** What a stated `scale.type` says the field must be — `SCALE_CATEGORY_INDEX`. */
+  private fun scaleCategory(def: VegaValue.Obj): MeasureType? =
+    when (def.obj("scale")?.string("type")) {
+      "linear",
+      "log",
+      "pow",
+      "sqrt",
+      "symlog",
+      "identity",
+      "sequential",
+      "quantile",
+      "quantize",
+      "threshold" -> MeasureType.QUANTITATIVE
+      "time",
+      "utc" -> MeasureType.TEMPORAL
+      else -> null
+    }
 
   /**
    * `orient` from `compile/mark/init.ts`, reduced to the marks this compiler emits.
@@ -332,6 +370,9 @@ internal class Parse(private val config: Config, private val diagnostics: Diagno
      * Channels a specification may legitimately use that this compiler does not implement. Named
      * individually so a report says which one stopped it, rather than "unsupported encoding".
      */
+    /** The two aggregates that answer with a whole row rather than a number. */
+    private val ARGMINMAX = setOf("argmin", "argmax")
+
     val UNSUPPORTED_CHANNELS =
       setOf(
         "latitude",

@@ -58,7 +58,8 @@ internal class DataPipeline(
   private fun needsRawTable(): Boolean =
     view.scaledChannels().any { (channel, def) ->
       val type = view.scaleType(channel) ?: return@any false
-      Scales.hasDiscreteDomain(type) && def.sort is VegaValue.Obj
+      Scales.hasDiscreteDomain(type) &&
+        Scales.sortsFromRawTable(Scales.settledSort(view, channel, def, type))
     }
 
   /**
