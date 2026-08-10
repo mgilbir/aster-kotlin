@@ -680,7 +680,7 @@ class TransformReferenceTest {
     VegaValue.Obj(linkedMapOf("g" to VegaValue.Str(group), "v" to VegaValue.Num(value)))
 
   @Test
-  fun `the registry covers the transforms the brief lists, plus thirty-three more`() {
+  fun `the registry covers the transforms the brief lists, plus thirty-four more`() {
     val fromTheBrief =
       setOf(
         "filter",
@@ -713,7 +713,9 @@ class TransformReferenceTest {
     // transform that is a simulation rather than a calculation: it places the nodes of a graph by
     // running d3-force to a standstill. `geoshape` and `graticule` are the map pair: a GeoJSON
     // feature drawn through a projection, the grid of meridians and parallels under it, and a
-    // longitude and latitude placed on the page.
+    // longitude and latitude placed on the page. `voronoi` is the region of the plane nearest to
+    // each point, which an interactive scatter plot draws invisibly so the pointer has something to
+    // hit.
     assertEquals(
       fromTheBrief +
         "timeunit" +
@@ -748,7 +750,8 @@ class TransformReferenceTest {
         "force" +
         "geoshape" +
         "geopoint" +
-        "graticule",
+        "graticule" +
+        "voronoi",
       TransformRegistry.Default.types,
     )
   }

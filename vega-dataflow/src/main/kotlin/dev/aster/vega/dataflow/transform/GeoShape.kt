@@ -79,6 +79,21 @@ public object GeoShapeTransform : Transform {
     input: List<VegaValue>,
     params: VegaValue.Obj,
     context: TransformContext,
+  ): List<VegaValue> = apply(input, params, context, defaultField = "datum")
+
+  /**
+   * @param defaultField where the geometry is when the specification names no `field`.
+   *
+   * `"datum"` for `geoshape`, which runs over scene items and reaches for the row inside one.
+   * **Null** for `geopath`, whose default is the row *itself* — upstream declares no default for it
+   * and falls back to the identity accessor. A dataset of decoded TopoJSON features is exactly that
+   * case, and reading a `datum` column that is not there leaves every state undrawn.
+   */
+  internal fun apply(
+    input: List<VegaValue>,
+    params: VegaValue.Obj,
+    context: TransformContext,
+    defaultField: String?,
   ): List<VegaValue> {
     val as0 = params.string("as") ?: "shape"
     val name = params.string("projection")
@@ -109,13 +124,13 @@ public object GeoShapeTransform : Transform {
       )
       return input
     }
-    val path = params.string("field") ?: "datum"
+    val path = params.string("field") ?: defaultField
     val radius = params.number("pointRadius")
 
     return input.map { item ->
       val sink = PathStringSink()
       radius?.let { sink.pointRadius(it) }
-      GeoJsonStream.stream(item.field(path), projection.stream(sink))
+      GeoJsonStream.stream(if (path == null) item else item.field(path), projection.stream(sink))
       val drawn = sink.result()
       // Null, not an empty string: upstream's path generator returns null when nothing was drawn,
       // and a mark measures a null path as a point rather than as empty bounds.

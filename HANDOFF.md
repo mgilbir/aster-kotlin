@@ -9,7 +9,7 @@ Branch `milestone-0-bootstrap`. Working tree clean, both gates green:
 - `./scripts/check.sh` — format, all tests, lint, demo APK
 - `./scripts/oracle.sh` — regenerates upstream references and runs the differential comparison
 
-**116 differential fixtures pass, all matching upstream exactly.** That is the only number here
+**117 differential fixtures pass, all matching upstream exactly.** That is the only number here
 that means what it says.
 
 ## Read this before trusting the other number
@@ -195,15 +195,14 @@ those before comparing, they paint nothing.
 its datasets are fetched into `test-fixtures/data/` and committed. Discount every loader diagnostic
 when judging how far an example is from passing.
 
-**Where the corpus stands, from `ExampleTriage` rather than from memory: 89 of the 93 compile
-clean, 4 report errors.** Read the *movement* rather than the number: 70 → 79 as the stochastic and
+**Where the corpus stands, from `ExampleTriage` rather than from memory: 90 of the 93 compile
+clean, 3 report errors.** Read the *movement* rather than the number: 70 → 79 as the stochastic and
 crossfilter work landed, **79 → 75 when mark-level `transform` was implemented** — the survey
 becoming honest, because five charts had been dropping a whole block silently — and 75 → 80 as the
 raster family and `force` landed.
 
-The 4 that remain are **one waiting on `voronoi`** and **three with no oracle at all** — and one of
-those three is refused by upstream Vega as well, so it is not outstanding work. There is no other
-category left.
+The 3 that remain **cannot be verified against upstream at all**, and one of them upstream itself
+refuses. There is no category of outstanding work left in the corpus.
 
 **`time-units` is done** and is a fixture; STATUS.md describes the five things it needed. The
 handoff's prediction was right as far as it went — the domain field is a `FieldRef` now — but the two
@@ -253,70 +252,63 @@ is arithmetic. See SUPPORTED_FEATURES.md for the three behaviours that had to co
 rather than from its schema — in particular that **an omitted force parameter falls to d3's default,
 not the one Vega documents**, because Vega only forwards the parameters a specification wrote.
 
-## What is left: one transform, and three examples with no oracle
+## What is left: three examples, and none of them can be verified
 
-**116 differential fixtures pass. 89 of the 93 examples compile clean.** The geographic category is
-done except for one transform.
+**117 differential fixtures pass. 90 of the 93 examples compile clean.** Everything that can be
+checked against upstream has been. The three that remain are not waiting on work in this engine.
 
-d3-geo is ported whole — rotation, antimeridian and circle pre-clipping, adaptive resampling,
-rectangular post-clip, TopoJSON decoding, `geoshape`/`geopath`/`geopoint`/`graticule`, `geoCentroid`,
-`geoArea`, and `invert` on a projection. Every projection type **Vega itself ships** is here: d3-geo's
-fifteen plus `mollweide`, each pinned against upstream's own path strings in
-`GeoProjectionTypesTest`. Read the commits that added them before touching any of it; several of the
-subtleties are the kind that produce a plausible wrong map.
+- **`projections` is refused by upstream Vega too.** It names `airy`, `armadillo`, `baker`,
+  `berghaus`, `bottomley`, `collignon`, `eckert1`, `guyou`, `hammer`, `littrow`, `wagner6`,
+  `wiechel`, `winkel3` and the interrupted and polyhedral families — and `vega-projection` imports
+  exactly **one** projection from `d3-geo-projection`, `geoMollweide`, which this engine has. Running
+  the example through the pinned oracle gives `Error: Unrecognized projection type: airy`. The Vega
+  website registers those types itself before rendering that page; a bare Vega cannot draw it, and
+  our diagnostic says what upstream's says. **Do not read its error count as outstanding work.** If
+  the extended family is ever wanted, `Projections.byName` is where a type is added and
+  `GeoProjectionTypesTest` is how it is proved.
 
-Two of those vectors are compared **within one printed digit** rather than exactly, and it is worth
-knowing why before assuming it is a defect. `azimuthalEqualArea` and `azimuthalEquidistant` clip at
-179.999 degrees, where their scale factor is 114,591 and its derivative is 3.8e14 — so a one-ulp
-difference in `cos` between V8 and the JVM, which neither runtime promises to avoid, moves a
-coordinate by 1.3e-4 of a pixel. That is enough to cross a rounding boundary in the third decimal and
-nothing more. The arithmetic is in the test's comment.
+- **`word-cloud` and `labeled-scatter-plot` have no oracle**, and this is established rather than
+  suspected. Both transforms measure or rasterise against a `<canvas>`, and there is none under Node:
+  - `wordcloud` measures text, and upstream's own headless output is degenerate — `fontSize: 0` on
+    every word, a surface width of `-Infinity`.
+  - `label` calls `markBitmaps`, which *renders the avoided marks into a canvas* and reads the alpha
+    back. Under the oracle it throws inside the transform, Vega logs it and carries on, and the
+    labels are never placed. `oracle-js/src/canvas-shim.js` deliberately refuses every drawing call
+    rather than returning something plausible, which is why this is visible instead of silently
+    wrong.
 
-### The one real gap: `voronoi`
+  Making either verifiable means installing the native `canvas` package — and then matching Cairo's
+  antialiasing coverage exactly on the Kotlin side, since `label` treats *any* non-zero alpha as
+  occupied. That is not a port, it is a rasteriser bake-off. **Implementing these two unverified
+  would produce exactly the plausible-looking wrong answer this project exists to avoid.** If they
+  are to be done, the decision to accept weaker evidence has to be the owner's, and it belongs here:
 
-`airport-connections` is the only remaining example that this engine could pass and does not. It
-needs the `voronoi` transform, and everything else in it already works — `geopoint` places its 600
-airports and the rest of the scene builds.
+  > Owner's decision on `label` and `wordcloud`: _not yet made._
 
-The cost is known and it is large: `voronoi` is `d3-delaunay` over `delaunator`, and delaunator
-depends on `robust-predicates` for an exact `orient2d`. That is about 1,550 lines of intricate
-numeric code — an incremental Delaunay triangulation with a hash-based hull, then cell polygons
-clipped to an extent. It is all deterministic double arithmetic, so it *is* verifiable, and
-`airport-connections` would verify it end to end. It was not attempted rather than attempted badly.
+### Where the numeric fidelity is hard-won, for whoever changes it next
 
-Worth knowing before starting: in that example the Voronoi cells are **invisible** — transparent
-paths that exist only to catch a pointer. They are still marks in the scene, so the fixture compares
-every one of their outlines, which makes it a demanding test of the port and a pointless one to
-approximate.
+Four places carry arithmetic that cannot be simplified without breaking a chart, and each has its
+reasoning in the code rather than here:
 
-### The three with no oracle, and one of them is not our doing
+- `Orient2d` — Shewchuk's adaptive predicate. `voronoi` is a sequence of orientation decisions and a
+  single wrong sign changes the whole diagram.
+- `Adder` — the same idea for `polygonContains`, where the sign of a sum around 1e-12 decides whether
+  a continent is filled or left as a hole.
+- `ResampleStream` — the guard is `!(d2 > 4 * delta2)` because `d2` is **NaN** for the first point of
+  every line, and `NaN <= x` is false too.
+- `Delaunator.quicksort` and `RandomStream` — two places where the *order* of operations is part of
+  the answer, not an implementation detail.
 
-**`projections` is refused by upstream Vega too.** It names `airy`, `armadillo`, `baker`,
-`berghaus`, `bottomley`, `collignon`, `eckert1`, `guyou`, `hammer`, `littrow`, `wagner6`, `wiechel`,
-`winkel3` and the interrupted and polyhedral families — and `vega-projection` imports exactly **one**
-projection from `d3-geo-projection`, `geoMollweide`. Running the example through the pinned oracle
-gives `Error: Unrecognized projection type: airy`. The Vega website registers those types itself
-before rendering that page; a bare Vega cannot draw it. Our diagnostic says the same thing upstream's
-does, so this example is *finished* in the only sense available — do not read its 57 errors as
-outstanding work. If the extended family is ever wanted, `Projections.byName` is where a type is
-added and `GeoProjectionTypesTest` is how it is proved.
+Two of the 60 projection vectors are compared **within one printed digit** rather than exactly.
+`azimuthalEqualArea` and `azimuthalEquidistant` clip at 179.999 degrees, where their scale factor is
+114,591 and its derivative is 3.8e14 — so a one-ulp difference in `cos` between V8 and the JVM, which
+neither runtime promises to avoid, moves a coordinate by 1.3e-4 of a pixel. That is enough to cross a
+rounding boundary in the third decimal and nothing more. The arithmetic is in the test's comment.
 
-**`word-cloud` and `labeled-scatter-plot` cannot be differential fixtures**, and this is established
-rather than suspected. Both transforms measure or rasterise against a `<canvas>`, and there is none
-under Node:
-
-- `wordcloud` measures text, and upstream's own headless output is degenerate — `fontSize: 0` on
-  every word, a surface width of `-Infinity`.
-- `label` calls `markBitmaps`, which *renders the avoided marks into a canvas* and reads the alpha
-  back. Under the oracle it throws inside the transform, Vega logs it and carries on, and the labels
-  are never placed. `oracle-js/src/canvas-shim.js` deliberately refuses every drawing call rather
-  than returning something plausible, which is why this is visible instead of silently wrong.
-
-Making either verifiable means installing the native `canvas` package — and then matching Cairo's
-antialiasing coverage exactly on the Kotlin side, since `label` treats *any* non-zero alpha as
-occupied. That is not a port, it is a rasteriser bake-off. **Implementing these two unverified would
-produce exactly the plausible-looking wrong answer this project exists to avoid.** If they are to be
-done, the decision to accept weaker evidence has to be the owner's and should be written down here.
+And one **deliberate difference** in the comparison, stated so it is not mistaken for a tolerance: a
+reference carrying a `strokeWidth` with no `stroke` colour describes an outline that is never
+painted, and this engine records no stroke at all for it. A reference carrying a stroke colour still
+demands a stroke of that width.
 
 ## Possible future work: a timer used as a `for` loop
 

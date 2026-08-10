@@ -570,6 +570,7 @@ public object Differential {
       if (channel in ignored) continue
       val got = actual.numbers[channel] ?: defaultFor(channel)
       if (got == null) {
+        if (unpaintedStroke(expected, channel)) continue
         out.add(Difference("$where.$channel", fmt(wanted), "absent"))
         continue
       }
@@ -684,6 +685,21 @@ public object Differential {
       "strokeWidth" -> null // absence means no stroke at all, which is a real difference
       else -> null
     }
+
+  /**
+   * A stroke property the reference carries with no stroke **colour** beside it.
+   *
+   * Upstream's items are property bags, so a mark encoding `strokeWidth` and no `stroke` has a
+   * width on it and paints no outline — its own SVG renderer emits neither attribute. A scene node
+   * here holds what a renderer needs, so it has no stroke at all. The two describe the same
+   * drawing, and an interactive Voronoi overlay is where it shows: every one of its 600 transparent
+   * cells sets a hairline width it never uses.
+   *
+   * Narrow on purpose. A reference carrying a stroke colour still demands a stroke of that width.
+   */
+  private fun unpaintedStroke(expected: Mark, channel: String): Boolean =
+    (channel == "strokeWidth" || channel == "strokeOpacity") &&
+      !expected.strings.containsKey("stroke")
 
   public fun compareScales(
     expected: Map<String, ScaleReference>,

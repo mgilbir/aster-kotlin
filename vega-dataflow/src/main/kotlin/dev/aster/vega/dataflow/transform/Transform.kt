@@ -281,6 +281,7 @@ public class TransformRegistry(transforms: List<Transform>) {
           GeoShapeTransform,
           GeoPointTransform,
           GraticuleTransform,
+          VoronoiTransform,
         )
       )
   }
