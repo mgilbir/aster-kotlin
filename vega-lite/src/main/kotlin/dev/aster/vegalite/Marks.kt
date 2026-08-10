@@ -428,14 +428,28 @@ internal object Marks {
     else obj { put(vgChannel, obj { put("value", value) }) }
   }
 
+  /**
+   * A literal channel value, or the **signal** an `{"expr": …}` stands for.
+   *
+   * `{"value": {"expr": "tint"}}` is how a chart reads a parameter into a graphic property, and it
+   * is not a literal object: upstream turns the expression into a signal reference in the same
+   * value ref, so a datum written that way still passes through its scale. Writing it out as a
+   * value paints the mark with an object, which the renderer reads as nothing at all.
+   */
+  private fun literalRef(value: VegaValue?): Pair<String, VegaValue>? {
+    if (value == null) return null
+    val expr = (value as? VegaValue.Obj)?.takeIf { it.fields.keys == setOf("expr") }?.get("expr")
+    return if (expr != null) "signal" to expr else "value" to value
+  }
+
   /** One entry of a channel's encoding: a value, a datum through the scale, or a scaled field. */
   private fun valueRef(view: UnitView, channel: String, def: ChannelDef): VegaValue.Obj? =
     when {
-      def.isValueDef -> obj { put("value", def.value) }
+      def.isValueDef -> obj { literalRef(def.value)?.let { (key, it) -> put(key, it) } }
       def.datum != null ->
         obj {
           put("scale", scaleName(view, channel))
-          put("value", def.datum)
+          literalRef(def.datum)?.let { (key, it) -> put(key, it) }
         }
       def.isFieldDef ->
         obj {
@@ -483,7 +497,7 @@ internal object Marks {
   private fun tooltipChannel(view: UnitView): VegaValue? {
     val def = view.spec.encoding["tooltip"]
     if (def != null && view.spec.encoding["tooltip"]?.raw?.fields?.isEmpty() != true) {
-      if (def.isValueDef) return obj { put("value", def.value) }
+      if (def.isValueDef) return obj { literalRef(def.value)?.let { (key, it) -> put(key, it) } }
       val defs = listOf(def) + def.siblings
       if (defs.size > 1) return tooltipObject(view, defs)
       if (def.isFieldDef) return signalRef(fieldExpression(view, def, separator = "\\n"))
@@ -674,7 +688,7 @@ internal object Marks {
 
   private fun textChannel(view: UnitView): VegaValue? {
     val def = view.spec.encoding["text"] ?: return null
-    if (def.isValueDef) return obj { put("value", def.value) }
+    if (def.isValueDef) return obj { literalRef(def.value)?.let { (key, it) -> put(key, it) } }
     if (!def.isFieldDef) return null
     return signalRef(fieldExpression(view, def))
   }
@@ -728,12 +742,12 @@ internal object Marks {
       if (value == VegaValue.Str("height") && (channel == "y" || channel == "y2")) {
         return obj { put("field", obj { put("group", "height") }) }
       }
-      return obj { put("value", value) }
+      return obj { literalRef(value)?.let { (key, it) -> put(key, it) } }
     }
     if (def.datum != null) {
       return obj {
         put("scale", scaleName(view, mainChannel(channel)))
-        put("value", def.datum)
+        literalRef(def.datum)?.let { (key, it) -> put(key, it) }
       }
     }
     if (def.bin is Binning.Bin && scaleType != null && !Scales.hasDiscreteDomain(scaleType)) {

@@ -470,7 +470,7 @@ produces a chart that is plausible and wrong.
 every fixture with upstream and checks two things:
 
 1. `VegaLiteFixtureTest` compares the Vega this compiler emits against upstream's, property by
-   property. Sixty-six fixtures, and all of them match exactly — every transform, scale, signal,
+   property. Sixty-seven fixtures, and all of them match exactly — every transform, scale, signal,
    axis, legend and mark encoding, down to the accessibility description string.
 2. `VegaLiteFixtureDifferentialTest` runs that output through this engine's own runtime and compares
    the scene against the one upstream draws. Every mark of every fixture matches, and nothing is
@@ -555,7 +555,7 @@ own) and `grouped-bar` on the step arithmetic.
 
 ### Where the compiler stands, and what it still refuses
 
-Sixty-six fixtures, each matching upstream's compiler property for property and drawing the chart
+Sixty-seven fixtures, each matching upstream's compiler property for property and drawing the chart
 upstream draws. The grammar covered: a single view, a layer of them, a concatenation of either, a
 repetition of any of those, both facet operators, eleven marks including `arc`,
 the Cartesian and polar position pairs, nested offsets, fourteen of fifteen transforms, sorting,
@@ -564,9 +564,11 @@ area that draws its own points, legends, axes, and a user `config` carried throu
 
 What it still refuses, by name, with the reason each is refused rather than approximated:
 
-- **`params`.** Selections and bound inputs. A conditional encoding whose condition is a **`test`**
-  now compiles — that is a predicate on the row and needs nothing to be selected — so only a
-  condition naming a `param` is refused, by itself, leaving the rest of the definition standing.
+- **A selection parameter** — one carrying `select`. It stands for the rows a reader picked, and
+  needs an interaction loop this engine does not run. Reported one parameter at a time, so a
+  specification mixing the two kinds still gets the variables it declared. A **variable** parameter
+  is implemented (below), and a condition naming a `param` is still refused by itself, leaving the
+  rest of its definition standing.
 - **Geographic projections and the `geoshape` mark.** The runtime draws maps — `world-map` is in the
   Vega corpus — so this is now a *compiler* gap and not an engine one: nothing here yet translates
   Vega-Lite's `projection` block and its `geoshape` mark into the Vega equivalents.
@@ -663,6 +665,23 @@ Three rules came out of upstream with it:
   many have landed on each and moves one across when they do not match, counting the side each
   *asked* for rather than the side it ended on. And only the first rules gridlines: two sets across
   one plot measure different things and say neither.
+
+### Parameters, where they are values and not selections
+
+A **variable** parameter is a Vega signal and almost nothing else — a value, optionally an `expr`
+computing it from the others, optionally a `bind` describing the input that sets it — because Vega
+already has the construct. `assembleParameterSignals` is the whole translation, and the signals go
+after the layout's own, a parameter being able to read a size and not the other way about.
+
+What the fixture found was not in the parameters at all. `{"value": {"expr": "tint"}}` is how a chart
+reads one into a graphic property, and it is **not a literal object**: upstream turns the expression
+into a `signal` in the same value ref, so a `datum` written that way still passes through its scale
+and comes out `{"scale": "y", "signal": "marker"}`. Writing it out as a value paints the mark with an
+object, which a renderer reads as nothing at all — and nothing about it is reported, because a value
+is exactly the thing a compiler is not supposed to look inside.
+
+A **selection** parameter is still refused, one at a time rather than as a block, so a specification
+mixing the two kinds gets the variables it declared.
 
 ### Ordering a trellis by a total none of its rows carries
 
@@ -1105,7 +1124,7 @@ the whole time.
 
 ## Verification
 
-- 2,295 JVM tests pass and none is skipped (`./gradlew test`); the portable core is most of
+- 2,302 JVM tests pass and none is skipped (`./gradlew test`); the portable core is most of
   them, and `./scripts/test-core.sh` runs it without an Android SDK.
 - Android lint is clean with `warningsAsErrors` on every Android module.
 - 63 instrumented tests pass on an API 37 arm64 emulator (`./scripts/test-android.sh`): 49 in

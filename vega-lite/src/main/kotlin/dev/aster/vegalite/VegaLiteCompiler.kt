@@ -153,9 +153,12 @@ private class Compilation(
     }
     val legends = allLegends.filterKeys { concat == null || owner[it] == null }.values.toList()
     // A merged size is written once, by the chart, rather than once by each plot that shares it.
+    // The layout's own signals first, then the parameters, which is upstream's order in
+    // `assembleTopLevelModel` — a parameter may read a size and not the other way about.
     val sizeSignals =
       plots.flatMap { plot -> plot.size!!.signals.filter { it.string("name") !in merged } } +
-        mergedSizeSignals()
+        mergedSizeSignals() +
+        Params.signals(spec, diagnostics)
     val root = plots.first().size!!
     // The facets' own values, which the layout counts and the headers title themselves from — and,
     // for a wrapped facet, only along the directions a shared axis was actually drawn in.
@@ -602,14 +605,6 @@ private class Compilation(
   }
 
   private fun reportUnsupportedTopLevel() {
-    if (spec.fields.containsKey("params")) {
-      diagnostics.error(
-        VegaLiteDiagnostics.UNSUPPORTED_PARAMETER,
-        "`params` is not implemented, so selections and bound inputs are dropped. The chart still " +
-          "compiles, without the interaction.",
-        jsonPath = "$.params",
-      )
-    }
     if (spec.fields.containsKey("projection")) {
       diagnostics.error(
         VegaLiteDiagnostics.UNSUPPORTED_TOP_LEVEL_PROPERTY,
