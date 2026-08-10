@@ -381,7 +381,12 @@ public sealed interface RangeSpec {
   public data class Named(val name: String) : RangeSpec
 
   /** A colour scheme, named outright, chosen by a signal, or written out as its stops. */
-  public data class Scheme(val scheme: SchemeRef, val count: Int? = null) : RangeSpec
+  public data class Scheme(
+    val scheme: SchemeRef,
+    val count: Int? = null,
+    /** `{"count": {"signal": "levels"}}` — a chart whose reader chooses how many buckets. */
+    val countSignal: String? = null,
+  ) : RangeSpec
 
   /**
    * `{"signal": "..."}` — the whole range comes from a signal.
@@ -951,22 +956,46 @@ public data class ProjectionSpec(
   /** `{"type": {"signal": "..."}}` — a chart that lets a reader choose the projection. */
   val typeSignal: String? = null,
   val scale: NumberValue? = null,
-  val translate: List<NumberValue> = emptyList(),
-  val center: List<NumberValue> = emptyList(),
-  val rotate: List<NumberValue> = emptyList(),
+  /**
+   * Each of these may be written two ways, and both are common.
+   *
+   * `[{"signal": "a"}, {"signal": "b"}]` is a list of signals, one per component. `{"signal": "[a,
+   * b]"}` is **one** signal that evaluates to the whole list — which is what a map with three
+   * rotation sliders usually writes, because it is shorter. [NumberList] holds either.
+   */
+  val translate: NumberList = NumberList.None,
+  val center: NumberList = NumberList.None,
+  val rotate: NumberList = NumberList.None,
   /** Post-projection rotation of the plane, in degrees. */
   val angle: NumberValue? = null,
   /** The subdivision threshold for adaptive resampling; `0` turns it off entirely. */
   val precision: NumberValue? = null,
   val clipAngle: NumberValue? = null,
-  val clipExtent: List<List<NumberValue>> = emptyList(),
+  val clipExtent: List<NumberList> = emptyList(),
   val reflectX: NumberValue? = null,
   val reflectY: NumberValue? = null,
   /** `fit`/`extent`/`size`, which size the projection from the data rather than from a scale. */
   val fit: VegaValue? = null,
-  val extent: List<List<NumberValue>> = emptyList(),
-  val size: List<NumberValue> = emptyList(),
+  val extent: List<NumberList> = emptyList(),
+  val size: NumberList = NumberList.None,
 )
+
+/**
+ * A list of numbers a specification may write out or hand over whole.
+ *
+ * The distinction is not cosmetic: `[{"signal": "a"}, {"signal": "b"}]` resolves two signals and
+ * `{"signal": "[a, b]"}` resolves one that returns an array. A parser that understood only the
+ * first reads a rotation as empty and draws the globe unturned, which is a plausible picture and
+ * the wrong one.
+ */
+public sealed interface NumberList {
+  public object None : NumberList
+
+  public data class Items(val values: List<NumberValue>) : NumberList
+
+  /** One signal for the whole list. */
+  public data class Signal(val expression: String) : NumberList
+}
 
 public enum class MarkType {
   ARC,

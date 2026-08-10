@@ -394,7 +394,10 @@ function record(type, role, item, dx, dy, precision) {
   }
   if (type === 'text') {
     for (const channel of TEXT_CHANNELS) {
-      if (item[channel] !== undefined) {
+      // `null` counts as absent, not as the four letters `String(null)` spells. A text item can
+      // genuinely have no text — a banded legend's lowest label has no lower bound to write — and
+      // recording that as "null" would let a label that really said "null" compare equal to it.
+      if (item[channel] !== undefined && item[channel] !== null) {
         entry[channel] =
           channel === 'text'
             ? item[channel]

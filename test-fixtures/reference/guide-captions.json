@@ -565,6 +565,11 @@
   "caption": "Symbol legend for stroke color with 3 values: USA, Japan, Europe"
  },
  {
+  "fixture": "county-unemployment",
+  "kind": "legend",
+  "caption": "Discrete legend titled 'Unemployment' for fill color with 6 boundaries: 2.1%, 4.3%, 6.4%, 8.6%, 10.7%, 12.9%"
+ },
+ {
   "fixture": "crossfilter-flights",
   "kind": "axis",
   "caption": "X-axis for a linear scale with values from −60 to 180"
@@ -933,6 +938,11 @@
   "fixture": "log-scale",
   "kind": "axis",
   "caption": "Y-axis for a sqrt scale with values from 0 to 100"
+ },
+ {
+  "fixture": "map-with-tooltip",
+  "kind": "legend",
+  "caption": "Discrete legend titled 'Unemployment' for fill color with 6 boundaries: 2.1%, 4.3%, 6.4%, 8.6%, 10.7%, 12.9%"
  },
  {
   "fixture": "multi-source-pluck",

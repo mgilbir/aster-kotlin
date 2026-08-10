@@ -1,5 +1,6 @@
 package dev.aster.vega.dataflow.geo
 
+import dev.aster.vega.dataflow.geo.GeoMath.DEGREES
 import dev.aster.vega.dataflow.geo.GeoMath.EPSILON
 import dev.aster.vega.dataflow.geo.GeoMath.HALF_PI
 import dev.aster.vega.dataflow.geo.GeoMath.PI_
@@ -7,8 +8,10 @@ import dev.aster.vega.dataflow.geo.GeoMath.RADIANS
 import dev.aster.vega.dataflow.geo.GeoMath.TAU
 import kotlin.math.abs
 import kotlin.math.asin
+import kotlin.math.atan
 import kotlin.math.atan2
 import kotlin.math.cos
+import kotlin.math.exp
 import kotlin.math.ln
 import kotlin.math.pow
 import kotlin.math.roundToLong
@@ -16,10 +19,31 @@ import kotlin.math.sin
 import kotlin.math.sqrt
 import kotlin.math.tan
 
-/** A point transform: longitude and latitude in radians to plane coordinates, or the reverse. */
+/** A point transform: longitude and latitude in radians to plane coordinates. */
 internal fun interface RawProjection {
   fun project(lambda: Double, phi: Double): DoubleArray
 }
+
+/**
+ * A projection that can be read backwards: a point on the page to a place on the globe.
+ *
+ * Separate from [RawProjection] because not every formula has a closed form inverse, and one that
+ * does not should say so rather than answer something plausible.
+ */
+internal interface InvertibleRaw : RawProjection {
+  fun invert(x: Double, y: Double): DoubleArray
+}
+
+/** A raw projection with both directions, which is how d3 writes the invertible ones. */
+internal fun invertible(
+  forward: (Double, Double) -> DoubleArray,
+  backward: (Double, Double) -> DoubleArray,
+): InvertibleRaw =
+  object : InvertibleRaw {
+    override fun project(lambda: Double, phi: Double): DoubleArray = forward(lambda, phi)
+
+    override fun invert(x: Double, y: Double): DoubleArray = backward(x, y)
+  }
 
 /**
  * Anything a `geoshape` can draw through.
@@ -310,6 +334,7 @@ internal class Projection(private var raw: RawProjection) : GeoProjector {
 
   private lateinit var rotation: Rotation
   private lateinit var transform: (Double, Double) -> DoubleArray
+  private var placeInvert: ((Double, Double) -> DoubleArray)? = null
 
   init {
     recenter()
@@ -419,6 +444,22 @@ internal class Projection(private var raw: RawProjection) : GeoProjector {
     return RotateStream(preclipped, rotation)
   }
 
+  /**
+   * A point on the page read back to longitude and latitude, or null for a projection with no
+   * closed form inverse.
+   *
+   * The pipeline undone in reverse: the placement, then the formula, then the rotation. Only the
+   * point transforms are undone — clipping and resampling are not functions and have no inverse —
+   * so this is exact for a point and meaningless for a shape.
+   */
+  fun invert(x: Double, y: Double): DoubleArray? {
+    val formula = raw as? InvertibleRaw ?: return null
+    val plane = placeInvert?.invoke(x, y) ?: return null
+    val place = formula.invert(plane[0], plane[1])
+    val turned = rotation.invert(place[0], place[1])
+    return doubleArrayOf(turned[0] * DEGREES, turned[1] * DEGREES)
+  }
+
   /** One point, projected — what a `geopoint` transform needs and a path does not. */
   override fun apply(lambda: Double, phi: Double): DoubleArray {
     val rotated = rotation.forward(lambda * RADIANS, phi * RADIANS)
@@ -443,6 +484,15 @@ internal class Projection(private var raw: RawProjection) : GeoProjector {
       val p = raw.project(lambda, phi)
       place(p[0], p[1])
     }
+    // The placement read backwards, for `invert`. A *rotated* plane has none here — d3 has one and
+    // nothing in the corpus uses it, so it is refused rather than guessed at.
+    val dx = translateX - at[0]
+    val dy = translateY - at[1]
+    placeInvert =
+      if (alpha != 0.0) null
+      else {
+        { x, y -> doubleArrayOf((x - dx) / scale * reflectX, (dy - y) / scale * reflectY) }
+      }
     if (clipsToOneTurn) {
       // The projected origin, which is where the square is centred. Upstream writes it as
       // `m(rotation(m.rotate()).invert([0, 0]))` — rotating a point straight back through the
@@ -496,38 +546,75 @@ internal class Projection(private var raw: RawProjection) : GeoProjector {
  */
 internal object RawProjections {
 
-  val mercator = RawProjection { lambda, phi ->
-    doubleArrayOf(lambda, ln(tan((HALF_PI + phi) / 2)))
-  }
+  val mercator =
+    invertible(
+      { lambda, phi -> doubleArrayOf(lambda, ln(tan((HALF_PI + phi) / 2))) },
+      { x, y -> doubleArrayOf(x, 2 * atan(exp(y)) - HALF_PI) },
+    )
 
-  val equirectangular = RawProjection { lambda, phi -> doubleArrayOf(lambda, phi) }
+  val equirectangular =
+    invertible({ lambda, phi -> doubleArrayOf(lambda, phi) }, { x, y -> doubleArrayOf(x, y) })
 
-  val orthographic = RawProjection { lambda, phi ->
-    doubleArrayOf(cos(phi) * sin(lambda), sin(phi))
-  }
+  val orthographic =
+    invertible(
+      { lambda, phi -> doubleArrayOf(cos(phi) * sin(lambda), sin(phi)) },
+      azimuthalInvert { GeoMath.asin(it) },
+    )
 
-  val gnomonic = RawProjection { lambda, phi ->
-    val cy = cos(phi)
-    val k = cos(lambda) * cy
-    doubleArrayOf(cy * sin(lambda) / k, sin(phi) / k)
-  }
+  val gnomonic =
+    invertible(
+      { lambda, phi ->
+        val cy = cos(phi)
+        val k = cos(lambda) * cy
+        doubleArrayOf(cy * sin(lambda) / k, sin(phi) / k)
+      },
+      azimuthalInvert { atan(it) },
+    )
 
-  val stereographic = RawProjection { lambda, phi ->
-    val cy = cos(phi)
-    val k = 1 + cos(lambda) * cy
-    doubleArrayOf(cy * sin(lambda) / k, sin(phi) / k)
-  }
+  val stereographic =
+    invertible(
+      { lambda, phi ->
+        val cy = cos(phi)
+        val k = 1 + cos(lambda) * cy
+        doubleArrayOf(cy * sin(lambda) / k, sin(phi) / k)
+      },
+      azimuthalInvert { 2 * atan(it) },
+    )
 
-  val azimuthalEqualArea = azimuthal { cxcy -> sqrt(2 / (1 + cxcy)) }
+  val azimuthalEqualArea =
+    invertible(
+      azimuthal { cxcy -> sqrt(2 / (1 + cxcy)) },
+      azimuthalInvert { 2 * GeoMath.asin(it / 2) },
+    )
 
-  val azimuthalEquidistant = azimuthal { cxcy ->
-    val c = GeoMath.acos(cxcy)
-    if (c == 0.0) c else c / sin(c)
-  }
+  val azimuthalEquidistant =
+    invertible(
+      azimuthal { cxcy ->
+        val c = GeoMath.acos(cxcy)
+        if (c == 0.0) c else c / sin(c)
+      },
+      azimuthalInvert { it },
+    )
 
-  val transverseMercator = RawProjection { lambda, phi ->
-    doubleArrayOf(ln(tan((HALF_PI + phi) / 2)), -lambda)
-  }
+  val transverseMercator =
+    invertible(
+      { lambda, phi -> doubleArrayOf(ln(tan((HALF_PI + phi) / 2)), -lambda) },
+      { x, y -> doubleArrayOf(-y, 2 * atan(exp(x)) - HALF_PI) },
+    )
+
+  /**
+   * The azimuthal family's shared inverse: a distance from the centre back to an angle.
+   *
+   * They differ only in how that distance maps to an angle, which is the function passed in.
+   */
+  private fun azimuthalInvert(angle: (Double) -> Double): (Double, Double) -> DoubleArray =
+    { x, y ->
+      val z = sqrt(x * x + y * y)
+      val c = angle(z)
+      val sc = sin(c)
+      val cc = cos(c)
+      doubleArrayOf(atan2(x * sc, z * cc), GeoMath.asin(if (z == 0.0) 0.0 else y * sc / z))
+    }
 
   val naturalEarth1 = RawProjection { lambda, phi ->
     val phi2 = phi * phi
@@ -556,13 +643,14 @@ internal object RawProjections {
    * The `Infinity` guard is upstream's: `gnomonic` at ninety degrees divides by zero, and d3
    * answers `[2, 0]` rather than a NaN that would poison every bound downstream.
    */
-  private fun azimuthal(scale: (Double) -> Double): RawProjection = RawProjection { lambda, phi ->
-    val cx = cos(lambda)
-    val cy = cos(phi)
-    val k = scale(cx * cy)
-    if (k == Double.POSITIVE_INFINITY) doubleArrayOf(2.0, 0.0)
-    else doubleArrayOf(k * cy * sin(lambda), k * sin(phi))
-  }
+  private fun azimuthal(scale: (Double) -> Double): (Double, Double) -> DoubleArray =
+    { lambda, phi ->
+      val cx = cos(lambda)
+      val cy = cos(phi)
+      val k = scale(cx * cy)
+      if (k == Double.POSITIVE_INFINITY) doubleArrayOf(2.0, 0.0)
+      else doubleArrayOf(k * cy * sin(lambda), k * sin(phi))
+    }
 
   fun conicEqualArea(y0: Double, y1: Double): RawProjection {
     val sy0 = sin(y0)

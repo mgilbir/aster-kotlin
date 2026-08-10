@@ -113,6 +113,15 @@ public interface ExpressionScope {
   /** `range('name')` — the scale's output extent. */
   public fun scaleRange(name: String): VegaValue = VegaValue.Null
 
+  /**
+   * `geoCentroid('projection', feature)` — where a shape balances, in projected coordinates.
+   *
+   * Declared here and implemented where projections live, exactly as `scale()` is: this module
+   * knows nothing about geography and should not start. A scope with no projections answers null,
+   * which is what a bare expression evaluated outside a chart should do.
+   */
+  public fun geoCentroid(projection: String?, geojson: VegaValue): VegaValue = VegaValue.Null
+
   /** `bandwidth('name')` — a band scale's band width, or zero for a scale that has none. */
   public fun scaleBandwidth(name: String): VegaValue = VegaValue.Num(0.0)
 

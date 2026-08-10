@@ -4,7 +4,9 @@ import dev.aster.vega.dataflow.geo.AlbersUsa
 import dev.aster.vega.dataflow.geo.GeoJsonStream
 import dev.aster.vega.dataflow.geo.GeoProjector
 import dev.aster.vega.dataflow.geo.Graticule
+import dev.aster.vega.dataflow.geo.PathCentroidSink
 import dev.aster.vega.dataflow.geo.PathStringSink
+import dev.aster.vega.dataflow.geo.Projection
 import dev.aster.vega.dataflow.geo.Projections
 import dev.aster.vega.model.DiagnosticCodes
 import dev.aster.vega.model.VegaValue
@@ -183,4 +185,39 @@ public object GraticuleTransform : Transform {
       second.values[1].asDouble(),
     )
   }
+}
+
+/**
+ * The measurements a specification asks for with an expression rather than a transform.
+ *
+ * `geoCentroid(projection, feature)` is how a chart labels a country: it places the label where the
+ * shape's *area* balances, not where its bounding box does, so a label on Norway lands on the
+ * mainland rather than out at sea between it and Svalbard.
+ */
+public object GeoMeasure {
+
+  /**
+   * The centroid of a geometry, in projected coordinates, or null if it has no area.
+   *
+   * d3 measures three things at once and reports the highest-dimensional one that exists: the
+   * area-weighted centroid of the polygons, else the length-weighted centroid of the lines, else
+   * the mean of the bare points. That order is why a `MultiPolygon` with one degenerate part still
+   * balances on the part that has area.
+   */
+  public fun centroid(definition: ProjectionDefinition?, geojson: VegaValue): DoubleArray? {
+    val sink = PathCentroidSink()
+    val stream = definition?.build()?.stream(sink) ?: sink
+    GeoJsonStream.stream(geojson, stream)
+    return sink.result()
+  }
+
+  /**
+   * A point on the page read back to longitude and latitude.
+   *
+   * `invert('projection', p)` — how a map turns where someone clicked into where on Earth that is.
+   * Null for a projection with no closed-form inverse, and for the composite ones, which are three
+   * projections and have no single answer.
+   */
+  public fun invert(definition: ProjectionDefinition, x: Double, y: Double): DoubleArray? =
+    (definition.build() as? Projection)?.invert(x, y)
 }

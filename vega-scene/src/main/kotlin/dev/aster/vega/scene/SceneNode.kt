@@ -366,6 +366,15 @@ public data class TextNode(
   override val visible: Boolean = true,
   override val metadata: NodeMetadata = NodeMetadata.None,
   val blendMode: SceneBlendMode = SceneBlendMode.NORMAL,
+  /**
+   * True when the item carries **no text at all**, which is not the same as carrying an empty one.
+   *
+   * A banded legend's lowest label is the case: that bucket reaches to negative infinity and
+   * upstream's formatter returns nothing rather than a number, so the item exists — it is measured
+   * and it occupies a row — and has no `text` property. Distinguishing the two is what lets a
+   * comparison see an empty string somebody meant to write.
+   */
+  val absent: Boolean = false,
 ) : SceneNode {
 
   public val text: String

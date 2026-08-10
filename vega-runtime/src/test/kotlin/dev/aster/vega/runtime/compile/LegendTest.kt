@@ -476,10 +476,12 @@ class LegendTest {
   }
 
   @Test
-  fun `banded gradients are reported rather than approximated`() {
+  fun `a banded legend needs a discretizing scale, and says so`() {
+    // `s1` is continuous, so there are no bands to draw. Asking for one is a specification error
+    // rather than something to approximate with swatches.
     val compiled = compile(spec("""{"fill": "s1", "type": "discrete"}"""))
     assertTrue(
-      compiled.diagnostics.any { it.message.contains("Discrete (banded)") },
+      compiled.diagnostics.any { it.message.contains("needs a discretizing scale") },
       compiled.diagnostics.toString(),
     )
   }

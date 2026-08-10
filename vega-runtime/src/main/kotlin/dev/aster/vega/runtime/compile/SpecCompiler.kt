@@ -289,7 +289,34 @@ public class SpecCompiler(
         }
         is Operator.Data ->
           dataSpecs[operator.name]?.let {
-            resolved = data.resolve(listOf(it), signalValues, resolved, unresolvedSignals, scales)
+            // Resolved here rather than once up front: a projection is made of signals, and the
+            // signals are still settling as the dataflow order is walked. It is a handful of
+            // arithmetic per dataset and it is what lets a `formula` call `geoCentroid()`.
+            val scope =
+              SignalScope(
+                signalValues,
+                resolved.datasets,
+                scales = scales,
+                diagnostics = diagnostics,
+              )
+            // Into a collector nobody reads: this runs once per dataset and the same projection
+            // would report the same unimplemented property once for each, where the scope built
+            // after the loop reports it exactly once.
+            val projections =
+              ProjectionResolver(
+                  NumberResolver(expressions, scope, DiagnosticCollector()),
+                  DiagnosticCollector(),
+                )
+                .resolve(spec.projections)
+            resolved =
+              data.resolve(
+                listOf(it),
+                signalValues,
+                resolved,
+                unresolvedSignals,
+                scales,
+                projections,
+              )
           }
         is Operator.Scale ->
           scaleSpecs[operator.name]?.let {

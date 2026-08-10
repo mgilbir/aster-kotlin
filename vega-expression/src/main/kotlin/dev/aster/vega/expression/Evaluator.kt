@@ -279,6 +279,17 @@ public class Evaluator(
       else scope.invertScale(scaleName, argument)
     }
 
+    // `geoCentroid(projection, feature)`, where the projection may be null for a measurement on
+    // the globe itself rather than on the page.
+    if (name == "geoCentroid" && node.arguments.size >= 2) {
+      val projection = evaluate(node.arguments[0], scope)
+      val geojson = evaluate(node.arguments[1], scope)
+      return scope.geoCentroid(
+        if (projection is VegaValue.Null) null else projection.asString(),
+        geojson,
+      )
+    }
+
     val function = functions[name]
     if (function == null) {
       val reason = Functions.knownUnsupported[name]

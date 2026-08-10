@@ -2,6 +2,9 @@ package dev.aster.vega.runtime.compile
 
 import dev.aster.vega.dataflow.transform.ProjectionDefinition
 import dev.aster.vega.model.DiagnosticCollector
+import dev.aster.vega.model.VegaValue
+import dev.aster.vega.model.asDouble
+import dev.aster.vega.model.spec.NumberList
 import dev.aster.vega.model.spec.NumberValue
 import dev.aster.vega.model.spec.ProjectionSpec
 
@@ -49,7 +52,7 @@ internal class ProjectionResolver(
       if (spec.clipAngle != null) add("clipAngle")
       if (spec.fit != null) add("fit")
       if (spec.extent.isNotEmpty()) add("extent")
-      if (spec.size.isNotEmpty()) add("size")
+      if (spec.size != NumberList.None) add("size")
     }
     if (unsupported.isEmpty()) return
     diagnostics.error(
@@ -68,13 +71,21 @@ internal class ProjectionResolver(
       is NumberValue.Signal -> numbers.resolve(value, owner)
     }
 
-  private fun numberList(values: List<NumberValue>, owner: String): List<Double> =
-    values.mapNotNull {
-      number(it, owner)
+  private fun numberList(values: NumberList, owner: String): List<Double> =
+    when (values) {
+      is NumberList.None -> emptyList()
+      is NumberList.Items -> values.values.mapNotNull { number(it, owner) }
+      // One signal for the whole list: it evaluates to an array, and each entry is read the same
+      // way a written-out one would be.
+      is NumberList.Signal ->
+        (numbers.resolveValue(values.expression, owner) as? VegaValue.Arr)
+          ?.values
+          ?.map { it.asDouble() }
+          ?.filterNot { it.isNaN() }
+          .orEmpty()
     }
 
-  private fun flatten(values: List<List<NumberValue>>, owner: String): List<Double> =
-    values.flatMap {
-      numberList(it, owner)
-    }
+  private fun flatten(values: List<NumberList>, owner: String): List<Double> = values.flatMap {
+    numberList(it, owner)
+  }
 }

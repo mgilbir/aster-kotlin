@@ -405,7 +405,7 @@ public class ScaleResolver(
       // repeat the first colours instead of reaching the later ones.
       palette != null ->
         if (spec.type == ScaleType.ORDINAL) palette
-        else range.count?.let { palette.take(it.coerceAtLeast(1)) } ?: palette
+        else schemeCount(spec, range)?.let { palette.take(it.coerceAtLeast(1)) } ?: palette
       ramp != null -> ramp
       else -> {
         diagnostics.error(
@@ -700,7 +700,7 @@ public class ScaleResolver(
         // seven nearest stops. With no count at all upstream falls back to five, not to however
         // many stops the ramp happens to have.
         val ramp = rampFor(spec, r)
-        val wanted = r.count ?: buckets ?: ramp?.let { DEFAULT_SCHEME_COUNT } ?: 0
+        val wanted = schemeCount(spec, r) ?: buckets ?: ramp?.let { DEFAULT_SCHEME_COUNT } ?: 0
         val colors =
           if (ramp != null) quantizeRamp(ramp, wanted) else colorRange(spec) ?: return null
         val taken =
@@ -717,6 +717,11 @@ public class ScaleResolver(
         null
       }
     }
+
+  /** How many colours a scheme is asked for, which a signal may decide. */
+  private fun schemeCount(spec: ScaleSpec, range: RangeSpec.Scheme): Int? =
+    range.count
+      ?: range.countSignal?.let { numbers.resolve(NumberValue.Signal(it), spec.name)?.toInt() }
 
   /** Upstream's `DEFAULT_COUNT`: how many buckets a discretizing scheme gets when nobody says. */
   private val DEFAULT_SCHEME_COUNT = 5
