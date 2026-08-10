@@ -9,7 +9,7 @@ Branch `milestone-0-bootstrap`. Working tree clean, both gates green:
 - `./scripts/check.sh` — format, all tests, lint, demo APK
 - `./scripts/oracle.sh` — regenerates upstream references and runs the differential comparison
 
-**112 differential fixtures pass, all matching upstream exactly.** That is the only number here
+**116 differential fixtures pass, all matching upstream exactly.** That is the only number here
 that means what it says.
 
 ## Read this before trusting the other number
@@ -195,13 +195,14 @@ those before comparing, they paint nothing.
 its datasets are fetched into `test-fixtures/data/` and committed. Discount every loader diagnostic
 when judging how far an example is from passing.
 
-**Where the corpus stands, from `ExampleTriage` rather than from memory: 85 of the 93 compile
-clean, 8 report errors.** Read the *movement* rather than the number: 70 → 79 as the stochastic and
+**Where the corpus stands, from `ExampleTriage` rather than from memory: 89 of the 93 compile
+clean, 4 report errors.** Read the *movement* rather than the number: 70 → 79 as the stochastic and
 crossfilter work landed, **79 → 75 when mark-level `transform` was implemented** — the survey
 becoming honest, because five charts had been dropping a whole block silently — and 75 → 80 as the
 raster family and `force` landed.
 
-The 8 that remain are **6 geographic** and **2 that have no oracle at all**. There is no third
+The 4 that remain are **one waiting on `voronoi`** and **three with no oracle at all** — and one of
+those three is refused by upstream Vega as well, so it is not outstanding work. There is no other
 category left.
 
 **`time-units` is done** and is a fixture; STATUS.md describes the five things it needed. The
@@ -252,54 +253,57 @@ is arithmetic. See SUPPORTED_FEATURES.md for the three behaviours that had to co
 rather than from its schema — in particular that **an omitted force parameter falls to d3's default,
 not the one Vega documents**, because Vega only forwards the parameters a specification wrote.
 
-## What is left: six maps, and two charts with no oracle
+## What is left: one transform, and three examples with no oracle
 
-**85 of the 93 examples compile clean.** The geographic category is open and mostly done:
-`world-map` is a fixture and matches exactly, and `earthquakes`, `earthquakes-globe`,
-`zoomable-world-map` and `county-unemployment` all compile clean.
+**116 differential fixtures pass. 89 of the 93 examples compile clean.** The geographic category is
+done except for one transform.
 
 d3-geo is ported whole — rotation, antimeridian and circle pre-clipping, adaptive resampling,
-rectangular post-clip — and all fifteen of its projection types are pinned against upstream's own
-path strings in `GeoProjectionTypesTest`. Read the commit that added it before touching any of it;
-three of its subtleties are the kind that produce a plausible wrong map.
+rectangular post-clip, TopoJSON decoding, `geoshape`/`geopath`/`geopoint`/`graticule`, `geoCentroid`,
+`geoArea`, and `invert` on a projection. Every projection type **Vega itself ships** is here: d3-geo's
+fifteen plus `mollweide`, each pinned against upstream's own path strings in
+`GeoProjectionTypesTest`. Read the commits that added them before touching any of it; several of the
+subtleties are the kind that produce a plausible wrong map.
 
-Two of those 67 vectors are compared **within one printed digit** rather than exactly, and it is
-worth knowing why before assuming it is a defect. `azimuthalEqualArea` and `azimuthalEquidistant`
-clip at 179.999 degrees, where their scale factor is 114,591 and its derivative is 3.8e14 — so a
-one-ulp difference in `cos` between V8 and the JVM, which neither runtime promises to avoid, moves
-a coordinate by 1.3e-4 of a pixel. That is enough to cross a rounding boundary in the third decimal
-and nothing more. The arithmetic is in the test's comment.
+Two of those vectors are compared **within one printed digit** rather than exactly, and it is worth
+knowing why before assuming it is a defect. `azimuthalEqualArea` and `azimuthalEquidistant` clip at
+179.999 degrees, where their scale factor is 114,591 and its derivative is 3.8e14 — so a one-ulp
+difference in `cos` between V8 and the JVM, which neither runtime promises to avoid, moves a
+coordinate by 1.3e-4 of a pixel. That is enough to cross a rounding boundary in the third decimal and
+nothing more. The arithmetic is in the test's comment.
 
-### The six maps, and what each one is waiting for
+### The one real gap: `voronoi`
 
-- **`county-unemployment`, `annual-precipitation`, `map-with-tooltip` — a band legend.** All three
-  compile clean and the *map* in `county-unemployment` was verified mark-for-mark against upstream:
-  3,607 shapes, every coordinate and every fill. What stopped it becoming a fixture is its
-  **legend**: a discretizing scale gets a `legend-band` legend upstream — a stack of rects — and
-  this engine draws symbols. The analysis is done and is short:
-  - `legendType` gives `Discrete` (not `Gradient`, not `Symbols`) for any discretizing scale with a
-    single `fill` or `stroke`; see `vega-parser/src/parsers/legend.js`.
-  - The entries come from `LegendEntries`' third branch: `values = labelValues(scale, count)`, which
-    for a `quantize` scale is `[-Infinity, ...thresholds]`, and each row carries `perc` and `perc2`
-    from `labelFraction(scale)`. The **first label is null** — `formatDiscrete` returns null at
-    index 0 — and the last band's `perc2` is 1.
-  - The marks are `legend-gradient-discrete.js`: one rect per row, `y = (1 - perc) * length`,
-    `y2 = (1 - perc2) * length`, `width = gradientThickness`.
-  - `test-fixtures/data/us-10m.json` and `unemployment.tsv` are already checked in, so the fixture
-    is one feature away from being re-added and green.
-- **`dorling-cartogram`, `distortion-comparison`, `airport-connections` — `geoCentroid`.** Three
-  uses of one expression function, still reported as out of scope. `d3-geo`'s `centroid` is a
-  stream like every other consumer of a projection, so it fits where `PathBoundsSink` does.
-  `distortion-comparison` additionally names a projection from a *group* scope that does not
-  declare it — worth reading before assuming it is the same defect.
-- **`projections`** draws every projection there is, including the fifty in `d3-geo-projection`
-  (`airy`, `bertin1953`, …). That is a second library, not a gap in this one.
+`airport-connections` is the only remaining example that this engine could pass and does not. It
+needs the `voronoi` transform, and everything else in it already works — `geopoint` places its 600
+airports and the rest of the scene builds.
 
-### The two with no oracle
+The cost is known and it is large: `voronoi` is `d3-delaunay` over `delaunator`, and delaunator
+depends on `robust-predicates` for an exact `orient2d`. That is about 1,550 lines of intricate
+numeric code — an incremental Delaunay triangulation with a hash-based hull, then cell polygons
+clipped to an extent. It is all deterministic double arithmetic, so it *is* verifiable, and
+`airport-connections` would verify it end to end. It was not attempted rather than attempted badly.
 
-**`word-cloud` and `labeled-scatter-plot` cannot be differential fixtures, and this is established
-rather than suspected.** Both transforms measure or rasterise against a `<canvas>`, and there is
-none under Node:
+Worth knowing before starting: in that example the Voronoi cells are **invisible** — transparent
+paths that exist only to catch a pointer. They are still marks in the scene, so the fixture compares
+every one of their outlines, which makes it a demanding test of the port and a pointless one to
+approximate.
+
+### The three with no oracle, and one of them is not our doing
+
+**`projections` is refused by upstream Vega too.** It names `airy`, `armadillo`, `baker`,
+`berghaus`, `bottomley`, `collignon`, `eckert1`, `guyou`, `hammer`, `littrow`, `wagner6`, `wiechel`,
+`winkel3` and the interrupted and polyhedral families — and `vega-projection` imports exactly **one**
+projection from `d3-geo-projection`, `geoMollweide`. Running the example through the pinned oracle
+gives `Error: Unrecognized projection type: airy`. The Vega website registers those types itself
+before rendering that page; a bare Vega cannot draw it. Our diagnostic says the same thing upstream's
+does, so this example is *finished* in the only sense available — do not read its 57 errors as
+outstanding work. If the extended family is ever wanted, `Projections.byName` is where a type is
+added and `GeoProjectionTypesTest` is how it is proved.
+
+**`word-cloud` and `labeled-scatter-plot` cannot be differential fixtures**, and this is established
+rather than suspected. Both transforms measure or rasterise against a `<canvas>`, and there is none
+under Node:
 
 - `wordcloud` measures text, and upstream's own headless output is degenerate — `fontSize: 0` on
   every word, a surface width of `-Infinity`.

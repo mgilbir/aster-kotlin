@@ -603,6 +603,44 @@ internal object RawProjections {
     )
 
   /**
+   * `mollweide`: the one extended projection Vega itself ships.
+   *
+   * An equal-area ellipse of the world, and the only projection here whose forward direction is
+   * **iterative** — the auxiliary angle solves `theta + sin theta = pi sin phi` by Newton's method,
+   * capped at thirty steps the way upstream caps it. A different cap or a different tolerance gives
+   * a slightly different ellipse.
+   */
+  val mollweide =
+    invertible(
+      { lambda, phi ->
+        val theta = mollweideTheta(PI_, phi)
+        doubleArrayOf(SQRT2 / HALF_PI * lambda * cos(theta), SQRT2 * sin(theta))
+      },
+      { x, y ->
+        val theta = GeoMath.asin(y / SQRT2)
+        doubleArrayOf(
+          x / (SQRT2 / HALF_PI * cos(theta)),
+          GeoMath.asin((2 * theta + sin(2 * theta)) / PI_),
+        )
+      },
+    )
+
+  private fun mollweideTheta(cp: Double, phi0: Double): Double {
+    val target = cp * sin(phi0)
+    var phi = phi0
+    var steps = 30
+    while (true) {
+      val delta = (phi + sin(phi) - target) / (1 + cos(phi))
+      phi -= delta
+      steps--
+      if (abs(delta) <= EPSILON || steps <= 0) break
+    }
+    return phi / 2
+  }
+
+  private val SQRT2 = sqrt(2.0)
+
+  /**
    * The azimuthal family's shared inverse: a distance from the centre back to an angle.
    *
    * They differ only in how that distance maps to an angle, which is the function passed in.
@@ -738,6 +776,7 @@ internal object Projections {
       "azimuthalequidistant" ->
         Projection(RawProjections.azimuthalEquidistant).scale(79.4188).clipAngle(180 - 1e-3)
       "naturalearth1" -> Projection(RawProjections.naturalEarth1).scale(175.295)
+      "mollweide" -> Projection(RawProjections.mollweide).scale(169.529)
       "equalearth" -> Projection(RawProjections.equalEarth).scale(177.158)
       // A mercator turned on its side. The default rotation is applied **before** the axis swap
       // is switched on, because upstream sets it through the accessor the swap replaces.
@@ -791,6 +830,7 @@ internal object Projections {
       "equirectangular",
       "gnomonic",
       "mercator",
+      "mollweide",
       "naturalEarth1",
       "orthographic",
       "stereographic",
