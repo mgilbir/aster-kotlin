@@ -1,5 +1,7 @@
 package dev.aster.vega.runtime.compile
 
+import dev.aster.vega.dataflow.transform.GeoMeasure
+import dev.aster.vega.dataflow.transform.ProjectionDefinition
 import dev.aster.vega.dataflow.transform.TreeSource
 import dev.aster.vega.expression.CachingExpressionCompiler
 import dev.aster.vega.expression.Clock
@@ -89,6 +91,8 @@ public class SignalScope(
   override val random: RandomStream = RandomStream(),
   /** What `now()` answers, pinned by default so a compile is a pure function. */
   private val clock: Clock = Clock.Fixed,
+  /** The projections `geoCentroid()` can reach, empty everywhere a chart is not being compiled. */
+  private val projections: Map<String, ProjectionDefinition> = emptyMap(),
 ) : ExpressionScope {
 
   override fun now(): Double = clock.now()
@@ -141,6 +145,23 @@ public class SignalScope(
     resolveScale(name, "scale")?.scale(value) ?: VegaValue.Null
 
   override fun invertScale(name: String, value: VegaValue): VegaValue {
+    // Projections share the scale namespace, and inverting one is what turns a click on a map into
+    // a place on Earth. It takes a *pair* and returns a pair, where a scale takes one number.
+    projections[name]?.let { definition ->
+      val point = (value as? VegaValue.Arr)?.values ?: return VegaValue.Null
+      if (point.size < 2) return VegaValue.Null
+      val place = GeoMeasure.invert(definition, point[0].asDouble(), point[1].asDouble())
+      if (place == null) {
+        diagnostics?.error(
+          DiagnosticCodes.SCALE_UNSUPPORTED_TYPE,
+          "invert() names projection '$name', whose type has no closed-form inverse here; " +
+            "a point on the page cannot be read back to a place on the globe",
+          operator = name,
+        )
+        return VegaValue.Null
+      }
+      return VegaValue.Arr(listOf(VegaValue.Num(place[0]), VegaValue.Num(place[1])))
+    }
     val scale = resolveScale(name, "invert") ?: return VegaValue.Null
     if (scale !is InvertibleScale) {
       diagnostics?.error(
@@ -239,7 +260,66 @@ public class SignalScope(
       trees,
       random,
       clock,
+      projections,
     )
+
+  /** The same scope with a scope's cartographic projections readable by `geoCentroid()`. */
+  public fun withProjections(projections: Map<String, ProjectionDefinition>): SignalScope =
+    SignalScope(
+      values,
+      datasets,
+      datum,
+      scales,
+      diagnostics,
+      indataIndexes,
+      pendingScales,
+      datasetSink,
+      trees,
+      random,
+      clock,
+      projections,
+    )
+
+  /**
+   * `geoCentroid('name', feature)`.
+   *
+   * A projection named but not declared is reported rather than quietly measured on the globe: the
+   * two answers are in different units and differ by a factor of a hundred, so a chart that got the
+   * wrong one would place its labels somewhere plausible and wrong.
+   */
+  override fun geoCentroid(projection: String?, geojson: VegaValue): VegaValue {
+    val definition =
+      if (projection == null) null
+      else
+        projections[projection]
+          ?: run {
+            diagnostics?.error(
+              DiagnosticCodes.SCALE_UNSUPPORTED_TYPE,
+              "geoCentroid() names projection '$projection', which this scope does not define",
+              operator = projection,
+            )
+            return VegaValue.Null
+          }
+    val centre = GeoMeasure.centroid(definition, geojson) ?: return VegaValue.Null
+    return VegaValue.Arr(listOf(VegaValue.Num(centre[0]), VegaValue.Num(centre[1])))
+  }
+
+  /** `geoArea('name', feature)`, in square units of the page. */
+  override fun geoArea(projection: String?, geojson: VegaValue): VegaValue {
+    val definition =
+      if (projection == null) null
+      else
+        projections[projection]
+          ?: run {
+            diagnostics?.error(
+              DiagnosticCodes.SCALE_UNSUPPORTED_TYPE,
+              "geoArea() names projection '$projection', which this scope does not define",
+              operator = projection,
+            )
+            return VegaValue.Null
+          }
+    return VegaValue.Num(GeoMeasure.area(definition, geojson))
+  }
 
   public val names: Set<String>
     get() = values.keys

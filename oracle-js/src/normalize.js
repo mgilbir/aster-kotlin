@@ -394,7 +394,10 @@ function record(type, role, item, dx, dy, precision) {
   }
   if (type === 'text') {
     for (const channel of TEXT_CHANNELS) {
-      if (item[channel] !== undefined) {
+      // `null` counts as absent, not as the four letters `String(null)` spells. A text item can
+      // genuinely have no text — a banded legend's lowest label has no lower bound to write — and
+      // recording that as "null" would let a label that really said "null" compare equal to it.
+      if (item[channel] !== undefined && item[channel] !== null) {
         entry[channel] =
           channel === 'text'
             ? item[channel]
@@ -402,15 +405,20 @@ function record(type, role, item, dx, dy, precision) {
       }
     }
     // A text mark's content is whatever the field held, so a numeric field gives a numeric `text`.
-    // Both engines draw its string form, so compare that rather than its type. Two values are not
-    // their `String()`: an **array** is upstream's multi-line form, whose lines are joined the way
-    // both engines lay them out rather than with commas; and `null`, which Vega's renderers draw as
-    // *nothing* where `String(null)` is the four letters "null" — writing those into the reference
-    // had this engine dutifully drawing them, the first band of a discretizing scale's legend
-    // having no lower bound and so a blank label rather than the word.
-    if (entry.text !== undefined) {
-      entry.text =
-        entry.text == null ? '' : Array.isArray(entry.text) ? entry.text.join('\n') : String(entry.text);
+    // Both engines draw its string form, so compare that rather than its type — and an **array** is
+    // upstream's multi-line form, so its lines are joined the way both engines lay them out rather
+    // than the way `String()` would, with commas.
+    //
+    // A **null** text is not a text at all, and is not an empty one either: the item exists and is
+    // measured, and it has nothing to draw. `String(null)` is the four letters "null", and writing
+    // those into the reference had this engine dutifully drawing them — the first band of a
+    // discretizing scale's legend reaches to negative infinity and has no lower bound to write.
+    // Dropping the property instead is what `TextNode.absent` models on this side, so the two agree
+    // without either of them inventing an empty string somebody could have meant.
+    if (entry.text === null) {
+      delete entry.text;
+    } else if (entry.text !== undefined) {
+      entry.text = Array.isArray(entry.text) ? entry.text.join('\n') : String(entry.text);
     }
   }
   return entry;

@@ -214,8 +214,14 @@ public class ScaleResolver(
 
   private fun buildSequentialColor(spec: ScaleSpec): SequentialColorScale? {
     val colors = colorRange(spec) ?: return null
+    // `nice` applies to a colour scale exactly as it does to a positional one: it rounds the
+    // *domain*. Skipping it leaves the ramp stretched over the raw extent, so every colour is a
+    // shade too dark and nothing about the geometry says so.
     val domain =
-      continuousDomain(spec, zeroDefault = false, fallback = listOf(0.0, 1.0)) ?: return null
+      (continuousDomain(spec, zeroDefault = false, fallback = listOf(0.0, 1.0)) ?: return null)
+        .let {
+          if (spec.nice) niceOf(it, spec) else it
+        }
     val space =
       spec.interpolate?.let { name ->
         ColorSpaces.Interpolation.fromName(name)
@@ -405,7 +411,7 @@ public class ScaleResolver(
       // repeat the first colours instead of reaching the later ones.
       palette != null ->
         if (spec.type == ScaleType.ORDINAL) palette
-        else range.count?.let { palette.take(it.coerceAtLeast(1)) } ?: palette
+        else schemeCount(spec, range)?.let { palette.take(it.coerceAtLeast(1)) } ?: palette
       ramp != null -> ramp
       else -> {
         diagnostics.error(
@@ -700,7 +706,7 @@ public class ScaleResolver(
         // seven nearest stops. With no count at all upstream falls back to five, not to however
         // many stops the ramp happens to have.
         val ramp = rampFor(spec, r)
-        val wanted = r.count ?: buckets ?: ramp?.let { DEFAULT_SCHEME_COUNT } ?: 0
+        val wanted = schemeCount(spec, r) ?: buckets ?: ramp?.let { DEFAULT_SCHEME_COUNT } ?: 0
         val colors =
           if (ramp != null) quantizeRamp(ramp, wanted) else colorRange(spec) ?: return null
         val taken =
@@ -717,6 +723,11 @@ public class ScaleResolver(
         null
       }
     }
+
+  /** How many colours a scheme is asked for, which a signal may decide. */
+  private fun schemeCount(spec: ScaleSpec, range: RangeSpec.Scheme): Int? =
+    range.count
+      ?: range.countSignal?.let { numbers.resolve(NumberValue.Signal(it), spec.name)?.toInt() }
 
   /** Upstream's `DEFAULT_COUNT`: how many buckets a discretizing scheme gets when nobody says. */
   private val DEFAULT_SCHEME_COUNT = 5

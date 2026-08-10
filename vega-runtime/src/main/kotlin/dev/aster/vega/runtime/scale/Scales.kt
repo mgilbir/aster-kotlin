@@ -654,6 +654,32 @@ public sealed interface BinnedScale : VegaScale {
         // always is. Later buckets take their own lower edge, since an equal value bisects right.
         if (i == 0) (thresholds.firstOrNull() ?: 0.0) - 1.0 else thresholds[i - 1]
       }
+
+  /**
+   * The values a **banded** legend labels: one per bucket, at the bucket's lower edge.
+   *
+   * The first is negative infinity, which is not a placeholder — the lowest bucket really does
+   * extend to it, and upstream marks the fact by leaving that entry's label empty rather than
+   * printing a number nothing bounds.
+   */
+  public val legendValues: List<Double>
+    get() = listOf(Double.NEGATIVE_INFINITY) + thresholds
+
+  /**
+   * Where a value sits along the legend's bar, in `0..1`.
+   *
+   * Measured against the scale's **input** extent rather than its cut points, so the bands are as
+   * wide as the ranges they stand for: a quantile scale's bands are uneven, which is the whole
+   * point of one.
+   */
+  public fun legendFraction(value: Double): Double {
+    val (lo, hi) = legendExtent
+    val span = hi - lo
+    return if (span == 0.0) 0.0 else (value - lo) / span
+  }
+
+  /** The extent [legendFraction] measures against; see each scale for what its domain means. */
+  public val legendExtent: Pair<Double, Double>
 }
 
 private fun bisectRight(values: List<Double>, x: Double, high: Int = values.size): Int {
@@ -689,6 +715,9 @@ public class QuantizeScale(
       (0 until n).map { i -> ((i + 1) * x1 - (i - n) * x0) / (n + 1) }
     }
 
+  override val legendExtent: Pair<Double, Double>
+    get() = (domain.firstOrNull() ?: 0.0) to (domain.lastOrNull() ?: 1.0)
+
   override fun scale(value: VegaValue): VegaValue {
     if (rangeValues.isEmpty()) return VegaValue.Null
     val x = value.asDouble()
@@ -716,6 +745,10 @@ public class QuantileScale(
     (1 until maxOf(1, rangeValues.size)).map { i ->
       quantileSorted(sorted, i.toDouble() / maxOf(1, rangeValues.size))
     }
+
+  /** The sample's own extent: a quantile scale's domain is the whole column, sorted. */
+  override val legendExtent: Pair<Double, Double>
+    get() = (sorted.firstOrNull() ?: 0.0) to (sorted.lastOrNull() ?: 1.0)
 
   override fun scale(value: VegaValue): VegaValue {
     if (rangeValues.isEmpty()) return VegaValue.Null
@@ -753,6 +786,22 @@ public class ThresholdScale(
   public val domain: List<Double>
     get() = thresholds
 
+  /**
+   * Widened by one band at each end, because the outermost buckets have no stated edge.
+   *
+   * A threshold scale's domain stops at its last cut point, so measuring against it would give the
+   * first and last bands no width at all. Upstream pads by one average band; with a single cut
+   * point and no average to take, it pads by a tenth.
+   */
+  override val legendExtent: Pair<Double, Double>
+    get() {
+      val lo = thresholds.firstOrNull() ?: 0.0
+      val hi = thresholds.lastOrNull() ?: 1.0
+      val count = thresholds.size - 1
+      val adjust = if (count > 0) (hi - lo) / count else 0.1
+      return (lo - adjust) to (hi + adjust)
+    }
+
   override fun scale(value: VegaValue): VegaValue {
     if (rangeValues.isEmpty()) return VegaValue.Null
     val x = value.asDouble()
@@ -782,6 +831,13 @@ public class BinOrdinalScale(
   /** The interior edges: the first and last bound the outermost buckets and label nothing. */
   override val thresholds: List<Double>
     get() = domain.drop(1).dropLast(1)
+
+  /** The bin edges are the labels, and the last one bounds rather than opens a bucket. */
+  override val legendValues: List<Double>
+    get() = domain.dropLast(1)
+
+  override val legendExtent: Pair<Double, Double>
+    get() = (domain.firstOrNull() ?: 0.0) to (domain.lastOrNull() ?: 1.0)
 
   // A bucket's lower edge is a domain entry, not a threshold, so the shared default is wrong here.
   override val bucketRepresentatives: List<Double>

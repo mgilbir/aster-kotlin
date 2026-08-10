@@ -1,5 +1,6 @@
 package dev.aster.vega.runtime.compile
 
+import dev.aster.vega.dataflow.transform.ProjectionDefinition
 import dev.aster.vega.dataflow.transform.TransformContext
 import dev.aster.vega.dataflow.transform.TransformPipeline
 import dev.aster.vega.dataflow.transform.TreeSource
@@ -318,6 +319,8 @@ internal class DataResolver(
      * passed instead.
      */
     scales: Map<String, VegaScale> = emptyMap(),
+    /** The scope's projections, which a `geoCentroid()` in a `formula` reaches for by name. */
+    projections: Map<String, ProjectionDefinition> = emptyMap(),
   ): ScopeData {
     if (specs.isEmpty()) return inherited
 
@@ -373,6 +376,7 @@ internal class DataResolver(
             trees,
             random,
             clock,
+            projections,
           )
         values = pipeline.run(values, spec.transform, context)
         tree = context.tree
@@ -506,6 +510,8 @@ internal class DataResolver(
     private val trees: Map<String, TreeSource>,
     private val random: RandomStream,
     private val clock: Clock,
+    /** The scope's projections, for a `geoshape` transform or a `geoCentroid()` expression. */
+    private val projections: Map<String, ProjectionDefinition>,
   ) : TransformContext {
 
     /** One diagnostic per signal per dataset; the expression runs once a row. */
@@ -520,17 +526,20 @@ internal class DataResolver(
     override fun scopeFor(datum: VegaValue): ExpressionScope =
       DeferredSignalScope(
         SignalScope(
-          signals,
-          datasets,
-          datum,
-          scales,
-          diagnostics,
-          trees = trees,
-          random = random,
-          clock = clock,
-        ),
+            signals,
+            datasets,
+            datum,
+            scales,
+            diagnostics,
+            trees = trees,
+            random = random,
+            clock = clock,
+          )
+          .withProjections(projections),
         ::reportDeferred,
       )
+
+    override fun projection(name: String): ProjectionDefinition? = projections[name]
 
     /**
      * A transform read a signal whose value is not known until after the data.

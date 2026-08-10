@@ -501,10 +501,12 @@ class LegendTest {
   }
 
   @Test
-  fun `a banded legend over a scale with no buckets is reported`() {
+  fun `a banded legend needs a discretizing scale, and says so`() {
+    // `s1` is continuous, so there are no bands to draw. Asking for one is a specification error
+    // rather than something to approximate with swatches.
     val compiled = compile(spec("""{"fill": "s1", "type": "discrete"}"""))
     assertTrue(
-      compiled.diagnostics.any { it.message.contains("banded legend needs a discretizing scale") },
+      compiled.diagnostics.any { it.message.contains("needs a discretizing scale") },
       compiled.diagnostics.toString(),
     )
   }

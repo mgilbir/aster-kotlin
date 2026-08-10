@@ -8,6 +8,7 @@ import dev.aster.vega.runtime.scale.BinnedScale
 import dev.aster.vega.runtime.scale.LinearScale
 import dev.aster.vega.runtime.scale.OrdinalScale
 import dev.aster.vega.runtime.scale.PointScale
+import dev.aster.vega.runtime.scale.QuantileScale
 import dev.aster.vega.runtime.scale.SequentialColorScale
 import dev.aster.vega.runtime.scale.Ticks
 import dev.aster.vega.runtime.scale.TimeScale
@@ -122,7 +123,10 @@ internal object GuideCaption {
   private fun domain(scale: VegaScale, format: String? = null, formatType: String? = null): String =
     when (scale) {
       is BinnedScale -> {
-        val cuts = scale.thresholds.map { formatTickLabel(it, decimalsFor(scale.thresholds)) }
+        // The same formatter the bands themselves use: the precision comes from the narrowest
+        // interval, not from the whole span, so a reader hears "2.1%" and not "0.021429".
+        val write = threshold(format, scale)
+        val cuts = scale.thresholds.map(write)
         "${cuts.size} boundar${if (cuts.size == 1) "y" else "ies"}: ${cuts.joinToString(", ")}"
       }
       is BandScale -> discrete(scale.domain.map { spoken(it, format, formatType) })
@@ -164,6 +168,34 @@ internal object GuideCaption {
       }
     return "$n value${if (n == 1) "" else "s"}: $body"
   }
+
+  /**
+   * A boundary as a discretizing legend writes it, upstream's `thresholdFormat`.
+   *
+   * The reference span is the *smallest* gap between cut points — or, for a quantize scale, the
+   * width of its declared domain — rather than the domain's whole extent, which is what makes a
+   * scale of seven buckets over `[0, 0.15]` read to a tenth of a percent.
+   */
+  private fun threshold(format: String?, scale: BinnedScale): (Double) -> String {
+    val reference =
+      if (scale is QuantileScale) scale.thresholds
+      else scale.legendExtent.let { listOf(it.first, it.second) }
+    val step =
+      when {
+        reference.size > 1 -> (1 until reference.size).minOf { reference[it] - reference[it - 1] }
+        reference.size == 1 -> reference[0]
+        else -> 1.0
+      }
+    if (format == null) {
+      val decimals = decimalsFor(scale.thresholds)
+      return { value -> formatTickLabel(value, decimals) }
+    }
+    val resolved = Ticks.spanSpecifier(format, 0.0, step, THRESHOLD_FORMAT_COUNT)
+    return { value -> NumberFormatSubset.format(value, resolved) }
+  }
+
+  /** Upstream's `3 * 10`: three ticks at ten times the resolution. */
+  private const val THRESHOLD_FORMAT_COUNT = 30
 
   /**
    * A numeric format resolved against the span it describes, as upstream's caption resolves it.

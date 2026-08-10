@@ -393,7 +393,12 @@ public sealed interface RangeSpec {
   public data class Named(val name: String) : RangeSpec
 
   /** A colour scheme, named outright, chosen by a signal, or written out as its stops. */
-  public data class Scheme(val scheme: SchemeRef, val count: Int? = null) : RangeSpec
+  public data class Scheme(
+    val scheme: SchemeRef,
+    val count: Int? = null,
+    /** `{"count": {"signal": "levels"}}` — a chart whose reader chooses how many buckets. */
+    val countSignal: String? = null,
+  ) : RangeSpec
 
   /**
    * `{"signal": "..."}` — the whole range comes from a signal.
@@ -945,6 +950,14 @@ public data class LegendSpec(
   val symbolType: String? = null,
   val symbolSize: NumberValue? = null,
   val symbolStrokeWidth: NumberValue? = null,
+  /**
+   * `clipHeight` — a fixed row height, so entries with very different symbol sizes still line up.
+   *
+   * A size legend whose largest swatch is 5,000 units across would otherwise give that row seventy
+   * units of height and the smallest row eight. Setting this makes every row the same and lets the
+   * large symbols overflow, which is what a cartogram's legend wants.
+   */
+  val clipHeight: NumberValue? = null,
   val gradientLength: NumberValue? = null,
   val gradientThickness: NumberValue? = null,
   val rowPadding: NumberValue? = null,
@@ -982,8 +995,10 @@ public data class LegendSpec(
   /**
    * The scale this legend describes.
    *
-   * Upstream picks the first channel present in this order and calls it the canonical scale, so a
-   * legend encoding both `fill` and `size` is titled and sized from the fill scale.
+   * Upstream's `LegendScales` order, first one present wins: **size** before shape before fill. A
+   * legend encoding both `fill` and `size` therefore takes its entry *values* from the size scale,
+   * and its colours follow from those values rather than the other way round. Reading `fill` first
+   * gives a legend with the right number of entries at the wrong values.
    */
   public val scale: String?
     get() = size ?: shape ?: fill ?: stroke ?: strokeWidth ?: strokeDash ?: opacity
@@ -1008,22 +1023,46 @@ public data class ProjectionSpec(
   /** `{"type": {"signal": "..."}}` — a chart that lets a reader choose the projection. */
   val typeSignal: String? = null,
   val scale: NumberValue? = null,
-  val translate: List<NumberValue> = emptyList(),
-  val center: List<NumberValue> = emptyList(),
-  val rotate: List<NumberValue> = emptyList(),
+  /**
+   * Each of these may be written two ways, and both are common.
+   *
+   * `[{"signal": "a"}, {"signal": "b"}]` is a list of signals, one per component. `{"signal": "[a,
+   * b]"}` is **one** signal that evaluates to the whole list — which is what a map with three
+   * rotation sliders usually writes, because it is shorter. [NumberList] holds either.
+   */
+  val translate: NumberList = NumberList.None,
+  val center: NumberList = NumberList.None,
+  val rotate: NumberList = NumberList.None,
   /** Post-projection rotation of the plane, in degrees. */
   val angle: NumberValue? = null,
   /** The subdivision threshold for adaptive resampling; `0` turns it off entirely. */
   val precision: NumberValue? = null,
   val clipAngle: NumberValue? = null,
-  val clipExtent: List<List<NumberValue>> = emptyList(),
+  val clipExtent: List<NumberList> = emptyList(),
   val reflectX: NumberValue? = null,
   val reflectY: NumberValue? = null,
   /** `fit`/`extent`/`size`, which size the projection from the data rather than from a scale. */
   val fit: VegaValue? = null,
-  val extent: List<List<NumberValue>> = emptyList(),
-  val size: List<NumberValue> = emptyList(),
+  val extent: List<NumberList> = emptyList(),
+  val size: NumberList = NumberList.None,
 )
+
+/**
+ * A list of numbers a specification may write out or hand over whole.
+ *
+ * The distinction is not cosmetic: `[{"signal": "a"}, {"signal": "b"}]` resolves two signals and
+ * `{"signal": "[a, b]"}` resolves one that returns an array. A parser that understood only the
+ * first reads a rotation as empty and draws the globe unturned, which is a plausible picture and
+ * the wrong one.
+ */
+public sealed interface NumberList {
+  public object None : NumberList
+
+  public data class Items(val values: List<NumberValue>) : NumberList
+
+  /** One signal for the whole list. */
+  public data class Signal(val expression: String) : NumberList
+}
 
 public enum class MarkType {
   ARC,

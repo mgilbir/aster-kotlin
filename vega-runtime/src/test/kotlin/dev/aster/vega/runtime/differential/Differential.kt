@@ -251,11 +251,14 @@ public object Differential {
       )
     val strings =
       linkedMapOf(
-        "text" to run.text,
         "align" to run.align.name.lowercase(),
         "baseline" to vegaBaseline(run.baseline),
         "font" to run.style.fontFamily,
       )
+    // An item with no text at all contributes no `text` property, exactly as upstream's does — its
+    // formatter returned nothing. An item with an *empty* text still contributes one, so the two
+    // stay distinguishable.
+    if (!node.absent) strings["text"] = run.text
     if (run.style.fontStyle == FontStyle.ITALIC) strings["fontStyle"] = "italic"
     node.fill?.let { fill ->
       solidColour(fill.paint)?.let { strings["fill"] = it.toCssHex() }
@@ -440,11 +443,8 @@ public object Differential {
     }
     val strings = LinkedHashMap<String, String>()
     node.fill?.let { f -> solidColour(f.paint)?.let { strings["fill"] = it.toCssHex() } }
-    node.stroke?.let { s ->
-      solidColour(s.paint)?.let { strings["stroke"] = it.toCssHex() }
-      numbers["strokeWidth"] = s.width
-    }
-    return Mark("group", node.metadata.role, numbers, strings)
+    node.stroke?.let { s -> solidColour(s.paint)?.let { strings["stroke"] = it.toCssHex() } }
+    return Mark("group", node.metadata.role, numbers + paintNumbers(node), strings)
   }
 
   /**
@@ -460,6 +460,9 @@ public object Differential {
         is RectNode -> node.fill
         is SymbolNode -> node.fill
         is PathNode -> node.fill
+        // A group is a painted mark too: a tooltip is a translucent rounded box with its content
+        // inside it, and nothing else in this comparison could see the translucency.
+        is GroupNode -> node.fill
         else -> null
       }
     fill?.let { result["fillOpacity"] = it.opacity }
@@ -468,6 +471,7 @@ public object Differential {
         is RectNode -> node.stroke
         is SymbolNode -> node.stroke
         is PathNode -> node.stroke
+        is GroupNode -> node.stroke
         else -> null
       }
     stroke?.let {

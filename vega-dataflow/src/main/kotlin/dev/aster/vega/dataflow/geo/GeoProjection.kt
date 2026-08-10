@@ -1,5 +1,6 @@
 package dev.aster.vega.dataflow.geo
 
+import dev.aster.vega.dataflow.geo.GeoMath.DEGREES
 import dev.aster.vega.dataflow.geo.GeoMath.EPSILON
 import dev.aster.vega.dataflow.geo.GeoMath.HALF_PI
 import dev.aster.vega.dataflow.geo.GeoMath.PI_
@@ -7,8 +8,10 @@ import dev.aster.vega.dataflow.geo.GeoMath.RADIANS
 import dev.aster.vega.dataflow.geo.GeoMath.TAU
 import kotlin.math.abs
 import kotlin.math.asin
+import kotlin.math.atan
 import kotlin.math.atan2
 import kotlin.math.cos
+import kotlin.math.exp
 import kotlin.math.ln
 import kotlin.math.pow
 import kotlin.math.roundToLong
@@ -16,10 +19,31 @@ import kotlin.math.sin
 import kotlin.math.sqrt
 import kotlin.math.tan
 
-/** A point transform: longitude and latitude in radians to plane coordinates, or the reverse. */
+/** A point transform: longitude and latitude in radians to plane coordinates. */
 internal fun interface RawProjection {
   fun project(lambda: Double, phi: Double): DoubleArray
 }
+
+/**
+ * A projection that can be read backwards: a point on the page to a place on the globe.
+ *
+ * Separate from [RawProjection] because not every formula has a closed form inverse, and one that
+ * does not should say so rather than answer something plausible.
+ */
+internal interface InvertibleRaw : RawProjection {
+  fun invert(x: Double, y: Double): DoubleArray
+}
+
+/** A raw projection with both directions, which is how d3 writes the invertible ones. */
+internal fun invertible(
+  forward: (Double, Double) -> DoubleArray,
+  backward: (Double, Double) -> DoubleArray,
+): InvertibleRaw =
+  object : InvertibleRaw {
+    override fun project(lambda: Double, phi: Double): DoubleArray = forward(lambda, phi)
+
+    override fun invert(x: Double, y: Double): DoubleArray = backward(x, y)
+  }
 
 /**
  * Anything a `geoshape` can draw through.
@@ -310,6 +334,7 @@ internal class Projection(private var raw: RawProjection) : GeoProjector {
 
   private lateinit var rotation: Rotation
   private lateinit var transform: (Double, Double) -> DoubleArray
+  private var placeInvert: ((Double, Double) -> DoubleArray)? = null
 
   init {
     recenter()
@@ -419,6 +444,22 @@ internal class Projection(private var raw: RawProjection) : GeoProjector {
     return RotateStream(preclipped, rotation)
   }
 
+  /**
+   * A point on the page read back to longitude and latitude, or null for a projection with no
+   * closed form inverse.
+   *
+   * The pipeline undone in reverse: the placement, then the formula, then the rotation. Only the
+   * point transforms are undone — clipping and resampling are not functions and have no inverse —
+   * so this is exact for a point and meaningless for a shape.
+   */
+  fun invert(x: Double, y: Double): DoubleArray? {
+    val formula = raw as? InvertibleRaw ?: return null
+    val plane = placeInvert?.invoke(x, y) ?: return null
+    val place = formula.invert(plane[0], plane[1])
+    val turned = rotation.invert(place[0], place[1])
+    return doubleArrayOf(turned[0] * DEGREES, turned[1] * DEGREES)
+  }
+
   /** One point, projected — what a `geopoint` transform needs and a path does not. */
   override fun apply(lambda: Double, phi: Double): DoubleArray {
     val rotated = rotation.forward(lambda * RADIANS, phi * RADIANS)
@@ -443,6 +484,15 @@ internal class Projection(private var raw: RawProjection) : GeoProjector {
       val p = raw.project(lambda, phi)
       place(p[0], p[1])
     }
+    // The placement read backwards, for `invert`. A *rotated* plane has none here — d3 has one and
+    // nothing in the corpus uses it, so it is refused rather than guessed at.
+    val dx = translateX - at[0]
+    val dy = translateY - at[1]
+    placeInvert =
+      if (alpha != 0.0) null
+      else {
+        { x, y -> doubleArrayOf((x - dx) / scale * reflectX, (dy - y) / scale * reflectY) }
+      }
     if (clipsToOneTurn) {
       // The projected origin, which is where the square is centred. Upstream writes it as
       // `m(rotation(m.rotate()).invert([0, 0]))` — rotating a point straight back through the
@@ -496,38 +546,113 @@ internal class Projection(private var raw: RawProjection) : GeoProjector {
  */
 internal object RawProjections {
 
-  val mercator = RawProjection { lambda, phi ->
-    doubleArrayOf(lambda, ln(tan((HALF_PI + phi) / 2)))
+  val mercator =
+    invertible(
+      { lambda, phi -> doubleArrayOf(lambda, ln(tan((HALF_PI + phi) / 2))) },
+      { x, y -> doubleArrayOf(x, 2 * atan(exp(y)) - HALF_PI) },
+    )
+
+  val equirectangular =
+    invertible({ lambda, phi -> doubleArrayOf(lambda, phi) }, { x, y -> doubleArrayOf(x, y) })
+
+  val orthographic =
+    invertible(
+      { lambda, phi -> doubleArrayOf(cos(phi) * sin(lambda), sin(phi)) },
+      azimuthalInvert { GeoMath.asin(it) },
+    )
+
+  val gnomonic =
+    invertible(
+      { lambda, phi ->
+        val cy = cos(phi)
+        val k = cos(lambda) * cy
+        doubleArrayOf(cy * sin(lambda) / k, sin(phi) / k)
+      },
+      azimuthalInvert { atan(it) },
+    )
+
+  val stereographic =
+    invertible(
+      { lambda, phi ->
+        val cy = cos(phi)
+        val k = 1 + cos(lambda) * cy
+        doubleArrayOf(cy * sin(lambda) / k, sin(phi) / k)
+      },
+      azimuthalInvert { 2 * atan(it) },
+    )
+
+  val azimuthalEqualArea =
+    invertible(
+      azimuthal { cxcy -> sqrt(2 / (1 + cxcy)) },
+      azimuthalInvert { 2 * GeoMath.asin(it / 2) },
+    )
+
+  val azimuthalEquidistant =
+    invertible(
+      azimuthal { cxcy ->
+        val c = GeoMath.acos(cxcy)
+        if (c == 0.0) c else c / sin(c)
+      },
+      azimuthalInvert { it },
+    )
+
+  val transverseMercator =
+    invertible(
+      { lambda, phi -> doubleArrayOf(ln(tan((HALF_PI + phi) / 2)), -lambda) },
+      { x, y -> doubleArrayOf(-y, 2 * atan(exp(x)) - HALF_PI) },
+    )
+
+  /**
+   * `mollweide`: the one extended projection Vega itself ships.
+   *
+   * An equal-area ellipse of the world, and the only projection here whose forward direction is
+   * **iterative** — the auxiliary angle solves `theta + sin theta = pi sin phi` by Newton's method,
+   * capped at thirty steps the way upstream caps it. A different cap or a different tolerance gives
+   * a slightly different ellipse.
+   */
+  val mollweide =
+    invertible(
+      { lambda, phi ->
+        val theta = mollweideTheta(PI_, phi)
+        doubleArrayOf(SQRT2 / HALF_PI * lambda * cos(theta), SQRT2 * sin(theta))
+      },
+      { x, y ->
+        val theta = GeoMath.asin(y / SQRT2)
+        doubleArrayOf(
+          x / (SQRT2 / HALF_PI * cos(theta)),
+          GeoMath.asin((2 * theta + sin(2 * theta)) / PI_),
+        )
+      },
+    )
+
+  private fun mollweideTheta(cp: Double, phi0: Double): Double {
+    val target = cp * sin(phi0)
+    var phi = phi0
+    var steps = 30
+    while (true) {
+      val delta = (phi + sin(phi) - target) / (1 + cos(phi))
+      phi -= delta
+      steps--
+      if (abs(delta) <= EPSILON || steps <= 0) break
+    }
+    return phi / 2
   }
 
-  val equirectangular = RawProjection { lambda, phi -> doubleArrayOf(lambda, phi) }
+  private val SQRT2 = sqrt(2.0)
 
-  val orthographic = RawProjection { lambda, phi ->
-    doubleArrayOf(cos(phi) * sin(lambda), sin(phi))
-  }
-
-  val gnomonic = RawProjection { lambda, phi ->
-    val cy = cos(phi)
-    val k = cos(lambda) * cy
-    doubleArrayOf(cy * sin(lambda) / k, sin(phi) / k)
-  }
-
-  val stereographic = RawProjection { lambda, phi ->
-    val cy = cos(phi)
-    val k = 1 + cos(lambda) * cy
-    doubleArrayOf(cy * sin(lambda) / k, sin(phi) / k)
-  }
-
-  val azimuthalEqualArea = azimuthal { cxcy -> sqrt(2 / (1 + cxcy)) }
-
-  val azimuthalEquidistant = azimuthal { cxcy ->
-    val c = GeoMath.acos(cxcy)
-    if (c == 0.0) c else c / sin(c)
-  }
-
-  val transverseMercator = RawProjection { lambda, phi ->
-    doubleArrayOf(ln(tan((HALF_PI + phi) / 2)), -lambda)
-  }
+  /**
+   * The azimuthal family's shared inverse: a distance from the centre back to an angle.
+   *
+   * They differ only in how that distance maps to an angle, which is the function passed in.
+   */
+  private fun azimuthalInvert(angle: (Double) -> Double): (Double, Double) -> DoubleArray =
+    { x, y ->
+      val z = sqrt(x * x + y * y)
+      val c = angle(z)
+      val sc = sin(c)
+      val cc = cos(c)
+      doubleArrayOf(atan2(x * sc, z * cc), GeoMath.asin(if (z == 0.0) 0.0 else y * sc / z))
+    }
 
   val naturalEarth1 = RawProjection { lambda, phi ->
     val phi2 = phi * phi
@@ -556,13 +681,14 @@ internal object RawProjections {
    * The `Infinity` guard is upstream's: `gnomonic` at ninety degrees divides by zero, and d3
    * answers `[2, 0]` rather than a NaN that would poison every bound downstream.
    */
-  private fun azimuthal(scale: (Double) -> Double): RawProjection = RawProjection { lambda, phi ->
-    val cx = cos(lambda)
-    val cy = cos(phi)
-    val k = scale(cx * cy)
-    if (k == Double.POSITIVE_INFINITY) doubleArrayOf(2.0, 0.0)
-    else doubleArrayOf(k * cy * sin(lambda), k * sin(phi))
-  }
+  private fun azimuthal(scale: (Double) -> Double): (Double, Double) -> DoubleArray =
+    { lambda, phi ->
+      val cx = cos(lambda)
+      val cy = cos(phi)
+      val k = scale(cx * cy)
+      if (k == Double.POSITIVE_INFINITY) doubleArrayOf(2.0, 0.0)
+      else doubleArrayOf(k * cy * sin(lambda), k * sin(phi))
+    }
 
   fun conicEqualArea(y0: Double, y1: Double): RawProjection {
     val sy0 = sin(y0)
@@ -650,6 +776,7 @@ internal object Projections {
       "azimuthalequidistant" ->
         Projection(RawProjections.azimuthalEquidistant).scale(79.4188).clipAngle(180 - 1e-3)
       "naturalearth1" -> Projection(RawProjections.naturalEarth1).scale(175.295)
+      "mollweide" -> Projection(RawProjections.mollweide).scale(169.529)
       "equalearth" -> Projection(RawProjections.equalEarth).scale(177.158)
       // A mercator turned on its side. The default rotation is applied **before** the axis swap
       // is switched on, because upstream sets it through the accessor the swap replaces.
@@ -703,6 +830,7 @@ internal object Projections {
       "equirectangular",
       "gnomonic",
       "mercator",
+      "mollweide",
       "naturalEarth1",
       "orthographic",
       "stereographic",

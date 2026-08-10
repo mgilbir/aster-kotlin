@@ -209,7 +209,7 @@ class SignalCompileTest {
 
   @Test
   fun `an unsupported function inside an encoding is reported once, not per datum`() {
-    val compiled = compile(spec(encode = """$basePosition, "opacity": {"signal": "geoArea()"}"""))
+    val compiled = compile(spec(encode = """$basePosition, "opacity": {"signal": "geoBounds()"}"""))
     val failures =
       compiled.diagnostics.filter { it.code == DiagnosticCodes.EXPRESSION_UNSUPPORTED_FUNCTION }
     // Two data rows, but the expression fails identically for both.

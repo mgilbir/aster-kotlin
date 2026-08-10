@@ -1071,16 +1071,22 @@ public class SpecParser {
     )
   }
 
-  /** A list whose entries may each be a signal, which is how a rotation is usually written. */
-  private fun numberList(value: VegaValue?, path: String): List<NumberValue> {
-    val array = value as? VegaValue.Arr ?: return emptyList()
-    return array.values.mapIndexedNotNull { index, entry ->
-      val holder = VegaValue.Obj(linkedMapOf("v" to entry))
-      holder.numberOrSignal("v", "$path[$index]")
+  /** A list written out, or one signal that produces the whole thing. */
+  private fun numberList(value: VegaValue?, path: String): NumberList {
+    if (value == null) return NumberList.None
+    (value as? VegaValue.Obj)?.fields?.get("signal")?.asString()?.let {
+      return NumberList.Signal(it)
     }
+    val array = value as? VegaValue.Arr ?: return NumberList.None
+    return NumberList.Items(
+      array.values.mapIndexedNotNull { index, entry ->
+        val holder = VegaValue.Obj(linkedMapOf("v" to entry))
+        holder.numberOrSignal("v", "$path[$index]")
+      }
+    )
   }
 
-  private fun numberPairs(value: VegaValue?, path: String): List<List<NumberValue>> {
+  private fun numberPairs(value: VegaValue?, path: String): List<NumberList> {
     val array = value as? VegaValue.Arr ?: return emptyList()
     return array.values.mapIndexed { index, entry -> numberList(entry, "$path[$index]") }
   }
@@ -1330,10 +1336,11 @@ public class SpecParser {
         val count = value.fields["count"]
         val data = value.fields["data"]
         val field = value.fields["field"]?.asString()
-        if (count != null && count !is VegaValue.Num) {
+        val countSignal = (count as? VegaValue.Obj)?.fields?.get("signal")?.asString()
+        if (count != null && count !is VegaValue.Num && countSignal == null) {
           diagnostics.warn(
             DiagnosticCodes.PARSE_UNKNOWN_PROPERTY,
-            "A scheme 'count' must be a number; the whole scheme will be used",
+            "A scheme 'count' must be a number or a signal; the whole scheme will be used",
             jsonPath = "$path.count",
           )
         }
@@ -1348,6 +1355,7 @@ public class SpecParser {
                 else -> SchemeRef.Named(scheme.asString())
               },
               (count as? VegaValue.Num)?.value?.toInt(),
+              countSignal,
             )
           !signal.isNullOrEmpty() -> RangeSpec.Signal(signal)
           step != null ->
@@ -1771,6 +1779,7 @@ public class SpecParser {
         symbolType = obj.fields["symbolType"]?.asString(),
         symbolSize = obj.numberOrSignal("symbolSize", "$path.symbolSize"),
         symbolStrokeWidth = obj.numberOrSignal("symbolStrokeWidth", "$path.symbolStrokeWidth"),
+        clipHeight = obj.numberOrSignal("clipHeight", "$path.clipHeight"),
         gradientLength = obj.numberOrSignal("gradientLength", "$path.gradientLength"),
         gradientThickness = obj.numberOrSignal("gradientThickness", "$path.gradientThickness"),
         rowPadding = obj.numberOrSignal("rowPadding", "$path.rowPadding"),

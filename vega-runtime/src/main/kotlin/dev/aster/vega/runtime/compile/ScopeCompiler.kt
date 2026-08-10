@@ -417,6 +417,10 @@ internal class ScopeCompiler(
               nested.scales,
               PlotSize(extent.width, extent.height),
               nested.scaleTypes,
+              // Everything else the nested scope holds, carried over rather than left to default:
+              // a scope rebuilt by naming some of its parts silently drops the rest, and a group
+              // that sizes itself would stop seeing a projection declared outside it.
+              nested.projections,
             )
           } else {
             nested

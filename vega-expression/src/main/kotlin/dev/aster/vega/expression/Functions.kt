@@ -96,9 +96,7 @@ public object Functions {
       "gradient" to "gradients cannot be produced from an expression yet",
       "lab" to "colour helpers are not implemented",
       "hcl" to "colour helpers are not implemented",
-      "geoArea" to "geographic functions are out of scope for the first release",
       "geoBounds" to "geographic functions are out of scope for the first release",
-      "geoCentroid" to "geographic functions are out of scope for the first release",
       "vlSelectionTest" to "selection helpers require the signal and selection subsystems",
       "vlSelectionResolve" to "selection helpers require the signal and selection subsystems",
     )
