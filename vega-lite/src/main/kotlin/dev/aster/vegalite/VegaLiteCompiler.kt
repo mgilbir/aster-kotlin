@@ -444,30 +444,42 @@ private class Compilation(
         }
       }
     }
-    val layers = spec.array("layer")
-    if (layers != null) {
+    if (spec.has("layer")) {
       // Each declared layer may itself normalize into more than one — a line that draws its own
       // points is two marks — so the list is expanded first and only then numbered. The numbering
       // is what names `layer_0_marks`, so it has to count the views that actually exist.
       val units = mutableListOf<Pair<Triple<String, VegaValue.Obj, String>, String>>()
-      layers.forEachIndexed { index, layer ->
-        val child = layer as? VegaValue.Obj ?: return@forEachIndexed
-        if (child.fields.containsKey("layer")) {
-          diagnostics.error(
-            VegaLiteDiagnostics.UNSUPPORTED_COMPOSITION,
-            "A layer inside a layer is not implemented; flatten the layers into one list.",
-            jsonPath = "$.layer[$index]",
-          )
-          return@forEachIndexed
-        }
-        val merged = inherited(spec, child)
-        // A layer that names itself is compiled under that name, which is what a `repeat` over
-        // `layer` relies on: its copies are `child__layer_b`, not `layer_0`.
-        val here = child.string("name") ?: named("layer_$index")
-        expand(merged, here).forEach {
-          units += Triple(it.first, it.second, here) to "$.layer[$index]"
+
+      /**
+       * A layer's members, and the members of any layer among them.
+       *
+       * A layer inside a layer needs nothing new: its names simply run deeper —
+       * `layer_1_layer_0_marks` — which is exactly what a composite mark inside a layer already
+       * produces, so the naming was already carrying it. What the recursion has to keep hold of is
+       * the name of the **outermost** member, because that is the child a top-level `resolve`
+       * speaks about; the nesting below it is not a level anything resolves against.
+       */
+      fun collect(parent: VegaValue.Obj, prefix: String, owner: String?, path: String) {
+        parent.array("layer").orEmpty().forEachIndexed { index, layer ->
+          val child = layer as? VegaValue.Obj ?: return@forEachIndexed
+          val merged = inherited(parent, child)
+          // A layer that names itself is compiled under that name, which is what a `repeat` over
+          // `layer` relies on: its copies are `child__layer_b`, not `layer_0`.
+          val here =
+            child.string("name")
+              ?: listOf(prefix, "layer_$index").filter { it.isNotEmpty() }.joinToString("_")
+          val here2 = "$path.layer[$index]"
+          if (child.has("layer")) {
+            collect(merged, here, owner ?: here, here2)
+          } else {
+            expand(merged, here).forEach {
+              units += Triple(it.first, it.second, owner ?: here) to here2
+            }
+          }
         }
       }
+      collect(spec, namePrefix, null, "$")
+
       return units.mapNotNull { (named, path) ->
         val (name, unit, child) = named
         parser.unit(unit, path)?.let { UnitView(it, config, name, child) }

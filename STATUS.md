@@ -470,7 +470,7 @@ produces a chart that is plausible and wrong.
 every fixture with upstream and checks two things:
 
 1. `VegaLiteFixtureTest` compares the Vega this compiler emits against upstream's, property by
-   property. Sixty-seven fixtures, and all of them match exactly — every transform, scale, signal,
+   property. Sixty-eight fixtures, and all of them match exactly — every transform, scale, signal,
    axis, legend and mark encoding, down to the accessibility description string.
 2. `VegaLiteFixtureDifferentialTest` runs that output through this engine's own runtime and compares
    the scene against the one upstream draws. Every mark of every fixture matches, and nothing is
@@ -555,8 +555,8 @@ own) and `grouped-bar` on the step arithmetic.
 
 ### Where the compiler stands, and what it still refuses
 
-Sixty-seven fixtures, each matching upstream's compiler property for property and drawing the chart
-upstream draws. The grammar covered: a single view, a layer of them, a concatenation of either, a
+Sixty-eight fixtures, each matching upstream's compiler property for property and drawing the chart
+upstream draws. The grammar covered: a single view, a layer of them to any depth, a concatenation of either, a
 repetition of any of those, both facet operators, eleven marks including `arc`,
 the Cartesian and polar position pairs, nested offsets, fourteen of fifteen transforms, sorting,
 binning, time units, stacking, faceting by `row` and `column`, conditional encodings, a line or an
@@ -665,6 +665,18 @@ Three rules came out of upstream with it:
   many have landed on each and moves one across when they do not match, counting the side each
   *asked* for rather than the side it ended on. And only the first rules gridlines: two sets across
   one plot measure different things and say neither.
+
+### A layer inside a layer, which the naming was already carrying
+
+A nested layer needs nothing new. Its names simply run deeper — `layer_1_layer_0_marks` — which is
+exactly what a composite mark inside a layer already produced, so the machinery had been there since
+the box plot and only the refusal was in the way. Collecting the members recursively is the whole
+change, and the fixture passed on arrival.
+
+The one thing the recursion has to hold on to is the name of the **outermost** member. That is the
+child a top-level `resolve` speaks about; the nesting below it is not a level anything resolves
+against, and naming an independent scale from the innermost view would give a line and its
+annotation a scale each.
 
 ### Parameters, where they are values and not selections
 
@@ -1124,7 +1136,7 @@ the whole time.
 
 ## Verification
 
-- 2,302 JVM tests pass and none is skipped (`./gradlew test`); the portable core is most of
+- 2,309 JVM tests pass and none is skipped (`./gradlew test`); the portable core is most of
   them, and `./scripts/test-core.sh` runs it without an Android SDK.
 - Android lint is clean with `warningsAsErrors` on every Android module.
 - 63 instrumented tests pass on an API 37 arm64 emulator (`./scripts/test-android.sh`): 49 in
