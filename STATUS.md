@@ -474,7 +474,7 @@ produces a chart that is plausible and wrong.
 every fixture with upstream and checks two things:
 
 1. `VegaLiteFixtureTest` compares the Vega this compiler emits against upstream's, property by
-   property. Seventy-two fixtures, and all of them match exactly — every transform, scale, signal,
+   property. Seventy-three fixtures, and all of them match exactly — every transform, scale, signal,
    axis, legend and mark encoding, down to the accessibility description string.
 2. `VegaLiteFixtureDifferentialTest` runs that output through this engine's own runtime and compares
    the scene against the one upstream draws. Every mark of every fixture matches, and nothing is
@@ -559,7 +559,7 @@ own) and `grouped-bar` on the step arithmetic.
 
 ### Where the compiler stands, and what it still refuses
 
-Seventy-two fixtures, each matching upstream's compiler property for property and drawing the chart
+Seventy-three fixtures, each matching upstream's compiler property for property and drawing the chart
 upstream draws. The grammar covered: a single view, a layer of them to any depth, a concatenation of
 either to any depth, a
 repetition of any of those, both facet operators, eleven marks including `arc`,
@@ -677,7 +677,7 @@ no data is needed to compare two compilers. So every one of them was compiled by
 by this one, and the outputs compared property by property. That is a *measurement*, not a gate: the
 examples are not fixtures here, and nothing about them is checked in.
 
-**124 of 627 matched exactly** at the start, and **147** do now. 16 were refused by name, and of those 8 are geographic,
+**124 of 627 matched exactly** at the start, and **151** do now. 16 were refused by name, and of those 8 are geographic,
 3 are a facet inside a facet, 2 a repeat inside a concatenation, and 2 are the `trail` mark — which
 this runtime draws and this compiler had simply not been told about.
 
@@ -742,6 +742,19 @@ because independence is resolved between the composition's children and a concat
 are its plots, not the layers within one; and scale **ownership** was being decided by usage rather
 than by the resolve, so a colour scale only one plot happened to draw with was written inside that
 plot instead of beside the chart.
+
+A third pass took four more, read straight off the ranked list:
+
+- **The implicit parse stored its type capitalised** — `"Number"` where upstream writes `"number"`.
+  It had been invisible because the *expression* was built by concatenating that same capital, so
+  two wrongs read `toNumber`; fixing the expression showed the `format.parse` underneath.
+- **`config.scale` is Vega-Lite-only** and was reaching the Vega config, and **`config.mark` keeps
+  only what Vega understands** — `color` and `filled` are resolved into a mark's own fill and stroke
+  long before Vega sees anything.
+- **A normalized stack's axis is a percentage**, `config.normalizedNumberFormat`, defaulting to
+  `.0%`. Left off, an axis reads 0, 0.2, 0.4 for what the chart draws as fifths of a whole.
+- **A `d` format asks for whole numbers**, so `defaultTickMinStep` is 1 — read *after* the
+  specification's own axis block, because that is usually where the format comes from.
 
 Two runtime gaps are recorded rather than fixed, both found by fixtures written here and both
 withdrawn from the corpus because a fixture has to pass:
@@ -1280,7 +1293,7 @@ the whole time.
 
 ## Verification
 
-- 2,365 JVM tests pass and none is skipped (`./gradlew test`); the portable core is most of
+- 2,372 JVM tests pass and none is skipped (`./gradlew test`); the portable core is most of
   them, and `./scripts/test-core.sh` runs it without an Android SDK.
 - Android lint is clean with `warningsAsErrors` on every Android module.
 - 63 instrumented tests pass on an API 37 arm64 emulator (`./scripts/test-android.sh`): 49 in

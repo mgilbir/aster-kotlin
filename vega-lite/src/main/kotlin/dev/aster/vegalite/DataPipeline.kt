@@ -85,7 +85,7 @@ internal class DataPipeline(
       } else if (def.type == MeasureType.QUANTITATIVE && def.aggregate in MIN_MAX_OPS) {
         // Upstream's own comment: "we need to parse numbers to support correct min and max". Every
         // other aggregate arithmetic-coerces on the way; these two only compare.
-        parse[field] = "Number"
+        parse[field] = "number"
       }
     }
     // A path mark joins its points in the order its rows arrive, so the dimension it runs along is
@@ -96,7 +96,7 @@ internal class DataPipeline(
       val def = view.spec.encoding[if (view.markDef.orient == "horizontal") "y" else "x"]
       val field = def?.field
       if (def != null && def.isFieldDef && field != null && def.type == MeasureType.QUANTITATIVE) {
-        parse.getOrPut(field) { "Number" }
+        parse.getOrPut(field) { "number" }
       }
     }
     return if (parse.isEmpty()) null else ParseNode(parse)

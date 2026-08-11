@@ -203,6 +203,17 @@ internal object Guides {
       Fields.timeUnitDuration(def.timeUnit)?.let { axis.set("tickMinStep", signalRef(it)) }
     }
 
+    // A normalized stack is a proportion, so its axis is a percentage —
+    // `config.normalizedNumberFormat`,
+    // which defaults to `.0%`. Left off, the labels read 0, 0.2, 0.4 for what the chart draws as
+    // fifths of a whole.
+    if (view.stack?.offset == "normalize" && channel == view.stack.fieldChannel) {
+      axis.set(
+        "format",
+        str(view.config.normalizedNumberFormat),
+      )
+    }
+
     tickCount(view, channel, def, type)?.let { axis.set("tickCount", it) }
 
     // A heatmap's axis is drawn *over* its cells: the rects fill their bands completely, so an axis
@@ -210,6 +221,11 @@ internal object Guides {
     if (view.spec.mark == "rect" && def.type?.isDiscrete == true) axis.set("zindex", num(1))
 
     user?.fields?.forEach { (key, value) -> axis.properties[key] = value }
+
+    // `defaultTickMinStep`: a `d` format asks for whole numbers, so no tick may be closer than one.
+    // Read *after* the specification's own block, because that is where the format usually comes
+    // from — and `set` leaves a stated `tickMinStep` alone.
+    if ((axis.properties["format"] as? VegaValue.Str)?.value == "d") axis.set("tickMinStep", num(1))
     return axis
   }
 

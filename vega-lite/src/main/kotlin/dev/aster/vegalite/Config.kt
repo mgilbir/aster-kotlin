@@ -95,7 +95,15 @@ internal class Config(private val user: VegaValue.Obj = VegaValue.EmptyObject) {
       when {
         key in VEGA_LITE_ONLY -> Unit
         key == "style" -> (value as? VegaValue.Obj)?.fields?.forEach { (k, v) -> styles[k] = v }
-        key == "mark" -> out["mark"] = value
+        // `config.mark` survives, minus the properties only Vega-Lite understands — `color` and
+        // `filled` are resolved into a mark's own fill and stroke long before Vega sees anything.
+        key == "mark" ->
+          (value as? VegaValue.Obj)
+            ?.let { block ->
+              VegaValue.Obj(block.fields.filterKeys { it !in VEGA_LITE_ONLY_MARK })
+            }
+            ?.takeIf { it.fields.isNotEmpty() }
+            ?.let { out["mark"] = it }
         key in MARK_TYPES ->
           if (value is VegaValue.Obj && value.fields.isNotEmpty()) styles[key] = value
         key == "title" -> titleStyle(value)?.let { styles["group-title"] = it }
@@ -142,8 +150,23 @@ internal class Config(private val user: VegaValue.Obj = VegaValue.EmptyObject) {
 
   private companion object {
     /** Keys Vega has no use for: this compiler has already applied them, or they mean nothing. */
+    /** `VL_ONLY_MARK_CONFIG_PROPERTIES`: what a `config.mark` block loses on the way to Vega. */
+    val VEGA_LITE_ONLY_MARK =
+      setOf(
+        "color",
+        "filled",
+        "invalid",
+        "order",
+        "radius2",
+        "theta2",
+        "timeUnitBandSize",
+        "timeUnitBandPosition",
+        "tooltip",
+      )
+
     val VEGA_LITE_ONLY =
       setOf(
+        "scale",
         "color",
         "fontSize",
         "background",
