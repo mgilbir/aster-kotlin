@@ -255,9 +255,20 @@ internal class DataPipeline(
     val stack = view.stack ?: return null
     val def = view.spec.encoding[stack.fieldChannel] ?: return null
     val stackBy = stack.stackBy.map { Fields.vgField(it) }
-    // Without an explicit order the segments are stacked in field order — downwards on a vertical
-    // stack so that the first category ends up on top, and upwards on a horizontal one.
-    val order = if (stack.fieldChannel == "y") "descending" else "ascending"
+    // The `order` channel says how the segments are laid within a bar, and it says it in two ways.
+    // A **field** def orders by that column — `sortParams`, ascending unless it says otherwise —
+    // and an **order-only** def (`{"sort": "ascending"}`, no field) keeps the stacking fields and
+    // changes only the direction. Without either, the segments go in field order: downwards on a
+    // vertical stack so the first category ends on top, upwards on a horizontal one.
+    val orderDef = view.spec.encoding["order"]
+    val orderFields = listOfNotNull(orderDef) + orderDef?.siblings.orEmpty()
+    val order =
+      when {
+        orderDef?.isFieldDef == true -> null
+        orderDef != null -> (orderDef.sort as? VegaValue.Str)?.value ?: "ascending"
+        stack.fieldChannel == "y" -> "descending"
+        else -> "ascending"
+      }
     // A **binned** dimension groups by both of its edges, so two bins that happen to start at the
     // same place are still two columns. For a column that arrived already binned the far edge has
     // no `_end` name of its own, and upstream's `vgField(def, {binSuffix: 'end'})` gives the field
@@ -279,8 +290,14 @@ internal class DataPipeline(
       field = Fields.vgField(def),
       // The facet's own fields group every accumulation, so a stack stays inside its cell.
       groupby = dimensions + view.facetFields.filterNot { it in dimensions },
-      sortFields = stackBy,
-      sortOrders = stackBy.map { order },
+      sortFields =
+        if (order == null) orderFields.map { Fields.vgField(it) }.distinct() else stackBy,
+      sortOrders =
+        if (order == null) {
+          orderFields.map { (it.sort as? VegaValue.Str)?.value ?: "ascending" }
+        } else {
+          stackBy.map { order }
+        },
       output =
         listOf(
           Fields.vgField(def, suffix = "start", forAs = true),

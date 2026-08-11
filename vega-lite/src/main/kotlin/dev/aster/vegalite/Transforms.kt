@@ -491,7 +491,17 @@ internal class Transforms(
 
   private fun ObjectBuilder.putOps(entries: List<VegaValue>) {
     put("ops", strings(entries.map { it.string("op") ?: "" }))
-    put("fields", arr(entries.map { entry -> entry.string("field")?.let(::str) ?: VegaValue.Null }))
+    // A `count` counts rows and has no field, whatever a specification wrote there — `"*"` is the
+    // conventional spelling of "all of them" and upstream drops it rather than passing it on.
+    put(
+      "fields",
+      arr(
+        entries.map { entry ->
+          if (entry.string("op") == "count") VegaValue.Null
+          else entry.string("field")?.let(::str) ?: VegaValue.Null
+        }
+      ),
+    )
     put("as", strings(entries.map { it.string("as") ?: "" }))
   }
 

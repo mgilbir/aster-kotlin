@@ -646,6 +646,15 @@ internal object Marks {
      * the same thing said once.
      */
     separator: String = " ",
+    /**
+     * Whether an array value is joined rather than printed.
+     *
+     * A **tooltip** and a spoken description join one, being a list of things; a mark's own `text`
+     * does not — `formatSignalRef` has no array branch at all, so a text mark drawn from an array
+     * column prints what Vega prints for one. Sharing the tooltip's expression here put a `join`
+     * into every text mark in the gallery.
+     */
+    arrays: Boolean = true,
   ): String {
     val stated = (def.format as? VegaValue.Str)?.value
     val accessor =
@@ -677,6 +686,7 @@ internal object Marks {
         }
       }
       def.type == MeasureType.QUANTITATIVE || stated != null -> "format($accessor, \"$number\")"
+      !arrays -> "isValid($accessor) ? $accessor : \"\"+$accessor"
       else ->
         "isValid($accessor) ? isArray($accessor) ? join($accessor, '$separator') : $accessor : " +
           "\"\"+$accessor"
@@ -705,7 +715,7 @@ internal object Marks {
     val def = view.spec.encoding["text"] ?: return null
     if (def.isValueDef) return obj { literalRef(def.value)?.let { (key, it) -> put(key, it) } }
     if (!def.isFieldDef) return null
-    return signalRef(fieldExpression(view, def))
+    return signalRef(fieldExpression(view, def, arrays = false))
   }
 
   // ---------------------------------------------------------------------------------------------

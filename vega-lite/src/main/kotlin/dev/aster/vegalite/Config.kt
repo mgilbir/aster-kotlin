@@ -119,7 +119,13 @@ internal class Config(private val user: VegaValue.Obj = VegaValue.EmptyObject) {
             ?.takeIf { it.fields.isNotEmpty() }
             ?.let { out["mark"] = it }
         key in MARK_TYPES ->
-          if (value is VegaValue.Obj && value.fields.isNotEmpty()) styles[key] = value
+          (value as? VegaValue.Obj)
+            ?.let { block ->
+              val drop = VEGA_LITE_ONLY_MARK + MARK_SPECIFIC_VEGA_LITE_ONLY[key].orEmpty()
+              VegaValue.Obj(block.fields.filterKeys { it !in drop })
+            }
+            ?.takeIf { it.fields.isNotEmpty() }
+            ?.let { styles[key] = it }
         key == "title" -> titleStyle(value)?.let { styles["group-title"] = it }
         // `config.view` becomes the **`cell`** style, not a `view` one: "View's default style is
         // `cell`" — `stripAndRedirectConfig` renames it on the way through, and a chart that told
@@ -164,6 +170,25 @@ internal class Config(private val user: VegaValue.Obj = VegaValue.EmptyObject) {
 
   private companion object {
     /** Keys Vega has no use for: this compiler has already applied them, or they mean nothing. */
+    /**
+     * `VL_ONLY_MARK_SPECIFIC_CONFIG_PROPERTY_INDEX`: what each *kind* of mark loses on top.
+     *
+     * These are the properties a mark's own compilation has already spent: a bar's band sizes have
+     * become a width by the time anything is emitted, and a line's `point` has become a second
+     * mark.
+     */
+    private val RECT_VEGA_LITE_ONLY =
+      setOf("binSpacing", "continuousBandSize", "discreteBandSize", "minBandSize")
+
+    val MARK_SPECIFIC_VEGA_LITE_ONLY: Map<String, Set<String>> =
+      mapOf(
+        "area" to setOf("line", "point"),
+        "line" to setOf("point"),
+        "bar" to RECT_VEGA_LITE_ONLY,
+        "rect" to RECT_VEGA_LITE_ONLY,
+        "tick" to RECT_VEGA_LITE_ONLY + setOf("bandSize", "thickness"),
+      )
+
     /** `VL_ONLY_MARK_CONFIG_PROPERTIES`: what a `config.mark` block loses on the way to Vega. */
     val VEGA_LITE_ONLY_MARK =
       setOf(

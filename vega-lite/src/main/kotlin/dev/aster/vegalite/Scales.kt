@@ -487,6 +487,12 @@ internal object Scales {
       }
     }
 
+    // A **continuous** domain cannot be sorted — Vega has no such thing — so a `sort: "descending"`
+    // on one reverses the *range* instead. A discrete domain sorts itself and needs none of this.
+    if (hasContinuousDomain(type) && (def.sort as? VegaValue.Str)?.value == "descending") {
+      set("reverse", bool(true))
+    }
+
     zero(view, channel, def, type, specifiedDomain)?.let { set("zero", bool(it)) }
 
     // Anything else the specification stated on the scale passes through untouched.
