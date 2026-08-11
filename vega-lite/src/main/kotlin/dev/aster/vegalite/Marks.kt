@@ -550,7 +550,9 @@ internal object Marks {
     return parts.entries
       .filterNot { it.key.startsWith("_") }
       .mapIndexed { index, (key, value) ->
-        "\"${if (index > 0) "; " else ""}$key: \" + ($value)"
+        // The title goes *inside* a JSON string in an expression, so a quotation mark in it has to
+        // be escaped or the expression ends early and the rest is a syntax error.
+        "\"${if (index > 0) "; " else ""}${key.replace("\"", "\\\"")}: \" + ($value)"
       }
       .joinToString(" + ")
   }
@@ -579,7 +581,11 @@ internal object Marks {
         // defaultTitle(fieldDef)` here, so hiding an axis title with `axis: {title: null}` restyles
         // the chart and leaves what a screen reader says about it alone. Reading the guide's title
         // dropped the channel from the description entirely.
-        val title = def.explicitTitle ?: Fields.defaultTitle(def, view.config)?.let(VegaValue::Str)
+        // A `title: null` hides the *guide's* caption; it does not take the field out of what a
+        // screen reader says, so the description falls back to the field's own name.
+        val title =
+          def.explicitTitle?.takeIf { it != VegaValue.Null }
+            ?: Fields.defaultTitle(def, view.config)?.let(VegaValue::Str)
         val key = (title as? VegaValue.Str)?.value ?: continue
         if (out.containsKey(key)) continue
         // A **normalized** stack is announced as the share it takes, not the number behind it: the

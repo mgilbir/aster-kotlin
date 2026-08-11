@@ -693,12 +693,28 @@ private class Compilation(
     putAll(child)
     val shared = spec.obj("encoding")
     if (shared != null) {
-      // Channel by channel, so a layer overriding `y` keeps the shared `x`.
+      // Channel by channel, and **property by property within a channel**: `mergeEncoding` spreads
+      // the parent's channel def under the child's, so a shared `x` stating the type and a layer's
+      // `x` naming only the field come out as one definition with both. Replacing the whole channel
+      // instead loses the type, and a quantitative measure is then spoken as a category.
       put(
         "encoding",
         obj {
-          putAll(shared)
-          putAll(child.obj("encoding"))
+          val own = child.obj("encoding")
+          val channels = shared.fields.keys + own?.fields?.keys.orEmpty()
+          for (channel in channels) {
+            val parent = shared.fields[channel] as? VegaValue.Obj
+            val mine = own?.fields?.get(channel)
+            put(
+              channel,
+              if (parent != null && mine is VegaValue.Obj) {
+                obj {
+                  putAll(parent)
+                  putAll(mine)
+                }
+              } else mine ?: shared.fields[channel],
+            )
+          }
         },
       )
     }

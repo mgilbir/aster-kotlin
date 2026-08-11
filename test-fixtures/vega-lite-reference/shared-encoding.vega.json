@@ -1,0 +1,210 @@
+{
+  "$schema": "https://vega.github.io/schema/vega/v6.json",
+  "description": "A layer whose shared encoding states the type and whose members name only the field.",
+  "background": "white",
+  "padding": 5,
+  "width": 200,
+  "height": 90,
+  "style": "cell",
+  "data": [
+    {
+      "name": "source_0",
+      "values": [
+        {
+          "from": -0.25,
+          "to": -2.9,
+          "label": "PoleStar"
+        },
+        {
+          "from": 0.25,
+          "to": 2.9,
+          "label": "Voyager"
+        }
+      ]
+    },
+    {
+      "name": "data_1",
+      "source": "source_0",
+      "transform": [
+        {
+          "type": "filter",
+          "expr": "isValid(datum[\"from\"]) && isFinite(+datum[\"from\"])"
+        }
+      ]
+    },
+    {
+      "name": "data_2",
+      "source": "source_0",
+      "transform": [
+        {
+          "type": "filter",
+          "expr": "isValid(datum[\"to\"]) && isFinite(+datum[\"to\"])"
+        }
+      ]
+    }
+  ],
+  "marks": [
+    {
+      "name": "layer_0_marks",
+      "type": "rule",
+      "style": [
+        "rule"
+      ],
+      "from": {
+        "data": "data_1"
+      },
+      "encode": {
+        "update": {
+          "stroke": {
+            "value": "black"
+          },
+          "description": {
+            "signal": "\"from: \" + (format(datum[\"from\"], \"\")) + \"; label: \" + (isValid(datum[\"label\"]) ? isArray(datum[\"label\"]) ? join(datum[\"label\"], ' ') : datum[\"label\"] : \"\"+datum[\"label\"]) + \"; to: \" + (format(datum[\"to\"], \"\"))"
+          },
+          "x": {
+            "scale": "x",
+            "field": "from"
+          },
+          "x2": {
+            "scale": "x",
+            "field": "to"
+          },
+          "y": {
+            "scale": "y",
+            "field": "label",
+            "band": 0.5
+          }
+        }
+      }
+    },
+    {
+      "name": "layer_1_marks",
+      "type": "symbol",
+      "style": [
+        "point"
+      ],
+      "from": {
+        "data": "data_2"
+      },
+      "encode": {
+        "update": {
+          "opacity": {
+            "value": 0.7
+          },
+          "size": {
+            "value": 60
+          },
+          "fill": {
+            "value": "#4c78a8"
+          },
+          "ariaRoleDescription": {
+            "value": "point"
+          },
+          "description": {
+            "signal": "\"to: \" + (format(datum[\"to\"], \"\")) + \"; label: \" + (isValid(datum[\"label\"]) ? isArray(datum[\"label\"]) ? join(datum[\"label\"], ' ') : datum[\"label\"] : \"\"+datum[\"label\"])"
+          },
+          "x": {
+            "scale": "x",
+            "field": "to"
+          },
+          "y": {
+            "scale": "y",
+            "field": "label",
+            "band": 0.5
+          }
+        }
+      }
+    }
+  ],
+  "scales": [
+    {
+      "name": "x",
+      "type": "linear",
+      "domain": {
+        "fields": [
+          {
+            "data": "data_1",
+            "field": "from"
+          },
+          {
+            "data": "data_1",
+            "field": "to"
+          },
+          {
+            "data": "data_2",
+            "field": "to"
+          }
+        ]
+      },
+      "range": [
+        0,
+        {
+          "signal": "width"
+        }
+      ],
+      "zero": false,
+      "nice": true
+    },
+    {
+      "name": "y",
+      "type": "band",
+      "domain": {
+        "fields": [
+          {
+            "data": "data_1",
+            "field": "label"
+          },
+          {
+            "data": "data_2",
+            "field": "label"
+          }
+        ],
+        "sort": true
+      },
+      "range": [
+        0,
+        {
+          "signal": "height"
+        }
+      ],
+      "paddingInner": 0,
+      "paddingOuter": 0
+    }
+  ],
+  "axes": [
+    {
+      "scale": "x",
+      "orient": "bottom",
+      "gridScale": "y",
+      "grid": true,
+      "tickCount": {
+        "signal": "ceil(width/40)"
+      },
+      "domain": false,
+      "labels": false,
+      "aria": false,
+      "maxExtent": 0,
+      "minExtent": 0,
+      "ticks": false,
+      "zindex": 0
+    },
+    {
+      "scale": "x",
+      "orient": "bottom",
+      "grid": false,
+      "title": "from, to",
+      "labelFlush": true,
+      "labelOverlap": true,
+      "tickCount": {
+        "signal": "ceil(width/40)"
+      },
+      "zindex": 0
+    },
+    {
+      "scale": "y",
+      "orient": "left",
+      "grid": false,
+      "zindex": 0
+    }
+  ]
+}
