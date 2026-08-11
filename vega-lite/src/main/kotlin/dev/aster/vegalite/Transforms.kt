@@ -73,7 +73,13 @@ internal class Transforms(
               "fields",
               arr(entries.map { entry -> entry.string("field")?.let(::str) ?: VegaValue.Null }),
             )
-            put("groupby", strings(fieldList(transform["groupby"])))
+            // Omitted where there is nothing to group by: a joinaggregate over the whole table
+            // writes no `groupby` at all, and an empty list is a different statement from silence.
+            fieldList(transform["groupby"])
+              .takeIf { it.isNotEmpty() }
+              ?.let {
+                put("groupby", strings(it))
+              }
           }
         )
 

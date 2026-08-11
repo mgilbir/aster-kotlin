@@ -351,7 +351,24 @@ internal object Guides {
         else -> if (gradient) put("direction", "horizontal")
       }
       def.legend?.fields?.forEach { (key, value) -> put(key, value) }
-      if (!gradient) {
+      if (gradient) {
+        // A ramp is painted at the mark's own opacity, so a legend beside a chart of translucent
+        // points is as translucent as they are — `gradient` in `legend/encode.ts`. Zero and absent
+        // both mean "say nothing", since a legend drawn at zero opacity is not a legend.
+        symbolOpacity(view)
+          ?.takeIf { it != 1.0 && it != 0.0 }
+          ?.let { opacity ->
+            put(
+              "encode",
+              obj {
+                put(
+                  "gradient",
+                  obj { put("update", obj { put("opacity", obj { put("value", opacity) }) }) },
+                )
+              },
+            )
+          }
+      } else {
         symbolEncode(view, channel)?.let {
           put("encode", obj { put("symbols", obj { put("update", it) }) })
         }

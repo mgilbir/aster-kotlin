@@ -677,7 +677,7 @@ no data is needed to compare two compilers. So every one of them was compiled by
 by this one, and the outputs compared property by property. That is a *measurement*, not a gate: the
 examples are not fixtures here, and nothing about them is checked in.
 
-**124 of 627 matched exactly** at the start, and **151** do now. 16 were refused by name, and of those 8 are geographic,
+**124 of 627 matched exactly** at the start, and **159** do now. 16 were refused by name, and of those 8 are geographic,
 3 are a facet inside a facet, 2 a repeat inside a concatenation, and 2 are the `trail` mark — which
 this runtime draws and this compiler had simply not been told about.
 
@@ -743,7 +743,7 @@ are its plots, not the layers within one; and scale **ownership** was being deci
 than by the resolve, so a colour scale only one plot happened to draw with was written inside that
 plot instead of beside the chart.
 
-A third pass took four more, read straight off the ranked list:
+A third and fourth pass took seven more, read straight off the ranked list:
 
 - **The implicit parse stored its type capitalised** — `"Number"` where upstream writes `"number"`.
   It had been invisible because the *expression* was built by concatenating that same capital, so
@@ -755,6 +755,15 @@ A third pass took four more, read straight off the ranked list:
   `.0%`. Left off, an axis reads 0, 0.2, 0.4 for what the chart draws as fifths of a whole.
 - **A `d` format asks for whole numbers**, so `defaultTickMinStep` is 1 — read *after* the
   specification's own axis block, because that is usually where the format comes from.
+- **A `joinaggregate` over the whole table writes no `groupby` at all.** An empty list is a
+  different statement from silence.
+- **A colour ramp is painted at the mark's own opacity**, so a legend beside a chart of translucent
+  points is as translucent as they are.
+- **`config.scale.zero` is a fallback, not an override.** A bar or an area *measures from* zero and
+  that is not a preference — the length of the mark is the value — so the theme settles only what
+  the rules leave open, which is what frees a gantt chart's ranged bars without freeing these. And
+  a `config.style` block is a mark config under another name, so it loses the same Vega-Lite-only
+  properties: `point: true` on a line is a *normalizer's* instruction and means nothing to Vega.
 
 Two runtime gaps are recorded rather than fixed, both found by fixtures written here and both
 withdrawn from the corpus because a fixture has to pass:

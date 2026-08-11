@@ -529,8 +529,11 @@ internal object Scales {
         }
       }
       val hasSecondary = secondaryChannel(channel)?.let { view.spec.encoding[it] != null } == true
+      // A bar or an area *measures from* zero, and that is not a preference: the length of the
+      // mark is the value. Everything else falls through to the theme, which is what lets
+      // `config.scale.zero: false` free a gantt chart's ranged bars without freeing these.
       if (mark in setOf("bar", "area") && !hasSecondary) return true
-      return true
+      return view.config.scaleFlag("zero") ?: true
     }
     return false
   }

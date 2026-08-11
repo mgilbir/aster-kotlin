@@ -64,6 +64,10 @@ internal class Config(private val user: VegaValue.Obj = VegaValue.EmptyObject) {
 
   fun scaleConfig(name: String): Double? = user.obj("scale").number(name) ?: SCALE_DEFAULTS[name]
 
+  /** A `config.scale` entry that is a flag rather than a number, such as `zero`. */
+  fun scaleFlag(name: String): Boolean? =
+    (user.obj("scale")?.fields?.get(name) as? VegaValue.Bool)?.value
+
   /** `config.axis.<name>`, which a theme uses to settle a property for every axis at once. */
   fun axisConfig(name: String): VegaValue? = user.obj("axis")?.fields?.get(name)
 
@@ -94,7 +98,17 @@ internal class Config(private val user: VegaValue.Obj = VegaValue.EmptyObject) {
     for ((key, value) in user.fields) {
       when {
         key in VEGA_LITE_ONLY -> Unit
-        key == "style" -> (value as? VegaValue.Obj)?.fields?.forEach { (k, v) -> styles[k] = v }
+        // A `config.style` block is a mark config under another name, so it loses the same
+        // Vega-Lite-only properties — `point: true` on a line is a *normalizer's* instruction and
+        // means nothing to Vega.
+        key == "style" ->
+          (value as? VegaValue.Obj)?.fields?.forEach { (k, v) ->
+            val kept =
+              (v as? VegaValue.Obj)?.let { block ->
+                VegaValue.Obj(block.fields.filterKeys { it !in VEGA_LITE_ONLY_MARK })
+              } ?: v
+            if (kept !is VegaValue.Obj || kept.fields.isNotEmpty()) styles[k] = kept
+          }
         // `config.mark` survives, minus the properties only Vega-Lite understands — `color` and
         // `filled` are resolved into a mark's own fill and stroke long before Vega sees anything.
         key == "mark" ->
@@ -162,6 +176,10 @@ internal class Config(private val user: VegaValue.Obj = VegaValue.EmptyObject) {
         "timeUnitBandSize",
         "timeUnitBandPosition",
         "tooltip",
+        // `point` and `line` on a path mark are the overlay normalizer's instructions: they have
+        // already become marks of their own by the time anything is emitted.
+        "point",
+        "line",
       )
 
     val VEGA_LITE_ONLY =
