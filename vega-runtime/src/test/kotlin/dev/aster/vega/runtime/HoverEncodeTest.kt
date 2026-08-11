@@ -1,0 +1,156 @@
+package dev.aster.vega.runtime
+
+import dev.aster.vega.scene.GroupNode
+import dev.aster.vega.scene.PointD
+import dev.aster.vega.scene.RectNode
+import dev.aster.vega.scene.SceneColor
+import dev.aster.vega.scene.SceneNode
+import dev.aster.vega.scene.ScenePaint
+import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertNotEquals
+import org.junit.jupiter.api.Assertions.assertNull
+import org.junit.jupiter.api.Assertions.assertTrue
+import org.junit.jupiter.api.Test
+
+/**
+ * A mark's `hover` block, reaching the scene.
+ *
+ * This was the gap behind "hovering a mark does nothing": the block was parsed, carried through the
+ * compiler and never applied, because a mark's effective encoding is `enter` overridden by `update`
+ * and nothing consulted the third set. The item under the pointer is now redrawn from it.
+ *
+ * The mechanism is worth knowing before changing it. Each item is encoded **twice** at compile time
+ * — resting, and as it looks hovered — with the id allocator rewound between the two so the pair
+ * share an id. Responding to the pointer is then a node swap, not a recompile, and the ids that the
+ * hit index, the selection and the accessibility tree all key on stay put.
+ */
+class HoverEncodeTest {
+
+  private val controller = VegaChartController()
+
+  private val json =
+    """
+    {
+      "width": 300, "height": 100, "padding": 0,
+      "data": [{"name": "t", "values": [{"c": "a"}, {"c": "b"}, {"c": "c"}]}],
+      "scales": [
+        {"name": "x", "type": "band", "domain": {"data": "t", "field": "c"},
+         "range": "width", "padding": 0}
+      ],
+      "marks": [{
+        "type": "rect", "from": {"data": "t"},
+        "encode": {
+          "enter": {
+            "x": {"scale": "x", "field": "c"},
+            "width": {"scale": "x", "band": 1},
+            "y": {"value": 0},
+            "height": {"value": 100},
+            "fill": {"value": "#4c78a8"},
+            "tooltip": {"field": "c"}
+          },
+          "hover": {"fill": {"value": "firebrick"}, "fillOpacity": {"value": 0.5}}
+        }
+      }]
+    }
+    """
+      .trimIndent()
+
+  private fun rects(): List<RectNode> {
+    val out = mutableListOf<RectNode>()
+    fun walk(node: SceneNode) {
+      when (node) {
+        is RectNode -> out += node
+        is GroupNode -> node.children.forEach { walk(it) }
+        else -> Unit
+      }
+    }
+    walk(controller.state.value.snapshot.scene.root)
+    return out
+  }
+
+  private fun fillOf(index: Int): SceneColor? =
+    (rects()[index].fill?.paint as? ScenePaint.Solid)?.color
+
+  /** The middle band of three across 300px, so x from 100 to 200. */
+  private val onMiddle = PointD(150.0, 50.0)
+  private val offAllBars = PointD(150.0, 400.0)
+
+  @Test
+  fun `the item under the pointer is drawn from its hover block, and only that item`() {
+    controller.setSpec(json)
+    val resting = fillOf(1)
+    val neighbourBefore = fillOf(0)
+
+    controller.dispatch(ChartInputEvent.PointerMoved(onMiddle))
+
+    assertNotEquals(resting, fillOf(1), "the hovered item kept its resting fill")
+    assertEquals(SceneColor.parse("firebrick"), fillOf(1))
+    assertEquals(0.5, rects()[1].fill?.opacity ?: -1.0, 1e-9, "the hover block's fillOpacity")
+    assertEquals(neighbourBefore, fillOf(0), "a neighbour changed as well")
+    assertEquals(3, rects().size, "the swap added or lost an item")
+  }
+
+  @Test
+  fun `moving off restores the resting appearance`() {
+    controller.setSpec(json)
+    val resting = fillOf(1)
+
+    controller.dispatch(ChartInputEvent.PointerMoved(onMiddle))
+    controller.dispatch(ChartInputEvent.PointerExited(null))
+
+    assertEquals(resting, fillOf(1))
+    assertNull(controller.snapshot.interactionState.hoveredNodeId)
+  }
+
+  @Test
+  fun `the hovered item keeps its id, so the pointer stays over it`() {
+    controller.setSpec(json)
+    val restingId = rects()[1].id
+
+    controller.dispatch(ChartInputEvent.PointerMoved(onMiddle))
+
+    assertEquals(restingId, rects()[1].id)
+    assertEquals(restingId, controller.snapshot.interactionState.hoveredNodeId)
+  }
+
+  @Test
+  fun `a tap hovers too, because a touch screen has no pointer`() {
+    // A browser synthesises `pointerover` from a touch before it reports the click, and without
+    // this
+    // a `hover` block and a tooltip would be unreachable on a phone.
+    controller.setSpec(json)
+    val resting = fillOf(1)
+
+    controller.dispatch(ChartInputEvent.Tap(onMiddle))
+
+    assertEquals(SceneColor.parse("firebrick"), fillOf(1))
+    assertNotEquals(resting, fillOf(1))
+    assertEquals("b", controller.snapshot.interactionState.tooltip?.let { tooltipText(it) })
+  }
+
+  @Test
+  fun `a selection after a hover keeps the hover styling`() {
+    controller.setSpec(json)
+    controller.dispatch(ChartInputEvent.PointerMoved(onMiddle))
+    controller.dispatch(ChartInputEvent.Tap(onMiddle))
+
+    assertEquals(SceneColor.parse("firebrick"), fillOf(1))
+    assertTrue(controller.snapshot.interactionState.selection.nodeIds.isNotEmpty())
+  }
+
+  @Test
+  fun `pointing at nothing leaves every item resting`() {
+    controller.setSpec(json)
+    val before = rects().map { it.fill?.paint }
+
+    controller.dispatch(ChartInputEvent.PointerMoved(offAllBars))
+
+    assertEquals(before, rects().map { it.fill?.paint })
+  }
+
+  private fun tooltipText(value: dev.aster.vega.model.VegaValue): String? =
+    (value as? dev.aster.vega.model.VegaValue.Str)?.value
+      ?: ((value as? dev.aster.vega.model.VegaValue.Obj)?.fields?.get("c")
+          as? dev.aster.vega.model.VegaValue.Str)
+        ?.value
+}

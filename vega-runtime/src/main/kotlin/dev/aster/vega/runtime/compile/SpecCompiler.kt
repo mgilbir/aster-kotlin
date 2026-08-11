@@ -51,6 +51,14 @@ public data class CompiledSpec(
    * survive a recompile, while everything else in here is rebuilt each time.
    */
   val spec: VegaSpec? = null,
+  /**
+   * Each item's appearance under the pointer, by the id of the item it replaces.
+   *
+   * A mark's `hover` block is layered over its `update` block and the mark encoded a second time,
+   * so responding to the pointer costs a node swap rather than a recompile. Empty for a
+   * specification with no `hover` blocks, which is most of them.
+   */
+  val hoverVariants: Map<dev.aster.vega.scene.SceneNodeId, SceneNode> = emptyMap(),
 ) {
   public val isUsable: Boolean
     get() = scene != null
@@ -359,15 +367,31 @@ public class SpecCompiler(
         ProjectionResolver(NumberResolver(expressions, signals, diagnostics), diagnostics)
           .resolve(spec.projections),
       )
-    val scope =
+    val scopeCompiler =
       ScopeCompiler(ids, textEngine, diagnostics, expressions, data, stream, clock)
-        .compile(spec.marks, spec.axes, spec.legends, spec.title, spec.layout, root, plot)
+    val scope =
+      scopeCompiler.compile(
+        spec.marks,
+        spec.axes,
+        spec.legends,
+        spec.title,
+        spec.layout,
+        root,
+        plot,
+      )
 
     val content = frame(spec, scope.nodes, plot, root, ids, diagnostics, expressions)
 
     val scene = layout(spec, scope.bounds, content, plot, ids, diagnostics, fit)
     return Pass(
-      CompiledSpec(scene, scales, signals, diagnostics.diagnostics, spec),
+      CompiledSpec(
+        scene,
+        scales,
+        signals,
+        diagnostics.diagnostics,
+        spec,
+        scopeCompiler.hoverVariants.toMap(),
+      ),
       scope.bounds,
       plot,
     )

@@ -17,6 +17,19 @@ public value class SceneNodeId(public val value: Long) {
  */
 public class SceneNodeIdAllocator(private var next: Long = 1L) {
   public fun allocate(): SceneNodeId = SceneNodeId(next++)
+
+  /**
+   * Where the allocator has got to, so a caller can encode the *same* items twice.
+   *
+   * A mark with a `hover` block is encoded once as it rests and once as it looks under the pointer,
+   * and the two have to agree on ids: the hit index, the selection and the accessibility tree all
+   * key on them, and a hovered item that changed its id would leave the pointer over nothing.
+   */
+  public fun mark(): Long = next
+
+  public fun rewind(to: Long) {
+    next = to
+  }
 }
 
 /** How a mark should be described to assistive technology. */

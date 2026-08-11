@@ -131,6 +131,18 @@ internal class ScopeCompiler(
     fun boxOf(index: Int): RectD = cellReach.getOrNull(index) ?: nodes[index].bounds
   }
 
+  /**
+   * Each item's appearance under the pointer, by the id of the item it replaces.
+   *
+   * Filled while the marks are encoded and read by the controller, which swaps one in when the
+   * pointer moves. Empty for a specification with no `hover` blocks, which is most of them.
+   */
+  val hoverVariants: MutableMap<dev.aster.vega.scene.SceneNodeId, SceneNode> = mutableMapOf()
+
+  /** A mark as it looks under the pointer: its `hover` block layered over `update`. */
+  private fun hoverSpec(mark: MarkSpec): MarkSpec =
+    mark.copy(encode = mark.encode.copy(update = mark.encode.update + mark.encode.hover))
+
   fun compile(
     marks: List<MarkSpec>,
     axes: List<AxisSpec>,
@@ -219,7 +231,32 @@ internal class ScopeCompiler(
         val rows = markData(mark, scope)
         val transformed = markTransformed(mark, rows, scope, encoder)
         scope = transformed.scope
+        // Encoded twice when the mark has a `hover` block: once as it rests, once as it looks under
+        // the pointer. The allocator is rewound between the two so the pair share their ids — the
+        // hit index and the selection key on them, and an item that changed its id under the
+        // pointer
+        // would leave the pointer over nothing.
+        val before = ids.mark()
         built[index] = encoder.encode(mark, rows, transformed.written)
+        if (mark.encode.hover.isNotEmpty()) {
+          val after = ids.mark()
+          ids.rewind(before)
+          val hovered = encoder.encode(hoverSpec(mark), rows, transformed.written)
+          ids.rewind(after)
+          val resting = built[index].orEmpty()
+          if (hovered.size == resting.size) {
+            for (i in resting.indices) hoverVariants[resting[i].id] = hovered[i]
+          } else {
+            // A hover block that changes *which* items exist cannot be swapped in item for item.
+            diagnostics.warn(
+              DiagnosticCodes.TRANSFORM_NOT_IMPLEMENTED,
+              "The 'hover' block on mark '${mark.name ?: mark.type.name.lowercase()}' changes how " +
+                "many items the mark produces, so there is no item-for-item swap to make; the mark " +
+                "will not respond to the pointer",
+              operator = mark.name,
+            )
+          }
+        }
         // The items a mark's own transforms produced, not the ones its encoding alone would: a
         // label drawn from a force-directed mark reads the position the simulation settled on.
         exposeItems(transformed.items ?: encoder.items(mark, rows))

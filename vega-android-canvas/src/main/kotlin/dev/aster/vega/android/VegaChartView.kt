@@ -10,6 +10,7 @@ import android.view.MotionEvent
 import android.view.ScaleGestureDetector
 import android.view.View
 import androidx.customview.widget.ExploreByTouchHelper
+import dev.aster.vega.model.asString
 import dev.aster.vega.runtime.ChartInputEvent
 import dev.aster.vega.runtime.ChartKey
 import dev.aster.vega.runtime.GesturePhase
@@ -261,6 +262,40 @@ constructor(context: Context, attrs: AttributeSet? = null, defStyleAttr: Int = 0
     return minOf(availableWidth / scene.width, availableHeight / scene.height)
   }
 
+  /**
+   * Whether this view draws the tooltip itself.
+   *
+   * Off is the right setting for a host that renders its own — the controller still publishes the
+   * datum and emits `TooltipChanged`, which is where a richer presentation belongs.
+   */
+  public var tooltipsEnabled: Boolean = true
+    set(value) {
+      field = value
+      invalidate()
+    }
+
+  private val tooltipRect = RectF()
+
+  private fun asStringOf(value: dev.aster.vega.model.VegaValue): String = value.asString()
+
+  private val tooltipFillPaint =
+    android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
+      style = android.graphics.Paint.Style.FILL
+      color = android.graphics.Color.argb(242, 255, 255, 255)
+    }
+
+  private val tooltipStrokePaint =
+    android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
+      style = android.graphics.Paint.Style.STROKE
+      color = android.graphics.Color.argb(255, 187, 187, 187)
+      strokeWidth = 1f
+    }
+
+  private val tooltipTextPaint =
+    android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
+      color = android.graphics.Color.argb(255, 34, 34, 34)
+    }
+
   override fun onDraw(canvas: Canvas) {
     // Everything below reads an already-built snapshot: no scene compilation, no text layout, no
     // JSON parsing, no large allocations (PROJECT_BRIEF.md 4.5).
@@ -294,8 +329,83 @@ constructor(context: Context, attrs: AttributeSet? = null, defStyleAttr: Int = 0
     } finally {
       canvas.restoreToCount(saveCount)
     }
+    if (tooltipsEnabled) drawTooltip(canvas, interaction)
     drawnRevision = snapshot.revision
   }
+
+  /**
+   * Draws the tooltip for whatever the pointer is on.
+   *
+   * Vega itself does not draw one — it publishes the datum and leaves the presentation to the host,
+   * which in a browser is the separate `vega-tooltip` library. That division is right, and it still
+   * left this view showing nothing at all for a specification that asks for a tooltip, which is
+   * not. So there is a plain default here and a switch to turn it off for a host that wants its
+   * own.
+   *
+   * Drawn **outside** the scene transform, in view coordinates, because a tooltip is chrome: it
+   * does not scale with a pinch and it does not move with a pan.
+   */
+  private fun drawTooltip(canvas: Canvas, interaction: dev.aster.vega.runtime.InteractionState) {
+    val datum = interaction.tooltip ?: return
+    val anchor = interaction.tooltipAnchor ?: return
+    val lines = tooltipLines(datum)
+    if (lines.isEmpty()) return
+
+    val pad = TOOLTIP_PADDING * resources.displayMetrics.density
+    // `density`, not the deprecated `scaledDensity`: a tooltip is chrome and sized against the
+    // chart it annotates, so it should not grow with the reader's font-scale setting while the
+    // marks stay put.
+    tooltipTextPaint.textSize = TOOLTIP_TEXT_SP * resources.displayMetrics.density
+    val lineHeight = tooltipTextPaint.fontSpacing
+    val textWidth = lines.maxOf { tooltipTextPaint.measureText(it) }
+    val boxWidth = textWidth + 2 * pad
+    val boxHeight = lineHeight * lines.size + 2 * pad
+
+    // Placed above and right of the pointer, and flipped when that would leave the view.
+    var left = anchor.x.toFloat() + pad
+    var top = anchor.y.toFloat() - boxHeight - pad
+    if (left + boxWidth > width.toFloat()) left = anchor.x.toFloat() - boxWidth - pad
+    if (left < 0f) left = 0f
+    if (top < 0f) top = anchor.y.toFloat() + pad
+    if (top + boxHeight > height.toFloat()) top = (height.toFloat() - boxHeight).coerceAtLeast(0f)
+
+    tooltipRect.set(left, top, left + boxWidth, top + boxHeight)
+    val radius = TOOLTIP_RADIUS * resources.displayMetrics.density
+    canvas.drawRoundRect(tooltipRect, radius, radius, tooltipFillPaint)
+    canvas.drawRoundRect(tooltipRect, radius, radius, tooltipStrokePaint)
+
+    var baseline = top + pad - tooltipTextPaint.fontMetrics.top
+    for (line in lines) {
+      canvas.drawText(line, left + pad, baseline, tooltipTextPaint)
+      baseline += lineHeight
+    }
+  }
+
+  /**
+   * A datum as the lines of a tooltip.
+   *
+   * An object becomes one `name: value` line per field, which is what upstream's tooltip library
+   * shows; anything else is a single line. Numbers are written the way a reader expects rather than
+   * the way a `Double` prints, so a count of three does not read "3.0".
+   */
+  private fun tooltipLines(datum: dev.aster.vega.model.VegaValue): List<String> =
+    when (datum) {
+      is dev.aster.vega.model.VegaValue.Obj ->
+        datum.fields.entries.take(TOOLTIP_MAX_ROWS).map { (key, value) ->
+          "$key: ${tooltipValue(value)}"
+        }
+      is dev.aster.vega.model.VegaValue.Null -> emptyList()
+      else -> listOf(tooltipValue(datum))
+    }
+
+  private fun tooltipValue(value: dev.aster.vega.model.VegaValue): String =
+    when (value) {
+      is dev.aster.vega.model.VegaValue.Num -> dev.aster.vega.scene.spokenNumber(value.value)
+      is dev.aster.vega.model.VegaValue.Null -> "-"
+      is dev.aster.vega.model.VegaValue.Obj,
+      is dev.aster.vega.model.VegaValue.Arr -> "…"
+      else -> asStringOf(value)
+    }
 
   /** Call after the controller's snapshot changed; only invalidates when the revision moved. */
   public fun invalidateIfStale() {
@@ -449,5 +559,13 @@ constructor(context: Context, attrs: AttributeSet? = null, defStyleAttr: Int = 0
   public companion object {
     /** Multiplicative zoom applied per mouse-wheel notch. */
     public const val WHEEL_ZOOM_STEP: Double = 1.15
+
+    /** Density-independent, because a tooltip is chrome and reads at one size on every screen. */
+    private const val TOOLTIP_PADDING = 6f
+    private const val TOOLTIP_RADIUS = 4f
+    private const val TOOLTIP_TEXT_SP = 12f
+
+    /** A datum with fifty columns is a table, not a tooltip. */
+    private const val TOOLTIP_MAX_ROWS = 12
   }
 }

@@ -29,6 +29,39 @@ public data class Scene(
   private fun countNodes(node: SceneNode): Int =
     if (node is GroupNode) 1 + node.children.sumOf { countNodes(it) } else 1
 
+  /**
+   * The same scene with some nodes swapped for others of the same id.
+   *
+   * What a hover does: the item under the pointer is redrawn from its mark's `hover` block, and
+   * everything else is the scene that was already there. Only the groups on the path to a
+   * replacement are rebuilt, so hovering one point in a ten-thousand-point scatter copies a handful
+   * of objects rather than the scene.
+   *
+   * Returns `this` unchanged when nothing matches, so a caller can publish the result without
+   * checking whether anything happened.
+   */
+  public fun replacing(replacements: Map<SceneNodeId, SceneNode>): Scene {
+    if (replacements.isEmpty()) return this
+    val replaced = replaceIn(root, replacements) ?: return this
+    return copy(root = replaced as GroupNode)
+  }
+
+  /** Null when nothing under [node] was replaced, which is what lets the rest be shared. */
+  private fun replaceIn(node: SceneNode, replacements: Map<SceneNodeId, SceneNode>): SceneNode? {
+    replacements[node.id]?.let {
+      return it
+    }
+    if (node !is GroupNode) return null
+    var changed = false
+    val children =
+      node.children.map { child ->
+        val swapped = replaceIn(child, replacements)
+        if (swapped != null) changed = true
+        swapped ?: child
+      }
+    return if (changed) node.copy(children = children) else null
+  }
+
   public companion object {
     public fun empty(width: Double = 0.0, height: Double = 0.0): Scene =
       Scene(

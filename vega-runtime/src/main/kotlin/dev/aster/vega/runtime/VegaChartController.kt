@@ -23,6 +23,7 @@ import dev.aster.vega.scene.PointD
 import dev.aster.vega.scene.Scene
 import dev.aster.vega.scene.SceneHitIndex
 import dev.aster.vega.scene.SceneNode
+import dev.aster.vega.scene.SceneNodeId
 import dev.aster.vega.scene.TextEngine
 import kotlin.time.Clock
 import kotlinx.coroutines.CancellationException
@@ -382,13 +383,18 @@ public class VegaChartController(
         hoveredNodeId = node?.id,
         tooltip = node?.metadata?.tooltip,
         tooltipAnchor = if (node?.metadata?.tooltip != null) point else null,
-      )
+      ),
+      scene = hoveredScene(node?.id),
     )
     emit(ChartEvent.MarkHovered(node?.id, node?.metadata?.markName, datumOf(node)))
     emit(ChartEvent.TooltipChanged(node?.metadata?.tooltip, point))
   }
 
   private fun handleTap(point: PointD) {
+    // A touch screen has no pointer to hover with, so a tap is also how a `hover` block and a
+    // tooltip are reached. A browser does the same thing: it synthesises `pointerover` from a touch
+    // before it reports the click.
+    updateHover(point)
     val hit = hitIndex.hitTest(toSceneSpace(point))
     val current = _state.value.snapshot.interactionState
     if (hit == null) {
@@ -502,13 +508,35 @@ public class VegaChartController(
     )
   }
 
-  private fun publishInteraction(interaction: InteractionState) {
+  /**
+   * The scene with the pointed-at item drawn from its mark's `hover` block.
+   *
+   * A `hover` block is the one part of an encoding that depends on where the pointer is, and it is
+   * applied by **swapping a node** rather than by recompiling: the item was encoded twice at
+   * compile time, once resting and once hovered, sharing its id. So a pointer moving across a
+   * scatter plot costs one map lookup and a rebuilt group chain, not a pass over the specification.
+   *
+   * Its bounds may differ slightly from the resting item's — a thicker stroke reaches further — and
+   * the hit index is deliberately **not** rebuilt for that: re-indexing ten thousand nodes on every
+   * pointer move to account for a hairline would cost more than it could ever be worth, and the
+   * item under the pointer is the one that just tested positive anyway.
+   */
+  private fun hoveredScene(hovered: SceneNodeId?): Scene {
+    val compiled = lastCompiled
+    val base = compiled?.scene ?: _state.value.snapshot.scene
+    val variant = hovered?.let { compiled?.hoverVariants?.get(it) } ?: return base
+    return base.replacing(mapOf(hovered to variant))
+  }
+
+  private fun publishInteraction(
+    interaction: InteractionState,
+    /** Defaults to whatever is on screen, so a selection or a pan keeps the hover styling. */
+    scene: Scene = _state.value.snapshot.scene,
+  ) {
     val revision = nextRevision++
-    val previous = _state.value.snapshot
     _state.value =
       _state.value.copy(
-        snapshot =
-          ChartSnapshot(scene = previous.scene, interactionState = interaction, revision = revision)
+        snapshot = ChartSnapshot(scene = scene, interactionState = interaction, revision = revision)
       )
   }
 
