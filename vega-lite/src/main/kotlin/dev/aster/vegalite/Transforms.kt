@@ -98,7 +98,9 @@ internal class Transforms(
               "fields",
               arr(entries.map { entry -> entry.string("field")?.let(::str) ?: VegaValue.Null }),
             )
-            sortFields(transform["sort"])?.let { put("sort", it) }
+            // Always written, empty or not: `sortParams` builds the pair of lists whether or not
+            // there is anything to sort by, and Vega reads a window's four arrays in step with it.
+            put("sort", sortFields(transform["sort"]))
             transform["frame"]?.let { put("frame", it) }
             transform["ignorePeers"]?.let { put("ignorePeers", it) }
             if (transform.has("groupby")) {
@@ -520,9 +522,8 @@ internal class Transforms(
     }
 
   /** `sort: [{field, order}]` becomes Vega's parallel `field`/`order` arrays. */
-  private fun sortFields(value: VegaValue?): VegaValue? {
-    val entries = (value as? VegaValue.Arr)?.values ?: return null
-    if (entries.isEmpty()) return null
+  private fun sortFields(value: VegaValue?): VegaValue {
+    val entries = (value as? VegaValue.Arr)?.values.orEmpty()
     return obj {
       put("field", strings(entries.mapNotNull { it.string("field") }))
       put("order", strings(entries.map { it.string("order") ?: "ascending" }))

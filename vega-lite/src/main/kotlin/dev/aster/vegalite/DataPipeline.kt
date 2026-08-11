@@ -202,7 +202,7 @@ internal class DataPipeline(
         dimensions += Fields.vgField(def)
         // A binned or bucketed dimension groups by both edges, so the span survives the
         // aggregation intact — the scale and the axis both read the end as well as the start.
-        if (def.bin is Binning.Bin || def.timeUnit != null) {
+        if (hasBandEnd(def)) {
           dimensions += Fields.vgField(def, suffix = "end")
         }
       } else {
@@ -251,6 +251,24 @@ internal class DataPipeline(
     )
   }
 
+  /**
+   * Whether a dimension is grouped by **both** of its edges — `hasBandEnd` in `channeldef.ts`.
+   *
+   * A bin always is: the span is what the bar covers. A **bucketed instant** only is where the mark
+   * has a band to sit in, which upstream asks by looking for a `timeUnitBandPosition` — a rect and
+   * a bar define one, a line and an area do not. Adding the far edge for every time unit puts a
+   * column into the grouping that nothing computes, and the aggregate then groups by a name that is
+   * not there.
+   */
+  private fun hasBandEnd(def: ChannelDef): Boolean {
+    if (def.bin is Binning.Bin) return true
+    if (def.timeUnit == null || def.type != MeasureType.TEMPORAL) return false
+    val secondary = secondaryChannel(def.channel)?.let { view.spec.encoding[it] }
+    if (secondary != null) return false
+    if (def.raw.number("bandPosition") != null) return true
+    return view.config.markConfig(view.spec.mark).number("timeUnitBandPosition") != null
+  }
+
   private fun stackNode(): StackNode? {
     val stack = view.stack ?: return null
     val def = view.spec.encoding[stack.fieldChannel] ?: return null
@@ -276,7 +294,7 @@ internal class DataPipeline(
     val dimensions =
       stack.groupbyChannels.flatMap { channel ->
         val dimension = view.spec.fieldDef(channel) ?: return@flatMap emptyList()
-        if (dimension.bin != null) {
+        if (dimension.bin != null || hasBandEnd(dimension)) {
           listOf(
             Fields.vgField(dimension),
             if (dimension.bin is Binning.Bin) Fields.vgField(dimension, suffix = "end")
