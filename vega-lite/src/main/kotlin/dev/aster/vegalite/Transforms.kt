@@ -101,21 +101,43 @@ internal class Transforms(
           }
         )
 
+      // Both of these **always** write their output names, filling in the defaults a specification
+      // left out — `key`/`value` for a fold, and the field's own name for each flattened column.
+      // Vega would default them the same way, but the names are what everything downstream groups
+      // and scales by, so upstream settles them here rather than leaving two places to agree.
       transform.has("fold") ->
         listOf(
           obj {
             put("type", "fold")
             put("fields", strings(fieldList(transform["fold"])))
-            asPair(transform["as"])?.let { put("as", it) }
+            val declared = (transform["as"] as? VegaValue.Arr)?.values.orEmpty()
+            put(
+              "as",
+              strings(
+                listOf(
+                  (declared.getOrNull(0) as? VegaValue.Str)?.value ?: "key",
+                  (declared.getOrNull(1) as? VegaValue.Str)?.value ?: "value",
+                )
+              ),
+            )
           }
         )
 
       transform.has("flatten") ->
         listOf(
           obj {
+            val fields = fieldList(transform["flatten"])
             put("type", "flatten")
-            put("fields", strings(fieldList(transform["flatten"])))
-            transform["as"]?.let { put("as", it) }
+            put("fields", strings(fields))
+            val declared = (transform["as"] as? VegaValue.Arr)?.values.orEmpty()
+            put(
+              "as",
+              strings(
+                fields.mapIndexed { index, field ->
+                  (declared.getOrNull(index) as? VegaValue.Str)?.value ?: field
+                }
+              ),
+            )
           }
         )
 

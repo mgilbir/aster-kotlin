@@ -427,6 +427,11 @@ internal object Scales {
     // back from here.
     if (def.bin is Binning.Bin) {
       set("bins", signalRef(binSignal(view, def)))
+    } else if (def.bin == Binning.PreBinned) {
+      // A column that arrived binned brings no boundary signal with it, but it may say what its
+      // **step** was — and that is enough: the ends come from the scale's own domain, so a `step`
+      // is the whole of what upstream writes here.
+      def.raw.obj("bin")?.number("step")?.let { set("bins", obj { put("step", it) }) }
     }
 
     if (channel in COLOR_CHANNELS && def.type != MeasureType.NOMINAL) {

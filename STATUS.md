@@ -474,7 +474,7 @@ produces a chart that is plausible and wrong.
 every fixture with upstream and checks two things:
 
 1. `VegaLiteFixtureTest` compares the Vega this compiler emits against upstream's, property by
-   property. Seventy-one fixtures, and all of them match exactly — every transform, scale, signal,
+   property. Seventy-two fixtures, and all of them match exactly — every transform, scale, signal,
    axis, legend and mark encoding, down to the accessibility description string.
 2. `VegaLiteFixtureDifferentialTest` runs that output through this engine's own runtime and compares
    the scene against the one upstream draws. Every mark of every fixture matches, and nothing is
@@ -559,7 +559,7 @@ own) and `grouped-bar` on the step arithmetic.
 
 ### Where the compiler stands, and what it still refuses
 
-Seventy-one fixtures, each matching upstream's compiler property for property and drawing the chart
+Seventy-two fixtures, each matching upstream's compiler property for property and drawing the chart
 upstream draws. The grammar covered: a single view, a layer of them to any depth, a concatenation of
 either to any depth, a
 repetition of any of those, both facet operators, eleven marks including `arc`,
@@ -677,7 +677,7 @@ no data is needed to compare two compilers. So every one of them was compiled by
 by this one, and the outputs compared property by property. That is a *measurement*, not a gate: the
 examples are not fixtures here, and nothing about them is checked in.
 
-**124 of 627 matched exactly** at the start. 16 were refused by name, and of those 8 are geographic,
+**124 of 627 matched exactly** at the start, and **147** do now. 16 were refused by name, and of those 8 are geographic,
 3 are a facet inside a facet, 2 a repeat inside a concatenation, and 2 are the `trail` mark — which
 this runtime draws and this compiler had simply not been told about.
 
@@ -717,14 +717,41 @@ merge looked scales up **by channel** in a map keyed by scale **name**, so insid
 every plot looked scale-less and three plots of different depths merged into one signal. It had been
 invisible because every existing concat fixture declares its sizes.
 
+A second pass took six more, working down the same ranking:
+
+- **`toNumber` was emitted as `tonumber`.** The parse expression was built by concatenation, and
+  Vega has no such function. A dated parse names a *specifier* rather than a type, too, so
+  `date:'%d/%m'` is `timeParse` and `utc:` its UTC twin.
+- **The `trail` mark was refused** although the runtime draws one — it was simply missing from the
+  compiler's mark list.
+- **`fold` and `flatten` always write their output names**, filling in `key`/`value` and each
+  field's own name. Vega would default them the same way, but the names are what everything
+  downstream groups and scales by, so upstream settles them once.
+- **`{"binned": true}` is `isBinned`, not `isBinning`.** Reading only the string `"binned"` binned
+  an already-binned column a second time, putting a whole `bin` transform and its extent signal into
+  the data flow and shifting everything after it. One example went from thirty differences to one —
+  which was the second half of the same rule: a binned field that states its **step** gives its
+  scale a `bins: {step}`, the ends coming from the domain.
+- **An explicit axis title wins outright across layers**, rather than joining. A layer that names
+  its axis has said what the axis measures; joining titled one `Value, PM2.5 Value`.
+
+And the fixture written to guard those found three more, all of them this branch's own and all from
+the `resolve` work: a bin's offset expression named the *unprefixed* scale, so it read `scale("x", …)`
+inside a plot whose scale is `concat_0_x`; a layer **inside** a concatenation got two of every axis,
+because independence is resolved between the composition's children and a concatenation's children
+are its plots, not the layers within one; and scale **ownership** was being decided by usage rather
+than by the resolve, so a colour scale only one plot happened to draw with was written inside that
+plot instead of beside the chart.
+
 Two runtime gaps are recorded rather than fixed, both found by fixtures written here and both
 withdrawn from the corpus because a fixture has to pass:
 
 - **A non-group mark's `clip` is not applied in the runtime.** The compiler emits it now, but the
   scene still measures the clipped-away points, so a clipped line makes the chart wider than
   upstream's.
-- **A ranged bar (`x`/`x2`) inside a concatenation** places its rects and gridlines differently from
-  upstream. Its specification matches property for property, so this is the runtime's.
+- **A plot inside a concatenation is placed one unit low** where it is a ranged bar or a layer. Its
+  specification matches property for property, so this is the runtime's — every mark, gridline and
+  tick in that cell is off by exactly one.
 
 ### Five defects behind one chart pasted into the demo
 
@@ -1253,7 +1280,7 @@ the whole time.
 
 ## Verification
 
-- 2,358 JVM tests pass and none is skipped (`./gradlew test`); the portable core is most of
+- 2,365 JVM tests pass and none is skipped (`./gradlew test`); the portable core is most of
   them, and `./scripts/test-core.sh` runs it without an Android SDK.
 - Android lint is clean with `warningsAsErrors` on every Android module.
 - 63 instrumented tests pass on an API 37 arm64 emulator (`./scripts/test-android.sh`): 49 in

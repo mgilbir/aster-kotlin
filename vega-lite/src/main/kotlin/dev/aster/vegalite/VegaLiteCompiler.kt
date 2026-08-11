@@ -119,9 +119,15 @@ private class Compilation(
     // Which plot each scale belongs to, or none where several share it. That is the whole of what
     // decides where a scale and its legend are written: a shared one at the top, an independent one
     // inside the plot that owns it.
+    // Ownership follows the **resolve**, not usage: a colour scale is shared between a
+    // concatenation's plots because that is what `defaultScaleResolve` says, whether or not more
+    // than one plot happens to draw with it. An independently resolved scale is named for the child
+    // that owns it, so a name that is still its plain channel is a shared one.
     val owner =
-      allScales.keys.associateWith { name ->
-        plots.filter { plot -> plot.views.any { name in it.scaleNames.values } }.singleOrNull()
+      allScales.values.associate { scale ->
+        scale.name() to
+          if (scale.name() == scale.channel) null
+          else plots.firstOrNull { plot -> plot.views.any { scale.name() in it.scaleNames.values } }
       }
     for (plot in plots) {
       plot.scales =
@@ -1007,13 +1013,28 @@ private class Compilation(
         val component = view.scaleComponents[channel] ?: continue
         val hasOther = view.scaleComponents.containsKey(if (channel == "x") "y" else "x")
         val parsed = Guides.parseAxis(view, channel, def, component.type, hasOther) ?: continue
+        // Independence is resolved **between the children of the composition**, and a
+        // concatenation's children are its plots — so the layers *inside* one plot still share an
+        // axis. Keying per view there gave a layered plot two of every axis.
         val key =
-          if (guideIsIndependent(channel)) "${view.childName}|$channel" else component.name()
+          if (concat == null && guideIsIndependent(channel)) "${view.childName}|$channel"
+          else component.name()
         val existing = components[key]
         if (existing == null) {
           components[key] = channel to parsed
         } else {
-          parsed.titles.forEach { if (it !in existing.second.titles) existing.second.titles += it }
+          val merged = existing.second
+          when {
+            // An explicit title wins outright rather than joining: a layer that names its axis has
+            // said what the axis measures, and the other layer's derived name adds nothing.
+            parsed.explicitTitle && !merged.explicitTitle -> {
+              merged.titles.clear()
+              merged.titles += parsed.titles
+              merged.explicitTitle = true
+            }
+            merged.explicitTitle && !parsed.explicitTitle -> Unit
+            else -> parsed.titles.forEach { if (it !in merged.titles) merged.titles += it }
+          }
         }
       }
     }

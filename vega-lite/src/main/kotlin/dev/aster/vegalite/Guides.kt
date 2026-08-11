@@ -98,6 +98,15 @@ internal object Guides {
   class AxisComponent(val channel: String) {
     val properties: LinkedHashMap<String, VegaValue> = LinkedHashMap()
     val titles: MutableList<String> = mutableListOf()
+
+    /**
+     * Whether the specification named this axis's title itself.
+     *
+     * An **explicit** title short-circuits the merge, across layers as well as across the two ends
+     * of a ranged position — `mergeTitleComponent` keeps the explicit one and drops the derived.
+     * Joining them instead titles an axis `Value, PM2.5 Value`, which names the column twice.
+     */
+    var explicitTitle: Boolean = false
     var disabled: Boolean = false
 
     /**
@@ -152,6 +161,7 @@ internal object Guides {
     val secondary = secondaryChannel(channel)?.let { view.spec.fieldDef(it) }
     val stated = listOfNotNull(def.explicitTitle, secondary?.explicitTitle)
     if (stated.isNotEmpty()) {
+      axis.explicitTitle = true
       stated.mapNotNull { (it as? VegaValue.Str)?.value }.forEach { axis.titles += it }
     } else {
       for (channelDef in listOfNotNull(def, secondary)) {

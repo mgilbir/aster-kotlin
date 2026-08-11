@@ -28,6 +28,9 @@ internal object Marks {
       "rule" to "rule",
       "text" to "text",
       "arc" to "arc",
+      // A trail is Vega's own mark: a line whose thickness follows the data, so its `size` channel
+      // becomes a width along the path rather than an area.
+      "trail" to "trail",
     )
 
   /**
@@ -760,7 +763,7 @@ internal object Marks {
       // The middle of a bin has to be computed from both edges, since only the edges are fields.
       val start = Fields.datumAccess(def)
       val end = Fields.datumAccess(def, suffix = "end")
-      return signalRef("scale(\"${mainChannel(channel)}\", 0.5 * $start + 0.5 * $end)")
+      return signalRef("scale(\"${view.scale(mainChannel(channel))}\", 0.5 * $start + 0.5 * $end)")
     }
     return obj {
       put("scale", scaleName(view, mainChannel(channel)))
@@ -1068,8 +1071,8 @@ internal object Marks {
     val minBandSize = markConfig.number("minBandSize")
     val axisTranslate = 0.5
     val sizeExpression =
-      "abs(scale(\"$channel\", ${Fields.datumAccess(def, suffix = "end")}) - " +
-        "scale(\"$channel\", ${Fields.datumAccess(def)}))"
+      "abs(scale(\"${view.scale(channel)}\", ${Fields.datumAccess(def, suffix = "end")}) - " +
+        "scale(\"${view.scale(channel)}\", ${Fields.datumAccess(def)}))"
 
     fun offset(isEnd: Boolean): VegaValue {
       val spacingOffset = if (isEnd) -spacing / 2 else spacing / 2

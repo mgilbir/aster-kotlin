@@ -242,14 +242,37 @@ internal class ParseNode(val parse: MutableMap<String, String>) : DataNode() {
   fun transforms(): List<VegaValue> = parse.map { (field, type) ->
     obj {
       put("type", "formula")
-      put(
-        "expr",
-        if (type == "date") "toDate(datum[${quoted(field)}])"
-        else "to$type(datum[${quoted(field)}])",
-      )
+      put("expr", parseExpression(field, type))
       put("as", field)
     }
   }
+
+  /**
+   * `parseExpression` from `data/formatparse.ts`: the call that turns text into what it says it is.
+   *
+   * The names are **camel-cased** — `toNumber`, not `tonumber` — and a dated parse names a
+   * *specifier* rather than a type, so `date:'%d/%m'` becomes `timeParse` and `utc:` its UTC twin.
+   * Building the name by concatenation instead gives an expression Vega has no function for.
+   */
+  private fun parseExpression(field: String, type: String): String {
+    val access = "datum[${quoted(field)}]"
+    return when {
+      type.startsWith("date:") -> "timeParse($access,'${unquote(type.removePrefix("date:"))}')"
+      type.startsWith("utc:") -> "utcParse($access,'${unquote(type.removePrefix("utc:"))}')"
+      type == "flatten" -> access
+      else -> "to${type.replaceFirstChar { it.uppercase() }}($access)"
+    }
+  }
+
+  /** A specifier may arrive quoted, and the quotes are not part of it. */
+  private fun unquote(text: String): String =
+    if (
+      text.length >= 2 &&
+        (text.first() == '\'' || text.first() == '"') &&
+        text.last() == text.first()
+    )
+      text.substring(1, text.length - 1)
+    else text
 }
 
 internal class BinNode(val bins: List<BinComponent>) : DataNode() {

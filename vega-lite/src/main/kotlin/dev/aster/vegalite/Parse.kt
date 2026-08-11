@@ -220,6 +220,11 @@ internal class Parse(private val config: Config, private val diagnostics: Diagno
       value == null || value == VegaValue.Bool(false) || value == VegaValue.Null -> null
       value == VegaValue.Bool(true) -> Binning.Bin(obj { put("maxbins", 10) })
       value == VegaValue.Str("binned") -> Binning.PreBinned
+      // `isBinned` is two spellings, not one: the string, **and** an object saying `binned: true`,
+      // which is how a specification states the step its data was already binned at. Reading only
+      // the string binned an already-binned column a second time, which put a whole `bin` transform
+      // and its extent signal into the data flow and shifted everything after it.
+      (value as? VegaValue.Obj)?.fields?.get("binned") == VegaValue.Bool(true) -> Binning.PreBinned
       value is VegaValue.Obj ->
         if (value.fields.isEmpty()) {
           Binning.Bin(obj { put("maxbins", 10) })
@@ -356,6 +361,7 @@ internal class Parse(private val config: Config, private val diagnostics: Diagno
         "arc",
         "area",
         "bar",
+        "trail",
         "circle",
         "line",
         "point",
