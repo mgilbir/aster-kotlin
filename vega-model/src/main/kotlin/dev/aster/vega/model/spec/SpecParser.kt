@@ -83,6 +83,7 @@ private val EVENT_STREAM_CONSUMED =
 
 private val AXIS_CONSUMED =
   setOf(
+    "labelBound",
     "tickMinStep",
     "labelOffset",
     "aria",
@@ -164,10 +165,7 @@ private fun guideStyleKeys(vararg prefixes: String): Set<String> =
     .toSet()
 
 private val AXIS_UNSUPPORTED =
-  mapOf(
-    "labelBound" to "Bounding axis labels to the plotting area is not implemented",
-    "labelFlushOffset" to "Axis label flush offsets are not implemented; they need labelFlush",
-  )
+  mapOf("labelFlushOffset" to "Axis label flush offsets are not implemented; they need labelFlush")
 
 /** Scale properties this engine reads. */
 private val SCALE_CONSUMED =
@@ -1199,6 +1197,10 @@ public class SpecParser {
       exponent = obj.numberOrSignal("exponent", "$path.exponent"),
       constant = obj.numberOrSignal("constant", "$path.constant"),
       interpolate = interpolationSpace(obj.fields["interpolate"], "$path.interpolate"),
+      interpolateGamma =
+        ((obj.fields["interpolate"] as? VegaValue.Obj)?.fields?.get("gamma") as? VegaValue.Num)
+          ?.value
+          ?.takeIf { it.isFinite() && it > 0.0 },
       bins = parseBins(obj.fields["bins"], "$path.bins"),
     )
   }
@@ -1261,14 +1263,6 @@ public class SpecParser {
       null -> null
       is VegaValue.Str -> value.value.takeIf { it.isNotEmpty() }
       is VegaValue.Obj -> {
-        if (value.fields["gamma"] != null) {
-          diagnostics.warn(
-            DiagnosticCodes.PARSE_UNKNOWN_PROPERTY,
-            "A colour interpolation gamma is not implemented; the ramp is interpolated without " +
-              "it, so its ends are right and its middle is not; 'gamma' was ignored",
-            jsonPath = "$path.gamma",
-          )
-        }
         value.fields["type"]?.asString()?.takeIf { it.isNotEmpty() }
       }
       else -> null
@@ -1580,6 +1574,13 @@ public class SpecParser {
       tickBand = band,
       labelOffset = obj.numberOrSignal("labelOffset", "$path.labelOffset"),
       tickMinStep = obj.numberOrSignal("tickMinStep", "$path.tickMinStep"),
+      // The same shape as `labelFlush`: `true` is one unit, a number is itself, `false` is nothing.
+      labelBound =
+        when (val bound = obj.fields["labelBound"]) {
+          is VegaValue.Bool -> if (bound.value) 1.0 else null
+          is VegaValue.Num -> bound.value.takeIf { it.isFinite() }
+          else -> null
+        },
       aria = obj.fields["aria"]?.asBoolean() ?: true,
       description = obj.fields["description"]?.asString()?.takeIf { it.isNotBlank() },
       position = obj.numberOrSignal("position", "$path.position"),

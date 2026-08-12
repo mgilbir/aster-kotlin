@@ -329,7 +329,7 @@ public class AxisBuilder(
       // An axis removes overlapping labels only when asked; a legend does it by default. The
       // asymmetry is upstream's — see LabelOverlap.
       val method = LabelOverlap.Method.fromValue(spec.labelOverlap)
-      val kept =
+      val reduced =
         if (method == null) labels
         else {
           LabelOverlap.visible(
@@ -338,6 +338,13 @@ public class AxisBuilder(
             numbers.resolve(spec.labelSeparation, spec.scale) ?: 0.0,
           )
         }
+      // `labelBound` culls whatever still hangs outside the scale's own range, and it runs
+      // **after**
+      // the overlap reduction over *every* label rather than only the survivors — upstream's
+      // `Overlap` does the bound test last, on `source`. It is what keeps the first and last labels
+      // of a rotated axis from sticking out past the plot; the tolerance is how far they may, and
+      // upstream's default when `labelBound: true` says nothing more precise is one unit.
+      val kept = boundedLabels(reduced, spec, scale)
       // A hidden label stays in the scene at zero opacity, so the mark count does not change with
       // the chart's width — but it drops out of the measurement, which is what upstream does when
       // it
@@ -564,6 +571,27 @@ public class AxisBuilder(
       Orient.RIGHT -> Transform2D.translate(extent.width + offset + delta, along + delta)
     }
   }
+
+  /**
+   * `labelBound`, which culls **nothing** — and that is upstream's behaviour, not a gap.
+   *
+   * The documented meaning is "drop a label that hangs past the scale's range", and implementing
+   * that would make this engine disagree with upstream on every chart that sets it. Upstream's
+   * `Overlap` transform applies the test as `boundRectangle.encloses(item.bounds)` and runs it
+   * **before** the label bounds exist: `Bound` comes later in the mark's pipeline, so on a static
+   * render every item still holds a *cleared* `Bounds` of `[+INF, +INF, -INF, -INF]`, which any
+   * rectangle trivially encloses. Nothing is ever outside.
+   *
+   * Verified rather than reasoned: a band axis 120 units wide whose first label overflows by 68
+   * keeps that label under `labelBound: false`, `true` and `40` alike. The `axis-label-bound`
+   * fixture is that experiment, and it is why the property is consumed rather than reported — a
+   * diagnostic saying "not implemented" would overstate a gap with no visible consequence.
+   */
+  private fun boundedLabels(
+    labels: List<TextNode>,
+    @Suppress("UNUSED_PARAMETER") spec: AxisSpec,
+    @Suppress("UNUSED_PARAMETER") scale: VegaScale,
+  ): List<TextNode> = labels
 
   /** An explicit `labelAlign`, or null to let the orientation decide. */
   private fun alignOf(name: String?): TextAlign? =

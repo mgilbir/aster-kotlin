@@ -21,7 +21,7 @@ end to end — expressions, signals, 33 of upstream's 40 data transforms, every 
 and an event handler that recompiles the chart — and are verified against upstream Vega by
 differential tests.
 
-One hundred and thirty-four differential fixtures pass, all matching upstream exactly on every mark and
+One hundred and thirty-five differential fixtures pass, all matching upstream exactly on every mark and
 scale output:
 
 | Fixture | Marks | Covers |
@@ -201,7 +201,7 @@ substantive compatibility items:
 | 6. View and Compose APIs | Yes |
 | 7. SVG, PNG, PDF export | Yes |
 | 8. TalkBack can describe and navigate | Partial — virtual nodes are tested by instrumentation, not with TalkBack itself |
-| 9. At least 100 compatibility fixtures pass | **Yes** — 134 |
+| 9. At least 100 compatibility fixtures pass | **Yes** — 135 |
 | 10. Core runtime has no Android dependency | Yes |
 | 11. Renders without WebView | Yes |
 | 12. Build and test loop runs from the terminal | Yes |
@@ -538,7 +538,7 @@ each example a deadline.
 
 ## Known failing fixtures
 
-None. One hundred and thirty-four fixtures exist and all of them pass — and that sentence became worth
+None. One hundred and thirty-five fixtures exist and all of them pass — and that sentence became worth
 something only once the gate could no longer skip itself, below.
 
 **The gate could report success without running.** `FixtureDifferentialTest` reads the fixtures and
@@ -1803,6 +1803,36 @@ two take the third range entry and then wrap to the first — beside the same sc
 which simply has no colour for them.
 
 With it, none of upstream's 23 scale properties is reported any more.
+
+## `labelBound` culls nothing, and implementing it would have been wrong
+
+The documented meaning is "drop an axis label that hangs past the scale's range". Implementing that is
+easy, and it would have made this engine disagree with upstream on every chart that sets the property.
+
+Upstream applies the test as `boundRectangle.encloses(item.bounds)` inside its `Overlap` transform, and
+`Overlap` runs **before the label bounds exist** — `Bound` comes later in the mark's pipeline. So on a
+static render every item still holds a *cleared* `Bounds` of `[+∞, +∞, −∞, −∞]`, which any rectangle
+trivially encloses. Nothing is ever outside.
+
+Established by experiment rather than by reading: a band axis 120 units wide whose first label
+overflows by 68 keeps that label under `labelBound: false`, `true` and `40` alike. The first attempt
+here culled two labels the reference kept, which is how the question got asked at all.
+
+So the property is **consumed and inert**, with the reason written where the code would otherwise be —
+a diagnostic saying "not implemented" would overstate a gap that has no visible consequence, and a
+correct-per-the-documentation implementation would be a real difference. With it, every one of
+upstream's 79 axis properties is read.
+
+## A comma grouped an exponent
+
+`format(200000, ',.1')` came out `2,e+5`. d3 splits a formatted value at the **first character that is
+not a digit** and groups only what is before it; this engine split on the decimal point alone, so an
+exponent's `e+5` was reversed into the grouping and came back with a comma in it. A percentage's `%`
+was the same case.
+
+Found by an axis, not by a formatting test: a `,` specifier over a domain of a million resolves to one
+significant figure, and one significant figure of 200,000 is `2e+5`. Six vectors for it now, including
+the two forms — `,.1` and `,.2e` — that reach exponential notation by different routes.
 
 ## Performance observations
 

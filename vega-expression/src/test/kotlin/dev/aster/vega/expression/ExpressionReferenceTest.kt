@@ -287,6 +287,18 @@ class ExpressionReferenceTest {
         "luminance('transparent')|null",
         "luminance('none')|null",
         "luminance('rgba(255, 0, 0, 0)')|null",
+        // ---- grouping, over the leading digits only ----
+        //
+        // d3 splits a formatted value at the first character that is not a digit and groups what is
+        // before it. Splitting on the decimal point alone grouped an *exponent* into the number:
+        // `,.1` of 200,000 came out `2,e+5`, which is what an axis over a million actually asks
+        // for.
+        "format(200000, ',')|\"200,000\"",
+        "format(200000, ',.1')|\"2e+5\"",
+        "format(1234567, ',.3')|\"1.23e+6\"",
+        "format(1234.5678, ',')|\"1,234.5678\"",
+        "format(123456, ',.2e')|\"1.23e+5\"",
+        "format(12.345, ',.1%')|\"1,234.5%\"",
         // ---- the nine that had no vector at all ----
         //
         // Found by subtracting the names any expression test calls from the names `Functions.kt`

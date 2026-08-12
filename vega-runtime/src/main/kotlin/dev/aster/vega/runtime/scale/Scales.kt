@@ -878,6 +878,8 @@ public class SequentialColorScale(
   public val domain: List<Double>,
   public val colors: List<SceneColor>,
   public val space: ColorSpaces.Interpolation = ColorSpaces.Interpolation.RGB,
+  /** `interpolate: {"type": "rgb", "gamma": y}` — only the RGB space has one. */
+  public val gamma: Double = 1.0,
   public val clamp: Boolean = true,
 ) : VegaScale {
 
@@ -895,7 +897,7 @@ public class SequentialColorScale(
     val raw = (x - lo) / (hi - lo)
     // Sequential scales clamp by default, since a colour past the end of a ramp has no meaning.
     if (!clamp && (raw < 0.0 || raw > 1.0)) return null
-    return ColorSpaces.sample(colors, raw.coerceIn(0.0, 1.0), space)
+    return ColorSpaces.sample(colors, raw.coerceIn(0.0, 1.0), space, gamma)
   }
 
   override fun scale(value: VegaValue): VegaValue {

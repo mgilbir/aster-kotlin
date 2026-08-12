@@ -240,6 +240,7 @@ public class ScaleResolver(
       domain = domain,
       colors = if (reversed(spec)) colors.reversed() else colors,
       space = space,
+      gamma = spec.interpolateGamma ?: 1.0,
     )
   }
 

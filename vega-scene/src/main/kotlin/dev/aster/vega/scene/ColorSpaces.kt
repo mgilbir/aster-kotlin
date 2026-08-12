@@ -104,11 +104,30 @@ public object ColorSpaces {
    * Rounding here rather than when the colour is written out matches d3, which rounds as it
    * stringifies: an interpolated colour is never interpolated again, so the two are the same.
    */
-  public fun interpolateRgb(from: SceneColor, to: SceneColor, t: Double): SceneColor {
+  public fun interpolateRgb(
+    from: SceneColor,
+    to: SceneColor,
+    t: Double,
+    /**
+     * `interpolate: {"type": "rgb", "gamma": y}` — the only interpolator d3 gives a gamma.
+     *
+     * It bends the ramp's **middle** and leaves both ends exactly where they were, which is what
+     * makes it easy to get wrong and hard to notice: `1.0` is the plain linear ramp, above that the
+     * ramp brightens through the middle and below it darkens. d3 raises each channel to the power,
+     * interpolates there, and takes the root on the way out.
+     */
+    gamma: Double = 1.0,
+  ): SceneColor {
     val amount = t.coerceIn(0.0, 1.0)
     fun channel(a: Double, b: Double): Double {
       val start = a * 255.0
-      return roundHalfUp(start + (b * 255.0 - start) * amount) / 255.0
+      val end = b * 255.0
+      if (gamma != 1.0) {
+        val lo = start.pow(gamma)
+        val span = end.pow(gamma) - lo
+        return roundHalfUp((lo + amount * span).pow(1.0 / gamma)) / 255.0
+      }
+      return roundHalfUp(start + (end - start) * amount) / 255.0
     }
     return SceneColor(
       red = channel(from.red, to.red),
@@ -141,9 +160,11 @@ public object ColorSpaces {
     to: SceneColor,
     t: Double,
     space: Interpolation,
+    /** Only `rgb` has one; every other space ignores it, as d3 does. */
+    gamma: Double = 1.0,
   ): SceneColor =
     when (space) {
-      Interpolation.RGB -> interpolateRgb(from, to, t)
+      Interpolation.RGB -> interpolateRgb(from, to, t, gamma)
       Interpolation.LAB -> interpolateLab(from, to, t)
       Interpolation.HCL,
       Interpolation.HCL_LONG -> interpolateHcl(from, to, t, space.isLong)
@@ -363,6 +384,7 @@ public object ColorSpaces {
     colors: List<SceneColor>,
     t: Double,
     space: Interpolation = Interpolation.RGB,
+    gamma: Double = 1.0,
   ): SceneColor {
     if (colors.isEmpty()) return SceneColor.Black
     if (colors.size == 1) return colors[0]
@@ -371,7 +393,7 @@ public object ColorSpaces {
     val lower = kotlin.math.floor(position).toInt().coerceIn(0, colors.size - 1)
     val upper = (lower + 1).coerceAtMost(colors.size - 1)
     if (lower == upper) return colors[lower]
-    return interpolate(colors[lower], colors[upper], position - lower, space)
+    return interpolate(colors[lower], colors[upper], position - lower, space, gamma)
   }
 
   // ---- CIE Lab ---------------------------------------------------------------

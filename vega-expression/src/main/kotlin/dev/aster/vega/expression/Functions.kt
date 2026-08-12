@@ -1110,13 +1110,22 @@ public object NumberFormatSubset {
   private fun prefixCurrency(text: String): String =
     if (text.startsWith("-")) "-$" + text.substring(1) else "$$text"
 
+  /**
+   * Thousands separators, over the **leading run of digits only**.
+   *
+   * d3 splits the formatted value at the first character that is not a digit and groups what is
+   * before it, which matters because a formatted number is not always plain digits and a point: an
+   * axis whose specifier resolves to one significant figure over a million produces `2e+5`, and
+   * splitting on the decimal point alone grouped the exponent into it as `2,e+5`. A percentage's
+   * `%` is the same case.
+   */
   private fun groupThousands(text: String): String {
     val negative = text.startsWith("-")
     val body = if (negative) text.substring(1) else text
-    val dot = body.indexOf('.')
-    val integerPart = if (dot < 0) body else body.substring(0, dot)
-    val rest = if (dot < 0) "" else body.substring(dot)
-    val grouped = integerPart.reversed().chunked(3).joinToString(",").reversed()
+    val end = body.indexOfFirst { !it.isDigit() }.let { if (it < 0) body.length else it }
+    val digits = body.substring(0, end)
+    val rest = body.substring(end)
+    val grouped = digits.reversed().chunked(3).joinToString(",").reversed()
     return (if (negative) "-" else "") + grouped + rest
   }
 

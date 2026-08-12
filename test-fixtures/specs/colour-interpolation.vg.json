@@ -1,8 +1,8 @@
 {
   "$schema": "https://vega.github.io/schema/vega/v6.json",
-  "description": "Every colour space Vega can interpolate a ramp in, over the same two ends. Both ends are exact by construction whichever space is chosen; the path between them is the only thing a reader sees, and for three of the spaces there are two ways round the hue circle.",
+  "description": "Every colour space Vega can interpolate a ramp in, over the same two ends, plus the rgb gamma \u2014 the only interpolator d3 gives one. Both ends are exact whichever is chosen; the path between them is the only thing a reader sees, and the gamma bends that path without moving either end.",
   "width": 340,
-  "height": 176,
+  "height": 220,
   "padding": 5,
   "background": "white",
   "data": [
@@ -176,6 +176,38 @@
         "#fde725"
       ],
       "interpolate": "cubehelix-long"
+    },
+    {
+      "name": "gamma22",
+      "type": "linear",
+      "domain": [
+        0,
+        1
+      ],
+      "range": [
+        "#440154",
+        "#fde725"
+      ],
+      "interpolate": {
+        "type": "rgb",
+        "gamma": 2.2
+      }
+    },
+    {
+      "name": "gamma05",
+      "type": "linear",
+      "domain": [
+        0,
+        1
+      ],
+      "range": [
+        "#440154",
+        "#fde725"
+      ],
+      "interpolate": {
+        "type": "rgb",
+        "gamma": 0.5
+      }
     }
   ],
   "marks": [
@@ -396,6 +428,60 @@
       }
     },
     {
+      "type": "rect",
+      "from": {
+        "data": "steps"
+      },
+      "encode": {
+        "enter": {
+          "x": {
+            "scale": "x",
+            "field": "t"
+          },
+          "width": {
+            "value": 20
+          },
+          "y": {
+            "value": 176
+          },
+          "height": {
+            "value": 18
+          },
+          "fill": {
+            "scale": "gamma22",
+            "field": "t"
+          }
+        }
+      }
+    },
+    {
+      "type": "rect",
+      "from": {
+        "data": "steps"
+      },
+      "encode": {
+        "enter": {
+          "x": {
+            "scale": "x",
+            "field": "t"
+          },
+          "width": {
+            "value": 20
+          },
+          "y": {
+            "value": 198
+          },
+          "height": {
+            "value": 18
+          },
+          "fill": {
+            "scale": "gamma05",
+            "field": "t"
+          }
+        }
+      }
+    },
+    {
       "type": "text",
       "encode": {
         "enter": {
@@ -603,6 +689,62 @@
           },
           "text": {
             "value": "cubehelix-long"
+          },
+          "align": {
+            "value": "right"
+          },
+          "baseline": {
+            "value": "middle"
+          },
+          "fontSize": {
+            "value": 9
+          },
+          "fill": {
+            "value": "#333333"
+          }
+        }
+      }
+    },
+    {
+      "type": "text",
+      "encode": {
+        "enter": {
+          "x": {
+            "signal": "width"
+          },
+          "y": {
+            "value": 185
+          },
+          "text": {
+            "value": "rgb gamma 2.2"
+          },
+          "align": {
+            "value": "right"
+          },
+          "baseline": {
+            "value": "middle"
+          },
+          "fontSize": {
+            "value": 9
+          },
+          "fill": {
+            "value": "#333333"
+          }
+        }
+      }
+    },
+    {
+      "type": "text",
+      "encode": {
+        "enter": {
+          "x": {
+            "signal": "width"
+          },
+          "y": {
+            "value": 207
+          },
+          "text": {
+            "value": "rgb gamma 0.5"
           },
           "align": {
             "value": "right"

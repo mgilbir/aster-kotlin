@@ -515,6 +515,13 @@ public data class ScaleSpec(
    * than its ends.
    */
   val interpolate: String? = null,
+  /**
+   * `interpolate: {"type": "rgb", "gamma": y}` — the only interpolator d3 gives a gamma.
+   *
+   * It bends the ramp's **middle** and leaves both ends where they were, which is why a chart that
+   * asked for one and got the plain ramp looks composed and is wrong exactly where nobody checks.
+   */
+  val interpolateGamma: Double? = null,
   /** Explicit bin boundaries; see [BinsSpec]. */
   val bins: BinsSpec? = null,
 )
@@ -705,6 +712,14 @@ public data class AxisSpec(
    * way to ask d3 for a step directly, and asking for fewer ticks is how upstream does it too.
    */
   val tickMinStep: NumberValue? = null,
+  /**
+   * `labelBound`: how far a label may hang past the scale's range before it is dropped.
+   *
+   * `true` means upstream's one unit and a number means itself; `false` and absence both mean no
+   * bounding at all. Zero is a real value — bound exactly to the range — which is why this is
+   * nullable rather than defaulting to zero.
+   */
+  val labelBound: Double? = null,
   /**
    * `aria: false` hides the whole guide from a screen reader, and `description` replaces the
    * caption this engine would otherwise generate for it.

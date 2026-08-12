@@ -134,23 +134,28 @@ class AxisStyleTest {
 
   // ---- what gets reported ---------------------------------------------------
 
+  /**
+   * Nothing is reported: every one of upstream's 79 axis properties is read.
+   *
+   * Kept as the place the next gap goes, and as the assertion that the last one has not come back.
+   * They came off this list in turn — the line caps and dash offsets first, then `tickRound`,
+   * `tickBand`, `position`, `translate`, `labelOffset`, `aria`, `description`, `tickMinStep`, and
+   * finally `labelBound`, which turned out to cull nothing upstream either.
+   */
   @Test
-  fun `every unhonoured axis property is reported by name`() {
-    // One left: `labelBound`, which needs the overlap remover to take a bounding rectangle.
-    // Everything else came off this list in turn — the line caps and dash offsets, then
-    // `tickRound`,
-    // `tickBand`, `position`, `translate`, `labelOffset`, `aria`, `description` and `tickMinStep`.
-    // `Stroke` had carried the caps and offsets since it was written and no guide passed either;
-    // each of the rest had the machinery to honour it one call away.
-    val unhonoured = listOf("\"labelBound\": true")
-    for (property in unhonoured) {
-      val name = property.substringAfter('"').substringBefore('"')
-      val diagnostics = compile("""{"orient": "bottom", "scale": "x", $property}""").diagnostics
-      val reported = diagnostics.filter {
-        it.code == DiagnosticCodes.PARSE_UNKNOWN_PROPERTY && it.jsonPath?.endsWith(name) == true
-      }
-      assertTrue(reported.isNotEmpty(), "'$name' was not reported: $diagnostics")
-    }
+  fun `an axis reports nothing, because every property is read`() {
+    val styled =
+      compile(
+          """{"orient": "bottom", "scale": "x", "labelBound": true, "tickMinStep": 5,
+              "tickRound": false, "tickBand": "extent", "position": 10, "translate": 0,
+              "labelOffset": 3, "aria": false, "description": "d", "tickCap": "round",
+              "gridCap": "round", "domainCap": "round", "tickDashOffset": 2}"""
+        )
+        .diagnostics
+    assertTrue(
+      styled.none { it.code == DiagnosticCodes.PARSE_UNKNOWN_PROPERTY },
+      "an axis reported something: $styled",
+    )
   }
 
   @Test
