@@ -21,7 +21,7 @@ end to end — expressions, signals, 33 of upstream's 40 data transforms, every 
 and an event handler that recompiles the chart — and are verified against upstream Vega by
 differential tests.
 
-One hundred and twenty-seven differential fixtures pass, all matching upstream exactly on every mark and
+One hundred and twenty-eight differential fixtures pass, all matching upstream exactly on every mark and
 scale output:
 
 | Fixture | Marks | Covers |
@@ -201,7 +201,7 @@ substantive compatibility items:
 | 6. View and Compose APIs | Yes |
 | 7. SVG, PNG, PDF export | Yes |
 | 8. TalkBack can describe and navigate | Partial — virtual nodes are tested by instrumentation, not with TalkBack itself |
-| 9. At least 100 compatibility fixtures pass | **Yes** — 127 |
+| 9. At least 100 compatibility fixtures pass | **Yes** — 128 |
 | 10. Core runtime has no Android dependency | Yes |
 | 11. Renders without WebView | Yes |
 | 12. Build and test loop runs from the terminal | Yes |
@@ -538,7 +538,7 @@ each example a deadline.
 
 ## Known failing fixtures
 
-None. One hundred and twenty-seven fixtures exist and all of them pass — and that sentence became worth
+None. One hundred and twenty-eight fixtures exist and all of them pass — and that sentence became worth
 something only once the gate could no longer skip itself, below.
 
 **The gate could report success without running.** `FixtureDifferentialTest` reads the fixtures and
@@ -1564,6 +1564,32 @@ which means a size legend's summary row is drawn at the size of the first thing 
 Worth having got from the source rather than from the name. A plain `take(limit)` would have looked
 right in a screenshot and been wrong by one entry and one row, and the fixture's reference reads
 `['alpha', 'beta', 'gamma', '…7 entries']` for a limit of four over ten values.
+
+## A legend over instants, and one report that was never a gap
+
+`formatType` on a legend is the only thing that can make its labels read as dates: a gradient
+legend's scale is a **colour ramp**, and a colour ramp knows nothing about time. There is nothing to
+infer it from, which is why the property exists and why ignoring it printed thirteen-digit
+millisecond counts where upstream printed "Jan 2024".
+
+The axis had solved this already, so the change was an extraction rather than an implementation:
+`GuideFormat` now holds the two pieces both guides need — the temporal labeller and
+`countWithMinStep` — and `tickMinStep` on a gradient legend came along with it for nothing.
+
+Two things the fixture's captions taught, which the labels alone would not have:
+
+- **A caption formats the same domain differently from the labels.** Upstream expands the
+  abbreviating directives before reading one out, so a ramp labelled `%b Y` is *described* as
+  "January 2024" while its labels say "Jan 2024". This engine already did that for a discrete domain
+  and not for a continuous one, so the legend captions read out raw milliseconds.
+- **A caption with no format at all carries its zone.** "Monday, 15 January 2024, 12:00:00 AM UTC" —
+  because a caption that reads out a whole timestamp should say which clock it is on. With an explicit
+  format it does not, and `GuideCaptionTest` compares all three legends in the fixture.
+
+And `clipHeight` was never a gap. It has been implemented since `dorling-cartogram`; it was simply
+missing from `LEGEND_CONSUMED`, so every legend using it was told it had been ignored. That is the
+fourth stale report of its kind, after `scaleX`/`scaleY` and the title's `font`, and all four came from
+the same thing: the consumed table is a **promise**, and until the schema diff nothing checked it.
 
 ## Performance observations
 

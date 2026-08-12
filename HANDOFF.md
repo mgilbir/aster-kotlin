@@ -9,7 +9,7 @@ Branch `milestone-0-bootstrap`. Working tree clean, both gates green:
 - `./scripts/check.sh` — format, all tests, lint, demo APK
 - `./scripts/oracle.sh` — regenerates upstream references and runs the differential comparison
 
-**127 differential fixtures pass, all matching upstream exactly.** That is the only number here
+**128 differential fixtures pass, all matching upstream exactly.** That is the only number here
 that means what it says.
 
 ## Read this before trusting the other number
@@ -254,7 +254,7 @@ not the one Vega documents**, because Vega only forwards the parameters a specif
 
 ## What is left: two examples, and neither can be verified
 
-**127 differential fixtures pass. 91 of the 93 examples compile clean.** Everything that can be
+**128 differential fixtures pass. 91 of the 93 examples compile clean.** Everything that can be
 checked against upstream has been.
 
 ### `projections` — upstream refuses it too
@@ -395,13 +395,9 @@ Anything left is either a gap or a stale diagnostic, and telling those two apart
 As of this handoff the subtraction leaves **nothing** for `encodeEntry`, `axis`, `projection` and
 `scale`, and this for the rest:
 
-- **Legend (5):** `clipHeight` (which *is* implemented — it is only missing from `LEGEND_CONSUMED`,
-  so it reports a gap that is not there; fix that first, it is one line), `gridAlign`, `titleAnchor`,
-  `tickMinStep` and `formatType`. The last two want the axis's `countWithMinStep` and its `labeller`
-  extracted somewhere both builders can reach — the arithmetic and the format-type routing are
-  already written, just not shared. `strokeDash`/`strokeWidth` appear in the schema diff and are
-  **not** gaps: on a legend those name *scales*, and the background's width and dash come from
-  `config.legend`.
+- **Legend (2):** `gridAlign` and `titleAnchor`. `strokeDash`/`strokeWidth` appear in the schema diff
+  and are **not** gaps: on a legend those name *scales*, and the background's width and dash come
+  from `config.legend`.
   `clipHeight` and the background (`fillColor`, `strokeColor`, `cornerRadius`, with the width and
   dash coming from `config.legend` alone) are *done* — do not re-report them.
 - **Axis (1):** `labelBound`, which needs the overlap remover to take a bounding rectangle.

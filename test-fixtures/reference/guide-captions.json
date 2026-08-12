@@ -965,6 +965,21 @@
   "caption": "Symbol legend for fill color with 5 values: aa, bb, cc, dd, ee"
  },
  {
+  "fixture": "legend-format-type",
+  "kind": "legend",
+  "caption": "Gradient legend titled 'as dates' for fill color with values from January 2024 to October 2024"
+ },
+ {
+  "fixture": "legend-format-type",
+  "kind": "legend",
+  "caption": "Gradient legend titled 'multi-format' for fill color with values from Monday, 15 January 2024, 12:00:00 AM UTC to Wednesday, 16 October 2024, 12:00:00 AM UTC"
+ },
+ {
+  "fixture": "legend-format-type",
+  "kind": "legend",
+  "caption": "Gradient legend titled 'thinned' for fill color with values from January to October"
+ },
+ {
   "fixture": "legend-style",
   "kind": "axis",
   "caption": "X-axis for a linear scale with values from 1.0 to 3.0"

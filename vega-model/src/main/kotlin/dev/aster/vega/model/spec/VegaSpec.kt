@@ -1040,6 +1040,15 @@ public data class LegendSpec(
    */
   val symbolLimit: NumberValue? = null,
   /**
+   * `formatType` — which grammar [format] is written in: `number`, `time` or `utc`.
+   *
+   * It decides the grammar *before* the scale gets a say, which is the only way a legend over
+   * instants reads as dates: its scale is a colour ramp and knows nothing about time.
+   */
+  val formatType: String? = null,
+  /** A floor on the gap between a gradient legend's labelled values; see the axis's own. */
+  val tickMinStep: NumberValue? = null,
+  /**
    * As on an axis: `aria: false` hides the legend from a screen reader, `description` renames it.
    */
   val aria: Boolean = true,

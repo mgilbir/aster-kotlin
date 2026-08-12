@@ -859,7 +859,13 @@ internal class LegendBuilder(
     // short
     // gradient does not end up with labels on top of each other.
     val count =
-      numbers.resolveInt(spec.tickCount, scaleName) ?: maxOf(2, 2 * floor(length / 100.0).toInt())
+      GuideFormat.countWithMinStep(
+        numbers.resolveInt(spec.tickCount, scaleName)
+          ?: maxOf(2, 2 * floor(length / 100.0).toInt()),
+        numbers.resolve(spec.tickMinStep, scaleName),
+        scale.domain,
+        linear = true,
+      )
     val values = scale.ticks(count)
     val format = numberLabeller(spec, scale.domain.first(), scale.domain.last(), count)
     val labels = format?.let { f -> values.map { f(it) } } ?: scale.tickLabels(count)
@@ -888,6 +894,11 @@ internal class LegendBuilder(
     high: Double,
     count: Int,
   ): ((Double) -> String)? {
+    // `formatType` decides the grammar before the scale or the specifier gets a say, which is how a
+    // legend over instants reads as dates: its scale is a colour ramp and knows nothing about time.
+    GuideFormat.timeLabeller(spec.format, spec.formatType)?.let {
+      return it
+    }
     val specifier = spec.format ?: return null
     val resolved = Ticks.spanSpecifier(specifier, low, high, count)
     return { value -> NumberFormatSubset.format(value, resolved) }
@@ -1087,7 +1098,7 @@ internal class LegendBuilder(
     // `array(item.text).join(' ')`. The lines reach here already joined by the newline the text
     // node draws on, and turning them back into spaces is the same operation.
     val title = titleTextOf(spec, scaleName)?.replace("\n", " ")
-    return GuideCaption.legend(kind, title, channels, scale, spec.format)
+    return GuideCaption.legend(kind, title, channels, scale, spec.format, spec.formatType)
   }
 
   private fun node(built: Built, x: Double, y: Double): SceneNode {

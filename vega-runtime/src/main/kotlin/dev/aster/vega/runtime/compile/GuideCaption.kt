@@ -88,13 +88,17 @@ internal object GuideCaption {
     scale: VegaScale?,
     /** The legend's own label format, so a reader hears the domain the way the entries read it. */
     format: String? = null,
+    /**
+     * And its `formatType`, without which a legend over instants reads its domain as milliseconds.
+     */
+    formatType: String? = null,
   ): String? {
     if (scale == null || channels.isEmpty()) return null
     return buildString {
       append("$kind legend".trim().replaceFirstChar { it.uppercase() })
       if (!title.isNullOrBlank()) append(" titled '$title'")
       append(" for ${channelNames(channels)}")
-      append(" with ${domain(scale, format)}")
+      append(" with ${domain(scale, format, formatType)}")
     }
   }
 
@@ -140,17 +144,44 @@ internal object GuideCaption {
       }
       is TransformedScale ->
         continuous(scale.domain.first(), scale.domain.last()) { v, _ ->
-          spelled(format, scale.domain)?.invoke(v) ?: scale.formatTick(v, CAPTION_TICK_COUNT)
+          spokenInstant(v, format, formatType)
+            ?: spelled(format, scale.domain)?.invoke(v)
+            ?: scale.formatTick(v, CAPTION_TICK_COUNT)
         }
       is SequentialColorScale ->
         continuous(scale.domain.first(), scale.domain.last()) { v, _ ->
-          spelled(format, scale.domain)?.invoke(v) ?: scale.formatTick(v, CAPTION_TICK_COUNT)
+          spokenInstant(v, format, formatType)
+            ?: spelled(format, scale.domain)?.invoke(v)
+            ?: scale.formatTick(v, CAPTION_TICK_COUNT)
         }
       is LinearScale ->
         continuous(scale.domain.first(), scale.domain.last()) { v, _ ->
-          spelled(format, scale.domain)?.invoke(v) ?: scale.formatTick(v, CAPTION_TICK_COUNT)
+          spokenInstant(v, format, formatType)
+            ?: spelled(format, scale.domain)?.invoke(v)
+            ?: scale.formatTick(v, CAPTION_TICK_COUNT)
         }
     }
+
+  /**
+   * One end of a continuous domain that a `formatType` says is an **instant**, spoken.
+   *
+   * Null when the type says nothing temporal, so the caller falls back to its scale's own
+   * formatter. The rules are the same ones [spoken] applies to a discrete value — the abbreviating
+   * directives are expanded, so a ramp labelled `%b` is described with "January" rather than "Jan"
+   * — with one addition: where no format was given at all the full date carries its zone, because a
+   * caption that reads out a whole timestamp should say which clock it is on.
+   */
+  private fun spokenInstant(value: Double, format: String?, formatType: String?): String? {
+    val zone =
+      when (formatType) {
+        "time" -> TimeZone.currentSystemDefault()
+        "utc" -> TimeZone.UTC
+        else -> return null
+      }
+    val pattern = format?.replace("%a", "%A")?.replace("%b", "%B")
+    val suffix = if (pattern == null && zone == TimeZone.UTC) " UTC" else ""
+    return TimeFormat.format(value, pattern ?: DATE_PATTERN, zone) + suffix
+  }
 
   /**
    * Reads a long domain as its first few and its last.

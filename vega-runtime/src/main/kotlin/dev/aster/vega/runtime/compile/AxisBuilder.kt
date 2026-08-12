@@ -10,7 +10,6 @@ import dev.aster.vega.model.spec.Anchor
 import dev.aster.vega.model.spec.AxisSpec
 import dev.aster.vega.model.spec.Orient
 import dev.aster.vega.model.spec.ScaleType
-import dev.aster.vega.model.time.TimeFormat
 import dev.aster.vega.runtime.scale.BandScale
 import dev.aster.vega.runtime.scale.LinearScale
 import dev.aster.vega.runtime.scale.PointScale
@@ -34,7 +33,6 @@ import dev.aster.vega.scene.TextNode
 import dev.aster.vega.scene.TextRun
 import dev.aster.vega.scene.Transform2D
 import dev.aster.vega.scene.transformedBounds
-import kotlinx.datetime.TimeZone
 
 /**
  * Generates axis scene nodes: ticks, labels, gridlines and the domain line.
@@ -834,22 +832,11 @@ public class AxisBuilder(
     // `vega-scale`'s `tickFormat`: a time type wins over every scale type, including the discrete
     // ones whose labels would otherwise be their own values. It is what a chart uses to label a
     // band of instants, since there is no temporal scale anywhere to infer it from.
-    val zone =
-      when (formatType) {
-        "time" -> TimeZone.currentSystemDefault()
-        "utc" -> TimeZone.UTC
-        else -> null
-      }
-    if (zone != null) {
+    // `formatType` decides the grammar and the shared formatter knows how; see [GuideFormat].
+    GuideFormat.timeLabeller(format, formatType)?.let { write ->
       return { value ->
         val instant = value.asDouble()
-        when {
-          instant.isNaN() -> value.asString()
-          // No specifier means upstream's *multi*-format, which picks its own granularity per
-          // value rather than formatting them all alike.
-          format == null -> TimeTicks.label(instant, zone)
-          else -> TimeFormat.format(instant, format, zone)
-        }
+        if (instant.isNaN()) value.asString() else write(instant)
       }
     }
     // An explicit specifier replaces the precision the scale would have chosen, and applies only
@@ -889,36 +876,6 @@ public class AxisBuilder(
     }
   }
 
-  /**
-   * `tickMinStep`: a floor on the gap between ticks, applied by *reducing the count*.
-   *
-   * Upstream's `tickCount` and every part of it matters. The count is first capped at what the
-   * domain can hold at that step — with `|| 1` guarding a step wider than the whole domain, which
-   * in JavaScript turns a zero into a one and so leaves two ticks rather than none. Then, because
-   * d3's step sizes grow monotonically as the count shrinks, the count is walked down one at a time
-   * until the step d3 would actually choose reaches the minimum. It is skipped for log and time
-   * scales, whose steps are not linear in the count at all.
-   */
-  private fun countWithMinStep(
-    count: Int,
-    spec: AxisSpec,
-    domain: List<Double>,
-    linear: Boolean,
-  ): Int {
-    val minStep = numbers.resolve(spec.tickMinStep, spec.scale) ?: return count
-    if (!minStep.isFinite() || minStep <= 0.0 || domain.size < 2) return count
-    val lo = minOf(domain.first(), domain.last())
-    val hi = maxOf(domain.first(), domain.last())
-    val span = ((hi - lo) / minStep).let { if (it.isFinite()) kotlin.math.floor(it) else 0.0 }
-    var reduced = minOf(count, (if (span == 0.0) 1.0 else span).toInt() + 1)
-    if (linear && lo < hi) {
-      while (reduced > 1 && Ticks.stepFrom(Ticks.tickIncrement(lo, hi, reduced)) < minStep) {
-        reduced--
-      }
-    }
-    return reduced
-  }
-
   private fun generatedTicks(scale: VegaScale, spec: AxisSpec, specifier: String?): List<Tick>? =
     when (scale) {
       // A discrete domain's values *are* its labels unless a format type says how to read them,
@@ -949,9 +906,9 @@ public class AxisBuilder(
       }
       is LinearScale -> {
         val count =
-          countWithMinStep(
+          GuideFormat.countWithMinStep(
             numbers.resolveInt(spec.tickCount, spec.scale) ?: AxisDefaults.DEFAULT_TICK_COUNT,
-            spec,
+            numbers.resolve(spec.tickMinStep, spec.scale),
             scale.domain,
             linear = true,
           )
@@ -970,9 +927,9 @@ public class AxisBuilder(
       }
       is TransformedScale -> {
         val count =
-          countWithMinStep(
+          GuideFormat.countWithMinStep(
             numbers.resolveInt(spec.tickCount, spec.scale) ?: AxisDefaults.DEFAULT_TICK_COUNT,
-            spec,
+            numbers.resolve(spec.tickMinStep, spec.scale),
             scale.domain,
             // A log or power scale's steps are not linear in the count, so upstream applies only
             // the
@@ -991,9 +948,9 @@ public class AxisBuilder(
       }
       is TimeScale -> {
         val count =
-          countWithMinStep(
+          GuideFormat.countWithMinStep(
             numbers.resolveInt(spec.tickCount, spec.scale) ?: AxisDefaults.DEFAULT_TICK_COUNT,
-            spec,
+            numbers.resolve(spec.tickMinStep, spec.scale),
             scale.domain,
             linear = false,
           )
