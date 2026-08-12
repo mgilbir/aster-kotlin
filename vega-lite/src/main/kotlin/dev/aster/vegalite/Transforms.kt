@@ -171,7 +171,10 @@ internal class Transforms(
           }
         )
 
-      transform.has("extent") ->
+      // `isExtent` excludes the two transforms that take an `extent` **parameter** rather than
+      // being one: a density and a regression both bound their sampling with it, and read as an
+      // extent transform they lost everything else they said.
+      transform.has("extent") && !transform.has("density") && !transform.has("regression") ->
         listOf(
           obj {
             put("type", "extent")

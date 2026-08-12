@@ -198,9 +198,13 @@ public object ImputeTransform : Transform {
             }
       }
 
-    val explicit = (params.fields["keyvals"] as? VegaValue.Arr)?.values
+    // `partition` seeds the key domain with `keyvals` and then **adds** every key the data
+    // carries: "these values will be automatically augmented with the key values observed in the
+    // input data". Reading `keyvals` as the whole domain instead dropped every observed key it did
+    // not name, so a series lost the rows it already had.
+    val explicit = (params.fields["keyvals"] as? VegaValue.Arr)?.values.orEmpty()
     val domain =
-      (explicit ?: input.map { it.field(key) })
+      (explicit + input.map { it.field(key) })
         .filterNot { it is VegaValue.Null }
         .distinctBy { it.asComparableKey() }
 

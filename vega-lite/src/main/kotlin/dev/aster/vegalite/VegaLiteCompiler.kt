@@ -1113,6 +1113,7 @@ private class Compilation(
     scaleOf: MutableMap<String, String> = mutableMapOf(),
   ): LinkedHashMap<String, VegaValue> {
     val legends = LinkedHashMap<String, LinkedHashMap<String, VegaValue>>()
+    val explicitlyTitled = mutableSetOf<String>()
     for (view in views) {
       for (channel in Channels.LEGEND_CHANNELS) {
         val def = view.spec.encoding[channel] ?: continue
@@ -1128,11 +1129,29 @@ private class Compilation(
         val prefix = component.name().removeSuffix(channel)
         val discrete = if (Scales.hasDiscreteDomain(component.type)) "d" else "c"
         val key = "$prefix|${def.field ?: channel}|$discrete"
+        // `mergeValuesWithExplicit` settles a property before any tie-breaker runs: a value the
+        // specification stated beats one this compiler derived. A field encoded as both a colour
+        // and a size, with a title written on only one of them, is titled by the one that was
+        // written — not by the two joined with a comma.
+        val titled = def.legend?.fields?.containsKey("title") == true || def.explicitTitle != null
         val existing = legends[key]
         if (existing == null) {
           legends[key] = LinkedHashMap(built.fields)
           scaleOf[key] = component.name()
-        } else merge(existing, built)
+          if (titled) explicitlyTitled += key
+        } else {
+          merge(
+            existing,
+            built,
+            titleWins =
+              when {
+                titled && key !in explicitlyTitled -> true
+                !titled && key in explicitlyTitled -> false
+                else -> null
+              },
+          )
+          if (titled) explicitlyTitled += key
+        }
       }
     }
     val out = LinkedHashMap<String, VegaValue>()
@@ -1176,7 +1195,16 @@ private class Compilation(
    * exceptions upstream names — a circle wins over any other glyph, being the plainer symbol, and
    * two different titles are joined rather than one being dropped.
    */
-  private fun merge(into: LinkedHashMap<String, VegaValue>, from: VegaValue.Obj) {
+  private fun merge(
+    into: LinkedHashMap<String, VegaValue>,
+    from: VegaValue.Obj,
+    /**
+     * Which of the two titles the specification stated, or null where neither or both did.
+     *
+     * True takes the incoming one, false keeps the standing one, and null joins them.
+     */
+    titleWins: Boolean? = null,
+  ) {
     for ((key, value) in from.fields) {
       val existing = into[key]
       if (existing == null) {
@@ -1186,10 +1214,15 @@ private class Compilation(
       if (existing == value) continue
       when (key) {
         "symbolType" -> if ((value as? VegaValue.Str)?.value == "circle") into[key] = value
-        "title" -> {
-          val titles = (existing.strings() + value.strings()).distinct()
-          into[key] = if (titles.size == 1) existing else str(titles.joinToString(", "))
-        }
+        "title" ->
+          when (titleWins) {
+            true -> into[key] = value
+            false -> Unit
+            null -> {
+              val titles = (existing.strings() + value.strings()).distinct()
+              into[key] = if (titles.size == 1) existing else str(titles.joinToString(", "))
+            }
+          }
       }
     }
   }

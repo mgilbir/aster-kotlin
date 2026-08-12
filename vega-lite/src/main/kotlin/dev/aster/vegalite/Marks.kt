@@ -535,8 +535,13 @@ internal object Marks {
       if (def.isFieldDef) return signalRef(fieldExpression(view, def, separator = "\\n"))
       return null
     }
-    // `{"type": "bar", "tooltip": true}` asks for the whole encoding.
-    val asked = view.markDef.raw.fields["tooltip"] ?: return null
+    // `{"type": "bar", "tooltip": true}` asks for the whole encoding — and so does
+    // `config.mark.tooltip`, which is `getMarkPropOrConfig` rather than a look at the mark alone:
+    // a theme that turns tooltips on turns them on for every mark in the chart.
+    val asked =
+      view.markDef.raw.fields["tooltip"]
+        ?: view.config.markConfig(view.spec.mark).fields["tooltip"]
+        ?: return null
     if (asked == VegaValue.Bool(true)) return tooltipObject(view, null)
     if (asked is VegaValue.Obj && asked.string("content") == "encoding") {
       return tooltipObject(view, null)

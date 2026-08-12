@@ -369,7 +369,29 @@ internal object Scales {
           arr(num(0), signalRef(view.sizeSignal(channel)))
         }
       }
-      "size" -> arr(num(sizeRangeMin(view)), num(sizeRangeMax(view)))
+      "size" -> {
+        val minimum = num(sizeRangeMin(view))
+        val maximum = sizeRangeMax(view)
+        // `interpolateRange`: a scale that maps a *continuum* onto buckets needs one size per
+        // bucket, not two ends to interpolate between — Vega has no way to interpolate a
+        // discretizing range itself, so upstream writes the sequence out as an expression.
+        if (type in setOf("quantile", "quantize", "threshold")) {
+          val count =
+            when (type) {
+              "quantile" -> config.scaleConfig("quantileCount") ?: 4.0
+              "quantize" -> config.scaleConfig("quantizeCount") ?: 4.0
+              else -> ((def.scale?.array("domain")?.size ?: 2) + 1).toDouble()
+            }
+          val low = Fields.expressionNumber(sizeRangeMin(view))
+          val high =
+            (maximum as? VegaValue.Num)?.let { Fields.expressionNumber(it.value) }
+              ?: "(" + (maximum as VegaValue.Obj).string("signal") + ")"
+          val step = "($high - $low) / (${Fields.expressionNumber(count)} - 1)"
+          signalRef("sequence($low, $high + $step, $step)")
+        } else {
+          arr(minimum, maximum)
+        }
+      }
       "opacity",
       "fillOpacity",
       "strokeOpacity" ->
@@ -426,17 +448,57 @@ internal object Scales {
    * The largest, which is bounded by the step so that neighbouring marks do not collide: a point's
    * size is an *area*, so the step is squared after being scaled down by a twentieth.
    */
-  private fun sizeRangeMax(view: UnitView): Double {
+  /**
+   * `sizeRangeMax`: the largest a mark may be drawn, which is a *step* and not a constant.
+   *
+   * The step is the plot's own — one band's worth — unless a position is **binned**, where a bin's
+   * width is not known until the bin transform has chosen its boundaries. Then the step is an
+   * expression reading the signal the bin published, and everything computed from it is an
+   * expression too: a chart's largest circle cannot be settled at compile time.
+   */
+  private fun sizeRangeMax(view: UnitView): VegaValue {
     val config = view.config
-    val step = minOf(stepFor(view, "width"), stepFor(view, "height"))
+    val binSteps = listOf("x", "y").map { binStepExpression(view, it) }
+    val step =
+      if (binSteps.any { it != null }) {
+        val parts =
+          listOf("width", "height").mapIndexed { index, size ->
+            binSteps[index] ?: Fields.expressionNumber(stepFor(view, size))
+          }
+        "min(${parts.joinToString(", ")})"
+      } else {
+        null
+      }
+    val number = minOf(stepFor(view, "width"), stepFor(view, "height"))
     return when (view.spec.mark) {
       "bar",
-      "tick" -> step - 1
+      "tick" -> if (step == null) num(number - 1) else signalRef("$step - 1")
       "line",
       "trail",
-      "rule" -> config.scaleConfig("maxStrokeWidth")!!
-      "text" -> config.scaleConfig("maxFontSize")!!
-      else -> (MAX_SIZE_RANGE_STEP_RATIO * step) * (MAX_SIZE_RANGE_STEP_RATIO * step)
+      "rule" -> num(config.scaleConfig("maxStrokeWidth")!!)
+      "text" -> num(config.scaleConfig("maxFontSize")!!)
+      else ->
+        if (step == null)
+          num((MAX_SIZE_RANGE_STEP_RATIO * number) * (MAX_SIZE_RANGE_STEP_RATIO * number))
+        else signalRef("pow(${Fields.expressionNumber(MAX_SIZE_RANGE_STEP_RATIO)} * $step, 2)")
+    }
+  }
+
+  /** `getBinStepSignal`: how wide one bin is, in units of the plot, once Vega has binned. */
+  private fun binStepExpression(view: UnitView, channel: String): String? {
+    val def = view.spec.fieldDef(channel) ?: return null
+    val size = view.sizeSignal(channel)
+    return when (val bin = def.bin) {
+      is Binning.Bin -> {
+        val signal = binSignal(view, def)
+        "$size / (($signal.stop - $signal.start) / $signal.step)"
+      }
+      Binning.PreBinned -> {
+        val step = def.raw.obj("bin")?.number("step") ?: return null
+        val scale = view.scale(channel)
+        "$size / ((domain(\"$scale\")[1] - domain(\"$scale\")[0]) / ${Fields.expressionNumber(step)})"
+      }
+      else -> null
     }
   }
 

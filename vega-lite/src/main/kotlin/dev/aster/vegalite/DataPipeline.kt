@@ -245,22 +245,28 @@ internal class DataPipeline(
     val key = if (x.impute != null) y else x
     val params = imputed.impute ?: return null
     val method = params.string("method")
-    if (params.fields["keyvals"] is VegaValue.Obj) {
-      diagnostics.error(
-        VegaLiteDiagnostics.UNSUPPORTED_ENCODING_PROPERTY,
-        "An `impute.keyvals` written as a sequence is not implemented; write the keys out as a " +
-          "list, or the gaps stay where they are.",
-        jsonPath = "$.encoding.${imputed.channel}.impute.keyvals",
-      )
-      return null
-    }
+    // `processSequence`: a `keyvals` written as `{start, stop, step}` is a *generated* list, which
+    // Vega has an expression for and no transform property — so it becomes a signal computing it.
+    val keyvals =
+      when (val stated = params.fields["keyvals"]) {
+        is VegaValue.Obj -> {
+          val parts =
+            listOfNotNull(
+              Fields.expressionNumber(stated.number("start") ?: 0.0),
+              stated.number("stop")?.let { Fields.expressionNumber(it) },
+              stated.number("step")?.let { Fields.expressionNumber(it) },
+            )
+          signalRef("sequence(${parts.joinToString(",")})")
+        }
+        else -> stated
+      }
     return ImputeNode(
       field = imputed.field ?: return null,
       key = key.field ?: return null,
       method = method,
       value = params.fields["value"],
       groupby = Marks.pathGroupingFields(view),
-      keyvals = params.fields["keyvals"],
+      keyvals = keyvals,
       frame = params.fields["frame"],
     )
   }

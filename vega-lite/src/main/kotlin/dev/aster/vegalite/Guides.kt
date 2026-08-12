@@ -159,7 +159,16 @@ internal object Guides {
     // an **explicit** title short-circuits the merge (`getFieldDefTitle`), which is how a summary
     // of `v` is titled `v` rather than `lower_v, upper_v`.
     val secondary = secondaryChannel(channel)?.let { view.spec.fieldDef(it) }
-    val stated = listOfNotNull(def.explicitTitle, secondary?.explicitTitle)
+    // The **guide's** own title is asked for first — `axis.title !== undefined` opens the rule —
+    // and it settles the question outright. A ranged position joins its two fields' names only
+    // where nothing has said what the axis is measuring, so an axis captioned `Temperature (F)`
+    // stays that and does not gain `, record.high, normal.high` from the layers under it.
+    val stated =
+      listOfNotNull(
+        def.axis?.fields?.get("title") ?: def.legend?.fields?.get("title"),
+        def.explicitTitle,
+        secondary?.explicitTitle,
+      )
     if (stated.isNotEmpty()) {
       axis.explicitTitle = true
       stated.mapNotNull { (it as? VegaValue.Str)?.value }.forEach { axis.titles += it }
@@ -177,9 +186,10 @@ internal object Guides {
         ?: if (channel == "x" && def.type?.isDiscrete == true && def.timeUnit == null) 270.0
         else null
     if (labelAngle != null) {
+      val side = user?.string("orient") ?: if (channel == "x") "bottom" else "left"
       axis.set("labelAngle", num(labelAngle))
-      labelAlign(labelAngle, channel)?.let { axis.set("labelAlign", str(it)) }
-      labelBaseline(labelAngle, channel)?.let { axis.set("labelBaseline", str(it)) }
+      labelAlign(labelAngle, channel, side)?.let { axis.set("labelAlign", str(it)) }
+      labelBaseline(labelAngle, channel, side)?.let { axis.set("labelBaseline", str(it)) }
     }
 
     if (
@@ -284,19 +294,29 @@ internal object Guides {
    * — the bottom for `x`, the left for `y` — which is the only case this compiler emits. A label
    * turned to 270° on the bottom axis reads upwards, so its *right* end is the one at the tick.
    */
-  private fun labelAlign(angle: Double, channel: String): String? {
+  /**
+   * Which way a turned label runs, which depends on the side the axis is on.
+   *
+   * `defaultLabelAlign` compares the angle against the axis's **main** orientation — the bottom for
+   * x, the left for y — and flips the answer when the axis has been moved to the other side. A
+   * label hanging off the top of a chart reads the other way round from the same label underneath
+   * it, so ignoring the side anchored every moved axis's labels at the wrong end.
+   */
+  private fun labelAlign(angle: Double, channel: String, orient: String): String? {
     val startAngle = if (channel == "x") 0.0 else 90.0
+    val main = if (channel == "x") "bottom" else "left"
     if ((angle + startAngle) % 180.0 == 0.0) return if (channel == "x") null else "center"
-    return if (startAngle < angle && angle < 180 + startAngle) "left" else "right"
+    val forward = startAngle < angle && angle < 180 + startAngle
+    return if (forward == (orient == main)) "left" else "right"
   }
 
-  private fun labelBaseline(angle: Double, channel: String): String? {
+  private fun labelBaseline(angle: Double, channel: String, orient: String): String? {
     if (channel == "x") {
       if ((45 < angle && angle < 135) || (225 < angle && angle < 315)) return "middle"
-      return if (angle <= 45 || 315 <= angle) "top" else "bottom"
+      return if ((angle <= 45 || 315 <= angle) == (orient == "top")) "bottom" else "top"
     }
     if (angle <= 45 || 315 <= angle || (135 <= angle && angle <= 225)) return null
-    return if (45 <= angle && angle <= 135) "top" else "bottom"
+    return if ((45 <= angle && angle <= 135) == (orient == "left")) "top" else "bottom"
   }
 
   /**

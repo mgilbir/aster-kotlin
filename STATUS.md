@@ -1389,6 +1389,43 @@ readings, and this compiler had a third: it wrote the empty string into both.
 `config.mark.tooltip` was also being stripped as a Vega-Lite-only property. It is not one — upstream's
 `VL_ONLY_MARK_CONFIG_INDEX` lists eight keys and that is not among them.
 
+### An explicit value settles a merge before any tie-breaker runs
+
+`mergeValuesWithExplicit` in `compile/split.ts` is three lines and this compiler had none of them:
+a value the *specification* stated beats one derived from a field, and only when both sides are
+derived — or both stated — does the tie-breaker join them. One field encoded as both a colour and a
+size, with a title written on one of them, is titled by the one that was written; this compiler
+joined the two with a comma. The same rule reaches an axis, where the **guide's** own title opens
+`title` in `axis/properties.ts` and settles it outright, so an axis captioned `Temperature (F)`
+stays that rather than gaining `, record.high, normal.high` from the layers under it.
+
+### The largest a mark may be drawn is not a constant
+
+`sizeRangeMax` reads a *step*, and a step is not known at compile time when the position is
+**binned**: the bin transform chooses its own boundaries. Upstream writes the expression instead —
+`pow(0.95 * min(width / ((bins.stop - bins.start) / bins.step), …), 2)` — and this compiler was
+writing the configured step, so a binned scatter's circles were sized against a band that was not
+there. Beside it `interpolateRange`, for a scale that maps a continuum onto *buckets*: Vega cannot
+interpolate a discretizing range itself, so the sequence is written out as an expression.
+
+### Two transforms that take an `extent` are not extent transforms
+
+`isExtent` excludes `density` and `regression` by name, and reading `extent` first turned a whole
+kernel-density transform into an extent one — losing its field, its grouping, its output columns and
+its resolve. `config.mark.tooltip` was also being ignored: `getMarkPropOrConfig` reads the mark
+*and* the configuration, so a theme that turns tooltips on turns them on for every mark.
+
+`impute.keyvals` written as a sequence is now generated rather than refused — `processSequence`
+turns `{start, stop, step}` into a `sequence(...)` signal — and the fixture found a runtime defect
+behind it: **`keyvals` was replacing the key domain instead of augmenting it.** Vega's own
+documentation is explicit that "these values will be automatically augmented with the key values
+observed in the input data", and reading it the other way dropped every observed key the list did
+not name, so a series lost rows it already had.
+
+A label's alignment also follows the side its axis is on — `defaultLabelAlign` compares the angle
+against the axis's *main* orientation and flips when the axis has been moved — so a turned label
+hanging off the top of a chart no longer anchors at the wrong end.
+
 ### Two runtime gaps this batch names but does not close
 
 `density`'s fixture is not in the corpus, and `trail`'s draws no legend. Both compile exactly as
