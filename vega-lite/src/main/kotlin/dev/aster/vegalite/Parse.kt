@@ -424,7 +424,6 @@ internal class Parse(private val config: Config, private val diagnostics: Diagno
         "yError",
         "angle",
         "url",
-        "href",
         "time",
       )
   }

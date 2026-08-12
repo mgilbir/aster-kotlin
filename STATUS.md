@@ -1632,6 +1632,22 @@ the far angle is the near one plus the extent, written as an `offset` on the sam
 **datum** contributes that constant to the domain — an area drawn down to zero has to cover zero
 whether or not any row holds it.
 
+### The `utc` in a time unit's name sits wherever it likes
+
+`normalizeTimeUnit` reads it out of the whole name, so `binnedutcyearmonth` is universal time as
+much as `utcmonth` is — and reading only the prefix left a universally bucketed column on a *local*
+scale, stepped its far edge with `timeOffset` rather than `utcOffset`, and spoke it with
+`timeFormat`. `utcOffset` is now an expression function too; it had never been asked for.
+
+### `href`, and the pointer that goes with it
+
+The `href` channel is no longer refused: it is a link the mark carries, written the way a text
+channel is. And a mark that links somewhere shows the **pointer** — `baseEncodeEntry` sets the
+cursor from the encoding, not from a style, since nothing else about a linked point looks clickable.
+
+A binned field on a discrete scale is also *spoken* as the plain column it came from: there is no
+numeric axis left, so upstream reads it as a category rather than as the range its label spells out.
+
 ### Two runtime gaps this batch names but does not close
 
 `density`'s fixture is not in the corpus, and `trail`'s draws no legend. Both compile exactly as
@@ -1650,6 +1666,9 @@ by *this runtime*:
   false. A condition testing a column the aggregate removed came out true for every row, so a chart
   whose grey was meant for the exceptions was grey throughout. The distinction needs a value the
   model does not have.
+- **A universally bucketed column's far edge lands elsewhere.** `binnedutcyearmonth` compiles
+  exactly as upstream compiles it and the bars come out a different width, so the two engines
+  disagree about what `utcOffset('month', …)` steps from. Covered by the sweep, not by a fixture.
 - **A facet's footer band reserves no height**, so a chart captioned below its cells comes out
   short by the caption. `facet-footer` is the one fixture in `GRID_LAYOUT_PENDING`.
 - **A quantile legend labels its buckets with a representative value** rather than the range they

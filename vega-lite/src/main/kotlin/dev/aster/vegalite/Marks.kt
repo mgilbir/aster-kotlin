@@ -347,6 +347,9 @@ internal object Marks {
     putAll(nonPosition(view, "strokeWidth", "strokeWidth"))
     putAll(nonPosition(view, "strokeDash", "strokeDash"))
     tooltipChannel(view)?.let { put("tooltip", it) }
+    // `href` is a link the mark carries, written the way a text channel is — and a mark that links
+    // somewhere says so with the pointer, since nothing else about it looks clickable.
+    hrefChannel(view)?.let { put("href", it) }
     putAll(aria(view))
   }
 
@@ -357,6 +360,11 @@ internal object Marks {
    * everywhere else it has already done its work in choosing the position rules.
    */
   private fun markDefProperties(view: UnitView): VegaValue.Obj = obj {
+    // A mark that links somewhere shows the pointer, there being nothing else about it that looks
+    // clickable — `baseEncodeEntry`'s `cursor` rule, which is about the *encoding* and not a style.
+    if (view.spec.encoding["href"] != null && view.markDef.raw.fields["cursor"] == null) {
+      put("cursor", obj { put("value", "pointer") })
+    }
     if (view.spec.mark == "area" && view.markDef.orient != null) {
       put("orient", obj { put("value", view.markDef.orient) })
     }
@@ -767,9 +775,19 @@ internal object Marks {
       // buckets
       // as much as one typed temporal. A month named on an ordinal scale is still a month, and
       // upstream speaks it as a date; reading only the type printed the bucket's raw number.
+      // A binned field the specification forced onto a **discrete** scale is spoken as the plain
+      // column it came from: there is no numeric axis left, so upstream reads it as a category
+      // rather than as the range its label spells out.
+      def.bin is Binning.Bin &&
+        (def.type == MeasureType.ORDINAL || def.type == MeasureType.NOMINAL) -> {
+        val plain = "datum[${quoted(def.field.orEmpty())}]"
+        "isValid($plain) ? isArray($plain) ? join($plain, '$separator') : $plain : \"\"+$plain"
+      }
       def.type == MeasureType.TEMPORAL || def.timeUnit != null -> {
         val timeUnit = def.timeUnit
-        val utc = timeUnit?.startsWith("utc") == true || def.scale.string("type") == "utc"
+        // `normalizeTimeUnit` reads the `utc` out of the unit's name wherever it sits, so
+        // `binnedutcyearmonth` is universal time as much as `utcmonth` is.
+        val utc = timeUnit?.contains("utc") == true || def.scale.string("type") == "utc"
         val prefix = if (utc) "utc" else "time"
         when {
           // `timeFormatExpression`: a stated format wins over the unit, because the reader asked
@@ -835,6 +853,14 @@ internal object Marks {
   private fun shouldBreakPath(view: UnitView): Boolean =
     view.invalidDataMode == "break-paths-filter-domains" ||
       view.invalidDataMode == "break-paths-show-domains"
+
+  /** `href`: where a mark links to, read as text and never joined. */
+  private fun hrefChannel(view: UnitView): VegaValue? {
+    val def = view.spec.encoding["href"] ?: return null
+    if (def.isValueDef) return obj { literalRef(def.value)?.let { (key, it) -> put(key, it) } }
+    if (!def.isFieldDef) return null
+    return signalRef(fieldExpression(view, def, arrays = false))
+  }
 
   private fun textChannel(view: UnitView): VegaValue? {
     val def = view.spec.encoding["text"] ?: return null

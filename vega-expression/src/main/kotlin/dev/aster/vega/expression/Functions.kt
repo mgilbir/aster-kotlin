@@ -475,6 +475,16 @@ public object Functions {
       VegaValue.Num(stepper.offset(at, floor(by).toInt()))
     }
 
+    /** The same, stepped in **universal** time: `utcOffset('hours', t, 1)` adds a UTC hour. */
+    map["utcOffset"] = ExpressionFunction { args ->
+      val stepper =
+        stepperFor(args.string(0), TimeZone.UTC) ?: return@ExpressionFunction VegaValue.Null
+      val at = JsSemantics.toNumber(args.at(1))
+      if (!at.isFinite()) return@ExpressionFunction VegaValue.Null
+      val by = args.numberOr(2, 1.0).takeIf { it.isFinite() } ?: 1.0
+      VegaValue.Num(stepper.offset(at, floor(by).toInt()))
+    }
+
     /**
      * `timeSequence(unit, start, stop[, step])` — every boundary in a span, `stop` exclusive.
      *

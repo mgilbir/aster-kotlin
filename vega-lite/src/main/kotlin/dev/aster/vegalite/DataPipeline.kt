@@ -215,9 +215,12 @@ internal class DataPipeline(
           def.timeUnit?.takeIf { Fields.isBinnedTimeUnit(it) } ?: return@mapNotNull null
         val field = def.field ?: return@mapNotNull null
         val part = Fields.timeUnitParts(timeUnit).lastOrNull() ?: return@mapNotNull null
+        // A **universal** bucket is stepped in universal time: `utcOffset`, not `timeOffset`, or
+        // the far edge lands an hour out wherever the viewer keeps daylight saving.
+        val offset = if (timeUnit.contains("utc")) "utcOffset" else "timeOffset"
         obj {
           put("type", "formula")
-          put("expr", "timeOffset('$part', datum['$field'], 1)")
+          put("expr", "$offset('$part', datum['$field'], 1)")
           put("as", "${field}_end")
         }
       }

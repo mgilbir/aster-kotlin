@@ -103,7 +103,9 @@ internal object Scales {
       MeasureType.TEMPORAL ->
         when {
           channel in DISCRETE_RANGE_CHANNELS -> "ordinal"
-          def.timeUnit?.startsWith("utc") == true -> "utc"
+          // The `utc` sits anywhere in the unit's name — `utcmonth`, `binnedutcyearmonth` — so
+          // reading only the prefix left a universally bucketed column on a local scale.
+          def.timeUnit?.contains("utc") == true -> "utc"
           else -> "time"
         }
       MeasureType.QUANTITATIVE ->
