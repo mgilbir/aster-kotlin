@@ -81,6 +81,7 @@ private val EVENT_STREAM_CONSUMED =
 
 private val AXIS_CONSUMED =
   setOf(
+    "tickMinStep",
     "labelOffset",
     "aria",
     "description",
@@ -164,7 +165,6 @@ private val AXIS_UNSUPPORTED =
   mapOf(
     "labelBound" to "Bounding axis labels to the plotting area is not implemented",
     "labelFlushOffset" to "Axis label flush offsets are not implemented; they need labelFlush",
-    "tickMinStep" to "A minimum tick step is not implemented; the scale's own tick count is used",
   )
 
 /** Scale properties this engine reads. */
@@ -1523,6 +1523,7 @@ public class SpecParser {
         if (band != null) band == "extent" else obj.fields["tickExtra"]?.asBoolean() ?: false,
       tickBand = band,
       labelOffset = obj.numberOrSignal("labelOffset", "$path.labelOffset"),
+      tickMinStep = obj.numberOrSignal("tickMinStep", "$path.tickMinStep"),
       aria = obj.fields["aria"]?.asBoolean() ?: true,
       description = obj.fields["description"]?.asString()?.takeIf { it.isNotBlank() },
       position = obj.numberOrSignal("position", "$path.position"),

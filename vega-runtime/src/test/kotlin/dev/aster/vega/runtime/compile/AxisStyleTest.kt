@@ -136,11 +136,13 @@ class AxisStyleTest {
 
   @Test
   fun `every unhonoured axis property is reported by name`() {
-    // Two left. Everything else came off this list in turn — the line caps and dash offsets, then
-    // `tickRound`, `tickBand`, `position`, `translate` and `labelOffset`, and finally `aria` and
-    // `description`. `Stroke` had carried the caps and offsets since it was written and no guide
-    // passed either; each of the rest had the machinery to honour it one call away.
-    val unhonoured = listOf("\"labelBound\": true", "\"tickMinStep\": 5")
+    // One left: `labelBound`, which needs the overlap remover to take a bounding rectangle.
+    // Everything else came off this list in turn — the line caps and dash offsets, then
+    // `tickRound`,
+    // `tickBand`, `position`, `translate`, `labelOffset`, `aria`, `description` and `tickMinStep`.
+    // `Stroke` had carried the caps and offsets since it was written and no guide passed either;
+    // each of the rest had the machinery to honour it one call away.
+    val unhonoured = listOf("\"labelBound\": true")
     for (property in unhonoured) {
       val name = property.substringAfter('"').substringBefore('"')
       val diagnostics = compile("""{"orient": "bottom", "scale": "x", $property}""").diagnostics

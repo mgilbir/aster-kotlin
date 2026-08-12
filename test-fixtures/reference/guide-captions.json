@@ -115,6 +115,26 @@
   "caption": "Y-axis titled 'Value' for a linear scale with values from 0 to 100"
  },
  {
+  "fixture": "axis-tick-min-step",
+  "kind": "axis",
+  "caption": "Y-axis titled 'twelve, no floor' for a linear scale with values from 0 to 97"
+ },
+ {
+  "fixture": "axis-tick-min-step",
+  "kind": "axis",
+  "caption": "Y-axis titled 'twelve, floor 20' for a linear scale with values from 0 to 97"
+ },
+ {
+  "fixture": "axis-tick-min-step",
+  "kind": "axis",
+  "caption": "X-axis titled 'a floor wider than the domain' for a linear scale with values from 0 to 97"
+ },
+ {
+  "fixture": "axis-tick-min-step",
+  "kind": "axis",
+  "caption": "X-axis titled 'a log scale, capped but not walked down' for a log scale with values from 1 to 1,000"
+ },
+ {
   "fixture": "axis-values",
   "kind": "axis",
   "caption": "X-axis for a discrete scale with 5 values: alpha, bravo, charlie, delta, echo"

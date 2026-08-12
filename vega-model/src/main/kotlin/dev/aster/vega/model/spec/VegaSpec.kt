@@ -664,6 +664,13 @@ public data class AxisSpec(
    */
   val labelOffset: NumberValue? = null,
   /**
+   * A floor on the gap between ticks, `tickMinStep`.
+   *
+   * Applied by reducing the tick *count* until the step d3 would choose reaches it — there is no
+   * way to ask d3 for a step directly, and asking for fewer ticks is how upstream does it too.
+   */
+  val tickMinStep: NumberValue? = null,
+  /**
    * `aria: false` hides the whole guide from a screen reader, and `description` replaces the
    * caption this engine would otherwise generate for it.
    *

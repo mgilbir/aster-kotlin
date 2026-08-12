@@ -21,7 +21,7 @@ end to end — expressions, signals, 33 of upstream's 40 data transforms, every 
 and an event handler that recompiles the chart — and are verified against upstream Vega by
 differential tests.
 
-One hundred and twenty-five differential fixtures pass, all matching upstream exactly on every mark and
+One hundred and twenty-six differential fixtures pass, all matching upstream exactly on every mark and
 scale output:
 
 | Fixture | Marks | Covers |
@@ -201,7 +201,7 @@ substantive compatibility items:
 | 6. View and Compose APIs | Yes |
 | 7. SVG, PNG, PDF export | Yes |
 | 8. TalkBack can describe and navigate | Partial — virtual nodes are tested by instrumentation, not with TalkBack itself |
-| 9. At least 100 compatibility fixtures pass | **Yes** — 125 |
+| 9. At least 100 compatibility fixtures pass | **Yes** — 126 |
 | 10. Core runtime has no Android dependency | Yes |
 | 11. Renders without WebView | Yes |
 | 12. Build and test loop runs from the terminal | Yes |
@@ -538,7 +538,7 @@ each example a deadline.
 
 ## Known failing fixtures
 
-None. One hundred and twenty-five fixtures exist and all of them pass — and that sentence became worth
+None. One hundred and twenty-six fixtures exist and all of them pass — and that sentence became worth
 something only once the gate could no longer skip itself, below.
 
 **The gate could report success without running.** `FixtureDifferentialTest` reads the fixtures and
@@ -1532,6 +1532,27 @@ scale, and a description that is only whitespace is not a description.
 That leaves **two** axis properties reported out of upstream's 79: `labelBound`, which needs the
 overlap remover to take a bounding rectangle, and `tickMinStep`, which needs the tick generator to
 take a floor on its step.
+
+## `tickMinStep`, which is a floor implemented as a ceiling
+
+Asking for a minimum gap between ticks sounds like it should set a step. It cannot: d3 chooses the
+step, and the only lever is the tick *count*. Upstream's `tickCount` therefore walks the count
+**down** until the step d3 would pick reaches the floor, and every part of that is load-bearing:
+
+- the count is first capped at `floor((hi - lo) / minStep || 1) + 1`. The `|| 1` is JavaScript
+  turning a zero into a one, so a floor wider than the whole domain leaves **two** ticks rather than
+  none — which is what the fixture's `tickMinStep: 200` over a `[0, 97]` domain draws;
+- then, because d3's step sizes grow monotonically as the count shrinks, the count is decremented one
+  at a time until `tickStep(lo, hi, count)` reaches the minimum. A closed form would need d3's
+  `e10`/`e5`/`e2` rounding inverted, which is why upstream loops and so does this;
+- and the walk-down is **skipped** for log and time scales, whose steps are not linear in the count at
+  all. Only the cap applies there.
+
+The fixture asks four axes for twelve ticks over the same domain with four different floors, and gets
+ten labels, five, two and a log axis's own progression — the same four sets upstream draws.
+
+One axis property is now reported out of upstream's 79: `labelBound`, which needs the overlap remover
+to take a bounding rectangle.
 
 ## Performance observations
 

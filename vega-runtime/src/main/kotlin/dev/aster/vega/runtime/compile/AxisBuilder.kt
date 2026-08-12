@@ -889,6 +889,36 @@ public class AxisBuilder(
     }
   }
 
+  /**
+   * `tickMinStep`: a floor on the gap between ticks, applied by *reducing the count*.
+   *
+   * Upstream's `tickCount` and every part of it matters. The count is first capped at what the
+   * domain can hold at that step — with `|| 1` guarding a step wider than the whole domain, which
+   * in JavaScript turns a zero into a one and so leaves two ticks rather than none. Then, because
+   * d3's step sizes grow monotonically as the count shrinks, the count is walked down one at a time
+   * until the step d3 would actually choose reaches the minimum. It is skipped for log and time
+   * scales, whose steps are not linear in the count at all.
+   */
+  private fun countWithMinStep(
+    count: Int,
+    spec: AxisSpec,
+    domain: List<Double>,
+    linear: Boolean,
+  ): Int {
+    val minStep = numbers.resolve(spec.tickMinStep, spec.scale) ?: return count
+    if (!minStep.isFinite() || minStep <= 0.0 || domain.size < 2) return count
+    val lo = minOf(domain.first(), domain.last())
+    val hi = maxOf(domain.first(), domain.last())
+    val span = ((hi - lo) / minStep).let { if (it.isFinite()) kotlin.math.floor(it) else 0.0 }
+    var reduced = minOf(count, (if (span == 0.0) 1.0 else span).toInt() + 1)
+    if (linear && lo < hi) {
+      while (reduced > 1 && Ticks.stepFrom(Ticks.tickIncrement(lo, hi, reduced)) < minStep) {
+        reduced--
+      }
+    }
+    return reduced
+  }
+
   private fun generatedTicks(scale: VegaScale, spec: AxisSpec, specifier: String?): List<Tick>? =
     when (scale) {
       // A discrete domain's values *are* its labels unless a format type says how to read them,
@@ -919,7 +949,12 @@ public class AxisBuilder(
       }
       is LinearScale -> {
         val count =
-          numbers.resolveInt(spec.tickCount, spec.scale) ?: AxisDefaults.DEFAULT_TICK_COUNT
+          countWithMinStep(
+            numbers.resolveInt(spec.tickCount, spec.scale) ?: AxisDefaults.DEFAULT_TICK_COUNT,
+            spec,
+            scale.domain,
+            linear = true,
+          )
         // Labels come from the scale rather than being formatted here, because a log scale blanks
         // the
         // crowded ones and only it knows which.
@@ -935,7 +970,15 @@ public class AxisBuilder(
       }
       is TransformedScale -> {
         val count =
-          numbers.resolveInt(spec.tickCount, spec.scale) ?: AxisDefaults.DEFAULT_TICK_COUNT
+          countWithMinStep(
+            numbers.resolveInt(spec.tickCount, spec.scale) ?: AxisDefaults.DEFAULT_TICK_COUNT,
+            spec,
+            scale.domain,
+            // A log or power scale's steps are not linear in the count, so upstream applies only
+            // the
+            // cap and not the walk-down.
+            linear = false,
+          )
         val format = labeller(scale, count, specifier, spec.formatType)
         scale.ticks(count).zip(scale.tickLabels(count)).map { (value, label) ->
           Tick(
@@ -948,7 +991,12 @@ public class AxisBuilder(
       }
       is TimeScale -> {
         val count =
-          numbers.resolveInt(spec.tickCount, spec.scale) ?: AxisDefaults.DEFAULT_TICK_COUNT
+          countWithMinStep(
+            numbers.resolveInt(spec.tickCount, spec.scale) ?: AxisDefaults.DEFAULT_TICK_COUNT,
+            spec,
+            scale.domain,
+            linear = false,
+          )
         scale.ticks(count).zip(scale.tickLabels(count)).map { (value, label) ->
           Tick(label, scale.apply(value), VegaValue.Num(value))
         }
