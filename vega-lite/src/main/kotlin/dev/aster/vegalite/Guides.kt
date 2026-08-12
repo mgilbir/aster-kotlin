@@ -192,7 +192,11 @@ internal object Guides {
     // cannot infer the category that went missing. A log axis drops them *greedily* rather than by
     // parity: its labels are unevenly spaced, so hiding every other one thins the dense end and
     // leaves the sparse end untouched.
-    if (def.type != MeasureType.NOMINAL && def.type != MeasureType.ORDINAL) {
+    // A bucketed instant is the exception among discrete labels: a reader who sees Jan, Mar, May
+    // supplies February, so `defaultLabelOverlap` lets a time unit thin its own labels — unless the
+    // specification stated an order, where a gap would leave the reader guessing what was skipped.
+    val timeUnitLabels = def.timeUnit != null && def.sort !is VegaValue.Obj
+    if (timeUnitLabels || (def.type != MeasureType.NOMINAL && def.type != MeasureType.ORDINAL)) {
       val greedy = type == "log" || type == "symlog"
       axis.set("labelOverlap", if (greedy) str("greedy") else bool(true))
     }
@@ -202,6 +206,10 @@ internal object Guides {
       axis.set("format", signalRef(Fields.timeUnitSpecifier(def.timeUnit)))
       Fields.timeUnitDuration(def.timeUnit)?.let { axis.set("tickMinStep", signalRef(it)) }
     }
+    // `guideFormatType`: a specifier is a *time* specifier, and Vega has to be told so wherever the
+    // scale itself does not already say it. A time or utc scale formats instants by nature; a band
+    // scale of month names does not, and without this its labels come out as raw numbers.
+    formatType(def, type)?.let { axis.set("formatType", str(it)) }
 
     // A normalized stack is a proportion, so its axis is a percentage —
     // `config.normalizedNumberFormat`,
@@ -228,6 +236,21 @@ internal object Guides {
     // from — and `set` leaves a stated `tickMinStep` alone.
     if ((axis.properties["format"] as? VegaValue.Str)?.value == "d") axis.set("tickMinStep", num(1))
     return axis
+  }
+
+  /**
+   * `guideFormatType`: whether a guide's format string is a *time* specifier.
+   *
+   * A time or utc scale already labels instants as instants, so it says nothing. Everything else —
+   * a band of month names, an ordinal of quarters — needs telling, or Vega reads the specifier as a
+   * number format and prints the bucket's milliseconds.
+   */
+  private fun formatType(def: ChannelDef, scaleType: String): String? {
+    if (scaleType == "time" || scaleType == "utc") return null
+    if (def.type != MeasureType.TEMPORAL && def.timeUnit == null) return null
+    // `normalizeTimeUnit` reads the `utc` out of the unit's *name*, wherever it sits: `utcmonth`
+    // and `binnedutcyearmonth` are both universal time.
+    return if (def.timeUnit?.contains("utc") == true) "utc" else "time"
   }
 
   /**
@@ -393,9 +416,14 @@ internal object Guides {
   fun legend(view: UnitView, channel: String, def: ChannelDef, type: String): VegaValue? {
     if (def.legendDisabled) return null
     val filled = view.markDef.filled
+    // `getLegendDefWithScale`: a trail's legend names two channels differently from every other
+    // mark's. Its swatch is a short stroke, so colour goes on the `stroke` however the mark is
+    // filled, and its `size` — a width along the path — is a `strokeWidth` rather than an area.
     val scaleChannel =
-      when (channel) {
-        "color" -> if (filled) "fill" else "stroke"
+      when {
+        view.spec.mark == "trail" && channel == "color" -> "stroke"
+        view.spec.mark == "trail" && channel == "size" -> "strokeWidth"
+        channel == "color" -> if (filled) "fill" else "stroke"
         else -> channel
       }
 
@@ -405,6 +433,14 @@ internal object Guides {
 
     return obj {
       put(scaleChannel, view.scale(channel))
+      // A legend labels a bucketed instant the same way an axis does, and for the same reason: the
+      // swatch beside a colour ramp of months should read `Jan`, not the month's number.
+      if (def.timeUnit != null) put("format", signalRef(Fields.timeUnitSpecifier(def.timeUnit)))
+      formatType(def, type)?.let { put("formatType", it) }
+      // `defaultLabelOverlap` for a legend, which is a shorter list than an axis's: a scale whose
+      // entries are unevenly spaced drops labels *greedily*, keeping the first of each collision
+      // rather than every other one, because parity would thin the crowded end alone.
+      if (type in setOf("quantile", "threshold", "log", "symlog")) put("labelOverlap", "greedy")
       if (gradient) {
         // A colour ramp is drawn as a bar whose length follows the plot, within Vega's own limits.
         put("gradientLength", signalRef("clamp(height, 64, 200)"))
@@ -488,8 +524,11 @@ internal object Guides {
    *   paints a size legend's swatches in the default blue on every chart that does.
    */
   private fun symbolEncode(view: UnitView, channel: String): VegaValue.Obj? {
-    val filled = view.markDef.filled
-    val colors = Marks.colorEncode(view)
+    // `symbols` in `legend/encode.ts` opens with `markDef.filled && mark !== 'trail'`. A trail is
+    // filled as a mark — it is a solid ribbon — but its swatch is a *stroke*, so its legend is read
+    // as an unfilled one and needs no fill painted into the symbol at all.
+    val filled = view.markDef.filled && view.spec.mark != "trail"
+    val colors = Marks.colorEncode(view, filledOverride = filled)
 
     val fields = LinkedHashMap<String, VegaValue>()
     val fill = colors["fill"]

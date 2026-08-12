@@ -1271,6 +1271,63 @@ whatever was there. Vega counts a null as a value: it gets a band of its own, at
 domain, labelled `null`. A chart that says a category has no name is honest; one that quietly draws
 it on top of another is not.
 
+### An instant is what a *time unit* makes it, not what the type says
+
+Five fixtures — `nested-fields`, `invalid-modes`, `timeunit-ordinal`, `trail`, `date-predicates` —
+and one rule behind three of them. `isFieldOrDatumDefForTimeFormat` in upstream's `channeldef.ts`
+reads a field as an instant when it is typed temporal **or** carries a `timeUnit`, and this compiler
+was reading only the type. A month bucketed onto an ordinal scale is the ordinary way to write a
+seasonal chart, and it came out three ways wrong at once: its spoken description read the bucket's
+raw milliseconds, its axis was given a time specifier without the `formatType` that says to read it
+as one, and the column was never parsed as a date on the way in. The guide side is
+`guideFormatType`, which states `time` wherever the *scale* does not already imply it — a `time`
+scale needs no telling, a band of month names does.
+
+The same reading fixed the legend, which had no `format` at all for a bucketed field, and needed
+`formatType` and a computed `format` added to `LegendSpec` for the runtime to honour it.
+
+### What a chart does with a value it cannot place
+
+`mark.invalid` is five modes and this engine had one. Upstream's default —
+`break-paths-show-path-domains` — is a macro for two different behaviours: a path *breaks* at the
+gap and keeps the row, everything else *drops* the row. Both consumers were hard-coded to the mark
+type, so `invalid: "filter"` on a line was ignored and `invalid: null` had no meaning. The mode is
+now normalised once, on the view, and the mark's `defined` and the data flow's filter both read it —
+they have to agree, because filtering a row the path was going to break at removes the break along
+with the row.
+
+`defined` itself was asking the wrong question: it looked at x and y and at the field's own type,
+where `defined.ts` asks it once per *scaled* channel and answers from the scale's domain. A line
+coloured by a continuous field breaks where that colour is missing too, and a channel whose scale
+has a discrete domain is never invalid — a null is simply another category.
+
+Two runtime defects came out of the fixture, both in the same function. **A series whose defined
+points never numbered two vanished entirely**: runs of one point were dropped, and with no run left
+the whole mark node was dropped with them. And **the point that broke a series was not in the
+scene** — it is not drawn, having no length, but it is one of the series' points, and upstream's
+scene keeps it. Both are now subpaths: one point each, drawing nothing.
+
+### A field named through a path
+
+`record.high` is a column's *name* in Vega and a path into a nested object in Vega-Lite, and the
+translation between them is a formula per nested field plus a `format.parse` that may come out
+empty and is written anyway. Reading a nested field without it looked for a column no row had.
+Beside it, the *derived* rule from `data/parse.ts`: a column a transform computed is never parsed,
+because it already has the type its transform gave it and the loader has never seen it — which is
+why a `density`'s own output columns stopped being asked for as numbers.
+
+### Two runtime gaps this batch names but does not close
+
+`density`'s fixture is not in the corpus, and `trail`'s draws no legend. Both compile exactly as
+upstream compiles them — the specification comparison covers them — and both are drawn differently
+by *this runtime*:
+
+- **`kde` samples a different grid.** The transform exists and produces a curve; its extent and
+  step count do not match upstream's, so the x domain comes out narrower and the axis carries 12
+  ticks where upstream has 20.
+- **A legend on the `strokeWidth` channel is drawn at the symbol's size**, not the scale's stroke
+  width, and a `stroke` symbol is sized as though it were an area.
+
 ### One difference is still open
 
 Every mark matches exactly and the surface around them is still between half a unit and a unit small

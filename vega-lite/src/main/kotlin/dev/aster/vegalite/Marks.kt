@@ -118,25 +118,40 @@ internal object Marks {
     }
   }
 
-  /** The fields a path mark is grouped by: every non-position field that is not aggregated. */
-  fun pathGroupingFields(view: UnitView): List<String> =
-    view.spec.encoding.entries
-      .filter { (channel, def) ->
-        channel in
-          setOf(
-            "color",
-            "fill",
-            "stroke",
-            "opacity",
-            "size",
-            "shape",
-            "detail",
-            "strokeDash",
-            "order",
-          ) && def.isFieldDef && def.aggregate == null
+  /**
+   * The fields a path mark is grouped by: every non-position field that is not aggregated.
+   *
+   * `pathGroupingFields` in `encoding.ts` reads channel by channel, and two of them are not the
+   * rule they look like. **`size`** groups a line, because a line has one width and a change of
+   * width means a new line; it does not group a *trail*, whose whole point is a width that varies
+   * along one path. **`order`** groups an area, because a stacked area needs its slices in a stated
+   * order, but not a line or a trail, where it only says which way to walk.
+   */
+  fun pathGroupingFields(view: UnitView): List<String> {
+    val mark = view.spec.mark
+    val grouping =
+      setOf(
+        "color",
+        "fill",
+        "stroke",
+        "opacity",
+        "fillOpacity",
+        "strokeOpacity",
+        "strokeDash",
+        "strokeWidth",
+        "size",
+        "detail",
+        "key",
+        "order",
+      )
+    return view.spec.encoding.entries
+      .filter { (channel, def) -> channel in grouping && def.isFieldDef && def.aggregate == null }
+      .filterNot { (channel, _) ->
+        (channel == "size" && mark == "trail") || (channel == "order" && mark != "area")
       }
-      .mapNotNull { (channel, def) -> if (channel == "order") null else Fields.vgField(def) }
+      .mapNotNull { (_, def) -> Fields.vgField(def) }
       .distinct()
+  }
 
   private fun markGroup(view: UnitView): VegaValue.Obj {
     val mark = view.spec.mark
@@ -210,6 +225,14 @@ internal object Marks {
           putAll(pointPosition(view, "x", "mid", null))
           putAll(pointPosition(view, "y", "mid", null))
           putAll(nonPosition(view, "size", "strokeWidth"))
+          defined(view)?.let { put("defined", it) }
+        }
+        // A trail differs from a line in one property: its `size` is Vega's own `size`, a width
+        // that varies point by point, rather than one stroke width for the whole path.
+        "trail" -> {
+          putAll(pointPosition(view, "x", "mid", null))
+          putAll(pointPosition(view, "y", "mid", null))
+          putAll(nonPosition(view, "size", "size"))
           defined(view)?.let { put("defined", it) }
         }
         "area" -> {
@@ -357,8 +380,8 @@ internal object Marks {
    * A filled mark takes its colour in the fill and a hollow one in the stroke, and the *other*
    * channel is set to transparent on a bar or a point so that a hollow point still has a hit area.
    */
-  fun colorEncode(view: UnitView): VegaValue.Obj {
-    val filled = view.markDef.filled
+  fun colorEncode(view: UnitView, filledOverride: Boolean? = null): VegaValue.Obj {
+    val filled = filledOverride ?: view.markDef.filled
     val markConfig = view.config.markConfig(view.spec.mark)
     val declaredColor =
       view.markDef.raw.fields["color"] ?: view.markDef.raw.fields[if (filled) "fill" else "stroke"]
@@ -668,22 +691,27 @@ internal object Marks {
         ?: if (normalizeStack) view.config.normalizedNumberFormat
         else view.config.numberFormat ?: ""
     return when {
+      // `isFieldOrDatumDefForTimeFormat` in `channeldef.ts`: an instant is one a *time unit*
+      // buckets
+      // as much as one typed temporal. A month named on an ordinal scale is still a month, and
+      // upstream speaks it as a date; reading only the type printed the bucket's raw number.
+      def.type == MeasureType.TEMPORAL || def.timeUnit != null -> {
+        val timeUnit = def.timeUnit
+        val utc = timeUnit?.startsWith("utc") == true || def.scale.string("type") == "utc"
+        val prefix = if (utc) "utc" else "time"
+        when {
+          // `timeFormatExpression`: a stated format wins over the unit, because the reader asked
+          // for it by name — on the guide for a positioned field, on the definition for a text one.
+          stated != null -> "${prefix}Format($accessor, \"$stated\")"
+          // A bucketed instant is otherwise spoken with the specifier Vega chooses at render time,
+          // the same one its axis labels use — so the description and the axis never disagree.
+          timeUnit != null -> "${prefix}Format($accessor, ${Fields.timeUnitSpecifier(timeUnit)})"
+          else -> "${prefix}Format($accessor, \"${view.config.timeFormat}\")"
+        }
+      }
       def.bin != null && binEnd != null -> {
         "!isValid($accessor) || !isFinite(+$accessor) ? \"null\" : " +
           "format($accessor, \"$number\") + \" $BIN_RANGE_DELIMITER \" + format($binEnd, \"$number\")"
-      }
-      def.type == MeasureType.TEMPORAL -> {
-        val timeUnit = def.timeUnit
-        when {
-          timeUnit != null -> {
-            // A bucketed instant is spoken with the specifier Vega chooses at render time, the same
-            // one its axis labels use — so the description and the axis never disagree.
-            val utc = timeUnit.startsWith("utc")
-            "${if (utc) "utc" else "time"}Format($accessor, ${Fields.timeUnitSpecifier(timeUnit)})"
-          }
-          stated != null -> "timeFormat($accessor, \"$stated\")"
-          else -> "timeFormat($accessor, \"${view.config.timeFormat}\")"
-        }
       }
       def.type == MeasureType.QUANTITATIVE || stated != null -> "format($accessor, \"$number\")"
       !arrays -> "isValid($accessor) ? $accessor : \"\"+$accessor"
@@ -696,20 +724,45 @@ internal object Marks {
   /** The en dash upstream puts between a bin's two edges. */
   private const val BIN_RANGE_DELIMITER = "–"
 
-  /** `defined`: what breaks a path, rather than filtering the row out of the data. */
+  /**
+   * `defined`: what breaks a path, rather than filtering the row out of the data.
+   *
+   * `defined.ts` asks the question once per *scaled* channel, not once for x and y: a line coloured
+   * by a continuous field breaks where that colour is missing too. A channel answers "always valid"
+   * when its scale has a discrete domain — a null is simply another category — or when it counts,
+   * because a count has no missing answer.
+   */
   private fun defined(view: UnitView): VegaValue? {
-    val tests =
-      listOf("x", "y").mapNotNull { channel ->
-        val def = view.spec.fieldDef(channel) ?: return@mapNotNull null
-        if (def.type != MeasureType.QUANTITATIVE && def.type != MeasureType.TEMPORAL)
-          return@mapNotNull null
-        if (def.aggregate == "count") return@mapNotNull null
-        val accessor = Fields.datumAccess(def)
-        "isValid($accessor) && isFinite(+$accessor)"
-      }
-    if (tests.isEmpty()) return null
-    return signalRef(tests.joinToString(" && "))
+    if (!shouldBreakPath(view)) return null
+    // `binSuffix: 'mid'` under an imputed stack: the imputation writes the bin's midpoint, and it
+    // is that column the path is drawn from.
+    val imputed = view.stack?.impute == true
+    val fields = LinkedHashSet<String>()
+    for ((channel, def) in view.spec.encoding) {
+      if (!def.isFieldDef) continue
+      val scaleType = view.scaleType(channel) ?: continue
+      if (!Scales.hasContinuousDomain(scaleType)) continue
+      if (def.aggregate in COUNTING_OPS) continue
+      if (view.config.scaleInvalid(channel) != null) continue
+      // A bin suffix names a *bin's* column, so it only reaches a binned field: `vgField` ignores
+      // it otherwise, and appending it here invented a `value_mid` no transform ever wrote.
+      fields += Fields.datumAccess(def, suffix = if (imputed && def.bin != null) "mid" else null)
+    }
+    if (fields.isEmpty()) return null
+    return signalRef(fields.joinToString(" && ") { "isValid($it) && isFinite(+$it)" })
   }
+
+  /**
+   * `normalizeInvalidDataMode` in `compile/invalid`: whether an invalid value breaks the path or is
+   * dealt with in the data flow.
+   *
+   * The default — `break-paths-show-path-domains` — reads as "break the path" for a path mark and
+   * "filter the row out" for everything else, which is why only a line, an area and a trail ask.
+   * `filter` and `show` both answer no: one has already removed the row, the other draws it.
+   */
+  private fun shouldBreakPath(view: UnitView): Boolean =
+    view.invalidDataMode == "break-paths-filter-domains" ||
+      view.invalidDataMode == "break-paths-show-domains"
 
   private fun textChannel(view: UnitView): VegaValue? {
     val def = view.spec.encoding["text"] ?: return null

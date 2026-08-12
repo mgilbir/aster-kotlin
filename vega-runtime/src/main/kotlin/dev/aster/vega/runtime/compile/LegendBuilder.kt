@@ -10,6 +10,7 @@ import dev.aster.vega.model.spec.Direction
 import dev.aster.vega.model.spec.LegendOrient
 import dev.aster.vega.model.spec.LegendSpec
 import dev.aster.vega.model.spec.LegendType
+import dev.aster.vega.model.time.TimeFormat
 import dev.aster.vega.runtime.scale.BandScale
 import dev.aster.vega.runtime.scale.BinnedScale
 import dev.aster.vega.runtime.scale.LinearScale
@@ -19,6 +20,7 @@ import dev.aster.vega.runtime.scale.QuantileScale
 import dev.aster.vega.runtime.scale.SequentialColorScale
 import dev.aster.vega.runtime.scale.Ticks
 import dev.aster.vega.runtime.scale.TimeScale
+import dev.aster.vega.runtime.scale.TimeTicks
 import dev.aster.vega.runtime.scale.TransformedScale
 import dev.aster.vega.runtime.scale.VegaScale
 import dev.aster.vega.runtime.scale.formatTickLabel
@@ -48,6 +50,7 @@ import dev.aster.vega.scene.transformedBounds
 import kotlin.math.ceil
 import kotlin.math.floor
 import kotlin.math.sqrt
+import kotlinx.datetime.TimeZone
 
 /**
  * The rectangles legend placement measures against.
@@ -921,6 +924,30 @@ internal class LegendBuilder(
     return { value -> NumberFormatSubset.format(value, resolved) }
   }
 
+  /**
+   * How a discrete legend entry that is really an instant is written, or null when it is not one.
+   *
+   * `TimeTicks.label` is the no-specifier case, the same multi-format an axis falls back to: it
+   * chooses its own granularity per value rather than writing them all alike.
+   */
+  private fun discreteDateLabeller(spec: LegendSpec, scaleName: String): ((String) -> String)? {
+    val zone =
+      when (spec.formatType) {
+        "time" -> TimeZone.currentSystemDefault()
+        "utc" -> TimeZone.UTC
+        else -> return null
+      }
+    val specifier = spec.format ?: spec.formatExpression?.let { numbers.resolveText(it, scaleName) }
+    return { value ->
+      val instant = value.toDoubleOrNull()
+      when {
+        instant == null -> value
+        specifier == null -> TimeTicks.label(instant, zone)
+        else -> TimeFormat.format(instant, specifier, zone)
+      }
+    }
+  }
+
   /** Numeric entries, with the legend's own format applied when it named one. */
   private fun numeric(
     spec: LegendSpec,
@@ -949,10 +976,14 @@ internal class LegendBuilder(
       return explicit.map { Entry(it, it.asString()) }
     }
     val count = numbers.resolveInt(spec.tickCount, scaleName) ?: LegendDefaults.SYMBOL_TICK_COUNT
+    // A discrete domain of *instants* is labelled as dates, which nothing about the scale can say:
+    // its values are its own categories. `formatType` is where the specification says so, and the
+    // specifier beside it may itself be computed — `timeUnitSpecifier([...])` for a bucketed one.
+    val dates = discreteDateLabeller(spec, scaleName)
     return when (scale) {
-      is OrdinalScale -> scale.domain.map { Entry(VegaValue.Str(it), it) }
-      is BandScale -> scale.domain.map { Entry(VegaValue.Str(it), it) }
-      is PointScale -> scale.domain.map { Entry(VegaValue.Str(it), it) }
+      is OrdinalScale -> scale.domain.map { Entry(VegaValue.Str(it), dates?.invoke(it) ?: it) }
+      is BandScale -> scale.domain.map { Entry(VegaValue.Str(it), dates?.invoke(it) ?: it) }
+      is PointScale -> scale.domain.map { Entry(VegaValue.Str(it), dates?.invoke(it) ?: it) }
       // A legend's own `format` wins over the scale's tick labels, exactly as an axis's does: a
       // rate scale labelled `.1%` reads "10.0%" and not "0.1".
       is LinearScale -> numeric(spec, scale.ticks(count), scale.tickLabels(count), count)

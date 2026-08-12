@@ -206,6 +206,7 @@ private val LEGEND_CONSUMED =
     "strokeDash",
     "type",
     "format",
+    "formatType",
     "orient",
     "direction",
     "title",
@@ -1767,6 +1768,9 @@ public class SpecParser {
           (obj.fields["title"] as? VegaValue.Obj)?.fields?.get("signal")?.asString(),
         values = (obj.fields["values"] as? VegaValue.Arr)?.values,
         format = obj.fields["format"]?.takeIf { it is VegaValue.Str }?.asString(),
+        formatExpression =
+          (obj.fields["format"] as? VegaValue.Obj)?.fields?.get("signal")?.asString(),
+        formatType = axisFormatType(obj.fields["formatType"], "$path.formatType"),
         tickCount = obj.numberOrSignal("tickCount", "$path.tickCount"),
         offset = obj.numberOrSignal("offset", "$path.offset"),
         padding = obj.numberOrSignal("padding", "$path.padding"),

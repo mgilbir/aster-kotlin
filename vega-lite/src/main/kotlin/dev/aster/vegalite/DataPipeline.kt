@@ -79,13 +79,24 @@ internal class DataPipeline(
     for ((_, def) in view.spec.encoding) {
       val field = def.field
       if (!def.isFieldDef || field == null) continue
-      // A time unit buckets a *date*, so the column still has to be read as one first.
-      if (def.type == MeasureType.TEMPORAL && def.aggregate == null) {
+      // A time unit buckets a *date*, so the column still has to be read as one first — and a time
+      // unit is what makes a field an instant, whatever type the encoding gave it. A month named on
+      // an ordinal scale is bucketed from a date exactly as a temporal one is.
+      if ((def.type == MeasureType.TEMPORAL || def.timeUnit != null) && def.aggregate == null) {
         parse[field] = "date"
       } else if (def.type == MeasureType.QUANTITATIVE && def.aggregate in MIN_MAX_OPS) {
         // Upstream's own comment: "we need to parse numbers to support correct min and max". Every
         // other aggregate arithmetic-coerces on the way; these two only compare.
         parse[field] = "number"
+      } else if (Fields.splitAccessPath(field).size > 1) {
+        // A field named through a path — `record.high` — is read out into a flat column of its own.
+        // A date or a number was going to be flattened by its parse anyway; this covers the rest,
+        // which would otherwise be looked for under a name no row has.
+        parse.getOrPut(field) { "flatten" }
+      }
+      // The same for a field named only in a `sort`, which is compared but never drawn.
+      (def.sort as? VegaValue.Obj)?.string("field")?.let { sortField ->
+        if (Fields.splitAccessPath(sortField).size > 1) parse.getOrPut(sortField) { "flatten" }
       }
     }
     // A path mark joins its points in the order its rows arrive, so the dimension it runs along is
@@ -99,6 +110,9 @@ internal class DataPipeline(
         parse.getOrPut(field) { "number" }
       }
     }
+    // A column a transform computed is *derived*: it has the type its transform gave it, and the
+    // loader has never seen it.
+    parse.keys.removeAll(Transforms(diagnostics).producedFields(view.spec.transforms))
     return if (parse.isEmpty()) null else ParseNode(parse)
   }
 
@@ -340,7 +354,10 @@ internal class DataPipeline(
    * through the mark's own `defined`, so that the gap is visible rather than closed over.
    */
   private fun filterInvalidNode(): FilterInvalidNode? {
-    if (view.spec.mark in setOf("line", "area", "trail")) return null
+    // `getDataSourcesForHandlingInvalidValues`: only a mode that *excludes* invalid values from the
+    // marks filters here. A path that breaks at the gap still needs the row — the break is drawn
+    // from it — and `show` draws the row outright.
+    if (view.invalidDataMode != "filter") return null
 
     // Keyed by the **raw** field, which is how upstream's aggregator is keyed, so two channels
     // reading one column through different buckets leave only the last of them: `d` bucketed by

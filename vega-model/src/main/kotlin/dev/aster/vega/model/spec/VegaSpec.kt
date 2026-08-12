@@ -929,6 +929,21 @@ public data class LegendSpec(
    * naming no precision takes as many decimals as the tick step needs, not d3's fixed six.
    */
   val format: String? = null,
+  /**
+   * `format: {"signal": "..."}` — the specifier is computed rather than written.
+   *
+   * A legend over bucketed instants is the case that needs it: the specifier is
+   * `timeUnitSpecifier([...])`, which asks Vega at render time for the pattern that names a month
+   * or a quarter, and there is no constant to write in its place.
+   */
+  val formatExpression: String? = null,
+  /**
+   * Whether [format] is read as a date pattern or a number one.
+   *
+   * A *band* of instants has no temporal scale to infer it from — its domain is a list of values —
+   * so without this the legend labels a month with its milliseconds.
+   */
+  val formatType: String? = null,
   val tickCount: NumberValue? = null,
   val offset: NumberValue? = null,
   val padding: NumberValue? = null,

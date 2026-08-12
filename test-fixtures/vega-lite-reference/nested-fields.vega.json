@@ -1,0 +1,229 @@
+{
+  "$schema": "https://vega.github.io/schema/vega/v6.json",
+  "description": "Fields named through a path, flattened into columns of their own.",
+  "background": "white",
+  "padding": 5,
+  "height": 300,
+  "style": "cell",
+  "data": [
+    {
+      "name": "source_0",
+      "values": [
+        {
+          "day": "Mon",
+          "record": {
+            "low": 3,
+            "high": 14
+          },
+          "place": {
+            "name": "Utrecht"
+          }
+        },
+        {
+          "day": "Tue",
+          "record": {
+            "low": 5,
+            "high": 17
+          },
+          "place": {
+            "name": "Delft"
+          }
+        },
+        {
+          "day": "Wed",
+          "record": {
+            "low": 2,
+            "high": 11
+          },
+          "place": {
+            "name": "Utrecht"
+          }
+        }
+      ]
+    },
+    {
+      "name": "data_0",
+      "source": "source_0",
+      "transform": [
+        {
+          "type": "formula",
+          "expr": "datum[\"record\"] && datum[\"record\"][\"high\"]",
+          "as": "record.high"
+        },
+        {
+          "type": "formula",
+          "expr": "datum[\"place\"] && datum[\"place\"][\"name\"]",
+          "as": "place.name"
+        },
+        {
+          "type": "stack",
+          "groupby": [
+            "day"
+          ],
+          "field": "record\\.high",
+          "sort": {
+            "field": [
+              "place\\.name"
+            ],
+            "order": [
+              "descending"
+            ]
+          },
+          "as": [
+            "record.high_start",
+            "record.high_end"
+          ],
+          "offset": "zero"
+        },
+        {
+          "type": "filter",
+          "expr": "isValid(datum[\"record.high\"]) && isFinite(+datum[\"record.high\"])"
+        }
+      ]
+    }
+  ],
+  "signals": [
+    {
+      "name": "x_step",
+      "value": 20
+    },
+    {
+      "name": "width",
+      "update": "bandspace(domain('x').length, 0.1, 0.05) * x_step"
+    }
+  ],
+  "marks": [
+    {
+      "name": "marks",
+      "type": "rect",
+      "style": [
+        "bar"
+      ],
+      "from": {
+        "data": "data_0"
+      },
+      "encode": {
+        "update": {
+          "fill": {
+            "scale": "color",
+            "field": "place\\.name"
+          },
+          "ariaRoleDescription": {
+            "value": "bar"
+          },
+          "description": {
+            "signal": "\"day: \" + (isValid(datum[\"day\"]) ? isArray(datum[\"day\"]) ? join(datum[\"day\"], ' ') : datum[\"day\"] : \"\"+datum[\"day\"]) + \"; record.high: \" + (format(datum[\"record.high\"], \"\")) + \"; place.name: \" + (isValid(datum[\"place.name\"]) ? isArray(datum[\"place.name\"]) ? join(datum[\"place.name\"], ' ') : datum[\"place.name\"] : \"\"+datum[\"place.name\"])"
+          },
+          "x": {
+            "scale": "x",
+            "field": "day"
+          },
+          "width": {
+            "signal": "max(0.25, bandwidth('x'))"
+          },
+          "y": {
+            "scale": "y",
+            "field": "record\\.high_end"
+          },
+          "y2": {
+            "scale": "y",
+            "field": "record\\.high_start"
+          }
+        }
+      }
+    }
+  ],
+  "scales": [
+    {
+      "name": "x",
+      "type": "band",
+      "domain": {
+        "data": "data_0",
+        "field": "day",
+        "sort": true
+      },
+      "range": {
+        "step": {
+          "signal": "x_step"
+        }
+      },
+      "paddingInner": 0.1,
+      "paddingOuter": 0.05
+    },
+    {
+      "name": "y",
+      "type": "linear",
+      "domain": {
+        "data": "data_0",
+        "fields": [
+          "record\\.high_start",
+          "record\\.high_end"
+        ]
+      },
+      "range": [
+        {
+          "signal": "height"
+        },
+        0
+      ],
+      "nice": true,
+      "zero": true
+    },
+    {
+      "name": "color",
+      "type": "ordinal",
+      "domain": {
+        "data": "data_0",
+        "field": "place\\.name",
+        "sort": true
+      },
+      "range": "category"
+    }
+  ],
+  "axes": [
+    {
+      "scale": "y",
+      "orient": "left",
+      "gridScale": "x",
+      "grid": true,
+      "tickCount": {
+        "signal": "ceil(height/40)"
+      },
+      "domain": false,
+      "labels": false,
+      "aria": false,
+      "maxExtent": 0,
+      "minExtent": 0,
+      "ticks": false,
+      "zindex": 0
+    },
+    {
+      "scale": "x",
+      "orient": "bottom",
+      "grid": false,
+      "title": "day",
+      "labelAlign": "right",
+      "labelAngle": 270,
+      "labelBaseline": "middle",
+      "zindex": 0
+    },
+    {
+      "scale": "y",
+      "orient": "left",
+      "grid": false,
+      "title": "record.high",
+      "labelOverlap": true,
+      "tickCount": {
+        "signal": "ceil(height/40)"
+      },
+      "zindex": 0
+    }
+  ],
+  "legends": [
+    {
+      "fill": "color",
+      "symbolType": "square",
+      "title": "place.name"
+    }
+  ]
+}

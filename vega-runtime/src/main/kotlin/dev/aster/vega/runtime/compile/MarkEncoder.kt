@@ -762,7 +762,14 @@ public class MarkEncoder(
     return !value
   }
 
-  /** Splits data into runs of consecutive defined points, so `defined: false` breaks the series. */
+  /**
+   * Splits data into runs of consecutive defined points, so `defined: false` breaks the series.
+   *
+   * A run of **one** point is kept. It draws nothing — a path needs two points to have a length —
+   * but the mark it belongs to is still a mark: a series filtered down to a single row, or one
+   * bracketed by two breaks, is present in the scene and carries its colour into the legend.
+   * Dropping the run dropped the whole item with it whenever no run had two points.
+   */
   private fun <T> segments(
     data: List<VegaValue>,
     channels: EncodeEntry,
@@ -772,13 +779,17 @@ public class MarkEncoder(
     var current = mutableListOf<T>()
     for (datum in data) {
       if (broken(channels, datum)) {
-        if (current.size > 1) result.add(current)
+        // The point that broke the series is a subpath of its own. Nothing is drawn to it or from
+        // it — a single point has no length — but it is still one of the series' points, and a
+        // break is exactly the absence of a line *between* two of them.
+        if (current.isNotEmpty()) result.add(current)
+        result.add(listOf(resolve(datum)))
         current = mutableListOf()
       } else {
         current.add(resolve(datum))
       }
     }
-    if (current.size > 1) result.add(current)
+    if (current.isNotEmpty()) result.add(current)
     return result
   }
 

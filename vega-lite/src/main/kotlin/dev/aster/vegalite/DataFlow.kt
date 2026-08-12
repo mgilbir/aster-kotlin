@@ -237,15 +237,37 @@ internal class SourceNode(val data: VegaValue, val name: String? = null) : DataN
  * already ingested — it becomes a `toDate` formula instead.
  */
 internal class ParseNode(val parse: MutableMap<String, String>) : DataNode() {
-  fun formatParse(): VegaValue.Obj = obj { parse.forEach { (field, type) -> put(field, type) } }
-
-  fun transforms(): List<VegaValue> = parse.map { (field, type) ->
-    obj {
-      put("type", "formula")
-      put("expr", parseExpression(field, type))
-      put("as", field)
+  /**
+   * `assembleFormatParse`: only a **top-level** column can be named in `format.parse`.
+   *
+   * Vega parses a loaded table field by field and has no path syntax there — a nested `record.high`
+   * named here would be looked for as a column called exactly that. Nested ones are flattened by a
+   * formula instead, which is why this may come out empty and still be written.
+   */
+  fun formatParse(): VegaValue.Obj = obj {
+    parse.forEach { (field, type) ->
+      if (Fields.splitAccessPath(field).size == 1) put(field, type)
     }
   }
+
+  /**
+   * The formulas that do the parsing `format.parse` could not.
+   *
+   * `onlyNested` is where a *loaded* table differs from one written out in the specification: the
+   * loader has already parsed every flat column by the time these run, so only the nested ones are
+   * left to flatten. Inline values had no loader, and parse everything here.
+   */
+  fun transforms(onlyNested: Boolean = false): List<VegaValue> =
+    parse
+      .filterKeys { !onlyNested || Fields.splitAccessPath(it).size > 1 }
+      .map { (field, type) ->
+        obj {
+          put("type", "formula")
+          put("expr", parseExpression(field, type))
+          // Vega's output is always flat: `record.high` is a column's *name*, not a path into one.
+          put("as", Fields.splitAccessPath(field).joinToString("."))
+        }
+      }
 
   /**
    * `parseExpression` from `data/formatparse.ts`: the call that turns text into what it says it is.
@@ -255,7 +277,14 @@ internal class ParseNode(val parse: MutableMap<String, String>) : DataNode() {
    * Building the name by concatenation instead gives an expression Vega has no function for.
    */
   private fun parseExpression(field: String, type: String): String {
-    val access = "datum[${quoted(field)}]"
+    // `accessPathWithDatum`: a nested read is guarded step by step, so a row missing the outer
+    // object yields nothing rather than failing the whole formula.
+    val access =
+      Fields.splitAccessPath(field).let { steps ->
+        (1..steps.size).joinToString(" && ") { depth ->
+          "datum" + steps.take(depth).joinToString("") { "[${quoted(it)}]" }
+        }
+      }
     return when {
       type.startsWith("date:") -> "timeParse($access,'${unquote(type.removePrefix("date:"))}')"
       type.startsWith("utc:") -> "utcParse($access,'${unquote(type.removePrefix("utc:"))}')"
@@ -596,6 +625,8 @@ internal class DataAssembler {
             putAll(existing)
             put("parse", node.formatParse())
           }
+          // What `format.parse` could not name is done here instead, on the loaded table.
+          dataset.transform += node.transforms(onlyNested = true)
         } else {
           dataset.transform += node.transforms()
         }

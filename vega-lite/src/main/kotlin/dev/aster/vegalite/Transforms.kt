@@ -216,7 +216,13 @@ internal class Transforms(
               )) {
               transform[key]?.let { put(key, it) }
             }
-            asPair(transform["as"])?.let { put("as", it) }
+            // A density always names its two output columns, defaulting to the pair the
+            // constructor supplies, because the chart that reads them was written against those
+            // names — `value` for the sampled point and `density` for its estimate.
+            put("as", asPair(transform["as"]) ?: strings(listOf("value", "density")))
+            // `resolve` decides whether grouped densities are estimated over one shared extent or
+            // each over its own; upstream states it either way rather than leaving Vega's default.
+            put("resolve", transform["resolve"] ?: VegaValue.Str("shared"))
           }
         )
 
@@ -323,6 +329,47 @@ internal class Transforms(
       collectParses(transform["filter"], parses)
     }
     return parses
+  }
+
+  /**
+   * The columns the specification's own transforms write, which are never parsed.
+   *
+   * `ancestorParse` in `data/parse.ts` records each transform's produced fields as *derived* as it
+   * walks the list, and a derived field is dropped from the implicit parse below it: a column a
+   * `density` computed is already a number, and asking the loader to parse it would name a column
+   * the source table never had.
+   */
+  fun producedFields(transforms: List<VegaValue>): Set<String> {
+    val produced = LinkedHashSet<String>()
+    for (transform in transforms) {
+      val stated = transform["as"]
+      when (stated) {
+        is VegaValue.Str -> produced += stated.value
+        is VegaValue.Arr -> produced += stated.values.mapNotNull { (it as? VegaValue.Str)?.value }
+        else -> Unit
+      }
+      // The transforms that name their output only by convention.
+      when {
+        transform.has("density") -> produced += listOf("value", "density")
+        transform.has("quantile") -> produced += listOf("prob", "value")
+        transform.has("fold") -> produced += listOf("key", "value")
+        transform.has("regression") ->
+          produced += listOfNotNull(transform.string("regression"), transform.string("on"))
+        transform.has("loess") ->
+          produced += listOfNotNull(transform.string("loess"), transform.string("on"))
+      }
+      // An aggregate, a window and a join-aggregate name each output in their own list.
+      for (key in listOf("aggregate", "window", "joinaggregate")) {
+        transform.array(key).orEmpty().forEach { entry ->
+          (entry as? VegaValue.Obj)?.string("as")?.let { produced += it }
+        }
+      }
+      transform.obj("lookup")?.let {
+        produced += it.array("fields").orEmpty().mapNotNull { f -> (f as? VegaValue.Str)?.value }
+      }
+      transform.string("extent")?.let { produced += transform.string("param") ?: it }
+    }
+    return produced
   }
 
   private fun collectParses(predicate: VegaValue?, into: MutableMap<String, String>) {

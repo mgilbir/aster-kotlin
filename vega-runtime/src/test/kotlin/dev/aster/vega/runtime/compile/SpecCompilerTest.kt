@@ -460,7 +460,9 @@ class SpecCompilerTest {
         .filterIsInstance<PathNode>()
         .single()
     val moves = path.path.commands.count { it is dev.aster.vega.scene.PathCommand.MoveTo }
-    assertEquals(2, moves, "two runs, split where the value was not defined")
+    // Three subpaths, not two: the run before the gap, the point that was not defined — which is
+    // still one of the series' points, drawn as nothing — and the run after it.
+    assertEquals(3, moves, "the runs either side of the gap, and the point that made it")
   }
 
   // ---- scale reverse ----------------------------------------------------------

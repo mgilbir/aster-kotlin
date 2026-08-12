@@ -29,6 +29,18 @@ internal class Config(private val user: VegaValue.Obj = VegaValue.EmptyObject) {
 
   val numberFormat: String? = user.string("numberFormat")
 
+  /** `config.mark.invalid`: what every mark does with a null it cannot place. */
+  val markInvalid: VegaValue? = user.obj("mark")?.fields?.get("invalid")
+
+  /**
+   * `config.scale.invalid[channel]`: a stated output for an invalid value on one channel.
+   *
+   * A channel that has one is valid by construction — the scale answers for a null — so it neither
+   * breaks a path nor filters a row.
+   */
+  fun scaleInvalid(channel: String): VegaValue? =
+    user.obj("scale")?.obj("invalid")?.fields?.get(channel)
+
   /** `view.continuousWidth`/`continuousHeight`: the size of a plot with a continuous position. */
   val continuousWidth: Double = view.number("continuousWidth") ?: 300.0
 

@@ -1,5 +1,7 @@
 package dev.aster.vegalite
 
+import dev.aster.vega.model.VegaValue
+
 /**
  * One view being compiled: its specification, and the parts of the whole chart it has to agree
  * with.
@@ -27,6 +29,28 @@ internal class UnitView(
   val markDef: MarkDef = spec.markDef
 
   val stack: StackProperties? = Stack.of(spec)
+
+  /**
+   * `normalizeInvalidDataMode`: what this view does with a value no scale can place.
+   *
+   * The default reads as two rules in one — a path *breaks* at the gap, everything else *drops* the
+   * row — because a line with a hole in it says something a scatter with a hole in it cannot. The
+   * two consumers are the mark's `defined` and the data flow's filter, and they have to agree:
+   * filtering a row the path was going to break at removes the break along with the row.
+   */
+  val invalidDataMode: String
+    get() {
+      val stated = markDef.raw.fields["invalid"] ?: config.markInvalid
+      val isPath = spec.mark in PATH_MARKS
+      val forPathOrNot = if (isPath) "break-paths-show-domains" else "filter"
+      if (stated == null) return forPathOrNot
+      if (stated is VegaValue.Null) return "show"
+      return when (val named = (stated as? VegaValue.Str)?.value) {
+        null,
+        "break-paths-show-path-domains" -> forPathOrNot
+        else -> named
+      }
+    }
 
   /** Merged scale type per channel, filled in once every view has contributed. */
   var scaleTypes: Map<String, String> = emptyMap()
