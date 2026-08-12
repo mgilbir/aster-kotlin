@@ -230,7 +230,18 @@ internal sealed class DataNode {
 
 internal class SourceNode(val data: VegaValue, val name: String? = null) : DataNode() {
   val isUrl: Boolean = data.string("url") != null
-  val isNamed: Boolean = data.string("name") != null && !isUrl && data["values"] == null
+
+  /**
+   * A **generated** table: `{"sequence": {...}}`, which is a transform rather than a table.
+   *
+   * It matters twice over. The dataset holds a `sequence` transform instead of `values`, and the
+   * flow does *not* fork below it — a generator is not something Vega might overwrite, so the
+   * view's own transforms belong in the same dataset rather than in a derived one.
+   */
+  val isGenerator: Boolean = data["sequence"] != null
+
+  val isNamed: Boolean =
+    data.string("name") != null && !isUrl && !isGenerator && data["values"] == null
 }
 
 /**
@@ -591,6 +602,7 @@ internal class DataAssembler {
           values = data["values"],
           url = data.string("url"),
           format = sourceFormat(data),
+          transform = generatorTransform(data),
         )
       if (root is SourceNode) walk(root, dataset) else datasets += dataset
     }
@@ -599,6 +611,17 @@ internal class DataAssembler {
     // it before whatever joins against it. Stable, so the numbering still reads in order.
     val (plain, derived) = datasets.partition { it.source == null && it.transform.isEmpty() }
     return (plain + derived).map { it.build() }
+  }
+
+  /** `{"sequence": {...}}` — the one data source that is a transform. */
+  private fun generatorTransform(data: VegaValue): MutableList<VegaValue> {
+    val sequence = data.obj("sequence") ?: return mutableListOf()
+    return mutableListOf(
+      obj {
+        put("type", "sequence")
+        sequence.fields.forEach { (key, value) -> put(key, value) }
+      }
+    )
   }
 
   private fun sourceFormat(data: VegaValue): VegaValue.Obj? {
@@ -621,7 +644,7 @@ internal class DataAssembler {
   private fun walk(node: DataNode, incoming: MutableDataset, parent: DataNode? = null) {
     var dataset = incoming
 
-    if (node is SourceNode && !node.isUrl) {
+    if (node is SourceNode && !node.isUrl && !node.isGenerator) {
       // Inline or named data becomes a dataset of its own so that Vega does not overwrite it; the
       // transforms then belong to a derived one.
       datasets += dataset

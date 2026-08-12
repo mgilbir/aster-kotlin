@@ -115,7 +115,9 @@ internal class DataPipeline(
     }
     // A column a transform computed is *derived*: it has the type its transform gave it, and the
     // loader has never seen it.
-    parse.keys.removeAll(Transforms(diagnostics).producedFields(view.spec.transforms))
+    parse.keys.removeAll(
+      Transforms(diagnostics).producedFields(view.spec.transforms, view.spec.data)
+    )
     return if (parse.isEmpty()) null else ParseNode(parse)
   }
 

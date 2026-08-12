@@ -1600,6 +1600,18 @@ A `DateTime` in a scale's domain cannot be handed to Vega as an object: each end
 expression that builds the instant, wrapped in `{data: …}` so Vega reads it as one *datum* of the
 domain rather than as a list to be spread. The runtime learned to unwrap it at the other end.
 
+### A table that is generated rather than loaded
+
+`{"sequence": {...}}` is the one data source that is a *transform*, and it matters twice over. The
+dataset holds a `sequence` transform instead of `values`; and the flow does **not** fork below it,
+a generator being nothing Vega might overwrite, so the view's own transforms belong in the same
+dataset rather than in a derived one. Its column is derived too, so nothing parses it — this
+compiler was writing a `toNumber` over a number a transform had just produced.
+
+Beside it, a step signal is named after the **scale** rather than the channel: inside a
+concatenation each plot counts its own categories, so a row of band charts reads `concat_1_x_step`
+rather than every plot taking the first one's width.
+
 ### Two runtime gaps this batch names but does not close
 
 `density`'s fixture is not in the corpus, and `trail`'s draws no legend. Both compile exactly as

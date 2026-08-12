@@ -397,7 +397,10 @@ internal object Scales {
           val declared = if (channel == "x") view.spec.width else view.spec.height
           val step = (declared as? VegaValue.Obj)?.number("step")
           if (declared == null || step != null) {
-            return obj { put("step", signalRef("${channel}_step")) }
+            // The step signal is named after the *scale*, not the channel: inside a concatenation
+            // each plot counts its own categories, so a row of band charts reads
+            // `concat_1_x_step` rather than every plot taking the first one's width.
+            return obj { put("step", signalRef("${view.scale(channel)}_step")) }
           }
         }
         if (channel == "y" && hasContinuousDomain(type)) {

@@ -371,8 +371,10 @@ internal class Transforms(
    * `density` computed is already a number, and asking the loader to parse it would name a column
    * the source table never had.
    */
-  fun producedFields(transforms: List<VegaValue>): Set<String> {
+  fun producedFields(transforms: List<VegaValue>, source: VegaValue? = null): Set<String> {
     val produced = LinkedHashSet<String>()
+    // A generated column is derived too: nothing loaded it, so nothing has to parse it.
+    source?.obj("sequence")?.let { produced += it.string("as") ?: "data" }
     for (transform in transforms) {
       val stated = transform["as"]
       when (stated) {
