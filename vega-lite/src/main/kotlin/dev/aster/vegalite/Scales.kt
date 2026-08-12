@@ -80,7 +80,13 @@ internal object Scales {
       )
 
   /** `scaleType()` in `compile/scale/type.ts`, for the channels this compiler scales. */
-  fun scaleType(channel: String, def: ChannelDef, mark: String): String {
+  fun scaleType(
+    channel: String,
+    def: ChannelDef,
+    mark: String,
+    /** Whether an offset scale is nested inside this position, which makes it a band. */
+    hasOffset: Boolean = false,
+  ): String {
     def.scale?.string("type")?.let {
       return it
     }
@@ -88,12 +94,20 @@ internal object Scales {
       MeasureType.NOMINAL,
       MeasureType.ORDINAL -> {
         if (channel in COLOR_CHANNELS || channel in DISCRETE_RANGE_CHANNELS) return "ordinal"
-        // An offset scale is always a band: it is the span the nested marks divide between them.
-        if (channel == "xOffset" || channel == "yOffset") return "band"
+        // An offset scale divides a band between the marks nested in it, and *how* it divides
+        // follows the mark: a bar takes a band of its own inside the group, a point sits at a
+        // place in it. The same rule the position channels use, one level in.
+        if (channel == "xOffset" || channel == "yOffset") {
+          return if (mark in setOf("rect", "bar", "image", "rule", "tick")) "band" else "point"
+        }
         if (channelIsPosition(channel)) {
           // A rect, a bar, a rule or a tick occupies a band; anything else is placed at a point,
           // which is why a scatter plot's categories sit on the tick and a bar spans between them.
           if (mark in setOf("rect", "bar", "image", "rule", "tick")) return "band"
+          // A position with an **offset** nested in it is a band whatever the mark: the band is
+          // the span the nested marks divide between them, and a point scale has no span to
+          // divide.
+          if (hasOffset) return "band"
         }
         // An **arc** occupies a band on its polar positions for the same reason a bar does on its
         // Cartesian ones: a slice spans an angle, it does not sit at one.
@@ -661,6 +675,11 @@ internal object Scales {
       set("nice", bool(true))
     }
 
+    // A **point** offset scale is padded at its ends like any other point scale, and by the same
+    // number: `pointPadding` becomes its outer padding, its marks having no width to pad within.
+    if ((channel == "xOffset" || channel == "yOffset") && type == "point") {
+      set("paddingOuter", num(config.scaleConfig("pointPadding")!!))
+    }
     if (channelIsPosition(channel)) {
       // A stated `padding` settles both ends of a band at once and passes through as it stands;
       // the derived inner and outer paddings are for a scale that said nothing, and writing them

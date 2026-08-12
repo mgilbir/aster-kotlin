@@ -1379,13 +1379,16 @@ internal object Marks {
   private fun offsetRef(view: UnitView, channel: String, centred: Boolean): VegaValue? {
     val offsetChannel = offsetChannelFor(channel)?.takeIf { view.hasScale(it) } ?: return null
     val offsetDef = view.spec.encoding.getValue(offsetChannel)
+    // A **point** offset places its marks rather than giving each a lane, so there is no lane to
+    // centre in: `bandPosition` is only asked of a band.
+    val banded = view.scaleType(offsetChannel) == "band"
     return obj {
       put("scale", view.scale(offsetChannel))
       // An offset may name a **datum** rather than a field, which is how a repeated layer puts
       // each copy in a lane of its own: there is no column to read, only the value to look up.
       if (offsetDef.isFieldDef) put("field", Fields.vgField(offsetDef))
       else literalRef(offsetDef.datum)?.let { (key, value) -> put(key, value) }
-      if (centred) put("band", num(0.5))
+      if (centred && banded) put("band", num(0.5))
     }
   }
 

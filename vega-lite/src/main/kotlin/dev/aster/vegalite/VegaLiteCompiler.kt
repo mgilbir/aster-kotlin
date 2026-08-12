@@ -976,7 +976,13 @@ private class Compilation(
     val scales = LinkedHashMap<String, ScaleComponent>()
     for (view in views) {
       for ((channel, def) in view.scaledChannels()) {
-        val type = Scales.scaleType(channel, def, view.spec.mark)
+        val type =
+          Scales.scaleType(
+            channel,
+            def,
+            view.spec.mark,
+            hasOffset = offsetChannelFor(channel)?.let { view.spec.encoding[it] != null } == true,
+          )
         val key = name(view, channel)
         val existing = scales[key]
         if (existing == null || Scales.precedence(type) > Scales.precedence(existing.type)) {

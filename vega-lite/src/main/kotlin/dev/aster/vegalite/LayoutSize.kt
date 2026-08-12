@@ -102,9 +102,13 @@ internal class LayoutSize(
                   put("name", "$scalePrefix${channel}_step")
                   put(
                     "update",
+                    // `bandspace` counts the *bands* a padded band scale needs; a **point** scale
+                    // has no bands, only places, so the count is the domain's own length.
                     "${number(step ?: config.step)} * " +
-                      "bandspace(domain('${offset.name()}').length, " +
-                      "${number(nestedInner)}, ${number(nestedOuter)})" +
+                      (if (offset.type == "point") "domain('${offset.name()}').length"
+                      else
+                        "bandspace(domain('${offset.name()}').length, " +
+                          "${number(nestedInner)}, ${number(nestedOuter)})") +
                       " / (1-${number(paddingInner)})",
                   )
                 }

@@ -1736,6 +1736,25 @@ Vega's way is `{"signal": …}`. Passed through, the property was unread and the
 default. And a mark's own `xOffset` applies wherever the position lands — including *inside* a
 bucketed bar's spacing, where the two nudges compose rather than one replacing the other.
 
+### A boxplot of one column has no category to span
+
+Five files turned on one word: a whisker runs along the **measured** axis, and saying so is what
+centres it on the other one. A boxplot with no discrete channel has nothing to span, so its parts
+sit in the middle of the plot — `{signal: "height", mult: 0.5}` — where saying nothing made them
+fill it from edge to edge.
+
+### An offset divides its band the way its mark would
+
+An offset scale is not always a band. It divides a band between the marks nested in it, and *how*
+it divides follows the mark: a bar takes a band of its own inside the group, a point sits at a place
+in it. That one rule settles four things — the offset scale's type, its `paddingOuter` (a point
+scale's ends are padded and its marks have no width to pad within), the step expression that counts
+its entries (`bandspace` counts *bands*, and a point scale has only places), and whether the
+position's offset is centred in a lane at all.
+
+A **position** with an offset nested in it is a band whatever the mark, for the same reason: a point
+scale has no span for the nested marks to divide.
+
 ### Two runtime gaps this batch names but does not close
 
 `density`'s fixture is not in the corpus, and `trail`'s draws no legend. Both compile exactly as

@@ -354,6 +354,10 @@ internal class Composite(
     fun rule() = obj {
       put("type", "rule")
       put("color", "black")
+      // The whisker runs along the *measured* axis, and saying so is what centres it on the other
+      // one: a boxplot of a single column has no category to span, so its parts sit in the middle
+      // of the plot rather than filling it.
+      put("orient", boxOrient)
       put("aria", VegaValue.Bool(false))
     }
 
