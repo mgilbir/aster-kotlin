@@ -375,6 +375,48 @@ Three things to weigh first, none of them checked:
   contract, and STATUS's "Next three tasks" item 1 describes the neighbouring gaps in the same
   machinery.
 
+## What is left, and the one technique that finds it
+
+The remaining inventory is **legend, title and layout properties**, plus a short tail. Every encode
+channel, every axis property and every projection property in Vega's schema is now either drawn or
+explained by name.
+
+**Find the next gap by diffing the schema against the parser's tables, not by reading diagnostics.**
+`ENCODE_UNSUPPORTED` being empty did not mean nothing was missing — it only held channels somebody had
+*noticed*. Eleven more were falling through to the generic message, and two of those (`scaleX`,
+`scaleY`) were already drawn: they had come off the unsupported list without being added to the
+consumed one, so every specification using them was told it had been ignored while it was honoured.
+The two tables are meant to be a partition of the vocabulary, and only the schema shows what has fallen
+between. `oracle-js/node_modules/vega/build/vega-schema.json` has a definition per block
+(`encodeEntry`, `axis`, `legend`, `title`, `layout`, `projection`, `scale`, `mark`); collect each
+table's string literals out of `SpecParser.kt`, expand `guideStyleKeys(...)` by hand, and subtract.
+Anything left is either a gap or a stale diagnostic, and telling those two apart is a grep.
+
+As of this handoff the subtraction leaves:
+
+- **Legend (20):** the legend's own background — `fillColor`, `strokeColor`, `strokeWidth`,
+  `strokeDash`, `cornerRadius` — which nothing draws at all; `labelAlign`, `labelBaseline`;
+  `titleAlign`, `titleBaseline`, `titleAnchor`, `titleLineHeight`; `symbolOffset`,
+  `symbolDashOffset`, `symbolFillColor`, `symbolLimit`; `gradientOpacity`, `gradientStrokeColor`,
+  `gradientStrokeWidth`; `gridAlign`; `tickMinStep`; `formatType`; `aria`/`description`.
+  `clipHeight` is *done* — do not re-report it.
+- **Title (10):** `baseline`, `color`, `lineHeight`, `style`, `limit`, an explicit `align`/`angle`,
+  `subtitleColor`, `subtitleFont`, `subtitleFontWeight`, `subtitleLineHeight`, `aria`,
+  `interactive`, `name`.
+- **Layout (all of it):** `align`, `bounds`, `center`, `columns`, `footerBand`, `headerBand`,
+  `offset`, `padding`, `titleAnchor`, `titleBand` — the grid works, but nothing in `LAYOUT` is
+  reported either, so this block has no consumed table at all yet.
+- **Mark (2):** a mark-level `description` and `key`.
+- **Tail:** `lab`/`hcl` colour helpers, `geoBounds`, `impute` methods, `pivot` ops, some window ops,
+  `timeunit` unit inference, facet aggregates, `domainRaw`, `domainImplicit`, unimplemented named
+  ranges.
+
+**Before adding any of it, check the harness can see it.** That has now been the eleventh finding of
+its kind and the largest: `shape` marks were compared by fill and stroke alone, so every map in the
+corpus was green on colour. Whatever the next property is, ask what number in
+`oracle-js/src/normalize.js` and `Differential.kt` would change if it were wrong, and if the answer is
+"none", add it there first and expect existing references to move.
+
 ## Unfinished work parked elsewhere
 
 `kde2d` + `isocontour` are checkpointed at `6ef5428` on branch
