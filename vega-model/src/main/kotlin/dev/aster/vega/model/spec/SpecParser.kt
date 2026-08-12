@@ -81,6 +81,9 @@ private val EVENT_STREAM_CONSUMED =
 
 private val AXIS_CONSUMED =
   setOf(
+    "labelOffset",
+    "aria",
+    "description",
     "tickBand",
     "position",
     "translate",
@@ -161,10 +164,7 @@ private val AXIS_UNSUPPORTED =
   mapOf(
     "labelBound" to "Bounding axis labels to the plotting area is not implemented",
     "labelFlushOffset" to "Axis label flush offsets are not implemented; they need labelFlush",
-    "labelOffset" to "Axis label offsets along the axis are not implemented",
     "tickMinStep" to "A minimum tick step is not implemented; the scale's own tick count is used",
-    "aria" to "Accessibility attributes on a guide are not implemented",
-    "description" to "Accessibility descriptions on a guide are not implemented",
   )
 
 /** Scale properties this engine reads. */
@@ -202,6 +202,8 @@ private val SCALE_UNSUPPORTED =
 /** Legend properties this engine reads. */
 private val LEGEND_CONSUMED =
   setOf(
+    "aria",
+    "description",
     "symbolDashOffset",
     "symbolFillColor",
     "symbolOffset",
@@ -1520,6 +1522,9 @@ public class SpecParser {
       tickExtra =
         if (band != null) band == "extent" else obj.fields["tickExtra"]?.asBoolean() ?: false,
       tickBand = band,
+      labelOffset = obj.numberOrSignal("labelOffset", "$path.labelOffset"),
+      aria = obj.fields["aria"]?.asBoolean() ?: true,
+      description = obj.fields["description"]?.asString()?.takeIf { it.isNotBlank() },
       position = obj.numberOrSignal("position", "$path.position"),
       translate = obj.numberOrSignal("translate", "$path.translate"),
       tickRound = obj.fields["tickRound"]?.asBoolean(),
@@ -1882,6 +1887,8 @@ public class SpecParser {
         gradientStrokeWidth =
           obj.numberOrSignal("gradientStrokeWidth", "$path.gradientStrokeWidth"),
         gradientOpacity = obj.numberOrSignal("gradientOpacity", "$path.gradientOpacity"),
+        aria = obj.fields["aria"]?.asBoolean() ?: true,
+        description = obj.fields["description"]?.asString()?.takeIf { it.isNotBlank() },
         // From the configuration alone; see [LegendSpec.fillColor] for why the legend's own value
         // is deliberately not consulted.
         backgroundStrokeWidth = legendConfig("strokeWidth")?.asDouble()?.takeIf { !it.isNaN() },

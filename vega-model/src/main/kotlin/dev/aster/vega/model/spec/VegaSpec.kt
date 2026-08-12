@@ -656,6 +656,22 @@ public data class AxisSpec(
    * instead of their centres. `"center"` sets the three back to their defaults.
    */
   val tickBand: String? = null,
+  /**
+   * How far a label is nudged **along** the axis, `labelOffset`.
+   *
+   * Not `labelPadding`, which moves it away from the axis. Upstream extends the shared band offset
+   * with this one, so a band axis's label keeps its centring and slides.
+   */
+  val labelOffset: NumberValue? = null,
+  /**
+   * `aria: false` hides the whole guide from a screen reader, and `description` replaces the
+   * caption this engine would otherwise generate for it.
+   *
+   * Both belong to the guide as a whole rather than to any part of it, which is why they are here
+   * and not in a [GuideStroke].
+   */
+  val aria: Boolean = true,
+  val description: String? = null,
   val grid: Boolean = false,
   val ticks: Boolean = true,
   val labels: Boolean = true,
@@ -1009,6 +1025,11 @@ public data class LegendSpec(
   val gradientStrokeColor: String? = null,
   val gradientStrokeWidth: NumberValue? = null,
   val gradientOpacity: NumberValue? = null,
+  /**
+   * As on an axis: `aria: false` hides the legend from a screen reader, `description` renames it.
+   */
+  val aria: Boolean = true,
+  val description: String? = null,
   val backgroundStrokeWidth: Double? = null,
   val backgroundStrokeDash: List<Double>? = null,
   val zindex: Int = 0,

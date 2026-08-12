@@ -21,7 +21,7 @@ end to end — expressions, signals, 33 of upstream's 40 data transforms, every 
 and an event handler that recompiles the chart — and are verified against upstream Vega by
 differential tests.
 
-One hundred and twenty-four differential fixtures pass, all matching upstream exactly on every mark and
+One hundred and twenty-five differential fixtures pass, all matching upstream exactly on every mark and
 scale output:
 
 | Fixture | Marks | Covers |
@@ -201,7 +201,7 @@ substantive compatibility items:
 | 6. View and Compose APIs | Yes |
 | 7. SVG, PNG, PDF export | Yes |
 | 8. TalkBack can describe and navigate | Partial — virtual nodes are tested by instrumentation, not with TalkBack itself |
-| 9. At least 100 compatibility fixtures pass | **Yes** — 124 |
+| 9. At least 100 compatibility fixtures pass | **Yes** — 125 |
 | 10. Core runtime has no Android dependency | Yes |
 | 11. Renders without WebView | Yes |
 | 12. Build and test loop runs from the terminal | Yes |
@@ -538,7 +538,7 @@ each example a deadline.
 
 ## Known failing fixtures
 
-None. One hundred and twenty-four fixtures exist and all of them pass — and that sentence became worth
+None. One hundred and twenty-five fixtures exist and all of them pass — and that sentence became worth
 something only once the gate could no longer skip itself, below.
 
 **The gate could report success without running.** `FixtureDifferentialTest` reads the fixtures and
@@ -1513,6 +1513,25 @@ This engine already took a `CRISP_OFFSET` back out of the guide bounds — which
 nudge was always half a pixel, and wrong the moment `translate: 0` made it something else, because
 then it was subtracting a half pixel that had never been added. A `translate: 0` axis made the chart
 half a unit wider than upstream's. It now reads the actual translate back.
+
+## `labelOffset`, and two properties a screen reader needs
+
+`labelOffset` slides an axis label **along** the axis, which is the other direction from
+`labelPadding`. It was reported and it is drawn now, and the shape of the change is the interesting
+part: the first attempt put it in `labelOffsetAlong`, which is a band scale's own centring rule and is
+only consulted for band scales — so a linear axis's labels did not move at all, and the fixture said so
+immediately. It belongs at the single place every label's coordinate passes through, after the band
+centring rather than inside it.
+
+`aria` and `description` are now honoured on both an axis and a legend. Neither is visible to the
+differential harness — upstream carries them as properties of the guide group and nothing about the
+drawing changes — so they are pinned by `GuideAccessibilityTest` instead: `aria: false` removes the
+guide from the accessibility tree, a `description` replaces the caption this engine generates from the
+scale, and a description that is only whitespace is not a description.
+
+That leaves **two** axis properties reported out of upstream's 79: `labelBound`, which needs the
+overlap remover to take a bounding rectangle, and `tickMinStep`, which needs the tick generator to
+take a floor on its step.
 
 ## Performance observations
 

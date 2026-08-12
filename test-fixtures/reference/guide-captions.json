@@ -65,6 +65,26 @@
   "caption": "Y-axis for a linear scale with values from 0 to 80"
  },
  {
+  "fixture": "axis-label-offset",
+  "kind": "axis",
+  "caption": "X-axis titled 'band labels slid 14 along' for a discrete scale with 3 values: alpha, beta, gamma"
+ },
+ {
+  "fixture": "axis-label-offset",
+  "kind": "axis",
+  "caption": "X-axis for a discrete scale with 3 values: alpha, beta, gamma"
+ },
+ {
+  "fixture": "axis-label-offset",
+  "kind": "axis",
+  "caption": "Y-axis titled 'linear labels slid 8 down' for a linear scale with values from 0 to 10"
+ },
+ {
+  "fixture": "axis-label-offset",
+  "kind": "axis",
+  "caption": "the same values again"
+ },
+ {
   "fixture": "axis-placement",
   "kind": "axis",
   "caption": "X-axis titled 'ticks on the band edges' for a discrete scale with 4 values: alpha, beta, gamma, delta"

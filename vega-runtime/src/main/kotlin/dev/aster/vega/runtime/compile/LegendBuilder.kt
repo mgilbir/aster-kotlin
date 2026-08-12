@@ -1101,9 +1101,15 @@ internal class LegendBuilder(
         NodeMetadata(
           role = "legend",
           markName = built.spec.scale,
+          // `aria: false` takes the legend out of the accessibility tree; a `description` replaces
+          // the caption this engine generates from the scale.
           accessibility =
-            caption(built)?.let {
-              AccessibilityDescriptor(label = it, role = "graphics-symbol", focusable = true)
+            if (!spec.aria) {
+              null
+            } else {
+              (spec.description ?: caption(built))?.let {
+                AccessibilityDescriptor(label = it, role = "graphics-symbol", focusable = true)
+              }
             },
         ),
     )

@@ -152,6 +152,7 @@ public class AxisBuilder(
     val fontSize = numbers.resolve(spec.labelFontSize, spec.scale) ?: AxisDefaults.LABEL_FONT_SIZE
     val labelStyle = GuideStyle.text(spec.labelStyle, fontSize, defaultWeight = 400)
     val labelLimit = numbers.resolve(spec.labelLimit, spec.scale) ?: AxisDefaults.LABEL_LIMIT
+    val labelAlong = numbers.resolve(spec.labelOffset, spec.scale) ?: 0.0
 
     val children = mutableListOf<SceneNode>()
     // Ticks and labels, in paint order, hidden labels included so the mark count does not change
@@ -288,7 +289,10 @@ public class AxisBuilder(
         // no value for the label to scale — and it stays a `NaN` here: a text node with no usable
         // anchor covers nothing and draws nothing, which is what upstream's scene and its own SVG
         // both say.
-        val along = tick.labelPosition ?: Double.NaN
+        // `labelOffset` slides the label along the axis — the other direction from `labelPadding`.
+        // Applied here rather than where the ticks are generated, because it applies to every scale
+        // type and a band scale's own centring is already in `labelPosition`.
+        val along = tick.labelPosition?.plus(labelAlong) ?: Double.NaN
         val (defaultX, defaultY) =
           when (spec.orient) {
             Orient.BOTTOM -> along to labelOffset
@@ -394,19 +398,29 @@ public class AxisBuilder(
             role = "axis",
             markName = spec.scale,
             // What a screen reader is told before it reaches the marks this axis frames.
+            //
+            // `aria: false` removes the axis from the accessibility tree entirely, and a
+            // `description` replaces the caption this engine would otherwise generate — a chart
+            // whose
+            // axis is self-explanatory in context says so rather than having its scale read out.
             accessibility =
-              GuideCaption.axis(
-                  spec.orient.name.lowercase(),
-                  // Spoken as one phrase; see LegendBuilder.caption for why the newline goes.
-                  titleText?.replace("\n", " "),
-                  scale,
-                  scaleTypes[spec.scale],
-                  specifier,
-                  spec.formatType,
-                )
-                ?.let {
-                  AccessibilityDescriptor(label = it, role = "graphics-symbol", focusable = true)
-                },
+              if (!spec.aria) {
+                null
+              } else {
+                (spec.description
+                    ?: GuideCaption.axis(
+                      spec.orient.name.lowercase(),
+                      // Spoken as one phrase; see LegendBuilder.caption for why the newline goes.
+                      titleText?.replace("\n", " "),
+                      scale,
+                      scaleTypes[spec.scale],
+                      specifier,
+                      spec.formatType,
+                    ))
+                  ?.let {
+                    AccessibilityDescriptor(label = it, role = "graphics-symbol", focusable = true)
+                  }
+              },
           ),
       )
 
