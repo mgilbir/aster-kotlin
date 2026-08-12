@@ -287,6 +287,45 @@ class ExpressionReferenceTest {
         "luminance('transparent')|null",
         "luminance('none')|null",
         "luminance('rgba(255, 0, 0, 0)')|null",
+        // ---- the nine that had no vector at all ----
+        //
+        // Found by subtracting the names any expression test calls from the names `Functions.kt`
+        // registers. Worth doing after `hsl(h, s, l)` turned out to have been returning null: a
+        // function nothing calls is a function nothing checks, and the diff takes a second.
+        "atan2(1, 2)|0.4636476090008061",
+        "atan2(-3, -4)|-2.498091544796509",
+        // `bandspace` counts *steps*, not bands, so five bands at 0.1 inner padding come to 5.3 —
+        // and the padding is allowed to eat the whole band without the answer going negative, which
+        // would invert the scale.
+        "bandspace(5, 0.1, 0.2)|5.300000000000001",
+        "bandspace(0, 0.1, 0.2)|0",
+        "bandspace(3, 0.9, 0)|2.1",
+        // `lerp` short-circuits at 0 and 1 rather than computing `lo + f*(hi-lo)`, so the ends are
+        // exact rather than within a rounding.
+        "lerp([10, 20], 0.25)|12.5",
+        "lerp([10, 20], 0)|10",
+        "lerp([10, 20], 1)|20",
+        "lerp([7], 0.5)|7",
+        "join(pluck([{a:1},{a:2},{a:3}], 'a'), ',')|\"1,2,3\"",
+        // `stop` is exclusive, and the values are multiplied out from the start rather than
+        // accumulated, so a fractional step does not drift.
+        "join(sequence(5), ',')|\"0,1,2,3,4\"",
+        "join(sequence(2, 8, 2), ',')|\"2,4,6\"",
+        "join(sequence(0, 1, 0.25), ',')|\"0,0.25,0.5,0.75\"",
+        "join(sort([3, 1, 2]), ',')|\"1,2,3\"",
+        "join(sort(['b','a','c']), ',')|\"a,b,c\"",
+        "trim('  padded  ')|\"padded\"",
+        "trim('')|\"\"",
+        // Local time, and the suite pins the zone: mid-January in Amsterdam is UTC+1, which
+        // JavaScript reports as a *negative* offset in minutes.
+        "timezoneoffset(datetime(2024, 0, 15))|-60",
+        // `timeSequence` steps in **local** time even when the result is read as UTC, which is why
+        // the first entry reads as the last day of the previous year.
+        "length(timeSequence('month', datetime(2024,0,1), datetime(2024,4,1)))|4",
+        "utcFormat(timeSequence('month', datetime(2024,0,1), datetime(2024,4,1))[0], " +
+          "'%Y-%m-%d')|\"2023-12-31\"",
+        "utcFormat(timeSequence('month', datetime(2024,0,1), datetime(2024,4,1))[3], " +
+          "'%Y-%m-%d')|\"2024-03-31\"",
         // ---- rgb, hsl, lab, hcl: components in, or a colour read apart ----
         //
         // The builders were **returning null**: a Kotlin string template had been escaped into its

@@ -1769,6 +1769,26 @@ and an array has none — upstream returns `[[Infinity, Infinity], [-Infinity, -
 rectangle nowhere. The features have to be wrapped in a `FeatureCollection`, which is what the fixture
 does.
 
+## Nine functions nothing called, and what the sweep found
+
+After `hsl(h, s, l)` turned out to have been returning null for want of a test, the obvious next
+question was which other functions nothing calls. Subtracting the names any expression test mentions
+from the names `Functions.kt` registers gives nine: `atan2`, `bandspace`, `lerp`, `pluck`, `sequence`,
+`sort`, `timeSequence`, `timezoneoffset` and `trim`. The diff takes a second and is worth keeping in the
+toolkit beside the schema one.
+
+All nine matched upstream on the first run. That is the useful outcome: 22 new vectors and no new
+findings, which turns "probably fine" into "checked" for the parts of the expression vocabulary the
+fixtures never happen to exercise. Three of the answers are worth having written down anyway:
+
+- `bandspace` counts **steps**, not bands, so five bands at 0.1 inner padding come to 5.3 — and
+  padding is allowed to eat a whole band without the answer going negative, which would invert the
+  scale;
+- `lerp` short-circuits at 0 and 1 rather than computing `lo + f*(hi - lo)`, so a specification asking
+  for the end of a range gets the end of it exactly;
+- `timeSequence` steps in **local** time even when the result is read back as UTC, which is why its
+  first entry for January 2024 in Amsterdam formats as the last day of 2023.
+
 ## Performance observations
 
 Nothing on hardware. No measurement has been taken on a physical device, and emulator numbers are
