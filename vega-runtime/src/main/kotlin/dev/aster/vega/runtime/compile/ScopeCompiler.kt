@@ -373,9 +373,19 @@ internal class ScopeCompiler(
    * vertically centred, so its text reaches a fraction above the legend's own top edge, and
    * measuring it there pushes the whole chart down by a unit.
    */
+  /**
+   * How far a legend reaches: its declared extent, widened by its own outline.
+   *
+   * The declared extent rather than its bounds, because a legend that clips an entry still occupies
+   * the box it declared. The outline has to be added back, though — a legend with a `strokeColor`
+   * is drawn half a stroke width outside the box on every side, and upstream measures it that way,
+   * so a chart with an outlined legend is a unit wider than one without.
+   */
   private fun legendBox(node: SceneNode): RectD =
-    (node as? GroupNode)?.size?.let {
-      node.transform.mapBounds(RectD(0.0, 0.0, it.width, it.height))
+    (node as? GroupNode)?.size?.let { size ->
+      val box = RectD(0.0, 0.0, size.width, size.height)
+      val widened = node.stroke?.takeIf { it.isVisible }?.let { box.expand(it.width / 2.0) } ?: box
+      node.transform.mapBounds(widened)
     } ?: node.transformedBounds
 
   private fun sortOrder(

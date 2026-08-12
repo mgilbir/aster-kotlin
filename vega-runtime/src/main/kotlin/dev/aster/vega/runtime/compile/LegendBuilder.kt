@@ -1043,12 +1043,30 @@ internal class LegendBuilder(
     return GuideCaption.legend(kind, title, channels, scale, spec.format)
   }
 
-  private fun node(built: Built, x: Double, y: Double): SceneNode =
-    GroupNode(
+  private fun node(built: Built, x: Double, y: Double): SceneNode {
+    val spec = built.spec
+    // The legend's own background, which nothing drew until now. Its width and dash come from
+    // `config.legend` rather than from the legend itself, which is upstream's rule and not a tidy
+    // one; see [LegendSpec.fillColor].
+    val backgroundFill = spec.fillColor?.let { SceneColor.parse(it) }?.let { Fill.of(it) }
+    val backgroundStroke =
+      spec.strokeColor
+        ?.let { SceneColor.parse(it) }
+        ?.let {
+          Stroke(
+            paint = ScenePaint.Solid(it),
+            width = spec.backgroundStrokeWidth ?: 1.0,
+            dashArray = spec.backgroundStrokeDash.orEmpty(),
+          )
+        }
+    return GroupNode(
       id = built.id,
       children = built.content,
       transform = Transform2D.translate(x, y),
       size = built.size,
+      fill = backgroundFill,
+      stroke = backgroundStroke,
+      cornerRadius = numbers.resolve(spec.cornerRadius, spec.scale ?: "legend") ?: 0.0,
       metadata =
         NodeMetadata(
           role = "legend",
@@ -1059,4 +1077,5 @@ internal class LegendBuilder(
             },
         ),
     )
+  }
 }

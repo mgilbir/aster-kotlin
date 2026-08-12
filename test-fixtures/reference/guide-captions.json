@@ -870,6 +870,16 @@
   "caption": "Gradient legend titled 'Value' for fill color with values from 12 to 83"
  },
  {
+  "fixture": "legend-background",
+  "kind": "legend",
+  "caption": "Symbol legend titled 'series' for fill color with 3 values: alpha, beta, gamma"
+ },
+ {
+  "fixture": "legend-background",
+  "kind": "legend",
+  "caption": "Symbol legend titled 'again' for fill color with 3 values: alpha, beta, gamma"
+ },
+ {
   "fixture": "legend-columns",
   "kind": "legend",
   "caption": "Symbol legend for fill color with 5 values: aa, bb, cc, dd, ee"

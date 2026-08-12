@@ -195,6 +195,10 @@ private val SCALE_UNSUPPORTED =
 /** Legend properties this engine reads. */
 private val LEGEND_CONSUMED =
   setOf(
+    // The legend's own background.
+    "fillColor",
+    "strokeColor",
+    "cornerRadius",
     "fill",
     "stroke",
     "size",
@@ -1736,6 +1740,10 @@ public class SpecParser {
    * `symbolLimit` and multi-column grids each report rather than being partly honoured, because a
    * legend that silently drops half its entries or ignores a formatter looks finished and is not.
    */
+  /** A `config.legend` property, without the legend's own value layered over it. */
+  private fun legendConfig(key: String): VegaValue? =
+    config.legendDefaults().firstNotNullOfOrNull { it.fields[key] }
+
   private fun parseLegend(value: VegaValue, path: String): LegendSpec? {
     val own = value as? VegaValue.Obj ?: return unexpected("a legend definition", path)
     val obj =
@@ -1780,6 +1788,17 @@ public class SpecParser {
         columns = obj.numberOrSignal("columns", "$path.columns"),
         legendX = obj.numberOrSignal("legendX", "$path.legendX"),
         legendY = obj.numberOrSignal("legendY", "$path.legendY"),
+        fillColor = obj.fields["fillColor"]?.asString()?.takeIf { it.isNotEmpty() },
+        strokeColor = obj.fields["strokeColor"]?.asString()?.takeIf { it.isNotEmpty() },
+        cornerRadius = obj.numberOrSignal("cornerRadius", "$path.cornerRadius"),
+        // From the configuration alone; see [LegendSpec.fillColor] for why the legend's own value
+        // is deliberately not consulted.
+        backgroundStrokeWidth = legendConfig("strokeWidth")?.asDouble()?.takeIf { !it.isNaN() },
+        backgroundStrokeDash =
+          (legendConfig("strokeDash") as? VegaValue.Arr)
+            ?.values
+            ?.map { it.asDouble() }
+            ?.takeIf { list -> list.isNotEmpty() && list.all { it.isFinite() && it >= 0.0 } },
         zindex = (obj.fields["zindex"] as? VegaValue.Num)?.value?.toInt() ?: 0,
         labelOverlap = obj.fields["labelOverlap"]?.asString(),
         labelSeparation = obj.numberOrSignal("labelSeparation", "$path.labelSeparation"),

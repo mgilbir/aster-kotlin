@@ -21,7 +21,7 @@ end to end — expressions, signals, 33 of upstream's 40 data transforms, every 
 and an event handler that recompiles the chart — and are verified against upstream Vega by
 differential tests.
 
-One hundred and twenty differential fixtures pass, all matching upstream exactly on every mark and
+One hundred and twenty-one differential fixtures pass, all matching upstream exactly on every mark and
 scale output:
 
 | Fixture | Marks | Covers |
@@ -201,7 +201,7 @@ substantive compatibility items:
 | 6. View and Compose APIs | Yes |
 | 7. SVG, PNG, PDF export | Yes |
 | 8. TalkBack can describe and navigate | Partial — virtual nodes are tested by instrumentation, not with TalkBack itself |
-| 9. At least 100 compatibility fixtures pass | **Yes** — 120 |
+| 9. At least 100 compatibility fixtures pass | **Yes** — 121 |
 | 10. Core runtime has no Android dependency | Yes |
 | 11. Renders without WebView | Yes |
 | 12. Build and test loop runs from the terminal | Yes |
@@ -538,7 +538,7 @@ each example a deadline.
 
 ## Known failing fixtures
 
-None. One hundred and twenty fixtures exist and all of them pass — and that sentence became worth
+None. One hundred and twenty-one fixtures exist and all of them pass — and that sentence became worth
 something only once the gate could no longer skip itself, below.
 
 **The gate could report success without running.** `FixtureDifferentialTest` reads the fixtures and
@@ -1413,6 +1413,28 @@ parser read `values` as an array or not at all — so the dataset was silently e
 `format` to inline values exactly as it does to a loaded file, including TopoJSON. It does now here,
 which took splitting each reader into a text half and a document half.
 
+## A legend had no background, and a legend's `strokeWidth` is not a width
+
+Nothing drew the panel behind a legend's entries. `fillColor`, `strokeColor` and `cornerRadius` were
+parsed and reported, and a chart that put its legends on a tinted card got no card.
+
+The part worth knowing is where the outline's **width** comes from. Upstream builds the legend group's
+encode from `_('fillColor')` and `_('strokeColor')` — the legend's own value over the config's — and
+then from `config.strokeWidth` and `config.strokeDash`, the configuration *alone*. That is not a
+tidying slip: a legend's own `strokeWidth` names a **scale**, exactly as `fill` and `size` do, and
+writing `"strokeWidth": 2` on a legend makes upstream throw `Invalid field reference: 2`. The fixture
+found that out by trying it. So the width and the dash are read from `config.legend` here too, and the
+reason is recorded next to the field rather than left as a puzzle.
+
+Two harness findings came with it, both in the same shape as every other one:
+
+- **A group's dash was never compared.** `groupMark` reported a group's fill and stroke *colour* and
+  not its dash pattern, so an outlined legend matched a dashed one.
+- **A legend's reach ignored its own outline.** `legendBox` measured the declared extent, which is
+  right — a legend that clips an entry still occupies the box it declared — but a `strokeColor` draws
+  half a stroke width outside that box on every side, and upstream measures it. A chart with an
+  outlined legend is a unit wider than one without, and this engine was making it the same width.
+
 ## Performance observations
 
 Nothing on hardware. No measurement has been taken on a physical device, and emulator numbers are
@@ -1597,7 +1619,7 @@ explored with it; the tree was already correct and two things it *said* were wro
 and pinned by instrumented tests. What remains untested there is physical hardware and a real user,
 which is a different claim from "not verified at all".
 
-A note on the harness, because it is now the eleventh time. The differential comparison has had to be
+A note on the harness, because it is now the thirteenth time. The differential comparison has had to be
 taught to see a symbol's outline, fill and stroke opacity, a dash pattern, a node's own opacity, an
 unfilled mark's missing opacity, the corners a curve puts between a series' points, a rectangle's four
 corner radii, a series' `tension`, the whole drawn extent of every `shape` mark, and — adding `linkpath` — the outline a `path` mark actually draws,

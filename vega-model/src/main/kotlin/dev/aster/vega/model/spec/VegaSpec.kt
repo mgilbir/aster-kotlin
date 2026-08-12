@@ -918,6 +918,21 @@ public data class LegendSpec(
   /** Absolute placement, used when [orient] is [LegendOrient.NONE]. */
   val legendX: NumberValue? = null,
   val legendY: NumberValue? = null,
+  /**
+   * The legend's own background: a rounded rectangle behind the entries and the title.
+   *
+   * `fillColor` and `strokeColor` are the legend's own properties, but the outline's **width and
+   * dash pattern are read from `config.legend` alone** — upstream builds the group's encode from
+   * `_('fillColor')` and `_('strokeColor')` and then from `config.strokeWidth` and
+   * `config.strokeDash`, so writing `"strokeWidth": 2` on a legend does nothing whatever and
+   * `config.legend.strokeWidth` does. Reproduced rather than tidied: a chart that outlines its
+   * legends does it in the theme.
+   */
+  val fillColor: String? = null,
+  val strokeColor: String? = null,
+  val cornerRadius: NumberValue? = null,
+  val backgroundStrokeWidth: Double? = null,
+  val backgroundStrokeDash: List<Double>? = null,
   val zindex: Int = 0,
   /**
    * Appearance of the three parts, read the same way an axis reads its own.

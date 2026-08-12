@@ -510,7 +510,13 @@ public object Differential {
     }
     val strings = LinkedHashMap<String, String>()
     node.fill?.let { f -> solidColour(f.paint)?.let { strings["fill"] = it.toCssHex() } }
-    node.stroke?.let { s -> solidColour(s.paint)?.let { strings["stroke"] = it.toCssHex() } }
+    node.stroke?.let { s ->
+      solidColour(s.paint)?.let { strings["stroke"] = it.toCssHex() }
+      // A group can be dashed too — a legend's own outline is where it shows — and this was
+      // reporting
+      // only its colour.
+      dashOf(s)?.let { strings["strokeDash"] = it }
+    }
     val corners =
       cornerNumbers(
         node.cornerRadius,

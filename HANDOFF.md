@@ -9,7 +9,7 @@ Branch `milestone-0-bootstrap`. Working tree clean, both gates green:
 - `./scripts/check.sh` — format, all tests, lint, demo APK
 - `./scripts/oracle.sh` — regenerates upstream references and runs the differential comparison
 
-**120 differential fixtures pass, all matching upstream exactly.** That is the only number here
+**121 differential fixtures pass, all matching upstream exactly.** That is the only number here
 that means what it says.
 
 ## Read this before trusting the other number
@@ -254,7 +254,7 @@ not the one Vega documents**, because Vega only forwards the parameters a specif
 
 ## What is left: two examples, and neither can be verified
 
-**120 differential fixtures pass. 91 of the 93 examples compile clean.** Everything that can be
+**121 differential fixtures pass. 91 of the 93 examples compile clean.** Everything that can be
 checked against upstream has been.
 
 ### `projections` — upstream refuses it too
@@ -394,12 +394,12 @@ Anything left is either a gap or a stale diagnostic, and telling those two apart
 
 As of this handoff the subtraction leaves:
 
-- **Legend (20):** the legend's own background — `fillColor`, `strokeColor`, `strokeWidth`,
-  `strokeDash`, `cornerRadius` — which nothing draws at all; `labelAlign`, `labelBaseline`;
+- **Legend (17):** `labelAlign`, `labelBaseline`;
   `titleAlign`, `titleBaseline`, `titleAnchor`, `titleLineHeight`; `symbolOffset`,
   `symbolDashOffset`, `symbolFillColor`, `symbolLimit`; `gradientOpacity`, `gradientStrokeColor`,
   `gradientStrokeWidth`; `gridAlign`; `tickMinStep`; `formatType`; `aria`/`description`.
-  `clipHeight` is *done* — do not re-report it.
+  `clipHeight` and the background (`fillColor`, `strokeColor`, `cornerRadius`, with the width and
+  dash coming from `config.legend` alone) are *done* — do not re-report them.
 - **Title (10):** `baseline`, `color`, `lineHeight`, `style`, `limit`, an explicit `align`/`angle`,
   `subtitleColor`, `subtitleFont`, `subtitleFontWeight`, `subtitleLineHeight`, `aria`,
   `interactive`, `name`.
