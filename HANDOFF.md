@@ -9,7 +9,7 @@ Branch `milestone-0-bootstrap`. Working tree clean, both gates green:
 - `./scripts/check.sh` — format, all tests, lint, demo APK
 - `./scripts/oracle.sh` — regenerates upstream references and runs the differential comparison
 
-**128 differential fixtures pass, all matching upstream exactly.** That is the only number here
+**129 differential fixtures pass, all matching upstream exactly.** That is the only number here
 that means what it says.
 
 ## Read this before trusting the other number
@@ -254,7 +254,7 @@ not the one Vega documents**, because Vega only forwards the parameters a specif
 
 ## What is left: two examples, and neither can be verified
 
-**128 differential fixtures pass. 91 of the 93 examples compile clean.** Everything that can be
+**129 differential fixtures pass. 91 of the 93 examples compile clean.** Everything that can be
 checked against upstream has been.
 
 ### `projections` — upstream refuses it too
@@ -411,9 +411,10 @@ As of this handoff the subtraction leaves **nothing** for `encodeEntry`, `axis`,
   consumes and reports the rest, which is what caught `titleAnchor`: it had no entry in the old
   exception table and no reader.
 - **Mark (2):** a mark-level `description` and `key`.
-- **Tail:** `lab`/`hcl` colour helpers, `geoBounds`, `impute` methods, `pivot` ops, some window ops,
-  `timeunit` unit inference, facet aggregates, `domainRaw`, `domainImplicit`, unimplemented named
-  ranges.
+- **Scale (1):** `domainImplicit`. `domainRaw` is *done*.
+- **Tail:** `hcl`/`hsl`/`cubehelix` colour interpolation (which fall back to RGB with a diagnostic),
+  `geoBounds`, `impute` methods, `pivot` ops, some window ops, `timeunit` unit inference, facet
+  aggregates, unimplemented named ranges.
 
 **Before adding any of it, check the harness can see it.** That has now been the eleventh finding of
 its kind and the largest: `shape` marks were compared by fill and stroke alone, so every map in the

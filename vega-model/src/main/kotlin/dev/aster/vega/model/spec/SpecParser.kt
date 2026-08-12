@@ -170,6 +170,7 @@ private val AXIS_UNSUPPORTED =
 /** Scale properties this engine reads. */
 private val SCALE_CONSUMED =
   setOf(
+    "domainRaw",
     "name",
     "type",
     "domain",
@@ -194,10 +195,7 @@ private val SCALE_CONSUMED =
   )
 
 private val SCALE_UNSUPPORTED =
-  mapOf(
-    "domainRaw" to "Overriding a resolved domain with 'domainRaw' is not implemented",
-    "domainImplicit" to "Extending an ordinal domain with unseen values is not implemented",
-  )
+  mapOf("domainImplicit" to "Extending an ordinal domain with unseen values is not implemented")
 
 /** Legend properties this engine reads. */
 private val LEGEND_CONSUMED =
@@ -1169,6 +1167,10 @@ public class SpecParser {
       name = name,
       type = type,
       domain = parseDomain(obj, "$path.domain"),
+      domainRaw =
+        obj.fields["domainRaw"]?.let {
+          parseDomain(VegaValue.Obj(mapOf("domain" to it)), "$path.domainRaw")
+        },
       domainMin = obj.numberOrSignal("domainMin", "$path.domainMin"),
       domainMax = obj.numberOrSignal("domainMax", "$path.domainMax"),
       domainMid = obj.numberOrSignal("domainMid", "$path.domainMid"),

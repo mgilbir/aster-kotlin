@@ -21,7 +21,7 @@ end to end — expressions, signals, 33 of upstream's 40 data transforms, every 
 and an event handler that recompiles the chart — and are verified against upstream Vega by
 differential tests.
 
-One hundred and twenty-eight differential fixtures pass, all matching upstream exactly on every mark and
+One hundred and twenty-nine differential fixtures pass, all matching upstream exactly on every mark and
 scale output:
 
 | Fixture | Marks | Covers |
@@ -201,7 +201,7 @@ substantive compatibility items:
 | 6. View and Compose APIs | Yes |
 | 7. SVG, PNG, PDF export | Yes |
 | 8. TalkBack can describe and navigate | Partial — virtual nodes are tested by instrumentation, not with TalkBack itself |
-| 9. At least 100 compatibility fixtures pass | **Yes** — 128 |
+| 9. At least 100 compatibility fixtures pass | **Yes** — 129 |
 | 10. Core runtime has no Android dependency | Yes |
 | 11. Renders without WebView | Yes |
 | 12. Build and test loop runs from the terminal | Yes |
@@ -538,7 +538,7 @@ each example a deadline.
 
 ## Known failing fixtures
 
-None. One hundred and twenty-eight fixtures exist and all of them pass — and that sentence became worth
+None. One hundred and twenty-nine fixtures exist and all of them pass — and that sentence became worth
 something only once the gate could no longer skip itself, below.
 
 **The gate could report success without running.** `FixtureDifferentialTest` reads the fixtures and
@@ -1617,6 +1617,26 @@ at all.
 Inverted to a `LAYOUT_CONSUMED` set and `reportUnhandled`, like every other block. Six layout
 properties are now named: `center`, `offset`, `headerBand`, `footerBand`, `titleBand` and
 `titleAnchor`.
+
+## `domainRaw` short-circuits five things, and one of them is not where you look
+
+`domainRaw` is what makes an interactive zoom work: a brush publishes the interval it wants and
+nothing is allowed to round it outwards. Upstream reads it **first** in `configureDomain` and returns
+before it looks at `zero`, `domainMin`, `domainMax` or `domainMid` — so it is not an override applied
+over the rest, it is a bypass of the rest.
+
+`nice` is the one that catches you. It is applied by the *caller*, after the domain has been resolved,
+at six separate sites — one per scale family, because each rounds differently. Returning early from the
+domain resolution therefore skips four of the five and leaves the fifth to widen `[17, 43]` back out to
+`[16, 44]`, which is exactly what the fixture reported. There is no single place all six pass through,
+so the check is at each of them.
+
+One more reading worth having: a raw domain of fewer than two values is **not** an override. Upstream's
+`rawDomain` returns `raw.length` and its caller only treats a value greater than `-1` as handled, so an
+empty array short-circuits with a length of zero and an unresolvable signal — which is what a brush
+publishes until a reader touches the chart — falls through to the ordinary domain.
+
+That leaves one scale property reported out of upstream's 23: `domainImplicit`.
 
 ## Performance observations
 

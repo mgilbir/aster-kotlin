@@ -113,7 +113,7 @@ public class ScaleResolver(
     var domain =
       continuousDomain(spec, zeroDefault = spec.bins == null, fallback = listOf(0.0, 1.0))
         ?: return null
-    if (spec.nice) domain = niceOf(domain, spec)
+    if (spec.nice && spec.domainRaw == null) domain = niceOf(domain, spec)
     return LinearScale(
       spec.name,
       domain,
@@ -220,7 +220,7 @@ public class ScaleResolver(
     val domain =
       (continuousDomain(spec, zeroDefault = false, fallback = listOf(0.0, 1.0)) ?: return null)
         .let {
-          if (spec.nice) niceOf(it, spec) else it
+          if (spec.nice && spec.domainRaw == null) niceOf(it, spec) else it
         }
     val space =
       spec.interpolate?.let { name ->
@@ -450,7 +450,7 @@ public class ScaleResolver(
     // here.
     var domain =
       continuousDomain(spec, zeroDefault = false, fallback = listOf(1.0, 10.0)) ?: return null
-    if (spec.nice) domain = Ticks.niceLog(domain, base)
+    if (spec.nice && spec.domainRaw == null) domain = Ticks.niceLog(domain, base)
 
     val scale =
       LogScale(spec.name, domain, oriented(range, reversed(spec)), base, spec.clamp, spec.round)
@@ -471,7 +471,7 @@ public class ScaleResolver(
     var domain =
       continuousDomain(spec, zeroDefault = spec.bins == null, fallback = listOf(0.0, 1.0))
         ?: return null
-    if (spec.nice) domain = niceOf(domain, spec)
+    if (spec.nice && spec.domainRaw == null) domain = niceOf(domain, spec)
     val exponent = numbers.resolve(spec.exponent, spec.name) ?: defaultExponent
     return PowScale(
       spec.name,
@@ -488,7 +488,7 @@ public class ScaleResolver(
     // Symlog is not in upstream's zero list: its domain reaches both signs happily.
     var domain =
       continuousDomain(spec, zeroDefault = false, fallback = listOf(0.0, 1.0)) ?: return null
-    if (spec.nice) domain = niceOf(domain, spec)
+    if (spec.nice && spec.domainRaw == null) domain = niceOf(domain, spec)
     val constant = numbers.resolve(spec.constant, spec.name) ?: 1.0
     return SymlogScale(
       spec.name,
@@ -519,11 +519,46 @@ public class ScaleResolver(
    * @param fallback the domain to use when nothing resolved; a log-family scale cannot take `[0,
    *   1]`.
    */
+  /**
+   * `domainRaw`: a domain to use exactly as given, whatever the rest of the scale says.
+   *
+   * Almost always a signal — `{"signal": "brush"}` — and almost always null until a reader touches
+   * the chart, which is why an unresolvable one has to mean "no override" rather than "empty
+   * domain".
+   */
+  /**
+   * True when `domainRaw` supplied the domain, in which case `nice` must not touch it.
+   *
+   * Checked at each `nice` site rather than once, because upstream's `configureDomain` returns
+   * before it reaches any of them and there is no single place here that all six pass through.
+   */
+  private fun rawDomain(spec: ScaleSpec): List<Double>? {
+    val raw = spec.domainRaw ?: return null
+    return literalNumbers(raw)
+      ?: numericExtent(raw, spec.name)?.let {
+        listOf(it.start, it.endInclusive)
+      }
+  }
+
   private fun continuousDomain(
     spec: ScaleSpec,
     zeroDefault: Boolean,
     fallback: List<Double>,
   ): List<Double>? {
+    // `domainRaw` short-circuits everything below it — `zero`, the three `domain*` overrides, and
+    // the
+    // `nice` the caller applies after. That is upstream's `configureDomain`, which reads the raw
+    // domain first and returns before it looks at anything else, and it is what makes an
+    // interactive
+    // zoom work: a brush publishes the exact interval it wants and nothing is allowed to round it
+    // outwards. A raw domain of one value or none is *not* an override — upstream returns its
+    // length
+    // and carries on — so it falls through to the ordinary path here as well.
+    rawDomain(spec)
+      ?.takeIf { it.size >= 2 }
+      ?.let {
+        return it
+      }
     val resolved =
       literalNumbers(spec.domain)?.also {
         if (it.size < 2) {
@@ -586,7 +621,7 @@ public class ScaleResolver(
         listOf(extent.start, extent.endInclusive)
       }
     val niced =
-      if (spec.nice) {
+      if (spec.nice && spec.domainRaw == null) {
         val (lo, hi) =
           TimeTicks.nice(
             domain.first(),

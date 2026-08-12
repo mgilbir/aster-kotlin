@@ -455,6 +455,15 @@ public data class ScaleSpec(
   val type: ScaleType,
   val domain: DomainSpec,
   /**
+   * A domain to use exactly as given, whatever the rest of the scale says: `domainRaw`.
+   *
+   * It short-circuits `zero`, the three `domain*` overrides and `nice` — which is what makes an
+   * interactive zoom work, since a brush publishes the interval it wants and nothing may round it
+   * outwards. Almost always a signal, and almost always null until a reader touches the chart, so
+   * an unresolvable one means "no override" and not "empty domain".
+   */
+  val domainRaw: DomainSpec? = null,
+  /**
    * `domainMin`/`domainMax` **replace** an end of the resolved domain rather than clamping it, and
    * they run after `zero`, which is how `domainMin: 30` beats the zero that would otherwise have
    * pulled the domain down. Upstream does not correct a minimum above the maximum either.

@@ -41,9 +41,8 @@ class UnhandledPropertiesTest {
       .trimIndent()
 
   /**
-   * Two of upstream's 23 scale properties remain. `domainMin`, `domainMax` and `domainMid` were the
-   * ones in wide use, and `bins` was the last one a real example needed; all four are implemented
-   * rather than reported.
+   * One of upstream's 23 scale properties remains. `domainMin`, `domainMax`, `domainMid`, `bins`
+   * and now `domainRaw` are implemented rather than reported.
    */
   @Test
   fun `a scale reports the domain overrides it cannot honour`() {
@@ -56,8 +55,9 @@ class UnhandledPropertiesTest {
               "domainRaw": [1, 2], "domainImplicit": true, "bins": [0, 5, 10]}]"""
         )
       )
-    // `bins` was on this list and is implemented; the two left are genuinely unread.
-    assertEquals(listOf("domainImplicit", "domainRaw").sorted(), reported.sorted())
+    // `bins` and `domainRaw` were on this list and are implemented; the one left is genuinely
+    // unread.
+    assertEquals(listOf("domainImplicit"), reported.sorted())
   }
 
   /**
@@ -190,11 +190,11 @@ class UnhandledPropertiesTest {
     val tailored =
       diagnostics(
           spec(
-            """"scales": [{"name": "s", "type": "linear", "domain": [0, 1],
-                "range": "width", "domainRaw": [1, 2]}]"""
+            """"scales": [{"name": "s", "type": "ordinal", "domain": ["a"],
+                "range": ["#000"], "domainImplicit": true}]"""
           )
         )
-        .single { it.jsonPath?.endsWith("domainRaw") == true }
-    assertTrue("resolved domain" in tailored.message, tailored.message)
+        .single { it.jsonPath?.endsWith("domainImplicit") == true }
+    assertTrue("unseen values" in tailored.message, tailored.message)
   }
 }
