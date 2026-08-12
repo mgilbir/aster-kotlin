@@ -1261,11 +1261,11 @@ internal object Marks {
         else -> {
           val discreteBandSize = markConfig.number("discreteBandSize")
           when {
-            discreteBandSize != null -> obj { put("value", discreteBandSize) }
-            // A rect-based mark with *nothing* encoded on this channel spans the plot rather than
-            // sitting somewhere in it at a default width — `defaultSizeRef`'s `!hasFieldDef`
-            // branch. It keeps back exactly what a band scale's inner padding would have kept
-            // back, so a lone row of ticks is as thick as one row of a trellis of them.
+            // `defaultSizeRef` asks whether the channel has a field **first**. A rect-based mark
+            // with nothing encoded on this channel spans the plot rather than sitting somewhere in
+            // it at a default width, and it keeps back exactly what a band scale's inner padding
+            // would have kept back — so a lone row of ticks is as thick as one row of a trellis of
+            // them, and a boxplot of one column is as thick as one row of boxes.
             def == null -> {
               val padding =
                 view.config.scaleConfig(
@@ -1281,6 +1281,7 @@ internal object Marks {
               // expression against that.
               signalRef("${canonicalNumberString(1 - padding)} * $sizeChannel")
             }
+            discreteBandSize != null -> obj { put("value", discreteBandSize) }
             else -> obj { put("value", view.config.step - 2) }
           }
         }
