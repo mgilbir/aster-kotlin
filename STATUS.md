@@ -1709,6 +1709,17 @@ through as though Vega knew them.
 Beside them, a relative band size on a *band* scale, which is two numbers rather than one: the mark
 fills `band * bandwidth(scale)` and starts `(1 - band) / 2` in, so the gaps either side of it match.
 
+### A layer that is not there renames every layer under it
+
+`"outliers": false` takes a boxplot's scatter of far-out rows off, and with it a whole layer — so
+the whiskers *are* the first layer and everything below loses a level of naming. The names are what
+every scale domain and mark reference is written against, so a layer that vanishes silently is a
+chart whose parts point at each other's names.
+
+An arc that states its own `outerRadius` is not measured from the plotting area either: a donut
+naming its own reach means it, and it still needs an inner radius of zero, Vega drawing nothing at
+all where neither is given.
+
 ### Two runtime gaps this batch names but does not close
 
 `density`'s fixture is not in the corpus, and `trail`'s draws no legend. Both compile exactly as

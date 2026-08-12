@@ -1,0 +1,183 @@
+{
+  "marks": [
+    {
+      "fill": "transparent",
+      "height": 300,
+      "role": "frame",
+      "type": "group",
+      "width": 300,
+      "x": 0,
+      "y": 0
+    },
+    {
+      "fill": "#f58518",
+      "role": "mark",
+      "shapeHeight": 160,
+      "shapeLeft": 70,
+      "shapeTop": 70,
+      "shapeWidth": 159.015067,
+      "type": "arc"
+    },
+    {
+      "fill": "#4c78a8",
+      "role": "mark",
+      "shapeHeight": 79.015067,
+      "shapeLeft": 150,
+      "shapeTop": 150,
+      "shapeWidth": 56.568543,
+      "type": "arc"
+    },
+    {
+      "fill": "#e45756",
+      "role": "mark",
+      "shapeHeight": 69.0833,
+      "shapeLeft": 150,
+      "shapeTop": 137.485243,
+      "shapeWidth": 80,
+      "type": "arc"
+    },
+    {
+      "fill": "#4c78a8",
+      "opacity": 1,
+      "role": "legend-symbol",
+      "shapeHeight": 10,
+      "shapeLeft": 319,
+      "shapeTop": 17,
+      "shapeWidth": 10,
+      "size": 100,
+      "type": "symbol",
+      "x": 324,
+      "y": 22
+    },
+    {
+      "align": "left",
+      "baseline": "middle",
+      "fill": "#000",
+      "font": "sans-serif",
+      "fontSize": 10,
+      "opacity": 1,
+      "role": "legend-label",
+      "text": "Shady side of a pyramid",
+      "type": "text",
+      "x": 334,
+      "y": 22
+    },
+    {
+      "fill": "#f58518",
+      "opacity": 1,
+      "role": "legend-symbol",
+      "shapeHeight": 10,
+      "shapeLeft": 319,
+      "shapeTop": 30,
+      "shapeWidth": 10,
+      "size": 100,
+      "type": "symbol",
+      "x": 324,
+      "y": 35
+    },
+    {
+      "align": "left",
+      "baseline": "middle",
+      "fill": "#000",
+      "font": "sans-serif",
+      "fontSize": 10,
+      "opacity": 1,
+      "role": "legend-label",
+      "text": "Sky",
+      "type": "text",
+      "x": 334,
+      "y": 35
+    },
+    {
+      "fill": "#e45756",
+      "opacity": 1,
+      "role": "legend-symbol",
+      "shapeHeight": 10,
+      "shapeLeft": 319,
+      "shapeTop": 43,
+      "shapeWidth": 10,
+      "size": 100,
+      "type": "symbol",
+      "x": 324,
+      "y": 48
+    },
+    {
+      "align": "left",
+      "baseline": "middle",
+      "fill": "#000",
+      "font": "sans-serif",
+      "fontSize": 10,
+      "opacity": 1,
+      "role": "legend-label",
+      "text": "Sunny side of a pyramid",
+      "type": "text",
+      "x": 334,
+      "y": 48
+    },
+    {
+      "align": "left",
+      "angle": 0,
+      "baseline": "top",
+      "fill": "#000",
+      "font": "sans-serif",
+      "fontSize": 11,
+      "fontWeight": "bold",
+      "opacity": 1,
+      "role": "legend-title",
+      "text": "category",
+      "type": "text",
+      "x": 318,
+      "y": 0
+    }
+  ],
+  "scales": {
+    "color": {
+      "domain": [
+        "Shady side of a pyramid",
+        "Sky",
+        "Sunny side of a pyramid"
+      ],
+      "range": [
+        "#4c78a8",
+        "#f58518",
+        "#e45756",
+        "#72b7b2",
+        "#54a24b",
+        "#eeca3b",
+        "#b279a2",
+        "#ff9da6",
+        "#9d755d",
+        "#bab0ac"
+      ]
+    },
+    "theta": {
+      "domain": [
+        0,
+        100
+      ],
+      "range": [
+        2.356194,
+        8.63938
+      ],
+      "ticks": [
+        0,
+        10,
+        20,
+        30,
+        40,
+        50,
+        60,
+        70,
+        80,
+        90,
+        100
+      ]
+    }
+  },
+  "size": {
+    "height": 310,
+    "width": 496
+  },
+  "spec": "arc-stated-radius.vg.json",
+  "vegaVersion": "6.3.1"
+}

@@ -298,10 +298,22 @@ internal object Marks {
         }
         "arc" -> {
           // An arc is a rect in polar coordinates: its centre comes from the plotting area and its
-          // extent from the two polar channel pairs.
+          // extent from the two polar channel pairs — unless the mark states a radius outright,
+          // where a donut names its own hole and its own reach and neither is derived.
           putAll(pointPosition(view, "x", "mid", null))
           putAll(pointPosition(view, "y", "mid", null))
-          putAll(rectPosition(view, "radius"))
+          val statedRadius =
+            view.markDef.raw.fields["outerRadius"] != null ||
+              view.markDef.raw.fields["radius"] != null
+          if (statedRadius) {
+            // A stated outer radius still needs an inner one: an arc with no hole is a wedge, and
+            // Vega draws nothing at all where neither radius is given.
+            if (view.markDef.raw.fields["innerRadius"] == null) {
+              put("innerRadius", obj { put("value", 0) })
+            }
+          } else {
+            putAll(rectPosition(view, "radius"))
+          }
           putAll(rectPosition(view, "theta"))
         }
         "text" -> {

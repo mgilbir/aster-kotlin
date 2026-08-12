@@ -458,20 +458,27 @@ internal class Composite(
         )
       )
 
+    // `"outliers": false` takes the scatter of far-out rows off, and with it a whole layer — so
+    // everything below is one level shallower and named accordingly.
+    val wantsOutliers = markDef.fields["outliers"] != VegaValue.Bool(false)
     val outliers =
-      part(
-        "outliers",
-        "layer_0_layer_0",
-        listOf(quartiles, outside),
-        obj { put("type", "point") },
-        start = field,
-        rawPosition = true,
-      )
+      if (!wantsOutliers) null
+      else
+        part(
+          "outliers",
+          "layer_0_layer_0",
+          listOf(quartiles, outside),
+          obj { put("type", "point") },
+          start = field,
+          rawPosition = true,
+        )
+    // With no outlier layer the whiskers *are* the first layer, so every name below loses a level.
+    val whiskerPrefix = if (wantsOutliers) "layer_0_layer_1" else "layer_0"
     val whiskers =
       listOfNotNull(
         part(
           "rule",
-          "layer_0_layer_1_layer_0",
+          "${whiskerPrefix}_layer_0",
           listOf(quartiles, inside, whiskerSummary),
           rule(),
           "lower_whisker",
@@ -480,7 +487,7 @@ internal class Composite(
         ),
         part(
           "rule",
-          "layer_0_layer_1_layer_1",
+          "${whiskerPrefix}_layer_1",
           listOf(quartiles, inside, whiskerSummary),
           rule(),
           "upper_box",
@@ -489,7 +496,7 @@ internal class Composite(
         ),
         part(
           "ticks",
-          "layer_0_layer_1_layer_2",
+          "${whiskerPrefix}_layer_2",
           listOf(quartiles, inside, whiskerSummary),
           tick("black"),
           "lower_whisker",
@@ -497,7 +504,7 @@ internal class Composite(
         ),
         part(
           "ticks",
-          "layer_0_layer_1_layer_3",
+          "${whiskerPrefix}_layer_3",
           listOf(quartiles, inside, whiskerSummary),
           tick("black"),
           "upper_whisker",
