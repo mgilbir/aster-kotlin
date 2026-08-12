@@ -464,6 +464,15 @@ public data class ScaleSpec(
    */
   val domainRaw: DomainSpec? = null,
   /**
+   * `domainImplicit`: an ordinal value nobody declared **joins** the domain instead of being
+   * unknown.
+   *
+   * d3 spells it by setting the scale's `unknown` to its `implicit` sentinel, and the effect is
+   * that the domain grows as the scale is used. Off by default because order of use then decides
+   * which colour a value gets; it is for a domain nobody can write down in advance.
+   */
+  val domainImplicit: Boolean = false,
+  /**
    * `domainMin`/`domainMax` **replace** an end of the resolved domain rather than clamping it, and
    * they run after `zero`, which is how `domainMin: 30` beats the zero that would otherwise have
    * pulled the domain down. Upstream does not correct a minimum above the maximum either.

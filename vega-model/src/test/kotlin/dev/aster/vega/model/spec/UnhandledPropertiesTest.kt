@@ -41,8 +41,12 @@ class UnhandledPropertiesTest {
       .trimIndent()
 
   /**
-   * One of upstream's 23 scale properties remains. `domainMin`, `domainMax`, `domainMid`, `bins`
-   * and now `domainRaw` are implemented rather than reported.
+   * None of upstream's 23 scale properties is reported any more.
+   *
+   * Kept, and kept naming the six that were the last to arrive — `domainMin`, `domainMax`,
+   * `domainMid`, `bins`, `domainRaw` and `domainImplicit`. One that stopped being honoured would go
+   * back to being reported here, which is the failure this test exists to produce; the empty list
+   * only says that today none of them is.
    */
   @Test
   fun `a scale reports the domain overrides it cannot honour`() {
@@ -55,9 +59,7 @@ class UnhandledPropertiesTest {
               "domainRaw": [1, 2], "domainImplicit": true, "bins": [0, 5, 10]}]"""
         )
       )
-    // `bins` and `domainRaw` were on this list and are implemented; the one left is genuinely
-    // unread.
-    assertEquals(listOf("domainImplicit"), reported.sorted())
+    assertEquals(emptyList<String>(), reported.sorted())
   }
 
   /**
@@ -187,14 +189,15 @@ class UnhandledPropertiesTest {
         .single { it.jsonPath?.endsWith("somethingUpstreamAddedLater") == true }
     assertTrue("not implemented" in invented.message, invented.message)
 
+    // A tailored explanation, from a block that still has some: `layout` reports six by name.
     val tailored =
       diagnostics(
           spec(
-            """"scales": [{"name": "s", "type": "ordinal", "domain": ["a"],
-                "range": ["#000"], "domainImplicit": true}]"""
+            """"marks": [{"type": "group", "from": {"facet": {"data": "t", "name": "cell",
+                "groupby": "c"}}, "layout": {"center": true}, "marks": []}]"""
           )
         )
-        .single { it.jsonPath?.endsWith("domainImplicit") == true }
-    assertTrue("unseen values" in tailored.message, tailored.message)
+        .single { it.jsonPath?.endsWith("center") == true }
+    assertTrue("Centring cells" in tailored.message, tailored.message)
   }
 }

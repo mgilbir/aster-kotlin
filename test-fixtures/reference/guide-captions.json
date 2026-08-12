@@ -1290,6 +1290,11 @@
   "caption": "Y-axis for a linear scale with values from 0 to 45"
  },
  {
+  "fixture": "scale-domain-implicit",
+  "kind": "axis",
+  "caption": "X-axis for a discrete scale with 4 values: alpha, beta, gamma, delta"
+ },
+ {
   "fixture": "scale-domain-raw",
   "kind": "axis",
   "caption": "X-axis titled 'raw [17, 43]' for a linear scale with values from 17 to 43"

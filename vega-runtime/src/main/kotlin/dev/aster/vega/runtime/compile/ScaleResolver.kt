@@ -722,7 +722,7 @@ public class ScaleResolver(
           return null
         }
       }
-    return OrdinalScale(spec.name, domain, range)
+    return OrdinalScale(spec.name, domain, range, implicit = spec.domainImplicit)
   }
 
   /**

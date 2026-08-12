@@ -21,7 +21,7 @@ end to end — expressions, signals, 33 of upstream's 40 data transforms, every 
 and an event handler that recompiles the chart — and are verified against upstream Vega by
 differential tests.
 
-One hundred and thirty-three differential fixtures pass, all matching upstream exactly on every mark and
+One hundred and thirty-four differential fixtures pass, all matching upstream exactly on every mark and
 scale output:
 
 | Fixture | Marks | Covers |
@@ -201,7 +201,7 @@ substantive compatibility items:
 | 6. View and Compose APIs | Yes |
 | 7. SVG, PNG, PDF export | Yes |
 | 8. TalkBack can describe and navigate | Partial — virtual nodes are tested by instrumentation, not with TalkBack itself |
-| 9. At least 100 compatibility fixtures pass | **Yes** — 133 |
+| 9. At least 100 compatibility fixtures pass | **Yes** — 134 |
 | 10. Core runtime has no Android dependency | Yes |
 | 11. Renders without WebView | Yes |
 | 12. Build and test loop runs from the terminal | Yes |
@@ -538,7 +538,7 @@ each example a deadline.
 
 ## Known failing fixtures
 
-None. One hundred and thirty-three fixtures exist and all of them pass — and that sentence became worth
+None. One hundred and thirty-four fixtures exist and all of them pass — and that sentence became worth
 something only once the gate could no longer skip itself, below.
 
 **The gate could report success without running.** `FixtureDifferentialTest` reads the fixtures and
@@ -1788,6 +1788,21 @@ fixtures never happen to exercise. Three of the answers are worth having written
   for the end of a range gets the end of it exactly;
 - `timeSequence` steps in **local** time even when the result is read back as UTC, which is why its
   first entry for January 2024 in Amsterdam formats as the last day of 2023.
+
+## `domainImplicit`, and a domain that grows as it is used
+
+An ordinal scale normally maps an undeclared value to its `unknown` — nothing, usually, so a mark with
+an unexpected category draws unpainted. `domainImplicit` makes such a value **join** the domain
+instead: d3 spells it by setting `unknown` to its own `implicit` sentinel, and the effect is that the
+scale's domain grows as it is used, each new value taking the range entry after the last one claimed.
+
+That is why it is off by default, and worth saying rather than leaving to be inferred: **order of use
+decides which colour a value gets**, so a chart that reorders its rows would repaint itself. It is for
+a domain nobody can write down in advance. The fixture declares two values, feeds four, and the last
+two take the third range entry and then wrap to the first — beside the same scale without the flag,
+which simply has no colour for them.
+
+With it, none of upstream's 23 scale properties is reported any more.
 
 ## Performance observations
 

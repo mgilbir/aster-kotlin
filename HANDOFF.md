@@ -9,7 +9,7 @@ Branch `milestone-0-bootstrap`. Working tree clean, both gates green:
 - `./scripts/check.sh` — format, all tests, lint, demo APK
 - `./scripts/oracle.sh` — regenerates upstream references and runs the differential comparison
 
-**133 differential fixtures pass, all matching upstream exactly.** That is the only number here
+**134 differential fixtures pass, all matching upstream exactly.** That is the only number here
 that means what it says.
 
 ## Read this before trusting the other number
@@ -254,7 +254,7 @@ not the one Vega documents**, because Vega only forwards the parameters a specif
 
 ## What is left: two examples, and neither can be verified
 
-**133 differential fixtures pass. 91 of the 93 examples compile clean.** Everything that can be
+**134 differential fixtures pass. 91 of the 93 examples compile clean.** Everything that can be
 checked against upstream has been.
 
 ### `projections` — upstream refuses it too
@@ -392,8 +392,8 @@ between. `oracle-js/node_modules/vega/build/vega-schema.json` has a definition p
 table's string literals out of `SpecParser.kt`, expand `guideStyleKeys(...)` by hand, and subtract.
 Anything left is either a gap or a stale diagnostic, and telling those two apart is a grep.
 
-As of this handoff the subtraction leaves **nothing** for `encodeEntry`, `axis`, `projection` and
-`scale`, and this for the rest:
+As of this handoff the subtraction leaves **nothing** for `encodeEntry`, `axis`, `title`, `scale`,
+`projection` or `mark`, and this for the rest:
 
 - **Legend (2):** `titleAnchor`, which needs upstream's `legendTitleOffset` — a title anchored `end`
   is placed from the *entries'* extent rather than the legend's, and a vertical gradient swaps which
@@ -411,7 +411,6 @@ As of this handoff the subtraction leaves **nothing** for `encodeEntry`, `axis`,
   consumes and reports the rest, which is what caught `titleAnchor`: it had no entry in the old
   exception table and no reader.
 - **Mark (2):** a mark-level `description` and `key`.
-- **Scale (1):** `domainImplicit`. `domainRaw` is *done*.
 - **Tail:** `timeunit` unit inference, facet aggregates, and an rgb interpolation `gamma`.
   `config.range`, the named ranges, all four geo expression functions and the `lab`/`hcl` colour
   helpers are *done*. The colour interpolation spaces are *done*, and so are all 26
