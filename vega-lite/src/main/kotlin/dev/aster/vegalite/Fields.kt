@@ -45,7 +45,9 @@ internal object Fields {
             binToString(def.bin.params)
           }
           def.aggregate != null -> def.aggregate
-          def.timeUnit != null -> timeUnitToString(def.timeUnit)
+          // `isBinnedTimeUnit`: a column that arrives already bucketed keeps its own name — there
+          // is no transform writing a new one, only a formula computing the bucket's far edge.
+          def.timeUnit != null && !isBinnedTimeUnit(def.timeUnit) -> timeUnitToString(def.timeUnit)
           else -> null
         }
       if (function != null) {
@@ -88,7 +90,9 @@ internal object Fields {
   fun defaultTitle(def: ChannelDef, config: Config): String? {
     if (def.aggregate == "count") return config.countTitle
     if (def.bin is Binning.Bin) return "${def.field} (binned)"
-    if (def.timeUnit != null) {
+    // A column that arrived already bucketed is titled by its own name: nothing here bucketed it,
+    // so there is no derivation to announce.
+    if (def.timeUnit != null && !isBinnedTimeUnit(def.timeUnit)) {
       val parts = timeUnitParts(def.timeUnit)
       if (parts.isNotEmpty()) return "${def.field} (${parts.joinToString("-")})"
     }
@@ -123,6 +127,9 @@ internal object Fields {
   }
 
   fun timeUnitToString(timeUnit: String): String = timeUnit
+
+  /** `binnedyearmonth` — a time unit the *data* was bucketed by before it arrived. */
+  fun isBinnedTimeUnit(timeUnit: String): Boolean = timeUnit.startsWith("binned")
 
   /**
    * `timeUnitSpecifier(...)`: the format specifier a bucketed instant is labelled with.
@@ -176,7 +183,8 @@ internal object Fields {
   }
 
   /** `yearmonth` reads as `year-month` in a title. */
-  fun timeUnitParts(timeUnit: String): List<String> {
+  fun timeUnitParts(rawTimeUnit: String): List<String> {
+    val timeUnit = rawTimeUnit.removePrefix("binned")
     val units =
       listOf(
         "year",

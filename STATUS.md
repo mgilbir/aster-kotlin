@@ -1525,6 +1525,19 @@ them, and Vega reads the first and warns about the rest — nine signals where u
 The runtime gained one to match: `encode.gradient` is where a ramp's own opacity is written, so a
 legend beside a chart of translucent marks is drawn as translucent as they are rather than solid.
 
+### A column that arrived already bucketed
+
+`binnedyearmonth` and its kin say the *data* was bucketed before it got here, and almost every rule
+that reads a time unit has to know it. There is no `timeunit` transform, only a formula computing
+where the bucket ends — `timeOffset('month', datum['date'], 1)`. The field keeps its own name,
+`vgField` skipping the prefix it would otherwise add. The title is the field's own, there being no
+derivation to announce. And the stack groups by the bucket's start alone, its far edge being a
+column a formula wrote rather than a second name for the same one.
+
+Beside it, a `groupby` is written whenever the specification **stated** one, empty or not: an empty
+list and silence are two different statements and it is the statement that is carried across. A
+boxplot over one ungrouped column states an empty one.
+
 ### Two runtime gaps this batch names but does not close
 
 `density`'s fixture is not in the corpus, and `trail`'s draws no legend. Both compile exactly as

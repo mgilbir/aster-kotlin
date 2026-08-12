@@ -28,6 +28,7 @@ internal class DataPipeline(
     implicitParse()?.let { head = head.then(it) }
     binNode()?.let { head = head.then(it) }
     timeUnitNode()?.let { head = head.then(it) }
+    binnedTimeUnitNode()?.let { head = head.then(it) }
     sortIndexNode()?.let { head = head.then(it) }
 
     // The pre-aggregation table, named only when something reads it. A domain sorted by an
@@ -184,10 +185,33 @@ internal class DataPipeline(
     return if (bins.isEmpty()) null else BinNode(bins.distinctBy { it.signal })
   }
 
+  /**
+   * The far edge of a bucket the *data* already carries — `binnedyearmonth` and its kin.
+   *
+   * There is nothing to bucket, so there is no `timeunit` transform: the column stays as it is and
+   * a formula computes where its bucket ends, one unit of the smallest part on from the start.
+   */
+  private fun binnedTimeUnitNode(): PassThroughNode? {
+    val formulas =
+      view.spec.encoding.values.mapNotNull { def ->
+        val timeUnit =
+          def.timeUnit?.takeIf { Fields.isBinnedTimeUnit(it) } ?: return@mapNotNull null
+        val field = def.field ?: return@mapNotNull null
+        val part = Fields.timeUnitParts(timeUnit).lastOrNull() ?: return@mapNotNull null
+        obj {
+          put("type", "formula")
+          put("expr", "timeOffset('$part', datum['$field'], 1)")
+          put("as", "${field}_end")
+        }
+      }
+    return if (formulas.isEmpty()) null else PassThroughNode(formulas)
+  }
+
   private fun timeUnitNode(): TimeUnitNode? {
     val units =
       view.spec.encoding.values.mapNotNull { def ->
-        val timeUnit = def.timeUnit ?: return@mapNotNull null
+        val timeUnit =
+          def.timeUnit?.takeIf { !Fields.isBinnedTimeUnit(it) } ?: return@mapNotNull null
         val field = def.field ?: return@mapNotNull null
         TimeUnitComponent(
           field,
@@ -325,7 +349,10 @@ internal class DataPipeline(
     val dimensions =
       stack.groupbyChannels.flatMap { channel ->
         val dimension = view.spec.fieldDef(channel) ?: return@flatMap emptyList()
-        if (dimension.bin != null || hasBandEnd(dimension)) {
+        val binnedUnit = dimension.timeUnit?.let { Fields.isBinnedTimeUnit(it) } == true
+        // A column that arrived already bucketed groups by its start alone: its far edge is a
+        // column a formula wrote, not a second name for the same one.
+        if (!binnedUnit && (dimension.bin != null || hasBandEnd(dimension))) {
           listOf(
             Fields.vgField(dimension),
             if (dimension.bin is Binning.Bin) Fields.vgField(dimension, suffix = "end")

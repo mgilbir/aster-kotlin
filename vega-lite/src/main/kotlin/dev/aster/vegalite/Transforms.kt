@@ -73,13 +73,10 @@ internal class Transforms(
               "fields",
               arr(entries.map { entry -> entry.string("field")?.let(::str) ?: VegaValue.Null }),
             )
-            // Omitted where there is nothing to group by: a joinaggregate over the whole table
-            // writes no `groupby` at all, and an empty list is a different statement from silence.
-            fieldList(transform["groupby"])
-              .takeIf { it.isNotEmpty() }
-              ?.let {
-                put("groupby", strings(it))
-              }
+            // Written whenever the specification *stated* one, empty or not: an empty list and
+            // silence are two different statements, and it is the statement that is carried
+            // across. A boxplot over an ungrouped column states an empty one.
+            if (transform.has("groupby")) put("groupby", strings(fieldList(transform["groupby"])))
           }
         )
 
