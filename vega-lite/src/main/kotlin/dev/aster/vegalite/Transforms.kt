@@ -464,33 +464,122 @@ internal class Transforms(
     return null
   }
 
+  /**
+   * A bucketed instant, rebuilt from the field's own parts — `fieldExpr` in `timeunit.ts`.
+   *
+   * A predicate on a time unit cannot ask Vega to bucket the column and compare that: it builds the
+   * bucket itself out of `year(datum.date)` and friends and hands the result to `datetime`, so the
+   * comparison is between two numbers. A quarter counts from zero here and is multiplied into a
+   * month, and every part the unit does not mention takes the same default a bare `datetime` does —
+   * 2012 for the year, so a day-of-week bucket falls in a leap year beginning on a Sunday.
+   */
   private fun timeUnitExpression(timeUnit: String, field: String): String {
-    val parts = Fields.timeUnitParts(timeUnit).joinToString(",") { "'$it'" }
-    return "timeUnit([$parts], datum[${quoted(field)}])"
+    val utc = if (timeUnit.startsWith("utc")) "utc" else ""
+    val present = Fields.timeUnitParts(timeUnit.removePrefix("utc")).toSet()
+    val access = "datum[${quoted(field)}]"
+    fun part(name: String) =
+      if (name == "quarter") "($utc" + "quarter($access)-1)" else "$utc$name($access)"
+    val year = if ("year" in present) part("year") else "2012"
+    val month =
+      when {
+        "month" in present -> part("month")
+        "quarter" in present -> "${part("quarter")}*3"
+        else -> "0"
+      }
+    val date =
+      when {
+        "date" in present -> part("date")
+        "day" in present -> "${part("day")}+1"
+        else -> "1"
+      }
+    val rest =
+      listOf("hours", "minutes", "seconds", "milliseconds").map {
+        if (it in present) part(it) else "0"
+      }
+    val arguments = (listOf(year, month, date) + rest).joinToString(", ")
+    return if (utc.isEmpty()) "datetime($arguments)" else "utc($arguments)"
   }
+
+  /** The single local units a bare number is read *as*, rather than as a millisecond count. */
+  private val SINGLE_TIME_UNITS =
+    setOf(
+      "year",
+      "quarter",
+      "month",
+      "date",
+      "day",
+      "hours",
+      "minutes",
+      "seconds",
+      "milliseconds",
+    )
 
   private fun literal(value: VegaValue, timeUnit: String?): String =
     when {
+      // A **number** compared against a single time unit is that unit's own value, not an instant:
+      // `2006` under a `year` bucket is the year 2006, so `valueExpr` expands it through
+      // `dateTimeToExpr({year: 2006})` rather than reading it as milliseconds since the epoch. The
+      // cut-off is upstream's: below ten thousand it cannot plausibly be a timestamp.
+      value is VegaValue.Num && timeUnit in SINGLE_TIME_UNITS && value.value < 10_000 ->
+        "time(datetime(${dateTimeArguments(obj { put(timeUnit!!, value) })}))"
+      value is VegaValue.Num && timeUnit != null ->
+        "time(datetime(${canonicalNumberString(value.value)}))"
+      value is VegaValue.Str && timeUnit in SINGLE_TIME_UNITS && !looksLikeADate(value.value) ->
+        "time(datetime(${dateTimeArguments(obj { put(timeUnit!!, value) })}))"
       value is VegaValue.Str && timeUnit != null -> "time(datetime(${quoted(value.value)}))"
       // Upstream writes these with `JSON.stringify`, so they are double-quoted.
       value is VegaValue.Str -> quoted(value.value)
       value is VegaValue.Num -> canonicalNumberString(value.value)
       value is VegaValue.Bool -> value.value.toString()
-      value is VegaValue.Obj -> "datetime(${dateTimeArguments(value)})"
+      // A date-time literal is compared as a number too, so it takes the same `time()` wrapper the
+      // field does — `predicateValueExpr` passes `wrapTime`.
+      value is VegaValue.Obj -> "time(datetime(${dateTimeArguments(value)}))"
       else -> "null"
     }
 
-  /** A `{"year": 2012, "month": "jan"}` literal, in the argument order `datetime` takes. */
+  /**
+   * A `{"year": 2012, "month": "jan"}` literal, in the argument order `datetime` takes.
+   *
+   * `dateTimeParts`: the missing parts are not zeroes throughout — a year defaults to **2012**, a
+   * month to zero *or* to a quarter times three, and a date to one *or* to a day plus one, which is
+   * the arithmetic that makes a bare `{"day": "mon"}` land on a Monday.
+   */
   private fun dateTimeArguments(value: VegaValue.Obj): String {
-    val order = listOf("year", "month", "date", "hours", "minutes", "seconds", "milliseconds")
-    return order.joinToString(", ") { key ->
+    fun number(key: String): String? =
       when (val part = value.fields[key]) {
-        null -> "0"
         is VegaValue.Num -> canonicalNumberString(part.value)
-        is VegaValue.Str -> quoted(part.value)
-        else -> "0"
+        is VegaValue.Str -> monthOrDay(key, part.value)
+        else -> null
       }
-    }
+    val year = number("year") ?: "2012"
+    val month = number("month") ?: number("quarter")?.let { "$it*3" } ?: "0"
+    val date = number("date") ?: number("day")?.let { "$it+1" } ?: "1"
+    val rest = listOf("hours", "minutes", "seconds", "milliseconds").map { number(it) ?: "0" }
+    return (listOf(year, month, date) + rest).joinToString(", ")
+  }
+
+  /**
+   * Whether a string is an instant rather than the name of a unit's value.
+   *
+   * Upstream asks `Date.parse`; a leading digit is the same question asked of the strings a
+   * specification actually writes — `"2006"` and `"2006-01-01"` are instants, `"jan"` is not.
+   */
+  private fun looksLikeADate(text: String): Boolean = text.firstOrNull()?.isDigit() == true
+
+  /**
+   * `jan` is month zero and `mon` is day one: upstream normalises the names before writing them.
+   */
+  private fun monthOrDay(key: String, name: String): String {
+    val lower = name.lowercase().take(3)
+    val index =
+      when (key) {
+        "month" ->
+          listOf("jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec")
+            .indexOf(lower)
+        "day" -> listOf("sun", "mon", "tue", "wed", "thu", "fri", "sat").indexOf(lower)
+        else -> -1
+      }
+    return if (index >= 0) index.toString() else quoted(name)
   }
 
   private fun ObjectBuilder.putOps(entries: List<VegaValue>) {
