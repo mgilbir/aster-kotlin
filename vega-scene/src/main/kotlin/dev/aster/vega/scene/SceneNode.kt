@@ -78,6 +78,13 @@ public data class NodeMetadata(
    * through the same points, and the differential harness compares the method alongside them.
    */
   val interpolate: String? = null,
+  /**
+   * The slack in a cardinal, Catmull-Rom or bundle curve, when the specification set one.
+   *
+   * Kept for the same reason as [interpolate]: two families at different tensions can pass through
+   * the same data points, so the outline alone does not say what was asked for.
+   */
+  val tension: Double? = null,
   /** Stable tuple identity from the dataflow, preserved across incremental updates. */
   val datumId: Long? = null,
   val datumIndex: Int? = null,
@@ -173,6 +180,11 @@ public data class GroupNode(
    */
   val size: SizeD? = null,
   val cornerRadius: Double = 0.0,
+  /** Per-corner overrides of [cornerRadius]; see the same fields on [RectNode]. */
+  val cornerRadiusTopLeft: Double? = null,
+  val cornerRadiusTopRight: Double? = null,
+  val cornerRadiusBottomRight: Double? = null,
+  val cornerRadiusBottomLeft: Double? = null,
   /** Clip rectangle in this group's own coordinate space, applied before drawing children. */
   val clip: RectD? = null,
   val clipPath: PathData? = null,
@@ -187,6 +199,23 @@ public data class GroupNode(
         size != null -> RectD(0.0, 0.0, size.width, size.height)
         else -> clip
       }
+
+  /** That rectangle rounded, or null when it is square or there is nothing to paint. */
+  public val roundedPaintPath: PathData?
+    get() {
+      val rect = paintRect ?: return null
+      val corners =
+        Corners.of(
+          rect.width,
+          rect.height,
+          cornerRadiusTopLeft ?: cornerRadius,
+          cornerRadiusTopRight ?: cornerRadius,
+          cornerRadiusBottomRight ?: cornerRadius,
+          cornerRadiusBottomLeft ?: cornerRadius,
+        )
+      return if (corners.isSquare) null
+      else RectPath.of(rect.left, rect.top, rect.width, rect.height, corners)
+    }
 
   override val bounds: RectD by
     lazy(LazyThreadSafetyMode.NONE) {
@@ -236,6 +265,17 @@ public data class RectNode(
   val width: Double,
   val height: Double,
   val cornerRadius: Double = 0.0,
+  /**
+   * Per-corner overrides, each falling back to [cornerRadius] when absent.
+   *
+   * Null rather than `0.0` because the fallback has to be distinguishable from a corner
+   * deliberately squared off: `cornerRadius: 4, cornerRadiusTopLeft: 0` is a bar rounded on three
+   * corners.
+   */
+  val cornerRadiusTopLeft: Double? = null,
+  val cornerRadiusTopRight: Double? = null,
+  val cornerRadiusBottomRight: Double? = null,
+  val cornerRadiusBottomLeft: Double? = null,
   val fill: Fill? = null,
   val stroke: Stroke? = null,
   override val transform: Transform2D = Transform2D.Identity,
@@ -249,8 +289,29 @@ public data class RectNode(
   public val rect: RectD
     get() = RectD.fromSize(x, y, width, height)
 
+  /** The four radii actually drawn: the overrides where given, clamped to fit. */
+  public val corners: Corners
+    get() =
+      Corners.of(
+        width,
+        height,
+        cornerRadiusTopLeft ?: cornerRadius,
+        cornerRadiusTopRight ?: cornerRadius,
+        cornerRadiusBottomRight ?: cornerRadius,
+        cornerRadiusBottomLeft ?: cornerRadius,
+      )
+
   public val effectiveCornerRadius: Double
     get() = cornerRadius.coerceIn(0.0, minOf(kotlin.math.abs(width), kotlin.math.abs(height)) / 2.0)
+
+  /**
+   * The outline as a path, or null when all four corners are square and a plain rectangle will do.
+   *
+   * Both renderers go through this rather than their own rounded-rectangle primitive, so that the
+   * corner geometry is Vega's in every output — see [RectPath].
+   */
+  public val roundedPath: PathData?
+    get() = corners.takeIf { !it.isSquare }?.let { RectPath.of(x, y, width, height, it) }
 
   override val bounds: RectD by
     lazy(LazyThreadSafetyMode.NONE) {

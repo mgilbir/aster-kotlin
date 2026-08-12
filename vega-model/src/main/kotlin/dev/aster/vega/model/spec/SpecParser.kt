@@ -450,6 +450,17 @@ private val ENCODE_CONSUMED =
     "strokeWidth",
     "opacity",
     "cornerRadius",
+    "cornerRadiusTopLeft",
+    "cornerRadiusTopRight",
+    "cornerRadiusBottomLeft",
+    "cornerRadiusBottomRight",
+    "clip",
+    "blend",
+    "tension",
+    "theta",
+    "radius",
+    "limit",
+    "ellipsis",
     "cursor",
     "tooltip",
     "zindex",
@@ -474,24 +485,15 @@ private val ENCODE_CONSUMED =
     "path",
   )
 
-private val ENCODE_UNSUPPORTED =
-  mapOf(
-    "limit" to "Text truncation is not implemented; the text is drawn in full",
-    "ellipsis" to "Text truncation is not implemented, so its ellipsis has nothing to mark",
-    "cornerRadiusTopLeft" to
-      "Per-corner radii are not implemented; use 'cornerRadius' for all four",
-    "cornerRadiusTopRight" to
-      "Per-corner radii are not implemented; use 'cornerRadius' for all four",
-    "cornerRadiusBottomLeft" to
-      "Per-corner radii are not implemented; use 'cornerRadius' for all four",
-    "cornerRadiusBottomRight" to
-      "Per-corner radii are not implemented; use 'cornerRadius' for all four",
-    "blend" to "Blend modes from an encode channel are not implemented",
-    "clip" to "Clipping from an encode channel is not implemented; use the mark's own 'clip'",
-    "tension" to "Curve tension is not implemented; it needs an interpolation method first",
-    "theta" to "Polar positioning is not implemented",
-    "radius" to "Polar positioning is not implemented",
-  )
+/**
+ * Encode channels this engine parses but cannot draw.
+ *
+ * Empty, and worth keeping as the place the next gap goes rather than deleting: every channel in
+ * Vega's encoding vocabulary now reaches the scene. What used to be here — per-corner radii, curve
+ * tension, polar `theta`/`radius`, `blend`, `limit`/`ellipsis` and `clip` — is implemented and
+ * covered by [dev.aster.vega.model.spec] and the differential fixtures.
+ */
+private val ENCODE_UNSUPPORTED = emptyMap<String, String>()
 
 /** A parsed specification plus everything the parser could not honour. */
 public data class ParsedSpec(val spec: VegaSpec?, val diagnostics: List<VegaDiagnostic>) {

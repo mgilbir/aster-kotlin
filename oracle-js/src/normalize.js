@@ -12,26 +12,30 @@
  */
 
 import { canonicalNumber, DEFAULT_PRECISION } from './canonical.js';
-import {
-  curveBasis,
-  curveBasisClosed,
-  curveCardinal,
-  curveCardinalClosed,
-  curveLinearClosed,
-  curveMonotoneX,
-  curveMonotoneY,
-  curveNatural,
-  curveStep,
-  curveStepAfter,
-  curveStepBefore,
-  line,
-} from 'd3-shape';
+import { line } from 'd3-shape';
+// Vega's own name table, reached by file path because the package does not export its sources.
+// Taken from upstream rather than restated here: it maps an `interpolate` name to a d3 curve, picks
+// between the two monotone forms from the mark's `orient`, and knows that `tension` means a cardinal
+// stiffness, a Catmull-Rom exponent or a bundle blend depending on the family — each with its own
+// default. A copy of that table in this file could be wrong in the same way the port is.
+import curves from '../node_modules/vega-scenegraph/src/path/curves.js';
 import { sceneVisit } from 'vega-scenegraph';
 
 /** Channels compared per mark type. Anything not listed here is ignored on both sides. */
+// A rectangle's corner radii are geometry, not style: they change the outline, and comparing only
+// the box let four independently-rounded corners through as if they were square. Listed for `group`
+// as well, because a Vega group mark's background is the same rounded rectangle.
+const CORNER_CHANNELS = [
+  'cornerRadius',
+  'cornerRadiusTopLeft',
+  'cornerRadiusTopRight',
+  'cornerRadiusBottomRight',
+  'cornerRadiusBottomLeft',
+];
+
 const GEOMETRY_CHANNELS = {
-  group: ['x', 'y', 'width', 'height'],
-  rect: ['x', 'y', 'width', 'height'],
+  group: ['x', 'y', 'width', 'height', ...CORNER_CHANNELS],
+  rect: ['x', 'y', 'width', 'height', ...CORNER_CHANNELS],
   rule: ['x', 'y', 'x2', 'y2'],
   line: ['x', 'y'],
   area: ['x', 'y', 'y2'],
@@ -177,35 +181,14 @@ function walkMarktype(marktype, dx, dy, out, precision) {
   }
 }
 
-/**
- * The curves both engines can draw, so the comparison can see the outline rather than the points.
- *
- * `monotone` is two curves: Vega picks between d3's X and Y forms from the mark's `orient`, so this
- * is resolved per item rather than by name alone.
- */
-const CURVES = {
-  'step': curveStep,
-  'step-before': curveStepBefore,
-  'step-after': curveStepAfter,
-  'basis': curveBasis,
-  'cardinal': curveCardinal,
-  'natural': curveNatural,
-  'linear-closed': curveLinearClosed,
-  'basis-closed': curveBasisClosed,
-  'cardinal-closed': curveCardinalClosed,
-};
-
 /** The return leg of an area steps the opposite way round; every other curve is symmetric. */
 const MIRRORED = {
   'step-before': 'step-after',
   'step-after': 'step-before',
 };
 
-function curveFor(interpolate, orient) {
-  if (interpolate === 'monotone') {
-    return orient === 'horizontal' ? curveMonotoneY : curveMonotoneX;
-  }
-  return CURVES[interpolate];
+function curveFor(interpolate, orient, tension) {
+  return curves(interpolate, orient, tension == null ? null : tension) || null;
 }
 
 /**
@@ -279,12 +262,12 @@ function seriesRecord(type, marktype, dx, dy, precision) {
     points.push(canonicalNumber((x || 0) + dx, precision));
     points.push(canonicalNumber((y || 0) + dy, precision));
   };
-  // A step interpolation puts corners between the data points, so the drawn outline is not the
-  // item list. Rather than reimplementing the staircase here — a second copy that could be wrong
-  // the same way the port is — the corners come from d3-shape itself, which is what Vega draws
-  // with. Every other curve family is reported as unsupported by the engine, so this only has to
-  // cover the steps.
-  const curve = curveFor(first.interpolate, first.orient);
+  // An interpolation method puts its own geometry between the data points, so the drawn outline is
+  // not the item list: a staircase adds corners, a spline adds control points, and an *open* family
+  // drops the first and last points entirely. Rather than reimplementing any of that here — a second
+  // copy that could be wrong the same way the port is — the outline comes from d3-shape itself,
+  // which is what Vega draws with.
+  const curve = curveFor(first.interpolate, first.orient, first.tension);
 
   const primary = items.map(i => [i.x || 0, i.y || 0]);
   const drawn = expandCurve(primary, curve);
@@ -295,7 +278,7 @@ function seriesRecord(type, marktype, dx, dy, precision) {
       .map(i => [i.x2 !== undefined ? i.x2 : i.x || 0, i.y2 !== undefined ? i.y2 : i.y || 0]);
     const back = expandCurve(
       secondary,
-      curveFor(MIRRORED[first.interpolate] || first.interpolate, first.orient)
+      curveFor(MIRRORED[first.interpolate] || first.interpolate, first.orient, first.tension)
     );
     for (const [x, y] of back.points) push(x, y);
   } else {
@@ -305,6 +288,9 @@ function seriesRecord(type, marktype, dx, dy, precision) {
   }
   entry.points = points.join(' ');
   if (first.interpolate) entry.interpolate = first.interpolate;
+  // Recorded as well as applied: two families can happen to draw the same outline for one series,
+  // and the channel itself still has to survive the round trip.
+  if (first.tension !== undefined) entry.tension = canonicalNumber(first.tension, precision);
 
   for (const channel of STYLE_CHANNELS) {
     if (first[channel] !== undefined) entry[channel] = canonicalNumber(first[channel], precision);
@@ -327,6 +313,16 @@ function record(type, role, item, dx, dy, precision) {
     const dx = item.dx || 0, dy = item.dy || 0, a = ((item.angle || 0) * Math.PI) / 180;
     textDx = dx * Math.cos(a) - dy * Math.sin(a);
     textDy = dx * Math.sin(a) + dy * Math.cos(a);
+  }
+
+  // The same equivalence for `radius`/`theta`, which place a label around a centre. Vega keeps both
+  // on the item and offsets at paint time — `anchorPoint` — where this engine's scene holds the
+  // anchor already offset. Folded *before* dx/dy, which is the order Vega applies them in: the
+  // rotation a rotated label turns about is the polar-offset point, not the centre.
+  if (type === 'text' && item.radius) {
+    const t = (item.theta || 0) - Math.PI / 2;
+    textDx += item.radius * Math.cos(t);
+    textDy += item.radius * Math.sin(t);
   }
 
   for (const channel of channels) {

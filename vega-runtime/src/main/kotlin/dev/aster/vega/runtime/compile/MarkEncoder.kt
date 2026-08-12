@@ -42,6 +42,7 @@ import dev.aster.vega.scene.RasterImage
 import dev.aster.vega.scene.RectD
 import dev.aster.vega.scene.RectNode
 import dev.aster.vega.scene.RuleNode
+import dev.aster.vega.scene.SceneBlendMode
 import dev.aster.vega.scene.SceneColor
 import dev.aster.vega.scene.SceneNode
 import dev.aster.vega.scene.SceneNodeIdAllocator
@@ -292,10 +293,23 @@ public class MarkEncoder(
         size = size,
         cornerRadius =
           number(channels["cornerRadius"], datum) ?: MarkConfig(spec).number("cornerRadius") ?: 0.0,
-        clip = if (spec.clip) RectD(0.0, 0.0, extent.width, extent.height) else null,
+        cornerRadiusTopLeft = number(channels["cornerRadiusTopLeft"], datum),
+        cornerRadiusTopRight = number(channels["cornerRadiusTopRight"], datum),
+        cornerRadiusBottomRight = number(channels["cornerRadiusBottomRight"], datum),
+        cornerRadiusBottomLeft = number(channels["cornerRadiusBottomLeft"], datum),
+        // `clip` is both a mark property and an encode channel, and real specifications use the
+        // channel: `overview-plus-detail` writes `clip: {value: true}` into `enter`, and it is what
+        // keeps the detail view's line inside its own panel. Either says the group clips.
+        clip =
+          if (spec.clip || boolean(channels["clip"], datum) == true) {
+            RectD(0.0, 0.0, extent.width, extent.height)
+          } else {
+            null
+          },
         fill = style.fill,
         stroke = style.stroke,
         opacity = style.opacity,
+        blendMode = blendMode(channels, datum),
         // Upstream calls a group mark's role "scope", distinguishing it from the guide groups that
         // hold axes and legends.
         metadata = metadata(spec, datum, index, channels).copy(role = "scope"),
@@ -313,8 +327,12 @@ public class MarkEncoder(
     if (horizontal == null || vertical == null) return null
 
     val style = style(channels, datum, spec)
+    val config = MarkConfig(spec)
     val cornerRadius =
-      number(channels["cornerRadius"], datum) ?: MarkConfig(spec).number("cornerRadius") ?: 0.0
+      number(channels["cornerRadius"], datum) ?: config.number("cornerRadius") ?: 0.0
+
+    fun corner(name: String): Double? =
+      number(channels["cornerRadius$name"], datum) ?: config.number("cornerRadius$name")
 
     return RectNode(
       id = ids.allocate(),
@@ -323,9 +341,14 @@ public class MarkEncoder(
       width = horizontal.extent,
       height = vertical.extent,
       cornerRadius = cornerRadius,
+      cornerRadiusTopLeft = corner("TopLeft"),
+      cornerRadiusTopRight = corner("TopRight"),
+      cornerRadiusBottomRight = corner("BottomRight"),
+      cornerRadiusBottomLeft = corner("BottomLeft"),
       fill = style.fill,
       stroke = style.stroke,
       opacity = style.opacity,
+      blendMode = blendMode(channels, datum),
       metadata = metadata(spec, datum, index, channels),
     )
   }
@@ -356,6 +379,7 @@ public class MarkEncoder(
       fill = style.fill ?: Fill.of(MarkDefaults.DEFAULT_FILL),
       stroke = style.stroke,
       opacity = style.opacity,
+      blendMode = blendMode(channels, data.firstOrNull() ?: VegaValue.Null),
       metadata = metadata(spec, data.first(), 0, channels).copy(markKind = "trail"),
     )
   }
@@ -425,6 +449,7 @@ public class MarkEncoder(
       fill = style.fill,
       stroke = style.stroke,
       opacity = style.opacity,
+      blendMode = blendMode(channels, datum),
       // `path` or `shape`, whichever the specification wrote: the node is the same and the name
       // is not, and a comparison that could not tell them apart would be a weaker one.
       metadata = metadata(spec, datum, index, channels).copy(markKind = channel),
@@ -477,6 +502,7 @@ public class MarkEncoder(
       fill = style.fill,
       stroke = style.stroke,
       opacity = style.opacity,
+      blendMode = blendMode(channels, datum),
       metadata = metadata(spec, datum, index, channels).copy(markKind = "arc"),
     )
   }
@@ -500,6 +526,7 @@ public class MarkEncoder(
       y2 = y2,
       stroke = stroke,
       opacity = style.opacity,
+      blendMode = blendMode(channels, datum),
       metadata = metadata(spec, datum, index, channels),
     )
   }
@@ -531,6 +558,7 @@ public class MarkEncoder(
       fill = style.fill,
       stroke = style.stroke,
       opacity = style.opacity,
+      blendMode = blendMode(channels, datum),
       metadata = metadata(spec, datum, index, channels),
     )
   }
@@ -632,12 +660,28 @@ public class MarkEncoder(
         style = textStyle,
         align = textAlign(string(channels["align"], datum)),
         baseline = textBaseline(string(channels["baseline"], datum)),
+        // A negative limit truncates from the *left*, which is upstream's convention for a label
+        // that must keep its tail — a file path, a long species name — so the sign is kept.
+        limit = number(channels["limit"], datum) ?: 0.0,
+        ellipsis = string(channels["ellipsis"], datum) ?: "\u2026",
       )
+
+    // `radius` and `theta` place a label on a circle, and only a text mark has them: the anchor is
+    // pushed `radius` out at `theta`, measured from twelve o'clock rather than from three, which is
+    // the quarter turn in upstream's `anchorPoint`.
+    val radius = number(channels["radius"], datum) ?: 0.0
+    val polar =
+      if (radius == 0.0) {
+        PointD(0.0, 0.0)
+      } else {
+        val t = (number(channels["theta"], datum) ?: 0.0) - kotlin.math.PI / 2
+        PointD(radius * kotlin.math.cos(t), radius * kotlin.math.sin(t))
+      }
 
     return TextNode(
       id = ids.allocate(),
-      x = anchorX + offset.x,
-      y = anchorY + offset.y,
+      x = anchorX + polar.x + offset.x,
+      y = anchorY + polar.y + offset.y,
       layout = textEngine.layout(run),
       // No fallback fill, for the same reason the arc has none: `style` has already applied the
       // pairing rule, so a label drawn as a bare outline stays one. And a text mark can be
@@ -647,8 +691,34 @@ public class MarkEncoder(
       stroke = style.stroke,
       angleDegrees = angle,
       opacity = style.opacity,
+      blendMode = blendMode(channels, datum),
       metadata = metadata(spec, datum, index, channels),
     )
+  }
+
+  /**
+   * How this item composites with what is under it, `blend`.
+   *
+   * The scene nodes have carried a blend mode from the start and nothing set it from an encoding,
+   * so a specification asking for `multiply` got `normal`. A name this engine has no mode for is
+   * reported rather than silently normal, because the difference is the whole point of asking.
+   */
+  private fun blendMode(channels: EncodeEntry, datum: VegaValue): SceneBlendMode {
+    val name = string(channels["blend"], datum) ?: return SceneBlendMode.NORMAL
+    if (name.isEmpty() || name.equals("normal", ignoreCase = true)) return SceneBlendMode.NORMAL
+    val mode = SceneBlendMode.entries.firstOrNull { it.name.equals(name.replace('-', '_'), true) }
+    if (mode == null) {
+      reportOnce(
+        "blend:$name",
+        dev.aster.vega.model.VegaDiagnostic(
+          severity = dev.aster.vega.model.DiagnosticSeverity.WARNING,
+          code = DiagnosticCodes.PARSE_UNKNOWN_PROPERTY,
+          message = "Blend mode '$name' is not one this engine has; the item composites normally",
+        ),
+      )
+      return SceneBlendMode.NORMAL
+    }
+    return mode
   }
 
   /**
@@ -668,7 +738,8 @@ public class MarkEncoder(
     reportUnsupportedInterpolation(interpolate, spec)
 
     val horizontal = string(channels["orient"], data.first())?.lowercase() == "horizontal"
-    val path = PathData.build { segments.forEach { trace(it, interpolate, horizontal) } }
+    val tension = number(channels["tension"], data.first())
+    val path = PathData.build { segments.forEach { trace(it, interpolate, horizontal, tension) } }
     return PathNode(
       id = ids.allocate(),
       path = path,
@@ -681,7 +752,10 @@ public class MarkEncoder(
       // no default fill for a line, so an ordinary series is unaffected.
       fill = style.fill,
       opacity = style.opacity,
-      metadata = metadata(spec, data.first(), 0, channels).copy(interpolate = interpolate),
+      blendMode = blendMode(channels, data.firstOrNull() ?: VegaValue.Null),
+      metadata =
+        metadata(spec, data.first(), 0, channels)
+          .copy(interpolate = interpolate, tension = tension),
     )
   }
 
@@ -711,6 +785,7 @@ public class MarkEncoder(
     val style = style(channels, data.first(), spec)
     val interpolate = string(channels["interpolate"], data.first())
     val horizontal = string(channels["orient"], data.first())?.lowercase() == "horizontal"
+    val tension = number(channels["tension"], data.first())
     reportUnsupportedInterpolation(interpolate, spec)
 
     val path = PathData.build {
@@ -718,8 +793,13 @@ public class MarkEncoder(
         // Forward along the primary boundary, back along the secondary one, then close. The
         // return leg steps the opposite way round, so a staircase area closes flush against
         // itself rather than crossing.
-        trace(segment.map { it.first }, interpolate, horizontal)
-        traceOnward(segment.reversed().map { it.second }, mirrored(interpolate), horizontal)
+        trace(segment.map { it.first }, interpolate, horizontal, tension, partOfArea = true)
+        traceOnward(
+          segment.reversed().map { it.second },
+          mirrored(interpolate),
+          horizontal,
+          tension,
+        )
         close()
       }
     }
@@ -729,7 +809,10 @@ public class MarkEncoder(
       fill = style.fill ?: Fill.of(MarkDefaults.DEFAULT_FILL),
       stroke = style.stroke,
       opacity = style.opacity,
-      metadata = metadata(spec, data.first(), 0, channels).copy(interpolate = interpolate),
+      blendMode = blendMode(channels, data.firstOrNull() ?: VegaValue.Null),
+      metadata =
+        metadata(spec, data.first(), 0, channels)
+          .copy(interpolate = interpolate, tension = tension),
     )
   }
 
@@ -788,9 +871,21 @@ public class MarkEncoder(
       }
     }
 
-  /** Traces a segment with whatever interpolation the specification asked for. */
-  private fun PathBuilder.trace(points: List<PointD>, method: String?, horizontal: Boolean) {
-    curve(points, CurveKind.fromName(method) ?: CurveKind.LINEAR, horizontal)
+  /**
+   * Traces a segment with whatever interpolation the specification asked for.
+   *
+   * `tension` only means anything to the cardinal and Catmull-Rom families — a monotone or a basis
+   * spline has no slack to take up — and the curve builders have taken it since they were written.
+   * Nothing passed it, so a specification asking for a slacker curve got the default one.
+   */
+  private fun PathBuilder.trace(
+    points: List<PointD>,
+    method: String?,
+    horizontal: Boolean,
+    tension: Double? = null,
+    partOfArea: Boolean = false,
+  ) {
+    curve(points, CurveKind.fromName(method) ?: CurveKind.LINEAR, horizontal, tension, partOfArea)
   }
 
   /**
@@ -799,13 +894,18 @@ public class MarkEncoder(
    * Every curve opens with a `moveTo`, which would break an area's outline in two; that leading
    * command becomes a line to the same place and the rest is copied through unchanged.
    */
-  private fun PathBuilder.traceOnward(points: List<PointD>, method: String?, horizontal: Boolean) {
+  private fun PathBuilder.traceOnward(
+    points: List<PointD>,
+    method: String?,
+    horizontal: Boolean,
+    tension: Double? = null,
+  ) {
     val kind = CurveKind.fromName(method) ?: CurveKind.LINEAR
     if (kind == CurveKind.LINEAR) {
       points.forEach { lineTo(it.x, it.y) }
       return
     }
-    val tail = PathData.build { curve(points, kind, horizontal) }
+    val tail = PathData.build { curve(points, kind, horizontal, tension) }
     for (command in tail.commands) {
       when (command) {
         is PathCommand.MoveTo -> lineTo(command.x, command.y)
@@ -832,11 +932,10 @@ public class MarkEncoder(
     }
 
   /**
-   * Reports an interpolation method this engine cannot draw.
+   * Reports an interpolation method that is not one of Vega's.
    *
-   * Everything but the `catmull-rom` and `bundle` families is implemented; those two carry their
-   * own parameterisation and closed variants, and drawing one as straight lines would look
-   * plausible and be wrong, so the substitution is reported.
+   * Every name in Vega's table is drawn, so this is now a misspelling rather than a gap — but it
+   * still has to be said, because falling back to straight lines looks plausible and is wrong.
    */
   private fun reportUnsupportedInterpolation(method: String?, spec: MarkSpec) {
     if (method == null || CurveKind.fromName(method) != null) return
@@ -846,7 +945,7 @@ public class MarkEncoder(
         severity = dev.aster.vega.model.DiagnosticSeverity.WARNING,
         code = DiagnosticCodes.PARSE_UNKNOWN_PROPERTY,
         message =
-          "Interpolation method '$method' is not implemented; the points were joined with " +
+          "'$method' is not one of Vega's interpolation methods; the points were joined with " +
             "straight lines instead",
         operator = spec.name,
       ),
@@ -1050,6 +1149,7 @@ public class MarkEncoder(
       align = ImageAlign.fromName(string(channels["align"], datum)),
       baseline = ImageBaseline.fromName(string(channels["baseline"], datum)),
       opacity = style.opacity,
+      blendMode = blendMode(channels, datum),
       metadata = metadata(spec, datum, index, channels).copy(markKind = "image"),
     )
   }

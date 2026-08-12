@@ -21,7 +21,8 @@ end to end — expressions, signals, 33 of upstream's 40 data transforms, every 
 and an event handler that recompiles the chart — and are verified against upstream Vega by
 differential tests.
 
-One hundred and six differential fixtures pass, all matching upstream exactly on every mark and scale output:
+One hundred and eighteen differential fixtures pass, all matching upstream exactly on every mark and
+scale output:
 
 | Fixture | Marks | Covers |
 | --- | --- | --- |
@@ -166,7 +167,7 @@ upstream-verified slice through parsing, scales, rect encoding and axes:
 | Diagnostics, canonical snapshots, goldens, oracle scaffolding | no upstream equivalent | complete |
 | `vega-scale` (linear, log, pow, sqrt, symlog, time, utc, band, point, ordinal, sequential) + d3-array ticks | 790 + parts of d3-scale, d3-array | every scale type in scope — the 11 continuous and discrete ones plus quantize, quantile, threshold and bin-ordinal — exact against upstream, with all 68 colour schemes |
 | `vega-parser` (width, height, padding, autosize, data, signals, scales, axes, legends, titles, marks, group scopes, `layout`, `config`) | 3,790 | a subset, and every property it does not read is reported by name |
-| `vega-encode` (mark encoders, axes, legends, titles) | 952 | 11 of 12 mark encoders — all but `shape`, which needs projections and is an explicit non-goal; axes, legends and titles including overlap removal, truncation and the `config` cascade; nine interpolation methods |
+| `vega-encode` (mark encoders, axes, legends, titles) | 952 | all 12 mark encoders; axes, legends and titles including overlap removal, truncation and the `config` cascade; every one of Vega's seventeen interpolation methods with its own reading of `tension`; every encode channel in the vocabulary |
 | `vega-expression` + `vega-functions` | 2,388 | language complete; 82 of 119 functions, with 17 more reported by name and reason |
 | `vega-transforms` (35 of 40) | 3,754 | the 12 the brief lists plus `timeunit`, `pie`, `window`, `sequence`, `lookup`, `impute`, `cross`, `pivot`, `countpattern`, the statistical family — `quantile`, `regression`, `loess`, `kde`, `density`, `dotbin` — and the whole hierarchy family: `stratify`, `nest`, `treemap`, `partition`, `pack`, `tree`, plus `treelinks` and `linkpath`, which turn a laid-out tree into the edges drawn between its nodes. Exact against upstream |
 | `vega-dataflow` | 2,081 | contracts and scheduling only; no pulse propagation |
@@ -179,7 +180,6 @@ The entire data and specification half is absent:
 | `vega-dataflow` — pulse propagation and incremental evaluation | 2,081 | contracts only |
 | `vega-functions` — the other 44 functions, mostly colour, geo and selection | most of 790 | 0 |
 | Remaining scale types — quantile, quantize, threshold, bin-ordinal | rest of `vega-scale` | all four; their legends draw the right colours as swatches rather than upstream's stacked bar |
-| Remaining mark encoders — image and shape | rest of `vega-encode` | 0; `image` needs a device resolver, `shape` needs projections |
 | Line and area interpolation — `catmull-rom` and `bundle` | part of d3-shape | 0, reported; the step and spline families are implemented |
 | Banded legends, trellis footers, legend `symbolLimit` | parts of `vega-encode`, `vega-view-transforms` | 0, reported |
 | `vega-view`, `vega-view-transforms` — the view lifecycle and incremental layout | 2,623 | bounds, grid layout and label overlap removal |
@@ -197,11 +197,11 @@ substantive compatibility items:
 | 2. Bar, line, area, scatter, stacked bar render natively | **Yes** — all five compile from a specification, and small multiples of them too |
 | 3. Axes, legends, labels and titles supported | **Yes** — all four |
 | 4. Basic transforms and scales execute in Kotlin | **Yes** — every scale type in scope, including time and UTC and the four discretizing ones, and 35 of upstream's 40 transforms |
-| 5. Tap, hover, tooltip, selection, pan, zoom | Yes, except tooltip rendering |
+| 5. Tap, hover, tooltip, selection, pan, zoom | Yes |
 | 6. View and Compose APIs | Yes |
 | 7. SVG, PNG, PDF export | Yes |
 | 8. TalkBack can describe and navigate | Partial — virtual nodes are tested by instrumentation, not with TalkBack itself |
-| 9. At least 100 compatibility fixtures pass | **Yes** — 100 |
+| 9. At least 100 compatibility fixtures pass | **Yes** — 118 |
 | 10. Core runtime has no Android dependency | Yes |
 | 11. Renders without WebView | Yes |
 | 12. Build and test loop runs from the terminal | Yes |
@@ -538,7 +538,7 @@ each example a deadline.
 
 ## Known failing fixtures
 
-None. One hundred and six fixtures exist and all of them pass — and that sentence became worth
+None. One hundred and eighteen fixtures exist and all of them pass — and that sentence became worth
 something only once the gate could no longer skip itself, below.
 
 **The gate could report success without running.** `FixtureDifferentialTest` reads the fixtures and
@@ -1248,6 +1248,62 @@ letters, which also means a `fill` of null is no longer a colour nobody can pars
 That last one is the fourth time the rendered SVG has caught something the comparison could not, and
 the first where the fixture was already green when the picture was wrong.
 
+## Every encode channel, and the six curve families behind the last of them
+
+`ENCODE_UNSUPPORTED` is now empty. It held ten entries — the four per-corner radii, `limit` and
+`ellipsis`, `tension`, polar `radius`/`theta`, `blend` and `clip` — and each is drawn rather than
+reported. Five things are worth keeping from doing them.
+
+**`tension` was not a small channel.** It read as one property to thread through, and threading it
+through meant discovering that six of Vega's seventeen interpolation methods were missing:
+`basis-open`, `bundle`, `cardinal-open`, `catmull-rom` and its open and closed variants. `tension`
+means a different quantity to each family it applies to — a cardinal stiffness, a Catmull-Rom
+distance exponent, a bundle blend — and each has its own neutral value (0, 0.5, 0.85). Reading an
+unspecified `tension` as 0 for all three would have turned an unspecified Catmull-Rom into a cardinal
+spline and an unspecified bundle into a straight line. `CurveKind.defaultTension` is that table.
+
+**A Catmull-Rom spline at alpha 0 is not a Catmull-Rom spline.** d3 does not degenerate it; it hands
+the series to the *cardinal* curve instead. The difference is real, because the correction that
+distinguishes the two is scaled by a span raised to the power alpha — and a zero span raised to the
+power zero is one, not zero, so the correction stays on and the end conditions come out different.
+`CurvesTest` caught this as the one assertion that says the two families agree at alpha 0.
+
+**The open families draw nothing for a short series.** Two points or fewer and `basis-open`,
+`cardinal-open` and `catmull-rom-open` emit no path at all — not a straight line, which is what every
+other family does. Three points and they emit a single position and a `Z`. That `Z` is also
+conditional: it appears on a line and must not appear on the first boundary of an area, where it
+would cut the outline off before its baseline. Only the caller knows which it is drawing, which is
+why `curve()` takes a `partOfArea` flag.
+
+**Both strengthenings were on the harness, and one of them paid immediately.** `normalize.js` had a
+hand-written table mapping an `interpolate` name to a d3 curve; it now imports `vega-scenegraph`'s own
+`curves()` by file path, which brings the name table, the monotone orientation choice and the
+`tension` semantics from upstream instead of from a copy that could be wrong the same way the port
+is. The moment it went in, `edge-bundling`'s reference changed by two thousand lines: its `bundle`
+interpolation had been falling through to the raw point list on both sides, so a chart drawing every
+edge as a straight line would have passed. It now compares the outline, and matches. The second
+strengthening is corner radii: `GEOMETRY_CHANNELS` compared a rect by `x`, `y`, `width` and `height`
+only, so four independently rounded corners were invisible. They are compared both ways — inventing a
+radius the reference does not have is as much a difference as missing one.
+
+**A rounded rectangle is emitted as a path, in both renderers.** SVG `rx`/`ry` cannot hold four
+different radii, and even for one it draws a true elliptical arc where Vega draws a Bézier
+approximation of one, with a control-point offset of `1 - 0.448084975506` — Mortensen's circle
+approximation, not the familiar `4/3 · (√2 - 1)`. Android's `drawRoundRect` has the same two problems.
+Both now go through `RectPath`, whose output is pinned to upstream's own path strings in
+`RectPathTest`, including the clamp: the limit is `min(width, height) / 2` for all four corners as a
+group, and it is `min` of the *signed* extents, so a rectangle drawn with a negative width comes out
+square rather than rounded.
+
+Two smaller things. `radius`/`theta` place a label around a centre, and upstream keeps both on the
+item and offsets at paint time; this engine's scene holds the anchor already offset, so the harness
+folds the polar offset in — the same equivalence it already applies to a text mark's `dx`/`dy`, and
+in the same order Vega applies them, so a rotated label turns about the offset point. And `clip` is
+both a mark property and an encode channel: `overview-plus-detail` writes `clip: {value: true}` into
+`enter`, and it is what keeps the detail view's line inside its own panel. The differential cannot see
+clipping at all — upstream's scenegraph still holds the items its renderer hides — so that one is
+evidenced by the exported SVG rather than by the comparison.
+
 ## Performance observations
 
 Nothing on hardware. No measurement has been taken on a physical device, and emulator numbers are
@@ -1432,11 +1488,11 @@ explored with it; the tree was already correct and two things it *said* were wro
 and pinned by instrumented tests. What remains untested there is physical hardware and a real user,
 which is a different claim from "not verified at all".
 
-A note on the harness, because it is now the seventh time. The differential comparison has had to be
+A note on the harness, because it is now the ninth time. The differential comparison has had to be
 taught to see a symbol's outline, fill and stroke opacity, a dash pattern, a node's own opacity, an
-unfilled mark's missing opacity, the corners a curve puts between a series' points, and — adding
-`linkpath` — the outline a `path` mark actually draws, which until then was compared only by the
-anchor it hung from. Each was invisible for the same reason — two marks agreeing on every channel
+unfilled mark's missing opacity, the corners a curve puts between a series' points, a rectangle's four
+corner radii, a series' `tension`, and — adding `linkpath` — the outline a `path` mark actually draws,
+which until then was compared only by the anchor it hung from. Each was invisible for the same reason — two marks agreeing on every channel
 being compared and differing in the drawn result. Before trusting a green fixture on a *new* kind of
 property, check that
 `oracle-js/src/normalize.js` and `Differential.kt` both emit it. And look at the two pictures: three

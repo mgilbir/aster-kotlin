@@ -2,6 +2,8 @@ package dev.aster.vega.scene
 
 import kotlin.math.abs
 import kotlin.math.min
+import kotlin.math.pow
+import kotlin.math.sqrt
 
 /**
  * How a series' points are joined.
@@ -31,6 +33,41 @@ public enum class CurveKind {
   NATURAL,
 
   /**
+   * The B-spline without the end conditions that pin [BASIS] to its first and last points.
+   *
+   * "Open" here means the *control polygon* is open, not the outline: the curve simply starts and
+   * ends where the spline naturally does, a sixth of the way in, so the first and last data points
+   * are not on it at all. Vega offers the same distinction for the cardinal family.
+   */
+  BASIS_OPEN,
+
+  /**
+   * A B-spline over points pulled some of the way towards the straight line between the ends.
+   *
+   * `tension` is a *blend*, not a stiffness: beta 1 leaves the points alone and draws [BASIS], beta
+   * 0 collapses them onto the chord and draws a straight line. Used for edge bundling, which is
+   * where the name comes from.
+   */
+  BUNDLE,
+
+  /** The cardinal spline without end conditions, as [BASIS_OPEN] is to [BASIS]. */
+  CARDINAL_OPEN,
+
+  /**
+   * The centripetal Catmull-Rom family: a spline through every point that cannot form a cusp.
+   *
+   * The difference from [CARDINAL] is the parameterisation. A cardinal spline takes each tangent
+   * from the neighbours' separation alone, so two points close together next to one far away pull
+   * the curve into a loop; this one weights each by the distance to the power `alpha`, which is
+   * what `tension` means here — 0 reproduces [CARDINAL] exactly, 0.5 (the default) is centripetal,
+   * 1 is chordal.
+   */
+  CATMULL_ROM,
+
+  /** The Catmull-Rom spline without end conditions, as [CARDINAL_OPEN] is to [CARDINAL]. */
+  CATMULL_ROM_OPEN,
+
+  /**
    * The closed variants, which join the last point back to the first.
    *
    * Not a decoration on the open forms. Only [LINEAR_CLOSED] is the open curve plus a `Z`; the two
@@ -40,11 +77,38 @@ public enum class CurveKind {
    */
   LINEAR_CLOSED,
   BASIS_CLOSED,
-  CARDINAL_CLOSED;
+  CARDINAL_CLOSED,
+  CATMULL_ROM_CLOSED;
 
   /** True when this curve joins its last point back to its first. */
   public val isClosed: Boolean
-    get() = this == LINEAR_CLOSED || this == BASIS_CLOSED || this == CARDINAL_CLOSED
+    get() =
+      this == LINEAR_CLOSED ||
+        this == BASIS_CLOSED ||
+        this == CARDINAL_CLOSED ||
+        this == CATMULL_ROM_CLOSED
+
+  /** True when the first and last data points are not on the curve. */
+  public val isOpen: Boolean
+    get() = this == BASIS_OPEN || this == CARDINAL_OPEN || this == CATMULL_ROM_OPEN
+
+  /**
+   * What `tension` means to this family when the specification does not say.
+   *
+   * Three different quantities share one channel name — a cardinal stiffness, a Catmull-Rom
+   * exponent and a bundle blend — and each has its own neutral value. Taking 0 for all three would
+   * turn an unspecified Catmull-Rom into a cardinal spline and an unspecified bundle into a
+   * straight line.
+   */
+  public val defaultTension: Double
+    get() =
+      when (this) {
+        BUNDLE -> 0.85
+        CATMULL_ROM,
+        CATMULL_ROM_OPEN,
+        CATMULL_ROM_CLOSED -> 0.5
+        else -> 0.0
+      }
 
   public companion object {
     public fun fromName(name: String?): CurveKind? =
@@ -58,22 +122,39 @@ public enum class CurveKind {
         "cardinal" -> CARDINAL
         "monotone" -> MONOTONE
         "natural" -> NATURAL
+        "basis-open" -> BASIS_OPEN
+        "bundle" -> BUNDLE
+        "cardinal-open" -> CARDINAL_OPEN
+        "catmull-rom" -> CATMULL_ROM
+        "catmull-rom-open" -> CATMULL_ROM_OPEN
         "linear-closed" -> LINEAR_CLOSED
         "basis-closed" -> BASIS_CLOSED
         "cardinal-closed" -> CARDINAL_CLOSED
+        "catmull-rom-closed" -> CATMULL_ROM_CLOSED
         else -> null
       }
   }
 }
 
-/** Draws [points] with [kind], opening a new subpath. */
+/**
+ * Draws [points] with [kind], opening a new subpath.
+ *
+ * A null [tension] takes the family's own neutral value; see [CurveKind.defaultTension].
+ *
+ * [partOfArea] exists for one quirk of the open families. Given exactly three points there is no
+ * segment left to draw — the curve is a single position — and d3 closes the subpath, which for a
+ * line renders nothing and for an area would cut the outline off before its baseline. It is the
+ * caller, not the geometry, that knows which of the two this is.
+ */
 public fun PathBuilder.curve(
   points: List<PointD>,
   kind: CurveKind,
   horizontal: Boolean = false,
-  tension: Double = 0.0,
+  tension: Double? = null,
+  partOfArea: Boolean = false,
 ): PathBuilder {
   if (points.isEmpty()) return this
+  @Suppress("NAME_SHADOWING") val tension = tension ?: kind.defaultTension
   when (kind) {
     CurveKind.LINEAR -> polyline(points)
     CurveKind.STEP -> steps(points, StepPosition.MIDDLE)
@@ -89,9 +170,33 @@ public fun PathBuilder.curve(
       } else {
         monotone(points, reflect = false)
       }
+    CurveKind.BASIS_OPEN -> basisOpen(points, partOfArea)
+    CurveKind.BUNDLE -> bundled(points, tension).takeIf { it.isNotEmpty() }?.let { basis(it) }
+    CurveKind.CARDINAL_OPEN -> cardinalOpen(points, tension, partOfArea)
+    // An alpha of zero is not a degenerate Catmull-Rom spline — d3 hands the whole series to the
+    // cardinal curve instead. The two are the same shape, but only the substitution reproduces its
+    // end conditions: a Catmull-Rom run at alpha 0 still applies the span correction, because a
+    // zero span raised to the power zero is one, not zero.
+    CurveKind.CATMULL_ROM ->
+      if (tension == 0.0) cardinal(points, 0.0) else catmullRom(points, tension)
+    CurveKind.CATMULL_ROM_OPEN ->
+      if (tension == 0.0) cardinalOpen(points, 0.0, partOfArea)
+      else catmullRomOpen(points, tension, partOfArea)
     CurveKind.LINEAR_CLOSED -> polyline(points, closePath = true)
     CurveKind.BASIS_CLOSED -> basisClosed(points)
     CurveKind.CARDINAL_CLOSED -> cardinalClosed(points, tension)
+    CurveKind.CATMULL_ROM_CLOSED ->
+      if (tension == 0.0) cardinalClosed(points, 0.0) else catmullRomClosed(points, tension)
+  }
+  // A line of one point closes its subpath. Nothing is drawn either way, but the `Z` is in every
+  // reference path upstream produces, so it is in ours. The closed families do it above, where they
+  // also have to place the point; the open ones drew nothing to close.
+  // `bundle` is excluded with the open families: having no chord to pull a single point towards, it
+  // feeds the B-spline nothing and so has no subpath to close.
+  if (
+    points.size == 1 && !partOfArea && !kind.isOpen && !kind.isClosed && kind != CurveKind.BUNDLE
+  ) {
+    close()
   }
   return this
 }
@@ -481,3 +586,287 @@ private fun PathBuilder.monotone(points: List<PointD>, reflect: Boolean) {
 }
 
 private fun sign(value: Double): Double = if (value < 0.0) -1.0 else 1.0
+
+// ---- the open families ------------------------------------------------------
+
+/**
+ * The B-spline without end conditions: the curve runs only between the interior control points.
+ *
+ * Two points or fewer therefore produce **nothing at all** — not a straight line, as the closed and
+ * end-pinned families do, but an empty path. Three produce a single position and a `Z`, which draws
+ * nothing either. That is upstream's behaviour and it is the reason a chart that switches from
+ * `basis` to `basis-open` can lose a short series entirely.
+ */
+private fun PathBuilder.basisOpen(points: List<PointD>, partOfArea: Boolean) {
+  var x0 = Double.NaN
+  var y0 = Double.NaN
+  var x1 = Double.NaN
+  var y1 = Double.NaN
+  var stage = 0
+  for (point in points) {
+    when (stage) {
+      0 -> stage = 1
+      1 -> stage = 2
+      2 -> {
+        stage = 3
+        moveTo((x0 + 4.0 * x1 + point.x) / 6.0, (y0 + 4.0 * y1 + point.y) / 6.0)
+      }
+      else -> {
+        stage = 4
+        basisSegment(PointD(x0, y0), PointD(x1, y1), point)
+      }
+    }
+    x0 = x1
+    x1 = point.x
+    y0 = y1
+    y1 = point.y
+  }
+  if (stage == 3 && !partOfArea) close()
+}
+
+/** The cardinal spline without end conditions; see [basisOpen] for the short-series behaviour. */
+private fun PathBuilder.cardinalOpen(points: List<PointD>, tension: Double, partOfArea: Boolean) {
+  val k = (1.0 - tension) / 6.0
+  var x0 = Double.NaN
+  var y0 = Double.NaN
+  var x1 = Double.NaN
+  var y1 = Double.NaN
+  var x2 = Double.NaN
+  var y2 = Double.NaN
+  var stage = 0
+  for (point in points) {
+    when (stage) {
+      0 -> stage = 1
+      1 -> stage = 2
+      2 -> {
+        stage = 3
+        moveTo(x2, y2)
+      }
+      else -> {
+        stage = 4
+        cubicTo(
+          x1 + k * (x2 - x0),
+          y1 + k * (y2 - y0),
+          x2 + k * (x1 - point.x),
+          y2 + k * (y1 - point.y),
+          x2,
+          y2,
+        )
+      }
+    }
+    x0 = x1
+    x1 = x2
+    x2 = point.x
+    y0 = y1
+    y1 = y2
+    y2 = point.y
+  }
+  if (stage == 3 && !partOfArea) close()
+}
+
+// ---- bundle -----------------------------------------------------------------
+
+/**
+ * Pulls a series `beta` of the way from its own shape towards the straight chord across it, which
+ * is all `bundle` is: the result is then drawn as an ordinary [basis] spline.
+ *
+ * The parameter `t` is the *index* fraction along the series, not arc length, so unevenly spaced
+ * points are pulled towards unevenly spaced positions on the chord.
+ */
+private fun bundled(points: List<PointD>, beta: Double): List<PointD> {
+  val last = points.size - 1
+  if (last <= 0) return emptyList()
+  val first = points[0]
+  val dx = points[last].x - first.x
+  val dy = points[last].y - first.y
+  return points.mapIndexed { index, point ->
+    val t = index.toDouble() / last
+    PointD(
+      beta * point.x + (1.0 - beta) * (first.x + t * dx),
+      beta * point.y + (1.0 - beta) * (first.y + t * dy),
+    )
+  }
+}
+
+// ---- catmull-rom ------------------------------------------------------------
+
+/** d3's epsilon, below which a span counts as no span and the tangent is left alone. */
+private const val CURVE_EPSILON = 1e-12
+
+/**
+ * The running state of a Catmull-Rom spline: three points and the two spans between them, each
+ * raised to `alpha` and to `alpha/2`.
+ *
+ * Held in an object because d3 shares one `point` routine between the open, closed and end-pinned
+ * variants, and reproducing that sharing is what keeps the three consistent with each other.
+ */
+private class CatmullRomState(val alpha: Double) {
+  var x0: Double = Double.NaN
+  var y0: Double = Double.NaN
+  var x1: Double = Double.NaN
+  var y1: Double = Double.NaN
+  var x2: Double = Double.NaN
+  var y2: Double = Double.NaN
+  var l01a: Double = 0.0
+  var l12a: Double = 0.0
+  var l23a: Double = 0.0
+  var l012a: Double = 0.0
+  var l122a: Double = 0.0
+  var l232a: Double = 0.0
+  var stage: Int = 0
+
+  /** Records the span to the incoming point, before it becomes part of the window. */
+  fun measure(x: Double, y: Double) {
+    if (stage == 0) return
+    val dx = x2 - x
+    val dy = y2 - y
+    l232a = (dx * dx + dy * dy).pow(alpha)
+    l23a = sqrt(l232a)
+  }
+
+  /** Slides the window along by one point. */
+  fun advance(x: Double, y: Double) {
+    l01a = l12a
+    l12a = l23a
+    l012a = l122a
+    l122a = l232a
+    x0 = x1
+    x1 = x2
+    x2 = x
+    y0 = y1
+    y1 = y2
+    y2 = y
+  }
+}
+
+/**
+ * One Catmull-Rom segment, ending at the middle point of the window.
+ *
+ * The two control points are the cardinal ones corrected by the ratio of the neighbouring spans —
+ * that correction is the whole difference between this family and [cardinal], and it is what stops
+ * the curve looping when one span is much shorter than the next.
+ */
+private fun PathBuilder.catmullRomSegment(s: CatmullRomState, x: Double, y: Double) {
+  var x1 = s.x1
+  var y1 = s.y1
+  var x2 = s.x2
+  var y2 = s.y2
+  if (s.l01a > CURVE_EPSILON) {
+    val a = 2.0 * s.l012a + 3.0 * s.l01a * s.l12a + s.l122a
+    val n = 3.0 * s.l01a * (s.l01a + s.l12a)
+    x1 = (x1 * a - s.x0 * s.l122a + s.x2 * s.l012a) / n
+    y1 = (y1 * a - s.y0 * s.l122a + s.y2 * s.l012a) / n
+  }
+  if (s.l23a > CURVE_EPSILON) {
+    val b = 2.0 * s.l232a + 3.0 * s.l23a * s.l12a + s.l122a
+    val m = 3.0 * s.l23a * (s.l23a + s.l12a)
+    x2 = (x2 * b + s.x1 * s.l232a - x * s.l122a) / m
+    y2 = (y2 * b + s.y1 * s.l232a - y * s.l122a) / m
+  }
+  cubicTo(x1, y1, x2, y2, s.x2, s.y2)
+}
+
+private fun PathBuilder.catmullRom(points: List<PointD>, alpha: Double) {
+  val s = CatmullRomState(alpha)
+  fun feed(x: Double, y: Double) {
+    s.measure(x, y)
+    when (s.stage) {
+      0 -> {
+        s.stage = 1
+        moveTo(x, y)
+      }
+      1 -> s.stage = 2
+      else -> {
+        s.stage = 3
+        catmullRomSegment(s, x, y)
+      }
+    }
+    s.advance(x, y)
+  }
+  for (point in points) feed(point.x, point.y)
+  // The closing segment comes from replaying the last point: with a zero span to itself the
+  // correction vanishes and the curve lands on it, which is how the end gets pinned.
+  when (s.stage) {
+    2 -> lineTo(s.x2, s.y2)
+    3 -> feed(s.x2, s.y2)
+  }
+}
+
+/**
+ * The Catmull-Rom spline without end conditions; see [basisOpen] for the short-series behaviour.
+ */
+private fun PathBuilder.catmullRomOpen(points: List<PointD>, alpha: Double, partOfArea: Boolean) {
+  val s = CatmullRomState(alpha)
+  for (point in points) {
+    s.measure(point.x, point.y)
+    when (s.stage) {
+      0 -> s.stage = 1
+      1 -> s.stage = 2
+      2 -> {
+        s.stage = 3
+        moveTo(s.x2, s.y2)
+      }
+      else -> {
+        s.stage = 4
+        catmullRomSegment(s, point.x, point.y)
+      }
+    }
+    s.advance(point.x, point.y)
+  }
+  if (s.stage == 3 && !partOfArea) close()
+}
+
+/**
+ * The Catmull-Rom spline wrapped round the series, as [cardinalClosed] wraps the cardinal one.
+ *
+ * Three points are held back and replayed, so the segments either side of the join are computed
+ * from points at the far end of the list.
+ */
+private fun PathBuilder.catmullRomClosed(points: List<PointD>, alpha: Double) {
+  val s = CatmullRomState(alpha)
+  var x3 = Double.NaN
+  var y3 = Double.NaN
+  var x4 = Double.NaN
+  var y4 = Double.NaN
+  var x5 = Double.NaN
+  var y5 = Double.NaN
+  fun feed(x: Double, y: Double) {
+    s.measure(x, y)
+    when (s.stage) {
+      0 -> {
+        s.stage = 1
+        x3 = x
+        y3 = y
+      }
+      1 -> {
+        s.stage = 2
+        x4 = x
+        y4 = y
+        moveTo(x, y)
+      }
+      2 -> {
+        s.stage = 3
+        x5 = x
+        y5 = y
+      }
+      else -> catmullRomSegment(s, x, y)
+    }
+    s.advance(x, y)
+  }
+  for (point in points) feed(point.x, point.y)
+  when (s.stage) {
+    1 -> {
+      moveTo(x3, y3)
+      close()
+    }
+    2 -> {
+      lineTo(x3, y3)
+      close()
+    }
+    3 -> {
+      feed(x3, y3)
+      feed(x4, y4)
+      feed(x5, y5)
+    }
+  }
+}

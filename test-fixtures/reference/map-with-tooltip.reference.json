@@ -18225,6 +18225,7 @@
       "y": 266
     },
     {
+      "cornerRadius": 100,
       "fill": "#FFFFFF",
       "fillOpacity": 0.7,
       "height": 0,

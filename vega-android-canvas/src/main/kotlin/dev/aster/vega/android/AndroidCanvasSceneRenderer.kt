@@ -143,21 +143,23 @@ public class AndroidCanvasSceneRenderer(
     // A group with its own paint draws a rectangle of its declared size, as Vega group marks do.
     val paintRect = node.paintRect
     if (paintRect != null) {
-      scratchRect.set(
-        paintRect.left.toFloat(),
-        paintRect.top.toFloat(),
-        paintRect.right.toFloat(),
-        paintRect.bottom.toFloat(),
-      )
-      val radius = node.cornerRadius.toFloat()
+      val rounded = node.roundedPaintPath
+      if (rounded != null) rounded.toAndroidPath(androidPath)
+      else
+        scratchRect.set(
+          paintRect.left.toFloat(),
+          paintRect.top.toFloat(),
+          paintRect.right.toFloat(),
+          paintRect.bottom.toFloat(),
+        )
       node.fill?.let { fill ->
         preparePaint(fillPaint, fill, opacity, paintRect, node.blendMode, diagnostics)
-        if (radius > 0f) canvas.drawRoundRect(scratchRect, radius, radius, fillPaint)
+        if (rounded != null) canvas.drawPath(androidPath, fillPaint)
         else canvas.drawRect(scratchRect, fillPaint)
       }
       node.stroke?.let { stroke ->
         prepareStroke(stroke, opacity, paintRect, node.blendMode, diagnostics)
-        if (radius > 0f) canvas.drawRoundRect(scratchRect, radius, radius, strokePaint)
+        if (rounded != null) canvas.drawPath(androidPath, strokePaint)
         else canvas.drawRect(scratchRect, strokePaint)
       }
     }
@@ -172,26 +174,41 @@ public class AndroidCanvasSceneRenderer(
     diagnostics: DiagnosticCollector,
   ) {
     val rect = node.rect
+    // Rounded corners go through Vega's own outline rather than `drawRoundRect`: that primitive
+    // draws one radius on all four corners, and a true arc where Vega draws a Bézier approximation.
+    val rounded = node.roundedPath
+    if (rounded != null) {
+      rounded.toAndroidPath(androidPath)
+      node.fill?.let { fill ->
+        if (fill.isVisible) {
+          preparePaint(fillPaint, fill, opacity, rect, node.blendMode, diagnostics)
+          canvas.drawPath(androidPath, fillPaint)
+        }
+      }
+      node.stroke?.let { stroke ->
+        if (stroke.isVisible) {
+          prepareStroke(stroke, opacity, rect, node.blendMode, diagnostics)
+          canvas.drawPath(androidPath, strokePaint)
+        }
+      }
+      return
+    }
     scratchRect.set(
       rect.left.toFloat(),
       rect.top.toFloat(),
       rect.right.toFloat(),
       rect.bottom.toFloat(),
     )
-    val radius = node.effectiveCornerRadius.toFloat()
-
     node.fill?.let { fill ->
       if (fill.isVisible) {
         preparePaint(fillPaint, fill, opacity, rect, node.blendMode, diagnostics)
-        if (radius > 0f) canvas.drawRoundRect(scratchRect, radius, radius, fillPaint)
-        else canvas.drawRect(scratchRect, fillPaint)
+        canvas.drawRect(scratchRect, fillPaint)
       }
     }
     node.stroke?.let { stroke ->
       if (stroke.isVisible) {
         prepareStroke(stroke, opacity, rect, node.blendMode, diagnostics)
-        if (radius > 0f) canvas.drawRoundRect(scratchRect, radius, radius, strokePaint)
-        else canvas.drawRect(scratchRect, strokePaint)
+        canvas.drawRect(scratchRect, strokePaint)
       }
     }
   }
@@ -520,6 +537,16 @@ public class AndroidCanvasSceneRenderer(
           SceneBlendMode.OVERLAY -> BlendMode.OVERLAY
           SceneBlendMode.DARKEN -> BlendMode.DARKEN
           SceneBlendMode.LIGHTEN -> BlendMode.LIGHTEN
+          SceneBlendMode.COLOR_DODGE -> BlendMode.COLOR_DODGE
+          SceneBlendMode.COLOR_BURN -> BlendMode.COLOR_BURN
+          SceneBlendMode.HARD_LIGHT -> BlendMode.HARD_LIGHT
+          SceneBlendMode.SOFT_LIGHT -> BlendMode.SOFT_LIGHT
+          SceneBlendMode.DIFFERENCE -> BlendMode.DIFFERENCE
+          SceneBlendMode.EXCLUSION -> BlendMode.EXCLUSION
+          SceneBlendMode.HUE -> BlendMode.HUE
+          SceneBlendMode.SATURATION -> BlendMode.SATURATION
+          SceneBlendMode.COLOR -> BlendMode.COLOR
+          SceneBlendMode.LUMINOSITY -> BlendMode.LUMINOSITY
         }
       return
     }
@@ -533,6 +560,9 @@ public class AndroidCanvasSceneRenderer(
         SceneBlendMode.DARKEN -> PorterDuff.Mode.DARKEN
         SceneBlendMode.LIGHTEN -> PorterDuff.Mode.LIGHTEN
         SceneBlendMode.NORMAL -> null
+        // `PorterDuff` stops at the five above. The rest are reported below rather than swapped for
+        // whichever mode looks closest.
+        else -> null
       }
     if (porterDuff == null) {
       diagnostics.warn(

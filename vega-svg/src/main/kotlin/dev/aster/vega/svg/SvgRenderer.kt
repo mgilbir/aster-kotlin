@@ -186,11 +186,16 @@ public class SvgRenderer(private val options: SvgOptions = SvgOptions()) {
     // group-mark behaviour.
     if (clipRect != null && (node.fill != null || node.stroke != null)) {
       newline(out, depth + 1)
-      out.append("<rect x=\"").append(num(clipRect.left))
-      out.append("\" y=\"").append(num(clipRect.top))
-      out.append("\" width=\"").append(num(clipRect.width))
-      out.append("\" height=\"").append(num(clipRect.height))
-      out.append('"')
+      val rounded = node.roundedPaintPath
+      if (rounded != null) {
+        out.append("<path d=\"").append(pathToString(rounded)).append('"')
+      } else {
+        out.append("<rect x=\"").append(num(clipRect.left))
+        out.append("\" y=\"").append(num(clipRect.top))
+        out.append("\" width=\"").append(num(clipRect.width))
+        out.append("\" height=\"").append(num(clipRect.height))
+        out.append('"')
+      }
       appendFill(out, node.fill, defs, node.bounds)
       appendStroke(out, node.stroke, defs, node.bounds)
       out.append("/>")
@@ -203,15 +208,19 @@ public class SvgRenderer(private val options: SvgOptions = SvgOptions()) {
   }
 
   private fun renderRect(node: RectNode, out: StringBuilder, defs: Defs, depth: Int) {
-    val r = node.rect
     newline(out, depth)
-    out.append("<rect x=\"").append(num(r.left)).append('"')
-    out.append(" y=\"").append(num(r.top)).append('"')
-    out.append(" width=\"").append(num(r.width)).append('"')
-    out.append(" height=\"").append(num(r.height)).append('"')
-    if (node.effectiveCornerRadius > 0.0) {
-      out.append(" rx=\"").append(num(node.effectiveCornerRadius)).append('"')
-      out.append(" ry=\"").append(num(node.effectiveCornerRadius)).append('"')
+    // A rounded rectangle is emitted as a path, as upstream emits it. `rx`/`ry` cannot hold four
+    // different radii, and even for one it draws a true elliptical arc where Vega draws a Bézier
+    // approximation of one — so a `<rect rx>` would be a different shape at every corner.
+    val rounded = node.roundedPath
+    if (rounded != null) {
+      out.append("<path d=\"").append(pathToString(rounded)).append('"')
+    } else {
+      val r = node.rect
+      out.append("<rect x=\"").append(num(r.left)).append('"')
+      out.append(" y=\"").append(num(r.top)).append('"')
+      out.append(" width=\"").append(num(r.width)).append('"')
+      out.append(" height=\"").append(num(r.height)).append('"')
     }
     appendFill(out, node.fill, defs, node.bounds)
     appendStroke(out, node.stroke, defs, node.bounds)
@@ -416,7 +425,10 @@ public class SvgRenderer(private val options: SvgOptions = SvgOptions()) {
    */
   private fun appendStyle(out: StringBuilder, node: SceneNode, mode: SceneBlendMode) {
     val parts = mutableListOf<String>()
-    if (mode != SceneBlendMode.NORMAL) parts += "mix-blend-mode:" + mode.name.lowercase()
+    // `COLOR_DODGE` is CSS's `color-dodge`; the enum's underscores are the only difference.
+    if (mode != SceneBlendMode.NORMAL) {
+      parts += "mix-blend-mode:" + mode.name.lowercase().replace('_', '-')
+    }
     node.metadata.cursor?.takeIf { it.isNotEmpty() }?.let { parts += "cursor:" + it }
     if (parts.isEmpty()) return
     out.append(" style=\"").append(escapeXml(parts.joinToString(";"))).append('"')

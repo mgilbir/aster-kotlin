@@ -102,9 +102,12 @@ class UnhandledPropertiesTest {
   }
 
   /**
-   * `limit` is the one that matters most here: a text mark that ignores it draws past the width it
-   * was told to stay inside, which overlaps a neighbour rather than leaving a gap, so the chart
-   * looks composed and reads wrong.
+   * Every channel in Vega's encoding vocabulary now reaches the scene, so this asserts silence.
+   *
+   * Kept rather than deleted, and kept naming the channels that were the last to arrive — the
+   * per-corner radii, `limit`/`ellipsis`, `tension`, polar `radius`/`theta`, `blend` and `clip`. A
+   * channel that stopped being honoured would go back to being reported here, which is the failure
+   * this test exists to produce; the empty list only says that today none of them is.
    */
   @Test
   fun `an encode entry reports the channels no encoder reads`() {
@@ -115,14 +118,15 @@ class UnhandledPropertiesTest {
               "xc": {"value": 10}, "yc": {"value": 10},
               "width": {"value": 5}, "height": {"value": 5},
               "strokeDash": {"value": [2, 2]}, "strokeCap": {"value": "round"},
-              "limit": {"value": 40}, "tooltip": {"value": "t"},
-              "cornerRadiusTopLeft": {"value": 2}, "zindex": {"value": 1},
+              "limit": {"value": 40}, "ellipsis": {"value": "~"},
+              "tooltip": {"value": "t"}, "zindex": {"value": 1},
+              "cornerRadiusTopLeft": {"value": 2}, "cornerRadiusBottomRight": {"value": 2},
+              "tension": {"value": 0.5}, "radius": {"value": 4}, "theta": {"value": 1},
+              "blend": {"value": "multiply"}, "clip": {"value": true},
               "cursor": {"value": "pointer"}}}}]"""
         )
       )
-    // `tooltip`, `zindex` and `cursor` came off this list when they were implemented: the datum a
-    // tooltip shows, the paint order within a mark, and the pointer shape over an item.
-    assertEquals(listOf("limit", "cornerRadiusTopLeft").sorted(), reported.sorted())
+    assertEquals(emptyList<String>(), reported.sorted())
   }
 
   /** A channel the engine does read is not reported, or the diagnostics would be noise. */

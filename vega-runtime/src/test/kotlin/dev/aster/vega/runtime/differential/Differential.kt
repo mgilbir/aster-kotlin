@@ -207,7 +207,45 @@ public object Differential {
         "width" to rect.width,
         "height" to rect.height,
       )
-    return Mark("rect", node.metadata.role, numbers + paintNumbers(node), paintStrings(node))
+    return Mark(
+      "rect",
+      node.metadata.role,
+      numbers +
+        cornerNumbers(
+          node.cornerRadius,
+          node.cornerRadiusTopLeft,
+          node.cornerRadiusTopRight,
+          node.cornerRadiusBottomRight,
+          node.cornerRadiusBottomLeft,
+        ) +
+        paintNumbers(node),
+      paintStrings(node),
+    )
+  }
+
+  /**
+   * A rectangle's corner radii as the specification declared them, each omitted when unset.
+   *
+   * Declared rather than drawn, because that is what upstream's scene item holds: its path
+   * generator clamps a radius to `min(width, height) / 2` while drawing and never writes the
+   * clamped value back. Comparing the declared numbers keeps the two sides describing the same
+   * thing; that the clamp itself matches is pinned separately, against upstream's own path strings,
+   * in `RectPathTest`.
+   */
+  private fun cornerNumbers(
+    cornerRadius: Double,
+    topLeft: Double?,
+    topRight: Double?,
+    bottomRight: Double?,
+    bottomLeft: Double?,
+  ): Map<String, Double> {
+    val out = LinkedHashMap<String, Double>()
+    if (cornerRadius != 0.0) out["cornerRadius"] = cornerRadius
+    topLeft?.let { out["cornerRadiusTopLeft"] = it }
+    topRight?.let { out["cornerRadiusTopRight"] = it }
+    bottomRight?.let { out["cornerRadiusBottomRight"] = it }
+    bottomLeft?.let { out["cornerRadiusBottomLeft"] = it }
+    return out
   }
 
   private fun ruleMark(node: RuleNode, world: Transform2D): Mark {
@@ -368,6 +406,7 @@ public object Differential {
     strings["points"] = vertices.joinToString(" ") { "${fmt(it.x)} ${fmt(it.y)}" }
     node.metadata.interpolate?.let { strings["interpolate"] = it }
     val numbers = LinkedHashMap<String, Double>()
+    node.metadata.tension?.let { numbers["tension"] = it }
     // Whether the outline joins back onto itself. Nothing else here can see it: `linear-closed`
     // draws exactly the points `linear` does and closes the polygon, so a line left open would
     // otherwise match its reference on every channel and render with one side missing.
@@ -444,7 +483,15 @@ public object Differential {
     val strings = LinkedHashMap<String, String>()
     node.fill?.let { f -> solidColour(f.paint)?.let { strings["fill"] = it.toCssHex() } }
     node.stroke?.let { s -> solidColour(s.paint)?.let { strings["stroke"] = it.toCssHex() } }
-    return Mark("group", node.metadata.role, numbers + paintNumbers(node), strings)
+    val corners =
+      cornerNumbers(
+        node.cornerRadius,
+        node.cornerRadiusTopLeft,
+        node.cornerRadiusTopRight,
+        node.cornerRadiusBottomRight,
+        node.cornerRadiusBottomLeft,
+      )
+    return Mark("group", node.metadata.role, numbers + corners + paintNumbers(node), strings)
   }
 
   /**
@@ -598,6 +645,15 @@ public object Differential {
         out.add(Difference("$where.$channel", "absent", actual.strings.getValue(channel)))
       }
     }
+    // The same both ways for corner radii: rounding a corner the reference leaves square changes
+    // the outline, and iterating only the reference's channels would never see it.
+    for (channel in CORNER_CHANNELS) {
+      if (channel in ignored) continue
+      val invented = actual.numbers[channel] ?: continue
+      if (channel !in expected.numbers && abs(invented) > tolerance) {
+        out.add(Difference("$where.$channel", "absent", fmt(invented)))
+      }
+    }
     for ((channel, wanted) in expected.strings) {
       if (channel in ignored) continue
       // A geometry channel the reference records as `NaN` or an infinity. It is a *string* there
@@ -682,6 +738,9 @@ public object Differential {
       "fillOpacity",
       "strokeOpacity" -> 1.0
       "angle" -> 0.0
+      // A radius the reference never set is a square corner, which is what this side draws when it
+      // omits the channel. The reverse — a radius here and none upstream — is caught below.
+      in CORNER_CHANNELS -> 0.0
       "strokeWidth" -> null // absence means no stroke at all, which is a real difference
       else -> null
     }
@@ -817,6 +876,15 @@ public object Differential {
   private val CURVE_EXTENT_TYPES = setOf("arc", "trail", "path")
 
   private val COLOUR_CHANNELS = setOf("fill", "stroke")
+
+  private val CORNER_CHANNELS =
+    setOf(
+      "cornerRadius",
+      "cornerRadiusTopLeft",
+      "cornerRadiusTopRight",
+      "cornerRadiusBottomRight",
+      "cornerRadiusBottomLeft",
+    )
 
   /** The channels that carry a position or an extent, and so have a painted equivalent of zero. */
   private val GEOMETRY_CHANNELS =

@@ -480,8 +480,11 @@ public data class Fill(val paint: ScenePaint, val opacity: Double = 1.0) {
 }
 
 /**
- * Blend modes the engine can express on every backend. Anything else in a specification produces
- * `VEGA_RENDER_UNSUPPORTED_BLEND_MODE` rather than a silent substitution.
+ * CSS `mix-blend-mode`, which is what Vega's `blend` channel takes.
+ *
+ * All sixteen, so a specification naming one always gets it in SVG. On Android the separable modes
+ * below `LIGHTEN` reach the canvas only from API 29 — `PorterDuff` has no equivalent — and a device
+ * below that produces `VEGA_RENDER_UNSUPPORTED_BLEND_MODE` rather than a silent substitution.
  */
 public enum class SceneBlendMode {
   NORMAL,
@@ -490,4 +493,17 @@ public enum class SceneBlendMode {
   OVERLAY,
   DARKEN,
   LIGHTEN,
+  COLOR_DODGE,
+  COLOR_BURN,
+  HARD_LIGHT,
+  SOFT_LIGHT,
+  DIFFERENCE,
+  EXCLUSION,
+  /**
+   * The four non-separable modes, which mix whole colours rather than each channel independently.
+   */
+  HUE,
+  SATURATION,
+  COLOR,
+  LUMINOSITY,
 }
