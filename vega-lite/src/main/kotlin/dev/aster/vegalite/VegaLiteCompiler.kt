@@ -922,7 +922,10 @@ private class Compilation(
       root.mergeAggregates()
       root.mergeOutputs()
     }
-    val datasets = DataAssembler().assemble(order.map { roots[it] ?: it })
+    val datasets =
+      DataAssembler()
+        .also { it.named = spec.obj("datasets")?.fields.orEmpty() }
+        .assemble(order.map { roots[it] ?: it })
     views.forEachIndexed { index, view ->
       view.mainData = outputs[index].main.source ?: ""
       view.rawData = outputs[index].raw?.source ?: view.mainData

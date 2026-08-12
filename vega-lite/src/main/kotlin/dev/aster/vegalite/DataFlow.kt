@@ -576,11 +576,13 @@ internal class DataAssembler {
     val url: String? = null,
     var format: VegaValue.Obj? = null,
     val transform: MutableList<VegaValue> = mutableListOf(),
+    /** Rows named at the top level, which stand in for the `values` this source did not state. */
+    val inline: VegaValue? = null,
   ) {
     fun build(): VegaValue.Obj = obj {
       put("name", name)
       put("url", url)
-      put("values", values)
+      put("values", values ?: inline)
       put("format", format)
       put("source", source)
       if (transform.isNotEmpty()) put("transform", arr(transform))
@@ -593,12 +595,23 @@ internal class DataAssembler {
    *   dataset stands beside a view's source rather than below it, a join reading a second table
    *   rather than deriving from the first.
    */
+  /** The rows a top-level `datasets` block holds, by the name each is handed in under. */
+  var named: Map<String, VegaValue> = emptyMap()
+
   fun assemble(roots: List<Any>): List<VegaValue> {
     for (root in roots) {
       val data = if (root is SourceNode) root.data else root as VegaValue
+      // A dataset the specification **named** keeps that name — `if (!root.hasName())` guards the
+      // numbering upstream, so a named root does not consume a `source_n` either. The name is how
+      // a chart hands its own data in at run time, and renaming it breaks the hand-off.
+      val stated = data.string("name")
       val dataset =
         MutableDataset(
-          name = "source_${sourceIndex++}",
+          name = stated ?: "source_${sourceIndex++}",
+          // A dataset named at the top level in `datasets` is *handed in* by name and has no
+          // `values` of its own; the specification's own block is where the rows are, and Vega
+          // wants them written out beside the name.
+          inline = stated?.let { named[it] },
           values = data["values"],
           url = data.string("url"),
           format = sourceFormat(data),

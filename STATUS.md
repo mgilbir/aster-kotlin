@@ -1665,6 +1665,14 @@ and beats the configured twenty, and a colour scale with a **midpoint** is a *di
 the reader is being shown which side of a value each datum falls and a one-ended ramp cannot say
 that.
 
+### A table handed in by name
+
+`{"data": {"name": "falcon"}}` reads a table the specification supplies in its top-level `datasets`
+block, and both halves of that were missing. A named root **keeps its name** — `if (!root.hasName())`
+guards the numbering upstream, so it does not consume a `source_n` either — and the rows the block
+holds are written out beside it, since the view's own `data` states none. Renaming it breaks the
+hand-off the name exists for.
+
 ### Two runtime gaps this batch names but does not close
 
 `density`'s fixture is not in the corpus, and `trail`'s draws no legend. Both compile exactly as
