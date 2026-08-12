@@ -21,7 +21,7 @@ end to end — expressions, signals, 33 of upstream's 40 data transforms, every 
 and an event handler that recompiles the chart — and are verified against upstream Vega by
 differential tests.
 
-One hundred and thirty-one differential fixtures pass, all matching upstream exactly on every mark and
+One hundred and thirty-two differential fixtures pass, all matching upstream exactly on every mark and
 scale output:
 
 | Fixture | Marks | Covers |
@@ -201,7 +201,7 @@ substantive compatibility items:
 | 6. View and Compose APIs | Yes |
 | 7. SVG, PNG, PDF export | Yes |
 | 8. TalkBack can describe and navigate | Partial — virtual nodes are tested by instrumentation, not with TalkBack itself |
-| 9. At least 100 compatibility fixtures pass | **Yes** — 131 |
+| 9. At least 100 compatibility fixtures pass | **Yes** — 132 |
 | 10. Core runtime has no Android dependency | Yes |
 | 11. Renders without WebView | Yes |
 | 12. Build and test loop runs from the terminal | Yes |
@@ -538,7 +538,7 @@ each example a deadline.
 
 ## Known failing fixtures
 
-None. One hundred and thirty-one fixtures exist and all of them pass — and that sentence became worth
+None. One hundred and thirty-two fixtures exist and all of them pass — and that sentence became worth
 something only once the gate could no longer skip itself, below.
 
 **The gate could report success without running.** `FixtureDifferentialTest` reads the fixtures and
@@ -1693,6 +1693,24 @@ Each of those messages fired only for a name upstream itself rejects, and each r
 They now say what is actually true — "'x' is neither a window operation nor an aggregate one" — which
 matters because a diagnostic that overstates a gap is the same failure as one that hides it: a reader
 plans around something that is not there.
+
+## `config.range` is what a named range stands for
+
+`"range": "category"` is not a keyword. It is a **key into `config.range`**, and only when the
+configuration says nothing about it does it fall through to a built-in default. This engine had the six
+defaults and ignored the configuration, so a theme that set its own categorical palette got
+`tableau10` anyway — and the whole `config.range` block was reported as unread, which was at least
+honest.
+
+Upstream substitutes and *re-reads*: `parseScaleRange` replaces the name with whatever the theme wrote
+and parses the result as an ordinary range. Doing it in the parser rather than in the resolver is not a
+detail of style — it is what lets a theme's `category` be a `{"scheme": ...}` where the built-in default
+is a literal list of symbol names. The two are the same property, not two kinds of thing, and a resolver
+that had already decided which kind it was could not accept the other.
+
+That also retires the last of the "named range is not implemented" messages. All six of upstream's
+names work, and what is left is a name that is neither one of them nor defined by the configuration —
+which the diagnostic now says.
 
 ## Performance observations
 

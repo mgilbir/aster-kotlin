@@ -9,7 +9,7 @@ Branch `milestone-0-bootstrap`. Working tree clean, both gates green:
 - `./scripts/check.sh` — format, all tests, lint, demo APK
 - `./scripts/oracle.sh` — regenerates upstream references and runs the differential comparison
 
-**131 differential fixtures pass, all matching upstream exactly.** That is the only number here
+**132 differential fixtures pass, all matching upstream exactly.** That is the only number here
 that means what it says.
 
 ## Read this before trusting the other number
@@ -254,7 +254,7 @@ not the one Vega documents**, because Vega only forwards the parameters a specif
 
 ## What is left: two examples, and neither can be verified
 
-**131 differential fixtures pass. 91 of the 93 examples compile clean.** Everything that can be
+**132 differential fixtures pass. 91 of the 93 examples compile clean.** Everything that can be
 checked against upstream has been.
 
 ### `projections` — upstream refuses it too
@@ -412,8 +412,8 @@ As of this handoff the subtraction leaves **nothing** for `encodeEntry`, `axis`,
   exception table and no reader.
 - **Mark (2):** a mark-level `description` and `key`.
 - **Scale (1):** `domainImplicit`. `domainRaw` is *done*.
-- **Tail:** `geoBounds`, `timeunit` unit inference, facet aggregates, unimplemented named ranges, and
-  an rgb interpolation `gamma`. The colour interpolation spaces are *done*, and so are all 26
+- **Tail:** `geoBounds`, `timeunit` unit inference, facet aggregates, and an rgb interpolation
+  `gamma`. `config.range` and all six named ranges are *done*. The colour interpolation spaces are *done*, and so are all 26
   aggregate operations — the `impute`, `pivot` and `window` reports were **never gaps**: each fired
   only for a name upstream itself rejects, and each read as one. They now say so.
 

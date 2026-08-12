@@ -585,6 +585,16 @@
   "caption": "Y-axis for a linear scale with values from 0 to 90"
  },
  {
+  "fixture": "config-range",
+  "kind": "legend",
+  "caption": "Symbol legend titled 'category' for fill color with 3 values: a, b, c"
+ },
+ {
+  "fixture": "config-range",
+  "kind": "legend",
+  "caption": "Symbol legend titled 'symbol' for shape with 3 values: a, b, c"
+ },
+ {
   "fixture": "config-theme",
   "kind": "axis",
   "caption": "X-axis titled 'Band, themed all the way down' for a discrete scale with 3 values: alpha, bravo, charlie"

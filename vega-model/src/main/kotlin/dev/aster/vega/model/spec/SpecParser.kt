@@ -28,6 +28,8 @@ private val MULTI_FIELD_SORT_OPS = listOf("count", "min", "max")
  */
 private val CONFIG_HONOURED =
   setOf(
+    // `config.range` is not a guide block: its entries are what a *named* range stands for.
+    "range",
     "mark",
     "rect",
     "symbol",
@@ -1403,7 +1405,17 @@ public class SpecParser {
   private fun parseRange(value: VegaValue?, path: String): RangeSpec =
     when (value) {
       null -> RangeSpec.Unset
-      is VegaValue.Str -> RangeSpec.Named(value.value)
+      // A named range is a **key into `config.range`** before it is anything else, and upstream
+      // substitutes and re-reads: `"range": "category"` under a theme that sets
+      // `config.range.category` to its own palette means that palette, not `tableau10`. Only when
+      // the
+      // configuration says nothing does the name fall through to `width`, `height` or the built-in
+      // defaults. Substituting here rather than in the resolver is upstream's own arrangement, and
+      // it
+      // is what lets a theme's `category` be a scheme where the default is a literal list.
+      is VegaValue.Str ->
+        config.rangeDefault(value.value)?.let { parseRange(it, path) }
+          ?: RangeSpec.Named(value.value)
       is VegaValue.Arr -> RangeSpec.Literal(value.values)
       is VegaValue.Obj -> {
         val scheme = value.fields["scheme"]

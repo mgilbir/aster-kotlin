@@ -258,9 +258,10 @@ public class ScaleResolver(
    * categorical palette, including the stacked-bar example in Vega's own documentation, so a scale
    * that rejects it rejects most charts anyone will paste.
    *
-   * The defaults are upstream's own (`vega-parser/src/config.js`). A specification that overrides
-   * them through `config.range` is **not** honoured yet, and the config block is reported as unread
-   * — so the substitution is visible rather than silent.
+   * The defaults are upstream's own (`vega-parser/src/config.js`). A `config.range` that overrides
+   * one never reaches here: the parser substitutes it for the name and re-reads the result, which
+   * is upstream's own arrangement and is what lets a theme's `category` be a scheme where the
+   * default is a literal list of symbol names.
    */
   private fun namedRange(name: String): RangeSpec? =
     when (name.lowercase()) {
@@ -1213,7 +1214,8 @@ public class ScaleResolver(
           else -> {
             diagnostics.error(
               DiagnosticCodes.SCALE_UNSUPPORTED_TYPE,
-              "Named range '${range.name}' is not implemented (scale '${spec.name}')",
+              "'${range.name}' is not one of Vega's named ranges, and 'config.range' does not " +
+                "define it (scale '${spec.name}')",
               operator = spec.name,
             )
             null

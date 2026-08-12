@@ -75,6 +75,16 @@ public class GuideConfig(private val blocks: Map<String, VegaValue.Obj>) {
   /** A named `config.style` block, which a mark opts into through its own `style` property. */
   public fun styleBlock(name: String): VegaValue.Obj = style(name)
 
+  /**
+   * A `config.range` entry, or null when the configuration does not name that range.
+   *
+   * The value is whatever the theme wrote — a scheme object, a literal array, a step — because
+   * upstream substitutes it for the name and reads the result as an ordinary `range`. That is why
+   * `config.range.category` may be a `{"scheme": ...}` where the built-in default is a list of
+   * symbol names: the two are the same property, not two kinds of thing.
+   */
+  public fun rangeDefault(name: String): VegaValue? = block("range").fields[name]
+
   /** A legend has one block, over the same guide styles. */
   public fun legendDefaults(): List<VegaValue.Obj> = listOf(guideStyleDefaults(), block("legend"))
 
