@@ -123,7 +123,7 @@ internal object Fields {
    * is no constant that says how long a month is, so the difference between two dates in a
    * deliberately non-leap year is what says it.
    */
-  fun timeUnitDuration(timeUnit: String): String? {
+  fun timeUnitDuration(timeUnit: String, wrap: (String) -> String = { it }): String? {
     val smallest = timeUnitParts(timeUnit).lastOrNull() ?: return null
     if (smallest == "day") return null
     // `datetime` takes a zero-based month, which is why January is 0 and the step lands on 1.
@@ -150,7 +150,7 @@ internal object Fields {
     end[part] = start.getValue(part) + step
     fun expr(values: Map<String, Int>) =
       "datetime(" + fields.joinToString(", ") { values.getValue(it).toString() } + ")"
-    return "${expr(end)} - ${expr(start)}"
+    return "${wrap(expr(end))} - ${wrap(expr(start))}"
   }
 
   /** `yearmonth` reads as `year-month` in a title. */
@@ -190,6 +190,20 @@ internal object Fields {
       is VegaValue.Bool -> value.value.toString()
       is VegaValue.Arr -> value.values.joinToString(",") { literalText(it) }
       else -> ""
+    }
+
+  /**
+   * A number written into an *expression*, the way JavaScript writes one.
+   *
+   * Not the display canonicaliser: that rounds, and an expression is compared as a string. Upstream
+   * writes `String(n)`, which is the shortest text that reads back as the same double — so `2`, not
+   * `2.0`, and `0.15000000000000002`, not `0.15`, those two being different numbers.
+   */
+  fun expressionNumber(value: Double): String =
+    if (value == kotlin.math.floor(value) && !value.isInfinite() && kotlin.math.abs(value) < 1e15) {
+      value.toLong().toString()
+    } else {
+      value.toString()
     }
 
   fun varName(text: String): String {

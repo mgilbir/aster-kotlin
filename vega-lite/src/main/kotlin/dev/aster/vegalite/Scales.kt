@@ -1,6 +1,7 @@
 package dev.aster.vegalite
 
 import dev.aster.vega.model.VegaValue
+import dev.aster.vega.model.canonicalNumberString
 
 /**
  * A scale as it is being built: its type, the domains contributed by each view, and its properties.
@@ -313,6 +314,32 @@ internal object Scales {
       "xOffset",
       "yOffset" -> {
         val position = if (channel == "xOffset") "x" else "y"
+        val positionScale = view.scaleType(position)
+        // `fullWidthOrHeightRange({center: true})`: an offset with **no** position beside it has no
+        // band to sit inside, so it spans the whole plot, measured from the middle.
+        if (positionScale == null) {
+          val size = view.sizeSignal(position)
+          return arr(listOf(signalRef("-$size/2"), signalRef("$size/2")))
+        }
+        // A *continuous* position bucketed by a time unit has a band after all — one bucket wide —
+        // and the offset divides that, inset by half the nested padding at each end. The duration
+        // is measured through the scale, since a bucket's width in pixels is what is being divided.
+        if (!hasDiscreteDomain(positionScale)) {
+          val positionDef = view.spec.fieldDef(position)
+          val timeUnit = positionDef?.timeUnit
+          val duration =
+            timeUnit?.let {
+              Fields.timeUnitDuration(it) { expr -> "scale('${view.scale(position)}', $expr)" }
+            } ?: return null
+          val padding = config.scaleConfig("bandWithNestedOffsetPaddingInner") ?: 0.0
+          if (padding == 0.0) return arr(listOf(num(0.0), signalRef(duration)))
+          return arr(
+            listOf(
+              signalRef("${canonicalNumberString(padding / 2)} * ($duration)"),
+              signalRef("${canonicalNumberString(1 - padding / 2)} * ($duration)"),
+            )
+          )
+        }
         val declared = if (position == "x") view.spec.width else view.spec.height
         // `getDiscretePositionSize`: an undeclared size is *already* a step — the configured one —
         // so the ordinary grouped bar takes that branch, and only a size stated as a **number**

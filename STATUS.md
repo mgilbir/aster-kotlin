@@ -1350,6 +1350,45 @@ it — so `show` is the only one that reaches the encoding at all.
 `encode.labels.update.text` from it, so passing it through was silently ignored, and passing it
 through on the *gridline* axis named an encode block for a mark that is not drawn.
 
+### A number in an expression is compared as text, so it has to be written as JavaScript writes one
+
+`max(4.0, bandwidth('x'))` and `max(4, bandwidth('x'))` are the same instruction and a different
+string, and the comparison is over the string. A Kotlin `Double` interpolated into an expression
+carries a decimal point Vega-Lite's own output never has — and the display canonicaliser is not the
+answer either, since it *rounds*: `(1 - 0.7) / 2` is `0.15000000000000002`, and `0.15` is a
+different number. `Fields.expressionNumber` writes the shortest text that reads back as the same
+double, which is what `String(n)` does. Nineteen files in the gallery differed on nothing else.
+
+### An offset is a lane, and a lane is not always inside a band
+
+Three rules, all from `getOffsetRange` and `rectPosition`, and each one a chart that was drawn
+wrongly rather than incompletely:
+
+- An offset with **no position** beside it has no band to sit inside, so it spans the whole plot
+  measured from the middle — `[-width/2, width/2]`. The bars had been stacking in the middle.
+- A **continuous** position bucketed by a time unit does have a band: one bucket wide, measured
+  through the scale, inset by half the nested padding at each end. Without it a grouped bar over a
+  year axis had no lane at all.
+- An offset encoding takes a rect **off** the bucket's edges, so the bucket is no longer what the
+  rect spans and the positioning is the ordinary banded one — and the band being filled is the
+  *offset's*, not the position's, which is what makes it `bandwidth('xOffset')` rather than the
+  five units a lone continuous rect gets.
+
+Beside them, `bandPositionForBandSize`: a rect asking for a *fraction* of its bucket
+(`{"width": {"band": 0.7}}`) is drawn inside it, both edges moving in by half of what is left over.
+The interpolation happens in *data* space and the scale is applied to the result, which is not the
+same as interpolating two scaled positions once the scale is not linear.
+
+### An empty title is not a title
+
+`assembleTitle` writes `titleString ? {title} : {}`, so an axis the specification titled `""` has no
+caption at all — and the tooltip and the description read `fieldDef.title || defaultTitle(...)`, an
+`||`, so the same empty title falls through to the field's own name there. One value, two opposite
+readings, and this compiler had a third: it wrote the empty string into both.
+
+`config.mark.tooltip` was also being stripped as a Vega-Lite-only property. It is not one — upstream's
+`VL_ONLY_MARK_CONFIG_INDEX` lists eight keys and that is not among them.
+
 ### Two runtime gaps this batch names but does not close
 
 `density`'s fixture is not in the corpus, and `trail`'s draws no legend. Both compile exactly as

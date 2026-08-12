@@ -212,11 +212,6 @@ internal class Config(private val user: VegaValue.Obj = VegaValue.EmptyObject) {
         "theta2",
         "timeUnitBandSize",
         "timeUnitBandPosition",
-        "tooltip",
-        // `point` and `line` on a path mark are the overlay normalizer's instructions: they have
-        // already become marks of their own by the time anything is emitted.
-        "point",
-        "line",
       )
 
     val VEGA_LITE_ONLY =

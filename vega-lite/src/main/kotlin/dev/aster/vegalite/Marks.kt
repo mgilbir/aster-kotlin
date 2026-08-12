@@ -556,7 +556,8 @@ internal object Marks {
         for (def in defs) {
           if (!def.isFieldDef) continue
           val title =
-            def.explicitTitle ?: Fields.defaultTitle(def, view.config)?.let(VegaValue::Str)
+            def.explicitTitle?.takeIf { it != VegaValue.Str("") }
+              ?: Fields.defaultTitle(def, view.config)?.let(VegaValue::Str)
           val key = (title as? VegaValue.Str)?.value ?: continue
           if (out.containsKey(key)) continue
           out[key] = fieldExpression(view, def, separator = "\\n")
@@ -606,8 +607,10 @@ internal object Marks {
         // dropped the channel from the description entirely.
         // A `title: null` hides the *guide's* caption; it does not take the field out of what a
         // screen reader says, so the description falls back to the field's own name.
+        // `fieldDef.title || defaultTitle(...)` is an `||`, so an **empty** title falls through to
+        // the field's own name rather than announcing a channel with no name at all.
         val title =
-          def.explicitTitle?.takeIf { it != VegaValue.Null }
+          def.explicitTitle?.takeIf { it != VegaValue.Null && it != VegaValue.Str("") }
             ?: Fields.defaultTitle(def, view.config)?.let(VegaValue::Str)
         val key = (title as? VegaValue.Str)?.value ?: continue
         if (out.containsKey(key)) continue
@@ -804,6 +807,10 @@ internal object Marks {
   private fun invalidPositionRef(view: UnitView, channel: String): VegaValue? {
     if (view.invalidDataMode != "show") return null
     val main = mainChannel(channel)
+    // A **stacked** position is not read from the row at all: it is the accumulated end the stack
+    // transform wrote, which is a number whatever the row held. Only the refs that go through
+    // `midPointRefWithPositionInvalidTest` get the test, and a stacked one does not.
+    if (view.stack != null && main == view.stack.fieldChannel) return null
     val def = view.spec.fieldDef(main) ?: return null
     val scaleType = view.scaleType(main) ?: return null
     if (!Scales.hasContinuousDomain(scaleType)) return null
@@ -1020,6 +1027,10 @@ internal object Marks {
         def.isFieldDef &&
         (def.bin != null || (def.timeUnit != null && def2 == null)) &&
         !hasSize &&
+        // An **offset** encoding takes the rect off the bucket's edges and puts it in a lane of
+        // its own inside them, so the bucket is no longer what the rect spans and the positioning
+        // is the ordinary banded one — `!encoding[offsetScaleChannel]` in `rectPosition`.
+        !view.hasNestedOffset(channel) &&
         scaleType != null &&
         !Scales.hasDiscreteDomain(scaleType)
     ) {
@@ -1052,6 +1063,11 @@ internal object Marks {
     sizeChannel: String,
   ): VegaValue.Obj {
     val scaleType = view.scaleType(channel)
+    // `(scale || offsetScale)?.get('type')`: where a channel has an offset scale nested in it, the
+    // band the mark fills is the *offset's*, not the position's. A grouped bar over a continuous
+    // axis has no band of its own and would otherwise be measured as a lone continuous rect.
+    val offsetChannel = offsetChannelFor(channel)?.takeIf { view.hasScale(it) }
+    val bandingType = scaleType ?: offsetChannel?.let { view.scaleType(it) }
     val markConfig = view.config.markConfig(view.spec.mark)
     val minBandSize = markConfig.number("minBandSize")
 
@@ -1068,12 +1084,15 @@ internal object Marks {
         declaredSize != null && useVlSizeChannel ->
           nonPosition(view, "size", sizeChannel).fields[sizeChannel] ?: VegaValue.EmptyObject
         markSize != null && useVlSizeChannel -> obj { put("value", markSize) }
-        scaleType == "band" -> {
+        offsetChannel != null || bandingType == "band" -> {
           // The width of one *nested* mark where there is an offset scale, and of the whole band
           // where there is not.
-          val band = offsetChannelFor(channel)?.takeIf { view.hasScale(it) } ?: channel
+          val band = offsetChannel ?: channel
           val bandwidth = "bandwidth('${view.scale(band)}')"
-          signalRef(if (minBandSize != null) "max($minBandSize, $bandwidth)" else bandwidth)
+          signalRef(
+            if (minBandSize != null) "max(${canonicalNumberString(minBandSize)}, $bandwidth)"
+            else bandwidth
+          )
         }
         // A rect-based mark on a **continuous** scale is `continuousBandSize` wide — five units for
         // a bar — not a step less two. `getBandSize` asks the scale's kind first and only reaches
@@ -1112,14 +1131,25 @@ internal object Marks {
         }
       }
 
-    val centred = scaleType != "band" || (declaredSize != null || markSize != null)
+    // `defaultBandAlign`: a rect filling a *relative* band starts at the band's leading edge; one
+    // given a size of its own is centred in it. The band in question may be the offset's.
+    val centred = bandingType != "band" || (declaredSize != null || markSize != null)
     val vgChannel = if (centred) if (channel == "x") "xc" else "yc" else channel
 
     val posRef =
       if (def != null) {
         midPointForRect(view, channel, def, scaleType, centred)
       } else {
-        defaultPositionRef(view, channel, "mid")
+        // A default position takes the offset too — `positionOffset` runs whether or not the
+        // channel has a definition, so a group of bars with no shared category still fans out
+        // across the plot instead of stacking in its middle.
+        defaultPositionRef(view, channel, "mid")?.let { base ->
+          val offset = offsetRef(view, channel, centred) ?: return@let base
+          obj {
+            (base as? VegaValue.Obj)?.fields?.forEach { (key, value) -> put(key, value) }
+            put("offset", offset)
+          }
+        }
       }
 
     return obj {
@@ -1149,18 +1179,24 @@ internal object Marks {
       if (scaleType == "band" && centred) put("band", num(0.5))
       // A nested offset moves the mark within its band, which is what puts the second bar of a
       // group beside the first rather than on top of it.
-      offsetChannelFor(channel)
-        ?.takeIf { view.hasScale(it) }
-        ?.let { offsetChannel ->
-          val offsetDef = view.spec.encoding.getValue(offsetChannel)
-          put(
-            "offset",
-            obj {
-              put("scale", view.scale(offsetChannel))
-              put("field", Fields.vgField(offsetDef))
-            },
-          )
-        }
+      offsetRef(view, channel, centred)?.let { put("offset", it) }
+    }
+  }
+
+  /**
+   * `positionOffset`: where a nested offset scale places the mark inside its lane.
+   *
+   * A centred mark sits in the middle of the lane — `bandPosition: 0.5` — and one aligned to the
+   * band's leading edge sits at the lane's start, which is `bandPosition: 0` and written by leaving
+   * the band off.
+   */
+  private fun offsetRef(view: UnitView, channel: String, centred: Boolean): VegaValue? {
+    val offsetChannel = offsetChannelFor(channel)?.takeIf { view.hasScale(it) } ?: return null
+    val offsetDef = view.spec.encoding.getValue(offsetChannel)
+    return obj {
+      put("scale", view.scale(offsetChannel))
+      put("field", Fields.vgField(offsetDef))
+      if (centred) put("band", num(0.5))
     }
   }
 
@@ -1185,9 +1221,14 @@ internal object Marks {
       val spacingOffset = if (isEnd) -spacing / 2 else spacing / 2
       if (minBandSize == null) return num(axisTranslate + spacingOffset)
       val sign = if (isEnd) "" else "-"
+      // Every number here is written the way JavaScript writes it — `2`, not `2.0`. A Kotlin
+      // `Double` interpolated straight into an expression carries a decimal point Vega-Lite's own
+      // output never has, and the two specifications then differ on a string neither engine reads
+      // as a number.
+      val minimum = canonicalNumberString(minBandSize)
       return signalRef(
-        "$axisTranslate + ($sizeExpression < $minBandSize ? " +
-          "${sign}0.5 * ($minBandSize - ($sizeExpression)) : $spacingOffset)"
+        "${canonicalNumberString(axisTranslate)} + ($sizeExpression < $minimum ? " +
+          "${sign}0.5 * ($minimum - ($sizeExpression)) : ${canonicalNumberString(spacingOffset)})"
       )
     }
 
@@ -1204,23 +1245,68 @@ internal object Marks {
       } else {
         Fields.vgField(def, suffix = "end")
       }
+    // `bandPositionForBandSize`: a mark that asks for a *fraction* of its bucket is drawn inside
+    // it rather than across it, so both edges move in by half of what is left over — `(1 - band)/2`
+    // and its complement. A full band leaves them at 0 and 1, which is the bucket's own edges and
+    // the plain field references below.
+    val band = relativeBandSize(view, channel)
+    val near = (1 - band) / 2
     return obj {
       put(
         channel2,
-        obj {
-          put("scale", view.scale(channel))
-          put("field", Fields.vgField(def))
-          put("offset", offset(!startIsEnd))
-        },
+        interpolated(view, channel, Fields.vgField(def), endField, near, offset(!startIsEnd)),
       )
       put(
         channel,
-        obj {
-          put("scale", view.scale(channel))
-          put("field", endField)
-          put("offset", offset(startIsEnd))
-        },
+        interpolated(view, channel, Fields.vgField(def), endField, 1 - near, offset(startIsEnd)),
       )
     }
+  }
+
+  /**
+   * How much of its bucket a rect fills, where the mark states it as a fraction.
+   *
+   * `isRelativeBandSize`: `{"width": {"band": 0.7}}` on the mark, or the same shape in the
+   * configured band size. Anything else — a number of units, a signal, nothing at all — leaves the
+   * rect spanning the whole bucket.
+   */
+  private fun relativeBandSize(view: UnitView, channel: String): Double {
+    val sizeChannel = if (channel == "x" || channel == "theta") "width" else "height"
+    val stated =
+      view.markDef.raw.obj(sizeChannel)
+        ?: view.config.markConfig(view.spec.mark).obj("continuousBandSize")
+        ?: view.config.markConfig(view.spec.mark).obj("discreteBandSize")
+    return stated?.number("band") ?: 1.0
+  }
+
+  /**
+   * `interpolatedSignalRef`: a point *between* a bucket's two edges.
+   *
+   * At 0 or 1 it is one of the edges, and Vega scales the column itself; anywhere between, the
+   * interpolation happens in data space and the scale is applied to the result — which is not the
+   * same as interpolating the two scaled positions once the scale is not linear.
+   */
+  private fun interpolated(
+    view: UnitView,
+    channel: String,
+    startField: String,
+    endField: String,
+    position: Double,
+    offset: VegaValue,
+  ): VegaValue = obj {
+    if (position == 0.0 || position == 1.0) {
+      put("scale", view.scale(channel))
+      put("field", if (position == 0.0) startField else endField)
+    } else {
+      val start = "datum[${quoted(startField)}]"
+      val end = "datum[${quoted(endField)}]"
+      put(
+        "signal",
+        "scale(\"${view.scale(channel)}\", " +
+          "${Fields.expressionNumber(1 - position)} * $start + " +
+          "${Fields.expressionNumber(position)} * $end)",
+      )
+    }
+    put("offset", offset)
   }
 }

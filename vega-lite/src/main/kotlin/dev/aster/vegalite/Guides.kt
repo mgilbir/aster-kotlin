@@ -430,7 +430,14 @@ internal object Guides {
         put("grid", false)
         // Two layers over one axis contribute two titles, and upstream joins them with a comma
         // rather than picking one, so a shared axis says what it is showing.
-        if (axis.titles.isNotEmpty()) put("title", str(axis.titles.distinct().joinToString(", ")))
+        // `assembleTitle`: a falsy title is not written at all — `titleString ? {title} : {}`. An
+        // axis the specification titled `""` has *no* caption, which is not the same as one
+        // captioned with nothing.
+        axis.titles
+          .distinct()
+          .filter { it.isNotEmpty() }
+          .takeIf { it.isNotEmpty() }
+          ?.let { put("title", str(it.joinToString(", "))) }
         var wroteEncode = false
         axis.properties.forEach { (key, value) ->
           if (key == "encode") {
