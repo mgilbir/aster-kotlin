@@ -151,13 +151,15 @@ private class Compilation(
     // A legend belongs where its scale does. A concatenation whose plots share a colour scale draws
     // one key beside the whole chart; one that resolves colour independently draws a key inside
     // each plot, because two keys standing for different scales cannot be one.
-    val allLegends = assembleLegends(views)
+    val legendScale = mutableMapOf<String, String>()
+    val allLegends = assembleLegends(views, legendScale)
     for (plot in plots) {
       plot.legends =
         if (concat == null) emptyList()
-        else allLegends.filterKeys { owner[it] === plot }.values.toList()
+        else allLegends.filterKeys { owner[legendScale[it]] === plot }.values.toList()
     }
-    val legends = allLegends.filterKeys { concat == null || owner[it] == null }.values.toList()
+    val legends =
+      allLegends.filterKeys { concat == null || owner[legendScale[it]] == null }.values.toList()
     // In the order upstream's `assembleLayoutSignals` walks the model tree: each level's own sizes
     // before it recurses, and within a level `width`, `height`, `childWidth`, `childHeight`. Then
     // the parameters, which is `assembleTopLevelModel`'s order — a parameter may read a size and
@@ -1101,7 +1103,16 @@ private class Compilation(
     }
   }
 
-  private fun assembleLegends(views: List<UnitView>): LinkedHashMap<String, VegaValue> {
+  private fun assembleLegends(
+    views: List<UnitView>,
+    /**
+     * Which scale each assembled legend came from, filled in as they are grouped.
+     *
+     * The legends are grouped by *field* and a concatenation places them by *scale*, so the two
+     * keys are not the same and the second has to be recorded on the way past.
+     */
+    scaleOf: MutableMap<String, String> = mutableMapOf(),
+  ): LinkedHashMap<String, VegaValue> {
     val legends = LinkedHashMap<String, LinkedHashMap<String, VegaValue>>()
     for (view in views) {
       for (channel in Channels.LEGEND_CHANNELS) {
@@ -1109,11 +1120,20 @@ private class Compilation(
         if (!def.isFieldDef && def.datum == null) continue
         val component = view.scaleComponents[channel] ?: continue
         val built = Guides.legend(view, channel, def, component.type) as? VegaValue.Obj ?: continue
-        // Keyed by the *scale*, so two views on one shared scale get one key between them and two
-        // on independently resolved scales get one each.
-        val existing = legends[component.name()]
-        if (existing == null) legends[component.name()] = LinkedHashMap(built.fields)
-        else merge(existing, built)
+        // Keyed by the **field**, not by the scale — `assembleLegends` groups by
+        // `field:<name>`. One field encoded twice, as a colour *and* as a size, is one key to the
+        // reader and one legend whose swatches carry both; keying by the scale gave it two, side by
+        // side, saying the same thing. The scale's own prefix stays in the key so that a
+        // composition resolving its legends independently still gets one per plot, and the
+        // discreteness with it, since a ramp and a set of swatches cannot be the same legend.
+        val prefix = component.name().removeSuffix(channel)
+        val discrete = if (Scales.hasDiscreteDomain(component.type)) "d" else "c"
+        val key = "$prefix|${def.field ?: channel}|$discrete"
+        val existing = legends[key]
+        if (existing == null) {
+          legends[key] = LinkedHashMap(built.fields)
+          scaleOf[key] = component.name()
+        } else merge(existing, built)
       }
     }
     val out = LinkedHashMap<String, VegaValue>()

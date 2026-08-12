@@ -282,6 +282,19 @@ internal object Scales {
     def.scale?.fields?.get("range")?.let {
       return it
     }
+    // `parseScheme`: a named colour scheme is a **range**, not a property beside one. Written as a
+    // property it sat next to the `"category"` range this would otherwise default to, and Vega read
+    // the range — so a chart that asked for `category20` got the ten-colour scheme.
+    def.scale?.fields?.get("scheme")?.let { scheme ->
+      return when (scheme) {
+        is VegaValue.Obj ->
+          obj {
+            put("scheme", scheme.fields["name"])
+            scheme.fields.forEach { (key, value) -> if (key != "name") put(key, value) }
+          }
+        else -> obj { put("scheme", scheme) }
+      }
+    }
     val config = view.config
     return when (channel) {
       // An offset scale's range is the *inner* band, and what it spans depends on whether the
@@ -515,7 +528,7 @@ internal object Scales {
 
     // Anything else the specification stated on the scale passes through untouched.
     user?.fields?.forEach { (key, value) ->
-      if (key !in setOf("type", "domain", "range")) component.properties[key] = value
+      if (key !in setOf("type", "domain", "range", "scheme")) component.properties[key] = value
     }
   }
 

@@ -109,7 +109,17 @@ internal class UnitView(
   /** The dataset before aggregation, which a sorted domain reads. */
   var rawData: String = ""
 
-  fun prefixed(suffix: String): String = if (name.isEmpty()) suffix else "${name}_$suffix"
+  /**
+   * A name the whole specification can refer to — `getName` in `compile/model.ts`.
+   *
+   * The name is run through `varName`, which is not cosmetic: these become **signal** names, and a
+   * signal is an identifier in Vega's expression language. A column called `IMDB Rating` gives a
+   * bin signal `bin_maxbins_10_IMDB Rating_bins`, which every expression reading it parses as two
+   * words and fails on. Anything outside `[A-Za-z0-9_]` becomes an underscore, and a leading digit
+   * takes one in front of it.
+   */
+  fun prefixed(suffix: String): String =
+    Fields.varName(if (name.isEmpty()) suffix else "${name}_$suffix")
 
   fun scaleType(channel: String): String? = if (hasScale(channel)) scaleTypes[channel] else null
 

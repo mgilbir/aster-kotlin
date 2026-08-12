@@ -1316,6 +1316,23 @@ Beside it, the *derived* rule from `data/parse.ts`: a column a transform compute
 because it already has the type its transform gave it and the loader has never seen it — which is
 why a `density`'s own output columns stopped being asked for as numbers.
 
+### A signal is an identifier, and a column name need not be one
+
+`varName` in upstream's `util.ts` runs over every name a model hands out, and this compiler was not
+running it. A column called `IMDB Rating` gives a bin signal `bin_maxbins_10_IMDB Rating_bins`,
+which is not a name Vega's expression language can read — every scale domain, every extent and
+every axis that mentioned it was a parse error waiting to happen. Anything outside `[A-Za-z0-9_]`
+becomes an underscore, and a leading digit takes one in front of it.
+
+Two more from the same sweep. A stated `scale.scheme` is a **range** — `parseScheme` returns
+`{scheme: name}` and that becomes the scale's range — where this compiler wrote it as a property
+beside the `"category"` range it would otherwise default to; Vega read the range, so a chart asking
+for `category20` got the ten-colour scheme. And legends are grouped by the **field** they encode,
+not by the scale: one field encoded twice, as a colour *and* as a size, is one key to the reader and
+one legend whose swatches carry both. The scale's own prefix stays in the key so a composition
+resolving its legends independently still gets one per plot, and the discreteness with it, since a
+ramp and a set of swatches cannot be the same legend.
+
 ### Two runtime gaps this batch names but does not close
 
 `density`'s fixture is not in the corpus, and `trail`'s draws no legend. Both compile exactly as
