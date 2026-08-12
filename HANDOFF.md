@@ -392,19 +392,24 @@ between. `oracle-js/node_modules/vega/build/vega-schema.json` has a definition p
 table's string literals out of `SpecParser.kt`, expand `guideStyleKeys(...)` by hand, and subtract.
 Anything left is either a gap or a stale diagnostic, and telling those two apart is a grep.
 
-As of this handoff the subtraction leaves:
+As of this handoff the subtraction leaves **nothing** for `encodeEntry`, `axis`, `projection` and
+`scale`, and this for the rest:
 
-- **Legend (4):** `titleAnchor`, `gridAlign`, `tickMinStep`, `formatType`. The last two want the
-  axis's `countWithMinStep` and its `labeller` extracted somewhere both builders can reach — the
-  arithmetic and the format-type routing are already written, just not shared.
+- **Legend (5):** `clipHeight` (which *is* implemented — it is only missing from `LEGEND_CONSUMED`,
+  so it reports a gap that is not there; fix that first, it is one line), `gridAlign`, `titleAnchor`,
+  `tickMinStep` and `formatType`. The last two want the axis's `countWithMinStep` and its `labeller`
+  extracted somewhere both builders can reach — the arithmetic and the format-type routing are
+  already written, just not shared. `strokeDash`/`strokeWidth` appear in the schema diff and are
+  **not** gaps: on a legend those name *scales*, and the background's width and dash come from
+  `config.legend`.
   `clipHeight` and the background (`fillColor`, `strokeColor`, `cornerRadius`, with the width and
   dash coming from `config.legend` alone) are *done* — do not re-report them.
 - **Axis (1):** `labelBound`, which needs the overlap remover to take a bounding rectangle.
   Everything else is *done*, including guide `aria`/`description` — pinned by
   `GuideAccessibilityTest`, since the differential cannot see them.
-- **Title (4):** `style`, `aria`, `interactive`, `name`. The rest — `color`, `lineHeight`,
-  `baseline`, `limit`, an explicit `align`/`angle`, and the four `subtitle*` properties — is done, as
-  is a title or subtitle written as an **array** of lines.
+- **Title (3):** `aria`, `interactive`, `name`. The rest — `color`, `lineHeight`, `baseline`,
+  `limit`, `style`, an explicit `align`/`angle`, and the four `subtitle*` properties — is done, as is
+  a title or subtitle written as an **array** of lines.
 - **Layout (all of it):** `align`, `bounds`, `center`, `columns`, `footerBand`, `headerBand`,
   `offset`, `padding`, `titleAnchor`, `titleBand` — the grid works, but nothing in `LAYOUT` is
   reported either, so this block has no consumed table at all yet.
