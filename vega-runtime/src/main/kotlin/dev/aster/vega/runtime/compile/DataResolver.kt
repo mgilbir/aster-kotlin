@@ -195,18 +195,10 @@ internal class DataResolver(
    * `format.feature` and `format.mesh` are alternatives and one of them is required — a TopoJSON
    * file holds several named objects and nothing in it says which one this dataset wants.
    */
-  private fun readTopoJson(spec: DataSpec, text: String): List<VegaValue> {
-    val document =
-      try {
-        VegaJson.parse(text)
-      } catch (failure: Exception) {
-        diagnostics.error(
-          DiagnosticCodes.PARSE_INVALID_JSON,
-          "Dataset '${spec.name}' is not valid JSON: ${failure.message}",
-          operator = spec.name,
-        )
-        return emptyList()
-      }
+  private fun readTopoJson(spec: DataSpec, text: String): List<VegaValue> =
+    readTopoJson(spec, parseJson(spec, text) ?: return emptyList())
+
+  private fun readTopoJson(spec: DataSpec, document: VegaValue): List<VegaValue> {
     val name = spec.feature ?: spec.mesh
     if (name == null) {
       diagnostics.error(
@@ -246,18 +238,23 @@ internal class DataResolver(
     return ingest(decoded)
   }
 
-  private fun readJson(spec: DataSpec, text: String): List<VegaValue> {
-    val document =
-      try {
-        VegaJson.parse(text)
-      } catch (failure: Exception) {
-        diagnostics.error(
-          DiagnosticCodes.PARSE_INVALID_JSON,
-          "Dataset '${spec.name}' is not valid JSON: ${failure.message}",
-          operator = spec.name,
-        )
-        return emptyList()
-      }
+  /** Parses a document, reporting a syntax error rather than throwing out of the compile. */
+  private fun parseJson(spec: DataSpec, text: String): VegaValue? =
+    try {
+      VegaJson.parse(text)
+    } catch (failure: Exception) {
+      diagnostics.error(
+        DiagnosticCodes.PARSE_INVALID_JSON,
+        "Dataset '${spec.name}' is not valid JSON: ${failure.message}",
+        operator = spec.name,
+      )
+      null
+    }
+
+  private fun readJson(spec: DataSpec, text: String): List<VegaValue> =
+    readJson(spec, parseJson(spec, text) ?: return emptyList())
+
+  private fun readJson(spec: DataSpec, document: VegaValue): List<VegaValue> {
     // `format.property` names the field inside the document that holds the rows, which is how a
     // specification reaches into an API response rather than a bare array.
     val rows = spec.property?.let { (document as? VegaValue.Obj)?.fields?.get(it) } ?: document
@@ -329,7 +326,19 @@ internal class DataResolver(
     val pipeline = TransformPipeline()
 
     for (spec in specs) {
-      var values = ingest(spec.values ?: emptyList())
+      // Inline values are usually an array of rows, but a specification may also write the whole
+      // *document* there — a GeoJSON `FeatureCollection`, or a TopoJSON topology — and reach the
+      // rows
+      // through the same `format` it would use for a url. Upstream applies the format to inline
+      // values and to a loaded file alike; reading only the array form dropped every such dataset
+      // without a word, which for a map means every feature.
+      var values =
+        spec.document?.let { document ->
+          when (spec.formatType) {
+            "topojson" -> readTopoJson(spec, document)
+            else -> readJson(spec, document)
+          }
+        } ?: ingest(spec.values ?: emptyList())
       // A `url` may itself be a signal — how a control swaps the file a chart is reading. It is
       // resolved here rather than at parse time because only now are the signals known, and a
       // signal that cannot be worked out before the data is one this cannot use.

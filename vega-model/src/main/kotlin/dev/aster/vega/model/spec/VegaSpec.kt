@@ -178,8 +178,16 @@ public data class Autosize(
 /** A named dataset. */
 public data class DataSpec(
   val name: String,
-  /** Inline values. `null` when the data comes from [url]. */
+  /** Inline values, when they are written as an array of rows. */
   val values: List<VegaValue>? = null,
+  /**
+   * Inline values written as a whole *document* rather than as rows.
+   *
+   * A GeoJSON `FeatureCollection` or a TopoJSON topology, reached through the same [format] a url
+   * would use. Kept separate from [values] because the two need different handling and because a
+   * dataset has one or the other, never both.
+   */
+  val document: VegaValue? = null,
   val url: String? = null,
   /**
    * `{"url": {"signal": "..."}}` — the address itself comes from a signal.
@@ -982,6 +990,16 @@ public data class ProjectionSpec(
   val precision: NumberValue? = null,
   val clipAngle: NumberValue? = null,
   val clipExtent: List<NumberList> = emptyList(),
+  /**
+   * The two standard parallels of a conic projection.
+   *
+   * Not a tuning knob: they change the raw formula, so `conicEqualArea` at `[20, 50]` and the same
+   * projection at its default is a different map of the same world rather than the same map
+   * redrawn.
+   */
+  val parallels: NumberList = NumberList.None,
+  /** The radius a `Point` geometry is drawn as, since a projected city has no extent of its own. */
+  val pointRadius: NumberValue? = null,
   val reflectX: NumberValue? = null,
   val reflectY: NumberValue? = null,
   /** `fit`/`extent`/`size`, which size the projection from the data rather than from a scale. */

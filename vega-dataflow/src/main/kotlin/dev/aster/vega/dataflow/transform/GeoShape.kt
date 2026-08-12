@@ -33,6 +33,24 @@ public data class ProjectionDefinition(
   val reflectX: Boolean = false,
   val reflectY: Boolean = false,
   val clipExtent: List<Double> = emptyList(),
+  val clipAngle: Double? = null,
+  /** The two standard parallels of a conic projection, which rebuild its raw formula. */
+  val parallels: List<Double> = emptyList(),
+  /** The radius a `Point` geometry draws as; `null` leaves d3's 4.5. */
+  val pointRadius: Double? = null,
+  /**
+   * The geometry the projection is scaled and centred to cover, `fit`.
+   *
+   * A projection fitted to its data has no `scale` or `translate` of its own worth speaking of:
+   * both are computed from where the geometry lands, which means the projection cannot be built
+   * until the data it fits has been loaded. That ordering is the whole reason this is a property of
+   * the definition rather than something the compiler could apply once.
+   */
+  val fit: VegaValue? = null,
+  /** `[[x0, y0], [x1, y1]]` flattened — the rectangle [fit] is made to fill. */
+  val fitExtent: List<Double> = emptyList(),
+  /** `[width, height]` — the same thing anchored at the origin. */
+  val fitSize: List<Double> = emptyList(),
 )
 
 /** Builds the projection a definition describes, or null for a type this engine does not have. */
@@ -48,16 +66,30 @@ internal fun ProjectionDefinition.build(): GeoProjector? {
     return composite
   }
   val projection = Projections.byName(type) ?: return null
+  // Upstream's own order, `vega-projection`'s `projectionProperties`. It matters in two places:
+  // `parallels` rebuilds the conic raw projection, so it has to come before `precision` reads the
+  // resampling threshold off the built one; and an explicit `clipExtent` has to be applied before
+  // `fit`, which reads it, clears it and puts it back.
+  clipAngle?.let { projection.clipAngle(it) }
+  if (clipExtent.size >= 4) {
+    projection.clipExtent(clipExtent[0], clipExtent[1], clipExtent[2], clipExtent[3])
+  }
   scale?.let { projection.scale(it) }
   if (translate.size >= 2) projection.translate(translate[0], translate[1])
   if (center.size >= 2) projection.center(center[0], center[1])
   if (rotate.isNotEmpty()) projection.rotate(rotate.toDoubleArray())
+  if (parallels.size >= 2) projection.parallels(parallels[0], parallels[1])
   angle?.let { projection.angle(it) }
   if (reflectX || reflectY) projection.reflect(reflectX, reflectY)
   precision?.let { projection.precision(it) }
-  // Last: an explicit extent replaces whatever rule the projection family applied for itself.
-  if (clipExtent.size >= 4) {
-    projection.clipExtent(clipExtent[0], clipExtent[1], clipExtent[2], clipExtent[3])
+  fit?.let { features ->
+    when {
+      fitExtent.size >= 4 ->
+        projection.fitExtent(fitExtent[0], fitExtent[1], fitExtent[2], fitExtent[3], features)
+      fitSize.size >= 2 -> projection.fitExtent(0.0, 0.0, fitSize[0], fitSize[1], features)
+      // Upstream's own reading: `fit` with neither an `extent` nor a `size` does nothing at all.
+      else -> Unit
+    }
   }
   return projection
 }
@@ -125,10 +157,12 @@ public object GeoShapeTransform : Transform {
       return input
     }
     val path = params.string("field") ?: defaultField
-    val radius = params.number("pointRadius")
+    // The mark's own `pointRadius` wins; otherwise the projection's, which upstream sets on the
+    // path generator the projection carries. Either way a projected city is a dot of that radius.
+    val radius = params.number("pointRadius") ?: definition.pointRadius
 
     return input.map { item ->
-      val sink = PathStringSink()
+      val sink = PathStringSink(digits = null)
       radius?.let { sink.pointRadius(it) }
       GeoJsonStream.stream(if (path == null) item else item.field(path), projection.stream(sink))
       val drawn = sink.result()

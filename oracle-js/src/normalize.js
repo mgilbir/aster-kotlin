@@ -151,6 +151,9 @@ const SERIES_TYPES = new Set(['line', 'area']);
  */
 const EXTENT_ONLY_SERIES = new Set(['trail']);
 
+/** Mark types whose whole geometry is an outline, so the drawn extent is what there is to compare. */
+const SHAPE_EXTENT_TYPES = new Set(['symbol', 'arc', 'path', 'shape']);
+
 /** A marktype node: `{marktype, role, items: [...]}`. */
 function walkMarktype(marktype, dx, dy, out, precision) {
   const type = marktype.marktype || 'group';
@@ -393,7 +396,11 @@ function record(type, role, item, dx, dy, precision) {
   // in a path string, and the only channels compared were the anchor it hangs from. Two engines
   // could agree on `x` and `y` and draw completely different outlines — which is exactly what a
   // `linkpath` transform emitting the wrong shape would look like.
-  if ((type === 'symbol' || type === 'arc' || type === 'path') && item.bounds) {
+  //
+  // `shape` was the widest hole of all, and it went unnoticed because the maps looked right: a
+  // `geoshape` mark carries no `x` or `y` at all, so the only things compared were its fill and its
+  // stroke. Every projection, every clip and every decoded TopoJSON feature was verified on colour.
+  if (SHAPE_EXTENT_TYPES.has(type) && item.bounds) {
     entry.shapeLeft = canonicalNumber(item.bounds.x1 + dx, precision);
     entry.shapeTop = canonicalNumber(item.bounds.y1 + dy, precision);
     entry.shapeWidth = canonicalNumber(item.bounds.x2 - item.bounds.x1, precision);

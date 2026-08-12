@@ -400,6 +400,8 @@ private val PROJECTION_CONSUMED =
     "precision",
     "clipAngle",
     "clipExtent",
+    "parallels",
+    "pointRadius",
     "reflectX",
     "reflectY",
     "fit",
@@ -959,7 +961,11 @@ public class SpecParser {
       return null
     }
 
-    val values = (obj.fields["values"] as? VegaValue.Arr)?.values
+    val declared = obj.fields["values"]
+    val values = (declared as? VegaValue.Arr)?.values
+    // An inline `values` that is an object is the document itself, not a row: a GeoJSON
+    // `FeatureCollection` or a TopoJSON topology, read through this dataset's own `format`.
+    val document = declared?.takeIf { it is VegaValue.Obj }
     val urlValue = obj.fields["url"]
     val urlSignal = (urlValue as? VegaValue.Obj)?.fields?.get("signal")?.asString()
     val url = if (urlSignal == null) urlValue?.asString() else null
@@ -1009,6 +1015,7 @@ public class SpecParser {
     return DataSpec(
       name = name,
       values = values,
+      document = document,
       url = url,
       urlSignal = urlSignal,
       formatType = formatType,
@@ -1064,6 +1071,8 @@ public class SpecParser {
       precision = obj.numberOrSignal("precision", "$path.precision"),
       clipAngle = obj.numberOrSignal("clipAngle", "$path.clipAngle"),
       clipExtent = numberPairs(obj.fields["clipExtent"], "$path.clipExtent"),
+      parallels = numberList(obj.fields["parallels"], "$path.parallels"),
+      pointRadius = obj.numberOrSignal("pointRadius", "$path.pointRadius"),
       reflectX = obj.numberOrSignal("reflectX", "$path.reflectX"),
       reflectY = obj.numberOrSignal("reflectY", "$path.reflectY"),
       fit = obj.fields["fit"],

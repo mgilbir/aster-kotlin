@@ -21,7 +21,7 @@ end to end — expressions, signals, 33 of upstream's 40 data transforms, every 
 and an event handler that recompiles the chart — and are verified against upstream Vega by
 differential tests.
 
-One hundred and nineteen differential fixtures pass, all matching upstream exactly on every mark and
+One hundred and twenty differential fixtures pass, all matching upstream exactly on every mark and
 scale output:
 
 | Fixture | Marks | Covers |
@@ -201,7 +201,7 @@ substantive compatibility items:
 | 6. View and Compose APIs | Yes |
 | 7. SVG, PNG, PDF export | Yes |
 | 8. TalkBack can describe and navigate | Partial — virtual nodes are tested by instrumentation, not with TalkBack itself |
-| 9. At least 100 compatibility fixtures pass | **Yes** — 119 |
+| 9. At least 100 compatibility fixtures pass | **Yes** — 120 |
 | 10. Core runtime has no Android dependency | Yes |
 | 11. Renders without WebView | Yes |
 | 12. Build and test loop runs from the terminal | Yes |
@@ -538,7 +538,7 @@ each example a deadline.
 
 ## Known failing fixtures
 
-None. One hundred and nineteen fixtures exist and all of them pass — and that sentence became worth
+None. One hundred and twenty fixtures exist and all of them pass — and that sentence became worth
 something only once the gate could no longer skip itself, below.
 
 **The gate could report success without running.** `FixtureDifferentialTest` reads the fixtures and
@@ -1346,6 +1346,73 @@ target for such a mark in the wrong place, which is the worse of the two, so the
 rotation out and this paragraph is the record. Nothing else about a rotated path mark differs: the
 outline, the anchor and the drawn transform all match.
 
+## Every map had been verified on its colours
+
+`normalize.js` compared a mark's drawn extent for `symbol`, `arc` and `path`. Not for **`shape`** —
+and a `geoshape` mark carries no `x` or `y` at all, so for the whole geographic family the only things
+ever compared were the fill and the stroke. `world-map`, `county-unemployment`, `map-with-tooltip`,
+`dorling-cartogram`, `geo-points`, `airport-connections` and `volcano-contours` were green on colour.
+The overall surface size did constrain the geometry indirectly under `autosize: pad`, which is why the
+maps were not in fact wrong, but nothing was checking them.
+
+Adding `shape` to that set produced 15,000 differences across four fixtures, of which three were real
+findings.
+
+**The path string was rounding the model, not the output.** `PathStringSink` rounded coordinates to
+d3-geo's three decimals, which is right for a `d` attribute and wrong for a scene: the string it
+produces is parsed straight back into the scene graph, where it *is* the geometry — every bound and
+every hit test comes off it. So every map's measured extent was systematically out by up to a
+thousandth. The sink now takes `digits = null` from the `geoshape` transform and keeps full precision;
+the SVG renderer rounds on the way out, which is where a digit count belongs. The default stays at
+three, because `GeoProjectionTest` and `GeoProjectionTypesTest` compare 67 upstream path *strings* and
+those are the strongest evidence the projections have.
+
+**A `fit` was destroying a mercator's automatic clip.** d3 distinguishes the rectangle a projection
+chooses for itself from the one a specification asks for: a mercator clips to the square its own scale
+makes one full turn of the world, and that square is recomputed every time the scale or the
+translation moves. A fit measures with the *user's* clip removed and puts it back afterwards; this
+engine had only one clip and put the stale automatic square back over the recomputed one, after the
+fit had changed the scale — which clipped the whole map away. `reclip()` now rebuilds the postclip
+from the two, intersecting them the way d3 does, and a user `clipExtent` on a mercator survives a
+recentre for the first time as well.
+
+**A `shape` mark that draws nothing measures nothing, and a `path` mark measures a point.** Upstream's
+two bound functions really do differ — `marks/path.js` short-circuits `item.path == null` to
+`bounds.set(0, 0, 0, 0)`, while `markItemPath` runs the generator into the bounds context and leaves
+the bounds cleared when it draws nothing. This engine applied the path rule to both, so the 467
+counties in Vega's own map that have no outline each measured as a point at the group's origin. Under
+`autosize: pad` that is 467 marks in the top-left corner.
+
+One harness detail came out of it. An empty rectangle must not be put through the world transform
+before it is reported: the sentinel a cleared `Bounds` holds is `MAX_VALUE`, and translating that
+gives a number no longer recognisable as empty — which is how the same absent county reported a width
+of zero on one side and an infinity on the other.
+
+## The projection properties that size a map rather than place it
+
+`fit`, `extent`, `size`, `clipAngle`, `parallels` and `pointRadius` were parsed and reported. All six
+are honoured now, and two were not where the earlier audit expected them.
+
+`clipAngle` and `parallels` were **plumbing**: `Projection` had taken both since the geographic family
+was ported, and the resolver never passed them. So an `orthographic` globe was drawing its far side
+and every conic stood on its family's default parallels — a different map of the same world, not the
+same map redrawn, because the parallels rebuild the raw formula.
+
+`fit` is the interesting one, and it is the only projection property that is **data**:
+`{"signal": "data('states')"}`. It is resolved in the scope that declared it, like every other signal,
+and it is why a fitted projection cannot be built until the data it fits has loaded. The arithmetic is
+d3's `fitExtent`, and none of its three oddities is arbitrary: the projection is reset to scale **150**
+because a fit is measured against d3's reference scale and the answer is a multiple of it; the scale
+factor is the **smaller** of the two ratios, so the geometry fits inside the box rather than filling it
+and spilling out; and the user's clip is removed for the measurement, because a clip in screen
+coordinates would cut the geometry to a rectangle the fit has not chosen yet.
+
+**And inline `values` could not be a document.** `"values": {a FeatureCollection}` with
+`"format": {"property": "features"}` is how a specification writes a map without a data file, and the
+parser read `values` as an array or not at all — so the dataset was silently empty. Upstream applies
+`format` to inline values exactly as it does to a loaded file, including TopoJSON. It does now here,
+which took splitting each reader into a text half and a document half.
+
 ## Performance observations
 
 Nothing on hardware. No measurement has been taken on a physical device, and emulator numbers are
@@ -1530,10 +1597,10 @@ explored with it; the tree was already correct and two things it *said* were wro
 and pinned by instrumented tests. What remains untested there is physical hardware and a real user,
 which is a different claim from "not verified at all".
 
-A note on the harness, because it is now the ninth time. The differential comparison has had to be
+A note on the harness, because it is now the eleventh time. The differential comparison has had to be
 taught to see a symbol's outline, fill and stroke opacity, a dash pattern, a node's own opacity, an
 unfilled mark's missing opacity, the corners a curve puts between a series' points, a rectangle's four
-corner radii, a series' `tension`, and — adding `linkpath` — the outline a `path` mark actually draws,
+corner radii, a series' `tension`, the whole drawn extent of every `shape` mark, and — adding `linkpath` — the outline a `path` mark actually draws,
 which until then was compared only by the anchor it hung from. Each was invisible for the same reason — two marks agreeing on every channel
 being compared and differing in the drawn result. Before trusting a green fixture on a *new* kind of
 property, check that

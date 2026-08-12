@@ -346,6 +346,17 @@ public object Differential {
    * It is not a rare case: a labelled donut draws a leader line for every label slot and only the
    * nine belonging to a slice have an outline, so two thirds of that mark is empty by design.
    */
+  /**
+   * A mark's drawn extent, in upstream's own spelling for a shape that drew nothing.
+   *
+   * [world] is applied here rather than by the caller because an **empty** rectangle must not be
+   * mapped through it: the sentinel a cleared `Bounds` holds is `MAX_VALUE`, and putting that
+   * through a translation gives a number that is no longer recognisably empty — which is how a
+   * county with no outline came to report a width of zero on one side and an infinity on the other.
+   */
+  private fun extentChannels(bounds: RectD, world: Transform2D): Map<String, Double> =
+    extentChannels(if (bounds.isEmpty) bounds else world.mapBounds(bounds))
+
   private fun extentChannels(bounds: RectD): Map<String, Double> =
     if (bounds.isEmpty) {
       linkedMapOf(
@@ -365,13 +376,12 @@ public object Differential {
 
   private fun symbolMark(node: SymbolNode, world: Transform2D): Mark {
     val centre = world.apply(node.x, node.y)
-    val extent = world.mapBounds(node.bounds)
     val numbers =
       linkedMapOf(
         "x" to centre.x,
         "y" to centre.y,
         "size" to node.size,
-      ) + extentChannels(extent)
+      ) + extentChannels(node.bounds, world)
     return Mark("symbol", node.metadata.role, numbers + paintNumbers(node), paintStrings(node))
   }
 
@@ -387,8 +397,7 @@ public object Differential {
     if (kind != "line" && kind != "area") {
       // An arc is compared by the wedge it drew rather than by a centre point, which says nothing
       // about its radii or its sweep.
-      val bounds = world.mapBounds(node.bounds)
-      val numbers = LinkedHashMap(extentChannels(bounds))
+      val numbers = LinkedHashMap(extentChannels(node.bounds, world))
       // A `path` mark also reports the anchor it was placed at, which upstream carries as the
       // item's own x and y — the outline itself is in the path string's coordinates.
       if (kind == "path") {

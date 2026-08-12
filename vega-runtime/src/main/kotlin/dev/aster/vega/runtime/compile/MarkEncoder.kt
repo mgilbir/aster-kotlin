@@ -417,8 +417,14 @@ public class MarkEncoder(
     val declared = channels[channel]?.let { value(it, datum) } ?: datum.field(channel)
     val source = (declared as? VegaValue.Str)?.value ?: ""
     // A path the specification never produced at all measures as a zero rectangle rather than as
-    // nothing; see [PathNode.absent].
-    val absent = declared.isMissing
+    // nothing — but only on a **path** mark. Upstream's two bound functions differ: `marks/path.js`
+    // short-circuits `item.path == null` to `bounds.set(0, 0, 0, 0)`, while a `shape` mark simply
+    // runs
+    // its generator into the bounds context and, when that draws nothing, leaves the bounds
+    // cleared.
+    // A choropleth is where it shows: 467 of the counties in Vega's own map have no outline, and
+    // measuring each as a point at its group's origin puts 467 marks at the top-left corner.
+    val absent = declared.isMissing && channel == "path"
     val parsed = SvgPath.parse(source)
     if (source.isNotEmpty() && !parsed.complete) {
       reportOnce(

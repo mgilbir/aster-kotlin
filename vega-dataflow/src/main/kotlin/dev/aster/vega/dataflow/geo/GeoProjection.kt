@@ -6,6 +6,7 @@ import dev.aster.vega.dataflow.geo.GeoMath.HALF_PI
 import dev.aster.vega.dataflow.geo.GeoMath.PI_
 import dev.aster.vega.dataflow.geo.GeoMath.RADIANS
 import dev.aster.vega.dataflow.geo.GeoMath.TAU
+import dev.aster.vega.model.VegaValue
 import kotlin.math.abs
 import kotlin.math.asin
 import kotlin.math.atan
@@ -299,6 +300,14 @@ internal class NoResampleStream(
  *
  * Ported from `d3-geo/src/projection/index.js`.
  */
+/**
+ * The scale a `fit` is measured against, which is d3's default for every projection family.
+ *
+ * A fitted projection's scale comes out as a multiple of this, so it has to be the number d3 uses
+ * rather than any convenient one.
+ */
+private const val FIT_REFERENCE_SCALE = 150.0
+
 internal class Projection(private var raw: RawProjection) : GeoProjector {
   var scale: Double = 150.0
     private set
@@ -425,13 +434,96 @@ internal class Projection(private var raw: RawProjection) : GeoProjector {
   }
 
   fun clipExtent(x0: Double, y0: Double, x1: Double, y1: Double): Projection {
-    postclip = { sink -> ClipRectangle(x0, y0, x1, y1).stream(sink) }
-    return this
+    userClip = doubleArrayOf(x0, y0, x1, y1)
+    return reclip()
   }
 
   fun clearClipExtent(): Projection {
-    postclip = null
+    userClip = null
+    return reclip()
+  }
+
+  /**
+   * The rectangle the specification asked to clip to, as distinct from the one a projection chooses
+   * for itself.
+   *
+   * The distinction is d3's and it is load-bearing twice over. A mercator clips to the square its
+   * own scale makes one full turn of the world, and that square has to be **recomputed** whenever
+   * the scale or the translation moves — so a user extent cannot simply replace it, it has to be
+   * intersected with it and re-intersected afterwards. And a `fit` measures the geometry with the
+   * user's clip removed: the automatic one must stay, because it is what keeps a mercator from
+   * drawing the world several times over, while the user's is in screen coordinates the fit has not
+   * chosen yet.
+   */
+  private var userClip: DoubleArray? = null
+
+  /** Rebuilds [postclip] from the automatic extent and the user's, in d3's `reclip`. */
+  private fun reclip(): Projection {
+    val user = userClip
+    if (!clipsToOneTurn) {
+      postclip = user?.let { r ->
+        { sink: GeoStream -> ClipRectangle(r[0], r[1], r[2], r[3]).stream(sink) }
+      }
+      return this
+    }
+    val k = PI_ * scale
+    // The projected origin, which is where the square is centred. Upstream writes it as
+    // `m(rotation(m.rotate()).invert([0, 0]))` — rotating a point straight back through the
+    // rotation
+    // that produced it leaves the untransformed origin, so this is the same thing without the round
+    // trip.
+    val t = transform(0.0, 0.0)
+    val rect =
+      when {
+        user == null -> doubleArrayOf(t[0] - k, t[1] - k, t[0] + k, t[1] + k)
+        // A transverse mercator wraps down the page rather than across, so the turn bounds *y*.
+        swapsAxes ->
+          doubleArrayOf(user[0], maxOf(t[1] - k, user[1]), user[2], minOf(t[1] + k, user[3]))
+        else -> doubleArrayOf(maxOf(t[0] - k, user[0]), user[1], minOf(t[0] + k, user[2]), user[3])
+      }
+    postclip = { sink -> ClipRectangle(rect[0], rect[1], rect[2], rect[3]).stream(sink) }
     return this
+  }
+
+  /**
+   * Scales and centres the projection so that [geojson] exactly fills the rectangle given,
+   * `d3-geo/src/projection/fit.js`.
+   *
+   * The sequence is upstream's and none of it is arbitrary. The projection is first reset to scale
+   * **150** with no translation, because a fit is measured against d3's reference scale and the
+   * result is a multiple of it. Any `clipExtent` is *removed* for the measurement and restored
+   * afterwards, since a clip in screen coordinates would cut the geometry to a rectangle the fit
+   * has not chosen yet and the two would chase each other. And the scale factor is the **smaller**
+   * of the two ratios, so the geometry fits inside the box rather than filling it and spilling
+   * over.
+   */
+  fun fitExtent(
+    x0: Double,
+    y0: Double,
+    x1: Double,
+    y1: Double,
+    geojson: VegaValue,
+  ): Projection {
+    // The *user's* clip is removed for the measurement and put back afterwards; the automatic one
+    // is left alone, because it moves with the scale and the fit is about to move the scale.
+    val clip = userClip
+    userClip = null
+    scale(FIT_REFERENCE_SCALE).translate(0.0, 0.0)
+    val sink = PathBoundsSink()
+    GeoJsonStream.stream(geojson, stream(sink))
+    val bounds = sink.result()
+    userClip = clip
+    reclip()
+    if (bounds == null) return this
+    val width = x1 - x0
+    val height = y1 - y0
+    val spanX = bounds[2] - bounds[0]
+    val spanY = bounds[3] - bounds[1]
+    if (spanX <= 0.0 || spanY <= 0.0) return this
+    val k = kotlin.math.min(width / spanX, height / spanY)
+    val cx = x0 + (width - k * (bounds[2] + bounds[0])) / 2.0
+    val cy = y0 + (height - k * (bounds[3] + bounds[1])) / 2.0
+    return scale(FIT_REFERENCE_SCALE * k).translate(cx, cy)
   }
 
   /** The full pipeline, wrapped around whatever will finally draw. */
@@ -493,15 +585,7 @@ internal class Projection(private var raw: RawProjection) : GeoProjector {
       else {
         { x, y -> doubleArrayOf((x - dx) / scale * reflectX, (dy - y) / scale * reflectY) }
       }
-    if (clipsToOneTurn) {
-      // The projected origin, which is where the square is centred. Upstream writes it as
-      // `m(rotation(m.rotate()).invert([0, 0]))` — rotating a point straight back through the
-      // rotation that produced it leaves the untransformed origin, so this is the same thing
-      // without the round trip.
-      val k = PI_ * scale
-      val t = transform(0.0, 0.0)
-      postclip = { sink -> ClipRectangle(t[0] - k, t[1] - k, t[0] + k, t[1] + k).stream(sink) }
-    }
+    if (clipsToOneTurn) reclip()
     return this
   }
 
