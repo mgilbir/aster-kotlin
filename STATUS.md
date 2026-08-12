@@ -1673,6 +1673,13 @@ guards the numbering upstream, so it does not consume a `source_n` either — an
 holds are written out beside it, since the view's own `data` states none. Renaming it breaks the
 hand-off the name exists for.
 
+### A whisker is not a category
+
+A boxplot's whiskers are drawn in **black** whatever the box is coloured: they mark the extent of
+the data rather than naming a category, and taking the category's colour made a coloured boxplot's
+whiskers disappear into its box. The box's thickness also reads a `size` **encoding** written as a
+value, which is how a specification thins a box without touching the rest of the chart.
+
 ### Two runtime gaps this batch names but does not close
 
 `density`'s fixture is not in the corpus, and `trail`'s draws no legend. Both compile exactly as

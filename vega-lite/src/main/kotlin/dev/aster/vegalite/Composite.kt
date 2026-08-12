@@ -183,7 +183,13 @@ internal class Composite(
     val minMax = (extent as? VegaValue.Str)?.value == "min-max"
     val k =
       (extent as? VegaValue.Num)?.value ?: config.markConfig("boxplot").number("extent") ?: 1.5
-    val size = markDef.fields["size"] ?: config.markConfig("boxplot").fields["size"]
+    // The box's thickness: the mark's own `size`, a `size` *encoding* written as a value — which
+    // is how a specification thins a box without touching the rest of the chart — or the
+    // configured one.
+    val size =
+      markDef.fields["size"]
+        ?: encoding.obj("size")?.fields?.get("value")
+        ?: config.markConfig("boxplot").fields["size"]
     val ticksOrient = if (orient == "vertical") "horizontal" else "vertical"
     val boxOrient = orient
 
@@ -342,8 +348,12 @@ internal class Composite(
       put("orient", ticksOrient)
       put("aria", VegaValue.Bool(false))
     }
+    // A whisker is drawn in **black** whatever the box is coloured: it marks the extent of the
+    // data rather than naming a category, and taking the category's colour made a coloured
+    // boxplot's whiskers disappear into its box.
     fun rule() = obj {
       put("type", "rule")
+      put("color", "black")
       put("aria", VegaValue.Bool(false))
     }
 
