@@ -125,6 +125,32 @@ class UnhandledPropertiesTest {
     assertEquals(emptyList<String>(), reported.sorted())
   }
 
+  /**
+   * A `layout` block, which listed its gaps by exception until now and so had no way of noticing
+   * one.
+   *
+   * `titleAnchor` is what that cost: it had neither an entry in the table nor a reader, so a
+   * trellis that anchored its cell titles was told nothing at all.
+   */
+  @Test
+  fun `a layout reports the properties it cannot honour`() {
+    val reported =
+      ignored(
+        spec(
+          """"marks": [{"type": "group", "from": {"facet": {"data": "t", "name": "cell",
+              "groupby": "c"}},
+             "layout": {"columns": 2, "padding": 5, "align": "each", "bounds": "flush",
+              "center": true, "offset": 4, "headerBand": 0.5, "footerBand": 0.5,
+              "titleBand": 0.5, "titleAnchor": "end"},
+             "marks": []}]"""
+        )
+      )
+    assertEquals(
+      listOf("center", "offset", "headerBand", "footerBand", "titleBand", "titleAnchor").sorted(),
+      reported.sorted(),
+    )
+  }
+
   /** A channel the engine does read is not reported, or the diagnostics would be noise. */
   @Test
   fun `an ordinary mark reports nothing`() {

@@ -1606,6 +1606,18 @@ and a vertical gradient swaps which coordinate that is — and `gridAlign`, whic
 a multi-column entry grid. The `strokeDash` and `strokeWidth` the diff also lists are not gaps: on a
 legend those name **scales**.
 
+## The last block that listed its gaps by exception
+
+`layout` was the one place still reporting what it *could not* do rather than naming what it does. The
+difference is not stylistic: a table of exceptions has no way of noticing a property nobody thought
+about, which is the whole failure this project's diagnostics exist to prevent. `titleAnchor` is what it
+cost — no entry in the table and no reader, so a trellis that anchored its cell titles was told nothing
+at all.
+
+Inverted to a `LAYOUT_CONSUMED` set and `reportUnhandled`, like every other block. Six layout
+properties are now named: `center`, `offset`, `headerBand`, `footerBand`, `titleBand` and
+`titleAnchor`.
+
 ## Performance observations
 
 Nothing on hardware. No measurement has been taken on a physical device, and emulator numbers are

@@ -445,6 +445,9 @@ private val PROJECTION_CONSUMED =
     "size",
   )
 
+/** Layout properties this engine reads; the rest are named in [SpecParser.parseLayout]. */
+private val LAYOUT_CONSUMED = setOf("columns", "padding", "align", "bounds")
+
 /** Data properties this engine reads. */
 private val DATA_CONSUMED = setOf("name", "values", "source", "transform", "format", "url")
 
@@ -2194,22 +2197,25 @@ public class SpecParser {
    */
   private fun parseLayout(value: VegaValue, path: String): LayoutSpec? {
     val obj = value as? VegaValue.Obj ?: return unexpected("a layout definition", path)
-    val unsupported =
+    // Named rather than listed by exception, like every other block: a layout property nobody
+    // thought about becomes a diagnostic instead of a silence. `titleAnchor` was the one this
+    // caught
+    // — it had neither an entry in the table below nor a reader, so a trellis that anchored its
+    // cell
+    // titles was told nothing at all.
+    obj.reportUnhandled(
+      "Layout",
+      path,
+      LAYOUT_CONSUMED,
       mapOf(
         "headerBand" to "Layout header bands are not implemented",
         "footerBand" to "Layout footer bands are not implemented",
         "titleBand" to "Layout title bands are not implemented",
+        "titleAnchor" to "Anchoring a cell's title within its row or column is not implemented",
         "center" to "Centring cells within their row or column is not implemented",
         "offset" to "Layout offsets are not implemented",
-      )
-    for ((key, reason) in unsupported) {
-      if (obj.fields[key] == null) continue
-      diagnostics.warn(
-        DiagnosticCodes.PARSE_UNKNOWN_PROPERTY,
-        "$reason; '$key' was ignored",
-        jsonPath = "$path.$key",
-      )
-    }
+      ),
+    )
 
     // `padding` is either one number for both directions or a per-direction object.
     val padding = obj.fields["padding"]

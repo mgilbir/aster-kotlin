@@ -406,9 +406,10 @@ As of this handoff the subtraction leaves **nothing** for `encodeEntry`, `axis`,
   Everything else is *done*, including guide `aria`/`description` — pinned by
   `GuideAccessibilityTest`, since the differential cannot see them.
 - **Title:** none. All 31 of upstream's title properties are read.
-- **Layout (all of it):** `align`, `bounds`, `center`, `columns`, `footerBand`, `headerBand`,
-  `offset`, `padding`, `titleAnchor`, `titleBand` — the grid works, but nothing in `LAYOUT` is
-  reported either, so this block has no consumed table at all yet.
+- **Layout (6):** `center`, `offset`, `headerBand`, `footerBand`, `titleBand`, `titleAnchor`. The
+  grid itself works — `columns`, `padding`, `align` and `bounds` are read. The block now names what it
+  consumes and reports the rest, which is what caught `titleAnchor`: it had no entry in the old
+  exception table and no reader.
 - **Mark (2):** a mark-level `description` and `key`.
 - **Tail:** `lab`/`hcl` colour helpers, `geoBounds`, `impute` methods, `pivot` ops, some window ops,
   `timeunit` unit inference, facet aggregates, `domainRaw`, `domainImplicit`, unimplemented named
