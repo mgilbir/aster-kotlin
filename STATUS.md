@@ -1680,6 +1680,24 @@ the data rather than naming a category, and taking the category's colour made a 
 whiskers disappear into its box. The box's thickness also reads a `size` **encoding** written as a
 value, which is how a specification thins a box without touching the rest of the chart.
 
+### A column may be called `source.reco`
+
+`escapePathAccess` escapes a bracket, a dot and both quotes *inside* a path step as well as between
+steps, because a name with a dot in it is a name and not a path: writing `source.reco` unescaped
+tells Vega to look one level into a `source` that is not there. This compiler was escaping only the
+joins.
+
+Three more of the same size. `background` on the specification beats `config.background`, a theme's
+default being what a stated one overrides. A top-level **`view`** block paints the *plotting area*
+rather than the surface around it, so it becomes an `encode` on the chart's own group — the two are
+different colours in the same chart. And `isDiscrete` counts a **binned** field, so a binned heatmap
+draws its axes over the cells as a categorical one does.
+
+An `impute` with a method other than `value` is three transforms, not one: Vega's `impute` fills a
+gap with a **constant** and nothing else, so the gap is filled with null, a `window` averages over
+the frame — which belongs to the window, not to the impute — and a formula writes the result back
+over the nulls.
+
 ### Two runtime gaps this batch names but does not close
 
 `density`'s fixture is not in the corpus, and `trail`'s draws no legend. Both compile exactly as
@@ -1701,6 +1719,8 @@ by *this runtime*:
 - **A universally bucketed column's far edge lands elsewhere.** `binnedutcyearmonth` compiles
   exactly as upstream compiles it and the bars come out a different width, so the two engines
   disagree about what `utcOffset('month', …)` steps from. Covered by the sweep, not by a fixture.
+- **A group's `encode` replaces its style's paint rather than overriding it property by
+  property.** A plotting area given a `fill` loses the `#ddd` border its `cell` style was drawing.
 - **`domainMid` does not split a colour scale.** A diverging scale compiles exactly as upstream
   compiles it and the runtime maps it as an ordinary ramp, so the two halves come out swapped.
 - **A facet's footer band reserves no height**, so a chart captioned below its cells comes out

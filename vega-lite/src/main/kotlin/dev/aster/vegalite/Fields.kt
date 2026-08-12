@@ -245,8 +245,17 @@ internal object Fields {
   private fun removePathFromField(path: String): String = splitAccessPath(path).joinToString(".")
 
   /** Everywhere else a dot is escaped, because Vega reads an unescaped one as a path step. */
+  /**
+   * `replacePathInField`: every path step joined by an **escaped** dot, each step escaped in turn.
+   *
+   * `escapePathAccess` escapes a bracket, a dot and both quotes *inside* a step as well, because a
+   * column may be called `source.reco` — a name with a dot in it, not a path into `source` — and
+   * writing it unescaped tells Vega to look one level in and find nothing.
+   */
   private fun replacePathInField(path: String): String =
-    splitAccessPath(path).joinToString("\\.") { it.replace("\"", "\\\"") }
+    splitAccessPath(path).joinToString("\\.") { step ->
+      step.map { if (it in "[].'\"") "\\$it" else "$it" }.joinToString("")
+    }
 
   /** Splits `a.b`, `a["b"]` and `a['b']` the way `vega-util`'s `splitAccessPath` does. */
   fun splitAccessPath(path: String): List<String> {

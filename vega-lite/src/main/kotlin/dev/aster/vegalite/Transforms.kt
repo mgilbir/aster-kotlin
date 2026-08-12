@@ -164,19 +164,51 @@ internal class Transforms(
       // field, its own key and its own grouping rather than taking them from the encoding, so it
       // is a translation rather than a derivation. A `keyvals` written as a sequence becomes the
       // expression that generates it, exactly as the encoding form does.
-      transform.has("impute") ->
-        listOf(
-          obj {
-            put("type", "impute")
-            put("field", transform.string("impute"))
-            put("key", transform.string("key"))
-            imputeKeyvals(transform["keyvals"])?.let { put("keyvals", it) }
-            put("method", transform.string("method") ?: "value")
-            if (transform.has("groupby")) put("groupby", strings(fieldList(transform["groupby"])))
-            transform["frame"]?.let { put("frame", it) }
-            transform["value"]?.let { put("value", it) }
-          }
-        )
+      transform.has("impute") -> {
+        val field = transform.string("impute").orEmpty()
+        val method = transform.string("method")
+        val groupby = if (transform.has("groupby")) fieldList(transform["groupby"]) else emptyList()
+        // Vega's `impute` fills a gap with a **constant**, and nothing else. A method that averages
+        // its neighbours is therefore two steps: the gap is filled with null, a `window` computes
+        // the average over the frame, and a formula writes it back over the nulls. That is what
+        // `ImputeNode.assemble` does, and the `frame` belongs to the *window*, not the impute.
+        val imputation = obj {
+          put("type", "impute")
+          put("field", field)
+          put("key", transform.string("key"))
+          imputeKeyvals(transform["keyvals"])?.let { put("keyvals", it) }
+          put("method", "value")
+          if (groupby.isNotEmpty()) put("groupby", strings(groupby))
+          put(
+            "value",
+            if (method == null || method == "value") transform["value"] else VegaValue.Null,
+          )
+        }
+        if (method == null || method == "value") {
+          listOf(imputation)
+        } else {
+          listOf(
+            imputation,
+            obj {
+              put("type", "window")
+              put("as", strings(listOf("imputed_${field}_value")))
+              put("ops", strings(listOf(method)))
+              put("fields", strings(listOf(field)))
+              put("frame", transform["frame"] ?: arr(listOf(VegaValue.Null, VegaValue.Null)))
+              put("ignorePeers", VegaValue.Bool(false))
+              if (groupby.isNotEmpty()) put("groupby", strings(groupby))
+            },
+            obj {
+              put("type", "formula")
+              put(
+                "expr",
+                "datum.$field === null ? datum.imputed_${field}_value : datum.$field",
+              )
+              put("as", field)
+            },
+          )
+        }
+      }
 
       transform.has("sample") ->
         listOf(

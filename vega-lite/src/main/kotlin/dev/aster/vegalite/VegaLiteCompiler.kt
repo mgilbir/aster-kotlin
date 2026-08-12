@@ -189,7 +189,10 @@ private class Compilation(
     val vega = obj {
       put("\$schema", "https://vega.github.io/schema/vega/v6.json")
       put("description", spec.string("description"))
-      put("background", config.background)
+      // The chart's own `background` beats the configured one: `config.background` is a theme's
+      // default and a specification that states one is overriding the theme, not being overridden
+      // by it.
+      put("background", spec.fields["background"] ?: config.background)
       put("padding", config.padding)
       autosize()?.let { put("autosize", it) }
       put("width", mergedSize("width") ?: if (concat == null) root.width else null)
@@ -200,6 +203,10 @@ private class Compilation(
       // does a concatenation, whose plots are each their own cell.
       if (facet == null && concat == null) put("style", style(views))
       title()?.let { put("title", it) }
+      // A top-level `view` block paints the *plotting area* rather than the surface around it, so
+      // it becomes an `encode` on the chart's own group — `background` is the surface, `view.fill`
+      // is the paper the marks sit on, and the two are different colours in the same chart.
+      viewEncode()?.let { put("encode", it) }
       put("data", arr(data))
       if (sizeSignals.isNotEmpty()) put("signals", arr(sizeSignals))
       // A stated `spacing` is the gap between cells, and it beats the configured twenty.
@@ -863,6 +870,20 @@ private class Compilation(
         encoding?.has("row") == true ||
         encoding?.has("column") == true
     return titleFor(declared, composed)
+  }
+
+  /** The chart group's own `encode`, which is where a top-level `view` block's paint lands. */
+  private fun viewEncode(): VegaValue? {
+    val view = spec.obj("view") ?: return null
+    val painted =
+      view.fields.filterKeys { it in setOf("fill", "stroke", "fillOpacity", "strokeOpacity") }
+    if (painted.isEmpty()) return null
+    return obj {
+      put(
+        "update",
+        obj { painted.forEach { (key, value) -> put(key, obj { put("value", value) }) } },
+      )
+    }
   }
 
   /** `assembleTitle`, for a title on any model: the group frame, or the composition's anchor. */

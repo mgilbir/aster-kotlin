@@ -236,7 +236,11 @@ internal object Guides {
 
     // A heatmap's axis is drawn *over* its cells: the rects fill their bands completely, so an axis
     // painted underneath would be hidden by them.
-    if (view.spec.mark == "rect" && def.type?.isDiscrete == true) axis.set("zindex", num(1))
+    // `isDiscrete` counts a **binned** field too: its buckets are categories, and a binned heatmap
+    // fills them as completely as a categorical one does.
+    if (view.spec.mark == "rect" && (def.type?.isDiscrete == true || def.bin != null)) {
+      axis.set("zindex", num(1))
+    }
 
     user?.fields?.forEach { (key, value) -> axis.properties[key] = value }
     conditionalToEncode(axis)
