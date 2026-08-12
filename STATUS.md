@@ -1426,6 +1426,36 @@ A label's alignment also follows the side its axis is on — `defaultLabelAlign`
 against the axis's *main* orientation and flips when the axis has been moved — so a turned label
 hanging off the top of a chart no longer anchors at the wrong end.
 
+### A title reads differently depending on what kind of model carries it
+
+`assembleTitle` splits on the model: a **unit or layer** anchors its title to the *group*, which
+keeps it over the plotting area when an axis widens the drawing to its left; a **composition**
+cannot, its groups being laid out with no one plotting area to sit over, and takes `anchor: "start"`
+instead. Upstream's own note is that a centred title "does not look nice" over a grid. A plot inside
+a concatenation is still a unit, so it frames its group while the concatenation above it anchors to
+the start.
+
+Beside it, `assembleHeaderProperties`: a facet's `header` names its properties `titleFontSize` and
+`labelFontSize` where a Vega title names them `fontSize`, so each is a rename per part. Without the
+map a header's whole styling was read and dropped.
+
+### Four more rules, each one a chart drawn wrongly
+
+- **`impute` as a transform**, as against an `impute` on a position channel: it names its own field,
+  key and grouping rather than taking them from the encoding, and was refused outright.
+- **A non-position channel gets the invalid arm too.** `nonposition.ts` asks for one, so a size
+  scaled from a column with nulls draws those rows at the scale's own output for an invalid value
+  rather than leaving them unsized.
+- **A reversed scale reverses its bin spacing.** `getBinSpacing` writes `(reverse ? -1 : 1) *` in
+  front of the half-spacing that pulls a bin's edge inward, because on a reversed axis inward is
+  the other way.
+- **An offset moves every position, not only a rect's.** A label over a grouped bar has to move
+  into the same lane the bar did — and *only* into the lane: the position's own band drops to 0
+  where the offset centres it, since centring twice moves the label half a group to the right.
+
+And both curve fits now always name their output columns, defaulting to the two they were computed
+from, as `RegressionTransformNode` does in its constructor.
+
 ### Two runtime gaps this batch names but does not close
 
 `density`'s fixture is not in the corpus, and `trail`'s draws no legend. Both compile exactly as

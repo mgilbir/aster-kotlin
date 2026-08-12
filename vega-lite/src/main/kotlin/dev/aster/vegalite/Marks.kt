@@ -432,8 +432,13 @@ internal object Marks {
     // that is white unless its box has no height says only when it is not white, and the white has
     // to come from somewhere for the rule to have anything to fall through to.
     val main = valueRef(view, channel, def) ?: markDefault(view, channel, vgChannel)[vgChannel]
-    if (rules.isEmpty())
+    // A non-position channel gets the same invalid arm a position does under the `show` mode —
+    // `nonposition.ts` asks for one too. A size scaled from a column with nulls in it draws those
+    // rows at the scale's own output for an invalid value rather than leaving them unsized.
+    val invalid = invalidPositionRef(view, channel)
+    if (rules.isEmpty() && invalid == null)
       return if (main == null) VegaValue.EmptyObject else obj { put(vgChannel, main) }
+    if (invalid != null) return obj { put(vgChannel, arr(rules + invalid + listOfNotNull(main))) }
     // The array form is used even for a single entry with a test, or Vega has no rule to fall back
     // to when the test fails.
     return obj { put(vgChannel, arr(rules + listOfNotNull(main))) }
@@ -811,6 +816,7 @@ internal object Marks {
    */
   private fun invalidPositionRef(view: UnitView, channel: String): VegaValue? {
     if (view.invalidDataMode != "show") return null
+    if (channel !in Channels.SCALE_CHANNELS) return null
     val main = mainChannel(channel)
     // A **stacked** position is not read from the row at all: it is the accumulated end the stack
     // transform wrote, which is a number whatever the row held. Only the refs that go through
@@ -885,8 +891,15 @@ internal object Marks {
     return obj {
       put("scale", scaleName(view, mainChannel(channel)))
       put("field", Fields.vgField(def))
-      // On a band scale a point belongs in the middle of its band rather than on its edge.
-      if (scaleType == "band") put("band", num(0.5))
+      // `positionOffset` runs for every position, not only a rect's: a label over a grouped bar
+      // has to move into the same lane the bar did, or it sits over the middle of the group.
+      val offset = offsetRef(view, mainChannel(channel), centred = true)
+      // On a band scale a point belongs in the middle of its band rather than on its edge — unless
+      // an offset has already put it in the middle of a *lane* inside that band, where centring
+      // twice would move it half a group to the right. `bandPosition` is 0 when the offset comes
+      // from an encoding.
+      if (scaleType == "band" && offset == null) put("band", num(0.5))
+      offset?.let { put("offset", it) }
     }
   }
 
@@ -1222,18 +1235,26 @@ internal object Marks {
       "abs(scale(\"${view.scale(channel)}\", ${Fields.datumAccess(def, suffix = "end")}) - " +
         "scale(\"${view.scale(channel)}\", ${Fields.datumAccess(def)}))"
 
+    // A **reversed** scale runs the other way, so the half-spacing that pulls a bin's edge inward
+    // has to pull the other way with it — `getBinSpacing`'s `(reverse ? -1 : 1) *`. Upstream writes
+    // the condition out rather than folding it, since a `reverse` may itself be a signal.
+    val reversed =
+      (view.scaleComponents[channel]?.properties?.get("reverse") as? VegaValue.Bool)?.value == true
     fun offset(isEnd: Boolean): VegaValue {
       val spacingOffset = if (isEnd) -spacing / 2 else spacing / 2
-      if (minBandSize == null) return num(axisTranslate + spacingOffset)
+      if (minBandSize == null) {
+        return num(axisTranslate + if (reversed) -spacingOffset else spacingOffset)
+      }
       val sign = if (isEnd) "" else "-"
       // Every number here is written the way JavaScript writes it — `2`, not `2.0`. A Kotlin
       // `Double` interpolated straight into an expression carries a decimal point Vega-Lite's own
       // output never has, and the two specifications then differ on a string neither engine reads
       // as a number.
       val minimum = canonicalNumberString(minBandSize)
+      val turn = if (reversed) "(true ? -1 : 1) * " else ""
       return signalRef(
-        "${canonicalNumberString(axisTranslate)} + ($sizeExpression < $minimum ? " +
-          "${sign}0.5 * ($minimum - ($sizeExpression)) : ${canonicalNumberString(spacingOffset)})"
+        "${Fields.expressionNumber(axisTranslate)} + $turn($sizeExpression < $minimum ? " +
+          "${sign}0.5 * ($minimum - ($sizeExpression)) : ${Fields.expressionNumber(spacingOffset)})"
       )
     }
 

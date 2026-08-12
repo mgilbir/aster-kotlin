@@ -534,9 +534,8 @@ private class Compilation(
     obj {
       put("type", "group")
       put("name", "${plot.name}_group")
-      plot.spec.fields["title"]?.let {
-        put("title", if (it is VegaValue.Str) obj { put("text", it) } else it)
-      }
+      // A plot inside a composition is still a unit or a layer, so its own title frames the group.
+      plot.spec.fields["title"]?.let { put("title", titleFor(it, composed = false)) }
       put("style", style(plot.views))
       put(
         "encode",
@@ -820,15 +819,35 @@ private class Compilation(
 
   private fun title(): VegaValue? {
     val declared = spec.fields["title"] ?: return null
-    // A title is anchored to the *group* rather than to the whole surface, which is what keeps it
-    // over the plotting area when an axis widens the drawing to its left.
-    return if (declared is VegaValue.Str) {
-      obj {
-        put("text", declared)
-        put("frame", "group")
+    // `assembleTitle` reads the two kinds of model differently. A **unit or layer** anchors its
+    // title to the *group* rather than to the whole surface, which keeps it over the plotting area
+    // when an axis widens the drawing to its left. A **composition** cannot: its groups are laid
+    // out and there is no one plotting area to sit over, so it takes `anchor: "start"` instead —
+    // upstream's note is that a centred title "does not look nice" over a grid.
+    val composed =
+      spec.has("facet") ||
+        spec.has("concat") ||
+        spec.has("hconcat") ||
+        spec.has("vconcat") ||
+        spec.has("repeat")
+    return titleFor(declared, composed)
+  }
+
+  /** `assembleTitle`, for a title on any model: the group frame, or the composition's anchor. */
+  private fun titleFor(declared: VegaValue, composed: Boolean): VegaValue {
+    val fields = (declared as? VegaValue.Obj)?.fields
+    val text = fields?.get("text") ?: declared.takeIf { it is VegaValue.Str }
+    if (text == null) return declared
+    return obj {
+      if (fields == null) put("text", text) else fields.forEach { (key, value) -> put(key, value) }
+      if (composed) {
+        if (fields?.containsKey("anchor") != true) put("anchor", "start")
+      } else {
+        val anchor = (fields?.get("anchor") as? VegaValue.Str)?.value
+        if ((anchor == null || anchor == "middle") && fields?.containsKey("frame") != true) {
+          put("frame", "group")
+        }
       }
-    } else {
-      declared
     }
   }
 

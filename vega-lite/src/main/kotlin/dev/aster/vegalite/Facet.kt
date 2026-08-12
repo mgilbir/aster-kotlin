@@ -10,6 +10,38 @@ import dev.aster.vega.model.VegaValue
  */
 internal class Facet(val channel: String, val def: ChannelDef) {
 
+  /**
+   * `assembleHeaderProperties`: what a `header` block says about the caption, renamed on the way.
+   *
+   * A header names its properties `titleFontSize`/`labelFontSize` and a Vega title names them
+   * `fontSize`, so the map is a rename per part — `HEADER_TITLE_PROPERTIES_MAP` and its label twin.
+   * Without it a header's whole styling was read and dropped.
+   */
+  fun headerProperties(part: String): Map<String, VegaValue> {
+    val header = def.raw.obj("header") ?: return emptyMap()
+    val renamed =
+      mapOf(
+        "Align" to "align",
+        "Anchor" to "anchor",
+        "Angle" to "angle",
+        "Baseline" to "baseline",
+        "Color" to "color",
+        "Font" to "font",
+        "FontSize" to "fontSize",
+        "FontStyle" to "fontStyle",
+        "FontWeight" to "fontWeight",
+        "Limit" to "limit",
+        "LineHeight" to "lineHeight",
+        "Orient" to "orient",
+        "Padding" to "offset",
+      )
+    val out = LinkedHashMap<String, VegaValue>()
+    for ((suffix, name) in renamed) {
+      header.fields["$part$suffix"]?.let { out[name] = it }
+    }
+    return out
+  }
+
   /** `column` grids horizontally, `row` vertically. */
   val isColumn: Boolean = channel == "column"
 
@@ -123,6 +155,7 @@ internal class Facet(val channel: String, val def: ChannelDef) {
         if (!isColumn) put("orient", "left")
         put("style", "guide-title")
         put("offset", num(offset))
+        headerProperties("title").forEach { (key, value) -> put(key, value) }
       },
     )
   }
@@ -285,6 +318,7 @@ internal class FacetGrid(val row: Facet?, val column: Facet?) : FacetLayout {
               put("style", "guide-label")
               put("frame", "group")
               put("offset", num(titleOffset))
+              facet.headerProperties("label").forEach { (key, value) -> put(key, value) }
             },
           )
         }

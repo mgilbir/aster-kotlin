@@ -163,6 +163,24 @@ internal class Transforms(
           }
         )
 
+      // An `impute` **transform**, as against an `impute` on a position channel: it names its own
+      // field, its own key and its own grouping rather than taking them from the encoding, so it
+      // is a translation rather than a derivation. A `keyvals` written as a sequence becomes the
+      // expression that generates it, exactly as the encoding form does.
+      transform.has("impute") ->
+        listOf(
+          obj {
+            put("type", "impute")
+            put("field", transform.string("impute"))
+            put("key", transform.string("key"))
+            imputeKeyvals(transform["keyvals"])?.let { put("keyvals", it) }
+            put("method", transform.string("method") ?: "value")
+            if (transform.has("groupby")) put("groupby", strings(fieldList(transform["groupby"])))
+            transform["frame"]?.let { put("frame", it) }
+            transform["value"]?.let { put("value", it) }
+          }
+        )
+
       transform.has("sample") ->
         listOf(
           obj {
@@ -242,7 +260,21 @@ internal class Transforms(
             for (key in listOf("bandwidth", "method", "order", "extent", "params")) {
               transform[key]?.let { put(key, it) }
             }
-            asPair(transform["as"])?.let { put("as", it) }
+            // Both fits always name their output columns, defaulting to the two they were computed
+            // from: the sampled `on` and the measure being fitted. The chart that reads them was
+            // written against those names, so upstream settles them here rather than leaving Vega
+            // to.
+            val declared = (transform["as"] as? VegaValue.Arr)?.values.orEmpty()
+            put(
+              "as",
+              strings(
+                listOfNotNull(
+                  (declared.getOrNull(0) as? VegaValue.Str)?.value ?: transform.string("on"),
+                  (declared.getOrNull(1) as? VegaValue.Str)?.value
+                    ?: transform.string(if (isLoess) "loess" else "regression"),
+                )
+              ),
+            )
           }
         )
       }
@@ -374,6 +406,27 @@ internal class Transforms(
     }
     return produced
   }
+
+  /**
+   * `processSequence`: a `keyvals` given as `{start, stop, step}` is a *generated* list.
+   *
+   * Vega has an expression for one and no transform property, so it becomes a signal. A list
+   * written out passes through as it stands.
+   */
+  fun imputeKeyvals(stated: VegaValue?): VegaValue? =
+    when (stated) {
+      null -> null
+      is VegaValue.Obj -> {
+        val parts =
+          listOfNotNull(
+            Fields.expressionNumber(stated.number("start") ?: 0.0),
+            stated.number("stop")?.let { Fields.expressionNumber(it) },
+            stated.number("step")?.let { Fields.expressionNumber(it) },
+          )
+        signalRef("sequence(${parts.joinToString(",")})")
+      }
+      else -> stated
+    }
 
   private fun collectParses(predicate: VegaValue?, into: MutableMap<String, String>) {
     when {
