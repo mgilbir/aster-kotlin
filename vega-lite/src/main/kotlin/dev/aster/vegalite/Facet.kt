@@ -17,6 +17,22 @@ internal class Facet(val channel: String, val def: ChannelDef) {
    * `fontSize`, so the map is a rename per part — `HEADER_TITLE_PROPERTIES_MAP` and its label twin.
    * Without it a header's whole styling was read and dropped.
    */
+  /**
+   * Which side of the grid this channel's captions hang off — `getHeaderChannel`.
+   *
+   * A column's captions sit above its cells and a row's to their left, unless the header says
+   * otherwise; `"bottom"` and `"right"` move them to the *footer* band, which is a different group
+   * with a different name rather than the same one moved.
+   */
+  fun headerOrient(part: String): String {
+    val header = def.raw.obj("header")
+    val stated = header?.string("${part}Orient") ?: header?.string("orient")
+    return stated ?: if (isColumn) "top" else "left"
+  }
+
+  /** Whether this channel's captions belong to the trailing band rather than the leading one. */
+  fun captionsInFooter(): Boolean = headerOrient("label") in setOf("bottom", "right")
+
   fun headerProperties(part: String): Map<String, VegaValue> {
     val header = def.raw.obj("header") ?: return emptyMap()
     val renamed =
@@ -155,6 +171,8 @@ internal class Facet(val channel: String, val def: ChannelDef) {
         if (!isColumn) put("orient", "left")
         put("style", "guide-title")
         put("offset", num(offset))
+        // A header moved to the other side of the grid takes its heading with it.
+        headerOrient("title").takeIf { it != "top" }?.let { put("orient", it) }
         headerProperties("title").forEach { (key, value) -> put(key, value) }
       },
     )
@@ -264,6 +282,13 @@ internal class FacetGrid(val row: Facet?, val column: Facet?) : FacetLayout {
         },
       )
     }
+    // `titleAnchor`: a heading over a *trailing* band is anchored at the end of the grid rather
+    // than the start, which is where the band it names now sits.
+    val anchors =
+      listOfNotNull(row, column).filter { it.channel in titled && it.captionsInFooter() }
+    if (anchors.isNotEmpty()) {
+      put("titleAnchor", obj { anchors.forEach { put(it.channel, "end") } })
+    }
     when {
       column != null -> put("columns", signalRef("length(data('${column.domainData}'))"))
       row != null -> put("columns", num(1))
@@ -284,15 +309,15 @@ internal class FacetGrid(val row: Facet?, val column: Facet?) : FacetLayout {
     channel: String,
     kind: String,
     axes: List<VegaValue>,
-    captioned: Boolean,
     titleOffset: Double,
   ): VegaValue? {
     val isColumn = channel == "column"
     val facet = if (isColumn) column else row
     // `"header": null` takes the *caption* off, not the band: the band is also where a shared axis
     // is drawn, and that axis is still wanted. A band with neither is the one that disappears.
-    val captions = captioned && facet?.def?.raw?.fields?.get("header") != VegaValue.Null
-    if (axes.isEmpty() && !(captions && facet != null)) return null
+    val wanted = if (facet?.captionsInFooter() == true) kind == "footer" else kind == "header"
+    val captions = wanted && facet != null && facet.def.raw.fields["header"] != VegaValue.Null
+    if (axes.isEmpty() && !captions) return null
     return obj {
       put("name", "${channel}_$kind")
       put("type", "group")
@@ -321,6 +346,8 @@ internal class FacetGrid(val row: Facet?, val column: Facet?) : FacetLayout {
               put("style", "guide-label")
               put("frame", "group")
               put("offset", num(titleOffset))
+              // A caption in the trailing band hangs off the other side of its cell.
+              facet.headerOrient("label").takeIf { it != "top" }?.let { put("orient", it) }
               facet.headerProperties("label").forEach { (key, value) -> put(key, value) }
             },
           )
@@ -382,14 +409,13 @@ internal class FacetGrid(val row: Facet?, val column: Facet?) : FacetLayout {
       titles[facet.channel]?.let { facet.titleGroup(it, titleOffset) }
     } +
       listOfNotNull(
-        band("row", "header", leading(vertical), captioned = true, titleOffset),
-        band("row", "footer", vertical - leading(vertical).toSet(), captioned = false, titleOffset),
-        band("column", "header", leading(horizontal), captioned = true, titleOffset),
+        band("row", "header", leading(vertical), titleOffset),
+        band("row", "footer", vertical - leading(vertical).toSet(), titleOffset),
+        band("column", "header", leading(horizontal), titleOffset),
         band(
           "column",
           "footer",
           horizontal - leading(horizontal).toSet(),
-          captioned = false,
           titleOffset,
         ),
       )

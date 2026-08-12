@@ -418,7 +418,19 @@ internal object Marks {
       if (defaultFill != null) put("fill", obj { put("value", defaultFill) })
       if (defaultStroke != null) put("stroke", obj { put("value", defaultStroke) })
       val colorChannel = if (filled) "fill" else "stroke"
-      putAll(nonPosition(view, "color", colorChannel))
+      // The mark's own colour is what a *conditional* colour falls through to — upstream passes it
+      // as `defaultValue` into `nonPosition`, so the production rule ends in it. Setting it above
+      // and then overwriting the whole property left a rule with no unconditional arm, and every
+      // mark the condition did not catch was drawn in Vega's own default rather than the chart's.
+      val fallback = if (filled) defaultFill else defaultStroke
+      putAll(
+        nonPosition(
+          view,
+          "color",
+          colorChannel,
+          fallback?.let { obj { put("value", it) } },
+        )
+      )
       putAll(nonPosition(view, "fill", "fill"))
       putAll(nonPosition(view, "stroke", "stroke"))
     }
@@ -437,7 +449,12 @@ internal object Marks {
    * That renaming is the reason it cannot simply pass through with the mark's other properties —
    * and being Vega-Lite-only, it was dropped on the floor instead.
    */
-  private fun nonPosition(view: UnitView, channel: String, vgChannel: String): VegaValue.Obj {
+  private fun nonPosition(
+    view: UnitView,
+    channel: String,
+    vgChannel: String,
+    defaultRef: VegaValue? = null,
+  ): VegaValue.Obj {
     val def = view.spec.encoding[channel] ?: return markDefault(view, channel, vgChannel)
     val rules =
       def.conditions.mapNotNull { condition ->
@@ -451,7 +468,8 @@ internal object Marks {
     // With conditions but no unconditional part, the *mark* supplies the fallback — a median tick
     // that is white unless its box has no height says only when it is not white, and the white has
     // to come from somewhere for the rule to have anything to fall through to.
-    val main = valueRef(view, channel, def) ?: markDefault(view, channel, vgChannel)[vgChannel]
+    val main =
+      valueRef(view, channel, def) ?: markDefault(view, channel, vgChannel)[vgChannel] ?: defaultRef
     // A non-position channel gets the same invalid arm a position does under the `show` mode —
     // `nonposition.ts` asks for one too. A size scaled from a column with nulls in it draws those
     // rows at the scale's own output for an invalid value rather than leaving them unsized.

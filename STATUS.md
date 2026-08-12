@@ -1558,6 +1558,17 @@ Beside it, a **binned** time unit in a predicate needs no bucketing — the colu
 bucket — so only the cast to a number is left, and the rebuilt-from-parts expression this compiler
 was writing compared the bucket against a bucket of the bucket.
 
+### A condition falls through to the mark's own colour
+
+`color(model, {filled})` hands the mark's own colour to `nonPosition` as its `defaultValue`, so a
+production rule *ends* in it. This compiler set the colour and then overwrote the whole property
+with the rule, leaving no unconditional arm — and every mark the condition did not catch was drawn
+in Vega's own default rather than the chart's.
+
+Beside it, `getHeaderChannel`: a facet's `header.orient` of `"bottom"` or `"right"` moves the
+captions to the **footer** band, which is a different group with a different name rather than the
+same one moved. The heading follows them, and the layout anchors it at the end of the grid.
+
 ### Two runtime gaps this batch names but does not close
 
 `density`'s fixture is not in the corpus, and `trail`'s draws no legend. Both compile exactly as
@@ -1572,6 +1583,12 @@ by *this runtime*:
 - **A time scale cannot take a colour scheme.** A sequential ramp over instants compiles exactly as
   upstream compiles it and then fails to build: the scale wants a numeric range and is handed a
   scheme.
+- **A missing field is `null` here and `undefined` in JavaScript**, and `undefined === null` is
+  false. A condition testing a column the aggregate removed came out true for every row, so a chart
+  whose grey was meant for the exceptions was grey throughout. The distinction needs a value the
+  model does not have.
+- **A facet's footer band reserves no height**, so a chart captioned below its cells comes out
+  short by the caption. `facet-footer` is the one fixture in `GRID_LAYOUT_PENDING`.
 - **A quantile legend labels its buckets with a representative value** rather than the range they
   cover — `75.75` where upstream reads `75.8 – 95.0` — which is the same gap as the banded legend
   drawn as swatches.

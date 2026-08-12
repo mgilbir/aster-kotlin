@@ -175,7 +175,7 @@ class VegaLiteFixtureDifferentialTest {
 
   private companion object {
     /** Fixtures whose *placement* is pending on the runtime's grid layout. */
-    val GRID_LAYOUT_PENDING = emptySet<String>()
+    val GRID_LAYOUT_PENDING = setOf("facet-footer")
 
     val repositoryRoot: File = File(System.getProperty("user.dir")).parentFile
 
