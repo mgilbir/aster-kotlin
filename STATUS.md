@@ -1456,6 +1456,33 @@ map a header's whole styling was read and dropped.
 And both curve fits now always name their output columns, defaulting to the two they were computed
 from, as `RegressionTransformNode` does in its constructor.
 
+### `"-x"` is a channel, not an unknown word
+
+`isSortByChannel`: a discrete domain's `sort` may name **another channel** — `"-x"` for "tallest
+bar first", which is how most sorted bar charts in the gallery are written. Read as an unrecognised
+string it silently became the default alphabetical order, which is a chart sorted the wrong way
+rather than one that failed. Expanded, it resolves through the same path a `sort` object takes: the
+categories are ordered by the *aggregate of the other channel's field*, computed from the
+pre-aggregation table, which is also what finally made this compiler name that table where upstream
+names it.
+
+### An aggregate that answers with a whole row
+
+`{"aggregate": {"argmax": "US Gross"}, "field": "Production Budget"}` asks for the production budget
+*of* the highest-grossing row, and the two columns in it play different parts everywhere. The
+aggregate is taken over `US Gross` and its output column is named after that; the `field` is a path
+*into* the row it answers with, appended unescaped because it is a real step into a real object; and
+the default title reads `Production Budget for max US Gross`. Read as an ordinary aggregate the
+whole thing collapsed into one name that no transform wrote.
+
+Two smaller ones fell out of it. Every field definition contributes to the aggregate, not only the
+channels' own — a `tooltip` written as a **list** holds several, and one of them may be the only
+thing asking for one. And a parse cannot climb past a step that produces what it reads *by root*: a
+step producing `argmax_US_Gross` blocks a parse of `argmax_US_Gross['Production Budget']`, though
+the two names differ. Where the parse stays below, it is a formula rather than a `format.parse`,
+since by then the loader has long since finished — `node.parent instanceof SourceNode` is upstream's
+test and it is asked at assembly, after the optimiser has moved what it can.
+
 ### Two runtime gaps this batch names but does not close
 
 `density`'s fixture is not in the corpus, and `trail`'s draws no legend. Both compile exactly as

@@ -24,6 +24,16 @@ internal object Fields {
     var field = def.field
     var effectiveSuffix = suffix
 
+    // An `argmin`/`argmax` names its output after the column it was taken over, not after the one
+    // being read — the row it answers with carries every column, and the field says which.
+    if (def.argumentField != null) {
+      val named = "${def.aggregate}_${def.argumentField}"
+      val full = if (effectiveSuffix != null) "${named}_$effectiveSuffix" else named
+      // As a *name* it is the column alone; as a **reference** it is that column read one step
+      // further in, and that step is not escaped — it is a real path into a real object.
+      return if (forAs) removePathFromField(full) else replacePathInField(full) + argAccessor(def)
+    }
+
     if (def.aggregate == "count") {
       // Upstream reserves a double-underscore namespace for fields it invents.
       field = "__count"
@@ -50,7 +60,14 @@ internal object Fields {
 
   /** `datum["mean_b"]`, the accessor an emitted expression uses to read the field. */
   fun datumAccess(def: ChannelDef, suffix: String? = null, datum: String = "datum"): String =
-    "$datum[${quoted(removePathFromField(vgField(def, suffix)))}]"
+    "$datum[${quoted(removePathFromField(vgField(def, suffix, forAs = true)))}]" + argAccessor(def)
+
+  /** The one path step an `argmin`/`argmax` reads out of the row it answered with. */
+  private fun argAccessor(def: ChannelDef): String {
+    if (def.argumentField == null) return ""
+    val field = def.field ?: return ""
+    return "[${quoted(field)}]"
+  }
 
   /**
    * `x_c_sort_index` — the column a written-out `sort` order records each row's place in.
@@ -74,6 +91,11 @@ internal object Fields {
     if (def.timeUnit != null) {
       val parts = timeUnitParts(def.timeUnit)
       if (parts.isNotEmpty()) return "${def.field} (${parts.joinToString("-")})"
+    }
+    // `Production Budget for max US Gross` — the column being read, then the one it was chosen by.
+    if (def.argumentField != null) {
+      val extreme = if (def.aggregate == "argmax") "max" else "min"
+      return "${def.field} for $extreme ${def.argumentField}"
     }
     if (def.aggregate != null) return "${titleCase(def.aggregate)} of ${def.field}"
     return def.field

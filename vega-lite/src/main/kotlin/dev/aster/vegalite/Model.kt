@@ -50,6 +50,14 @@ internal data class ChannelDef(
   val value: VegaValue? = null,
   val type: MeasureType? = null,
   val aggregate: String? = null,
+  /**
+   * The column an `argmin`/`argmax` is taken over, which is not the column being read.
+   *
+   * `{"aggregate": {"argmax": "US Gross"}, "field": "Production Budget"}` asks for the production
+   * budget *of* the highest-grossing row: the aggregate produces a whole row under `argmax_US
+   * Gross`, and the field names which of its columns to read.
+   */
+  val argumentField: String? = null,
   val bin: Binning? = null,
   val timeUnit: String? = null,
   val sort: VegaValue? = null,
@@ -220,6 +228,29 @@ internal object Channels {
       "angle",
       "theta",
       "radius",
+    )
+
+  /**
+   * The channels a `sort` may name as a shorthand — `"-x"`, `"color"`.
+   *
+   * `SORT_BY_CHANNELS` upstream. Two of the scale channels are missing on purpose: a `sort` can
+   * name neither offset, since an offset already sits inside the order being decided.
+   */
+  val SORT_BY_CHANNELS =
+    setOf(
+      "x",
+      "y",
+      "color",
+      "fill",
+      "stroke",
+      "opacity",
+      "fillOpacity",
+      "strokeOpacity",
+      "strokeWidth",
+      "size",
+      "shape",
+      "strokeDash",
+      "text",
     )
 
   val POSITION_CHANNELS = listOf("x", "y")

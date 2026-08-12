@@ -232,9 +232,11 @@ internal object Scales {
     channel: String,
     def: ChannelDef,
     type: String,
+    /** The sort to read instead of the definition's own, once a shorthand has been expanded. */
+    override: VegaValue? = null,
   ): VegaValue? {
     if (!hasDiscreteDomain(type)) return null
-    return when (val sort = def.sort) {
+    return when (val sort = override ?: def.sort) {
       null -> bool(true)
       is VegaValue.Str ->
         when (sort.value) {
@@ -245,7 +247,28 @@ internal object Scales {
               put("order", "descending")
             }
           "ascending" -> bool(true)
-          else -> bool(true)
+          // `isSortByChannel`: `"-x"` names *another channel* to sort by, with the minus for
+          // descending — the commonest way to write "put the tallest bar first". Read as an
+          // unknown string it silently became the default alphabetical order, which is a chart
+          // sorted the wrong way rather than one that failed.
+          else -> {
+            val descending = sort.value.startsWith("-")
+            val channelName = sort.value.removePrefix("-")
+            if (channelName in Channels.SORT_BY_CHANNELS) {
+              domainSort(
+                view,
+                channel,
+                def,
+                type,
+                obj {
+                  put("encoding", channelName)
+                  if (descending) put("order", "descending")
+                },
+              )
+            } else {
+              bool(true)
+            }
+          }
         }
       VegaValue.Null -> null
       // A written-out order is not a comparator Vega has; the order is turned into a *number* per

@@ -824,12 +824,17 @@ private class Compilation(
     // when an axis widens the drawing to its left. A **composition** cannot: its groups are laid
     // out and there is no one plotting area to sit over, so it takes `anchor: "start"` instead —
     // upstream's note is that a centred title "does not look nice" over a grid.
+    val encoding = spec.obj("encoding")
     val composed =
       spec.has("facet") ||
         spec.has("concat") ||
         spec.has("hconcat") ||
         spec.has("vconcat") ||
-        spec.has("repeat")
+        spec.has("repeat") ||
+        // A `row`/`column` channel is a facet written in the encoding, and the model it makes is a
+        // facet model — so its title is a composition's, laid out above a grid.
+        encoding?.has("row") == true ||
+        encoding?.has("column") == true
     return titleFor(declared, composed)
   }
 

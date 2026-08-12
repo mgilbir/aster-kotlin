@@ -143,7 +143,14 @@ internal class Parse(private val config: Config, private val diagnostics: Diagno
     }
 
     val field = value.string("field")
-    val aggregate = value.string("aggregate")
+    // `{"aggregate": {"argmax": "US Gross"}}` — an aggregate that answers with a whole *row*
+    // rather than a number, named by the column it maximises. The op and that column are two
+    // separate things and everything downstream needs both.
+    val aggregateObject = value.obj("aggregate")
+    val aggregate =
+      value.string("aggregate")
+        ?: aggregateObject?.fields?.keys?.firstOrNull { it == "argmin" || it == "argmax" }
+    val argumentField = aggregate?.let { aggregateObject?.string(it) }
     val timeUnit = value.string("timeUnit")
     val bin = binning(value.fields["bin"], path)
 
@@ -160,6 +167,7 @@ internal class Parse(private val config: Config, private val diagnostics: Diagno
       value = value.fields["value"],
       type = type,
       aggregate = aggregate,
+      argumentField = argumentField,
       bin = bin,
       timeUnit = timeUnit,
       sort = value.fields["sort"],

@@ -209,7 +209,10 @@ internal class DataPipeline(
     val fields = mutableListOf<String?>()
     val outputs = mutableListOf<String>()
 
-    for ((_, def) in view.spec.encoding) {
+    // Every field definition, not only the channels' own: a `tooltip` written as a **list** holds
+    // several, and one of them may be the only thing asking for an aggregate.
+    val everyDef = view.spec.encoding.values.flatMap { listOf(it) + it.siblings }
+    for (def in everyDef) {
       if (!def.isFieldDef) continue
       val aggregate = def.aggregate
       if (aggregate == null) {
@@ -221,7 +224,13 @@ internal class DataPipeline(
         }
       } else {
         ops += aggregate
-        fields += if (aggregate == "count") null else def.field
+        // An `argmin`/`argmax` is taken over the column it *names*, not the one being read.
+        fields +=
+          when {
+            aggregate == "count" -> null
+            def.argumentField != null -> def.argumentField
+            else -> def.field
+          }
         outputs += Fields.vgField(def, forAs = true)
       }
     }

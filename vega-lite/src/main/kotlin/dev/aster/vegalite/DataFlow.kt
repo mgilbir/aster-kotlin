@@ -111,7 +111,11 @@ internal sealed class DataNode {
       for ((index, below) in children.withIndex()) {
         if (below is ParseNode) continue
         val parse = below.children.singleOrNull() as? ParseNode ?: continue
-        if (below.producedFields().any { it in parse.parse.keys }) continue
+        // A parse cannot climb past a step that produces what it reads — and a *nested* parse
+        // reads the whole path, so a step producing `argmax_US_Gross` blocks a parse of
+        // `argmax_US_Gross['Production Budget']` even though the two names differ.
+        val roots = parse.parse.keys.map { Fields.splitAccessPath(it).first() }.toSet()
+        if (below.producedFields().any { it in parse.parse.keys || it in roots }) continue
         val above = parse.children.toList()
         parse.children.clear()
         below.children.clear()
@@ -607,7 +611,7 @@ internal class DataAssembler {
     }
   }
 
-  private fun walk(node: DataNode, incoming: MutableDataset) {
+  private fun walk(node: DataNode, incoming: MutableDataset, parent: DataNode? = null) {
     var dataset = incoming
 
     if (node is SourceNode && !node.isUrl) {
@@ -619,7 +623,10 @@ internal class DataAssembler {
 
     when (node) {
       is ParseNode ->
-        if (dataset.source == null) {
+        // `node.parent instanceof SourceNode`: a parse at the top of the flow is the *loader's*
+        // work and becomes `format.parse`; one below a transform is a formula, the columns by then
+        // being ones the flow itself computed, which the loader never saw.
+        if (dataset.source == null && parent is SourceNode) {
           val existing = dataset.format
           dataset.format = obj {
             putAll(existing)
@@ -657,7 +664,7 @@ internal class DataAssembler {
         if (node is OutputNode && (dataset.source == null || dataset.transform.isNotEmpty())) {
           datasets += dataset
         }
-      1 -> walk(node.children[0], dataset)
+      1 -> walk(node.children[0], dataset, node)
       else -> {
         if (dataset.name == null) dataset.name = "data_${datasetIndex++}"
         var source = dataset.name
@@ -667,7 +674,7 @@ internal class DataAssembler {
           source = dataset.source
         }
         for (child in node.children) {
-          walk(child, MutableDataset(name = null, source = source))
+          walk(child, MutableDataset(name = null, source = source), node)
         }
       }
     }
