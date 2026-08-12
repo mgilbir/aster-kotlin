@@ -359,7 +359,26 @@ internal object Marks {
    * `orient` is passed on only by an area, which uses it to decide which way it is filled;
    * everywhere else it has already done its work in choosing the position rules.
    */
+  /**
+   * `cornerRadiusEnd`: round the two corners at the *far* end of a bar and leave the near two.
+   *
+   * Vega has four corner properties and no notion of which end a bar grows from, so this is a
+   * Vega-Lite word that has to be resolved into two of them — and which two depends on the
+   * orientation, a vertical bar ending at the top and a horizontal one at the right.
+   */
+  private val CORNER_RADIUS_END =
+    mapOf(
+      "vertical" to listOf("cornerRadiusTopLeft", "cornerRadiusTopRight"),
+      "horizontal" to listOf("cornerRadiusTopRight", "cornerRadiusBottomRight"),
+    )
+
   private fun markDefProperties(view: UnitView): VegaValue.Obj = obj {
+    view.markDef.raw.fields["cornerRadiusEnd"]?.let { radius ->
+      val orient = view.markDef.orient ?: "vertical"
+      CORNER_RADIUS_END.getValue(orient).forEach { corner ->
+        put(corner, obj { put("value", radius) })
+      }
+    }
     // A mark that links somewhere shows the pointer, there being nothing else about it that looks
     // clickable — `baseEncodeEntry`'s `cursor` rule, which is about the *encoding* and not a style.
     if (view.spec.encoding["href"] != null && view.markDef.raw.fields["cursor"] == null) {
@@ -406,6 +425,11 @@ internal object Marks {
       "timeUnitBandPosition",
       "invalid",
       "tooltip",
+      // Resolved into two of Vega's four corner properties, which end depending on the
+      // orientation; and into an `offset` on the position, Vega having no `xOffset` on a mark.
+      "cornerRadiusEnd",
+      "xOffset",
+      "yOffset",
       // Consumed by the overlay normalizer before a mark is built. A `point: false` that reached
       // here would be emitted as an encode channel Vega has never heard of.
       "point",
@@ -1199,9 +1223,12 @@ internal object Marks {
         markSize != null && useVlSizeChannel -> obj { put("value", markSize) }
         offsetChannel != null || bandingType == "band" -> {
           // The width of one *nested* mark where there is an offset scale, and of the whole band
-          // where there is not.
+          // where there is not — times the fraction of it the mark asked for, if it asked.
           val band = offsetChannel ?: channel
-          val bandwidth = "bandwidth('${view.scale(band)}')"
+          val fraction = relativeBandSize(view, channel)
+          val bandwidth =
+            if (fraction == 1.0) "bandwidth('${view.scale(band)}')"
+            else "${Fields.expressionNumber(fraction)} * bandwidth('${view.scale(band)}')"
           signalRef(
             if (minBandSize != null) "max(${canonicalNumberString(minBandSize)}, $bandwidth)"
             else bandwidth
@@ -1312,8 +1339,15 @@ internal object Marks {
         def.bin is Binning.Bin &&
           (def.type == MeasureType.ORDINAL || def.type == MeasureType.NOMINAL)
       put("field", Fields.vgField(def, suffix = if (binnedLabels) "range" else null))
-      // A bar starts at the band's edge and fills it; a centred mark asks for the middle instead.
+      // A bar starts at the band's edge and fills it; a centred mark asks for the middle instead;
+      // and one filling a *fraction* of the band starts half of what is left over in, so the two
+      // gaps either side of it match — `(1 - band) / 2`.
+      val fraction = relativeBandSize(view, channel)
       if (scaleType == "band" && centred) put("band", num(0.5))
+      else if (scaleType == "band" && fraction != 1.0) put("band", num((1 - fraction) / 2))
+      // A `xOffset`/`yOffset` on the **mark** is a plain nudge, unlike the same name in an
+      // encoding: `positionOffset` reads it as a visual offset and adds it to the position.
+      view.markDef.raw.fields["${channel}Offset"]?.let { put("offset", it) }
       // A nested offset moves the mark within its band, which is what puts the second bar of a
       // group beside the first rather than on top of it.
       offsetRef(view, channel, centred)?.let { put("offset", it) }

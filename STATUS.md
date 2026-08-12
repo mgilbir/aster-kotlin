@@ -1698,6 +1698,17 @@ gap with a **constant** and nothing else, so the gap is filled with null, a `win
 the frame — which belongs to the window, not to the impute — and a formula writes the result back
 over the nulls.
 
+### Three mark properties that are words rather than values
+
+`cornerRadiusEnd` rounds the two corners at the *far* end of a bar, and Vega has four corner
+properties and no notion of which end a bar grows from — so it resolves into two of them, and which
+two depends on the orientation. `xOffset` and `yOffset` on a **mark** are plain nudges, unlike the
+same names in an encoding, and fold into the position's `offset`. All three had been passed straight
+through as though Vega knew them.
+
+Beside them, a relative band size on a *band* scale, which is two numbers rather than one: the mark
+fills `band * bandwidth(scale)` and starts `(1 - band) / 2` in, so the gaps either side of it match.
+
 ### Two runtime gaps this batch names but does not close
 
 `density`'s fixture is not in the corpus, and `trail`'s draws no legend. Both compile exactly as

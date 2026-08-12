@@ -213,7 +213,10 @@ internal class DataPipeline(
       view.spec.encoding.values.mapNotNull { def ->
         val timeUnit =
           def.timeUnit?.takeIf { Fields.isBinnedTimeUnit(it) } ?: return@mapNotNull null
-        val field = def.field ?: return@mapNotNull null
+        // The column's own name, unescaped: a formula reads and writes a *column*, where the
+        // escaping is for references Vega would otherwise read as a path.
+        val field =
+          def.field?.let { Fields.splitAccessPath(it).joinToString(".") } ?: return@mapNotNull null
         val part = Fields.timeUnitParts(timeUnit).lastOrNull() ?: return@mapNotNull null
         // A **universal** bucket is stepped in universal time: `utcOffset`, not `timeOffset`, or
         // the far edge lands an hour out wherever the viewer keeps daylight saving.
