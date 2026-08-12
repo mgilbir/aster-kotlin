@@ -497,7 +497,14 @@ public data class ScaleSpec(
   val exponent: NumberValue? = null,
   /** Symlog constant; defaults to 1. */
   val constant: NumberValue? = null,
-  /** Colour interpolation space for a colour range, e.g. `"rgb"` or `"lab"`. */
+  /**
+   * Colour interpolation space for a colour range: `rgb`, `lab`, `hcl`, `hsl`, `cubehelix`, and the
+   * `-long` variant of the last three.
+   *
+   * Vega also accepts the object form `{"type": "rgb", "gamma": 2.2}`, whose type is read here and
+   * whose gamma is reported: only `rgb` has one in d3, and it changes the ramp's midpoint rather
+   * than its ends.
+   */
   val interpolate: String? = null,
   /** Explicit bin boundaries; see [BinsSpec]. */
   val bins: BinsSpec? = null,

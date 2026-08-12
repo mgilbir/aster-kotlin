@@ -21,7 +21,7 @@ end to end — expressions, signals, 33 of upstream's 40 data transforms, every 
 and an event handler that recompiles the chart — and are verified against upstream Vega by
 differential tests.
 
-One hundred and twenty-nine differential fixtures pass, all matching upstream exactly on every mark and
+One hundred and thirty differential fixtures pass, all matching upstream exactly on every mark and
 scale output:
 
 | Fixture | Marks | Covers |
@@ -201,7 +201,7 @@ substantive compatibility items:
 | 6. View and Compose APIs | Yes |
 | 7. SVG, PNG, PDF export | Yes |
 | 8. TalkBack can describe and navigate | Partial — virtual nodes are tested by instrumentation, not with TalkBack itself |
-| 9. At least 100 compatibility fixtures pass | **Yes** — 129 |
+| 9. At least 100 compatibility fixtures pass | **Yes** — 130 |
 | 10. Core runtime has no Android dependency | Yes |
 | 11. Renders without WebView | Yes |
 | 12. Build and test loop runs from the terminal | Yes |
@@ -538,7 +538,7 @@ each example a deadline.
 
 ## Known failing fixtures
 
-None. One hundred and twenty-nine fixtures exist and all of them pass — and that sentence became worth
+None. One hundred and thirty fixtures exist and all of them pass — and that sentence became worth
 something only once the gate could no longer skip itself, below.
 
 **The gate could report success without running.** `FixtureDifferentialTest` reads the fixtures and
@@ -1637,6 +1637,35 @@ empty array short-circuits with a length of zero and an unresolvable signal — 
 publishes until a reader touches the chart — falls through to the ordinary domain.
 
 That leaves one scale property reported out of upstream's 23: `domainImplicit`.
+
+## Six colour spaces, and the `NaN` that holds a hue still
+
+`hcl`, `hsl` and `cubehelix` — and the `-long` variant of each — fell back to RGB with a diagnostic.
+All six are ported now, pinned to `d3-interpolate`'s own output in `ColorInterpolationTest` and proved
+by a fixture that draws the same two ends through all eight spaces: eight visibly different ramps, and
+eight sets of colours that match upstream's exactly.
+
+Three details are upstream's and each is invisible from the ends of a ramp, which is the only place a
+casual test would look:
+
+- **A hue is a circle, so there are two ways round it.** `d - 360 * round(d / 360)` is d3's short-arc
+  rule, and it is not a modulo: a difference of exactly 180 maps to 180 rather than to −180, so a pair
+  of complementary colours turns the same way whichever was written first. The `-long` variants skip
+  the correction, which is the whole difference between a ramp that stays in one colour family and one
+  that visits the rest of the spectrum on the way. Viridis's own two ends go through magenta under
+  `hcl` and through blue under `hcl-long`.
+- **A grey has no hue — `NaN`, not zero.** An angle at the origin means nothing, and d3 reads
+  `NaN - x` as "no difference" and so holds the channel constant *at the end that has a value*. A ramp
+  from grey to red therefore keeps red's hue throughout and only moves its chroma; averaging the zero
+  a naive port would put there drags the whole ramp through red. Pure black and white have a `NaN`
+  saturation too, where even the radius is undefined.
+- **Cubehelix's `-120` is not a normalisation.** Green defined the helix with its zero at blue, and
+  dropping the offset turns every ramp a third of the way round the circle.
+
+The object form `{"type": "rgb", "gamma": 2.2}` is read for its type, and its gamma is now *reported*
+rather than dropped: only `interpolateRgb` has one in d3, and it bends the ramp's middle without moving
+either end — so a chart that asked for it and got the plain ramp would look composed and be wrong
+exactly where nobody checks.
 
 ## Performance observations
 

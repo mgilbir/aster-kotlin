@@ -1189,7 +1189,7 @@ public class SpecParser {
       base = obj.numberOrSignal("base", "$path.base"),
       exponent = obj.numberOrSignal("exponent", "$path.exponent"),
       constant = obj.numberOrSignal("constant", "$path.constant"),
-      interpolate = obj.fields["interpolate"]?.takeIf { it is VegaValue.Str }?.asString(),
+      interpolate = interpolationSpace(obj.fields["interpolate"], "$path.interpolate"),
       bins = parseBins(obj.fields["bins"], "$path.bins"),
     )
   }
@@ -1238,6 +1238,31 @@ public class SpecParser {
         )
         false
       }
+    }
+
+  /**
+   * A colour interpolation space, written as a name or as `{"type": ..., "gamma": ...}`.
+   *
+   * The object form is Vega's and its `gamma` is reported rather than silently dropped: in d3 only
+   * `interpolateRgb` has one, and it bends the ramp's middle without moving either end — so a chart
+   * that asked for it and got the plain ramp would look composed and be wrong in the middle.
+   */
+  private fun interpolationSpace(value: VegaValue?, path: String): String? =
+    when (value) {
+      null -> null
+      is VegaValue.Str -> value.value.takeIf { it.isNotEmpty() }
+      is VegaValue.Obj -> {
+        if (value.fields["gamma"] != null) {
+          diagnostics.warn(
+            DiagnosticCodes.PARSE_UNKNOWN_PROPERTY,
+            "A colour interpolation gamma is not implemented; the ramp is interpolated without " +
+              "it, so its ends are right and its middle is not; 'gamma' was ignored",
+            jsonPath = "$path.gamma",
+          )
+        }
+        value.fields["type"]?.asString()?.takeIf { it.isNotEmpty() }
+      }
+      else -> null
     }
 
   private fun parseDomain(scale: VegaValue.Obj, path: String): DomainSpec {
