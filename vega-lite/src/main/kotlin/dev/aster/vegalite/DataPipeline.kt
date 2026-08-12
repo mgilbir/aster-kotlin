@@ -59,7 +59,12 @@ internal class DataPipeline(
   private fun needsRawTable(): Boolean =
     view.scaledChannels().any { (channel, def) ->
       val type = view.scaleType(channel) ?: return@any false
-      Scales.hasDiscreteDomain(type) &&
+      // A sort the *specification* stated may read a column the aggregation removes, and that is
+      // what the pre-aggregation table is for. One this compiler derived — a binned domain
+      // ordered by its own bin's start — is built from columns the grouping keeps, so it reads
+      // the same table everything else does.
+      def.sort != null &&
+        Scales.hasDiscreteDomain(type) &&
         Scales.sortsFromRawTable(Scales.settledSort(view, channel, def, type))
     }
 
@@ -179,9 +184,19 @@ internal class DataPipeline(
           signal = view.prefixed("${key}_bins"),
           extentSignal = view.prefixed("${key}_extent"),
           extent = bin.params.fields["extent"],
-          // A binned field on a discrete scale needs its range as text, because that is what the
-          // axis labels and the legend entries read.
-          rangeFormula = null,
+          // `binRequiresRange`: a binned field the specification forced onto a **discrete** scale
+          // needs its range written out as text, because that text is what the axis labels and the
+          // legend entries then read — there is no numeric axis left to derive them from.
+          rangeFormula =
+            if (def.type == MeasureType.ORDINAL || def.type == MeasureType.NOMINAL) {
+              val start = Fields.datumAccess(def)
+              val end = Fields.datumAccess(def, suffix = "end")
+              val format = (def.format as? VegaValue.Str)?.value ?: view.config.numberFormat ?: ""
+              "!isValid($start) || !isFinite(+$start) ? \"null\" : " +
+                "format($start, \"$format\") + \" – \" + format($end, \"$format\")"
+            } else {
+              null
+            },
         )
       }
     return if (bins.isEmpty()) null else BinNode(bins.distinctBy { it.signal })
@@ -249,6 +264,14 @@ internal class DataPipeline(
         // aggregation intact — the scale and the axis both read the end as well as the start.
         if (hasBandEnd(def)) {
           dimensions += Fields.vgField(def, suffix = "end")
+        }
+        // A binned field on a **discrete** scale groups by its label as well: the label is what
+        // the axis lists, so it has to survive the aggregation alongside the two edges.
+        if (
+          def.bin is Binning.Bin &&
+            (def.type == MeasureType.ORDINAL || def.type == MeasureType.NOMINAL)
+        ) {
+          dimensions += Fields.vgField(def, suffix = "range", forAs = true)
         }
       } else {
         ops += aggregate

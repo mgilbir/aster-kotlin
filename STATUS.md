@@ -1612,6 +1612,24 @@ Beside it, a step signal is named after the **scale** rather than the channel: i
 concatenation each plot counts its own categories, so a row of band charts reads `concat_1_x_step`
 rather than every plot taking the first one's width.
 
+### A binned field forced onto a discrete scale is a domain of labels
+
+`binRequiresRange`: where a specification puts a `bin` on an *ordinal* channel, the axis has no
+numbers left to derive its labels from, so the bin writes them out — `"5.0 – 6.0"` into a `_range`
+column. Four things then read that column rather than the bin's start: the scale's domain, the
+mark's position, the aggregate's grouping, and — because labels do not sort themselves into numeric
+order, `"1.0 – 2.0"` coming before `"9.0 – 10.0"` alphabetically — the domain's sort, which orders
+them by the bin's own start.
+
+That sort also settled a question about the pre-aggregation table. It is wanted where the
+*specification* stated a sort that reads a column the aggregation removes; a sort this compiler
+*derived* is built from columns the grouping keeps, and reads the same table everything else does.
+
+An **arc** takes a band on its polar positions for the same reason a bar takes one on its Cartesian
+ones: a slice spans an angle, it does not sit at one. And a ranged position whose far end is a
+**datum** contributes that constant to the domain — an area drawn down to zero has to cover zero
+whether or not any row holds it.
+
 ### Two runtime gaps this batch names but does not close
 
 `density`'s fixture is not in the corpus, and `trail`'s draws no legend. Both compile exactly as

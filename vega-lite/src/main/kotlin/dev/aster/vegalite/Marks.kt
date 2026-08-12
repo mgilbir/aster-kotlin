@@ -949,7 +949,12 @@ internal object Marks {
     }
     return obj {
       put("scale", scaleName(view, mainChannel(channel)))
-      put("field", Fields.vgField(def))
+      // A binned field on a discrete scale is placed by its **label**: that is what the domain
+      // lists, so the bin's start would name a category the scale has never heard of.
+      val binnedLabels =
+        def.bin is Binning.Bin &&
+          (def.type == MeasureType.ORDINAL || def.type == MeasureType.NOMINAL)
+      put("field", Fields.vgField(def, suffix = if (binnedLabels) "range" else null))
       // `positionOffset` runs for every position, not only a rect's: a label over a grouped bar
       // has to move into the same lane the bar did, or it sits over the middle of the group.
       val offset = offsetRef(view, mainChannel(channel), centred = true)
@@ -1254,7 +1259,12 @@ internal object Marks {
     if (!def.isFieldDef && def.datum == null) return midPoint(view, channel, def, scaleType)
     return obj {
       put("scale", scaleName(view, channel))
-      put("field", Fields.vgField(def))
+      // A binned field on a discrete scale is placed by its **label**, that being what the domain
+      // lists; the bin's start would name a category the scale has never heard of.
+      val binnedLabels =
+        def.bin is Binning.Bin &&
+          (def.type == MeasureType.ORDINAL || def.type == MeasureType.NOMINAL)
+      put("field", Fields.vgField(def, suffix = if (binnedLabels) "range" else null))
       // A bar starts at the band's edge and fills it; a centred mark asks for the middle instead.
       if (scaleType == "band" && centred) put("band", num(0.5))
       // A nested offset moves the mark within its band, which is what puts the second bar of a

@@ -95,6 +95,9 @@ internal object Scales {
           // which is why a scatter plot's categories sit on the tick and a bar spans between them.
           if (mark in setOf("rect", "bar", "image", "rule", "tick")) return "band"
         }
+        // An **arc** occupies a band on its polar positions for the same reason a bar does on its
+        // Cartesian ones: a slice spans an angle, it does not sit at one.
+        if (mark == "arc" && channel in setOf("theta", "radius")) return "band"
         "point"
       }
       MeasureType.TEMPORAL ->
@@ -174,7 +177,8 @@ internal object Scales {
 
     // A ranged position contributes *both* of its fields: the scale has to cover the whole span,
     // not the ends the first channel happens to name.
-    val secondary = secondaryChannel(channel)?.let { view.spec.fieldDef(it) }
+    val secondaryChannel = secondaryChannel(channel)
+    val secondary = secondaryChannel?.let { view.spec.fieldDef(it) }
     if (secondary != null) {
       return listOf(
         obj {
@@ -185,6 +189,18 @@ internal object Scales {
           put("data", dataName)
           put("field", Fields.vgField(secondary))
         },
+      )
+    }
+    // A ranged position whose far end is a **datum** contributes that constant, not a column: an
+    // area drawn down to zero has to cover zero whether or not any row holds it.
+    val secondaryDatum = secondaryChannel?.let { view.spec.encoding[it] }?.datum
+    if (secondaryDatum != null) {
+      return listOf(
+        obj {
+          put("data", dataName)
+          put("field", Fields.vgField(def))
+        },
+        arr(listOf(secondaryDatum)),
       )
     }
 
@@ -210,10 +226,14 @@ internal object Scales {
     // Sorting by an aggregate of some *other* field has to be computed independently of the
     // aggregation being drawn, so upstream reads the pre-aggregation table for it.
     val source = if (sortsFromRawTable(sort)) view.rawData else dataName
+    // A binned field forced onto a discrete scale is a domain of *labels*, not of bin starts: the
+    // `_range` column the bin wrote is what the axis reads, and it is what has to be listed.
+    val binnedLabels =
+      def.bin is Binning.Bin && (def.type == MeasureType.ORDINAL || def.type == MeasureType.NOMINAL)
     return listOf(
       obj {
         put("data", source)
-        put("field", Fields.vgField(def))
+        put("field", Fields.vgField(def, suffix = if (binnedLabels) "range" else null))
         put("sort", sort)
       }
     )
@@ -250,6 +270,20 @@ internal object Scales {
     override: VegaValue? = null,
   ): VegaValue? {
     if (!hasDiscreteDomain(type)) return null
+    // A binned field on a discrete scale is a domain of *labels*, and labels do not sort
+    // themselves into numeric order — `"1.0 – 2.0"` sorts before `"9.0 – 10.0"` alphabetically.
+    // The bin's own start is what orders them.
+    if (
+      override == null &&
+        def.sort == null &&
+        def.bin is Binning.Bin &&
+        (def.type == MeasureType.ORDINAL || def.type == MeasureType.NOMINAL)
+    ) {
+      return obj {
+        put("field", Fields.vgField(def))
+        put("op", "min")
+      }
+    }
     return when (val sort = override ?: def.sort) {
       null -> bool(true)
       is VegaValue.Str ->
