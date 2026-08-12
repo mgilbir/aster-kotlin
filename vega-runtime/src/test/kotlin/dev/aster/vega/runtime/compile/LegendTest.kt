@@ -496,9 +496,11 @@ class LegendTest {
         )
       )
     val messages = compiled.diagnostics.map { it.message }
-    // `gradientOpacity` came off this list: it fades the whole ramp, outline included, because
-    // upstream puts it on the item rather than on either paint.
-    for (name in listOf("symbolLimit", "titleAnchor")) {
+    // `gradientOpacity` came off this list, then `symbolLimit`. The first fades the whole ramp,
+    // outline included, because upstream puts it on the item rather than on either paint; the
+    // second
+    // keeps `limit - 1` entries and spends the last row saying how many it left out.
+    for (name in listOf("titleAnchor")) {
       assertTrue(messages.any { it.contains("'$name'") }, "$name not reported in $messages")
     }
   }

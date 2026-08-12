@@ -21,7 +21,7 @@ end to end — expressions, signals, 33 of upstream's 40 data transforms, every 
 and an event handler that recompiles the chart — and are verified against upstream Vega by
 differential tests.
 
-One hundred and twenty-six differential fixtures pass, all matching upstream exactly on every mark and
+One hundred and twenty-seven differential fixtures pass, all matching upstream exactly on every mark and
 scale output:
 
 | Fixture | Marks | Covers |
@@ -201,7 +201,7 @@ substantive compatibility items:
 | 6. View and Compose APIs | Yes |
 | 7. SVG, PNG, PDF export | Yes |
 | 8. TalkBack can describe and navigate | Partial — virtual nodes are tested by instrumentation, not with TalkBack itself |
-| 9. At least 100 compatibility fixtures pass | **Yes** — 126 |
+| 9. At least 100 compatibility fixtures pass | **Yes** — 127 |
 | 10. Core runtime has no Android dependency | Yes |
 | 11. Renders without WebView | Yes |
 | 12. Build and test loop runs from the terminal | Yes |
@@ -538,7 +538,7 @@ each example a deadline.
 
 ## Known failing fixtures
 
-None. One hundred and twenty-six fixtures exist and all of them pass — and that sentence became worth
+None. One hundred and twenty-seven fixtures exist and all of them pass — and that sentence became worth
 something only once the gate could no longer skip itself, below.
 
 **The gate could report success without running.** `FixtureDifferentialTest` reads the fixtures and
@@ -1553,6 +1553,17 @@ ten labels, five, two and a log axis's own progression — the same four sets up
 
 One axis property is now reported out of upstream's 79: `labelBound`, which needs the overlap remover
 to take a bounding rectangle.
+
+## `symbolLimit` is not a truncation
+
+A legend told to show at most five entries shows **four**, and spends the fifth row on `…7 entries`.
+Upstream keeps `limit - 1` and gives the last slot to a summary of what it left out — so the number in
+that row counts the entries *not shown*, and the swatch beside it takes the size of the next value,
+which means a size legend's summary row is drawn at the size of the first thing it stands for.
+
+Worth having got from the source rather than from the name. A plain `take(limit)` would have looked
+right in a screenshot and been wrong by one entry and one row, and the fixture's reference reads
+`['alpha', 'beta', 'gamma', '…7 entries']` for a limit of four over ten values.
 
 ## Performance observations
 

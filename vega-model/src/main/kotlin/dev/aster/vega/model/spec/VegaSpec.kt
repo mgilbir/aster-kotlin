@@ -1033,6 +1033,13 @@ public data class LegendSpec(
   val gradientStrokeWidth: NumberValue? = null,
   val gradientOpacity: NumberValue? = null,
   /**
+   * The most entries a symbol legend shows, `symbolLimit`.
+   *
+   * Upstream keeps `limit - 1` and spends the last row on a summary of what it left out, so this is
+   * not a plain truncation: a legend that drops entries says how many.
+   */
+  val symbolLimit: NumberValue? = null,
+  /**
    * As on an axis: `aria: false` hides the legend from a screen reader, `description` renames it.
    */
   val aria: Boolean = true,

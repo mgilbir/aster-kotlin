@@ -314,7 +314,7 @@ internal class LegendBuilder(
     scale: VegaScale,
     scaleName: String,
   ): List<SceneNode> {
-    val entries = entryValues(spec, scale, scaleName)
+    val entries = limited(spec, entryValues(spec, scale, scaleName), scaleName)
     if (entries.isEmpty()) return emptyList()
 
     val vertical = isVertical(spec)
@@ -891,6 +891,23 @@ internal class LegendBuilder(
     val specifier = spec.format ?: return null
     val resolved = Ticks.spanSpecifier(specifier, low, high, count)
     return { value -> NumberFormatSubset.format(value, resolved) }
+  }
+
+  /**
+   * `symbolLimit`: the most entries a symbol legend will show.
+   *
+   * Upstream keeps `limit - 1` of them and spends the last slot on a summary — `…12 entries` — so a
+   * limit of 5 shows four swatches and a fifth row saying how many were left out. The count in that
+   * row is of the entries **not shown**, and the swatch beside it takes the *next* value's own
+   * size, so a size legend's summary row is drawn at the size of the first thing it stands for. A
+   * limit that the entries already fit inside does nothing at all.
+   */
+  private fun limited(spec: LegendSpec, entries: List<Entry>, scaleName: String): List<Entry> {
+    val limit = numbers.resolveInt(spec.symbolLimit, scaleName) ?: return entries
+    if (limit <= 0 || entries.size <= limit) return entries
+    val kept = entries.take(limit - 1)
+    val remainder = entries.size - kept.size
+    return kept + Entry(entries[kept.size].value, "\u2026$remainder entries")
   }
 
   /** Numeric entries, with the legend's own format applied when it named one. */

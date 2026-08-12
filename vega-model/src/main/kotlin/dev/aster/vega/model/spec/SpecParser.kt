@@ -202,6 +202,7 @@ private val SCALE_UNSUPPORTED =
 /** Legend properties this engine reads. */
 private val LEGEND_CONSUMED =
   setOf(
+    "symbolLimit",
     "aria",
     "description",
     "symbolDashOffset",
@@ -1888,6 +1889,7 @@ public class SpecParser {
         gradientStrokeWidth =
           obj.numberOrSignal("gradientStrokeWidth", "$path.gradientStrokeWidth"),
         gradientOpacity = obj.numberOrSignal("gradientOpacity", "$path.gradientOpacity"),
+        symbolLimit = obj.numberOrSignal("symbolLimit", "$path.symbolLimit"),
         aria = obj.fields["aria"]?.asBoolean() ?: true,
         description = obj.fields["description"]?.asString()?.takeIf { it.isNotBlank() },
         // From the configuration alone; see [LegendSpec.fillColor] for why the legend's own value
@@ -1943,7 +1945,6 @@ public class SpecParser {
       LEGEND_CONSUMED,
       mapOf(
         "formatType" to "Legend label format types are not implemented",
-        "symbolLimit" to "Legend entry limits are not implemented; every entry is shown",
         "titleAnchor" to "Legend title anchoring is not implemented",
       ),
     )
