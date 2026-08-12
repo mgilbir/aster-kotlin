@@ -1538,6 +1538,26 @@ Beside it, a `groupby` is written whenever the specification **stated** one, emp
 list and silence are two different statements and it is the statement that is carried across. A
 boxplot over one ungrouped column states an empty one.
 
+### A column of plots is one width and a stack of heights
+
+Nine files turned on one sentence of `parseConcatLayoutSize`: a nested concatenation contributes
+upward only the dimension it shares **as a whole**. A column of plots has one width and its
+`childHeight` is one cell's, not the column's — so a *row* of columns must not merge on it, and this
+compiler was merging on it and handing the whole chart a height of one cell. The plain name is what
+says which of the two a level settled: `width`/`height` for the dimension the concatenation shares,
+`childWidth`/`childHeight` for the one each cell keeps.
+
+### January is month one to a reader and month zero to Vega
+
+`normalizeMonth` and `normalizeQuarter` shift a **number**, and only a number: a month written as
+`1` is the reader's January and `datetime()`'s month zero, where a month named `"jan"` has already
+been resolved to the index Vega wants and shifting it again reads January as December. Passing the
+number through unshifted put every dated comparison a month late.
+
+Beside it, a **binned** time unit in a predicate needs no bucketing — the column already holds the
+bucket — so only the cast to a number is left, and the rebuilt-from-parts expression this compiler
+was writing compared the bucket against a bucket of the bucket.
+
 ### Two runtime gaps this batch names but does not close
 
 `density`'s fixture is not in the corpus, and `trail`'s draws no legend. Both compile exactly as

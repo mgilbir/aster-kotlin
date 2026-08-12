@@ -511,9 +511,15 @@ internal class Transforms(
     val timeUnit = predicate.string("timeUnit")
     // A bucketed comparison is between *instants*, so the field is bucketed and cast to a number
     // on the way in — which is what lets `===` and `indexof` compare dates at all.
+    // A bucketed comparison is between *instants*, so the field is bucketed and cast to a number
+    // on the way in. A **binned** unit needs no bucketing — the column already holds the bucket —
+    // so only the cast is left.
     val fieldExpr =
-      if (timeUnit != null) "time(${timeUnitExpression(timeUnit, field)})"
-      else "datum[${quoted(field)}]"
+      when {
+        timeUnit == null -> "datum[${quoted(field)}]"
+        Fields.isBinnedTimeUnit(timeUnit) -> "time(datum[${quoted(field)}])"
+        else -> "time(${timeUnitExpression(timeUnit, field)})"
+      }
 
     predicate.fields["equal"]?.let {
       return "$fieldExpr===${literal(it, timeUnit)}"
@@ -651,8 +657,24 @@ internal class Transforms(
         is VegaValue.Str -> monthOrDay(key, part.value)
         else -> null
       }
+
+    /**
+     * The same, one off — `normalizeMonth` and `normalizeQuarter`.
+     *
+     * A specification writes a **1-based** month and quarter where `datetime()` counts months from
+     * zero, so a number is shifted. A *name* is not: `monthOrDay` has already resolved `"may"` to
+     * the index Vega wants, and shifting it again reads May as April.
+     */
+    fun oneBased(key: String): String? =
+      when (val part = value.fields[key]) {
+        is VegaValue.Num -> Fields.expressionNumber(part.value - 1)
+        else -> number(key)
+      }
     val year = number("year") ?: "2012"
-    val month = number("month") ?: number("quarter")?.let { "$it*3" } ?: "0"
+    // `normalizeMonth`/`normalizeQuarter`: a specification writes a **1-based** month and quarter,
+    // where `datetime()` counts months from zero. Passing the number through gave every dated
+    // comparison a month too late — January read as February.
+    val month = oneBased("month") ?: oneBased("quarter")?.let { "$it*3" } ?: "0"
     val date = number("date") ?: number("day")?.let { "$it+1" } ?: "1"
     val rest = listOf("hours", "minutes", "seconds", "milliseconds").map { number(it) ?: "0" }
     return (listOf(year, month, date) + rest).joinToString(", ")

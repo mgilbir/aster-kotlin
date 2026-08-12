@@ -401,7 +401,15 @@ private class Compilation(
           node.plot.spec,
           channel,
         )
-      is Node.Nest -> nestSizes[node]?.get(channel)
+      // A nested concatenation contributes upward only the dimension it shares **as a whole**. A
+      // column of plots is one width and a stack of heights; its `childHeight` is one cell's, not
+      // the column's, so a row of columns must not merge on it. The plain name is what says which
+      // of the two a level settled.
+      is Node.Nest ->
+        nestSizes[node]?.get(channel)?.takeIf {
+          val plain = if (channel == "x") "width" else "height"
+          node.owns[channel]?.removePrefix(node.prefix()) == plain
+        }
     }
 
   /** What each concatenation merged its children's sizes into, by channel. */
