@@ -1112,6 +1112,13 @@ public class ScaleResolver(
    * falling back to `[0, 1]` produces a chart that looks plausible and is not.
    */
   private fun signalDomain(domain: DomainSpec.FromSignal, scaleName: String): List<VegaValue>? {
+    // `{data: …}` around a single value is how a domain names one *datum* rather than a list —
+    // Vega-Lite writes a dated bound that way, `{data: datetime(2012, 0, 1, 0, 0, 0, 0)}`, so the
+    // instant is not mistaken for a two-element domain. Unwrapped, it is one end of the domain.
+    val wrapped = numbers.resolveValue(domain.expression, scaleName) as? VegaValue.Obj
+    wrapped?.fields?.get("data")?.let {
+      return listOf(it)
+    }
     val values = numbers.resolveList(domain.expression, scaleName)
     if (values.isNullOrEmpty()) {
       diagnostics.error(

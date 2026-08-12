@@ -1,5 +1,6 @@
 package dev.aster.vegalite
 
+import dev.aster.vega.model.DiagnosticCollector
 import dev.aster.vega.model.VegaValue
 import dev.aster.vega.model.canonicalNumberString
 
@@ -126,8 +127,21 @@ internal object Scales {
     type: String,
     dataName: String,
   ): List<VegaValue> {
-    def.scale?.fields?.get("domain")?.let {
-      return listOf(it)
+    def.scale?.fields?.get("domain")?.let { stated ->
+      // A domain written as **dates** cannot be handed to Vega as objects: each end becomes the
+      // expression that builds the instant, wrapped in `{data: …}` so Vega reads it as a datum of
+      // the domain rather than as a signal to be scaled.
+      val values = (stated as? VegaValue.Arr)?.values
+      if (values != null && values.any { it is VegaValue.Obj && looksLikeADateTime(it) }) {
+        return values.map { value ->
+          if (value is VegaValue.Obj && looksLikeADateTime(value)) {
+            signalRef("{data: ${Transforms(DiagnosticCollector()).dateTimeExpression(value)}}")
+          } else {
+            value
+          }
+        }
+      }
+      return listOf(stated)
     }
 
     val stack = view.stack
@@ -689,6 +703,24 @@ internal object Scales {
       else -> "maybe"
     }
   }
+
+  /** The parts a `DateTime` is written from, which is what tells one from an ordinary object. */
+  private val DATE_TIME_PARTS =
+    setOf(
+      "year",
+      "quarter",
+      "month",
+      "date",
+      "day",
+      "hours",
+      "minutes",
+      "seconds",
+      "milliseconds",
+      "utc",
+    )
+
+  private fun looksLikeADateTime(value: VegaValue.Obj): Boolean =
+    value.fields.isNotEmpty() && value.fields.keys.all { it in DATE_TIME_PARTS }
 
   /** `zero()` in `properties.ts`: whether the baseline is forced into the domain. */
   private fun zero(

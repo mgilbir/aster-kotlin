@@ -195,7 +195,25 @@ internal object Marks {
     return listOf(view.spec.mark) + named
   }
 
+  /**
+   * `getSort`: the order a mark's items are drawn in.
+   *
+   * An **`order` channel** names it outright, and then the sort is by that column rather than by
+   * the position — which is the whole of what makes a *connected* scatter plot connected, its line
+   * running through the years rather than left to right. A stacked mark is the exception: there
+   * `order` says how the segments stack, not how the path runs. Failing both, a path is drawn along
+   * its own dimension, or nothing would keep it from doubling back.
+   */
   private fun sortOrder(view: UnitView): VegaValue? {
+    val order = view.spec.encoding["order"]
+    if (order != null && order.isValueDef && order.value == VegaValue.Null) return null
+    val ordering = listOfNotNull(order) + order?.siblings.orEmpty()
+    if (ordering.any { it.isFieldDef } && view.stack == null) {
+      return obj {
+        put("field", strings(ordering.map { Fields.datumAccess(it) }))
+        put("order", strings(ordering.map { (it.sort as? VegaValue.Str)?.value ?: "ascending" }))
+      }
+    }
     if (view.spec.mark !in PATH_MARKS) return null
     val orient = view.markDef.orient
     val dimension = if (orient == "horizontal") "y" else "x"

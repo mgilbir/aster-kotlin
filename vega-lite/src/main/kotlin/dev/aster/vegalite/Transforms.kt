@@ -650,6 +650,11 @@ internal class Transforms(
    * month to zero *or* to a quarter times three, and a date to one *or* to a day plus one, which is
    * the arithmetic that makes a bare `{"day": "mon"}` land on a Monday.
    */
+  /** `dateTimeToExpr`: the instant a `DateTime` object names, as an expression. */
+  fun dateTimeExpression(value: VegaValue.Obj): String =
+    if (value.fields["utc"] == VegaValue.Bool(true)) "utc(${dateTimeArguments(value)})"
+    else "datetime(${dateTimeArguments(value)})"
+
   private fun dateTimeArguments(value: VegaValue.Obj): String {
     fun number(key: String): String? =
       when (val part = value.fields[key]) {

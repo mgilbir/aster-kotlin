@@ -1581,6 +1581,25 @@ as a bare number in the configuration, which is how a theme narrows every bucket
 an offset may name a **datum** rather than a field, which is how a repeated layer puts each copy in
 a lane of its own — there is no column to read, only the value to look up.
 
+### An `order` channel is what makes a connected scatter plot connected
+
+`getSort`: an `order` channel names the drawing order outright, and the mark is then sorted by that
+column rather than by its position — a line running through the years rather than left to right,
+which is the whole of what a connected scatter plot is. A **stacked** mark is the exception, where
+`order` says how the segments stack; and a path with neither is drawn along its own dimension, or
+nothing would keep it from doubling back.
+
+Beside it, two rules about what groups a stack. `getGroupbyFields` pairs a dimension with its far
+edge only where the dimension is **binned** — a bucketed instant's `_end` is a column the time unit
+wrote and the stack has no use for it — and a binned dimension under an *imputation* groups by the
+bin's midpoint instead, two fields not being imputable at once.
+
+### A domain written as dates
+
+A `DateTime` in a scale's domain cannot be handed to Vega as an object: each end becomes the
+expression that builds the instant, wrapped in `{data: …}` so Vega reads it as one *datum* of the
+domain rather than as a list to be spread. The runtime learned to unwrap it at the other end.
+
 ### Two runtime gaps this batch names but does not close
 
 `density`'s fixture is not in the corpus, and `trail`'s draws no legend. Both compile exactly as

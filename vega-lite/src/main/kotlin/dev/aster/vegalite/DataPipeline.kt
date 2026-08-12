@@ -349,17 +349,19 @@ internal class DataPipeline(
     val dimensions =
       stack.groupbyChannels.flatMap { channel ->
         val dimension = view.spec.fieldDef(channel) ?: return@flatMap emptyList()
-        val binnedUnit = dimension.timeUnit?.let { Fields.isBinnedTimeUnit(it) } == true
-        // A column that arrived already bucketed groups by its start alone: its far edge is a
-        // column a formula wrote, not a second name for the same one.
-        if (!binnedUnit && (dimension.bin != null || hasBandEnd(dimension))) {
-          listOf(
-            Fields.vgField(dimension),
-            if (dimension.bin is Binning.Bin) Fields.vgField(dimension, suffix = "end")
-            else Fields.vgField(dimension),
-          )
-        } else {
-          listOf(Fields.vgField(dimension))
+        // `getGroupbyFields`: only a **binned** dimension groups by both of its edges, so two bins
+        // that happen to start at the same place are still two columns. A bucketed *instant* does
+        // not — its `_end` is a column the time unit wrote and the stack has no use for it — and a
+        // binned dimension under an **imputation** groups by the bin's *midpoint* instead, two
+        // fields not being imputable at once.
+        when {
+          dimension.bin == null -> listOf(Fields.vgField(dimension))
+          stack.impute -> listOf(Fields.vgField(dimension, suffix = "mid"))
+          dimension.bin is Binning.Bin ->
+            listOf(Fields.vgField(dimension), Fields.vgField(dimension, suffix = "end"))
+          // A column that arrived already binned has no `_end` of its own, and upstream's
+          // `vgField(def, {binSuffix: 'end'})` gives the field back unchanged.
+          else -> listOf(Fields.vgField(dimension), Fields.vgField(dimension))
         }
       }
     return StackNode(
