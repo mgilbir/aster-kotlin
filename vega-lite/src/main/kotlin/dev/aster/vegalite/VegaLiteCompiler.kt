@@ -164,7 +164,12 @@ private class Compilation(
     // before it recurses, and within a level `width`, `height`, `childWidth`, `childHeight`. Then
     // the parameters, which is `assembleTopLevelModel`'s order — a parameter may read a size and
     // not the other way about.
-    val sizeSignals = sizeSignalsFor(plotTree) + Params.signals(spec, diagnostics)
+    // One signal per *name*: a level of the tree contributes its own merged sizes and its children
+    // contribute theirs, and a size two levels agree on is named once by each. Vega reads the
+    // first and warns about the rest, so the duplicates are not harmless — they are a chart that
+    // logs on every render.
+    val sizeSignals =
+      sizeSignalsFor(plotTree).distinctBy { it.string("name") } + Params.signals(spec, diagnostics)
     val root = plots.first().size!!
     // The facets' own values, which the layout counts and the headers title themselves from — and,
     // for a wrapped facet, only along the directions a shared axis was actually drawn in.
@@ -296,7 +301,13 @@ private class Compilation(
   private sealed interface Node {
     class Leaf(val plot: Plot) : Node
 
-    class Nest(val name: String, val concat: Concat, val children: List<Node>) : Node {
+    class Nest(
+      val name: String,
+      val concat: Concat,
+      val children: List<Node>,
+      /** The specification this level was built from, which may carry a title of its own. */
+      val spec: VegaValue.Obj = VegaValue.EmptyObject,
+    ) : Node {
       /** The size signal this level merged its children into, per channel, where it merged one. */
       val owns: MutableMap<String, String> = mutableMapOf()
     }
@@ -325,7 +336,7 @@ private class Compilation(
             declared ?: listOf(name, "concat_$index").filter { it.isNotEmpty() }.joinToString("_")
           build(here, entry) ?: return null
         }
-      return Node.Nest(name, nested, children)
+      return Node.Nest(name, nested, children, child)
     }
 
     plotTree = build("", spec) ?: return null
@@ -522,6 +533,9 @@ private class Compilation(
               obj {
                 put("type", "group")
                 put("name", "${child.name}_group")
+                // A nested concatenation may still be titled, and being a composition it anchors
+                // to the start rather than framing a plotting area it does not have.
+                child.spec.fields["title"]?.let { put("title", titleFor(it, composed = true)) }
                 put("layout", child.concat.layout())
                 put("marks", arr(groups(child)))
               }

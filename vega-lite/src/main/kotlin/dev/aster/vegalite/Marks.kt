@@ -1176,7 +1176,10 @@ internal object Marks {
 
     val posRef =
       if (def != null) {
-        midPointForRect(view, channel, def, scaleType, centred)
+        // A rect's position takes the invalid arm too — `midPointRefWithPositionInvalidTest` is
+        // what builds it, whichever shape the position takes.
+        val main = midPointForRect(view, channel, def, scaleType, centred)
+        invalidPositionRef(view, channel)?.let { arr(listOf(it, main)) } ?: main
       } else {
         // A default position takes the offset too — `positionOffset` runs whether or not the
         // channel has a definition, so a group of bars with no shared category still fans out

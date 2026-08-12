@@ -82,7 +82,9 @@ internal class DataPipeline(
       // A time unit buckets a *date*, so the column still has to be read as one first — and a time
       // unit is what makes a field an instant, whatever type the encoding gave it. A month named on
       // an ordinal scale is bucketed from a date exactly as a temporal one is.
-      if ((def.type == MeasureType.TEMPORAL || def.timeUnit != null) && def.aggregate == null) {
+      // No exception for an aggregate: a `mean` over a date column still needs the column read as
+      // dates first, or it averages the strings' character codes.
+      if (def.type == MeasureType.TEMPORAL || def.timeUnit != null) {
         parse[field] = "date"
       } else if (def.type == MeasureType.QUANTITATIVE && def.aggregate in MIN_MAX_OPS) {
         // Upstream's own comment: "we need to parse numbers to support correct min and max". Every

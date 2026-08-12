@@ -647,6 +647,10 @@ internal class LegendBuilder(
             width = LegendDefaults.GRADIENT_STROKE_WIDTH,
           ),
         metadata = NodeMetadata(role = "legend-gradient", markName = scaleName),
+        // `encode.gradient` is where a ramp's own opacity is written: a legend beside a chart of
+        // translucent marks is drawn as translucent as they are, and reading only the defaults
+        // painted it solid.
+        opacity = entryNumber(spec, "gradient", "opacity", Entry(VegaValue.Null, "")) ?: 1.0,
       )
 
     val nodes = mutableListOf<SceneNode>(swatch)

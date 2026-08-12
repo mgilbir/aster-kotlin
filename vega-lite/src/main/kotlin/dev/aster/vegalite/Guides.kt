@@ -499,15 +499,30 @@ internal object Guides {
         else -> channel
       }
 
+    // `isContinuousToContinuous` includes the two **time** scales: a colour ramp over instants is
+    // still a ramp, and reading it as discrete drew a row of square swatches over a continuum.
     val continuous =
-      type == "linear" || type == "log" || type == "pow" || type == "sqrt" || type == "symlog"
+      type == "linear" ||
+        type == "log" ||
+        type == "pow" ||
+        type == "sqrt" ||
+        type == "symlog" ||
+        type == "time" ||
+        type == "utc"
     val gradient = channel in setOf("color", "fill", "stroke") && continuous
 
     return obj {
       put(scaleChannel, view.scale(channel))
       // A legend labels a bucketed instant the same way an axis does, and for the same reason: the
       // swatch beside a colour ramp of months should read `Jan`, not the month's number.
-      if (def.timeUnit != null) put("format", signalRef(Fields.timeUnitSpecifier(def.timeUnit)))
+      if (def.timeUnit != null) {
+        put("format", signalRef(Fields.timeUnitSpecifier(def.timeUnit)))
+      } else if (def.type == MeasureType.TEMPORAL) {
+        // `omitTimeFormatConfig` is true for an axis and **false** for a legend: an axis chooses
+        // its own granularity from the span it is showing, where a legend's entries stand alone
+        // and take the configured date format.
+        put("format", str(view.config.timeFormat))
+      }
       formatType(def, type)?.let { put("formatType", it) }
       // `defaultLabelOverlap` for a legend, which is a shorter list than an axis's: a scale whose
       // entries are unevenly spaced drops labels *greedily*, keeping the first of each collision
@@ -515,7 +530,10 @@ internal object Guides {
       if (type in setOf("quantile", "threshold", "log", "symlog")) put("labelOverlap", "greedy")
       if (gradient) {
         // A colour ramp is drawn as a bar whose length follows the plot, within Vega's own limits.
-        put("gradientLength", signalRef("clamp(height, 64, 200)"))
+        // The *view's* own height signal, not the plain name: inside a concatenation the plotting
+        // area is `concat_0_childHeight` and `height` is either something else or nothing at all,
+        // so a ramp measured against it came out the wrong length or not at all.
+        put("gradientLength", signalRef("clamp(${view.sizeSignal("y")}, 64, 200)"))
       } else {
         put("symbolType", defaultSymbolType(view, channel))
       }

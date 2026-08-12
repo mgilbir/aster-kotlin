@@ -1507,6 +1507,24 @@ Three more from the same pass, each a property that was being overridden rather 
 And `"header": null` takes a facet's **caption** off rather than its band: the band is also where a
 shared axis is drawn, and that axis is still wanted. A band with neither is the one that disappears.
 
+### A ramp over instants is still a ramp
+
+`isContinuousToContinuous` includes the two **time** scales, and this compiler's own list did not:
+a colour ramp over dates was read as discrete and drawn as a row of square swatches over a
+continuum. Its legend also takes the configured date format outright, `omitTimeFormatConfig` being
+true for an axis and **false** for a legend — an axis chooses its granularity from the span it is
+showing, where a legend's entries stand alone. And a `mean` over a date column still needs the
+column read as dates first, aggregate or no aggregate, or it averages the characters.
+
+Three more from the same pass. A rect's position takes the **invalid arm** like any other, which
+`midPointRefWithPositionInvalidTest` builds whatever shape the position takes. A nested
+concatenation may carry a title of its own, and being a composition it anchors to the start. And a
+size signal is written once per *name*: a size two levels of a tree agree on was named by each of
+them, and Vega reads the first and warns about the rest — nine signals where upstream has three.
+
+The runtime gained one to match: `encode.gradient` is where a ramp's own opacity is written, so a
+legend beside a chart of translucent marks is drawn as translucent as they are rather than solid.
+
 ### Two runtime gaps this batch names but does not close
 
 `density`'s fixture is not in the corpus, and `trail`'s draws no legend. Both compile exactly as
@@ -1518,6 +1536,12 @@ by *this runtime*:
   ticks where upstream has 20.
 - **A legend on the `strokeWidth` channel is drawn at the symbol's size**, not the scale's stroke
   width, and a `stroke` symbol is sized as though it were an area.
+- **A time scale cannot take a colour scheme.** A sequential ramp over instants compiles exactly as
+  upstream compiles it and then fails to build: the scale wants a numeric range and is handed a
+  scheme.
+- **A quantile legend labels its buckets with a representative value** rather than the range they
+  cover — `75.75` where upstream reads `75.8 – 95.0` — which is the same gap as the banded legend
+  drawn as swatches.
 
 ### One difference is still open
 
