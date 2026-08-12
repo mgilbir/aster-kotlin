@@ -284,10 +284,28 @@ internal object Scales {
     }
     val config = view.config
     return when (channel) {
-      // An offset scale's range is a step per nested mark, stated plainly rather than by signal:
-      // it is the *inner* band, and the outer one's step is computed from it.
+      // An offset scale's range is the *inner* band, and what it spans depends on whether the
+      // outer one was given a step to grow by. `getOffsetRange`: a declared `{step}` on the
+      // position — unless it says `for: "position"` — makes the step the offset's own, and the
+      // outer band is then computed from it; anything else, a fixed width included, means the
+      // offset fills whatever band the outer scale ended up with, `[0, bandwidth('x')]`.
       "xOffset",
-      "yOffset" -> obj { put("step", num(view.config.step)) }
+      "yOffset" -> {
+        val position = if (channel == "xOffset") "x" else "y"
+        val declared = if (position == "x") view.spec.width else view.spec.height
+        // `getDiscretePositionSize`: an undeclared size is *already* a step — the configured one —
+        // so the ordinary grouped bar takes that branch, and only a size stated as a **number**
+        // leaves the offset nothing to grow by.
+        val stated = declared as? VegaValue.Obj
+        val step =
+          stated?.number("step") ?: (declared as? VegaValue.Num)?.let { null } ?: view.config.step
+        val stepFor = stated?.string("for") ?: "offset"
+        if (declared is VegaValue.Num || stepFor != "offset") {
+          arr(listOf(num(0.0), signalRef("bandwidth('${view.scale(position)}')")))
+        } else {
+          obj { put("step", num(step)) }
+        }
+      }
       "x",
       "y" -> {
         if (type == "point" || type == "band") {
