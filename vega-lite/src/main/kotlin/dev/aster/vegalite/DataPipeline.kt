@@ -380,6 +380,7 @@ internal class DataPipeline(
           Fields.vgField(def, suffix = "end", forAs = true),
         ),
       offset = stack.offset,
+      imputeGroupby = stackBy + view.facetFields.filterNot { it in stackBy },
       imputeKeys =
         if (stack.impute) {
           stack.groupbyChannels.mapNotNull {

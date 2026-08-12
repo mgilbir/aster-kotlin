@@ -439,13 +439,20 @@ internal class StackNode(
    * only for a path mark.
    */
   val imputeKeys: List<String> = emptyList(),
+  /**
+   * What the imputation is done *within* — `facetby.concat(stackby)` upstream.
+   *
+   * The series being filled are the stack's own segments, and inside a trellis each cell's segments
+   * are its own: a gap filled across the cells would draw one cell's rows into another.
+   */
+  val imputeGroupby: List<String> = emptyList(),
 ) : DataNode() {
   fun transforms(): List<VegaValue> =
     imputeKeys.map { key ->
       obj {
         put("type", "impute")
         put("field", field)
-        put("groupby", strings(sortFields))
+        put("groupby", strings(imputeGroupby))
         put("key", key)
         put("method", "value")
         put("value", 0)

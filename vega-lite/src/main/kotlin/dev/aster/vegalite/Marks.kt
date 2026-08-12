@@ -87,7 +87,10 @@ internal object Marks {
                 "facet",
                 obj {
                   put("name", facetName)
-                  put("data", view.mainData)
+                  // Inside a facet the series are faceted out of the *cell's* rows, not the whole
+                  // table's: `markData` is the cell's own partition, and reading the table instead
+                  // drew every cell's series in every cell.
+                  put("data", view.markData)
                   put("groupby", strings(details))
                 },
               )
@@ -1254,7 +1257,10 @@ internal object Marks {
     val offsetDef = view.spec.encoding.getValue(offsetChannel)
     return obj {
       put("scale", view.scale(offsetChannel))
-      put("field", Fields.vgField(offsetDef))
+      // An offset may name a **datum** rather than a field, which is how a repeated layer puts
+      // each copy in a lane of its own: there is no column to read, only the value to look up.
+      if (offsetDef.isFieldDef) put("field", Fields.vgField(offsetDef))
+      else literalRef(offsetDef.datum)?.let { (key, value) -> put(key, value) }
       if (centred) put("band", num(0.5))
     }
   }
@@ -1339,11 +1345,22 @@ internal object Marks {
    */
   private fun relativeBandSize(view: UnitView, channel: String): Double {
     val sizeChannel = if (channel == "x" || channel == "theta") "width" else "height"
+    val markConfig = view.config.markConfig(view.spec.mark)
     val stated =
       view.markDef.raw.obj(sizeChannel)
-        ?: view.config.markConfig(view.spec.mark).obj("continuousBandSize")
-        ?: view.config.markConfig(view.spec.mark).obj("discreteBandSize")
-    return stated?.number("band") ?: 1.0
+        ?: markConfig.obj("continuousBandSize")
+        ?: markConfig.obj("discreteBandSize")
+    stated?.number("band")?.let {
+      return it
+    }
+    // `timeUnitBandSize` is the same fraction written as a bare number, and it applies to a
+    // *bucketed* dimension only: it is how a theme narrows every month's bar at once.
+    if (view.spec.fieldDef(channel)?.timeUnit != null) {
+      markConfig.number("timeUnitBandSize")?.let {
+        return it
+      }
+    }
+    return 1.0
   }
 
   /**

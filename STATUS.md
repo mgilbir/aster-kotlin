@@ -1569,6 +1569,18 @@ Beside it, `getHeaderChannel`: a facet's `header.orient` of `"bottom"` or `"righ
 captions to the **footer** band, which is a different group with a different name rather than the
 same one moved. The heading follows them, and the layout anchors it at the end of the grid.
 
+### Inside a trellis, a series belongs to its cell
+
+Two of these, and both drew one cell's rows into another. A stacked path mark's **imputation** is
+done within `facetby.concat(stackby)`, so a gap filled across the cells is a gap filled from the
+wrong rows. And a path mark split into series reads the *cell's* own partition rather than the whole
+table: `markData`, not `mainData` — reading the table drew every cell's series in every cell.
+
+With them, `timeUnitBandSize`: the same fraction a mark writes as `{"width": {"band": 0.7}}`, written
+as a bare number in the configuration, which is how a theme narrows every bucket's bar at once. And
+an offset may name a **datum** rather than a field, which is how a repeated layer puts each copy in
+a lane of its own — there is no column to read, only the value to look up.
+
 ### Two runtime gaps this batch names but does not close
 
 `density`'s fixture is not in the corpus, and `trail`'s draws no legend. Both compile exactly as
