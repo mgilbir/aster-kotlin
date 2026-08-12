@@ -1,0 +1,178 @@
+{
+  "marks": [
+    {
+      "role": "mark",
+      "stroke": "#4c78a8",
+      "strokeDash": "8,8",
+      "strokeWidth": 3,
+      "type": "rule",
+      "x": 10,
+      "x2": 200,
+      "y": 12,
+      "y2": 12
+    },
+    {
+      "role": "mark",
+      "stroke": "#e45756",
+      "strokeDash": "8,8 @8",
+      "strokeWidth": 3,
+      "type": "rule",
+      "x": 10,
+      "x2": 200,
+      "y": 22,
+      "y2": 22
+    },
+    {
+      "closed": 0,
+      "interpolate": "linear",
+      "points": "10 40 40 100 70 40 100 100 130 40",
+      "role": "mark",
+      "stroke": "#54a24b",
+      "strokeWidth": 10,
+      "type": "line"
+    },
+    {
+      "fill": "#bab0ac",
+      "role": "mark",
+      "shapeHeight": 20,
+      "shapeLeft": 240,
+      "shapeTop": 30,
+      "shapeWidth": 20,
+      "type": "path",
+      "x": 250,
+      "y": 40
+    },
+    {
+      "fill": "#f58518",
+      "role": "mark",
+      "shapeHeight": 10,
+      "shapeLeft": 230,
+      "shapeTop": 35,
+      "shapeWidth": 40,
+      "type": "path",
+      "x": 250,
+      "y": 40
+    },
+    {
+      "fill": "#f58518",
+      "role": "mark",
+      "shapeHeight": 20,
+      "shapeLeft": 320,
+      "shapeTop": 30,
+      "shapeWidth": 20,
+      "size": 400,
+      "type": "symbol",
+      "x": 330,
+      "y": 40
+    },
+    {
+      "baseline": "top",
+      "fill": "#333333",
+      "font": "sans-serif",
+      "fontSize": 10,
+      "lineBreak": "/",
+      "lineHeight": 16,
+      "role": "mark",
+      "text": "usr/local/share/doc",
+      "type": "text",
+      "x": 10,
+      "y": 150
+    },
+    {
+      "baseline": "top",
+      "fill": "#333333",
+      "font": "sans-serif",
+      "fontSize": 10,
+      "lineBreak": "/",
+      "lineHeight": 16,
+      "role": "mark",
+      "text": "var/log/system/daily",
+      "type": "text",
+      "x": 10,
+      "y": 190
+    },
+    {
+      "baseline": "top",
+      "dir": "rtl",
+      "fill": "#333333",
+      "font": "sans-serif",
+      "fontSize": 11,
+      "role": "mark",
+      "text": "one two three four five",
+      "type": "text",
+      "x": 150,
+      "y": 130
+    },
+    {
+      "baseline": "top",
+      "fill": "#333333",
+      "font": "sans-serif",
+      "fontSize": 11,
+      "role": "mark",
+      "text": "one two three four five",
+      "type": "text",
+      "x": 150,
+      "y": 148
+    },
+    {
+      "align": "left",
+      "aspect": "none",
+      "baseline": "top",
+      "height": 40,
+      "role": "mark",
+      "smooth": "none",
+      "type": "image",
+      "url": "tail.png",
+      "width": 100,
+      "x": 300,
+      "y": 120
+    },
+    {
+      "fill": "#f7f7f7",
+      "height": 60,
+      "role": "scope",
+      "stroke": "#333333",
+      "strokeWidth": 6,
+      "type": "group",
+      "width": 180,
+      "x": 10,
+      "y": 190
+    },
+    {
+      "fill": "#4c78a8",
+      "height": 20,
+      "role": "mark",
+      "type": "rect",
+      "width": 180,
+      "x": 10,
+      "y": 210
+    },
+    {
+      "fill": "#f7f7f7",
+      "height": 60,
+      "role": "scope",
+      "stroke": "#333333",
+      "strokeWidth": 6,
+      "type": "group",
+      "width": 180,
+      "x": 220,
+      "y": 190
+    },
+    {
+      "fill": "#4c78a8",
+      "height": 20,
+      "role": "mark",
+      "type": "rect",
+      "width": 180,
+      "x": 220,
+      "y": 210
+    }
+  ],
+  "scales": {},
+  "size": {
+    "height": 270,
+    "width": 450
+  },
+  "spec": "encode-channels-tail.vg.json",
+  "vegaVersion": "6.3.1"
+}

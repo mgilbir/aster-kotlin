@@ -2,10 +2,12 @@
   "marks": [
     {
       "align": "left",
+      "aspect": "fit",
       "baseline": "top",
       "height": 625,
       "opacity": 0.25,
       "role": "mark",
+      "smooth": "none",
       "type": "image",
       "url": "https://i.ibb.co/ZBc5RZK/Screen-Shot-2020-12-13-at-3-36-09-PM.png",
       "width": 1093.75,

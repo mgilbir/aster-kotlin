@@ -10,6 +10,7 @@ import dev.aster.vega.runtime.scale.PointScale
 import dev.aster.vega.runtime.scale.VegaScale
 import dev.aster.vega.scene.FontStyle
 import dev.aster.vega.scene.GroupNode
+import dev.aster.vega.scene.ImageFit
 import dev.aster.vega.scene.ImageNode
 import dev.aster.vega.scene.PathNode
 import dev.aster.vega.scene.RectD
@@ -273,8 +274,17 @@ public object Differential {
    * position, colour, width and opacity, so leaving the dash out would let a chart pass the
    * comparison and draw differently — the same way a symbol's outline once did.
    */
+  /**
+   * A dash pattern, with its offset. The offset is part of the pattern: the same array started a
+   * half-period along draws its gaps where the other draws its marks.
+   */
   private fun dashOf(stroke: Stroke): String? =
-    stroke.dashArray.takeIf { it.isNotEmpty() }?.joinToString(",") { fmt(it) }
+    stroke.dashArray
+      .takeIf { it.isNotEmpty() }
+      ?.let { dash ->
+        dash.joinToString(",") { fmt(it) } +
+          if (stroke.dashOffset != 0.0) " @${fmt(stroke.dashOffset)}" else ""
+      }
 
   private fun textMark(node: TextNode, world: Transform2D): Mark {
     val anchor = world.apply(node.x, node.y)
@@ -298,6 +308,9 @@ public object Differential {
     // stay distinguishable.
     if (!node.absent) strings["text"] = run.text
     if (run.style.fontStyle == FontStyle.ITALIC) strings["fontStyle"] = "italic"
+    if (run.style.direction == dev.aster.vega.scene.TextDirection.RTL) strings["dir"] = "rtl"
+    run.lineBreak?.let { strings["lineBreak"] = it }
+    run.style.lineHeight?.let { numbers["lineHeight"] = it }
     node.fill?.let { fill ->
       solidColour(fill.paint)?.let { strings["fill"] = it.toCssHex() }
       numbers["fillOpacity"] = fill.opacity
@@ -456,6 +469,12 @@ public object Differential {
         "url" to node.url,
         "align" to node.align.name.lowercase(),
         "baseline" to node.baseline.name.lowercase(),
+        // Two images with the same box can be drawn completely differently: `aspect: false`
+        // stretches to the box where the default letterboxes inside it, and `smooth: false` asks
+        // for
+        // nearest-neighbour sampling.
+        "aspect" to if (node.fit == ImageFit.CONTAIN) "fit" else "none",
+        "smooth" to if (node.smooth) "smooth" else "none",
       ) +
         // The pixels, as a digest. An image mark is otherwise compared by its box alone, so a
         // heatmap that painted nothing would agree with one that painted the right thing in the

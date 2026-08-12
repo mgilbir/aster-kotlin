@@ -183,28 +183,48 @@ public class SvgRenderer(private val options: SvgOptions = SvgOptions()) {
     appendDescription(out, node, depth + 1)
 
     // A group with its own paint draws its clip rectangle as a backing rect, matching Vega's
-    // group-mark behaviour.
-    if (clipRect != null && (node.fill != null || node.stroke != null)) {
-      newline(out, depth + 1)
-      val rounded = node.roundedPaintPath
-      if (rounded != null) {
-        out.append("<path d=\"").append(pathToString(rounded)).append('"')
-      } else {
-        out.append("<rect x=\"").append(num(clipRect.left))
-        out.append("\" y=\"").append(num(clipRect.top))
-        out.append("\" width=\"").append(num(clipRect.width))
-        out.append("\" height=\"").append(num(clipRect.height))
-        out.append('"')
-      }
-      appendFill(out, node.fill, defs, node.bounds)
-      appendStroke(out, node.stroke, defs, node.bounds)
-      out.append("/>")
+    // group-mark behaviour. `strokeForeground` splits that into two elements — the fill under the
+    // children and the stroke over them — because the alternative, one element drawn twice, would
+    // paint the fill over the children as well.
+    val background = clipRect?.takeIf { node.fill != null || node.stroke != null }
+    if (background != null) {
+      renderGroupPaint(node, background, out, defs, depth + 1, stroked = !node.strokeForeground)
     }
 
     for (child in node.children) renderNode(child, out, defs, warnings, depth + 1)
 
+    if (background != null && node.strokeForeground && node.stroke != null) {
+      renderGroupPaint(node, background, out, defs, depth + 1, filled = false)
+    }
+
     newline(out, depth)
     out.append("</g>")
+  }
+
+  private fun renderGroupPaint(
+    node: GroupNode,
+    clipRect: RectD,
+    out: StringBuilder,
+    defs: Defs,
+    depth: Int,
+    filled: Boolean = true,
+    stroked: Boolean = true,
+  ) {
+    newline(out, depth)
+    val rounded = node.roundedPaintPath
+    if (rounded != null) {
+      out.append("<path d=\"").append(pathToString(rounded)).append('"')
+    } else {
+      val offset = node.effectiveStrokeOffset
+      out.append("<rect x=\"").append(num(clipRect.left + offset))
+      out.append("\" y=\"").append(num(clipRect.top + offset))
+      out.append("\" width=\"").append(num(clipRect.width))
+      out.append("\" height=\"").append(num(clipRect.height))
+      out.append('"')
+    }
+    appendFill(out, if (filled) node.fill else null, defs, node.bounds)
+    appendStroke(out, if (stroked) node.stroke else null, defs, node.bounds)
+    out.append("/>")
   }
 
   private fun renderRect(node: RectNode, out: StringBuilder, defs: Defs, depth: Int) {

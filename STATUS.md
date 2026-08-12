@@ -21,7 +21,7 @@ end to end — expressions, signals, 33 of upstream's 40 data transforms, every 
 and an event handler that recompiles the chart — and are verified against upstream Vega by
 differential tests.
 
-One hundred and eighteen differential fixtures pass, all matching upstream exactly on every mark and
+One hundred and nineteen differential fixtures pass, all matching upstream exactly on every mark and
 scale output:
 
 | Fixture | Marks | Covers |
@@ -201,7 +201,7 @@ substantive compatibility items:
 | 6. View and Compose APIs | Yes |
 | 7. SVG, PNG, PDF export | Yes |
 | 8. TalkBack can describe and navigate | Partial — virtual nodes are tested by instrumentation, not with TalkBack itself |
-| 9. At least 100 compatibility fixtures pass | **Yes** — 118 |
+| 9. At least 100 compatibility fixtures pass | **Yes** — 119 |
 | 10. Core runtime has no Android dependency | Yes |
 | 11. Renders without WebView | Yes |
 | 12. Build and test loop runs from the terminal | Yes |
@@ -538,7 +538,7 @@ each example a deadline.
 
 ## Known failing fixtures
 
-None. One hundred and eighteen fixtures exist and all of them pass — and that sentence became worth
+None. One hundred and nineteen fixtures exist and all of them pass — and that sentence became worth
 something only once the gate could no longer skip itself, below.
 
 **The gate could report success without running.** `FixtureDifferentialTest` reads the fixtures and
@@ -1303,6 +1303,48 @@ both a mark property and an encode channel: `overview-plus-detail` writes `clip:
 `enter`, and it is what keeps the detail view's line inside its own panel. The differential cannot see
 clipping at all — upstream's scenegraph still holds the items its renderer hides — so that one is
 evidenced by the exported SVG rather than by the comparison.
+
+## The eleven channels that were never on the list, and a rotated path mark's bounds
+
+The encode group was declared finished a commit too early. `ENCODE_UNSUPPORTED` was empty, but that
+table only holds channels *known* to be missing — and diffing Vega's own schema against
+`ENCODE_CONSUMED` found eleven more that were falling through to the generic "not implemented and was
+ignored". Two of them, `scaleX` and `scaleY`, were **already drawn**: they had been taken off the
+unsupported list without ever being added to the consumed one, so every specification using them was
+told it had been ignored while it was in fact honoured. The rule this suggests: the two tables are a
+partition of what the encoders read, and only checking them against the schema shows a channel that
+has fallen between.
+
+The other nine are implemented here. Four were plumbing to something the scene already had —
+`strokeDashOffset`, `strokeMiterLimit`, and `aspect`/`smooth` on an image, which the encoder read and
+the comparison could not see. Three were text: `lineHeight`, `lineBreak` and `dir`. Two were the group
+mark's `strokeOffset` and `strokeForeground`.
+
+**Truncation was being applied to the wrong string.** Upstream truncates *per line*, and trims each
+line first; this engine applied the limit to the whole run with its newlines still in it, so a
+two-line label was measured as one long one and its first line cut down to nothing. `displayText`
+became `displayLines`. Two smaller findings came with it: a limit of zero or less is not a truncation
+from the other end, it is no truncation at all — a comment here had claimed otherwise — and a
+right-to-left run keeps its **tail** with the ellipsis in front, which is `dir`, not the sign of the
+limit. Upstream's own SVG for the fixture reads `…r five` where the left-to-right copy reads
+`one t…`.
+
+**`scaleX`/`scaleY` are a `path` mark's channels, not a symbol's.** The fixture was written with them
+on a symbol, and passed while proving nothing: upstream's SVG for that mark is
+`transform="translate(330,40)" d="M-10,-10h20v20h-20Z"`, unscaled. Only `vega-scenegraph`'s
+`marks/path.js` reads them.
+
+**One difference found and kept.** A `path` mark that is both rotated and scaled has bounds here that
+do not match upstream's, and upstream's do not match what upstream draws. Its renderer rotates the
+outline about the item's own `(x, y)`; its *bounds* code rotates the already-placed points about the
+**origin**, because the bounds context it uses defines no `translate` or `rotate` and so falls into
+`pathRender`'s other branch, where the rotation is a matrix about zero. For the fixture's square at
+`(250, 40)` scaled by `(2, 0.5)` and turned 20 degrees, upstream reports a top-left of
+`(200.7, 111.6)` — 70 units below the shape it drew. This engine reports the box it actually painted.
+Reproducing the quirk would make chart sizes agree under `autosize: pad` and would put every hit
+target for such a mark in the wrong place, which is the worse of the two, so the fixture leaves the
+rotation out and this paragraph is the record. Nothing else about a rotated path mark differs: the
+outline, the anchor and the drawn transform all match.
 
 ## Performance observations
 

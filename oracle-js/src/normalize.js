@@ -51,7 +51,10 @@ const GEOMETRY_CHANNELS = {
 };
 
 const STYLE_CHANNELS = ['fill', 'stroke', 'strokeWidth', 'opacity', 'fillOpacity', 'strokeOpacity'];
-const TEXT_CHANNELS = ['text', 'align', 'baseline', 'font', 'fontSize', 'fontWeight', 'fontStyle', 'angle'];
+// `dir` and `lineBreak` change what is drawn without changing the anchor, and `lineHeight` changes
+// where the second line sits. All three were invisible while a text mark was compared by its anchor
+// and its font.
+const TEXT_CHANNELS = ['text', 'align', 'baseline', 'font', 'fontSize', 'fontWeight', 'fontStyle', 'angle', 'dir', 'lineBreak', 'lineHeight'];
 
 /**
  * FNV-1a over a canvas's pixels, in the packed `0xAARRGGBB` order the Kotlin scene stores.
@@ -111,7 +114,10 @@ function numericIfPossible(value) {
 function dashOf(item) {
   const dash = item.strokeDash;
   if (!Array.isArray(dash) || dash.length === 0) return undefined;
-  return dash.join(',');
+  // The offset is part of the pattern, not a separate decoration: the same dash array started a
+  // half-period along draws its gaps where the other draws its marks.
+  const offset = item.strokeDashOffset;
+  return dash.join(',') + (offset ? ` @${offset}` : '');
 }
 
 /**
@@ -349,6 +355,11 @@ function record(type, role, item, dx, dy, precision) {
     entry.url = item.url;
     entry.align = item.align || 'left';
     entry.baseline = item.baseline || 'top';
+    // `aspect: false` stretches the image to the box instead of letterboxing it inside, and
+    // `smooth: false` asks for nearest-neighbour sampling. Both are the whole difference between two
+    // images with identical boxes.
+    entry.aspect = item.aspect === false ? 'none' : 'fit';
+    entry.smooth = item.smooth === false ? 'none' : 'smooth';
     // An image mark that carries *pixels* rather than an address — a `heatmap`'s output — is
     // otherwise compared only by its box, so a blank raster in the right place would pass. The
     // digest is a cheap stand-in for the pixels themselves, which no reference file should hold:

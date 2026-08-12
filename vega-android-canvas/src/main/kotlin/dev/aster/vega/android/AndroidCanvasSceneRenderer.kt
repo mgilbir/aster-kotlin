@@ -143,28 +143,64 @@ public class AndroidCanvasSceneRenderer(
     // A group with its own paint draws a rectangle of its declared size, as Vega group marks do.
     val paintRect = node.paintRect
     if (paintRect != null) {
-      val rounded = node.roundedPaintPath
-      if (rounded != null) rounded.toAndroidPath(androidPath)
-      else
-        scratchRect.set(
-          paintRect.left.toFloat(),
-          paintRect.top.toFloat(),
-          paintRect.right.toFloat(),
-          paintRect.bottom.toFloat(),
-        )
+      drawGroupPaint(
+        node,
+        paintRect,
+        canvas,
+        opacity,
+        diagnostics,
+        filled = true,
+        stroked = !node.strokeForeground,
+      )
+    }
+
+    for (child in node.children) drawNode(child, canvas, opacity, diagnostics)
+
+    // `strokeForeground` puts the group's outline over its children rather than under them, which
+    // is
+    // the whole channel: a cell whose bars run to its own border either covers it or is covered.
+    if (paintRect != null && node.strokeForeground) {
+      drawGroupPaint(node, paintRect, canvas, opacity, diagnostics, filled = false, stroked = true)
+    }
+  }
+
+  private fun drawGroupPaint(
+    node: GroupNode,
+    paintRect: RectD,
+    canvas: Canvas,
+    opacity: Double,
+    diagnostics: DiagnosticCollector,
+    filled: Boolean,
+    stroked: Boolean,
+  ) {
+    val rounded = node.roundedPaintPath
+    if (rounded != null) {
+      rounded.toAndroidPath(androidPath)
+    } else {
+      // A thin stroke is nudged onto a pixel boundary, as upstream nudges it; see
+      // `GroupNode.effectiveStrokeOffset`.
+      val offset = node.effectiveStrokeOffset.toFloat()
+      scratchRect.set(
+        paintRect.left.toFloat() + offset,
+        paintRect.top.toFloat() + offset,
+        paintRect.right.toFloat() + offset,
+        paintRect.bottom.toFloat() + offset,
+      )
+    }
+    if (filled) {
       node.fill?.let { fill ->
         preparePaint(fillPaint, fill, opacity, paintRect, node.blendMode, diagnostics)
         if (rounded != null) canvas.drawPath(androidPath, fillPaint)
         else canvas.drawRect(scratchRect, fillPaint)
       }
+    }
+    if (stroked) {
       node.stroke?.let { stroke ->
         prepareStroke(stroke, opacity, paintRect, node.blendMode, diagnostics)
         if (rounded != null) canvas.drawPath(androidPath, strokePaint)
         else canvas.drawRect(scratchRect, strokePaint)
       }
     }
-
-    for (child in node.children) drawNode(child, canvas, opacity, diagnostics)
   }
 
   private fun drawRect(

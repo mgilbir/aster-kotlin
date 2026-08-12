@@ -56,6 +56,7 @@ import dev.aster.vega.scene.SymbolNode
 import dev.aster.vega.scene.SymbolShape
 import dev.aster.vega.scene.TextAlign
 import dev.aster.vega.scene.TextBaseline
+import dev.aster.vega.scene.TextDirection
 import dev.aster.vega.scene.TextEngine
 import dev.aster.vega.scene.TextNode
 import dev.aster.vega.scene.TextRun
@@ -297,6 +298,8 @@ public class MarkEncoder(
         cornerRadiusTopRight = number(channels["cornerRadiusTopRight"], datum),
         cornerRadiusBottomRight = number(channels["cornerRadiusBottomRight"], datum),
         cornerRadiusBottomLeft = number(channels["cornerRadiusBottomLeft"], datum),
+        strokeOffset = number(channels["strokeOffset"], datum),
+        strokeForeground = boolean(channels["strokeForeground"], datum) ?: false,
         // `clip` is both a mark property and an encode channel, and real specifications use the
         // channel: `overview-plus-detail` writes `clip: {value: true}` into `enter`, and it is what
         // keeps the detail view's line inside its own panel. Either says the group clips.
@@ -653,6 +656,16 @@ public class MarkEncoder(
           } else {
             FontStyle.NORMAL
           },
+        // Upstream's default is `fontSize + 2` rather than a ratio, which `TextLayout` applies when
+        // this is null. Only the *gap between lines* changes; a single-line label is unaffected, so
+        // the channel is invisible until the text has a break in it.
+        lineHeight = number(channels["lineHeight"], datum),
+        direction =
+          if (string(channels["dir"], datum)?.equals("rtl", ignoreCase = true) == true) {
+            TextDirection.RTL
+          } else {
+            TextDirection.LTR
+          },
       )
     val run =
       TextRun(
@@ -660,10 +673,13 @@ public class MarkEncoder(
         style = textStyle,
         align = textAlign(string(channels["align"], datum)),
         baseline = textBaseline(string(channels["baseline"], datum)),
-        // A negative limit truncates from the *left*, which is upstream's convention for a label
-        // that must keep its tail — a file path, a long species name — so the sign is kept.
+        // Only a limit greater than zero truncates, which is upstream's `textValue`. A negative
+        // one is not a truncation from the other end — `dir: "rtl"` is what keeps a label's tail.
         limit = number(channels["limit"], datum) ?: 0.0,
         ellipsis = string(channels["ellipsis"], datum) ?: "\u2026",
+        // `lineBreak` splits one string into lines on a separator of the specification's choosing —
+        // `"lineBreak": "/"` turns a path into a stack.
+        lineBreak = string(channels["lineBreak"], datum)?.takeIf { it.isNotEmpty() },
       )
 
     // `radius` and `theta` place a label on a circle, and only a text mark has them: the anchor is
@@ -982,6 +998,12 @@ public class MarkEncoder(
     val cap = strokeCap(string(channels["strokeCap"], datum) ?: defaults.text("strokeCap"), spec)
     val join =
       strokeJoin(string(channels["strokeJoin"], datum) ?: defaults.text("strokeJoin"), spec)
+    val dashOffset =
+      number(channels["strokeDashOffset"], datum) ?: defaults.number("strokeDashOffset") ?: 0.0
+    val miterLimit =
+      number(channels["strokeMiterLimit"], datum)
+        ?: defaults.number("strokeMiterLimit")
+        ?: Stroke.DEFAULT_MITER_LIMIT
 
     return Style(
       fill = fillColour?.let { Fill(ScenePaint.Solid(it), fillOpacity) },
@@ -994,6 +1016,8 @@ public class MarkEncoder(
             join = join,
             opacity = strokeOpacity,
             dashArray = strokeDash,
+            dashOffset = dashOffset,
+            miterLimit = miterLimit,
           )
         },
       opacity = number(channels["opacity"], datum) ?: defaults.number("opacity") ?: 1.0,

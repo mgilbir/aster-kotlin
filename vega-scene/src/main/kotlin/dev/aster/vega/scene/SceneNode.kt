@@ -185,6 +185,22 @@ public data class GroupNode(
   val cornerRadiusTopRight: Double? = null,
   val cornerRadiusBottomRight: Double? = null,
   val cornerRadiusBottomLeft: Double? = null,
+  /**
+   * How far the background rectangle is nudged so a thin stroke lands on a pixel boundary.
+   *
+   * Null takes upstream's rule, which is not "no offset": a group stroked at a width between 0.5
+   * and 1.5 is shifted by `0.5 - |width - 1|`, so the commonest case — a 1px outline — moves half a
+   * pixel and comes out crisp instead of grey on both sides of the boundary. Only the group mark
+   * has this; a `rect` inside one does not.
+   */
+  val strokeOffset: Double? = null,
+  /**
+   * Draws the group's stroke **after** its children rather than before.
+   *
+   * The difference is only visible where a child reaches the edge: a cell whose bars run to its own
+   * border either have the border drawn over them or paint over it themselves.
+   */
+  val strokeForeground: Boolean = false,
   /** Clip rectangle in this group's own coordinate space, applied before drawing children. */
   val clip: RectD? = null,
   val clipPath: PathData? = null,
@@ -200,6 +216,22 @@ public data class GroupNode(
         else -> clip
       }
 
+  /**
+   * The half-pixel nudge actually applied to the background, `strokeOffset` resolved.
+   *
+   * Upstream's `offset(item)`: an explicit value wins; otherwise a stroke whose width is within
+   * half a unit of 1 is shifted to sit on a pixel boundary, and anything else is not shifted at
+   * all.
+   */
+  public val effectiveStrokeOffset: Double
+    get() {
+      strokeOffset?.let {
+        return it
+      }
+      val width = stroke?.width ?: return 0.0
+      return if (width > 0.5 && width < 1.5) 0.5 - kotlin.math.abs(width - 1.0) else 0.0
+    }
+
   /** That rectangle rounded, or null when it is square or there is nothing to paint. */
   public val roundedPaintPath: PathData?
     get() {
@@ -213,8 +245,9 @@ public data class GroupNode(
           cornerRadiusBottomRight ?: cornerRadius,
           cornerRadiusBottomLeft ?: cornerRadius,
         )
-      return if (corners.isSquare) null
-      else RectPath.of(rect.left, rect.top, rect.width, rect.height, corners)
+      if (corners.isSquare) return null
+      val offset = effectiveStrokeOffset
+      return RectPath.of(rect.left + offset, rect.top + offset, rect.width, rect.height, corners)
     }
 
   override val bounds: RectD by
