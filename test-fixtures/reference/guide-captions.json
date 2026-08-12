@@ -1350,6 +1350,16 @@
   "caption": "Y-axis titled 'Events' for a linear scale with values from 0.0 to 3.0"
  },
  {
+  "fixture": "title-style",
+  "kind": "title",
+  "caption": "Title text 'A heading long enough to need two lines'"
+ },
+ {
+  "fixture": "title-style",
+  "kind": "subtitle",
+  "caption": "Subtitle text 'and a subtitle that also wraps'"
+ },
+ {
   "fixture": "titles",
   "kind": "axis",
   "caption": "X-axis titled 'Segment' for a discrete scale with 3 values: alpha, beta, gamma"

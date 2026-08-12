@@ -167,14 +167,25 @@ class TitleTest {
     )
   }
 
+  /**
+   * An explicit `align`, `angle` and `limit` override what `anchor` and `orient` imply, rather than
+   * being reported: upstream writes the derived values into the title's `enter` block and these
+   * into `update`, so the explicit one wins. This used to assert that all three were reported by
+   * name.
+   */
   @Test
-  fun `unimplemented title properties are reported by name`() {
+  fun `an explicit align, angle and limit override what the anchor implies`() {
     val compiled = compile(spec("""{"text": "Tt", "align": "left", "angle": 45, "limit": 20}"""))
-    val messages = compiled.diagnostics.map { it.message }
-    // `dx` was on this list and is implemented; it moves the whole surface with it.
-    for (name in listOf("align", "angle", "limit")) {
-      assertTrue(messages.any { it.contains("'$name'") }, "$name not reported in $messages")
-    }
+    assertTrue(compiled.diagnostics.none { it.message.contains("'align'") }, "align reported")
+    val title =
+      requireNotNull(compiled.scene)
+        .flatten()
+        .map { it.node }
+        .filterIsInstance<TextNode>()
+        .first { it.metadata.role == "title-text" }
+    assertEquals(45.0, title.angleDegrees, 1e-9)
+    assertEquals(TextAlign.LEFT, title.layout.run.align)
+    assertEquals(20.0, title.layout.run.limit, 1e-9)
   }
 
   // ---- axis titles ------------------------------------------------------------

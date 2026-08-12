@@ -93,13 +93,10 @@ class UnhandledPropertiesTest {
               "baseline": "top"}"""
         )
       )
-    // `fontWeight`, `font` and `fontStyle` are read now — a theme setting the heading in
-    // `config.title` is ordinary, and both the weight and the slant change the *measurement*, not
-    // only the look.
-    assertEquals(
-      listOf("color", "lineHeight", "subtitleColor", "baseline").sorted(),
-      reported.sorted(),
-    )
+    // Every one of these is read now. `color` and `subtitleColor` paint the two lines separately,
+    // `lineHeight` sets the gap between a heading's lines, and `baseline` overrides what `orient`
+    // implies — as `align` and `angle` override what `anchor` and `orient` imply.
+    assertEquals(emptyList<String>(), reported.sorted())
   }
 
   /**

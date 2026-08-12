@@ -241,6 +241,16 @@ private val LEGEND_CONSUMED =
 /** Title properties this engine reads. */
 private val TITLE_CONSUMED =
   setOf(
+    "color",
+    "subtitleColor",
+    "subtitleFont",
+    "subtitleFontWeight",
+    "lineHeight",
+    "subtitleLineHeight",
+    "align",
+    "angle",
+    "baseline",
+    "limit",
     "text",
     "subtitle",
     "orient",
@@ -1680,7 +1690,14 @@ public class SpecParser {
 
     val textField = obj.fields["text"]
     val expression = (textField as? VegaValue.Obj)?.fields?.get("signal")?.asString()
-    val text = textField?.takeIf { it is VegaValue.Str }?.asString() ?: ""
+    // An **array** is upstream's multi-line form, for a title and for a subtitle alike, and it was
+    // rejected outright: a heading written as two lines produced "A title needs a 'text'" and no
+    // chart at all. Joined with the newline this engine lays lines out on.
+    val text =
+      when (textField) {
+        is VegaValue.Arr -> textField.values.joinToString("\n") { it.asString() }
+        else -> textField?.takeIf { it is VegaValue.Str }?.asString() ?: ""
+      }
     if (text.isEmpty() && expression == null) {
       diagnostics.error(
         DiagnosticCodes.PARSE_MISSING_PROPERTY,
@@ -1697,16 +1714,17 @@ public class SpecParser {
       mapOf(
         "encode" to "Only 'dx' and 'dy' are read from a title's encode block; the rest was ignored",
         "style" to "Title styles are not implemented",
-        "limit" to "Title text limits are not implemented",
-        "align" to "Title alignment follows 'anchor'; an explicit align is not implemented",
-        "angle" to "Title rotation follows 'orient'; an explicit angle is not implemented",
       ),
     )
 
     return TitleSpec(
       text = text,
       textExpression = expression,
-      subtitle = obj.fields["subtitle"]?.takeIf { it is VegaValue.Str }?.asString(),
+      subtitle =
+        when (val sub = obj.fields["subtitle"]) {
+          is VegaValue.Arr -> sub.values.joinToString("\n") { it.asString() }
+          else -> sub?.takeIf { it is VegaValue.Str }?.asString()
+        },
       orient =
         obj.enumOrNull("orient", path, "title orientation") { Orient.fromName(it) } ?: Orient.TOP,
       anchor =
@@ -1727,6 +1745,22 @@ public class SpecParser {
       fontStyle = obj.fields["fontStyle"]?.takeIf { it is VegaValue.Str }?.asString(),
       subtitleFontStyle =
         obj.fields["subtitleFontStyle"]?.takeIf { it is VegaValue.Str }?.asString(),
+      color = obj.fields["color"]?.asString()?.takeIf { it.isNotEmpty() },
+      font = obj.fields["font"]?.asString()?.takeIf { it.isNotEmpty() },
+      subtitleColor = obj.fields["subtitleColor"]?.asString()?.takeIf { it.isNotEmpty() },
+      subtitleFont = obj.fields["subtitleFont"]?.asString()?.takeIf { it.isNotEmpty() },
+      subtitleFontWeight =
+        when (val weight = obj.fields["subtitleFontWeight"]) {
+          is VegaValue.Str -> weight.value
+          is VegaValue.Num -> weight.value.takeIf { it.isFinite() }?.toInt()?.toString()
+          else -> null
+        },
+      lineHeight = obj.numberOrSignal("lineHeight", "$path.lineHeight"),
+      subtitleLineHeight = obj.numberOrSignal("subtitleLineHeight", "$path.subtitleLineHeight"),
+      align = obj.fields["align"]?.asString()?.takeIf { it.isNotEmpty() },
+      angle = obj.numberOrSignal("angle", "$path.angle"),
+      baseline = obj.fields["baseline"]?.asString()?.takeIf { it.isNotEmpty() },
+      limit = obj.numberOrSignal("limit", "$path.limit"),
       zindex = (obj.fields["zindex"] as? VegaValue.Num)?.value?.toInt() ?: 0,
     )
   }

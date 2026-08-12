@@ -77,18 +77,26 @@ internal class TitleBuilder(
     val subtitleFontSize =
       numbers.resolve(spec.subtitleFontSize, "title") ?: TitleDefaults.SUBTITLE_FONT_SIZE
 
+    // The derived angle and alignment, which an explicit `angle` or `align` overrides: upstream
+    // writes these into the title's `enter` block and the explicit ones into `update`.
     val angle =
-      when (spec.orient) {
-        Orient.LEFT -> -90.0
-        Orient.RIGHT -> 90.0
-        else -> 0.0
-      }
+      numbers.resolve(spec.angle, "title")
+        ?: when (spec.orient) {
+          Orient.LEFT -> -90.0
+          Orient.RIGHT -> 90.0
+          else -> 0.0
+        }
     val align =
-      when (spec.anchor) {
-        Anchor.START -> TextAlign.LEFT
-        Anchor.END -> TextAlign.RIGHT
-        Anchor.MIDDLE -> TextAlign.CENTER
-      }
+      alignOf(spec.align)
+        ?: when (spec.anchor) {
+          Anchor.START -> TextAlign.LEFT
+          Anchor.END -> TextAlign.RIGHT
+          Anchor.MIDDLE -> TextAlign.CENTER
+        }
+    val baseline = baselineOf(spec.baseline) ?: TextBaseline.TOP
+    val limit = numbers.resolve(spec.limit, "title") ?: 0.0
+    val colour = spec.color?.let { SceneColor.parse(it) } ?: TitleDefaults.color
+    val subtitleColour = spec.subtitleColor?.let { SceneColor.parse(it) } ?: TitleDefaults.color
 
     // A trellis header takes its words from the row it labels, so the text may be a signal.
     val text = spec.textExpression?.let { numbers.resolveText(it, "title") } ?: spec.text
@@ -103,9 +111,21 @@ internal class TitleBuilder(
         x = nudgeX,
         y = nudgeY,
         layout =
-          textEngine.layout(run(text, fontSize, titleWeight(spec), align, styleOf(spec.fontStyle))),
+          textEngine.layout(
+            run(
+              text,
+              fontSize,
+              titleWeight(spec),
+              align,
+              styleOf(spec.fontStyle),
+              baseline,
+              spec.font,
+              numbers.resolve(spec.lineHeight, "title"),
+              limit,
+            )
+          ),
         angleDegrees = angle,
-        fill = Fill.of(TitleDefaults.color),
+        fill = Fill.of(colour),
         metadata =
           NodeMetadata(
             role = "title-text",
@@ -113,7 +133,9 @@ internal class TitleBuilder(
             // rather than just being read the words.
             accessibility =
               AccessibilityDescriptor(
-                label = "Title text '$text'",
+                // Upstream's caption is `array(text).join(' ')`, so a two-line heading is read out
+                // as one sentence rather than with the break in it.
+                label = "Title text '${text.replace('\n', ' ')}'",
                 role = "graphics-symbol",
                 focusable = true,
               ),
@@ -144,19 +166,23 @@ internal class TitleBuilder(
                 run(
                   text,
                   subtitleFontSize,
-                  TitleDefaults.SUBTITLE_FONT_WEIGHT,
+                  weightOf(spec.subtitleFontWeight) ?: TitleDefaults.SUBTITLE_FONT_WEIGHT,
                   align,
                   styleOf(spec.subtitleFontStyle),
+                  baseline,
+                  spec.subtitleFont ?: spec.font,
+                  numbers.resolve(spec.subtitleLineHeight, "title"),
+                  limit,
                 )
               ),
             angleDegrees = angle,
-            fill = Fill.of(TitleDefaults.color),
+            fill = Fill.of(subtitleColour),
             metadata =
               NodeMetadata(
                 role = "title-subtitle",
                 accessibility =
                   AccessibilityDescriptor(
-                    label = "Subtitle text '$text'",
+                    label = "Subtitle text '${text.replace('\n', ' ')}'",
                     role = "graphics-symbol",
                     focusable = true,
                   ),
@@ -226,19 +252,41 @@ internal class TitleBuilder(
 
   /** The title's own `fontWeight`, or a theme's, falling back to Vega's bold default. */
   private fun titleWeight(spec: TitleSpec): Int =
-    spec.fontWeight?.let { named ->
-      when (named.lowercase()) {
-        "normal" -> 400
-        "bold" -> 700
-        "lighter" -> 300
-        "bolder" -> 800
-        else -> named.toIntOrNull()
-      }
-    } ?: TitleDefaults.FONT_WEIGHT
+    weightOf(spec.fontWeight) ?: TitleDefaults.FONT_WEIGHT
+
+  /** A CSS font weight, named or numeric. */
+  private fun weightOf(named: String?): Int? = named?.let {
+    when (it.lowercase()) {
+      "normal" -> 400
+      "bold" -> 700
+      "lighter" -> 300
+      "bolder" -> 800
+      else -> it.toIntOrNull()
+    }
+  }
 
   /** `"italic"` slants the face; anything else, including nothing, leaves it upright. */
   private fun styleOf(name: String?): FontStyle =
     if (name.equals("italic", ignoreCase = true)) FontStyle.ITALIC else FontStyle.NORMAL
+
+  private fun alignOf(name: String?): TextAlign? =
+    when (name?.lowercase()) {
+      "left" -> TextAlign.LEFT
+      "center" -> TextAlign.CENTER
+      "right" -> TextAlign.RIGHT
+      else -> null
+    }
+
+  private fun baselineOf(name: String?): TextBaseline? =
+    when (name?.lowercase()) {
+      "top" -> TextBaseline.TOP
+      "middle" -> TextBaseline.MIDDLE
+      "bottom" -> TextBaseline.BOTTOM
+      "alphabetic" -> TextBaseline.ALPHABETIC
+      "line-top" -> TextBaseline.LINE_TOP
+      "line-bottom" -> TextBaseline.LINE_BOTTOM
+      else -> null
+    }
 
   private fun run(
     text: String,
@@ -246,17 +294,23 @@ internal class TitleBuilder(
     weight: Int,
     align: TextAlign,
     fontStyle: FontStyle = FontStyle.NORMAL,
+    baseline: TextBaseline = TextBaseline.TOP,
+    fontFamily: String? = null,
+    lineHeight: Double? = null,
+    limit: Double = 0.0,
   ) =
     TextRun(
       text = text,
       style =
         TextStyle(
-          fontFamily = TitleDefaults.FONT_FAMILY,
+          fontFamily = fontFamily ?: TitleDefaults.FONT_FAMILY,
           fontSize = fontSize,
           fontWeight = weight,
           fontStyle = fontStyle,
+          lineHeight = lineHeight,
         ),
       align = align,
-      baseline = TextBaseline.TOP,
+      baseline = baseline,
+      limit = limit,
     )
 }

@@ -21,7 +21,7 @@ end to end — expressions, signals, 33 of upstream's 40 data transforms, every 
 and an event handler that recompiles the chart — and are verified against upstream Vega by
 differential tests.
 
-One hundred and twenty-one differential fixtures pass, all matching upstream exactly on every mark and
+One hundred and twenty-two differential fixtures pass, all matching upstream exactly on every mark and
 scale output:
 
 | Fixture | Marks | Covers |
@@ -201,7 +201,7 @@ substantive compatibility items:
 | 6. View and Compose APIs | Yes |
 | 7. SVG, PNG, PDF export | Yes |
 | 8. TalkBack can describe and navigate | Partial — virtual nodes are tested by instrumentation, not with TalkBack itself |
-| 9. At least 100 compatibility fixtures pass | **Yes** — 121 |
+| 9. At least 100 compatibility fixtures pass | **Yes** — 122 |
 | 10. Core runtime has no Android dependency | Yes |
 | 11. Renders without WebView | Yes |
 | 12. Build and test loop runs from the terminal | Yes |
@@ -538,7 +538,7 @@ each example a deadline.
 
 ## Known failing fixtures
 
-None. One hundred and twenty-one fixtures exist and all of them pass — and that sentence became worth
+None. One hundred and twenty-two fixtures exist and all of them pass — and that sentence became worth
 something only once the gate could no longer skip itself, below.
 
 **The gate could report success without running.** `FixtureDifferentialTest` reads the fixtures and
@@ -1434,6 +1434,30 @@ Two harness findings came with it, both in the same shape as every other one:
   right — a legend that clips an entry still occupies the box it declared — but a `strokeColor` draws
   half a stroke width outside that box on every side, and upstream measures it. A chart with an
   outlined legend is a unit wider than one without, and this engine was making it the same width.
+
+## The title's own styling, and a heading written as two lines
+
+Ten title properties were reported rather than drawn: `color`, `lineHeight`, an explicit `align`,
+`angle` and `baseline`, `limit`, and the subtitle's own `subtitleColor`, `subtitleFont`,
+`subtitleFontWeight` and `subtitleLineHeight`. Two things came out of implementing them.
+
+**`align`, `angle` and `baseline` are overrides, not alternatives.** Upstream writes the values derived
+from `anchor` and `orient` into the title's `enter` block and the explicit ones into `update`, so an
+explicit value wins over the derived one. Reporting them as unimplemented was doubly wrong: a chart
+that turns its left-hand title to read *up* the page was told it had been ignored and then had the
+derived angle applied.
+
+**`font` had been claimed as consumed and was never read.** `TITLE_CONSUMED` listed it — a theme
+setting the heading's face in `config.title` is ordinary — and `TitleBuilder.run()` hard-coded
+`TitleDefaults.FONT_FAMILY`. The third stale claim of its kind after `scaleX`/`scaleY`, and the same
+lesson: a name in the consumed table is a promise, and nothing was checking it.
+
+**And a title written as an array was rejected outright.** `"text": ["two", "lines"]` is upstream's
+multi-line form, for the subtitle too, and the parser accepted only a string — so a two-line heading
+produced `A title needs a 'text'` and no chart at all. The lines are joined with the newline this
+engine lays text out on, and the *accessibility caption* joins them back with a space, which is
+upstream's `array(text).join(' ')` and the same rule the axis and legend captions already follow.
+`GuideCaptionTest` caught that half.
 
 ## Performance observations
 

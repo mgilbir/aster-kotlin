@@ -574,6 +574,33 @@ public data class TitleSpec(
   val fontStyle: String? = null,
   val subtitleFontStyle: String? = null,
   /**
+   * The colour of the words, `color`, and of the subtitle's, `subtitleColor`.
+   *
+   * Separate properties rather than one inherited: a chart that greys its subtitle sets only the
+   * second, and reading the first for both would darken it.
+   */
+  val color: String? = null,
+  /** The face the heading is set in. Claimed as consumed since the theme work and never read. */
+  val font: String? = null,
+  val subtitleColor: String? = null,
+  val subtitleFont: String? = null,
+  val subtitleFontWeight: String? = null,
+  /** The gap between lines, for a heading long enough to have more than one. */
+  val lineHeight: NumberValue? = null,
+  val subtitleLineHeight: NumberValue? = null,
+  /**
+   * An explicit `align`, `angle` and `baseline`, each overriding what [anchor] and [orient] imply.
+   *
+   * Upstream writes the derived values into the title's `enter` block and these into `update`, so
+   * an explicit one wins — which is how a left-hand title is made to read up the page rather than
+   * down.
+   */
+  val align: String? = null,
+  val angle: NumberValue? = null,
+  val baseline: String? = null,
+  /** How wide the words may be drawn before they are truncated. */
+  val limit: NumberValue? = null,
+  /**
    * `dx`/`dy` — a nudge applied after the anchor has placed the title.
    *
    * Written either as a property or inside the title's own `encode.update`, which is where a

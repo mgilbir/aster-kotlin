@@ -9,7 +9,7 @@ Branch `milestone-0-bootstrap`. Working tree clean, both gates green:
 - `./scripts/check.sh` — format, all tests, lint, demo APK
 - `./scripts/oracle.sh` — regenerates upstream references and runs the differential comparison
 
-**121 differential fixtures pass, all matching upstream exactly.** That is the only number here
+**122 differential fixtures pass, all matching upstream exactly.** That is the only number here
 that means what it says.
 
 ## Read this before trusting the other number
@@ -254,7 +254,7 @@ not the one Vega documents**, because Vega only forwards the parameters a specif
 
 ## What is left: two examples, and neither can be verified
 
-**121 differential fixtures pass. 91 of the 93 examples compile clean.** Everything that can be
+**122 differential fixtures pass. 91 of the 93 examples compile clean.** Everything that can be
 checked against upstream has been.
 
 ### `projections` — upstream refuses it too
@@ -400,9 +400,9 @@ As of this handoff the subtraction leaves:
   `gradientStrokeWidth`; `gridAlign`; `tickMinStep`; `formatType`; `aria`/`description`.
   `clipHeight` and the background (`fillColor`, `strokeColor`, `cornerRadius`, with the width and
   dash coming from `config.legend` alone) are *done* — do not re-report them.
-- **Title (10):** `baseline`, `color`, `lineHeight`, `style`, `limit`, an explicit `align`/`angle`,
-  `subtitleColor`, `subtitleFont`, `subtitleFontWeight`, `subtitleLineHeight`, `aria`,
-  `interactive`, `name`.
+- **Title (4):** `style`, `aria`, `interactive`, `name`. The rest — `color`, `lineHeight`,
+  `baseline`, `limit`, an explicit `align`/`angle`, and the four `subtitle*` properties — is done, as
+  is a title or subtitle written as an **array** of lines.
 - **Layout (all of it):** `align`, `bounds`, `center`, `columns`, `footerBand`, `headerBand`,
   `offset`, `padding`, `titleAnchor`, `titleBand` — the grid works, but nothing in `LAYOUT` is
   reported either, so this block has no consumed table at all yet.
