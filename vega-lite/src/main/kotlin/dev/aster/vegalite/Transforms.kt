@@ -176,7 +176,9 @@ internal class Transforms(
           obj {
             put("type", "extent")
             put("field", transform.string("extent"))
-            put("signal", transform.string("as"))
+            // The signal an `extent` publishes is named by **`param`**, not by `as`: it is a
+            // parameter the rest of the specification reads, not a column written onto the rows.
+            put("signal", transform.string("param") ?: transform.string("as"))
           }
         )
 

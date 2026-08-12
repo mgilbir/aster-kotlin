@@ -27,6 +27,8 @@ import dev.aster.vega.scene.RectD
 import dev.aster.vega.scene.RuleNode
 import dev.aster.vega.scene.SceneNode
 import dev.aster.vega.scene.SceneNodeIdAllocator
+import dev.aster.vega.scene.ScenePaint
+import dev.aster.vega.scene.Stroke
 import dev.aster.vega.scene.TextAlign
 import dev.aster.vega.scene.TextBaseline
 import dev.aster.vega.scene.TextEngine
@@ -208,6 +210,10 @@ public class AxisBuilder(
         }
       for (tick in ticks) {
         val at = AxisDefaults.crispRound(tick.position)
+        // A gridline's own `encode` block, resolved against the tick: this is how a chart picks the
+        // zero line out of the rest, and Vega-Lite writes every conditional guide property this way
+        // because Vega has no conditional guide properties of its own.
+        val strokeHere = gridEncodeStroke(spec, tick) ?: gridStroke
         children +=
           when (spec.orient) {
             Orient.BOTTOM,
@@ -218,7 +224,7 @@ public class AxisBuilder(
                 gridRange.first + undoOffset,
                 at,
                 gridRange.second + undoOffset,
-                gridStroke,
+                strokeHere,
                 metadata = gridMeta,
               )
             Orient.LEFT,
@@ -229,7 +235,7 @@ public class AxisBuilder(
                 at,
                 gridRange.second + undoOffset,
                 at,
-                gridStroke,
+                strokeHere,
                 metadata = gridMeta,
               )
           }
@@ -741,6 +747,16 @@ public class AxisBuilder(
     val datum =
       VegaValue.Obj(linkedMapOf("value" to tick.value, "label" to VegaValue.Str(tick.label)))
     return encoder.channelText(entry, datum)
+  }
+
+  /** The stroke an `encode.grid` block gives this gridline, or null where it says nothing. */
+  private fun gridEncodeStroke(spec: AxisSpec, tick: Tick): Stroke? {
+    val encoder = channels ?: return null
+    val entry = spec.encode["grid"]?.update?.get("stroke") ?: return null
+    val datum = VegaValue.Obj(linkedMapOf("value" to tick.value))
+    val colour = encoder.channelColor(entry, datum) ?: return null
+    return GuideStyle.stroke(spec.gridStyle, AxisDefaults.gridColor)
+      .copy(paint = ScenePaint.Solid(colour))
   }
 
   private fun labelChannel(spec: AxisSpec, channel: String, tick: Tick): Double? {

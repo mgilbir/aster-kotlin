@@ -174,6 +174,16 @@ public class MarkEncoder(
   public fun channelText(channel: ChannelValue, datum: VegaValue): String? = string(channel, datum)
 
   /**
+   * The same, as a colour: an axis picking one gridline out of the rest by a condition on its tick.
+   *
+   * Resolved through the same machinery so the conditional, the signal and the scale lookup all
+   * behave here as they do on a mark — the alternative being a second, smaller reader that agrees
+   * until the day one of them is fixed.
+   */
+  public fun channelColor(channel: ChannelValue, datum: VegaValue): SceneColor? =
+    string(channel, datum)?.let { SceneColor.parse(it) }
+
+  /**
    * A mark's scene items, as data another mark can be drawn from.
    *
    * Vega marks share a namespace with datasets, so `"from": {"data": "category-line"}` names the

@@ -221,6 +221,7 @@ internal object Guides {
     if (view.spec.mark == "rect" && def.type?.isDiscrete == true) axis.set("zindex", num(1))
 
     user?.fields?.forEach { (key, value) -> axis.properties[key] = value }
+    conditionalToEncode(axis)
 
     // `defaultTickMinStep`: a `d` format asks for whole numbers, so no tick may be closer than one.
     // Read *after* the specification's own block, because that is where the format usually comes
@@ -275,6 +276,75 @@ internal object Guides {
     return if (45 <= angle && angle <= 135) "top" else "bottom"
   }
 
+  /**
+   * The Vega encode channel a **conditional** axis property becomes —
+   * `CONDITIONAL_AXIS_PROP_INDEX`.
+   *
+   * Vega has no conditional guide properties, so a `gridColor` written as a condition has to become
+   * a `stroke` on the grid *part*'s encode block, as an array of refs ending in the unconditional
+   * one. Left where it was written, Vega reads the whole object as a colour and paints nothing.
+   */
+  private val CONDITIONAL_AXIS_PARTS: Map<String, Pair<String, String>> =
+    mapOf(
+      "labelAlign" to ("labels" to "align"),
+      "labelBaseline" to ("labels" to "baseline"),
+      "labelColor" to ("labels" to "fill"),
+      "labelFont" to ("labels" to "font"),
+      "labelFontSize" to ("labels" to "fontSize"),
+      "labelFontStyle" to ("labels" to "fontStyle"),
+      "labelFontWeight" to ("labels" to "fontWeight"),
+      "labelOpacity" to ("labels" to "opacity"),
+      "gridColor" to ("grid" to "stroke"),
+      "gridDash" to ("grid" to "strokeDash"),
+      "gridDashOffset" to ("grid" to "strokeDashOffset"),
+      "gridOpacity" to ("grid" to "opacity"),
+      "gridWidth" to ("grid" to "strokeWidth"),
+      "tickColor" to ("ticks" to "stroke"),
+      "tickDash" to ("ticks" to "strokeDash"),
+      "tickDashOffset" to ("ticks" to "strokeDashOffset"),
+      "tickOpacity" to ("ticks" to "opacity"),
+      "tickWidth" to ("ticks" to "strokeWidth"),
+    )
+
+  /** Moves every conditional property onto the encode block of the part it paints. */
+  private fun conditionalToEncode(axis: AxisComponent) {
+    val moved = LinkedHashMap<String, LinkedHashMap<String, VegaValue>>()
+    for ((property, mapping) in CONDITIONAL_AXIS_PARTS) {
+      val value = axis.properties[property] as? VegaValue.Obj ?: continue
+      val condition = value["condition"] ?: continue
+      val (part, vgProp) = mapping
+      val otherwise = obj { value.fields.forEach { (k, v) -> if (k != "condition") put(k, v) } }
+      val conditions =
+        when (condition) {
+          is VegaValue.Arr -> condition.values
+          else -> listOf(condition)
+        }
+      moved.getOrPut(part) { LinkedHashMap() }[vgProp] = arr(conditions + otherwise)
+      axis.properties.remove(property)
+    }
+    if (moved.isEmpty()) return
+    val existing = axis.properties["encode"] as? VegaValue.Obj
+    axis.properties["encode"] = obj {
+      existing?.fields?.forEach { (k, v) -> put(k, v) }
+      moved.forEach { (part, channels) ->
+        put(part, obj { put("update", obj { channels.forEach { (k, v) -> put(k, v) } }) })
+      }
+    }
+  }
+
+  /**
+   * The half of an `encode` block that belongs to one of the two axes a component splits into.
+   *
+   * The gridlines are drawn by the grid axis and everything else by the axis proper, so a `grid`
+   * part carried onto the main axis encodes a mark that is not there — and one left off the grid
+   * axis leaves the gridlines unpainted.
+   */
+  private fun encodeFor(encode: VegaValue, kind: String): VegaValue? {
+    val parts = (encode as? VegaValue.Obj)?.fields ?: return null
+    val kept = parts.filterKeys { (it == "grid") == (kind == "grid") }
+    return if (kept.isEmpty()) null else obj { kept.forEach { (k, v) -> put(k, v) } }
+  }
+
   /** Splits one component into the gridline axis and the axis proper, in that order. */
   fun assembleAxis(axis: AxisComponent, kind: String): VegaValue? {
     val grid = (axis.properties["grid"] as? VegaValue.Bool)?.value == true
@@ -286,7 +356,8 @@ internal object Guides {
       val zindex = axis.properties["zindex"] ?: num(0)
       if (kind == "grid") {
         axis.properties.forEach { (key, value) ->
-          if (key !in setOf("scale", "orient", "zindex") && key !in MAIN_ONLY) put(key, value)
+          if (key == "encode") encodeFor(value, kind)?.let { put(key, it) }
+          else if (key !in setOf("scale", "orient", "zindex") && key !in MAIN_ONLY) put(key, value)
         }
         put("domain", false)
         put("labels", false)
@@ -302,7 +373,10 @@ internal object Guides {
         // rather than picking one, so a shared axis says what it is showing.
         if (axis.titles.isNotEmpty()) put("title", str(axis.titles.distinct().joinToString(", ")))
         axis.properties.forEach { (key, value) ->
-          if (key !in setOf("scale", "orient", "grid", "title", "zindex") && key !in GRID_ONLY) {
+          if (key == "encode") encodeFor(value, kind)?.let { put(key, it) }
+          else if (
+            key !in setOf("scale", "orient", "grid", "title", "zindex") && key !in GRID_ONLY
+          ) {
             put(key, value)
           }
         }
