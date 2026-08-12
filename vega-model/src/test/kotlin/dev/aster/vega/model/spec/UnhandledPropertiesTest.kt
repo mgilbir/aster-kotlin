@@ -120,10 +120,9 @@ class UnhandledPropertiesTest {
               "cursor": {"value": "pointer"}}}}]"""
         )
       )
-    assertEquals(
-      listOf("limit", "tooltip", "cornerRadiusTopLeft", "zindex", "cursor").sorted(),
-      reported.sorted(),
-    )
+    // `tooltip`, `zindex` and `cursor` came off this list when they were implemented: the datum a
+    // tooltip shows, the paint order within a mark, and the pointer shape over an item.
+    assertEquals(listOf("limit", "cornerRadiusTopLeft").sorted(), reported.sorted())
   }
 
   /** A channel the engine does read is not reported, or the diagnostics would be noise. */

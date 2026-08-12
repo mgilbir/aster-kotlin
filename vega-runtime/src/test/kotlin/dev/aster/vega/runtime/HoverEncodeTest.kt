@@ -55,6 +55,22 @@ class HoverEncodeTest {
     """
       .trimIndent()
 
+  /**
+   * The same chart, but the hovered bar raises itself, names a cursor and writes its own tooltip.
+   */
+  private val raisingJson =
+    json
+      .replace(
+        """"tooltip": {"field": "c"}""",
+        """"tooltip": {"signal": "'bar ' + datum.c"}, "cursor": {"value": "pointer"},
+           "zindex": {"value": 0}""",
+      )
+      .replace(
+        """"hover": {"fill": {"value": "firebrick"}, "fillOpacity": {"value": 0.5}}""",
+        """"hover": {"fill": {"value": "firebrick"}, "fillOpacity": {"value": 0.5},
+           "zindex": {"value": 1}}""",
+      )
+
   private fun rects(): List<RectNode> {
     val out = mutableListOf<RectNode>()
     fun walk(node: SceneNode) {
@@ -136,6 +152,51 @@ class HoverEncodeTest {
 
     assertEquals(SceneColor.parse("firebrick"), fillOf(1))
     assertTrue(controller.snapshot.interactionState.selection.nodeIds.isNotEmpty())
+  }
+
+  @Test
+  fun `a raised item is drawn over its neighbours, and only within its own mark`() {
+    // `zindex` on an item is paint order *within* the mark. The middle bar starts second of three
+    // and, raised, has to be painted last of the three — but still under the axis, which is a
+    // sibling of the mark in the same group.
+    controller.setSpec(raisingJson)
+    assertEquals(listOf(0, 1, 2), rects().map { it.metadata.datumIndex })
+
+    controller.dispatch(ChartInputEvent.PointerMoved(onMiddle))
+
+    assertEquals(listOf(0, 2, 1), rects().map { it.metadata.datumIndex })
+    assertEquals(1, rects().last().metadata.zindex)
+  }
+
+  @Test
+  fun `moving off puts the raised item back where the data had it`() {
+    controller.setSpec(raisingJson)
+    controller.dispatch(ChartInputEvent.PointerMoved(onMiddle))
+    controller.dispatch(ChartInputEvent.PointerExited(null))
+
+    assertEquals(listOf(0, 1, 2), rects().map { it.metadata.datumIndex })
+  }
+
+  @Test
+  fun `the cursor the item asks for is published for the host to apply`() {
+    // Published rather than applied here: what a cursor *is* differs by platform, so the host maps
+    // the CSS name to a `PointerIcon` or writes it into a style attribute.
+    controller.setSpec(raisingJson)
+    assertNull(controller.snapshot.interactionState.cursor)
+
+    controller.dispatch(ChartInputEvent.PointerMoved(onMiddle))
+    assertEquals("pointer", controller.snapshot.interactionState.cursor)
+
+    controller.dispatch(ChartInputEvent.PointerExited(null))
+    assertNull(controller.snapshot.interactionState.cursor)
+  }
+
+  @Test
+  fun `a tooltip channel wins over the datum`() {
+    controller.setSpec(raisingJson)
+    controller.dispatch(ChartInputEvent.PointerMoved(onMiddle))
+
+    assertEquals("bar b", tooltipText(controller.snapshot.interactionState.tooltip!!))
   }
 
   @Test

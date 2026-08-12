@@ -450,6 +450,9 @@ private val ENCODE_CONSUMED =
     "strokeWidth",
     "opacity",
     "cornerRadius",
+    "cursor",
+    "tooltip",
+    "zindex",
     "defined",
     "interpolate",
     "orient",
@@ -475,9 +478,6 @@ private val ENCODE_UNSUPPORTED =
   mapOf(
     "limit" to "Text truncation is not implemented; the text is drawn in full",
     "ellipsis" to "Text truncation is not implemented, so its ellipsis has nothing to mark",
-    "tooltip" to
-      "Tooltip content from an encode channel is not implemented; a tooltip is built from the " +
-        "mark's own fields instead",
     "cornerRadiusTopLeft" to
       "Per-corner radii are not implemented; use 'cornerRadius' for all four",
     "cornerRadiusTopRight" to
@@ -488,12 +488,9 @@ private val ENCODE_UNSUPPORTED =
       "Per-corner radii are not implemented; use 'cornerRadius' for all four",
     "blend" to "Blend modes from an encode channel are not implemented",
     "clip" to "Clipping from an encode channel is not implemented; use the mark's own 'clip'",
-    "zindex" to "Per-item z-order is not implemented; marks are drawn in specification order",
     "tension" to "Curve tension is not implemented; it needs an interpolation method first",
     "theta" to "Polar positioning is not implemented",
     "radius" to "Polar positioning is not implemented",
-    "scaleX" to "Per-item scaling is not implemented",
-    "scaleY" to "Per-item scaling is not implemented",
   )
 
 /** A parsed specification plus everything the parser could not honour. */

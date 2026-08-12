@@ -276,6 +276,9 @@ constructor(context: Context, attrs: AttributeSet? = null, defStyleAttr: Int = 0
 
   private val tooltipRect = RectF()
 
+  /** The icon currently set, so an unchanged cursor does not churn the window's pointer. */
+  private var appliedCursor: Int? = null
+
   private fun asStringOf(value: dev.aster.vega.model.VegaValue): String = value.asString()
 
   private val tooltipFillPaint =
@@ -330,8 +333,55 @@ constructor(context: Context, attrs: AttributeSet? = null, defStyleAttr: Int = 0
       canvas.restoreToCount(saveCount)
     }
     if (tooltipsEnabled) drawTooltip(canvas, interaction)
+    applyCursor(interaction.cursor)
     drawnRevision = snapshot.revision
   }
+
+  /**
+   * Sets the pointer shape the item under the pointer asked for.
+   *
+   * A `cursor` channel is a CSS name, and Android has a fixed set of system icons rather than a
+   * string — so the mapping is by name, and a name Android has no icon for leaves the pointer alone
+   * rather than resetting it to the arrow. Only meaningful where there is a pointer at all: a
+   * finger has no shape, and `setPointerIcon` is simply ignored for one.
+   */
+  private fun applyCursor(cursor: String?) {
+    val icon = cursor?.let { pointerIconFor(it) }
+    if (icon == appliedCursor) return
+    appliedCursor = icon
+    pointerIcon = icon?.let { android.view.PointerIcon.getSystemIcon(context, it) }
+  }
+
+  /** CSS cursor names to Android's system icons, for the ones that correspond. */
+  private fun pointerIconFor(name: String): Int? =
+    when (name.lowercase()) {
+      "default" -> android.view.PointerIcon.TYPE_ARROW
+      "pointer" -> android.view.PointerIcon.TYPE_HAND
+      "crosshair" -> android.view.PointerIcon.TYPE_CROSSHAIR
+      "text" -> android.view.PointerIcon.TYPE_TEXT
+      "vertical-text" -> android.view.PointerIcon.TYPE_VERTICAL_TEXT
+      "wait" -> android.view.PointerIcon.TYPE_WAIT
+      "progress" -> android.view.PointerIcon.TYPE_WAIT
+      "help" -> android.view.PointerIcon.TYPE_HELP
+      "cell" -> android.view.PointerIcon.TYPE_CROSSHAIR
+      "copy" -> android.view.PointerIcon.TYPE_COPY
+      "alias" -> android.view.PointerIcon.TYPE_ALIAS
+      "no-drop",
+      "not-allowed" -> android.view.PointerIcon.TYPE_NO_DROP
+      "grab" -> android.view.PointerIcon.TYPE_GRAB
+      "grabbing" -> android.view.PointerIcon.TYPE_GRABBING
+      "all-scroll" -> android.view.PointerIcon.TYPE_ALL_SCROLL
+      "col-resize" -> android.view.PointerIcon.TYPE_HORIZONTAL_DOUBLE_ARROW
+      "row-resize" -> android.view.PointerIcon.TYPE_VERTICAL_DOUBLE_ARROW
+      "ew-resize" -> android.view.PointerIcon.TYPE_HORIZONTAL_DOUBLE_ARROW
+      "ns-resize" -> android.view.PointerIcon.TYPE_VERTICAL_DOUBLE_ARROW
+      "nesw-resize" -> android.view.PointerIcon.TYPE_TOP_RIGHT_DIAGONAL_DOUBLE_ARROW
+      "nwse-resize" -> android.view.PointerIcon.TYPE_TOP_LEFT_DIAGONAL_DOUBLE_ARROW
+      "zoom-in" -> android.view.PointerIcon.TYPE_ZOOM_IN
+      "zoom-out" -> android.view.PointerIcon.TYPE_ZOOM_OUT
+      "none" -> android.view.PointerIcon.TYPE_NULL
+      else -> null
+    }
 
   /**
    * Draws the tooltip for whatever the pointer is on.

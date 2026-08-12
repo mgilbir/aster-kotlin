@@ -53,13 +53,54 @@ public data class Scene(
     }
     if (node !is GroupNode) return null
     var changed = false
+    val swappedHere = mutableListOf<Int>()
     val children =
-      node.children.map { child ->
+      node.children.mapIndexed { index, child ->
         val swapped = replaceIn(child, replacements)
-        if (swapped != null) changed = true
+        if (swapped != null) {
+          changed = true
+          if (replacements.containsKey(child.id)) swappedHere += index
+        }
         swapped ?: child
       }
-    return if (changed) node.copy(children = children) else null
+    if (!changed) return null
+    return node.copy(children = raiseSwapped(children, swappedHere))
+  }
+
+  /**
+   * Re-sorts the marks around a swapped item by `zindex`, which is what raises a hovered one.
+   *
+   * `zindex` on an *item* is paint order **within its own mark**, so the sort is confined to the
+   * run of children that came from the same mark — a raised bar must draw over its neighbours and
+   * still under the axis. A mark's items are contiguous in the group, so the run is found by
+   * walking out from the swap while the mark's name and kind stay the same.
+   *
+   * Stable, so items sharing a `zindex` keep the order the data gave them.
+   */
+  private fun raiseSwapped(children: List<SceneNode>, swapped: List<Int>): List<SceneNode> {
+    if (swapped.isEmpty()) return children
+    if (children.none { it.metadata.zindex != 0 }) return children
+    val out = children.toMutableList()
+    val done = mutableSetOf<Int>()
+    for (index in swapped) {
+      if (index in done) continue
+      val name = out[index].metadata.markName
+      val kind = out[index].metadata.markKind
+      fun sameMark(node: SceneNode) =
+        node.metadata.role == "mark" &&
+          node.metadata.markName == name &&
+          node.metadata.markKind == kind
+      if (!sameMark(out[index])) continue
+      var from = index
+      while (from > 0 && sameMark(out[from - 1])) from--
+      var to = index
+      while (to < out.size - 1 && sameMark(out[to + 1])) to++
+      for (i in from..to) done += i
+      val run = out.subList(from, to + 1)
+      val sorted = run.sortedBy { it.metadata.zindex }
+      for (i in sorted.indices) out[from + i] = sorted[i]
+    }
+    return out
   }
 
   public companion object {

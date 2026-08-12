@@ -237,7 +237,11 @@ internal class ScopeCompiler(
         // pointer
         // would leave the pointer over nothing.
         val before = ids.mark()
-        built[index] = encoder.encode(mark, rows, transformed.written)
+        // Sorted by each item's own `zindex`, which is paint order *within* the mark: a bar the
+        // specification raised draws over its neighbours and still under the axis. Stable, so items
+        // sharing a `zindex` keep the order the data gave them.
+        built[index] =
+          encoder.encode(mark, rows, transformed.written).sortedBy { it.metadata.zindex }
         if (mark.encode.hover.isNotEmpty()) {
           val after = ids.mark()
           ids.rewind(before)

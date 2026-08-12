@@ -1155,7 +1155,12 @@ public class MarkEncoder(
       datumIndex = index,
       interactive = spec.interactive,
       datum = datum,
-      tooltip = datum,
+      // The `tooltip` channel when there is one, and the whole row when there is not. Upstream does
+      // the same, and the difference shows on a chart that wants one line rather than a table.
+      tooltip =
+        channels["tooltip"]?.let { value(it, datum) }?.takeIf { it !is VegaValue.Null } ?: datum,
+      cursor = string(channels["cursor"], datum),
+      zindex = number(channels["zindex"], datum)?.toInt() ?: 0,
       accessibility = describe(spec, datum, channels),
     )
 

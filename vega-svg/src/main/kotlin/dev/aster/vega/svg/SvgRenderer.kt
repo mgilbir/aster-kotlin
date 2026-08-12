@@ -176,7 +176,7 @@ public class SvgRenderer(private val options: SvgOptions = SvgOptions()) {
     appendTransform(out, node.transform)
     appendOpacity(out, node.opacity)
     clipId?.let { out.append(" clip-path=\"url(#").append(it).append(")\"") }
-    appendBlendMode(out, node.blendMode)
+    appendStyle(out, node, node.blendMode)
     appendAccessibility(out, node)
     out.append('>')
 
@@ -217,7 +217,7 @@ public class SvgRenderer(private val options: SvgOptions = SvgOptions()) {
     appendStroke(out, node.stroke, defs, node.bounds)
     appendTransform(out, node.transform)
     appendOpacity(out, node.opacity)
-    appendBlendMode(out, node.blendMode)
+    appendStyle(out, node, node.blendMode)
     appendAccessibility(out, node)
     out.append("/>")
   }
@@ -231,7 +231,7 @@ public class SvgRenderer(private val options: SvgOptions = SvgOptions()) {
     appendStroke(out, node.stroke, defs, node.bounds)
     appendTransform(out, node.transform)
     appendOpacity(out, node.opacity)
-    appendBlendMode(out, node.blendMode)
+    appendStyle(out, node, node.blendMode)
     appendAccessibility(out, node)
     out.append("/>")
   }
@@ -243,7 +243,7 @@ public class SvgRenderer(private val options: SvgOptions = SvgOptions()) {
     appendStroke(out, node.stroke, defs, node.bounds)
     appendTransform(out, node.transform)
     appendOpacity(out, node.opacity)
-    appendBlendMode(out, node.blendMode)
+    appendStyle(out, node, node.blendMode)
     appendAccessibility(out, node)
     out.append("/>")
   }
@@ -255,7 +255,7 @@ public class SvgRenderer(private val options: SvgOptions = SvgOptions()) {
     appendStroke(out, node.stroke, defs, node.bounds)
     appendTransform(out, node.transform)
     appendOpacity(out, node.opacity)
-    appendBlendMode(out, node.blendMode)
+    appendStyle(out, node, node.blendMode)
     appendAccessibility(out, node)
     out.append("/>")
   }
@@ -291,7 +291,7 @@ public class SvgRenderer(private val options: SvgOptions = SvgOptions()) {
           .concat(Transform2D.translate(-node.x, -node.y))
     appendTransform(out, transform)
     appendOpacity(out, node.opacity)
-    appendBlendMode(out, node.blendMode)
+    appendStyle(out, node, node.blendMode)
     appendAccessibility(out, node)
     out.append('>')
 
@@ -408,9 +408,18 @@ public class SvgRenderer(private val options: SvgOptions = SvgOptions()) {
     if (opacity != 1.0) out.append(" opacity=\"").append(num(opacity)).append('"')
   }
 
-  private fun appendBlendMode(out: StringBuilder, mode: SceneBlendMode) {
-    if (mode == SceneBlendMode.NORMAL) return
-    out.append(" style=\"mix-blend-mode:").append(mode.name.lowercase()).append('"')
+  /**
+   * The one `style` attribute an element gets, holding whatever needs to be CSS rather than SVG.
+   *
+   * One attribute rather than two, because a blend mode and a cursor both live in `style` and an
+   * element carrying it twice is invalid — a browser keeps one and silently drops the other.
+   */
+  private fun appendStyle(out: StringBuilder, node: SceneNode, mode: SceneBlendMode) {
+    val parts = mutableListOf<String>()
+    if (mode != SceneBlendMode.NORMAL) parts += "mix-blend-mode:" + mode.name.lowercase()
+    node.metadata.cursor?.takeIf { it.isNotEmpty() }?.let { parts += "cursor:" + it }
+    if (parts.isEmpty()) return
+    out.append(" style=\"").append(escapeXml(parts.joinToString(";"))).append('"')
   }
 
   private fun appendAccessibility(out: StringBuilder, node: SceneNode) {

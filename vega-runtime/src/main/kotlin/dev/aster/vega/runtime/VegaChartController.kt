@@ -383,6 +383,7 @@ public class VegaChartController(
         hoveredNodeId = node?.id,
         tooltip = node?.metadata?.tooltip,
         tooltipAnchor = if (node?.metadata?.tooltip != null) point else null,
+        cursor = node?.metadata?.cursor,
       ),
       scene = hoveredScene(node?.id),
     )

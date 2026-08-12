@@ -90,7 +90,30 @@ public data class NodeMetadata(
    * same object the encoder saw rather than a copy, so it costs a reference.
    */
   val datum: VegaValue? = null,
+  /**
+   * What a tooltip should say, which is **not** always the datum.
+   *
+   * Upstream's `tooltip` encode channel puts whatever it resolves to on the item, and a chart that
+   * wants one line rather than a whole row writes one: `{"signal": "datum.name + ': ' + datum.v"}`.
+   * With no channel the item carries its datum, which is what upstream does too.
+   */
   val tooltip: VegaValue? = null,
+  /**
+   * The pointer shape over this item, as the CSS name a specification writes.
+   *
+   * Carried on the node rather than resolved to a platform constant because the platforms disagree
+   * about what they have: a host maps it to a `PointerIcon` on Android and emits it verbatim in
+   * SVG.
+   */
+  val cursor: String? = null,
+  /**
+   * Paint order **within** the item's own mark, `zindex`.
+   *
+   * Zero for almost everything. It matters on hover — a raised item has to be drawn over its
+   * neighbours, which is a reordering and not a repaint — and the sort is stable, so items sharing
+   * a `zindex` keep the order the data gave them.
+   */
+  val zindex: Int = 0,
   val accessibility: AccessibilityDescriptor? = null,
 ) {
   public companion object {
