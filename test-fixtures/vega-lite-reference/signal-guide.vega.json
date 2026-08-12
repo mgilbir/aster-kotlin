@@ -1,0 +1,173 @@
+{
+  "$schema": "https://vega.github.io/schema/vega/v6.json",
+  "description": "A guide property computed by a parameter, which Vega reads as a signal.",
+  "background": "white",
+  "padding": 5,
+  "height": 300,
+  "style": "cell",
+  "data": [
+    {
+      "name": "source_0",
+      "url": "data/cars.json",
+      "format": {
+        "type": "json"
+      },
+      "transform": [
+        {
+          "type": "aggregate",
+          "groupby": [
+            "Origin"
+          ],
+          "ops": [
+            "count"
+          ],
+          "fields": [
+            null
+          ],
+          "as": [
+            "__count"
+          ]
+        }
+      ]
+    }
+  ],
+  "signals": [
+    {
+      "name": "x_step",
+      "value": 20
+    },
+    {
+      "name": "width",
+      "update": "bandspace(domain('x').length, 1, 0.5) * x_step"
+    },
+    {
+      "name": "xLabelAngle",
+      "value": 45,
+      "bind": {
+        "input": "range",
+        "min": -90,
+        "max": 90
+      }
+    }
+  ],
+  "marks": [
+    {
+      "name": "marks",
+      "type": "symbol",
+      "style": [
+        "point"
+      ],
+      "from": {
+        "data": "source_0"
+      },
+      "encode": {
+        "update": {
+          "fill": {
+            "value": "transparent"
+          },
+          "stroke": {
+            "value": "#4c78a8"
+          },
+          "ariaRoleDescription": {
+            "value": "point"
+          },
+          "description": {
+            "signal": "\"Origin: \" + (isValid(datum[\"Origin\"]) ? isArray(datum[\"Origin\"]) ? join(datum[\"Origin\"], ' ') : datum[\"Origin\"] : \"\"+datum[\"Origin\"]) + \"; Count of Records: \" + (format(datum[\"__count\"], \"\"))"
+          },
+          "x": {
+            "scale": "x",
+            "field": "Origin"
+          },
+          "y": {
+            "scale": "y",
+            "field": "__count"
+          }
+        }
+      }
+    }
+  ],
+  "scales": [
+    {
+      "name": "x",
+      "type": "point",
+      "domain": {
+        "data": "source_0",
+        "field": "Origin",
+        "sort": true
+      },
+      "range": {
+        "step": {
+          "signal": "x_step"
+        }
+      },
+      "padding": 0.5
+    },
+    {
+      "name": "y",
+      "type": "linear",
+      "domain": {
+        "data": "source_0",
+        "field": "__count"
+      },
+      "range": [
+        {
+          "signal": "height"
+        },
+        0
+      ],
+      "nice": true,
+      "zero": true
+    }
+  ],
+  "axes": [
+    {
+      "scale": "y",
+      "orient": "left",
+      "gridScale": "x",
+      "grid": true,
+      "tickCount": {
+        "signal": "ceil(height/40)"
+      },
+      "domain": false,
+      "labels": false,
+      "aria": false,
+      "maxExtent": 0,
+      "minExtent": 0,
+      "ticks": false,
+      "zindex": 0
+    },
+    {
+      "scale": "x",
+      "orient": "bottom",
+      "grid": false,
+      "title": "Origin",
+      "labelAngle": {
+        "signal": "xLabelAngle"
+      },
+      "encode": {
+        "labels": {
+          "update": {
+            "align": {
+              "signal": "((((xLabelAngle % 360) + 360) % 360) % 180 === 0) ? null :(0 < (((xLabelAngle % 360) + 360) % 360) && (((xLabelAngle % 360) + 360) % 360) < 180) === true ? \"left\" : \"right\""
+            },
+            "baseline": {
+              "signal": "(45 < (((xLabelAngle % 360) + 360) % 360) && (((xLabelAngle % 360) + 360) % 360) < 135) || (225 < (((xLabelAngle % 360) + 360) % 360) && (((xLabelAngle % 360) + 360) % 360) < 315) ? \"middle\" :((((xLabelAngle % 360) + 360) % 360) <= 45 || 315 <= (((xLabelAngle % 360) + 360) % 360)) === false ? \"bottom\" : \"top\""
+            }
+          }
+        }
+      },
+      "zindex": 0
+    },
+    {
+      "scale": "y",
+      "orient": "left",
+      "grid": false,
+      "title": "Count of Records",
+      "labelOverlap": true,
+      "tickCount": {
+        "signal": "ceil(height/40)"
+      },
+      "zindex": 0
+    }
+  ]
+}

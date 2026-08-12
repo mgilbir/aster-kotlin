@@ -279,12 +279,16 @@ public class AxisBuilder(
           TextRun(
             text = labelText(spec, tick) ?: tick.label,
             style = labelStyle,
+            // The labels' own `encode` comes first: an angle supplied by a signal cannot be
+            // compared at compile time, so Vega-Lite writes the *comparison* into the encode and
+            // leaves the axis property off. Reading only the property left the labels at the
+            // anchor the orientation would have chosen.
             align =
-              alignOf(spec.labelAlign)
+              alignOf(labelText(spec, "align", tick) ?: spec.labelAlign)
                 ?: (if (spec.orient.isVertical) null else flushed?.let(::flushAlign))
                 ?: labelAlign(spec.orient),
             baseline =
-              baselineOf(spec.labelBaseline)
+              baselineOf(labelText(spec, "baseline", tick) ?: spec.labelBaseline)
                 ?: (if (spec.orient.isVertical) flushed?.let(::flushBaseline) else null)
                 ?: labelBaseline(spec.orient),
             limit = labelLimit,
@@ -757,6 +761,15 @@ public class AxisBuilder(
     val colour = encoder.channelColor(entry, datum) ?: return null
     return GuideStyle.stroke(spec.gridStyle, AxisDefaults.gridColor)
       .copy(paint = ScenePaint.Solid(colour))
+  }
+
+  /** The same as [labelChannel], for a channel whose answer is a word rather than a number. */
+  private fun labelText(spec: AxisSpec, channel: String, tick: Tick): String? {
+    val encoder = channels ?: return null
+    val entry = spec.encode["labels"]?.update?.get(channel) ?: return null
+    val datum =
+      VegaValue.Obj(linkedMapOf("value" to tick.value, "label" to VegaValue.Str(tick.label)))
+    return encoder.channelText(entry, datum)
   }
 
   private fun labelChannel(spec: AxisSpec, channel: String, tick: Tick): Double? {

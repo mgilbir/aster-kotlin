@@ -1720,6 +1720,22 @@ An arc that states its own `outerRadius` is not measured from the plotting area 
 naming its own reach means it, and it still needs an inner radius of zero, Vega drawing nothing at
 all where neither is given.
 
+### An angle nobody can read yet
+
+`defaultLabelAlign` has a second half this compiler had never reached: where the label angle comes
+from a **signal**, the comparison cannot be made here, so it is written out as an expression and
+handed to Vega. The two answers then have to live on the labels' own `encode`, an axis property
+taking a constant rather than a rule — which is why upstream's axis carries neither `labelAlign` nor
+`labelBaseline` in that case and an `encode.labels.update` instead.
+
+The runtime met it halfway again: it read the axis *property* and never the labels' encode, so a
+label whose alignment was computed sat wherever the orientation would have put it.
+
+Beside them, `replaceExprRef`: `{"expr": …}` on a guide is Vega-Lite's way of writing a signal and
+Vega's way is `{"signal": …}`. Passed through, the property was unread and the guide stayed at its
+default. And a mark's own `xOffset` applies wherever the position lands — including *inside* a
+bucketed bar's spacing, where the two nudges compose rather than one replacing the other.
+
 ### Two runtime gaps this batch names but does not close
 
 `density`'s fixture is not in the corpus, and `trail`'s draws no legend. Both compile exactly as

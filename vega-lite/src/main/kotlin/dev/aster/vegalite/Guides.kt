@@ -125,6 +125,29 @@ internal object Guides {
     fun override(name: String, value: VegaValue) {
       properties[name] = value
     }
+
+    /** A property that has to be a *rule* rather than a constant, on the labels' own encode. */
+    fun encodeLabel(channel: String, value: VegaValue) {
+      val existing = properties["encode"] as? VegaValue.Obj
+      val labels = (existing?.fields?.get("labels") as? VegaValue.Obj)?.fields.orEmpty()
+      val update = (labels["update"] as? VegaValue.Obj)?.fields.orEmpty()
+      properties["encode"] = obj {
+        existing?.fields?.forEach { (key, part) -> if (key != "labels") put(key, part) }
+        put(
+          "labels",
+          obj {
+            labels.forEach { (key, part) -> if (key != "update") put(key, part) }
+            put(
+              "update",
+              obj {
+                update.forEach { (key, part) -> put(key, part) }
+                put(channel, value)
+              },
+            )
+          },
+        )
+      }
+    }
   }
 
   fun parseAxis(
@@ -185,8 +208,19 @@ internal object Guides {
       user?.number("labelAngle")
         ?: if (channel == "x" && def.type?.isDiscrete == true && def.timeUnit == null) 270.0
         else null
-    if (labelAngle != null) {
-      val side = user?.string("orient") ?: if (channel == "x") "bottom" else "left"
+    val side = user?.string("orient") ?: if (channel == "x") "bottom" else "left"
+    // An angle a *signal* supplies cannot be compared here, so the comparison is written out and
+    // handed to Vega: `defaultLabelAlign`'s signal branch. The two answers then have to live on the
+    // labels' own `encode`, an axis property taking a constant rather than a rule.
+    val angleSignal =
+      (user?.fields?.get("labelAngle") as? VegaValue.Obj)?.let {
+        it.string("expr") ?: it.string("signal")
+      }
+    if (angleSignal != null) {
+      val turned = "((($angleSignal % 360) + 360) % 360)"
+      turnedAlign(turned, channel, side)?.let { axis.encodeLabel("align", signalRef(it)) }
+      turnedBaseline(turned, channel, side)?.let { axis.encodeLabel("baseline", signalRef(it)) }
+    } else if (labelAngle != null) {
       axis.set("labelAngle", num(labelAngle))
       labelAlign(labelAngle, channel, side)?.let { axis.set("labelAlign", str(it)) }
       labelBaseline(labelAngle, channel, side)?.let { axis.set("labelBaseline", str(it)) }
@@ -242,7 +276,9 @@ internal object Guides {
       axis.set("zindex", num(1))
     }
 
-    user?.fields?.forEach { (key, value) -> axis.properties[key] = value }
+    // `replaceExprRef`: an `{"expr": …}` written on a guide is a *signal* to Vega, which has no
+    // `expr`. Passing it through left the property unread and the guide at its default.
+    user?.fields?.forEach { (key, value) -> axis.properties[key] = asSignal(value) }
     conditionalToEncode(axis)
 
     // `defaultTickMinStep`: a `d` format asks for whole numbers, so no tick may be closer than one.
@@ -250,6 +286,38 @@ internal object Guides {
     // from — and `set` leaves a stated `tickMinStep` alone.
     if ((axis.properties["format"] as? VegaValue.Str)?.value == "d") axis.set("tickMinStep", num(1))
     return axis
+  }
+
+  /**
+   * `defaultLabelAlign`, written out for an angle nobody can read yet.
+   *
+   * The rule is the same as the constant one — is the label turned past the axis's own side? — but
+   * every branch of it has to be an expression, because the angle arrives at render time.
+   */
+  private fun turnedAlign(turned: String, channel: String, orient: String): String? {
+    val isX = channel == "x"
+    val startAngle = if (isX) 0 else 90
+    val main = if (isX) "bottom" else "left"
+    val forward = "($startAngle < $turned && $turned < ${180 + startAngle})"
+    val flat = if (isX) "null" else "\"center\""
+    val shifted = if (startAngle == 0) turned else "($turned + $startAngle)"
+    return "($shifted % 180 === 0) ? $flat :" +
+      "$forward === ${orient == main} ? \"left\" : \"right\""
+  }
+
+  private fun turnedBaseline(turned: String, channel: String, orient: String): String? {
+    if (channel == "x") {
+      return "(45 < $turned && $turned < 135) || (225 < $turned && $turned < 315) ? \"middle\" :" +
+        "($turned <= 45 || 315 <= $turned) === ${orient == "top"} ? \"bottom\" : \"top\""
+    }
+    return "$turned <= 45 || 315 <= $turned || (135 <= $turned && $turned <= 225) ? null : " +
+      "(45 <= $turned && $turned <= 135) === ${orient == "left"} ? \"top\" : \"bottom\""
+  }
+
+  /** `{"expr": …}` is Vega-Lite's way of writing a signal, and Vega's way is `{"signal": …}`. */
+  private fun asSignal(value: VegaValue): VegaValue {
+    val expression = (value as? VegaValue.Obj)?.takeIf { it.fields.keys == setOf("expr") }
+    return expression?.string("expr")?.let { signalRef(it) } ?: value
   }
 
   /**
@@ -554,7 +622,7 @@ internal object Guides {
         null -> Unit
         else -> if (gradient) put("direction", "horizontal")
       }
-      def.legend?.fields?.forEach { (key, value) -> put(key, value) }
+      def.legend?.fields?.forEach { (key, value) -> put(key, asSignal(value)) }
       if (gradient) {
         // A ramp is painted at the mark's own opacity, so a legend beside a chart of translucent
         // points is as translucent as they are — `gradient` in `legend/encode.ts`. Zero and absent

@@ -442,6 +442,8 @@ internal object Marks {
       "cornerRadiusEnd",
       "xOffset",
       "yOffset",
+      "x2Offset",
+      "y2Offset",
       // Consumed by the overlay normalizer before a mark is built. A `point: false` that reached
       // here would be emitted as an encode channel Vega has never heard of.
       "point",
@@ -1025,7 +1027,8 @@ internal object Marks {
       // twice would move it half a group to the right. `bandPosition` is 0 when the offset comes
       // from an encoding.
       if (scaleType == "band" && offset == null) put("band", num(0.5))
-      offset?.let { put("offset", it) }
+      // A mark's own `xOffset` is a plain nudge and applies wherever the position lands.
+      (offset ?: view.markDef.raw.fields["${channel}Offset"])?.let { put("offset", it) }
     }
   }
 
@@ -1420,10 +1423,15 @@ internal object Marks {
       // as a number.
       val minimum = canonicalNumberString(minBandSize)
       val turn = if (reversed) "(true ? -1 : 1) * " else ""
-      return signalRef(
-        "${Fields.expressionNumber(axisTranslate)} + $turn($sizeExpression < $minimum ? " +
-          "${sign}0.5 * ($minimum - ($sizeExpression)) : ${Fields.expressionNumber(spacingOffset)})"
-      )
+      // A mark's own offset on this end is added *inside* the spacing, so the two nudges compose
+      // rather than one replacing the other — `(${offset} + ${spacingAndSizeOffset})` upstream.
+      val own = view.markDef.raw.number(if (isEnd) "${channel}Offset" else "${channel2}Offset")
+      val spacingAndSize =
+        "($sizeExpression < $minimum ? ${sign}0.5 * ($minimum - ($sizeExpression)) : " +
+          "${Fields.expressionNumber(spacingOffset)})"
+      val nudged =
+        if (own == null) spacingAndSize else "(${Fields.expressionNumber(own)} + $spacingAndSize)"
+      return signalRef("${Fields.expressionNumber(axisTranslate)} + $turn$nudged")
     }
 
     // `x2` takes the bin's start and `x` its end, which is what makes the rect span the bin.
