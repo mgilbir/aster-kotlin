@@ -191,7 +191,8 @@ public object ImputeTransform : Transform {
             ?: run {
               context.diagnostics.error(
                 DiagnosticCodes.TRANSFORM_NOT_IMPLEMENTED,
-                "impute method '$method' is not implemented",
+                "'$method' is not one of impute's methods; they are value, mean, median, " +
+                  "min and max",
                 operator = type,
               )
               return input

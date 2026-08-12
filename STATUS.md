@@ -21,7 +21,7 @@ end to end — expressions, signals, 33 of upstream's 40 data transforms, every 
 and an event handler that recompiles the chart — and are verified against upstream Vega by
 differential tests.
 
-One hundred and thirty differential fixtures pass, all matching upstream exactly on every mark and
+One hundred and thirty-one differential fixtures pass, all matching upstream exactly on every mark and
 scale output:
 
 | Fixture | Marks | Covers |
@@ -201,7 +201,7 @@ substantive compatibility items:
 | 6. View and Compose APIs | Yes |
 | 7. SVG, PNG, PDF export | Yes |
 | 8. TalkBack can describe and navigate | Partial — virtual nodes are tested by instrumentation, not with TalkBack itself |
-| 9. At least 100 compatibility fixtures pass | **Yes** — 130 |
+| 9. At least 100 compatibility fixtures pass | **Yes** — 131 |
 | 10. Core runtime has no Android dependency | Yes |
 | 11. Renders without WebView | Yes |
 | 12. Build and test loop runs from the terminal | Yes |
@@ -538,7 +538,7 @@ each example a deadline.
 
 ## Known failing fixtures
 
-None. One hundred and thirty fixtures exist and all of them pass — and that sentence became worth
+None. One hundred and thirty-one fixtures exist and all of them pass — and that sentence became worth
 something only once the gate could no longer skip itself, below.
 
 **The gate could report success without running.** `FixtureDifferentialTest` reads the fixtures and
@@ -1666,6 +1666,33 @@ The object form `{"type": "rgb", "gamma": 2.2}` is read for its type, and its ga
 rather than dropped: only `interpolateRgb` has one in d3, and it bends the ramp's middle without moving
 either end — so a chart that asked for it and got the plain ramp would look composed and be wrong
 exactly where nobody checks.
+
+## Three aggregate operations, and four diagnostics that were lying
+
+Upstream has 26 aggregate operations and this engine had 23. The three missing were `product` and the
+two exponentially weighted means, and the pair is unlike everything else in the family twice over:
+
+- **their answer depends on the order of the rows.** Upstream accumulates `exp = r * exp + v` as the
+  rows arrive, so a value's weight is `r` to the power of how many rows follow it and the *last* row
+  counts most. Every other operation here is symmetric in its input.
+- **they are the only two that take a parameter.** `aggregate_params` sits positionally alongside
+  `ops`, and it is a *specification* property rather than an internal one — so `exponential` is
+  reachable from a chart and was reachable before this only as a diagnostic. `exponential` normalises
+  by `(1 - r) / (1 - r^n)` so the weights sum to one; `exponentialb` scales only by `(1 - r)`, which
+  is what makes it comparable across groups of different sizes.
+
+The more interesting half of this batch was what it found *not* to be missing. Four diagnostics said
+"is not implemented" about things that are:
+
+- `impute` accepts `value`, `mean`, `median`, `min` and `max` — upstream's whole enumerated set, and
+  all five have worked here since the transform was written;
+- `pivot` takes any aggregate operation, so with the three above added it takes all 26;
+- `window` implements all thirteen of upstream's window operations *and* every aggregate one.
+
+Each of those messages fired only for a name upstream itself rejects, and each read as an engine gap.
+They now say what is actually true — "'x' is neither a window operation nor an aggregate one" — which
+matters because a diagnostic that overstates a gap is the same failure as one that hides it: a reader
+plans around something that is not there.
 
 ## Performance observations
 

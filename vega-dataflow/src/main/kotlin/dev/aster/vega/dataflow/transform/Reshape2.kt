@@ -83,7 +83,7 @@ public object PivotTransform : Transform {
         ?: run {
           context.diagnostics.error(
             DiagnosticCodes.TRANSFORM_NOT_IMPLEMENTED,
-            "pivot operation '$opName' is not implemented",
+            "'$opName' is not one of Vega's aggregate operations, so pivot cannot use it",
             operator = type,
           )
           return input

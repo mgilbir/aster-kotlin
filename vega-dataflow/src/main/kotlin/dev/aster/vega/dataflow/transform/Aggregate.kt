@@ -5,6 +5,7 @@ import dev.aster.vega.model.DiagnosticCodes
 import dev.aster.vega.model.VegaValue
 import dev.aster.vega.model.field
 import dev.aster.vega.model.isMissing
+import kotlin.math.pow
 import kotlin.math.sqrt
 
 /**
@@ -23,6 +24,16 @@ public enum class AggregateOp(public val opName: String, public val needsField: 
   MISSING("missing", needsField = true),
   DISTINCT("distinct", needsField = true),
   SUM("sum", needsField = true),
+  PRODUCT("product", needsField = true),
+  /**
+   * An exponentially weighted mean, and the same thing unnormalised.
+   *
+   * The only two operations that take a **parameter** — the decay rate, from the transform's
+   * `aggregate_params` — and the only two whose answer depends on the *order* of the rows, because
+   * each value is weighted by how far it is from the end of the group.
+   */
+  EXPONENTIAL("exponential", needsField = true),
+  EXPONENTIALB("exponentialb", needsField = true),
   MEAN("mean", needsField = true),
   AVERAGE("average", needsField = true),
   MIN("min", needsField = true),
@@ -166,6 +177,14 @@ internal class Measure(
   private val op: AggregateOp,
   private val fieldPath: String?,
   val outputName: String,
+  /**
+   * The decay rate for [AggregateOp.EXPONENTIAL] and [AggregateOp.EXPONENTIALB]; ignored by the
+   * rest.
+   *
+   * Zero, which is upstream's fallback, makes the mean the last value alone — every earlier row is
+   * weighted by a power of zero.
+   */
+  private val rate: Double = 0.0,
 ) {
   fun compute(
     tuples: List<VegaValue>,
@@ -230,6 +249,22 @@ internal class Measure(
 
     return when (op) {
       AggregateOp.SUM -> VegaValue.Num(numbers.sum())
+      AggregateOp.PRODUCT -> VegaValue.Num(numbers.fold(1.0) { acc, v -> acc * v })
+      // Upstream accumulates `exp = r * exp + v` as the rows arrive, so a value's weight is `r` to
+      // the power of how many rows follow it: the **last** row counts most. `exponential` then
+      // normalises by `(1 - r) / (1 - r^n)` so the weights sum to one; `exponentialb` leaves the
+      // series unnormalised and only scales by `(1 - r)`, which is what makes it comparable across
+      // groups of different sizes.
+      AggregateOp.EXPONENTIAL,
+      AggregateOp.EXPONENTIALB -> {
+        val r = rate
+        val accumulated = numbers.fold(0.0) { acc, v -> r * acc + v }
+        val n = numbers.size
+        VegaValue.Num(
+          if (op == AggregateOp.EXPONENTIALB) accumulated * (1.0 - r)
+          else accumulated * (1.0 - r) / (1.0 - r.pow(n))
+        )
+      }
       AggregateOp.MEAN,
       AggregateOp.AVERAGE -> VegaValue.Num(numbers.average())
       AggregateOp.MIN -> VegaValue.Num(numbers.min())
@@ -293,6 +328,11 @@ internal fun measures(params: VegaValue.Obj, context: TransformContext): List<Me
   val fields = params.stringList("fields")
   val opNames = params.stringList("ops")
   val names = params.stringList("as")
+  // `aggregate_params` is positional alongside `ops`, and only the two exponential operations read
+  // it. Upstream's `_.aggregate_params[i] || null` treats a zero as absent as well, which is why
+  // the
+  // fallback below is the same for both.
+  val rates = params.numberList("aggregate_params")
 
   if (opNames.isEmpty() && fields.isEmpty()) {
     return listOf(Measure(AggregateOp.COUNT, null, names.getOrNull(0) ?: "count"))
@@ -306,7 +346,7 @@ internal fun measures(params: VegaValue.Obj, context: TransformContext): List<Me
     if (op == null) {
       context.diagnostics.error(
         DiagnosticCodes.TRANSFORM_NOT_IMPLEMENTED,
-        "Aggregate operation '$opName' is not implemented" + (REFUSED[opName.lowercase()] ?: ""),
+        "'$opName' is not one of Vega's aggregate operations" + (REFUSED[opName.lowercase()] ?: ""),
         operator = opName,
       )
       return null
@@ -322,7 +362,9 @@ internal fun measures(params: VegaValue.Obj, context: TransformContext): List<Me
     }
     // Upstream names a fieldless count just "count", and everything else "{op}_{field}".
     val defaultName = if (path == null) op.opName else "${op.opName}_$path"
-    measures.add(Measure(op, path, names.getOrNull(index) ?: defaultName))
+    measures.add(
+      Measure(op, path, names.getOrNull(index) ?: defaultName, rates.getOrNull(index) ?: 0.0)
+    )
   }
   return measures
 }

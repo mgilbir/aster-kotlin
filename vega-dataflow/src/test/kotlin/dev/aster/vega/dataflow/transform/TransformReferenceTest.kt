@@ -80,6 +80,38 @@ class TransformReferenceTest {
   /**
    * Runs a pipeline and renders the result as sorted-key JSON, matching the probe's output form.
    */
+  /**
+   * `product`, and the two exponentially weighted means, against upstream's own output.
+   *
+   * These are the only aggregate operations whose answer depends on the **order** of the rows: each
+   * value is weighted by `rate` to the power of how many rows follow it, so the last row counts
+   * most. `exponential` normalises by `(1 - r) / (1 - r^n)` so the weights sum to one, and
+   * `exponentialb` only scales by `(1 - r)` — which is why the two differ on a group of three and
+   * agree on nothing. They are also the only two that read `aggregate_params`, positionally
+   * alongside `ops`.
+   *
+   * Upstream, on `[{g:a,x:2},{g:a,x:3},{g:a,x:5},{g:b,x:4},{g:b,x:6}]` at a rate of 0.5:
+   * ```
+   * [{"g":"a","prod":30,"exp":4,"expb":3.5},
+   *  {"g":"b","prod":24,"exp":5.333333333333333,"expb":4}]
+   * ```
+   */
+  @Test
+  fun `product and the exponentially weighted means`() {
+    assertEquals(
+      """[{"exp":4,"expb":3.5,"g":"a","prod":30},""" +
+        """{"exp":5.333333333333333,"expb":4,"g":"b","prod":24}]""",
+      run(
+        """[{"type": "aggregate", "groupby": ["g"], "fields": ["x", "x", "x"],
+            "ops": ["product", "exponential", "exponentialb"],
+            "aggregate_params": [null, 0.5, 0.5],
+            "as": ["prod", "exp", "expb"]}]""",
+        """[{"g": "a", "x": 2}, {"g": "a", "x": 3}, {"g": "a", "x": 5},
+            {"g": "b", "x": 4}, {"g": "b", "x": 6}]""",
+      ),
+    )
+  }
+
   private fun run(transforms: String, data: String = base): String {
     context = TestContext()
     val input = (VegaJson.parse(data) as VegaValue.Arr).values
