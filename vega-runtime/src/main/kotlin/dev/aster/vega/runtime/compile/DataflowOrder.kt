@@ -5,10 +5,12 @@ import dev.aster.vega.expression.ExpressionResult
 import dev.aster.vega.model.DiagnosticCodes
 import dev.aster.vega.model.DiagnosticCollector
 import dev.aster.vega.model.VegaValue
+import dev.aster.vega.model.asString
 import dev.aster.vega.model.spec.DataSpec
 import dev.aster.vega.model.spec.DomainSpec
 import dev.aster.vega.model.spec.FieldRef
 import dev.aster.vega.model.spec.NumberValue
+import dev.aster.vega.model.spec.ProjectionSpec
 import dev.aster.vega.model.spec.RangeSpec
 import dev.aster.vega.model.spec.ScaleSpec
 import dev.aster.vega.model.spec.SchemeRef
@@ -66,6 +68,15 @@ internal class DataflowOrder(
       signals: List<SignalSpec>,
       expressions: ExpressionCompiler,
       diagnostics: DiagnosticCollector,
+      /**
+       * The chart's projections, which are not operators here but are read like scales.
+       *
+       * Upstream registers a projection in the **same namespace as a scale** and visits
+       * `geoScale('p')` with its `scaleVisitor`, so the reference already arrives as a scale
+       * dependency. What it needs is somewhere to land: a projection with a `fit` is built from a
+       * dataset, so a signal asking it anything has to wait for that dataset.
+       */
+      projections: List<ProjectionSpec> = emptyList(),
     ): DataflowOrder {
       // Distinct, because a name is what identifies an operator and a specification may declare the
       // same one twice. Upstream refuses that outright — "Duplicate data set name" — and this
@@ -78,7 +89,7 @@ internal class DataflowOrder(
           .distinct()
       reportDuplicates(data.map { it.name }, "dataset", diagnostics)
       reportDuplicates(scales.map { it.name }, "scale", diagnostics)
-      val reader = Reader(data, scales, signals, expressions)
+      val reader = Reader(data, scales, signals, expressions, projections)
       val dependencies = nodes.associateWith { node ->
         // A declaration may not read itself; `{"name": "x", "update": "x + 1"}` is a self
         // reference upstream resolves against the previous value, and here there is none.
@@ -190,8 +201,27 @@ internal class DataflowOrder(
     scales: List<ScaleSpec>,
     signals: List<SignalSpec>,
     private val expressions: ExpressionCompiler,
+    projections: List<ProjectionSpec> = emptyList(),
   ) {
     private val dataSpecs = data.associateBy { it.name }
+
+    /**
+     * For each projection, the datasets its `fit` reads.
+     *
+     * Only `fit` matters: every other projection property is a number or a signal, and a signal is
+     * already an operator that the ordering knows how to wait for.
+     */
+    private val projectionFits: Map<String, Set<String>> = projections.associate { projection ->
+      val fit = projection.fit
+      val source = (fit as? VegaValue.Obj)?.fields?.get("signal")?.asString()
+      val reads =
+        source
+          ?.let { expressions.compile(it) }
+          ?.let { compiled ->
+            (compiled as? ExpressionResult.Compiled)?.expression?.dataDependencies
+          } ?: emptySet()
+      projection.name to reads
+    }
     private val scaleSpecs = scales.associateBy { it.name }
     private val signalSpecs = signals.associateBy { it.name }
 
@@ -431,6 +461,13 @@ internal class DataflowOrder(
       }
       for (name in expression.scaleDependencies) {
         if (name in scaleSpecs) result.add(Operator.Scale(name))
+        // A projection is read through the same functions a scale is, and a *fitted* one is built
+        // from data — so asking it anything means waiting for whatever it fits. Without this,
+        // `geoScale('p')` on a projection fitted to `data('land')` answered with the family's
+        // unfitted default: `albers` reported 1070 where upstream reported 34.3, because the fit
+        // had
+        // not happened yet.
+        projectionFits[name]?.forEach { result.add(Operator.Data(it)) }
       }
       if (expression.readsUnnamedScale) {
         scaleSpecs.keys.forEach { result.add(Operator.Scale(it)) }

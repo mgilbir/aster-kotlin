@@ -21,7 +21,7 @@ end to end — expressions, signals, 33 of upstream's 40 data transforms, every 
 and an event handler that recompiles the chart — and are verified against upstream Vega by
 differential tests.
 
-One hundred and thirty-two differential fixtures pass, all matching upstream exactly on every mark and
+One hundred and thirty-three differential fixtures pass, all matching upstream exactly on every mark and
 scale output:
 
 | Fixture | Marks | Covers |
@@ -201,7 +201,7 @@ substantive compatibility items:
 | 6. View and Compose APIs | Yes |
 | 7. SVG, PNG, PDF export | Yes |
 | 8. TalkBack can describe and navigate | Partial — virtual nodes are tested by instrumentation, not with TalkBack itself |
-| 9. At least 100 compatibility fixtures pass | **Yes** — 132 |
+| 9. At least 100 compatibility fixtures pass | **Yes** — 133 |
 | 10. Core runtime has no Android dependency | Yes |
 | 11. Renders without WebView | Yes |
 | 12. Build and test loop runs from the terminal | Yes |
@@ -538,7 +538,7 @@ each example a deadline.
 
 ## Known failing fixtures
 
-None. One hundred and thirty-two fixtures exist and all of them pass — and that sentence became worth
+None. One hundred and thirty-three fixtures exist and all of them pass — and that sentence became worth
 something only once the gate could no longer skip itself, below.
 
 **The gate could report success without running.** `FixtureDifferentialTest` reads the fixtures and
@@ -1712,6 +1712,63 @@ That also retires the last of the "named range is not implemented" messages. All
 names work, and what is left is a name that is neither one of them nor defined by the configuration —
 which the diagnostic now says.
 
+## `hsl(h, s, l)` had been returning null for months, and nothing noticed
+
+An escaping accident — a Kotlin string template written as `${'$'}h`, which is the literal text `$h`
+rather than the value — made three expression builders parse a nonsense string and return null:
+`hsl(h, s, l)`, `rgb(r, g, b)`, and the default `as` name for a facet aggregate. Five occurrences
+across two files, all from the same cause.
+
+**Every test read a colour apart and none built one.** `ExpressionReferenceTest` had eleven vectors for
+`luminance('hsl(...)')` and none for `hsl(210, 0.6, 0.4)`, so the half of each function that was broken
+was the half nobody asked about. A vector for each is in now, and the pairing is worth stating as a
+rule: a function with two arities needs a vector for **both**, because a test of one is not weak
+evidence for the other — it is none.
+
+**The differential could not see it either, and that was the more serious half.** Vega's colour helpers
+return **objects** — `hsl(h, s, l)` is a `d3.Hsl`, not a string — and a mark encoder writes the object
+straight onto the item, where the renderer stringifies it. Passing such an object through the harness's
+`canonicalNumber` gave `undefined`, which `JSON.stringify` omits, so the channel *vanished from the
+reference*. Every one of the 7,514 rects in Vega's platformer had its fill compared as "absent", which
+is why a fill of null matched perfectly. The harness now stringifies a colour object exactly as the
+renderer does — a gradient is an object too and keeps its own shape — and the platformer's terrain is
+compared for the first time.
+
+That immediately found a second, smaller thing: 85 of those rects came out pure black against
+upstream's `rgb(0, 0, 4)`. Building the colour by writing the fractions out as CSS percentages and
+parsing them back loses precision exactly where it shows, in a colour so dark that a channel is a
+single digit. It is built from the numbers now.
+
+And with `ColorSpaces` carrying the perceptual spaces, `lab(l, a, b)` and `hcl(h, c, l)` are
+implemented rather than refused. Their components are **not** fractions — a Lab lightness runs 0 to
+100 and an HCL chroma is a radius in those units — which the `hsl` beside them invites you to assume,
+and which would give a colour that is nearly black for every input.
+
+## Two things a signal could not see, and the geo measurements that needed both
+
+`geoBounds` and `geoScale` were the last two of upstream's four geo expression functions this engine
+did not have, and neither was hard. What was hard was that a signal could not reach a projection at
+all.
+
+**A dataset's transforms had been given the projections since `geoCentroid` was implemented; a
+signal's own `update` had not.** So `geoScale('p')` reported the projection as undefined however late
+in the dataflow it ran. The map is rebuilt at each step of the order rather than held once, because a
+projection is *made of* signals — `rotate: [{signal: "lon"}, 0]` — so what is buildable changes as the
+order is walked.
+
+**And a projection reference created no ordering edge.** Upstream registers a projection in the **same
+namespace as a scale** and visits `geoScale('p')` with its `scaleVisitor`, so the reference already
+arrived here as a scale dependency — there was simply nowhere for it to land, because a projection is
+not an operator in this engine. A projection with a `fit` is built from a dataset, so asking it
+anything has to wait for that dataset: `geoScale('p')` on a projection fitted to `data('land')` answered
+`1070`, which is `albers`'s own unfitted default, where upstream answered `34.3`.
+
+One reading the fixture forced, and it is upstream's: **`geoBounds` takes a GeoJSON object, not an
+array.** `geoBounds('p', data('land'))` measures nothing at all, because `geoStream` looks for a `type`
+and an array has none — upstream returns `[[Infinity, Infinity], [-Infinity, -Infinity]]` and draws the
+rectangle nowhere. The features have to be wrapped in a `FeatureCollection`, which is what the fixture
+does.
+
 ## Performance observations
 
 Nothing on hardware. No measurement has been taken on a physical device, and emulator numbers are
@@ -1896,7 +1953,7 @@ explored with it; the tree was already correct and two things it *said* were wro
 and pinned by instrumented tests. What remains untested there is physical hardware and a real user,
 which is a different claim from "not verified at all".
 
-A note on the harness, because it is now the thirteenth time. The differential comparison has had to be
+A note on the harness, because it is now the fifteenth time. The differential comparison has had to be
 taught to see a symbol's outline, fill and stroke opacity, a dash pattern, a node's own opacity, an
 unfilled mark's missing opacity, the corners a curve puts between a series' points, a rectangle's four
 corner radii, a series' `tension`, the whole drawn extent of every `shape` mark, and — adding `linkpath` — the outline a `path` mark actually draws,

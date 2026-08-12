@@ -125,6 +125,14 @@ public interface ExpressionScope {
   /** `geoArea('projection', feature)` — how much of the page the shape covers. */
   public fun geoArea(projection: String?, geojson: VegaValue): VegaValue = VegaValue.Null
 
+  /** `geoBounds(projection, feature)` — the box a feature occupies once drawn. */
+  public fun geoBounds(projection: String?, geojson: VegaValue): VegaValue = VegaValue.Null
+
+  /**
+   * `geoScale(projection)` — the projection's own scale, which a fitted one only knows once fitted.
+   */
+  public fun geoScale(projection: String?): VegaValue = VegaValue.Null
+
   /** `bandwidth('name')` — a band scale's band width, or zero for a scale that has none. */
   public fun scaleBandwidth(name: String): VegaValue = VegaValue.Num(0.0)
 

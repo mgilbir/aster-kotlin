@@ -11,6 +11,7 @@ import dev.aster.vega.model.time.TimeInterval
 import dev.aster.vega.model.time.TimeStepper
 import dev.aster.vega.model.time.TimeUnits
 import dev.aster.vega.model.withTypographicMinus
+import dev.aster.vega.scene.ColorSpaces
 import dev.aster.vega.scene.SceneColor
 import kotlin.math.abs
 import kotlin.math.acos
@@ -94,9 +95,6 @@ public object Functions {
         "parsing a date against a format string needs a strptime the engine does not have; " +
           "an ISO 8601 string works through toDate",
       "gradient" to "gradients cannot be produced from an expression yet",
-      "lab" to "colour helpers are not implemented",
-      "hcl" to "colour helpers are not implemented",
-      "geoBounds" to "geographic functions are out of scope for the first release",
       "vlSelectionTest" to "selection helpers require the signal and selection subsystems",
       "vlSelectionResolve" to "selection helpers require the signal and selection subsystems",
     )
@@ -517,8 +515,11 @@ public object Functions {
         val h = JsSemantics.toNumber(args.at(0))
         val s = JsSemantics.toNumber(args.at(1))
         val l = JsSemantics.toNumber(args.at(2))
-        val colour = SceneColor.parse("hsl(${'$'}h, ${'$'}{s * 100}%, ${'$'}{l * 100}%)")
-        if (colour == null) VegaValue.Null else VegaValue.Str(colour.toCssRgb())
+        // Converted directly rather than through a CSS string: writing the fractions out as
+        // percentages and parsing them back loses precision exactly where it shows, in a colour so
+        // dark that a channel is a single digit. Vega's platformer shades its terrain that way, and
+        // 85 of its rects came out as pure black against upstream's `rgb(0, 0, 4)`.
+        VegaValue.Str(ColorSpaces.fromHsl(ColorSpaces.Hsl(h, s, l)).toCssRgb())
       } else {
         val colour = SceneColor.parse(args.string(0)) ?: return@ExpressionFunction VegaValue.Null
         val (h, s, l) = colour.toHsl()
@@ -532,14 +533,70 @@ public object Functions {
       }
     }
 
+    /**
+     * `lab(l, a, b)` and `hcl(h, c, l)` — the same two-in-one shape, in the perceptual spaces.
+     *
+     * Their components are **not** fractions and not degrees-and-percentages, which the `hsl` above
+     * invites: a Lab lightness runs 0 to 100, its `a` and `b` run either side of zero with no fixed
+     * bound, and an HCL chroma is a radius in those same units. Reading them as fractions gives a
+     * colour that is nearly black whatever the input.
+     */
+    map["lab"] = ExpressionFunction { args ->
+      if (args.size >= 3) {
+        val colour =
+          ColorSpaces.fromLab(
+            ColorSpaces.Lab(
+              lightness = JsSemantics.toNumber(args.at(0)),
+              a = JsSemantics.toNumber(args.at(1)),
+              b = JsSemantics.toNumber(args.at(2)),
+            )
+          )
+        VegaValue.Str(colour.toCssRgb())
+      } else {
+        val colour = SceneColor.parse(args.string(0)) ?: return@ExpressionFunction VegaValue.Null
+        val lab = ColorSpaces.toLab(colour)
+        VegaValue.Obj(
+          linkedMapOf(
+            "l" to VegaValue.Num(lab.lightness),
+            "a" to VegaValue.Num(lab.a),
+            "b" to VegaValue.Num(lab.b),
+          )
+        )
+      }
+    }
+
+    map["hcl"] = ExpressionFunction { args ->
+      if (args.size >= 3) {
+        val colour =
+          ColorSpaces.fromHcl(
+            ColorSpaces.Hcl(
+              hue = JsSemantics.toNumber(args.at(0)),
+              chroma = JsSemantics.toNumber(args.at(1)),
+              lightness = JsSemantics.toNumber(args.at(2)),
+            )
+          )
+        VegaValue.Str(colour.toCssRgb())
+      } else {
+        val colour = SceneColor.parse(args.string(0)) ?: return@ExpressionFunction VegaValue.Null
+        val hcl = ColorSpaces.toHcl(colour)
+        VegaValue.Obj(
+          linkedMapOf(
+            "h" to VegaValue.Num(hcl.hue),
+            "c" to VegaValue.Num(hcl.chroma),
+            "l" to VegaValue.Num(hcl.lightness),
+          )
+        )
+      }
+    }
+
     /** `rgb(r, g, b)` — the same shape, and the form every colour prints in. */
     map["rgb"] = ExpressionFunction { args ->
       val colour =
         if (args.size >= 3) {
           SceneColor.parse(
-            "rgb(${'$'}{JsSemantics.toNumber(args.at(0))}, " +
-              "${'$'}{JsSemantics.toNumber(args.at(1))}, " +
-              "${'$'}{JsSemantics.toNumber(args.at(2))})"
+            "rgb(${JsSemantics.toNumber(args.at(0))}, " +
+              "${JsSemantics.toNumber(args.at(1))}, " +
+              "${JsSemantics.toNumber(args.at(2))})"
           )
         } else {
           SceneColor.parse(args.string(0))

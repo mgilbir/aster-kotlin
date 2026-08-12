@@ -1,5 +1,6 @@
 package dev.aster.vega.runtime.compile
 
+import dev.aster.vega.dataflow.transform.ProjectionDefinition
 import dev.aster.vega.expression.CachingExpressionCompiler
 import dev.aster.vega.expression.Clock
 import dev.aster.vega.expression.ExpressionCompiler
@@ -251,7 +252,15 @@ public class SpecCompiler(
     // come before data. `probability-density` needs all three at once and no fixed order supplies
     // it. Upstream never had the problem: `vega-parser` puts every dataset, scale and signal into
     // one dataflow and the topological ranking decides. [DataflowOrder] is that ranking.
-    val order = DataflowOrder.of(spec.data, spec.scales, spec.signals, expressions, diagnostics)
+    val order =
+      DataflowOrder.of(
+        spec.data,
+        spec.scales,
+        spec.signals,
+        expressions,
+        diagnostics,
+        spec.projections,
+      )
 
     // One stream for the whole compile, seeded the same way every time. Every scope built below
     // shares it, so the draws form a single sequence the way upstream's module-level generator
@@ -292,7 +301,16 @@ public class SpecCompiler(
     for (operator in order.order) {
       when (operator) {
         is Operator.Signal -> {
-          session.resolve(operator.name, resolved.datasets, scales, unbuiltScales)
+          // A projection is made of signals, so it is rebuilt from the ones that have settled at
+          // this point in the order — exactly as it is for each dataset below. Without it a signal
+          // calling `geoScale('p')` was told the projection did not exist, however late it ran.
+          session.resolve(
+            operator.name,
+            resolved.datasets,
+            scales,
+            unbuiltScales,
+            projectionsSoFar(spec, expressions, signalValues, resolved, scales),
+          )
           unresolvedSignals.remove(operator.name)
         }
         is Operator.Data ->
@@ -310,12 +328,7 @@ public class SpecCompiler(
             // Into a collector nobody reads: this runs once per dataset and the same projection
             // would report the same unimplemented property once for each, where the scope built
             // after the loop reports it exactly once.
-            val projections =
-              ProjectionResolver(
-                  NumberResolver(expressions, scope, DiagnosticCollector()),
-                  DiagnosticCollector(),
-                )
-                .resolve(spec.projections)
+            val projections = projectionsSoFar(spec, expressions, signalValues, resolved, scales)
             resolved =
               data.resolve(
                 listOf(it),
@@ -571,6 +584,37 @@ public class SpecCompiler(
    * built at whatever point the order reaches it — after the `width` signal, which is the edge
    * [DataflowOrder] adds for exactly this.
    */
+  /**
+   * The projections buildable from the signals that have settled so far.
+   *
+   * Rebuilt at each step of the dataflow order rather than once, because a projection is *made of*
+   * signals — `rotate: [{signal: "lon"}, 0]` — and the answer therefore changes as the order is
+   * walked. Into a collector nobody reads: this runs many times over and the same projection would
+   * report the same unimplemented property once per call, where the scope built after the loop
+   * reports it exactly once.
+   */
+  private fun projectionsSoFar(
+    spec: VegaSpec,
+    expressions: ExpressionCompiler,
+    signalValues: Map<String, VegaValue>,
+    resolved: ScopeData,
+    scales: Map<String, VegaScale>,
+  ): Map<String, ProjectionDefinition> {
+    if (spec.projections.isEmpty()) return emptyMap()
+    val scope =
+      SignalScope(
+        signalValues,
+        resolved.datasets,
+        scales = scales,
+        diagnostics = DiagnosticCollector(),
+      )
+    return ProjectionResolver(
+        NumberResolver(expressions, scope, DiagnosticCollector()),
+        DiagnosticCollector(),
+      )
+      .resolve(spec.projections)
+  }
+
   private fun plotSize(
     signals: Map<String, VegaValue>,
     declaredWidth: Double,

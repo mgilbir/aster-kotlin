@@ -245,10 +245,14 @@ class ParserTest {
 
   @Test
   fun `a deliberately excluded function explains why`() {
+    // `geoBounds` used to be the example here and is implemented now, along with `lab` and `hcl`.
+    // What is left on the list needs a subsystem rather than an algorithm.
     val failure =
-      assertThrows<ExpressionEvaluationException> { compiled("geoBounds()").evaluate(scopeOf()) }
+      assertThrows<ExpressionEvaluationException> {
+        compiled("vlSelectionTest('sel', datum)").evaluate(scopeOf())
+      }
     assertTrue(
-      failure.diagnostic.message.contains("geographic"),
+      failure.diagnostic.message.contains("selection"),
       failure.diagnostic.message,
     )
   }

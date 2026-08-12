@@ -2215,7 +2215,7 @@ public class SpecParser {
         field = field,
         name =
           names.getOrNull(index)?.takeIf { it.isNotEmpty() }
-            ?: if (field == null) op else "${'$'}{op}_${'$'}field",
+            ?: if (field == null) op else "${op}_$field",
       )
     }
     return FacetSpec(

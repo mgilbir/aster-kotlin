@@ -287,6 +287,37 @@ class ExpressionReferenceTest {
         "luminance('transparent')|null",
         "luminance('none')|null",
         "luminance('rgba(255, 0, 0, 0)')|null",
+        // ---- rgb, hsl, lab, hcl: components in, or a colour read apart ----
+        //
+        // The builders were **returning null**: a Kotlin string template had been escaped into its
+        // own literal text, so `hsl(210, 0.6, 0.4)` parsed the string `hsl($h, ${s * 100}%, ...)`
+        // and got nothing. Nothing noticed, because every test here read a colour *apart* and none
+        // built one. `s` and `l` are fractions, which is d3's convention rather than CSS's.
+        "''+hsl(210, 0.6, 0.4)|\"rgb(41, 102, 163)\"",
+        "''+rgb(31, 119, 180)|\"rgb(31, 119, 180)\"",
+        "''+rgb('steelblue')|\"rgb(70, 130, 180)\"",
+        // Reading a colour apart gives the components. Upstream's one object both stringifies as a
+        // colour *and* exposes them; a `VegaValue` is one or the other, so the two uses are split
+        // by
+        // arity — see the note on `hsl` in `Functions.kt`. What a specification does with it is
+        // read
+        // a channel, shift it and build a new colour, which both halves above support.
+        "format(hsl('#4c78a8').h, '.4f')|\"211.3043\"",
+        "format(hsl('#4c78a8').s, '.4f')|\"0.3770\"",
+        "format(hsl('#4c78a8').l, '.4f')|\"0.4784\"",
+        // `lab` and `hcl`, whose components are *not* fractions: a Lab lightness runs 0 to 100 and
+        // an
+        // HCL chroma is a radius in those units. Reading them the way `hsl` reads its own gives a
+        // colour that is nearly black for every input.
+        "''+lab(50, 20, -30)|\"rgb(133, 108, 170)\"",
+        "''+hcl(120, 40, 60)|\"rgb(125, 154, 81)\"",
+        "format(lab('#4c78a8').l, '.4f')|\"48.8173\"",
+        // A typographic minus, U+2212, which is what `d3-format` writes and this engine already
+        // reproduces everywhere else it formats a negative number.
+        "format(lab('#4c78a8').a, '.4f')|\"\u22124.7035\"",
+        "format(lab('#4c78a8').b, '.4f')|\"\u221230.8117\"",
+        "format(hcl('#4c78a8').h, '.4f')|\"261.3207\"",
+        "format(hcl('#4c78a8').c, '.4f')|\"31.1686\"",
         // ---- contrast ----
         // The WCAG ratio, which is symmetric: the brighter colour always goes on top, so writing
         // the pair either way round gives the same answer and it is never below 1.

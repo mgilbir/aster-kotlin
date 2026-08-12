@@ -5,6 +5,7 @@ import dev.aster.vega.dataflow.geo.GeoJsonStream
 import dev.aster.vega.dataflow.geo.GeoProjector
 import dev.aster.vega.dataflow.geo.Graticule
 import dev.aster.vega.dataflow.geo.PathAreaSink
+import dev.aster.vega.dataflow.geo.PathBoundsSink
 import dev.aster.vega.dataflow.geo.PathCentroidSink
 import dev.aster.vega.dataflow.geo.PathStringSink
 import dev.aster.vega.dataflow.geo.Projection
@@ -284,6 +285,24 @@ public object GeoMeasure {
     GeoJsonStream.stream(geojson, stream)
     return sink.result()
   }
+
+  /**
+   * The box a geometry occupies once drawn, as `[x0, y0, x1, y1]`, or null when it draws nothing.
+   *
+   * Measured through the projection's own stream, so the answer already carries whatever clipping
+   * and resampling the projection does — a feature cut at the antimeridian is bounded by the part
+   * that survived, not by the part that was asked for.
+   */
+  public fun bounds(definition: ProjectionDefinition?, geojson: VegaValue): DoubleArray? {
+    val sink = PathBoundsSink()
+    val stream = definition?.build()?.stream(sink) ?: sink
+    GeoJsonStream.stream(geojson, stream)
+    return sink.result()
+  }
+
+  /** A projection's own scale, `geoScale('name')`. */
+  public fun scaleOf(definition: ProjectionDefinition): Double? =
+    (definition.build() as? Projection)?.scale
 }
 
 /**

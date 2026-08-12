@@ -111,6 +111,26 @@ function numericIfPossible(value) {
  * fourth thing this harness compared its way past: a dashed gridline and a solid one have identical
  * geometry, identical colour and identical width, so nothing else here can tell them apart.
  */
+/**
+ * One paint channel, as what it actually paints.
+ *
+ * Vega's colour helpers return **objects** — `hsl(h, s, l)` gives a `d3.Hsl`, not a string — and a
+ * mark encoder writes the object straight onto the item. Its renderer then stringifies it, which is
+ * where `rgb(...)` comes from. Passing such an object through `canonicalNumber` returned `undefined`,
+ * which `JSON.stringify` omits, so the channel vanished from the reference: every one of the 7,514
+ * rects in Vega's platformer had its fill compared as "absent". Stringifying is what the renderer
+ * does and is the only reading under which the two engines are describing the same drawing.
+ *
+ * A gradient is an object too and is *not* a colour: it keeps its own shape, which the comparison
+ * handles separately.
+ */
+function styleValue(value, precision) {
+  if (value && typeof value === 'object' && value.gradient === undefined) {
+    return String(value);
+  }
+  return canonicalNumber(value, precision);
+}
+
 function dashOf(item) {
   const dash = item.strokeDash;
   if (!Array.isArray(dash) || dash.length === 0) return undefined;
@@ -247,7 +267,7 @@ function extentRecord(type, marktype, dx, dy, precision) {
     shapeHeight: canonicalNumber(b.y2 - b.y1, precision),
   };
   for (const channel of STYLE_CHANNELS) {
-    if (first[channel] !== undefined) entry[channel] = canonicalNumber(first[channel], precision);
+    if (first[channel] !== undefined) entry[channel] = styleValue(first[channel], precision);
   }
   if (entry.fillOpacity !== undefined && entry.fill === undefined) delete entry.fillOpacity;
   if (entry.strokeOpacity !== undefined && entry.stroke === undefined) delete entry.strokeOpacity;
@@ -302,7 +322,7 @@ function seriesRecord(type, marktype, dx, dy, precision) {
   if (first.tension !== undefined) entry.tension = canonicalNumber(first.tension, precision);
 
   for (const channel of STYLE_CHANNELS) {
-    if (first[channel] !== undefined) entry[channel] = canonicalNumber(first[channel], precision);
+    if (first[channel] !== undefined) entry[channel] = styleValue(first[channel], precision);
   }
   const seriesDash = dashOf(first);
   if (seriesDash !== undefined) entry.strokeDash = seriesDash;
@@ -376,7 +396,7 @@ function record(type, role, item, dx, dy, precision) {
   }
 
   for (const channel of STYLE_CHANNELS) {
-    if (item[channel] !== undefined) entry[channel] = canonicalNumber(item[channel], precision);
+    if (item[channel] !== undefined) entry[channel] = styleValue(item[channel], precision);
   }
   // Vega sets a legend symbol's strokeWidth whether or not it has a stroke colour, so an unstroked
   // swatch carries a width that paints nothing. This engine has no way to say "a width with no
