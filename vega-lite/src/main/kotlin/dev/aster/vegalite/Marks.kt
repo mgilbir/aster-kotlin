@@ -1120,10 +1120,8 @@ internal object Marks {
     }
 
     if (
-      sizeChannel != null &&
-        (def != null && scaleType != null && Scales.hasDiscreteDomain(scaleType) ||
-          isBarOrTickBand) &&
-        def2 == null
+      (def != null && scaleType != null && Scales.hasDiscreteDomain(scaleType) ||
+        isBarOrTickBand) && def2 == null
     ) {
       return positionAndSize(view, channel, def, sizeChannel)
     }
@@ -1142,7 +1140,14 @@ internal object Marks {
     view: UnitView,
     channel: String,
     def: ChannelDef?,
-    sizeChannel: String,
+    /**
+     * The Vega channel the mark's *extent* is written on, or null for a polar position.
+     *
+     * Vega has no `thetaWidth`, so a slice's extent is simulated: the second angle is the first
+     * plus the size, written as an `offset` on the same reference. `positionAndSize` ends in that
+     * branch, and it is what makes an arc over categories span its band instead of sitting on it.
+     */
+    sizeChannel: String?,
   ): VegaValue.Obj {
     val scaleType = view.scaleType(channel)
     // `(scale || offsetScale)?.get('type')`: where a channel has an offset scale nested in it, the
@@ -1163,7 +1168,7 @@ internal object Marks {
 
     val sizeRef: VegaValue =
       when {
-        declaredSize != null && useVlSizeChannel ->
+        declaredSize != null && useVlSizeChannel && sizeChannel != null ->
           nonPosition(view, "size", sizeChannel).fields[sizeChannel] ?: VegaValue.EmptyObject
         markSize != null && useVlSizeChannel -> obj { put("value", markSize) }
         offsetChannel != null || bandingType == "band" -> {
@@ -1237,9 +1242,25 @@ internal object Marks {
         }
       }
 
+    if (sizeChannel != null) {
+      return obj {
+        if (posRef != null) put(vgChannel, posRef)
+        put(sizeChannel, sizeRef)
+      }
+    }
+    // A polar position has no size channel: the far end is the near one plus the extent.
+    val extent = (sizeRef as? VegaValue.Obj)?.fields?.get("signal") ?: sizeRef
     return obj {
-      if (posRef != null) put(vgChannel, posRef)
-      put(sizeChannel, sizeRef)
+      if (posRef != null) put(vgPositionChannel(channel), posRef)
+      if (posRef is VegaValue.Obj) {
+        put(
+          vgPositionChannel(secondaryChannel(channel)!!),
+          obj {
+            posRef.fields.forEach { (key, value) -> put(key, value) }
+            put("offset", if (extent is VegaValue.Str) signalRef(extent.value) else sizeRef)
+          },
+        )
+      }
     }
   }
 

@@ -1626,7 +1626,9 @@ That sort also settled a question about the pre-aggregation table. It is wanted 
 *derived* is built from columns the grouping keeps, and reads the same table everything else does.
 
 An **arc** takes a band on its polar positions for the same reason a bar takes one on its Cartesian
-ones: a slice spans an angle, it does not sit at one. And a ranged position whose far end is a
+ones: a slice spans an angle, it does not sit at one — and spanning it needs the other half of
+`positionAndSize`, the branch for a channel with no size of its own. Vega has no `thetaWidth`, so
+the far angle is the near one plus the extent, written as an `offset` on the same reference. And a ranged position whose far end is a
 **datum** contributes that constant to the domain — an area drawn down to zero has to cover zero
 whether or not any row holds it.
 
