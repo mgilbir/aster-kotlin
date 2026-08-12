@@ -1591,6 +1591,21 @@ missing from `LEGEND_CONSUMED`, so every legend using it was told it had been ig
 fourth stale report of its kind, after `scaleX`/`scaleY` and the title's `font`, and all four came from
 the same thing: the consumed table is a **promise**, and until the schema diff nothing checked it.
 
+## The title is a guide too
+
+`aria`, `name` and `interactive` on a title were the last three of upstream's 31 title properties this
+engine did not read. `aria: false` is the only way to keep a decorative heading — a watermark, a chart
+drawn twice with one copy labelled — out of what a screen reader reads, so it matters more than its
+size suggests. All three go on both the heading and its subtitle, because upstream builds them as two
+marks under one guide and either can be focused.
+
+The schema diff now finds **nothing** unaccounted for in `encodeEntry`, `axis`, `title`, `projection`
+or `scale`, and two entries in `legend`: `titleAnchor`, which needs upstream's
+`legendTitleOffset` — a title anchored `end` is placed from the *entries'* extent and not the legend's,
+and a vertical gradient swaps which coordinate that is — and `gridAlign`, which only means anything to
+a multi-column entry grid. The `strokeDash` and `strokeWidth` the diff also lists are not gaps: on a
+legend those name **scales**.
+
 ## Performance observations
 
 Nothing on hardware. No measurement has been taken on a physical device, and emulator numbers are

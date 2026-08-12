@@ -395,7 +395,9 @@ Anything left is either a gap or a stale diagnostic, and telling those two apart
 As of this handoff the subtraction leaves **nothing** for `encodeEntry`, `axis`, `projection` and
 `scale`, and this for the rest:
 
-- **Legend (2):** `gridAlign` and `titleAnchor`. `strokeDash`/`strokeWidth` appear in the schema diff
+- **Legend (2):** `titleAnchor`, which needs upstream's `legendTitleOffset` — a title anchored `end`
+  is placed from the *entries'* extent rather than the legend's, and a vertical gradient swaps which
+  coordinate that is — and `gridAlign`, which only means anything to a multi-column entry grid. `strokeDash`/`strokeWidth` appear in the schema diff
   and are **not** gaps: on a legend those name *scales*, and the background's width and dash come
   from `config.legend`.
   `clipHeight` and the background (`fillColor`, `strokeColor`, `cornerRadius`, with the width and
@@ -403,9 +405,7 @@ As of this handoff the subtraction leaves **nothing** for `encodeEntry`, `axis`,
 - **Axis (1):** `labelBound`, which needs the overlap remover to take a bounding rectangle.
   Everything else is *done*, including guide `aria`/`description` — pinned by
   `GuideAccessibilityTest`, since the differential cannot see them.
-- **Title (3):** `aria`, `interactive`, `name`. The rest — `color`, `lineHeight`, `baseline`,
-  `limit`, `style`, an explicit `align`/`angle`, and the four `subtitle*` properties — is done, as is
-  a title or subtitle written as an **array** of lines.
+- **Title:** none. All 31 of upstream's title properties are read.
 - **Layout (all of it):** `align`, `bounds`, `center`, `columns`, `footerBand`, `headerBand`,
   `offset`, `padding`, `titleAnchor`, `titleBand` — the grid works, but nothing in `LAYOUT` is
   reported either, so this block has no consumed table at all yet.

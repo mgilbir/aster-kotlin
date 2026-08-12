@@ -129,16 +129,23 @@ internal class TitleBuilder(
         metadata =
           NodeMetadata(
             role = "title-text",
+            markName = spec.name,
+            interactive = spec.interactive,
             // A title is a guide like any other, and a screen reader is told which kind it is
-            // rather than just being read the words.
+            // rather than just being read the words. `aria: false` takes it out of the tree
+            // altogether, which is what a decorative heading wants and the only way to say so.
             accessibility =
-              AccessibilityDescriptor(
-                // Upstream's caption is `array(text).join(' ')`, so a two-line heading is read out
-                // as one sentence rather than with the break in it.
-                label = "Title text '${text.replace('\n', ' ')}'",
-                role = "graphics-symbol",
-                focusable = true,
-              ),
+              if (!spec.aria) {
+                null
+              } else {
+                AccessibilityDescriptor(
+                  // Upstream's caption is `array(text).join(' ')`, so a two-line heading is read
+                  // out as one sentence rather than with the break in it.
+                  label = "Title text '${text.replace('\n', ' ')}'",
+                  role = "graphics-symbol",
+                  focusable = true,
+                )
+              },
           ),
       )
 
@@ -180,12 +187,18 @@ internal class TitleBuilder(
             metadata =
               NodeMetadata(
                 role = "title-subtitle",
+                markName = spec.name,
+                interactive = spec.interactive,
                 accessibility =
-                  AccessibilityDescriptor(
-                    label = "Subtitle text '${text.replace('\n', ' ')}'",
-                    role = "graphics-symbol",
-                    focusable = true,
-                  ),
+                  if (!spec.aria) {
+                    null
+                  } else {
+                    AccessibilityDescriptor(
+                      label = "Subtitle text '${text.replace('\n', ' ')}'",
+                      role = "graphics-symbol",
+                      focusable = true,
+                    )
+                  },
               ),
           )
       }

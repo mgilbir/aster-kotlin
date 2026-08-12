@@ -601,6 +601,16 @@ public data class TitleSpec(
   /** How wide the words may be drawn before they are truncated. */
   val limit: NumberValue? = null,
   /**
+   * `aria: false` takes the heading out of the accessibility tree, `name` names its mark, and
+   * `interactive: false` makes it ignore the pointer.
+   *
+   * A decorative heading — a watermark, a chart drawn twice with one copy labelled — is exactly
+   * what `aria: false` is for, and it is the only way to say it.
+   */
+  val aria: Boolean = true,
+  val name: String? = null,
+  val interactive: Boolean = true,
+  /**
    * `dx`/`dy` — a nudge applied after the anchor has placed the title.
    *
    * Written either as a property or inside the title's own `encode.update`, which is where a

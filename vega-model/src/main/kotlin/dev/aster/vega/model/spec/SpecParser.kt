@@ -260,6 +260,9 @@ private val LEGEND_CONSUMED =
 /** Title properties this engine reads. */
 private val TITLE_CONSUMED =
   setOf(
+    "aria",
+    "name",
+    "interactive",
     "color",
     "subtitleColor",
     "subtitleFont",
@@ -1821,6 +1824,9 @@ public class SpecParser {
       angle = obj.numberOrSignal("angle", "$path.angle"),
       baseline = obj.fields["baseline"]?.asString()?.takeIf { it.isNotEmpty() },
       limit = obj.numberOrSignal("limit", "$path.limit"),
+      aria = obj.fields["aria"]?.asBoolean() ?: true,
+      name = obj.fields["name"]?.asString()?.takeIf { it.isNotEmpty() },
+      interactive = obj.fields["interactive"]?.asBoolean() ?: true,
       zindex = (obj.fields["zindex"] as? VegaValue.Num)?.value?.toInt() ?: 0,
     )
   }

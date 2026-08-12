@@ -61,6 +61,38 @@ class GuideAccessibilityTest {
     assertEquals("one colour per crop", legend.metadata.accessibility?.label)
   }
 
+  /**
+   * A title is a guide too, and `aria: false` is the only way to keep a decorative heading — a
+   * watermark, a chart drawn twice with one copy labelled — out of what a screen reader reads.
+   */
+  @Test
+  fun `a title takes aria, name and interactive`() {
+    val json =
+      """
+      {
+        "width": 100, "height": 60, "padding": 5,
+        "title": {"text": "Heading", "subtitle": "and a subtitle", "name": "banner",
+                  "aria": false, "interactive": false},
+        "data": [{"name": "t", "values": [{"v": 1}]}]
+      }
+      """
+        .trimIndent()
+    for (role in listOf("title-text", "title-subtitle")) {
+      val node = guide(json, role)
+      assertNull(node.metadata.accessibility, "$role is still in the accessibility tree")
+      assertEquals("banner", node.metadata.markName)
+      assertEquals(false, node.metadata.interactive)
+    }
+
+    val plain =
+      guide(
+        json.replace(""""aria": false, "interactive": false""", """"aria": true"""),
+        "title-text",
+      )
+    assertNotNull(plain.metadata.accessibility)
+    assertEquals("Title text 'Heading'", plain.metadata.accessibility?.label)
+  }
+
   @Test
   fun `aria false takes the guide out of the accessibility tree`() {
     assertNull(guide(spec(""", "aria": false""", ""), "axis").metadata.accessibility)
