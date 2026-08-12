@@ -547,6 +547,16 @@ public data class TitleSpec(
   /** The literal text, or empty when [textExpression] supplies it instead. */
   val text: String,
   /**
+   * How far the words are turned, where the title states it.
+   *
+   * A title's orientation supplies a default — a left-hand one reads upwards — but a trellis
+   * caption written at `angle: 0` is asking for the words to lie flat beside their row, and the
+   * anchor it states goes with it. Left unstated, all three follow the orientation.
+   */
+  val angle: NumberValue? = null,
+  val align: String? = null,
+  val baseline: String? = null,
+  /**
    * An expression producing the text.
    *
    * A trellis header labels its row with `{"signal": "parent.r"}`, so a title whose words come from

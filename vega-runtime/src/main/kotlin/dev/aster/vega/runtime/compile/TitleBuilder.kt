@@ -85,17 +85,26 @@ internal class TitleBuilder(
     val subtitleFontSize =
       numbers.resolve(spec.subtitleFontSize, "title") ?: TitleDefaults.SUBTITLE_FONT_SIZE
 
+    // The orientation supplies a default and the title may override it: a trellis caption written
+    // at `angle: 0` is asking for the words to lie flat beside their row rather than read upwards.
     val angle =
-      when (spec.orient) {
-        Orient.LEFT -> -90.0
-        Orient.RIGHT -> 90.0
-        else -> 0.0
-      }
+      numbers.resolve(spec.angle, "title")
+        ?: when (spec.orient) {
+          Orient.LEFT -> -90.0
+          Orient.RIGHT -> 90.0
+          else -> 0.0
+        }
     val align =
-      when (spec.anchor) {
-        Anchor.START -> TextAlign.LEFT
-        Anchor.END -> TextAlign.RIGHT
-        Anchor.MIDDLE -> TextAlign.CENTER
+      when (spec.align) {
+        "left" -> TextAlign.LEFT
+        "right" -> TextAlign.RIGHT
+        "center" -> TextAlign.CENTER
+        else ->
+          when (spec.anchor) {
+            Anchor.START -> TextAlign.LEFT
+            Anchor.END -> TextAlign.RIGHT
+            Anchor.MIDDLE -> TextAlign.CENTER
+          }
       }
 
     // A trellis header takes its words from the row it labels, so the text may be a signal.
@@ -117,7 +126,15 @@ internal class TitleBuilder(
         y = nudgeY,
         layout =
           textEngine.layout(
-            run(text, fontSize, titleWeight(spec), align, styleOf(spec.fontStyle), spec.font)
+            run(
+              text,
+              fontSize,
+              titleWeight(spec),
+              align,
+              styleOf(spec.fontStyle),
+              spec.font,
+              baselineOf(spec.baseline),
+            )
           ),
         angleDegrees = angle,
         fill = Fill.of(titleColor),
@@ -263,6 +280,15 @@ internal class TitleBuilder(
   private fun styleOf(name: String?): FontStyle =
     if (name.equals("italic", ignoreCase = true)) FontStyle.ITALIC else FontStyle.NORMAL
 
+  /** A stated title baseline, or the top the heading otherwise hangs from. */
+  private fun baselineOf(name: String?): TextBaseline =
+    when (name) {
+      "middle" -> TextBaseline.MIDDLE
+      "bottom" -> TextBaseline.BOTTOM
+      "alphabetic" -> TextBaseline.ALPHABETIC
+      else -> TextBaseline.TOP
+    }
+
   private fun run(
     text: String,
     fontSize: Double,
@@ -270,6 +296,8 @@ internal class TitleBuilder(
     align: TextAlign,
     fontStyle: FontStyle = FontStyle.NORMAL,
     font: String? = null,
+    /** A stated baseline, which a trellis caption uses to centre itself against its row. */
+    baseline: TextBaseline = TextBaseline.TOP,
   ) =
     TextRun(
       text = text,
@@ -281,6 +309,6 @@ internal class TitleBuilder(
           fontStyle = fontStyle,
         ),
       align = align,
-      baseline = TextBaseline.TOP,
+      baseline = baseline,
     )
 }

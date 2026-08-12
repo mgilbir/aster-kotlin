@@ -1648,6 +1648,23 @@ cursor from the encoding, not from a style, since nothing else about a linked po
 A binned field on a discrete scale is also *spoken* as the plain column it came from: there is no
 numeric axis left, so upstream reads it as a category rather than as the range its label spells out.
 
+### A caption turned to face its row
+
+`defaultHeaderGuideAlign` and `defaultHeaderGuideBaseline` both open with *if the angle is stated*:
+a caption left at whatever angle the renderer chooses is left at whatever anchor it chooses too.
+State one and the caption has to be turned to face its cell — a **row**'s captions run down the side
+of the grid, so each is right-aligned against the cells and centred on them.
+
+The runtime met it halfway. A title's `angle`, `align` and `baseline` were parsed and dropped, so a
+left-oriented caption read upwards however flatly the specification asked for it; and a title
+hanging from its top sits a line above the row it labels, where `baseline: "middle"` puts it beside
+it.
+
+With them, two rules that are one line each: a stated `spacing` is the gap between a grid's cells
+and beats the configured twenty, and a colour scale with a **midpoint** is a *diverging* one, since
+the reader is being shown which side of a value each datum falls and a one-ended ramp cannot say
+that.
+
 ### Two runtime gaps this batch names but does not close
 
 `density`'s fixture is not in the corpus, and `trail`'s draws no legend. Both compile exactly as
@@ -1669,6 +1686,8 @@ by *this runtime*:
 - **A universally bucketed column's far edge lands elsewhere.** `binnedutcyearmonth` compiles
   exactly as upstream compiles it and the bars come out a different width, so the two engines
   disagree about what `utcOffset('month', …)` steps from. Covered by the sweep, not by a fixture.
+- **`domainMid` does not split a colour scale.** A diverging scale compiles exactly as upstream
+  compiles it and the runtime maps it as an ordinary ramp, so the two halves come out swapped.
 - **A facet's footer band reserves no height**, so a chart captioned below its cells comes out
   short by the caption. `facet-footer` is the one fixture in `GRID_LAYOUT_PENDING`.
 - **A quantile legend labels its buckets with a representative value** rather than the range they

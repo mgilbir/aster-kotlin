@@ -348,6 +348,21 @@ internal class FacetGrid(val row: Facet?, val column: Facet?) : FacetLayout {
               put("offset", num(titleOffset))
               // A caption in the trailing band hangs off the other side of its cell.
               facet.headerOrient("label").takeIf { it != "top" }?.let { put("orient", it) }
+              // `defaultHeaderGuideBaseline`/`defaultHeaderGuideAlign`: a **row**'s captions run
+              // down the side of the grid, so each is turned to face its cell — right-aligned
+              // against the cells and centred on them. A column's sit above and need neither,
+              // which upstream expresses by leaving their angle undefined.
+              // `defaultHeaderGuideAlign`/`defaultHeaderGuideBaseline` both open with "if the
+              // angle is stated" — a caption left at whatever angle the renderer chooses is left
+              // at whatever anchor it chooses too. State one and the caption has to be turned to
+              // face its cell: a **row**'s runs down the side of the grid, so it is right-aligned
+              // against the cells and centred on them.
+              val angle = facet.def.raw.obj("header")?.number("labelAngle")
+              if (angle != null && !facet.isColumn) {
+                put("baseline", "middle")
+                put("align", if (facet.headerOrient("label") == "right") "left" else "right")
+                put("angle", num(angle))
+              }
               facet.headerProperties("label").forEach { (key, value) -> put(key, value) }
             },
           )

@@ -202,7 +202,12 @@ private class Compilation(
       title()?.let { put("title", it) }
       put("data", arr(data))
       if (sizeSignals.isNotEmpty()) put("signals", arr(sizeSignals))
-      facet?.let { put("layout", it.layout(FACET_SPACING, HEADER_OFFSET, config)) }
+      // A stated `spacing` is the gap between cells, and it beats the configured twenty.
+      facet?.let {
+        val spacing =
+          spec.number("spacing") ?: config.raw.obj("facet")?.number("spacing") ?: FACET_SPACING
+        put("layout", it.layout(spacing, HEADER_OFFSET, config))
+      }
       concat?.let { put("layout", it.layout()) }
       put("marks", arr(if (concat == null) marks(views, plots.single().axes) else groups(plotTree)))
       // Shared scales first, then each plot's own, which is the order upstream's assembly walks the

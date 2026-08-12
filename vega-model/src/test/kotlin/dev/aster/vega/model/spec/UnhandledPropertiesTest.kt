@@ -96,10 +96,9 @@ class UnhandledPropertiesTest {
     // `config.title` is ordinary, and both the weight and the slant change the *measurement*, not
     // only the look. `color` and `subtitleColor` are read too: a Vega-Lite theme states the
     // heading's colour and nothing else was carrying it, so a themed title drew black.
-    assertEquals(
-      listOf("lineHeight", "baseline").sorted(),
-      reported.sorted(),
-    )
+    // `baseline` is read now too: a trellis caption centres itself against the row it labels, and
+    // hanging every one from its top put them all a line above where they belong.
+    assertEquals(listOf("lineHeight"), reported.sorted())
   }
 
   /**

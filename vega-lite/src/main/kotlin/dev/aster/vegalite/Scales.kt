@@ -500,7 +500,13 @@ internal object Scales {
           // ramp.
           str(if (def.type == MeasureType.NOMINAL) "category" else "ordinal")
         } else {
-          str(if (view.spec.mark == "rect" || view.spec.mark == "geoshape") "heatmap" else "ramp")
+          // A scale with a **midpoint** is a diverging one: the reader is being shown which side
+          // of a value each datum falls, and a one-ended ramp cannot say that.
+          when {
+            def.scale?.has("domainMid") == true -> str("diverging")
+            view.spec.mark == "rect" || view.spec.mark == "geoshape" -> str("heatmap")
+            else -> str("ramp")
+          }
         }
       else -> null
     }
