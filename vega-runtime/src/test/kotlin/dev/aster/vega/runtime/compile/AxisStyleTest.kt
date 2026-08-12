@@ -141,13 +141,11 @@ class AxisStyleTest {
         "\"labelBound\": true",
         "\"labelOffset\": 3",
         "\"tickMinStep\": 5",
-        "\"tickRound\": false",
-        "\"tickBand\": \"extent\"",
-        // The line caps and dash offsets came off this list: `Stroke` had carried both since it was
-        // written and no guide passed either, so every tick was butt-capped and every dash pattern
-        // started at the line's end.
-        "\"position\": 10",
-        "\"translate\": 0",
+        // The line caps and dash offsets came off this list, then `tickRound`, `tickBand`,
+        // `position` and `translate`: `Stroke` had carried the caps and offsets since it was
+        // written
+        // and no guide passed either, and the four placement properties each had the machinery to
+        // honour them one call away.
         "\"aria\": false",
         "\"description\": \"d\"",
       )

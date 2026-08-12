@@ -9,7 +9,7 @@ Branch `milestone-0-bootstrap`. Working tree clean, both gates green:
 - `./scripts/check.sh` — format, all tests, lint, demo APK
 - `./scripts/oracle.sh` — regenerates upstream references and runs the differential comparison
 
-**123 differential fixtures pass, all matching upstream exactly.** That is the only number here
+**124 differential fixtures pass, all matching upstream exactly.** That is the only number here
 that means what it says.
 
 ## Read this before trusting the other number
@@ -254,7 +254,7 @@ not the one Vega documents**, because Vega only forwards the parameters a specif
 
 ## What is left: two examples, and neither can be verified
 
-**123 differential fixtures pass. 91 of the 93 examples compile clean.** Everything that can be
+**124 differential fixtures pass. 91 of the 93 examples compile clean.** Everything that can be
 checked against upstream has been.
 
 ### `projections` — upstream refuses it too
@@ -398,9 +398,9 @@ As of this handoff the subtraction leaves:
   `aria`/`description`.
   `clipHeight` and the background (`fillColor`, `strokeColor`, `cornerRadius`, with the width and
   dash coming from `config.legend` alone) are *done* — do not re-report them.
-- **Axis (7):** `labelBound`, `labelFlushOffset`, `labelOffset`, `tickMinStep`, `tickRound`,
-  `tickBand`, `position`, `translate`, plus guide `aria`/`description`. The line caps and dash
-  offsets are *done*.
+- **Axis (4):** `labelBound`, `labelFlushOffset`, `labelOffset`, `tickMinStep`, plus guide
+  `aria`/`description`. The line caps, the dash offsets, `tickRound`, `tickBand`, `position` and
+  `translate` are *done*.
 - **Title (4):** `style`, `aria`, `interactive`, `name`. The rest — `color`, `lineHeight`,
   `baseline`, `limit`, an explicit `align`/`angle`, and the four `subtitle*` properties — is done, as
   is a title or subtitle written as an **array** of lines.

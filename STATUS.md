@@ -21,7 +21,7 @@ end to end — expressions, signals, 33 of upstream's 40 data transforms, every 
 and an event handler that recompiles the chart — and are verified against upstream Vega by
 differential tests.
 
-One hundred and twenty-three differential fixtures pass, all matching upstream exactly on every mark and
+One hundred and twenty-four differential fixtures pass, all matching upstream exactly on every mark and
 scale output:
 
 | Fixture | Marks | Covers |
@@ -201,7 +201,7 @@ substantive compatibility items:
 | 6. View and Compose APIs | Yes |
 | 7. SVG, PNG, PDF export | Yes |
 | 8. TalkBack can describe and navigate | Partial — virtual nodes are tested by instrumentation, not with TalkBack itself |
-| 9. At least 100 compatibility fixtures pass | **Yes** — 123 |
+| 9. At least 100 compatibility fixtures pass | **Yes** — 124 |
 | 10. Core runtime has no Android dependency | Yes |
 | 11. Renders without WebView | Yes |
 | 12. Build and test loop runs from the terminal | Yes |
@@ -538,7 +538,7 @@ each example a deadline.
 
 ## Known failing fixtures
 
-None. One hundred and twenty-three fixtures exist and all of them pass — and that sentence became worth
+None. One hundred and twenty-four fixtures exist and all of them pass — and that sentence became worth
 something only once the gate could no longer skip itself, below.
 
 **The gate could report success without running.** `FixtureDifferentialTest` reads the fixtures and
@@ -1492,6 +1492,27 @@ the label's offset by extending the symbol's, so the gap between them stays `lab
 symbol offset is; the gradient ramp's own `gradientStrokeColor`, `gradientStrokeWidth` and
 `gradientOpacity`, the last of which fades the outline with the colours because upstream puts it on the
 item rather than on either paint; and the axis `titleLimit`.
+
+## Where an axis sits, and the half pixel that is not in the measurement
+
+`tickBand`, `tickRound`, `position` and `translate` were reported and are drawn now. Each was a small
+change and one of them found something.
+
+**`tickBand` is three properties in one, and only one of its two values touches all three.**
+Upstream's `tickBand()` reads `"extent"` as `bandPosition: 1`, `tickExtra: true` **and**
+`tickOffset: 0`; `"center"` sets the first two back to their defaults and *leaves `tickOffset` alone*.
+That matters because `config.axisBand` gives a band axis a `tickOffset` of `-0.5`, which is what
+corrects the half pixel the axis group's own translation adds. Zeroing it for `"center"` as well moved
+every tick and label on that axis by half a unit, and the fixture caught it as two ticks out of four
+landing a whole unit wrong — the rounding turning half a unit into either nothing or one.
+
+**And `translate` is excluded from the axis's measurement, not just added to its position.** Upstream's
+`axisLayout` computes the axis bounds at `x`, calls `boundStroke` on them, and only then sets the item
+to `x + delta`. So the nudge onto the pixel grid is in the drawing and not in the size of the chart.
+This engine already took a `CRISP_OFFSET` back out of the guide bounds — which was right while the
+nudge was always half a pixel, and wrong the moment `translate: 0` made it something else, because
+then it was subtracting a half pixel that had never been added. A `translate: 0` axis made the chart
+half a unit wider than upstream's. It now reads the actual translate back.
 
 ## Performance observations
 

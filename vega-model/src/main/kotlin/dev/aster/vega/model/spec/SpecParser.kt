@@ -81,6 +81,10 @@ private val EVENT_STREAM_CONSUMED =
 
 private val AXIS_CONSUMED =
   setOf(
+    "tickBand",
+    "position",
+    "translate",
+    "tickRound",
     "titleLimit",
     "scale",
     "orient",
@@ -159,10 +163,6 @@ private val AXIS_UNSUPPORTED =
     "labelFlushOffset" to "Axis label flush offsets are not implemented; they need labelFlush",
     "labelOffset" to "Axis label offsets along the axis are not implemented",
     "tickMinStep" to "A minimum tick step is not implemented; the scale's own tick count is used",
-    "tickRound" to "Suppressing tick rounding is not implemented; ticks are always rounded",
-    "tickBand" to "Placing band-scale ticks at band edges is not implemented; they sit at centres",
-    "position" to "Positioning an axis along its own dimension is not implemented",
-    "translate" to "Overriding the axis's half-pixel translation is not implemented",
     "aria" to "Accessibility attributes on a guide are not implemented",
     "description" to "Accessibility descriptions on a guide are not implemented",
   )
@@ -1450,6 +1450,19 @@ public class SpecParser {
       GuideConfig.merge(own, config.axisDefaults(orient, scaleTypes[scale] == ScaleType.BAND))
         .withGuideEncode(AXIS_ENCODE_PARTS, "Axis", path)
 
+    val band =
+      obj.fields["tickBand"]?.asString()?.takeIf { it == "extent" || it == "center" }
+        ?: run {
+          obj.fields["tickBand"]?.asString()?.let { stated ->
+            diagnostics.error(
+              DiagnosticCodes.PARSE_UNKNOWN_PROPERTY,
+              "Unknown tickBand '$stated'; the only values are 'center' and 'extent'",
+              jsonPath = "$path.tickBand",
+            )
+          }
+          null
+        }
+
     return AxisSpec(
       scale = scale,
       orient = orient,
@@ -1489,9 +1502,27 @@ public class SpecParser {
       formatExpression =
         (obj.fields["format"] as? VegaValue.Obj)?.fields?.get("signal")?.asString(),
       formatType = axisFormatType(obj.fields["formatType"], "$path.formatType"),
-      bandPosition = obj.numberOrSignal("bandPosition", "$path.bandPosition"),
-      tickOffset = obj.numberOrSignal("tickOffset", "$path.tickOffset"),
-      tickExtra = obj.fields["tickExtra"]?.asBoolean() ?: false,
+      // `tickBand` is a shorthand for these three, and it wins: upstream's `tickBand()` reads the
+      // others only when it is absent. `"extent"` puts a band scale's ticks on the band edges.
+      bandPosition =
+        when (band) {
+          "extent" -> NumberValue.Constant(1.0)
+          "center" -> NumberValue.Constant(0.5)
+          else -> obj.numberOrSignal("bandPosition", "$path.bandPosition")
+        },
+      // Only `"extent"` zeroes the offset. `"center"` sets the band position and the extra tick and
+      // leaves `tickOffset` alone — so a band axis keeps the `-0.5` that `config.axisBand` gives
+      // it,
+      // which is what corrects the half pixel the axis group's own translation adds.
+      tickOffset =
+        if (band == "extent") NumberValue.Constant(0.0)
+        else obj.numberOrSignal("tickOffset", "$path.tickOffset"),
+      tickExtra =
+        if (band != null) band == "extent" else obj.fields["tickExtra"]?.asBoolean() ?: false,
+      tickBand = band,
+      position = obj.numberOrSignal("position", "$path.position"),
+      translate = obj.numberOrSignal("translate", "$path.translate"),
+      tickRound = obj.fields["tickRound"]?.asBoolean(),
       gridScale = obj.fields["gridScale"]?.takeIf { it is VegaValue.Str }?.asString(),
       labelFlush = flushThreshold(obj.fields["labelFlush"]),
       minExtent = obj.numberOrSignal("minExtent", "$path.minExtent"),

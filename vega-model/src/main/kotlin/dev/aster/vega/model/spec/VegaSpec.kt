@@ -629,6 +629,33 @@ public data class AxisSpec(
   val titleAnchor: Anchor? = null,
   /** How wide the axis title may be drawn before it is truncated. */
   val titleLimit: NumberValue? = null,
+  /**
+   * Where the axis sits **along its own direction**, `position`.
+   *
+   * Not the same as [offset], which moves it away from the plot: a bottom axis's `position` slides
+   * it left and right, and `offset` slides it down.
+   */
+  val position: NumberValue? = null,
+  /**
+   * The whole axis group's nudge onto the pixel grid, `translate`. `null` means Vega's half pixel.
+   *
+   * Zero is a real value here and not the absence of one, which is why this is nullable: a chart
+   * exported for print sets `translate: 0` so the lines land on whole coordinates.
+   */
+  val translate: NumberValue? = null,
+  /**
+   * Whether a tick's coordinate is rounded to a whole unit. Vega's default is `true`.
+   *
+   * `false` leaves it where the scale put it, which is what a chart drawn at a fractional device
+   * ratio wants — rounding to whole units there moves a tick by up to half a device pixel.
+   */
+  val tickRound: Boolean? = null,
+  /**
+   * `tickBand`, which is three properties in one: `"extent"` sets [bandPosition] to 1, turns
+   * [tickExtra] on and zeroes `tickOffset`, so a band scale's ticks land on the band **edges**
+   * instead of their centres. `"center"` sets the three back to their defaults.
+   */
+  val tickBand: String? = null,
   val grid: Boolean = false,
   val ticks: Boolean = true,
   val labels: Boolean = true,

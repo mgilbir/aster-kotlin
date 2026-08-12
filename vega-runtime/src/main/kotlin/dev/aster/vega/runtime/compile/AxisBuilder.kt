@@ -206,7 +206,7 @@ public class AxisBuilder(
           Orient.BOTTOM -> -gridOffset
         }
       for (tick in ticks) {
-        val at = AxisDefaults.crispRound(tick.position)
+        val at = tickCoordinate(tick.position, spec)
         children +=
           when (spec.orient) {
             Orient.BOTTOM,
@@ -238,7 +238,7 @@ public class AxisBuilder(
     if (spec.ticks) {
       val tickMeta = NodeMetadata(role = "axis-tick")
       for (tick in ticks) {
-        val at = AxisDefaults.crispRound(tick.position)
+        val at = tickCoordinate(tick.position, spec)
         val tickNode =
           when (spec.orient) {
             Orient.BOTTOM ->
@@ -410,14 +410,17 @@ public class AxisBuilder(
           ),
       )
 
+    val delta = numbers.resolve(spec.translate, spec.scale) ?: AxisDefaults.CRISP_OFFSET
     val guide =
       extentRect(spec, scale, tickAndLabelReach)
         .union(tickAndLabelReach)
         .union(titleNode?.bounds ?: RectD.Empty)
-        .translate(
-          placement.e - AxisDefaults.CRISP_OFFSET,
-          placement.f - AxisDefaults.CRISP_OFFSET,
-        )
+        // The axis's own nudge onto the pixel grid is taken back out: upstream measures the axis at
+        // `x` and only then places the item at `x + delta`, so the half pixel is in the drawing and
+        // not in the measurement. `translate` is what that nudge is, which is why this reads it
+        // back
+        // rather than subtracting a constant — a `translate: 0` axis has nothing to take out.
+        .translate(placement.e - delta, placement.f - delta)
     return BuiltAxis(node, guide)
   }
 
@@ -535,21 +538,18 @@ public class AxisBuilder(
    */
   private fun groupTransform(spec: AxisSpec, extent: PlotSize): Transform2D {
     val offset = offsetOf(spec)
+    // `translate` replaces the half pixel; `position` slides the axis along its own direction,
+    // which
+    // is the *other* axis from the one `offset` moves it along. Upstream's `axisLayout` computes
+    // both
+    // and adds the translation last, so `position` is measured before the nudge and not after it.
+    val delta = numbers.resolve(spec.translate, spec.scale) ?: AxisDefaults.CRISP_OFFSET
+    val along = numbers.resolve(spec.position, spec.scale) ?: 0.0
     return when (spec.orient) {
-      Orient.BOTTOM ->
-        Transform2D.translate(
-          AxisDefaults.CRISP_OFFSET,
-          extent.height + AxisDefaults.CRISP_OFFSET + offset,
-        )
-      Orient.TOP ->
-        Transform2D.translate(AxisDefaults.CRISP_OFFSET, AxisDefaults.CRISP_OFFSET - offset)
-      Orient.LEFT ->
-        Transform2D.translate(AxisDefaults.CRISP_OFFSET - offset, AxisDefaults.CRISP_OFFSET)
-      Orient.RIGHT ->
-        Transform2D.translate(
-          extent.width + AxisDefaults.CRISP_OFFSET + offset,
-          AxisDefaults.CRISP_OFFSET,
-        )
+      Orient.BOTTOM -> Transform2D.translate(along + delta, extent.height + offset + delta)
+      Orient.TOP -> Transform2D.translate(along + delta, -offset + delta)
+      Orient.LEFT -> Transform2D.translate(-offset + delta, along + delta)
+      Orient.RIGHT -> Transform2D.translate(extent.width + offset + delta, along + delta)
     }
   }
 
@@ -764,6 +764,16 @@ public class AxisBuilder(
 
   private fun flushBaseline(end: FlushEnd): TextBaseline =
     if (end == FlushEnd.START) TextBaseline.TOP else TextBaseline.BOTTOM
+
+  /**
+   * A tick's drawn coordinate, rounded unless `tickRound: false` says not to.
+   *
+   * Rounding is what keeps a one-unit tick on a pixel centre rather than straddling two, and
+   * upstream's default is on. Switching it off is for a chart drawn at a fractional device ratio,
+   * where rounding to whole units moves a tick by up to half a device pixel.
+   */
+  private fun tickCoordinate(position: Double, spec: AxisSpec): Double =
+    if (spec.tickRound == false) position else AxisDefaults.crispRound(position)
 
   private fun bandOffset(scale: PositionScale, spec: AxisSpec): Double {
     if (scale !is BandScale) return 0.0
