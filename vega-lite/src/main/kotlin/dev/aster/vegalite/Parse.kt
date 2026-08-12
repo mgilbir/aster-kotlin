@@ -152,7 +152,7 @@ internal class Parse(private val config: Config, private val diagnostics: Diagno
         ?: aggregateObject?.fields?.keys?.firstOrNull { it == "argmin" || it == "argmax" }
     val argumentField = aggregate?.let { aggregateObject?.string(it) }
     val timeUnit = value.string("timeUnit")
-    val bin = binning(value.fields["bin"], path)
+    val bin = binning(value.fields["bin"], path, channel)
 
     val conditions = conditions(channel, value.fields["condition"], "$path.condition")
 
@@ -223,10 +223,10 @@ internal class Parse(private val config: Config, private val diagnostics: Diagno
    * name is built from, so `bin_maxbins_10_v` appears even where the specification said only
    * `true`.
    */
-  private fun binning(value: VegaValue?, path: String): Binning? =
+  private fun binning(value: VegaValue?, path: String, channel: String): Binning? =
     when {
       value == null || value == VegaValue.Bool(false) || value == VegaValue.Null -> null
-      value == VegaValue.Bool(true) -> Binning.Bin(obj { put("maxbins", 10) })
+      value == VegaValue.Bool(true) -> Binning.Bin(obj { put("maxbins", autoMaxBins(channel)) })
       value == VegaValue.Str("binned") -> Binning.PreBinned
       // `isBinned` is two spellings, not one: the string, **and** an object saying `binned: true`,
       // which is how a specification states the step its data was already binned at. Reading only
@@ -235,7 +235,7 @@ internal class Parse(private val config: Config, private val diagnostics: Diagno
       (value as? VegaValue.Obj)?.fields?.get("binned") == VegaValue.Bool(true) -> Binning.PreBinned
       value is VegaValue.Obj ->
         if (value.fields.isEmpty()) {
-          Binning.Bin(obj { put("maxbins", 10) })
+          Binning.Bin(obj { put("maxbins", autoMaxBins(channel)) })
         } else {
           Binning.Bin(value)
         }
@@ -386,6 +386,32 @@ internal class Parse(private val config: Config, private val diagnostics: Diagno
      */
     /** The two aggregates that answer with a whole row rather than a number. */
     private val ARGMINMAX = setOf("argmin", "argmax")
+
+    /**
+     * `autoMaxBins`: how many buckets a `bin: true` asks for, which depends on the channel.
+     *
+     * Ten along an axis, where a reader can follow a fine grid; **six** on a colour, a size or a
+     * facet, where more than a handful of steps stop being tellable apart — upstream picks six "to
+     * simplify the rule", matching the six shapes Vega has; and four on a stroke dash, there being
+     * five patterns and four reading better. The number is in the field's own name, so getting it
+     * wrong renames every column the bin produces.
+     */
+    fun autoMaxBins(channel: String): Int =
+      when (channel) {
+        "row",
+        "column",
+        "size",
+        "color",
+        "fill",
+        "stroke",
+        "strokeWidth",
+        "opacity",
+        "fillOpacity",
+        "strokeOpacity",
+        "shape" -> 6
+        "strokeDash" -> 4
+        else -> 10
+      }
 
     val UNSUPPORTED_CHANNELS =
       setOf(

@@ -60,6 +60,11 @@ internal class LayoutSize(
       val scale = scales[channel]
       val discrete = scale != null && (scale.type == "band" || scale.type == "point")
       val step = (declared as? VegaValue.Obj)?.number("step")
+      // `{"step": 50, "for": "position"}` — the step belongs to the *outer* band, not to one mark
+      // inside it. `getPositionStep` reads the `for` and hands the step straight to the position,
+      // so the nested arithmetic below is skipped and the offset scale divides whatever band the
+      // step produced.
+      val stepForPosition = (declared as? VegaValue.Obj)?.string("for") == "position"
 
       val value: VegaValue? =
         when {
@@ -83,7 +88,7 @@ internal class LayoutSize(
             // takes away. That arithmetic is the whole width of a grouped bar chart.
             val offset = scales[if (channel == "x") "xOffset" else "yOffset"]
             emitted +=
-              if (offset == null) {
+              if (offset == null || stepForPosition) {
                 obj {
                   put("name", "$scalePrefix${channel}_step")
                   put("value", step ?: config.step)

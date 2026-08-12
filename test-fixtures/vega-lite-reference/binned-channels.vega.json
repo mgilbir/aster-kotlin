@@ -1,0 +1,203 @@
+{
+  "$schema": "https://vega.github.io/schema/vega/v6.json",
+  "description": "A bin on a colour, which asks for fewer buckets than a bin on an axis does.",
+  "background": "white",
+  "padding": 5,
+  "width": 300,
+  "height": 300,
+  "style": "cell",
+  "data": [
+    {
+      "name": "source_0",
+      "url": "data/cars.json",
+      "format": {
+        "type": "json"
+      },
+      "transform": [
+        {
+          "type": "extent",
+          "field": "Horsepower",
+          "signal": "bin_maxbins_10_Horsepower_extent"
+        },
+        {
+          "type": "bin",
+          "field": "Horsepower",
+          "as": [
+            "bin_maxbins_10_Horsepower",
+            "bin_maxbins_10_Horsepower_end"
+          ],
+          "signal": "bin_maxbins_10_Horsepower_bins",
+          "extent": {
+            "signal": "bin_maxbins_10_Horsepower_extent"
+          },
+          "maxbins": 10
+        },
+        {
+          "type": "extent",
+          "field": "Acceleration",
+          "signal": "bin_maxbins_6_Acceleration_extent"
+        },
+        {
+          "type": "bin",
+          "field": "Acceleration",
+          "as": [
+            "bin_maxbins_6_Acceleration",
+            "bin_maxbins_6_Acceleration_end"
+          ],
+          "signal": "bin_maxbins_6_Acceleration_bins",
+          "extent": {
+            "signal": "bin_maxbins_6_Acceleration_extent"
+          },
+          "maxbins": 6
+        },
+        {
+          "type": "filter",
+          "expr": "isValid(datum[\"bin_maxbins_10_Horsepower\"]) && isFinite(+datum[\"bin_maxbins_10_Horsepower\"]) && isValid(datum[\"Miles_per_Gallon\"]) && isFinite(+datum[\"Miles_per_Gallon\"])"
+        }
+      ]
+    }
+  ],
+  "marks": [
+    {
+      "name": "marks",
+      "type": "symbol",
+      "style": [
+        "point"
+      ],
+      "from": {
+        "data": "source_0"
+      },
+      "encode": {
+        "update": {
+          "opacity": {
+            "value": 0.7
+          },
+          "fill": {
+            "value": "transparent"
+          },
+          "stroke": {
+            "scale": "color",
+            "field": "bin_maxbins_6_Acceleration"
+          },
+          "ariaRoleDescription": {
+            "value": "point"
+          },
+          "description": {
+            "signal": "\"Horsepower (binned): \" + (!isValid(datum[\"bin_maxbins_10_Horsepower\"]) || !isFinite(+datum[\"bin_maxbins_10_Horsepower\"]) ? \"null\" : format(datum[\"bin_maxbins_10_Horsepower\"], \"\") + \" – \" + format(datum[\"bin_maxbins_10_Horsepower_end\"], \"\")) + \"; Miles_per_Gallon: \" + (format(datum[\"Miles_per_Gallon\"], \"\")) + \"; Acceleration (binned): \" + (!isValid(datum[\"bin_maxbins_6_Acceleration\"]) || !isFinite(+datum[\"bin_maxbins_6_Acceleration\"]) ? \"null\" : format(datum[\"bin_maxbins_6_Acceleration\"], \"\") + \" – \" + format(datum[\"bin_maxbins_6_Acceleration_end\"], \"\"))"
+          },
+          "x": {
+            "signal": "scale(\"x\", 0.5 * datum[\"bin_maxbins_10_Horsepower\"] + 0.5 * datum[\"bin_maxbins_10_Horsepower_end\"])"
+          },
+          "y": {
+            "scale": "y",
+            "field": "Miles_per_Gallon"
+          }
+        }
+      }
+    }
+  ],
+  "scales": [
+    {
+      "name": "x",
+      "type": "linear",
+      "domain": {
+        "signal": "[bin_maxbins_10_Horsepower_bins.start, bin_maxbins_10_Horsepower_bins.stop]"
+      },
+      "range": [
+        0,
+        {
+          "signal": "width"
+        }
+      ],
+      "bins": {
+        "signal": "bin_maxbins_10_Horsepower_bins"
+      },
+      "zero": false
+    },
+    {
+      "name": "y",
+      "type": "linear",
+      "domain": {
+        "data": "source_0",
+        "field": "Miles_per_Gallon"
+      },
+      "range": [
+        {
+          "signal": "height"
+        },
+        0
+      ],
+      "nice": true,
+      "zero": true
+    },
+    {
+      "name": "color",
+      "type": "bin-ordinal",
+      "range": "ramp",
+      "bins": {
+        "signal": "bin_maxbins_6_Acceleration_bins"
+      },
+      "interpolate": "hcl"
+    }
+  ],
+  "axes": [
+    {
+      "scale": "y",
+      "orient": "left",
+      "gridScale": "x",
+      "grid": true,
+      "tickCount": {
+        "signal": "ceil(height/40)"
+      },
+      "domain": false,
+      "labels": false,
+      "aria": false,
+      "maxExtent": 0,
+      "minExtent": 0,
+      "ticks": false,
+      "zindex": 0
+    },
+    {
+      "scale": "x",
+      "orient": "bottom",
+      "grid": false,
+      "title": "Horsepower (binned)",
+      "labelFlush": true,
+      "labelOverlap": true,
+      "tickCount": {
+        "signal": "ceil(width/10)"
+      },
+      "zindex": 0
+    },
+    {
+      "scale": "y",
+      "orient": "left",
+      "grid": false,
+      "title": "Miles_per_Gallon",
+      "labelOverlap": true,
+      "tickCount": {
+        "signal": "ceil(height/40)"
+      },
+      "zindex": 0
+    }
+  ],
+  "legends": [
+    {
+      "stroke": "color",
+      "symbolType": "circle",
+      "title": "Acceleration (binned)",
+      "encode": {
+        "symbols": {
+          "update": {
+            "fill": {
+              "value": "transparent"
+            },
+            "opacity": {
+              "value": 0.7
+            }
+          }
+        }
+      }
+    }
+  ]
+}

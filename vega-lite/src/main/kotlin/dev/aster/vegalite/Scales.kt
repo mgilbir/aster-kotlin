@@ -603,9 +603,12 @@ internal object Scales {
     }
 
     if (channelIsPosition(channel)) {
+      // A stated `padding` settles both ends of a band at once and passes through as it stands;
+      // the derived inner and outer paddings are for a scale that said nothing, and writing them
+      // beside a stated one gives Vega three numbers where the specification gave it one.
       if (type == "point") {
         set("padding", num(config.scaleConfig("pointPadding")!!))
-      } else if (type == "band") {
+      } else if (type == "band" && def.scale?.has("padding") != true) {
         val inner =
           if (view.hasNestedOffset(channel)) {
             // A band holding several bars is padded more generously than one holding a single bar,

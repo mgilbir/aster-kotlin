@@ -614,7 +614,15 @@ public class MarkEncoder(
     // applies them *after* the rotation, so an offset runs along the text rather than along the
     // page.
     // Rotating them here keeps the anchor as the point the text turns about, which is what it is.
-    val nudge = PointD(number(channels["dx"], datum) ?: 0.0, number(channels["dy"], datum) ?: 0.0)
+    // Every one of these falls back to the mark's own configuration and to the **style blocks** it
+    // names — a label styled `{align: "left", baseline: "middle", dx: 3}` says nothing in its
+    // encoding, and reading only the encoding left it centred on its anchor with no nudge at all.
+    val markConfig = MarkConfig(spec)
+    val nudge =
+      PointD(
+        number(channels["dx"], datum) ?: markConfig.number("dx") ?: 0.0,
+        number(channels["dy"], datum) ?: markConfig.number("dy") ?: 0.0,
+      )
     val offset =
       if (angle == 0.0) nudge else Transform2D.rotateDegrees(angle).apply(nudge.x, nudge.y)
     val style = style(channels, datum, spec)
@@ -623,11 +631,11 @@ public class MarkEncoder(
       TextStyle(
         fontFamily =
           string(channels["font"], datum)
-            ?: MarkConfig(spec).text("font")
+            ?: markConfig.text("font")
             ?: MarkDefaults.TEXT_FONT_FAMILY,
         fontSize =
           number(channels["fontSize"], datum)
-            ?: MarkConfig(spec).number("fontSize")
+            ?: markConfig.number("fontSize")
             ?: MarkDefaults.TEXT_FONT_SIZE,
         fontWeight = fontWeight(channels, datum),
         fontStyle =
@@ -641,8 +649,8 @@ public class MarkEncoder(
       TextRun(
         text = content,
         style = textStyle,
-        align = textAlign(string(channels["align"], datum)),
-        baseline = textBaseline(string(channels["baseline"], datum)),
+        align = textAlign(string(channels["align"], datum) ?: markConfig.text("align")),
+        baseline = textBaseline(string(channels["baseline"], datum) ?: markConfig.text("baseline")),
       )
 
     return TextNode(

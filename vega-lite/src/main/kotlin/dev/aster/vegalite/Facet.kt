@@ -289,7 +289,10 @@ internal class FacetGrid(val row: Facet?, val column: Facet?) : FacetLayout {
   ): VegaValue? {
     val isColumn = channel == "column"
     val facet = if (isColumn) column else row
-    if (axes.isEmpty() && !(captioned && facet != null)) return null
+    // `"header": null` takes the *caption* off, not the band: the band is also where a shared axis
+    // is drawn, and that axis is still wanted. A band with neither is the one that disappears.
+    val captions = captioned && facet?.def?.raw?.fields?.get("header") != VegaValue.Null
+    if (axes.isEmpty() && !(captions && facet != null)) return null
     return obj {
       put("name", "${channel}_$kind")
       put("type", "group")
@@ -303,7 +306,7 @@ internal class FacetGrid(val row: Facet?, val column: Facet?) : FacetLayout {
             put("order", facet.order)
           },
         )
-        if (captioned) {
+        if (captions) {
           put(
             "title",
             obj {
@@ -356,6 +359,9 @@ internal class FacetGrid(val row: Facet?, val column: Facet?) : FacetLayout {
    */
   private fun titles(config: Config): Map<String, String> =
     listOfNotNull(row, column)
+      // `"header": null` takes the whole header off — its caption, its labels and the room the
+      // layout was keeping for them. It is not the same as a header with nothing in it.
+      .filter { it.def.raw.fields["header"] != VegaValue.Null }
       .mapNotNull { facet ->
         (Fields.title(facet.def, config) as? VegaValue.Str)?.let { facet.channel to it.value }
       }

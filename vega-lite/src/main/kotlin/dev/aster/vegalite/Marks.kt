@@ -288,12 +288,32 @@ internal object Marks {
           putAll(pointPosition(view, "y", "mid", null))
           textChannel(view)?.let { put("text", it) }
           putAll(nonPosition(view, "size", "fontSize"))
-          if (view.markDef.string("align") == null) put("align", obj { put("value", "center") })
-          if (view.markDef.string("baseline") == null)
-            put("baseline", obj { put("value", "middle") })
+          // `getMarkPropOrConfig` reads the mark's **styles** as well as the mark: a text mark
+          // that names a style whose block sets `align` has already been aligned, and writing the
+          // default beside it overrides the very thing the style was for.
+          if (styled(view, "align") == null) put("align", obj { put("value", "center") })
+          if (styled(view, "baseline") == null) put("baseline", obj { put("value", "middle") })
         }
       }
     }
+  }
+
+  /**
+   * A mark property as the mark, its style blocks and the configuration between them settle it.
+   *
+   * The mark's own wins; failing that, the *last* style block that names it, styles being applied
+   * in order; failing that, the mark type's own configuration.
+   */
+  private fun styled(view: UnitView, property: String): VegaValue? {
+    view.markDef.raw.fields[property]?.let {
+      return it
+    }
+    for (name in styles(view).reversed()) {
+      view.config.style(name)?.fields?.get(property)?.let {
+        return it
+      }
+    }
+    return view.config.markConfig(view.spec.mark).fields[property]
   }
 
   /** `baseEncodeEntry`: the properties every mark shares, in upstream's order. */

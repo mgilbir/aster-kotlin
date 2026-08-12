@@ -1483,6 +1483,30 @@ the two names differ. Where the parse stays below, it is a formula rather than a
 since by then the loader has long since finished — `node.parent instanceof SourceNode` is upstream's
 test and it is asked at assembly, after the optimiser has moved what it can.
 
+### How many buckets a `bin: true` asks for depends on the channel
+
+`autoMaxBins`: ten along an axis, where a reader can follow a fine grid; **six** on a colour, a size
+or a facet, where more than a handful of steps stop being tellable apart; four on a stroke dash,
+there being five patterns and four reading better. The number goes into the field's own *name*, so
+reading ten everywhere renamed every column a binned colour scale produced and nothing downstream
+found them.
+
+Three more from the same pass, each a property that was being overridden rather than read:
+
+- **A style block settles a text mark's alignment.** `getMarkPropOrConfig` reads the mark, then the
+  style blocks it names, then the mark type's configuration; this compiler read only the mark, so a
+  label styled `{align: "left"}` had `align: "center"` written beside it by the very default the
+  style existed to replace. The **runtime** had the same gap from the other end — it read `align`,
+  `baseline`, `dx` and `dy` only from the encoding, so a style block's never reached the page.
+- **A stated `padding` settles a band's two ends at once.** The derived inner and outer paddings
+  are for a scale that said nothing; writing them beside a stated one gave Vega three numbers where
+  the specification gave it one.
+- **`{"step": 50, "for": "position"}`** hands the step to the outer band rather than to one mark
+  inside it, so `x_step` is 50 outright and the offset divides whatever band that produced.
+
+And `"header": null` takes a facet's **caption** off rather than its band: the band is also where a
+shared axis is drawn, and that axis is still wanted. A band with neither is the one that disappears.
+
 ### Two runtime gaps this batch names but does not close
 
 `density`'s fixture is not in the corpus, and `trail`'s draws no legend. Both compile exactly as
