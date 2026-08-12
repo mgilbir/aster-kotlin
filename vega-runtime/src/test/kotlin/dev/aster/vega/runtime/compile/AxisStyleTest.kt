@@ -143,13 +143,11 @@ class AxisStyleTest {
         "\"tickMinStep\": 5",
         "\"tickRound\": false",
         "\"tickBand\": \"extent\"",
-        "\"tickCap\": \"round\"",
-        "\"gridCap\": \"round\"",
-        "\"gridDashOffset\": 2",
-        "\"domainCap\": \"round\"",
+        // The line caps and dash offsets came off this list: `Stroke` had carried both since it was
+        // written and no guide passed either, so every tick was butt-capped and every dash pattern
+        // started at the line's end.
         "\"position\": 10",
         "\"translate\": 0",
-        "\"titleLimit\": 40",
         "\"aria\": false",
         "\"description\": \"d\"",
       )

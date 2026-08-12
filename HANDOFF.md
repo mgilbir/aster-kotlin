@@ -9,7 +9,7 @@ Branch `milestone-0-bootstrap`. Working tree clean, both gates green:
 - `./scripts/check.sh` — format, all tests, lint, demo APK
 - `./scripts/oracle.sh` — regenerates upstream references and runs the differential comparison
 
-**122 differential fixtures pass, all matching upstream exactly.** That is the only number here
+**123 differential fixtures pass, all matching upstream exactly.** That is the only number here
 that means what it says.
 
 ## Read this before trusting the other number
@@ -254,7 +254,7 @@ not the one Vega documents**, because Vega only forwards the parameters a specif
 
 ## What is left: two examples, and neither can be verified
 
-**122 differential fixtures pass. 91 of the 93 examples compile clean.** Everything that can be
+**123 differential fixtures pass. 91 of the 93 examples compile clean.** Everything that can be
 checked against upstream has been.
 
 ### `projections` — upstream refuses it too
@@ -394,12 +394,13 @@ Anything left is either a gap or a stale diagnostic, and telling those two apart
 
 As of this handoff the subtraction leaves:
 
-- **Legend (17):** `labelAlign`, `labelBaseline`;
-  `titleAlign`, `titleBaseline`, `titleAnchor`, `titleLineHeight`; `symbolOffset`,
-  `symbolDashOffset`, `symbolFillColor`, `symbolLimit`; `gradientOpacity`, `gradientStrokeColor`,
-  `gradientStrokeWidth`; `gridAlign`; `tickMinStep`; `formatType`; `aria`/`description`.
+- **Legend (5):** `titleAnchor`, `symbolLimit`, `gridAlign`, `tickMinStep`, `formatType`, plus guide
+  `aria`/`description`.
   `clipHeight` and the background (`fillColor`, `strokeColor`, `cornerRadius`, with the width and
   dash coming from `config.legend` alone) are *done* — do not re-report them.
+- **Axis (7):** `labelBound`, `labelFlushOffset`, `labelOffset`, `tickMinStep`, `tickRound`,
+  `tickBand`, `position`, `translate`, plus guide `aria`/`description`. The line caps and dash
+  offsets are *done*.
 - **Title (4):** `style`, `aria`, `interactive`, `name`. The rest — `color`, `lineHeight`,
   `baseline`, `limit`, an explicit `align`/`angle`, and the four `subtitle*` properties — is done, as
   is a title or subtitle written as an **array** of lines.

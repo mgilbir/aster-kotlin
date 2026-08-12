@@ -81,6 +81,7 @@ private val EVENT_STREAM_CONSUMED =
 
 private val AXIS_CONSUMED =
   setOf(
+    "titleLimit",
     "scale",
     "orient",
     "title",
@@ -130,9 +131,25 @@ private val AXIS_CONSUMED =
 private fun guideStyleKeys(vararg prefixes: String): Set<String> =
   prefixes
     .flatMap { prefix ->
-      listOf("Color", "Width", "Dash", "Opacity", "Font", "FontWeight", "FontStyle").map {
-        "$prefix$it"
-      }
+      listOf(
+          "Color",
+          "Width",
+          "Dash",
+          // `Stroke` has carried both of these since it was written and no guide passed either, so
+          // every tick was butt-capped and every dash pattern started at the line's end.
+          "DashOffset",
+          "Cap",
+          "Opacity",
+          "Font",
+          "FontWeight",
+          "FontStyle",
+          // Only meaningful on a text part, and a guide that has no such property simply never
+          // writes one — consuming a name upstream does not define costs nothing.
+          "Align",
+          "Baseline",
+          "LineHeight",
+        )
+        .map { "$prefix$it" }
     }
     .toSet()
 
@@ -141,21 +158,11 @@ private val AXIS_UNSUPPORTED =
     "labelBound" to "Bounding axis labels to the plotting area is not implemented",
     "labelFlushOffset" to "Axis label flush offsets are not implemented; they need labelFlush",
     "labelOffset" to "Axis label offsets along the axis are not implemented",
-    "labelLineHeight" to "Multi-line axis labels are not implemented",
     "tickMinStep" to "A minimum tick step is not implemented; the scale's own tick count is used",
     "tickRound" to "Suppressing tick rounding is not implemented; ticks are always rounded",
     "tickBand" to "Placing band-scale ticks at band edges is not implemented; they sit at centres",
-    "tickCap" to "Axis tick line caps are not implemented",
-    "tickDashOffset" to "Dash offsets are not implemented; the dash pattern starts at the line end",
-    "gridCap" to "Gridline caps are not implemented",
-    "gridDashOffset" to "Dash offsets are not implemented; the dash pattern starts at the line end",
-    "domainCap" to "Domain line caps are not implemented",
-    "domainDashOffset" to
-      "Dash offsets are not implemented; the dash pattern starts at the line end",
     "position" to "Positioning an axis along its own dimension is not implemented",
     "translate" to "Overriding the axis's half-pixel translation is not implemented",
-    "titleLimit" to "Axis title truncation is not implemented; the title is drawn in full",
-    "titleLineHeight" to "Multi-line axis titles are not implemented",
     "aria" to "Accessibility attributes on a guide are not implemented",
     "description" to "Accessibility descriptions on a guide are not implemented",
   )
@@ -195,6 +202,12 @@ private val SCALE_UNSUPPORTED =
 /** Legend properties this engine reads. */
 private val LEGEND_CONSUMED =
   setOf(
+    "symbolDashOffset",
+    "symbolFillColor",
+    "symbolOffset",
+    "gradientStrokeColor",
+    "gradientStrokeWidth",
+    "gradientOpacity",
     // The legend's own background.
     "fillColor",
     "strokeColor",
@@ -1445,6 +1458,7 @@ public class SpecParser {
       titlePadding = obj.numberOrSignal("titlePadding", "$path.titlePadding"),
       titleFontSize = obj.numberOrSignal("titleFontSize", "$path.titleFontSize"),
       titleAnchor = obj.enumOrNull("titleAnchor", path, "title anchor") { Anchor.fromName(it) },
+      titleLimit = obj.numberOrSignal("titleLimit", "$path.titleLimit"),
       grid = obj.fields["grid"]?.asBoolean() ?: false,
       ticks = obj.fields["ticks"]?.asBoolean() ?: true,
       labels = obj.fields["labels"]?.asBoolean() ?: true,
@@ -1636,8 +1650,13 @@ public class SpecParser {
           ?.values
           ?.map { it.asDouble() }
           ?.takeIf { values -> values.isNotEmpty() && values.all { it.isFinite() } },
+      dashOffset = (fields["${prefix}DashOffset"] as? VegaValue.Num)?.value,
+      cap = fields["${prefix}Cap"]?.takeIf { it is VegaValue.Str }?.asString(),
       opacity = (fields["${prefix}Opacity"] as? VegaValue.Num)?.value,
       font = fields["${prefix}Font"]?.takeIf { it is VegaValue.Str }?.asString(),
+      align = fields["${prefix}Align"]?.takeIf { it is VegaValue.Str }?.asString(),
+      baseline = fields["${prefix}Baseline"]?.takeIf { it is VegaValue.Str }?.asString(),
+      lineHeight = (fields["${prefix}LineHeight"] as? VegaValue.Num)?.value,
       // Vega accepts either a keyword (`"bold"`) or a number (`700`); both reach the renderer as
       // text, so a number is normalized to its integer spelling rather than kept as a double.
       fontWeight =
@@ -1825,6 +1844,13 @@ public class SpecParser {
         fillColor = obj.fields["fillColor"]?.asString()?.takeIf { it.isNotEmpty() },
         strokeColor = obj.fields["strokeColor"]?.asString()?.takeIf { it.isNotEmpty() },
         cornerRadius = obj.numberOrSignal("cornerRadius", "$path.cornerRadius"),
+        symbolFillColor = obj.fields["symbolFillColor"]?.asString()?.takeIf { it.isNotEmpty() },
+        symbolOffset = obj.numberOrSignal("symbolOffset", "$path.symbolOffset"),
+        gradientStrokeColor =
+          obj.fields["gradientStrokeColor"]?.asString()?.takeIf { it.isNotEmpty() },
+        gradientStrokeWidth =
+          obj.numberOrSignal("gradientStrokeWidth", "$path.gradientStrokeWidth"),
+        gradientOpacity = obj.numberOrSignal("gradientOpacity", "$path.gradientOpacity"),
         // From the configuration alone; see [LegendSpec.fillColor] for why the legend's own value
         // is deliberately not consulted.
         backgroundStrokeWidth = legendConfig("strokeWidth")?.asDouble()?.takeIf { !it.isNaN() },
@@ -1856,6 +1882,9 @@ public class SpecParser {
                   ?.map { it.asDouble() }
                   ?.takeIf { values -> values.isNotEmpty() && values.all { it.isFinite() } },
               opacity = (obj.fields["symbolOpacity"] as? VegaValue.Num)?.value,
+              // `symbolDashOffset`, matching `symbolDash` — the `symbolStroke` prefix would look
+              // for `symbolStrokeDashOffset`, which is not a property upstream has.
+              dashOffset = (obj.fields["symbolDashOffset"] as? VegaValue.Num)?.value,
             ),
       )
 
@@ -1876,7 +1905,6 @@ public class SpecParser {
       mapOf(
         "formatType" to "Legend label format types are not implemented",
         "symbolLimit" to "Legend entry limits are not implemented; every entry is shown",
-        "gradientOpacity" to "Legend gradient opacity is not implemented",
         "titleAnchor" to "Legend title anchoring is not implemented",
       ),
     )

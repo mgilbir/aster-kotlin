@@ -508,6 +508,7 @@ public class AxisBuilder(
         baseline =
           baselineOf(spec.titleBaseline)
             ?: if (spec.orient == Orient.BOTTOM) TextBaseline.TOP else TextBaseline.BOTTOM,
+        limit = numbers.resolve(spec.titleLimit, spec.scale) ?: 0.0,
       )
     return TextNode(
       id = ids.allocate(),

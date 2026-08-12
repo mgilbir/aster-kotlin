@@ -627,6 +627,8 @@ public data class AxisSpec(
   val titlePadding: NumberValue? = null,
   val titleFontSize: NumberValue? = null,
   val titleAnchor: Anchor? = null,
+  /** How wide the axis title may be drawn before it is truncated. */
+  val titleLimit: NumberValue? = null,
   val grid: Boolean = false,
   val ticks: Boolean = true,
   val labels: Boolean = true,
@@ -792,10 +794,18 @@ public data class GuideStroke(
   val color: String? = null,
   val width: Double? = null,
   val dash: List<Double>? = null,
+  /** Where in the dash pattern the line starts; see `Stroke.dashOffset`. */
+  val dashOffset: Double? = null,
+  /** `butt`, `round` or `square` — how the ends of a tick or a gridline are finished. */
+  val cap: String? = null,
   val opacity: Double? = null,
   val font: String? = null,
   val fontWeight: String? = null,
   val fontStyle: String? = null,
+  /** For a text part: an explicit alignment, overriding whatever the guide's geometry implies. */
+  val align: String? = null,
+  val baseline: String? = null,
+  val lineHeight: Double? = null,
 )
 
 /**
@@ -958,6 +968,20 @@ public data class LegendSpec(
   val fillColor: String? = null,
   val strokeColor: String? = null,
   val cornerRadius: NumberValue? = null,
+  /**
+   * A swatch's fill where the legend maps no colour scale of its own.
+   *
+   * A **fallback**, not an override: upstream sets the channel from `symbolFillColor` and then
+   * overwrites it from the scale for every legend that has one, so a `fill` scale wins and only a
+   * `size` or `shape` legend takes the stated colour.
+   */
+  val symbolFillColor: String? = null,
+  /** Shifts a swatch and its label along the row, `symbolOffset`. */
+  val symbolOffset: NumberValue? = null,
+  /** The outline round a gradient ramp, and the ramp's own opacity. */
+  val gradientStrokeColor: String? = null,
+  val gradientStrokeWidth: NumberValue? = null,
+  val gradientOpacity: NumberValue? = null,
   val backgroundStrokeWidth: Double? = null,
   val backgroundStrokeDash: List<Double>? = null,
   val zindex: Int = 0,

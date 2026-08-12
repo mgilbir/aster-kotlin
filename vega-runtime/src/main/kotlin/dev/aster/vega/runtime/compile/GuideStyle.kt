@@ -6,6 +6,9 @@ import dev.aster.vega.scene.FontStyle
 import dev.aster.vega.scene.SceneColor
 import dev.aster.vega.scene.ScenePaint
 import dev.aster.vega.scene.Stroke
+import dev.aster.vega.scene.StrokeCap
+import dev.aster.vega.scene.TextAlign
+import dev.aster.vega.scene.TextBaseline
 import dev.aster.vega.scene.TextStyle
 
 /**
@@ -26,9 +29,39 @@ internal object GuideStyle {
     Stroke(
       paint = ScenePaint.Solid(style.color?.let { SceneColor.parse(it) } ?: defaultColor),
       width = style.width ?: AxisDefaults.TICK_WIDTH,
+      cap = capOf(style.cap),
       dashArray = style.dash ?: emptyList(),
+      dashOffset = style.dashOffset ?: 0.0,
       opacity = style.opacity ?: 1.0,
     )
+
+  /** A CSS line cap. Anything unrecognised leaves the default, which is what upstream draws. */
+  fun capOf(name: String?): StrokeCap =
+    when (name?.lowercase()) {
+      "round" -> StrokeCap.ROUND
+      "square" -> StrokeCap.SQUARE
+      else -> StrokeCap.BUTT
+    }
+
+  /** An explicit alignment on a guide's text part, or null to keep the derived one. */
+  fun alignOf(name: String?): TextAlign? =
+    when (name?.lowercase()) {
+      "left" -> TextAlign.LEFT
+      "center" -> TextAlign.CENTER
+      "right" -> TextAlign.RIGHT
+      else -> null
+    }
+
+  fun baselineOf(name: String?): TextBaseline? =
+    when (name?.lowercase()) {
+      "top" -> TextBaseline.TOP
+      "middle" -> TextBaseline.MIDDLE
+      "bottom" -> TextBaseline.BOTTOM
+      "alphabetic" -> TextBaseline.ALPHABETIC
+      "line-top" -> TextBaseline.LINE_TOP
+      "line-bottom" -> TextBaseline.LINE_BOTTOM
+      else -> null
+    }
 
   fun fill(style: GuideStroke, defaultColor: SceneColor): Fill =
     Fill(
@@ -40,6 +73,7 @@ internal object GuideStyle {
     TextStyle(
       fontFamily = style.font ?: AxisDefaults.LABEL_FONT_FAMILY,
       fontSize = fontSize,
+      lineHeight = style.lineHeight,
       fontWeight = style.fontWeight?.let(::weightOf) ?: defaultWeight,
       fontStyle =
         if (style.fontStyle.equals("italic", ignoreCase = true)) {

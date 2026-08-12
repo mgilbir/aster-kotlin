@@ -263,11 +263,15 @@ internal class LegendBuilder(
       TextRun(
         text = text,
         style = GuideStyle.text(spec.titleStyle, fontSize, LegendDefaults.TITLE_FONT_WEIGHT),
-        align = TextAlign.LEFT,
+        // `titleAlign` and `titleBaseline` are overrides: upstream derives both from the title's
+        // orientation and its anchor in `enter` and writes the explicit ones into `update`.
+        align = GuideStyle.alignOf(spec.titleStyle.align) ?: TextAlign.LEFT,
         limit = numbers.resolve(spec.titleLimit, scaleName) ?: LegendDefaults.TITLE_LIMIT,
         // Upstream reads a left or right title as `middle`-anchored where a top one is
         // `start`-anchored, and the baseline follows the anchor.
-        baseline = if (alongside) TextBaseline.MIDDLE else TextBaseline.TOP,
+        baseline =
+          GuideStyle.baselineOf(spec.titleStyle.baseline)
+            ?: if (alongside) TextBaseline.MIDDLE else TextBaseline.TOP,
       )
     return TextNode(
       id = ids.allocate(),
@@ -337,6 +341,10 @@ internal class LegendBuilder(
 
     val labelStyle = GuideStyle.text(spec.labelStyle, labelFontSize, defaultWeight = 400)
     val labelLimit = numbers.resolve(spec.labelLimit, scaleName) ?: LegendDefaults.LABEL_LIMIT
+    // `symbolOffset` shifts the swatch **and its label** along the row: upstream builds the label's
+    // own offset by extending the symbol's, so the gap between the two stays `labelOffset` whatever
+    // the symbol offset is.
+    val symbolOffset = numbers.resolve(spec.symbolOffset, scaleName) ?: LegendDefaults.SYMBOL_OFFSET
 
     // Build each entry at its own origin first: the layout below needs to know how far a cell
     // reaches
@@ -345,19 +353,19 @@ internal class LegendBuilder(
       val box = boxes[index]
       val anchor = if (vertical) widest else measured[index]
       val centre = box * 0.5
-      val labelX = anchor + LegendDefaults.SYMBOL_OFFSET + labelOffset
+      val labelX = anchor + symbolOffset + labelOffset
       val run =
         TextRun(
           text = entryText(spec, "labels", "text", entry) ?: entry.label,
           style = labelStyle,
-          align = TextAlign.LEFT,
-          baseline = TextBaseline.MIDDLE,
+          align = GuideStyle.alignOf(spec.labelStyle.align) ?: TextAlign.LEFT,
+          baseline = GuideStyle.baselineOf(spec.labelStyle.baseline) ?: TextBaseline.MIDDLE,
           limit = labelLimit,
         )
       listOf(
         SymbolNode(
           id = ids.allocate(),
-          x = anchor * 0.5 + LegendDefaults.SYMBOL_OFFSET,
+          x = anchor * 0.5 + symbolOffset,
           y = centre,
           size = sizes[index],
           shape = shape,
@@ -500,9 +508,20 @@ internal class LegendBuilder(
    * `stroke` scale therefore gets the transparent fill too — it draws the same either way, but a
    * comparison against upstream can see the difference and a stroke-only legend is common.
    */
+  /**
+   * A legend symbol's fill.
+   *
+   * `symbolFillColor` is a **fallback**, not an override: upstream passes it to `addEncoders` and
+   * then overwrites the channel from the scale for every legend that maps one, so a `fill` scale
+   * wins and a `size` or `shape` legend takes the stated colour. Its own default in that case is
+   * `config.symbolBaseFillColor`, which is transparent — an unfilled swatch with a grey outline.
+   */
   private fun symbolFill(spec: LegendSpec, value: VegaValue): Fill? {
     val fillScale = spec.fill?.let { scales[it] }
-    if (fillScale == null) return Fill.of(SceneColor.Transparent)
+    if (fillScale == null) {
+      val stated = spec.symbolFillColor?.let { SceneColor.parse(it) }
+      return Fill.of(stated ?: SceneColor.Transparent)
+    }
     val colour = SceneColor.parse(fillScale.scale(value).asString()) ?: return null
     return Fill.of(colour)
   }
@@ -515,25 +534,27 @@ internal class LegendBuilder(
    */
   private fun symbolStroke(spec: LegendSpec, value: VegaValue, width: Double): Stroke? {
     val dash = spec.symbolStyle.dash ?: emptyList()
+    val dashOffset = spec.symbolStyle.dashOffset ?: 0.0
+    fun outline(colour: SceneColor) =
+      Stroke(
+        paint = ScenePaint.Solid(colour),
+        width = width,
+        dashArray = dash,
+        dashOffset = dashOffset,
+      )
     // An explicit `symbolStrokeColor` outlines every swatch, whatever the scales say.
     spec.symbolStyle.color
       ?.let { SceneColor.parse(it) }
       ?.let {
-        return Stroke(paint = ScenePaint.Solid(it), width = width, dashArray = dash)
+        return outline(it)
       }
     val strokeScale = spec.stroke?.let { scales[it] }
     if (strokeScale != null) {
       val colour = SceneColor.parse(strokeScale.scale(value).asString())
-      if (colour != null) {
-        return Stroke(paint = ScenePaint.Solid(colour), width = width, dashArray = dash)
-      }
+      if (colour != null) return outline(colour)
     }
     if (spec.fill != null || spec.stroke != null) return null
-    return Stroke(
-      paint = ScenePaint.Solid(LegendDefaults.symbolBaseStrokeColor),
-      width = width,
-      dashArray = dash,
-    )
+    return outline(LegendDefaults.symbolBaseStrokeColor)
   }
 
   // ---- gradient legends -------------------------------------------------------
@@ -582,9 +603,18 @@ internal class LegendBuilder(
           ),
         stroke =
           Stroke(
-            paint = ScenePaint.Solid(LegendDefaults.gradientStrokeColor),
-            width = LegendDefaults.GRADIENT_STROKE_WIDTH,
+            paint =
+              ScenePaint.Solid(
+                spec.gradientStrokeColor?.let { SceneColor.parse(it) }
+                  ?: LegendDefaults.gradientStrokeColor
+              ),
+            width =
+              numbers.resolve(spec.gradientStrokeWidth, scaleName)
+                ?: LegendDefaults.GRADIENT_STROKE_WIDTH,
           ),
+        // `gradientOpacity` fades the whole ramp — the outline with the colours — because upstream
+        // puts it on the item rather than on either paint.
+        opacity = numbers.resolve(spec.gradientOpacity, scaleName) ?: 1.0,
         metadata = NodeMetadata(role = "legend-gradient", markName = scaleName),
       )
 

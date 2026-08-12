@@ -61,10 +61,9 @@ class UnhandledPropertiesTest {
   }
 
   /**
-   * `labelColor`, `labelFont`, `symbolDash` and the legend's own background — `fillColor`,
-   * `strokeColor`, `cornerRadius` — are implemented and so do not appear. What remains is
-   * `symbolFillColor`, which upstream applies only where the scale supplies no fill of its own, and
-   * two layout properties.
+   * What remains is two layout properties. `symbolFillColor` came off this list once it was
+   * understood to be a *fallback* rather than an override — upstream sets the channel from it and
+   * then overwrites it from the scale, so only a `size` or `shape` legend ever takes the colour.
    */
   @Test
   fun `a legend reports the styling it cannot honour`() {
@@ -77,10 +76,7 @@ class UnhandledPropertiesTest {
               "cornerRadius": 4, "clipHeight": 10, "gridAlign": "each"}]"""
         )
       )
-    assertEquals(
-      listOf("symbolFillColor", "clipHeight", "gridAlign").sorted(),
-      reported.sorted(),
-    )
+    assertEquals(listOf("clipHeight", "gridAlign").sorted(), reported.sorted())
   }
 
   @Test

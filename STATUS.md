@@ -21,7 +21,7 @@ end to end — expressions, signals, 33 of upstream's 40 data transforms, every 
 and an event handler that recompiles the chart — and are verified against upstream Vega by
 differential tests.
 
-One hundred and twenty-two differential fixtures pass, all matching upstream exactly on every mark and
+One hundred and twenty-three differential fixtures pass, all matching upstream exactly on every mark and
 scale output:
 
 | Fixture | Marks | Covers |
@@ -201,7 +201,7 @@ substantive compatibility items:
 | 6. View and Compose APIs | Yes |
 | 7. SVG, PNG, PDF export | Yes |
 | 8. TalkBack can describe and navigate | Partial — virtual nodes are tested by instrumentation, not with TalkBack itself |
-| 9. At least 100 compatibility fixtures pass | **Yes** — 122 |
+| 9. At least 100 compatibility fixtures pass | **Yes** — 123 |
 | 10. Core runtime has no Android dependency | Yes |
 | 11. Renders without WebView | Yes |
 | 12. Build and test loop runs from the terminal | Yes |
@@ -538,7 +538,7 @@ each example a deadline.
 
 ## Known failing fixtures
 
-None. One hundred and twenty-two fixtures exist and all of them pass — and that sentence became worth
+None. One hundred and twenty-three fixtures exist and all of them pass — and that sentence became worth
 something only once the gate could no longer skip itself, below.
 
 **The gate could report success without running.** `FixtureDifferentialTest` reads the fixtures and
@@ -1458,6 +1458,40 @@ produced `A title needs a 'text'` and no chart at all. The lines are joined with
 engine lays text out on, and the *accessibility caption* joins them back with a space, which is
 upstream's `array(text).join(' ')` and the same rule the axis and legend captions already follow.
 `GuideCaptionTest` caught that half.
+
+## Six guide properties that only needed passing on
+
+`Stroke` has carried `cap` and `dashOffset` since it was written, and both renderers have honoured
+them since then. No guide passed either. So `tickCap`, `gridCap`, `domainCap`, `tickDashOffset`,
+`gridDashOffset` and `domainDashOffset` were all reported as unimplemented while the machinery to
+draw them sat one function call away — every tick butt-capped and every dash pattern starting at the
+line's end.
+
+The fix was to widen `GuideStroke`, which upstream reads as one family per part — the prefix is the
+only thing that changes — rather than as six separate properties. It now carries `dashOffset`, `cap`,
+`align`, `baseline` and `lineHeight` alongside the colour, width, dash, opacity and font it already
+had, and `guideStyleKeys` generates all of them for every prefix. That closed the legend's
+`labelAlign`, `labelBaseline`, `titleAlign`, `titleBaseline` and `titleLineHeight` in the same change,
+and the axis's `labelLineHeight` and `titleLineHeight` with them. Consuming a name upstream does not
+define — `gridAlign` on an axis, say — costs nothing, because a guide that has no such property simply
+never writes one.
+
+Two exceptions to the family rule, both upstream's:
+
+- **`symbolDashOffset`, not `symbolStrokeDashOffset`.** The legend's symbol part is read through the
+  `symbolStroke` prefix, because upstream spells the colour `symbolStrokeColor` — but the dash and its
+  offset are `symbolDash` and `symbolDashOffset`. The fixture caught it: every swatch drew the right
+  pattern from the wrong starting point.
+- **`symbolFillColor` is a fallback, not an override.** Upstream sets the channel from it and *then*
+  overwrites it from the scale for every legend that maps one, so a `fill` scale always wins and only
+  a `size` or `shape` legend takes the stated colour. It had been reported as unimplemented, which
+  read as a bigger gap than it was.
+
+Also done here: `symbolOffset`, which shifts a swatch **and its label** along the row — upstream builds
+the label's offset by extending the symbol's, so the gap between them stays `labelOffset` whatever the
+symbol offset is; the gradient ramp's own `gradientStrokeColor`, `gradientStrokeWidth` and
+`gradientOpacity`, the last of which fades the outline with the colours because upstream puts it on the
+item rather than on either paint; and the axis `titleLimit`.
 
 ## Performance observations
 
