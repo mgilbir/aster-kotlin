@@ -929,8 +929,7 @@ private class Compilation(
           Scales.range(view, channel, def, component.type)?.let { component.set("range", it) }
           Scales.properties(view, channel, def, component.type, component)
         }
-        if ((component.properties["zero"] as? VegaValue.Bool)?.value == true)
-          component.domainHasZero = true
+        component.domainHasZero = Scales.domainHasZero(component)
       }
     }
   }

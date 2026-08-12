@@ -13,8 +13,16 @@ internal class ScaleComponent(val channel: String, val type: String, private val
   val domains: MutableList<VegaValue> = mutableListOf()
   val properties: LinkedHashMap<String, VegaValue> = LinkedHashMap()
 
-  /** True when the domain is certain to include zero, which is what a baseline needs to know. */
-  var domainHasZero: Boolean = false
+  /**
+   * Whether the domain includes zero — `definitely`, `definitely-not`, or `maybe`.
+   *
+   * Three answers rather than two, because the third is the common one and it is *not* the same as
+   * "no": a domain read from a column is not known until the data is. A baseline that must be
+   * decided at compile time asks Vega instead, with `inrange(0, domain('y')) ? 0 : domain('y')[0]`,
+   * and treating `maybe` as "no" put a bar's baseline at the bottom of the data rather than at the
+   * origin whenever the column happened to straddle it.
+   */
+  var domainHasZero: String = "maybe"
 
   fun set(name: String, value: VegaValue?) {
     if (value != null) properties[name] = value
@@ -529,6 +537,41 @@ internal object Scales {
     // Anything else the specification stated on the scale passes through untouched.
     user?.fields?.forEach { (key, value) ->
       if (key !in setOf("type", "domain", "range", "scheme")) component.properties[key] = value
+    }
+  }
+
+  /**
+   * `domainHasZero()` in `scale/component.ts`, once the component is settled.
+   *
+   * A log scale cannot hold zero and a time scale's zero is an arbitrary instant, so neither ever
+   * does. A stated `zero: true` — or the default zero a linear, sqrt or pow scale takes — settles
+   * it the other way. Failing both, a domain written out as numbers answers for itself, and one
+   * read from a column cannot answer at all.
+   */
+  fun domainHasZero(component: ScaleComponent): String {
+    val type = component.type
+    if (type == "log" || type == "time" || type == "utc") return "definitely-not"
+    val zero = (component.properties["zero"] as? VegaValue.Bool)?.value
+    if (zero == true) return "definitely"
+    if (zero == null && type in setOf("linear", "sqrt", "pow")) return "definitely"
+
+    var explicitWithZero = false
+    var explicitWithoutZero = false
+    var fromField = false
+    for (domain in component.domains) {
+      val values = (domain as? VegaValue.Arr)?.values
+      val first = (values?.firstOrNull() as? VegaValue.Num)?.value
+      val last = (values?.lastOrNull() as? VegaValue.Num)?.value
+      when {
+        first == null || last == null -> fromField = true
+        first <= 0.0 && last >= 0.0 -> explicitWithZero = true
+        else -> explicitWithoutZero = true
+      }
+    }
+    return when {
+      explicitWithZero -> "definitely"
+      explicitWithoutZero && !fromField -> "definitely-not"
+      else -> "maybe"
     }
   }
 

@@ -1333,6 +1333,23 @@ one legend whose swatches carry both. The scale's own prefix stays in the key so
 resolving its legends independently still gets one per plot, and the discreteness with it, since a
 ramp and a set of swatches cannot be the same legend.
 
+### Three answers to "does this domain contain zero", not two
+
+`domainHasZero()` returns `definitely`, `definitely-not` or **`maybe`**, and the third is the common
+one: a domain read from a column is not known until the data is. This compiler had a boolean, and
+read `maybe` as no — which put a baseline at the bottom of the data rather than at the origin
+whenever the column straddled it. The `maybe` case does not decide at all; it hands the question to
+Vega, which has the data: `scale('y', inrange(0, domain('y')) ? 0 : domain('y')[0])`.
+
+That is also the answer the last invalid-value mode needed. Under `show`, a value no scale can place
+is *drawn*, at the scale's own output for one, and the channel becomes a production rule whose first
+arm tests for it. Every other mode has already dealt with the row — dropped it, or broken the path at
+it — so `show` is the only one that reaches the encoding at all.
+
+`labelExpr` turned out not to be a Vega axis property. `assembleAxis` destructures it out and writes
+`encode.labels.update.text` from it, so passing it through was silently ignored, and passing it
+through on the *gridline* axis named an encode block for a mark that is not drawn.
+
 ### Two runtime gaps this batch names but does not close
 
 `density`'s fixture is not in the corpus, and `trail`'s draws no legend. Both compile exactly as

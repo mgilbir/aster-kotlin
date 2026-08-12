@@ -368,10 +368,45 @@ internal object Guides {
     return if (kept.isEmpty()) null else obj { kept.forEach { (k, v) -> put(k, v) } }
   }
 
+  /**
+   * `labelExpr` becomes the labels' **text**, and only on the axis that draws labels.
+   *
+   * It is not a Vega axis property at all: `assembleAxis` destructures it out and writes
+   * `encode.labels.update.text` from it. Passed through as a property it was silently ignored, and
+   * passed through on the *gridline* axis it named an encode block for a mark that is not drawn.
+   * Where an encode already states the text — a conditional label — `datum.label` in the expression
+   * means that text rather than the axis's own, so the two compose instead of one replacing the
+   * other.
+   */
+  private fun withLabelText(encode: VegaValue?, labelExpr: String): VegaValue {
+    val parts = (encode as? VegaValue.Obj)?.fields.orEmpty()
+    val labels = (parts["labels"] as? VegaValue.Obj)?.fields.orEmpty()
+    val update = (labels["update"] as? VegaValue.Obj)?.fields.orEmpty()
+    val stated = (update["text"] as? VegaValue.Obj)?.string("signal")
+    val expression = if (stated == null) labelExpr else labelExpr.replace("datum.label", stated)
+    return obj {
+      parts.forEach { (key, value) -> if (key != "labels") put(key, value) }
+      put(
+        "labels",
+        obj {
+          labels.forEach { (key, value) -> if (key != "update") put(key, value) }
+          put(
+            "update",
+            obj {
+              update.forEach { (key, value) -> if (key != "text") put(key, value) }
+              put("text", signalRef(expression))
+            },
+          )
+        },
+      )
+    }
+  }
+
   /** Splits one component into the gridline axis and the axis proper, in that order. */
   fun assembleAxis(axis: AxisComponent, kind: String): VegaValue? {
     val grid = (axis.properties["grid"] as? VegaValue.Bool)?.value == true
     if (kind == "grid" && !grid) return null
+    val labelExpr = (axis.properties["labelExpr"] as? VegaValue.Str)?.value
 
     return obj {
       put("scale", axis.properties["scale"])
@@ -380,7 +415,8 @@ internal object Guides {
       if (kind == "grid") {
         axis.properties.forEach { (key, value) ->
           if (key == "encode") encodeFor(value, kind)?.let { put(key, it) }
-          else if (key !in setOf("scale", "orient", "zindex") && key !in MAIN_ONLY) put(key, value)
+          else if (key !in setOf("scale", "orient", "zindex", "labelExpr") && key !in MAIN_ONLY)
+            put(key, value)
         }
         put("domain", false)
         put("labels", false)
@@ -395,14 +431,23 @@ internal object Guides {
         // Two layers over one axis contribute two titles, and upstream joins them with a comma
         // rather than picking one, so a shared axis says what it is showing.
         if (axis.titles.isNotEmpty()) put("title", str(axis.titles.distinct().joinToString(", ")))
+        var wroteEncode = false
         axis.properties.forEach { (key, value) ->
-          if (key == "encode") encodeFor(value, kind)?.let { put(key, it) }
-          else if (
-            key !in setOf("scale", "orient", "grid", "title", "zindex") && key !in GRID_ONLY
+          if (key == "encode") {
+            val own = encodeFor(value, kind)
+            val withText = if (labelExpr == null) own else withLabelText(own, labelExpr)
+            withText?.let {
+              put(key, it)
+              wroteEncode = true
+            }
+          } else if (
+            key !in setOf("scale", "orient", "grid", "title", "zindex", "labelExpr") &&
+              key !in GRID_ONLY
           ) {
             put(key, value)
           }
         }
+        if (labelExpr != null && !wroteEncode) put("encode", withLabelText(null, labelExpr))
         put("zindex", zindex)
       }
     }

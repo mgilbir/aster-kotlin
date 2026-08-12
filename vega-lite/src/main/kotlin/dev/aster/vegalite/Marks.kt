@@ -783,7 +783,43 @@ internal object Marks {
     vgChannel: String?,
   ): VegaValue.Obj {
     val ref = positionRef(view, channel, defaultPos) ?: return VegaValue.EmptyObject
-    return obj { put(vgChannel ?: vgPositionChannel(channel), ref) }
+    val invalid = invalidPositionRef(view, channel)
+    return obj {
+      put(
+        vgChannel ?: vgPositionChannel(channel),
+        if (invalid == null) ref else arr(listOf(invalid, ref)),
+      )
+    }
+  }
+
+  /**
+   * Where a value the scale cannot place is drawn, under the `show` mode.
+   *
+   * `getConditionalValueRefForIncludingInvalidValue`: the channel gets a *production rule* whose
+   * first arm tests for the invalid value and answers with the scale's own output for one —
+   * `config.scale.invalid` where a specification named it, and otherwise the same zero-or-minimum a
+   * bar measures from. Every other mode has already dealt with the row, by dropping it or by
+   * breaking the path at it, so this is the only one that reaches the encoding.
+   */
+  private fun invalidPositionRef(view: UnitView, channel: String): VegaValue? {
+    if (view.invalidDataMode != "show") return null
+    val main = mainChannel(channel)
+    val def = view.spec.fieldDef(main) ?: return null
+    val scaleType = view.scaleType(main) ?: return null
+    if (!Scales.hasContinuousDomain(scaleType)) return null
+    if (def.aggregate in COUNTING_OPS) return null
+    val accessor = Fields.datumAccess(def)
+    val stated = view.config.scaleInvalid(main)
+    val output =
+      when {
+        stated is VegaValue.Obj && stated.has("value") ->
+          obj { literalRef(stated.fields["value"])?.let { (key, it) -> put(key, it) } }
+        else -> scaledZeroOrMinOrMax(view, main, "zeroOrMin")
+      }
+    return obj {
+      put("test", "!isValid($accessor) || !isFinite(+$accessor)")
+      (output as? VegaValue.Obj)?.fields?.forEach { (key, value) -> put(key, value) }
+    }
   }
 
   private fun positionRef(view: UnitView, channel: String, defaultPos: String?): VegaValue? {
@@ -894,14 +930,16 @@ internal object Marks {
     val component = view.scaleComponents[channel]
     val scale = view.scale(channel)
     val domain = "domain('$scale')"
-    return when {
-      component?.domainHasZero == true ->
+    val other = if (mode == "zeroOrMin") "$domain[0]" else "peek($domain)"
+    return when (component?.domainHasZero ?: "maybe") {
+      "definitely" ->
         obj {
           put("scale", scale)
           put("value", 0)
         }
-      else ->
-        signalRef("scale('$scale', ${if (mode == "zeroOrMin") "$domain[0]" else "peek($domain)"})")
+      // Not knowable here, so the question is passed to Vega, which has the data.
+      "maybe" -> signalRef("scale('$scale', inrange(0, $domain) ? 0 : $other)")
+      else -> signalRef("scale('$scale', $other)")
     }
   }
 

@@ -1,0 +1,176 @@
+{
+  "$schema": "https://vega.github.io/schema/vega/v6.json",
+  "description": "A value no scale can place, drawn rather than dropped, at the scale's own output for one.",
+  "background": "white",
+  "padding": 5,
+  "width": 300,
+  "height": 300,
+  "style": "cell",
+  "data": [
+    {
+      "name": "source_0",
+      "values": [
+        {
+          "a": 1,
+          "b": 4
+        },
+        {
+          "a": 2,
+          "b": null
+        },
+        {
+          "a": 3,
+          "b": 6
+        },
+        {
+          "a": 4,
+          "b": 5
+        }
+      ]
+    }
+  ],
+  "marks": [
+    {
+      "name": "marks",
+      "type": "symbol",
+      "style": [
+        "point"
+      ],
+      "from": {
+        "data": "source_0"
+      },
+      "encode": {
+        "update": {
+          "opacity": {
+            "value": 0.7
+          },
+          "fill": {
+            "value": "transparent"
+          },
+          "stroke": {
+            "value": "#4c78a8"
+          },
+          "ariaRoleDescription": {
+            "value": "point"
+          },
+          "description": {
+            "signal": "\"a: \" + (format(datum[\"a\"], \"\")) + \"; b: \" + (format(datum[\"b\"], \"\"))"
+          },
+          "x": [
+            {
+              "test": "!isValid(datum[\"a\"]) || !isFinite(+datum[\"a\"])",
+              "scale": "x",
+              "value": 0
+            },
+            {
+              "scale": "x",
+              "field": "a"
+            }
+          ],
+          "y": [
+            {
+              "test": "!isValid(datum[\"b\"]) || !isFinite(+datum[\"b\"])",
+              "scale": "y",
+              "value": 0
+            },
+            {
+              "scale": "y",
+              "field": "b"
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "scales": [
+    {
+      "name": "x",
+      "type": "linear",
+      "domain": {
+        "data": "source_0",
+        "field": "a"
+      },
+      "range": [
+        0,
+        {
+          "signal": "width"
+        }
+      ],
+      "nice": true,
+      "zero": true
+    },
+    {
+      "name": "y",
+      "type": "linear",
+      "domain": {
+        "data": "source_0",
+        "field": "b"
+      },
+      "range": [
+        {
+          "signal": "height"
+        },
+        0
+      ],
+      "nice": true,
+      "zero": true
+    }
+  ],
+  "axes": [
+    {
+      "scale": "x",
+      "orient": "bottom",
+      "gridScale": "y",
+      "grid": true,
+      "tickCount": {
+        "signal": "ceil(width/40)"
+      },
+      "domain": false,
+      "labels": false,
+      "aria": false,
+      "maxExtent": 0,
+      "minExtent": 0,
+      "ticks": false,
+      "zindex": 0
+    },
+    {
+      "scale": "y",
+      "orient": "left",
+      "gridScale": "x",
+      "grid": true,
+      "tickCount": {
+        "signal": "ceil(height/40)"
+      },
+      "domain": false,
+      "labels": false,
+      "aria": false,
+      "maxExtent": 0,
+      "minExtent": 0,
+      "ticks": false,
+      "zindex": 0
+    },
+    {
+      "scale": "x",
+      "orient": "bottom",
+      "grid": false,
+      "title": "a",
+      "labelFlush": true,
+      "labelOverlap": true,
+      "tickCount": {
+        "signal": "ceil(width/40)"
+      },
+      "zindex": 0
+    },
+    {
+      "scale": "y",
+      "orient": "left",
+      "grid": false,
+      "title": "b",
+      "labelOverlap": true,
+      "tickCount": {
+        "signal": "ceil(height/40)"
+      },
+      "zindex": 0
+    }
+  ]
+}
