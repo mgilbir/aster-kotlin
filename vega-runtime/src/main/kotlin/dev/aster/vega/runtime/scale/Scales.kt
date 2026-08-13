@@ -75,6 +75,30 @@ public sealed interface PositionScale : VegaScale {
  * @param domain at least two values; more than two makes it piecewise.
  * @param clamp when true, out-of-domain inputs clamp to the range ends instead of extrapolating.
  */
+/**
+ * `identity`: the value itself, coerced to a number.
+ *
+ * The one scale that maps nothing. It exists so a specification can name a scale where a channel
+ * expects one and still hand over coordinates it has already worked out — a chart drawing a legend
+ * by hand, or a layout computed in a `formula`. Upstream registers it beside the others, which is
+ * why a `"scale": "identity"` reference has to resolve rather than report.
+ *
+ * `domain` and `range` are both `[0, 1]` and are never consulted, which is d3's answer as well: the
+ * pair exists so `domain('name')` returns *something*, not because the scale uses them. A value
+ * that is not a number maps to **nothing** rather than to `NaN` — d3's `unknown`, which for a mark
+ * means a channel left unset and a mark that does not draw.
+ */
+public class IdentityScale(override val name: String) : VegaScale {
+  public val range: List<Double> = listOf(0.0, 1.0)
+
+  public val domain: List<Double> = listOf(0.0, 1.0)
+
+  override fun scale(value: VegaValue): VegaValue {
+    val number = value.asDouble()
+    return if (number.isNaN()) VegaValue.Null else VegaValue.Num(number)
+  }
+}
+
 public class LinearScale(
   override val name: String,
   public val domain: List<Double>,

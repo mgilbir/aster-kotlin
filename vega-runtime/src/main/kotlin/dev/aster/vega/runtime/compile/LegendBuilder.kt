@@ -14,6 +14,7 @@ import dev.aster.vega.model.spec.LegendSpec
 import dev.aster.vega.model.spec.LegendType
 import dev.aster.vega.runtime.scale.BandScale
 import dev.aster.vega.runtime.scale.BinnedScale
+import dev.aster.vega.runtime.scale.IdentityScale
 import dev.aster.vega.runtime.scale.LinearScale
 import dev.aster.vega.runtime.scale.OrdinalScale
 import dev.aster.vega.runtime.scale.PointScale
@@ -1077,6 +1078,10 @@ internal class LegendBuilder(
     }
     val count = numbers.resolveInt(spec.tickCount, scaleName) ?: LegendDefaults.SYMBOL_TICK_COUNT
     return when (scale) {
+      // Nothing to enumerate: an identity scale has no domain of its own, so a legend over one has
+      // no
+      // entries rather than a made-up set of them.
+      is IdentityScale -> emptyList()
       is OrdinalScale -> scale.domain.map { Entry(VegaValue.Str(it), it) }
       is BandScale -> scale.domain.map { Entry(VegaValue.Str(it), it) }
       is PointScale -> scale.domain.map { Entry(VegaValue.Str(it), it) }

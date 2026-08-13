@@ -168,12 +168,20 @@ class SpecCompilerTest {
   }
 
   @Test
-  fun `an unsupported scale type is reported and dependent marks report too`() {
-    // `identity` is the last scale type with no implementation. Everything else the parser accepts
-    // now builds — including `quantile`, which this test used to name.
-    val withIdentity = minimalBar.replace("\"type\": \"linear\"", "\"type\": \"identity\"")
-    val diagnostics = compile(withIdentity).diagnostics
-    assertTrue(diagnostics.any { it.code == DiagnosticCodes.SCALE_UNSUPPORTED_TYPE })
+  fun `a scale type upstream does not have is reported, and dependent marks report too`() {
+    // `quantile` was the example here, then `identity`; both build now, and so does every other
+    // type
+    // upstream registers — the `when` in `ScaleResolver` has no `else` left and the compiler
+    // enforces
+    // it. What still has to be reported is a type upstream does **not** have, which is caught by
+    // name
+    // before anything tries to build it.
+    val invented = minimalBar.replace("\"type\": \"linear\"", "\"type\": \"quadratic\"")
+    val diagnostics = compile(invented).diagnostics
+    assertTrue(
+      diagnostics.any { it.code == DiagnosticCodes.SCALE_UNSUPPORTED_TYPE },
+      "$diagnostics",
+    )
     // The mark that referenced it must complain as well, rather than positioning at the origin.
     assertTrue(diagnostics.count { it.code == DiagnosticCodes.SCALE_UNSUPPORTED_TYPE } > 1)
   }

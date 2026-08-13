@@ -22,6 +22,7 @@ import dev.aster.vega.model.asString
 import dev.aster.vega.model.spec.SignalSpec
 import dev.aster.vega.runtime.scale.BandScale
 import dev.aster.vega.runtime.scale.BinnedScale
+import dev.aster.vega.runtime.scale.IdentityScale
 import dev.aster.vega.runtime.scale.InvertibleScale
 import dev.aster.vega.runtime.scale.LinearScale
 import dev.aster.vega.runtime.scale.OrdinalScale
@@ -251,6 +252,9 @@ public class SignalScope(
     val scale = resolveScale(name, "domain") ?: return VegaValue.Null
     return VegaValue.Arr(
       when (scale) {
+        // `[0, 1]`, which is d3's and never consulted by the scale itself: the pair exists so
+        // `domain('name')` answers something rather than because anything reads it.
+        is IdentityScale -> scale.domain.map { VegaValue.Num(it) }
         is LinearScale -> scale.domain.map { VegaValue.Num(it) }
         is TransformedScale -> scale.domain.map { VegaValue.Num(it) }
         is TimeScale -> scale.domain.map { VegaValue.Num(it) }

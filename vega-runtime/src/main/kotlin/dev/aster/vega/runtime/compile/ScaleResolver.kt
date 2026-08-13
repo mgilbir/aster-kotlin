@@ -23,6 +23,7 @@ import dev.aster.vega.model.spec.SchemeRef
 import dev.aster.vega.runtime.scale.BandScale
 import dev.aster.vega.runtime.scale.BinOrdinalScale
 import dev.aster.vega.runtime.scale.ColorSchemes
+import dev.aster.vega.runtime.scale.IdentityScale
 import dev.aster.vega.runtime.scale.LinearScale
 import dev.aster.vega.runtime.scale.LogScale
 import dev.aster.vega.runtime.scale.OrdinalScale
@@ -79,6 +80,10 @@ public class ScaleResolver(
       // A linear scale with a colour range is a colour scale, not a positional one.
       ScaleType.LINEAR -> if (hasColorRange(spec)) buildSequentialColor(spec) else buildLinear(spec)
       ScaleType.SEQUENTIAL -> buildSequentialColor(spec)
+      // Nothing to build: an identity scale has no domain, no range and no interpolation. It exists
+      // so
+      // a channel that wants a scale can be handed coordinates that are already final.
+      ScaleType.IDENTITY -> IdentityScale(spec.name)
       ScaleType.LOG -> buildLog(spec)
       ScaleType.POW -> buildPow(spec, defaultExponent = 1.0)
       ScaleType.SQRT -> buildPow(spec, defaultExponent = 0.5)
@@ -92,16 +97,11 @@ public class ScaleResolver(
       ScaleType.QUANTILE -> buildQuantile(spec)
       ScaleType.THRESHOLD -> buildThreshold(spec)
       ScaleType.BIN_ORDINAL -> buildBinOrdinal(spec)
-      else -> {
-        diagnostics.error(
-          DiagnosticCodes.SCALE_UNSUPPORTED_TYPE,
-          "Scale type '${spec.type.name.lowercase()}' is not implemented yet " +
-            "(scale '${spec.name}'); marks using it will not be positioned",
-          operator = spec.name,
-        )
-        null
-      }
     }
+
+  // No `else`, and the compiler now enforces it: every scale type upstream registers is built here.
+  // A type it does not have never reaches this point — `ScaleType.fromName` reports an unknown name
+  // and the scale is skipped before anything asks what to build.
 
   private fun buildLinear(spec: ScaleSpec): LinearScale? {
     val range = numericRange(spec) ?: return null

@@ -5,6 +5,7 @@ import dev.aster.vega.model.spec.ScaleType
 import dev.aster.vega.model.time.TimeFormat
 import dev.aster.vega.runtime.scale.BandScale
 import dev.aster.vega.runtime.scale.BinnedScale
+import dev.aster.vega.runtime.scale.IdentityScale
 import dev.aster.vega.runtime.scale.LinearScale
 import dev.aster.vega.runtime.scale.OrdinalScale
 import dev.aster.vega.runtime.scale.PointScale
@@ -126,6 +127,9 @@ internal object GuideCaption {
    */
   private fun domain(scale: VegaScale, format: String? = null, formatType: String? = null): String =
     when (scale) {
+      // An identity scale has no domain to describe: it maps the value itself, so a guide over one
+      // is a guide over the data as it stands.
+      is IdentityScale -> "the values themselves"
       is BinnedScale -> {
         // The same formatter the bands themselves use: the precision comes from the narrowest
         // interval, not from the whole span, so a reader hears "2.1%" and not "0.021429".
