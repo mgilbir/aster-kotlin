@@ -678,7 +678,7 @@ no data is needed to compare two compilers. So every one of them was compiled by
 by this one, and the outputs compared property by property. That is a *measurement*, not a gate: the
 examples are not fixtures here, and nothing about them is checked in.
 
-**124 of 627 matched exactly** at the start, and **497** do now. 16 were refused by name, and of those 8 are geographic,
+**124 of 627 matched exactly** at the start, and **499** do now. 16 were refused by name, and of those 8 are geographic,
 3 are a facet inside a facet, 2 a repeat inside a concatenation, and 2 are the `trail` mark — which
 this runtime draws and this compiler had simply not been told about.
 
@@ -2265,6 +2265,19 @@ runtime already had a Delaunay triangulation and a voronoi transform, and it was
 coordinates as *field names*: Vega-Lite writes them as expressions, `{"expr": "datum.datum.x || 0"}`,
 because the points are mark items and the coordinate wanted is the one the encoding resolved. Every
 cell came out without coordinates, so the diagram was empty and the overlay drew nothing.
+
+### What a name reaches, and what a shared scale is required for
+
+A chart may **name itself**, and that name prefixes every scale, mark and step signal in it —
+`getName` again, the same rule that gives a concatenation's children `concat_0_x`. The sizes are the
+exception: `width` and `height` belong to the chart rather than to a level of it.
+
+And two rules about a facet, both following from the same question — *is this cell's scale the
+grid's?* Cells that scale a direction for themselves cannot be **aligned** along it, their plotting
+areas being different widths, so the layout says `align: "none"`; and their **axis** cannot be drawn
+once for the grid either, since one band of labels cannot stand for several different extents. It
+moves into the cell instead, beside the gridlines. A grid faceted both ways is aligned regardless:
+every cell then shares a row and a column with another.
 
 ### A selection somebody drives with a slider
 

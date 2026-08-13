@@ -386,7 +386,11 @@ private class Compilation(
       facet?.let {
         val spacing =
           spec.number("spacing") ?: config.raw.obj("facet")?.number("spacing") ?: FACET_SPACING
-        put("layout", it.layout(spacing, HEADER_OFFSET, config))
+        val independent =
+          setOf("x", "y").filter { channel ->
+            resolve.scaleIsIndependent(channel, defaultIndependent = false)
+          }
+        put("layout", it.layout(spacing, HEADER_OFFSET, config, independent.toSet()))
       }
       concat?.let { put("layout", it.layout()) }
       // The cells' own scales are assembled before the marks that read them, the cell group being
@@ -456,7 +460,7 @@ private class Compilation(
           if (concat != null) channel in Channels.POSITION_SCALE_CHANNELS || channel == "theta"
           else facet != null && channel == "theta",
       )
-    if (!independent) return channel
+    if (!independent) return prefixed(channel)
     val owner = if (concat != null) plotOf(view) else view.childName
     return if (owner.isEmpty()) channel else "${owner}_$channel"
   }
@@ -522,6 +526,10 @@ private class Compilation(
       }
     return walk(value)
   }
+
+  /** The chart's own name in front of a shared name, where the specification gave it one. */
+  private fun prefixed(name: String): String =
+    listOf(spec.string("name").orEmpty(), name).filter { it.isNotEmpty() }.joinToString("_")
 
   private fun plotOf(view: UnitView): String = plotNames[view] ?: ""
 
@@ -644,7 +652,11 @@ private class Compilation(
       return Node.Nest(name, nested, children, child)
     }
 
-    plotTree = build("", spec) ?: return null
+    // A chart that **names itself** is compiled under that name, the way a concatenation's children
+    // are: `getName` prefixes every scale, mark and step signal with the model's own name, so a
+    // specification with `"name": "plotname"` reads `plotname_x` throughout. The sizes are the
+    // exception — `width` and `height` are the chart's, not this level's.
+    plotTree = build(spec.string("name").orEmpty(), spec) ?: return null
     return leaves
   }
 
@@ -1160,8 +1172,18 @@ private class Compilation(
     val childMarks = views.flatMap { Marks.marks(it) }
     val current = facet ?: return childMarks
 
-    val gridAxes = axes.filter { (it["grid"] as? VegaValue.Bool)?.value == true }
-    val mainAxes = axes.filter { (it["grid"] as? VegaValue.Bool)?.value != true }
+    // An axis is drawn **once for the grid** only where its scale is the grid's: a channel each
+    // cell scales for itself has an axis per cell, since one band of labels cannot stand for
+    // several different extents. `parseGuideResolve` says the same thing about the guide.
+    val independent =
+      setOf("x", "y").filter { channel ->
+        resolve.scaleIsIndependent(channel, defaultIndependent = false)
+      }
+    fun cellsOwn(axis: VegaValue): Boolean = independent.any { channel ->
+      axis.string("scale")?.endsWith(channel) == true
+    }
+    val gridAxes = axes.filter { (it["grid"] as? VegaValue.Bool)?.value == true || cellsOwn(it) }
+    val mainAxes = axes.filter { (it["grid"] as? VegaValue.Bool)?.value != true && !cellsOwn(it) }
     val horizontal = mainAxes.filter {
       it.string("orient") == "bottom" || it.string("orient") == "top"
     }

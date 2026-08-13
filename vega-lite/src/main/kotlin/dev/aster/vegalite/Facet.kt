@@ -273,7 +273,13 @@ internal interface FacetLayout {
    */
   fun domainDatasets(source: String, vertical: Boolean, horizontal: Boolean): List<VegaValue>
 
-  fun layout(spacing: Double, titleOffset: Double, config: Config): VegaValue
+  fun layout(
+    spacing: Double,
+    titleOffset: Double,
+    config: Config,
+    /** The position channels the cells resolve **independently**, which cannot be aligned. */
+    independent: Set<String> = emptySet(),
+  ): VegaValue
 
   /** The heading over the grid and the bands of shared axes around it, in upstream's order. */
   fun groups(
@@ -326,7 +332,12 @@ internal class FacetGrid(val row: Facet?, val column: Facet?) : FacetLayout {
    * one cell's axis labels are wider than another's. `columns` counts the column facet's own values
    * and is 1 when a chart is faceted by rows alone.
    */
-  override fun layout(spacing: Double, titleOffset: Double, config: Config): VegaValue = obj {
+  override fun layout(
+    spacing: Double,
+    titleOffset: Double,
+    config: Config,
+    independent: Set<String>,
+  ): VegaValue = obj {
     val titled = titles(config).keys
     put("padding", num(spacing))
     val offsets =
@@ -351,7 +362,11 @@ internal class FacetGrid(val row: Facet?, val column: Facet?) : FacetLayout {
       row != null -> put("columns", num(1))
     }
     put("bounds", "full")
-    put("align", "all")
+    // Cells whose scale along a direction is each their own cannot be **aligned** along it: their
+    // plotting areas are different widths, and lining them up would be lining up nothing. A grid
+    // faceted both ways is aligned regardless, since every cell then shares a row and a column.
+    val unalignable = (row == null && "x" in independent) || (column == null && "y" in independent)
+    put("align", if (unalignable) "none" else "all")
   }
 
   /**
@@ -644,7 +659,12 @@ internal class FacetWrap(val def: ChannelDef, private val columns: Int?) : Facet
       }
   }
 
-  override fun layout(spacing: Double, titleOffset: Double, config: Config): VegaValue = obj {
+  override fun layout(
+    spacing: Double,
+    titleOffset: Double,
+    config: Config,
+    independent: Set<String>,
+  ): VegaValue = obj {
     put("padding", num(spacing))
     put("bounds", "full")
     put("align", "all")
