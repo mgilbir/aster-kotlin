@@ -475,8 +475,25 @@ internal object Scales {
 
   /** `defaultRange()` in `compile/scale/range.ts`. */
   fun range(view: UnitView, channel: String, def: ChannelDef, type: String): VegaValue? {
-    def.scale?.fields?.get("range")?.let {
-      return it
+    def.scale?.fields?.get("range")?.let { stated ->
+      // A range read from a **column** — `{"range": {"field": "c"}}` — is a lookup rather than a
+      // list: the rows carry the colours, and the scale reads them in the order the domain lists
+      // its categories. Which is what the `sort` is for: one row per category, taken by the
+      // smallest value of the column the domain is built from.
+      if (stated is VegaValue.Obj && stated.has("field") && !stated.has("data")) {
+        return obj {
+          put("data", view.mainData)
+          put("field", stated.string("field"))
+          put(
+            "sort",
+            obj {
+              put("op", "min")
+              put("field", Fields.vgField(def))
+            },
+          )
+        }
+      }
+      return stated
     }
     // `parseScheme`: a named colour scheme is a **range**, not a property beside one. Written as a
     // property it sat next to the `"category"` range this would otherwise default to, and Vega read
@@ -818,6 +835,10 @@ internal object Scales {
         // pads the ends against a gap the bands do not have.
         val inner =
           def.scale?.number("paddingInner")
+            // A configured `bandPaddingInner` is the chart's own answer for **every** band scale
+            // and beats the per-mark defaults below it — `getFirstDefined(bandPaddingInner, …)`.
+            // It does not beat the nested-offset padding, which is about groups rather than marks.
+            ?: config.scaleConfig("bandPaddingInner").takeIf { !view.hasNestedOffset(channel) }
             ?: if (view.hasNestedOffset(channel)) {
               // A band holding several bars is padded more generously than one holding a single
               // bar,

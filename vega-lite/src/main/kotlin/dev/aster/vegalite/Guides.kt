@@ -15,6 +15,22 @@ import dev.aster.vega.model.VegaValue
 internal object Guides {
 
   /**
+   * `hasAxisOrientSignalRef`: whether any axis takes its side from an expression.
+   *
+   * An axis that moves from the bottom of a chart to the top re-lays the whole drawing out, and a
+   * surface that was padded to the old extent keeps it — so the chart has to be told it may resize.
+   */
+  /** The expression behind `{"expr": …}` or `{"signal": …}`, where a property is written as one. */
+  private fun signalOf(value: VegaValue?): String? =
+    (value as? VegaValue.Obj)?.let { it.string("expr") ?: it.string("signal") }
+
+  fun hasSignalOrient(view: UnitView): Boolean =
+    listOf("x", "y").any { channel ->
+      val orient = view.spec.encoding[channel]?.axis?.fields?.get("orient")
+      orient is VegaValue.Obj && (orient.has("expr") || orient.has("signal"))
+    }
+
+  /**
    * An axis is emitted twice: once as gridlines and once as the axis proper.
    *
    * Upstream splits them because they belong at different depths — the grid is painted behind the
@@ -226,8 +242,24 @@ internal object Guides {
     } else if (labelAngle != null) {
       // `normalizeAngle`: an angle is a turn from zero, so a label at minus forty-five degrees is
       // a label at three hundred and fifteen — the two draw alike and compare as different numbers.
-      axis.set("labelAngle", num(((labelAngle % 360) + 360) % 360))
-      labelAlign(labelAngle, channel, side)?.let { axis.set("labelAlign", str(it)) }
+      val angle = ((labelAngle % 360) + 360) % 360
+      axis.set("labelAngle", num(angle))
+      // An **orient** the specification drives from a parameter cannot be compared here either: the
+      // side the axis will be drawn on is not known until the reader picks it, so the alignment is
+      // written as the comparison and handed to Vega, on the labels' own encode block.
+      val orientSignal = signalOf(user?.fields?.get("orient"))
+      if (orientSignal != null) {
+        val start = if (channel == "x") 0.0 else 90.0
+        val main = if (channel == "x") "bottom" else "left"
+        val turned = start < angle && angle < 180 + start
+        val comparison = if (turned) "===" else "!=="
+        axis.encodeLabel(
+          "align",
+          signalRef("$orientSignal $comparison \"$main\" ? \"left\" : \"right\""),
+        )
+      } else {
+        labelAlign(labelAngle, channel, side)?.let { axis.set("labelAlign", str(it)) }
+      }
       labelBaseline(labelAngle, channel, side)?.let { axis.set("labelBaseline", str(it)) }
     }
 

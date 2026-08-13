@@ -346,7 +346,7 @@ private class Compilation(
       // by it.
       put("background", spec.fields["background"] ?: config.background)
       put("padding", config.padding)
-      autosize()?.let { put("autosize", it) }
+      autosize(views)?.let { put("autosize", it) }
       put("width", mergedSize("width") ?: if (concat == null) root.width else null)
       put("height", mergedSize("height") ?: if (concat == null) root.height else null)
       // `cell` is the bordered plotting area; a chart with no Cartesian position — a pie — has no
@@ -1184,12 +1184,45 @@ private class Compilation(
     }
   }
 
-  private fun autosize(): VegaValue? {
-    val declared = spec.fields["autosize"] ?: return null
-    val type = (declared as? VegaValue.Str)?.value ?: declared.string("type")
-    // `pad` is Vega's own default, so upstream writes nothing for it.
-    if (declared is VegaValue.Str) return if (type == "pad") null else declared
-    return declared
+  /**
+   * `normalizeAutoSize` and `getTopLevelProperties`, which settle the same property in two places.
+   *
+   * A chart says nothing about sizing and gets `pad`, which is Vega's own default and so is written
+   * as nothing at all. Two things change that. A size of **`"container"`** asks the page for it, so
+   * the chart is *fitted* along that direction — and `contains: "padding"` with it, because the
+   * element's width includes the padding the chart would otherwise add outside it. And an axis
+   * whose orientation is driven by a **parameter** needs `resize`, since the drawing is re-laid out
+   * when the axis moves from one side to the other and a padded surface would keep the old extent.
+   */
+  private fun autosize(views: List<UnitView>): VegaValue? {
+    val declared = spec.fields["autosize"]
+    val stated = (declared as? VegaValue.Str)?.let { obj { put("type", it.value) } } ?: declared
+    val responsive =
+      listOf("width" to "fit-x", "height" to "fit-y").filter {
+        spec.fields[it.first] == VegaValue.Str("container")
+      }
+    val fitted =
+      when {
+        responsive.size == 2 -> "fit"
+        responsive.size == 1 -> responsive.single().second
+        else -> null
+      }
+    val resize = views.any { view -> Guides.hasSignalOrient(view) }
+    val merged = obj {
+      put("type", "pad")
+      if (fitted != null) {
+        put("type", fitted)
+        put("contains", "padding")
+      }
+      if (resize) put("resize", VegaValue.Bool(true))
+      (stated as? VegaValue.Obj)?.fields?.forEach { (key, value) -> put(key, value) }
+    }
+    // Vega's own default is written as nothing; a type on its own is written as the bare string.
+    if (merged.fields.keys == setOf("type")) {
+      val type = merged.string("type")
+      return if (type == "pad") null else VegaValue.Str(type.orEmpty())
+    }
+    return merged
   }
 
   private fun title(): VegaValue? {

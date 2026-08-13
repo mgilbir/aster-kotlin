@@ -66,6 +66,33 @@ internal class LayoutSize(
       // step produced.
       val stepForPosition = (declared as? VegaValue.Obj)?.string("for") == "position"
 
+      // `"container"` is a size the *page* settles: the signal reads the element it is drawn in and
+      // follows it as the window changes, with the view's own default where there is nothing to
+      // measure — a chart rendered outside a browser still has to have a width.
+      if (declared == VegaValue.Str("container")) {
+        val measured = if (channel == "x") "containerSize()[0]" else "containerSize()[1]"
+        val fallback =
+          number(if (channel == "x") config.continuousWidth else config.continuousHeight)
+        val expression = "isFinite($measured) ? $measured : $fallback"
+        emitted += obj {
+          put("name", sizeName)
+          put("init", expression)
+          put(
+            "on",
+            arr(
+              listOf(
+                obj {
+                  put("events", "window:resize")
+                  put("update", expression)
+                }
+              )
+            ),
+          )
+        }
+        sizes[channel] = null
+        continue
+      }
+
       val value: VegaValue? =
         when {
           !discrete || declared is VegaValue.Num -> value(views, scales, config, spec, channel)

@@ -678,7 +678,7 @@ no data is needed to compare two compilers. So every one of them was compiled by
 by this one, and the outputs compared property by property. That is a *measurement*, not a gate: the
 examples are not fixtures here, and nothing about them is checked in.
 
-**124 of 627 matched exactly** at the start, and **484** do now. 16 were refused by name, and of those 8 are geographic,
+**124 of 627 matched exactly** at the start, and **488** do now. 16 were refused by name, and of those 8 are geographic,
 3 are a facet inside a facet, 2 a repeat inside a concatenation, and 2 are the `trail` mark — which
 this runtime draws and this compiler had simply not been told about.
 
@@ -2372,6 +2372,17 @@ examples turned on it.
 upstream compiles them — the specification comparison covers them — and both are drawn differently
 by *this runtime*:
 
+- **A size the *page* settles is not read.** `width: "container"` compiles to the signal upstream
+  writes — `isFinite(containerSize()[0]) ? containerSize()[0] : 300`, with a `window:resize` handler
+  — and this runtime sizes the surface from the `width` *property*, which such a chart does not
+  have, so it falls back to the default and never fits. Two pieces are missing: a declared
+  `width`/`height` signal has to seed the layout, and the layout's own answer has to be written back
+  over it once the fit is measured.
+- **A signal-valued axis `orient` is refused.** An axis whose side is driven by a parameter reaches
+  the runtime as `orient: {signal: "xAxisOrient"}`, and the axis is parsed into a model that holds
+  the side as a fixed enum — so it is reported by name and the axis is dropped altogether. The
+  compiler's side of it is right, including the label alignment written as a comparison; what the
+  runtime needs is an orientation resolved where the signals are rather than where the JSON is.
 - **A colour ramp over a bucketed instant samples one step out.** A `time` scale with a colour range
   is now built as the colour scale it is — it was reported as unbuildable, so a line coloured by
   quarter drew in the mark default and no legend at all — and the shades it produces are one step
