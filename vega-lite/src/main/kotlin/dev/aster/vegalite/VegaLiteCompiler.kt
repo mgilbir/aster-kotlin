@@ -315,6 +315,14 @@ private class Compilation(
     val sizeSignals =
       sizeSignalsFor(plotTree).distinctBy { it.string("name") } +
         selectionSignals +
+        // A selection's **controls** are part of the page rather than of the drawing, so they sit
+        // at
+        // the top with `unit` and before the signal the tests read.
+        selections
+          .distinctBy { it.name }
+          .flatMap {
+            it.inputSignals(it.owner ?: views.firstOrNull())
+          } +
         selections.distinctBy { it.name }.map { it.resolveSignal() } +
         Params.signals(spec, diagnostics) +
         // A concatenation writes each selection's machinery inside the plot that declared it,

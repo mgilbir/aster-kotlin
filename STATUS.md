@@ -678,7 +678,7 @@ no data is needed to compare two compilers. So every one of them was compiled by
 by this one, and the outputs compared property by property. That is a *measurement*, not a gate: the
 examples are not fixtures here, and nothing about them is checked in.
 
-**124 of 627 matched exactly** at the start, and **493** do now. 16 were refused by name, and of those 8 are geographic,
+**124 of 627 matched exactly** at the start, and **497** do now. 16 were refused by name, and of those 8 are geographic,
 3 are a facet inside a facet, 2 a repeat inside a concatenation, and 2 are the `trail` mark — which
 this runtime draws and this compiler had simply not been told about.
 
@@ -2265,6 +2265,17 @@ runtime already had a Delaunay triangulation and a voronoi transform, and it was
 coordinates as *field names*: Vega-Lite writes them as expressions, `{"expr": "datum.datum.x || 0"}`,
 because the points are mark items and the coordinate wanted is the one the encoding resolved. Every
 cell came out without coordinates, so the diagram was empty and the overlay drew nothing.
+
+### A selection somebody drives with a slider
+
+`bind` on a point selection may name **controls** rather than scales or a legend, one per projected
+field, and then the controls *are* the interaction. Three things follow, and the third is the one
+that is easy to miss. Each projection gets a signal of its own at the **top** of the chart — a
+control belongs to the page rather than to the drawing — holding null until the reader moves it.
+The tuple stops listening for events and becomes an expression over those signals, null until every
+one of them holds something. And `disableDirectManipulation` takes the click, the clear and the
+toggle off the selection unless the specification asked for them by name, so the marks no longer
+show a pointer either: nothing about this chart is clickable.
 
 ### What a mark measures along, decided in the right order
 

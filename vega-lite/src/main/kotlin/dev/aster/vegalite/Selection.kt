@@ -29,6 +29,15 @@ internal class Selection(
   val toggle: String?,
   val bindsScales: Boolean,
   /**
+   * The input elements a **point** selection is driven from, where it is bound to any.
+   *
+   * `{"bind": {"Cylinders": {"input": "range", …}}}` — one control per projected field, or one
+   * control for all of them written bare. A selection driven this way is not clicked at all: the
+   * controls are the interaction, and `disableDirectManipulation` takes the pointer streams off
+   * unless the specification asked for them by name.
+   */
+  val inputs: VegaValue.Obj?,
+  /**
    * `nearest`: the pick goes to the closest mark rather than to the one under the pointer.
    *
    * Vega has no such notion, so it is compiled: a **voronoi** mark is laid over the marks, each of
@@ -69,7 +78,11 @@ internal class Selection(
   /** Whether the pointer becomes a hand over a mark: a *hover* selection is not clicked. */
   val showsPointer: Boolean
     get() =
-      type == "point" && !bindsScales && (on as? VegaValue.Obj)?.string("type") != "pointerover"
+      // A selection driven from **controls** is not clicked, so the marks say nothing about being
+      // clickable — upstream asks for `!s.bind`, a bound selection being driven from the widget.
+      if (inputs != null || bindsScales) false
+      else
+        type == "point" && !bindsScales && (on as? VegaValue.Obj)?.string("type") != "pointerover"
 
   /** Whether a picked row is remembered by its **identity** rather than by any column of it. */
   val byIdentity: Boolean
@@ -157,12 +170,20 @@ internal class Selection(
           // replace it.
           toggle =
             when (val stated = options.fields["toggle"]) {
-              null -> if (type == "point") "event.shiftKey" else null
+              null ->
+                // `disableDirectManipulation`: a selection driven by **controls** does not toggle,
+                // clear or listen for a click unless the specification asked for one by name — the
+                // controls are the interaction.
+                if (type == "point" && bind !is VegaValue.Obj) "event.shiftKey" else null
               VegaValue.Bool(false) -> null
               is VegaValue.Str -> stated.value
               else -> "event.shiftKey"
             },
           bindsScales = bind == VegaValue.Str("scales"),
+          inputs =
+            (bind as? VegaValue.Obj)?.takeIf {
+              type == "point" && options.string("resolve") == null
+            },
           nearest = options.fields["nearest"] == VegaValue.Bool(true),
           brushPaint =
             obj {
@@ -180,6 +201,7 @@ internal class Selection(
             when (val stated = options.fields["clear"]) {
               VegaValue.Bool(false) -> null
               is VegaValue.Str -> stated.value
+              null -> if (bind is VegaValue.Obj && type == "point") null else "dblclick"
               else -> "dblclick"
             },
           initial = param.fields["value"],
@@ -609,6 +631,32 @@ internal class Selection(
     )
   }
 
+  /**
+   * `inputBindings.topLevelSignals`: one signal per projection, each bound to its own control.
+   *
+   * They live at the **top** of the chart rather than in the plot, because a control is part of the
+   * page rather than of the drawing; and they are written in reverse order, each being unshifted
+   * onto the list as the projections are walked.
+   */
+  fun inputSignals(view: UnitView?): List<VegaValue> {
+    val bind = inputs ?: return emptyList()
+    val projected = view?.let { projections(it) } ?: fields.map { null to it }
+    val started = (initial as? VegaValue.Arr)?.values?.firstOrNull() as? VegaValue.Obj
+    return projected
+      .map { (channel, field) ->
+        obj {
+          put("name", Fields.varName("${name}_$field"))
+          val start = started?.fields?.get(field)
+          if (start != null) put("init", literal(start)) else put("value", VegaValue.Null)
+          // The control for this field, the one for its channel, or — where the binding names
+          // neither — the one control the whole selection is driven from.
+          val own = bind.fields[field] ?: channel?.let { bind.fields[it] }
+          put("bind", own ?: bind)
+        }
+      }
+      .reversed()
+  }
+
   /** The name of the voronoi overlay this selection picks through, when it picks by nearness. */
   fun voronoiName(): String =
     listOf(owner?.name.orEmpty(), "voronoi").filter { it.isNotEmpty() }.joinToString("_")
@@ -698,37 +746,52 @@ internal class Selection(
     val guard =
       "datum && item().mark.marktype !== 'group' && indexof(item().mark.role, 'legend') < 0" +
         brushes.joinToString("") { " && indexof(item().mark.name, '$it') < 0" }
-    out += obj {
-      put("name", "${name}_tuple")
-      put(
-        "on",
-        arr(
-          listOfNotNull(
-            obj {
-              put("events", arr(listOf(pickStream())))
-              put("update", "$guard ? {$picked} : null")
-              put("force", VegaValue.Bool(true))
-            },
-            clear?.let {
+    // A selection driven by **controls** has no events to write its tuple: the tuple is whatever
+    // the controls hold, and it is null until every one of them holds something.
+    if (inputs != null) {
+      val values = projected.map { (_, field) -> Fields.varName("${name}_$field") }
+      out += obj {
+        put("name", "${name}_tuple")
+        put(
+          "update",
+          if (values.isEmpty()) "null"
+          else
+            "${values.joinToString(" && ") { "$it !== null" }} ? " +
+              "{fields: ${name}_tuple_fields, values: [${values.joinToString(", ")}]} : null",
+        )
+      }
+    } else
+      out += obj {
+        put("name", "${name}_tuple")
+        put(
+          "on",
+          arr(
+            listOfNotNull(
               obj {
-                put(
-                  "events",
-                  arr(
-                    listOf(
-                      obj {
-                        put("source", "view")
-                        put("type", it)
-                      }
-                    )
-                  ),
-                )
-                put("update", "null")
-              }
-            },
-          )
-        ),
-      )
-    }
+                put("events", arr(listOf(pickStream())))
+                put("update", "$guard ? {$picked} : null")
+                put("force", VegaValue.Bool(true))
+              },
+              clear?.let {
+                obj {
+                  put(
+                    "events",
+                    arr(
+                      listOf(
+                        obj {
+                          put("source", "view")
+                          put("type", it)
+                        }
+                      )
+                    ),
+                  )
+                  put("update", "null")
+                }
+              },
+            )
+          ),
+        )
+      }
     // `_tuple_fields` — what each remembered value *is*, which the store needs to compare them:
     // `E` for an exact value, `R` for a range. A selection remembering rows by identity has no
     // projection and so no such signal.
