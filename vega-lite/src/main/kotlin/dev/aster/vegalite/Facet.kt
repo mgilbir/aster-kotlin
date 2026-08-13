@@ -35,7 +35,12 @@ private fun headerText(def: ChannelDef, field: String): String {
  * @see FacetGrid, which is what a chart actually has — `row` and `column` are two of these, and a
  *   chart may carry either or both.
  */
-internal class Facet(val channel: String, val def: ChannelDef) {
+internal class Facet(
+  val channel: String,
+  val def: ChannelDef,
+  /** The chart's own name, where it has one: every dataset it makes is named under it. */
+  private val prefix: String = "",
+) {
 
   /**
    * `assembleHeaderProperties`: what a `header` block says about the caption, renamed on the way.
@@ -171,7 +176,8 @@ internal class Facet(val channel: String, val def: ChannelDef) {
   }
 
   /** `column_domain` — the facet's distinct values, which the layout counts and headers title. */
-  val domainData: String = "${channel}_domain"
+  val domainData: String =
+    listOf(prefix, "${channel}_domain").filter { it.isNotEmpty() }.joinToString("_")
 
   fun domainDataset(source: String, counted: Map<String, String> = emptyMap()): VegaValue = obj {
     put("name", domainData)
@@ -260,6 +266,16 @@ internal class Facet(val channel: String, val def: ChannelDef) {
  */
 internal interface FacetLayout {
 
+  /**
+   * `getName`: the chart's own name in front of the grid's structural names, where it has one.
+   *
+   * A facet's cell, its partition, and its header bands are named through the model exactly as its
+   * scales and signals are, so a chart calling itself `trellis` reads `trellis_cell` holding
+   * `trellis_facet` between `trellis_row_header` and `trellis_column_footer`. Only the headings
+   * stand outside it — `assembleTitleGroup` names them for the channel alone.
+   */
+  fun named(suffix: String): String
+
   /** The columns each cell is grouped by, which every grouping in the data flow has to carry. */
   val fields: List<String>
 
@@ -331,7 +347,11 @@ internal interface FacetLayout {
   ): VegaValue
 }
 
-internal class FacetGrid(val row: Facet?, val column: Facet?) : FacetLayout {
+internal class FacetGrid(val row: Facet?, val column: Facet?, private val prefix: String = "") :
+  FacetLayout {
+
+  override fun named(suffix: String): String =
+    listOf(prefix, suffix).filter { it.isNotEmpty() }.joinToString("_")
 
   /** Row before column, which is the order upstream groups, sorts and crosses by. */
   override val fields: List<String> = listOfNotNull(row, column).flatMap { it.groupingFields }
@@ -417,7 +437,7 @@ internal class FacetGrid(val row: Facet?, val column: Facet?) : FacetLayout {
     val captions = wanted && facet != null && facet.def.raw.fields["header"] != VegaValue.Null
     if (axes.isEmpty() && !captions) return null
     return obj {
-      put("name", "${channel}_$kind")
+      put("name", named("${channel}_$kind"))
       put("type", "group")
       put("role", "$channel-$kind")
       if (facet != null) {
@@ -566,7 +586,7 @@ internal class FacetGrid(val row: Facet?, val column: Facet?) : FacetLayout {
     counted: Map<String, String>,
     scales: List<VegaValue>,
   ): VegaValue = obj {
-    put("name", "cell")
+    put("name", named("cell"))
     put("type", "group")
     put("style", style)
     put(
@@ -575,7 +595,7 @@ internal class FacetGrid(val row: Facet?, val column: Facet?) : FacetLayout {
         put(
           "facet",
           obj {
-            put("name", "facet")
+            put("name", named("facet"))
             put("data", dataName)
             put("groupby", strings(fields))
             val sorted = listOfNotNull(row, column).filter { it.cellSortAggregate != null }
@@ -651,11 +671,18 @@ internal class FacetGrid(val row: Facet?, val column: Facet?) : FacetLayout {
  * no such band — its columns are positions, not values — so every **cell** carries its own caption,
  * and the heading over the whole grid is a `column-title` naming the field.
  */
-internal class FacetWrap(val def: ChannelDef, private val columns: Int?) : FacetLayout {
+internal class FacetWrap(
+  val def: ChannelDef,
+  private val columns: Int?,
+  private val prefix: String = "",
+) : FacetLayout {
+
+  override fun named(suffix: String): String =
+    listOf(prefix, suffix).filter { it.isNotEmpty() }.joinToString("_")
 
   private val field: String = Fields.vgField(def)
 
-  private val domainData: String = "facet_domain"
+  private val domainData: String = named("facet_domain")
 
   override val fields: List<String> =
     if (def.bin is Binning.Bin) listOf(field, "${field}_end") else listOf(field)
@@ -777,7 +804,7 @@ internal class FacetWrap(val def: ChannelDef, private val columns: Int?) : Facet
     if (axes.isEmpty()) return null
     val isColumn = channel == "column"
     return obj {
-      put("name", "${channel}_$kind")
+      put("name", named("${channel}_$kind"))
       put("type", "group")
       put("role", "$channel-$kind")
       put("from", obj { put("data", "${domainData}_$channel") })
@@ -810,7 +837,7 @@ internal class FacetWrap(val def: ChannelDef, private val columns: Int?) : Facet
     counted: Map<String, String>,
     scales: List<VegaValue>,
   ): VegaValue = obj {
-    put("name", "cell")
+    put("name", named("cell"))
     put("type", "group")
     // Each cell names the value it holds, there being no band of column headings to name it in.
     put(
@@ -832,7 +859,7 @@ internal class FacetWrap(val def: ChannelDef, private val columns: Int?) : Facet
         put(
           "facet",
           obj {
-            put("name", "facet")
+            put("name", named("facet"))
             put("data", dataName)
             put("groupby", strings(fields))
           },

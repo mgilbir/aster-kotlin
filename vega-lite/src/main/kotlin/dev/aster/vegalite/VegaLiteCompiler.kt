@@ -203,7 +203,9 @@ private class Compilation(
     val owner =
       allScales.values.associate { scale ->
         scale.name() to
-          if (scale.name() == scale.channel) null
+          // A scale still called by its own channel — under the chart's name, where the chart has
+          // one — is a **shared** one; anything else is named for the child that owns it.
+          if (scale.name() == prefixed(scale.channel)) null
           else plots.firstOrNull { plot -> plot.views.any { scale.name() in it.scaleNames.values } }
       }
     for (plot in plots) {
@@ -468,7 +470,9 @@ private class Compilation(
       // where they are written.
       if (facet != null && concat == null) {
         cellScales =
-          allScales.values.filter { it.name() != it.channel }.map { withinCell(assembleScale(it)) }
+          allScales.values
+            .filter { it.name() != prefixed(it.channel) }
+            .map { withinCell(assembleScale(it)) }
       }
       // A brush is drawn in **two** parts around the marks: its background under them so the data
       // stays legible through it, and its outline over them so it can be grabbed.
@@ -486,7 +490,7 @@ private class Compilation(
             plots.flatMap { plot -> allScales.values.filter { owner[it.name()] === plot } })
           // A facet's independently resolved scales are built inside its cells, where the rows
           // they measure are, so they are not written beside the grid as well.
-          .filterNot { facet != null && concat == null && it.name() != it.channel }
+          .filterNot { facet != null && concat == null && it.name() != prefixed(it.channel) }
       if (scales.isNotEmpty()) put("scales", arr(scales.map { assembleScale(it) }))
       // A faceted chart has no axes of its own: the gridlines live in every cell and the labelled
       // axis in a header drawn once for the whole grid. A concatenation's axes live in its plots.
@@ -776,8 +780,12 @@ private class Compilation(
   private fun nameSizes(plots: List<Plot>) {
     if (concat == null) {
       val plot = plots.single()
+      // A cell's size is named through the model, the whole grid's is not: `width` is always the
+      // chart's, and `child_width` belongs to the facet that owns the cell.
       val prefix = if (facet != null) "child_" else ""
-      plot.sizeNames = mapOf("x" to "${prefix}width", "y" to "${prefix}height")
+      plot.sizeNames =
+        if (facet == null) mapOf("x" to "width", "y" to "height")
+        else mapOf("x" to prefixed("${prefix}width"), "y" to prefixed("${prefix}height"))
       plot.views.forEach {
         it.widthSignal = plot.sizeNames.getValue("x")
         it.heightSignal = plot.sizeNames.getValue("y")
@@ -1191,7 +1199,11 @@ private class Compilation(
    */
   private fun liftFacet(views: List<UnitView>): List<UnitView> {
     fun channel(name: String) = views.firstNotNullOfOrNull { view ->
-      view.spec.encoding[name]?.takeIf { it.isFieldDef }?.let { Facet(name, it) }
+      view.spec.encoding[name]
+        ?.takeIf { it.isFieldDef }
+        ?.let {
+          Facet(name, it, spec.string("name").orEmpty())
+        }
     }
     val row = channel("row")
     val column = channel("column")
@@ -1206,8 +1218,12 @@ private class Compilation(
       // the operator form carries it beside the facet: `mapFacetedUnit` lifts the one to the other,
       // and reading only the outer place left a grid that never wrapped.
       if (wrapped != null)
-        FacetWrap(wrapped, (spec.number("columns") ?: wrapped.raw.number("columns"))?.toInt())
-      else FacetGrid(row, column)
+        FacetWrap(
+          wrapped,
+          (spec.number("columns") ?: wrapped.raw.number("columns"))?.toInt(),
+          spec.string("name").orEmpty(),
+        )
+      else FacetGrid(row, column, spec.string("name").orEmpty())
     facet = found
 
     return views.map { view ->
@@ -1222,16 +1238,25 @@ private class Compilation(
             height = view.spec.height,
           ),
           config,
-          if (view.name.isEmpty()) "child" else "child_${view.name}",
+          // `child` under the chart's own name and above the layer's: a named trellis of layers
+          // reads `trellis_child_layer_0`, because the name belongs to the model the cell hangs
+          // from and the layer's index to the view inside it.
+          listOf(
+              spec.string("name").orEmpty(),
+              "child",
+              view.name.removePrefix(prefixed("")).trimStart('_'),
+            )
+            .filter { it.isNotEmpty() }
+            .joinToString("_"),
         )
         .also {
-          it.widthSignal = "child_width"
-          it.heightSignal = "child_height"
+          it.widthSignal = prefixed("child_width")
+          it.heightSignal = prefixed("child_height")
           it.facetFields = found.fields
           it.facetDefs = found.defs
           // The cell's marks read the partition Vega facets out for them, named `facet`; the
           // scales still read the whole table, so every cell is scaled alike.
-          it.markData = "facet"
+          it.markData = found.named("facet")
         }
     }
   }
