@@ -742,6 +742,37 @@ class ExpressionReferenceTest {
         // Upstream in a `renderer: 'none'` view, which is what the oracle renders every fixture in:
         // no window means an empty object and a pair of absent numbers, not zeroes and not the
         // view's own size.
+        // ---- reading a date back out of a string ----
+        // `timeParse` reads in local time and `utcParse` in UTC, which is the whole difference
+        // between the first two. What is not written defaults to **1900-01-01**, not to today, so a
+        // specifier of `%I:%M %p` puts its time on the first of January 1900.
+        "utcFormat(timeParse('2020-03-15', '%Y-%m-%d'), '%Y-%m-%dT%H:%M')|\"2020-03-14T23:00\"",
+        "utcFormat(utcParse('2020-03-15', '%Y-%m-%d'), '%Y-%m-%dT%H:%M')|\"2020-03-15T00:00\"",
+        "utcFormat(timeParse('15/03/2020 14:30', '%d/%m/%Y %H:%M'), " +
+          "'%Y-%m-%dT%H:%M')|\"2020-03-15T13:30\"",
+        "utcFormat(timeParse('March 15 2020', '%B %d %Y'), '%Y-%m-%dT%H:%M')|\"2020-03-14T23:00\"",
+        "utcFormat(timeParse('Mar 15 20', '%b %d %y'), '%Y-%m-%dT%H:%M')|\"2020-03-14T23:00\"",
+        "utcFormat(utcParse('2020-03-15 02:03:04.567', '%Y-%m-%d %H:%M:%S.%L'), " +
+          "'%H:%M:%S.%L')|\"02:03:04.567\"",
+        "utcFormat(utcParse('2020-075', '%Y-%j'), '%Y-%m-%d')|\"2020-03-15\"",
+        "utcFormat(utcParse('11:30 PM', '%I:%M %p'), '%Y-%m-%dT%H:%M')|\"1900-01-01T23:30\"",
+        "utcFormat(utcParse('12:30 AM', '%I:%M %p'), '%Y-%m-%dT%H:%M')|\"1900-01-01T00:30\"",
+        "utcFormat(utcParse('2020', '%Y'), '%Y-%m-%dT%H:%M')|\"2020-01-01T00:00\"",
+        "utcFormat(utcParse('2020-03-15T10:00:00Z', '%Y-%m-%dT%H:%M:%S%Z'), " +
+          "'%Y-%m-%dT%H:%M')|\"2020-03-15T10:00\"",
+        "utcFormat(utcParse('2020-03-15T10:00:00+0200', '%Y-%m-%dT%H:%M:%S%Z'), " +
+          "'%Y-%m-%dT%H:%M')|\"2020-03-15T08:00\"",
+        "utcFormat(utcParse('2020-03-15T10:00:00+02:00', '%Y-%m-%dT%H:%M:%S%Z'), " +
+          "'%Y-%m-%dT%H:%M')|\"2020-03-15T08:00\"",
+        "utcFormat(utcParse(' 5 Jan 2020', '%d %b %Y'), '%Y-%m-%d')|\"2020-01-05\"",
+        "utcFormat(utcParse('Sunday', '%A'), '%Y-%m-%d')|\"1900-01-01\"",
+        "utcFormat(utcParse('50%', '%d%%'), '%Y-%m-%d')|\"1900-02-19\"",
+        // The string and the specifier must match **exactly**: trailing input is a failure, not
+        // a date, and neither is a string the specifier cannot walk.
+        "timeParse('nonsense', '%Y-%m-%d')|null",
+        "timeParse('2020-03-15 extra', '%Y-%m-%d')|null",
+        // Overflow normalises as `new Date` normalises it: day 50 of January is the 19th of
+        // February, which is also what makes `%j` able to name the last day of a leap year.
         "screen()|{}",
         "windowSize()|[null,null]",
         "timeFormat(timeOffset('day', datetime(2019,2,31)), '%Y-%m-%d %H:%M')|\"2019-04-01 00:00\"",

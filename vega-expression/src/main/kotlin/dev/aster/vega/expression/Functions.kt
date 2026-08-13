@@ -3,11 +3,13 @@ package dev.aster.vega.expression
 import dev.aster.vega.model.MINUS_SIGN
 import dev.aster.vega.model.PlatformDecimals
 import dev.aster.vega.model.VegaValue
+import dev.aster.vega.model.asString
 import dev.aster.vega.model.field
 import dev.aster.vega.model.roundHalfUp
 import dev.aster.vega.model.time.DateValues
 import dev.aster.vega.model.time.TimeFormat
 import dev.aster.vega.model.time.TimeInterval
+import dev.aster.vega.model.time.TimeParse
 import dev.aster.vega.model.time.TimeStepper
 import dev.aster.vega.model.time.TimeUnits
 import dev.aster.vega.model.withTypographicMinus
@@ -91,12 +93,6 @@ public object Functions {
    */
   public val knownUnsupported: Map<String, String> =
     mapOf(
-      "timeParse" to
-        "parsing a date against a format string needs a strptime the engine does not have; " +
-          "an ISO 8601 string works through toDate",
-      "utcParse" to
-        "parsing a date against a format string needs a strptime the engine does not have; " +
-          "an ISO 8601 string works through toDate",
       // The three type predicates whose answer depends on a representation this engine does not
       // share, so each would be confidently wrong rather than unavailable.
       "isDate" to
@@ -772,6 +768,17 @@ public object Functions {
     map["timeFormat"] = ExpressionFunction { args -> formatted(args, localZone()) }
     map["utcFormat"] = ExpressionFunction { args -> formatted(args, TimeZone.UTC) }
 
+    /**
+     * `timeParse(text, specifier)` and `utcParse` — a date read back out of a formatted string.
+     *
+     * The inverse of `timeFormat`, and the reason it is not simply `toDate`: a specification
+     * reading a column of `15/03/2020` has no other way to say which number is the day. Null where
+     * the string and the specifier do not match **exactly**, which is d3's rule and stricter than
+     * it looks — see [TimeParse].
+     */
+    map["timeParse"] = ExpressionFunction { args -> parsed(args, localZone(), utc = false) }
+    map["utcParse"] = ExpressionFunction { args -> parsed(args, TimeZone.UTC, utc = true) }
+
     map["timezoneoffset"] = ExpressionFunction { args ->
       // JavaScript reports the offset as minutes *behind* UTC, so a zone east of Greenwich is
       // negative. Reproducing the sign matters more than it looks: specifications subtract it.
@@ -1283,6 +1290,16 @@ public object Functions {
     val instant = instantOf(value)
     if (instant.isNaN()) return VegaValue.Num(Double.NaN)
     return VegaValue.Num(read(TimeFormat.at(instant, zone)))
+  }
+
+  private fun parsed(args: List<VegaValue>, zone: TimeZone, utc: Boolean): VegaValue {
+    val text = args.at(0)
+    // Upstream's wrapper answers the *string* `"null"` for a null input, before any parsing
+    // happens.
+    if (text is VegaValue.Null) return VegaValue.Str("null")
+    val specifier = args.string(1)
+    val millis = TimeParse.parse(text.asString(), specifier, zone, utc) ?: return VegaValue.Null
+    return VegaValue.Num(millis)
   }
 
   private fun formatted(args: List<VegaValue>, zone: TimeZone): VegaValue {
