@@ -134,6 +134,21 @@ public interface ExpressionScope {
   public fun geoScale(projection: String?): VegaValue = VegaValue.Null
 
   /**
+   * `gradient(scale, p0, p1[, count])` — a colour scale as a gradient a mark can be filled with.
+   *
+   * Answers the same object a specification can write by hand — `{"gradient": "linear", "x1": …,
+   * "stops": [{"offset": …, "color": …}]}` — because that is what upstream's `Gradient` is: a plain
+   * object its renderer turns into an SVG definition. So the value is usable wherever a literal one
+   * is, and the encoder does not need to know which of the two it got.
+   */
+  public fun gradient(
+    scale: String,
+    from: VegaValue,
+    to: VegaValue,
+    count: VegaValue,
+  ): VegaValue = VegaValue.Null
+
+  /**
    * `geoShape(projection, feature)` — the feature drawn through the projection, as a path.
    *
    * The same stated divergence as `pathShape`, for the same reason: upstream returns a closure no

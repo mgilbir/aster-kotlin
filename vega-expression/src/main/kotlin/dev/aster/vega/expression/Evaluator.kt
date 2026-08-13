@@ -289,6 +289,16 @@ public class Evaluator(
       return values.lastOrNull() ?: VegaValue.Null
     }
 
+    // `gradient(scale, p0, p1[, count])` — the scale's ramp, as a paint value.
+    if (name == "gradient" && node.arguments.size >= 3) {
+      return scope.gradient(
+        evaluate(node.arguments[0], scope).asString(),
+        evaluate(node.arguments[1], scope),
+        evaluate(node.arguments[2], scope),
+        node.arguments.getOrNull(3)?.let { evaluate(it, scope) } ?: VegaValue.Null,
+      )
+    }
+
     // `geoShape(projection, feature)` — the outline, as a path this engine's `shape` channel takes.
     if (name == "geoShape" && node.arguments.size >= 2) {
       val projection = evaluate(node.arguments[0], scope)

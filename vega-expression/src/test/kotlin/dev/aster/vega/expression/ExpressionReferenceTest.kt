@@ -167,6 +167,7 @@ class ExpressionReferenceTest {
         "zoomPow",
         "zoomSymlog",
         "geoShape",
+        "gradient",
       )
     // Resolved against the **scope** rather than through the function table, because each needs
     // something the table cannot see: the scales, the datasets, the projections, or somewhere to
@@ -189,6 +190,7 @@ class ExpressionReferenceTest {
         "geoCentroid",
         "geoScale",
         "geoShape",
+        "gradient",
         "random",
         "sampleNormal",
         "sampleLogNormal",

@@ -107,7 +107,6 @@ public object Functions {
       "vlSelectionIdTest" to "selection helpers require the signal and selection subsystems",
       "vlSelectionTuples" to "selection helpers require the signal and selection subsystems",
       "copy" to "copying a scale needs the scale itself as a value, which is not one here",
-      "gradient" to "gradients cannot be produced from an expression yet",
       // Functions that read or write the running view rather than computing anything. A compiled
       // scene is a value, so there is no view to ask and nothing to modify.
       "encode" to "reading an item's encode block back needs the running view",

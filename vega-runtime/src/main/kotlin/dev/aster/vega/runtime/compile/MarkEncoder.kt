@@ -27,6 +27,7 @@ import dev.aster.vega.scene.ArcPath
 import dev.aster.vega.scene.CurveKind
 import dev.aster.vega.scene.Fill
 import dev.aster.vega.scene.FontStyle
+import dev.aster.vega.scene.GradientStop
 import dev.aster.vega.scene.GroupNode
 import dev.aster.vega.scene.ImageAlign
 import dev.aster.vega.scene.ImageBaseline
@@ -987,11 +988,17 @@ public class MarkEncoder(
     // `fill` would have filled it with the built-in blue.
     val paintsItself = channels["fill"] != null || channels["stroke"] != null
     val fillColour =
-      paint(channels["fill"], datum, "fill", spec)
-        ?: defaults.colour("fill", MarkDefaults.fillFor(spec.type)).takeIf { !paintsItself }
+      paintOf(channels["fill"], datum, "fill", spec)
+        ?: defaults
+          .colour("fill", MarkDefaults.fillFor(spec.type))
+          .takeIf { !paintsItself }
+          ?.let { ScenePaint.Solid(it) }
     val strokeColour =
-      paint(channels["stroke"], datum, "stroke", spec)
-        ?: defaults.colour("stroke", MarkDefaults.strokeFor(spec.type)).takeIf { !paintsItself }
+      paintOf(channels["stroke"], datum, "stroke", spec)
+        ?: defaults
+          .colour("stroke", MarkDefaults.strokeFor(spec.type))
+          .takeIf { !paintsItself }
+          ?.let { ScenePaint.Solid(it) }
     val fillOpacity =
       number(channels["fillOpacity"], datum) ?: defaults.number("fillOpacity") ?: 1.0
     val strokeOpacity =
@@ -1013,11 +1020,11 @@ public class MarkEncoder(
         ?: Stroke.DEFAULT_MITER_LIMIT
 
     return Style(
-      fill = fillColour?.let { Fill(ScenePaint.Solid(it), fillOpacity) },
+      fill = fillColour?.let { Fill(it, fillOpacity) },
       stroke =
         strokeColour?.let {
           Stroke(
-            paint = ScenePaint.Solid(it),
+            paint = it,
             width = strokeWidth,
             cap = cap,
             join = join,
@@ -1642,6 +1649,72 @@ public class MarkEncoder(
       is ChannelValue.Conditional -> number(selectRule(channel, datum), datum)
       is ChannelValue.Adjusted -> adjustedNumber(channel, datum)
     }
+
+  /**
+   * A paint channel, which may resolve to a **gradient** rather than to a colour.
+   *
+   * Vega lets either channel hold an object — `{"gradient": "linear", "stops": [...]}` — and its
+   * renderer turns that into an SVG gradient definition. It arrives here as an ordinary channel
+   * value, so the object has to be recognised before the string coercion: stringifying one produced
+   * `gradient:linear,x1:0,…` and a diagnostic saying that was not a colour, which was true and
+   * useless.
+   */
+  private fun paintOf(
+    channel: ChannelValue?,
+    datum: VegaValue,
+    channelName: String,
+    spec: MarkSpec,
+  ): ScenePaint? {
+    channelValue(channel, datum)?.let { value ->
+      gradientPaint(value)?.let {
+        return it
+      }
+    }
+    return paint(channel, datum, channelName, spec)?.let { ScenePaint.Solid(it) }
+  }
+
+  /**
+   * A gradient object as scene paint, with upstream's defaults for whatever it leaves out.
+   *
+   * `gradientRef` fills in a linear gradient as left-to-right across the mark's own box — `x1: 0,
+   * y1: 0, x2: 1, y2: 0` — and a radial one as centred and half as wide. The coordinates are
+   * fractions of the box in both engines, which is SVG's `objectBoundingBox`, so they carry across
+   * unchanged.
+   */
+  private fun gradientPaint(value: VegaValue): ScenePaint? {
+    val fields = (value as? VegaValue.Obj)?.fields ?: return null
+    val kind = (fields["gradient"] as? VegaValue.Str)?.value ?: return null
+    val stops =
+      (fields["stops"] as? VegaValue.Arr)
+        ?.values
+        ?.mapNotNull { stop ->
+          val entry = (stop as? VegaValue.Obj)?.fields ?: return@mapNotNull null
+          val colour = SceneColor.parse(entry["color"]?.asString() ?: "") ?: return@mapNotNull null
+          GradientStop(entry["offset"]?.asDouble()?.takeIf { !it.isNaN() } ?: 0.0, colour)
+        }
+        .orEmpty()
+    if (stops.isEmpty()) return null
+    fun at(name: String, fallback: Double) =
+      fields[name]?.asDouble()?.takeIf { !it.isNaN() } ?: fallback
+    return if (kind == "radial") {
+      ScenePaint.RadialGradient(
+        cx = at("x2", 0.5),
+        cy = at("y2", 0.5),
+        radius = at("r2", 0.5),
+        focusX = at("x1", 0.5),
+        focusY = at("y1", 0.5),
+        stops = stops,
+      )
+    } else {
+      ScenePaint.LinearGradient(
+        x1 = at("x1", 0.0),
+        y1 = at("y1", 0.0),
+        x2 = at("x2", 1.0),
+        y2 = at("y2", 0.0),
+        stops = stops,
+      )
+    }
+  }
 
   private fun paint(
     channel: ChannelValue?,

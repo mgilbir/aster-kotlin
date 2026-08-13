@@ -17,6 +17,7 @@ import dev.aster.vega.model.DiagnosticCodes
 import dev.aster.vega.model.DiagnosticCollector
 import dev.aster.vega.model.VegaValue
 import dev.aster.vega.model.asDouble
+import dev.aster.vega.model.asNumberOrNull
 import dev.aster.vega.model.asString
 import dev.aster.vega.model.spec.SignalSpec
 import dev.aster.vega.runtime.scale.BandScale
@@ -357,6 +358,58 @@ public class SignalScope(
     } else {
       collector.info(DiagnosticCodes.EXPRESSION_LOG, text)
     }
+  }
+
+  /**
+   * `gradient(scale, p0, p1[, count])` — a colour scale as a gradient object.
+   *
+   * The stop list is upstream's: the scale's own ticks at `count` or fifteen, with the domain's two
+   * ends forced in at either end, each offset being the value's *fraction* of the domain rather
+   * than its position in the list — so a log scale's stops bunch up exactly as its colours do. The
+   * object is the same shape a specification can write by hand, which is what makes it usable in a
+   * `fill` without the encoder knowing where it came from.
+   */
+  override fun gradient(
+    scale: String,
+    from: VegaValue,
+    to: VegaValue,
+    count: VegaValue,
+  ): VegaValue {
+    val resolved = resolveScale(scale, "gradient") as? SequentialColorScale ?: return VegaValue.Null
+    val requested = count.asNumberOrNull()?.takeIf { it.isFinite() && it >= 1.0 }?.toInt() ?: 15
+    val lo = resolved.domain.first()
+    val hi = resolved.domain.last()
+    val values = LinkedHashSet<Double>()
+    values += lo
+    values += resolved.ticks(requested).filter { it in minOf(lo, hi)..maxOf(lo, hi) }
+    values += hi
+    val stops =
+      values
+        .sortedBy { resolved.fraction(it) }
+        .mapNotNull { value ->
+          resolved.colorAt(value)?.let { colour ->
+            VegaValue.Obj(
+              linkedMapOf(
+                "offset" to VegaValue.Num(resolved.fraction(value)),
+                "color" to VegaValue.Str(colour.toCssRgb()),
+              )
+            )
+          }
+        }
+    fun coordinate(point: VegaValue, index: Int, fallback: Double): Double =
+      ((point as? VegaValue.Arr)?.values?.getOrNull(index))?.asNumberOrNull()?.takeIf {
+        it.isFinite()
+      } ?: fallback
+    return VegaValue.Obj(
+      linkedMapOf(
+        "gradient" to VegaValue.Str("linear"),
+        "x1" to VegaValue.Num(coordinate(from, 0, 0.0)),
+        "y1" to VegaValue.Num(coordinate(from, 1, 0.0)),
+        "x2" to VegaValue.Num(coordinate(to, 0, 1.0)),
+        "y2" to VegaValue.Num(coordinate(to, 1, 0.0)),
+        "stops" to VegaValue.Arr(stops),
+      )
+    )
   }
 
   /** `geoShape('name', feature)` — the outline, which a `shape` channel draws directly. */
