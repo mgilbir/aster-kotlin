@@ -270,18 +270,17 @@ internal sealed class DataNode {
   fun mergeBins(renames: MutableMap<String, String>) {
     children.forEach { it.mergeBins(renames) }
     if (children.size <= 1) return
-    val grouped = LinkedHashMap<String, MutableList<BinNode>>()
-    for (child in children.filterIsInstance<BinNode>()) {
-      grouped.getOrPut(child.key()) { mutableListOf() } += child
-    }
-    for (group in grouped.values) {
-      if (group.size < 2) continue
-      val kept = group.removeAt(group.size - 1)
-      for (folded in group) {
-        kept.merge(folded, renames)
-        children.remove(folded)
-        kept.children += folded.children
-      }
+    // **Every** sibling bin folds into one node, not only those bucketing the same column the same
+    // way: a node holds a *set* of bucketings keyed by what they bucket, and `remainingBins.pop()`
+    // takes the lot. Two plots each binning a different column, or one column two ways, therefore
+    // cut both buckets in one place above them rather than each in a dataset of its own.
+    val bins = children.filterIsInstance<BinNode>()
+    if (bins.size < 2) return
+    val kept = bins.last()
+    for (folded in bins.dropLast(1)) {
+      kept.merge(folded, renames)
+      children.remove(folded)
+      kept.children += folded.children
     }
   }
 
@@ -449,9 +448,6 @@ internal class BinNode(bins: List<BinComponent>) : DataNode() {
   var bins: List<BinComponent> = bins
     private set
 
-  /** What makes two bin nodes the same one: the column, bucketed by the same parameters. */
-  fun key(): String = bins.joinToString("|") { "${it.field}:${it.params}:${it.extent}" }
-
   /**
    * Folds another node's bins into this one, recording the signals that changed their names.
    *
@@ -460,15 +456,24 @@ internal class BinNode(bins: List<BinComponent>) : DataNode() {
    * to find their own.
    */
   fun merge(other: BinNode, renames: MutableMap<String, String>) {
-    bins = bins.mapIndexed { index, mine ->
-      val theirs = other.bins.getOrNull(index) ?: return@mapIndexed mine
-      renames[theirs.signal] = mine.signal
-      renames[theirs.extentSignal] = mine.extentSignal
-      mine.copy(
-        output = (mine.output + theirs.output).distinct(),
-        rangeFormula = mine.rangeFormula ?: theirs.rangeFormula,
-      )
+    val order = bins.map { it.key() }.toMutableList()
+    val byKey = bins.associateBy { it.key() }.toMutableMap()
+    for (theirs in other.bins) {
+      val mine = byKey[theirs.key()]
+      if (mine == null) {
+        order += theirs.key()
+        byKey[theirs.key()] = theirs
+      } else {
+        renames[theirs.signal] = mine.signal
+        renames[theirs.extentSignal] = mine.extentSignal
+        byKey[theirs.key()] =
+          mine.copy(
+            output = (mine.output + theirs.output).distinct(),
+            rangeFormula = mine.rangeFormula ?: theirs.rangeFormula,
+          )
+      }
     }
+    bins = order.map { byKey.getValue(it) }
   }
 
   fun transforms(): List<VegaValue> = bins.flatMap { bin ->
@@ -509,7 +514,10 @@ internal data class BinComponent(
   val extentSignal: String,
   val extent: VegaValue?,
   val rangeFormula: String?,
-)
+) {
+  /** What makes two bucketings the same one: the column, cut by the same parameters. */
+  fun key(): String = "$field:$params:$extent"
+}
 
 internal class TimeUnitNode(units: List<TimeUnitComponent>) : DataNode() {
   var units: List<TimeUnitComponent> = units
