@@ -1221,6 +1221,24 @@ public class SpecParser {
       return null
     }
 
+    // Upstream's own rewrite: `{"encode": "select"}` *is* `{"update": "encode(item(), 'select')"}`,
+    // spelled shorter. Doing it here means one code path applies both spellings, and a
+    // specification
+    // that writes the call out by hand behaves identically — which it should, because upstream's
+    // parser produces exactly this string.
+    val encodeSet = encode?.asString()?.takeIf { it.isNotBlank() }
+    if (encodeSet != null) {
+      obj.reportUnhandled("Signal handler", path, SIGNAL_HANDLER_CONSUMED)
+      return SignalHandler(
+        streams = streams,
+        signalSources = signals,
+        scaleSources = scales,
+        update = SignalUpdate.Expression("encode(item(), '$encodeSet')"),
+        encode = encode,
+        force = (obj.fields["force"] as? VegaValue.Bool)?.value ?: false,
+      )
+    }
+
     val update =
       when {
         updateValue == null -> null
@@ -3044,20 +3062,18 @@ public class SpecParser {
 
   private fun parseEncode(value: VegaValue?, path: String): EncodeSpec {
     val obj = value as? VegaValue.Obj ?: return EncodeSpec()
-    for (key in obj.fields.keys) {
-      if (key !in setOf("enter", "update", "exit", "hover")) {
-        diagnostics.warn(
-          DiagnosticCodes.PARSE_UNKNOWN_PROPERTY,
-          "Unknown encode set '$key'",
-          jsonPath = "$path.$key",
-        )
-      }
-    }
+    val built = setOf("enter", "update", "exit", "hover")
     return EncodeSpec(
       enter = parseEncodeEntry(obj.fields["enter"], "$path.enter"),
       update = parseEncodeEntry(obj.fields["update"], "$path.update"),
       exit = parseEncodeEntry(obj.fields["exit"], "$path.exit"),
       hover = parseEncodeEntry(obj.fields["hover"], "$path.hover"),
+      // Any other name is a block a handler invokes rather than one the dataflow runs; upstream has
+      // no fixed list, so reporting these as unknown lost a chart's press styling at parse time.
+      named =
+        obj.fields
+          .filterKeys { it !in built }
+          .mapValues { (key, entry) -> parseEncodeEntry(entry, "$path.$key") },
     )
   }
 

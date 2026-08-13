@@ -316,6 +316,46 @@ public class Evaluator(
      * what it was handed. With no item there is nothing to encode and the value comes back unchanged,
      * which is upstream's guard rather than an omission.
      */
+    /*
+     * The **event** functions: `item()`, `xy()`, `x()`, `y()`, and `group()`.
+     *
+     * Upstream generates these as `event.vega.<name>`, so they answer about the event being handled
+     * and nothing else — which is why they belong here rather than in the function table. `x()` is
+     * the commonest expression in an interactive specification after `datum`: forty of the uses in
+     * Vega's own examples, in every brush and every pan. They are not `event.x`, which is the raw
+     * pointer position the platform reported; the chart's padding and autosize origin come off first,
+     * so the answer is in the space the marks are placed in.
+     *
+     * The **argument** forms are refused rather than guessed at. `x(item)` walks up from that item
+     * subtracting each ancestor group's own position, and `group()` answers with the enclosing group
+     * *item* — both need the chain of groups above the item, which the event carries in a live view
+     * and this engine's event value does not. Five uses across the 93 published examples, all in one
+     * of them.
+     */
+    if (name == "item" && node.arguments.isEmpty()) return scope.activeItem()
+    if (name == "xy" || name == "x" || name == "y" || name == "group" || name == "item") {
+      if (node.arguments.isNotEmpty() || name == "group") {
+        throw ExpressionEvaluationException(
+          VegaDiagnostic(
+            code = DiagnosticCodes.EXPRESSION_UNSUPPORTED_FUNCTION,
+            severity = DiagnosticSeverity.ERROR,
+            message =
+              if (name == "group") {
+                "'group()' answers with the enclosing group item, which needs the chain of groups " +
+                  "above the event's own item; this engine's event does not carry it"
+              } else {
+                "'$name(item)' measures from another item, which needs the chain of groups above " +
+                  "it; only the argument-less form is available"
+              },
+          )
+        )
+      }
+      val point = scope.eventPoint()
+      if (name == "xy") return point
+      val parts = (point as? VegaValue.Arr)?.values ?: return VegaValue.Null
+      return parts.getOrNull(if (name == "x") 0 else 1) ?: VegaValue.Null
+    }
+
     if (name == "encode" && node.arguments.isNotEmpty()) {
       val item = evaluate(node.arguments[0], scope)
       val set = node.arguments.getOrNull(1)?.let { evaluate(it, scope).asString() } ?: "update"

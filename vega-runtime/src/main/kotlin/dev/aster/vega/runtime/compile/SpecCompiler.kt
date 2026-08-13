@@ -29,6 +29,7 @@ import dev.aster.vega.scene.RectD
 import dev.aster.vega.scene.Scene
 import dev.aster.vega.scene.SceneColor
 import dev.aster.vega.scene.SceneNode
+import dev.aster.vega.scene.SceneNodeId
 import dev.aster.vega.scene.SceneNodeIdAllocator
 import dev.aster.vega.scene.TextEngine
 import dev.aster.vega.scene.Transform2D
@@ -82,6 +83,16 @@ public data class CompiledSpec(
  * @param textEngine measures axis labels. Pass the Android engine to get the scene the device will
  *   draw, or the default deterministic engine for JVM comparisons.
  */
+/**
+ * One item's re-encoding through a named block of its own mark, as a handler's `encode` left it.
+ *
+ * [fresh] is whether it was applied by the event being handled *now*. It decides whether the block
+ * beats the mark's `update` or loses to it, which is upstream's behaviour and not a choice: the
+ * pass that applies an overlay puts it last, and every pass after that re-runs `update`, which
+ * takes back the channels it sets and leaves the others alone.
+ */
+public data class ItemEncode(val set: String, val fresh: Boolean)
+
 public class SpecCompiler(
   private val textEngine: TextEngine = MetricTextEngine(),
   /**
@@ -106,11 +117,12 @@ public class SpecCompiler(
   public fun compileJson(
     json: String,
     signalOverrides: Map<String, VegaValue> = emptyMap(),
+    itemEncodes: Map<SceneNodeId, ItemEncode> = emptyMap(),
   ): CompiledSpec {
     val parsed = SpecParser().parseJson(json)
     val spec =
       parsed.spec ?: return CompiledSpec(null, emptyMap(), EMPTY_SIGNALS, parsed.diagnostics)
-    val compiled = compile(spec, signalOverrides)
+    val compiled = compile(spec, signalOverrides, itemEncodes)
     // Parse diagnostics come first so a reader sees problems in specification order.
     return compiled.copy(diagnostics = parsed.diagnostics + compiled.diagnostics)
   }
@@ -124,6 +136,7 @@ public class SpecCompiler(
   public fun compile(
     spec: VegaSpec,
     signalOverrides: Map<String, VegaValue> = emptyMap(),
+    itemEncodes: Map<SceneNodeId, ItemEncode> = emptyMap(),
   ): CompiledSpec {
     // `fit` shrinks the plotting area so the *whole drawing* comes out the declared size, which
     // cannot be known until the drawing has been measured. Upstream measures, sets the `width` and
@@ -134,11 +147,11 @@ public class SpecCompiler(
     // ones against the size that is actually drawn.
     val fit =
       if (spec.autosize.type.isFit) {
-        measure(compileOnce(spec, signalOverrides, DiagnosticCollector(), null))
+        measure(compileOnce(spec, signalOverrides, DiagnosticCollector(), null, itemEncodes))
       } else {
         null
       }
-    return compileOnce(spec, signalOverrides, DiagnosticCollector(), fit).compiled
+    return compileOnce(spec, signalOverrides, DiagnosticCollector(), fit, itemEncodes).compiled
   }
 
   /** One compile, with what a later pass needs to measure it. */
@@ -174,6 +187,7 @@ public class SpecCompiler(
     diagnostics: DiagnosticCollector,
     /** What the first pass measured, or null when this *is* the first pass. */
     fit: Overflow?,
+    itemEncodes: Map<SceneNodeId, ItemEncode> = emptyMap(),
   ): Pass {
     val ids = SceneNodeIdAllocator()
 
@@ -386,7 +400,16 @@ public class SpecCompiler(
           .resolve(spec.projections),
       )
     val scopeCompiler =
-      ScopeCompiler(ids, textEngine, diagnostics, expressions, data, stream, clock)
+      ScopeCompiler(
+        ids,
+        textEngine,
+        diagnostics,
+        expressions,
+        data,
+        stream,
+        clock,
+        itemEncodes,
+      )
     val scope =
       scopeCompiler.compile(
         spec.marks,

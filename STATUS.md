@@ -2121,15 +2121,20 @@ depends on them. Each has a test and a comment; this is the index.
 
 ## Next three tasks
 
-1. **What the interaction system still does not do.** The chain works end to end and three things
-   inside it are stubbed rather than finished: a `debounce` fires on every event instead of after
-   the quiet period, because nothing schedules; a **timer** stream, which fires on its own rather
-   than in response to anything, needs the same missing clock; and an `encode` handler, which sets
-   properties on the event's own mark rather than a signal, is reported and does nothing. The first
-   two need a scheduler the controller does not have; the third needs the compiler to hand back a
-   mutable node. All three are reported by name, the timer only since `config.events` was
-   implemented — until then it read as a view event of type `timer` that nothing ever raises, so the
-   signal simply never changed and said nothing about why.
+1. **What the interaction system still does not do.** Two things, and they are the same thing: a
+   `debounce` fires on every event instead of after the quiet period, and a **timer** stream never
+   fires at all. Both need something that can wake up later, which the controller does not have. Both
+   are reported by name — the timer only since `config.events` was implemented, because until then it
+   read as a view event of type `timer` that nothing ever raises, so the signal simply never changed
+   and said nothing about why.
+
+   Two came off this list. A handler sourced on **another signal** now fires and cascades: 79 handlers
+   across twenty of Vega's 93 examples use it, which is every pan, zoom and brush in the gallery. And
+   an **`encode` handler** now overlays a named block on the event's own item, which needed the event
+   functions — `item()`, `x()`, `y()`, `xy()` — that were missing under it; `x()` alone is forty uses
+   across the corpus. What is left needs a *scheduler*, and the note in HANDOFF.md on
+   `donut-chart-labelled` argues that the commonest use of a timer is a bounded loop that can be run
+   to convergence at compile time instead — which is now the same machinery the signal cascade uses.
 
    A fourth came off this list: a handler sourced on **another signal** now fires and cascades. It
    was the largest of the four by a distance — 79 handlers across twenty of Vega's 93 examples use

@@ -12,6 +12,7 @@ import dev.aster.vega.model.spec.EventConfig
 import dev.aster.vega.model.spec.EventPermit
 import dev.aster.vega.model.spec.EventStream
 import dev.aster.vega.model.spec.SignalHandler
+import dev.aster.vega.scene.SceneNodeId
 
 /**
  * An input event, in terms the engine can reason about.
@@ -28,6 +29,13 @@ public data class InputEvent(
   val type: String,
   val timestampMillis: Long,
   val source: String = EventStream.SOURCE_VIEW,
+  /**
+   * The scene node the event landed on, when it landed on one.
+   *
+   * What `encode(item(), 'select')` needs: a handler's `encode` overlays a block on **one** item,
+   * and the id is how that item is found again after the scene has been rebuilt.
+   */
+  val itemId: SceneNodeId? = null,
   /** The mark instance under the pointer, if the event landed on one. */
   val markType: String? = null,
   val markName: String? = null,
@@ -35,6 +43,18 @@ public data class InputEvent(
   val datum: VegaValue = VegaValue.Null,
   val x: Double = 0.0,
   val y: Double = 0.0,
+  /**
+   * The same position in the **root frame's** own coordinates, which is what `x()`, `y()` and
+   * `xy()` answer.
+   *
+   * Distinct from [x] and [y] on purpose: those are the raw pointer position as the platform
+   * reported it, which is what upstream's `event.x` carries, while this has the chart's padding and
+   * autosize origin taken off — upstream's `offset(view)` — so it is in the space the marks are
+   * placed in. A brush written `[x(), x()]` reads this one, and reading the other would put it out
+   * by the padding.
+   */
+  val rootX: Double = 0.0,
+  val rootY: Double = 0.0,
   val properties: Map<String, VegaValue> = emptyMap(),
 ) {
   /** The `event` object a filter expression sees. */

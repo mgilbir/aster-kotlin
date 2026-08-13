@@ -1619,6 +1619,16 @@ public data class EncodeSpec(
   val update: EncodeEntry = emptyMap(),
   val exit: EncodeEntry = emptyMap(),
   val hover: EncodeEntry = emptyMap(),
+  /**
+   * Blocks under any other name, which a handler applies by asking for them.
+   *
+   * `enter`, `update`, `exit` and `hover` are the four the dataflow runs by itself; a block called
+   * anything else — `select`, `release`, `leave` — is run only when something says `encode(item(),
+   * 'select')`, which is what `{"events": "...", "encode": "select"}` desugars to. There is no
+   * fixed list of names upstream, so these were being reported as unknown sets and dropped: a chart
+   * whose press styling lives in a `select` block lost it at parse time.
+   */
+  val named: Map<String, EncodeEntry> = emptyMap(),
 ) {
   /**
    * The channels in effect for a static render: `enter` overridden by `update`.

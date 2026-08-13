@@ -207,6 +207,26 @@ public interface ExpressionScope {
   public fun encodeItem(item: VegaValue, set: String) {}
 
   /**
+   * `item()` — the scene item the event being handled landed on.
+   *
+   * One of upstream's five *event* functions, which read the event rather than the data: they are
+   * generated as `event.vega.<name>` and so answer only while an event is being handled. Empty when
+   * none is, which is upstream's `item || {}` and is why `encode(item(), 'select')` is a no-op
+   * outside a handler rather than an error.
+   */
+  public fun activeItem(): VegaValue = VegaValue.EmptyObject
+
+  /**
+   * `xy()` — the event's position in the **root frame's** own coordinates, as a two-element array.
+   *
+   * Not the same as `event.x`: that is the raw pointer position as the platform reported it, where
+   * this has the chart's padding and autosize origin taken off, so it is in the space marks are
+   * placed in. `x()` and `y()` are its two components. [VegaValue.Null] when no event is being
+   * handled.
+   */
+  public fun eventPoint(): VegaValue = VegaValue.Null
+
+  /**
    * `inScope(item)` — whether the item is inside the group this expression belongs to.
    *
    * False with no enclosing group, which is what upstream answers when its `context.group` is unset

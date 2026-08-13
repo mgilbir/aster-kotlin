@@ -57,6 +57,23 @@ class ControllerInteractionTest {
     """
       .trimIndent()
 
+  /** Every rect's fill as a hex string, in scene order. */
+  private fun rectFills(): List<String> {
+    val out = mutableListOf<String>()
+    fun walk(node: SceneNode) {
+      when (node) {
+        is RectNode ->
+          out +=
+            ((node.fill?.paint as? dev.aster.vega.scene.ScenePaint.Solid)?.color?.toCssHex()
+              ?: "none")
+        is GroupNode -> node.children.forEach { walk(it) }
+        else -> Unit
+      }
+    }
+    walk(controller.state.value.snapshot.scene.root)
+    return out
+  }
+
   private fun fills(): List<String> {
     val out = mutableListOf<String>()
     fun walk(node: SceneNode) {
@@ -226,6 +243,147 @@ class ControllerInteractionTest {
     controller.dispatch(ChartInputEvent.Tap(onSecondBar))
     val reported = controller.state.value.diagnostics.map { it.message }
     assertTrue(reported.any { it.contains("are on a cycle") }, reported.toString())
+  }
+
+  /**
+   * The event functions — `x()`, `y()`, `xy()` and `item()` — which every brush and pan is built
+   * on.
+   *
+   * `x()` is the commonest expression in an interactive specification after `datum`: forty of the
+   * uses across Vega's own examples. It is **not** `event.x`: upstream takes the chart's padding
+   * and autosize origin off first (`offset(view)`, which is exactly what the root group carries as
+   * its translation), so the answer is in the space the marks are placed in. With a padding of ten,
+   * a tap at 30 has to read 20 — reading the raw pointer position instead would put every brush out
+   * by the padding, and a chart with no padding would have hidden it.
+   */
+  @Test
+  fun `the event functions read the point in the root frame's space`() {
+    controller.setSpec(
+      """
+      {
+        "width": 100, "height": 50, "padding": 10, "autosize": "none",
+        "signals": [
+          {"name": "px", "value": -1, "on": [{"events": "click", "update": "x()"}]},
+          {"name": "py", "value": -1, "on": [{"events": "click", "update": "y()"}]},
+          {"name": "pxy", "value": null, "on": [{"events": "click", "update": "xy()"}]},
+          {"name": "kind", "value": "none",
+           "on": [{"events": "*:click", "update": "item().mark.marktype"}]}
+        ],
+        "data": [{"name": "t", "values": [{"c": "a"}]}],
+        "marks": [{
+          "type": "rect", "from": {"data": "t"},
+          "encode": {"enter": {
+            "x": {"value": 0}, "width": {"value": 100},
+            "y": {"value": 0}, "height": {"value": 50}, "fill": {"value": "#4c78a8"}}}
+        }]
+      }
+      """
+        .trimIndent()
+    )
+    controller.dispatch(ChartInputEvent.Tap(PointD(30.0, 25.0)))
+
+    val signals = controller.lastCompiled!!.signals
+    assertEquals(VegaValue.Num(20.0), signals["px"])
+    assertEquals(VegaValue.Num(15.0), signals["py"])
+    assertEquals(
+      VegaValue.Arr(listOf(VegaValue.Num(20.0), VegaValue.Num(15.0))),
+      signals["pxy"],
+    )
+    // The tap landed on the rect, so `item()` is that item rather than upstream's empty object.
+    assertEquals(VegaValue.Str("rect"), signals["kind"])
+  }
+
+  /**
+   * `x(item)` and `group()` need the chain of groups above the event's item, which this event does
+   * not carry. Refused with a message that says so rather than answered from the wrong space.
+   */
+  @Test
+  fun `the argument forms of the event functions are refused`() {
+    controller.setSpec(
+      json.replace(
+        """{"name": "taps", "value": 0,""",
+        """{"name": "measured", "value": -1,
+          "on": [{"events": "click", "update": "x(item())"}]},
+         {"name": "taps", "value": 0,""",
+      )
+    )
+    controller.dispatch(ChartInputEvent.Tap(onSecondBar))
+    val reported = controller.state.value.diagnostics.map { it.message }
+    assertTrue(reported.any { it.contains("only the argument-less form") }, reported.toString())
+  }
+
+  /**
+   * `{"encode": "select"}` — a handler whose whole effect is on the event's own item.
+   *
+   * Upstream rewrites it into `encode(item(), 'select')` and pulses that into the dataflow, so a
+   * named block is overlaid on one item and nothing else moves. Two halves were probed rather than
+   * assumed. The pass that applies it puts the block **after** the mark's `update`, so a `select`
+   * setting `fill` red beats an `update` setting it green; every pass after that re-runs `update`,
+   * which takes back the channels it sets and leaves the rest — a second signal change returned the
+   * item to green upstream, and returns it to green here.
+   *
+   * Also the case where nothing else says to redraw: the update expression returns the item it was
+   * handed, so no signal value changes, and testing only the signals meant a press styled nothing.
+   */
+  @Test
+  fun `an encode handler overlays a named block on the event's own item`() {
+    val spec =
+      """
+      {
+        "width": 90, "height": 30, "padding": 0,
+        "signals": [
+          {"name": "nudge", "value": 0,
+           "on": [{"events": "click", "update": "nudge + 1"}]},
+          {"name": "picked", "value": 0, "on": [
+            {"events": "rect:mousedown", "encode": "select"},
+            {"events": "rect:mouseup", "encode": "release"}
+          ]}
+        ],
+        "data": [{"name": "t", "values": [{"i": 0}, {"i": 1}, {"i": 2}]}],
+        "marks": [{
+          "type": "rect", "from": {"data": "t"},
+          "encode": {
+            "enter": {"y": {"value": 0}, "width": {"value": 30}, "height": {"value": 30},
+                      "stroke": {"value": "#000000"}},
+            "update": {"x": {"signal": "datum.i * 30 + nudge"}, "fill": {"value": "#00ff00"}},
+            "select": {"fill": {"value": "#ff0000"}, "strokeWidth": {"value": 3}},
+            "release": {"fill": {"value": "#0000ff"}}
+          }
+        }]
+      }
+      """
+        .trimIndent()
+    controller.setSpec(spec)
+    assertEquals(listOf("#00ff00", "#00ff00", "#00ff00"), rectFills())
+
+    // A press on the middle rect: only that one takes the `select` block, and the block wins over
+    // `update`, which sets the same channel.
+    controller.dispatch(
+      ChartInputEvent.PointerDown(
+        PointD(45.0, 15.0),
+        pointerId = 1,
+        device = PointerDevice.MOUSE,
+        buttons = 1,
+      )
+    )
+    assertEquals(listOf("#00ff00", "#ff0000", "#00ff00"), rectFills())
+
+    // A **signal change** re-runs `update`, which owns `fill` and takes it back — upstream's
+    // behaviour, probed both ways. A click that changed nothing would leave the overlay alone there
+    // too, because upstream reverts on the encoder running again and not on the clock.
+    controller.dispatch(ChartInputEvent.Tap(PointD(1.0, 1.0)))
+    assertEquals(listOf("#00ff00", "#00ff00", "#00ff00"), rectFills())
+
+    // And the opposite block replaces the overlay rather than adding to it.
+    controller.dispatch(
+      ChartInputEvent.PointerUp(
+        PointD(45.0, 15.0),
+        pointerId = 1,
+        device = PointerDevice.MOUSE,
+        buttons = 0,
+      )
+    )
+    assertEquals(listOf("#00ff00", "#0000ff", "#00ff00"), rectFills())
   }
 
   /** Loading a new specification forgets what the old one's handlers had set. */

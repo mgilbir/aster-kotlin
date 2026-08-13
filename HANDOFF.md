@@ -429,6 +429,28 @@ reproduce meaningless output, pixel for pixel. Numeric ranges make the same four
 comparison mean something. If a fixture's expected output looks like garbage, the fixture is wrong
 before the engine is.
 
+## The event functions were missing under everything else
+
+`x()` is the second commonest expression in an interactive specification after `datum` — forty uses
+across Vega's 93 examples, in every brush and every pan — and it, `y()`, `xy()` and `item()` were not
+implemented at all. Worth knowing why that stayed invisible: they only ever appear inside `on`
+handlers, so no fixture can reach them, and the handler that used one failed at evaluation time into a
+collector nobody read. Two of those collectors are now drained into the published diagnostics.
+
+`x()` is **not** `event.x`. Upstream takes `offset(view)` — padding plus the autosize origin — off the
+canvas point first, which is exactly what the root group carries as its translation, so the answer is
+in the space the marks are placed in. A chart with no padding hides the difference completely, so test
+with padding. The argument forms (`x(item)`, `group()`) walk the chain of groups above an item and are
+refused by name: the event value here does not carry that chain.
+
+With `item()` in place, `encode` handlers fell out. Upstream desugars `{"encode": "select"}` into
+`encode(item(), 'select')`, and doing the same in the parser means one path serves both spellings. The
+ordering rule was probed in both directions and is worth not re-deriving: the overlay beats the mark's
+`update` on the pass that applies it and loses to it on every pass after. That is reproduced by
+putting the block after `update` while it is fresh and before it once it is not — `ItemEncode.fresh`,
+aged by the controller once the compile has happened. And the handler changes no signal value at all,
+so the redraw has to be triggered by the overlay itself.
+
 ## What is left, and the one technique that finds it
 
 The remaining inventory is **legend, title and layout properties**, plus a short tail. Every encode

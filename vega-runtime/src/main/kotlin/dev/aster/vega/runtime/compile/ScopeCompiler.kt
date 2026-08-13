@@ -113,6 +113,16 @@ internal class ScopeCompiler(
    */
   private val random: RandomStream = RandomStream(),
   private val clock: Clock = Clock.Fixed,
+  /**
+   * Which items a handler has re-encoded through one of their mark's named blocks, and how
+   * recently.
+   *
+   * `{"events": "*:mousedown", "encode": "select"}` desugars to `encode(item(), 'select')`, whose
+   * whole effect is to overlay that block on that one item. This scene is rebuilt from the
+   * specification on every change, so the overlay has to be handed back in to survive — see
+   * [ItemEncode] for why *when* it was applied matters.
+   */
+  private val itemEncodes: Map<dev.aster.vega.scene.SceneNodeId, ItemEncode> = emptyMap(),
 ) {
 
   /**
@@ -145,6 +155,23 @@ internal class ScopeCompiler(
   /** A mark as it looks under the pointer: its `hover` block layered over `update`. */
   private fun hoverSpec(mark: MarkSpec): MarkSpec =
     mark.copy(encode = mark.encode.copy(update = mark.encode.update + mark.encode.hover))
+
+  /**
+   * A mark with one of its named blocks overlaid, as a handler's `encode` leaves it.
+   *
+   * The ordering is the part that was probed rather than assumed, and it is not a fixed one. On the
+   * pass that *applies* the block it wins over `update`: upstream pulses the encode into the same
+   * dataflow run, and a `select` block setting `fill` red beats an `update` setting it green. On
+   * every pass after that, `update` runs again and takes back the channels it sets — the same probe
+   * with a second signal change returned the item to green — while the channels `update` says
+   * nothing about keep the overlay. So the block goes *after* `update` while it is fresh and
+   * *before* it once it is not, which reproduces both halves without keeping any per-channel state.
+   */
+  private fun overlaySpec(mark: MarkSpec, set: String, fresh: Boolean): MarkSpec {
+    val block = mark.encode.named[set] ?: return mark
+    val update = if (fresh) mark.encode.update + block else block + mark.encode.update
+    return mark.copy(encode = mark.encode.copy(update = update))
+  }
 
   fun compile(
     marks: List<MarkSpec>,
@@ -272,6 +299,31 @@ internal class ScopeCompiler(
             )
           }
         }
+        // A handler's `encode` overlays one of the mark's named blocks on one item. Applied after
+        // the
+        // hover pass and keyed by **id** rather than by position, because the resting list has been
+        // sorted by `zindex` and the freshly encoded one has not.
+        val overlaid = built[index].orEmpty().mapNotNull { itemEncodes[it.id] }.toSet()
+        for (state in overlaid) {
+          if (state.set !in mark.encode.named) continue
+          // The allocator is rewound to where the resting pass started so the variant comes back
+          // carrying the **same ids**, which is what lets the two be matched item for item — the
+          // hit
+          // index and the selection key are on those ids, and an item that changed its id under the
+          // pointer would leave the pointer over nothing. The same rewind the hover pass does, and
+          // for the same reason.
+          val resume = ids.mark()
+          ids.rewind(before)
+          val variant =
+            encoder.encode(overlaySpec(mark, state.set, state.fresh), rows, transformed.written)
+          ids.rewind(resume)
+          val byId = variant.associateBy { it.id }
+          built[index] =
+            built[index].orEmpty().map { node ->
+              if (itemEncodes[node.id] == state) byId[node.id] ?: node else node
+            }
+        }
+
         // The items a mark's own transforms produced, not the ones its encoding alone would: a
         // label drawn from a force-directed mark reads the position the simulation settled on.
         exposeItems(transformed.items ?: encoder.items(mark, rows))

@@ -217,7 +217,17 @@ public class VegaChartController(
 
   private val expressions = CachingExpressionCompiler(VegaExpressionCompiler())
 
-  private val signals = SignalUpdater(expressions, DiagnosticCollector())
+  /**
+   * What a handler's own evaluation reported — an expression that could not be read, a function
+   * whose argument form this engine refuses.
+   *
+   * Collected separately from the compiler's and published beside them: a handler that failed at
+   * the moment it fired is exactly what a host needs told, and it went into a collector nobody
+   * read.
+   */
+  private val handlerDiagnostics = DiagnosticCollector()
+
+  private val signals = SignalUpdater(expressions, handlerDiagnostics)
 
   /** Rebuilt on every publish, because the handlers and the scales both come from the compile. */
   private var vegaEvents: EventDispatcher? = null
@@ -350,7 +360,12 @@ public class VegaChartController(
         else -> return
       }
     val point = pointOf(event)
-    val hit = point?.let { hitIndex.hitTest(toSceneSpace(it)) }?.node
+    val scenePoint = point?.let { toSceneSpace(it) }
+    val hit = scenePoint?.let { hitIndex.hitTest(it) }?.node
+    // What `x()`, `y()` and `xy()` answer: the point with the chart's padding and autosize origin
+    // taken off, which the root group carries as its own translation — upstream's `offset(view)`.
+    val origin = _state.value.snapshot.scene.root.transform
+    val rootPoint = scenePoint?.let { PointD(it.x - origin.e, it.y - origin.f) } ?: PointD(0.0, 0.0)
     val changed = LinkedHashSet<String>()
     for (type in types) {
       val fired =
@@ -358,27 +373,47 @@ public class VegaChartController(
           VegaEvent(
             type = type,
             timestampMillis = clock(),
+            itemId = hit?.id,
             markType = hit?.metadata?.markKind,
             markName = hit?.metadata?.markName,
             datum = hit?.metadata?.datum ?: VegaValue.Null,
             x = point?.x ?: 0.0,
             y = point?.y ?: 0.0,
+            rootX = rootPoint.x,
+            rootY = rootPoint.y,
           )
         )
       if (fired.isNotEmpty()) changed += signals.apply(fired, compiled.signals)
     }
-    if (changed.isEmpty()) return
-    val cascaded = cascade(changed, compiled)
+    // A handler whose whole effect is `encode(item(), 'select')` changes no signal value: its
+    // update
+    // expression returns the item it was handed, which is the same object as before. So a fresh
+    // overlay is a reason to redraw in its own right, and testing only the signals meant a press
+    // styled nothing.
+    val overlaid = signals.itemEncodes.values.any { it.fresh }
+    if (changed.isEmpty() && !overlaid) return
+    val cascaded = cascade(changed, compiled) + drainHandlerDiagnostics()
 
     // Recompile rather than patch. Measured at well under a frame for the heaviest fixture, which
     // is what makes this simple enough to be obviously correct (STATUS.md, Performance
     // observations).
     val json = loadedSpecJson ?: return
-    publish(compiler.compileJson(json, signals.overrides))
-    // After publishing, which replaces the diagnostics with the new compile's: a cycle among the
-    // signal-driven handlers is a fact about this interaction rather than about the specification's
-    // text, and it would otherwise be wiped by the very recompile it caused.
+    publish(compiler.compileJson(json, signals.overrides, signals.itemEncodes))
+    // The overlays that were fresh have now been applied once; from here on the mark's own `update`
+    // takes back the channels it sets, which is what ageing them expresses.
+    signals.ageItemEncodes()
+    // After publishing, which replaces the diagnostics with the new compile's: what a handler
+    // reported as it fired — a cycle among the signal-driven ones, an expression that could not be
+    // read — is a fact about this interaction rather than about the specification's text, and it
+    // would otherwise be wiped by the very recompile it caused.
     for (diagnostic in cascaded) report(diagnostic)
+  }
+
+  /** Takes what the handlers reported and clears it, so the same message is not published twice. */
+  private fun drainHandlerDiagnostics(): List<VegaDiagnostic> {
+    val drained = handlerDiagnostics.diagnostics.toList()
+    if (drained.isNotEmpty()) handlerDiagnostics.clear()
+    return drained
   }
 
   /**
