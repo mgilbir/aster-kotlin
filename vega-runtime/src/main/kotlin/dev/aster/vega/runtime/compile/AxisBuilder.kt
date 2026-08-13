@@ -311,6 +311,8 @@ public class AxisBuilder(
                 ?: (if (spec.orient.isVertical) flushed?.let(::flushBaseline) else null)
                 ?: labelBaseline(spec.orient),
             limit = labelLimit,
+            ellipsis = labelString(spec, "ellipsis", tick) ?: "\u2026",
+            lineBreak = labelString(spec, "lineBreak", tick)?.takeIf { it.isNotEmpty() },
           )
         val layout = textEngine.layout(run)
         // A label sits where *it* was placed, which on a band axis is the band's centre whatever
@@ -434,7 +436,15 @@ public class AxisBuilder(
     // with the choice, and there is no constant to write down.
     // `resolveLines`, not `resolveText`: an axis title given as an array is two lines, exactly as a
     // legend's is, and stringifying it would join them with a comma on one line.
-    val titleText = spec.title ?: spec.titleExpression?.let { numbers.resolveLines(it, spec.scale) }
+    // The title's own `encode` block may replace the words, and what a screen reader hears is what
+    // the
+    // axis actually says: upstream's caption is built from the item's text, so a title written in
+    // an
+    // encode block is read out and the one it replaced is not.
+    val titleText =
+      titleString(spec, "text")
+        ?: spec.title
+        ?: spec.titleExpression?.let { numbers.resolveLines(it, spec.scale) }
     val titleNode = titleText?.let { title(spec, it, scale, tickAndLabelReach) }
     titleNode?.let { children += it }
 
@@ -542,9 +552,6 @@ public class AxisBuilder(
     val anchor = spec.titleAnchor ?: Anchor.MIDDLE
 
     val depth = depth(spec, reach)
-    val away =
-      if (spec.orient == Orient.TOP || spec.orient == Orient.LEFT) -(depth + padding)
-      else depth + padding
 
     // Along the axis, the title sits wherever the anchor says on the *scale's range*, not on the
     // plotting area — the two differ inside a group.
@@ -564,7 +571,13 @@ public class AxisBuilder(
     // flat along the bottom rather than turned up the side of its own axis.
     val run =
       TextRun(
-        text = text,
+        // A title's own `encode` block may replace the words, break them or truncate them, and none
+        // of the three has a property behind it: `titleLimit` says *how wide*, and `ellipsis` says
+        // what
+        // the truncation looks like. The datum is empty — an axis title labels the axis, not a tick
+        // —
+        // which is upstream's `Collect(null, [{}])` for the same mark.
+        text = titleString(spec, "text") ?: text,
         style = GuideStyle.text(spec.titleStyle, fontSize, AxisDefaults.TITLE_FONT_WEIGHT),
         align =
           alignOf(spec.titleAlign)
@@ -577,12 +590,36 @@ public class AxisBuilder(
           baselineOf(spec.titleBaseline)
             ?: if (spec.orient == Orient.BOTTOM) TextBaseline.TOP else TextBaseline.BOTTOM,
         limit = numbers.resolve(spec.titleLimit, spec.scale) ?: 0.0,
+        ellipsis = titleString(spec, "ellipsis") ?: "\u2026",
+        lineBreak = titleString(spec, "lineBreak")?.takeIf { it.isNotEmpty() },
       )
+    val layout = textEngine.layout(run)
+    // A **multi-line** title sits further out by the height of its extra lines: upstream's
+    // `axisTitleLayout` places it at `sign * (offset + dl + pad)` where `dl` is `multiLineOffset`.
+    // Without it a two-line title crept back towards the axis and overlapped the labels, because
+    // the
+    // block grows away from an anchor baselined at its bottom.
+    val extraLines = (layout.lines.size - 1) * layout.metrics.lineHeight
+    val away =
+      if (spec.orient == Orient.TOP || spec.orient == Orient.LEFT) {
+        -(depth + extraLines + padding)
+      } else {
+        depth + extraLines + padding
+      }
+    // `dx` and `dy` nudge the title without changing what it is anchored to, exactly as they do on
+    // a
+    // label, so they are added to whatever placed it.
+    val nudgeX = titleNumber(spec, "dx") ?: 0.0
+    val nudgeY = titleNumber(spec, "dy") ?: 0.0
     return TextNode(
       id = ids.allocate(),
-      x = numbers.resolve(spec.titleX, spec.scale) ?: if (spec.orient.isVertical) away else along,
-      y = numbers.resolve(spec.titleY, spec.scale) ?: if (spec.orient.isVertical) along else away,
-      layout = textEngine.layout(run),
+      x =
+        (numbers.resolve(spec.titleX, spec.scale) ?: if (spec.orient.isVertical) away else along) +
+          nudgeX,
+      y =
+        (numbers.resolve(spec.titleY, spec.scale) ?: if (spec.orient.isVertical) along else away) +
+          nudgeY,
+      layout = layout,
       angleDegrees =
         numbers.resolve(spec.titleAngle, spec.scale)
           ?: when (spec.orient) {
@@ -792,9 +829,33 @@ public class AxisBuilder(
    * channel, which leaves the label where the orientation put it.
    */
   /** A label's `encode` text, when the specification replaces it rather than formatting it. */
-  private fun labelText(spec: AxisSpec, tick: Tick): String? {
+  private fun labelText(spec: AxisSpec, tick: Tick): String? = labelString(spec, "text", tick)
+
+  /**
+   * A text channel of a label's own `encode`, resolved against the tick.
+   *
+   * `text` is the one a specification usually writes, but `ellipsis` and `lineBreak` are read the
+   * same way and change what the reader sees: the first is the mark a truncated label ends with and
+   * the second is the character a long label is broken on, so a path can be shown as a stack.
+   * Neither has a guide *property* upstream, which is why they are resolved here rather than
+   * folded.
+   */
+  /** A text channel of the axis **title**'s own `encode`, whose datum is empty. */
+  private fun titleString(spec: AxisSpec, channel: String): String? {
     val encoder = channels ?: return null
-    val entry = spec.encode["labels"]?.update?.get("text") ?: return null
+    val entry = spec.encode["title"]?.update?.get(channel) ?: return null
+    return encoder.channelText(entry, VegaValue.EmptyObject)?.takeIf { it.isNotEmpty() }
+  }
+
+  private fun titleNumber(spec: AxisSpec, channel: String): Double? {
+    val encoder = channels ?: return null
+    val entry = spec.encode["title"]?.update?.get(channel) ?: return null
+    return encoder.channelNumber(entry, VegaValue.EmptyObject)?.takeIf { it.isFinite() }
+  }
+
+  private fun labelString(spec: AxisSpec, channel: String, tick: Tick): String? {
+    val encoder = channels ?: return null
+    val entry = spec.encode["labels"]?.update?.get(channel) ?: return null
     val datum =
       VegaValue.Obj(linkedMapOf("value" to tick.value, "label" to VegaValue.Str(tick.label)))
     return encoder.channelText(entry, datum)

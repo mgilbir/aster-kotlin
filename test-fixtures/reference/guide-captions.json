@@ -940,6 +940,16 @@
   "caption": "Symbol legend titled 'swatches' for fill color with 2 values: a, b"
  },
  {
+  "fixture": "guide-encode-text",
+  "kind": "axis",
+  "caption": "X-axis titled 'from the encode block' for a discrete scale with 3 values: one/two/three, alpha/beta, a-very-long-category-name"
+ },
+ {
+  "fixture": "guide-encode-text",
+  "kind": "axis",
+  "caption": "Y-axis titled 'stacked/title' for a linear scale with values from 0 to 7"
+ },
+ {
   "fixture": "guide-style-signals",
   "kind": "axis",
   "caption": "X-axis titled 'series' for a discrete scale with 3 values: alpha, beta, gamma"

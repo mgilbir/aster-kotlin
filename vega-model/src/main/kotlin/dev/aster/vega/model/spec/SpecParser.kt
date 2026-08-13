@@ -175,6 +175,83 @@ private fun guideStyleKeys(vararg prefixes: String): Set<String> =
 private val AXIS_UNSUPPORTED = emptyMap<String, String>()
 
 /**
+ * What each part of a guide **is**, and which channels the thing it is can draw.
+ *
+ * A tick is a rule and a label is a text mark, so `encode.ticks.update.text` is not a gap — it is a
+ * channel a rule has no use for. Upstream agrees in the only way that matters: it writes the value
+ * onto the item and its renderer never looks at it, so a tick given a `text` draws no text there
+ * either. Reporting those as "not implemented" claimed a deficiency that does not exist and buried
+ * the channels that *are* missing among a hundred that are not.
+ *
+ * The sets are what this engine's own node types can express, which is the same question asked from
+ * the other side.
+ */
+private val GUIDE_PART_SHAPES: Map<String, Pair<String, Set<String>>> = run {
+  val common =
+    setOf(
+      "opacity",
+      "blend",
+      "tooltip",
+      "cursor",
+      "href",
+      "aria",
+      "description",
+      "zindex",
+      "x",
+      "y",
+    )
+  val stroked =
+    common +
+      setOf(
+        "stroke",
+        "strokeWidth",
+        "strokeDash",
+        "strokeDashOffset",
+        "strokeCap",
+        "strokeOpacity",
+      )
+  val text =
+    common +
+      setOf(
+        "text",
+        "fill",
+        "fillOpacity",
+        "font",
+        "fontSize",
+        "fontStyle",
+        "fontWeight",
+        "lineHeight",
+        "align",
+        "baseline",
+        "angle",
+        "limit",
+        "ellipsis",
+        "lineBreak",
+        "dir",
+        "dx",
+        "dy",
+        "radius",
+        "theta",
+      )
+  val rule = stroked + setOf("x2", "y2")
+  val symbol =
+    stroked +
+      setOf("size", "shape", "angle", "fill", "fillOpacity", "strokeJoin", "strokeMiterLimit")
+  val rect = stroked + setOf("width", "height", "x2", "y2", "fill", "fillOpacity", "cornerRadius")
+  val group = rect + setOf("clip", "strokeOffset", "strokeForeground")
+  mapOf(
+    "labels" to ("text mark" to text),
+    "title" to ("text mark" to text),
+    "ticks" to ("rule" to rule),
+    "grid" to ("rule" to rule),
+    "domain" to ("rule" to rule),
+    "symbols" to ("symbol" to symbol),
+    "gradient" to ("rect" to rect),
+    "legend" to ("group" to group),
+  )
+}
+
+/**
  * `config` entries that are chart-level **values** rather than blocks of properties.
  *
  * Each is read where the top-level property of the same name is read — `root.fields[key] ?:
@@ -500,6 +577,21 @@ private val RESOLVED_GUIDE_CHANNELS =
     // A legend label's text, which is how an id becomes a name — read through a scale, so there is
     // nothing constant to fold.
     "labels.update.text",
+    // How a label ends when it is truncated, and what it breaks on when it is long. Neither has a
+    // guide property upstream, and both change what the reader sees: `"lineBreak": "/"` shows a
+    // path
+    // as a stack.
+    "labels.update.ellipsis",
+    "labels.update.lineBreak",
+    "labels.enter.ellipsis",
+    "labels.enter.lineBreak",
+    // The same three on a guide's **title**, plus its own nudge. A title's `text` is the one a
+    // trellis writes: the words come from the cell rather than from the axis.
+    "title.update.text",
+    "title.update.ellipsis",
+    "title.update.lineBreak",
+    "title.update.dx",
+    "title.update.dy",
     // A legend swatch's fill opacity. Upstream has `symbolOpacity`, which fades the outline with
     // the swatch; this fades only what is inside it, and there is no property for that.
     "symbols.enter.fillOpacity",
@@ -2013,6 +2105,19 @@ public class SpecParser {
                 "$subject encode sets '$channel' on '$part' in 'enter', which changes nothing: " +
                   "the guide writes that channel in 'update' on every pass and overwrites it. " +
                   "Move it to 'update'",
+                jsonPath = "$path.encode.$part.$pass.$channel",
+              )
+            // A channel the part's own mark type cannot draw is **not a gap**: upstream writes it
+            // onto
+            // the item and its renderer ignores it, so a tick given a `text` draws no text either
+            // way.
+            // Saying so is the difference between a report a reader can act on and a hundred they
+            // cannot.
+            property == null && GUIDE_PART_SHAPES[part]?.let { channel !in it.second } == true ->
+              diagnostics.info(
+                DiagnosticCodes.PARSE_UNKNOWN_PROPERTY,
+                "$subject '$part' is a ${GUIDE_PART_SHAPES.getValue(part).first}, which has no " +
+                  "'$channel' — upstream sets it on the item and draws nothing with it either",
                 jsonPath = "$path.encode.$part.$pass.$channel",
               )
             property == null ->
