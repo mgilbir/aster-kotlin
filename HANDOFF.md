@@ -329,6 +329,31 @@ reference carrying a `strokeWidth` with no `stroke` colour describes an outline 
 painted, and this engine records no stroke at all for it. A reference carrying a stroke colour still
 demands a stroke of that width.
 
+## The chart can be handed a clock now
+
+`Scheduler` is one method — run this later, once or repeating — passed to `VegaChartController` and
+defaulting to null. With one, a `debounce` is upstream's trailing edge exactly and a timer stream ticks
+at its interval with `timestamp` and `elapsed` on its event. Without one, nothing changed: the debounce
+fires eagerly, the timer does not fire, and both say so. **Keep that default.** It is what makes a
+chart a pure function of its specification, and so comparable against upstream at all; every fixture in
+the corpus depends on it without knowing.
+
+Three things worth not rediscovering:
+
+- **A tick recompiles, and a recompile must not restart the timers.** Doing so cancels the running ones
+  mid-flight, resets every `elapsed`, and drops the ticks in between. They are keyed by
+  (signal, interval) and left alone unless the specification's own timers change.
+- **Test against virtual time.** `SchedulerInteractionTest` has a fake scheduler whose clock the test
+  advances by hand, and the controller's own `clock` is moved with it. That is exact, where sleeping
+  would be slow and flaky at once — and it caught the restart bug on the first run.
+- **The scope is the whole lifecycle question.** The demo passes `CoroutineScheduler(rememberCoroutineScope())`,
+  so every pending tick is cancelled when the composition goes away and nothing has to remember to.
+  `controller.stop()` is there for a host without that luxury.
+
+What this does *not* do is make an animation verifiable. The harness compares the scene upstream
+reaches after `runAsync`, and for a specification with a timer `runAsync` never returns — so a ticking
+chart has no reference to compare against, whatever this engine does with it.
+
 ## Possible future work: a timer used as a `for` loop
 
 `donut-chart-labelled` passes the differential and still looks wrong in the demo: its three most
