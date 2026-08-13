@@ -186,12 +186,13 @@ internal object Guides {
     // and it settles the question outright. A ranged position joins its two fields' names only
     // where nothing has said what the axis is measuring, so an axis captioned `Temperature (F)`
     // stays that and does not gain `, record.high, normal.high` from the layers under it.
+    // `axis.title` first, then the field's own, then the pair a ranged position names — and the
+    // first of those that answers is the whole answer. A layer whose *guide* names the axis has
+    // said what the axis measures, so the fields' own titles add nothing after it.
+    val guideTitle = def.axis?.fields?.get("title") ?: def.legend?.fields?.get("title")
     val stated =
-      listOfNotNull(
-        def.axis?.fields?.get("title") ?: def.legend?.fields?.get("title"),
-        def.explicitTitle,
-        secondary?.explicitTitle,
-      )
+      if (guideTitle != null) listOf(guideTitle)
+      else listOfNotNull(def.explicitTitle, secondary?.explicitTitle)
     if (stated.isNotEmpty()) {
       axis.explicitTitle = true
       stated.mapNotNull { (it as? VegaValue.Str)?.value }.forEach { axis.titles += it }

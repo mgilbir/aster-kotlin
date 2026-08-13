@@ -119,6 +119,16 @@ internal class DataPipeline(
         parse.getOrPut(field) { "number" }
       }
     }
+    // The specification's own `data.format.parse`, which is the **explicit** half of the same node,
+    // and an explicit parse wins over one this compiler inferred — `Split(explicit, implicit)`.
+    // On a table written out in the specification Vega has already ingested the rows, so this is
+    // a formula like any other rather than an instruction to the loader.
+    view.spec.data
+      ?.takeIf { it.string("url") == null }
+      ?.obj("format")
+      ?.obj("parse")
+      ?.fields
+      ?.forEach { (field, kind) -> (kind as? VegaValue.Str)?.let { parse[field] = it.value } }
     // A column a transform computed is *derived*: it has the type its transform gave it, and the
     // loader has never seen it.
     parse.keys.removeAll(

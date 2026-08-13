@@ -638,7 +638,17 @@ internal class DataAssembler {
   }
 
   private fun sourceFormat(data: VegaValue): VegaValue.Obj? {
-    val declared = data.obj("format")
+    // A stated `parse` is not the *loader's* work on a table written out in the specification:
+    // Vega has already ingested those rows, so the parse joins the flow's own and becomes a
+    // formula there. Only what is left of the format block belongs on the source.
+    val declared =
+      data.obj("format")?.let { format ->
+        if (data.string("url") != null) format
+        else
+          VegaValue.Obj(format.fields.filterKeys { it != "parse" }).takeIf {
+            it.fields.isNotEmpty()
+          }
+      }
     val url = data.string("url") ?: return declared
     val type =
       declared.string("type")

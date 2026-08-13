@@ -1821,6 +1821,23 @@ specification's own block is copied over, not before. And an impute's grouping i
 `[...stackby, ...facetby]` **concatenated**, not merged: a field that is both a series and a facet
 is named twice, where the stack's *sort* names each field once.
 
+### A parse the specification stated, over rows no loader ever saw
+
+`{"values": [...], "format": {"parse": {...}}}` is not an instruction to the loader — Vega has
+already ingested those rows — so the stated parse joins the flow's own and becomes a *formula*
+there, and only what is left of the format block belongs on the source. An explicit parse also wins
+over one this compiler inferred, which is what `Split(explicit, implicit)` says: a `utc:'%d %b %Y'`
+the reader wrote is not to be replaced by the `toDate` a temporal encoding would have asked for.
+
+That change turned a silent near-miss into a named gap. Reading the stated parse means emitting
+`utcParse`, and `utcParse` is one of the functions this engine refuses by name for want of a
+`strptime`. The chart compiled correctly and had been *rendering* by accident, on a `toDate` that
+was never asked for.
+
+Beside it, the axis title order: `axis.title` first, then the field's own, then the pair a ranged
+position names — and the first of those that answers is the whole answer. A layer whose guide names
+the axis has said what the axis measures, so the fields' own titles add nothing after it.
+
 ### Two runtime gaps this batch names but does not close
 
 `density`'s fixture is not in the corpus, and `trail`'s draws no legend. Both compile exactly as
@@ -1844,6 +1861,9 @@ by *this runtime*:
   disagree about what `utcOffset('month', …)` steps from. Covered by the sweep, not by a fixture.
 - **A group's `encode` replaces its style's paint rather than overriding it property by
   property.** A plotting area given a `fill` loses the `#ddd` border its `cell` style was drawing.
+- **`timeParse`/`utcParse` are refused for want of a `strptime`.** A specification that states its
+  own date format now compiles to the `utcParse` upstream compiles it to, and this engine cannot
+  run it — where before it ran a `toDate` nobody asked for.
 - **`domainMid` does not split a colour scale.** A diverging scale compiles exactly as upstream
   compiles it and the runtime maps it as an ordinary ramp, so the two halves come out swapped.
 - **A facet's footer band reserves no height**, so a chart captioned below its cells comes out
