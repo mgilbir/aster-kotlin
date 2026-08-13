@@ -231,6 +231,33 @@ internal sealed class DataNode {
    * instead. The renames are collected here and applied to the whole specification once it is
    * assembled, which is what upstream's `signalNameMap` does at every reference.
    */
+  /**
+   * `RemoveDuplicateTimeUnits`: a bucket already cut **above** in the chain is not cut again.
+   *
+   * The merge folds *siblings*; this drops a unit whose output some ancestor already wrote, which
+   * is what a layer reading its parent's bucketed column produces. Cutting it twice is harmless to
+   * the numbers and wrong in the output — upstream emits one transform and so must this.
+   */
+  fun removeDuplicateTimeUnits(above: Set<String> = emptySet()) {
+    val here = mutableSetOf<String>()
+    if (this is TimeUnitNode) {
+      dropUnits(above)
+      here += units.map { it.output }
+    }
+    val seen = above + here
+    children.toList().forEach { it.removeDuplicateTimeUnits(seen) }
+    // A node left with nothing to write is no node at all, and its children move up to its parent.
+    // After the recursion, not before: it is the recursion that empties it.
+    children
+      .filterIsInstance<TimeUnitNode>()
+      .filter { it.units.isEmpty() }
+      .toList()
+      .forEach { empty ->
+        children.remove(empty)
+        children += empty.children
+      }
+  }
+
   fun mergeBins(renames: MutableMap<String, String>) {
     children.forEach { it.mergeBins(renames) }
     if (children.size <= 1) return
@@ -461,9 +488,18 @@ internal class TimeUnitNode(units: List<TimeUnitComponent>) : DataNode() {
   var units: List<TimeUnitComponent> = units
     private set
 
+  /** Drops the units an ancestor has already written, which is `removeFormulas` upstream. */
+  fun dropUnits(written: Set<String>) {
+    units = units.filterNot { it.output in written }
+  }
+
   /** `TimeUnitNode.merge`: the other's units are taken over, and its children hang below this. */
   fun merge(other: TimeUnitNode) {
-    units = units + other.units.filterNot { it in units }
+    // Compared by what they **write**, not by the whole component: two views may cut one column the
+    // same way and differ in the interpolated edges one of them also wants, and that is still one
+    // bucketing. Comparing the components whole emitted the same `timeunit` transform twice.
+    val written = units.map { it.output }.toSet()
+    units = units + other.units.filterNot { it.output in written }
     children += other.children
     other.children.clear()
   }

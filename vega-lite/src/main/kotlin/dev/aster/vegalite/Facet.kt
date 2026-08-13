@@ -11,6 +11,14 @@ import dev.aster.vega.model.VegaValue
  */
 private fun headerText(def: ChannelDef, field: String): String {
   val accessor = "parent[${quoted(field)}]"
+  // A **bucketed** column is captioned by the bucket rather than by its near edge: `binFormat`
+  // writes both ends with an en dash between them, and says `"null"` where the row had no value —
+  // an empty bucket is a real cell of the grid and has to be captioned as one.
+  if (def.bin is Binning.Bin) {
+    val end = "parent[${quoted("${field}_end")}]"
+    return "!isValid($accessor) || !isFinite(+$accessor) ? \"null\" : " +
+      "format($accessor, \"\") + \" – \" + format($end, \"\")"
+  }
   val timeUnit = def.timeUnit
   if (def.type == MeasureType.TEMPORAL || timeUnit != null) {
     val utc = timeUnit?.contains("utc") == true || def.scale.string("type") == "utc"
@@ -81,6 +89,15 @@ internal class Facet(val channel: String, val def: ChannelDef) {
   val isColumn: Boolean = channel == "column"
 
   val field: String = Fields.vgField(def)
+
+  /**
+   * The columns a cell is grouped by, which for a **bucketed** facet is two.
+   *
+   * A bucket is an interval and both ends identify it: grouping by the near edge alone would merge
+   * two buckets that happen to start together, and the caption reads the far edge as well.
+   */
+  val groupingFields: List<String> =
+    if (def.bin is Binning.Bin) listOf(field, "${field}_end") else listOf(field)
 
   /** The `sort` object this channel orders its cells by, where it names one. */
   private val sortObject: VegaValue.Obj? = (def.sort as? VegaValue.Obj)?.takeIf { it.has("field") }
@@ -164,7 +181,7 @@ internal class Facet(val channel: String, val def: ChannelDef) {
       arr(
         obj {
           put("type", "aggregate")
-          put("groupby", strings(listOf(field)))
+          put("groupby", strings(groupingFields))
           // The key the cells are ordered by, measured once per cell — which is what this dataset
           // already holds a row of. `assembleRowColumnHeaderData` puts it here rather than leaving
           // the header bands to sort on something they cannot see.
@@ -288,7 +305,7 @@ internal interface FacetLayout {
 internal class FacetGrid(val row: Facet?, val column: Facet?) : FacetLayout {
 
   /** Row before column, which is the order upstream groups, sorts and crosses by. */
-  override val fields: List<String> = listOfNotNull(row?.field, column?.field)
+  override val fields: List<String> = listOfNotNull(row, column).flatMap { it.groupingFields }
 
   override val defs: List<ChannelDef> = listOfNotNull(row?.def, column?.def)
 
@@ -574,7 +591,8 @@ internal class FacetWrap(val def: ChannelDef, private val columns: Int?) : Facet
 
   private val domainData: String = "facet_domain"
 
-  override val fields: List<String> = listOf(field)
+  override val fields: List<String> =
+    if (def.bin is Binning.Bin) listOf(field, "${field}_end") else listOf(field)
 
   override val defs: List<ChannelDef> = listOf(def)
 

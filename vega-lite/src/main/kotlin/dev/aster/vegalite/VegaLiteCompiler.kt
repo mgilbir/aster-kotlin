@@ -1286,6 +1286,7 @@ private class Compilation(
       var previous = ""
       repeat(5) {
         root.moveParseUp()
+        root.removeDuplicateTimeUnits()
         root.mergeBins(signalRenames)
         root.mergeParse()
         root.mergeAggregates()

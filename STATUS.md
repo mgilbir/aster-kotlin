@@ -678,7 +678,7 @@ no data is needed to compare two compilers. So every one of them was compiled by
 by this one, and the outputs compared property by property. That is a *measurement*, not a gate: the
 examples are not fixtures here, and nothing about them is checked in.
 
-**124 of 627 matched exactly** at the start, and **474** do now. 16 were refused by name, and of those 8 are geographic,
+**124 of 627 matched exactly** at the start, and **475** do now. 16 were refused by name, and of those 8 are geographic,
 3 are a facet inside a facet, 2 a repeat inside a concatenation, and 2 are the `trail` mark — which
 this runtime draws and this compiler had simply not been told about.
 
@@ -2265,6 +2265,16 @@ runtime already had a Delaunay triangulation and a voronoi transform, and it was
 coordinates as *field names*: Vega-Lite writes them as expressions, `{"expr": "datum.datum.x || 0"}`,
 because the points are mark items and the coordinate wanted is the one the encoding resolved. Every
 cell came out without coordinates, so the diagram was empty and the overlay drew nothing.
+
+### A facet may bucket the column it splits on
+
+A trellis whose rows are *buckets* of a column has to bucket that column, and the transform belongs
+to the **facet's** own model rather than to a cell's — which shows in three places at once. The bin
+signals are named plainly where a cell's carry the cell's prefix; the grid is grouped by **both**
+ends of the bucket, since an interval is identified by both and two buckets may start together; and
+the caption is the bucket rather than its near edge, `format(start) – format(end)`, with `"null"`
+for the rows that had no value, an empty bucket still being a cell of the grid. The bin also needs
+no `_range` column: `binRequiresRange` asks about a *scale* channel, and a facet has no scale.
 
 ### A click can be projected too, and a collinear set of points
 

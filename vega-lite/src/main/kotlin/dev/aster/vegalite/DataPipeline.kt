@@ -205,10 +205,17 @@ internal class DataPipeline(
 
   private fun binNode(): BinNode? {
     val bins =
-      view.spec.encoding.values.mapNotNull { def ->
+      // The **facet's** own channels first, as with the time units: a trellis broken down by
+      // buckets of a column has to bucket that column, and the facet's encoding was lifted out of
+      // the cell's before anything else looked at it.
+      (view.facetDefs + view.spec.encoding.values).mapNotNull { def ->
         val bin = def.bin as? Binning.Bin ?: return@mapNotNull null
         val field = def.field ?: return@mapNotNull null
         val key = "${Fields.binToString(bin.params)}_$field"
+        // A facet's bucketing belongs to the **facet** model, which sits above the cell: its
+        // signals are named plainly where a cell's carry the cell's prefix. And it needs no range
+        // formula — `binRequiresRange` asks about a *scale* channel, and a facet has no scale.
+        val facetted = def in view.facetDefs
         BinComponent(
           field = field,
           params = bin.params,
@@ -217,14 +224,14 @@ internal class DataPipeline(
               Fields.vgField(def, forAs = true),
               Fields.vgField(def, suffix = "end", forAs = true),
             ),
-          signal = view.prefixed("${key}_bins"),
-          extentSignal = view.prefixed("${key}_extent"),
+          signal = if (facetted) "${key}_bins" else view.prefixed("${key}_bins"),
+          extentSignal = if (facetted) "${key}_extent" else view.prefixed("${key}_extent"),
           extent = bin.params.fields["extent"],
           // `binRequiresRange`: a binned field the specification forced onto a **discrete** scale
           // needs its range written out as text, because that text is what the axis labels and the
           // legend entries then read — there is no numeric axis left to derive them from.
           rangeFormula =
-            if (def.type == MeasureType.ORDINAL || def.type == MeasureType.NOMINAL) {
+            if (!facetted && (def.type == MeasureType.ORDINAL || def.type == MeasureType.NOMINAL)) {
               val start = Fields.datumAccess(def)
               val end = Fields.datumAccess(def, suffix = "end")
               val format = (def.format as? VegaValue.Str)?.value ?: view.config.numberFormat ?: ""
