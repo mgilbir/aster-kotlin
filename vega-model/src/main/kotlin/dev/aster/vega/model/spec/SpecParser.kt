@@ -167,6 +167,64 @@ private fun guideStyleKeys(vararg prefixes: String): Set<String> =
 
 private val AXIS_UNSUPPORTED = emptyMap<String, String>()
 
+/**
+ * Guide properties that can carry a `{"signal": ...}`, which is what decides whether one **folds**.
+ *
+ * A guide's `encode` channel is rewritten into the property it is another spelling of, and that
+ * rewrite happens at parse time where no signal has a value yet. It works anyway for these, because
+ * the property itself carries the signal to the builder: the styling block records one in its
+ * `signals` map, and everything here read through `numberOrSignal` resolves one already. A property
+ * read as a plain string would stringify the object instead, so a signal aimed at one of those is
+ * still named rather than folded.
+ */
+private val SIGNAL_CAPABLE_GUIDE_PROPERTIES: Set<String> =
+  guideStyleKeys("label", "tick", "grid", "domain", "title", "symbolStroke") +
+    setOf(
+      "labelAngle",
+      // The font *sizes*, which `guideStyleKeys` does not cover: it lists `Font`, `FontWeight` and
+      // `FontStyle` because a size is read through `numberOrSignal` rather than through the styling
+      // block, and being read there is exactly what makes it able to carry a signal.
+      "labelFontSize",
+      "titleFontSize",
+      "subtitleFontSize",
+      "labelFlushOffset",
+      "labelLimit",
+      "labelOffset",
+      "labelPadding",
+      "labelSeparation",
+      "titleAngle",
+      "titleLimit",
+      "titlePadding",
+      "titleX",
+      "titleY",
+      "tickCount",
+      "tickMinStep",
+      "tickOffset",
+      "tickSize",
+      "minExtent",
+      "maxExtent",
+      "position",
+      "translate",
+      "bandPosition",
+      "cornerRadius",
+      "clipHeight",
+      "columnPadding",
+      "columns",
+      "gradientLength",
+      "gradientOpacity",
+      "gradientStrokeWidth",
+      "gradientThickness",
+      "legendX",
+      "legendY",
+      "offset",
+      "padding",
+      "rowPadding",
+      "symbolLimit",
+      "symbolOffset",
+      "symbolSize",
+      "symbolStrokeWidth",
+    )
+
 /** Upstream's `LegendScales`: the order that picks the one scale a legend describes. */
 private val LEGEND_CHANNEL_ORDER =
   listOf("size", "shape", "fill", "stroke", "strokeWidth", "strokeDash", "opacity")
@@ -1865,6 +1923,13 @@ public class SpecParser {
                 "$subject encode channel '$channel' on '$part' is not implemented; it was ignored",
                 jsonPath = "$path.encode.$part.$pass.$channel",
               )
+            // A `{"signal": ...}` folds too, but only onto a property that can carry one — the
+            // styling block records a signal and the numeric properties are read through
+            // `numberOrSignal`, while a plain string property would stringify the object into
+            // nonsense. So `encode.labels.update.fontSize` from a signal works and
+            // `encode.symbols.update.shape` from one is still named.
+            (value as? VegaValue.Obj)?.fields?.get("signal") != null &&
+              property in SIGNAL_CAPABLE_GUIDE_PROPERTIES -> folded[property] = value
             constant == null ->
               diagnostics.warn(
                 DiagnosticCodes.PARSE_UNKNOWN_PROPERTY,

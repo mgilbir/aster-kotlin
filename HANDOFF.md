@@ -419,10 +419,11 @@ instance — rather than the whole block being reported as unread. That is where
 `numberOrSignal`; `labelColor: {"signal": "c"}` was dropped in silence, because the styling block
 took only a literal — so a chart colouring its axis from a control drew black labels and looked
 finished. `GuideStroke` now carries a `signals` map beside its constants and the builders substitute
-a resolved copy once, before anything reads it, which is what kept the change from spreading. What is
-still reported is a guide **`encode` channel** valued by a signal rather than a constant: those fold
-into properties at parse time, where no signal has a value yet, so closing that one means resolving
-the channel in the builder instead of folding it.
+a resolved copy once, before anything reads it, which is what kept the change from spreading. A guide **`encode` channel** valued by a signal folds too, and for a reason worth keeping in
+mind: the fold happens at parse time where no signal has a value, so it only works where the *target
+property* can carry one — the styling block records it and everything read through `numberOrSignal`
+resolves it. A channel aimed at a plain string property (`symbolType`, `orient`, `format`) is still
+named, because folding an object into one would stringify it.
 
 Run the same subtraction over the *encode* vocabulary and the pattern repeats: several channels
 reported as unimplemented had a property behind them all along, one map entry away in

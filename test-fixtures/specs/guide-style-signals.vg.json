@@ -1,6 +1,6 @@
 {
   "$schema": "https://vega.github.io/schema/vega/v6.json",
-  "description": "A guide's styling read from signals. Half of this always worked and half was dropped without a word: labelFontSize is read through the number-or-signal path while labelColor took only a literal, so a chart colouring its axis from a control drew black labels and looked finished. Every field of an axis's and a legend's styling now takes either spelling.",
+  "description": "A guide's styling read from signals. Half of this always worked and half was dropped without a word: labelFontSize is read through the number-or-signal path while labelColor took only a literal, so a chart colouring its axis from a control drew black labels and looked finished. Every field of an axis's and a legend's styling now takes either spelling. The same reaches a guide's encode block: a channel there is rewritten into the property it is another spelling of, and a signal survives that rewrite wherever the property can carry one.",
   "width": 200,
   "height": 110,
   "padding": 5,
@@ -143,6 +143,22 @@
       },
       "labelColor": {
         "signal": "accent"
+      },
+      "encode": {
+        "grid": {
+          "update": {
+            "strokeWidth": {
+              "signal": "thin"
+            }
+          }
+        },
+        "labels": {
+          "update": {
+            "fontSize": {
+              "signal": "8 + thin"
+            }
+          }
+        }
       }
     }
   ],
@@ -165,6 +181,22 @@
       },
       "symbolStrokeWidth": {
         "signal": "thin"
+      },
+      "encode": {
+        "symbols": {
+          "update": {
+            "size": {
+              "signal": "60"
+            }
+          }
+        },
+        "title": {
+          "update": {
+            "fontSize": {
+              "signal": "12"
+            }
+          }
+        }
       }
     }
   ],
