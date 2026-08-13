@@ -1226,6 +1226,8 @@ public class SpecParser {
     if (format != null) {
       for ((key, value) in format.fields) {
         if (key == "type" || key == "property" || key == "delimiter") continue
+        // `header` names the columns of a delimited file that has none.
+        if (key == "header") continue
         // The TopoJSON three: which object in the file, and — for a mesh — which of its arcs.
         if (key == "feature" || key == "mesh" || key == "filter") continue
         if (key == "parse") {
@@ -1271,6 +1273,8 @@ public class SpecParser {
       urlSignal = urlSignal,
       formatType = formatType,
       property = format?.fields?.get("property")?.asString()?.takeIf { it.isNotEmpty() },
+      header =
+        (format?.fields?.get("header") as? VegaValue.Arr)?.values?.map { it.asString() }.orEmpty(),
       feature = format?.fields?.get("feature")?.asString()?.takeIf { it.isNotEmpty() },
       mesh = format?.fields?.get("mesh")?.asString()?.takeIf { it.isNotEmpty() },
       meshFilter = format?.fields?.get("filter")?.asString()?.takeIf { it.isNotEmpty() },

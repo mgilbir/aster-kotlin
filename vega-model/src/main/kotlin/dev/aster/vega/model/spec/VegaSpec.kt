@@ -236,6 +236,15 @@ public data class DataSpec(
   val property: String? = null,
   /** `format.delimiter` for a `dsv` file. */
   val delimiter: String? = null,
+  /**
+   * `format.header` — the column names for a delimited file that carries none.
+   *
+   * Upstream prepends them as a header row and lets the ordinary parser take over, which is exactly
+   * what makes them behave like real column names: the delimiter is the file's own, and a name
+   * needing quoting is quoted. A file that *does* have a header and is given this list ends up with
+   * its first row read as data under the supplied names, which is upstream's behaviour too.
+   */
+  val header: List<String> = emptyList(),
   /** `format.feature`: which object of a TopoJSON file to decode, as one feature per geometry. */
   val feature: String? = null,
   /** `format.mesh`: the same object's arcs as a single line string, each drawn once. */
