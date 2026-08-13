@@ -116,6 +116,60 @@ public data class Scene(
 }
 
 /** Depth-first walk in paint order (parents before children, children in declaration order). */
+/**
+ * A group's children in the order they are **painted**, which `zindex` decides.
+ *
+ * Not a sort, and the difference is visible. Upstream's `visit` paints every item whose `zindex` is
+ * **zero** first, in data order, and only then the ones that have a `zindex`, ordered by it and by
+ * their original position. So a `zindex: -1` item draws *on top* of the untouched ones rather than
+ * beneath them — counter-intuitive, and exactly what `zorder` does: negatives are still non-zero,
+ * so they join the second pass.
+ *
+ * `zindex` is paint order **within one mark**, so the reordering is confined to each contiguous run
+ * of children that came from the same mark. A raised bar draws over its neighbours and still under
+ * the axis.
+ *
+ * Returns the list unchanged when nothing carries a `zindex`, which is almost every group.
+ */
+public fun paintOrder(children: List<SceneNode>): List<SceneNode> {
+  if (children.none { it.metadata.zindex != 0 }) return children
+  val out = mutableListOf<SceneNode>()
+  var index = 0
+  while (index < children.size) {
+    val node = children[index]
+    val name = node.metadata.markName
+    val kind = node.metadata.markKind
+    // A run is one mark's items. Anything that is not a mark — a guide, a nested group — stands
+    // alone,
+    // so a `zindex` on one of those cannot reorder it against its siblings, which is upstream's
+    // rule
+    // too: a mark's `zindex` and an *item's* are different things.
+    if (node.metadata.role != "mark") {
+      out += node
+      index++
+      continue
+    }
+    var end = index
+    while (
+      end + 1 < children.size &&
+        children[end + 1].metadata.role == "mark" &&
+        children[end + 1].metadata.markName == name &&
+        children[end + 1].metadata.markKind == kind
+    ) {
+      end++
+    }
+    val run = children.subList(index, end + 1)
+    if (run.none { it.metadata.zindex != 0 }) {
+      out += run
+    } else {
+      out += run.filter { it.metadata.zindex == 0 }
+      out += run.filter { it.metadata.zindex != 0 }.sortedBy { it.metadata.zindex }
+    }
+    index = end + 1
+  }
+  return out
+}
+
 public fun SceneNode.walk(visit: (node: SceneNode, parentTransform: Transform2D) -> Unit) {
   walkInternal(Transform2D.Identity, visit)
 }

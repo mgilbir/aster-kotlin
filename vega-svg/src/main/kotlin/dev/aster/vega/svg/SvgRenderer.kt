@@ -25,6 +25,7 @@ import dev.aster.vega.scene.TextAlign
 import dev.aster.vega.scene.TextBaseline
 import dev.aster.vega.scene.TextNode
 import dev.aster.vega.scene.Transform2D
+import dev.aster.vega.scene.paintOrder
 
 /** How images are represented in exported SVG. */
 public enum class SvgImagePolicy {
@@ -191,7 +192,12 @@ public class SvgRenderer(private val options: SvgOptions = SvgOptions()) {
       renderGroupPaint(node, background, out, defs, depth + 1, stroked = !node.strokeForeground)
     }
 
-    for (child in node.children) renderNode(child, out, defs, warnings, depth + 1)
+    // Painted in `zindex` order, which is a render-time question rather than a scene one: upstream
+    // keeps its items in data order and reorders in `visit`, and the differential harness compares
+    // the
+    // scene, so the reordering has to happen here or the two engines draw the same list
+    // differently.
+    for (child in paintOrder(node.children)) renderNode(child, out, defs, warnings, depth + 1)
 
     if (background != null && node.strokeForeground && node.stroke != null) {
       renderGroupPaint(node, background, out, defs, depth + 1, filled = false)

@@ -425,6 +425,13 @@ property* can carry one — the styling block records it and everything read thr
 resolves it. A channel aimed at a plain string property (`symbolType`, `orient`, `format`) is still
 named, because folding an object into one would stringify it.
 
+**The harness compares the scene, not the drawing.** That is the right trade almost everywhere and it
+has one blind spot worth remembering: anything upstream decides at *render* time is invisible to it.
+`zindex` was the example — upstream keeps its items in data order and reorders inside `visit`, so a
+chart drawing in the wrong order agreed on every compared number. If you suspect a gap that the
+fixtures cannot see, ask whether the behaviour lives in the scene or in the renderer, and if it is the
+renderer then probe upstream's **SVG** and pin the answer in a unit test.
+
 **`Functions.knownUnsupported` is empty, and it should stay that way.** It is a list of work, not a
 verdict: every entry that was ever on it came off, and each excuse was softer than it read. If you add
 one, add the reason too — the evaluator reads it out instead of saying "unknown function" — but treat
