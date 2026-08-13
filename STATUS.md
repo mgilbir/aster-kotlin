@@ -2058,6 +2058,23 @@ The fixture written for that found a runtime defect: **a time scale ignored `dom
 of a decade was drawn with the whole decade in it. `configureDomain` runs the same block whatever
 the scale's type, and so does this now.
 
+### A bucket's interpolated edges belong to the bucket, and one composite collapses where another does not
+
+`TimeUnitNode.assemble` emits, per unit, the bucketing **and** the two interpolated edges a rect
+sitting off the middle of that bucket is drawn between — from the same loop, in that order. Writing
+all the bucketings first and all the edges after put a heatmap bucketed on both axes in an order
+upstream never writes, and the names each pair refers to then belong to the wrong bucket.
+
+A composite mark's grouping is every channel that is *not* aggregated, tooltips included: a tooltip
+naming the column being summarised breaks the summary down by it, and one asking for a mean of that
+column does not, because an aggregate is a measure rather than a grouping. That is one rule where
+this compiler had two half-rules, and it settles both `errorband_tooltip` and
+`boxplot_tooltip_aggregate`'s grouping.
+
+And an **error bar** of one part collapses back into the view — `layer.length > 1 ? {layer} :
+{...layer[0]}` — where an **error band** of one part does not. That asymmetry is upstream's own, in
+its own source, and not a simplification either way: a band with its borders off is still `layer_0`.
+
 ### Two runtime gaps this batch names but does not close
 
 `density`'s fixture is not in the corpus, and `trail`'s draws no legend. Both compile exactly as

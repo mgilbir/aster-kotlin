@@ -1,0 +1,268 @@
+{
+  "$schema": "https://vega.github.io/schema/vega/v6.json",
+  "description": "A heatmap whose rects sit over their buckets on both axes, each bucket interpolated beside its own.",
+  "background": "white",
+  "padding": 5,
+  "width": 300,
+  "height": 300,
+  "style": "cell",
+  "data": [
+    {
+      "name": "source_0",
+      "url": "data/cars.json",
+      "format": {
+        "type": "json",
+        "parse": {
+          "Year": "date",
+          "Horsepower": "number"
+        }
+      },
+      "transform": [
+        {
+          "field": "Year",
+          "type": "timeunit",
+          "units": [
+            "year"
+          ],
+          "as": [
+            "year_Year",
+            "year_Year_end"
+          ]
+        },
+        {
+          "type": "formula",
+          "expr": "0.5 * timeOffset('year', datum['year_Year'], -1) + 0.5 * datum['year_Year']",
+          "as": "year_Year_offsetted_rect_start"
+        },
+        {
+          "type": "formula",
+          "expr": "0.5 * datum['year_Year'] + 0.5 * datum['year_Year_end']",
+          "as": "year_Year_offsetted_rect_end"
+        },
+        {
+          "field": "Year",
+          "type": "timeunit",
+          "units": [
+            "month"
+          ],
+          "as": [
+            "month_Year",
+            "month_Year_end"
+          ]
+        },
+        {
+          "type": "formula",
+          "expr": "0.5 * timeOffset('month', datum['month_Year'], -1) + 0.5 * datum['month_Year']",
+          "as": "month_Year_offsetted_rect_start"
+        },
+        {
+          "type": "formula",
+          "expr": "0.5 * datum['month_Year'] + 0.5 * datum['month_Year_end']",
+          "as": "month_Year_offsetted_rect_end"
+        },
+        {
+          "type": "aggregate",
+          "groupby": [
+            "year_Year",
+            "year_Year_end",
+            "year_Year_offsetted_rect_start",
+            "year_Year_offsetted_rect_end",
+            "month_Year",
+            "month_Year_end",
+            "month_Year_offsetted_rect_start",
+            "month_Year_offsetted_rect_end"
+          ],
+          "ops": [
+            "max"
+          ],
+          "fields": [
+            "Horsepower"
+          ],
+          "as": [
+            "max_Horsepower"
+          ]
+        },
+        {
+          "type": "filter",
+          "expr": "(isDate(datum[\"month_Year\"]) || (isValid(datum[\"month_Year\"]) && isFinite(+datum[\"month_Year\"]))) && isValid(datum[\"max_Horsepower\"]) && isFinite(+datum[\"max_Horsepower\"])"
+        }
+      ]
+    }
+  ],
+  "marks": [
+    {
+      "name": "marks",
+      "type": "rect",
+      "style": [
+        "rect"
+      ],
+      "from": {
+        "data": "source_0"
+      },
+      "encode": {
+        "update": {
+          "fill": {
+            "scale": "color",
+            "field": "max_Horsepower"
+          },
+          "description": {
+            "signal": "\"Year (year): \" + (timeFormat(datum[\"year_Year\"], timeUnitSpecifier([\"year\"], {\"year-month\":\"%b %Y \",\"year-month-date\":\"%b %d, %Y \"}))) + \"; Year (month): \" + (timeFormat(datum[\"month_Year\"], timeUnitSpecifier([\"month\"], {\"year-month\":\"%b %Y \",\"year-month-date\":\"%b %d, %Y \"}))) + \"; Max of Horsepower: \" + (format(datum[\"max_Horsepower\"], \"\"))"
+          },
+          "x2": {
+            "scale": "x",
+            "field": "year_Year_offsetted_rect_start",
+            "offset": {
+              "signal": "0.5 + (abs(scale(\"x\", datum[\"year_Year_end\"]) - scale(\"x\", datum[\"year_Year\"])) < 0.25 ? -0.5 * (0.25 - (abs(scale(\"x\", datum[\"year_Year_end\"]) - scale(\"x\", datum[\"year_Year\"])))) : 0)"
+            }
+          },
+          "x": {
+            "scale": "x",
+            "field": "year_Year_offsetted_rect_end",
+            "offset": {
+              "signal": "0.5 + (abs(scale(\"x\", datum[\"year_Year_end\"]) - scale(\"x\", datum[\"year_Year\"])) < 0.25 ? 0.5 * (0.25 - (abs(scale(\"x\", datum[\"year_Year_end\"]) - scale(\"x\", datum[\"year_Year\"])))) : 0)"
+            }
+          },
+          "y2": {
+            "scale": "y",
+            "field": "month_Year_offsetted_rect_start",
+            "offset": {
+              "signal": "0.5 + (abs(scale(\"y\", datum[\"month_Year_end\"]) - scale(\"y\", datum[\"month_Year\"])) < 0.25 ? 0.5 * (0.25 - (abs(scale(\"y\", datum[\"month_Year_end\"]) - scale(\"y\", datum[\"month_Year\"])))) : 0)"
+            }
+          },
+          "y": {
+            "scale": "y",
+            "field": "month_Year_offsetted_rect_end",
+            "offset": {
+              "signal": "0.5 + (abs(scale(\"y\", datum[\"month_Year_end\"]) - scale(\"y\", datum[\"month_Year\"])) < 0.25 ? -0.5 * (0.25 - (abs(scale(\"y\", datum[\"month_Year_end\"]) - scale(\"y\", datum[\"month_Year\"])))) : 0)"
+            }
+          }
+        }
+      }
+    }
+  ],
+  "scales": [
+    {
+      "name": "x",
+      "type": "time",
+      "domain": {
+        "data": "source_0",
+        "fields": [
+          "year_Year_offsetted_rect_start",
+          "year_Year_offsetted_rect_end"
+        ]
+      },
+      "range": [
+        0,
+        {
+          "signal": "width"
+        }
+      ]
+    },
+    {
+      "name": "y",
+      "type": "time",
+      "domain": {
+        "data": "source_0",
+        "fields": [
+          "month_Year_offsetted_rect_start",
+          "month_Year_offsetted_rect_end"
+        ]
+      },
+      "range": [
+        {
+          "signal": "height"
+        },
+        0
+      ]
+    },
+    {
+      "name": "color",
+      "type": "linear",
+      "domain": {
+        "data": "source_0",
+        "field": "max_Horsepower"
+      },
+      "range": "heatmap",
+      "interpolate": "hcl",
+      "zero": false
+    }
+  ],
+  "axes": [
+    {
+      "scale": "x",
+      "orient": "bottom",
+      "gridScale": "y",
+      "grid": true,
+      "tickCount": {
+        "signal": "ceil(width/40)"
+      },
+      "tickMinStep": {
+        "signal": "datetime(2002, 0, 1, 0, 0, 0, 0) - datetime(2001, 0, 1, 0, 0, 0, 0)"
+      },
+      "domain": false,
+      "labels": false,
+      "aria": false,
+      "maxExtent": 0,
+      "minExtent": 0,
+      "ticks": false,
+      "zindex": 0
+    },
+    {
+      "scale": "y",
+      "orient": "left",
+      "gridScale": "x",
+      "grid": true,
+      "tickMinStep": {
+        "signal": "datetime(2001, 1, 1, 0, 0, 0, 0) - datetime(2001, 0, 1, 0, 0, 0, 0)"
+      },
+      "domain": false,
+      "labels": false,
+      "aria": false,
+      "maxExtent": 0,
+      "minExtent": 0,
+      "ticks": false,
+      "zindex": 0
+    },
+    {
+      "scale": "x",
+      "orient": "bottom",
+      "grid": false,
+      "title": "Year (year)",
+      "format": {
+        "signal": "timeUnitSpecifier([\"year\"], {\"year-month\":\"%b %Y \",\"year-month-date\":\"%b %d, %Y \"})"
+      },
+      "labelFlush": true,
+      "labelOverlap": true,
+      "tickCount": {
+        "signal": "ceil(width/40)"
+      },
+      "tickMinStep": {
+        "signal": "datetime(2002, 0, 1, 0, 0, 0, 0) - datetime(2001, 0, 1, 0, 0, 0, 0)"
+      },
+      "zindex": 0
+    },
+    {
+      "scale": "y",
+      "orient": "left",
+      "grid": false,
+      "title": "Year (month)",
+      "format": {
+        "signal": "timeUnitSpecifier([\"month\"], {\"year-month\":\"%b %Y \",\"year-month-date\":\"%b %d, %Y \"})"
+      },
+      "labelOverlap": true,
+      "tickMinStep": {
+        "signal": "datetime(2001, 1, 1, 0, 0, 0, 0) - datetime(2001, 0, 1, 0, 0, 0, 0)"
+      },
+      "zindex": 0
+    }
+  ],
+  "legends": [
+    {
+      "fill": "color",
+      "gradientLength": {
+        "signal": "clamp(height, 64, 200)"
+      },
+      "title": "Max of Horsepower"
+    }
+  ]
+}

@@ -416,16 +416,24 @@ internal class TimeUnitNode(units: List<TimeUnitComponent>) : DataNode() {
     other.children.clear()
   }
 
-  fun transforms(): List<VegaValue> = units.map {
-    obj {
-      put("type", "timeunit")
-      put("field", it.field)
-      put("units", strings(it.units))
-      // Which calendar the bucket is cut against. A `utcmonth` says so and a `month` says nothing,
-      // taking the viewer's own zone — and the two put a midnight instant in different months.
-      if (it.utc) put("timezone", "utc")
-      put("as", strings(listOf(it.output, "${it.output}_end")))
-    }
+  fun transforms(): List<VegaValue> = units.flatMap {
+    listOf(
+      obj {
+        put("type", "timeunit")
+        put("field", it.field)
+        put("units", strings(it.units))
+        // Which calendar the bucket is cut against. A `utcmonth` says so and a `month` says
+        // nothing, taking the viewer's own zone — and the two put a midnight instant in
+        // different months.
+        if (it.utc) put("timezone", "utc")
+        put("as", strings(listOf(it.output, "${it.output}_end")))
+      }
+    ) +
+      // A bucket the rect sits **off the middle of** is drawn between two interpolated edges,
+      // and they belong to this bucket rather than to the step after it: upstream emits them
+      // from the same loop, one pair per unit, so a chart bucketing a column twice keeps each
+      // pair beside the bucket it interpolates.
+      it.offsettedRect
   }
 }
 
@@ -434,6 +442,8 @@ internal data class TimeUnitComponent(
   val units: List<String>,
   val output: String,
   val utc: Boolean = false,
+  /** The two interpolated edges a rect off the middle of this bucket is drawn between. */
+  val offsettedRect: List<VegaValue> = emptyList(),
 )
 
 internal class AggregateNode(

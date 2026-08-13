@@ -89,9 +89,10 @@ internal class Composite(
    */
   private fun groupbyOf(shared: Map<String, VegaValue>): List<String> =
     shared.entries
-      .filterNot { (channel, value) ->
-        channel == "tooltip" && (value as? VegaValue.Obj)?.has("aggregate") != true
-      }
+      // A channel that **aggregates** is a measure, not a grouping: `extractTransformsFromEncoding`
+      // pushes it onto the aggregate list instead, so a tooltip asking for a mean of the column
+      // being summarised does not also break the summary down by that column.
+      .filterNot { (_, value) -> (value as? VegaValue.Obj)?.has("aggregate") == true }
       .mapNotNull { (_, value) -> (value as? VegaValue.Obj)?.string("field") }
 
   /** The marks this handles. Anything else is not a composite mark. */
@@ -184,8 +185,10 @@ internal class Composite(
 
     val drawn = parts.filter { enabled(markDef, it.name, type) }
     return drawn.mapIndexed { index, part ->
-      // A composite of one part keeps the view's own name; several become a layer of them.
-      val name = if (drawn.size == 1) "" else "layer_$index"
+      // An **error bar** of one part collapses back into the view — `layer.length > 1 ? {layer} :
+      // {...layer[0]}` — and an error band does not, which is upstream's own asymmetry and not a
+      // simplification either way: a band with its borders off is still `layer_0`.
+      val name = if (drawn.size == 1 && type == "errorbar") "" else "layer_$index"
       name to
         obj {
           putAll(outer)

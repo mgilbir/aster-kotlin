@@ -29,7 +29,6 @@ internal class DataPipeline(
     binNode()?.let { head = head.then(it) }
     timeUnitNode()?.let { head = head.then(it) }
     binnedTimeUnitNode()?.let { head = head.then(it) }
-    offsettedRectNode()?.let { head = head.then(it) }
     sortIndexNode()?.let { head = head.then(it) }
 
     // The pre-aggregation table, named only when something reads it. A domain sorted by an
@@ -228,35 +227,28 @@ internal class DataPipeline(
    * and its end. A rect marking the gaps in a series is written that way: the bar sits over the
    * missing point rather than after it.
    */
-  private fun offsettedRectNode(): PassThroughNode? {
-    val formulas =
-      view.spec.encoding.entries.flatMap { (channel, def) ->
-        val position = view.offsettedRectPosition(def, channel) ?: return@flatMap emptyList()
-        val timeUnit = def.timeUnit ?: return@flatMap emptyList()
-        val start = Fields.vgField(def, forAs = true)
-        val end = Fields.vgField(def, suffix = "end", forAs = true)
-        val fraction = position + 0.5
-        val before = Fields.expressionNumber(1 - fraction)
-        val after = Fields.expressionNumber(fraction)
-        val offset = if (timeUnit.contains("utc")) "utcOffset" else "timeOffset"
-        val part = Fields.timeUnitParts(timeUnit).lastOrNull() ?: return@flatMap emptyList()
-        listOf(
-          obj {
-            put("type", "formula")
-            put(
-              "expr",
-              "$before * $offset('$part', datum['$start'], -1) + $after * datum['$start']",
-            )
-            put("as", "${start}_offsetted_rect_start")
-          },
-          obj {
-            put("type", "formula")
-            put("expr", "$before * datum['$start'] + $after * datum['$end']")
-            put("as", "${start}_offsetted_rect_end")
-          },
-        )
-      }
-    return if (formulas.isEmpty()) null else PassThroughNode(formulas)
+  private fun offsettedRectFormulas(def: ChannelDef, channel: String): List<VegaValue> {
+    val position = view.offsettedRectPosition(def, channel) ?: return emptyList()
+    val timeUnit = def.timeUnit ?: return emptyList()
+    val start = Fields.vgField(def, forAs = true)
+    val end = Fields.vgField(def, suffix = "end", forAs = true)
+    val fraction = position + 0.5
+    val before = Fields.expressionNumber(1 - fraction)
+    val after = Fields.expressionNumber(fraction)
+    val offset = if (timeUnit.contains("utc")) "utcOffset" else "timeOffset"
+    val part = Fields.timeUnitParts(timeUnit).lastOrNull() ?: return emptyList()
+    return listOf(
+      obj {
+        put("type", "formula")
+        put("expr", "$before * $offset('$part', datum['$start'], -1) + $after * datum['$start']")
+        put("as", "${start}_offsetted_rect_start")
+      },
+      obj {
+        put("type", "formula")
+        put("expr", "$before * datum['$start'] + $after * datum['$end']")
+        put("as", "${start}_offsetted_rect_end")
+      },
+    )
   }
 
   private fun binnedTimeUnitNode(): PassThroughNode? {
@@ -285,15 +277,17 @@ internal class DataPipeline(
     // The facet's own channels first: their transform belongs to the facet model, which sits above
     // the cell's, so a trellis broken down by year buckets the year before it buckets the quarter.
     val units =
-      (view.facetDefs + view.spec.encoding.values).mapNotNull { def ->
+      (view.facetDefs + view.spec.encoding.entries.map { it.value }).mapNotNull { def ->
         val timeUnit =
           def.timeUnit?.takeIf { !Fields.isBinnedTimeUnit(it) } ?: return@mapNotNull null
         val field = def.field ?: return@mapNotNull null
+        val channel = view.spec.encoding.entries.firstOrNull { it.value === def }?.key
         TimeUnitComponent(
           field,
           Fields.timeUnitParts(timeUnit),
           Fields.vgField(def, forAs = true),
           utc = timeUnit.startsWith("utc"),
+          offsettedRect = channel?.let { offsettedRectFormulas(def, it) }.orEmpty(),
         )
       }
     return if (units.isEmpty()) null else TimeUnitNode(units)
