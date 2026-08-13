@@ -2,6 +2,7 @@ package dev.aster.vega.runtime.compile
 
 import dev.aster.vega.expression.JsSemantics
 import dev.aster.vega.model.VegaValue
+import dev.aster.vega.model.asNumberOrNull
 import dev.aster.vega.model.asString
 import dev.aster.vega.model.spec.GuideStroke
 import dev.aster.vega.scene.Fill
@@ -47,7 +48,7 @@ internal object GuideStyle {
     fun number(field: String): Double? =
       style.signals[field]
         ?.let { numbers.resolveValue(it, owner) }
-        ?.let { (it as? VegaValue.Num)?.value }
+        ?.let { it.asNumberOrNull() }
         ?.takeIf { it.isFinite() }
     return style.copy(
       color = text("color") ?: style.color,

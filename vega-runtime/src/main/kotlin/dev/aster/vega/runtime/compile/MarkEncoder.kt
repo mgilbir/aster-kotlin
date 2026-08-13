@@ -10,6 +10,7 @@ import dev.aster.vega.model.DiagnosticCodes
 import dev.aster.vega.model.DiagnosticCollector
 import dev.aster.vega.model.VegaValue
 import dev.aster.vega.model.asDouble
+import dev.aster.vega.model.asNumberOrNull
 import dev.aster.vega.model.asString
 import dev.aster.vega.model.field
 import dev.aster.vega.model.isMissing
@@ -1695,7 +1696,7 @@ public class MarkEncoder(
    */
   /** A value as a screen reader should say it; see [spokenNumber]. */
   private fun spoken(value: VegaValue): String =
-    if (value is VegaValue.Num) spokenNumber(value.value) else value.asString()
+    value.asNumberOrNull()?.let(::spokenNumber) ?: value.asString()
 
   /**
    * What a screen reader is told about one mark.

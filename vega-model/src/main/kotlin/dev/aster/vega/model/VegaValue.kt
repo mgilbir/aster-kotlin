@@ -50,6 +50,23 @@ public val VegaValue.isMissing: Boolean
     }
 
 /**
+ * A value that already **is** a number, as a number: `Num` or `Timestamp`, and nothing else.
+ *
+ * The distinction matters because a date is a `Timestamp` here and a `Date` upstream, and both
+ * engines treat one as a number for arithmetic while refusing to call it one:
+ * `isNumber(datetime(…))` is false on both sides. So a numeric *read* has to accept a timestamp — a
+ * `datetime()` handed to a scale is a number to that scale — while a type *test* must not. A raw
+ * `as? VegaValue.Num` does neither: it silently answers null for a date, which is a mark that does
+ * not draw.
+ */
+public fun VegaValue.asNumberOrNull(): Double? =
+  when (this) {
+    is VegaValue.Num -> value
+    is VegaValue.Timestamp -> epochMillis
+    else -> null
+  }
+
+/**
  * Vega's coercion to number. Returns `NaN` rather than throwing, because Vega expressions and
  * scales are expected to propagate `NaN` instead of failing the whole dataflow.
  */

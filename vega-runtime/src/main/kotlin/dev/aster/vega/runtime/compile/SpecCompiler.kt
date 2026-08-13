@@ -10,6 +10,7 @@ import dev.aster.vega.model.DiagnosticCodes
 import dev.aster.vega.model.DiagnosticCollector
 import dev.aster.vega.model.VegaDiagnostic
 import dev.aster.vega.model.VegaValue
+import dev.aster.vega.model.asNumberOrNull
 import dev.aster.vega.model.spec.AutosizeType
 import dev.aster.vega.model.spec.ChannelValue
 import dev.aster.vega.model.spec.EncodeSpec
@@ -630,7 +631,7 @@ public class SpecCompiler(
 
   /** A signal's value as a usable number, or null if it is not one. */
   private fun numberSignal(signals: Map<String, VegaValue>, name: String): Double? =
-    (signals[name] as? VegaValue.Num)?.value?.takeIf { it.isFinite() }
+    signals[name]?.asNumberOrNull()?.takeIf { it.isFinite() }
 
   public companion object {
     private val EMPTY_SIGNALS = SignalScope(emptyMap(), emptyMap())

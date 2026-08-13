@@ -411,5 +411,8 @@ internal fun VegaValue.asComparableKey(): String =
   when (this) {
     is VegaValue.Str -> "s:$value"
     is VegaValue.Num -> "n:${JsSemantics.numberToString(value)}"
+    // A date is a number for this purpose: two rows on the same instant are the same group,
+    // however that instant was written.
+    is VegaValue.Timestamp -> "n:${JsSemantics.numberToString(epochMillis)}"
     else -> "o:${JsSemantics.toStringValue(this)}"
   }

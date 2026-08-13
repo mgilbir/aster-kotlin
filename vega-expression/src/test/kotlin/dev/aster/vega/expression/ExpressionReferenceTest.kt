@@ -773,6 +773,26 @@ class ExpressionReferenceTest {
         "timeParse('2020-03-15 extra', '%Y-%m-%d')|null",
         // Overflow normalises as `new Date` normalises it: day 50 of January is the 19th of
         // February, which is also what makes `%j` able to name the last day of a leap year.
+        // ---- what a date is ----
+        // `typeof new Date()` is `"object"`, so a date is **not a number** on either side even
+        // though it adds and compares like one. `datetime` builds a Date and `utc` builds
+        // milliseconds, which is why the two answer differently; `now()` is milliseconds too.
+        "isDate(datetime(2020,0,1))|true",
+        "isNumber(datetime(2020,0,1))|false",
+        "isObject(datetime(2020,0,1))|true",
+        "isValid(datetime(2020,0,1))|true",
+        "isDate(utc(2020,0,1))|false",
+        "isNumber(utc(2020,0,1))|true",
+        "isDate(now())|false",
+        "isNumber(now())|true",
+        "isDate(5)|false",
+        "isDate('x')|false",
+        "isDate(timeParse('2020','%Y'))|true",
+        "isDate(timeOffset('day', datetime(2020,0,1)))|true",
+        // Arithmetic and comparison are unaffected, which is the point of keeping it a number
+        // underneath.
+        "datetime(2020,0,1) < datetime(2020,0,2)|true",
+        "datetime(2020,0,2) - datetime(2020,0,1)|86400000",
         "screen()|{}",
         "windowSize()|[null,null]",
         "timeFormat(timeOffset('day', datetime(2019,2,31)), '%Y-%m-%d %H:%M')|\"2019-04-01 00:00\"",

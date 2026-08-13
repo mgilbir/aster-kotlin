@@ -4,6 +4,7 @@ import dev.aster.vega.expression.NumberFormatSubset
 import dev.aster.vega.model.DiagnosticCodes
 import dev.aster.vega.model.DiagnosticCollector
 import dev.aster.vega.model.VegaValue
+import dev.aster.vega.model.asNumberOrNull
 import dev.aster.vega.model.asString
 import dev.aster.vega.model.roundHalfUp
 import dev.aster.vega.model.spec.Anchor
@@ -591,14 +592,14 @@ internal class LegendBuilder(
   private fun symbolSizeFor(spec: LegendSpec, value: VegaValue, declared: Double): Double {
     val sizeScale = spec.size?.let { scales[it] } ?: return declared
     val mapped = sizeScale.scale(value)
-    val number = (mapped as? VegaValue.Num)?.value
+    val number = mapped.asNumberOrNull()
     return if (number != null && number.isFinite() && number > 0.0) number else declared
   }
 
   /** The width a `strokeWidth` scale gives this entry's outline, or the declared one. */
   private fun strokeWidthFor(spec: LegendSpec, value: VegaValue, declared: Double): Double {
     val scale = spec.strokeWidthScale?.let { scales[it] } ?: return declared
-    val number = (scale.scale(value) as? VegaValue.Num)?.value
+    val number = scale.scale(value).asNumberOrNull()
     return if (number != null && number.isFinite() && number >= 0.0) number else declared
   }
 

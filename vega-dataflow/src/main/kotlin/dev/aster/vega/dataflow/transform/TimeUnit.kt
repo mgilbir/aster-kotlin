@@ -2,6 +2,7 @@ package dev.aster.vega.dataflow.transform
 
 import dev.aster.vega.model.DiagnosticCodes
 import dev.aster.vega.model.VegaValue
+import dev.aster.vega.model.asNumberOrNull
 import dev.aster.vega.model.field
 import dev.aster.vega.model.time.DateValues
 import dev.aster.vega.model.time.TimeFormat
@@ -77,7 +78,7 @@ public object TimeUnitTransform : Transform {
       if (declared.isNotEmpty()) null
       else {
         val instants = input.mapNotNull {
-          (DateValues.parse(it.field(fieldPath)) as? VegaValue.Num)?.value?.takeIf { v ->
+          DateValues.parse(it.field(fieldPath))?.asNumberOrNull()?.takeIf { v ->
             v.isFinite()
           }
         }
@@ -151,7 +152,7 @@ public object TimeUnitTransform : Transform {
     var lowest = Double.POSITIVE_INFINITY
     var highest = Double.NEGATIVE_INFINITY
     val bucketed = input.map { datum ->
-      val instant = (DateValues.parse(datum.field(fieldPath)) as? VegaValue.Num)?.value
+      val instant = DateValues.parse(datum.field(fieldPath))?.asNumberOrNull()
       if (instant == null || !instant.isFinite()) {
         datum.withFields(mapOf(startName to VegaValue.Null, endName to VegaValue.Null))
       } else {

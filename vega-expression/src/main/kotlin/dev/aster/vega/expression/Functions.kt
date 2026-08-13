@@ -3,6 +3,7 @@ package dev.aster.vega.expression
 import dev.aster.vega.model.MINUS_SIGN
 import dev.aster.vega.model.PlatformDecimals
 import dev.aster.vega.model.VegaValue
+import dev.aster.vega.model.asNumberOrNull
 import dev.aster.vega.model.asString
 import dev.aster.vega.model.field
 import dev.aster.vega.model.roundHalfUp
@@ -93,11 +94,8 @@ public object Functions {
    */
   public val knownUnsupported: Map<String, String> =
     mapOf(
-      // The three type predicates whose answer depends on a representation this engine does not
-      // share, so each would be confidently wrong rather than unavailable.
-      "isDate" to
-        "a date is epoch milliseconds here rather than a Date object, so nothing distinguishes " +
-          "one from a number; compare against a range instead",
+      // The two type predicates whose answer depends on a representation this engine does not
+      // share.
       "isRegExp" to
         "the expression language has no regular-expression literal, so nothing can be one",
       "isTuple" to
@@ -251,7 +249,7 @@ public object Functions {
       val values =
         (args.at(0) as? VegaValue.Arr)?.values ?: return@ExpressionFunction VegaValue.Null
       val usable = values.filterNot {
-        it is VegaValue.Null || (it is VegaValue.Num && it.value.isNaN())
+        it is VegaValue.Null || (it.asNumberOrNull()?.isNaN() == true)
       }
       if (usable.isEmpty()) {
         return@ExpressionFunction VegaValue.Arr(listOf(VegaValue.Null, VegaValue.Null))
@@ -308,8 +306,17 @@ public object Functions {
     // ---- type predicates ----------------------------------------------------
     map.predicate("isArray") { it is VegaValue.Arr }
     map.predicate("isBoolean") { it is VegaValue.Bool }
-    map.predicate("isNumber") { it is VegaValue.Num || it is VegaValue.Timestamp }
-    map.predicate("isObject") { it is VegaValue.Obj }
+    // A **date is not a number**, on both sides: `typeof new Date()` is `"object"`, so upstream's
+    // `isNumber(datetime(…))` is false even though the value adds and compares like one. This
+    // engine
+    // spells a date as a `Timestamp` for exactly that reason, and the two predicates below are the
+    // only place the difference shows.
+    map.predicate("isNumber") { it is VegaValue.Num }
+    map.predicate("isDate") { it is VegaValue.Timestamp }
+    // A date is an **object** as well as a date, because `typeof new Date()` is `"object"`. Both
+    // predicates answer true for one upstream, which is the other half of `isNumber` answering
+    // false.
+    map.predicate("isObject") { it is VegaValue.Obj || it is VegaValue.Timestamp }
     map.predicate("isString") { it is VegaValue.Str }
     map.predicate("isDefined") { it !is VegaValue.Null }
     // `isValid` is narrower than truthiness: it rejects null and NaN but accepts 0 and "".
@@ -708,7 +715,13 @@ public object Functions {
     // would
     // otherwise carry everywhere. What it does cost is `typeof`: `isDate` cannot tell a date from a
     // number, and reports rather than guessing.
-    map["datetime"] = ExpressionFunction { args -> VegaValue.Num(construct(args, localZone())) }
+    // `datetime` builds a **date**; `utc` builds a *number*. That is upstream, not an oversight:
+    // `datetime(...)` is `new Date(...)` while `utc(...)` is `Date.UTC(...)`, which returns
+    // milliseconds — so `isDate(datetime(2020,0,1))` is true and `isDate(utc(2020,0,1))` is false.
+    // Both are numbers for arithmetic either way; only the type test can tell them apart.
+    map["datetime"] = ExpressionFunction { args ->
+      VegaValue.Timestamp(construct(args, localZone()))
+    }
     map["utc"] = ExpressionFunction { args -> VegaValue.Num(construct(args, TimeZone.UTC)) }
     map["toDate"] = ExpressionFunction { args -> DateValues.parse(args.at(0)) ?: VegaValue.Null }
     map["time"] = ExpressionFunction { args -> VegaValue.Num(instantOf(args.at(0))) }
@@ -1232,7 +1245,7 @@ public object Functions {
       // `Number()` of a missing argument is 0, which offsets by nothing and returns the date it was
       // handed. That is d3's rule — `step == null ? 1 : Math.floor(step)`.
       val by = args.numberOr(2, 1.0).takeIf { it.isFinite() } ?: 1.0
-      VegaValue.Num(stepper.offset(at, floor(by).toInt()))
+      VegaValue.Timestamp(stepper.offset(at, floor(by).toInt()))
     }
   }
 
@@ -1265,7 +1278,7 @@ public object Functions {
       var at = if (floored < start) stepper.floor(stepper.offset(floored, 1)) else floored
       var guard = 0
       while (at < stop && guard < MAX_SEQUENCE) {
-        out.add(VegaValue.Num(at))
+        out.add(VegaValue.Timestamp(at))
         at = stepper.floor(stepper.offset(at, by.toInt()))
         guard++
       }
@@ -1299,7 +1312,7 @@ public object Functions {
     if (text is VegaValue.Null) return VegaValue.Str("null")
     val specifier = args.string(1)
     val millis = TimeParse.parse(text.asString(), specifier, zone, utc) ?: return VegaValue.Null
-    return VegaValue.Num(millis)
+    return VegaValue.Timestamp(millis)
   }
 
   private fun formatted(args: List<VegaValue>, zone: TimeZone): VegaValue {

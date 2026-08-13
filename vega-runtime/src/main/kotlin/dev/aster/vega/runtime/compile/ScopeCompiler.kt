@@ -13,6 +13,7 @@ import dev.aster.vega.expression.RandomStream
 import dev.aster.vega.model.DiagnosticCodes
 import dev.aster.vega.model.DiagnosticCollector
 import dev.aster.vega.model.VegaValue
+import dev.aster.vega.model.asNumberOrNull
 import dev.aster.vega.model.asString
 import dev.aster.vega.model.field
 import dev.aster.vega.model.roundHalfUp
@@ -1009,7 +1010,7 @@ internal class ScopeCompiler(
   }
 
   private fun numberSignal(signals: SignalScope, name: String): Double? =
-    (signals[name] as? VegaValue.Num)?.value?.takeIf { !it.isNaN() }
+    signals[name]?.asNumberOrNull()?.takeIf { !it.isNaN() }
 
   /** The rows a non-group mark iterates. A mark with no data draws once. */
   private fun markData(mark: MarkSpec, scope: CompileScope): List<VegaValue> {
