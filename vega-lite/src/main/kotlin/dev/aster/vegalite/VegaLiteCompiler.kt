@@ -872,6 +872,10 @@ private class Compilation(
         "child_width",
         "child_height",
         HEADER_OFFSET,
+        // A cell is styled by the same rule the chart's own group is: `cell` where it has a
+        // Cartesian position to border, `view` where it has none. A trellis of pies has no
+        // plotting area in any of its cells.
+        (style(views) as? VegaValue.Str)?.value ?: "cell",
       )
   }
 

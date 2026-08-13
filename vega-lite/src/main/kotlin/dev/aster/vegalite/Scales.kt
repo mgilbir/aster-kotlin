@@ -212,7 +212,16 @@ internal object Scales {
       )
     }
 
-    if (def.datum != null) return listOf(arr(listOf(def.datum)))
+    if (def.datum != null) {
+      // A datum on a scale that measures **time** joins the domain as the expression that builds
+      // the instant, wrapped so Vega reads it as a datum of the domain — the same rule a stated
+      // domain follows, and the same one that puts a rule at a year on the time axis beside it.
+      val datum = def.datum
+      if (measuresTime(def) && datum is VegaValue.Obj && looksLikeADateTime(datum)) {
+        return listOf(signalRef("{data: ${instantExpression(datum)}}"))
+      }
+      return listOf(arr(listOf(datum)))
+    }
 
     if (def.bin is Binning.Bin) {
       // A `bin-ordinal` scale states no domain: Vega infers one from the `bins` property, and
@@ -864,7 +873,7 @@ internal object Scales {
       "utc",
     )
 
-  private fun looksLikeADateTime(value: VegaValue.Obj): Boolean =
+  fun looksLikeADateTime(value: VegaValue.Obj): Boolean =
     value.fields.isNotEmpty() && value.fields.keys.all { it in DATE_TIME_PARTS }
 
   /** `zero()` in `properties.ts`: whether the baseline is forced into the domain. */

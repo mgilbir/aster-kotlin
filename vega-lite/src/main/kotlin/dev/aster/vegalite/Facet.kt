@@ -273,6 +273,8 @@ internal interface FacetLayout {
     widthSignal: String,
     heightSignal: String,
     titleOffset: Double,
+    /** `cell` or `view`, by the same rule the chart's own group follows. */
+    style: String,
   ): VegaValue
 }
 
@@ -484,10 +486,11 @@ internal class FacetGrid(val row: Facet?, val column: Facet?) : FacetLayout {
     widthSignal: String,
     heightSignal: String,
     titleOffset: Double,
+    style: String,
   ): VegaValue = obj {
     put("name", "cell")
     put("type", "group")
-    put("style", "cell")
+    put("style", style)
     put(
       "from",
       obj {
@@ -696,6 +699,7 @@ internal class FacetWrap(val def: ChannelDef, private val columns: Int?) : Facet
     widthSignal: String,
     heightSignal: String,
     titleOffset: Double,
+    style: String,
   ): VegaValue = obj {
     put("name", "cell")
     put("type", "group")
@@ -712,7 +716,7 @@ internal class FacetWrap(val def: ChannelDef, private val columns: Int?) : Facet
         put("offset", num(titleOffset))
       },
     )
-    put("style", "cell")
+    put("style", style)
     put(
       "from",
       obj {

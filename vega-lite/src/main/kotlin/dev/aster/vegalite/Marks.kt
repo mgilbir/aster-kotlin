@@ -1,5 +1,6 @@
 package dev.aster.vegalite
 
+import dev.aster.vega.model.DiagnosticCollector
 import dev.aster.vega.model.VegaValue
 import dev.aster.vega.model.canonicalNumberString
 
@@ -1311,7 +1312,18 @@ internal object Marks {
     if (def.datum != null) {
       return obj {
         put("scale", scaleName(view, mainChannel(channel)))
-        literalRef(def.datum)?.let { (key, it) -> put(key, it) }
+        // A datum written as a **date** is the expression that builds the instant, not an object:
+        // Vega has no `{year: 2006}`, and passing one through scaled a mark by an object.
+        val datum = def.datum
+        if (
+          def.type == MeasureType.TEMPORAL &&
+            datum is VegaValue.Obj &&
+            Scales.looksLikeADateTime(datum)
+        ) {
+          put("signal", Transforms(DiagnosticCollector()).dateTimeExpression(datum))
+        } else {
+          literalRef(datum)?.let { (key, it) -> put(key, it) }
+        }
       }
     }
     // A **bucket** is placed by a point inside it rather than at its near edge, and a bucketed

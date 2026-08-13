@@ -2078,6 +2078,25 @@ And an **error bar** of one part collapses back into the view — `layer.length 
 {...layer[0]}` — where an **error band** of one part does not. That asymmetry is upstream's own, in
 its own source, and not a simplification either way: a band with its borders off is still `layer_0`.
 
+### A datum written as a date is an instant
+
+`initFieldDef` reads `isDateTime` and types such a datum **temporal**. Everything follows from
+that: the scale it lands on measures time rather than categories, the plot takes a continuous
+width, and the value itself becomes the expression that builds the instant — in the mark, where
+Vega has no `{year: 2006}` to scale, and in the domain, wrapped so Vega reads it as a datum of the
+domain. A rule drawn at a year had been a category in a band of its own, thirty-eight differences
+deep.
+
+A facet cell is styled by the same rule the chart's own group is — `cell` where it has a Cartesian
+position to border, `view` where it has none — so a trellis of pies has no plotting area in any of
+its cells.
+
+**A gap named here rather than closed**: a facet resolves its `theta` scale *independently*
+(`defaultScaleResolve`, which is `channel === 'theta' ? 'independent' : 'shared'` for a facet), and
+the resulting `child_theta` belongs *inside* the cell group rather than beside the chart. This
+compiler shares it, so a trellis of pies scales every cell against the whole table. The fixture
+written for the cell-style rule was withdrawn because it cannot pass without this one.
+
 ### Two runtime gaps this batch names but does not close
 
 `density`'s fixture is not in the corpus, and `trail`'s draws no legend. Both compile exactly as

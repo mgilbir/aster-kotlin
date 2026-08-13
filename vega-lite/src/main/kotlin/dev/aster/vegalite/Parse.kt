@@ -287,6 +287,10 @@ internal class Parse(private val config: Config, private val diagnostics: Diagno
       timeUnit != null -> MeasureType.TEMPORAL
       bin != null || (aggregate != null && aggregate !in ARGMINMAX) -> MeasureType.QUANTITATIVE
       datum is VegaValue.Num -> MeasureType.QUANTITATIVE
+      // A datum written as a **date** is an instant, not a category: `initFieldDef` reads
+      // `isDateTime` and types it temporal, which is what puts a rule at a year on a time axis
+      // rather than in a band of its own.
+      datum is VegaValue.Obj && Scales.looksLikeADateTime(datum) -> MeasureType.TEMPORAL
       datum != null -> MeasureType.NOMINAL
       scaleCategory(def) != null -> scaleCategory(def)
       channel != mainChannel(channel) -> null
