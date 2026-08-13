@@ -337,6 +337,9 @@ public class SpecCompiler(
                 unresolvedSignals,
                 scales,
                 projections,
+                refreshProjections = { signals ->
+                  projectionsSoFar(spec, expressions, signals, resolved, scales)
+                },
               )
           }
         is Operator.Scale ->

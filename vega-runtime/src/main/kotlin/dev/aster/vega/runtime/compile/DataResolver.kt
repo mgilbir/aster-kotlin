@@ -318,6 +318,19 @@ internal class DataResolver(
     scales: Map<String, VegaScale> = emptyMap(),
     /** The scope's projections, which a `geoCentroid()` in a `formula` reaches for by name. */
     projections: Map<String, ProjectionDefinition> = emptyMap(),
+    /**
+     * Rebuilds the projections from the signals as they stand, for a fit that a transform supplies.
+     *
+     * A `geojson` transform gathers a table of coordinates into a `FeatureCollection` and publishes
+     * it, and a projection fitted to that signal cannot be built until it has run — which may be
+     * one transform earlier in the *same* list. Upstream has no difficulty: each transform is its
+     * own operator and the projection sits between them in topological order. Here the projections
+     * are resolved once per dataset, so without this a `geopoint` two lines below a `geojson`
+     * placed every row through the family's unfitted default.
+     *
+     * Null where there is nothing to rebuild from, which is every caller that has no projections.
+     */
+    refreshProjections: ((Map<String, VegaValue>) -> Map<String, ProjectionDefinition>)? = null,
   ): ScopeData {
     if (specs.isEmpty()) return inherited
 
@@ -386,6 +399,7 @@ internal class DataResolver(
             random,
             clock,
             projections,
+            refreshProjections,
           )
         values = pipeline.run(values, spec.transform, context)
         tree = context.tree
@@ -520,8 +534,29 @@ internal class DataResolver(
     private val random: RandomStream,
     private val clock: Clock,
     /** The scope's projections, for a `geoshape` transform or a `geoCentroid()` expression. */
-    private val projections: Map<String, ProjectionDefinition>,
+    projections: Map<String, ProjectionDefinition>,
+    /** See [resolve]: rebuilds them when a transform has published something a fit reads. */
+    private val refreshProjections:
+      ((Map<String, VegaValue>) -> Map<String, ProjectionDefinition>)?,
   ) : TransformContext {
+
+    /**
+     * The projections as they stand, rebuilt at most once per signal a transform writes.
+     *
+     * Rebuilt lazily rather than on the write: `scopeFor` is called once a row, and resolving every
+     * projection per row of a formula would cost more than the fit it is there to notice.
+     */
+    private var currentProjections = projections
+    private var projectionsStale = false
+
+    private fun projectionsNow(): Map<String, ProjectionDefinition> {
+      val refresh = refreshProjections
+      if (projectionsStale && refresh != null) {
+        currentProjections = refresh(signals)
+        projectionsStale = false
+      }
+      return currentProjections
+    }
 
     /** One diagnostic per signal per dataset; the expression runs once a row. */
     private val reported = mutableSetOf<String>()
@@ -530,6 +565,7 @@ internal class DataResolver(
 
     override fun setSignal(name: String, value: VegaValue) {
       signals[name] = value
+      projectionsStale = true
     }
 
     override fun scopeFor(datum: VegaValue): ExpressionScope =
@@ -544,11 +580,11 @@ internal class DataResolver(
             random = random,
             clock = clock,
           )
-          .withProjections(projections),
+          .withProjections(projectionsNow()),
         ::reportDeferred,
       )
 
-    override fun projection(name: String): ProjectionDefinition? = projections[name]
+    override fun projection(name: String): ProjectionDefinition? = projectionsNow()[name]
 
     /**
      * A transform read a signal whose value is not known until after the data.

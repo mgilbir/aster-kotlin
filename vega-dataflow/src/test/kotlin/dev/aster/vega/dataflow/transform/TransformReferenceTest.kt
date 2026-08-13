@@ -709,7 +709,7 @@ class TransformReferenceTest {
     val output =
       run(
         """[{"type": "formula", "expr": "1", "as": "one"},
-            {"type": "geojson", "field": "v"},
+            {"type": "wordcloud", "text": "c"},
             {"type": "filter", "expr": "false"}]"""
       )
     // The formula ran; the filter after the unknown transform did not.
@@ -719,7 +719,7 @@ class TransformReferenceTest {
       context.diagnostics.diagnostics.first {
         it.code == DiagnosticCodes.TRANSFORM_NOT_IMPLEMENTED
       }
-    assertTrue(diagnostic.message.contains("geojson"), diagnostic.message)
+    assertTrue(diagnostic.message.contains("wordcloud"), diagnostic.message)
   }
 
   @Test
@@ -782,7 +782,7 @@ class TransformReferenceTest {
     VegaValue.Obj(linkedMapOf("g" to VegaValue.Str(group), "v" to VegaValue.Num(value)))
 
   @Test
-  fun `the registry covers the transforms the brief lists, plus thirty-five more`() {
+  fun `the registry covers the transforms the brief lists, plus thirty-six more`() {
     val fromTheBrief =
       setOf(
         "filter",
@@ -817,7 +817,10 @@ class TransformReferenceTest {
     // feature drawn through a projection, the grid of meridians and parallels under it, and a
     // longitude and latitude placed on the page. `voronoi` is the region of the plane nearest to
     // each point, which an interactive scatter plot draws invisibly so the pointer has something to
-    // hit. `label` places a text mark beside the marks it annotates, dropping the ones that would
+    // hit. `geojson` gathers a table of coordinates into one `FeatureCollection` for a projection's
+    // `fit` to read, which is the ordinary way to fit a map to point data. `label` places a text
+    // mark
+    // beside the marks it annotates, dropping the ones that would
     // collide — the one transform here whose fidelity is not established against upstream, because
     // upstream's own needs a canvas Node has not got.
     assertEquals(
@@ -854,6 +857,7 @@ class TransformReferenceTest {
         "force" +
         "geoshape" +
         "geopoint" +
+        "geojson" +
         "graticule" +
         "voronoi" +
         "label",

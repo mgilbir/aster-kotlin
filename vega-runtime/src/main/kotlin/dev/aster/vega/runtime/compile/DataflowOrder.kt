@@ -211,17 +211,24 @@ internal class DataflowOrder(
      * Only `fit` matters: every other projection property is a number or a signal, and a signal is
      * already an operator that the ordering knows how to wait for.
      */
-    private val projectionFits: Map<String, Set<String>> = projections.associate { projection ->
-      val fit = projection.fit
-      val source = (fit as? VegaValue.Obj)?.fields?.get("signal")?.asString()
-      val reads =
-        source
-          ?.let { expressions.compile(it) }
-          ?.let { compiled ->
-            (compiled as? ExpressionResult.Compiled)?.expression?.dataDependencies
-          } ?: emptySet()
-      projection.name to reads
+    /**
+     * What each projection's `fit` waits for, as operators.
+     *
+     * Lazy because it is `readsOf` in disguise and that needs every other table built first. Going
+     * through `readsOf` rather than reading `dataDependencies` directly is the point: a fit written
+     * `{"signal": "data('land')"}` names a dataset, but one written `{"signal": "cloud"}` names a
+     * signal a `geojson` transform **publishes**, and only `readsOf` knows to turn that into an
+     * edge to the dataset whose pipeline publishes it.
+     */
+    private val projectionSources: Map<String, Set<Operator>> by lazy {
+      projections.associate { projection ->
+        val source = (projection.fit as? VegaValue.Obj)?.fields?.get("signal")?.asString()
+        projection.name to (source?.let { readsOf(it) } ?: emptySet())
+      }
     }
+
+    /** Which projection each transform type names, so a dataset waits for that projection's fit. */
+    private val projectionParameter = "projection"
     private val scaleSpecs = scales.associateBy { it.name }
     private val signalSpecs = signals.associateBy { it.name }
 
@@ -305,6 +312,14 @@ internal class DataflowOrder(
       for (transform in spec.transform) {
         collectSignalReferences(transform, result)
         collectTransformExpressions(transform, result)
+        // A `geopath`, `geopoint` or `geoshape` names its projection in a plain string, and a
+        // *fitted* projection is built from data — so a dataset that places rows through one waits
+        // for whatever the fit reads. Without this, a `geopoint` under a projection fitted to what
+        // another dataset published placed every row through the family's unfitted default: right
+        // shape, wrong scale, and nothing said.
+        val named =
+          ((transform as? VegaValue.Obj)?.fields?.get(projectionParameter) as? VegaValue.Str)?.value
+        named?.let { projectionSources[it]?.let(result::addAll) }
       }
       return result
     }
@@ -467,7 +482,7 @@ internal class DataflowOrder(
         // unfitted default: `albers` reported 1070 where upstream reported 34.3, because the fit
         // had
         // not happened yet.
-        projectionFits[name]?.forEach { result.add(Operator.Data(it)) }
+        projectionSources[name]?.let { result.addAll(it) }
       }
       if (expression.readsUnnamedScale) {
         scaleSpecs.keys.forEach { result.add(Operator.Scale(it)) }

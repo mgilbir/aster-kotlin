@@ -10,10 +10,12 @@ import dev.aster.vega.dataflow.geo.PathCentroidSink
 import dev.aster.vega.dataflow.geo.PathStringSink
 import dev.aster.vega.dataflow.geo.Projection
 import dev.aster.vega.dataflow.geo.Projections
+import dev.aster.vega.expression.JsSemantics
 import dev.aster.vega.model.DiagnosticCodes
 import dev.aster.vega.model.VegaValue
 import dev.aster.vega.model.asDouble
 import dev.aster.vega.model.field
+import dev.aster.vega.model.isMissing
 
 /**
  * A projection with every signal in it already resolved, as a transform receives it.
@@ -314,6 +316,93 @@ public object GeoMeasure {
  * behaviour, and it matters — a mark encoded from a missing `x` draws at the origin rather than
  * being left out, which is visible as a cluster of points in the top-left corner.
  */
+/**
+ * `geojson`: gathers rows into one GeoJSON `FeatureCollection` and publishes it as a signal.
+ *
+ * The data passes through untouched — this transform exists for its **value**, which is what a
+ * projection's `fit` reads. It is the ordinary way to fit a projection to a table of coordinates:
+ * `fields` names a longitude and a latitude column and every row becomes one point of a single
+ * `MultiPoint` feature, so the fit sees the whole cloud as one geometry rather than as one feature
+ * per row.
+ *
+ * `geojson` names a column already holding a feature, and the two combine: the features come first
+ * and the `MultiPoint` built from the coordinate columns is appended after them, which is
+ * upstream's order and matters because `fit` walks the collection in order.
+ *
+ * A row whose longitude or latitude is missing or unparseable is left out of the point list rather
+ * than contributing a `NaN` — upstream tests both with `(x = +x) === x`, which rejects a `null`, an
+ * empty string and anything non-numeric alike.
+ */
+public object GeoJsonTransform : Transform {
+  override val type: String = "geojson"
+
+  /** The collection itself, which is the only thing this transform produces. */
+  override val publishesSignal: Boolean = true
+
+  override fun apply(
+    input: List<VegaValue>,
+    params: VegaValue.Obj,
+    context: TransformContext,
+  ): List<VegaValue> {
+    val fields = params.stringList("fields")
+    val geojson = params.string("geojson")
+    if (geojson == null && fields.size < 2) {
+      context.diagnostics.error(
+        DiagnosticCodes.TRANSFORM_INVALID_PARAMETER,
+        "geojson needs 'geojson' naming a feature column, or 'fields' naming a longitude and a " +
+          "latitude",
+        operator = type,
+      )
+      return input
+    }
+
+    val features = mutableListOf<VegaValue>()
+    // With neither parameter upstream falls back to the identity accessor, so each row *is* the
+    // feature. That case cannot be reached here: the guard above requires one or the other.
+    if (geojson != null) {
+      for (row in input) features += row.field(geojson)
+    }
+    if (fields.size >= 2) {
+      val points = input.mapNotNull { row ->
+        val lon = row.field(fields[0])
+        val lat = row.field(fields[1])
+        if (lon.isMissing || lat.isMissing) return@mapNotNull null
+        val x = JsSemantics.toNumber(lon)
+        val y = JsSemantics.toNumber(lat)
+        if (!x.isFinite() || !y.isFinite()) null
+        else VegaValue.Arr(listOf(VegaValue.Num(x), VegaValue.Num(y)))
+      }
+      features +=
+        VegaValue.Obj(
+          linkedMapOf(
+            "type" to VegaValue.Str("Feature"),
+            "geometry" to
+              VegaValue.Obj(
+                linkedMapOf(
+                  "type" to VegaValue.Str("MultiPoint"),
+                  "coordinates" to VegaValue.Arr(points),
+                )
+              ),
+          )
+        )
+    }
+
+    val signal = params.string("signal")
+    if (signal != null) {
+      context.setSignal(
+        signal,
+        VegaValue.Obj(
+          linkedMapOf(
+            "type" to VegaValue.Str("FeatureCollection"),
+            "features" to VegaValue.Arr(features),
+          )
+        ),
+      )
+    }
+    return input
+  }
+}
+
 public object GeoPointTransform : Transform {
   override val type: String = "geopoint"
 
@@ -353,10 +442,16 @@ public object GeoPointTransform : Transform {
       return input
     }
 
+    // Each coordinate is coerced the way `+value` coerces it and the pair is projected whatever
+    // comes out, which is upstream's `proj([lon(t), lat(t)])` and not the same as skipping the row:
+    // a **null** longitude is `+null`, which is zero, so the row is placed on the prime meridian; a
+    // longitude of `"west"` is `NaN`, and for a projection whose two coordinates are independent
+    // that leaves `x` unusable while `y` still lands where the latitude says. Rejecting the pair up
+    // front put both at the origin, which drew a point nothing in the data asked for.
     return input.map { row ->
-      val lon = row.field(fields[0]).asDouble()
-      val lat = row.field(fields[1]).asDouble()
-      val placed = if (lon.isNaN() || lat.isNaN()) null else projection.apply(lon, lat)
+      val lon = JsSemantics.toNumber(row.field(fields[0]))
+      val lat = JsSemantics.toNumber(row.field(fields[1]))
+      val placed = projection.apply(lon, lat)
       row.withFields(
         linkedMapOf(
           outputs[0] to (placed?.let { VegaValue.Num(it[0]) } ?: VegaValue.Null),

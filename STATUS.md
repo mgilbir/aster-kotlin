@@ -17,7 +17,7 @@ Last updated: 2026-08-08
 ## Current milestone
 
 Milestones 0, 1 and 2 complete. **Milestones 3, 4 and 5 in progress**: Vega specifications compile
-end to end — expressions, signals, 33 of upstream's 40 data transforms, every scale type in scope,
+end to end — expressions, signals, 49 of upstream's 51 data transforms, every scale type in scope,
 and an event handler that recompiles the chart — and are verified against upstream Vega by
 differential tests.
 
@@ -196,12 +196,12 @@ substantive compatibility items:
 | 1. Compiled Vega JSON loads without JavaScript | **Yes**, for a substantial subset — `VegaChartController.setSpec` loads it and the demo renders three bundled specifications on device |
 | 2. Bar, line, area, scatter, stacked bar render natively | **Yes** — all five compile from a specification, and small multiples of them too |
 | 3. Axes, legends, labels and titles supported | **Yes** — all four |
-| 4. Basic transforms and scales execute in Kotlin | **Yes** — every scale type in scope, including time and UTC and the four discretizing ones, and 35 of upstream's 40 transforms |
+| 4. Basic transforms and scales execute in Kotlin | **Yes** — every scale type in scope, including time and UTC and the four discretizing ones, and 49 of upstream's 51 transforms |
 | 5. Tap, hover, tooltip, selection, pan, zoom | Yes |
 | 6. View and Compose APIs | Yes |
 | 7. SVG, PNG, PDF export | Yes |
 | 8. TalkBack can describe and navigate | Partial — virtual nodes are tested by instrumentation, not with TalkBack itself |
-| 9. At least 100 compatibility fixtures pass | **Yes** — 145 |
+| 9. At least 100 compatibility fixtures pass | **Yes** — 146 |
 | 10. Core runtime has no Android dependency | Yes |
 | 11. Renders without WebView | Yes |
 | 12. Build and test loop runs from the terminal | Yes |
