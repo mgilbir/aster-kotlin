@@ -354,7 +354,27 @@ What this does *not* do is make an animation verifiable. The harness compares th
 reaches after `runAsync`, and for a specification with a timer `runAsync` never returns — so a ticking
 chart has no reference to compare against, whatever this engine does with it.
 
-## Possible future work: a timer used as a `for` loop
+## The timer-as-a-loop is resolved, and it found a transform bug
+
+The section below was written as future work: `donut-chart-labelled` passes the differential and still
+looks wrong, because its timer is standing in for a loop and the fixture compares the frame *before*
+the loop runs. With a scheduler it now runs to its own fixed point and the labels spread —
+`TimerLoopTest` pins that, and pins that running the clock on afterwards changes nothing, which is
+what makes it a loop rather than an animation. Compile-time convergence, which the note below
+proposes, would be a *divergence* from the only reference obtainable: upstream's `runAsync` never
+returns for this specification, so the reference is the unsettled frame and the fixture is right to
+match it.
+
+Writing that test found a real bug two layers down, and the way it hid is the lesson. The `values`
+aggregate operation collects the **rows** of a group, not the column the schema makes you name;
+upstream pushes the tuple and ignores the field. Ours collected the column, so
+`pluck(datum.shiftArray, 'shift')` — reading a *different* column back out of those rows — returned
+nothing but nulls and every label's shift was zero. No fixture could see it: the array is only ever
+read by a **signal**, so every compared scene agreed. If a transform's output is consumed by an
+expression rather than by a mark, the corpus is blind to it, and the only way in is a test that runs
+the thing.
+
+## The note that was: a timer used as a `for` loop
 
 `donut-chart-labelled` passes the differential and still looks wrong in the demo: its three most
 crowded labels — United States, France, Germany — are drawn on top of each other, where the gallery

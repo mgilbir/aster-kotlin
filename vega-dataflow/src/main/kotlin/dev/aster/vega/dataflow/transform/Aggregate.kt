@@ -201,6 +201,16 @@ internal class Measure(
     if (op == AggregateOp.COUNT && fieldPath == null) {
       return VegaValue.Num(tuples.size.toDouble())
     }
+    // `values` collects the **rows**, not the column: upstream pushes the tuple itself and ignores
+    // the field the schema makes you name. It matters because the whole point of the operation is
+    // to
+    // carry a group's rows along with it — `pluck(datum.rows, 'shift')` in `donut-chart-labelled`
+    // reads a *different* column out of them afterwards, and against an array of one column's
+    // values
+    // that reads back nothing but nulls. The static scene cannot see it: the rows are only ever
+    // read
+    // by a signal, so every fixture agreed while the array was the wrong thing entirely.
+    if (op == AggregateOp.VALUES) return VegaValue.Arr(tuples)
     val path = fieldPath ?: return VegaValue.Null
     if (op == AggregateOp.CI0 || op == AggregateOp.CI1) {
       val interval = confidence?.invoke(path) ?: return VegaValue.Null
@@ -213,8 +223,6 @@ internal class Measure(
     if (op == AggregateOp.MISSING) {
       return VegaValue.Num(raw.count { it.isMissing }.toDouble())
     }
-    if (op == AggregateOp.VALUES) return VegaValue.Arr(raw)
-
     val present = raw.filterNot { it.isMissing }
     if (op == AggregateOp.VALID) return VegaValue.Num(present.size.toDouble())
     // The arg operations pick a *tuple*, so they run over the rows rather than over the values the
