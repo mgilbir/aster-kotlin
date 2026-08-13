@@ -17,9 +17,12 @@ import dev.aster.vega.scene.RectD
 import dev.aster.vega.scene.RectNode
 import dev.aster.vega.scene.RuleNode
 import dev.aster.vega.scene.Scene
+import dev.aster.vega.scene.SceneBlendMode
 import dev.aster.vega.scene.SceneColor
 import dev.aster.vega.scene.SceneNode
 import dev.aster.vega.scene.Stroke
+import dev.aster.vega.scene.StrokeCap
+import dev.aster.vega.scene.StrokeJoin
 import dev.aster.vega.scene.SymbolNode
 import dev.aster.vega.scene.TextNode
 import dev.aster.vega.scene.Transform2D
@@ -264,6 +267,7 @@ public object Differential {
     val strings = LinkedHashMap<String, String>()
     solidColour(node.stroke.paint)?.let { strings["stroke"] = it.toCssHex() }
     dashOf(node.stroke)?.let { strings["strokeDash"] = it }
+    strokeDetails(node.stroke, strings)
     return Mark("rule", node.metadata.role, numbers, strings)
   }
 
@@ -278,6 +282,22 @@ public object Differential {
    * A dash pattern, with its offset. The offset is part of the pattern: the same array started a
    * half-period along draws its gaps where the other draws its marks.
    */
+  /**
+   * The stroke details nothing else here can see: the cap, the join and the mitre limit.
+   *
+   * A round-capped rule is longer than a butt-capped one by its own width, and a mitre limit
+   * decides whether a spike on a zig-zag comes to a point or is cut flat. Both were compared past
+   * for as long as the comparison looked only at position, colour, width and opacity. Recorded only
+   * when they differ from the default, which is what upstream leaves absent.
+   */
+  private fun strokeDetails(stroke: Stroke, into: MutableMap<String, String>) {
+    if (stroke.cap != StrokeCap.BUTT) into["strokeCap"] = stroke.cap.name.lowercase()
+    if (stroke.join != StrokeJoin.MITER) into["strokeJoin"] = stroke.join.name.lowercase()
+    if (stroke.miterLimit != Stroke.DEFAULT_MITER_LIMIT) {
+      into["strokeMiterLimit"] = fmt(stroke.miterLimit)
+    }
+  }
+
   private fun dashOf(stroke: Stroke): String? =
     stroke.dashArray
       .takeIf { it.isNotEmpty() }
@@ -323,6 +343,14 @@ public object Differential {
       numbers["strokeWidth"] = stroke.width
       numbers["strokeOpacity"] = stroke.opacity
       dashOf(stroke)?.let { strings["strokeDash"] = it }
+    }
+    // `limit` decides whether a label reads "September" or "Sep…", and `ellipsis` decides how the
+    // truncation looks. Both were compared past: the item's `text` is the untruncated string on
+    // both
+    // sides, so a wrong limit changed the drawing and nothing else.
+    if (run.limit != 0.0) {
+      numbers["limit"] = run.limit
+      strings["ellipsis"] = run.ellipsis
     }
     return Mark("text", node.metadata.role, numbers, strings)
   }
@@ -525,6 +553,9 @@ public object Differential {
         node.cornerRadiusBottomRight,
         node.cornerRadiusBottomLeft,
       )
+    // A clipped group hides whatever its children draw outside it, which no coordinate here
+    // reveals.
+    if (node.clip != null) strings["clip"] = "true"
     return Mark("group", node.metadata.role, numbers + corners + paintNumbers(node), strings)
   }
 
@@ -582,8 +613,31 @@ public object Differential {
     stroke?.let { s ->
       solidColour(s.paint)?.let { result["stroke"] = it.toCssHex() }
       dashOf(s)?.let { result["strokeDash"] = it }
+      strokeDetails(s, result)
     }
+    blendOf(node)?.let { result["blend"] = it }
     return result
+  }
+
+  /**
+   * A blend mode, which changes every pixel a mark covers and was invisible to this comparison.
+   *
+   * Absent for `normal`, which is what upstream leaves off the item.
+   */
+  private fun blendOf(node: SceneNode): String? {
+    val mode =
+      when (node) {
+        is RectNode -> node.blendMode
+        is SymbolNode -> node.blendMode
+        is PathNode -> node.blendMode
+        is RuleNode -> node.blendMode
+        is TextNode -> node.blendMode
+        is ImageNode -> node.blendMode
+        is GroupNode -> node.blendMode
+      }
+    if (mode == SceneBlendMode.NORMAL) return null
+    // The scene spells them as enum constants; upstream carries the CSS keyword.
+    return mode.name.lowercase().replace('_', '-')
   }
 
   private fun solidColour(paint: dev.aster.vega.scene.ScenePaint): SceneColor? =

@@ -919,6 +919,7 @@
     {
       "role": "mark",
       "stroke": "goldenrod",
+      "strokeCap": "round",
       "strokeWidth": 9.454479,
       "type": "rule",
       "x": 200,

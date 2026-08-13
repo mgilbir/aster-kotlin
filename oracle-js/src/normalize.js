@@ -409,6 +409,21 @@ function record(type, role, item, dx, dy, precision) {
   if (entry.strokeOpacity !== undefined && entry.stroke === undefined) delete entry.strokeOpacity;
   const dash = dashOf(item);
   if (dash !== undefined) entry.strokeDash = dash;
+  // The channels that change what is drawn without changing a coordinate or a colour, and were
+  // therefore invisible to this harness. A round-capped rule is longer than a butt-capped one by its
+  // own width; a mitre limit decides whether a spike on a zig-zag is pointed or cut off; a blend mode
+  // changes every pixel; a `limit` decides whether a label says "September" or "Sep…"; and a group's
+  // `clip` decides whether its children are drawn at all outside it. Each of them was compared past.
+  for (const channel of ['strokeCap', 'strokeJoin', 'strokeMiterLimit', 'blend', 'limit', 'clip']) {
+    if (item[channel] !== undefined && item[channel] !== null) {
+      entry[channel] = styleValue(item[channel], precision);
+    }
+  }
+  // `ellipsis` only means something where a `limit` can bite, and Vega carries its default on every
+  // text item — so it is compared where the label is actually being truncated and nowhere else.
+  if (type === 'text' && item.limit && item.ellipsis !== undefined && item.ellipsis !== null) {
+    entry.ellipsis = String(item.ellipsis);
+  }
   // A symbol's `size` channel says nothing about the outline it actually draws, and Vega ships its own
   // symbol table rather than d3's — so compare the drawn extent, not just the requested size.
   //

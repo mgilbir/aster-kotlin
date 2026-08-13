@@ -40,6 +40,7 @@
       "y": 91
     },
     {
+      "blend": "multiply",
       "cornerRadius": 14,
       "fill": "#f58518",
       "fillOpacity": 0.7,
@@ -101,9 +102,11 @@
     {
       "align": "center",
       "baseline": "middle",
+      "ellipsis": "~",
       "fill": "#333333",
       "font": "sans-serif",
       "fontSize": 11,
+      "limit": 46,
       "role": "mark",
       "text": "north by a long way",
       "type": "text",
@@ -113,9 +116,11 @@
     {
       "align": "center",
       "baseline": "middle",
+      "ellipsis": "~",
       "fill": "#333333",
       "font": "sans-serif",
       "fontSize": 11,
+      "limit": 46,
       "role": "mark",
       "text": "east by a long way",
       "type": "text",
@@ -125,9 +130,11 @@
     {
       "align": "center",
       "baseline": "middle",
+      "ellipsis": "~",
       "fill": "#333333",
       "font": "sans-serif",
       "fontSize": 11,
+      "limit": 46,
       "role": "mark",
       "text": "south by a long way",
       "type": "text",
@@ -137,9 +144,11 @@
     {
       "align": "center",
       "baseline": "middle",
+      "ellipsis": "~",
       "fill": "#333333",
       "font": "sans-serif",
       "fontSize": 11,
+      "limit": 46,
       "role": "mark",
       "text": "west by a long way",
       "type": "text",
@@ -147,6 +156,7 @@
       "y": 200
     },
     {
+      "clip": true,
       "cornerRadiusBottomRight": 18,
       "cornerRadiusTopLeft": 18,
       "fill": "#f2f2f2",
