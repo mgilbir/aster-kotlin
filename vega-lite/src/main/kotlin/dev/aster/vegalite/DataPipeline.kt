@@ -645,13 +645,32 @@ internal class DataPipeline(
    * in the same dataset anyway; where there is one — a box plot's outliers and its whiskers both
    * begin by finding the quartiles — it is the difference between computing them once and twice.
    */
+  private fun text(value: VegaValue): String? = (value as? VegaValue.Str)?.value
+
+  /** The stated `aggregate` as the flow's own node, or null for anything else. */
+  private fun aggregateFrom(transform: VegaValue): AggregateNode? {
+    if (transform.string("type") != "aggregate") return null
+    return AggregateNode(
+      dimensions = transform.array("groupby").orEmpty().mapNotNull { text(it) },
+      ops = transform.array("ops").orEmpty().mapNotNull { text(it) },
+      fields = transform.array("fields").orEmpty().map { text(it) },
+      outputs = transform.array("as").orEmpty().mapNotNull { text(it) },
+    )
+  }
+
   private fun userTransforms(head: DataNode): DataNode {
     var last = head
     val transforms = Transforms(diagnostics, registerLookup, view::prefixed, view.selections)
     view.spec.transforms.forEachIndexed { index, transform ->
       val path = "$.transform[$index]"
       for (emitted in transforms.translateAt(transform, path)) {
-        last = last.then(PassThroughNode(listOf(emitted)))
+        // An `aggregate` a specification *states* is the same node as one an encoding asks for —
+        // `AggregateNode.makeFromTransform` beside `makeFromEncoding` — and being the same node is
+        // what lets the two fold together. A composite mark is where it tells: an error bar states
+        // its own aggregate and the point drawn over it asks for a `mean`, both grouped the same
+        // way, and upstream computes the grouping once. Carried as an opaque transform, the
+        // grouping is computed twice into two datasets.
+        last = last.then(aggregateFrom(emitted) ?: PassThroughNode(listOf(emitted)))
       }
     }
     return last

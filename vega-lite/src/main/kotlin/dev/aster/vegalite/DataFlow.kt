@@ -294,8 +294,26 @@ internal sealed class DataNode {
     }
     for (group in grouped.values) {
       if (group.size < 2) continue
-      val kept = group.removeAt(group.size - 1)
-      for (folded in group) {
+      // Exact duplicates fold into the **first**, and the rest into the *last*. The two rules are
+      // one rule upstream: a composite mark states its aggregate once, on the layer above the
+      // views it expands into, so upstream never has two identical sibling aggregates to merge and
+      // the branches below the single node stay in the order the views were written. This compiler
+      // gives each expanded view its own copy, and folding them into the first restores that tree.
+      // Genuinely different aggregates are `MergeAggregates` proper — `mergeableAggs.pop()` keeps
+      // the last, which is why an error bar's own aggregate ends up *under* the mean drawn over it.
+      val distinct = mutableListOf<AggregateNode>()
+      for (node in group) {
+        val same = distinct.firstOrNull { it.sameAs(node) }
+        if (same == null) {
+          distinct += node
+        } else {
+          same.children += node.children
+          children.remove(node)
+        }
+      }
+      if (distinct.size < 2) continue
+      val kept = distinct.removeAt(distinct.size - 1)
+      for (folded in distinct) {
         kept.merge(folded)
         children.remove(folded)
         kept.children += folded.children
@@ -550,29 +568,37 @@ internal class AggregateNode(
   outputs: List<String>,
 ) : DataNode() {
   /**
-   * The measures, keyed by the field they read and then by the operation.
+   * The measures, keyed by the field they read, then by the operation, then by the names it is
+   * written out under.
    *
    * Kept this way because merging two aggregates is a *union of measures*, and the emitted order
    * follows the fields' first appearance rather than the order the operations were asked for —
    * which is what puts a `count`, whose field is nothing at all, after every measure of a column.
+   *
+   * The innermost level is a **set of names**, not one name: two views can ask for the same measure
+   * of the same column and want it under different names — an error bar's `center_yield` beside the
+   * `mean_yield` the point drawn over it encodes — and the merged aggregate computes it once for
+   * each name. Upstream's `mergeMeasures` unions those sets for the same reason.
    */
-  private val measures = LinkedHashMap<String?, LinkedHashMap<String, String>>()
+  private val measures = LinkedHashMap<String?, LinkedHashMap<String, LinkedHashSet<String>>>()
 
   init {
     for (index in ops.indices) {
-      measures.getOrPut(fields.getOrNull(index)) { LinkedHashMap() }[ops[index]] =
-        outputs.getOrElse(index) { "" }
+      measures
+        .getOrPut(fields.getOrNull(index)) { LinkedHashMap() }
+        .getOrPut(ops[index]) { LinkedHashSet() } += outputs.getOrElse(index) { "" }
     }
   }
 
   val ops: List<String>
-    get() = measures.values.flatMap { it.keys }
+    get() =
+      measures.values.flatMap { byOp -> byOp.entries.flatMap { (op, names) -> names.map { op } } }
 
   val fields: List<String?>
-    get() = measures.entries.flatMap { (field, byOp) -> byOp.keys.map { field } }
+    get() = measures.entries.flatMap { (field, byOp) -> byOp.values.flatMap { it.map { field } } }
 
   val outputs: List<String>
-    get() = measures.values.flatMap { it.values }
+    get() = measures.values.flatMap { byOp -> byOp.values.flatten() }
 
   /**
    * Folds another aggregate's measures into this one — upstream's `mergeMeasures`.
@@ -581,10 +607,17 @@ internal class AggregateNode(
    * merge: two aggregates over one table with one grouping are one aggregate, and leaving them
    * apart means the same grouping computed twice into two datasets.
    */
+  /** Whether two aggregates are the same node written twice, measures and all. */
+  fun sameAs(other: AggregateNode): Boolean =
+    dimensions == other.dimensions &&
+      ops == other.ops &&
+      fields == other.fields &&
+      outputs == other.outputs
+
   fun merge(other: AggregateNode) {
     for ((field, byOp) in other.measures) {
       val into = measures.getOrPut(field) { LinkedHashMap() }
-      for ((op, output) in byOp) into.putIfAbsent(op, output)
+      for ((op, names) in byOp) into.getOrPut(op) { LinkedHashSet() } += names
     }
   }
 
