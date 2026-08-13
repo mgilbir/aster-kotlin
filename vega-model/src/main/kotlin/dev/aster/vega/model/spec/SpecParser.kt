@@ -1981,6 +1981,21 @@ public class SpecParser {
       labels = obj.fields["labels"]?.asBoolean() ?: true,
       domainLine = obj.fields["domain"]?.asBoolean() ?: true,
       tickCount = obj.numberOrSignal("tickCount", "$path.tickCount"),
+      // `tickCount` also takes a time interval, in the same two spellings `nice` does. Read here
+      // rather than through `numberOrSignal`, which sees a string or an object and has nothing to
+      // make a number of — so the interval form was dropped in silence and the axis fell back to a
+      // count, labelling a night at whatever round number the algorithm liked.
+      tickInterval =
+        when (val count = obj.fields["tickCount"]) {
+          is VegaValue.Str -> count.value.lowercase()
+          is VegaValue.Obj -> count.fields["interval"]?.asString()?.lowercase()
+          else -> null
+        },
+      tickStep =
+        ((obj.fields["tickCount"] as? VegaValue.Obj)?.fields?.get("step") as? VegaValue.Num)
+          ?.value
+          ?.toInt()
+          ?.takeIf { it >= 1 },
       tickSize = obj.numberOrSignal("tickSize", "$path.tickSize"),
       labelPadding = obj.numberOrSignal("labelPadding", "$path.labelPadding"),
       labelFontSize = obj.numberOrSignal("labelFontSize", "$path.labelFontSize"),
@@ -2559,6 +2574,22 @@ public class SpecParser {
         formatExpression =
           (obj.fields["format"] as? VegaValue.Obj)?.fields?.get("signal")?.asString(),
         tickCount = obj.numberOrSignal("tickCount", "$path.tickCount"),
+        // `tickCount` also takes a time interval, in the same two spellings `nice` does. Read here
+        // rather than through `numberOrSignal`, which sees a string or an object and has nothing to
+        // make a number of — so the interval form was dropped in silence and the axis fell back to
+        // a
+        // count, labelling a night at whatever round number the algorithm liked.
+        tickInterval =
+          when (val count = obj.fields["tickCount"]) {
+            is VegaValue.Str -> count.value.lowercase()
+            is VegaValue.Obj -> count.fields["interval"]?.asString()?.lowercase()
+            else -> null
+          },
+        tickStep =
+          ((obj.fields["tickCount"] as? VegaValue.Obj)?.fields?.get("step") as? VegaValue.Num)
+            ?.value
+            ?.toInt()
+            ?.takeIf { it >= 1 },
         offset = obj.numberOrSignal("offset", "$path.offset"),
         padding = obj.numberOrSignal("padding", "$path.padding"),
         titlePadding = obj.numberOrSignal("titlePadding", "$path.titlePadding"),

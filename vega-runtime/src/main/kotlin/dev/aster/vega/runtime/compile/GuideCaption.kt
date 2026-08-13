@@ -4,6 +4,7 @@ import dev.aster.vega.expression.NumberFormatSubset
 import dev.aster.vega.model.spec.ScaleType
 import dev.aster.vega.model.time.TimeFormat
 import dev.aster.vega.runtime.scale.BandScale
+import dev.aster.vega.runtime.scale.BinOrdinalScale
 import dev.aster.vega.runtime.scale.BinnedScale
 import dev.aster.vega.runtime.scale.IdentityScale
 import dev.aster.vega.runtime.scale.LinearScale
@@ -112,6 +113,10 @@ internal object GuideCaption {
 
   private fun typeName(scale: VegaScale, declaredType: ScaleType?): String =
     when (scale) {
+      // `bin-ordinal` belongs here and not with the other three discretizing scales: upstream's
+      // `isDiscrete` is true for it — its domain is a list of edges rather than an interval — so a
+      // reader is told "a discrete scale" where a quantile scale is named by type.
+      is BinOrdinalScale,
       is BandScale,
       is PointScale,
       is OrdinalScale -> "discrete"
@@ -228,7 +233,14 @@ internal object GuideCaption {
         else -> 1.0
       }
     if (format == null) {
-      val decimals = decimalsFor(scale.thresholds)
+      // The precision the *step* needs, not the precision the values happen to have. Upstream
+      // passes
+      // the reference span through `formatSpan` whether or not a specifier was given, so a quantile
+      // scale whose cut points are 19.333 and 48.667 is described as "19, 49" — a reader is being
+      // told where the boundaries roughly are, and six decimals of a quantile is noise. Reading the
+      // decimals off the values instead read them out in full.
+      val increment = Ticks.stepFrom(Ticks.tickIncrement(0.0, step, THRESHOLD_FORMAT_COUNT))
+      val decimals = if (increment.isFinite()) Ticks.precisionForStep(increment) else 0
       return { value -> formatTickLabel(value, decimals) }
     }
     val resolved = Ticks.spanSpecifier(format, 0.0, step, THRESHOLD_FORMAT_COUNT)

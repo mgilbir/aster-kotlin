@@ -771,6 +771,15 @@ public class QuantileScale(
 
   private val sorted: List<Double> = domain.filterNot { it.isNaN() }.sorted()
 
+  /**
+   * The scale's domain as d3 keeps it: the samples, sorted, with the unreadable ones dropped.
+   *
+   * A quantile scale's domain really is the whole column — that is what distinguishes it from
+   * `quantize` — so this is also what an axis on one ticks at, one tick per sample.
+   */
+  public val sampleDomain: List<Double>
+    get() = sorted
+
   override val thresholds: List<Double> =
     (1 until maxOf(1, rangeValues.size)).map { i ->
       quantileSorted(sorted, i.toDouble() / maxOf(1, rangeValues.size))
@@ -857,6 +866,15 @@ public class BinOrdinalScale(
   public val domain: List<Double>,
   override val rangeValues: List<VegaValue>,
 ) : BinnedScale {
+
+  /**
+   * The bin edges are the scale's `bins`, which is what upstream ticks an axis on one at.
+   *
+   * The last edge bounds the topmost bucket rather than opening one, so it maps to nothing and
+   * drops out when the ticks are filtered to those that land inside the range.
+   */
+  override val bins: List<Double>
+    get() = domain
 
   /** The interior edges: the first and last bound the outermost buckets and label nothing. */
   override val thresholds: List<Double>

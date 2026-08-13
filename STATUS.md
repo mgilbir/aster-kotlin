@@ -145,6 +145,9 @@ scale output:
 | `airport-connections` | 650 | Vega's airport map: 49 states through `albersUsa`, and a **Voronoi** cell over each of 597 airports so the pointer always has a nearest one — invisible, and compared outline by outline |
 | `mark-join-key` | 23 | a mark `key` collapsing two rows onto one item, as text and as a number, beside a mark with no key that draws every row |
 | `mark-descriptions` | 12 | what a reader is told about a *mark*: a described series, a decorative rule hidden with `aria: false`, and items that name their own role |
+| `axis-discretizing` | 89 | an axis on each of the four discretizing scales, whose ranges are steps rather than colours |
+| `scope-shadowing` | 11 | a group redeclaring a signal and a scale the outer scope already has, and an inner group shadowing the shadow |
+| `timeunit-dst-scale` | 37 | hourly readings bucketed by local and by UTC hours across the spring change, ticked by a two-hour interval |
 
 The gate is wired into `./scripts/oracle.sh`, so every further scale, mark and transform is built
 against a harness that can say we are wrong — which golden tests cannot.
@@ -203,7 +206,7 @@ substantive compatibility items:
 | 6. View and Compose APIs | Yes |
 | 7. SVG, PNG, PDF export | Yes |
 | 8. TalkBack can describe and navigate | Partial — virtual nodes are tested by instrumentation, not with TalkBack itself |
-| 9. At least 100 compatibility fixtures pass | **Yes** — 159 |
+| 9. At least 100 compatibility fixtures pass | **Yes** — 162 |
 | 10. Core runtime has no Android dependency | Yes |
 | 11. Renders without WebView | Yes |
 | 12. Build and test loop runs from the terminal | Yes |
@@ -2141,10 +2144,14 @@ depends on them. Each has a test and a comment; this is the index.
    engine is not at fault; the demo reads badly and a user would notice before any of us did.
 3. **Keep growing the fixture corpus.** The brief's 100 is reached; the corpus is now aimed at the three categories the brief used to rule out. Aiming it at *combinations* the
    engine has not met rather than at more variations of a single feature is what makes it find
-   things: that is how `scale()` in an expression turned up missing. Untried combinations that
-   remain include an axis on a discretizing scale, a group whose signals shadow the outer scope's,
-   and a `timeunit` transform feeding a `time` scale across the same daylight-saving boundary the
-   `local-time-dst` fixture crosses.
+   things: that is how `scale()` in an expression turned up missing. The three combinations named here last time are
+   now fixtures, and two of the three failed on arrival: an axis on a **discretizing** scale was
+   skipped outright with a diagnostic, and a `tickCount` written as a time **interval** was dropped in
+   silence. The third, a group shadowing the outer scope's signals and scales, passed unchanged. Two
+   further bugs fell out of the first: a `bin-ordinal` domain taken from a field kept its duplicates,
+   so the lowest bin was painted with the highest bucket's colour, and every interval name in the
+   plural — `"hours"`, `"minutes"`, `"seconds"` — matched nothing, which `nice` had been getting wrong
+   too.
 
 ~~A fourth candidate: **a transform cannot read a computed signal**.~~ **Resolved**, by the
 dependency ordering that replaced the compile phases. It was described here as needing "the signal

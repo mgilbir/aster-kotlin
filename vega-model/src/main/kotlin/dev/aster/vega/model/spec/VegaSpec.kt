@@ -776,6 +776,16 @@ public data class AxisSpec(
   val labels: Boolean = true,
   val domainLine: Boolean = true,
   val tickCount: NumberValue? = null,
+  /**
+   * `tickCount` written as a **time interval** — `"hours"`, or `{"interval": "hours", "step": 2}`.
+   *
+   * Not a count at all, which is why it needs its own field: it names the calendar unit the ticks
+   * land on, so an axis over one night is labelled every two hours rather than at whatever round
+   * number a count would have chosen. Upstream errors when a non-temporal scale is given one.
+   */
+  val tickInterval: String? = null,
+  /** How many of [tickInterval] make one step; `{"interval": "hours", "step": 2}`. */
+  val tickStep: Int? = null,
   val tickSize: NumberValue? = null,
   val labelPadding: NumberValue? = null,
   val labelFontSize: NumberValue? = null,
@@ -1185,6 +1195,16 @@ public data class LegendSpec(
    */
   val format: String? = null,
   val tickCount: NumberValue? = null,
+  /**
+   * `tickCount` written as a **time interval** — `"hours"`, or `{"interval": "hours", "step": 2}`.
+   *
+   * Not a count at all, which is why it needs its own field: it names the calendar unit the ticks
+   * land on, so an axis over one night is labelled every two hours rather than at whatever round
+   * number a count would have chosen. Upstream errors when a non-temporal scale is given one.
+   */
+  val tickInterval: String? = null,
+  /** How many of [tickInterval] make one step; `{"interval": "hours", "step": 2}`. */
+  val tickStep: Int? = null,
   val offset: NumberValue? = null,
   val padding: NumberValue? = null,
   val titlePadding: NumberValue? = null,

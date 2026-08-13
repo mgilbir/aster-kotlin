@@ -65,6 +65,26 @@
   "caption": "Y-axis for a linear scale with values from 0 to 1,800,000"
  },
  {
+  "fixture": "axis-discretizing",
+  "kind": "axis",
+  "caption": "X-axis titled 'quantize' for a quantize scale with 4 boundaries: 20, 40, 60, 80"
+ },
+ {
+  "fixture": "axis-discretizing",
+  "kind": "axis",
+  "caption": "X-axis titled 'threshold' for a threshold scale with 3 boundaries: 25, 50, 75"
+ },
+ {
+  "fixture": "axis-discretizing",
+  "kind": "axis",
+  "caption": "X-axis titled 'quantile' for a quantile scale with 2 boundaries: 19, 49"
+ },
+ {
+  "fixture": "axis-discretizing",
+  "kind": "axis",
+  "caption": "X-axis titled 'bin-ordinal' for a discrete scale with 2 boundaries: 25, 50"
+ },
+ {
   "fixture": "axis-label-angle",
   "kind": "axis",
   "caption": "X-axis for a discrete scale with 4 values: alpha-long-name, bravo-long-name, charlie-long, delta-longer"
@@ -1713,6 +1733,21 @@
   "fixture": "time-units",
   "kind": "subtitle",
   "caption": "Subtitle text '20k Sample, January - March 2001'"
+ },
+ {
+  "fixture": "timeunit-dst-scale",
+  "kind": "axis",
+  "caption": "X-axis titled 'local hours' for a time scale with values from 22:00 to 04:00"
+ },
+ {
+  "fixture": "timeunit-dst-scale",
+  "kind": "axis",
+  "caption": "X-axis titled 'utc hours' for a utc scale with values from 21:00 to 02:00"
+ },
+ {
+  "fixture": "timeunit-dst-scale",
+  "kind": "axis",
+  "caption": "Y-axis for a linear scale with values from 0 to 26"
  },
  {
   "fixture": "timeunit-inferred",

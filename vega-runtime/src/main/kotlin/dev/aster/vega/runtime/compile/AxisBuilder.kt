@@ -5,21 +5,30 @@ import dev.aster.vega.model.DiagnosticCodes
 import dev.aster.vega.model.DiagnosticCollector
 import dev.aster.vega.model.VegaValue
 import dev.aster.vega.model.asDouble
+import dev.aster.vega.model.asNumberOrNull
 import dev.aster.vega.model.asString
 import dev.aster.vega.model.spec.Anchor
 import dev.aster.vega.model.spec.AxisSpec
 import dev.aster.vega.model.spec.Orient
 import dev.aster.vega.model.spec.ScaleType
 import dev.aster.vega.model.time.TimeFormat
+import dev.aster.vega.model.time.TimeInterval
+import dev.aster.vega.model.time.TimeStepper
 import dev.aster.vega.runtime.scale.BandScale
+import dev.aster.vega.runtime.scale.BinOrdinalScale
+import dev.aster.vega.runtime.scale.BinnedScale
 import dev.aster.vega.runtime.scale.LinearScale
 import dev.aster.vega.runtime.scale.PointScale
 import dev.aster.vega.runtime.scale.PositionScale
+import dev.aster.vega.runtime.scale.QuantileScale
+import dev.aster.vega.runtime.scale.QuantizeScale
+import dev.aster.vega.runtime.scale.ThresholdScale
 import dev.aster.vega.runtime.scale.Ticks
 import dev.aster.vega.runtime.scale.TimeScale
 import dev.aster.vega.runtime.scale.TimeTicks
 import dev.aster.vega.runtime.scale.TransformedScale
 import dev.aster.vega.runtime.scale.VegaScale
+import dev.aster.vega.runtime.scale.formatTickLabel
 import dev.aster.vega.scene.AccessibilityDescriptor
 import dev.aster.vega.scene.GroupNode
 import dev.aster.vega.scene.NodeMetadata
@@ -428,7 +437,7 @@ public class AxisBuilder(
         partMetadata(spec, "domain", VegaValue.EmptyObject, NodeMetadata(role = "axis-domain"))
       // Upstream encodes the domain line's endpoints as range positions 0 and 1 of the axis scale,
       // so a scale that does not span the whole plotting area gets a correspondingly short line.
-      val span = (scale as? PositionScale)?.range
+      val span = rangeEnds(scale)
       val from = span?.firstOrNull() ?: 0.0
       val to = span?.lastOrNull() ?: if (spec.orient.isVertical) extent.height else extent.width
       children +=
@@ -523,7 +532,7 @@ public class AxisBuilder(
    * whole scale range even when its outermost tick falls short of the domain's end.
    */
   private fun extentRect(spec: AxisSpec, scale: VegaScale, reach: RectD): RectD {
-    val range = (scale as? PositionScale)?.range
+    val range = rangeEnds(scale)
     val length =
       if (range == null || range.size < 2) 0.0 else kotlin.math.abs(range.last() - range.first())
     val depth = depth(spec, reach)
@@ -571,7 +580,7 @@ public class AxisBuilder(
 
     // Along the axis, the title sits wherever the anchor says on the *scale's range*, not on the
     // plotting area — the two differ inside a group.
-    val range = (scale as? PositionScale)?.range
+    val range = rangeEnds(scale)
     val from = range?.firstOrNull() ?: 0.0
     val to = range?.lastOrNull() ?: 0.0
     val along =
@@ -786,6 +795,23 @@ public class AxisBuilder(
     if (!at.isFinite()) return ticks
     return ticks + Tick("", at + tickOffset(positional, spec), VegaValue.Null, labelPosition = null)
   }
+
+  /**
+   * The two ends of the scale's range, which is what an axis is drawn along.
+   *
+   * Upstream reads them off the scale's own range whatever kind of scale it is — `{"scale": s,
+   * "range": 0}` and `{"scale": s, "range": 1}` for the domain line's endpoints, and
+   * `span(range(s))` for the length. That includes a **discretizing** scale, whose range is a list
+   * of steps rather than an interval: its first and last entries are still the two ends, so the
+   * axis spans them and its title is centred between them. Reading only [PositionScale] here left
+   * every such axis drawn from zero, with a title stacked at the origin.
+   */
+  private fun rangeEnds(scale: VegaScale): List<Double>? =
+    when (scale) {
+      is PositionScale -> scale.range
+      is BinnedScale -> scale.rangeValues.mapNotNull { it.asNumberOrNull() }.takeIf { it.size >= 2 }
+      else -> null
+    }
 
   private fun ticksFor(scale: VegaScale, spec: AxisSpec, specifier: String?): List<Tick>? {
     // A scale with `bins` has its tick values already decided: upstream's `tickValues` returns the
@@ -1166,6 +1192,28 @@ public class AxisBuilder(
         }
       }
       is TimeScale -> {
+        // `tickCount` may name a calendar unit instead of a number, and then it decides the ticks
+        // outright: every boundary of that unit inside the domain, however many that is. Upstream
+        // hands the interval to the scale in place of the count, so nothing downstream chooses a
+        // step at all.
+        val stepper =
+          TimeInterval.forUnit(spec.tickInterval)?.let { (interval, implied) ->
+            // `"quarter"` carries a step of its own — three months — and a `step` written beside it
+            // multiplies rather than replaces it, which is what `timeMonth.every(3).every(n)`
+            // means.
+            TimeStepper(interval, implied * (spec.tickStep ?: 1), scale.zone)
+          }
+        if (stepper != null) {
+          val format = labeller(scale, AxisDefaults.DEFAULT_TICK_COUNT, specifier, spec.formatType)
+          return TimeTicks.intervalTicks(scale.domain, stepper).map { value ->
+            Tick(
+              if (specifier == null && spec.formatType == null) TimeTicks.label(value, scale.zone)
+              else format(VegaValue.Num(value)),
+              scale.apply(value),
+              VegaValue.Num(value),
+            )
+          }
+        }
         val count =
           GuideFormat.countWithMinStep(
             numbers.resolveInt(spec.tickCount, spec.scale) ?: AxisDefaults.DEFAULT_TICK_COUNT,
@@ -1189,6 +1237,90 @@ public class AxisBuilder(
           )
         }
       }
+      // The four discretizing scales, whose output is a short list of steps rather than a length.
+      // Upstream's `tickValues` decides among them by what the scale *has*: bins first, then a
+      // `ticks` method, and the domain when it has neither — which is why each of the four ticks at
+      // something different, and only one of them is filtered.
+      is BinnedScale -> {
+        val count =
+          numbers.resolveInt(spec.tickCount, spec.scale) ?: AxisDefaults.DEFAULT_TICK_COUNT
+        val values =
+          when (scale) {
+            // d3's quantize delegates to the linear scale it is built on, so an axis on one is
+            // ticked over the *domain* it buckets rather than at the buckets.
+            is QuantizeScale -> Ticks.ticks(scale.domain.first(), scale.domain.last(), count)
+            // A quantile scale's domain is the column itself: one tick per sample.
+            is QuantileScale -> scale.sampleDomain
+            // A threshold scale's domain *is* its cut points.
+            is ThresholdScale -> scale.domain
+            // The one with `bins`, so the one that is filtered and thinned; see [validTicks].
+            is BinOrdinalScale -> validTicks(scale, scale.bins, maxOf(count, scale.bins.size))
+          }
+        val label = binnedLabeller(scale, count, specifier, spec.formatType)
+        values.map { value ->
+          // The position is whatever the scale maps the value *to*, which for a scale whose range
+          // is
+          // a list of colours is not a number at all: upstream writes NaN onto the item and draws
+          // nothing, and so does this.
+          val at = scale.scale(VegaValue.Num(value)).asNumberOrNull() ?: Double.NaN
+          Tick(label(VegaValue.Num(value)), at, VegaValue.Num(value))
+        }
+      }
       else -> null
     }
+
+  /**
+   * Upstream's `validTicks`: keep the candidates that land inside the range, in range order.
+   *
+   * The filter is what drops a bin scale's last edge — it bounds the topmost bucket rather than
+   * opening one, so it maps to nothing — and the thinning that follows is the same halving a long
+   * `values` list gets, ends restored when it overshoots below three.
+   */
+  /**
+   * How a discretizing scale's ticks are labelled, which is not how a positional scale's are.
+   *
+   * Upstream asks the scale for a `tickFormat` and falls back to plain string coercion when it has
+   * none — and of the four, only `quantize` has one, because d3 builds it on a linear scale. So a
+   * `format` specifier on an axis over a threshold, quantile or bin-ordinal scale is **ignored**
+   * upstream rather than applied, and ignoring it here is the faithful reading rather than an
+   * omission.
+   */
+  private fun binnedLabeller(
+    scale: BinnedScale,
+    count: Int,
+    specifier: String?,
+    formatType: String?,
+  ): (VegaValue) -> String {
+    if (scale is QuantizeScale) {
+      GuideFormat.timeLabeller(specifier, formatType)?.let { write ->
+        return { value ->
+          val instant = value.asDouble()
+          if (instant.isNaN()) value.asString() else write(instant)
+        }
+      }
+      val low = scale.domain.firstOrNull() ?: 0.0
+      val high = scale.domain.lastOrNull() ?: 1.0
+      if (specifier != null) {
+        val resolved = Ticks.spanSpecifier(specifier, low, high, count)
+        return { value -> NumberFormatSubset.format(value.asDouble(), resolved) }
+      }
+      val step = Ticks.stepFrom(Ticks.tickIncrement(low, high, count))
+      val precision = if (step.isFinite()) Ticks.precisionForStep(step) else 0
+      return { value -> formatTickLabel(value.asDouble(), precision) }
+    }
+    return { value -> value.asString() }
+  }
+
+  private fun validTicks(scale: BinnedScale, candidates: List<Double>, count: Int): List<Double> {
+    val positions = scale.rangeValues.mapNotNull { it.asNumberOrNull() }
+    if (positions.isEmpty()) return emptyList()
+    val low = kotlin.math.floor(positions.min())
+    val high = kotlin.math.ceil(positions.max())
+    val placed =
+      candidates
+        .map { it to (scale.scale(VegaValue.Num(it)).asNumberOrNull() ?: Double.NaN) }
+        .filter { (_, at) -> at.isFinite() && at >= low && at <= high }
+        .sortedBy { it.second }
+    return thin(placed, count).map { it.first }
+  }
 }

@@ -630,9 +630,12 @@ public class ScaleResolver(
         // whatever step the tick algorithm chose. Over 17 January to 9 May those differ by eleven
         // days at one end — the difference between an axis labelled by months and one by weeks.
         val stepper =
-          spec.niceInterval
-            ?.let { name -> TimeInterval.entries.firstOrNull { it.name.equals(name, true) } }
-            ?.let { TimeStepper(it, spec.niceStep ?: 1, zone) }
+          // By the specification's own unit names — `"hours"`, `"date"`, `"quarter"` — and not by
+          // this enum's; see [TimeInterval.forUnit], which is where matching them wrongly was
+          // found.
+          TimeInterval.forUnit(spec.niceInterval)?.let { (interval, implied) ->
+            TimeStepper(interval, implied * (spec.niceStep ?: 1), zone)
+          }
         val (lo, hi) =
           if (stepper != null) {
             val start = stepper.floor(domain.first())
@@ -823,7 +826,16 @@ public class ScaleResolver(
   }
 
   private fun buildBinOrdinal(spec: ScaleSpec): BinOrdinalScale? {
-    val edges = fullNumericDomain(spec) ?: return null
+    // **Distinct**, unlike the other three: a bin-ordinal scale is a discrete scale whose domain is
+    // the bin *edges*, so a column of a thousand rows in four bins has a domain of four. Keeping
+    // the
+    // duplicates put every edge at the wrong bucket — the bisection counts equal values, so the
+    // lowest bin was painted with the highest bucket's colour. Order is first appearance, not
+    // sorted:
+    // upstream sorts only when the domain says `"sort": true`, and a jumbled column really does
+    // give
+    // a jumbled scale there.
+    val edges = fullNumericDomain(spec)?.distinct() ?: return null
     val range = binnedRange(spec, buckets = maxOf(1, edges.size - 1)) ?: return null
     return BinOrdinalScale(spec.name, edges, range)
   }

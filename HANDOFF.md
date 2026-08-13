@@ -9,7 +9,7 @@ Branch `milestone-0-bootstrap`. Working tree clean, both gates green:
 - `./scripts/check.sh` — format, all tests, lint, demo APK
 - `./scripts/oracle.sh` — regenerates upstream references and runs the differential comparison
 
-**159 differential fixtures pass, all matching upstream exactly.** That is the only number here
+**162 differential fixtures pass, all matching upstream exactly.** That is the only number here
 that means what it says.
 
 ## Read this before trusting the other number
@@ -254,7 +254,7 @@ not the one Vega documents**, because Vega only forwards the parameters a specif
 
 ## What is left: two examples, and neither can be verified
 
-**159 differential fixtures pass. 91 of the 93 examples compile clean.** Everything that can be
+**162 differential fixtures pass. 91 of the 93 examples compile clean.** Everything that can be
 checked against upstream has been.
 
 ### `projections` — upstream refuses it too
@@ -402,6 +402,32 @@ outright, and drawing with one signal stuck beats not drawing.
 
 The scale form stays reported. A recompile rebuilds every scale, so nothing here says which one
 *moved*, and firing on all of them would run the handler when nothing had changed.
+
+## Writing the three untried combinations found four bugs
+
+STATUS's "next tasks" named three combinations the corpus had never met. Two of the three failed on
+arrival, which is the method working:
+
+- **An axis on a discretizing scale** was skipped outright — a whole axis missing from a chart that
+  asked for one. Each of the four ticks at something different and upstream picks by what the scale
+  *has*: bins, then a `ticks` method, then the domain.
+- **A `tickCount` written as a time interval** was dropped in silence, so a night was ticked at
+  whatever round number the count algorithm liked.
+- **A group shadowing the outer scope's signals and scales** passed unchanged.
+
+Two more fell out of the first, and both were the kind that only a fixture finds. A `bin-ordinal`
+domain taken from a field kept its **duplicates**, so the bisection counted equal values and the
+lowest bin was painted with the highest bucket's colour. And **every plural interval name matched
+nothing** — `TimeInterval` is spelled `HOUR`, Vega's unit is `"hours"` — so `nice: "hours"` had been
+silently doing nothing too, and `"quarter"` is not an interval at all but three months. That one is
+now in `TimeInterval.forUnit`, which is the only place a unit name should ever be matched.
+
+The first draft of the discretizing fixture is worth remembering as a mistake: it gave the scales
+**colour** ranges, which is what a discretizing scale is usually for. Upstream then positions every
+tick at `NaN` — a colour is not a length — and the fixture would have been asking this engine to
+reproduce meaningless output, pixel for pixel. Numeric ranges make the same four rules visible and the
+comparison mean something. If a fixture's expected output looks like garbage, the fixture is wrong
+before the engine is.
 
 ## What is left, and the one technique that finds it
 

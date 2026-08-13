@@ -12,6 +12,8 @@ import dev.aster.vega.model.spec.Direction
 import dev.aster.vega.model.spec.LegendOrient
 import dev.aster.vega.model.spec.LegendSpec
 import dev.aster.vega.model.spec.LegendType
+import dev.aster.vega.model.time.TimeInterval
+import dev.aster.vega.model.time.TimeStepper
 import dev.aster.vega.runtime.scale.BandScale
 import dev.aster.vega.runtime.scale.BinnedScale
 import dev.aster.vega.runtime.scale.IdentityScale
@@ -22,6 +24,7 @@ import dev.aster.vega.runtime.scale.QuantileScale
 import dev.aster.vega.runtime.scale.SequentialColorScale
 import dev.aster.vega.runtime.scale.Ticks
 import dev.aster.vega.runtime.scale.TimeScale
+import dev.aster.vega.runtime.scale.TimeTicks
 import dev.aster.vega.runtime.scale.TransformedScale
 import dev.aster.vega.runtime.scale.VegaScale
 import dev.aster.vega.runtime.scale.formatTickLabel
@@ -1247,8 +1250,22 @@ internal class LegendBuilder(
       is LinearScale -> numeric(spec, scale.ticks(count), scale.tickLabels(count), count)
       is TransformedScale -> numeric(spec, scale.ticks(count), scale.tickLabels(count), count)
       is SequentialColorScale -> numeric(spec, scale.ticks(count), scale.tickLabels(count), count)
-      is TimeScale ->
-        scale.ticks(count).zip(scale.tickLabels(count)).map { (v, l) -> Entry(VegaValue.Num(v), l) }
+      is TimeScale -> {
+        // A legend's `tickCount` takes a calendar unit as an axis's does — `{"interval": "month"}`
+        // on a legend over a time scale asks for one entry a month, not for five of whatever the
+        // count picks.
+        val stepper =
+          TimeInterval.forUnit(spec.tickInterval)?.let { (interval, implied) ->
+            TimeStepper(interval, implied * (spec.tickStep ?: 1), scale.zone)
+          }
+        val values =
+          if (stepper != null) TimeTicks.intervalTicks(scale.domain, stepper)
+          else scale.ticks(count)
+        val labels =
+          if (stepper != null) values.map { TimeTicks.label(it, scale.zone) }
+          else scale.tickLabels(count)
+        values.zip(labels).map { (v, l) -> Entry(VegaValue.Num(v), l) }
+      }
       // A banded legend, approximately. Upstream draws one as a *stacked colour bar* —
       // `legend-band`
       // rects of `gradientLength / buckets` each, bottom upwards, with the labels sitting at the
