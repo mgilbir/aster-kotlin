@@ -596,10 +596,9 @@ class GroupMarkTest {
         }
         """
       )
+    // Nothing is left to report: all ten of upstream's layout properties are read.
     val messages = compiled.diagnostics.map { it.message }
-    // `offset` was on this list until a trellis needed it to keep its headings clear of the
-    // captions beneath them; the three left are still reported.
-    for (name in listOf("titleBand", "center", "headerBand")) {
+    for (name in emptyList<String>()) {
       assertTrue(messages.any { it.contains("'$name'") }, "$name not reported in $messages")
     }
   }

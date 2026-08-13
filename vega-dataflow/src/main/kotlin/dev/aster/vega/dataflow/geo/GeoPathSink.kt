@@ -5,12 +5,17 @@ import kotlin.math.round
 /**
  * The stream that finally writes an SVG path, `d3-geo/src/path/string.js`.
  *
- * Two details are upstream's and both are visible. Coordinates are rounded to **three** decimals —
- * d3-geo's default `digits`, not a tidying choice, and it is what a map's `d` attribute actually
- * contains. And a bare `point` between `lineStart`s draws a *circle* of the current point radius,
- * because that is how d3 renders a `Point` geometry; a projected city is a dot, not a move-to.
+ * A bare `point` between `lineStart`s draws a *circle* of the current point radius, because that is
+ * how d3 renders a `Point` geometry: a projected city is a dot, not a move-to.
+ *
+ * [digits] defaults to d3-geo's **three**, which is what a map's `d` attribute actually contains
+ * and so is what the upstream-vector tests compare against. `null` keeps full precision, which is
+ * what the `geoshape` transform asks for: the string it produces is parsed straight back into the
+ * scene, where it *is* the geometry — a mark's bounds and every hit test come off it — and rounding
+ * it there would put the rounding into the model rather than into the output. The SVG renderer
+ * rounds on the way out, which is where a `d` attribute's digit count belongs.
  */
-internal class PathStringSink(private val digits: Int = 3) : GeoStream() {
+internal class PathStringSink(private val digits: Int? = 3) : GeoStream() {
   private val out = StringBuilder()
   private var pointState = -1
   private var line = Double.NaN
@@ -78,9 +83,14 @@ internal class PathStringSink(private val digits: Int = 3) : GeoStream() {
 
   private fun number(value: Double): String {
     if (!value.isFinite()) return "NaN"
-    var k = 1.0
-    repeat(digits) { k *= 10 }
-    val rounded = round(value * k) / k
+    val rounded =
+      if (digits == null) {
+        value
+      } else {
+        var k = 1.0
+        repeat(digits) { k *= 10 }
+        round(value * k) / k
+      }
     // JavaScript renders a whole number without a decimal point, and a path string is compared as
     // text, so `10` and `10.0` are not the same attribute.
     return if (rounded == kotlin.math.floor(rounded) && kotlin.math.abs(rounded) < 1e21) {

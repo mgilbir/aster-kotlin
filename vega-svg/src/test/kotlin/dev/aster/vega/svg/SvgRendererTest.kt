@@ -255,8 +255,10 @@ class SvgRendererTest {
         stroke = Stroke(ScenePaint.Solid(SceneColor.parse("#ddd")!!)),
       )
     val svg = sceneOf(cell).toSvg()
+    // The extent, not the origin: a stroked rectangle is drawn on the half-pixel so its outline
+    // lands on the device grid rather than straddling two rows of pixels, which is `strokeOffset`.
     assertTrue(
-      svg.contains("""<rect x="0" y="0" width="40" height="30""""),
+      svg.contains("""width="40" height="30"""") && svg.contains("stroke=\"#dddddd\""),
       "the cell's own border is missing:\n$svg",
     )
 

@@ -11,6 +11,7 @@
       "y": 0
     },
     {
+      "cornerRadius": 4,
       "fill": "rgb(28, 49, 133)",
       "height": 20,
       "role": "mark",
@@ -20,6 +21,7 @@
       "y": 80
     },
     {
+      "cornerRadius": 4,
       "fill": "rgb(44, 158, 192)",
       "height": 20,
       "role": "mark",
@@ -29,6 +31,7 @@
       "y": 20
     },
     {
+      "cornerRadius": 4,
       "fill": "rgb(41, 150, 190)",
       "height": 20,
       "role": "mark",
@@ -38,6 +41,7 @@
       "y": 20
     },
     {
+      "cornerRadius": 4,
       "fill": "rgb(36, 137, 186)",
       "height": 20,
       "role": "mark",
@@ -47,6 +51,7 @@
       "y": 60
     },
     {
+      "cornerRadius": 4,
       "fill": "rgb(38, 142, 187)",
       "height": 20,
       "role": "mark",
@@ -56,6 +61,7 @@
       "y": 20
     },
     {
+      "cornerRadius": 4,
       "fill": "rgb(237, 248, 188)",
       "height": 20,
       "role": "mark",
@@ -65,6 +71,7 @@
       "y": 0
     },
     {
+      "cornerRadius": 4,
       "fill": "rgb(233, 247, 186)",
       "height": 20,
       "role": "mark",
@@ -74,6 +81,7 @@
       "y": 60
     },
     {
+      "cornerRadius": 4,
       "fill": "rgb(237, 248, 188)",
       "height": 20,
       "role": "mark",
@@ -83,6 +91,7 @@
       "y": 60
     },
     {
+      "cornerRadius": 4,
       "fill": "rgb(239, 249, 189)",
       "height": 20,
       "role": "mark",

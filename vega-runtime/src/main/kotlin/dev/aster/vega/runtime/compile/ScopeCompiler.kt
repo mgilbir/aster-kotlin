@@ -13,6 +13,7 @@ import dev.aster.vega.expression.RandomStream
 import dev.aster.vega.model.DiagnosticCodes
 import dev.aster.vega.model.DiagnosticCollector
 import dev.aster.vega.model.VegaValue
+import dev.aster.vega.model.asNumberOrNull
 import dev.aster.vega.model.asString
 import dev.aster.vega.model.field
 import dev.aster.vega.model.parseFieldPath
@@ -135,6 +136,18 @@ internal class ScopeCompiler(
     fun boxOf(index: Int): RectD = cellReach.getOrNull(index) ?: nodes[index].bounds
   }
 
+  /**
+   * Each item's appearance under the pointer, by the id of the item it replaces.
+   *
+   * Filled while the marks are encoded and read by the controller, which swaps one in when the
+   * pointer moves. Empty for a specification with no `hover` blocks, which is most of them.
+   */
+  val hoverVariants: MutableMap<dev.aster.vega.scene.SceneNodeId, SceneNode> = mutableMapOf()
+
+  /** A mark as it looks under the pointer: its `hover` block layered over `update`. */
+  private fun hoverSpec(mark: MarkSpec): MarkSpec =
+    mark.copy(encode = mark.encode.copy(update = mark.encode.update + mark.encode.hover))
+
   fun compile(
     marks: List<MarkSpec>,
     axes: List<AxisSpec>,
@@ -143,6 +156,8 @@ internal class ScopeCompiler(
     layout: LayoutSpec?,
     enclosing: CompileScope,
     extent: PlotSize,
+    /** Where this scope's own group sits in its parent, which `{"group": "x"}` reads. */
+    origin: PointD = PointD(0.0, 0.0),
   ): ScopeContent {
     // Grows as named marks are encoded: a mark drawn from another mark's output needs the items the
     // earlier one produced, and specification order is the order they become available in.
@@ -164,6 +179,7 @@ internal class ScopeCompiler(
         expressions,
         textEngine,
         extent,
+        origin,
       )
     // The encoder goes to the axis builder as well: a label's `encode` block resolves through the
     // same channel machinery a mark's does, over the tick as its datum.
@@ -223,7 +239,36 @@ internal class ScopeCompiler(
         val rows = markData(mark, scope)
         val transformed = markTransformed(mark, rows, scope, encoder)
         scope = transformed.scope
-        built[index] = encoder.encode(mark, rows, transformed.written)
+        // Encoded twice when the mark has a `hover` block: once as it rests, once as it looks under
+        // the pointer. The allocator is rewound between the two so the pair share their ids — the
+        // hit index and the selection key on them, and an item that changed its id under the
+        // pointer
+        // would leave the pointer over nothing.
+        val before = ids.mark()
+        // Sorted by each item's own `zindex`, which is paint order *within* the mark: a bar the
+        // specification raised draws over its neighbours and still under the axis. Stable, so items
+        // sharing a `zindex` keep the order the data gave them.
+        built[index] =
+          encoder.encode(mark, rows, transformed.written).sortedBy { it.metadata.zindex }
+        if (mark.encode.hover.isNotEmpty()) {
+          val after = ids.mark()
+          ids.rewind(before)
+          val hovered = encoder.encode(hoverSpec(mark), rows, transformed.written)
+          ids.rewind(after)
+          val resting = built[index].orEmpty()
+          if (hovered.size == resting.size) {
+            for (i in resting.indices) hoverVariants[resting[i].id] = hovered[i]
+          } else {
+            // A hover block that changes *which* items exist cannot be swapped in item for item.
+            diagnostics.warn(
+              DiagnosticCodes.TRANSFORM_NOT_IMPLEMENTED,
+              "The 'hover' block on mark '${mark.name ?: mark.type.name.lowercase()}' changes how " +
+                "many items the mark produces, so there is no item-for-item swap to make; the mark " +
+                "will not respond to the pointer",
+              operator = mark.name,
+            )
+          }
+        }
         // The items a mark's own transforms produced, not the ones its encoding alone would: a
         // label drawn from a force-directed mark reads the position the simulation settled on.
         exposeItems(transformed.items ?: encoder.items(mark, rows))
@@ -263,7 +308,8 @@ internal class ScopeCompiler(
     // Last, because a title is placed against everything else: it centres over the chart *and* its
     // axes and legends, not over the plotting area.
     title?.let {
-      val node = TitleBuilder(ids, textEngine, diagnostics, numbers).build(it, content, extent)
+      val node =
+        TitleBuilder(ids, textEngine, diagnostics, numbers, encoder).build(it, content, extent)
       children += node
       content = content.union(node.transformedBounds)
     }
@@ -340,9 +386,19 @@ internal class ScopeCompiler(
    * vertically centred, so its text reaches a fraction above the legend's own top edge, and
    * measuring it there pushes the whole chart down by a unit.
    */
+  /**
+   * How far a legend reaches: its declared extent, widened by its own outline.
+   *
+   * The declared extent rather than its bounds, because a legend that clips an entry still occupies
+   * the box it declared. The outline has to be added back, though — a legend with a `strokeColor`
+   * is drawn half a stroke width outside the box on every side, and upstream measures it that way,
+   * so a chart with an outlined legend is a unit wider than one without.
+   */
   private fun legendBox(node: SceneNode): RectD =
-    (node as? GroupNode)?.size?.let {
-      node.transform.mapBounds(RectD(0.0, 0.0, it.width, it.height))
+    (node as? GroupNode)?.size?.let { size ->
+      val box = RectD(0.0, 0.0, size.width, size.height)
+      val widened = node.stroke?.takeIf { it.isVisible }?.let { box.expand(it.width / 2.0) } ?: box
+      node.transform.mapBounds(widened)
     } ?: node.transformedBounds
 
   private fun sortOrder(
@@ -402,7 +458,7 @@ internal class ScopeCompiler(
     val partitions = partition(spec, outer)
     val inner = arrayOfNulls<RectD>(partitions.size)
     val nodes =
-      encoder.encodeGroup(spec, partitions.map { it.datum }) { _, index, extent ->
+      encoder.encodeGroup(spec, partitions.map { it.datum }) { _, index, extent, origin ->
         // A group that *encodes* its own size redefines `width` and `height` for everything inside
         // it, not only where its marks are drawn: a gridline in a trellis cell spans the cell, and
         // a `"width"` range inside one is the cell's width. Vega gives every group scope its own
@@ -442,6 +498,7 @@ internal class ScopeCompiler(
             spec.layout,
             sized,
             PlotSize(extent.width, extent.height),
+            origin,
           )
         inner[index] = scoped.bounds
         scoped.nodes
@@ -512,9 +569,13 @@ internal class ScopeCompiler(
         ?: cellNodes.size.coerceAtLeast(1)
     val rows = if (cellNodes.isEmpty()) 1 else ceil(cellNodes.size / columns.toDouble()).toInt()
 
-    // The grid itself, which is what a title is centred along.
-    val gridBounds = cellBoxes.fold(RectD.Empty) { acc, box -> acc.union(box) }
     var bounds = cells.fold(RectD.Empty) { acc, part -> acc.union(part.bounds) }
+    // The **cells'** extent, captured before the headers widen it: a title is centred on the grid
+    // it
+    // titles, not on the grid plus whatever hangs off it. Upstream returns this from `gridLayout`
+    // and
+    // lays the headers out afterwards, which is the same thing said by construction.
+    val gridBounds = bounds
 
     fun offsetOf(value: NumberValue?) = numbers.resolve(value, "layout") ?: 0.0
 
@@ -564,15 +625,39 @@ internal class ScopeCompiler(
         if (role != band.role) return@forEachIndexed
         val moved =
           part.nodes.mapIndexedNotNull { position, node ->
-            // The nearest cell, walking back from this label's own place in the grid, so a table
-            // with fewer cells than slots still has its last labels against a cell.
+            // Header j labels the first cell of row j, or the j-th cell of the top row; a footer
+            // labels the same rows and columns from the other side. More labels than rows is not
+            // an error: upstream lays out the first `limit` of them and leaves the rest where they
+            // were rather than dropping them, a missing mark being a bigger difference than a
+            // misplaced one.
+            val limit = if (band.alongRows) rows else columns
+            // Within the limit, the cell may still be past the end — a **wrapped** facet's last
+            // row is short — so the label lines up with the nearest one behind it.
             var at = start + position * stride
             val back = if (band.alongRows) 1 else columns
             while (at >= cellNodes.size && at >= back) at -= back
-            val cell = cellNodes.getOrNull(at) ?: return@mapIndexedNotNull null
-            val to =
-              if (band.alongRows) PointD(margin, cell.transform.f)
-              else PointD(cell.transform.e, margin)
+            val cell =
+              if (position >= limit) null
+              else cellNodes.getOrNull(at) ?: return@mapIndexedNotNull null
+            if (cell == null) return@mapIndexedNotNull node
+            // A **band** places the label along the cell it names rather than at the cell's own
+            // origin: absent, which is upstream's default, means the origin, and a fraction means
+            // that far across the cell's own extent.
+            val fraction =
+              if (band.leading) layout.headerBand(band.alongRows)
+              else layout.footerBand(band.alongRows)
+            val extent = cellBoxes.getOrNull(at)
+            val across =
+              if (fraction == null || extent == null) {
+                if (band.alongRows) cell.transform.f else cell.transform.e
+              } else if (band.alongRows) {
+                // `cellBoxes` are already in the enclosing coordinates, so the cell's own
+                // translation is in them: adding it again put every label a cell further along.
+                roundHalfUp(extent.top + fraction * extent.height)
+              } else {
+                roundHalfUp(extent.left + fraction * extent.width)
+              }
+            val to = if (band.alongRows) PointD(margin, across) else PointD(across, margin)
             val node2 = moveTo(node, to)
             val box = node2.transform.mapBounds(part.boxOf(position))
             bounds = bounds.union(box)
@@ -596,16 +681,30 @@ internal class ScopeCompiler(
     gridded.forEachIndexed { declaration, (role, part) ->
       if (role != TrellisRole.ROW_TITLE && role != TrellisRole.COLUMN_TITLE) return@forEachIndexed
       val alongRows = role == TrellisRole.ROW_TITLE
-      val band = edges[if (alongRows) TrellisRole.ROW_HEADER else TrellisRole.COLUMN_HEADER] ?: 0.0
-      val gap =
-        band - offsetOf(if (alongRows) layout.offset.rowTitle else layout.offset.columnTitle)
+      // A title sits just outside whatever the headers reached — or, under `titleAnchor: "end"`,
+      // just outside the **footers** on the far side, with its own offset pushing it further out
+      // in whichever direction that is.
+      val atEnd = layout.titleAtEnd(alongRows)
+      val edgeRole =
+        when {
+          alongRows && atEnd -> TrellisRole.ROW_FOOTER
+          alongRows -> TrellisRole.ROW_HEADER
+          atEnd -> TrellisRole.COLUMN_FOOTER
+          else -> TrellisRole.COLUMN_HEADER
+        }
+      val band = edges[edgeRole] ?: 0.0
+      val away = offsetOf(if (alongRows) layout.offset.rowTitle else layout.offset.columnTitle)
+      val gap = if (atEnd) band + away else band - away
+      // `titleBand` runs the title along the grid it names, halfway by default.
+      val fraction = layout.titleBand(alongRows)
       val moved =
         part.nodes.mapIndexed { position, node ->
+          // A title sits just outside the band of labels it heads, centred on the grid it names.
           val at =
             if (alongRows) {
-              PointD(gap, roundHalfUp(gridBounds.top + 0.5 * gridBounds.height))
+              PointD(gap, roundHalfUp(gridBounds.top + fraction * gridBounds.height))
             } else {
-              PointD(roundHalfUp(gridBounds.left + 0.5 * gridBounds.width), gap)
+              PointD(roundHalfUp(gridBounds.left + fraction * gridBounds.width), gap)
             }
           val node2 = moveTo(node, at)
           bounds = bounds.union(node2.transform.mapBounds(part.boxOf(position)))
@@ -653,6 +752,8 @@ internal class ScopeCompiler(
         columnPadding = numbers.resolve(layout.columnPadding, "layout") ?: 0.0,
         alignColumn = GridLayout.Align.fromName(layout.alignColumn),
         alignRow = GridLayout.Align.fromName(layout.alignRow),
+        centerColumn = layout.centerColumn,
+        centerRow = layout.centerRow,
       )
     val offsets = GridLayout.place(boxes, options)
 
@@ -690,7 +791,7 @@ internal class ScopeCompiler(
     encoder: MarkEncoder,
   ): MarkTransformResult {
     if (spec.transform.isEmpty()) return MarkTransformResult(scope, emptyList(), null)
-    val context = MarkTransformScope(diagnostics, expressions, scope)
+    val context = MarkTransformScope(diagnostics, expressions, scope, textEngine)
     // The **items**, encoded: `{"field": "datum.contour"}` reaches for the row under `datum`, and
     // `{"force": "x", "x": "xfocus"}` reaches for a channel the encoding resolved. Running these
     // over the rows instead would answer the first and silently miss the second.
@@ -726,6 +827,7 @@ internal class ScopeCompiler(
     override val diagnostics: DiagnosticCollector,
     override val expressions: ExpressionCompiler,
     private val outer: CompileScope,
+    private val textEngine: TextEngine,
   ) : TransformContext {
     override var tree: dev.aster.vega.dataflow.transform.TreeSource? = null
 
@@ -742,6 +844,18 @@ internal class ScopeCompiler(
       Replacing(outer.signals.withScales(outer.scales, diagnostics).withDatum(datum), replaced)
 
     override fun projection(name: String): ProjectionDefinition? = outer.projections[name]
+
+    /** The chart's own text engine, so a label is measured the way it will be drawn. */
+    override fun measureText(text: String, fontSize: Double): Double =
+      textEngine
+        .layout(
+          dev.aster.vega.scene.TextRun(
+            text = text,
+            style = dev.aster.vega.scene.TextStyle(fontSize = fontSize),
+          )
+        )
+        .bounds
+        .width
 
     /** The scope the marks after this one see, with any dataset a transform rewrote in it. */
     fun published(scope: CompileScope): CompileScope =
@@ -905,7 +1019,8 @@ internal class ScopeCompiler(
         if (op == null) {
           diagnostics.error(
             DiagnosticCodes.TRANSFORM_INVALID_PARAMETER,
-            "Facet aggregate '${measure.op}' is not implemented",
+            "'${measure.op}' is not one of Vega's aggregate operations, " +
+              "so a facet cannot measure with it",
             operator = spec.name,
           )
           continue
@@ -994,7 +1109,7 @@ internal class ScopeCompiler(
     }
 
   private fun numberSignal(signals: SignalScope, name: String): Double? =
-    (signals[name] as? VegaValue.Num)?.value?.takeIf { !it.isNaN() }
+    signals[name]?.asNumberOrNull()?.takeIf { !it.isNaN() }
 
   /** The rows a non-group mark iterates. A mark with no data draws once. */
   private fun markData(mark: MarkSpec, scope: CompileScope): List<VegaValue> {
@@ -1043,6 +1158,16 @@ internal class ScopeCompiler(
       for (mark in list) {
         mark.from?.data?.let(names::add)
         mark.from?.facet?.data?.let(names::add)
+        // A mark-level transform may name another mark in a *parameter* rather than in `from`:
+        // `label`'s `avoidMarks` is the case, and the items it names have to be built for it.
+        for (definition in mark.transform) {
+          val avoid = (definition as? VegaValue.Obj)?.fields?.get("avoidMarks")
+          when (avoid) {
+            is VegaValue.Arr -> avoid.values.forEach { names.add(it.asString()) }
+            is VegaValue.Str -> names.add(avoid.value)
+            else -> Unit
+          }
+        }
         walk(mark.marks)
       }
     }

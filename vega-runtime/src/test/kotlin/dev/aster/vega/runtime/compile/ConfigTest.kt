@@ -260,11 +260,13 @@ class ConfigTest {
    */
   @Test
   fun `config blocks that do not reach the chart are reported`() {
+    // `range` came off this list: its entries are what a *named* range stands for, and the parser
+    // substitutes one for the name exactly as upstream does.
     val diagnostics =
-      compile("""{"range": {}, "group": {"fill": "#eee"}, "projection": {}}""").diagnostics.filter {
+      compile("""{"group": {"fill": "#eee"}, "projection": {}}""").diagnostics.filter {
         it.code == DiagnosticCodes.PARSE_UNKNOWN_PROPERTY
       }
-    for (name in listOf("range", "group", "projection")) {
+    for (name in listOf("group", "projection")) {
       assertTrue(
         diagnostics.any { it.jsonPath == "$.config.$name" },
         "$name not reported in $diagnostics",

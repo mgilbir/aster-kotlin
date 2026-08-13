@@ -1,0 +1,141 @@
+{
+  "$schema": "https://vega.github.io/schema/vega/v6.json",
+  "description": "symbolLimit is not a plain truncation: upstream keeps limit - 1 swatches and spends the last row saying how many entries it left out, with the swatch beside that row drawn from the next value.",
+  "width": 200,
+  "height": 140,
+  "padding": 5,
+  "background": "white",
+  "data": [
+    {
+      "name": "t",
+      "values": [
+        {
+          "c": "alpha",
+          "v": 1
+        },
+        {
+          "c": "beta",
+          "v": 2
+        },
+        {
+          "c": "gamma",
+          "v": 3
+        },
+        {
+          "c": "delta",
+          "v": 4
+        },
+        {
+          "c": "epsilon",
+          "v": 5
+        },
+        {
+          "c": "zeta",
+          "v": 6
+        },
+        {
+          "c": "eta",
+          "v": 7
+        },
+        {
+          "c": "theta",
+          "v": 8
+        },
+        {
+          "c": "iota",
+          "v": 9
+        },
+        {
+          "c": "kappa",
+          "v": 10
+        }
+      ]
+    }
+  ],
+  "scales": [
+    {
+      "name": "x",
+      "type": "band",
+      "domain": {
+        "data": "t",
+        "field": "c"
+      },
+      "range": "width"
+    },
+    {
+      "name": "y",
+      "type": "linear",
+      "domain": {
+        "data": "t",
+        "field": "v"
+      },
+      "range": "height"
+    },
+    {
+      "name": "colour",
+      "type": "ordinal",
+      "domain": {
+        "data": "t",
+        "field": "c"
+      },
+      "range": "category"
+    },
+    {
+      "name": "area",
+      "type": "linear",
+      "domain": {
+        "data": "t",
+        "field": "v"
+      },
+      "range": [
+        20,
+        400
+      ]
+    }
+  ],
+  "legends": [
+    {
+      "fill": "colour",
+      "title": "capped at four",
+      "symbolLimit": 4,
+      "orient": "right"
+    },
+    {
+      "size": "area",
+      "title": "uncapped",
+      "orient": "bottom-right"
+    }
+  ],
+  "marks": [
+    {
+      "type": "rect",
+      "from": {
+        "data": "t"
+      },
+      "encode": {
+        "enter": {
+          "x": {
+            "scale": "x",
+            "field": "c"
+          },
+          "width": {
+            "scale": "x",
+            "band": 0.9
+          },
+          "y": {
+            "scale": "y",
+            "field": "v"
+          },
+          "y2": {
+            "scale": "y",
+            "value": 0
+          },
+          "fill": {
+            "scale": "colour",
+            "field": "c"
+          }
+        }
+      }
+    }
+  ]
+}

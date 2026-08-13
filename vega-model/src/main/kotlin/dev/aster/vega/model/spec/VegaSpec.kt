@@ -190,8 +190,16 @@ public data class Autosize(
 /** A named dataset. */
 public data class DataSpec(
   val name: String,
-  /** Inline values. `null` when the data comes from [url]. */
+  /** Inline values, when they are written as an array of rows. */
   val values: List<VegaValue>? = null,
+  /**
+   * Inline values written as a whole *document* rather than as rows.
+   *
+   * A GeoJSON `FeatureCollection` or a TopoJSON topology, reached through the same [format] a url
+   * would use. Kept separate from [values] because the two need different handling and because a
+   * dataset has one or the other, never both.
+   */
+  val document: VegaValue? = null,
   val url: String? = null,
   /**
    * `{"url": {"signal": "..."}}` — the address itself comes from a signal.
@@ -459,6 +467,24 @@ public data class ScaleSpec(
   val type: ScaleType,
   val domain: DomainSpec,
   /**
+   * A domain to use exactly as given, whatever the rest of the scale says: `domainRaw`.
+   *
+   * It short-circuits `zero`, the three `domain*` overrides and `nice` — which is what makes an
+   * interactive zoom work, since a brush publishes the interval it wants and nothing may round it
+   * outwards. Almost always a signal, and almost always null until a reader touches the chart, so
+   * an unresolvable one means "no override" and not "empty domain".
+   */
+  val domainRaw: DomainSpec? = null,
+  /**
+   * `domainImplicit`: an ordinal value nobody declared **joins** the domain instead of being
+   * unknown.
+   *
+   * d3 spells it by setting the scale's `unknown` to its `implicit` sentinel, and the effect is
+   * that the domain grows as the scale is used. Off by default because order of use then decides
+   * which colour a value gets; it is for a domain nobody can write down in advance.
+   */
+  val domainImplicit: Boolean = false,
+  /**
    * `domainMin`/`domainMax` **replace** an end of the resolved domain rather than clamping it, and
    * they run after `zero`, which is how `domainMin: 30` beats the zero that would otherwise have
    * pulled the domain down. Upstream does not correct a minimum above the maximum either.
@@ -492,8 +518,22 @@ public data class ScaleSpec(
   val exponent: NumberValue? = null,
   /** Symlog constant; defaults to 1. */
   val constant: NumberValue? = null,
-  /** Colour interpolation space for a colour range, e.g. `"rgb"` or `"lab"`. */
+  /**
+   * Colour interpolation space for a colour range: `rgb`, `lab`, `hcl`, `hsl`, `cubehelix`, and the
+   * `-long` variant of the last three.
+   *
+   * Vega also accepts the object form `{"type": "rgb", "gamma": 2.2}`, whose type is read here and
+   * whose gamma is reported: only `rgb` has one in d3, and it changes the ramp's midpoint rather
+   * than its ends.
+   */
   val interpolate: String? = null,
+  /**
+   * `interpolate: {"type": "rgb", "gamma": y}` — the only interpolator d3 gives a gamma.
+   *
+   * It bends the ramp's **middle** and leaves both ends where they were, which is why a chart that
+   * asked for one and got the plain ramp looks composed and is wrong exactly where nobody checks.
+   */
+  val interpolateGamma: Double? = null,
   /** Explicit bin boundaries; see [BinsSpec]. */
   val bins: BinsSpec? = null,
 )
@@ -547,16 +587,6 @@ public data class TitleSpec(
   /** The literal text, or empty when [textExpression] supplies it instead. */
   val text: String,
   /**
-   * How far the words are turned, where the title states it.
-   *
-   * A title's orientation supplies a default — a left-hand one reads upwards — but a trellis
-   * caption written at `angle: 0` is asking for the words to lie flat beside their row, and the
-   * anchor it states goes with it. Left unstated, all three follow the orientation.
-   */
-  val angle: NumberValue? = null,
-  val align: String? = null,
-  val baseline: String? = null,
-  /**
    * An expression producing the text.
    *
    * A trellis header labels its row with `{"signal": "parent.r"}`, so a title whose words come from
@@ -588,20 +618,42 @@ public data class TitleSpec(
   val fontStyle: String? = null,
   val subtitleFontStyle: String? = null,
   /**
-   * The face the heading is set in, which a `config.style` block supplies as often as a title does.
+   * The colour of the words, `color`, and of the subtitle's, `subtitleColor`.
    *
-   * It is measured as well as drawn, so a heading in a narrower face is a narrower chart.
-   */
-  val font: String? = null,
-  /**
-   * The heading's colour, and its subtitle's.
-   *
-   * A Vega-Lite theme states it as `config.title.color` and its compiler redirects that into the
-   * `group-title` style; both arrive here as `color`, because a title names its own properties the
-   * way a guide does.
+   * Separate properties rather than one inherited: a chart that greys its subtitle sets only the
+   * second, and reading the first for both would darken it.
    */
   val color: String? = null,
+  /** The face the heading is set in. Claimed as consumed since the theme work and never read. */
+  val font: String? = null,
   val subtitleColor: String? = null,
+  val subtitleFont: String? = null,
+  val subtitleFontWeight: String? = null,
+  /** The gap between lines, for a heading long enough to have more than one. */
+  val lineHeight: NumberValue? = null,
+  val subtitleLineHeight: NumberValue? = null,
+  /**
+   * An explicit `align`, `angle` and `baseline`, each overriding what [anchor] and [orient] imply.
+   *
+   * Upstream writes the derived values into the title's `enter` block and these into `update`, so
+   * an explicit one wins — which is how a left-hand title is made to read up the page rather than
+   * down.
+   */
+  val align: String? = null,
+  val angle: NumberValue? = null,
+  val baseline: String? = null,
+  /** How wide the words may be drawn before they are truncated. */
+  val limit: NumberValue? = null,
+  /**
+   * `aria: false` takes the heading out of the accessibility tree, `name` names its mark, and
+   * `interactive: false` makes it ignore the pointer.
+   *
+   * A decorative heading — a watermark, a chart drawn twice with one copy labelled — is exactly
+   * what `aria: false` is for, and it is the only way to say it.
+   */
+  val aria: Boolean = true,
+  val name: String? = null,
+  val interactive: Boolean = true,
   /**
    * `dx`/`dy` — a nudge applied after the anchor has placed the title.
    *
@@ -613,6 +665,14 @@ public data class TitleSpec(
   val dy: NumberValue? = null,
   val subtitleFontSize: NumberValue? = null,
   val zindex: Int = 0,
+  /**
+   * `encode`, keyed by the part it addresses: `group`, `title` or `subtitle`.
+   *
+   * Upstream also accepts the **deprecated** form, where a block naming none of those three applies
+   * to the title's *text* — which is the form a specification writing `encode.update.dx` is using,
+   * and it is normalised to `title` here so there is one shape to read.
+   */
+  val encode: Map<String, EncodeSpec> = emptyMap(),
 )
 
 /**
@@ -645,6 +705,59 @@ public data class AxisSpec(
   val titlePadding: NumberValue? = null,
   val titleFontSize: NumberValue? = null,
   val titleAnchor: Anchor? = null,
+  /** How wide the axis title may be drawn before it is truncated. */
+  val titleLimit: NumberValue? = null,
+  /**
+   * Where the axis sits **along its own direction**, `position`.
+   *
+   * Not the same as [offset], which moves it away from the plot: a bottom axis's `position` slides
+   * it left and right, and `offset` slides it down.
+   */
+  val position: NumberValue? = null,
+  /**
+   * The whole axis group's nudge onto the pixel grid, `translate`. `null` means Vega's half pixel.
+   *
+   * Zero is a real value here and not the absence of one, which is why this is nullable: a chart
+   * exported for print sets `translate: 0` so the lines land on whole coordinates.
+   */
+  val translate: NumberValue? = null,
+  /**
+   * Whether a tick's coordinate is rounded to a whole unit. Vega's default is `true`.
+   *
+   * `false` leaves it where the scale put it, which is what a chart drawn at a fractional device
+   * ratio wants — rounding to whole units there moves a tick by up to half a device pixel.
+   */
+  val tickRound: Boolean? = null,
+  /**
+   * `tickBand`, which is three properties in one: `"extent"` sets [bandPosition] to 1, turns
+   * [tickExtra] on and zeroes `tickOffset`, so a band scale's ticks land on the band **edges**
+   * instead of their centres. `"center"` sets the three back to their defaults.
+   */
+  val tickBand: String? = null,
+  /**
+   * How far a label is nudged **along** the axis, `labelOffset`.
+   *
+   * Not `labelPadding`, which moves it away from the axis. Upstream extends the shared band offset
+   * with this one, so a band axis's label keeps its centring and slides.
+   */
+  val labelOffset: NumberValue? = null,
+  /**
+   * `labelBound`: how far a label may hang past the scale's range before it is dropped.
+   *
+   * `true` means upstream's one unit and a number means itself; `false` and absence both mean no
+   * bounding at all. Zero is a real value — bound exactly to the range — which is why this is
+   * nullable rather than defaulting to zero.
+   */
+  val labelBound: Double? = null,
+  /**
+   * `aria: false` hides the whole guide from a screen reader, and `description` replaces the
+   * caption this engine would otherwise generate for it.
+   *
+   * Both belong to the guide as a whole rather than to any part of it, which is why they are here
+   * and not in a [GuideStroke].
+   */
+  val aria: Boolean = true,
+  val description: String? = null,
   val grid: Boolean = false,
   val ticks: Boolean = true,
   val labels: Boolean = true,
@@ -780,6 +893,15 @@ public data class AxisSpec(
    */
   val labelFlush: Double? = null,
   /**
+   * `labelFlushOffset` — how far a flushed label is nudged along the axis, once flushed.
+   *
+   * Signed the way upstream signs it, which is *outwards*: a label flushed to the start moves back
+   * towards it and one flushed to the end moves past it. Applied only where the flush rule decided
+   * the alignment — an explicit `labelAlign` on a horizontal axis, or `labelBaseline` on a vertical
+   * one, means the label is not being flushed and there is nothing to nudge.
+   */
+  val labelFlushOffset: NumberValue? = null,
+  /**
    * `minExtent`/`maxExtent` — how deep the axis is allowed to be, whatever its contents measure.
    *
    * Upstream clamps its measured depth into this range with defaults of 0 and 200, so a chart with
@@ -818,10 +940,29 @@ public data class GuideStroke(
   val color: String? = null,
   val width: Double? = null,
   val dash: List<Double>? = null,
+  /** Where in the dash pattern the line starts; see `Stroke.dashOffset`. */
+  val dashOffset: Double? = null,
+  /** `butt`, `round` or `square` — how the ends of a tick or a gridline are finished. */
+  val cap: String? = null,
   val opacity: Double? = null,
   val font: String? = null,
   val fontWeight: String? = null,
   val fontStyle: String? = null,
+  /** For a text part: an explicit alignment, overriding whatever the guide's geometry implies. */
+  val align: String? = null,
+  val baseline: String? = null,
+  val lineHeight: Double? = null,
+  /**
+   * The fields a specification wrote as a `{"signal": ...}`, keyed by the field's own name.
+   *
+   * Kept beside the constants rather than folded into their types, so nothing downstream changes
+   * shape: the builders substitute the resolved values into a copy of this block once, before
+   * anything reads it. The keys are the property names of this class — `"color"`, `"width"` —
+   * because one map is easier to keep complete than a dozen parallel nullable fields, and being
+   * complete is the point: half of these worked and half were silently dropped, which is a
+   * difference a specification cannot see.
+   */
+  val signals: Map<String, String> = emptyMap(),
 )
 
 /**
@@ -902,8 +1043,9 @@ public enum class Direction {
 /**
  * A legend.
  *
- * At least one of [fill], [stroke], [size], [shape] or [opacity] names the scale being described; a
- * legend with none of them cannot say what it is a legend for, and is rejected.
+ * At least one of [fill], [stroke], [size], [shape], [strokeWidthScale], [strokeDashScale] or
+ * [opacity] names the scale being described; a legend with none of them cannot say what it is a
+ * legend for, and is rejected.
  */
 public data class LegendSpec(
   val fill: String? = null,
@@ -911,12 +1053,25 @@ public data class LegendSpec(
   val size: String? = null,
   val shape: String? = null,
   val opacity: String? = null,
-  val strokeWidth: String? = null,
   /**
-   * `strokeDash` — the channel that tells two series apart by their *pattern* rather than by
-   * colour, for a reader who cannot rely on colour or a chart that will be printed in one ink.
+   * The `strokeWidth` and `strokeDash` **channels**, which on a legend name scales like the rest.
+   *
+   * Spelled apart from the legend background's own [backgroundStrokeWidth] and
+   * [backgroundStrokeDash] because the two meanings collide on one property name: a legend's
+   * `strokeWidth` names a scale, while the outline drawn round the legend takes its width from
+   * `config.legend` alone. Keyed to one of these, each swatch is drawn at its own width or under
+   * its own dash pattern — the natural legend for a chart that distinguishes series by line style.
    */
-  val strokeDash: String? = null,
+  val strokeWidthScale: String? = null,
+  val strokeDashScale: String? = null,
+  /**
+   * `gridAlign` — how the entry grid lines its columns and rows up.
+   *
+   * `config.legend` defaults it to `each`, which is why it is not simply absent: the entry grid's
+   * row **centring** is conditional on being aligned at all, so `none` both packs the columns
+   * tightly and stops a short entry being centred against a tall one.
+   */
+  val gridAlign: String? = null,
   /** `null` means "derive from the scale type", which is what a specification usually wants. */
   val type: LegendType? = null,
   val orient: LegendOrient = LegendOrient.RIGHT,
@@ -947,13 +1102,6 @@ public data class LegendSpec(
    * or a quarter, and there is no constant to write in its place.
    */
   val formatExpression: String? = null,
-  /**
-   * Whether [format] is read as a date pattern or a number one.
-   *
-   * A *band* of instants has no temporal scale to infer it from — its domain is a list of values —
-   * so without this the legend labels a month with its milliseconds.
-   */
-  val formatType: String? = null,
   val tickCount: NumberValue? = null,
   val offset: NumberValue? = null,
   val padding: NumberValue? = null,
@@ -967,6 +1115,15 @@ public data class LegendSpec(
    * where a top one is `start`-anchored — so it is not only a translation.
    */
   val titleOrient: String? = null,
+  /**
+   * `titleAnchor` — where along the entries the title sits.
+   *
+   * A top title runs along their width and takes its alignment from the anchor, so `end` puts the
+   * title's right edge at theirs. A left title runs down their height and takes its *baseline* from
+   * the anchor instead, staying left-aligned; there a multi-line title is anchored by its last
+   * line.
+   */
+  val titleAnchor: Anchor? = null,
   /** How wide the title may be drawn before it is truncated. Upstream's legend default is 180. */
   val titleLimit: NumberValue? = null,
   val titleFontSize: NumberValue? = null,
@@ -992,6 +1149,56 @@ public data class LegendSpec(
   /** Absolute placement, used when [orient] is [LegendOrient.NONE]. */
   val legendX: NumberValue? = null,
   val legendY: NumberValue? = null,
+  /**
+   * The legend's own background: a rounded rectangle behind the entries and the title.
+   *
+   * `fillColor` and `strokeColor` are the legend's own properties, but the outline's **width and
+   * dash pattern are read from `config.legend` alone** — upstream builds the group's encode from
+   * `_('fillColor')` and `_('strokeColor')` and then from `config.strokeWidth` and
+   * `config.strokeDash`, so writing `"strokeWidth": 2` on a legend does nothing whatever and
+   * `config.legend.strokeWidth` does. Reproduced rather than tidied: a chart that outlines its
+   * legends does it in the theme.
+   */
+  val fillColor: String? = null,
+  val strokeColor: String? = null,
+  val cornerRadius: NumberValue? = null,
+  /**
+   * A swatch's fill where the legend maps no colour scale of its own.
+   *
+   * A **fallback**, not an override: upstream sets the channel from `symbolFillColor` and then
+   * overwrites it from the scale for every legend that has one, so a `fill` scale wins and only a
+   * `size` or `shape` legend takes the stated colour.
+   */
+  val symbolFillColor: String? = null,
+  /** Shifts a swatch and its label along the row, `symbolOffset`. */
+  val symbolOffset: NumberValue? = null,
+  /** The outline round a gradient ramp, and the ramp's own opacity. */
+  val gradientStrokeColor: String? = null,
+  val gradientStrokeWidth: NumberValue? = null,
+  val gradientOpacity: NumberValue? = null,
+  /**
+   * The most entries a symbol legend shows, `symbolLimit`.
+   *
+   * Upstream keeps `limit - 1` and spends the last row on a summary of what it left out, so this is
+   * not a plain truncation: a legend that drops entries says how many.
+   */
+  val symbolLimit: NumberValue? = null,
+  /**
+   * `formatType` — which grammar [format] is written in: `number`, `time` or `utc`.
+   *
+   * It decides the grammar *before* the scale gets a say, which is the only way a legend over
+   * instants reads as dates: its scale is a colour ramp and knows nothing about time.
+   */
+  val formatType: String? = null,
+  /** A floor on the gap between a gradient legend's labelled values; see the axis's own. */
+  val tickMinStep: NumberValue? = null,
+  /**
+   * As on an axis: `aria: false` hides the legend from a screen reader, `description` renames it.
+   */
+  val aria: Boolean = true,
+  val description: String? = null,
+  val backgroundStrokeWidth: Double? = null,
+  val backgroundStrokeDash: List<Double>? = null,
   val zindex: Int = 0,
   /**
    * Appearance of the three parts, read the same way an axis reads its own.
@@ -1026,11 +1233,12 @@ public data class LegendSpec(
    * gives a legend with the right number of entries at the wrong values.
    */
   public val scale: String?
-    get() = size ?: shape ?: fill ?: stroke ?: strokeWidth ?: strokeDash ?: opacity
+    get() = size ?: shape ?: fill ?: stroke ?: strokeWidthScale ?: strokeDashScale ?: opacity
 
   /** How many channels this legend maps, which is what decides whether the type can be derived. */
   public val channelCount: Int
-    get() = listOfNotNull(fill, stroke, size, shape, opacity, strokeWidth, strokeDash).size
+    get() =
+      listOfNotNull(fill, stroke, size, shape, strokeWidthScale, strokeDashScale, opacity).size
 }
 
 /**
@@ -1064,6 +1272,16 @@ public data class ProjectionSpec(
   val precision: NumberValue? = null,
   val clipAngle: NumberValue? = null,
   val clipExtent: List<NumberList> = emptyList(),
+  /**
+   * The two standard parallels of a conic projection.
+   *
+   * Not a tuning knob: they change the raw formula, so `conicEqualArea` at `[20, 50]` and the same
+   * projection at its default is a different map of the same world rather than the same map
+   * redrawn.
+   */
+  val parallels: NumberList = NumberList.None,
+  /** The radius a `Point` geometry is drawn as, since a projected city has no extent of its own. */
+  val pointRadius: NumberValue? = null,
   val reflectX: NumberValue? = null,
   val reflectY: NumberValue? = null,
   /** `fit`/`extent`/`size`, which size the projection from the data rather than from a scale. */
@@ -1346,7 +1564,54 @@ public data class LayoutSpec(
    * with the overhang allowed to collide. A chart with an axis on every cell reads better flush.
    */
   val bounds: String? = null,
-)
+  /**
+   * `center`: a cell narrower than its column sits in the middle of it rather than at its start.
+   *
+   * One value for both directions or a per-direction object, like `padding` and `align`. Only
+   * meaningful alongside an alignment, and upstream guards it twice over — horizontally it needs
+   * more than one row, vertically more than one column, since a single row has nothing to centre
+   * against.
+   */
+  val centerColumn: Boolean = false,
+  val centerRow: Boolean = false,
+  /**
+   * `headerBand`, `footerBand` and `titleBand`: how far **along** a cell or the grid a label sits.
+   *
+   * `null` is upstream's default for a header or a footer and means the cell's own origin; a
+   * fraction means that far across the cell's extent, so `0.5` centres it. A title's default is
+   * `0.5`, because a row title centred on the grid is what a trellis usually wants.
+   */
+  val headerBandRow: Double? = null,
+  val headerBandColumn: Double? = null,
+  val footerBandRow: Double? = null,
+  val footerBandColumn: Double? = null,
+  val titleBandRow: Double? = null,
+  val titleBandColumn: Double? = null,
+  /** `titleAnchor`: `"end"` puts a title past the **footers** rather than before the headers. */
+  val titleAnchorRow: String? = null,
+  val titleAnchorColumn: String? = null,
+  /**
+   * `offset`: how far outside the grid each kind of label sits.
+   *
+   * One number for all six, or an object naming any of `rowHeader`, `columnHeader`, `rowFooter`,
+   * `columnFooter`, `rowTitle` and `columnTitle`.
+   */
+  val offsets: Map<String, Double> = emptyMap(),
+) {
+  /** The band for a header, by direction. */
+  public fun headerBand(row: Boolean): Double? = if (row) headerBandRow else headerBandColumn
+
+  public fun footerBand(row: Boolean): Double? = if (row) footerBandRow else footerBandColumn
+
+  /** A title's band, whose default is the middle rather than the origin. */
+  public fun titleBand(row: Boolean): Double = (if (row) titleBandRow else titleBandColumn) ?: 0.5
+
+  public fun titleAtEnd(row: Boolean): Boolean =
+    (if (row) titleAnchorRow else titleAnchorColumn) == "end"
+
+  /** How far outside the grid one kind of label sits; zero when the layout says nothing. */
+  public fun offsetFor(role: String): Double = offsets[role] ?: 0.0
+}
 
 /**
  * A mark definition.

@@ -36,6 +36,9 @@ public object GeoPathTransform : Transform {
           }
         ),
         context,
+        // `geopath` declares no default field, so the geometry is the row itself — which is what a
+        // dataset of decoded TopoJSON features is.
+        defaultField = null,
       )
     }
     val path = params.string("field")

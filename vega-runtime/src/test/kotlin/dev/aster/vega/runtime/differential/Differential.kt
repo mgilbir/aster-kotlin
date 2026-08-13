@@ -10,6 +10,7 @@ import dev.aster.vega.runtime.scale.PointScale
 import dev.aster.vega.runtime.scale.VegaScale
 import dev.aster.vega.scene.FontStyle
 import dev.aster.vega.scene.GroupNode
+import dev.aster.vega.scene.ImageFit
 import dev.aster.vega.scene.ImageNode
 import dev.aster.vega.scene.PathNode
 import dev.aster.vega.scene.RectD
@@ -207,7 +208,45 @@ public object Differential {
         "width" to rect.width,
         "height" to rect.height,
       )
-    return Mark("rect", node.metadata.role, numbers + paintNumbers(node), paintStrings(node))
+    return Mark(
+      "rect",
+      node.metadata.role,
+      numbers +
+        cornerNumbers(
+          node.cornerRadius,
+          node.cornerRadiusTopLeft,
+          node.cornerRadiusTopRight,
+          node.cornerRadiusBottomRight,
+          node.cornerRadiusBottomLeft,
+        ) +
+        paintNumbers(node),
+      paintStrings(node),
+    )
+  }
+
+  /**
+   * A rectangle's corner radii as the specification declared them, each omitted when unset.
+   *
+   * Declared rather than drawn, because that is what upstream's scene item holds: its path
+   * generator clamps a radius to `min(width, height) / 2` while drawing and never writes the
+   * clamped value back. Comparing the declared numbers keeps the two sides describing the same
+   * thing; that the clamp itself matches is pinned separately, against upstream's own path strings,
+   * in `RectPathTest`.
+   */
+  private fun cornerNumbers(
+    cornerRadius: Double,
+    topLeft: Double?,
+    topRight: Double?,
+    bottomRight: Double?,
+    bottomLeft: Double?,
+  ): Map<String, Double> {
+    val out = LinkedHashMap<String, Double>()
+    if (cornerRadius != 0.0) out["cornerRadius"] = cornerRadius
+    topLeft?.let { out["cornerRadiusTopLeft"] = it }
+    topRight?.let { out["cornerRadiusTopRight"] = it }
+    bottomRight?.let { out["cornerRadiusBottomRight"] = it }
+    bottomLeft?.let { out["cornerRadiusBottomLeft"] = it }
+    return out
   }
 
   private fun ruleMark(node: RuleNode, world: Transform2D): Mark {
@@ -235,8 +274,17 @@ public object Differential {
    * position, colour, width and opacity, so leaving the dash out would let a chart pass the
    * comparison and draw differently — the same way a symbol's outline once did.
    */
+  /**
+   * A dash pattern, with its offset. The offset is part of the pattern: the same array started a
+   * half-period along draws its gaps where the other draws its marks.
+   */
   private fun dashOf(stroke: Stroke): String? =
-    stroke.dashArray.takeIf { it.isNotEmpty() }?.joinToString(",") { fmt(it) }
+    stroke.dashArray
+      .takeIf { it.isNotEmpty() }
+      ?.let { dash ->
+        dash.joinToString(",") { fmt(it) } +
+          if (stroke.dashOffset != 0.0) " @${fmt(stroke.dashOffset)}" else ""
+      }
 
   private fun textMark(node: TextNode, world: Transform2D): Mark {
     val anchor = world.apply(node.x, node.y)
@@ -260,6 +308,9 @@ public object Differential {
     // stay distinguishable.
     if (!node.absent) strings["text"] = run.text
     if (run.style.fontStyle == FontStyle.ITALIC) strings["fontStyle"] = "italic"
+    if (run.style.direction == dev.aster.vega.scene.TextDirection.RTL) strings["dir"] = "rtl"
+    run.lineBreak?.let { strings["lineBreak"] = it }
+    run.style.lineHeight?.let { numbers["lineHeight"] = it }
     node.fill?.let { fill ->
       solidColour(fill.paint)?.let { strings["fill"] = it.toCssHex() }
       numbers["fillOpacity"] = fill.opacity
@@ -295,6 +346,17 @@ public object Differential {
    * It is not a rare case: a labelled donut draws a leader line for every label slot and only the
    * nine belonging to a slice have an outline, so two thirds of that mark is empty by design.
    */
+  /**
+   * A mark's drawn extent, in upstream's own spelling for a shape that drew nothing.
+   *
+   * [world] is applied here rather than by the caller because an **empty** rectangle must not be
+   * mapped through it: the sentinel a cleared `Bounds` holds is `MAX_VALUE`, and putting that
+   * through a translation gives a number that is no longer recognisably empty — which is how a
+   * county with no outline came to report a width of zero on one side and an infinity on the other.
+   */
+  private fun extentChannels(bounds: RectD, world: Transform2D): Map<String, Double> =
+    extentChannels(if (bounds.isEmpty) bounds else world.mapBounds(bounds))
+
   private fun extentChannels(bounds: RectD): Map<String, Double> =
     if (bounds.isEmpty) {
       linkedMapOf(
@@ -314,13 +376,12 @@ public object Differential {
 
   private fun symbolMark(node: SymbolNode, world: Transform2D): Mark {
     val centre = world.apply(node.x, node.y)
-    val extent = world.mapBounds(node.bounds)
     val numbers =
       linkedMapOf(
         "x" to centre.x,
         "y" to centre.y,
         "size" to node.size,
-      ) + extentChannels(extent)
+      ) + extentChannels(node.bounds, world)
     return Mark("symbol", node.metadata.role, numbers + paintNumbers(node), paintStrings(node))
   }
 
@@ -336,8 +397,7 @@ public object Differential {
     if (kind != "line" && kind != "area") {
       // An arc is compared by the wedge it drew rather than by a centre point, which says nothing
       // about its radii or its sweep.
-      val bounds = world.mapBounds(node.bounds)
-      val numbers = LinkedHashMap(extentChannels(bounds))
+      val numbers = LinkedHashMap(extentChannels(node.bounds, world))
       // A `path` mark also reports the anchor it was placed at, which upstream carries as the
       // item's own x and y — the outline itself is in the path string's coordinates.
       if (kind == "path") {
@@ -368,6 +428,7 @@ public object Differential {
     strings["points"] = vertices.joinToString(" ") { "${fmt(it.x)} ${fmt(it.y)}" }
     node.metadata.interpolate?.let { strings["interpolate"] = it }
     val numbers = LinkedHashMap<String, Double>()
+    node.metadata.tension?.let { numbers["tension"] = it }
     // Whether the outline joins back onto itself. Nothing else here can see it: `linear-closed`
     // draws exactly the points `linear` does and closes the polygon, so a line left open would
     // otherwise match its reference on every channel and render with one side missing.
@@ -417,6 +478,12 @@ public object Differential {
         "url" to node.url,
         "align" to node.align.name.lowercase(),
         "baseline" to node.baseline.name.lowercase(),
+        // Two images with the same box can be drawn completely differently: `aspect: false`
+        // stretches to the box where the default letterboxes inside it, and `smooth: false` asks
+        // for
+        // nearest-neighbour sampling.
+        "aspect" to if (node.fit == ImageFit.CONTAIN) "fit" else "none",
+        "smooth" to if (node.smooth) "smooth" else "none",
       ) +
         // The pixels, as a digest. An image mark is otherwise compared by its box alone, so a
         // heatmap that painted nothing would agree with one that painted the right thing in the
@@ -443,8 +510,22 @@ public object Differential {
     }
     val strings = LinkedHashMap<String, String>()
     node.fill?.let { f -> solidColour(f.paint)?.let { strings["fill"] = it.toCssHex() } }
-    node.stroke?.let { s -> solidColour(s.paint)?.let { strings["stroke"] = it.toCssHex() } }
-    return Mark("group", node.metadata.role, numbers + paintNumbers(node), strings)
+    node.stroke?.let { s ->
+      solidColour(s.paint)?.let { strings["stroke"] = it.toCssHex() }
+      // A group can be dashed too — a legend's own outline is where it shows — and this was
+      // reporting
+      // only its colour.
+      dashOf(s)?.let { strings["strokeDash"] = it }
+    }
+    val corners =
+      cornerNumbers(
+        node.cornerRadius,
+        node.cornerRadiusTopLeft,
+        node.cornerRadiusTopRight,
+        node.cornerRadiusBottomRight,
+        node.cornerRadiusBottomLeft,
+      )
+    return Mark("group", node.metadata.role, numbers + corners + paintNumbers(node), strings)
   }
 
   /**
@@ -570,6 +651,7 @@ public object Differential {
       if (channel in ignored) continue
       val got = actual.numbers[channel] ?: defaultFor(channel)
       if (got == null) {
+        if (unpaintedStroke(expected, channel)) continue
         out.add(Difference("$where.$channel", fmt(wanted), "absent"))
         continue
       }
@@ -595,6 +677,15 @@ public object Differential {
       if (channel in ignored) continue
       if (channel !in expected.strings && channel in actual.strings) {
         out.add(Difference("$where.$channel", "absent", actual.strings.getValue(channel)))
+      }
+    }
+    // The same both ways for corner radii: rounding a corner the reference leaves square changes
+    // the outline, and iterating only the reference's channels would never see it.
+    for (channel in CORNER_CHANNELS) {
+      if (channel in ignored) continue
+      val invented = actual.numbers[channel] ?: continue
+      if (channel !in expected.numbers && abs(invented) > tolerance) {
+        out.add(Difference("$where.$channel", "absent", fmt(invented)))
       }
     }
     for ((channel, wanted) in expected.strings) {
@@ -681,9 +772,27 @@ public object Differential {
       "fillOpacity",
       "strokeOpacity" -> 1.0
       "angle" -> 0.0
+      // A radius the reference never set is a square corner, which is what this side draws when it
+      // omits the channel. The reverse — a radius here and none upstream — is caught below.
+      in CORNER_CHANNELS -> 0.0
       "strokeWidth" -> null // absence means no stroke at all, which is a real difference
       else -> null
     }
+
+  /**
+   * A stroke property the reference carries with no stroke **colour** beside it.
+   *
+   * Upstream's items are property bags, so a mark encoding `strokeWidth` and no `stroke` has a
+   * width on it and paints no outline — its own SVG renderer emits neither attribute. A scene node
+   * here holds what a renderer needs, so it has no stroke at all. The two describe the same
+   * drawing, and an interactive Voronoi overlay is where it shows: every one of its 600 transparent
+   * cells sets a hairline width it never uses.
+   *
+   * Narrow on purpose. A reference carrying a stroke colour still demands a stroke of that width.
+   */
+  private fun unpaintedStroke(expected: Mark, channel: String): Boolean =
+    (channel == "strokeWidth" || channel == "strokeOpacity") &&
+      !expected.strings.containsKey("stroke")
 
   public fun compareScales(
     expected: Map<String, ScaleReference>,
@@ -801,6 +910,15 @@ public object Differential {
   private val CURVE_EXTENT_TYPES = setOf("arc", "trail", "path")
 
   private val COLOUR_CHANNELS = setOf("fill", "stroke")
+
+  private val CORNER_CHANNELS =
+    setOf(
+      "cornerRadius",
+      "cornerRadiusTopLeft",
+      "cornerRadiusTopRight",
+      "cornerRadiusBottomRight",
+      "cornerRadiusBottomLeft",
+    )
 
   /** The channels that carry a position or an extent, and so have a painted equivalent of zero. */
   private val GEOMETRY_CHANNELS =

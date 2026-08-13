@@ -3204,7 +3204,7 @@
       "y2": 0.5
     },
     {
-      "closed": 0,
+      "closed": 1,
       "points": "1030 287.782857",
       "role": "mark",
       "stroke": "#54a24b",
@@ -3212,7 +3212,7 @@
       "type": "line"
     },
     {
-      "closed": 0,
+      "closed": 1,
       "points": "1030 246.767143",
       "role": "mark",
       "stroke": "#f58518",
@@ -3220,7 +3220,7 @@
       "type": "line"
     },
     {
-      "closed": 0,
+      "closed": 1,
       "points": "1030 246.491429",
       "role": "mark",
       "stroke": "#72b7b2",
@@ -3228,7 +3228,7 @@
       "type": "line"
     },
     {
-      "closed": 0,
+      "closed": 1,
       "points": "1030 69.01",
       "role": "mark",
       "stroke": "#e45756",
@@ -3236,7 +3236,7 @@
       "type": "line"
     },
     {
-      "closed": 0,
+      "closed": 1,
       "points": "1030 211.471429",
       "role": "mark",
       "stroke": "#4c78a8",

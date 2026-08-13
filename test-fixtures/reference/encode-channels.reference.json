@@ -1,0 +1,262 @@
+{
+  "marks": [
+    {
+      "cornerRadiusBottomLeft": 0,
+      "cornerRadiusBottomRight": 0,
+      "cornerRadiusTopLeft": 12,
+      "cornerRadiusTopRight": 12,
+      "fill": "#4c78a8",
+      "height": 57.2,
+      "role": "mark",
+      "type": "rect",
+      "width": 50,
+      "x": 12.5,
+      "y": 72.8
+    },
+    {
+      "cornerRadiusBottomLeft": 0,
+      "cornerRadiusBottomRight": 0,
+      "cornerRadiusTopLeft": 6,
+      "cornerRadiusTopRight": 6,
+      "fill": "#4c78a8",
+      "height": 93.6,
+      "role": "mark",
+      "type": "rect",
+      "width": 50,
+      "x": 75,
+      "y": 36.4
+    },
+    {
+      "cornerRadiusBottomLeft": 0,
+      "cornerRadiusBottomRight": 0,
+      "cornerRadiusTopLeft": 40,
+      "cornerRadiusTopRight": 40,
+      "fill": "#4c78a8",
+      "height": 39,
+      "role": "mark",
+      "type": "rect",
+      "width": 50,
+      "x": 137.5,
+      "y": 91
+    },
+    {
+      "cornerRadius": 14,
+      "fill": "#f58518",
+      "fillOpacity": 0.7,
+      "height": 60,
+      "role": "mark",
+      "type": "rect",
+      "width": 120,
+      "x": 20,
+      "y": 40
+    },
+    {
+      "closed": 0,
+      "interpolate": "catmull-rom",
+      "points": "0 104 0 104 25.925711 29.463162 40 28.6 52.727408 27.819441 67.198041 86.490921 80 85.8 93.965707 85.046272 106.034293 13.753728 120 13 132.801959 12.309079 144.861105 66.487071 160 70.2 172.167071 73.184067 200 49.4 200 49.4",
+      "role": "mark",
+      "stroke": "#54a24b",
+      "strokeWidth": 2,
+      "type": "line"
+    },
+    {
+      "closed": 0,
+      "interpolate": "cardinal",
+      "points": "0 104 0 104 36 29.51 40 28.6 44 27.69 76 86.58 80 85.8 84 85.02 116 13.78 120 13 124 12.22 156 68.38 160 70.2 164 72.02 200 49.4 200 49.4",
+      "role": "mark",
+      "stroke": "#e45756",
+      "strokeWidth": 2,
+      "tension": 0.7,
+      "type": "line"
+    },
+    {
+      "closed": 0,
+      "interpolate": "bundle",
+      "points": "0 104 6.666667 97.881333 13.333333 91.762667 26.666667 79.525333 40 76.128 53.333333 72.730667 66.666667 78.173333 80 74.949333 93.333333 71.725333 106.666667 59.834667 120 56.610667 133.333333 53.386667 146.666667 58.829333 160 59.072 173.333333 59.314667 186.666667 54.357333 193.333333 51.878667 200 49.4",
+      "role": "mark",
+      "stroke": "#b279a2",
+      "strokeWidth": 2,
+      "tension": 0.4,
+      "type": "line"
+    },
+    {
+      "closed": 0,
+      "interpolate": "cardinal-open",
+      "points": "40 28.6 53.333333 25.566667 66.666667 88.4 80 85.8 93.333333 83.2 106.666667 15.6 120 13 133.333333 10.4 146.666667 64.133333 160 70.2",
+      "role": "mark",
+      "stroke": "#9d755d",
+      "strokeDash": "4,2",
+      "strokeWidth": 1.5,
+      "type": "line"
+    },
+    {
+      "fill": "#72b7b2",
+      "fillOpacity": 0.35,
+      "interpolate": "catmull-rom",
+      "points": "0 104 0 104 25.223901 27.574853 40 28.6 52.328892 29.455363 67.557572 85.085382 80 85.8 94.551938 86.635775 105.448062 12.164225 120 13 132.442428 13.714618 142.829726 68.652924 160 70.2 171.586241 71.243943 200 49.4 200 49.4 200 130 200 130 173.333333 130 160 130 146.666667 130 133.333333 130 120 130 106.666667 130 93.333333 130 80 130 66.666667 130 53.333333 130 40 130 26.666667 130 0 130 0 130",
+      "role": "mark",
+      "tension": 0.9,
+      "type": "area"
+    },
+    {
+      "align": "center",
+      "baseline": "middle",
+      "fill": "#333333",
+      "font": "sans-serif",
+      "fontSize": 11,
+      "role": "mark",
+      "text": "north by a long way",
+      "type": "text",
+      "x": 340,
+      "y": 140
+    },
+    {
+      "align": "center",
+      "baseline": "middle",
+      "fill": "#333333",
+      "font": "sans-serif",
+      "fontSize": 11,
+      "role": "mark",
+      "text": "east by a long way",
+      "type": "text",
+      "x": 400,
+      "y": 200
+    },
+    {
+      "align": "center",
+      "baseline": "middle",
+      "fill": "#333333",
+      "font": "sans-serif",
+      "fontSize": 11,
+      "role": "mark",
+      "text": "south by a long way",
+      "type": "text",
+      "x": 340,
+      "y": 260
+    },
+    {
+      "align": "center",
+      "baseline": "middle",
+      "fill": "#333333",
+      "font": "sans-serif",
+      "fontSize": 11,
+      "role": "mark",
+      "text": "west by a long way",
+      "type": "text",
+      "x": 280,
+      "y": 200
+    },
+    {
+      "cornerRadiusBottomRight": 18,
+      "cornerRadiusTopLeft": 18,
+      "fill": "#f2f2f2",
+      "height": 70,
+      "role": "scope",
+      "stroke": "#bbbbbb",
+      "type": "group",
+      "width": 120,
+      "x": 240,
+      "y": 20
+    },
+    {
+      "role": "mark",
+      "stroke": "#4c78a8",
+      "strokeWidth": 3,
+      "type": "rule",
+      "x": 250,
+      "x2": 540,
+      "y": 55,
+      "y2": 55
+    }
+  ],
+  "scales": {
+    "lx": {
+      "domain": [
+        0,
+        5
+      ],
+      "range": [
+        0,
+        200
+      ],
+      "ticks": [
+        0,
+        0.5,
+        1,
+        1.5,
+        2,
+        2.5,
+        3,
+        3.5,
+        4,
+        4.5,
+        5
+      ]
+    },
+    "ly": {
+      "domain": [
+        0,
+        100
+      ],
+      "range": [
+        130,
+        0
+      ],
+      "ticks": [
+        0,
+        10,
+        20,
+        30,
+        40,
+        50,
+        60,
+        70,
+        80,
+        90,
+        100
+      ]
+    },
+    "x": {
+      "bandwidth": 50,
+      "domain": [
+        "a",
+        "b",
+        "c"
+      ],
+      "range": [
+        0,
+        200
+      ],
+      "step": 62.5
+    },
+    "y": {
+      "domain": [
+        0,
+        100
+      ],
+      "range": [
+        130,
+        0
+      ],
+      "ticks": [
+        0,
+        10,
+        20,
+        30,
+        40,
+        50,
+        60,
+        70,
+        80,
+        90,
+        100
+      ]
+    }
+  },
+  "size": {
+    "height": 310,
+    "width": 474
+  },
+  "spec": "encode-channels.vg.json",
+  "vegaVersion": "6.3.1"
+}

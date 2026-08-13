@@ -17,11 +17,12 @@ Last updated: 2026-08-09
 ## Current milestone
 
 Milestones 0, 1 and 2 complete. **Milestones 3, 4 and 5 in progress**: Vega specifications compile
-end to end — expressions, signals, 33 of upstream's 40 data transforms, every scale type in scope,
+end to end — expressions, signals, 50 of upstream's 51 data transforms, every scale type in scope,
 and an event handler that recompiles the chart — and are verified against upstream Vega by
 differential tests.
 
-One hundred and six differential fixtures pass, all matching upstream exactly on every mark and scale output:
+One hundred and thirty-eight differential fixtures pass, all matching upstream exactly on every mark and
+scale output:
 
 | Fixture | Marks | Covers |
 | --- | --- | --- |
@@ -141,6 +142,7 @@ One hundred and six differential fixtures pass, all matching upstream exactly on
 | `map-with-tooltip` | 3623 | The same counties under a mercator, with `geoCentroid` placing a tooltip and `invert` reading the projection backwards |
 | `dorling-cartogram` | 113 | Vega's Dorling cartogram: states as circles sized by `geoArea` over `albersUsa`, and a size legend whose rows are clipped so its biggest swatches overlap |
 | `geo-points` | 30 | Six cities placed by `geopoint` under three projections at once, joined by rules so a misplaced point moves a line as well as a dot |
+| `airport-connections` | 650 | Vega's airport map: 49 states through `albersUsa`, and a **Voronoi** cell over each of 597 airports so the pointer always has a nearest one — invisible, and compared outline by outline |
 
 The gate is wired into `./scripts/oracle.sh`, so every further scale, mark and transform is built
 against a harness that can say we are wrong — which golden tests cannot.
@@ -165,7 +167,7 @@ upstream-verified slice through parsing, scales, rect encoding and axes:
 | Diagnostics, canonical snapshots, goldens, oracle scaffolding | no upstream equivalent | complete |
 | `vega-scale` (linear, log, pow, sqrt, symlog, time, utc, band, point, ordinal, sequential) + d3-array ticks | 790 + parts of d3-scale, d3-array | every scale type in scope — the 11 continuous and discrete ones plus quantize, quantile, threshold and bin-ordinal — exact against upstream, with all 68 colour schemes |
 | `vega-parser` (width, height, padding, autosize, data, signals, scales, axes, legends, titles, marks, group scopes, `layout`, `config`) | 3,790 | a subset, and every property it does not read is reported by name |
-| `vega-encode` (mark encoders, axes, legends, titles) | 952 | 11 of 12 mark encoders — all but `shape`, which needs projections and is an explicit non-goal; axes, legends and titles including overlap removal, truncation and the `config` cascade; nine interpolation methods |
+| `vega-encode` (mark encoders, axes, legends, titles) | 952 | all 12 mark encoders; axes, legends and titles including overlap removal, truncation and the `config` cascade; every one of Vega's seventeen interpolation methods with its own reading of `tension`; every encode channel in the vocabulary |
 | `vega-expression` + `vega-functions` | 2,388 | language complete; 82 of 119 functions, with 17 more reported by name and reason |
 | `vega-transforms` (35 of 40) | 3,754 | the 12 the brief lists plus `timeunit`, `pie`, `window`, `sequence`, `lookup`, `impute`, `cross`, `pivot`, `countpattern`, the statistical family — `quantile`, `regression`, `loess`, `kde`, `density`, `dotbin` — and the whole hierarchy family: `stratify`, `nest`, `treemap`, `partition`, `pack`, `tree`, plus `treelinks` and `linkpath`, which turn a laid-out tree into the edges drawn between its nodes. Exact against upstream |
 | `vega-dataflow` | 2,081 | contracts and scheduling only; no pulse propagation |
@@ -178,7 +180,6 @@ The entire data and specification half is absent:
 | `vega-dataflow` — pulse propagation and incremental evaluation | 2,081 | contracts only |
 | `vega-functions` — the other 44 functions, mostly colour, geo and selection | most of 790 | 0 |
 | Remaining scale types — quantile, quantize, threshold, bin-ordinal | rest of `vega-scale` | all four; their legends draw the right colours as swatches rather than upstream's stacked bar |
-| Remaining mark encoders — image and shape | rest of `vega-encode` | 0; `image` needs a device resolver, `shape` needs projections |
 | Line and area interpolation — `catmull-rom` and `bundle` | part of d3-shape | 0, reported; the step and spline families are implemented |
 | Banded legends, trellis footers, legend `symbolLimit` | parts of `vega-encode`, `vega-view-transforms` | 0, reported |
 | `vega-view`, `vega-view-transforms` — the view lifecycle and incremental layout | 2,623 | bounds, grid layout and label overlap removal |
@@ -195,12 +196,12 @@ substantive compatibility items:
 | 1. Compiled Vega JSON loads without JavaScript | **Yes**, for a substantial subset — `VegaChartController.setSpec` loads it and the demo renders three bundled specifications on device |
 | 2. Bar, line, area, scatter, stacked bar render natively | **Yes** — all five compile from a specification, and small multiples of them too |
 | 3. Axes, legends, labels and titles supported | **Yes** — all four |
-| 4. Basic transforms and scales execute in Kotlin | **Yes** — every scale type in scope, including time and UTC and the four discretizing ones, and 35 of upstream's 40 transforms |
-| 5. Tap, hover, tooltip, selection, pan, zoom | Yes, except tooltip rendering |
+| 4. Basic transforms and scales execute in Kotlin | **Yes** — every scale type in scope, including time and UTC and the four discretizing ones, and 50 of upstream's 51 transforms |
+| 5. Tap, hover, tooltip, selection, pan, zoom | Yes |
 | 6. View and Compose APIs | Yes |
 | 7. SVG, PNG, PDF export | Yes |
 | 8. TalkBack can describe and navigate | Partial — virtual nodes are tested by instrumentation, not with TalkBack itself |
-| 9. At least 100 compatibility fixtures pass | **Yes** — 100 |
+| 9. At least 100 compatibility fixtures pass | **Yes** — 148 |
 | 10. Core runtime has no Android dependency | Yes |
 | 11. Renders without WebView | Yes |
 | 12. Build and test loop runs from the terminal | Yes |
@@ -2098,6 +2099,42 @@ cell: the scale's extent is measured over the rows the facet handed *that* cell,
 group those rows are the partition Vega named `facet`. Shared instead, a trellis of pies scaled
 every cell against the whole table, so a cell holding a tenth of the data drew a tenth of a pie.
 
+### Taking the main line's work: forty-seven commits, and what the merge itself found
+
+`milestone-0-bootstrap` was merged in at `0166edf` — expression functions, `strptime`, projections,
+guide `encode` folding, rounded rects, colour interpolation in five spaces, `symbolLimit`, title
+anchoring, layout bands. Forty-eight conflicts across fifteen files. Where both sides had built the
+same thing, the fuller port won: their `titleStyleLayers` over a single-name `style`, their
+`TitleBuilder` whole, their `strokeWidthScale`/`strokeDashScale` renaming of the two legend channels
+whose names collide with the legend border's own. Where the two were different things in one place,
+both were kept: the scale padding *and* their `domainRaw` guard on `nice`; their text `limit`,
+`ellipsis` and `lineBreak` *and* the style-block fallback for `align`; their `symbolFillColor`
+fallback *and* the swatch's own `encode` override.
+
+Three of their rules had to be narrowed, and three of mine:
+
+- **A scheme carries its own interpolator**, and `interpolate` does not reach it. Their new HCL
+  interpolation was being applied to `"range": "heatmap"` and every shade came out a unit or two
+  off. `interpolate` applies to a range written out as a list of colours, which is what their own
+  fixture states.
+- **A title with no `style` still takes `group-title`.** Their `titleStyleLayers` returned nothing
+  for one, so a Vega-Lite theme's heading colour — which its compiler redirects into
+  `config.style.group-title` — reached nothing and every themed title drew black.
+- **A line of one point closes its subpath, but one left over from a _break_ does not.** What closes
+  is a line d3 was handed a single point for; a series broken into fragments was handed all of them.
+
+- My **trellis band layout** kept its four bands and its margins, and took their `headerBand`,
+  `footerBand`, `titleBand` and `titleAnchor` on top — and in the grafting, a bug of my own: the
+  cell boxes are already in the enclosing coordinates, so adding the cell's translation again put
+  every band label a whole cell further along.
+- My **`closed` flag in the oracle** was reading false by construction for any line that named no
+  `interpolate`, because `curves(undefined)` is null and the replay never happened. It now defaults
+  to `linear`, which is what Vega passes, so the flag says what it means.
+- My **`{"field": {"group": "y"}}`** never resolved: it fell through to a signal lookup and returned
+  nothing. Nobody had noticed because nothing had moved a group *and* asked a child to move back —
+  until a stacked bar with rounded corners did exactly that, and every segment was drawn its own
+  group's height too far down. The enclosing group's origin is now what the reference reads.
+
 ### Two runtime gaps this batch names but does not close
 
 `density`'s fixture is not in the corpus, and `trail`'s draws no legend. Both compile exactly as
@@ -2242,7 +2279,7 @@ each example a deadline.
 
 ## Known failing fixtures
 
-None. One hundred and six fixtures exist and all of them pass — and that sentence became worth
+None. One hundred and thirty-eight fixtures exist and all of them pass — and that sentence became worth
 something only once the gate could no longer skip itself, below.
 
 **The gate could report success without running.** `FixtureDifferentialTest` reads the fixtures and
@@ -2952,6 +2989,729 @@ letters, which also means a `fill` of null is no longer a colour nobody can pars
 That last one is the fourth time the rendered SVG has caught something the comparison could not, and
 the first where the fixture was already green when the picture was wrong.
 
+## Every encode channel, and the six curve families behind the last of them
+
+`ENCODE_UNSUPPORTED` is now empty. It held ten entries — the four per-corner radii, `limit` and
+`ellipsis`, `tension`, polar `radius`/`theta`, `blend` and `clip` — and each is drawn rather than
+reported. Five things are worth keeping from doing them.
+
+**`tension` was not a small channel.** It read as one property to thread through, and threading it
+through meant discovering that six of Vega's seventeen interpolation methods were missing:
+`basis-open`, `bundle`, `cardinal-open`, `catmull-rom` and its open and closed variants. `tension`
+means a different quantity to each family it applies to — a cardinal stiffness, a Catmull-Rom
+distance exponent, a bundle blend — and each has its own neutral value (0, 0.5, 0.85). Reading an
+unspecified `tension` as 0 for all three would have turned an unspecified Catmull-Rom into a cardinal
+spline and an unspecified bundle into a straight line. `CurveKind.defaultTension` is that table.
+
+**A Catmull-Rom spline at alpha 0 is not a Catmull-Rom spline.** d3 does not degenerate it; it hands
+the series to the *cardinal* curve instead. The difference is real, because the correction that
+distinguishes the two is scaled by a span raised to the power alpha — and a zero span raised to the
+power zero is one, not zero, so the correction stays on and the end conditions come out different.
+`CurvesTest` caught this as the one assertion that says the two families agree at alpha 0.
+
+**The open families draw nothing for a short series.** Two points or fewer and `basis-open`,
+`cardinal-open` and `catmull-rom-open` emit no path at all — not a straight line, which is what every
+other family does. Three points and they emit a single position and a `Z`. That `Z` is also
+conditional: it appears on a line and must not appear on the first boundary of an area, where it
+would cut the outline off before its baseline. Only the caller knows which it is drawing, which is
+why `curve()` takes a `partOfArea` flag.
+
+**Both strengthenings were on the harness, and one of them paid immediately.** `normalize.js` had a
+hand-written table mapping an `interpolate` name to a d3 curve; it now imports `vega-scenegraph`'s own
+`curves()` by file path, which brings the name table, the monotone orientation choice and the
+`tension` semantics from upstream instead of from a copy that could be wrong the same way the port
+is. The moment it went in, `edge-bundling`'s reference changed by two thousand lines: its `bundle`
+interpolation had been falling through to the raw point list on both sides, so a chart drawing every
+edge as a straight line would have passed. It now compares the outline, and matches. The second
+strengthening is corner radii: `GEOMETRY_CHANNELS` compared a rect by `x`, `y`, `width` and `height`
+only, so four independently rounded corners were invisible. They are compared both ways — inventing a
+radius the reference does not have is as much a difference as missing one.
+
+**A rounded rectangle is emitted as a path, in both renderers.** SVG `rx`/`ry` cannot hold four
+different radii, and even for one it draws a true elliptical arc where Vega draws a Bézier
+approximation of one, with a control-point offset of `1 - 0.448084975506` — Mortensen's circle
+approximation, not the familiar `4/3 · (√2 - 1)`. Android's `drawRoundRect` has the same two problems.
+Both now go through `RectPath`, whose output is pinned to upstream's own path strings in
+`RectPathTest`, including the clamp: the limit is `min(width, height) / 2` for all four corners as a
+group, and it is `min` of the *signed* extents, so a rectangle drawn with a negative width comes out
+square rather than rounded.
+
+Two smaller things. `radius`/`theta` place a label around a centre, and upstream keeps both on the
+item and offsets at paint time; this engine's scene holds the anchor already offset, so the harness
+folds the polar offset in — the same equivalence it already applies to a text mark's `dx`/`dy`, and
+in the same order Vega applies them, so a rotated label turns about the offset point. And `clip` is
+both a mark property and an encode channel: `overview-plus-detail` writes `clip: {value: true}` into
+`enter`, and it is what keeps the detail view's line inside its own panel. The differential cannot see
+clipping at all — upstream's scenegraph still holds the items its renderer hides — so that one is
+evidenced by the exported SVG rather than by the comparison.
+
+## The eleven channels that were never on the list, and a rotated path mark's bounds
+
+The encode group was declared finished a commit too early. `ENCODE_UNSUPPORTED` was empty, but that
+table only holds channels *known* to be missing — and diffing Vega's own schema against
+`ENCODE_CONSUMED` found eleven more that were falling through to the generic "not implemented and was
+ignored". Two of them, `scaleX` and `scaleY`, were **already drawn**: they had been taken off the
+unsupported list without ever being added to the consumed one, so every specification using them was
+told it had been ignored while it was in fact honoured. The rule this suggests: the two tables are a
+partition of what the encoders read, and only checking them against the schema shows a channel that
+has fallen between.
+
+The other nine are implemented here. Four were plumbing to something the scene already had —
+`strokeDashOffset`, `strokeMiterLimit`, and `aspect`/`smooth` on an image, which the encoder read and
+the comparison could not see. Three were text: `lineHeight`, `lineBreak` and `dir`. Two were the group
+mark's `strokeOffset` and `strokeForeground`.
+
+**Truncation was being applied to the wrong string.** Upstream truncates *per line*, and trims each
+line first; this engine applied the limit to the whole run with its newlines still in it, so a
+two-line label was measured as one long one and its first line cut down to nothing. `displayText`
+became `displayLines`. Two smaller findings came with it: a limit of zero or less is not a truncation
+from the other end, it is no truncation at all — a comment here had claimed otherwise — and a
+right-to-left run keeps its **tail** with the ellipsis in front, which is `dir`, not the sign of the
+limit. Upstream's own SVG for the fixture reads `…r five` where the left-to-right copy reads
+`one t…`.
+
+**`scaleX`/`scaleY` are a `path` mark's channels, not a symbol's.** The fixture was written with them
+on a symbol, and passed while proving nothing: upstream's SVG for that mark is
+`transform="translate(330,40)" d="M-10,-10h20v20h-20Z"`, unscaled. Only `vega-scenegraph`'s
+`marks/path.js` reads them.
+
+**One difference found and kept.** A `path` mark that is both rotated and scaled has bounds here that
+do not match upstream's, and upstream's do not match what upstream draws. Its renderer rotates the
+outline about the item's own `(x, y)`; its *bounds* code rotates the already-placed points about the
+**origin**, because the bounds context it uses defines no `translate` or `rotate` and so falls into
+`pathRender`'s other branch, where the rotation is a matrix about zero. For the fixture's square at
+`(250, 40)` scaled by `(2, 0.5)` and turned 20 degrees, upstream reports a top-left of
+`(200.7, 111.6)` — 70 units below the shape it drew. This engine reports the box it actually painted.
+Reproducing the quirk would make chart sizes agree under `autosize: pad` and would put every hit
+target for such a mark in the wrong place, which is the worse of the two, so the fixture leaves the
+rotation out and this paragraph is the record. Nothing else about a rotated path mark differs: the
+outline, the anchor and the drawn transform all match.
+
+## Every map had been verified on its colours
+
+`normalize.js` compared a mark's drawn extent for `symbol`, `arc` and `path`. Not for **`shape`** —
+and a `geoshape` mark carries no `x` or `y` at all, so for the whole geographic family the only things
+ever compared were the fill and the stroke. `world-map`, `county-unemployment`, `map-with-tooltip`,
+`dorling-cartogram`, `geo-points`, `airport-connections` and `volcano-contours` were green on colour.
+The overall surface size did constrain the geometry indirectly under `autosize: pad`, which is why the
+maps were not in fact wrong, but nothing was checking them.
+
+Adding `shape` to that set produced 15,000 differences across four fixtures, of which three were real
+findings.
+
+**The path string was rounding the model, not the output.** `PathStringSink` rounded coordinates to
+d3-geo's three decimals, which is right for a `d` attribute and wrong for a scene: the string it
+produces is parsed straight back into the scene graph, where it *is* the geometry — every bound and
+every hit test comes off it. So every map's measured extent was systematically out by up to a
+thousandth. The sink now takes `digits = null` from the `geoshape` transform and keeps full precision;
+the SVG renderer rounds on the way out, which is where a digit count belongs. The default stays at
+three, because `GeoProjectionTest` and `GeoProjectionTypesTest` compare 67 upstream path *strings* and
+those are the strongest evidence the projections have.
+
+**A `fit` was destroying a mercator's automatic clip.** d3 distinguishes the rectangle a projection
+chooses for itself from the one a specification asks for: a mercator clips to the square its own scale
+makes one full turn of the world, and that square is recomputed every time the scale or the
+translation moves. A fit measures with the *user's* clip removed and puts it back afterwards; this
+engine had only one clip and put the stale automatic square back over the recomputed one, after the
+fit had changed the scale — which clipped the whole map away. `reclip()` now rebuilds the postclip
+from the two, intersecting them the way d3 does, and a user `clipExtent` on a mercator survives a
+recentre for the first time as well.
+
+**A `shape` mark that draws nothing measures nothing, and a `path` mark measures a point.** Upstream's
+two bound functions really do differ — `marks/path.js` short-circuits `item.path == null` to
+`bounds.set(0, 0, 0, 0)`, while `markItemPath` runs the generator into the bounds context and leaves
+the bounds cleared when it draws nothing. This engine applied the path rule to both, so the 467
+counties in Vega's own map that have no outline each measured as a point at the group's origin. Under
+`autosize: pad` that is 467 marks in the top-left corner.
+
+One harness detail came out of it. An empty rectangle must not be put through the world transform
+before it is reported: the sentinel a cleared `Bounds` holds is `MAX_VALUE`, and translating that
+gives a number no longer recognisable as empty — which is how the same absent county reported a width
+of zero on one side and an infinity on the other.
+
+## The projection properties that size a map rather than place it
+
+`fit`, `extent`, `size`, `clipAngle`, `parallels` and `pointRadius` were parsed and reported. All six
+are honoured now, and two were not where the earlier audit expected them.
+
+`clipAngle` and `parallels` were **plumbing**: `Projection` had taken both since the geographic family
+was ported, and the resolver never passed them. So an `orthographic` globe was drawing its far side
+and every conic stood on its family's default parallels — a different map of the same world, not the
+same map redrawn, because the parallels rebuild the raw formula.
+
+`fit` is the interesting one, and it is the only projection property that is **data**:
+`{"signal": "data('states')"}`. It is resolved in the scope that declared it, like every other signal,
+and it is why a fitted projection cannot be built until the data it fits has loaded. The arithmetic is
+d3's `fitExtent`, and none of its three oddities is arbitrary: the projection is reset to scale **150**
+because a fit is measured against d3's reference scale and the answer is a multiple of it; the scale
+factor is the **smaller** of the two ratios, so the geometry fits inside the box rather than filling it
+and spilling out; and the user's clip is removed for the measurement, because a clip in screen
+coordinates would cut the geometry to a rectangle the fit has not chosen yet.
+
+**And inline `values` could not be a document.** `"values": {a FeatureCollection}` with
+`"format": {"property": "features"}` is how a specification writes a map without a data file, and the
+parser read `values` as an array or not at all — so the dataset was silently empty. Upstream applies
+`format` to inline values exactly as it does to a loaded file, including TopoJSON. It does now here,
+which took splitting each reader into a text half and a document half.
+
+## A legend had no background, and a legend's `strokeWidth` is not a width
+
+Nothing drew the panel behind a legend's entries. `fillColor`, `strokeColor` and `cornerRadius` were
+parsed and reported, and a chart that put its legends on a tinted card got no card.
+
+The part worth knowing is where the outline's **width** comes from. Upstream builds the legend group's
+encode from `_('fillColor')` and `_('strokeColor')` — the legend's own value over the config's — and
+then from `config.strokeWidth` and `config.strokeDash`, the configuration *alone*. That is not a
+tidying slip: a legend's own `strokeWidth` names a **scale**, exactly as `fill` and `size` do, and
+writing `"strokeWidth": 2` on a legend makes upstream throw `Invalid field reference: 2`. The fixture
+found that out by trying it. So the width and the dash are read from `config.legend` here too, and the
+reason is recorded next to the field rather than left as a puzzle.
+
+Two harness findings came with it, both in the same shape as every other one:
+
+- **A group's dash was never compared.** `groupMark` reported a group's fill and stroke *colour* and
+  not its dash pattern, so an outlined legend matched a dashed one.
+- **A legend's reach ignored its own outline.** `legendBox` measured the declared extent, which is
+  right — a legend that clips an entry still occupies the box it declared — but a `strokeColor` draws
+  half a stroke width outside that box on every side, and upstream measures it. A chart with an
+  outlined legend is a unit wider than one without, and this engine was making it the same width.
+
+## The title's own styling, and a heading written as two lines
+
+Ten title properties were reported rather than drawn: `color`, `lineHeight`, an explicit `align`,
+`angle` and `baseline`, `limit`, and the subtitle's own `subtitleColor`, `subtitleFont`,
+`subtitleFontWeight` and `subtitleLineHeight`. Two things came out of implementing them.
+
+**`align`, `angle` and `baseline` are overrides, not alternatives.** Upstream writes the values derived
+from `anchor` and `orient` into the title's `enter` block and the explicit ones into `update`, so an
+explicit value wins over the derived one. Reporting them as unimplemented was doubly wrong: a chart
+that turns its left-hand title to read *up* the page was told it had been ignored and then had the
+derived angle applied.
+
+**`font` had been claimed as consumed and was never read.** `TITLE_CONSUMED` listed it — a theme
+setting the heading's face in `config.title` is ordinary — and `TitleBuilder.run()` hard-coded
+`TitleDefaults.FONT_FAMILY`. The third stale claim of its kind after `scaleX`/`scaleY`, and the same
+lesson: a name in the consumed table is a promise, and nothing was checking it.
+
+**And a title written as an array was rejected outright.** `"text": ["two", "lines"]` is upstream's
+multi-line form, for the subtitle too, and the parser accepted only a string — so a two-line heading
+produced `A title needs a 'text'` and no chart at all. The lines are joined with the newline this
+engine lays text out on, and the *accessibility caption* joins them back with a space, which is
+upstream's `array(text).join(' ')` and the same rule the axis and legend captions already follow.
+`GuideCaptionTest` caught that half.
+
+## Six guide properties that only needed passing on
+
+`Stroke` has carried `cap` and `dashOffset` since it was written, and both renderers have honoured
+them since then. No guide passed either. So `tickCap`, `gridCap`, `domainCap`, `tickDashOffset`,
+`gridDashOffset` and `domainDashOffset` were all reported as unimplemented while the machinery to
+draw them sat one function call away — every tick butt-capped and every dash pattern starting at the
+line's end.
+
+The fix was to widen `GuideStroke`, which upstream reads as one family per part — the prefix is the
+only thing that changes — rather than as six separate properties. It now carries `dashOffset`, `cap`,
+`align`, `baseline` and `lineHeight` alongside the colour, width, dash, opacity and font it already
+had, and `guideStyleKeys` generates all of them for every prefix. That closed the legend's
+`labelAlign`, `labelBaseline`, `titleAlign`, `titleBaseline` and `titleLineHeight` in the same change,
+and the axis's `labelLineHeight` and `titleLineHeight` with them. Consuming a name upstream does not
+define — `gridAlign` on an axis, say — costs nothing, because a guide that has no such property simply
+never writes one.
+
+Two exceptions to the family rule, both upstream's:
+
+- **`symbolDashOffset`, not `symbolStrokeDashOffset`.** The legend's symbol part is read through the
+  `symbolStroke` prefix, because upstream spells the colour `symbolStrokeColor` — but the dash and its
+  offset are `symbolDash` and `symbolDashOffset`. The fixture caught it: every swatch drew the right
+  pattern from the wrong starting point.
+- **`symbolFillColor` is a fallback, not an override.** Upstream sets the channel from it and *then*
+  overwrites it from the scale for every legend that maps one, so a `fill` scale always wins and only
+  a `size` or `shape` legend takes the stated colour. It had been reported as unimplemented, which
+  read as a bigger gap than it was.
+
+Also done here: `symbolOffset`, which shifts a swatch **and its label** along the row — upstream builds
+the label's offset by extending the symbol's, so the gap between them stays `labelOffset` whatever the
+symbol offset is; the gradient ramp's own `gradientStrokeColor`, `gradientStrokeWidth` and
+`gradientOpacity`, the last of which fades the outline with the colours because upstream puts it on the
+item rather than on either paint; and the axis `titleLimit`.
+
+## Where an axis sits, and the half pixel that is not in the measurement
+
+`tickBand`, `tickRound`, `position` and `translate` were reported and are drawn now. Each was a small
+change and one of them found something.
+
+**`tickBand` is three properties in one, and only one of its two values touches all three.**
+Upstream's `tickBand()` reads `"extent"` as `bandPosition: 1`, `tickExtra: true` **and**
+`tickOffset: 0`; `"center"` sets the first two back to their defaults and *leaves `tickOffset` alone*.
+That matters because `config.axisBand` gives a band axis a `tickOffset` of `-0.5`, which is what
+corrects the half pixel the axis group's own translation adds. Zeroing it for `"center"` as well moved
+every tick and label on that axis by half a unit, and the fixture caught it as two ticks out of four
+landing a whole unit wrong — the rounding turning half a unit into either nothing or one.
+
+**And `translate` is excluded from the axis's measurement, not just added to its position.** Upstream's
+`axisLayout` computes the axis bounds at `x`, calls `boundStroke` on them, and only then sets the item
+to `x + delta`. So the nudge onto the pixel grid is in the drawing and not in the size of the chart.
+This engine already took a `CRISP_OFFSET` back out of the guide bounds — which was right while the
+nudge was always half a pixel, and wrong the moment `translate: 0` made it something else, because
+then it was subtracting a half pixel that had never been added. A `translate: 0` axis made the chart
+half a unit wider than upstream's. It now reads the actual translate back.
+
+## `labelOffset`, and two properties a screen reader needs
+
+`labelOffset` slides an axis label **along** the axis, which is the other direction from
+`labelPadding`. It was reported and it is drawn now, and the shape of the change is the interesting
+part: the first attempt put it in `labelOffsetAlong`, which is a band scale's own centring rule and is
+only consulted for band scales — so a linear axis's labels did not move at all, and the fixture said so
+immediately. It belongs at the single place every label's coordinate passes through, after the band
+centring rather than inside it.
+
+`aria` and `description` are now honoured on both an axis and a legend. Neither is visible to the
+differential harness — upstream carries them as properties of the guide group and nothing about the
+drawing changes — so they are pinned by `GuideAccessibilityTest` instead: `aria: false` removes the
+guide from the accessibility tree, a `description` replaces the caption this engine generates from the
+scale, and a description that is only whitespace is not a description.
+
+That leaves **two** axis properties reported out of upstream's 79: `labelBound`, which needs the
+overlap remover to take a bounding rectangle, and `tickMinStep`, which needs the tick generator to
+take a floor on its step.
+
+## `tickMinStep`, which is a floor implemented as a ceiling
+
+Asking for a minimum gap between ticks sounds like it should set a step. It cannot: d3 chooses the
+step, and the only lever is the tick *count*. Upstream's `tickCount` therefore walks the count
+**down** until the step d3 would pick reaches the floor, and every part of that is load-bearing:
+
+- the count is first capped at `floor((hi - lo) / minStep || 1) + 1`. The `|| 1` is JavaScript
+  turning a zero into a one, so a floor wider than the whole domain leaves **two** ticks rather than
+  none — which is what the fixture's `tickMinStep: 200` over a `[0, 97]` domain draws;
+- then, because d3's step sizes grow monotonically as the count shrinks, the count is decremented one
+  at a time until `tickStep(lo, hi, count)` reaches the minimum. A closed form would need d3's
+  `e10`/`e5`/`e2` rounding inverted, which is why upstream loops and so does this;
+- and the walk-down is **skipped** for log and time scales, whose steps are not linear in the count at
+  all. Only the cap applies there.
+
+The fixture asks four axes for twelve ticks over the same domain with four different floors, and gets
+ten labels, five, two and a log axis's own progression — the same four sets upstream draws.
+
+One axis property is now reported out of upstream's 79: `labelBound`, which needs the overlap remover
+to take a bounding rectangle.
+
+## `symbolLimit` is not a truncation
+
+A legend told to show at most five entries shows **four**, and spends the fifth row on `…7 entries`.
+Upstream keeps `limit - 1` and gives the last slot to a summary of what it left out — so the number in
+that row counts the entries *not shown*, and the swatch beside it takes the size of the next value,
+which means a size legend's summary row is drawn at the size of the first thing it stands for.
+
+Worth having got from the source rather than from the name. A plain `take(limit)` would have looked
+right in a screenshot and been wrong by one entry and one row, and the fixture's reference reads
+`['alpha', 'beta', 'gamma', '…7 entries']` for a limit of four over ten values.
+
+## A legend over instants, and one report that was never a gap
+
+`formatType` on a legend is the only thing that can make its labels read as dates: a gradient
+legend's scale is a **colour ramp**, and a colour ramp knows nothing about time. There is nothing to
+infer it from, which is why the property exists and why ignoring it printed thirteen-digit
+millisecond counts where upstream printed "Jan 2024".
+
+The axis had solved this already, so the change was an extraction rather than an implementation:
+`GuideFormat` now holds the two pieces both guides need — the temporal labeller and
+`countWithMinStep` — and `tickMinStep` on a gradient legend came along with it for nothing.
+
+Two things the fixture's captions taught, which the labels alone would not have:
+
+- **A caption formats the same domain differently from the labels.** Upstream expands the
+  abbreviating directives before reading one out, so a ramp labelled `%b Y` is *described* as
+  "January 2024" while its labels say "Jan 2024". This engine already did that for a discrete domain
+  and not for a continuous one, so the legend captions read out raw milliseconds.
+- **A caption with no format at all carries its zone.** "Monday, 15 January 2024, 12:00:00 AM UTC" —
+  because a caption that reads out a whole timestamp should say which clock it is on. With an explicit
+  format it does not, and `GuideCaptionTest` compares all three legends in the fixture.
+
+And `clipHeight` was never a gap. It has been implemented since `dorling-cartogram`; it was simply
+missing from `LEGEND_CONSUMED`, so every legend using it was told it had been ignored. That is the
+fourth stale report of its kind, after `scaleX`/`scaleY` and the title's `font`, and all four came from
+the same thing: the consumed table is a **promise**, and until the schema diff nothing checked it.
+
+## The title is a guide too
+
+`aria`, `name` and `interactive` on a title were the last three of upstream's 31 title properties this
+engine did not read. `aria: false` is the only way to keep a decorative heading — a watermark, a chart
+drawn twice with one copy labelled — out of what a screen reader reads, so it matters more than its
+size suggests. All three go on both the heading and its subtitle, because upstream builds them as two
+marks under one guide and either can be focused.
+
+The schema diff now finds **nothing** unaccounted for in `encodeEntry`, `axis`, `legend`, `layout`,
+`projection` or `scale`, and **nothing** in `title` either. The whole inventory is closed: every property upstream
+defines in every block is read.
+
+Running the same subtraction over the *encode* vocabulary found the same thing one level down: several
+channels reported as unimplemented had a property behind them the whole time, one entry away in the
+translation map — a tick's `strokeCap` and `strokeDashOffset`, a label's `lineHeight`, and an axis
+title's `align`, `baseline`, `angle`, `limit`, `x` and `y`, every one of which was already honoured
+under its own name. The two whole-block gaps went with them: `encode.gradient` styles the ramp and
+`encode.legend` the group the legend sits in, which is where its background and its placement live.
+
+One channel is deliberately **not** folded. A ramp label's `align` and `baseline` are *not* the same
+thing as `labelAlign` and `labelBaseline`: upstream derives a gradient label's alignment from where
+along the bar it sits, never reads the property, and lets only an `encode` block override it — probed
+both ways to be sure. Folding the channel into the property would quietly make the property work on
+the one kind of legend that is supposed to ignore it, so the mapping now depends on what kind of legend
+it is.
+
+That work turned up a placement rule nothing had exercised: a legend title aligned or anchored away
+from its default reaches *left* of the legend's own origin, and upstream drags the whole legend right
+rather than letting it be cut off — `legendGroupLayout` measures `title.bounds.x1 - padding` and
+translates both the title and the entries by the overflow.
+
+A guide's `encode` block is a vocabulary of its own, and a channel it cannot express is now named one
+at a time — `A title's 'title' encode block sets 'x', which is not
+read` — rather than the block being written off whole. That is the difference between an unfinished
+feature and a wrong chart: a heading whose `encode` positioned its own text is a heading this engine
+would draw in the wrong place, and there is no property to warn about, only a channel.
+
+A title's `encode` splits three ways, which is worth knowing before reading the code: `group` styles
+the group the heading sits in, `title` its text, `subtitle` the second line — and a block naming none
+of the three is upstream's **deprecated** form, which applies to the *text*. That last one is the form
+`encode.update.dx` is written in, and it is the reason this engine had been reading `dx` out of an
+encode block for some time without reading anything else.
+
+The `group` block also produced the one scene-graph rule this needed: a title group's paint does not
+widen it. `titleLayout` finishes by writing the union of the heading's and subtitle's bounds *over* the
+group's, which discards the half-unit `boundStroke` had already added — so an outlined heading paints
+that outline round a rectangle of no size and the drawing does not grow. Ported as an explicit
+`boundsFromChildren` on the group node rather than by relaxing the general group rule, which is right
+for a group mark that declares a size.
+
+A title's `style` turned out not to be decoration. Upstream builds the heading's text mark with
+`style: "group-title"` and lets a specification's `style` take **that slot**, so naming one does not
+add to the 13-point bold — it removes it, and what the named block does not say falls through to the
+*renderer's* defaults of 11 point and no weight rather than to the title's. Written here as two
+configuration layers beneath `config.title`, so the ordinary precedence still holds: the title's own
+property beats the theme, which beats the style, which beats the renderer. The subtitle is untouched —
+its slot is `group-subtitle`, which a title's `style` never takes.
+
+Closing `legend` took admitting that a line in this file was wrong. `strokeDash` and `strokeWidth` had
+been written off here as "not gaps, they name scales" — which is exactly what makes them gaps. On a
+legend those two are **channels**: keyed to a `strokeDash` scale a legend draws a swatch per dash
+pattern, and keyed to a `strokeWidth` scale its rows are of different heights, because upstream's
+row-height expression reads that scale rather than the `symbolStrokeWidth` property. The legend
+background's own width and dash are a separate thing and do come from `config.legend` alone — which is
+why the channel has to be read from the legend's *own* object and not the config-layered one, or a
+themed border becomes a channel naming a scale called "2".
+
+Two more things fell out of that. `gridAlign` looked like a dead letter — it only means anything to a
+multi-column grid — but `config.legend` defaults it to `each`, and the entry grid's row **centring**
+is conditional on being aligned at all. So the default was doing work no legend had noticed until one
+had rows of unequal height. And a mark's `strokeDash` read through a **scale** was dropped silently:
+the encoder resolved a constant or a field but returned nothing for a scaled one, so every line in a
+chart that distinguished its series by line style came out solid.
+
+`labelFlushOffset`, the last axis property, was a **stale** report: its explanation said it needed
+`labelFlush`, which had been implemented for some time. It nudges a flushed label along the axis, and
+it is signed *outwards* — a label flushed to the start moves back towards it — applied only where the
+flush rule decided the alignment, since an explicit `labelAlign` means the label is not being flushed
+at all.
+
+## The last block that listed its gaps by exception
+
+`layout` was the one place still reporting what it *could not* do rather than naming what it does. The
+difference is not stylistic: a table of exceptions has no way of noticing a property nobody thought
+about, which is the whole failure this project's diagnostics exist to prevent. `titleAnchor` is what it
+cost — no entry in the table and no reader, so a trellis that anchored its cell titles was told nothing
+at all.
+
+Inverted to a `LAYOUT_CONSUMED` set and `reportUnhandled`, like every other block. Six layout
+properties are now named: `center`, `offset`, `headerBand`, `footerBand`, `titleBand` and
+`titleAnchor`.
+
+## `domainRaw` short-circuits five things, and one of them is not where you look
+
+`domainRaw` is what makes an interactive zoom work: a brush publishes the interval it wants and
+nothing is allowed to round it outwards. Upstream reads it **first** in `configureDomain` and returns
+before it looks at `zero`, `domainMin`, `domainMax` or `domainMid` — so it is not an override applied
+over the rest, it is a bypass of the rest.
+
+`nice` is the one that catches you. It is applied by the *caller*, after the domain has been resolved,
+at six separate sites — one per scale family, because each rounds differently. Returning early from the
+domain resolution therefore skips four of the five and leaves the fifth to widen `[17, 43]` back out to
+`[16, 44]`, which is exactly what the fixture reported. There is no single place all six pass through,
+so the check is at each of them.
+
+One more reading worth having: a raw domain of fewer than two values is **not** an override. Upstream's
+`rawDomain` returns `raw.length` and its caller only treats a value greater than `-1` as handled, so an
+empty array short-circuits with a length of zero and an unresolvable signal — which is what a brush
+publishes until a reader touches the chart — falls through to the ordinary domain.
+
+That leaves one scale property reported out of upstream's 23: `domainImplicit`.
+
+## Six colour spaces, and the `NaN` that holds a hue still
+
+`hcl`, `hsl` and `cubehelix` — and the `-long` variant of each — fell back to RGB with a diagnostic.
+All six are ported now, pinned to `d3-interpolate`'s own output in `ColorInterpolationTest` and proved
+by a fixture that draws the same two ends through all eight spaces: eight visibly different ramps, and
+eight sets of colours that match upstream's exactly.
+
+Three details are upstream's and each is invisible from the ends of a ramp, which is the only place a
+casual test would look:
+
+- **A hue is a circle, so there are two ways round it.** `d - 360 * round(d / 360)` is d3's short-arc
+  rule, and it is not a modulo: a difference of exactly 180 maps to 180 rather than to −180, so a pair
+  of complementary colours turns the same way whichever was written first. The `-long` variants skip
+  the correction, which is the whole difference between a ramp that stays in one colour family and one
+  that visits the rest of the spectrum on the way. Viridis's own two ends go through magenta under
+  `hcl` and through blue under `hcl-long`.
+- **A grey has no hue — `NaN`, not zero.** An angle at the origin means nothing, and d3 reads
+  `NaN - x` as "no difference" and so holds the channel constant *at the end that has a value*. A ramp
+  from grey to red therefore keeps red's hue throughout and only moves its chroma; averaging the zero
+  a naive port would put there drags the whole ramp through red. Pure black and white have a `NaN`
+  saturation too, where even the radius is undefined.
+- **Cubehelix's `-120` is not a normalisation.** Green defined the helix with its zero at blue, and
+  dropping the offset turns every ramp a third of the way round the circle.
+
+The object form `{"type": "rgb", "gamma": 2.2}` is read for its type, and its gamma is now *reported*
+rather than dropped: only `interpolateRgb` has one in d3, and it bends the ramp's middle without moving
+either end — so a chart that asked for it and got the plain ramp would look composed and be wrong
+exactly where nobody checks.
+
+## Three aggregate operations, and four diagnostics that were lying
+
+Upstream has 26 aggregate operations and this engine had 23. The three missing were `product` and the
+two exponentially weighted means, and the pair is unlike everything else in the family twice over:
+
+- **their answer depends on the order of the rows.** Upstream accumulates `exp = r * exp + v` as the
+  rows arrive, so a value's weight is `r` to the power of how many rows follow it and the *last* row
+  counts most. Every other operation here is symmetric in its input.
+- **they are the only two that take a parameter.** `aggregate_params` sits positionally alongside
+  `ops`, and it is a *specification* property rather than an internal one — so `exponential` is
+  reachable from a chart and was reachable before this only as a diagnostic. `exponential` normalises
+  by `(1 - r) / (1 - r^n)` so the weights sum to one; `exponentialb` scales only by `(1 - r)`, which
+  is what makes it comparable across groups of different sizes.
+
+The more interesting half of this batch was what it found *not* to be missing. Four diagnostics said
+"is not implemented" about things that are:
+
+- `impute` accepts `value`, `mean`, `median`, `min` and `max` — upstream's whole enumerated set, and
+  all five have worked here since the transform was written;
+- `pivot` takes any aggregate operation, so with the three above added it takes all 26;
+- `window` implements all thirteen of upstream's window operations *and* every aggregate one.
+
+Each of those messages fired only for a name upstream itself rejects, and each read as an engine gap.
+They now say what is actually true — "'x' is neither a window operation nor an aggregate one" — which
+matters because a diagnostic that overstates a gap is the same failure as one that hides it: a reader
+plans around something that is not there.
+
+## `config.range` is what a named range stands for
+
+`"range": "category"` is not a keyword. It is a **key into `config.range`**, and only when the
+configuration says nothing about it does it fall through to a built-in default. This engine had the six
+defaults and ignored the configuration, so a theme that set its own categorical palette got
+`tableau10` anyway — and the whole `config.range` block was reported as unread, which was at least
+honest.
+
+Upstream substitutes and *re-reads*: `parseScaleRange` replaces the name with whatever the theme wrote
+and parses the result as an ordinary range. Doing it in the parser rather than in the resolver is not a
+detail of style — it is what lets a theme's `category` be a `{"scheme": ...}` where the built-in default
+is a literal list of symbol names. The two are the same property, not two kinds of thing, and a resolver
+that had already decided which kind it was could not accept the other.
+
+That also retires the last of the "named range is not implemented" messages. All six of upstream's
+names work, and what is left is a name that is neither one of them nor defined by the configuration —
+which the diagnostic now says.
+
+## `hsl(h, s, l)` had been returning null for months, and nothing noticed
+
+An escaping accident — a Kotlin string template written as `${'$'}h`, which is the literal text `$h`
+rather than the value — made three expression builders parse a nonsense string and return null:
+`hsl(h, s, l)`, `rgb(r, g, b)`, and the default `as` name for a facet aggregate. Five occurrences
+across two files, all from the same cause.
+
+**Every test read a colour apart and none built one.** `ExpressionReferenceTest` had eleven vectors for
+`luminance('hsl(...)')` and none for `hsl(210, 0.6, 0.4)`, so the half of each function that was broken
+was the half nobody asked about. A vector for each is in now, and the pairing is worth stating as a
+rule: a function with two arities needs a vector for **both**, because a test of one is not weak
+evidence for the other — it is none.
+
+**The differential could not see it either, and that was the more serious half.** Vega's colour helpers
+return **objects** — `hsl(h, s, l)` is a `d3.Hsl`, not a string — and a mark encoder writes the object
+straight onto the item, where the renderer stringifies it. Passing such an object through the harness's
+`canonicalNumber` gave `undefined`, which `JSON.stringify` omits, so the channel *vanished from the
+reference*. Every one of the 7,514 rects in Vega's platformer had its fill compared as "absent", which
+is why a fill of null matched perfectly. The harness now stringifies a colour object exactly as the
+renderer does — a gradient is an object too and keeps its own shape — and the platformer's terrain is
+compared for the first time.
+
+That immediately found a second, smaller thing: 85 of those rects came out pure black against
+upstream's `rgb(0, 0, 4)`. Building the colour by writing the fractions out as CSS percentages and
+parsing them back loses precision exactly where it shows, in a colour so dark that a channel is a
+single digit. It is built from the numbers now.
+
+And with `ColorSpaces` carrying the perceptual spaces, `lab(l, a, b)` and `hcl(h, c, l)` are
+implemented rather than refused. Their components are **not** fractions — a Lab lightness runs 0 to
+100 and an HCL chroma is a radius in those units — which the `hsl` beside them invites you to assume,
+and which would give a colour that is nearly black for every input.
+
+## Two things a signal could not see, and the geo measurements that needed both
+
+`geoBounds` and `geoScale` were the last two of upstream's four geo expression functions this engine
+did not have, and neither was hard. What was hard was that a signal could not reach a projection at
+all.
+
+**A dataset's transforms had been given the projections since `geoCentroid` was implemented; a
+signal's own `update` had not.** So `geoScale('p')` reported the projection as undefined however late
+in the dataflow it ran. The map is rebuilt at each step of the order rather than held once, because a
+projection is *made of* signals — `rotate: [{signal: "lon"}, 0]` — so what is buildable changes as the
+order is walked.
+
+**And a projection reference created no ordering edge.** Upstream registers a projection in the **same
+namespace as a scale** and visits `geoScale('p')` with its `scaleVisitor`, so the reference already
+arrived here as a scale dependency — there was simply nowhere for it to land, because a projection is
+not an operator in this engine. A projection with a `fit` is built from a dataset, so asking it
+anything has to wait for that dataset: `geoScale('p')` on a projection fitted to `data('land')` answered
+`1070`, which is `albers`'s own unfitted default, where upstream answered `34.3`.
+
+One reading the fixture forced, and it is upstream's: **`geoBounds` takes a GeoJSON object, not an
+array.** `geoBounds('p', data('land'))` measures nothing at all, because `geoStream` looks for a `type`
+and an array has none — upstream returns `[[Infinity, Infinity], [-Infinity, -Infinity]]` and draws the
+rectangle nowhere. The features have to be wrapped in a `FeatureCollection`, which is what the fixture
+does.
+
+## Nine functions nothing called, and what the sweep found
+
+After `hsl(h, s, l)` turned out to have been returning null for want of a test, the obvious next
+question was which other functions nothing calls. Subtracting the names any expression test mentions
+from the names `Functions.kt` registers gives nine: `atan2`, `bandspace`, `lerp`, `pluck`, `sequence`,
+`sort`, `timeSequence`, `timezoneoffset` and `trim`. The diff takes a second and is worth keeping in the
+toolkit beside the schema one.
+
+All nine matched upstream on the first run. That is the useful outcome: 22 new vectors and no new
+findings, which turns "probably fine" into "checked" for the parts of the expression vocabulary the
+fixtures never happen to exercise. Three of the answers are worth having written down anyway:
+
+- `bandspace` counts **steps**, not bands, so five bands at 0.1 inner padding come to 5.3 — and
+  padding is allowed to eat a whole band without the answer going negative, which would invert the
+  scale;
+- `lerp` short-circuits at 0 and 1 rather than computing `lo + f*(hi - lo)`, so a specification asking
+  for the end of a range gets the end of it exactly;
+- `timeSequence` steps in **local** time even when the result is read back as UTC, which is why its
+  first entry for January 2024 in Amsterdam formats as the last day of 2023.
+
+## `domainImplicit`, and a domain that grows as it is used
+
+An ordinal scale normally maps an undeclared value to its `unknown` — nothing, usually, so a mark with
+an unexpected category draws unpainted. `domainImplicit` makes such a value **join** the domain
+instead: d3 spells it by setting `unknown` to its own `implicit` sentinel, and the effect is that the
+scale's domain grows as it is used, each new value taking the range entry after the last one claimed.
+
+That is why it is off by default, and worth saying rather than leaving to be inferred: **order of use
+decides which colour a value gets**, so a chart that reorders its rows would repaint itself. It is for
+a domain nobody can write down in advance. The fixture declares two values, feeds four, and the last
+two take the third range entry and then wrap to the first — beside the same scale without the flag,
+which simply has no colour for them.
+
+With it, none of upstream's 23 scale properties is reported any more.
+
+## `labelBound` culls nothing, and implementing it would have been wrong
+
+The documented meaning is "drop an axis label that hangs past the scale's range". Implementing that is
+easy, and it would have made this engine disagree with upstream on every chart that sets the property.
+
+Upstream applies the test as `boundRectangle.encloses(item.bounds)` inside its `Overlap` transform, and
+`Overlap` runs **before the label bounds exist** — `Bound` comes later in the mark's pipeline. So on a
+static render every item still holds a *cleared* `Bounds` of `[+∞, +∞, −∞, −∞]`, which any rectangle
+trivially encloses. Nothing is ever outside.
+
+Established by experiment rather than by reading: a band axis 120 units wide whose first label
+overflows by 68 keeps that label under `labelBound: false`, `true` and `40` alike. The first attempt
+here culled two labels the reference kept, which is how the question got asked at all.
+
+So the property is **consumed and inert**, with the reason written where the code would otherwise be —
+a diagnostic saying "not implemented" would overstate a gap that has no visible consequence, and a
+correct-per-the-documentation implementation would be a real difference. With it, every one of
+upstream's 79 axis properties is read.
+
+## A comma grouped an exponent
+
+`format(200000, ',.1')` came out `2,e+5`. d3 splits a formatted value at the **first character that is
+not a digit** and groups only what is before it; this engine split on the decimal point alone, so an
+exponent's `e+5` was reversed into the grouping and came back with a comma in it. A percentage's `%`
+was the same case.
+
+Found by an axis, not by a formatting test: a `,` specifier over a domain of a million resolves to one
+significant figure, and one significant figure of 200,000 is `2e+5`. Six vectors for it now, including
+the two forms — `,.1` and `,.2e` — that reach exponential notation by different routes.
+
+## `timeunit` picks its own buckets, and its `step` was published but not applied
+
+Two gaps in one transform, and only one of them was on the list.
+
+**The inference** was reported as unimplemented, and it is a table: seventeen intervals from a second
+to a year, chosen by which one's duration is nearest the data's span divided by `maxbins` — *nearest in
+ratio*, not in difference, which is why choosing between two neighbouring intervals compares
+`target / lower` against `upper / target`. Off the ends of the table the step comes from d3's own tick
+step instead: years above, milliseconds below. Ninety daily rows at the default forty bins give days;
+the same ninety asked to fit four give months.
+
+**The step was worse, because it was silent.** `step` was read, published in the transform's own
+signal, and never applied: `step: 3` bucketed by month and then announced that it had bucketed by
+quarter. It applies to the **finest** unit only — a `{year, month}` bucket at step 3 is a quarter, not
+three years of quarters — with a phase of 1 for the units counted from one rather than zero, because
+`3 * floor(month / 3)` puts January in a bucket starting at month zero, which is December of the year
+before.
+
+## An explicit format on a time axis was ignored
+
+The fixture for the above wanted `"format": "%b"` on a `utc` axis and got `2024`, `February`, `March`
+— the multi-format, which writes each tick at its own granularity and carries the year on the first
+one of a year. A named format should replace that for every tick alike.
+
+The linear branch of the tick generator had always made that distinction and the **time** branch never
+had: it took `scale.tickLabels(count)` unconditionally, so an axis that named a format was labelled as
+if it had not. The accessibility caption had the same hole, one layer down — it read the whole
+timestamp out where upstream describes a `%b` axis as "January to March", expanding the abbreviating
+directive as it does everywhere else.
+
+Neither would have been found by the fixture the property belonged to. Both were found because a
+fixture *about something else* happened to put a format on a time axis, which is the argument for
+writing fixtures that combine features rather than isolate them.
+
+## Layout `center`, and two more diagnostics that were overstating
+
+`center` puts a cell narrower than its column in the middle of it rather than at its start. Upstream
+guards it twice over and both guards are load-bearing: horizontally it needs more than one **row**, and
+vertically more than one **column**, because a single row of cells has nothing to centre against —
+every column is exactly as wide as the one cell in it. The correction is `x > 0` too, so the widest
+cell in a column, which has no slack, is not pulled backwards out of it.
+
+The facet aggregate message went the way the `impute`, `pivot` and `window` ones did earlier: a facet
+measures with any aggregate operation, so with all 26 implemented the report fired only for a name
+upstream also rejects. It says that now.
+
+## A trellis has footers, and this engine was gridding them
+
+`row-footer` and `column-footer` were not in `TrellisRole`, so they fell through to `CELL` — which does
+not merely misplace them, it **grids them among the cells**. A trellis of four cells with four row
+footers laid out as an eight-cell grid. Nothing reported it, because a group mark with no recognised
+role is a cell by design and that is exactly what an unrecognised one looked like.
+
+With the two roles added, the whole `layout` block closes: `headerBand`, `footerBand`, `titleBand`,
+`titleAnchor` and `offset`, which is all ten of upstream's properties. Four things in it are upstream's
+and none is guessable:
+
+- **a band is `null` by default for a header and `0.5` for a title.** `null` means the cell's own
+  origin, not its middle — so a header without a band lines up with the corner of the cell it names,
+  and a title without one is centred on the grid.
+- **a title is centred on the *cells*, not on the grid plus its headers.** Upstream returns the cell
+  bounds from `gridLayout` and lays the headers out afterwards, so the question never arises there;
+  here the header pass had already widened the bounds the title was centred on, which moved every
+  title by half the width of its own row labels.
+- **`titleAnchor: "end"` measures from the footers**, not from the far side of the cells — so a title
+  anchored to the end of a trellis that has footers clears them.
+- **more headers than rows is not an error and not a reason to drop one.** Upstream lays out the first
+  `limit` and leaves the rest where they were; the limit is the number of rows or columns and *not*
+  the number of cells, so six column headers over a two-by-three grid label three columns and the
+  other three stay put. Dropping them changes the mark count, which is a bigger difference than a
+  label in the wrong place.
+
 ## Performance observations
 
 Nothing on hardware. No measurement has been taken on a physical device, and emulator numbers are
@@ -3142,11 +3902,11 @@ explored with it; the tree was already correct and two things it *said* were wro
 and pinned by instrumented tests. What remains untested there is physical hardware and a real user,
 which is a different claim from "not verified at all".
 
-A note on the harness, because it is now the seventh time. The differential comparison has had to be
+A note on the harness, because it is now the fifteenth time. The differential comparison has had to be
 taught to see a symbol's outline, fill and stroke opacity, a dash pattern, a node's own opacity, an
-unfilled mark's missing opacity, the corners a curve puts between a series' points, and — adding
-`linkpath` — the outline a `path` mark actually draws, which until then was compared only by the
-anchor it hung from. Each was invisible for the same reason — two marks agreeing on every channel
+unfilled mark's missing opacity, the corners a curve puts between a series' points, a rectangle's four
+corner radii, a series' `tension`, the whole drawn extent of every `shape` mark, and — adding `linkpath` — the outline a `path` mark actually draws,
+which until then was compared only by the anchor it hung from. Each was invisible for the same reason — two marks agreeing on every channel
 being compared and differing in the drawn result. Before trusting a green fixture on a *new* kind of
 property, check that
 `oracle-js/src/normalize.js` and `Differential.kt` both emit it. And look at the two pictures: three

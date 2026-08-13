@@ -17,6 +17,19 @@ public value class SceneNodeId(public val value: Long) {
  */
 public class SceneNodeIdAllocator(private var next: Long = 1L) {
   public fun allocate(): SceneNodeId = SceneNodeId(next++)
+
+  /**
+   * Where the allocator has got to, so a caller can encode the *same* items twice.
+   *
+   * A mark with a `hover` block is encoded once as it rests and once as it looks under the pointer,
+   * and the two have to agree on ids: the hit index, the selection and the accessibility tree all
+   * key on them, and a hovered item that changed its id would leave the pointer over nothing.
+   */
+  public fun mark(): Long = next
+
+  public fun rewind(to: Long) {
+    next = to
+  }
 }
 
 /** How a mark should be described to assistive technology. */
@@ -65,6 +78,13 @@ public data class NodeMetadata(
    * through the same points, and the differential harness compares the method alongside them.
    */
   val interpolate: String? = null,
+  /**
+   * The slack in a cardinal, Catmull-Rom or bundle curve, when the specification set one.
+   *
+   * Kept for the same reason as [interpolate]: two families at different tensions can pass through
+   * the same data points, so the outline alone does not say what was asked for.
+   */
+  val tension: Double? = null,
   /** Stable tuple identity from the dataflow, preserved across incremental updates. */
   val datumId: Long? = null,
   val datumIndex: Int? = null,
@@ -77,7 +97,30 @@ public data class NodeMetadata(
    * same object the encoder saw rather than a copy, so it costs a reference.
    */
   val datum: VegaValue? = null,
+  /**
+   * What a tooltip should say, which is **not** always the datum.
+   *
+   * Upstream's `tooltip` encode channel puts whatever it resolves to on the item, and a chart that
+   * wants one line rather than a whole row writes one: `{"signal": "datum.name + ': ' + datum.v"}`.
+   * With no channel the item carries its datum, which is what upstream does too.
+   */
   val tooltip: VegaValue? = null,
+  /**
+   * The pointer shape over this item, as the CSS name a specification writes.
+   *
+   * Carried on the node rather than resolved to a platform constant because the platforms disagree
+   * about what they have: a host maps it to a `PointerIcon` on Android and emits it verbatim in
+   * SVG.
+   */
+  val cursor: String? = null,
+  /**
+   * Paint order **within** the item's own mark, `zindex`.
+   *
+   * Zero for almost everything. It matters on hover — a raised item has to be drawn over its
+   * neighbours, which is a reordering and not a repaint — and the sort is stable, so items sharing
+   * a `zindex` keep the order the data gave them.
+   */
+  val zindex: Int = 0,
   val accessibility: AccessibilityDescriptor? = null,
 ) {
   public companion object {
@@ -137,6 +180,38 @@ public data class GroupNode(
    */
   val size: SizeD? = null,
   val cornerRadius: Double = 0.0,
+  /** Per-corner overrides of [cornerRadius]; see the same fields on [RectNode]. */
+  val cornerRadiusTopLeft: Double? = null,
+  val cornerRadiusTopRight: Double? = null,
+  val cornerRadiusBottomRight: Double? = null,
+  val cornerRadiusBottomLeft: Double? = null,
+  /**
+   * How far the background rectangle is nudged so a thin stroke lands on a pixel boundary.
+   *
+   * Null takes upstream's rule, which is not "no offset": a group stroked at a width between 0.5
+   * and 1.5 is shifted by `0.5 - |width - 1|`, so the commonest case — a 1px outline — moves half a
+   * pixel and comes out crisp instead of grey on both sides of the boundary. Only the group mark
+   * has this; a `rect` inside one does not.
+   */
+  val strokeOffset: Double? = null,
+  /**
+   * Draws the group's stroke **after** its children rather than before.
+   *
+   * The difference is only visible where a child reaches the edge: a cell whose bars run to its own
+   * border either have the border drawn over them or paint over it themselves.
+   */
+  val strokeForeground: Boolean = false,
+  /**
+   * Whether this group measures as its children alone, ignoring its own paint.
+   *
+   * A faithful port of one upstream rule, not a general relaxation. `titleLayout` finishes by
+   * writing the union of the heading's and subtitle's bounds over the group's — `group.bounds
+   * .clear().union(tempBounds)` — which discards the half-unit `boundStroke` had already added for
+   * the group's background. So a heading given an outline through its `encode.group` block paints
+   * that outline over a rectangle of no size and does **not** make the drawing half a unit wider,
+   * which it would under the ordinary group rule.
+   */
+  val boundsFromChildren: Boolean = false,
   /** Clip rectangle in this group's own coordinate space, applied before drawing children. */
   val clip: RectD? = null,
   val clipPath: PathData? = null,
@@ -152,6 +227,40 @@ public data class GroupNode(
         else -> clip
       }
 
+  /**
+   * The half-pixel nudge actually applied to the background, `strokeOffset` resolved.
+   *
+   * Upstream's `offset(item)`: an explicit value wins; otherwise a stroke whose width is within
+   * half a unit of 1 is shifted to sit on a pixel boundary, and anything else is not shifted at
+   * all.
+   */
+  public val effectiveStrokeOffset: Double
+    get() {
+      strokeOffset?.let {
+        return it
+      }
+      val width = stroke?.width ?: return 0.0
+      return if (width > 0.5 && width < 1.5) 0.5 - kotlin.math.abs(width - 1.0) else 0.0
+    }
+
+  /** That rectangle rounded, or null when it is square or there is nothing to paint. */
+  public val roundedPaintPath: PathData?
+    get() {
+      val rect = paintRect ?: return null
+      val corners =
+        Corners.of(
+          rect.width,
+          rect.height,
+          cornerRadiusTopLeft ?: cornerRadius,
+          cornerRadiusTopRight ?: cornerRadius,
+          cornerRadiusBottomRight ?: cornerRadius,
+          cornerRadiusBottomLeft ?: cornerRadius,
+        )
+      if (corners.isSquare) return null
+      val offset = effectiveStrokeOffset
+      return RectPath.of(rect.left + offset, rect.top + offset, rect.width, rect.height, corners)
+    }
+
   override val bounds: RectD by
     lazy(LazyThreadSafetyMode.NONE) {
       // Upstream measures a group as its declared extent unioned with its children. Clipping
@@ -163,6 +272,7 @@ public data class GroupNode(
         if (child.visible) result = result.union(child.transformedBounds)
       }
       if (clip != null) result = intersect(result, clip)
+      if (boundsFromChildren) return@lazy result.normalized()
       (stroke.wideningAt(opacity)?.let { result.expand(it.halfWidth) } ?: result).normalized()
     }
 }
@@ -200,6 +310,17 @@ public data class RectNode(
   val width: Double,
   val height: Double,
   val cornerRadius: Double = 0.0,
+  /**
+   * Per-corner overrides, each falling back to [cornerRadius] when absent.
+   *
+   * Null rather than `0.0` because the fallback has to be distinguishable from a corner
+   * deliberately squared off: `cornerRadius: 4, cornerRadiusTopLeft: 0` is a bar rounded on three
+   * corners.
+   */
+  val cornerRadiusTopLeft: Double? = null,
+  val cornerRadiusTopRight: Double? = null,
+  val cornerRadiusBottomRight: Double? = null,
+  val cornerRadiusBottomLeft: Double? = null,
   val fill: Fill? = null,
   val stroke: Stroke? = null,
   override val transform: Transform2D = Transform2D.Identity,
@@ -213,8 +334,29 @@ public data class RectNode(
   public val rect: RectD
     get() = RectD.fromSize(x, y, width, height)
 
+  /** The four radii actually drawn: the overrides where given, clamped to fit. */
+  public val corners: Corners
+    get() =
+      Corners.of(
+        width,
+        height,
+        cornerRadiusTopLeft ?: cornerRadius,
+        cornerRadiusTopRight ?: cornerRadius,
+        cornerRadiusBottomRight ?: cornerRadius,
+        cornerRadiusBottomLeft ?: cornerRadius,
+      )
+
   public val effectiveCornerRadius: Double
     get() = cornerRadius.coerceIn(0.0, minOf(kotlin.math.abs(width), kotlin.math.abs(height)) / 2.0)
+
+  /**
+   * The outline as a path, or null when all four corners are square and a plain rectangle will do.
+   *
+   * Both renderers go through this rather than their own rounded-rectangle primitive, so that the
+   * corner geometry is Vega's in every output — see [RectPath].
+   */
+  public val roundedPath: PathData?
+    get() = corners.takeIf { !it.isSquare }?.let { RectPath.of(x, y, width, height, it) }
 
   override val bounds: RectD by
     lazy(LazyThreadSafetyMode.NONE) {

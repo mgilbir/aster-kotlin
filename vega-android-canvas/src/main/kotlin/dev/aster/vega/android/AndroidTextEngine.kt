@@ -15,7 +15,7 @@ import dev.aster.vega.scene.TextLine
 import dev.aster.vega.scene.TextMetrics
 import dev.aster.vega.scene.TextRun
 import dev.aster.vega.scene.TextStyle
-import dev.aster.vega.scene.displayText
+import dev.aster.vega.scene.displayLines
 import dev.aster.vega.scene.textBounds
 import kotlin.math.ceil
 
@@ -51,7 +51,7 @@ public class AndroidTextEngine(
     val constraintWidth = constraint?.width?.takeIf { it > 0.0 && it.isFinite() }
     // A guide's `limit` shortens what is drawn without changing what the run says, so a truncated
     // label still reports the value it came from to accessibility and to the differential harness.
-    val shown = text.displayText { paint.measureText(it).toDouble() }
+    val shown = text.displayLines { paint.measureText(it).toDouble() }.joinToString("\n")
     val lines =
       if (constraintWidth == null && !shown.contains('\n')) {
         listOf(TextLine(shown, paint.measureText(shown).toDouble(), 0.0))

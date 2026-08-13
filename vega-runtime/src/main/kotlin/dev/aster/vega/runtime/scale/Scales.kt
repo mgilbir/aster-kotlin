@@ -599,16 +599,34 @@ public class OrdinalScale(
   public val rangeValues: List<VegaValue>,
   /** Returned for a value outside the domain; `null` means [VegaValue.Null]. */
   public val unknown: VegaValue? = null,
+  /**
+   * `domainImplicit`: an unseen value **joins** the domain rather than being unknown.
+   *
+   * d3 spells this by setting the scale's `unknown` to its `implicit` sentinel, and the effect is
+   * that the domain grows as the scale is used: the first unseen value takes the range entry after
+   * the last one already claimed. Order of use therefore decides which colour a value gets, which
+   * is why it is off by default — a chart that reorders its rows would repaint itself. It is for a
+   * scale whose domain nobody can write down in advance.
+   */
+  private val implicit: Boolean = false,
 ) : VegaScale {
 
-  private val indices: Map<String, Int> =
-    domain.withIndex().associate { (index, value) -> value to index }
+  private val indices: MutableMap<String, Int> =
+    domain.withIndex().associateTo(LinkedHashMap()) { (index, value) -> value to index }
 
   override fun scale(value: VegaValue): VegaValue {
     if (rangeValues.isEmpty()) return unknown ?: VegaValue.Null
-    val index = indices[value.asString()] ?: return unknown ?: VegaValue.Null
+    val key = value.asString()
+    val index =
+      indices[key]
+        ?: if (implicit) indices.size.also { indices[key] = it }
+        else return unknown ?: VegaValue.Null
     return rangeValues[index % rangeValues.size]
   }
+
+  /** The domain as it now stands, which [implicit] may have grown past what was declared. */
+  public val effectiveDomain: List<String>
+    get() = indices.keys.toList()
 }
 
 /**
@@ -872,6 +890,8 @@ public class SequentialColorScale(
   public val domain: List<Double>,
   public val colors: List<SceneColor>,
   public val space: ColorSpaces.Interpolation = ColorSpaces.Interpolation.RGB,
+  /** `interpolate: {"type": "rgb", "gamma": y}` — only the RGB space has one. */
+  public val gamma: Double = 1.0,
   public val clamp: Boolean = true,
 ) : VegaScale {
 
@@ -889,7 +909,7 @@ public class SequentialColorScale(
     val raw = (x - lo) / (hi - lo)
     // Sequential scales clamp by default, since a colour past the end of a ramp has no meaning.
     if (!clamp && (raw < 0.0 || raw > 1.0)) return null
-    return ColorSpaces.sample(colors, raw.coerceIn(0.0, 1.0), space)
+    return ColorSpaces.sample(colors, raw.coerceIn(0.0, 1.0), space, gamma)
   }
 
   override fun scale(value: VegaValue): VegaValue {

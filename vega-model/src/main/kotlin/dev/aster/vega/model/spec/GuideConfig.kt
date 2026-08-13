@@ -97,6 +97,16 @@ public class GuideConfig(private val blocks: Map<String, VegaValue.Obj>) {
     return VegaValue.Obj(fields)
   }
 
+  /**
+   * A `config.range` entry, or null when the configuration does not name that range.
+   *
+   * The value is whatever the theme wrote — a scheme object, a literal array, a step — because
+   * upstream substitutes it for the name and reads the result as an ordinary `range`. That is why
+   * `config.range.category` may be a `{"scheme": ...}` where the built-in default is a list of
+   * symbol names: the two are the same property, not two kinds of thing.
+   */
+  public fun rangeDefault(name: String): VegaValue? = block("range").fields[name]
+
   /** A legend has one block, over the same guide styles. */
   public fun legendDefaults(): List<VegaValue.Obj> = listOf(guideStyleDefaults(), block("legend"))
 
@@ -112,16 +122,15 @@ public class GuideConfig(private val blocks: Map<String, VegaValue.Obj>) {
    *   upstream's `guideMark` assigns `mark.style = extras.style || mark.style`, so a trellis header
    *   asking for `guide-label` is set at a label's ten points and not a heading's thirteen.
    */
-  public fun titleDefaults(style: String? = null): List<VegaValue.Obj> =
-    listOf(titleStyleDefaults(style ?: "group-title"), block("title"))
-
-  private fun titleStyleDefaults(name: String): VegaValue.Obj {
-    val style = style(name)
-    if (style.fields.isEmpty()) return EMPTY
-    val fields = LinkedHashMap<String, VegaValue>(style.fields.size)
-    for ((key, value) in style.fields) fields[if (key == "fill") "color" else key] = value
-    return VegaValue.Obj(fields)
-  }
+  /**
+   * A title's own configuration block.
+   *
+   * The `group-title` style beneath it is *not* here: `titleStyleLayers` supplies whichever style
+   * blocks the title names, `group-title` among them, and layering one here as well outranked a
+   * title that had named a narrower style — which is how every trellis caption came out at a
+   * heading's thirteen points rather than a label's ten.
+   */
+  public fun titleDefaults(): List<VegaValue.Obj> = listOf(block("title"))
 
   /**
    * `style["guide-label"]` and `style["guide-title"]` rewritten in guide property names.

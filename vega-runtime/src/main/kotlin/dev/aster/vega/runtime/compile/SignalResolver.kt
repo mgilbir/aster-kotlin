@@ -321,6 +321,81 @@ public class SignalScope(
     return VegaValue.Num(GeoMeasure.area(definition, geojson))
   }
 
+  /** `geoBounds('name', feature)` — `[[x0, y0], [x1, y1]]` in units of the page. */
+  override fun geoBounds(projection: String?, geojson: VegaValue): VegaValue {
+    val definition = projectionFor(projection, "geoBounds") ?: return VegaValue.Null
+    val box = GeoMeasure.bounds(definition.orNull(), geojson) ?: return VegaValue.Null
+    return VegaValue.Arr(
+      listOf(
+        VegaValue.Arr(listOf(VegaValue.Num(box[0]), VegaValue.Num(box[1]))),
+        VegaValue.Arr(listOf(VegaValue.Num(box[2]), VegaValue.Num(box[3]))),
+      )
+    )
+  }
+
+  /**
+   * `geoScale('name')` — the projection's own scale.
+   *
+   * Worth having for the same reason `fit` is: a fitted projection's scale is computed from the
+   * data, so a chart that draws anything sized in projected units — a symbol whose radius is in
+   * kilometres — has no other way to ask what one unit currently means.
+   */
+  /**
+   * `warn(...)`, `info(...)` and `debug(...)` — routed to the diagnostics rather than to a console.
+   *
+   * Upstream writes these to the dataflow's logger at the matching level. There is no console here
+   * and a compiled chart carries its diagnostics with it, so that is where they go: a specification
+   * that asks a question of itself gets the answer in the same list as everything else the compile
+   * has to say. The severity follows the function — `warn` warns, `info` and `debug` are
+   * informational — because a specification choosing `warn` is choosing to be noticed.
+   */
+  override fun log(level: String, message: String) {
+    val collector = diagnostics ?: return
+    val text = "Expression $level: $message"
+    if (level == "warn") {
+      collector.warn(DiagnosticCodes.EXPRESSION_LOG, text)
+    } else {
+      collector.info(DiagnosticCodes.EXPRESSION_LOG, text)
+    }
+  }
+
+  /** `geoShape('name', feature)` — the outline, which a `shape` channel draws directly. */
+  override fun geoShape(projection: String?, geojson: VegaValue): VegaValue {
+    val definition = projectionFor(projection, "geoShape") ?: return VegaValue.Null
+    return GeoMeasure.shape(definition.orNull(), geojson)?.let { VegaValue.Str(it) }
+      ?: VegaValue.Null
+  }
+
+  override fun geoScale(projection: String?): VegaValue {
+    val definition = projectionFor(projection, "geoScale")?.orNull() ?: return VegaValue.Null
+    return GeoMeasure.scaleOf(definition)?.let { VegaValue.Num(it) } ?: VegaValue.Null
+  }
+
+  /**
+   * Looks up a named projection, reporting one this scope does not define.
+   *
+   * The outer null means "reported, give up"; an inner null means the caller passed no name at all,
+   * which is a measurement on the globe rather than on the page.
+   */
+  private fun projectionFor(name: String?, caller: String): Optional? {
+    if (name == null) return Optional(null)
+    val definition = projections[name]
+    if (definition == null) {
+      diagnostics?.error(
+        DiagnosticCodes.SCALE_UNSUPPORTED_TYPE,
+        "$caller() names projection '$name', which this scope does not define",
+        operator = name,
+      )
+      return null
+    }
+    return Optional(definition)
+  }
+
+  /** A found-or-absent projection, so the two kinds of null above stay distinguishable. */
+  private class Optional(private val value: ProjectionDefinition?) {
+    fun orNull(): ProjectionDefinition? = value
+  }
+
   public val names: Set<String>
     get() = values.keys
 
@@ -471,6 +546,16 @@ public class SignalResolver(
       datasets: Map<String, List<VegaValue>>,
       scales: Map<String, VegaScale> = emptyMap(),
       pendingScales: Set<String> = emptySet(),
+      /**
+       * The projections `geoBounds()`, `geoScale()`, `geoCentroid()` and `geoArea()` can reach.
+       *
+       * Passed in per signal rather than held on the session, because a projection is *made of*
+       * signals: it can only be built from the ones that have already settled, so the map is
+       * different at every step of the dataflow order. A dataset's transforms have been given the
+       * same thing since `geoCentroid` was implemented; a signal's own `update` had not, so
+       * `geoScale('p')` reported the projection as undefined however late in the order it ran.
+       */
+      projections: Map<String, ProjectionDefinition> = emptyMap(),
     ) {
       if (name in settled) return
       val spec = specs[name] ?: return
@@ -494,7 +579,7 @@ public class SignalResolver(
         // reading it as null turns "leave it alone" into "reset it to zero", and a chart written
         // that way then draws a state it was never in.
         if (name !in values) values[name] = spec.value ?: VegaValue.Null
-        values[name] = evaluate(spec, datasets, scales, pendingScales)
+        values[name] = evaluate(spec, datasets, scales, pendingScales, projections)
         settled.add(name)
       } finally {
         inProgress.remove(name)
@@ -506,6 +591,7 @@ public class SignalResolver(
       datasets: Map<String, List<VegaValue>>,
       scales: Map<String, VegaScale>,
       pendingScales: Set<String>,
+      projections: Map<String, ProjectionDefinition>,
     ): VegaValue {
       val source = spec.expression ?: return spec.value ?: VegaValue.Null
 
@@ -518,20 +604,23 @@ public class SignalResolver(
           // Resolve everything this signal reads before reading it. Already done when the caller
           // drives the order itself, and the settled check makes that a no-op.
           for (dependency in compiled.expression.signalDependencies) {
-            if (dependency != spec.name) resolve(dependency, datasets, scales, pendingScales)
+            if (dependency != spec.name) {
+              resolve(dependency, datasets, scales, pendingScales, projections)
+            }
           }
           try {
             compiled.expression.evaluate(
               SignalScope(
-                values,
-                datasets,
-                diagnostics = diagnostics,
-                scales = scales,
-                pendingScales = pendingScales,
-                datasetSink = datasetSink,
-                random = random,
-                clock = clock,
-              )
+                  values,
+                  datasets,
+                  diagnostics = diagnostics,
+                  scales = scales,
+                  pendingScales = pendingScales,
+                  datasetSink = datasetSink,
+                  random = random,
+                  clock = clock,
+                )
+                .withProjections(projections)
             )
           } catch (e: ExpressionEvaluationException) {
             diagnostics.add(e.diagnostic.copy(operator = spec.name))

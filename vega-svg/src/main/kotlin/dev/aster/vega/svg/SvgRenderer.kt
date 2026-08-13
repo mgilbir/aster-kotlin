@@ -176,58 +176,81 @@ public class SvgRenderer(private val options: SvgOptions = SvgOptions()) {
     appendTransform(out, node.transform)
     appendOpacity(out, node.opacity)
     clipId?.let { out.append(" clip-path=\"url(#").append(it).append(")\"") }
-    appendBlendMode(out, node.blendMode)
+    appendStyle(out, node, node.blendMode)
     appendAccessibility(out, node)
     out.append('>')
 
     appendDescription(out, node, depth + 1)
 
-    // A group with its own paint draws a rectangle of its declared size, as Vega group marks do —
-    // and which rectangle that is, is what the scene graph's `paintRect` already works out: the
-    // group's size, or failing that its clip. Reading the clip alone missed every Vega-Lite chart.
-    // Its plotting area is a group that states a size and a `#ddd` border and does *not* clip, so
-    // that border was drawn on the device, counted in the differential comparison, and absent from
-    // every SVG export — found by putting the two pictures side by side, which is the only place it
-    // shows.
-    val paintRect = node.paintRect
-    if (paintRect != null) {
-      newline(out, depth + 1)
-      out.append("<rect x=\"").append(num(paintRect.left))
-      out.append("\" y=\"").append(num(paintRect.top))
-      out.append("\" width=\"").append(num(paintRect.width))
-      out.append("\" height=\"").append(num(paintRect.height))
-      out.append('"')
-      if (node.cornerRadius > 0.0) {
-        out.append(" rx=\"").append(num(node.cornerRadius)).append('"')
-        out.append(" ry=\"").append(num(node.cornerRadius)).append('"')
-      }
-      appendFill(out, node.fill, defs, node.bounds)
-      appendStroke(out, node.stroke, defs, node.bounds)
-      out.append("/>")
+    // A group with its own paint draws its clip rectangle as a backing rect, matching Vega's
+    // group-mark behaviour. `strokeForeground` splits that into two elements — the fill under the
+    // children and the stroke over them — because the alternative, one element drawn twice, would
+    // paint the fill over the children as well.
+    // Which rectangle that is comes from the scene graph's `paintRect`: the group's declared size,
+    // or failing that its clip. Reading the clip alone missed every Vega-Lite chart — its plotting
+    // area states a size and a `#ddd` border and does not clip, so that border was drawn on the
+    // device and absent from every SVG export.
+    val background = node.paintRect?.takeIf { node.fill != null || node.stroke != null }
+    if (background != null) {
+      renderGroupPaint(node, background, out, defs, depth + 1, stroked = !node.strokeForeground)
     }
 
     for (child in node.children) renderNode(child, out, defs, warnings, depth + 1)
+
+    if (background != null && node.strokeForeground && node.stroke != null) {
+      renderGroupPaint(node, background, out, defs, depth + 1, filled = false)
+    }
 
     newline(out, depth)
     out.append("</g>")
   }
 
-  private fun renderRect(node: RectNode, out: StringBuilder, defs: Defs, depth: Int) {
-    val r = node.rect
+  private fun renderGroupPaint(
+    node: GroupNode,
+    clipRect: RectD,
+    out: StringBuilder,
+    defs: Defs,
+    depth: Int,
+    filled: Boolean = true,
+    stroked: Boolean = true,
+  ) {
     newline(out, depth)
-    out.append("<rect x=\"").append(num(r.left)).append('"')
-    out.append(" y=\"").append(num(r.top)).append('"')
-    out.append(" width=\"").append(num(r.width)).append('"')
-    out.append(" height=\"").append(num(r.height)).append('"')
-    if (node.effectiveCornerRadius > 0.0) {
-      out.append(" rx=\"").append(num(node.effectiveCornerRadius)).append('"')
-      out.append(" ry=\"").append(num(node.effectiveCornerRadius)).append('"')
+    val rounded = node.roundedPaintPath
+    if (rounded != null) {
+      out.append("<path d=\"").append(pathToString(rounded)).append('"')
+    } else {
+      val offset = node.effectiveStrokeOffset
+      out.append("<rect x=\"").append(num(clipRect.left + offset))
+      out.append("\" y=\"").append(num(clipRect.top + offset))
+      out.append("\" width=\"").append(num(clipRect.width))
+      out.append("\" height=\"").append(num(clipRect.height))
+      out.append('"')
+    }
+    appendFill(out, if (filled) node.fill else null, defs, node.bounds)
+    appendStroke(out, if (stroked) node.stroke else null, defs, node.bounds)
+    out.append("/>")
+  }
+
+  private fun renderRect(node: RectNode, out: StringBuilder, defs: Defs, depth: Int) {
+    newline(out, depth)
+    // A rounded rectangle is emitted as a path, as upstream emits it. `rx`/`ry` cannot hold four
+    // different radii, and even for one it draws a true elliptical arc where Vega draws a Bézier
+    // approximation of one — so a `<rect rx>` would be a different shape at every corner.
+    val rounded = node.roundedPath
+    if (rounded != null) {
+      out.append("<path d=\"").append(pathToString(rounded)).append('"')
+    } else {
+      val r = node.rect
+      out.append("<rect x=\"").append(num(r.left)).append('"')
+      out.append(" y=\"").append(num(r.top)).append('"')
+      out.append(" width=\"").append(num(r.width)).append('"')
+      out.append(" height=\"").append(num(r.height)).append('"')
     }
     appendFill(out, node.fill, defs, node.bounds)
     appendStroke(out, node.stroke, defs, node.bounds)
     appendTransform(out, node.transform)
     appendOpacity(out, node.opacity)
-    appendBlendMode(out, node.blendMode)
+    appendStyle(out, node, node.blendMode)
     appendAccessibility(out, node)
     out.append("/>")
   }
@@ -241,7 +264,7 @@ public class SvgRenderer(private val options: SvgOptions = SvgOptions()) {
     appendStroke(out, node.stroke, defs, node.bounds)
     appendTransform(out, node.transform)
     appendOpacity(out, node.opacity)
-    appendBlendMode(out, node.blendMode)
+    appendStyle(out, node, node.blendMode)
     appendAccessibility(out, node)
     out.append("/>")
   }
@@ -253,7 +276,7 @@ public class SvgRenderer(private val options: SvgOptions = SvgOptions()) {
     appendStroke(out, node.stroke, defs, node.bounds)
     appendTransform(out, node.transform)
     appendOpacity(out, node.opacity)
-    appendBlendMode(out, node.blendMode)
+    appendStyle(out, node, node.blendMode)
     appendAccessibility(out, node)
     out.append("/>")
   }
@@ -265,7 +288,7 @@ public class SvgRenderer(private val options: SvgOptions = SvgOptions()) {
     appendStroke(out, node.stroke, defs, node.bounds)
     appendTransform(out, node.transform)
     appendOpacity(out, node.opacity)
-    appendBlendMode(out, node.blendMode)
+    appendStyle(out, node, node.blendMode)
     appendAccessibility(out, node)
     out.append("/>")
   }
@@ -301,7 +324,7 @@ public class SvgRenderer(private val options: SvgOptions = SvgOptions()) {
           .concat(Transform2D.translate(-node.x, -node.y))
     appendTransform(out, transform)
     appendOpacity(out, node.opacity)
-    appendBlendMode(out, node.blendMode)
+    appendStyle(out, node, node.blendMode)
     appendAccessibility(out, node)
     out.append('>')
 
@@ -418,9 +441,21 @@ public class SvgRenderer(private val options: SvgOptions = SvgOptions()) {
     if (opacity != 1.0) out.append(" opacity=\"").append(num(opacity)).append('"')
   }
 
-  private fun appendBlendMode(out: StringBuilder, mode: SceneBlendMode) {
-    if (mode == SceneBlendMode.NORMAL) return
-    out.append(" style=\"mix-blend-mode:").append(mode.name.lowercase()).append('"')
+  /**
+   * The one `style` attribute an element gets, holding whatever needs to be CSS rather than SVG.
+   *
+   * One attribute rather than two, because a blend mode and a cursor both live in `style` and an
+   * element carrying it twice is invalid — a browser keeps one and silently drops the other.
+   */
+  private fun appendStyle(out: StringBuilder, node: SceneNode, mode: SceneBlendMode) {
+    val parts = mutableListOf<String>()
+    // `COLOR_DODGE` is CSS's `color-dodge`; the enum's underscores are the only difference.
+    if (mode != SceneBlendMode.NORMAL) {
+      parts += "mix-blend-mode:" + mode.name.lowercase().replace('_', '-')
+    }
+    node.metadata.cursor?.takeIf { it.isNotEmpty() }?.let { parts += "cursor:" + it }
+    if (parts.isEmpty()) return
+    out.append(" style=\"").append(escapeXml(parts.joinToString(";"))).append('"')
   }
 
   private fun appendAccessibility(out: StringBuilder, node: SceneNode) {

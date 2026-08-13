@@ -37,7 +37,6 @@ import dev.aster.vega.scene.TextRun
 import dev.aster.vega.scene.Transform2D
 import dev.aster.vega.scene.transformedBounds
 import kotlin.math.floor
-import kotlinx.datetime.TimeZone
 
 /**
  * Generates axis scene nodes: ticks, labels, gridlines and the domain line.
@@ -121,7 +120,23 @@ public class AxisBuilder(
    * @param extent the enclosing group's encoded size, which positions a bottom or right axis.
    * @param gridSize the `width`/`height` signals in scope, which set how long a gridline is.
    */
-  public fun build(spec: AxisSpec, extent: PlotSize, gridSize: PlotSize = extent): BuiltAxis? {
+  public fun build(
+    declared: AxisSpec,
+    extent: PlotSize,
+    gridSize: PlotSize = extent,
+  ): BuiltAxis? {
+    // A styling property written as a signal is substituted here, once, so everything below reads
+    // plain constants: an axis whose label colour comes from a control is the ordinary case, and
+    // the
+    // alternative is resolving the same expression at each of a hundred reads.
+    val spec =
+      declared.copy(
+        labelStyle = GuideStyle.resolved(declared.labelStyle, numbers, declared.scale),
+        tickStyle = GuideStyle.resolved(declared.tickStyle, numbers, declared.scale),
+        gridStyle = GuideStyle.resolved(declared.gridStyle, numbers, declared.scale),
+        domainStyle = GuideStyle.resolved(declared.domainStyle, numbers, declared.scale),
+        titleStyle = GuideStyle.resolved(declared.titleStyle, numbers, declared.scale),
+      )
     val scale = scales[spec.scale]
     if (scale == null) {
       diagnostics.error(
@@ -155,6 +170,8 @@ public class AxisBuilder(
     val fontSize = numbers.resolve(spec.labelFontSize, spec.scale) ?: AxisDefaults.LABEL_FONT_SIZE
     val labelStyle = GuideStyle.text(spec.labelStyle, fontSize, defaultWeight = 400)
     val labelLimit = numbers.resolve(spec.labelLimit, spec.scale) ?: AxisDefaults.LABEL_LIMIT
+    val labelAlong = numbers.resolve(spec.labelOffset, spec.scale) ?: 0.0
+    val flushOffset = numbers.resolve(spec.labelFlushOffset, spec.scale) ?: 0.0
 
     val children = mutableListOf<SceneNode>()
     // Ticks and labels, in paint order, hidden labels included so the mark count does not change
@@ -209,7 +226,7 @@ public class AxisBuilder(
           Orient.BOTTOM -> -gridOffset
         }
       for (tick in ticks) {
-        val at = AxisDefaults.crispRound(tick.position)
+        val at = tickCoordinate(tick.position, spec)
         // A gridline's own `encode` block, resolved against the tick: this is how a chart picks the
         // zero line out of the rest, and Vega-Lite writes every conditional guide property this way
         // because Vega has no conditional guide properties of its own.
@@ -245,7 +262,7 @@ public class AxisBuilder(
     if (spec.ticks) {
       val tickMeta = NodeMetadata(role = "axis-tick")
       for (tick in ticks) {
-        val at = AxisDefaults.crispRound(tick.position)
+        val at = tickCoordinate(tick.position, spec)
         val tickNode =
           when (spec.orient) {
             Orient.BOTTOM ->
@@ -299,7 +316,25 @@ public class AxisBuilder(
         // no value for the label to scale — and it stays a `NaN` here: a text node with no usable
         // anchor covers nothing and draws nothing, which is what upstream's scene and its own SVG
         // both say.
-        val along = tick.labelPosition ?: Double.NaN
+        // `labelOffset` slides the label along the axis — the other direction from `labelPadding`.
+        // Applied here rather than where the ticks are generated, because it applies to every scale
+        // type and a band scale's own centring is already in `labelPosition`.
+        // `labelFlushOffset` nudges a flushed label *further* along the axis, away from the end it
+        // was flushed to: the alignment alone puts a first label's left edge on the range's start,
+        // and this pushes it inwards from there. Upstream applies it as a `dx`/`dy` and only when
+        // the corresponding alignment was left to the flush rule to decide — an explicit
+        // `labelAlign` means the label is not being flushed, so there is nothing to nudge.
+        val flushNudge =
+          if (flushed == null || flushOffset == 0.0) {
+            0.0
+          } else if (spec.orient.isVertical) {
+            if (spec.labelBaseline != null) 0.0
+            else if (flushed == FlushEnd.START) -flushOffset else flushOffset
+          } else {
+            if (spec.labelAlign != null) 0.0
+            else if (flushed == FlushEnd.START) -flushOffset else flushOffset
+          }
+        val along = tick.labelPosition?.plus(labelAlong)?.plus(flushNudge) ?: Double.NaN
         val (defaultX, defaultY) =
           when (spec.orient) {
             Orient.BOTTOM -> along to labelOffset
@@ -338,7 +373,7 @@ public class AxisBuilder(
       // An axis removes overlapping labels only when asked; a legend does it by default. The
       // asymmetry is upstream's — see LabelOverlap.
       val method = LabelOverlap.Method.fromValue(spec.labelOverlap)
-      val kept =
+      val reduced =
         if (method == null) labels
         else {
           LabelOverlap.visible(
@@ -347,6 +382,13 @@ public class AxisBuilder(
             numbers.resolve(spec.labelSeparation, spec.scale) ?: 0.0,
           )
         }
+      // `labelBound` culls whatever still hangs outside the scale's own range, and it runs
+      // **after**
+      // the overlap reduction over *every* label rather than only the survivors — upstream's
+      // `Overlap` does the bound test last, on `source`. It is what keeps the first and last labels
+      // of a rotated axis from sticking out past the plot; the tolerance is how far they may, and
+      // upstream's default when `labelBound: true` says nothing more precise is one unit.
+      val kept = boundedLabels(reduced, spec, scale)
       // A hidden label stays in the scene at zero opacity, so the mark count does not change with
       // the chart's width — but it drops out of the measurement, which is what upstream does when
       // it
@@ -405,30 +447,43 @@ public class AxisBuilder(
             role = "axis",
             markName = spec.scale,
             // What a screen reader is told before it reaches the marks this axis frames.
+            //
+            // `aria: false` removes the axis from the accessibility tree entirely, and a
+            // `description` replaces the caption this engine would otherwise generate — a chart
+            // whose
+            // axis is self-explanatory in context says so rather than having its scale read out.
             accessibility =
-              GuideCaption.axis(
-                  spec.orient.name.lowercase(),
-                  // Spoken as one phrase; see LegendBuilder.caption for why the newline goes.
-                  titleText?.replace("\n", " "),
-                  scale,
-                  scaleTypes[spec.scale],
-                  specifier,
-                  spec.formatType,
-                )
-                ?.let {
-                  AccessibilityDescriptor(label = it, role = "graphics-symbol", focusable = true)
-                },
+              if (!spec.aria) {
+                null
+              } else {
+                (spec.description
+                    ?: GuideCaption.axis(
+                      spec.orient.name.lowercase(),
+                      // Spoken as one phrase; see LegendBuilder.caption for why the newline goes.
+                      titleText?.replace("\n", " "),
+                      scale,
+                      scaleTypes[spec.scale],
+                      specifier,
+                      spec.formatType,
+                    ))
+                  ?.let {
+                    AccessibilityDescriptor(label = it, role = "graphics-symbol", focusable = true)
+                  }
+              },
           ),
       )
 
+    val delta = numbers.resolve(spec.translate, spec.scale) ?: AxisDefaults.CRISP_OFFSET
     val guide =
       extentRect(spec, scale, tickAndLabelReach)
         .union(tickAndLabelReach)
         .union(titleNode?.bounds ?: RectD.Empty)
-        .translate(
-          placement.e - AxisDefaults.CRISP_OFFSET,
-          placement.f - AxisDefaults.CRISP_OFFSET,
-        )
+        // The axis's own nudge onto the pixel grid is taken back out: upstream measures the axis at
+        // `x` and only then places the item at `x + delta`, so the half pixel is in the drawing and
+        // not in the measurement. `translate` is what that nudge is, which is why this reads it
+        // back
+        // rather than subtracting a constant — a `translate: 0` axis has nothing to take out.
+        .translate(placement.e - delta, placement.f - delta)
     return BuiltAxis(node, guide)
   }
 
@@ -519,6 +574,7 @@ public class AxisBuilder(
         baseline =
           baselineOf(spec.titleBaseline)
             ?: if (spec.orient == Orient.BOTTOM) TextBaseline.TOP else TextBaseline.BOTTOM,
+        limit = numbers.resolve(spec.titleLimit, spec.scale) ?: 0.0,
       )
     return TextNode(
       id = ids.allocate(),
@@ -545,23 +601,41 @@ public class AxisBuilder(
    */
   private fun groupTransform(spec: AxisSpec, extent: PlotSize): Transform2D {
     val offset = offsetOf(spec)
+    // `translate` replaces the half pixel; `position` slides the axis along its own direction,
+    // which
+    // is the *other* axis from the one `offset` moves it along. Upstream's `axisLayout` computes
+    // both
+    // and adds the translation last, so `position` is measured before the nudge and not after it.
+    val delta = numbers.resolve(spec.translate, spec.scale) ?: AxisDefaults.CRISP_OFFSET
+    val along = numbers.resolve(spec.position, spec.scale) ?: 0.0
     return when (spec.orient) {
-      Orient.BOTTOM ->
-        Transform2D.translate(
-          AxisDefaults.CRISP_OFFSET,
-          extent.height + AxisDefaults.CRISP_OFFSET + offset,
-        )
-      Orient.TOP ->
-        Transform2D.translate(AxisDefaults.CRISP_OFFSET, AxisDefaults.CRISP_OFFSET - offset)
-      Orient.LEFT ->
-        Transform2D.translate(AxisDefaults.CRISP_OFFSET - offset, AxisDefaults.CRISP_OFFSET)
-      Orient.RIGHT ->
-        Transform2D.translate(
-          extent.width + AxisDefaults.CRISP_OFFSET + offset,
-          AxisDefaults.CRISP_OFFSET,
-        )
+      Orient.BOTTOM -> Transform2D.translate(along + delta, extent.height + offset + delta)
+      Orient.TOP -> Transform2D.translate(along + delta, -offset + delta)
+      Orient.LEFT -> Transform2D.translate(-offset + delta, along + delta)
+      Orient.RIGHT -> Transform2D.translate(extent.width + offset + delta, along + delta)
     }
   }
+
+  /**
+   * `labelBound`, which culls **nothing** — and that is upstream's behaviour, not a gap.
+   *
+   * The documented meaning is "drop a label that hangs past the scale's range", and implementing
+   * that would make this engine disagree with upstream on every chart that sets it. Upstream's
+   * `Overlap` transform applies the test as `boundRectangle.encloses(item.bounds)` and runs it
+   * **before** the label bounds exist: `Bound` comes later in the mark's pipeline, so on a static
+   * render every item still holds a *cleared* `Bounds` of `[+INF, +INF, -INF, -INF]`, which any
+   * rectangle trivially encloses. Nothing is ever outside.
+   *
+   * Verified rather than reasoned: a band axis 120 units wide whose first label overflows by 68
+   * keeps that label under `labelBound: false`, `true` and `40` alike. The `axis-label-bound`
+   * fixture is that experiment, and it is why the property is consumed rather than reported — a
+   * diagnostic saying "not implemented" would overstate a gap with no visible consequence.
+   */
+  private fun boundedLabels(
+    labels: List<TextNode>,
+    @Suppress("UNUSED_PARAMETER") spec: AxisSpec,
+    @Suppress("UNUSED_PARAMETER") scale: VegaScale,
+  ): List<TextNode> = labels
 
   /** An explicit `labelAlign`, or null to let the orientation decide. */
   private fun alignOf(name: String?): TextAlign? =
@@ -823,6 +897,16 @@ public class AxisBuilder(
   private fun flushBaseline(end: FlushEnd): TextBaseline =
     if (end == FlushEnd.START) TextBaseline.TOP else TextBaseline.BOTTOM
 
+  /**
+   * A tick's drawn coordinate, rounded unless `tickRound: false` says not to.
+   *
+   * Rounding is what keeps a one-unit tick on a pixel centre rather than straddling two, and
+   * upstream's default is on. Switching it off is for a chart drawn at a fractional device ratio,
+   * where rounding to whole units moves a tick by up to half a device pixel.
+   */
+  private fun tickCoordinate(position: Double, spec: AxisSpec): Double =
+    if (spec.tickRound == false) position else AxisDefaults.crispRound(position)
+
   private fun bandOffset(scale: PositionScale, spec: AxisSpec): Double {
     if (scale !is BandScale) return 0.0
     val position = numbers.resolve(spec.bandPosition, spec.scale) ?: AxisDefaults.BAND_POSITION
@@ -868,22 +952,11 @@ public class AxisBuilder(
     // `vega-scale`'s `tickFormat`: a time type wins over every scale type, including the discrete
     // ones whose labels would otherwise be their own values. It is what a chart uses to label a
     // band of instants, since there is no temporal scale anywhere to infer it from.
-    val zone =
-      when (formatType) {
-        "time" -> TimeZone.currentSystemDefault()
-        "utc" -> TimeZone.UTC
-        else -> null
-      }
-    if (zone != null) {
+    // `formatType` decides the grammar and the shared formatter knows how; see [GuideFormat].
+    GuideFormat.timeLabeller(format, formatType)?.let { write ->
       return { value ->
         val instant = value.asDouble()
-        when {
-          instant.isNaN() -> value.asString()
-          // No specifier means upstream's *multi*-format, which picks its own granularity per
-          // value rather than formatting them all alike.
-          format == null -> TimeTicks.label(instant, zone)
-          else -> TimeFormat.format(instant, format, zone)
-        }
+        if (instant.isNaN()) value.asString() else write(instant)
       }
     }
     // A time scale formats its labels as *times* whether or not a `formatType` says so: the scale
@@ -968,7 +1041,13 @@ public class AxisBuilder(
         }
       }
       is LinearScale -> {
-        val count = tickCountFor(spec, scale.domain, refine = scale.bins == null)
+        val count =
+          GuideFormat.countWithMinStep(
+            numbers.resolveInt(spec.tickCount, spec.scale) ?: AxisDefaults.DEFAULT_TICK_COUNT,
+            numbers.resolve(spec.tickMinStep, spec.scale),
+            scale.domain,
+            linear = true,
+          )
         // Labels come from the scale rather than being formatted here, because a log scale blanks
         // the
         // crowded ones and only it knows which.
@@ -983,7 +1062,16 @@ public class AxisBuilder(
         }
       }
       is TransformedScale -> {
-        val count = tickCountFor(spec, scale.domain, refine = false)
+        val count =
+          GuideFormat.countWithMinStep(
+            numbers.resolveInt(spec.tickCount, spec.scale) ?: AxisDefaults.DEFAULT_TICK_COUNT,
+            numbers.resolve(spec.tickMinStep, spec.scale),
+            scale.domain,
+            // A log or power scale's steps are not linear in the count, so upstream applies only
+            // the
+            // cap and not the walk-down.
+            linear = false,
+          )
         val format = labeller(scale, count, specifier, spec.formatType)
         scale.ticks(count).zip(scale.tickLabels(count)).map { (value, label) ->
           Tick(
@@ -995,13 +1083,19 @@ public class AxisBuilder(
         }
       }
       is TimeScale -> {
-        // A temporal scale is exempt from the step *refinement* below: its intervals are calendar
-        // ones and do not shrink monotonically with the count the way d3's numeric steps do.
-        val count = tickCountFor(spec, scale.domain, refine = false)
-        // A stated format replaces the scale's own multi-format labelling, which otherwise writes
-        // each tick at its own granularity — a January tick carrying its year while the rest carry
-        // month names. Every Vega-Lite chart over a bucketed instant states one, and dropping it
-        // was how an axis of months came out reading "2012, February, March".
+        val count =
+          GuideFormat.countWithMinStep(
+            numbers.resolveInt(spec.tickCount, spec.scale) ?: AxisDefaults.DEFAULT_TICK_COUNT,
+            numbers.resolve(spec.tickMinStep, spec.scale),
+            scale.domain,
+            linear = false,
+          )
+        // A time scale labels each tick at its own granularity — a January tick carries the year —
+        // *unless* the axis names a format, which then applies to every tick alike. The linear
+        // branch
+        // above has always made that distinction and this one had not, so an explicit `%b` on a
+        // time
+        // axis was ignored and every label came back multi-formatted.
         val format = labeller(scale, count, specifier, spec.formatType)
         scale.ticks(count).zip(scale.tickLabels(count)).map { (value, label) ->
           Tick(

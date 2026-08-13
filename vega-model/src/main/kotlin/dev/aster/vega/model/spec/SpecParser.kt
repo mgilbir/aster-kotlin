@@ -28,6 +28,8 @@ private val MULTI_FIELD_SORT_OPS = listOf("count", "min", "max")
  */
 private val CONFIG_HONOURED =
   setOf(
+    // `config.range` is not a guide block: its entries are what a *named* range stands for.
+    "range",
     "mark",
     "rect",
     "symbol",
@@ -81,6 +83,16 @@ private val EVENT_STREAM_CONSUMED =
 
 private val AXIS_CONSUMED =
   setOf(
+    "labelBound",
+    "tickMinStep",
+    "labelOffset",
+    "aria",
+    "description",
+    "tickBand",
+    "position",
+    "translate",
+    "tickRound",
+    "titleLimit",
     "scale",
     "orient",
     "title",
@@ -117,6 +129,7 @@ private val AXIS_CONSUMED =
     "tickExtra",
     "gridScale",
     "labelFlush",
+    "labelFlushOffset",
     "minExtent",
     "maxExtent",
     "titleX",
@@ -133,38 +146,152 @@ private val AXIS_CONSUMED =
 private fun guideStyleKeys(vararg prefixes: String): Set<String> =
   prefixes
     .flatMap { prefix ->
-      listOf("Color", "Width", "Dash", "Opacity", "Font", "FontWeight", "FontStyle").map {
-        "$prefix$it"
-      }
+      listOf(
+          "Color",
+          "Width",
+          "Dash",
+          // `Stroke` has carried both of these since it was written and no guide passed either, so
+          // every tick was butt-capped and every dash pattern started at the line's end.
+          "DashOffset",
+          "Cap",
+          "Opacity",
+          "Font",
+          "FontWeight",
+          "FontStyle",
+          // Only meaningful on a text part, and a guide that has no such property simply never
+          // writes one — consuming a name upstream does not define costs nothing.
+          "Align",
+          "Baseline",
+          "LineHeight",
+        )
+        .map { "$prefix$it" }
     }
     .toSet()
 
-private val AXIS_UNSUPPORTED =
-  mapOf(
-    "labelBound" to "Bounding axis labels to the plotting area is not implemented",
-    "labelFlushOffset" to "Axis label flush offsets are not implemented; they need labelFlush",
-    "labelOffset" to "Axis label offsets along the axis are not implemented",
-    "labelLineHeight" to "Multi-line axis labels are not implemented",
-    "tickRound" to "Suppressing tick rounding is not implemented; ticks are always rounded",
-    "tickBand" to "Placing band-scale ticks at band edges is not implemented; they sit at centres",
-    "tickCap" to "Axis tick line caps are not implemented",
-    "tickDashOffset" to "Dash offsets are not implemented; the dash pattern starts at the line end",
-    "gridCap" to "Gridline caps are not implemented",
-    "gridDashOffset" to "Dash offsets are not implemented; the dash pattern starts at the line end",
-    "domainCap" to "Domain line caps are not implemented",
-    "domainDashOffset" to
-      "Dash offsets are not implemented; the dash pattern starts at the line end",
-    "position" to "Positioning an axis along its own dimension is not implemented",
-    "translate" to "Overriding the axis's half-pixel translation is not implemented",
-    "titleLimit" to "Axis title truncation is not implemented; the title is drawn in full",
-    "titleLineHeight" to "Multi-line axis titles are not implemented",
-    "aria" to "Accessibility attributes on a guide are not implemented",
-    "description" to "Accessibility descriptions on a guide are not implemented",
+private val AXIS_UNSUPPORTED = emptyMap<String, String>()
+
+/**
+ * Guide properties that can carry a `{"signal": ...}`, which is what decides whether one **folds**.
+ *
+ * A guide's `encode` channel is rewritten into the property it is another spelling of, and that
+ * rewrite happens at parse time where no signal has a value yet. It works anyway for these, because
+ * the property itself carries the signal to the builder: the styling block records one in its
+ * `signals` map, and everything here read through `numberOrSignal` resolves one already. A property
+ * read as a plain string would stringify the object instead, so a signal aimed at one of those is
+ * still named rather than folded.
+ */
+private val SIGNAL_CAPABLE_GUIDE_PROPERTIES: Set<String> =
+  guideStyleKeys("label", "tick", "grid", "domain", "title", "symbolStroke") +
+    setOf(
+      "labelAngle",
+      // The font *sizes*, which `guideStyleKeys` does not cover: it lists `Font`, `FontWeight` and
+      // `FontStyle` because a size is read through `numberOrSignal` rather than through the styling
+      // block, and being read there is exactly what makes it able to carry a signal.
+      "labelFontSize",
+      "titleFontSize",
+      "subtitleFontSize",
+      "labelFlushOffset",
+      "labelLimit",
+      "labelOffset",
+      "labelPadding",
+      "labelSeparation",
+      "titleAngle",
+      "titleLimit",
+      "titlePadding",
+      "titleX",
+      "titleY",
+      "tickCount",
+      "tickMinStep",
+      "tickOffset",
+      "tickSize",
+      "minExtent",
+      "maxExtent",
+      "position",
+      "translate",
+      "bandPosition",
+      "cornerRadius",
+      "clipHeight",
+      "columnPadding",
+      "columns",
+      "gradientLength",
+      "gradientOpacity",
+      "gradientStrokeWidth",
+      "gradientThickness",
+      "legendX",
+      "legendY",
+      "offset",
+      "padding",
+      "rowPadding",
+      "symbolLimit",
+      "symbolOffset",
+      "symbolSize",
+      "symbolStrokeWidth",
+    )
+
+/** Upstream's `LegendScales`: the order that picks the one scale a legend describes. */
+private val LEGEND_CHANNEL_ORDER =
+  listOf("size", "shape", "fill", "stroke", "strokeWidth", "strokeDash", "opacity")
+
+/** Scale types a legend draws as a ramp rather than as a column of swatches. */
+private val RAMP_LEGEND_SCALE_TYPES =
+  setOf(
+    ScaleType.LINEAR,
+    ScaleType.LOG,
+    ScaleType.POW,
+    ScaleType.SQRT,
+    ScaleType.SYMLOG,
+    ScaleType.TIME,
+    ScaleType.UTC,
+    ScaleType.SEQUENTIAL,
+  )
+
+/** The parts a title's `encode` may address, in the order upstream builds them. */
+private val TITLE_ENCODE_PARTS = listOf("group", "title", "subtitle")
+
+/** What a title's or subtitle's `encode` can say about its text mark. */
+private val TITLE_TEXT_CHANNELS =
+  setOf(
+    "text",
+    "fill",
+    "fillOpacity",
+    "opacity",
+    "font",
+    "fontSize",
+    "fontStyle",
+    "fontWeight",
+    "lineHeight",
+    "align",
+    "baseline",
+    "angle",
+    "limit",
+    "dx",
+    "dy",
+  )
+
+/** What a title's `group` encode can say about the group the heading sits in. */
+private val TITLE_GROUP_CHANNELS = setOf("fill", "fillOpacity", "stroke", "opacity", "cornerRadius")
+
+/**
+ * What a title's text falls back to once a `style` has taken the `group-title` slot.
+ *
+ * These are `vega-scenegraph`'s own defaults, not the title's: `fontSize(item)` answers 11 for a
+ * text item that names no size, and nothing supplies a weight. Materialising them means the
+ * runtime's `group-title` defaults — 13 point, bold — stop applying, which is the whole effect of
+ * naming a style.
+ *
+ * The **subtitle** is not here. Its own style slot is `group-subtitle`, which a title's `style`
+ * never takes, so a subtitle under a styled heading keeps its 12 point.
+ */
+private val TITLE_RENDERER_FALLBACKS: VegaValue.Obj =
+  VegaValue.Obj(
+    linkedMapOf("fontSize" to VegaValue.Num(11.0), "fontWeight" to VegaValue.Str("normal"))
   )
 
 /** Scale properties this engine reads. */
 private val SCALE_CONSUMED =
   setOf(
+    "domainImplicit",
+    "domainRaw",
     "name",
     "type",
     "domain",
@@ -188,22 +315,43 @@ private val SCALE_CONSUMED =
     "bins",
   )
 
-private val SCALE_UNSUPPORTED =
-  mapOf(
-    "domainRaw" to "Overriding a resolved domain with 'domainRaw' is not implemented",
-    "domainImplicit" to "Extending an ordinal domain with unseen values is not implemented",
-  )
+/**
+ * Scale properties this engine parses but cannot honour.
+ *
+ * Empty. `domainMin`, `domainMax`, `domainMid`, `bins`, `domainRaw` and `domainImplicit` were the
+ * six that used to be here; all 23 of upstream's scale properties are read.
+ */
+private val SCALE_UNSUPPORTED = emptyMap<String, String>()
 
 /** Legend properties this engine reads. */
 private val LEGEND_CONSUMED =
   setOf(
+    "formatType",
+    "tickMinStep",
+    "clipHeight",
+    "symbolLimit",
+    "aria",
+    "description",
+    "symbolDashOffset",
+    "symbolFillColor",
+    "symbolOffset",
+    "gradientStrokeColor",
+    "gradientStrokeWidth",
+    "gradientOpacity",
+    // The legend's own background.
+    "fillColor",
+    "strokeColor",
+    "cornerRadius",
     "fill",
     "stroke",
     "size",
     "shape",
     "opacity",
+    // On a legend these two name **scales**, not the outline round the legend: that one takes its
+    // width and dash from `config.legend` alone.
     "strokeWidth",
     "strokeDash",
+    "gridAlign",
     "type",
     "format",
     "formatType",
@@ -216,6 +364,7 @@ private val LEGEND_CONSUMED =
     "padding",
     "titlePadding",
     "titleOrient",
+    "titleAnchor",
     "titleLimit",
     "titleFontSize",
     "labelFontSize",
@@ -242,6 +391,19 @@ private val LEGEND_CONSUMED =
 /** Title properties this engine reads. */
 private val TITLE_CONSUMED =
   setOf(
+    "aria",
+    "name",
+    "interactive",
+    "color",
+    "subtitleColor",
+    "subtitleFont",
+    "subtitleFontWeight",
+    "lineHeight",
+    "subtitleLineHeight",
+    "align",
+    "angle",
+    "baseline",
+    "limit",
     "text",
     "subtitle",
     "orient",
@@ -279,6 +441,8 @@ private fun strokeEncodeMap(prefix: String): Map<String, String> =
     "stroke" to "${prefix}Color",
     "strokeWidth" to "${prefix}Width",
     "strokeDash" to "${prefix}Dash",
+    "strokeDashOffset" to "${prefix}DashOffset",
+    "strokeCap" to "${prefix}Cap",
     "strokeOpacity" to "${prefix}Opacity",
     "opacity" to "${prefix}Opacity",
   )
@@ -292,6 +456,7 @@ private fun textEncodeMap(prefix: String): Map<String, String> =
     "fontSize" to "${prefix}FontSize",
     "fontWeight" to "${prefix}FontWeight",
     "fontStyle" to "${prefix}FontStyle",
+    "lineHeight" to "${prefix}LineHeight",
   )
 
 /**
@@ -347,7 +512,20 @@ private val AXIS_ENCODE_PARTS: Map<String, Map<String, String>> =
           "baseline" to "labelBaseline",
           "angle" to "labelAngle",
         ),
-    "title" to textEncodeMap("title"),
+    // An axis title's alignment, angle, limit and position each have a property of their own, and
+    // `axis-title.js` builds the mark's channel straight from it — so the two spellings are one
+    // thing here as everywhere else. They had been reported as unimplemented while the properties
+    // behind them were being honoured.
+    "title" to
+      textEncodeMap("title") +
+        mapOf(
+          "align" to "titleAlign",
+          "baseline" to "titleBaseline",
+          "angle" to "titleAngle",
+          "limit" to "titleLimit",
+          "x" to "titleX",
+          "y" to "titleY",
+        ),
   )
 
 private val LEGEND_ENCODE_PARTS: Map<String, Map<String, String>> =
@@ -356,16 +534,60 @@ private val LEGEND_ENCODE_PARTS: Map<String, Map<String, String>> =
     // `symbolStroke` prefix the colour and width use, which is why this one is written out.
     "symbols" to
       mapOf(
+        // `fill` is **not** here, and `symbolFillColor` is why: upstream sets the channel from that
+        // property and then *overwrites* it from the legend's own colour scale, so the property
+        // only
+        // ever shows on a legend that maps no fill. A specification's `encode` block is applied
+        // after
+        // both and does beat the scale — so the channel and the property are not the same thing,
+        // and
+        // folding one into the other would put a swatch's colour back under the scale's.
         "stroke" to "symbolStrokeColor",
         "strokeWidth" to "symbolStrokeWidth",
         "strokeDash" to "symbolDash",
+        "strokeDashOffset" to "symbolDashOffset",
         "strokeOpacity" to "symbolOpacity",
         "opacity" to "symbolOpacity",
         "size" to "symbolSize",
         "shape" to "symbolType",
       ),
-    "labels" to textEncodeMap("label") + mapOf("limit" to "labelLimit"),
-    "title" to textEncodeMap("title"),
+    "labels" to
+      textEncodeMap("label") +
+        mapOf(
+          "limit" to "labelLimit",
+          "align" to "labelAlign",
+          "baseline" to "labelBaseline",
+        ),
+    "title" to
+      textEncodeMap("title") +
+        mapOf(
+          "limit" to "titleLimit",
+          "align" to "titleAlign",
+          "baseline" to "titleBaseline",
+          "orient" to "titleOrient",
+        ),
+    // The ramp itself, whose three channels each have a `gradient`-prefixed property.
+    "gradient" to
+      mapOf(
+        "stroke" to "gradientStrokeColor",
+        "strokeWidth" to "gradientStrokeWidth",
+        "opacity" to "gradientOpacity",
+      ),
+    // The legend's own group, which is where its background and its placement live. `strokeWidth`
+    // and `strokeDash` are deliberately absent: on a legend those two name *scales*, and the
+    // background's own width and dash come from `config.legend` rather than from either spelling.
+    "legend" to
+      mapOf(
+        "fill" to "fillColor",
+        "stroke" to "strokeColor",
+        "cornerRadius" to "cornerRadius",
+        "x" to "legendX",
+        "y" to "legendY",
+        "padding" to "padding",
+        "titlePadding" to "titlePadding",
+        "offset" to "offset",
+        "orient" to "orient",
+      ),
   )
 
 /** Mark properties this engine reads. */
@@ -411,11 +633,28 @@ private val PROJECTION_CONSUMED =
     "precision",
     "clipAngle",
     "clipExtent",
+    "parallels",
+    "pointRadius",
     "reflectX",
     "reflectY",
     "fit",
     "extent",
     "size",
+  )
+
+/** Layout properties this engine reads; the rest are named in [SpecParser.parseLayout]. */
+private val LAYOUT_CONSUMED =
+  setOf(
+    "columns",
+    "padding",
+    "align",
+    "bounds",
+    "center",
+    "headerBand",
+    "footerBand",
+    "titleBand",
+    "titleAnchor",
+    "offset",
   )
 
 /** Data properties this engine reads. */
@@ -461,6 +700,32 @@ private val ENCODE_CONSUMED =
     "strokeWidth",
     "opacity",
     "cornerRadius",
+    // The channels that transform an item about its own anchor rather than moving it.
+    "scaleX",
+    "scaleY",
+    "aspect",
+    "smooth",
+    "dir",
+    "lineBreak",
+    "lineHeight",
+    "strokeDashOffset",
+    "strokeMiterLimit",
+    "strokeOffset",
+    "strokeForeground",
+    "cornerRadiusTopLeft",
+    "cornerRadiusTopRight",
+    "cornerRadiusBottomLeft",
+    "cornerRadiusBottomRight",
+    "clip",
+    "blend",
+    "tension",
+    "theta",
+    "radius",
+    "limit",
+    "ellipsis",
+    "cursor",
+    "tooltip",
+    "zindex",
     "defined",
     "interpolate",
     "orient",
@@ -482,30 +747,15 @@ private val ENCODE_CONSUMED =
     "path",
   )
 
-private val ENCODE_UNSUPPORTED =
-  mapOf(
-    "limit" to "Text truncation is not implemented; the text is drawn in full",
-    "ellipsis" to "Text truncation is not implemented, so its ellipsis has nothing to mark",
-    "tooltip" to
-      "Tooltip content from an encode channel is not implemented; a tooltip is built from the " +
-        "mark's own fields instead",
-    "cornerRadiusTopLeft" to
-      "Per-corner radii are not implemented; use 'cornerRadius' for all four",
-    "cornerRadiusTopRight" to
-      "Per-corner radii are not implemented; use 'cornerRadius' for all four",
-    "cornerRadiusBottomLeft" to
-      "Per-corner radii are not implemented; use 'cornerRadius' for all four",
-    "cornerRadiusBottomRight" to
-      "Per-corner radii are not implemented; use 'cornerRadius' for all four",
-    "blend" to "Blend modes from an encode channel are not implemented",
-    "clip" to "Clipping from an encode channel is not implemented; use the mark's own 'clip'",
-    "zindex" to "Per-item z-order is not implemented; marks are drawn in specification order",
-    "tension" to "Curve tension is not implemented; it needs an interpolation method first",
-    "theta" to "Polar positioning is not implemented",
-    "radius" to "Polar positioning is not implemented",
-    "scaleX" to "Per-item scaling is not implemented",
-    "scaleY" to "Per-item scaling is not implemented",
-  )
+/**
+ * Encode channels this engine parses but cannot draw.
+ *
+ * Empty, and worth keeping as the place the next gap goes rather than deleting: every channel in
+ * Vega's encoding vocabulary now reaches the scene. What used to be here — per-corner radii, curve
+ * tension, polar `theta`/`radius`, `blend`, `limit`/`ellipsis` and `clip` — is implemented and
+ * covered by [dev.aster.vega.model.spec] and the differential fixtures.
+ */
+private val ENCODE_UNSUPPORTED = emptyMap<String, String>()
 
 /** A parsed specification plus everything the parser could not honour. */
 public data class ParsedSpec(val spec: VegaSpec?, val diagnostics: List<VegaDiagnostic>) {
@@ -962,7 +1212,11 @@ public class SpecParser {
       return null
     }
 
-    val values = (obj.fields["values"] as? VegaValue.Arr)?.values
+    val declared = obj.fields["values"]
+    val values = (declared as? VegaValue.Arr)?.values
+    // An inline `values` that is an object is the document itself, not a row: a GeoJSON
+    // `FeatureCollection` or a TopoJSON topology, read through this dataset's own `format`.
+    val document = declared?.takeIf { it is VegaValue.Obj }
     val urlValue = obj.fields["url"]
     val urlSignal = (urlValue as? VegaValue.Obj)?.fields?.get("signal")?.asString()
     val url = if (urlSignal == null) urlValue?.asString() else null
@@ -1012,6 +1266,7 @@ public class SpecParser {
     return DataSpec(
       name = name,
       values = values,
+      document = document,
       url = url,
       urlSignal = urlSignal,
       formatType = formatType,
@@ -1067,6 +1322,8 @@ public class SpecParser {
       precision = obj.numberOrSignal("precision", "$path.precision"),
       clipAngle = obj.numberOrSignal("clipAngle", "$path.clipAngle"),
       clipExtent = numberPairs(obj.fields["clipExtent"], "$path.clipExtent"),
+      parallels = numberList(obj.fields["parallels"], "$path.parallels"),
+      pointRadius = obj.numberOrSignal("pointRadius", "$path.pointRadius"),
       reflectX = obj.numberOrSignal("reflectX", "$path.reflectX"),
       reflectY = obj.numberOrSignal("reflectY", "$path.reflectY"),
       fit = obj.fields["fit"],
@@ -1124,6 +1381,11 @@ public class SpecParser {
       name = name,
       type = type,
       domain = parseDomain(obj, "$path.domain"),
+      domainRaw =
+        obj.fields["domainRaw"]?.let {
+          parseDomain(VegaValue.Obj(mapOf("domain" to it)), "$path.domainRaw")
+        },
+      domainImplicit = obj.fields["domainImplicit"]?.asBoolean() ?: false,
       domainMin = obj.numberOrSignal("domainMin", "$path.domainMin"),
       domainMax = obj.numberOrSignal("domainMax", "$path.domainMax"),
       domainMid = obj.numberOrSignal("domainMid", "$path.domainMid"),
@@ -1142,7 +1404,11 @@ public class SpecParser {
       base = obj.numberOrSignal("base", "$path.base"),
       exponent = obj.numberOrSignal("exponent", "$path.exponent"),
       constant = obj.numberOrSignal("constant", "$path.constant"),
-      interpolate = obj.fields["interpolate"]?.takeIf { it is VegaValue.Str }?.asString(),
+      interpolate = interpolationSpace(obj.fields["interpolate"], "$path.interpolate"),
+      interpolateGamma =
+        ((obj.fields["interpolate"] as? VegaValue.Obj)?.fields?.get("gamma") as? VegaValue.Num)
+          ?.value
+          ?.takeIf { it.isFinite() && it > 0.0 },
       bins = parseBins(obj.fields["bins"], "$path.bins"),
     )
   }
@@ -1191,6 +1457,23 @@ public class SpecParser {
         )
         false
       }
+    }
+
+  /**
+   * A colour interpolation space, written as a name or as `{"type": ..., "gamma": ...}`.
+   *
+   * The object form is Vega's and its `gamma` is reported rather than silently dropped: in d3 only
+   * `interpolateRgb` has one, and it bends the ramp's middle without moving either end — so a chart
+   * that asked for it and got the plain ramp would look composed and be wrong in the middle.
+   */
+  private fun interpolationSpace(value: VegaValue?, path: String): String? =
+    when (value) {
+      null -> null
+      is VegaValue.Str -> value.value.takeIf { it.isNotEmpty() }
+      is VegaValue.Obj -> {
+        value.fields["type"]?.asString()?.takeIf { it.isNotEmpty() }
+      }
+      else -> null
     }
 
   private fun parseDomain(scale: VegaValue.Obj, path: String): DomainSpec {
@@ -1331,7 +1614,17 @@ public class SpecParser {
   private fun parseRange(value: VegaValue?, path: String): RangeSpec =
     when (value) {
       null -> RangeSpec.Unset
-      is VegaValue.Str -> RangeSpec.Named(value.value)
+      // A named range is a **key into `config.range`** before it is anything else, and upstream
+      // substitutes and re-reads: `"range": "category"` under a theme that sets
+      // `config.range.category` to its own palette means that palette, not `tableau10`. Only when
+      // the
+      // configuration says nothing does the name fall through to `width`, `height` or the built-in
+      // defaults. Substituting here rather than in the resolver is upstream's own arrangement, and
+      // it
+      // is what lets a theme's `category` be a scheme where the default is a literal list.
+      is VegaValue.Str ->
+        config.rangeDefault(value.value)?.let { parseRange(it, path) }
+          ?: RangeSpec.Named(value.value)
       is VegaValue.Arr -> RangeSpec.Literal(value.values)
       is VegaValue.Obj -> {
         val scheme = value.fields["scheme"]
@@ -1417,14 +1710,28 @@ public class SpecParser {
       GuideConfig.merge(own, config.axisDefaults(orient, scaleTypes[scale] == ScaleType.BAND))
         .withGuideEncode(AXIS_ENCODE_PARTS, "Axis", path)
 
+    val band =
+      obj.fields["tickBand"]?.asString()?.takeIf { it == "extent" || it == "center" }
+        ?: run {
+          obj.fields["tickBand"]?.asString()?.let { stated ->
+            diagnostics.error(
+              DiagnosticCodes.PARSE_UNKNOWN_PROPERTY,
+              "Unknown tickBand '$stated'; the only values are 'center' and 'extent'",
+              jsonPath = "$path.tickBand",
+            )
+          }
+          null
+        }
+
     return AxisSpec(
       scale = scale,
       orient = orient,
-      title = obj.fields["title"]?.takeIf { it is VegaValue.Str }?.asString(),
+      title = guideTitleText(obj.fields["title"]),
       titleExpression = (obj.fields["title"] as? VegaValue.Obj)?.fields?.get("signal")?.asString(),
       titlePadding = obj.numberOrSignal("titlePadding", "$path.titlePadding"),
       titleFontSize = obj.numberOrSignal("titleFontSize", "$path.titleFontSize"),
       titleAnchor = obj.enumOrNull("titleAnchor", path, "title anchor") { Anchor.fromName(it) },
+      titleLimit = obj.numberOrSignal("titleLimit", "$path.titleLimit"),
       grid = obj.fields["grid"]?.asBoolean() ?: false,
       ticks = obj.fields["ticks"]?.asBoolean() ?: true,
       labels = obj.fields["labels"]?.asBoolean() ?: true,
@@ -1456,22 +1763,51 @@ public class SpecParser {
       formatExpression =
         (obj.fields["format"] as? VegaValue.Obj)?.fields?.get("signal")?.asString(),
       formatType = axisFormatType(obj.fields["formatType"], "$path.formatType"),
-      bandPosition = obj.numberOrSignal("bandPosition", "$path.bandPosition"),
-      tickOffset = obj.numberOrSignal("tickOffset", "$path.tickOffset"),
-      tickExtra = obj.fields["tickExtra"]?.asBoolean() ?: false,
+      // `tickBand` is a shorthand for these three, and it wins: upstream's `tickBand()` reads the
+      // others only when it is absent. `"extent"` puts a band scale's ticks on the band edges.
+      bandPosition =
+        when (band) {
+          "extent" -> NumberValue.Constant(1.0)
+          "center" -> NumberValue.Constant(0.5)
+          else -> obj.numberOrSignal("bandPosition", "$path.bandPosition")
+        },
+      // Only `"extent"` zeroes the offset. `"center"` sets the band position and the extra tick and
+      // leaves `tickOffset` alone — so a band axis keeps the `-0.5` that `config.axisBand` gives
+      // it,
+      // which is what corrects the half pixel the axis group's own translation adds.
+      tickOffset =
+        if (band == "extent") NumberValue.Constant(0.0)
+        else obj.numberOrSignal("tickOffset", "$path.tickOffset"),
+      tickExtra =
+        if (band != null) band == "extent" else obj.fields["tickExtra"]?.asBoolean() ?: false,
+      tickBand = band,
+      labelOffset = obj.numberOrSignal("labelOffset", "$path.labelOffset"),
+      // The same shape as `labelFlush`: `true` is one unit, a number is itself, `false` is nothing.
+      labelBound =
+        when (val bound = obj.fields["labelBound"]) {
+          is VegaValue.Bool -> if (bound.value) 1.0 else null
+          is VegaValue.Num -> bound.value.takeIf { it.isFinite() }
+          else -> null
+        },
+      aria = obj.fields["aria"]?.asBoolean() ?: true,
+      description = obj.fields["description"]?.asString()?.takeIf { it.isNotBlank() },
+      position = obj.numberOrSignal("position", "$path.position"),
+      translate = obj.numberOrSignal("translate", "$path.translate"),
+      tickRound = obj.fields["tickRound"]?.asBoolean(),
       gridScale = obj.fields["gridScale"]?.takeIf { it is VegaValue.Str }?.asString(),
       labelFlush = flushThreshold(obj.fields["labelFlush"]),
+      labelFlushOffset = obj.numberOrSignal("labelFlushOffset", "$path.labelFlushOffset"),
       minExtent = obj.numberOrSignal("minExtent", "$path.minExtent"),
       maxExtent = obj.numberOrSignal("maxExtent", "$path.maxExtent"),
       encode =
         (obj.fields["encode"] as? VegaValue.Obj)?.fields.orEmpty().mapValues { (part, block) ->
           parseEncode(block, "$path.encode.$part")
         },
-      labelStyle = obj.guideStroke("label"),
-      tickStyle = obj.guideStroke("tick"),
-      gridStyle = obj.guideStroke("grid"),
-      domainStyle = obj.guideStroke("domain"),
-      titleStyle = obj.guideStroke("title"),
+      labelStyle = obj.guideStroke("label", "Axis", path),
+      tickStyle = obj.guideStroke("tick", "Axis", path),
+      gridStyle = obj.guideStroke("grid", "Axis", path),
+      domainStyle = obj.guideStroke("domain", "Axis", path),
+      titleStyle = obj.guideStroke("title", "Axis", path),
     )
   }
 
@@ -1482,6 +1818,20 @@ public class SpecParser {
    * `end`-anchored against the entries and a right one is measured from their far edge — and a
    * legend that quietly put its title on the wrong side would look finished.
    */
+  /**
+   * A guide's `title`, which upstream also lets be an **array** of lines.
+   *
+   * Axis and legend titles took the string form only, and an array was dropped without a word — a
+   * legend headed with two lines came out with no heading at all. Joined with the newline this
+   * engine lays lines out on, the same way a chart title's is.
+   */
+  private fun guideTitleText(value: VegaValue?): String? =
+    when (value) {
+      is VegaValue.Arr -> value.values.joinToString("\n") { it.asString() }.ifEmpty { null }
+      is VegaValue.Str -> value.value
+      else -> null
+    }
+
   private fun legendTitleOrient(value: VegaValue?, path: String): String? {
     val name = (value as? VegaValue.Str)?.value?.lowercase() ?: return null
     if (name == "top" || name == "left") return name
@@ -1586,6 +1936,13 @@ public class SpecParser {
                 "$subject encode channel '$channel' on '$part' is not implemented; it was ignored",
                 jsonPath = "$path.encode.$part.$pass.$channel",
               )
+            // A `{"signal": ...}` folds too, but only onto a property that can carry one — the
+            // styling block records a signal and the numeric properties are read through
+            // `numberOrSignal`, while a plain string property would stringify the object into
+            // nonsense. So `encode.labels.update.fontSize` from a signal works and
+            // `encode.symbols.update.shape` from one is still named.
+            (value as? VegaValue.Obj)?.fields?.get("signal") != null &&
+              property in SIGNAL_CAPABLE_GUIDE_PROPERTIES -> folded[property] = value
             constant == null ->
               diagnostics.warn(
                 DiagnosticCodes.PARSE_UNKNOWN_PROPERTY,
@@ -1608,27 +1965,83 @@ public class SpecParser {
    * Upstream spells all five parts the same way — the prefix is the only thing that changes — so
    * they are read the same way rather than five times over.
    */
-  private fun VegaValue.Obj.guideStroke(prefix: String): GuideStroke =
-    GuideStroke(
-      color = fields["${prefix}Color"]?.takeIf { it is VegaValue.Str }?.asString(),
-      width = (fields["${prefix}Width"] as? VegaValue.Num)?.value,
+  /**
+   * The styling block behind one part of a guide: its colour, face, dash and alignment.
+   *
+   * Every one of these is a **constant** here, and a `{"signal": ...}` in any of them is reported
+   * rather than dropped. That report is the point of the `constantOnly` calls below: a
+   * signal-valued `labelFontSize` works, because that property is read through `numberOrSignal`,
+   * while a signal-valued `labelColor` did not and said nothing — a chart colouring its axis from a
+   * control drew black labels and looked finished. The two spellings sit side by side in a
+   * specification, so the difference has to be visible.
+   */
+  private fun VegaValue.Obj.guideStroke(
+    prefix: String,
+    subject: String,
+    path: String,
+  ): GuideStroke {
+    val signals = LinkedHashMap<String, String>()
+    fun constantOnly(
+      field: String,
+      suffix: String,
+      shape: String,
+      accept: (VegaValue) -> Boolean,
+    ): VegaValue? {
+      val value = fields["$prefix$suffix"] ?: return null
+      if (accept(value)) return value
+      // A `{"signal": ...}` is recorded for the builders to resolve; anything else is a value of a
+      // shape nothing can read, and is named.
+      (value as? VegaValue.Obj)?.fields?.get("signal")?.asString()?.let {
+        signals[field] = it
+        return null
+      }
+      diagnostics.warn(
+        DiagnosticCodes.PARSE_UNKNOWN_PROPERTY,
+        "$subject property '$prefix$suffix' is only implemented as $shape or a signal; it was " +
+          "ignored",
+        jsonPath = "$path.$prefix$suffix",
+      )
+      return null
+    }
+    val text = { field: String, suffix: String ->
+      constantOnly(field, suffix, "a constant string") { it is VegaValue.Str }
+    }
+    val number = { field: String, suffix: String ->
+      (constantOnly(field, suffix, "a constant number") { it is VegaValue.Num } as? VegaValue.Num)
+        ?.value
+    }
+    return GuideStroke(
+      color = text("color", "Color")?.asString(),
+      width = number("width", "Width"),
       dash =
-        (fields["${prefix}Dash"] as? VegaValue.Arr)
+        (constantOnly("dash", "Dash", "a constant array") { it is VegaValue.Arr } as? VegaValue.Arr)
           ?.values
           ?.map { it.asDouble() }
           ?.takeIf { values -> values.isNotEmpty() && values.all { it.isFinite() } },
-      opacity = (fields["${prefix}Opacity"] as? VegaValue.Num)?.value,
-      font = fields["${prefix}Font"]?.takeIf { it is VegaValue.Str }?.asString(),
+      dashOffset = number("dashOffset", "DashOffset"),
+      cap = text("cap", "Cap")?.asString(),
+      opacity = number("opacity", "Opacity"),
+      font = text("font", "Font")?.asString(),
+      align = text("align", "Align")?.asString(),
+      baseline = text("baseline", "Baseline")?.asString(),
+      lineHeight = number("lineHeight", "LineHeight"),
       // Vega accepts either a keyword (`"bold"`) or a number (`700`); both reach the renderer as
       // text, so a number is normalized to its integer spelling rather than kept as a double.
       fontWeight =
-        when (val weight = fields["${prefix}FontWeight"]) {
+        when (
+          val weight =
+            constantOnly("fontWeight", "FontWeight", "a constant keyword or number") {
+              it is VegaValue.Str || it is VegaValue.Num
+            }
+        ) {
           is VegaValue.Str -> weight.value
           is VegaValue.Num -> weight.value.takeIf { it.isFinite() }?.toInt()?.toString()
           else -> null
         },
-      fontStyle = fields["${prefix}FontStyle"]?.takeIf { it is VegaValue.Str }?.asString(),
+      fontStyle = text("fontStyle", "FontStyle")?.asString(),
+      signals = signals,
     )
+  }
 
   // ---- titles ---------------------------------------------------------------
 
@@ -1644,6 +2057,73 @@ public class SpecParser {
    * Upstream takes either; a specification that writes one usually writes it in the encode block,
    * because that is where every other guide's overrides go.
    */
+  /**
+   * A title's `style`, which **replaces** the layer its own look comes from.
+   *
+   * Upstream builds the title's text mark with `style: "group-title"` and lets a specification's
+   * `style` take that slot instead — so naming one does not decorate the heading, it removes the
+   * 13-point bold and leaves whatever the named block says. What it does not say falls through to
+   * the *renderer's* defaults, which are 11 point and unweighted, not the title's.
+   *
+   * Written as two configuration layers beneath `config.title` so the ordinary precedence still
+   * holds: a property on the title beats the theme, which beats the style, which beats the
+   * renderer. The names are translated because a style block speaks in mark channels — `fill` —
+   * where a title speaks in its own — `color`.
+   */
+  private fun titleStyleLayers(own: VegaValue.Obj): List<VegaValue.Obj> {
+    // A title that names no style is still styled: `group-title` is the block Vega builds one
+    // with, and a stated `style` *replaces* that slot rather than adding to it. Without the
+    // fallback a Vega-Lite theme's heading colour — which its compiler redirects into
+    // `config.style.group-title` — reached nothing at all and every themed title drew black.
+    val names = markStyles(own).ifEmpty { listOf("group-title") }
+    if (names.isEmpty()) return emptyList()
+    val translated = LinkedHashMap<String, VegaValue>()
+    for (name in names) {
+      for ((key, field) in config.styleBlock(name).fields) {
+        translated[if (key == "fill") "color" else key] = field
+      }
+    }
+    return listOf(TITLE_RENDERER_FALLBACKS, VegaValue.Obj(translated))
+  }
+
+  /**
+   * A title's `encode`, normalised to one block per part, with anything unreadable reported.
+   *
+   * Upstream splits it three ways — `group` styles the group the heading sits in, `title` its text,
+   * `subtitle` the second line — and keeps a **deprecated** fourth form: a block naming none of
+   * those three applies to the *text*, which is the form `encode.update.dx` is written in. Both are
+   * folded onto `title` here.
+   *
+   * Channels beyond the ones each part can express are named rather than dropped: a heading whose
+   * `encode` positioned its own text is a heading this engine would draw in the wrong place, and
+   * saying so is the difference between an unfinished feature and a wrong chart.
+   */
+  private fun titleEncode(own: VegaValue.Obj, path: String): Map<String, EncodeSpec> {
+    val encode = own.fields["encode"] as? VegaValue.Obj ?: return emptyMap()
+    val named = encode.fields.keys.any { it in TITLE_ENCODE_PARTS }
+    val blocks = LinkedHashMap<String, EncodeSpec>()
+    if (named) {
+      for (part in TITLE_ENCODE_PARTS) {
+        encode.fields[part]?.let { blocks[part] = parseEncode(it, "$path.$part") }
+      }
+    } else {
+      blocks["title"] = parseEncode(encode, path)
+    }
+    for ((part, block) in blocks) {
+      val readable = if (part == "group") TITLE_GROUP_CHANNELS else TITLE_TEXT_CHANNELS
+      for (channel in block.effective.keys.sorted()) {
+        if (channel in readable) continue
+        diagnostics.warn(
+          DiagnosticCodes.PARSE_UNKNOWN_PROPERTY,
+          "A title's '$part' encode block sets '$channel', which is not read; the rest of the " +
+            "block was applied",
+          jsonPath = "$path.$part.$channel",
+        )
+      }
+    }
+    return blocks
+  }
+
   private fun titleNudge(obj: VegaValue.Obj, channel: String, path: String): NumberValue? {
     obj.numberOrSignal(channel, "$path.$channel")?.let {
       return it
@@ -1667,23 +2147,18 @@ public class SpecParser {
       )
     }
     val own = value as? VegaValue.Obj ?: return unexpected("a title definition", path)
-    // A title's `style` names the `config.style` block behind it, *replacing* the `group-title`
-    // block a heading otherwise takes: upstream's `guideMark` assigns `mark.style = extras.style ||
-    // mark.style`. That is how a trellis header is set at a label's ten points rather than a
-    // heading's thirteen, and the size is measured as well as drawn.
-    val style = own.fields["style"]?.takeIf { it is VegaValue.Str }?.asString()
-    if (own.fields["style"] != null && style == null) {
-      diagnostics.warn(
-        DiagnosticCodes.PARSE_UNKNOWN_PROPERTY,
-        "A title takes one style name; a list of them is not implemented",
-        jsonPath = "$path.style",
-      )
-    }
-    val obj = GuideConfig.merge(own, config.titleDefaults(style))
+    val obj = GuideConfig.merge(own, titleStyleLayers(own) + config.titleDefaults())
 
     val textField = obj.fields["text"]
     val expression = (textField as? VegaValue.Obj)?.fields?.get("signal")?.asString()
-    val text = textField?.takeIf { it is VegaValue.Str }?.asString() ?: ""
+    // An **array** is upstream's multi-line form, for a title and for a subtitle alike, and it was
+    // rejected outright: a heading written as two lines produced "A title needs a 'text'" and no
+    // chart at all. Joined with the newline this engine lays lines out on.
+    val text =
+      when (textField) {
+        is VegaValue.Arr -> textField.values.joinToString("\n") { it.asString() }
+        else -> textField?.takeIf { it is VegaValue.Str }?.asString() ?: ""
+      }
     if (text.isEmpty() && expression == null) {
       diagnostics.error(
         DiagnosticCodes.PARSE_MISSING_PROPERTY,
@@ -1697,26 +2172,21 @@ public class SpecParser {
       "Title",
       path,
       TITLE_CONSUMED,
-      mapOf(
-        "encode" to "Only 'dx' and 'dy' are read from a title's encode block; the rest was ignored",
-        "limit" to "Title text limits are not implemented",
-        "align" to "Title alignment follows 'anchor'; an explicit align is not implemented",
-        "angle" to "Title rotation follows 'orient'; an explicit angle is not implemented",
-      ),
     )
 
     return TitleSpec(
       text = text,
       textExpression = expression,
-      subtitle = obj.fields["subtitle"]?.takeIf { it is VegaValue.Str }?.asString(),
+      subtitle =
+        when (val sub = obj.fields["subtitle"]) {
+          is VegaValue.Arr -> sub.values.joinToString("\n") { it.asString() }
+          else -> sub?.takeIf { it is VegaValue.Str }?.asString()
+        },
       orient =
         obj.enumOrNull("orient", path, "title orientation") { Orient.fromName(it) } ?: Orient.TOP,
       anchor =
         obj.enumOrNull("anchor", path, "title anchor") { Anchor.fromName(it) } ?: Anchor.MIDDLE,
       frame = obj.fields["frame"]?.asString(),
-      angle = obj.numberOrSignal("angle", "$path.angle"),
-      align = obj.fields["align"]?.takeIf { it is VegaValue.Str }?.asString(),
-      baseline = obj.fields["baseline"]?.takeIf { it is VegaValue.Str }?.asString(),
       offset = obj.numberOrSignal("offset", "$path.offset"),
       subtitlePadding = obj.numberOrSignal("subtitlePadding", "$path.subtitlePadding"),
       fontSize = obj.numberOrSignal("fontSize", "$path.fontSize"),
@@ -1729,12 +2199,29 @@ public class SpecParser {
           else -> null
         },
       subtitleFontSize = obj.numberOrSignal("subtitleFontSize", "$path.subtitleFontSize"),
+      encode = titleEncode(own, "$path.encode"),
       fontStyle = obj.fields["fontStyle"]?.takeIf { it is VegaValue.Str }?.asString(),
       subtitleFontStyle =
         obj.fields["subtitleFontStyle"]?.takeIf { it is VegaValue.Str }?.asString(),
-      font = obj.fields["font"]?.takeIf { it is VegaValue.Str }?.asString(),
-      color = obj.fields["color"]?.takeIf { it is VegaValue.Str }?.asString(),
-      subtitleColor = obj.fields["subtitleColor"]?.takeIf { it is VegaValue.Str }?.asString(),
+      color = obj.fields["color"]?.asString()?.takeIf { it.isNotEmpty() },
+      font = obj.fields["font"]?.asString()?.takeIf { it.isNotEmpty() },
+      subtitleColor = obj.fields["subtitleColor"]?.asString()?.takeIf { it.isNotEmpty() },
+      subtitleFont = obj.fields["subtitleFont"]?.asString()?.takeIf { it.isNotEmpty() },
+      subtitleFontWeight =
+        when (val weight = obj.fields["subtitleFontWeight"]) {
+          is VegaValue.Str -> weight.value
+          is VegaValue.Num -> weight.value.takeIf { it.isFinite() }?.toInt()?.toString()
+          else -> null
+        },
+      lineHeight = obj.numberOrSignal("lineHeight", "$path.lineHeight"),
+      subtitleLineHeight = obj.numberOrSignal("subtitleLineHeight", "$path.subtitleLineHeight"),
+      align = obj.fields["align"]?.asString()?.takeIf { it.isNotEmpty() },
+      angle = obj.numberOrSignal("angle", "$path.angle"),
+      baseline = obj.fields["baseline"]?.asString()?.takeIf { it.isNotEmpty() },
+      limit = obj.numberOrSignal("limit", "$path.limit"),
+      aria = obj.fields["aria"]?.asBoolean() ?: true,
+      name = obj.fields["name"]?.asString()?.takeIf { it.isNotEmpty() },
+      interactive = obj.fields["interactive"]?.asBoolean() ?: true,
       zindex = (obj.fields["zindex"] as? VegaValue.Num)?.value?.toInt() ?: 0,
     )
   }
@@ -1748,11 +2235,39 @@ public class SpecParser {
    * `symbolLimit` and multi-column grids each report rather than being partly honoured, because a
    * legend that silently drops half its entries or ignores a formatter looks finished and is not.
    */
+  /** A `config.legend` property, without the legend's own value layered over it. */
+  private fun legendConfig(key: String): VegaValue? =
+    config.legendDefaults().firstNotNullOfOrNull { it.fields[key] }
+
+  /**
+   * The encode-to-property mapping for one legend, which depends on the kind of legend it is.
+   *
+   * A label's `align` and `baseline` are the same thing as `labelAlign` and `labelBaseline` on a
+   * **symbol** legend and are *not* on a gradient one: upstream derives a ramp label's alignment
+   * from where along the bar it sits, never reads the property, and lets only an `encode` block
+   * override it. Verified both ways — `labelAlign: "right"` on a gradient legend does nothing
+   * upstream while `encode.labels.update.align` does — so folding the channel into the property
+   * would quietly make the property work too, on the one kind of legend that is supposed to ignore
+   * it.
+   */
+  private fun legendEncodeParts(own: VegaValue.Obj): Map<String, Map<String, String>> {
+    val declared = (own.fields["type"] as? VegaValue.Str)?.value?.lowercase()
+    val scale = LEGEND_CHANNEL_ORDER.firstNotNullOfOrNull { own.fields[it]?.asString() }
+    val ramp =
+      when {
+        declared == "gradient" || declared == "symbol" -> declared == "gradient"
+        else -> scaleTypes[scale] in RAMP_LEGEND_SCALE_TYPES
+      }
+    if (!ramp) return LEGEND_ENCODE_PARTS
+    return LEGEND_ENCODE_PARTS +
+      mapOf("labels" to LEGEND_ENCODE_PARTS.getValue("labels") - setOf("align", "baseline"))
+  }
+
   private fun parseLegend(value: VegaValue, path: String): LegendSpec? {
     val own = value as? VegaValue.Obj ?: return unexpected("a legend definition", path)
     val obj =
       GuideConfig.merge(own, config.legendDefaults())
-        .withGuideEncode(LEGEND_ENCODE_PARTS, "Legend", path)
+        .withGuideEncode(legendEncodeParts(own), "Legend", path)
 
     val spec =
       LegendSpec(
@@ -1761,15 +2276,21 @@ public class SpecParser {
         size = obj.fields["size"]?.asString(),
         shape = obj.fields["shape"]?.asString(),
         opacity = obj.fields["opacity"]?.asString(),
-        strokeWidth = obj.fields["strokeWidth"]?.asString(),
-        strokeDash = obj.fields["strokeDash"]?.asString(),
+        // Read from the legend's **own** object and not from the config-layered one: this is the
+        // one
+        // property name whose two meanings collide. `config.legend.strokeWidth` is the width of the
+        // outline drawn round the legend, and layering it in would turn a themed border into a
+        // channel naming a scale called "2".
+        strokeWidthScale = own.fields["strokeWidth"]?.asString(),
+        strokeDashScale = own.fields["strokeDash"]?.asString(),
+        gridAlign = obj.fields["gridAlign"]?.asString(),
         type = obj.enumOrNull("type", path, "legend type") { LegendType.fromName(it) },
         orient =
           obj.enumOrNull("orient", path, "legend orientation") { LegendOrient.fromName(it) }
             ?: LegendOrient.RIGHT,
         direction =
           obj.enumOrNull("direction", path, "legend direction") { Direction.fromName(it) },
-        title = obj.fields["title"]?.takeIf { it is VegaValue.Str }?.asString(),
+        title = guideTitleText(obj.fields["title"]),
         titleExpression =
           (obj.fields["title"] as? VegaValue.Obj)?.fields?.get("signal")?.asString(),
         values = (obj.fields["values"] as? VegaValue.Arr)?.values,
@@ -1782,6 +2303,8 @@ public class SpecParser {
         padding = obj.numberOrSignal("padding", "$path.padding"),
         titlePadding = obj.numberOrSignal("titlePadding", "$path.titlePadding"),
         titleOrient = legendTitleOrient(obj.fields["titleOrient"], "$path.titleOrient"),
+        titleAnchor =
+          obj.enumOrNull("titleAnchor", path, "legend title anchor") { Anchor.fromName(it) },
         titleLimit = obj.numberOrSignal("titleLimit", "$path.titleLimit"),
         titleFontSize = obj.numberOrSignal("titleFontSize", "$path.titleFontSize"),
         labelFontSize = obj.numberOrSignal("labelFontSize", "$path.labelFontSize"),
@@ -1797,6 +2320,28 @@ public class SpecParser {
         columns = obj.numberOrSignal("columns", "$path.columns"),
         legendX = obj.numberOrSignal("legendX", "$path.legendX"),
         legendY = obj.numberOrSignal("legendY", "$path.legendY"),
+        fillColor = obj.fields["fillColor"]?.asString()?.takeIf { it.isNotEmpty() },
+        strokeColor = obj.fields["strokeColor"]?.asString()?.takeIf { it.isNotEmpty() },
+        cornerRadius = obj.numberOrSignal("cornerRadius", "$path.cornerRadius"),
+        symbolFillColor = obj.fields["symbolFillColor"]?.asString()?.takeIf { it.isNotEmpty() },
+        symbolOffset = obj.numberOrSignal("symbolOffset", "$path.symbolOffset"),
+        gradientStrokeColor =
+          obj.fields["gradientStrokeColor"]?.asString()?.takeIf { it.isNotEmpty() },
+        gradientStrokeWidth =
+          obj.numberOrSignal("gradientStrokeWidth", "$path.gradientStrokeWidth"),
+        gradientOpacity = obj.numberOrSignal("gradientOpacity", "$path.gradientOpacity"),
+        symbolLimit = obj.numberOrSignal("symbolLimit", "$path.symbolLimit"),
+        tickMinStep = obj.numberOrSignal("tickMinStep", "$path.tickMinStep"),
+        aria = obj.fields["aria"]?.asBoolean() ?: true,
+        description = obj.fields["description"]?.asString()?.takeIf { it.isNotBlank() },
+        // From the configuration alone; see [LegendSpec.fillColor] for why the legend's own value
+        // is deliberately not consulted.
+        backgroundStrokeWidth = legendConfig("strokeWidth")?.asDouble()?.takeIf { !it.isNaN() },
+        backgroundStrokeDash =
+          (legendConfig("strokeDash") as? VegaValue.Arr)
+            ?.values
+            ?.map { it.asDouble() }
+            ?.takeIf { list -> list.isNotEmpty() && list.all { it.isFinite() && it >= 0.0 } },
         zindex = (obj.fields["zindex"] as? VegaValue.Num)?.value?.toInt() ?: 0,
         labelOverlap = obj.fields["labelOverlap"]?.asString(),
         labelSeparation = obj.numberOrSignal("labelSeparation", "$path.labelSeparation"),
@@ -1805,14 +2350,14 @@ public class SpecParser {
           (obj.fields["encode"] as? VegaValue.Obj)?.fields.orEmpty().mapValues { (part, block) ->
             parseEncode(block, "$path.encode.$part")
           },
-        labelStyle = obj.guideStroke("label"),
-        titleStyle = obj.guideStroke("title"),
+        labelStyle = obj.guideStroke("label", "Legend", path),
+        titleStyle = obj.guideStroke("title", "Legend", path),
         // `symbolStrokeColor`/`symbolStrokeWidth` rather than `symbolColor`/`symbolWidth`, so the
         // shared reader is pointed at the `symbolStroke` prefix and the dash and opacity are picked
         // up separately.
         symbolStyle =
           obj
-            .guideStroke("symbolStroke")
+            .guideStroke("symbolStroke", "Legend", path)
             .copy(
               dash =
                 (obj.fields["symbolDash"] as? VegaValue.Arr)
@@ -1820,6 +2365,9 @@ public class SpecParser {
                   ?.map { it.asDouble() }
                   ?.takeIf { values -> values.isNotEmpty() && values.all { it.isFinite() } },
               opacity = (obj.fields["symbolOpacity"] as? VegaValue.Num)?.value,
+              // `symbolDashOffset`, matching `symbolDash` — the `symbolStroke` prefix would look
+              // for `symbolStrokeDashOffset`, which is not a property upstream has.
+              dashOffset = (obj.fields["symbolDashOffset"] as? VegaValue.Num)?.value,
             ),
       )
 
@@ -1834,17 +2382,7 @@ public class SpecParser {
       return null
     }
 
-    own.reportUnhandled(
-      "Legend",
-      path,
-      LEGEND_CONSUMED,
-      mapOf(
-        "formatType" to "Legend label format types are not implemented",
-        "symbolLimit" to "Legend entry limits are not implemented; every entry is shown",
-        "gradientOpacity" to "Legend gradient opacity is not implemented",
-        "titleAnchor" to "Legend title anchoring is not implemented",
-      ),
-    )
+    own.reportUnhandled("Legend", path, LEGEND_CONSUMED)
     return spec
   }
 
@@ -2062,7 +2600,7 @@ public class SpecParser {
         field = field,
         name =
           names.getOrNull(index)?.takeIf { it.isNotEmpty() }
-            ?: if (field == null) op else "${'$'}{op}_${'$'}field",
+            ?: if (field == null) op else "${op}_$field",
       )
     }
     return FacetSpec(
@@ -2082,23 +2620,48 @@ public class SpecParser {
    * band of labels lines up against are reported rather than half-honoured, because a trellis whose
    * headers label the wrong row is worse than one that says it cannot place them.
    */
+  /** The six labels a layout `offset` can name, when it names one number for all of them. */
+  private val OFFSET_PARTS =
+    listOf("rowHeader", "columnHeader", "rowFooter", "columnFooter", "rowTitle", "columnTitle")
+
+  /** One direction of a layout band, written either as one number or as `{row, column}`. */
+  private fun layoutBand(value: VegaValue?, direction: String): Double? =
+    when (value) {
+      is VegaValue.Obj -> (value.fields[direction] as? VegaValue.Num)?.value
+      is VegaValue.Num -> value.value
+      else -> null
+    }?.takeIf { it.isFinite() }
+
+  /** The same for a layout property whose value is a word. */
+  private fun layoutText(value: VegaValue?, direction: String): String? =
+    when (value) {
+      is VegaValue.Obj -> value.fields[direction]?.asString()
+      is VegaValue.Str -> value.value
+      else -> null
+    }?.takeIf { it.isNotEmpty() }
+
+  /** One direction of a layout flag written either as one value or as `{row, column}`. */
+  private fun layoutFlag(value: VegaValue?, direction: String): Boolean =
+    when (value) {
+      null -> false
+      is VegaValue.Obj -> value.fields[direction]?.asBoolean() ?: false
+      else -> value.asBoolean()
+    }
+
   private fun parseLayout(value: VegaValue, path: String): LayoutSpec? {
     val obj = value as? VegaValue.Obj ?: return unexpected("a layout definition", path)
-    val unsupported =
-      mapOf(
-        "headerBand" to "Layout header bands are not implemented",
-        "footerBand" to "Layout footer bands are not implemented",
-        "titleBand" to "Layout title bands are not implemented",
-        "center" to "Centring cells within their row or column is not implemented",
-      )
-    for ((key, reason) in unsupported) {
-      if (obj.fields[key] == null) continue
-      diagnostics.warn(
-        DiagnosticCodes.PARSE_UNKNOWN_PROPERTY,
-        "$reason; '$key' was ignored",
-        jsonPath = "$path.$key",
-      )
-    }
+    // Named rather than listed by exception, like every other block: a layout property nobody
+    // thought about becomes a diagnostic instead of a silence. `titleAnchor` was the one this
+    // caught
+    // — it had neither an entry in the table below nor a reader, so a trellis that anchored its
+    // cell
+    // titles was told nothing at all.
+    obj.reportUnhandled(
+      "Layout",
+      path,
+      LAYOUT_CONSUMED,
+      emptyMap(),
+    )
 
     // `padding` is either one number for both directions or a per-direction object.
     val padding = obj.fields["padding"]
@@ -2124,6 +2687,32 @@ public class SpecParser {
       alignRow = layoutAlign(align, "row"),
       alignColumn = layoutAlign(align, "column"),
       bounds = obj.fields["bounds"]?.takeIf { it is VegaValue.Str }?.asString()?.lowercase(),
+      centerColumn = layoutFlag(obj.fields["center"], "column"),
+      centerRow = layoutFlag(obj.fields["center"], "row"),
+      headerBandRow = layoutBand(obj.fields["headerBand"], "row"),
+      headerBandColumn = layoutBand(obj.fields["headerBand"], "column"),
+      footerBandRow = layoutBand(obj.fields["footerBand"], "row"),
+      footerBandColumn = layoutBand(obj.fields["footerBand"], "column"),
+      titleBandRow = layoutBand(obj.fields["titleBand"], "row"),
+      titleBandColumn = layoutBand(obj.fields["titleBand"], "column"),
+      titleAnchorRow = layoutText(obj.fields["titleAnchor"], "row"),
+      titleAnchorColumn = layoutText(obj.fields["titleAnchor"], "column"),
+      // One number for all six, or an object naming any of them. Upstream reads each key on demand,
+      // so a partial object leaves the rest at zero rather than at the single value.
+      offsets =
+        (obj.fields["offset"] as? VegaValue.Obj)
+          ?.fields
+          ?.mapNotNull { (key, value) ->
+            (value as? VegaValue.Num)?.value?.takeIf { it.isFinite() }?.let { key to it }
+          }
+          ?.toMap()
+          ?: (obj.fields["offset"] as? VegaValue.Num)
+            ?.value
+            ?.takeIf { it.isFinite() }
+            ?.let { one ->
+              OFFSET_PARTS.associateWith { one }
+            }
+          ?: emptyMap(),
     )
   }
 

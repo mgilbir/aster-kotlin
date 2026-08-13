@@ -96,22 +96,48 @@ public class TimeStepper(
     }
   }
 
-  /** [millis] advanced by [count] steps. */
+  /**
+   * [millis] advanced by [count] steps.
+   *
+   * Months and years **overflow** rather than clamping, which is d3's behaviour because it is
+   * JavaScript's: `setMonth(month + 1)` on 31 January asks for "31 February" and the Date
+   * normalises it to 2 or 3 March depending on the leap year. `kotlinx-datetime` clamps instead —
+   * it would answer 29 February — so the two disagree by one to three days for any date past the
+   * 28th, which is a quarter of the month. Tick generation never noticed: it only ever offsets from
+   * a floored boundary, the first of a month, where nothing overflows. `timeOffset` in an
+   * expression does.
+   */
   public fun offset(millis: Double, count: Int): Double {
     val at = instant(millis)
     val amount = step.toLong() * count
-    return millis(
-      when (interval) {
-        TimeInterval.MILLISECOND -> at.plus(amount, DateTimeUnit.MILLISECOND)
-        TimeInterval.SECOND -> at.plus(amount, DateTimeUnit.SECOND)
-        TimeInterval.MINUTE -> at.plus(amount, DateTimeUnit.MINUTE)
-        TimeInterval.HOUR -> at.plus(amount, DateTimeUnit.HOUR)
-        TimeInterval.DAY -> at.plus(amount, DateTimeUnit.DAY, zone)
-        TimeInterval.WEEK -> at.plus(amount, DateTimeUnit.WEEK, zone)
-        TimeInterval.MONTH -> at.plus(amount, DateTimeUnit.MONTH, zone)
-        TimeInterval.YEAR -> at.plus(amount, DateTimeUnit.YEAR, zone)
-      }
-    )
+    return when (interval) {
+      TimeInterval.MILLISECOND -> millis(at.plus(amount, DateTimeUnit.MILLISECOND))
+      TimeInterval.SECOND -> millis(at.plus(amount, DateTimeUnit.SECOND))
+      TimeInterval.MINUTE -> millis(at.plus(amount, DateTimeUnit.MINUTE))
+      TimeInterval.HOUR -> millis(at.plus(amount, DateTimeUnit.HOUR))
+      TimeInterval.DAY -> millis(at.plus(amount, DateTimeUnit.DAY, zone))
+      TimeInterval.WEEK -> millis(at.plus(amount, DateTimeUnit.WEEK, zone))
+      TimeInterval.MONTH -> overflowing(millis, monthsFrom = amount, yearsFrom = 0L)
+      TimeInterval.YEAR -> overflowing(millis, monthsFrom = 0L, yearsFrom = amount)
+    }
+  }
+
+  /**
+   * A month or year shift done the way `Date.setMonth` does it: keep the day number and let it
+   * spill.
+   *
+   * Built by taking the first of the target month and adding `day - 1` days, which is exactly what
+   * the overflow amounts to, and reattaching the original wall-clock time — a shift by months keeps
+   * the local time of day across a daylight-saving change rather than the absolute instant.
+   */
+  private fun overflowing(millis: Double, monthsFrom: Long, yearsFrom: Long): Double {
+    val at = local(millis)
+    val zeroBased = (at.date.month.number - 1).toLong() + monthsFrom
+    val year = at.date.year + yearsFrom + zeroBased.floorDiv(12)
+    val month = zeroBased.mod(12L).toInt() + 1
+    val first = LocalDate(year.toInt(), month, 1)
+    val date = first.plus(at.date.day - 1, DateTimeUnit.DAY)
+    return millis(LocalDateTime(date, at.time).toInstant(zone))
   }
 
   /**

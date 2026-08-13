@@ -1,0 +1,412 @@
+{
+  "marks": [
+    {
+      "closed": 0,
+      "points": "0 96 200 24",
+      "role": "mark",
+      "stroke": "#333333",
+      "strokeDash": "1,0",
+      "strokeWidth": 1,
+      "type": "line"
+    },
+    {
+      "closed": 0,
+      "points": "0 48 200 72",
+      "role": "mark",
+      "stroke": "#333333",
+      "strokeDash": "6,3",
+      "strokeWidth": 4,
+      "type": "line"
+    },
+    {
+      "closed": 0,
+      "points": "0 72 200 0",
+      "role": "mark",
+      "stroke": "#333333",
+      "strokeDash": "2,2,8,2",
+      "strokeWidth": 9,
+      "type": "line"
+    },
+    {
+      "fill": "transparent",
+      "opacity": 1,
+      "role": "legend-symbol",
+      "shapeHeight": 16,
+      "shapeLeft": 234,
+      "shapeTop": 14,
+      "shapeWidth": 16,
+      "size": 100,
+      "stroke": "#888",
+      "strokeDash": "1,0",
+      "strokeWidth": 1.5,
+      "type": "symbol",
+      "x": 242,
+      "y": 22
+    },
+    {
+      "align": "left",
+      "baseline": "middle",
+      "fill": "#000",
+      "font": "sans-serif",
+      "fontSize": 10,
+      "opacity": 1,
+      "role": "legend-label",
+      "text": "alpha",
+      "type": "text",
+      "x": 252,
+      "y": 22
+    },
+    {
+      "fill": "transparent",
+      "opacity": 1,
+      "role": "legend-symbol",
+      "shapeHeight": 16,
+      "shapeLeft": 234,
+      "shapeTop": 32,
+      "shapeWidth": 16,
+      "size": 100,
+      "stroke": "#888",
+      "strokeDash": "6,3",
+      "strokeWidth": 1.5,
+      "type": "symbol",
+      "x": 242,
+      "y": 40
+    },
+    {
+      "align": "left",
+      "baseline": "middle",
+      "fill": "#000",
+      "font": "sans-serif",
+      "fontSize": 10,
+      "opacity": 1,
+      "role": "legend-label",
+      "text": "beta",
+      "type": "text",
+      "x": 252,
+      "y": 40
+    },
+    {
+      "fill": "transparent",
+      "opacity": 1,
+      "role": "legend-symbol",
+      "shapeHeight": 16,
+      "shapeLeft": 234,
+      "shapeTop": 50,
+      "shapeWidth": 16,
+      "size": 100,
+      "stroke": "#888",
+      "strokeDash": "2,2,8,2",
+      "strokeWidth": 1.5,
+      "type": "symbol",
+      "x": 242,
+      "y": 58
+    },
+    {
+      "align": "left",
+      "baseline": "middle",
+      "fill": "#000",
+      "font": "sans-serif",
+      "fontSize": 10,
+      "opacity": 1,
+      "role": "legend-label",
+      "text": "gamma",
+      "type": "text",
+      "x": 252,
+      "y": 58
+    },
+    {
+      "align": "left",
+      "angle": 0,
+      "baseline": "top",
+      "fill": "#000",
+      "font": "sans-serif",
+      "fontSize": 11,
+      "fontWeight": "bold",
+      "opacity": 1,
+      "role": "legend-title",
+      "text": "style",
+      "type": "text",
+      "x": 236,
+      "y": 0
+    },
+    {
+      "fill": "transparent",
+      "opacity": 1,
+      "role": "legend-symbol",
+      "shapeHeight": 14,
+      "shapeLeft": 20.5,
+      "shapeTop": 32.5,
+      "shapeWidth": 14,
+      "size": 100,
+      "stroke": "#888",
+      "strokeWidth": 1,
+      "type": "symbol",
+      "x": 27.5,
+      "y": 39.5
+    },
+    {
+      "align": "left",
+      "baseline": "middle",
+      "fill": "#000",
+      "font": "sans-serif",
+      "fontSize": 10,
+      "opacity": 1,
+      "role": "legend-label",
+      "text": "alpha",
+      "type": "text",
+      "x": 41,
+      "y": 39.5
+    },
+    {
+      "fill": "transparent",
+      "opacity": 1,
+      "role": "legend-symbol",
+      "shapeHeight": 26,
+      "shapeLeft": 14.5,
+      "shapeTop": 49,
+      "shapeWidth": 26,
+      "size": 100,
+      "stroke": "#888",
+      "strokeWidth": 4,
+      "type": "symbol",
+      "x": 27.5,
+      "y": 62
+    },
+    {
+      "align": "left",
+      "baseline": "middle",
+      "fill": "#000",
+      "font": "sans-serif",
+      "fontSize": 10,
+      "opacity": 1,
+      "role": "legend-label",
+      "text": "beta",
+      "type": "text",
+      "x": 41,
+      "y": 62
+    },
+    {
+      "fill": "transparent",
+      "opacity": 1,
+      "role": "legend-symbol",
+      "shapeHeight": 46,
+      "shapeLeft": 4.5,
+      "shapeTop": 77.5,
+      "shapeWidth": 46,
+      "size": 100,
+      "stroke": "#888",
+      "strokeWidth": 9,
+      "type": "symbol",
+      "x": 27.5,
+      "y": 100.5
+    },
+    {
+      "align": "left",
+      "baseline": "middle",
+      "fill": "#000",
+      "font": "sans-serif",
+      "fontSize": 10,
+      "opacity": 1,
+      "role": "legend-label",
+      "text": "gamma",
+      "type": "text",
+      "x": 41,
+      "y": 100.5
+    },
+    {
+      "align": "left",
+      "angle": 0,
+      "baseline": "top",
+      "fill": "#000",
+      "font": "sans-serif",
+      "fontSize": 11,
+      "fontWeight": "bold",
+      "opacity": 1,
+      "role": "legend-title",
+      "text": "weight",
+      "type": "text",
+      "x": 18,
+      "y": 18
+    },
+    {
+      "fill": "transparent",
+      "opacity": 1,
+      "role": "legend-symbol",
+      "shapeHeight": 14,
+      "shapeLeft": -1.5,
+      "shapeTop": 162.75,
+      "shapeWidth": 14,
+      "size": 100,
+      "stroke": "#888",
+      "strokeDash": "1,0",
+      "strokeWidth": 1,
+      "type": "symbol",
+      "x": 5.5,
+      "y": 169.75
+    },
+    {
+      "align": "left",
+      "baseline": "middle",
+      "fill": "#000",
+      "font": "sans-serif",
+      "fontSize": 10,
+      "opacity": 1,
+      "role": "legend-label",
+      "text": "alpha",
+      "type": "text",
+      "x": 15,
+      "y": 169.75
+    },
+    {
+      "fill": "transparent",
+      "opacity": 1,
+      "role": "legend-symbol",
+      "shapeHeight": 26,
+      "shapeLeft": 65,
+      "shapeTop": 154.5,
+      "shapeWidth": 26,
+      "size": 100,
+      "stroke": "#888",
+      "strokeDash": "6,3",
+      "strokeWidth": 4,
+      "type": "symbol",
+      "x": 78,
+      "y": 167.5
+    },
+    {
+      "align": "left",
+      "baseline": "middle",
+      "fill": "#000",
+      "font": "sans-serif",
+      "fontSize": 10,
+      "opacity": 1,
+      "role": "legend-label",
+      "text": "beta",
+      "type": "text",
+      "x": 89,
+      "y": 167.5
+    },
+    {
+      "fill": "transparent",
+      "opacity": 1,
+      "role": "legend-symbol",
+      "shapeHeight": 46,
+      "shapeLeft": 131.5,
+      "shapeTop": 140.75,
+      "shapeWidth": 46,
+      "size": 100,
+      "stroke": "#888",
+      "strokeDash": "2,2,8,2",
+      "strokeWidth": 9,
+      "type": "symbol",
+      "x": 154.5,
+      "y": 163.75
+    },
+    {
+      "align": "left",
+      "baseline": "middle",
+      "fill": "#000",
+      "font": "sans-serif",
+      "fontSize": 10,
+      "opacity": 1,
+      "role": "legend-label",
+      "text": "gamma",
+      "type": "text",
+      "x": 168,
+      "y": 163.75
+    },
+    {
+      "align": "left",
+      "angle": 0,
+      "baseline": "top",
+      "fill": "#000",
+      "font": "sans-serif",
+      "fontSize": 11,
+      "fontWeight": "bold",
+      "opacity": 1,
+      "role": "legend-title",
+      "text": "both",
+      "type": "text",
+      "x": 0,
+      "y": 138
+    }
+  ],
+  "scales": {
+    "dash": {
+      "domain": [
+        "alpha",
+        "beta",
+        "gamma"
+      ],
+      "range": [
+        "1,0",
+        "6,3",
+        "2,2,8,2"
+      ]
+    },
+    "thick": {
+      "domain": [
+        "alpha",
+        "beta",
+        "gamma"
+      ],
+      "range": [
+        1,
+        4,
+        9
+      ]
+    },
+    "x": {
+      "domain": [
+        0,
+        1
+      ],
+      "range": [
+        0,
+        200
+      ],
+      "ticks": [
+        0,
+        0.1,
+        0.2,
+        0.3,
+        0.4,
+        0.5,
+        0.6,
+        0.7,
+        0.8,
+        0.9,
+        1
+      ]
+    },
+    "y": {
+      "domain": [
+        0,
+        5
+      ],
+      "range": [
+        120,
+        0
+      ],
+      "ticks": [
+        0,
+        0.5,
+        1,
+        1.5,
+        2,
+        2.5,
+        3,
+        3.5,
+        4,
+        4.5,
+        5
+      ]
+    }
+  },
+  "size": {
+    "height": 215,
+    "width": 320
+  },
+  "spec": "legend-stroke-channels.vg.json",
+  "vegaVersion": "6.3.1"
+}

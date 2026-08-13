@@ -37,6 +37,10 @@ public object DateValues {
   ): VegaValue? =
     when (value) {
       is VegaValue.Num -> value
+      // A **date** is already parsed: `datetime()` and `timeParse()` answer one, and a transform
+      // reading a column a formula wrote gets it back unchanged. Falling through to `null` here
+      // dropped every such row, which is a calendar with a fiftieth of its labels.
+      is VegaValue.Timestamp -> value
       is VegaValue.Str ->
         (parseIso(value.value, local)
             ?: parseSlashes(value.value, local)

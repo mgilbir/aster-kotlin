@@ -10,6 +10,7 @@ import dev.aster.vega.model.DiagnosticCodes
 import dev.aster.vega.model.DiagnosticCollector
 import dev.aster.vega.model.VegaJson
 import dev.aster.vega.model.VegaValue
+import dev.aster.vega.model.asDouble
 import dev.aster.vega.model.asString
 import dev.aster.vega.model.field
 import org.junit.jupiter.api.Assertions.assertEquals
@@ -80,6 +81,107 @@ class TransformReferenceTest {
   /**
    * Runs a pipeline and renders the result as sorted-key JSON, matching the probe's output form.
    */
+  /**
+   * `product`, and the two exponentially weighted means, against upstream's own output.
+   *
+   * These are the only aggregate operations whose answer depends on the **order** of the rows: each
+   * value is weighted by `rate` to the power of how many rows follow it, so the last row counts
+   * most. `exponential` normalises by `(1 - r) / (1 - r^n)` so the weights sum to one, and
+   * `exponentialb` only scales by `(1 - r)` — which is why the two differ on a group of three and
+   * agree on nothing. They are also the only two that read `aggregate_params`, positionally
+   * alongside `ops`.
+   *
+   * Upstream, on `[{g:a,x:2},{g:a,x:3},{g:a,x:5},{g:b,x:4},{g:b,x:6}]` at a rate of 0.5:
+   * ```
+   * [{"g":"a","prod":30,"exp":4,"expb":3.5},
+   *  {"g":"b","prod":24,"exp":5.333333333333333,"expb":4}]
+   * ```
+   */
+  @Test
+  fun `product and the exponentially weighted means`() {
+    assertEquals(
+      """[{"exp":4,"expb":3.5,"g":"a","prod":30},""" +
+        """{"exp":5.333333333333333,"expb":4,"g":"b","prod":24}]""",
+      run(
+        """[{"type": "aggregate", "groupby": ["g"], "fields": ["x", "x", "x"],
+            "ops": ["product", "exponential", "exponentialb"],
+            "aggregate_params": [null, 0.5, 0.5],
+            "as": ["prod", "exp", "expb"]}]""",
+        """[{"g": "a", "x": 2}, {"g": "a", "x": 3}, {"g": "a", "x": 5},
+            {"g": "b", "x": 4}, {"g": "b", "x": 6}]""",
+      ),
+    )
+  }
+
+  /**
+   * `timeunit` choosing its own units, and honouring a step.
+   *
+   * Both were gaps of a kind: the inference was reported as unimplemented, and `step` was
+   * *published* in the transform's own signal while the buckets ignored it — so `step: 3` bucketed
+   * by month and said it had bucketed by quarter.
+   *
+   * The inference is a table of seventeen intervals picked by which one's duration is nearest the
+   * span over `maxbins` — nearest **in ratio**, not in difference. Ninety days at the default 40
+   * bins gives days; the same ninety days at four bins gives months. Upstream, on the same rows:
+   * ```
+   * 3 months of days => ["date",["year","month","date"],1]
+   * 2 days hourly    => ["hours",["year","month","date","hours"],1]
+   * maxbins 4        => ["month",["year","month"],1]
+   * ```
+   */
+  @Test
+  fun `timeunit infers its units and honours a step`() {
+    val start = 1704067200000L // 2024-01-01T00:00:00Z
+    // rows, spacing, maxbins, declared step, expected finest unit, expected end of the first bucket
+    val cases =
+      listOf(
+        // 90 daily rows: days.
+        Case(90, 86_400_000L, 40, null, "date", "2024-01-02T00:00:00Z"),
+        // The same span asked to fit four buckets: months.
+        Case(90, 86_400_000L, 4, null, "month", "2024-02-01T00:00:00Z"),
+        // 48 hourly rows: hours.
+        Case(48, 3_600_000L, 40, null, "hours", "2024-01-01T01:00:00Z"),
+        // 60 monthly rows: months.
+        Case(60, 2_592_000_000L, 40, null, "month", "2024-02-01T00:00:00Z"),
+        // A declared unit with a step of three is a quarter, and its bucket is three months wide.
+        Case(12, 2_592_000_000L, 40, 3, "month", "2024-04-01T00:00:00Z"),
+      )
+    for (case in cases) {
+      val rows =
+        (0 until case.rows).joinToString(",", "[", "]") {
+          """{"t": ${start + it * case.spacing}}"""
+        }
+      val declared =
+        if (case.step == null) "" else ""","units": ["year", "month"], "step": ${case.step}"""
+      val output =
+        run(
+          """[{"type": "timeunit", "field": "t", "timezone": "utc", "maxbins": ${case.maxbins},
+              "signal": "tb"$declared}]""",
+          rows,
+        )
+      assertEquals(
+        case.unit,
+        (context.signals["tb"]?.field("unit") as? VegaValue.Str)?.value,
+        case.toString(),
+      )
+      val firstEnd = (VegaJson.parse(output) as VegaValue.Arr).values.first().field("unit1")
+      assertEquals(
+        case.end,
+        kotlin.time.Instant.fromEpochMilliseconds(firstEnd.asDouble().toLong()).toString(),
+        case.toString(),
+      )
+    }
+  }
+
+  private data class Case(
+    val rows: Int,
+    val spacing: Long,
+    val maxbins: Int,
+    val step: Int?,
+    val unit: String,
+    val end: String,
+  )
+
   private fun run(transforms: String, data: String = base): String {
     context = TestContext()
     val input = (VegaJson.parse(data) as VegaValue.Arr).values
@@ -607,7 +709,7 @@ class TransformReferenceTest {
     val output =
       run(
         """[{"type": "formula", "expr": "1", "as": "one"},
-            {"type": "geojson", "field": "v"},
+            {"type": "wordcloud", "text": "c"},
             {"type": "filter", "expr": "false"}]"""
       )
     // The formula ran; the filter after the unknown transform did not.
@@ -617,7 +719,7 @@ class TransformReferenceTest {
       context.diagnostics.diagnostics.first {
         it.code == DiagnosticCodes.TRANSFORM_NOT_IMPLEMENTED
       }
-    assertTrue(diagnostic.message.contains("geojson"), diagnostic.message)
+    assertTrue(diagnostic.message.contains("wordcloud"), diagnostic.message)
   }
 
   @Test
@@ -680,7 +782,7 @@ class TransformReferenceTest {
     VegaValue.Obj(linkedMapOf("g" to VegaValue.Str(group), "v" to VegaValue.Num(value)))
 
   @Test
-  fun `the registry covers the transforms the brief lists, plus thirty-three more`() {
+  fun `the registry covers the transforms the brief lists, plus thirty-seven more`() {
     val fromTheBrief =
       setOf(
         "filter",
@@ -713,7 +815,16 @@ class TransformReferenceTest {
     // transform that is a simulation rather than a calculation: it places the nodes of a graph by
     // running d3-force to a standstill. `geoshape` and `graticule` are the map pair: a GeoJSON
     // feature drawn through a projection, the grid of meridians and parallels under it, and a
-    // longitude and latitude placed on the page.
+    // longitude and latitude placed on the page. `voronoi` is the region of the plane nearest to
+    // each point, which an interactive scatter plot draws invisibly so the pointer has something to
+    // hit. `geojson` gathers a table of coordinates into one `FeatureCollection` for a projection's
+    // `fit` to read, which is the ordinary way to fit a map to point data. `sample` keeps a
+    // reservoir of at most `size` rows, and it is deterministic here only because both engines draw
+    // from the same seeded stream. `label` places a text
+    // mark
+    // beside the marks it annotates, dropping the ones that would
+    // collide — the one transform here whose fidelity is not established against upstream, because
+    // upstream's own needs a canvas Node has not got.
     assertEquals(
       fromTheBrief +
         "timeunit" +
@@ -748,7 +859,11 @@ class TransformReferenceTest {
         "force" +
         "geoshape" +
         "geopoint" +
-        "graticule",
+        "geojson" +
+        "sample" +
+        "graticule" +
+        "voronoi" +
+        "label",
       TransformRegistry.Default.types,
     )
   }
@@ -1117,6 +1232,39 @@ class TransformReferenceTest {
         """[{"type": "pivot", "field": "c", "value": "v", "groupby": ["k"], "limit": 2}]""",
         wide,
       ),
+    )
+  }
+
+  /** Twelve rows for `sample`, whose output depends on how many it has seen. */
+  private val squares =
+    (0..11).joinToString(",", "[", "]") { i ->
+      """{"c": "${('a' + i)}", "v": ${i * i}}"""
+    }
+
+  /**
+   * `sample` keeps the reservoir's order, not the input's.
+   *
+   * Every vector below is upstream's, over the same seeded stream the oracle installs, and the
+   * middle one is the point: a `size` the data already fits inside passes every row through in
+   * order, so the transform costs nothing and reorders nothing. The other two show what replacement
+   * in place looks like — `j` sits third because it landed in slot 2 long after `c` had left it,
+   * while `b` is still in slot 1 because nothing was ever offered that slot.
+   */
+  @Test
+  fun `sample keeps a reservoir of rows`() {
+    assertEquals(
+      """[{"c":"i","v":64},{"c":"b","v":1},{"c":"j","v":81},{"c":"f","v":25}]""",
+      run("""[{"type": "sample", "size": 4}]""", squares),
+    )
+    assertEquals(
+      """[{"c":"a","v":0},{"c":"b","v":1},{"c":"c","v":4},{"c":"d","v":9},{"c":"e","v":16},""" +
+        """{"c":"f","v":25},{"c":"g","v":36},{"c":"h","v":49},{"c":"i","v":64},{"c":"j","v":81},""" +
+        """{"c":"k","v":100},{"c":"l","v":121}]""",
+      run("""[{"type": "sample", "size": 20}]""", squares),
+    )
+    assertEquals(
+      """[{"c":"j","v":81}]""",
+      run("""[{"type": "sample", "size": 1}]""", squares),
     )
   }
 

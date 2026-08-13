@@ -9,7 +9,7 @@ Branch `milestone-0-bootstrap`. Working tree clean, both gates green:
 - `./scripts/check.sh` — format, all tests, lint, demo APK
 - `./scripts/oracle.sh` — regenerates upstream references and runs the differential comparison
 
-**116 differential fixtures pass, all matching upstream exactly.** That is the only number here
+**148 differential fixtures pass, all matching upstream exactly.** That is the only number here
 that means what it says.
 
 ## Read this before trusting the other number
@@ -195,15 +195,14 @@ those before comparing, they paint nothing.
 its datasets are fetched into `test-fixtures/data/` and committed. Discount every loader diagnostic
 when judging how far an example is from passing.
 
-**Where the corpus stands, from `ExampleTriage` rather than from memory: 89 of the 93 compile
-clean, 4 report errors.** Read the *movement* rather than the number: 70 → 79 as the stochastic and
+**Where the corpus stands, from `ExampleTriage` rather than from memory: 91 of the 93 compile
+clean, 2 report errors.** Read the *movement* rather than the number: 70 → 79 as the stochastic and
 crossfilter work landed, **79 → 75 when mark-level `transform` was implemented** — the survey
 becoming honest, because five charts had been dropping a whole block silently — and 75 → 80 as the
 raster family and `force` landed.
 
-The 4 that remain are **one waiting on `voronoi`** and **three with no oracle at all** — and one of
-those three is refused by upstream Vega as well, so it is not outstanding work. There is no other
-category left.
+The 2 that remain **cannot be verified against upstream at all**, and one of them upstream itself
+refuses. There is no category of outstanding work left in the corpus.
 
 **`time-units` is done** and is a fixture; STATUS.md describes the five things it needed. The
 handoff's prediction was right as far as it went — the domain field is a `FieldRef` now — but the two
@@ -253,70 +252,82 @@ is arithmetic. See SUPPORTED_FEATURES.md for the three behaviours that had to co
 rather than from its schema — in particular that **an omitted force parameter falls to d3's default,
 not the one Vega documents**, because Vega only forwards the parameters a specification wrote.
 
-## What is left: one transform, and three examples with no oracle
+## What is left: two examples, and neither can be verified
 
-**116 differential fixtures pass. 89 of the 93 examples compile clean.** The geographic category is
-done except for one transform.
+**148 differential fixtures pass. 91 of the 93 examples compile clean.** Everything that can be
+checked against upstream has been.
 
-d3-geo is ported whole — rotation, antimeridian and circle pre-clipping, adaptive resampling,
-rectangular post-clip, TopoJSON decoding, `geoshape`/`geopath`/`geopoint`/`graticule`, `geoCentroid`,
-`geoArea`, and `invert` on a projection. Every projection type **Vega itself ships** is here: d3-geo's
-fifteen plus `mollweide`, each pinned against upstream's own path strings in
-`GeoProjectionTypesTest`. Read the commits that added them before touching any of it; several of the
-subtleties are the kind that produce a plausible wrong map.
+### `projections` — upstream refuses it too
 
-Two of those vectors are compared **within one printed digit** rather than exactly, and it is worth
-knowing why before assuming it is a defect. `azimuthalEqualArea` and `azimuthalEquidistant` clip at
-179.999 degrees, where their scale factor is 114,591 and its derivative is 3.8e14 — so a one-ulp
-difference in `cos` between V8 and the JVM, which neither runtime promises to avoid, moves a
-coordinate by 1.3e-4 of a pixel. That is enough to cross a rounding boundary in the third decimal and
-nothing more. The arithmetic is in the test's comment.
-
-### The one real gap: `voronoi`
-
-`airport-connections` is the only remaining example that this engine could pass and does not. It
-needs the `voronoi` transform, and everything else in it already works — `geopoint` places its 600
-airports and the rest of the scene builds.
-
-The cost is known and it is large: `voronoi` is `d3-delaunay` over `delaunator`, and delaunator
-depends on `robust-predicates` for an exact `orient2d`. That is about 1,550 lines of intricate
-numeric code — an incremental Delaunay triangulation with a hash-based hull, then cell polygons
-clipped to an extent. It is all deterministic double arithmetic, so it *is* verifiable, and
-`airport-connections` would verify it end to end. It was not attempted rather than attempted badly.
-
-Worth knowing before starting: in that example the Voronoi cells are **invisible** — transparent
-paths that exist only to catch a pointer. They are still marks in the scene, so the fixture compares
-every one of their outlines, which makes it a demanding test of the port and a pointless one to
-approximate.
-
-### The three with no oracle, and one of them is not our doing
-
-**`projections` is refused by upstream Vega too.** It names `airy`, `armadillo`, `baker`,
-`berghaus`, `bottomley`, `collignon`, `eckert1`, `guyou`, `hammer`, `littrow`, `wagner6`, `wiechel`,
-`winkel3` and the interrupted and polyhedral families — and `vega-projection` imports exactly **one**
-projection from `d3-geo-projection`, `geoMollweide`. Running the example through the pinned oracle
-gives `Error: Unrecognized projection type: airy`. The Vega website registers those types itself
-before rendering that page; a bare Vega cannot draw it. Our diagnostic says the same thing upstream's
-does, so this example is *finished* in the only sense available — do not read its 57 errors as
-outstanding work. If the extended family is ever wanted, `Projections.byName` is where a type is
+It names `airy`, `armadillo`, `baker`, `berghaus`, `bottomley`, `collignon`, `eckert1`, `guyou`,
+`hammer`, `littrow`, `wagner6`, `wiechel`, `winkel3` and the interrupted and polyhedral families —
+and `vega-projection` imports exactly **one** projection from `d3-geo-projection`, `geoMollweide`,
+which this engine has. Running the example through the pinned oracle gives `Error: Unrecognized
+projection type: airy`. The Vega website registers those types itself before rendering that page; a
+bare Vega cannot draw it, and our diagnostic says what upstream's says. **Do not read its error count
+as outstanding work.** If the extended family is ever wanted, `Projections.byName` is where a type is
 added and `GeoProjectionTypesTest` is how it is proved.
 
-**`word-cloud` and `labeled-scatter-plot` cannot be differential fixtures**, and this is established
-rather than suspected. Both transforms measure or rasterise against a `<canvas>`, and there is none
-under Node:
+### `word-cloud` — the one thing that was not attempted, and why
 
-- `wordcloud` measures text, and upstream's own headless output is degenerate — `fontSize: 0` on
-  every word, a surface width of `-Infinity`.
-- `label` calls `markBitmaps`, which *renders the avoided marks into a canvas* and reads the alpha
-  back. Under the oracle it throws inside the transform, Vega logs it and carries on, and the labels
-  are never placed. `oracle-js/src/canvas-shim.js` deliberately refuses every drawing call rather
-  than returning something plausible, which is why this is visible instead of silently wrong.
+`labeled-scatter-plot` and `word-cloud` used to be a pair: both transforms reach for a `<canvas>`
+Node has not got. They are **not** the same case, and the difference is what decided one and not the
+other.
 
-Making either verifiable means installing the native `canvas` package — and then matching Cairo's
-antialiasing coverage exactly on the Kotlin side, since `label` treats *any* non-zero alpha as
-occupied. That is not a port, it is a rasteriser bake-off. **Implementing these two unverified would
-produce exactly the plausible-looking wrong answer this project exists to avoid.** If they are to be
-done, the decision to accept weaker evidence has to be the owner's and should be written down here.
+`label` rasterises the marks it must avoid — circles, a line — and asks only whether a pixel got *any*
+coverage. That question has a geometric answer: does the shape overlap the pixel's square? So the
+transform is implemented, with the occupancy computed analytically, the two halves that *can* be
+pinned pinned (`BitmapTest`), and a warning on every use naming the one step that is not upstream's.
+The two answers differ only on pixels a shape barely grazes.
+
+`wordcloud` rasterises **glyphs**. `cloudSprite` sets a font, calls `fillText`, and reads the pixel
+mask back; the packing then slides each word along an Archimedean spiral until its *mask* stops
+colliding with the masks already placed. Words interlock into each other's gaps — a descender under a
+crossbar — and that interlocking is the whole visual character of a word cloud. There is no geometric
+answer to "which pixels does the word 'GRAMMARS' cover in 36px sans-serif": it depends on the font's
+outlines and the rasteriser's hinting.
+
+Substituting bounding boxes would produce a chart that looks like a word cloud and is not Vega's — a
+visibly looser packing, and unlike `label` there is no pinned half to stand behind it. Everything that
+determines the picture would be the invented part: the spiral is four lines and the generator is
+already shared. **So it is not implemented, and the transform is reported by name.**
+
+What would change that, in order of cost:
+
+1. Install the native `canvas` package in `oracle-js`. That gives upstream a real oracle for both
+   transforms — and costs the guarantee that references can be regenerated offline from a checked-out
+   tree, which PROJECT_BRIEF.md §21 asks for. An owner's call, not a mechanical one.
+2. With an oracle in hand, `label`'s analytic occupancy could be *measured* against a real
+   rasteriser's rather than reasoned about, and its warning either removed or made precise.
+3. `wordcloud` would still need a glyph rasteriser on the Kotlin side to match, which is a font engine
+   and not a port of Vega.
+
+  > Owner's decision on `wordcloud` and on adding a native canvas to the oracle: _not yet made._
+
+### Where the numeric fidelity is hard-won, for whoever changes it next
+
+Four places carry arithmetic that cannot be simplified without breaking a chart, and each has its
+reasoning in the code rather than here:
+
+- `Orient2d` — Shewchuk's adaptive predicate. `voronoi` is a sequence of orientation decisions and a
+  single wrong sign changes the whole diagram.
+- `Adder` — the same idea for `polygonContains`, where the sign of a sum around 1e-12 decides whether
+  a continent is filled or left as a hole.
+- `ResampleStream` — the guard is `!(d2 > 4 * delta2)` because `d2` is **NaN** for the first point of
+  every line, and `NaN <= x` is false too.
+- `Delaunator.quicksort` and `RandomStream` — two places where the *order* of operations is part of
+  the answer, not an implementation detail.
+
+Two of the 60 projection vectors are compared **within one printed digit** rather than exactly.
+`azimuthalEqualArea` and `azimuthalEquidistant` clip at 179.999 degrees, where their scale factor is
+114,591 and its derivative is 3.8e14 — so a one-ulp difference in `cos` between V8 and the JVM, which
+neither runtime promises to avoid, moves a coordinate by 1.3e-4 of a pixel. That is enough to cross a
+rounding boundary in the third decimal and nothing more. The arithmetic is in the test's comment.
+
+And one **deliberate difference** in the comparison, stated so it is not mistaken for a tolerance: a
+reference carrying a `strokeWidth` with no `stroke` colour describes an outline that is never
+painted, and this engine records no stroke at all for it. A reference carrying a stroke colour still
+demands a stroke of that width.
 
 ## Possible future work: a timer used as a `for` loop
 
@@ -363,6 +374,85 @@ Three things to weigh first, none of them checked:
   interaction layer, on a real event; running them at compile time until they settle is a different
   contract, and STATUS's "Next three tasks" item 1 describes the neighbouring gaps in the same
   machinery.
+
+## What is left, and the one technique that finds it
+
+The remaining inventory is **legend, title and layout properties**, plus a short tail. Every encode
+channel, every axis property and every projection property in Vega's schema is now either drawn or
+explained by name.
+
+**Find the next gap by diffing the schema against the parser's tables, not by reading diagnostics.**
+`ENCODE_UNSUPPORTED` being empty did not mean nothing was missing — it only held channels somebody had
+*noticed*. Eleven more were falling through to the generic message, and two of those (`scaleX`,
+`scaleY`) were already drawn: they had come off the unsupported list without being added to the
+consumed one, so every specification using them was told it had been ignored while it was honoured.
+The two tables are meant to be a partition of the vocabulary, and only the schema shows what has fallen
+between. `oracle-js/node_modules/vega/build/vega-schema.json` has a definition per block
+(`encodeEntry`, `axis`, `legend`, `title`, `layout`, `projection`, `scale`, `mark`); collect each
+table's string literals out of `SpecParser.kt`, expand `guideStyleKeys(...)` by hand, and subtract.
+Anything left is either a gap or a stale diagnostic, and telling those two apart is a grep.
+
+As of this handoff the subtraction leaves **nothing** for `encodeEntry`, `axis`, `title`, `scale`,
+`projection` or `mark`, and this for the rest:
+
+- **Legend:** none. All 72 of upstream's legend properties are read, including the `strokeDash` and
+  `strokeWidth` **channels** (on a legend those name *scales*; the legend background's own width and
+  dash are a separate thing and come from `config.legend` alone) and `gridAlign`. Do not re-report
+  `titleAnchor`, `clipHeight` or the background — they are done.
+- **Axis:** none. All 79 of upstream's axis properties are read. `labelFlushOffset` was the last, and
+  it was a **stale** report: the explanation said it "needs labelFlush", which had been implemented
+  for some time. `labelBound` is consumed and deliberately **inert**: upstream's bound test runs
+  before the label bounds exist, so it culls nothing, and implementing the documented behaviour would
+  be a real difference. See STATUS.md.
+- **Title:** none. All 31 of upstream's title properties are read, `encode` and `style` included.
+  `encode` splits three ways — `group` for the group the heading sits in, `title` for its text,
+  `subtitle` for the second line — plus the deprecated form, where a block naming none of those three
+  applies to the *text*. `style` **replaces** the `group-title` slot rather than adding to it.
+
+**The subtraction is now empty for every block.** What is left is one level down: a **channel** a
+guide's `encode` cannot express is named one at a time — a title's `encode.title.update.x`, for
+instance — rather than the whole block being reported as unread. That is where to look next, and
+`UnhandledPropertiesTest` asserts the naming still happens.
+
+**A signal in a guide's styling now works**, which it did not until recently and said nothing about.
+`labelFontSize: {"signal": "n"}` always worked, because that property is read through
+`numberOrSignal`; `labelColor: {"signal": "c"}` was dropped in silence, because the styling block
+took only a literal — so a chart colouring its axis from a control drew black labels and looked
+finished. `GuideStroke` now carries a `signals` map beside its constants and the builders substitute
+a resolved copy once, before anything reads it, which is what kept the change from spreading. A guide **`encode` channel** valued by a signal folds too, and for a reason worth keeping in
+mind: the fold happens at parse time where no signal has a value, so it only works where the *target
+property* can carry one — the styling block records it and everything read through `numberOrSignal`
+resolves it. A channel aimed at a plain string property (`symbolType`, `orient`, `format`) is still
+named, because folding an object into one would stringify it.
+
+Run the same subtraction over the *encode* vocabulary and the pattern repeats: several channels
+reported as unimplemented had a property behind them all along, one map entry away in
+`AXIS_ENCODE_PARTS`/`LEGEND_ENCODE_PARTS`. Both maps and both whole-block gaps (`encode.gradient` and
+`encode.legend`) are now closed. Two channels are deliberately **not** folded, both for the same reason read from opposite ends: the
+channel and the property are not one thing. A ramp label's `align`/`baseline` — upstream derives a
+gradient label's alignment from where along the bar it sits and reads no property for it, so the
+channel works there and the property does not, which is why `legendEncodeParts` has to know what kind
+of legend it is looking at. And a symbol swatch's `fill` — upstream sets it from `symbolFillColor` and
+then *overwrites* it from the legend's own colour scale, while an `encode` block is applied after both
+and beats the scale. Folding either one would make a property work where upstream ignores it. Checked
+against the `addEncoders` tables in `vega-parser/src/parsers/guides/`, which is the list of channels
+that do have a property behind them; both maps now cover it exactly.
+- **Layout:** none. All ten of upstream's layout properties are read, and `row-footer` and
+  `column-footer` are recognised roles — they used to fall through to `CELL` and be gridded among the
+  cells.
+- **Mark (2):** a mark-level `description` and `key`.
+- **Tail:** none. Facet aggregates take all 26 operations; the report only ever fired for a name
+  upstream rejects too, and says so now. `timeunit` unit inference and its `step` are *done*.
+  `config.range`, the named ranges, all four geo expression functions and the `lab`/`hcl` colour
+  helpers are *done*. The colour interpolation spaces are *done*, and so are all 26
+  aggregate operations — the `impute`, `pivot` and `window` reports were **never gaps**: each fired
+  only for a name upstream itself rejects, and each read as one. They now say so.
+
+**Before adding any of it, check the harness can see it.** That has now been the eleventh finding of
+its kind and the largest: `shape` marks were compared by fill and stroke alone, so every map in the
+corpus was green on colour. Whatever the next property is, ask what number in
+`oracle-js/src/normalize.js` and `Differential.kt` would change if it were wrong, and if the answer is
+"none", add it there first and expect existing references to move.
 
 ## Unfinished work parked elsewhere
 

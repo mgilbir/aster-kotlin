@@ -223,6 +223,7 @@
       "y2": 0.5
     },
     {
+      "cornerRadius": 4,
       "fill": "#4c78a8",
       "fillOpacity": 0.75,
       "height": 56,
@@ -235,6 +236,7 @@
       "y": 64
     },
     {
+      "cornerRadius": 4,
       "fill": "#4c78a8",
       "fillOpacity": 0.75,
       "height": 117.333333,
@@ -247,6 +249,7 @@
       "y": 2.666667
     },
     {
+      "cornerRadius": 4,
       "fill": "#4c78a8",
       "fillOpacity": 0.75,
       "height": 81.333333,
@@ -259,6 +262,7 @@
       "y": 38.666667
     },
     {
+      "cornerRadius": 8,
       "fill": "#ddaa33",
       "fillOpacity": 0.75,
       "height": 6,
@@ -271,6 +275,7 @@
       "y": 64
     },
     {
+      "cornerRadius": 8,
       "fill": "#ddaa33",
       "fillOpacity": 0.75,
       "height": 6,
@@ -283,6 +288,7 @@
       "y": 2.666667
     },
     {
+      "cornerRadius": 8,
       "fill": "#ddaa33",
       "fillOpacity": 0.75,
       "height": 6,
@@ -295,6 +301,7 @@
       "y": 38.666667
     },
     {
+      "cornerRadius": 4,
       "height": 14,
       "role": "mark",
       "stroke": "#224466",
@@ -305,6 +312,7 @@
       "y": 0
     },
     {
+      "cornerRadius": 4,
       "height": 14,
       "role": "mark",
       "stroke": "#224466",
@@ -315,6 +323,7 @@
       "y": 0
     },
     {
+      "cornerRadius": 4,
       "height": 14,
       "role": "mark",
       "stroke": "#224466",

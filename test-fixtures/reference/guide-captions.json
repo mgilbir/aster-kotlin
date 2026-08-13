@@ -1,5 +1,20 @@
 [
  {
+  "fixture": "aggregate-ops-tail",
+  "kind": "axis",
+  "caption": "X-axis for a discrete scale with 3 values: a, b, c"
+ },
+ {
+  "fixture": "aggregate-ops-tail",
+  "kind": "axis",
+  "caption": "Y-axis for a linear scale with values from 0 to 30"
+ },
+ {
+  "fixture": "aggregate-ops-tail",
+  "kind": "legend",
+  "caption": "Symbol legend titled 'operation' for fill color with 4 values: sum, prod, exp, expb"
+ },
+ {
   "fixture": "area-gaps",
   "kind": "axis",
   "caption": "X-axis for a linear scale with values from 0 to 4"
@@ -65,6 +80,81 @@
   "caption": "Y-axis for a linear scale with values from 0 to 80"
  },
  {
+  "fixture": "axis-label-bound",
+  "kind": "axis",
+  "caption": "X-axis for a discrete scale with 3 values: a very long first label indeed, b, c"
+ },
+ {
+  "fixture": "axis-label-bound",
+  "kind": "axis",
+  "caption": "X-axis for a discrete scale with 3 values: a very long first label indeed, b, c"
+ },
+ {
+  "fixture": "axis-label-bound",
+  "kind": "axis",
+  "caption": "Y-axis for a linear scale with values from 0 to 10"
+ },
+ {
+  "fixture": "axis-label-flush",
+  "kind": "axis",
+  "caption": "X-axis for a linear scale with values from 0 to 100"
+ },
+ {
+  "fixture": "axis-label-flush",
+  "kind": "axis",
+  "caption": "X-axis for a linear scale with values from 0 to 100"
+ },
+ {
+  "fixture": "axis-label-flush",
+  "kind": "axis",
+  "caption": "Y-axis for a linear scale with values from 0 to 8"
+ },
+ {
+  "fixture": "axis-label-flush",
+  "kind": "axis",
+  "caption": "Y-axis for a linear scale with values from 0 to 8"
+ },
+ {
+  "fixture": "axis-label-offset",
+  "kind": "axis",
+  "caption": "X-axis titled 'band labels slid 14 along' for a discrete scale with 3 values: alpha, beta, gamma"
+ },
+ {
+  "fixture": "axis-label-offset",
+  "kind": "axis",
+  "caption": "X-axis for a discrete scale with 3 values: alpha, beta, gamma"
+ },
+ {
+  "fixture": "axis-label-offset",
+  "kind": "axis",
+  "caption": "Y-axis titled 'linear labels slid 8 down' for a linear scale with values from 0 to 10"
+ },
+ {
+  "fixture": "axis-label-offset",
+  "kind": "axis",
+  "caption": "the same values again"
+ },
+ {
+  "fixture": "axis-placement",
+  "kind": "axis",
+  "caption": "X-axis titled 'ticks on the band edges' for a discrete scale with 4 values: alpha, beta, gamma, delta"
+ },
+ {
+  "fixture": "axis-placement",
+  "kind": "axis",
+  "caption": "X-axis titled 'centred, and slid 20 along' for a discrete scale with 4 values: alpha, beta, gamma, delta"
+ },
+ {
+  "fixture": "axis-placement",
+  "kind": "axis",
+  "caption": "Y-axis titled 'no half-pixel nudge' for a linear scale with values from 0 to 10"
+ },
+ {
+  "fixture": "axis-placement",
+  "kind": "axis",
+  "caption": "Y-axis titled 'unrounded ticks' for a linear scale with values from 0 to 10"
+ },
+ {
   "fixture": "axis-style",
   "kind": "axis",
   "caption": "X-axis titled 'Category' for a discrete scale with 5 values: a, b, c, d, e"
@@ -73,6 +163,26 @@
   "fixture": "axis-style",
   "kind": "axis",
   "caption": "Y-axis titled 'Value' for a linear scale with values from 0 to 100"
+ },
+ {
+  "fixture": "axis-tick-min-step",
+  "kind": "axis",
+  "caption": "Y-axis titled 'twelve, no floor' for a linear scale with values from 0 to 97"
+ },
+ {
+  "fixture": "axis-tick-min-step",
+  "kind": "axis",
+  "caption": "Y-axis titled 'twelve, floor 20' for a linear scale with values from 0 to 97"
+ },
+ {
+  "fixture": "axis-tick-min-step",
+  "kind": "axis",
+  "caption": "X-axis titled 'a floor wider than the domain' for a linear scale with values from 0 to 97"
+ },
+ {
+  "fixture": "axis-tick-min-step",
+  "kind": "axis",
+  "caption": "X-axis titled 'a log scale, capped but not walked down' for a log scale with values from 1 to 1,000"
  },
  {
   "fixture": "axis-values",
@@ -510,6 +620,16 @@
   "caption": "Y-axis for a linear scale with values from 0 to 90"
  },
  {
+  "fixture": "config-range",
+  "kind": "legend",
+  "caption": "Symbol legend titled 'category' for fill color with 3 values: a, b, c"
+ },
+ {
+  "fixture": "config-range",
+  "kind": "legend",
+  "caption": "Symbol legend titled 'symbol' for shape with 3 values: a, b, c"
+ },
+ {
   "fixture": "config-theme",
   "kind": "axis",
   "caption": "X-axis titled 'Band, themed all the way down' for a discrete scale with 3 values: alpha, bravo, charlie"
@@ -775,6 +895,56 @@
   "caption": "Y-axis for a discrete scale with 3 values: A, B, C"
  },
  {
+  "fixture": "guide-caps-and-offsets",
+  "kind": "axis",
+  "caption": "X-axis titled 'a category axis title far too long to fit the width it was given' for a discrete scale with 3 values: alpha, beta, gamma"
+ },
+ {
+  "fixture": "guide-caps-and-offsets",
+  "kind": "axis",
+  "caption": "Y-axis for a linear scale with values from 0 to 10"
+ },
+ {
+  "fixture": "guide-caps-and-offsets",
+  "kind": "legend",
+  "caption": "Symbol legend titled 'series' for fill color with 3 values: alpha, beta, gamma"
+ },
+ {
+  "fixture": "guide-caps-and-offsets",
+  "kind": "legend",
+  "caption": "Gradient legend titled 'value' for fill color with values from 0 to 10"
+ },
+ {
+  "fixture": "guide-encode-channels",
+  "kind": "axis",
+  "caption": "X-axis titled 'an axis title' for a linear scale with values from 0 to 9"
+ },
+ {
+  "fixture": "guide-encode-channels",
+  "kind": "legend",
+  "caption": "Gradient legend titled 'ramp' for fill color with values from 1 to 9"
+ },
+ {
+  "fixture": "guide-encode-channels",
+  "kind": "legend",
+  "caption": "Symbol legend titled 'swatches' for fill color with 2 values: a, b"
+ },
+ {
+  "fixture": "guide-style-signals",
+  "kind": "axis",
+  "caption": "X-axis titled 'series' for a discrete scale with 3 values: alpha, beta, gamma"
+ },
+ {
+  "fixture": "guide-style-signals",
+  "kind": "axis",
+  "caption": "Y-axis for a linear scale with values from 0 to 8"
+ },
+ {
+  "fixture": "guide-style-signals",
+  "kind": "legend",
+  "caption": "Symbol legend titled 'key' for fill color with 3 values: alpha, beta, gamma"
+ },
+ {
   "fixture": "histogram-null-values",
   "kind": "axis",
   "caption": "X-axis for a linear scale with values from 1 to 10"
@@ -870,9 +1040,64 @@
   "caption": "Gradient legend titled 'Value' for fill color with values from 12 to 83"
  },
  {
+  "fixture": "legend-background",
+  "kind": "legend",
+  "caption": "Symbol legend titled 'series' for fill color with 3 values: alpha, beta, gamma"
+ },
+ {
+  "fixture": "legend-background",
+  "kind": "legend",
+  "caption": "Symbol legend titled 'again' for fill color with 3 values: alpha, beta, gamma"
+ },
+ {
   "fixture": "legend-columns",
   "kind": "legend",
   "caption": "Symbol legend for fill color with 5 values: aa, bb, cc, dd, ee"
+ },
+ {
+  "fixture": "legend-format-type",
+  "kind": "legend",
+  "caption": "Gradient legend titled 'as dates' for fill color with values from January 2024 to October 2024"
+ },
+ {
+  "fixture": "legend-format-type",
+  "kind": "legend",
+  "caption": "Gradient legend titled 'multi-format' for fill color with values from Monday, 15 January 2024, 12:00:00 AM UTC to Wednesday, 16 October 2024, 12:00:00 AM UTC"
+ },
+ {
+  "fixture": "legend-format-type",
+  "kind": "legend",
+  "caption": "Gradient legend titled 'thinned' for fill color with values from January to October"
+ },
+ {
+  "fixture": "legend-grid-align",
+  "kind": "legend",
+  "caption": "Symbol legend titled 'each' for size with values from 0 to 2,500"
+ },
+ {
+  "fixture": "legend-grid-align",
+  "kind": "legend",
+  "caption": "Symbol legend titled 'all' for size with values from 0 to 2,500"
+ },
+ {
+  "fixture": "legend-grid-align",
+  "kind": "legend",
+  "caption": "Symbol legend titled 'none' for size with values from 0 to 2,500"
+ },
+ {
+  "fixture": "legend-stroke-channels",
+  "kind": "legend",
+  "caption": "Symbol legend titled 'style' for strokeDash with 3 values: alpha, beta, gamma"
+ },
+ {
+  "fixture": "legend-stroke-channels",
+  "kind": "legend",
+  "caption": "Symbol legend titled 'weight' for strokeWidth with 3 values: alpha, beta, gamma"
+ },
+ {
+  "fixture": "legend-stroke-channels",
+  "kind": "legend",
+  "caption": "Symbol legend titled 'both' for strokeWidth and strokeDash with 3 values: alpha, beta, gamma"
  },
  {
   "fixture": "legend-style",
@@ -888,6 +1113,46 @@
   "fixture": "legend-style",
   "kind": "legend",
   "caption": "Symbol legend titled 'Series' for fill color with 2 values: alpha, beta"
+ },
+ {
+  "fixture": "legend-symbol-limit",
+  "kind": "legend",
+  "caption": "Symbol legend titled 'capped at four' for fill color with 10 values: alpha, beta, gamma, delta, epsilon, ending with kappa"
+ },
+ {
+  "fixture": "legend-symbol-limit",
+  "kind": "legend",
+  "caption": "Symbol legend titled 'uncapped' for size with values from 0 to 10"
+ },
+ {
+  "fixture": "legend-title-anchor",
+  "kind": "legend",
+  "caption": "Symbol legend titled 'start' for fill color with 3 values: alpha, beta, gamma-wide"
+ },
+ {
+  "fixture": "legend-title-anchor",
+  "kind": "legend",
+  "caption": "Symbol legend titled 'middle' for fill color with 3 values: alpha, beta, gamma-wide"
+ },
+ {
+  "fixture": "legend-title-anchor",
+  "kind": "legend",
+  "caption": "Symbol legend titled 'end' for fill color with 3 values: alpha, beta, gamma-wide"
+ },
+ {
+  "fixture": "legend-title-anchor",
+  "kind": "legend",
+  "caption": "Symbol legend titled 'down-end' for fill color with 3 values: alpha, beta, gamma-wide"
+ },
+ {
+  "fixture": "legend-title-anchor",
+  "kind": "legend",
+  "caption": "Symbol legend titled 'down-start' for fill color with 3 values: alpha, beta, gamma-wide"
+ },
+ {
+  "fixture": "legend-title-anchor",
+  "kind": "legend",
+  "caption": "Symbol legend titled 'two lines' for fill color with 3 values: alpha, beta, gamma-wide"
  },
  {
   "fixture": "legends",
@@ -1150,6 +1415,31 @@
   "caption": "Y-axis for a linear scale with values from 0 to 45"
  },
  {
+  "fixture": "sample-reservoir",
+  "kind": "axis",
+  "caption": "X-axis for a discrete scale with 8 values: 16, 1, 39, 17, 28, ending with 7"
+ },
+ {
+  "fixture": "scale-domain-implicit",
+  "kind": "axis",
+  "caption": "X-axis for a discrete scale with 4 values: alpha, beta, gamma, delta"
+ },
+ {
+  "fixture": "scale-domain-raw",
+  "kind": "axis",
+  "caption": "X-axis titled 'raw [17, 43]' for a linear scale with values from 17 to 43"
+ },
+ {
+  "fixture": "scale-domain-raw",
+  "kind": "axis",
+  "caption": "X-axis titled 'the same data, zeroed and niced' for a linear scale with values from 0 to 40"
+ },
+ {
+  "fixture": "scale-domain-raw",
+  "kind": "axis",
+  "caption": "Y-axis for a linear scale with values from 0 to 45"
+ },
+ {
   "fixture": "scale-variants",
   "kind": "axis",
   "caption": "X-axis titled 'Symlog, both signs' for a symlog scale with values from −900 to 1,400"
@@ -1330,6 +1620,11 @@
   "caption": "Subtitle text '20k Sample, January - March 2001'"
  },
  {
+  "fixture": "timeunit-inferred",
+  "kind": "axis",
+  "caption": "X-axis for a utc scale with values from January to March"
+ },
+ {
   "fixture": "timeunit",
   "kind": "axis",
   "caption": "X-axis for a utc scale with values from Thursday, 01 January 2026, 12:00:00 AM UTC to Tuesday, 05 May 2026, 12:00:00 AM UTC"
@@ -1338,6 +1633,51 @@
   "fixture": "timeunit",
   "kind": "axis",
   "caption": "Y-axis titled 'Events' for a linear scale with values from 0.0 to 3.0"
+ },
+ {
+  "fixture": "title-encode",
+  "kind": "axis",
+  "caption": "X-axis for a discrete scale with 2 values: a, b"
+ },
+ {
+  "fixture": "title-encode",
+  "kind": "title",
+  "caption": "Title text 'inner'"
+ },
+ {
+  "fixture": "title-encode",
+  "kind": "title",
+  "caption": "Title text 'Encoded heading'"
+ },
+ {
+  "fixture": "title-encode",
+  "kind": "subtitle",
+  "caption": "Subtitle text 'with its own subtitle'"
+ },
+ {
+  "fixture": "title-style-block",
+  "kind": "axis",
+  "caption": "X-axis for a discrete scale with 2 values: a, b"
+ },
+ {
+  "fixture": "title-style-block",
+  "kind": "title",
+  "caption": "Title text 'Styled heading'"
+ },
+ {
+  "fixture": "title-style-block",
+  "kind": "subtitle",
+  "caption": "Subtitle text 'and its subtitle'"
+ },
+ {
+  "fixture": "title-style",
+  "kind": "title",
+  "caption": "Title text 'A heading long enough to need two lines'"
+ },
+ {
+  "fixture": "title-style",
+  "kind": "subtitle",
+  "caption": "Subtitle text 'and a subtitle that also wraps'"
  },
  {
   "fixture": "titles",

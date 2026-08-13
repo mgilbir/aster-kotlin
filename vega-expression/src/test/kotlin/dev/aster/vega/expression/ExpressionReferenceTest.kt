@@ -45,6 +45,164 @@ class ExpressionReferenceTest {
         value.fields.entries.joinToString(",", "{", "}") { "\"${it.key}\":${asJson(it.value)}" }
     }
 
+  /**
+   * Every function upstream has either works or says why not.
+   *
+   * The list is upstream's own `functionContext`, read out of the pinned build:
+   * ```
+   * node --input-type=module -e "import * as vf from 'vega-functions';
+   *   console.log(Object.keys(vf.functionContext).sort().join(' '))"
+   * ```
+   *
+   * Nineteen of these had neither an implementation nor an entry in `knownUnsupported`, so an
+   * expression using one got "unknown function" and no hint that the reason was a browser, a
+   * running view or a value model that cannot hold a function. Sixteen more were simply missing and
+   * are now implemented. A function upstream adds later shows up here as a failure, which is the
+   * point.
+   *
+   * The five names not in the list below are resolved against the scope rather than this table —
+   * `scale`, `data`, `domain`, `bandwidth` and their kin live where the scales and datasets are.
+   */
+  @Test
+  fun `every upstream expression function is implemented or explained`() {
+    val upstream =
+      listOf(
+        "bandspace",
+        "clampRange",
+        "containerSize",
+        "contrast",
+        "copy",
+        "cumulativeLogNormal",
+        "cumulativeNormal",
+        "cumulativeUniform",
+        "dayAbbrevFormat",
+        "dayFormat",
+        "dayofyear",
+        "debug",
+        "densityLogNormal",
+        "densityNormal",
+        "densityUniform",
+        "encode",
+        "extent",
+        "flush",
+        "format",
+        "gradient",
+        "hcl",
+        "hsl",
+        "inScope",
+        "indexof",
+        "info",
+        "inrange",
+        "intersect",
+        "intersectLasso",
+        "isArray",
+        "isBoolean",
+        "isDate",
+        "isDefined",
+        "isNumber",
+        "isObject",
+        "isRegExp",
+        "isString",
+        "isTuple",
+        "isValid",
+        "join",
+        "lab",
+        "lassoAppend",
+        "lassoPath",
+        "lastindexof",
+        "lerp",
+        "luminance",
+        "merge",
+        "modify",
+        "monthAbbrevFormat",
+        "monthFormat",
+        "pad",
+        "panLinear",
+        "panLog",
+        "panPow",
+        "panSymlog",
+        "pathShape",
+        "peek",
+        "pinchAngle",
+        "pinchDistance",
+        "pluck",
+        "quantileLogNormal",
+        "quantileNormal",
+        "quantileUniform",
+        "quarter",
+        "replace",
+        "reverse",
+        "rgb",
+        "screen",
+        "sequence",
+        "slice",
+        "sort",
+        "span",
+        "timeFormat",
+        "timeOffset",
+        "timeParse",
+        "timeSequence",
+        "timeUnitSpecifier",
+        "toBoolean",
+        "toDate",
+        "toNumber",
+        "toString",
+        "truncate",
+        "utcFormat",
+        "utcOffset",
+        "utcParse",
+        "utcSequence",
+        "utcdayofyear",
+        "utcquarter",
+        "utcweek",
+        "vlSelectionIdTest",
+        "vlSelectionResolve",
+        "vlSelectionTest",
+        "vlSelectionTuples",
+        "warn",
+        "week",
+        "windowSize",
+        "zoomLinear",
+        "zoomLog",
+        "zoomPow",
+        "zoomSymlog",
+        "geoShape",
+      )
+    // Resolved against the **scope** rather than through the function table, because each needs
+    // something the table cannot see: the scales, the datasets, the projections, or somewhere to
+    // send
+    // a message. `Evaluator` dispatches these by name before it consults the table at all.
+    val scopeBound =
+      setOf(
+        "scale",
+        "invert",
+        "domain",
+        "range",
+        "bandwidth",
+        "data",
+        "indata",
+        "setdata",
+        "treePath",
+        "treeAncestors",
+        "geoArea",
+        "geoBounds",
+        "geoCentroid",
+        "geoScale",
+        "geoShape",
+        "random",
+        "sampleNormal",
+        "sampleLogNormal",
+        "sampleUniform",
+        "warn",
+        "info",
+        "debug",
+      )
+    val unaccounted = upstream.filterNot {
+      it in Functions.functions || it in Functions.knownUnsupported || it in scopeBound
+    }
+    assertEquals(emptyList<String>(), unaccounted)
+  }
+
   private object EmptyScope : ExpressionScope {
     override val datum: VegaValue = VegaValue.EmptyObject
 
@@ -287,6 +445,88 @@ class ExpressionReferenceTest {
         "luminance('transparent')|null",
         "luminance('none')|null",
         "luminance('rgba(255, 0, 0, 0)')|null",
+        // ---- grouping, over the leading digits only ----
+        //
+        // d3 splits a formatted value at the first character that is not a digit and groups what is
+        // before it. Splitting on the decimal point alone grouped an *exponent* into the number:
+        // `,.1` of 200,000 came out `2,e+5`, which is what an axis over a million actually asks
+        // for.
+        "format(200000, ',')|\"200,000\"",
+        "format(200000, ',.1')|\"2e+5\"",
+        "format(1234567, ',.3')|\"1.23e+6\"",
+        "format(1234.5678, ',')|\"1,234.5678\"",
+        "format(123456, ',.2e')|\"1.23e+5\"",
+        "format(12.345, ',.1%')|\"1,234.5%\"",
+        // ---- the nine that had no vector at all ----
+        //
+        // Found by subtracting the names any expression test calls from the names `Functions.kt`
+        // registers. Worth doing after `hsl(h, s, l)` turned out to have been returning null: a
+        // function nothing calls is a function nothing checks, and the diff takes a second.
+        "atan2(1, 2)|0.4636476090008061",
+        "atan2(-3, -4)|-2.498091544796509",
+        // `bandspace` counts *steps*, not bands, so five bands at 0.1 inner padding come to 5.3 —
+        // and the padding is allowed to eat the whole band without the answer going negative, which
+        // would invert the scale.
+        "bandspace(5, 0.1, 0.2)|5.300000000000001",
+        "bandspace(0, 0.1, 0.2)|0",
+        "bandspace(3, 0.9, 0)|2.1",
+        // `lerp` short-circuits at 0 and 1 rather than computing `lo + f*(hi-lo)`, so the ends are
+        // exact rather than within a rounding.
+        "lerp([10, 20], 0.25)|12.5",
+        "lerp([10, 20], 0)|10",
+        "lerp([10, 20], 1)|20",
+        "lerp([7], 0.5)|7",
+        "join(pluck([{a:1},{a:2},{a:3}], 'a'), ',')|\"1,2,3\"",
+        // `stop` is exclusive, and the values are multiplied out from the start rather than
+        // accumulated, so a fractional step does not drift.
+        "join(sequence(5), ',')|\"0,1,2,3,4\"",
+        "join(sequence(2, 8, 2), ',')|\"2,4,6\"",
+        "join(sequence(0, 1, 0.25), ',')|\"0,0.25,0.5,0.75\"",
+        "join(sort([3, 1, 2]), ',')|\"1,2,3\"",
+        "join(sort(['b','a','c']), ',')|\"a,b,c\"",
+        "trim('  padded  ')|\"padded\"",
+        "trim('')|\"\"",
+        // Local time, and the suite pins the zone: mid-January in Amsterdam is UTC+1, which
+        // JavaScript reports as a *negative* offset in minutes.
+        "timezoneoffset(datetime(2024, 0, 15))|-60",
+        // `timeSequence` steps in **local** time even when the result is read as UTC, which is why
+        // the first entry reads as the last day of the previous year.
+        "length(timeSequence('month', datetime(2024,0,1), datetime(2024,4,1)))|4",
+        "utcFormat(timeSequence('month', datetime(2024,0,1), datetime(2024,4,1))[0], " +
+          "'%Y-%m-%d')|\"2023-12-31\"",
+        "utcFormat(timeSequence('month', datetime(2024,0,1), datetime(2024,4,1))[3], " +
+          "'%Y-%m-%d')|\"2024-03-31\"",
+        // ---- rgb, hsl, lab, hcl: components in, or a colour read apart ----
+        //
+        // The builders were **returning null**: a Kotlin string template had been escaped into its
+        // own literal text, so `hsl(210, 0.6, 0.4)` parsed the string `hsl($h, ${s * 100}%, ...)`
+        // and got nothing. Nothing noticed, because every test here read a colour *apart* and none
+        // built one. `s` and `l` are fractions, which is d3's convention rather than CSS's.
+        "''+hsl(210, 0.6, 0.4)|\"rgb(41, 102, 163)\"",
+        "''+rgb(31, 119, 180)|\"rgb(31, 119, 180)\"",
+        "''+rgb('steelblue')|\"rgb(70, 130, 180)\"",
+        // Reading a colour apart gives the components. Upstream's one object both stringifies as a
+        // colour *and* exposes them; a `VegaValue` is one or the other, so the two uses are split
+        // by
+        // arity — see the note on `hsl` in `Functions.kt`. What a specification does with it is
+        // read
+        // a channel, shift it and build a new colour, which both halves above support.
+        "format(hsl('#4c78a8').h, '.4f')|\"211.3043\"",
+        "format(hsl('#4c78a8').s, '.4f')|\"0.3770\"",
+        "format(hsl('#4c78a8').l, '.4f')|\"0.4784\"",
+        // `lab` and `hcl`, whose components are *not* fractions: a Lab lightness runs 0 to 100 and
+        // an
+        // HCL chroma is a radius in those units. Reading them the way `hsl` reads its own gives a
+        // colour that is nearly black for every input.
+        "''+lab(50, 20, -30)|\"rgb(133, 108, 170)\"",
+        "''+hcl(120, 40, 60)|\"rgb(125, 154, 81)\"",
+        "format(lab('#4c78a8').l, '.4f')|\"48.8173\"",
+        // A typographic minus, U+2212, which is what `d3-format` writes and this engine already
+        // reproduces everywhere else it formats a negative number.
+        "format(lab('#4c78a8').a, '.4f')|\"\u22124.7035\"",
+        "format(lab('#4c78a8').b, '.4f')|\"\u221230.8117\"",
+        "format(hcl('#4c78a8').h, '.4f')|\"261.3207\"",
+        "format(hcl('#4c78a8').c, '.4f')|\"31.1686\"",
         // ---- contrast ----
         // The WCAG ratio, which is symmetric: the brighter colour always goes on top, so writing
         // the pair either way round gives the same answer and it is never below 1.
@@ -408,11 +648,168 @@ class ExpressionReferenceTest {
         // The step defaults to one and is *floored*; an absent argument is not `Number()`-coerced
         // to zero, which would hand the date straight back. Both forms below are the ones a
         // specification writes, and the two-argument one is the common one.
+        // ---- month and weekday names ----
+        // Upstream produces these by formatting a date it builds for the purpose, so both
+        // indices wrap: month 12 is January again and day -1 is Saturday. A non-integer gives
+        // the empty string rather than a name for a day that does not exist.
+        "monthFormat(0)|\"January\"",
+        "monthFormat(11)|\"December\"",
+        "monthFormat(12)|\"January\"",
+        "monthFormat(-1)|\"December\"",
+        "monthAbbrevFormat(2)|\"Mar\"",
+        "monthFormat(1.5)|\"\"",
+        "dayFormat(0)|\"Sunday\"",
+        "dayFormat(6)|\"Saturday\"",
+        "dayFormat(7)|\"Sunday\"",
+        "dayFormat(-1)|\"Saturday\"",
+        "dayAbbrevFormat(3)|\"Wed\"",
+        // ---- week numbers ----
+        // Sundays since the start of the year, not ISO weeks: the days before the first
+        // Sunday are week 0, and a year beginning on a Sunday has its first day in week 1.
+        "week(datetime(2020, 0, 5))|1",
+        "week(datetime(2021, 0, 1))|0",
+        "week(datetime(2017, 0, 1))|1",
+        "week(datetime(2020, 11, 31))|52",
+        "utcweek(datetime(2020, 0, 5))|0",
+        // ---- the UTC twins of timeOffset and timeSequence ----
+        // A local midnight in Amsterdam is 23:00 the day before in UTC, which is the whole
+        // reason both exist: "one day later" is 24 hours in UTC and 23 or 25 across a clock
+        // change locally.
+        "utcFormat(utcOffset('day', datetime(2020,0,1), 3), '%Y-%m-%d %H:%M')|\"2020-01-03 23:00\"",
+        "utcFormat(utcOffset('month', datetime(2020,0,31), 1), '%Y-%m-%d %H:%M')|\"2020-03-01 23:00\"",
+        "length(utcSequence('day', datetime(2020,0,1), datetime(2020,0,4)))|3",
+        "utcFormat(utcSequence('day', datetime(2020,0,1), datetime(2020,0,4))[0], " +
+          "'%Y-%m-%d %H:%M')|\"2020-01-01 00:00\"",
+        "utcFormat(utcSequence('month', datetime(2020,0,1), datetime(2020,6,1), 2)[1], " +
+          "'%Y-%m-%d %H:%M')|\"2020-03-01 00:00\"",
+        // A sequence yields the unit **boundaries**, so a start at noon is ceiled to the next
+        // midnight rather than stepped from. This pair contradicted the implementation, which
+        // walked from the start itself and carried a comment claiming that was upstream's rule.
+        "length(timeSequence('day', datetime(2020,0,1,12), datetime(2020,0,4)))|2",
+        "timeFormat(timeSequence('day', datetime(2020,0,1,12), datetime(2020,0,4))[0], " +
+          "'%m-%d %H:%M')|\"01-02 00:00\"",
+        // ---- pan and zoom ----
+        // What an interactive chart's `domainRaw` is written with. Each pair lifts the
+        // interval into the space its gesture is linear in, moves it there and puts it back.
+        "panLinear([0, 10], 0.5)|[-5,5]",
+        "panLinear([0, 10], -0.25)|[2.5,12.5]",
+        "panLog([1, 100], 0.5)|[0.09999999999999998,10.000000000000002]",
+        "panPow([1, 10], 0.5, 2)|[-6.96419413859206,7.106335201775948]",
+        "panSymlog([-10, 10], 0.5, 1)|[-120.00000000000003,0]",
+        "zoomLinear([0, 10], 5, 2)|[-5,15]",
+        // A null anchor is the interval's own midpoint, which is what makes a zoom with no
+        // pointer position behave like one centred on the plot.
+        "zoomLinear([0, 10], null, 2)|[-5,15]",
+        "zoomLog([1, 100], 10, 2)|[0.09999999999999998,1000.0000000000007]",
+        "zoomPow([1, 10], 5, 2, 2)|[-4.795831523312719,13.228756555322953]",
+        "zoomSymlog([-10, 10], 0, 2, 1)|[-120.00000000000003,120.00000000000003]",
+        // ---- merge and flush ----
+        // `merge` is `extend({}, ...)`: shallow, later arguments winning, and a key keeps the
+        // position of its *first* appearance while taking its value from the last.
+        "merge({a: 1}, {b: 2}, {a: 3})|{\"a\":3,\"b\":2}",
+        "merge()|{}",
+        // `flush`, the rule the axis builder already uses for `labelFlush`: the ends are
+        // sorted before the comparison, so a descending range still answers for its low end.
+        "flush([0, 100], 3, 5, 'L', 'R', 'C')|\"L\"",
+        "flush([0, 100], 97, 5, 'L', 'R', 'C')|\"R\"",
+        "flush([0, 100], 50, 5, 'L', 'R', 'C')|\"C\"",
+        "flush([100, 0], 2, 5, 'L', 'R', 'C')|\"L\"",
+        // ---- lasso and pinch geometry ----
+        // `lassoAppend` adds the point only if it is **strictly** further than `minDist` from the
+        // last, which defaults to 5 — so a drag that has not moved six units returns the same
+        // array.
+        "lassoAppend([], 10, 20)|[[10,20]]",
+        "lassoAppend([[0,0]], 3, 4)|[[0,0]]",
+        "lassoAppend([[0,0]], 30, 40)|[[0,0],[30,40]]",
+        "lassoAppend([[0,0]], 3, 4, 1)|[[0,0],[3,4]]",
+        // `lassoPath` is transcribed spacing and all: the **last** point becomes " Z" and is never
+        // written, which is why a three-point lasso has two spaces before the Z, and a one-point
+        // one
+        // takes the first branch rather than the last.
+        "lassoPath([[0,0],[10,0],[10,10]])|\"M 0,0 L 10,0  Z\"",
+        "lassoPath([])|\"\"",
+        "lassoPath([[1,2]])|\"M 1,2 \"",
+        // The pinch pair is arithmetic over two touches and nothing else about a browser.
+        "pinchDistance({touches: [{clientX: 0, clientY: 0}, {clientX: 3, clientY: 4}]})|5",
+        "pinchAngle({touches: [{clientX: 0, clientY: 0}, {clientX: 3, clientY: 4}]})|-2.214297435588181",
+        // ---- messages a specification sends itself ----
+        // Each returns its **last** argument, which is what lets one wrap a value without changing
+        // what the expression computes. The message goes to the diagnostics.
+        "warn('hi', 42)|42",
+        "info(1, 2)|2",
+        "debug('x')|\"x\"",
+        // ---- the headless answers ----
+        // Upstream in a `renderer: 'none'` view, which is what the oracle renders every fixture in:
+        // no window means an empty object and a pair of absent numbers, not zeroes and not the
+        // view's own size.
+        // ---- reading a date back out of a string ----
+        // `timeParse` reads in local time and `utcParse` in UTC, which is the whole difference
+        // between the first two. What is not written defaults to **1900-01-01**, not to today, so a
+        // specifier of `%I:%M %p` puts its time on the first of January 1900.
+        "utcFormat(timeParse('2020-03-15', '%Y-%m-%d'), '%Y-%m-%dT%H:%M')|\"2020-03-14T23:00\"",
+        "utcFormat(utcParse('2020-03-15', '%Y-%m-%d'), '%Y-%m-%dT%H:%M')|\"2020-03-15T00:00\"",
+        "utcFormat(timeParse('15/03/2020 14:30', '%d/%m/%Y %H:%M'), " +
+          "'%Y-%m-%dT%H:%M')|\"2020-03-15T13:30\"",
+        "utcFormat(timeParse('March 15 2020', '%B %d %Y'), '%Y-%m-%dT%H:%M')|\"2020-03-14T23:00\"",
+        "utcFormat(timeParse('Mar 15 20', '%b %d %y'), '%Y-%m-%dT%H:%M')|\"2020-03-14T23:00\"",
+        "utcFormat(utcParse('2020-03-15 02:03:04.567', '%Y-%m-%d %H:%M:%S.%L'), " +
+          "'%H:%M:%S.%L')|\"02:03:04.567\"",
+        "utcFormat(utcParse('2020-075', '%Y-%j'), '%Y-%m-%d')|\"2020-03-15\"",
+        "utcFormat(utcParse('11:30 PM', '%I:%M %p'), '%Y-%m-%dT%H:%M')|\"1900-01-01T23:30\"",
+        "utcFormat(utcParse('12:30 AM', '%I:%M %p'), '%Y-%m-%dT%H:%M')|\"1900-01-01T00:30\"",
+        "utcFormat(utcParse('2020', '%Y'), '%Y-%m-%dT%H:%M')|\"2020-01-01T00:00\"",
+        "utcFormat(utcParse('2020-03-15T10:00:00Z', '%Y-%m-%dT%H:%M:%S%Z'), " +
+          "'%Y-%m-%dT%H:%M')|\"2020-03-15T10:00\"",
+        "utcFormat(utcParse('2020-03-15T10:00:00+0200', '%Y-%m-%dT%H:%M:%S%Z'), " +
+          "'%Y-%m-%dT%H:%M')|\"2020-03-15T08:00\"",
+        "utcFormat(utcParse('2020-03-15T10:00:00+02:00', '%Y-%m-%dT%H:%M:%S%Z'), " +
+          "'%Y-%m-%dT%H:%M')|\"2020-03-15T08:00\"",
+        "utcFormat(utcParse(' 5 Jan 2020', '%d %b %Y'), '%Y-%m-%d')|\"2020-01-05\"",
+        "utcFormat(utcParse('Sunday', '%A'), '%Y-%m-%d')|\"1900-01-01\"",
+        "utcFormat(utcParse('50%', '%d%%'), '%Y-%m-%d')|\"1900-02-19\"",
+        // The string and the specifier must match **exactly**: trailing input is a failure, not
+        // a date, and neither is a string the specifier cannot walk.
+        "timeParse('nonsense', '%Y-%m-%d')|null",
+        "timeParse('2020-03-15 extra', '%Y-%m-%d')|null",
+        // Overflow normalises as `new Date` normalises it: day 50 of January is the 19th of
+        // February, which is also what makes `%j` able to name the last day of a leap year.
+        // ---- what a date is ----
+        // `typeof new Date()` is `"object"`, so a date is **not a number** on either side even
+        // though it adds and compares like one. `datetime` builds a Date and `utc` builds
+        // milliseconds, which is why the two answer differently; `now()` is milliseconds too.
+        "isDate(datetime(2020,0,1))|true",
+        "isNumber(datetime(2020,0,1))|false",
+        "isObject(datetime(2020,0,1))|true",
+        "isValid(datetime(2020,0,1))|true",
+        "isDate(utc(2020,0,1))|false",
+        "isNumber(utc(2020,0,1))|true",
+        "isDate(now())|false",
+        "isNumber(now())|true",
+        "isDate(5)|false",
+        "isDate('x')|false",
+        "isDate(timeParse('2020','%Y'))|true",
+        "isDate(timeOffset('day', datetime(2020,0,1)))|true",
+        // Arithmetic and comparison are unaffected, which is the point of keeping it a number
+        // underneath.
+        "datetime(2020,0,1) < datetime(2020,0,2)|true",
+        "datetime(2020,0,2) - datetime(2020,0,1)|86400000",
+        "screen()|{}",
+        "windowSize()|[null,null]",
         "timeFormat(timeOffset('day', datetime(2019,2,31)), '%Y-%m-%d %H:%M')|\"2019-04-01 00:00\"",
         "timeFormat(timeOffset('day', datetime(2019,2,31), 2), '%Y-%m-%d %H:%M')|\"2019-04-02 00:00\"",
         "timeFormat(timeOffset('day', datetime(2019,2,31), 0), '%Y-%m-%d %H:%M')|\"2019-03-31 00:00\"",
         "timeFormat(timeOffset('day', datetime(2019,2,31), null), '%Y-%m-%d %H:%M')|\"2019-04-01 00:00\"",
         "timeFormat(timeOffset('day', datetime(2019,2,31), 1.7), '%Y-%m-%d %H:%M')|\"2019-04-01 00:00\"",
+        // A month or year step **overflows** rather than clamping, because that is what
+        // `Date.setMonth` does: 31 January plus a month asks for "31 February", which normalises to
+        // 2 March in a leap year and 3 March otherwise. Clamping to the 29th put every date past
+        // the
+        // 28th one to three days early, and the tick generator never noticed because it only ever
+        // offsets from the first of a month.
+        "timeFormat(timeOffset('month', datetime(2020,0,31), 1), '%Y-%m-%d')|\"2020-03-02\"",
+        "timeFormat(timeOffset('month', datetime(2020,4,31), 1), '%Y-%m-%d')|\"2020-07-01\"",
+        "timeFormat(timeOffset('month', datetime(2021,0,31), -1), '%Y-%m-%d')|\"2020-12-31\"",
+        "timeFormat(timeOffset('year', datetime(2020,1,29), 1), '%Y-%m-%d')|\"2021-03-01\"",
         "timeFormat(timeOffset('day', datetime(2019,2,31), -1), '%Y-%m-%d %H:%M')|\"2019-03-30 00:00\"",
         // ---- reading ----
         "toDate('2026-01-05T00:00:00Z')|1767571200000",

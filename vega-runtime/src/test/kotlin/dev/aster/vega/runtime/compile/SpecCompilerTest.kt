@@ -138,13 +138,13 @@ class SpecCompilerTest {
     val withTransform =
       minimalBar.replace(
         """"values": [{"c": "a", "v": 1}, {"c": "b", "v": 2}]""",
-        """"values": [{"c": "a", "v": 1}], "transform": [{"type": "geojson", "field": "v"}]""",
+        """"values": [{"c": "a", "v": 1}], "transform": [{"type": "wordcloud", "text": "c"}]""",
       )
     val diagnostic =
       compile(withTransform).diagnostics.first {
         it.code == DiagnosticCodes.TRANSFORM_NOT_IMPLEMENTED
       }
-    assertTrue(diagnostic.message.contains("geojson"), diagnostic.message)
+    assertTrue(diagnostic.message.contains("wordcloud"), diagnostic.message)
   }
 
   @Test

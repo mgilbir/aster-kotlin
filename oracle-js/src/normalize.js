@@ -12,26 +12,30 @@
  */
 
 import { canonicalNumber, DEFAULT_PRECISION } from './canonical.js';
-import {
-  curveBasis,
-  curveBasisClosed,
-  curveCardinal,
-  curveCardinalClosed,
-  curveLinearClosed,
-  curveMonotoneX,
-  curveMonotoneY,
-  curveNatural,
-  curveStep,
-  curveStepAfter,
-  curveStepBefore,
-  line,
-} from 'd3-shape';
+import { line } from 'd3-shape';
+// Vega's own name table, reached by file path because the package does not export its sources.
+// Taken from upstream rather than restated here: it maps an `interpolate` name to a d3 curve, picks
+// between the two monotone forms from the mark's `orient`, and knows that `tension` means a cardinal
+// stiffness, a Catmull-Rom exponent or a bundle blend depending on the family — each with its own
+// default. A copy of that table in this file could be wrong in the same way the port is.
+import curves from '../node_modules/vega-scenegraph/src/path/curves.js';
 import { sceneVisit } from 'vega-scenegraph';
 
 /** Channels compared per mark type. Anything not listed here is ignored on both sides. */
+// A rectangle's corner radii are geometry, not style: they change the outline, and comparing only
+// the box let four independently-rounded corners through as if they were square. Listed for `group`
+// as well, because a Vega group mark's background is the same rounded rectangle.
+const CORNER_CHANNELS = [
+  'cornerRadius',
+  'cornerRadiusTopLeft',
+  'cornerRadiusTopRight',
+  'cornerRadiusBottomRight',
+  'cornerRadiusBottomLeft',
+];
+
 const GEOMETRY_CHANNELS = {
-  group: ['x', 'y', 'width', 'height'],
-  rect: ['x', 'y', 'width', 'height'],
+  group: ['x', 'y', 'width', 'height', ...CORNER_CHANNELS],
+  rect: ['x', 'y', 'width', 'height', ...CORNER_CHANNELS],
   rule: ['x', 'y', 'x2', 'y2'],
   line: ['x', 'y'],
   area: ['x', 'y', 'y2'],
@@ -47,7 +51,10 @@ const GEOMETRY_CHANNELS = {
 };
 
 const STYLE_CHANNELS = ['fill', 'stroke', 'strokeWidth', 'opacity', 'fillOpacity', 'strokeOpacity'];
-const TEXT_CHANNELS = ['text', 'align', 'baseline', 'font', 'fontSize', 'fontWeight', 'fontStyle', 'angle'];
+// `dir` and `lineBreak` change what is drawn without changing the anchor, and `lineHeight` changes
+// where the second line sits. All three were invisible while a text mark was compared by its anchor
+// and its font.
+const TEXT_CHANNELS = ['text', 'align', 'baseline', 'font', 'fontSize', 'fontWeight', 'fontStyle', 'angle', 'dir', 'lineBreak', 'lineHeight'];
 
 /**
  * FNV-1a over a canvas's pixels, in the packed `0xAARRGGBB` order the Kotlin scene stores.
@@ -104,10 +111,33 @@ function numericIfPossible(value) {
  * fourth thing this harness compared its way past: a dashed gridline and a solid one have identical
  * geometry, identical colour and identical width, so nothing else here can tell them apart.
  */
+/**
+ * One paint channel, as what it actually paints.
+ *
+ * Vega's colour helpers return **objects** — `hsl(h, s, l)` gives a `d3.Hsl`, not a string — and a
+ * mark encoder writes the object straight onto the item. Its renderer then stringifies it, which is
+ * where `rgb(...)` comes from. Passing such an object through `canonicalNumber` returned `undefined`,
+ * which `JSON.stringify` omits, so the channel vanished from the reference: every one of the 7,514
+ * rects in Vega's platformer had its fill compared as "absent". Stringifying is what the renderer
+ * does and is the only reading under which the two engines are describing the same drawing.
+ *
+ * A gradient is an object too and is *not* a colour: it keeps its own shape, which the comparison
+ * handles separately.
+ */
+function styleValue(value, precision) {
+  if (value && typeof value === 'object' && value.gradient === undefined) {
+    return String(value);
+  }
+  return canonicalNumber(value, precision);
+}
+
 function dashOf(item) {
   const dash = item.strokeDash;
   if (!Array.isArray(dash) || dash.length === 0) return undefined;
-  return dash.join(',');
+  // The offset is part of the pattern, not a separate decoration: the same dash array started a
+  // half-period along draws its gaps where the other draws its marks.
+  const offset = item.strokeDashOffset;
+  return dash.join(',') + (offset ? ` @${offset}` : '');
 }
 
 /**
@@ -140,6 +170,9 @@ const SERIES_TYPES = new Set(['line', 'area']);
  * in the wrong order.
  */
 const EXTENT_ONLY_SERIES = new Set(['trail']);
+
+/** Mark types whose whole geometry is an outline, so the drawn extent is what there is to compare. */
+const SHAPE_EXTENT_TYPES = new Set(['symbol', 'arc', 'path', 'shape']);
 
 /** A marktype node: `{marktype, role, items: [...]}`. */
 function walkMarktype(marktype, dx, dy, out, precision) {
@@ -177,35 +210,18 @@ function walkMarktype(marktype, dx, dy, out, precision) {
   }
 }
 
-/**
- * The curves both engines can draw, so the comparison can see the outline rather than the points.
- *
- * `monotone` is two curves: Vega picks between d3's X and Y forms from the mark's `orient`, so this
- * is resolved per item rather than by name alone.
- */
-const CURVES = {
-  'step': curveStep,
-  'step-before': curveStepBefore,
-  'step-after': curveStepAfter,
-  'basis': curveBasis,
-  'cardinal': curveCardinal,
-  'natural': curveNatural,
-  'linear-closed': curveLinearClosed,
-  'basis-closed': curveBasisClosed,
-  'cardinal-closed': curveCardinalClosed,
-};
-
 /** The return leg of an area steps the opposite way round; every other curve is symmetric. */
 const MIRRORED = {
   'step-before': 'step-after',
   'step-after': 'step-before',
 };
 
-function curveFor(interpolate, orient) {
-  if (interpolate === 'monotone') {
-    return orient === 'horizontal' ? curveMonotoneY : curveMonotoneX;
-  }
-  return CURVES[interpolate];
+function curveFor(interpolate, orient, tension) {
+  // A line that names no `interpolate` is still drawn through a curve — `linear`, which is what
+  // Vega passes when the property is absent. Returning null for it left `closed` reading false by
+  // construction for every plain line, which is a flag that says nothing rather than a flag that
+  // says no: d3 closes a one-point line, and the reference has to record that it does.
+  return curves(interpolate || 'linear', orient, tension == null ? null : tension) || null;
 }
 
 /**
@@ -255,7 +271,7 @@ function extentRecord(type, marktype, dx, dy, precision) {
     shapeHeight: canonicalNumber(b.y2 - b.y1, precision),
   };
   for (const channel of STYLE_CHANNELS) {
-    if (first[channel] !== undefined) entry[channel] = canonicalNumber(first[channel], precision);
+    if (first[channel] !== undefined) entry[channel] = styleValue(first[channel], precision);
   }
   if (entry.fillOpacity !== undefined && entry.fill === undefined) delete entry.fillOpacity;
   if (entry.strokeOpacity !== undefined && entry.stroke === undefined) delete entry.strokeOpacity;
@@ -279,12 +295,12 @@ function seriesRecord(type, marktype, dx, dy, precision) {
     points.push(canonicalNumber((x || 0) + dx, precision));
     points.push(canonicalNumber((y || 0) + dy, precision));
   };
-  // A step interpolation puts corners between the data points, so the drawn outline is not the
-  // item list. Rather than reimplementing the staircase here — a second copy that could be wrong
-  // the same way the port is — the corners come from d3-shape itself, which is what Vega draws
-  // with. Every other curve family is reported as unsupported by the engine, so this only has to
-  // cover the steps.
-  const curve = curveFor(first.interpolate, first.orient);
+  // An interpolation method puts its own geometry between the data points, so the drawn outline is
+  // not the item list: a staircase adds corners, a spline adds control points, and an *open* family
+  // drops the first and last points entirely. Rather than reimplementing any of that here — a second
+  // copy that could be wrong the same way the port is — the outline comes from d3-shape itself,
+  // which is what Vega draws with.
+  const curve = curveFor(first.interpolate, first.orient, first.tension);
 
   const primary = items.map(i => [i.x || 0, i.y || 0]);
   const drawn = expandCurve(primary, curve);
@@ -295,7 +311,7 @@ function seriesRecord(type, marktype, dx, dy, precision) {
       .map(i => [i.x2 !== undefined ? i.x2 : i.x || 0, i.y2 !== undefined ? i.y2 : i.y || 0]);
     const back = expandCurve(
       secondary,
-      curveFor(MIRRORED[first.interpolate] || first.interpolate, first.orient)
+      curveFor(MIRRORED[first.interpolate] || first.interpolate, first.orient, first.tension)
     );
     for (const [x, y] of back.points) push(x, y);
   } else {
@@ -305,9 +321,12 @@ function seriesRecord(type, marktype, dx, dy, precision) {
   }
   entry.points = points.join(' ');
   if (first.interpolate) entry.interpolate = first.interpolate;
+  // Recorded as well as applied: two families can happen to draw the same outline for one series,
+  // and the channel itself still has to survive the round trip.
+  if (first.tension !== undefined) entry.tension = canonicalNumber(first.tension, precision);
 
   for (const channel of STYLE_CHANNELS) {
-    if (first[channel] !== undefined) entry[channel] = canonicalNumber(first[channel], precision);
+    if (first[channel] !== undefined) entry[channel] = styleValue(first[channel], precision);
   }
   const seriesDash = dashOf(first);
   if (seriesDash !== undefined) entry.strokeDash = seriesDash;
@@ -327,6 +346,16 @@ function record(type, role, item, dx, dy, precision) {
     const dx = item.dx || 0, dy = item.dy || 0, a = ((item.angle || 0) * Math.PI) / 180;
     textDx = dx * Math.cos(a) - dy * Math.sin(a);
     textDy = dx * Math.sin(a) + dy * Math.cos(a);
+  }
+
+  // The same equivalence for `radius`/`theta`, which place a label around a centre. Vega keeps both
+  // on the item and offsets at paint time — `anchorPoint` — where this engine's scene holds the
+  // anchor already offset. Folded *before* dx/dy, which is the order Vega applies them in: the
+  // rotation a rotated label turns about is the polar-offset point, not the centre.
+  if (type === 'text' && item.radius) {
+    const t = (item.theta || 0) - Math.PI / 2;
+    textDx += item.radius * Math.cos(t);
+    textDy += item.radius * Math.sin(t);
   }
 
   for (const channel of channels) {
@@ -353,6 +382,11 @@ function record(type, role, item, dx, dy, precision) {
     entry.url = item.url;
     entry.align = item.align || 'left';
     entry.baseline = item.baseline || 'top';
+    // `aspect: false` stretches the image to the box instead of letterboxing it inside, and
+    // `smooth: false` asks for nearest-neighbour sampling. Both are the whole difference between two
+    // images with identical boxes.
+    entry.aspect = item.aspect === false ? 'none' : 'fit';
+    entry.smooth = item.smooth === false ? 'none' : 'smooth';
     // An image mark that carries *pixels* rather than an address — a `heatmap`'s output — is
     // otherwise compared only by its box, so a blank raster in the right place would pass. The
     // digest is a cheap stand-in for the pixels themselves, which no reference file should hold:
@@ -366,7 +400,7 @@ function record(type, role, item, dx, dy, precision) {
   }
 
   for (const channel of STYLE_CHANNELS) {
-    if (item[channel] !== undefined) entry[channel] = canonicalNumber(item[channel], precision);
+    if (item[channel] !== undefined) entry[channel] = styleValue(item[channel], precision);
   }
   // Vega sets a legend symbol's strokeWidth whether or not it has a stroke colour, so an unstroked
   // swatch carries a width that paints nothing. This engine has no way to say "a width with no
@@ -386,7 +420,11 @@ function record(type, role, item, dx, dy, precision) {
   // in a path string, and the only channels compared were the anchor it hangs from. Two engines
   // could agree on `x` and `y` and draw completely different outlines — which is exactly what a
   // `linkpath` transform emitting the wrong shape would look like.
-  if ((type === 'symbol' || type === 'arc' || type === 'path') && item.bounds) {
+  //
+  // `shape` was the widest hole of all, and it went unnoticed because the maps looked right: a
+  // `geoshape` mark carries no `x` or `y` at all, so the only things compared were its fill and its
+  // stroke. Every projection, every clip and every decoded TopoJSON feature was verified on colour.
+  if (SHAPE_EXTENT_TYPES.has(type) && item.bounds) {
     entry.shapeLeft = canonicalNumber(item.bounds.x1 + dx, precision);
     entry.shapeTop = canonicalNumber(item.bounds.y1 + dy, precision);
     entry.shapeWidth = canonicalNumber(item.bounds.x2 - item.bounds.x1, precision);

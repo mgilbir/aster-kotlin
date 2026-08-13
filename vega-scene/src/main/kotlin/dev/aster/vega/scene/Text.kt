@@ -62,27 +62,63 @@ public data class TextRun(
    */
   val limit: Double = 0.0,
   val ellipsis: String = "\u2026",
+  /**
+   * The separator [text] is broken into lines on, when the specification names one.
+   *
+   * Null means the newline this engine uses to carry an array-valued `text`. Upstream splits on
+   * `lineBreak` **instead of** on anything else, so a string holding both is one line here as it is
+   * there. Kept on the run rather than folded into [text] because the scenegraph has to keep saying
+   * what the data said — a label a screen reader reads, or the differential harness compares, is
+   * the original string and not the broken one.
+   */
+  val lineBreak: String? = null,
 )
 
 /**
- * The string that actually gets drawn: [TextRun.text] shortened to fit [TextRun.limit].
+ * One line as it actually gets drawn: trimmed, then shortened to fit [TextRun.limit].
  *
- * Upstream's own binary search, including both of its **strict** comparisons — a string exactly as
- * wide as the limit is already too wide, and so is a prefix exactly filling the space the ellipsis
- * leaves. The two together take one more character off than a reading of "fits within the limit"
- * would, and an off-by-one here is a visible difference in every truncated label.
+ * Upstream's `textValue`, and every part of it matters. The line is **trimmed** first, which
+ * changes its measured width. Truncation happens only for a limit greater than zero — a negative
+ * limit is not a truncation from the other end, it is no truncation at all. And the binary search
+ * keeps both of upstream's **strict** comparisons: a string exactly as wide as the limit is already
+ * too wide, and so is a prefix exactly filling the space the ellipsis leaves. Together they take
+ * one more character off than a reading of "fits within the limit" would, and an off-by-one here is
+ * visible in every truncated label.
+ *
+ * A right-to-left run keeps its **tail** instead, with the ellipsis in front, because the end of an
+ * RTL string is where its meaning starts.
  */
-public fun TextRun.displayText(measure: (String) -> Double): String {
-  if (limit <= 0.0 || measure(text) < limit) return text
+public fun TextRun.displayLine(line: String, measure: (String) -> Double): String {
+  val text = line.trim()
+  if (limit <= 0.0 || text.isEmpty() || measure(text) < limit) return text
   val room = limit - measure(ellipsis)
   var low = 0
   var high = text.length
+  if (style.direction == TextDirection.RTL) {
+    while (low < high) {
+      val mid = (low + high) ushr 1
+      if (measure(text.substring(mid)) > room) low = mid + 1 else high = mid
+    }
+    return ellipsis + text.substring(low)
+  }
   while (low < high) {
     val mid = 1 + ((low + high) ushr 1)
     if (mid <= text.length && measure(text.substring(0, mid)) < room) low = mid else high = mid - 1
   }
   return text.substring(0, low) + ellipsis
 }
+
+/**
+ * The whole run as it gets drawn, line by line.
+ *
+ * Per line, not over the joined string: a limit bounds each line's own width, so truncating the
+ * text with its newlines still in it would measure a two-line label as one long one and cut the
+ * first line down to nothing.
+ */
+public fun TextRun.displayLines(measure: (String) -> Double): List<String> =
+  (if (lineBreak != null) text.split(lineBreak) else text.split('\n')).map {
+    displayLine(it, measure)
+  }
 
 public data class TextMetrics(
   val width: Double,
@@ -147,7 +183,7 @@ public class MetricTextEngine(
     val ascent = style.fontSize * ascentRatio
     val descent = style.fontSize * descentRatio
 
-    val rawLines = text.displayText { advance(it, style) }.split('\n')
+    val rawLines = text.displayLines { advance(it, style) }
     val wrapped =
       if (constraint?.width != null && constraint.width > 0.0) {
         rawLines.flatMap { wrap(it, style, constraint.width) }

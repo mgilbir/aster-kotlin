@@ -354,6 +354,8 @@
       "y": 30.5
     },
     {
+      "cornerRadiusBottomRight": 2,
+      "cornerRadiusTopRight": 2,
       "fill": "#4c78a8",
       "height": 9,
       "role": "mark",
@@ -363,6 +365,8 @@
       "y": 50.5
     },
     {
+      "cornerRadiusBottomRight": 2,
+      "cornerRadiusTopRight": 2,
       "fill": "#4c78a8",
       "height": 9,
       "role": "mark",
@@ -372,6 +376,8 @@
       "y": 10.5
     },
     {
+      "cornerRadiusBottomRight": 2,
+      "cornerRadiusTopRight": 2,
       "fill": "#4c78a8",
       "height": 9,
       "role": "mark",

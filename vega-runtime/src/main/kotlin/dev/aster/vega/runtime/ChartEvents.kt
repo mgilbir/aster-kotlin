@@ -151,6 +151,14 @@ public data class InteractionState(
   val selection: ChartSelection = ChartSelection.Empty,
   val tooltip: VegaValue? = null,
   val tooltipAnchor: PointD? = null,
+  /**
+   * The pointer shape the item under the pointer asks for, as the CSS name a specification writes.
+   *
+   * Published rather than applied, because what a cursor *is* differs by platform: a host maps it
+   * to a `PointerIcon` on Android and a browser writes it straight into a style attribute. Null
+   * when nothing under the pointer asks for one.
+   */
+  val cursor: String? = null,
   /** Pan/zoom applied on top of the scene, so panning does not rebuild static content. */
   val viewportOffset: VectorD = VectorD.Zero,
   val viewportScale: Double = 1.0,

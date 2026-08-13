@@ -257,7 +257,7 @@ public object WindowTransform : Transform {
       if (kind == null && aggregate == null) {
         context.diagnostics.error(
           DiagnosticCodes.TRANSFORM_NOT_IMPLEMENTED,
-          "Window operation '$op' is not implemented",
+          "'$op' is neither a window operation nor an aggregate one",
           operator = type,
         )
         return null

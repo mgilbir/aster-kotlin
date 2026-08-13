@@ -119,7 +119,7 @@ public class ScaleResolver(
       continuousDomain(spec, zeroDefault = spec.bins == null, fallback = listOf(0.0, 1.0))
         ?: return null
     domain = padded(domain, range, spec)
-    if (spec.nice) domain = niceOf(domain, spec)
+    if (spec.nice && spec.domainRaw == null) domain = niceOf(domain, spec)
     return LinearScale(
       spec.name,
       domain,
@@ -226,26 +226,37 @@ public class ScaleResolver(
     val domain =
       (continuousDomain(spec, zeroDefault = false, fallback = listOf(0.0, 1.0)) ?: return null)
         .let {
-          if (spec.nice) niceOf(it, spec) else it
+          if (spec.nice && spec.domainRaw == null) niceOf(it, spec) else it
         }
+    // A **scheme** carries its own interpolator, and `interpolate` does not reach it: upstream
+    // hands `scale.interpolator(...)` the scheme's own function, where `interpolate` only ever
+    // applies to a range written out as a list of colours. Honouring it for a scheme walked a
+    // heatmap's ramp through a different space from the one upstream walked it through, and every
+    // shade came out a unit or two off.
+    // A **named** range is one too: `"range": "heatmap"` resolves through `config.range` to a
+    // scheme, and it is the commonest way a Vega-Lite chart asks for one.
+    val scheme = spec.range is RangeSpec.Scheme || spec.range is RangeSpec.Named
     val space =
-      spec.interpolate?.let { name ->
-        ColorSpaces.Interpolation.fromName(name)
-          ?: run {
-            diagnostics.warn(
-              DiagnosticCodes.SCALE_UNSUPPORTED_TYPE,
-              "Colour interpolation space '$name' is not implemented; interpolating in RGB instead",
-              operator = spec.name,
-            )
-            null
-          }
-      } ?: ColorSpaces.Interpolation.RGB
+      spec.interpolate
+        ?.takeIf { !scheme }
+        ?.let { name ->
+          ColorSpaces.Interpolation.fromName(name)
+            ?: run {
+              diagnostics.warn(
+                DiagnosticCodes.SCALE_UNSUPPORTED_TYPE,
+                "Colour interpolation space '$name' is not implemented; interpolating in RGB instead",
+                operator = spec.name,
+              )
+              null
+            }
+        } ?: ColorSpaces.Interpolation.RGB
 
     return SequentialColorScale(
       name = spec.name,
       domain = domain,
       colors = if (reversed(spec)) colors.reversed() else colors,
       space = space,
+      gamma = spec.interpolateGamma ?: 1.0,
     )
   }
 
@@ -264,9 +275,10 @@ public class ScaleResolver(
    * categorical palette, including the stacked-bar example in Vega's own documentation, so a scale
    * that rejects it rejects most charts anyone will paste.
    *
-   * The defaults are upstream's own (`vega-parser/src/config.js`). A specification that overrides
-   * them through `config.range` is **not** honoured yet, and the config block is reported as unread
-   * — so the substitution is visible rather than silent.
+   * The defaults are upstream's own (`vega-parser/src/config.js`). A `config.range` that overrides
+   * one never reaches here: the parser substitutes it for the name and re-reads the result, which
+   * is upstream's own arrangement and is what lets a theme's `category` be a scheme where the
+   * default is a literal list of symbol names.
    */
   private fun namedRange(name: String): RangeSpec? =
     when (name.lowercase()) {
@@ -465,7 +477,7 @@ public class ScaleResolver(
         lift = { ln(it * logSign) },
         ground = { logSign * exp(it) },
       )
-    if (spec.nice) domain = Ticks.niceLog(domain, base)
+    if (spec.nice && spec.domainRaw == null) domain = Ticks.niceLog(domain, base)
 
     val scale =
       LogScale(spec.name, domain, oriented(range, reversed(spec)), base, spec.clamp, spec.round)
@@ -495,7 +507,7 @@ public class ScaleResolver(
         lift = { signedPow(it, exponent) },
         ground = { signedPow(it, 1 / exponent) },
       )
-    if (spec.nice) domain = niceOf(domain, spec)
+    if (spec.nice && spec.domainRaw == null) domain = niceOf(domain, spec)
     return PowScale(
       spec.name,
       domain,
@@ -520,7 +532,7 @@ public class ScaleResolver(
         lift = { sign(it) * ln(1 + abs(it / constant)) },
         ground = { sign(it) * (exp(abs(it)) - 1) * constant },
       )
-    if (spec.nice) domain = niceOf(domain, spec)
+    if (spec.nice && spec.domainRaw == null) domain = niceOf(domain, spec)
     return SymlogScale(
       spec.name,
       domain,
@@ -550,11 +562,46 @@ public class ScaleResolver(
    * @param fallback the domain to use when nothing resolved; a log-family scale cannot take `[0,
    *   1]`.
    */
+  /**
+   * `domainRaw`: a domain to use exactly as given, whatever the rest of the scale says.
+   *
+   * Almost always a signal — `{"signal": "brush"}` — and almost always null until a reader touches
+   * the chart, which is why an unresolvable one has to mean "no override" rather than "empty
+   * domain".
+   */
+  /**
+   * True when `domainRaw` supplied the domain, in which case `nice` must not touch it.
+   *
+   * Checked at each `nice` site rather than once, because upstream's `configureDomain` returns
+   * before it reaches any of them and there is no single place here that all six pass through.
+   */
+  private fun rawDomain(spec: ScaleSpec): List<Double>? {
+    val raw = spec.domainRaw ?: return null
+    return literalNumbers(raw)
+      ?: numericExtent(raw, spec.name)?.let {
+        listOf(it.start, it.endInclusive)
+      }
+  }
+
   private fun continuousDomain(
     spec: ScaleSpec,
     zeroDefault: Boolean,
     fallback: List<Double>,
   ): List<Double>? {
+    // `domainRaw` short-circuits everything below it — `zero`, the three `domain*` overrides, and
+    // the
+    // `nice` the caller applies after. That is upstream's `configureDomain`, which reads the raw
+    // domain first and returns before it looks at anything else, and it is what makes an
+    // interactive
+    // zoom work: a brush publishes the exact interval it wants and nothing is allowed to round it
+    // outwards. A raw domain of one value or none is *not* an override — upstream returns its
+    // length
+    // and carries on — so it falls through to the ordinary path here as well.
+    rawDomain(spec)
+      ?.takeIf { it.size >= 2 }
+      ?.let {
+        return it
+      }
     val resolved =
       literalNumbers(spec.domain)?.also {
         if (it.size < 2) {
@@ -626,7 +673,7 @@ public class ScaleResolver(
       }
     val padded = padded(bounded, range, spec)
     val niced =
-      if (spec.nice) {
+      if (spec.nice && spec.domainRaw == null) {
         val (lo, hi) =
           TimeTicks.nice(
             padded.first(),
@@ -726,7 +773,7 @@ public class ScaleResolver(
           return null
         }
       }
-    return OrdinalScale(spec.name, domain, range)
+    return OrdinalScale(spec.name, domain, range, implicit = spec.domainImplicit)
   }
 
   /**
@@ -1335,7 +1382,8 @@ public class ScaleResolver(
           else -> {
             diagnostics.error(
               DiagnosticCodes.SCALE_UNSUPPORTED_TYPE,
-              "Named range '${range.name}' is not implemented (scale '${spec.name}')",
+              "'${range.name}' is not one of Vega's named ranges, and 'config.range' does not " +
+                "define it (scale '${spec.name}')",
               operator = spec.name,
             )
             null

@@ -195,18 +195,10 @@ internal class DataResolver(
    * `format.feature` and `format.mesh` are alternatives and one of them is required — a TopoJSON
    * file holds several named objects and nothing in it says which one this dataset wants.
    */
-  private fun readTopoJson(spec: DataSpec, text: String): List<VegaValue> {
-    val document =
-      try {
-        VegaJson.parse(text)
-      } catch (failure: Exception) {
-        diagnostics.error(
-          DiagnosticCodes.PARSE_INVALID_JSON,
-          "Dataset '${spec.name}' is not valid JSON: ${failure.message}",
-          operator = spec.name,
-        )
-        return emptyList()
-      }
+  private fun readTopoJson(spec: DataSpec, text: String): List<VegaValue> =
+    readTopoJson(spec, parseJson(spec, text) ?: return emptyList())
+
+  private fun readTopoJson(spec: DataSpec, document: VegaValue): List<VegaValue> {
     val name = spec.feature ?: spec.mesh
     if (name == null) {
       diagnostics.error(
@@ -246,18 +238,23 @@ internal class DataResolver(
     return ingest(decoded)
   }
 
-  private fun readJson(spec: DataSpec, text: String): List<VegaValue> {
-    val document =
-      try {
-        VegaJson.parse(text)
-      } catch (failure: Exception) {
-        diagnostics.error(
-          DiagnosticCodes.PARSE_INVALID_JSON,
-          "Dataset '${spec.name}' is not valid JSON: ${failure.message}",
-          operator = spec.name,
-        )
-        return emptyList()
-      }
+  /** Parses a document, reporting a syntax error rather than throwing out of the compile. */
+  private fun parseJson(spec: DataSpec, text: String): VegaValue? =
+    try {
+      VegaJson.parse(text)
+    } catch (failure: Exception) {
+      diagnostics.error(
+        DiagnosticCodes.PARSE_INVALID_JSON,
+        "Dataset '${spec.name}' is not valid JSON: ${failure.message}",
+        operator = spec.name,
+      )
+      null
+    }
+
+  private fun readJson(spec: DataSpec, text: String): List<VegaValue> =
+    readJson(spec, parseJson(spec, text) ?: return emptyList())
+
+  private fun readJson(spec: DataSpec, document: VegaValue): List<VegaValue> {
     // `format.property` names the field inside the document that holds the rows, which is how a
     // specification reaches into an API response rather than a bare array.
     val rows = spec.property?.let { (document as? VegaValue.Obj)?.fields?.get(it) } ?: document
@@ -321,6 +318,19 @@ internal class DataResolver(
     scales: Map<String, VegaScale> = emptyMap(),
     /** The scope's projections, which a `geoCentroid()` in a `formula` reaches for by name. */
     projections: Map<String, ProjectionDefinition> = emptyMap(),
+    /**
+     * Rebuilds the projections from the signals as they stand, for a fit that a transform supplies.
+     *
+     * A `geojson` transform gathers a table of coordinates into a `FeatureCollection` and publishes
+     * it, and a projection fitted to that signal cannot be built until it has run — which may be
+     * one transform earlier in the *same* list. Upstream has no difficulty: each transform is its
+     * own operator and the projection sits between them in topological order. Here the projections
+     * are resolved once per dataset, so without this a `geopoint` two lines below a `geojson`
+     * placed every row through the family's unfitted default.
+     *
+     * Null where there is nothing to rebuild from, which is every caller that has no projections.
+     */
+    refreshProjections: ((Map<String, VegaValue>) -> Map<String, ProjectionDefinition>)? = null,
   ): ScopeData {
     if (specs.isEmpty()) return inherited
 
@@ -329,7 +339,19 @@ internal class DataResolver(
     val pipeline = TransformPipeline()
 
     for (spec in specs) {
-      var values = ingest(spec.values ?: emptyList())
+      // Inline values are usually an array of rows, but a specification may also write the whole
+      // *document* there — a GeoJSON `FeatureCollection`, or a TopoJSON topology — and reach the
+      // rows
+      // through the same `format` it would use for a url. Upstream applies the format to inline
+      // values and to a loaded file alike; reading only the array form dropped every such dataset
+      // without a word, which for a map means every feature.
+      var values =
+        spec.document?.let { document ->
+          when (spec.formatType) {
+            "topojson" -> readTopoJson(spec, document)
+            else -> readJson(spec, document)
+          }
+        } ?: ingest(spec.values ?: emptyList())
       // A `url` may itself be a signal — how a control swaps the file a chart is reading. It is
       // resolved here rather than at parse time because only now are the signals known, and a
       // signal that cannot be worked out before the data is one this cannot use.
@@ -377,6 +399,7 @@ internal class DataResolver(
             random,
             clock,
             projections,
+            refreshProjections,
           )
         values = pipeline.run(values, spec.transform, context)
         tree = context.tree
@@ -511,8 +534,29 @@ internal class DataResolver(
     private val random: RandomStream,
     private val clock: Clock,
     /** The scope's projections, for a `geoshape` transform or a `geoCentroid()` expression. */
-    private val projections: Map<String, ProjectionDefinition>,
+    projections: Map<String, ProjectionDefinition>,
+    /** See [resolve]: rebuilds them when a transform has published something a fit reads. */
+    private val refreshProjections:
+      ((Map<String, VegaValue>) -> Map<String, ProjectionDefinition>)?,
   ) : TransformContext {
+
+    /**
+     * The projections as they stand, rebuilt at most once per signal a transform writes.
+     *
+     * Rebuilt lazily rather than on the write: `scopeFor` is called once a row, and resolving every
+     * projection per row of a formula would cost more than the fit it is there to notice.
+     */
+    private var currentProjections = projections
+    private var projectionsStale = false
+
+    private fun projectionsNow(): Map<String, ProjectionDefinition> {
+      val refresh = refreshProjections
+      if (projectionsStale && refresh != null) {
+        currentProjections = refresh(signals)
+        projectionsStale = false
+      }
+      return currentProjections
+    }
 
     /** One diagnostic per signal per dataset; the expression runs once a row. */
     private val reported = mutableSetOf<String>()
@@ -521,6 +565,7 @@ internal class DataResolver(
 
     override fun setSignal(name: String, value: VegaValue) {
       signals[name] = value
+      projectionsStale = true
     }
 
     override fun scopeFor(datum: VegaValue): ExpressionScope =
@@ -535,11 +580,11 @@ internal class DataResolver(
             random = random,
             clock = clock,
           )
-          .withProjections(projections),
+          .withProjections(projectionsNow()),
         ::reportDeferred,
       )
 
-    override fun projection(name: String): ProjectionDefinition? = projections[name]
+    override fun projection(name: String): ProjectionDefinition? = projectionsNow()[name]
 
     /**
      * A transform read a signal whose value is not known until after the data.

@@ -220,55 +220,51 @@ class AxisStyleTest {
 
   // ---- what gets reported ---------------------------------------------------
 
+  /**
+   * Nothing is reported: every one of upstream's 79 axis properties is read.
+   *
+   * Kept as the place the next gap goes, and as the assertion that the last one has not come back.
+   * They came off this list in turn — the line caps and dash offsets first, then `tickRound`,
+   * `tickBand`, `position`, `translate`, `labelOffset`, `aria`, `description`, `tickMinStep`, and
+   * finally `labelBound`, which turned out to cull nothing upstream either.
+   */
   @Test
-  fun `every unhonoured axis property is reported by name`() {
-    val unhonoured =
-      listOf(
-        "\"labelBound\": true",
-        "\"labelOffset\": 3",
-        "\"tickRound\": false",
-        "\"tickBand\": \"extent\"",
-        "\"tickCap\": \"round\"",
-        "\"gridCap\": \"round\"",
-        "\"gridDashOffset\": 2",
-        "\"domainCap\": \"round\"",
-        "\"position\": 10",
-        "\"translate\": 0",
-        "\"titleLimit\": 40",
-        "\"aria\": false",
-        "\"description\": \"d\"",
-      )
-    for (property in unhonoured) {
-      val name = property.substringAfter('"').substringBefore('"')
-      val diagnostics = compile("""{"orient": "bottom", "scale": "x", $property}""").diagnostics
-      val reported = diagnostics.filter {
-        it.code == DiagnosticCodes.PARSE_UNKNOWN_PROPERTY && it.jsonPath?.endsWith(name) == true
-      }
-      assertTrue(reported.isNotEmpty(), "'$name' was not reported: $diagnostics")
-    }
+  fun `an axis reports nothing, because every property is read`() {
+    val styled =
+      compile(
+          """{"orient": "bottom", "scale": "x", "labelBound": true, "tickMinStep": 5,
+              "tickRound": false, "tickBand": "extent", "position": 10, "translate": 0,
+              "labelOffset": 3, "aria": false, "description": "d", "tickCap": "round",
+              "gridCap": "round", "domainCap": "round", "tickDashOffset": 2}"""
+        )
+        .diagnostics
+    assertTrue(
+      styled.none { it.code == DiagnosticCodes.PARSE_UNKNOWN_PROPERTY },
+      "an axis reported something: $styled",
+    )
   }
 
   @Test
   fun `an axis encode block folds into the properties it duplicates`() {
     // Reported by name rather than dropped: a part nobody implements, a channel that part has no
-    // property for, and a channel that would need the axis's own datum to resolve.
+    // property for, and a channel a *plain string* property could not carry a signal into.
     val diagnostics =
       compile(
           """{"orient": "bottom", "scale": "x", "grid": true, "encode": {
               "grid": {"enter": {"strokeDash": {"value": [3, 3]},
                                  "x": {"value": 4},
                                  "strokeWidth": {"signal": "1 + 1"}}},
+              "labels": {"update": {"text": {"signal": "'E'"}}},
               "axis": {"enter": {"fill": {"value": "red"}}}}}"""
         )
         .diagnostics
     assertTrue(diagnostics.any { it.jsonPath?.endsWith("encode.axis") == true }, "$diagnostics")
     assertTrue(diagnostics.any { it.jsonPath?.endsWith("grid.enter.x") == true }, "$diagnostics")
-    assertTrue(
-      diagnostics.any { it.jsonPath?.endsWith("grid.enter.strokeWidth") == true },
-      "$diagnostics",
-    )
-    // The one it can honour says nothing at all.
+    // Both of these are honoured and say nothing: a constant dash pattern folds onto `gridDash`,
+    // and
+    // a **signal**-valued width folds onto `gridWidth`, which carries one as far as the builder.
     assertTrue(diagnostics.none { it.jsonPath?.endsWith("strokeDash") == true }, "$diagnostics")
+    assertTrue(diagnostics.none { it.jsonPath?.endsWith("strokeWidth") == true }, "$diagnostics")
   }
 
   @Test

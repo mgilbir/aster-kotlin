@@ -4,8 +4,10 @@ import dev.aster.vega.expression.NumberFormatSubset
 import dev.aster.vega.model.DiagnosticCodes
 import dev.aster.vega.model.DiagnosticCollector
 import dev.aster.vega.model.VegaValue
-import dev.aster.vega.model.asDouble
+import dev.aster.vega.model.asNumberOrNull
 import dev.aster.vega.model.asString
+import dev.aster.vega.model.roundHalfUp
+import dev.aster.vega.model.spec.Anchor
 import dev.aster.vega.model.spec.Direction
 import dev.aster.vega.model.spec.LegendOrient
 import dev.aster.vega.model.spec.LegendSpec
@@ -157,9 +159,17 @@ internal class LegendBuilder(
 
   // ---- one legend's content ---------------------------------------------------
 
-  private fun buildOne(spec: LegendSpec): Built? {
+  private fun buildOne(declared: LegendSpec): Built? {
     val id = ids.allocate()
-    val scaleName = spec.scale ?: return null
+    val scaleName = declared.scale ?: return null
+    // As in the axis builder: a styling property written as a signal is substituted once, here, so
+    // nothing below has to know the difference.
+    val spec =
+      declared.copy(
+        labelStyle = GuideStyle.resolved(declared.labelStyle, numbers, scaleName),
+        titleStyle = GuideStyle.resolved(declared.titleStyle, numbers, scaleName),
+        symbolStyle = GuideStyle.resolved(declared.symbolStyle, numbers, scaleName),
+      )
     val scale = scales[scaleName]
     if (scale == null) {
       diagnostics.error(
@@ -186,15 +196,18 @@ internal class LegendBuilder(
     // labels under it, which is upstream's `entry.items[0]` and the reason a ramp's title sits
     // level with the colours rather than with the whole block.
     val alongside = spec.titleOrient == "left"
-    val centreOver =
+    // The same distinction decides what a `titleAnchor` measures along, for the same reason: a
+    // ramp's
+    // anchor runs the width of the bar, a symbol legend's the width of the whole column of entries.
+    val titleReference =
       if (type == LegendType.GRADIENT || type == LegendType.DISCRETE) {
-        entries.firstOrNull()?.transformedBounds?.bottom ?: 0.0
-      } else entries.fold(RectD.Empty) { acc, node -> acc.union(node.transformedBounds) }.bottom
+        entries.firstOrNull()?.transformedBounds ?: RectD.Empty
+      } else entries.fold(RectD.Empty) { acc, node -> acc.union(node.transformedBounds) }
     val title =
       // A legend may name itself from a signal, exactly as an axis does — a chart whose measure is
       // chosen by a control has no constant to write down.
       titleTextOf(spec, scaleName)?.let {
-        titleNode(spec, scaleName, it, padding, alongside, 0.5 * centreOver)
+        titleNode(spec, scaleName, it, padding, alongside, titleReference)
       }
     val titleReach = title?.let { it.bounds.height + titlePadding } ?: 0.0
     val titleAside =
@@ -212,7 +225,26 @@ internal class LegendBuilder(
         metadata = NodeMetadata(role = "legend-entry", markName = scaleName),
       )
 
-    val content = listOfNotNull(body, title)
+    // A title that reaches left of the legend's own origin drags the whole legend right rather than
+    // being cut off: upstream's `legendGroupLayout` ends by measuring `title.bounds.x1 - padding`
+    // and, when it is negative, translating **both** the title and the entries by that much. It
+    // only
+    // happens once the title is aligned or anchored away from its default, which is exactly when a
+    // heading can extend backwards past the thing it labels.
+    val overhang = title?.let { roundHalfUp(it.transformedBounds.left - padding) } ?: 0.0
+    val content =
+      if (overhang < 0.0) {
+        listOfNotNull(body, title).map { node ->
+          when (node) {
+            is GroupNode ->
+              node.copy(
+                transform = Transform2D.translate(node.transform.e - overhang, node.transform.f)
+              )
+            is TextNode -> node.copy(x = node.x - overhang)
+            else -> node
+          }
+        }
+      } else listOfNotNull(body, title)
     // Upstream anchors the content bounds at the padding and rounds the result up, so a legend is
     // always a whole number of units across.
     val bounds = content.fold(RectD.Empty) { acc, node -> acc.union(node.transformedBounds) }
@@ -260,24 +292,63 @@ internal class LegendBuilder(
     text: String,
     padding: Double,
     alongside: Boolean = false,
-    centre: Double = 0.0,
+    /**
+     * The extent a `titleAnchor` measures along: the entries' own far edge, which is upstream's
+     * `s`. A top title runs along its width, a left title down its height.
+     */
+    reference: RectD = RectD.Empty,
   ): TextNode {
+    // Upstream reads a left title as `middle`-anchored and a top one as `start`-anchored, and both
+    // the alignment and the position follow from the anchor rather than from the orientation.
+    val anchor = spec.titleAnchor ?: if (alongside) Anchor.MIDDLE else Anchor.START
     val fontSize = numbers.resolve(spec.titleFontSize, scaleName) ?: LegendDefaults.TITLE_FONT_SIZE
     val run =
       TextRun(
         text = text,
         style = GuideStyle.text(spec.titleStyle, fontSize, LegendDefaults.TITLE_FONT_WEIGHT),
-        align = TextAlign.LEFT,
+        // `titleAlign` and `titleBaseline` are overrides: upstream derives both from the title's
+        // orientation and its anchor in `enter` and writes the explicit ones into `update`.
+        // For a top title the anchor sets the alignment too — `end` right-aligns it so its far edge
+        // meets the entries' rather than starting there and running past. A left title always
+        // aligns
+        // `left`, and carries the anchor in its baseline instead.
+        align =
+          GuideStyle.alignOf(spec.titleStyle.align)
+            ?: when {
+              alongside -> TextAlign.LEFT
+              anchor == Anchor.END -> TextAlign.RIGHT
+              anchor == Anchor.MIDDLE -> TextAlign.CENTER
+              else -> TextAlign.LEFT
+            },
         limit = numbers.resolve(spec.titleLimit, scaleName) ?: LegendDefaults.TITLE_LIMIT,
-        // Upstream reads a left or right title as `middle`-anchored where a top one is
-        // `start`-anchored, and the baseline follows the anchor.
-        baseline = if (alongside) TextBaseline.MIDDLE else TextBaseline.TOP,
+        baseline =
+          GuideStyle.baselineOf(spec.titleStyle.baseline)
+            ?: when {
+              !alongside -> TextBaseline.TOP
+              anchor == Anchor.START -> TextBaseline.TOP
+              anchor == Anchor.END -> TextBaseline.BOTTOM
+              else -> TextBaseline.MIDDLE
+            },
       )
+    val layout = textEngine.layout(run)
+    // The anchor slides the title along the entries it labels: upstream's `legendTitleOffset`,
+    // whose
+    // `s` is the entries' own far edge less the padding — so, in the entries' own coordinates, the
+    // extent they occupy. Its `o` keeps a multi-line title's *last* line level with the far edge
+    // rather than its first, and applies only when measuring downwards.
+    val span = if (alongside) reference.bottom else reference.right
+    val extraLines = if (alongside) (layout.lines.size - 1) * layout.metrics.lineHeight else 0.0
+    val along =
+      when (anchor) {
+        Anchor.START -> 0.0
+        Anchor.END -> roundHalfUp(span - extraLines)
+        Anchor.MIDDLE -> roundHalfUp(0.5 * (span - extraLines))
+      }
     return TextNode(
       id = ids.allocate(),
-      x = padding,
-      y = padding + if (alongside) centre else 0.0,
-      layout = textEngine.layout(run),
+      x = padding + if (alongside) 0.0 else along,
+      y = padding + if (alongside) along else 0.0,
+      layout = layout,
       fill = GuideStyle.fill(spec.titleStyle, LegendDefaults.titleColor),
       metadata = NodeMetadata(role = "legend-title", markName = spec.scale),
     )
@@ -314,7 +385,7 @@ internal class LegendBuilder(
     scale: VegaScale,
     scaleName: String,
   ): List<SceneNode> {
-    val entries = entryValues(spec, scale, scaleName)
+    val entries = limited(spec, entryValues(spec, scale, scaleName), scaleName)
     if (entries.isEmpty()) return emptyList()
 
     val vertical = isVertical(spec)
@@ -331,10 +402,18 @@ internal class LegendBuilder(
     // than one symbol repeated down the column. The legend exists to say which outline means which
     // category, so a column of identical circles is not a smaller version of the right answer.
     val shapes = entries.map { symbolShapeFor(spec, it.value, shape) }
+    // A `strokeWidth` scale widens the swatch's outline per entry — and upstream's row-height
+    // expression reads that scale, not the `symbolStrokeWidth` property, so a legend keyed to it
+    // has
+    // rows of different heights.
+    val widths = entries.map { strokeWidthFor(spec, it.value, strokeWidth) }
+    val dashes = entries.map { strokeDashFor(spec, it.value) }
     val clipHeight = numbers.resolve(spec.clipHeight, scaleName)
     // A row is as tall as the taller of its symbol and its label, and upstream rounds the symbol's
     // contribution up before comparing: this is the number every offset within a cell derives from.
-    val measured = sizes.map { maxOf(ceil(sqrt(it) + strokeWidth), labelFontSize) }
+    val measured = sizes.mapIndexed { index, size ->
+      maxOf(ceil(sqrt(size) + widths[index]), labelFontSize)
+    }
     // `clipHeight` replaces that measurement **vertically only**. The horizontal anchor still comes
     // from the real symbols — upstream's `datum.offset` is the widest of them whatever the rows are
     // clipped to — so a clipped legend's labels still clear its biggest circle.
@@ -345,6 +424,10 @@ internal class LegendBuilder(
 
     val labelStyle = GuideStyle.text(spec.labelStyle, labelFontSize, defaultWeight = 400)
     val labelLimit = numbers.resolve(spec.labelLimit, scaleName) ?: LegendDefaults.LABEL_LIMIT
+    // `symbolOffset` shifts the swatch **and its label** along the row: upstream builds the label's
+    // own offset by extending the symbol's, so the gap between the two stays `labelOffset` whatever
+    // the symbol offset is.
+    val symbolOffset = numbers.resolve(spec.symbolOffset, scaleName) ?: LegendDefaults.SYMBOL_OFFSET
 
     // Build each entry at its own origin first: the layout below needs to know how far a cell
     // reaches
@@ -353,19 +436,19 @@ internal class LegendBuilder(
       val box = boxes[index]
       val anchor = if (vertical) widest else measured[index]
       val centre = box * 0.5
-      val labelX = anchor + LegendDefaults.SYMBOL_OFFSET + labelOffset
+      val labelX = anchor + symbolOffset + labelOffset
       val run =
         TextRun(
           text = entryText(spec, "labels", "text", entry) ?: entry.label,
           style = labelStyle,
-          align = TextAlign.LEFT,
-          baseline = TextBaseline.MIDDLE,
+          align = GuideStyle.alignOf(spec.labelStyle.align) ?: TextAlign.LEFT,
+          baseline = GuideStyle.baselineOf(spec.labelStyle.baseline) ?: TextBaseline.MIDDLE,
           limit = labelLimit,
         )
       listOf(
         SymbolNode(
           id = ids.allocate(),
-          x = anchor * 0.5 + LegendDefaults.SYMBOL_OFFSET,
+          x = anchor * 0.5 + symbolOffset,
           y = centre,
           size = sizes[index],
           shape = shapes[index],
@@ -377,7 +460,7 @@ internal class LegendBuilder(
               entryNumber(spec, "symbols", "fillOpacity", entry)?.let { fill.copy(opacity = it) }
                 ?: fill
             },
-          stroke = symbolStroke(spec, entry.value, strokeWidth),
+          stroke = symbolStroke(spec, entry.value, widths[index], dashes[index]),
           // `symbolOpacity` is the item's overall opacity upstream, not a fill or stroke opacity —
           // it fades the outline with the swatch rather than only what is inside it. The `encode`
           // block wins over the property, and it is where an *interactive* legend lives: a swatch
@@ -409,7 +492,7 @@ internal class LegendBuilder(
     val columns =
       numbers.resolveInt(spec.columns, scaleName)?.coerceAtLeast(1)
         ?: if (vertical) 1 else cells.size
-    return place(cells, columns, rowPadding, columnPadding, scaleName, clipHeight)
+    return place(cells, columns, rowPadding, columnPadding, scaleName, clipHeight, spec.gridAlign)
   }
 
   /**
@@ -432,6 +515,15 @@ internal class LegendBuilder(
      * entire reason a specification sets one.
      */
     clipHeight: Double? = null,
+    /**
+     * `gridAlign`, which upstream defaults to `each` in `config.legend` rather than leaving unset.
+     *
+     * That default is what makes the entry grid centre its rows, since the centring is conditional
+     * on the alignment: a row of entries of unequal height — the natural shape of a legend keyed to
+     * a `strokeWidth` scale — has each shorter one lowered by half its slack. `none` turns both
+     * off.
+     */
+    gridAlign: String? = null,
   ): List<SceneNode> {
     val order = GridLayout.columnMajorOrder(cells.size, columns)
     val ordered = order.map { cells[it] }
@@ -439,7 +531,22 @@ internal class LegendBuilder(
       val measured = cell.fold(RectD.Empty) { acc, node -> acc.union(node.bounds) }
       if (clipHeight == null) measured else RectD(measured.left, 0.0, measured.right, clipHeight)
     }
-    val offsets = GridLayout.place(boxes, GridLayout.Options(columns, rowPadding, columnPadding))
+    val align = GridLayout.Align.fromName(gridAlign)
+    val offsets =
+      GridLayout.place(
+        boxes,
+        GridLayout.Options(
+          columns,
+          rowPadding,
+          columnPadding,
+          alignColumn = align,
+          alignRow = align,
+          // `center: {row: true, column: false}` — upstream's, and not symmetrical: entries in a
+          // row
+          // are centred against the tallest, while a column is left alone.
+          centerRow = true,
+        ),
+      )
 
     return ordered.indices.map { position ->
       val offset = offsets[position]
@@ -516,8 +623,28 @@ internal class LegendBuilder(
   private fun symbolSizeFor(spec: LegendSpec, value: VegaValue, declared: Double): Double {
     val sizeScale = spec.size?.let { scales[it] } ?: return declared
     val mapped = sizeScale.scale(value)
-    val number = (mapped as? VegaValue.Num)?.value
+    val number = mapped.asNumberOrNull()
     return if (number != null && number.isFinite() && number > 0.0) number else declared
+  }
+
+  /** The width a `strokeWidth` scale gives this entry's outline, or the declared one. */
+  private fun strokeWidthFor(spec: LegendSpec, value: VegaValue, declared: Double): Double {
+    val scale = spec.strokeWidthScale?.let { scales[it] } ?: return declared
+    val number = scale.scale(value).asNumberOrNull()
+    return if (number != null && number.isFinite() && number >= 0.0) number else declared
+  }
+
+  /**
+   * The dash pattern a `strokeDash` scale gives this entry, or none.
+   *
+   * The range of such a scale is a list *of lists*, so the mapped value is itself an array — a
+   * legend for a chart whose series are told apart by line style, which is the reason the channel
+   * exists.
+   */
+  private fun strokeDashFor(spec: LegendSpec, value: VegaValue): List<Double>? {
+    val scale = spec.strokeDashScale?.let { scales[it] } ?: return null
+    val mapped = scale.scale(value) as? VegaValue.Arr ?: return null
+    return mapped.values.mapNotNull { (it as? VegaValue.Num)?.value }.takeIf { it.isNotEmpty() }
   }
 
   /**
@@ -532,17 +659,28 @@ internal class LegendBuilder(
    * `stroke` scale therefore gets the transparent fill too — it draws the same either way, but a
    * comparison against upstream can see the difference and a stroke-only legend is common.
    */
+  /**
+   * A legend symbol's fill.
+   *
+   * `symbolFillColor` is a **fallback**, not an override: upstream passes it to `addEncoders` and
+   * then overwrites the channel from the scale for every legend that maps one, so a `fill` scale
+   * wins and a `size` or `shape` legend takes the stated colour. Its own default in that case is
+   * `config.symbolBaseFillColor`, which is transparent — an unfilled swatch with a grey outline.
+   *
+   * A swatch's own `encode` block beats both: it is how a legend explaining *some other* channel
+   * still shows the colour its marks are drawn in.
+   */
   private fun symbolFill(spec: LegendSpec, entry: Entry): Fill? {
-    // A swatch's own `encode` block beats every scale: it is how a legend that explains *some
-    // other*
-    // channel still shows the colour its marks are drawn in.
     entryText(spec, "symbols", "fill", entry)
       ?.let { SceneColor.parse(it) }
       ?.let {
         return Fill.of(it)
       }
     val fillScale = spec.fill?.let { scales[it] }
-    if (fillScale == null) return Fill.of(SceneColor.Transparent)
+    if (fillScale == null) {
+      val stated = spec.symbolFillColor?.let { SceneColor.parse(it) }
+      return Fill.of(stated ?: SceneColor.Transparent)
+    }
     val colour = SceneColor.parse(fillScale.scale(entry.value).asString()) ?: return null
     return Fill.of(colour)
   }
@@ -565,36 +703,36 @@ internal class LegendBuilder(
    * When the legend maps no colour at all — a `size` or `shape` legend — upstream outlines the
    * swatch in grey and leaves it unfilled, rather than inventing a fill the scale never assigned.
    */
-  private fun symbolStroke(spec: LegendSpec, value: VegaValue, width: Double): Stroke? {
-    // A legend over a `strokeDash` scale draws each swatch in *its own* pattern — that is the whole
-    // of what it explains, and a column of identical solid strokes beside a chart of dashed ones
-    // says nothing. An explicit `symbolDash` still wins, as any stated property does.
-    val scaledDash: List<Double>? =
-      spec.strokeDash?.let { name ->
-        val scaled = scales[name]?.scale(value) as? VegaValue.Arr ?: return@let null
-        val pattern = scaled.values.map { it.asDouble() }
-        pattern.takeIf { it.isNotEmpty() && it.all { step -> step.isFinite() && step >= 0.0 } }
-      }
-    val dash = spec.symbolStyle.dash ?: scaledDash ?: emptyList()
+  private fun symbolStroke(
+    spec: LegendSpec,
+    value: VegaValue,
+    width: Double,
+    scaledDash: List<Double>? = null,
+  ): Stroke? {
+    val dash = scaledDash ?: spec.symbolStyle.dash ?: emptyList()
+    val dashOffset = spec.symbolStyle.dashOffset ?: 0.0
+    fun outline(colour: SceneColor) =
+      Stroke(
+        paint = ScenePaint.Solid(colour),
+        width = width,
+        dashArray = dash,
+        dashOffset = dashOffset,
+      )
     // An explicit `symbolStrokeColor` outlines every swatch, whatever the scales say.
     spec.symbolStyle.color
       ?.let { SceneColor.parse(it) }
       ?.let {
-        return Stroke(paint = ScenePaint.Solid(it), width = width, dashArray = dash)
+        return outline(it)
       }
     val strokeScale = spec.stroke?.let { scales[it] }
     if (strokeScale != null) {
       val colour = SceneColor.parse(strokeScale.scale(value).asString())
-      if (colour != null) {
-        return Stroke(paint = ScenePaint.Solid(colour), width = width, dashArray = dash)
-      }
+      if (colour != null) return outline(colour)
     }
-    if (spec.fill != null || spec.stroke != null) return null
-    return Stroke(
-      paint = ScenePaint.Solid(LegendDefaults.symbolBaseStrokeColor),
-      width = width,
-      dashArray = dash,
-    )
+    // Upstream's test is on the **fill** channel alone: a legend that maps no fill gets the base
+    // outline colour, and that is what makes the swatches of a dash or width legend visible at all.
+    if (spec.fill != null) return null
+    return outline(LegendDefaults.symbolBaseStrokeColor)
   }
 
   // ---- gradient legends -------------------------------------------------------
@@ -643,14 +781,25 @@ internal class LegendBuilder(
           ),
         stroke =
           Stroke(
-            paint = ScenePaint.Solid(LegendDefaults.gradientStrokeColor),
-            width = LegendDefaults.GRADIENT_STROKE_WIDTH,
+            paint =
+              ScenePaint.Solid(
+                spec.gradientStrokeColor?.let { SceneColor.parse(it) }
+                  ?: LegendDefaults.gradientStrokeColor
+              ),
+            width =
+              numbers.resolve(spec.gradientStrokeWidth, scaleName)
+                ?: LegendDefaults.GRADIENT_STROKE_WIDTH,
           ),
+        // `gradientOpacity` fades the whole ramp — the outline with the colours — because upstream
+        // puts it on the item rather than on either paint.
         metadata = NodeMetadata(role = "legend-gradient", markName = scaleName),
-        // `encode.gradient` is where a ramp's own opacity is written: a legend beside a chart of
-        // translucent marks is drawn as translucent as they are, and reading only the defaults
-        // painted it solid.
-        opacity = entryNumber(spec, "gradient", "opacity", Entry(VegaValue.Null, "")) ?: 1.0,
+        // `encode.gradient` is where a ramp's own opacity is written, and it beats the property:
+        // a legend beside a chart of translucent marks is drawn as translucent as they are, and
+        // reading only the defaults painted it solid.
+        opacity =
+          entryNumber(spec, "gradient", "opacity", Entry(VegaValue.Null, ""))
+            ?: numbers.resolve(spec.gradientOpacity, scaleName)
+            ?: 1.0,
       )
 
     val nodes = mutableListOf<SceneNode>(swatch)
@@ -894,7 +1043,13 @@ internal class LegendBuilder(
     // short
     // gradient does not end up with labels on top of each other.
     val count =
-      numbers.resolveInt(spec.tickCount, scaleName) ?: maxOf(2, 2 * floor(length / 100.0).toInt())
+      GuideFormat.countWithMinStep(
+        numbers.resolveInt(spec.tickCount, scaleName)
+          ?: maxOf(2, 2 * floor(length / 100.0).toInt()),
+        numbers.resolve(spec.tickMinStep, scaleName),
+        scale.domain,
+        linear = true,
+      )
     val values = scale.ticks(count)
     val format = numberLabeller(spec, scale.domain.first(), scale.domain.last(), count)
     val labels = format?.let { f -> values.map { f(it) } } ?: scale.tickLabels(count)
@@ -923,6 +1078,11 @@ internal class LegendBuilder(
     high: Double,
     count: Int,
   ): ((Double) -> String)? {
+    // `formatType` decides the grammar before the scale or the specifier gets a say, which is how a
+    // legend over instants reads as dates: its scale is a colour ramp and knows nothing about time.
+    GuideFormat.timeLabeller(spec.format, spec.formatType)?.let {
+      return it
+    }
     val specifier = spec.format ?: return null
     val resolved = Ticks.spanSpecifier(specifier, low, high, count)
     return { value -> NumberFormatSubset.format(value, resolved) }
@@ -950,6 +1110,23 @@ internal class LegendBuilder(
         else -> TimeFormat.format(instant, specifier, zone)
       }
     }
+  }
+
+  /**
+   * `symbolLimit`: the most entries a symbol legend will show.
+   *
+   * Upstream keeps `limit - 1` of them and spends the last slot on a summary — `…12 entries` — so a
+   * limit of 5 shows four swatches and a fifth row saying how many were left out. The count in that
+   * row is of the entries **not shown**, and the swatch beside it takes the *next* value's own
+   * size, so a size legend's summary row is drawn at the size of the first thing it stands for. A
+   * limit that the entries already fit inside does nothing at all.
+   */
+  private fun limited(spec: LegendSpec, entries: List<Entry>, scaleName: String): List<Entry> {
+    val limit = numbers.resolveInt(spec.symbolLimit, scaleName) ?: return entries
+    if (limit <= 0 || entries.size <= limit) return entries
+    val kept = entries.take(limit - 1)
+    val remainder = entries.size - kept.size
+    return kept + Entry(entries[kept.size].value, "\u2026$remainder entries")
   }
 
   /** Numeric entries, with the legend's own format applied when it named one. */
@@ -1148,6 +1325,8 @@ internal class LegendBuilder(
         spec.shape?.let { "shape" },
         spec.fill?.let { "fill" },
         spec.stroke?.let { "stroke" },
+        spec.strokeWidthScale?.let { "strokeWidth" },
+        spec.strokeDashScale?.let { "strokeDash" },
         spec.opacity?.let { "opacity" },
       )
     val scaleName = spec.scale ?: return null
@@ -1162,23 +1341,48 @@ internal class LegendBuilder(
     // `array(item.text).join(' ')`. The lines reach here already joined by the newline the text
     // node draws on, and turning them back into spaces is the same operation.
     val title = titleTextOf(spec, scaleName)?.replace("\n", " ")
-    return GuideCaption.legend(kind, title, channels, scale, spec.format)
+    return GuideCaption.legend(kind, title, channels, scale, spec.format, spec.formatType)
   }
 
-  private fun node(built: Built, x: Double, y: Double): SceneNode =
-    GroupNode(
+  private fun node(built: Built, x: Double, y: Double): SceneNode {
+    val spec = built.spec
+    // The legend's own background, which nothing drew until now. Its width and dash come from
+    // `config.legend` rather than from the legend itself, which is upstream's rule and not a tidy
+    // one; see [LegendSpec.fillColor].
+    val backgroundFill = spec.fillColor?.let { SceneColor.parse(it) }?.let { Fill.of(it) }
+    val backgroundStroke =
+      spec.strokeColor
+        ?.let { SceneColor.parse(it) }
+        ?.let {
+          Stroke(
+            paint = ScenePaint.Solid(it),
+            width = spec.backgroundStrokeWidth ?: 1.0,
+            dashArray = spec.backgroundStrokeDash.orEmpty(),
+          )
+        }
+    return GroupNode(
       id = built.id,
       children = built.content,
       transform = Transform2D.translate(x, y),
       size = built.size,
+      fill = backgroundFill,
+      stroke = backgroundStroke,
+      cornerRadius = numbers.resolve(spec.cornerRadius, spec.scale ?: "legend") ?: 0.0,
       metadata =
         NodeMetadata(
           role = "legend",
           markName = built.spec.scale,
+          // `aria: false` takes the legend out of the accessibility tree; a `description` replaces
+          // the caption this engine generates from the scale.
           accessibility =
-            caption(built)?.let {
-              AccessibilityDescriptor(label = it, role = "graphics-symbol", focusable = true)
+            if (!spec.aria) {
+              null
+            } else {
+              (spec.description ?: caption(built))?.let {
+                AccessibilityDescriptor(label = it, role = "graphics-symbol", focusable = true)
+              }
             },
         ),
     )
+  }
 }

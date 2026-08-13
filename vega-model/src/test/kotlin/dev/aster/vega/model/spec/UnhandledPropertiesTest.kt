@@ -41,9 +41,12 @@ class UnhandledPropertiesTest {
       .trimIndent()
 
   /**
-   * Two of upstream's 23 scale properties remain. `domainMin`, `domainMax` and `domainMid` were the
-   * ones in wide use, and `bins` was the last one a real example needed; all four are implemented
-   * rather than reported.
+   * None of upstream's 23 scale properties is reported any more.
+   *
+   * Kept, and kept naming the six that were the last to arrive — `domainMin`, `domainMax`,
+   * `domainMid`, `bins`, `domainRaw` and `domainImplicit`. One that stopped being honoured would go
+   * back to being reported here, which is the failure this test exists to produce; the empty list
+   * only says that today none of them is.
    */
   @Test
   fun `a scale reports the domain overrides it cannot honour`() {
@@ -56,14 +59,19 @@ class UnhandledPropertiesTest {
               "domainRaw": [1, 2], "domainImplicit": true, "bins": [0, 5, 10]}]"""
         )
       )
-    // `bins` was on this list and is implemented; the two left are genuinely unread.
-    assertEquals(listOf("domainImplicit", "domainRaw").sorted(), reported.sorted())
+    assertEquals(emptyList<String>(), reported.sorted())
   }
 
   /**
-   * `labelColor`, `labelFont` and `symbolDash` are implemented and so do not appear. What remains
-   * is the legend's own background — `strokeColor`, `cornerRadius` — which nothing draws yet, and
-   * `symbolFillColor`, which upstream applies only where the scale supplies no fill of its own.
+   * Nothing remains: all 72 of upstream's legend properties are read.
+   *
+   * `symbolFillColor` came off this list once it was understood to be a *fallback* rather than an
+   * override — upstream sets the channel from it and then overwrites it from the scale, so only a
+   * `size` or `shape` legend ever takes the colour — and `clipHeight` came off because it had been
+   * implemented all along and was simply missing from `LEGEND_CONSUMED`, so it reported a gap that
+   * was not there. `gridAlign` was the last, and it is not the dead letter it looks like: upstream
+   * defaults it to `each` in `config.legend`, and the entry grid's row centring is conditional on
+   * being aligned, so a legend that set `none` was quietly centred anyway.
    */
   @Test
   fun `a legend reports the styling it cannot honour`() {
@@ -76,10 +84,44 @@ class UnhandledPropertiesTest {
               "cornerRadius": 4, "clipHeight": 10, "gridAlign": "each"}]"""
         )
       )
-    assertEquals(
-      listOf("symbolFillColor", "strokeColor", "cornerRadius", "clipHeight", "gridAlign").sorted(),
-      reported.sorted(),
-    )
+    assertEquals(emptyList<String>(), reported.sorted())
+  }
+
+  /**
+   * A signal in a guide's styling is **read**, and a value of an unreadable shape is reported.
+   *
+   * This was the quietest gap in the parser and it is now closed. `labelFontSize: {"signal": "n"}`
+   * always worked, because that property is read through `numberOrSignal`; `labelColor: {"signal":
+   * "c"}` did not, because the styling block took only a literal — and it said nothing, so a chart
+   * colouring its axis from a control drew black labels and looked finished. Both work now. What is
+   * still reported is a value that is neither: an array where a colour belongs is nothing anything
+   * can read, and saying so is the difference between a gap and a wrong chart.
+   */
+  @Test
+  fun `a guide's styling reads a signal and reports what it cannot`() {
+    val honoured =
+      ignored(
+        spec(
+          """"signals": [{"name": "c", "value": "#c00"}],
+             "scales": [{"name": "s", "type": "linear", "domain": [0, 1], "range": "width"}],
+             "axes": [{"scale": "s", "orient": "bottom", "labelColor": {"signal": "c"},
+              "tickWidth": {"signal": "2"}, "gridDash": {"signal": "[2,2]"},
+              "titleFontWeight": {"signal": "'bold'"}, "labelFontSize": {"signal": "12"}}],
+             "legends": [{"fill": "s", "labelColor": {"signal": "c"},
+              "symbolSize": {"signal": "40"}}]"""
+        )
+      )
+    assertEquals(emptyList<String>(), honoured.sorted())
+
+    val unreadable =
+      ignored(
+        spec(
+          """"scales": [{"name": "s", "type": "linear", "domain": [0, 1], "range": "width"}],
+             "axes": [{"scale": "s", "orient": "bottom", "labelColor": [1, 2],
+              "tickWidth": "wide"}]"""
+        )
+      )
+    assertEquals(listOf("labelColor", "tickWidth"), unreadable.sorted())
   }
 
   @Test
@@ -92,19 +134,19 @@ class UnhandledPropertiesTest {
               "baseline": "top"}"""
         )
       )
-    // `fontWeight`, `font` and `fontStyle` are read now — a theme setting the heading in
-    // `config.title` is ordinary, and both the weight and the slant change the *measurement*, not
-    // only the look. `color` and `subtitleColor` are read too: a Vega-Lite theme states the
-    // heading's colour and nothing else was carrying it, so a themed title drew black.
-    // `baseline` is read now too: a trellis caption centres itself against the row it labels, and
-    // hanging every one from its top put them all a line above where they belong.
-    assertEquals(listOf("lineHeight"), reported.sorted())
+    // Every one of these is read now. `color` and `subtitleColor` paint the two lines separately,
+    // `lineHeight` sets the gap between a heading's lines, and `baseline` overrides what `orient`
+    // implies — as `align` and `angle` override what `anchor` and `orient` imply.
+    assertEquals(emptyList<String>(), reported.sorted())
   }
 
   /**
-   * `limit` is the one that matters most here: a text mark that ignores it draws past the width it
-   * was told to stay inside, which overlaps a neighbour rather than leaving a gap, so the chart
-   * looks composed and reads wrong.
+   * Every channel in Vega's encoding vocabulary now reaches the scene, so this asserts silence.
+   *
+   * Kept rather than deleted, and kept naming the channels that were the last to arrive — the
+   * per-corner radii, `limit`/`ellipsis`, `tension`, polar `radius`/`theta`, `blend` and `clip`. A
+   * channel that stopped being honoured would go back to being reported here, which is the failure
+   * this test exists to produce; the empty list only says that today none of them is.
    */
   @Test
   fun `an encode entry reports the channels no encoder reads`() {
@@ -115,15 +157,38 @@ class UnhandledPropertiesTest {
               "xc": {"value": 10}, "yc": {"value": 10},
               "width": {"value": 5}, "height": {"value": 5},
               "strokeDash": {"value": [2, 2]}, "strokeCap": {"value": "round"},
-              "limit": {"value": 40}, "tooltip": {"value": "t"},
-              "cornerRadiusTopLeft": {"value": 2}, "zindex": {"value": 1},
+              "limit": {"value": 40}, "ellipsis": {"value": "~"},
+              "tooltip": {"value": "t"}, "zindex": {"value": 1},
+              "cornerRadiusTopLeft": {"value": 2}, "cornerRadiusBottomRight": {"value": 2},
+              "tension": {"value": 0.5}, "radius": {"value": 4}, "theta": {"value": 1},
+              "blend": {"value": "multiply"}, "clip": {"value": true},
               "cursor": {"value": "pointer"}}}}]"""
         )
       )
-    assertEquals(
-      listOf("limit", "tooltip", "cornerRadiusTopLeft", "zindex", "cursor").sorted(),
-      reported.sorted(),
-    )
+    assertEquals(emptyList<String>(), reported.sorted())
+  }
+
+  /**
+   * A `layout` block reports nothing: all ten of upstream's properties are read.
+   *
+   * Kept because inverting this block from a table of exceptions into a table of what it *consumes*
+   * is what found the last gap — `titleAnchor` had neither an entry nor a reader, so a trellis that
+   * anchored its cell titles was told nothing at all.
+   */
+  @Test
+  fun `a layout reports the properties it cannot honour`() {
+    val reported =
+      ignored(
+        spec(
+          """"marks": [{"type": "group", "from": {"facet": {"data": "t", "name": "cell",
+              "groupby": "c"}},
+             "layout": {"columns": 2, "padding": 5, "align": "each", "bounds": "flush",
+              "center": true, "offset": 4, "headerBand": 0.5, "footerBand": 0.5,
+              "titleBand": 0.5, "titleAnchor": "end"},
+             "marks": []}]"""
+        )
+      )
+    assertEquals(emptyList<String>(), reported.sorted())
   }
 
   /** A channel the engine does read is not reported, or the diagnostics would be noise. */
@@ -147,8 +212,12 @@ class UnhandledPropertiesTest {
 
   /**
    * The generic message is the safety net: it fires for a property nobody has written a tailored
-   * explanation for, including one upstream adds later. A tailored explanation wins where it
-   * exists, because "what will be drawn instead" is the useful half.
+   * explanation for, including one upstream adds later.
+   *
+   * Every block's table of tailored explanations is now empty — there is no property left in the
+   * whole inventory to point at — so the second half of this test looks one level *down* instead,
+   * at a **channel** a guide's `encode` block cannot express. That is where the remaining gaps are,
+   * and they are named one at a time rather than being reported as a whole block nobody reads.
    */
   @Test
   fun `a property nobody anticipated is still reported`() {
@@ -162,14 +231,14 @@ class UnhandledPropertiesTest {
         .single { it.jsonPath?.endsWith("somethingUpstreamAddedLater") == true }
     assertTrue("not implemented" in invented.message, invented.message)
 
-    val tailored =
+    val channel =
       diagnostics(
           spec(
-            """"scales": [{"name": "s", "type": "linear", "domain": [0, 1],
-                "range": "width", "domainRaw": [1, 2]}]"""
+            """"title": {"text": "T", "encode": {"title": {"update": {"x": {"value": 4},
+                  "fill": {"value": "#333"}}}}}"""
           )
         )
-        .single { it.jsonPath?.endsWith("domainRaw") == true }
-    assertTrue("resolved domain" in tailored.message, tailored.message)
+        .single { it.jsonPath?.endsWith("x") == true }
+    assertTrue("is not read" in channel.message, channel.message)
   }
 }

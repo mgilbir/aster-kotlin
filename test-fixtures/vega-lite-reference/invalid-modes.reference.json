@@ -719,7 +719,7 @@
       "type": "line"
     },
     {
-      "closed": 0,
+      "closed": 1,
       "points": "300 0",
       "role": "mark",
       "stroke": "#f58518",
@@ -727,7 +727,7 @@
       "type": "line"
     },
     {
-      "closed": 0,
+      "closed": 1,
       "points": "0 100",
       "role": "mark",
       "stroke": "#4c78a8",
@@ -735,7 +735,7 @@
       "type": "line"
     },
     {
-      "closed": 0,
+      "closed": 1,
       "points": "300 0",
       "role": "mark",
       "stroke": "#f58518",
