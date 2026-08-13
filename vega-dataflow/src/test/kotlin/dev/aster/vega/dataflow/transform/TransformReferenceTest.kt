@@ -782,7 +782,7 @@ class TransformReferenceTest {
     VegaValue.Obj(linkedMapOf("g" to VegaValue.Str(group), "v" to VegaValue.Num(value)))
 
   @Test
-  fun `the registry covers the transforms the brief lists, plus thirty-six more`() {
+  fun `the registry covers the transforms the brief lists, plus thirty-seven more`() {
     val fromTheBrief =
       setOf(
         "filter",
@@ -818,7 +818,9 @@ class TransformReferenceTest {
     // longitude and latitude placed on the page. `voronoi` is the region of the plane nearest to
     // each point, which an interactive scatter plot draws invisibly so the pointer has something to
     // hit. `geojson` gathers a table of coordinates into one `FeatureCollection` for a projection's
-    // `fit` to read, which is the ordinary way to fit a map to point data. `label` places a text
+    // `fit` to read, which is the ordinary way to fit a map to point data. `sample` keeps a
+    // reservoir of at most `size` rows, and it is deterministic here only because both engines draw
+    // from the same seeded stream. `label` places a text
     // mark
     // beside the marks it annotates, dropping the ones that would
     // collide — the one transform here whose fidelity is not established against upstream, because
@@ -858,6 +860,7 @@ class TransformReferenceTest {
         "geoshape" +
         "geopoint" +
         "geojson" +
+        "sample" +
         "graticule" +
         "voronoi" +
         "label",
@@ -1229,6 +1232,39 @@ class TransformReferenceTest {
         """[{"type": "pivot", "field": "c", "value": "v", "groupby": ["k"], "limit": 2}]""",
         wide,
       ),
+    )
+  }
+
+  /** Twelve rows for `sample`, whose output depends on how many it has seen. */
+  private val squares =
+    (0..11).joinToString(",", "[", "]") { i ->
+      """{"c": "${('a' + i)}", "v": ${i * i}}"""
+    }
+
+  /**
+   * `sample` keeps the reservoir's order, not the input's.
+   *
+   * Every vector below is upstream's, over the same seeded stream the oracle installs, and the
+   * middle one is the point: a `size` the data already fits inside passes every row through in
+   * order, so the transform costs nothing and reorders nothing. The other two show what replacement
+   * in place looks like — `j` sits third because it landed in slot 2 long after `c` had left it,
+   * while `b` is still in slot 1 because nothing was ever offered that slot.
+   */
+  @Test
+  fun `sample keeps a reservoir of rows`() {
+    assertEquals(
+      """[{"c":"i","v":64},{"c":"b","v":1},{"c":"j","v":81},{"c":"f","v":25}]""",
+      run("""[{"type": "sample", "size": 4}]""", squares),
+    )
+    assertEquals(
+      """[{"c":"a","v":0},{"c":"b","v":1},{"c":"c","v":4},{"c":"d","v":9},{"c":"e","v":16},""" +
+        """{"c":"f","v":25},{"c":"g","v":36},{"c":"h","v":49},{"c":"i","v":64},{"c":"j","v":81},""" +
+        """{"c":"k","v":100},{"c":"l","v":121}]""",
+      run("""[{"type": "sample", "size": 20}]""", squares),
+    )
+    assertEquals(
+      """[{"c":"j","v":81}]""",
+      run("""[{"type": "sample", "size": 1}]""", squares),
     )
   }
 

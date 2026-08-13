@@ -140,6 +140,58 @@ public object IdentifierTransform : Transform {
 }
 
 /**
+ * `sample`: keeps at most `size` rows, chosen by reservoir sampling.
+ *
+ * A transcription of upstream's algorithm rather than of its intent, because the two differ in ways
+ * a fixture can see. The reservoir fills with the first `size` rows in order; after that each row
+ * is offered slot `trunc((seen + 1) * random())` and taken only if that slot is inside the
+ * reservoir, so a later row *replaces* an earlier one in place. The output is therefore the
+ * reservoir's own order, not the input's — row 30 may sit between rows 2 and 4 — and the counter
+ * advances for every row including the ones that filled the reservoir, which is what makes the
+ * acceptance probability `size / seen`.
+ *
+ * Deterministic here for the same reason it is in the oracle: both draw from the seeded stream that
+ * upstream's `setRandom` installs, so the same rows survive on both sides. A specification running
+ * against a real random source gets a different sample every render, upstream included.
+ *
+ * Input shorter than `size` passes through untouched, which is the case worth knowing about: a
+ * `sample` that never fires costs nothing and reorders nothing.
+ */
+public object SampleTransform : Transform {
+  override val type: String = "sample"
+
+  override fun apply(
+    input: List<VegaValue>,
+    params: VegaValue.Obj,
+    context: TransformContext,
+  ): List<VegaValue> {
+    val size = params.number("size")?.takeIf { it.isFinite() } ?: DEFAULT_SIZE
+    val capacity = size.toInt()
+    if (capacity <= 0) return emptyList()
+    if (input.size <= capacity) return input
+
+    val random = context.scope.random
+    val reservoir = ArrayList<VegaValue>(capacity)
+    var seen = 0
+    for (row in input) {
+      if (reservoir.size < capacity) {
+        reservoir.add(row)
+      } else {
+        // `~~((cnt + 1) * random())`: truncation toward zero, and `cnt` counts the rows *before*
+        // this one, so the first row past the reservoir is offered one of `capacity + 1` slots.
+        val slot = ((seen + 1) * random.next()).toInt()
+        if (slot < reservoir.size) reservoir[slot] = row
+      }
+      seen++
+    }
+    return reservoir
+  }
+
+  /** Upstream's default, from `Sample.Definition`. */
+  private const val DEFAULT_SIZE = 1000.0
+}
+
+/**
  * `extent`: publishes a field's `[min, max]` as a signal and leaves the data untouched.
  *
  * Missing values are excluded, verified against upstream: a field of `[1, 9, null]` yields `[1,
