@@ -159,6 +159,7 @@ scale output:
 | `symbols-and-curves` | 17 | the seven built-in symbol shapes and three curve families nothing had drawn |
 | `timeunit-units` | 25 | quarter, dayofyear, minutes, seconds and milliseconds, labelled by the instant each bucket starts |
 | `projection-families` | 84 | the twelve projections nothing had drawn, each with the same graticule and the same four cities |
+| `parse-date-patterns` | 27 | a column of dates read with a stated format rather than a guessed one, local and UTC, one pattern quoted |
 
 The gate is wired into `./scripts/oracle.sh`, so every further scale, mark and transform is built
 against a harness that can say we are wrong — which golden tests cannot.
@@ -217,7 +218,7 @@ substantive compatibility items:
 | 6. View and Compose APIs | Yes |
 | 7. SVG, PNG, PDF export | Yes |
 | 8. TalkBack can describe and navigate | Partial — virtual nodes are tested by instrumentation, not with TalkBack itself |
-| 9. At least 100 compatibility fixtures pass | **Yes** — 173 |
+| 9. At least 100 compatibility fixtures pass | **Yes** — 174 |
 | 10. Core runtime has no Android dependency | Yes |
 | 11. Renders without WebView | Yes |
 | 12. Build and test loop runs from the terminal | Yes |

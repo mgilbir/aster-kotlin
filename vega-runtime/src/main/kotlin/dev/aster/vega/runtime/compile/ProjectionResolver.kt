@@ -98,7 +98,8 @@ internal class ProjectionResolver(
     when (value) {
       null -> null
       is NumberValue.Constant -> value.value
-      is NumberValue.Signal -> numbers.resolve(value, owner)
+      is NumberValue.Signal,
+      is NumberValue.Reference -> numbers.resolve(value, owner)
     }
 
   private fun numberList(values: NumberList, owner: String): List<Double> =

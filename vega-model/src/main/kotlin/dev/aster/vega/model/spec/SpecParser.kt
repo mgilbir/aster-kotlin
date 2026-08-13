@@ -3267,9 +3267,15 @@ public class SpecParser {
     if (value is VegaValue.Obj) {
       val signal = value.fields["signal"]?.asString()
       if (signal != null) return NumberValue.Signal(signal)
+      // Upstream's `numberValue` is a **value reference**, so a guide's number may go through a
+      // scale: `{"scale": "ord", "value": "Cylinders", "mult": -1}` is how parallel coordinates
+      // spaces its seven axes. Refusing it left every one of them at the same offset, stacked.
+      parseChannel(key, value, path)?.let {
+        return NumberValue.Reference(it)
+      }
       diagnostics.warn(
         DiagnosticCodes.PARSE_UNKNOWN_PROPERTY,
-        "'$key' must be a number or a signal reference",
+        "'$key' must be a number, a signal reference or a scaled value",
         jsonPath = path,
       )
       return null

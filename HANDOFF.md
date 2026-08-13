@@ -9,7 +9,7 @@ Branch `milestone-0-bootstrap`. Working tree clean, both gates green:
 - `./scripts/check.sh` — format, all tests, lint, demo APK
 - `./scripts/oracle.sh` — regenerates upstream references and runs the differential comparison
 
-**173 differential fixtures pass, all matching upstream exactly.** That is the only number here
+**174 differential fixtures pass, all matching upstream exactly.** That is the only number here
 that means what it says.
 
 ## Read this before trusting the other number
@@ -252,9 +252,34 @@ is arithmetic. See SUPPORTED_FEATURES.md for the three behaviours that had to co
 rather than from its schema — in particular that **an omitted force parameter falls to d3's default,
 not the one Vega documents**, because Vega only forwards the parameters a specification wrote.
 
+## Read the diagnostics the 93 examples produce, not just the clean count
+
+The triage reports a *count* of warnings per example and nothing about what they say, which hides both
+real gaps and pure noise. Compile all 93 through `SpecCompiler` and group the messages — twenty lines
+of throwaway test — and the distribution is the work list. It has now been run once and found three
+things worth having, in the order the counts put them:
+
+- **406 × "Cannot read field 'Year' as 'date:%Y-%m-%d'".** Upstream's `parse` takes `date:` and `utc:`
+  followed by a d3 pattern, quoted or not, split on the *first* colon. Without it a whole column stays
+  text and an axis is drawn from strings. The parser for it already existed — `TimeParse`, written for
+  the expression `timeParse` — and was simply not wired to the loader.
+- **7 × "'offset' must be a number or a signal reference".** Upstream's `numberValue` is a **value
+  reference**, so a guide's number may go through a scale: parallel coordinates writes
+  `{"scale": "ord", "value": "Cylinders", "mult": -1}` on each of seven axes, which is how they end up
+  side by side rather than stacked. Resolved by the encoder's own channel code against the empty datum
+  a guide has.
+- **318 × "Could not parse colour 'null'".** Pure noise, and the third time this class of thing has
+  turned up: a colour that resolves to nothing is *no paint*, not a bad colour. Stringifying first
+  turned every unset stroke into the word "null" and then into a complaint, on charts that were
+  drawing correctly.
+
+The rest are honest: input widgets that have no equivalent here, the extended projection family
+upstream itself refuses, `wordcloud`, and two properties (`marknames`, a mark-level `index`) that are
+in nobody's schema and are ignored by both engines.
+
 ## What is left: two examples, and neither can be verified
 
-**173 differential fixtures pass. 91 of the 93 examples compile clean.** Everything that can be
+**174 differential fixtures pass. 91 of the 93 examples compile clean.** Everything that can be
 checked against upstream has been.
 
 ### `projections` — upstream refuses it too

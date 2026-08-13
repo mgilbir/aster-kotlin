@@ -14064,6 +14064,38 @@
   "hidden": false
  },
  {
+  "fixture": "parse-date-patterns",
+  "kind": "group",
+  "role": "graphics-object",
+  "roleDescription": "group mark container",
+  "label": null,
+  "hidden": false
+ },
+ {
+  "fixture": "parse-date-patterns",
+  "kind": "line",
+  "role": "graphics-symbol",
+  "roleDescription": "line mark container",
+  "label": null,
+  "hidden": false
+ },
+ {
+  "fixture": "parse-date-patterns",
+  "kind": "symbol",
+  "role": "graphics-symbol",
+  "roleDescription": "symbol mark container",
+  "label": null,
+  "hidden": false
+ },
+ {
+  "fixture": "parse-date-patterns",
+  "kind": "text",
+  "role": "graphics-object",
+  "roleDescription": "text mark container",
+  "label": null,
+  "hidden": false
+ },
+ {
   "fixture": "path-marks",
   "kind": "group",
   "role": "graphics-object",

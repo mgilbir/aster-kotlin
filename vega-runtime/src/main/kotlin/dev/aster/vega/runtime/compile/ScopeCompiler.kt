@@ -190,7 +190,10 @@ internal class ScopeCompiler(
     // ten-thousand-row scatter it would be a lot of it.
     val readBack = sourceNames(marks)
 
-    val numbers = NumberResolver(expressions, scope.signals, diagnostics)
+    // The encoder is built first so the resolver can read a **scaled** guide number through it — an
+    // axis `offset` written `{"scale": "ord", "value": "Cylinders"}` is resolved by exactly the
+    // code
+    // that resolves a mark's channel, against the empty datum a guide has.
     val encoder =
       MarkEncoder(
         scope.scales,
@@ -203,6 +206,10 @@ internal class ScopeCompiler(
         textEngine,
         extent,
       )
+    val numbers =
+      NumberResolver(expressions, scope.signals, diagnostics) { channel ->
+        encoder.channelNumber(channel, VegaValue.EmptyObject)
+      }
     // The encoder goes to the axis builder as well: a label's `encode` block resolves through the
     // same channel machinery a mark's does, over the tick as its datum.
     val axisBuilder =

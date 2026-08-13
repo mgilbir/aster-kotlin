@@ -73,6 +73,17 @@ public sealed interface NumberValue {
   public data class Constant(val value: Double) : NumberValue
 
   public data class Signal(val expression: String) : NumberValue
+
+  /**
+   * A **value reference**, which is what upstream's `numberValue` actually is.
+   *
+   * A guide's number may be put through a scale like any encode channel: parallel coordinates
+   * writes `"offset": {"scale": "ord", "value": "Cylinders", "mult": -1}` on each of its seven
+   * axes, which is how they end up side by side. There is no datum to resolve against — a guide
+   * property is resolved once — so only the datum-free forms mean anything here, and they are the
+   * ones a specification writes.
+   */
+  public data class Reference(val channel: ChannelValue) : NumberValue
 }
 
 /**
