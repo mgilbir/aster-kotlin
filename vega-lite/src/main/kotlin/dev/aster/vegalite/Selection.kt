@@ -75,6 +75,10 @@ internal class Selection(
   val byIdentity: Boolean
     get() = type != "interval" && fields.isEmpty() && channels.isEmpty()
 
+  /** Whether the voronoi overlay's cells are stripes along one channel rather than tiles. */
+  private fun projectedChannels(view: UnitView): Set<String> =
+    projections(view).mapNotNull { it.first }.toSet()
+
   companion object {
 
     /** `CONTINUOUS_DOMAIN_SCALES` in `scale.ts`. */
@@ -628,8 +632,9 @@ internal class Selection(
    */
   fun voronoiMark(view: UnitView): VegaValue? {
     if (!nearest || view.spec.mark in PATH_MARKS) return null
-    val hasX = intervalChannels(view).any { it.first == "x" } || channels.isEmpty()
-    val hasY = intervalChannels(view).any { it.first == "y" } || channels.isEmpty()
+    val projectedOn = projectedChannels(view)
+    val hasX = "x" in projectedOn || projectedOn.isEmpty()
+    val hasY = "y" in projectedOn || projectedOn.isEmpty()
     return obj {
       put("name", voronoiName())
       put("type", "path")
@@ -672,21 +677,27 @@ internal class Selection(
     }
   }
 
-  fun signals(unit: String): List<VegaValue> {
+  fun signals(
+    unit: String,
+    brushes: List<String> = emptyList(),
+    view: UnitView? = null,
+  ): List<VegaValue> {
     val out = mutableListOf<VegaValue>()
     val datum = "(item().isVoronoi ? datum.datum : datum)"
+    val projected = view?.let { projections(it) } ?: fields.map { null to it }
     val picked =
       if (byIdentity) {
         "unit: $unit, ${SELECTION_ID}: $datum[${quoted(SELECTION_ID)}]"
       } else {
-        val values = fields.joinToString(", ") { "$datum[${quoted(it)}]" }
+        val values = projected.joinToString(", ") { (_, field) -> "$datum[${quoted(field)}]" }
         "unit: $unit, fields: ${name}_tuple_fields, values: [$values]"
       }
     // A click on a group, on a legend or on another selection's brush is not a pick: the first is
     // the plot itself, the second is a legend binding's business, and the third belongs to the
     // brush that owns it.
     val guard =
-      "datum && item().mark.marktype !== 'group' && indexof(item().mark.role, 'legend') < 0"
+      "datum && item().mark.marktype !== 'group' && indexof(item().mark.role, 'legend') < 0" +
+        brushes.joinToString("") { " && indexof(item().mark.name, '$it') < 0" }
     out += obj {
       put("name", "${name}_tuple")
       put(
@@ -727,10 +738,14 @@ internal class Selection(
         put(
           "value",
           arr(
-            fields.map {
+            projected.map { (channel, field) ->
               obj {
-                put("type", "E")
-                put("field", it)
+                put("field", field)
+                // A projection made through a **channel** records which channel, because a test
+                // has to know what the value was compared against; one made on a bare field does
+                // not, there being no channel it came from.
+                channel?.let { put("channel", it) }
+                put("type", if (view != null) projectionType(view, channel) else "E")
               }
             }
           ),
@@ -1056,8 +1071,9 @@ internal class Selection(
    * categories it covered. A binned field stores a range that is closed at the left and open at the
    * right, which is how a bucket's own boundary is written.
    */
-  private fun projectionType(view: UnitView, channel: String): String =
+  private fun projectionType(view: UnitView, channel: String?): String =
     when {
+      channel == null -> "E"
       type == "interval" && channel in Channels.SCALE_CHANNELS && continuous(view, channel) -> "R"
       view.spec.fieldDef(channel)?.bin != null -> "R-RE"
       else -> "E"
@@ -1172,9 +1188,24 @@ internal class Selection(
   private fun continuous(view: UnitView, channel: String): Boolean =
     isContinuous(view.scaleType(channel))
 
-  fun intervalChannels(view: UnitView): List<Pair<String, String>> {
-    if (type != "interval") return emptyList()
-    val wanted = channels.ifEmpty { listOf("x", "y") }
+  /**
+   * What a selection **projects** onto — `project.ts`, which reads both `encodings` and `fields`.
+   *
+   * A channel projection is named by the field the marks are placed by and remembers which channel
+   * it came from; a bare field projection is just the column. A point selection may have either,
+   * and one that has neither remembers rows by their identity instead.
+   */
+  fun projections(view: UnitView): List<Pair<String?, String>> {
+    val byChannel = channelProjections(view)
+    val named = byChannel.map { it.second }.toSet()
+    return byChannel.map { (channel, field) -> channel as String? to field } +
+      fields.filter { it !in named }.map { null to it }
+  }
+
+  private fun channelProjections(view: UnitView): List<Pair<String, String>> {
+    // A selection that states neither is projected onto **x and y** if it is dragged, and onto the
+    // row's own identity if it is clicked — so a click has no channel projection at all.
+    val wanted = channels.ifEmpty { if (type == "interval") listOf("x", "y") else emptyList() }
     return wanted.mapNotNull { channel ->
       val def = view.spec.fieldDef(channel) ?: return@mapNotNull null
       // A channel that *aggregates* cannot be projected: there is no row-level value to compare a
@@ -1188,6 +1219,11 @@ internal class Selection(
       channel to field
     }
   }
+
+  /** The channels a **brush** is dragged along, which are the ones it is drawn between. */
+  fun intervalChannels(view: UnitView): List<Pair<String, String>> =
+    if (type != "interval") emptyList()
+    else channelProjections(view).filter { it.first == "x" || it.first == "y" }
 
   /** The top-level signal the tests read: the store, resolved into one set of picked values. */
   fun resolveSignal(): VegaValue = obj {

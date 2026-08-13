@@ -85,7 +85,19 @@ private class Compilation(
    * the plot's group in a concatenation — because the events they listen for are scoped to a group.
    */
   private fun machinery(selection: Selection, views: List<UnitView>): List<VegaValue> {
-    if (selection.type != "interval") return selection.signals(unit = selection.unitName())
+    if (selection.type != "interval") {
+      // A click on another selection's **brush** is not a pick: the rectangle belongs to the brush
+      // that owns it, and a click on it would otherwise pick whatever row lies under the drag.
+      val brushes =
+        selections
+          .filter { it.type == "interval" && !it.bindsScales && it.owner === selection.owner }
+          .map { "${it.name}_brush" }
+      return selection.signals(
+        unit = selection.unitName(),
+        brushes = brushes,
+        view = selection.owner ?: views.firstOrNull(),
+      )
+    }
     val view = selection.owner ?: views.firstOrNull() ?: return emptyList()
     return selection.intervalSignals(view, selection.initial) +
       selection.intervalTail(view, unit = selection.unitName(), initial = selection.initial)
@@ -1061,7 +1073,11 @@ private class Compilation(
     val crossed = row != null && column != null
     listOfNotNull(row, column).forEach { it.reportUnsupportedSort(diagnostics, crossed) }
     val found: FacetLayout =
-      if (wrapped != null) FacetWrap(wrapped, spec.number("columns")?.toInt())
+      // A wrapped facet written as a **channel** carries its `columns` on the channel itself, where
+      // the operator form carries it beside the facet: `mapFacetedUnit` lifts the one to the other,
+      // and reading only the outer place left a grid that never wrapped.
+      if (wrapped != null)
+        FacetWrap(wrapped, (spec.number("columns") ?: wrapped.raw.number("columns"))?.toInt())
       else FacetGrid(row, column)
     facet = found
 

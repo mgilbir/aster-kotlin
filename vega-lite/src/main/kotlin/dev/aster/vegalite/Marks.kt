@@ -843,6 +843,18 @@ internal object Marks {
    * value ref, so a datum written that way still passes through its scale. Writing it out as a
    * value paints the mark with an object, which the renderer reads as nothing at all.
    */
+  /**
+   * A mark's own `xOffset`/`yOffset`, as Vega takes it.
+   *
+   * `signalOrValueRef` again: written as `{"expr": …}` it is a **signal**, and a nudge written out
+   * as an object moves the mark nowhere at all.
+   */
+  private fun markOffset(view: UnitView, channel: String): VegaValue? {
+    val stated = view.markDef.raw.fields["${channel}Offset"] ?: return null
+    val (key, value) = literalRef(stated) ?: return null
+    return if (key == "signal") signalRef((value as? VegaValue.Str)?.value.orEmpty()) else value
+  }
+
   private fun literalRef(value: VegaValue?): Pair<String, VegaValue>? {
     if (value == null) return null
     val expr = (value as? VegaValue.Obj)?.takeIf { it.fields.keys == setOf("expr") }?.get("expr")
@@ -1275,7 +1287,7 @@ internal object Marks {
     val stack = view.stack
     val scaleType = view.scaleType(channel)
 
-    val offset = view.markDef.raw.fields["${channel}Offset"]
+    val offset = markOffset(view, channel)
 
     if (def != null && stack != null && channel == stack.fieldChannel) {
       // A stacked value asked for a **band position** is drawn between the segment's two ends
@@ -1415,7 +1427,7 @@ internal object Marks {
       // from an encoding.
       if (scaleType == "band" && offset == null) put("band", num(0.5))
       // A mark's own `xOffset` is a plain nudge and applies wherever the position lands.
-      (offset ?: view.markDef.raw.fields["${channel}Offset"])?.let { put("offset", it) }
+      (offset ?: markOffset(view, channel))?.let { put("offset", it) }
     }
   }
 
@@ -1750,7 +1762,7 @@ internal object Marks {
       else if (scaleType == "band" && fraction != 1.0) put("band", num((1 - fraction) / 2))
       // A `xOffset`/`yOffset` on the **mark** is a plain nudge, unlike the same name in an
       // encoding: `positionOffset` reads it as a visual offset and adds it to the position.
-      view.markDef.raw.fields["${channel}Offset"]?.let { put("offset", it) }
+      markOffset(view, channel)?.let { put("offset", it) }
       // A nested offset moves the mark within its band, which is what puts the second bar of a
       // group beside the first rather than on top of it.
       offsetRef(view, channel, centred)?.let { put("offset", it) }

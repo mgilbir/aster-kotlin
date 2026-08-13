@@ -678,7 +678,7 @@ no data is needed to compare two compilers. So every one of them was compiled by
 by this one, and the outputs compared property by property. That is a *measurement*, not a gate: the
 examples are not fixtures here, and nothing about them is checked in.
 
-**124 of 627 matched exactly** at the start, and **469** do now. 16 were refused by name, and of those 8 are geographic,
+**124 of 627 matched exactly** at the start, and **474** do now. 16 were refused by name, and of those 8 are geographic,
 3 are a facet inside a facet, 2 a repeat inside a concatenation, and 2 are the `trail` mark — which
 this runtime draws and this compiler had simply not been told about.
 
@@ -2265,6 +2265,27 @@ runtime already had a Delaunay triangulation and a voronoi transform, and it was
 coordinates as *field names*: Vega-Lite writes them as expressions, `{"expr": "datum.datum.x || 0"}`,
 because the points are mark items and the coordinate wanted is the one the encoding resolved. Every
 cell came out without coordinates, so the diagram was empty and the overlay drew nothing.
+
+### A click can be projected too, and a collinear set of points
+
+`project.ts` reads `encodings` and `fields` the same way for both kinds of selection, and this
+compiler read only `fields` for a click. So a chart that picks *by the date under the pointer* —
+`{"type": "point", "encodings": ["x"]}` — remembered nothing: its `_tuple_fields` was empty, and the
+value it stored was the row's identity rather than the date. A projection made through a channel
+records which channel it came from, because a test has to know what the value was compared against;
+one made on a bare field does not.
+
+Two rules beside it. A click on another selection's **brush** is not a pick — the rectangle belongs
+to the brush that owns it — so each interval in the same view contributes a clause to the guard. And
+the voronoi cells of a selection projected onto one channel are *stripes* rather than tiles: the
+other coordinate is held at zero, so the nearest point is the nearest along the axis projected.
+
+Which found a crash. A stripe diagram is a set of **collinear** points, and the exact orientation
+predicate underneath the triangulation reads one past the end of its component array while merging:
+the algorithm advances a cursor and only then asks whether it is still in range. JavaScript answers
+`undefined` for a read that is never used; Kotlin throws. Guarded now, and the fixture that found it
+is a selection projected onto one channel — which is how anyone would write "highlight the whole
+day under the pointer".
 
 ### One bucketing for two layers, and a scale that cannot be shared
 
