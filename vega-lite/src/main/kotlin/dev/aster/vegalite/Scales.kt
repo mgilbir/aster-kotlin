@@ -399,6 +399,29 @@ internal object Scales {
       }
     }
     val config = view.config
+    // `rangeMin`/`rangeMax` **replace the ends** of whatever range the channel would take, rather
+    // than being properties of their own: they are how a radial chart says "start the rings at
+    // twenty" without writing out the expression for the other end.
+    val ends = listOf(def.scale?.fields?.get("rangeMin"), def.scale?.fields?.get("rangeMax"))
+    if (ends.any { it != null }) {
+      val derived = defaultRange(view, channel, def, type) as? VegaValue.Arr
+      return arr(
+        listOf(
+          ends[0] ?: derived?.values?.firstOrNull() ?: num(0),
+          ends[1] ?: derived?.values?.lastOrNull() ?: num(0),
+        )
+      )
+    }
+    return defaultRange(view, channel, def, type)
+  }
+
+  private fun defaultRange(
+    view: UnitView,
+    channel: String,
+    def: ChannelDef,
+    type: String,
+  ): VegaValue? {
+    val config = view.config
     return when (channel) {
       // An offset scale's range is the *inner* band, and what it spans depends on whether the
       // outer one was given a step to grow by. `getOffsetRange`: a declared `{step}` on the
@@ -736,7 +759,9 @@ internal object Scales {
 
     // Anything else the specification stated on the scale passes through untouched.
     user?.fields?.forEach { (key, value) ->
-      if (key !in setOf("type", "domain", "range", "scheme")) component.properties[key] = value
+      if (key !in setOf("type", "domain", "range", "scheme", "rangeMin", "rangeMax")) {
+        component.properties[key] = value
+      }
     }
   }
 

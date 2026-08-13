@@ -449,13 +449,17 @@ internal class DataPipeline(
       field = Fields.vgField(def),
       // The facet's own fields group every accumulation, so a stack stays inside its cell.
       groupby = dimensions + view.facetFields.filterNot { it in dimensions },
+      // `if (!s.field.includes(field))` — the stack's sort names each field **once**. Two channels
+      // over one column is one thing to sort by, and repeating it in the pair of parallel lists is
+      // a comparator that reads the same column twice.
       sortFields =
-        if (order == null) orderFields.map { Fields.vgField(it) }.distinct() else stackBy,
+        if (order == null) orderFields.map { Fields.vgField(it) }.distinct()
+        else stackBy.distinct(),
       sortOrders =
         if (order == null) {
           orderFields.map { (it.sort as? VegaValue.Str)?.value ?: "ascending" }
         } else {
-          stackBy.map { order }
+          stackBy.distinct().map { order }
         },
       output =
         listOf(

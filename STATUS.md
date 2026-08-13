@@ -1782,6 +1782,21 @@ half a day late, every time.
 Those two columns are columns like any other, so the **grouping** has to carry them: an aggregate
 that throws them away throws away the very numbers the mark is placed by.
 
+### `rangeMin` is one end of a range, not a property beside it
+
+A radial chart says "start the rings at twenty" without writing out the expression for the other
+end, and `rangeMin`/`rangeMax` are how: they **replace the ends** of whatever range the channel
+would have taken and are not emitted themselves. Passed through as properties they were ignored and
+the rings were drawn from the centre.
+
+A wrong guess is worth recording beside it. The first reading was that a radial scale's range begins
+at the *mark's* `innerRadius`, which fitted this chart exactly — both numbers are twenty — and is
+not the rule. The `rangeMin` beside it is what said so.
+
+Beside them, the stack's sort names each field **once**: two channels over one column is one thing
+to sort by, and repeating it in the pair of parallel lists is a comparator that reads the same
+column twice.
+
 ### Two runtime gaps this batch names but does not close
 
 `density`'s fixture is not in the corpus, and `trail`'s draws no legend. Both compile exactly as
