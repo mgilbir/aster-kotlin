@@ -275,6 +275,13 @@ internal interface FacetLayout {
     titleOffset: Double,
     /** `cell` or `view`, by the same rule the chart's own group follows. */
     style: String,
+    /**
+     * The scales a cell owns rather than shares — a facet resolves `theta` independently.
+     *
+     * They belong *inside* the group: a cell's own extent is measured over the rows the facet
+     * handed it, so the scale has to be built where `facet` is the data it can see.
+     */
+    scales: List<VegaValue>,
   ): VegaValue
 }
 
@@ -487,6 +494,7 @@ internal class FacetGrid(val row: Facet?, val column: Facet?) : FacetLayout {
     heightSignal: String,
     titleOffset: Double,
     style: String,
+    scales: List<VegaValue>,
   ): VegaValue = obj {
     put("name", "cell")
     put("type", "group")
@@ -542,6 +550,7 @@ internal class FacetGrid(val row: Facet?, val column: Facet?) : FacetLayout {
     )
     put("marks", arr(marks))
     if (axes.isNotEmpty()) put("axes", arr(axes))
+    if (scales.isNotEmpty()) put("scales", arr(scales))
   }
 }
 
@@ -700,6 +709,7 @@ internal class FacetWrap(val def: ChannelDef, private val columns: Int?) : Facet
     heightSignal: String,
     titleOffset: Double,
     style: String,
+    scales: List<VegaValue>,
   ): VegaValue = obj {
     put("name", "cell")
     put("type", "group")
@@ -751,5 +761,6 @@ internal class FacetWrap(val def: ChannelDef, private val columns: Int?) : Facet
     )
     put("marks", arr(marks))
     if (axes.isNotEmpty()) put("axes", arr(axes))
+    if (scales.isNotEmpty()) put("scales", arr(scales))
   }
 }

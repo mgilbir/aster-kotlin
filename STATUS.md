@@ -2091,11 +2091,12 @@ A facet cell is styled by the same rule the chart's own group is — `cell` wher
 position to border, `view` where it has none — so a trellis of pies has no plotting area in any of
 its cells.
 
-**A gap named here rather than closed**: a facet resolves its `theta` scale *independently*
-(`defaultScaleResolve`, which is `channel === 'theta' ? 'independent' : 'shared'` for a facet), and
-the resulting `child_theta` belongs *inside* the cell group rather than beside the chart. This
-compiler shares it, so a trellis of pies scales every cell against the whole table. The fixture
-written for the cell-style rule was withdrawn because it cannot pass without this one.
+A facet resolves its `theta` scale **independently** — `defaultScaleResolve` is `channel ===
+'theta' ? 'independent' : 'shared'` for a facet — and the resulting `child_theta` is built *inside*
+the cell group rather than beside the chart. That placement is the whole point of resolving it per
+cell: the scale's extent is measured over the rows the facet handed *that* cell, and inside the
+group those rows are the partition Vega named `facet`. Shared instead, a trellis of pies scaled
+every cell against the whole table, so a cell holding a tenth of the data drew a tenth of a pie.
 
 ### Two runtime gaps this batch names but does not close
 

@@ -218,12 +218,21 @@ private class Compilation(
         put("layout", it.layout(spacing, HEADER_OFFSET, config))
       }
       concat?.let { put("layout", it.layout()) }
+      // The cells' own scales are assembled before the marks that read them, the cell group being
+      // where they are written.
+      if (facet != null && concat == null) {
+        cellScales =
+          allScales.values.filter { it.name() != it.channel }.map { withinCell(assembleScale(it)) }
+      }
       put("marks", arr(if (concat == null) marks(views, plots.single().axes) else groups(plotTree)))
       // Shared scales first, then each plot's own, which is the order upstream's assembly walks the
       // model tree in: the composition's own components before it recurses into its children.
       val scales =
-        allScales.values.filter { owner[it.name()] == null } +
-          plots.flatMap { plot -> allScales.values.filter { owner[it.name()] === plot } }
+        (allScales.values.filter { owner[it.name()] == null } +
+            plots.flatMap { plot -> allScales.values.filter { owner[it.name()] === plot } })
+          // A facet's independently resolved scales are built inside its cells, where the rows
+          // they measure are, so they are not written beside the grid as well.
+          .filterNot { facet != null && concat == null && it.name() != it.channel }
       if (scales.isNotEmpty()) put("scales", arr(scales.map { assembleScale(it) }))
       // A faceted chart has no axes of its own: the gridlines live in every cell and the labelled
       // axis in a header drawn once for the whole grid. A concatenation's axes live in its plots.
@@ -248,10 +257,16 @@ private class Compilation(
    * everything else, at either level, is shared unless it does.
    */
   private fun scaleName(view: UnitView, channel: String): String {
+    // `defaultScaleResolve`: a concatenation's plots measure their own positions and their own
+    // polar extents; a **facet's** cells share everything but `theta`, which is the one channel
+    // whose extent is a cell's own — a trellis of pies compares slices within each pie, not
+    // across the grid.
     val independent =
       resolve.scaleIsIndependent(
         channel,
-        defaultIndependent = concat != null && channel in Channels.POSITION_SCALE_CHANNELS,
+        defaultIndependent =
+          if (concat != null) channel in Channels.POSITION_SCALE_CHANNELS || channel == "theta"
+          else facet != null && channel == "theta",
       )
     if (!independent) return channel
     val owner = if (concat != null) plotOf(view) else view.childName
@@ -853,6 +868,38 @@ private class Compilation(
    * axis belongs to a footer or header drawn once, or a trellis repeats its tick labels under every
    * cell.
    */
+  /**
+   * The scales a facet's cells own, which are built inside the cell rather than beside the grid.
+   */
+  private var cellScales: List<VegaValue> = emptyList()
+
+  /**
+   * A cell-owned scale, reading the cell's own rows.
+   *
+   * The whole point of resolving a scale per cell is that its extent is measured over the rows the
+   * facet handed *that* cell, and inside the group those rows are the partition Vega named `facet`.
+   * Left pointing at the shared dataset the scale would be built per cell and identical in each.
+   */
+  private fun withinCell(scale: VegaValue): VegaValue {
+    val block = scale as? VegaValue.Obj ?: return scale
+    val domain = block.obj("domain") ?: return scale
+    if (!domain.fields.containsKey("data")) return scale
+    return obj {
+      block.fields.forEach { (key, value) ->
+        if (key != "domain") put(key, value)
+        else
+          put(
+            "domain",
+            obj {
+              domain.fields.forEach { (name, own) ->
+                put(name, if (name == "data") VegaValue.Str("facet") else own)
+              }
+            },
+          )
+      }
+    }
+  }
+
   private fun marks(views: List<UnitView>, axes: List<VegaValue>): List<VegaValue> {
     val childMarks = views.flatMap { Marks.marks(it) }
     val current = facet ?: return childMarks
@@ -876,6 +923,7 @@ private class Compilation(
         // Cartesian position to border, `view` where it has none. A trellis of pies has no
         // plotting area in any of its cells.
         (style(views) as? VegaValue.Str)?.value ?: "cell",
+        cellScales,
       )
   }
 
@@ -1217,7 +1265,9 @@ private class Compilation(
       channel,
       resolve.scaleIsIndependent(
         channel,
-        defaultIndependent = concat != null && channel in Channels.POSITION_SCALE_CHANNELS,
+        defaultIndependent =
+          if (concat != null) channel in Channels.POSITION_SCALE_CHANNELS || channel == "theta"
+          else facet != null && channel == "theta",
       ),
     )
 
