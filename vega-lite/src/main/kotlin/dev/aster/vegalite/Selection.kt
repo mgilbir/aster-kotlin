@@ -1387,6 +1387,25 @@ internal class Selection(
     }
   }
 
+  /**
+   * The bucketings this selection remembers its rows under — `proj.timeUnit` in `project.ts`.
+   *
+   * A brush over `month(date)` stores a `month_date`, so anything that *tests* the brush has to
+   * have a `month_date` of its own to be tested against. `parseSelectionPredicate` inserts a copy
+   * of this node above whatever does the testing, which is how a second view in the same layer —
+   * one that never bucketed a date itself — comes to have the column.
+   */
+  fun projectedTimeUnits(): List<Pair<ChannelDef, String>> {
+    val view = owner ?: return emptyList()
+    val wanted = channels.ifEmpty { if (type == "interval") listOf("x", "y") else emptyList() }
+    return wanted.mapNotNull { channel ->
+      val def = view.spec.fieldDef(channel) ?: return@mapNotNull null
+      if (def.aggregate != null || def.field == null) return@mapNotNull null
+      val unit = def.timeUnit?.takeIf { !Fields.isBinnedTimeUnit(it) } ?: return@mapNotNull null
+      def to unit
+    }
+  }
+
   /** The channels a **brush** is dragged along, which are the ones it is drawn between. */
   fun intervalChannels(view: UnitView): List<Pair<String, String>> =
     if (type != "interval") emptyList()

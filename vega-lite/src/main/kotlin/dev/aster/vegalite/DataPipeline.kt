@@ -647,6 +647,38 @@ internal class DataPipeline(
    */
   private fun text(value: VegaValue): String? = (value as? VegaValue.Str)?.value
 
+  /** The bucketing the selections a `filter` names remember their rows by, as one node. */
+  private fun selectionTimeUnits(transform: VegaValue): TimeUnitNode? {
+    val named = mutableListOf<String>()
+    fun scan(value: VegaValue?) {
+      when (value) {
+        is VegaValue.Obj -> {
+          value.string("param")?.let { named += it }
+          value.fields.values.forEach { scan(it) }
+        }
+        is VegaValue.Arr -> value.values.forEach { scan(it) }
+        else -> Unit
+      }
+    }
+    scan(transform["filter"])
+    if (named.isEmpty()) return null
+    val units =
+      named
+        .flatMap { name ->
+          view.selections.firstOrNull { it.name == name }?.projectedTimeUnits().orEmpty()
+        }
+        .map { (def, unit) ->
+          TimeUnitComponent(
+            def.field!!,
+            Fields.timeUnitParts(unit),
+            Fields.vgField(def, forAs = true),
+            utc = unit.startsWith("utc"),
+          )
+        }
+        .distinctBy { it.output }
+    return if (units.isEmpty()) null else TimeUnitNode(units)
+  }
+
   /** The stated `aggregate` as the flow's own node, or null for anything else. */
   private fun aggregateFrom(transform: VegaValue): AggregateNode? {
     if (transform.string("type") != "aggregate") return null
@@ -663,6 +695,11 @@ internal class DataPipeline(
     val transforms = Transforms(diagnostics, registerLookup, view::prefixed, view.selections)
     view.spec.transforms.forEachIndexed { index, transform ->
       val path = "$.transform[$index]"
+      // `parseSelectionPredicate`: a filter that tests a selection is given the selection's own
+      // bucketing as a parent. A brush over `month(date)` remembers a `month_date`, and a view that
+      // filters on that brush has to have a `month_date` to be tested against — which it does not,
+      // unless it buckets one, however little its own encoding has to do with months.
+      selectionTimeUnits(transform)?.let { last = last.then(it) }
       for (emitted in transforms.translateAt(transform, path)) {
         // An `aggregate` a specification *states* is the same node as one an encoding asks for —
         // `AggregateNode.makeFromTransform` beside `makeFromEncoding` — and being the same node is
