@@ -167,6 +167,23 @@ private fun guideStyleKeys(vararg prefixes: String): Set<String> =
 
 private val AXIS_UNSUPPORTED = emptyMap<String, String>()
 
+/** Upstream's `LegendScales`: the order that picks the one scale a legend describes. */
+private val LEGEND_CHANNEL_ORDER =
+  listOf("size", "shape", "fill", "stroke", "strokeWidth", "strokeDash", "opacity")
+
+/** Scale types a legend draws as a ramp rather than as a column of swatches. */
+private val RAMP_LEGEND_SCALE_TYPES =
+  setOf(
+    ScaleType.LINEAR,
+    ScaleType.LOG,
+    ScaleType.POW,
+    ScaleType.SQRT,
+    ScaleType.SYMLOG,
+    ScaleType.TIME,
+    ScaleType.UTC,
+    ScaleType.SEQUENTIAL,
+  )
+
 /** The parts a title's `encode` may address, in the order upstream builds them. */
 private val TITLE_ENCODE_PARTS = listOf("group", "title", "subtitle")
 
@@ -356,6 +373,8 @@ private fun strokeEncodeMap(prefix: String): Map<String, String> =
     "stroke" to "${prefix}Color",
     "strokeWidth" to "${prefix}Width",
     "strokeDash" to "${prefix}Dash",
+    "strokeDashOffset" to "${prefix}DashOffset",
+    "strokeCap" to "${prefix}Cap",
     "strokeOpacity" to "${prefix}Opacity",
     "opacity" to "${prefix}Opacity",
   )
@@ -369,6 +388,7 @@ private fun textEncodeMap(prefix: String): Map<String, String> =
     "fontSize" to "${prefix}FontSize",
     "fontWeight" to "${prefix}FontWeight",
     "fontStyle" to "${prefix}FontStyle",
+    "lineHeight" to "${prefix}LineHeight",
   )
 
 /**
@@ -424,7 +444,20 @@ private val AXIS_ENCODE_PARTS: Map<String, Map<String, String>> =
           "baseline" to "labelBaseline",
           "angle" to "labelAngle",
         ),
-    "title" to textEncodeMap("title"),
+    // An axis title's alignment, angle, limit and position each have a property of their own, and
+    // `axis-title.js` builds the mark's channel straight from it — so the two spellings are one
+    // thing here as everywhere else. They had been reported as unimplemented while the properties
+    // behind them were being honoured.
+    "title" to
+      textEncodeMap("title") +
+        mapOf(
+          "align" to "titleAlign",
+          "baseline" to "titleBaseline",
+          "angle" to "titleAngle",
+          "limit" to "titleLimit",
+          "x" to "titleX",
+          "y" to "titleY",
+        ),
   )
 
 private val LEGEND_ENCODE_PARTS: Map<String, Map<String, String>> =
@@ -441,8 +474,43 @@ private val LEGEND_ENCODE_PARTS: Map<String, Map<String, String>> =
         "size" to "symbolSize",
         "shape" to "symbolType",
       ),
-    "labels" to textEncodeMap("label") + mapOf("limit" to "labelLimit"),
-    "title" to textEncodeMap("title"),
+    "labels" to
+      textEncodeMap("label") +
+        mapOf(
+          "limit" to "labelLimit",
+          "align" to "labelAlign",
+          "baseline" to "labelBaseline",
+        ),
+    "title" to
+      textEncodeMap("title") +
+        mapOf(
+          "limit" to "titleLimit",
+          "align" to "titleAlign",
+          "baseline" to "titleBaseline",
+          "orient" to "titleOrient",
+        ),
+    // The ramp itself, whose three channels each have a `gradient`-prefixed property.
+    "gradient" to
+      mapOf(
+        "stroke" to "gradientStrokeColor",
+        "strokeWidth" to "gradientStrokeWidth",
+        "opacity" to "gradientOpacity",
+      ),
+    // The legend's own group, which is where its background and its placement live. `strokeWidth`
+    // and `strokeDash` are deliberately absent: on a legend those two name *scales*, and the
+    // background's own width and dash come from `config.legend` rather than from either spelling.
+    "legend" to
+      mapOf(
+        "fill" to "fillColor",
+        "stroke" to "strokeColor",
+        "cornerRadius" to "cornerRadius",
+        "x" to "legendX",
+        "y" to "legendY",
+        "padding" to "padding",
+        "titlePadding" to "titlePadding",
+        "offset" to "offset",
+        "orient" to "orient",
+      ),
   )
 
 /** Mark properties this engine reads. */
@@ -2029,11 +2097,35 @@ public class SpecParser {
   private fun legendConfig(key: String): VegaValue? =
     config.legendDefaults().firstNotNullOfOrNull { it.fields[key] }
 
+  /**
+   * The encode-to-property mapping for one legend, which depends on the kind of legend it is.
+   *
+   * A label's `align` and `baseline` are the same thing as `labelAlign` and `labelBaseline` on a
+   * **symbol** legend and are *not* on a gradient one: upstream derives a ramp label's alignment
+   * from where along the bar it sits, never reads the property, and lets only an `encode` block
+   * override it. Verified both ways — `labelAlign: "right"` on a gradient legend does nothing
+   * upstream while `encode.labels.update.align` does — so folding the channel into the property
+   * would quietly make the property work too, on the one kind of legend that is supposed to ignore
+   * it.
+   */
+  private fun legendEncodeParts(own: VegaValue.Obj): Map<String, Map<String, String>> {
+    val declared = (own.fields["type"] as? VegaValue.Str)?.value?.lowercase()
+    val scale = LEGEND_CHANNEL_ORDER.firstNotNullOfOrNull { own.fields[it]?.asString() }
+    val ramp =
+      when {
+        declared == "gradient" || declared == "symbol" -> declared == "gradient"
+        else -> scaleTypes[scale] in RAMP_LEGEND_SCALE_TYPES
+      }
+    if (!ramp) return LEGEND_ENCODE_PARTS
+    return LEGEND_ENCODE_PARTS +
+      mapOf("labels" to LEGEND_ENCODE_PARTS.getValue("labels") - setOf("align", "baseline"))
+  }
+
   private fun parseLegend(value: VegaValue, path: String): LegendSpec? {
     val own = value as? VegaValue.Obj ?: return unexpected("a legend definition", path)
     val obj =
       GuideConfig.merge(own, config.legendDefaults())
-        .withGuideEncode(LEGEND_ENCODE_PARTS, "Legend", path)
+        .withGuideEncode(legendEncodeParts(own), "Legend", path)
 
     val spec =
       LegendSpec(

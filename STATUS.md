@@ -201,7 +201,7 @@ substantive compatibility items:
 | 6. View and Compose APIs | Yes |
 | 7. SVG, PNG, PDF export | Yes |
 | 8. TalkBack can describe and navigate | Partial — virtual nodes are tested by instrumentation, not with TalkBack itself |
-| 9. At least 100 compatibility fixtures pass | **Yes** — 144 |
+| 9. At least 100 compatibility fixtures pass | **Yes** — 145 |
 | 10. Core runtime has no Android dependency | Yes |
 | 11. Renders without WebView | Yes |
 | 12. Build and test loop runs from the terminal | Yes |
@@ -1603,8 +1603,27 @@ The schema diff now finds **nothing** unaccounted for in `encodeEntry`, `axis`, 
 `projection` or `scale`, and **nothing** in `title` either. The whole inventory is closed: every property upstream
 defines in every block is read.
 
-What is left is one level down. A guide's `encode` block is a vocabulary of its own, and a channel it
-cannot express is now named one at a time — `A title's 'title' encode block sets 'x', which is not
+Running the same subtraction over the *encode* vocabulary found the same thing one level down: several
+channels reported as unimplemented had a property behind them the whole time, one entry away in the
+translation map — a tick's `strokeCap` and `strokeDashOffset`, a label's `lineHeight`, and an axis
+title's `align`, `baseline`, `angle`, `limit`, `x` and `y`, every one of which was already honoured
+under its own name. The two whole-block gaps went with them: `encode.gradient` styles the ramp and
+`encode.legend` the group the legend sits in, which is where its background and its placement live.
+
+One channel is deliberately **not** folded. A ramp label's `align` and `baseline` are *not* the same
+thing as `labelAlign` and `labelBaseline`: upstream derives a gradient label's alignment from where
+along the bar it sits, never reads the property, and lets only an `encode` block override it — probed
+both ways to be sure. Folding the channel into the property would quietly make the property work on
+the one kind of legend that is supposed to ignore it, so the mapping now depends on what kind of legend
+it is.
+
+That work turned up a placement rule nothing had exercised: a legend title aligned or anchored away
+from its default reaches *left* of the legend's own origin, and upstream drags the whole legend right
+rather than letting it be cut off — `legendGroupLayout` measures `title.bounds.x1 - padding` and
+translates both the title and the entries by the overflow.
+
+A guide's `encode` block is a vocabulary of its own, and a channel it cannot express is now named one
+at a time — `A title's 'title' encode block sets 'x', which is not
 read` — rather than the block being written off whole. That is the difference between an unfinished
 feature and a wrong chart: a heading whose `encode` positioned its own text is a heading this engine
 would draw in the wrong place, and there is no property to warn about, only a channel.

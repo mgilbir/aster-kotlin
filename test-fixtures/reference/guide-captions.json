@@ -915,6 +915,21 @@
   "caption": "Gradient legend titled 'value' for fill color with values from 0 to 10"
  },
  {
+  "fixture": "guide-encode-channels",
+  "kind": "axis",
+  "caption": "X-axis titled 'an axis title' for a linear scale with values from 0 to 9"
+ },
+ {
+  "fixture": "guide-encode-channels",
+  "kind": "legend",
+  "caption": "Gradient legend titled 'ramp' for fill color with values from 1 to 9"
+ },
+ {
+  "fixture": "guide-encode-channels",
+  "kind": "legend",
+  "caption": "Symbol legend titled 'swatches' for fill color with 2 values: a, b"
+ },
+ {
   "fixture": "histogram-null-values",
   "kind": "axis",
   "caption": "X-axis for a linear scale with values from 1 to 10"

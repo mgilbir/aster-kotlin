@@ -9,7 +9,7 @@ Branch `milestone-0-bootstrap`. Working tree clean, both gates green:
 - `./scripts/check.sh` — format, all tests, lint, demo APK
 - `./scripts/oracle.sh` — regenerates upstream references and runs the differential comparison
 
-**144 differential fixtures pass, all matching upstream exactly.** That is the only number here
+**145 differential fixtures pass, all matching upstream exactly.** That is the only number here
 that means what it says.
 
 ## Read this before trusting the other number
@@ -254,7 +254,7 @@ not the one Vega documents**, because Vega only forwards the parameters a specif
 
 ## What is left: two examples, and neither can be verified
 
-**144 differential fixtures pass. 91 of the 93 examples compile clean.** Everything that can be
+**145 differential fixtures pass. 91 of the 93 examples compile clean.** Everything that can be
 checked against upstream has been.
 
 ### `projections` — upstream refuses it too
@@ -413,6 +413,15 @@ As of this handoff the subtraction leaves **nothing** for `encodeEntry`, `axis`,
 guide's `encode` cannot express is named one at a time — a title's `encode.title.update.x`, for
 instance — rather than the whole block being reported as unread. That is where to look next, and
 `UnhandledPropertiesTest` asserts the naming still happens.
+
+Run the same subtraction over the *encode* vocabulary and the pattern repeats: several channels
+reported as unimplemented had a property behind them all along, one map entry away in
+`AXIS_ENCODE_PARTS`/`LEGEND_ENCODE_PARTS`. Both maps and both whole-block gaps (`encode.gradient` and
+`encode.legend`) are now closed. One channel is deliberately **not** folded: a ramp label's `align`
+and `baseline`, because upstream derives a gradient label's alignment from where along the bar it sits
+and reads no property for it — so the channel works there and the property does not, and folding the
+two would quietly make the property work on the one kind of legend meant to ignore it. That
+distinction is why `legendEncodeParts` has to know what kind of legend it is looking at.
 - **Layout:** none. All ten of upstream's layout properties are read, and `row-footer` and
   `column-footer` are recognised roles — they used to fall through to `CELL` and be gridded among the
   cells.

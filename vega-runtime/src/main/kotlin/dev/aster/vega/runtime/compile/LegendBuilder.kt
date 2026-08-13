@@ -213,7 +213,26 @@ internal class LegendBuilder(
         metadata = NodeMetadata(role = "legend-entry", markName = scaleName),
       )
 
-    val content = listOfNotNull(body, title)
+    // A title that reaches left of the legend's own origin drags the whole legend right rather than
+    // being cut off: upstream's `legendGroupLayout` ends by measuring `title.bounds.x1 - padding`
+    // and, when it is negative, translating **both** the title and the entries by that much. It
+    // only
+    // happens once the title is aligned or anchored away from its default, which is exactly when a
+    // heading can extend backwards past the thing it labels.
+    val overhang = title?.let { roundHalfUp(it.transformedBounds.left - padding) } ?: 0.0
+    val content =
+      if (overhang < 0.0) {
+        listOfNotNull(body, title).map { node ->
+          when (node) {
+            is GroupNode ->
+              node.copy(
+                transform = Transform2D.translate(node.transform.e - overhang, node.transform.f)
+              )
+            is TextNode -> node.copy(x = node.x - overhang)
+            else -> node
+          }
+        }
+      } else listOfNotNull(body, title)
     // Upstream anchors the content bounds at the padding and rounds the result up, so a legend is
     // always a whole number of units across.
     val bounds = content.fold(RectD.Empty) { acc, node -> acc.union(node.transformedBounds) }
