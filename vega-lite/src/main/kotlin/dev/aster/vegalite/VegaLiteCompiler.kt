@@ -1772,6 +1772,12 @@ private class Compilation(
             merged.explicitTitle && !parsed.explicitTitle -> Unit
             else -> parsed.titles.forEach { if (it !in merged.titles) merged.titles += it }
           }
+          // `mergeValuesWithExplicit`: a property one layer settled and the other left alone is
+          // the merged axis's. A layer of an error band over a line is where it tells — the band
+          // lifts its bucketing out into a transform, so its own axis says nothing about buckets,
+          // while the line's still asks for a `%Y` format and a tick step a year wide. Taking the
+          // first layer's answer for everything dropped both.
+          parsed.properties.forEach { (name, value) -> merged.set(name, value) }
         }
       }
     }

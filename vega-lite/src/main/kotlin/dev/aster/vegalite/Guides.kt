@@ -263,7 +263,15 @@ internal object Guides {
           signalRef("$orientSignal $comparison \"$main\" ? \"left\" : \"right\""),
         )
       } else {
-        labelAlign(labelAngle, channel, side)?.let { axis.set("labelAlign", str(it)) }
+        // A **null** alignment is a decision, not a gap: an x axis whose labels sit level takes
+        // Vega's own default so that `labelFlush` still works, and upstream records that null on
+        // the component. It is what stops a layer beside it — one whose labels are turned, and so
+        // aligned to their right — from supplying an alignment for the whole axis. `assembleAxis`
+        // then drops it rather than writing it out.
+        axis.set(
+          "labelAlign",
+          labelAlign(labelAngle, channel, side)?.let { str(it) } ?: VegaValue.Null,
+        )
       }
       labelBaseline(labelAngle, channel, side)?.let { axis.set("labelBaseline", str(it)) }
     }
@@ -596,6 +604,9 @@ internal object Guides {
   }
 
   /** Splits one component into the gridline axis and the axis proper, in that order. */
+  /** `labelAlign`/`labelBaseline` of null are decisions the axis keeps and Vega is not shown. */
+  private val NULLABLE_LABEL_PROPERTIES = setOf("labelAlign", "labelBaseline")
+
   fun assembleAxis(axis: AxisComponent, kind: String): VegaValue? {
     val grid = (axis.properties["grid"] as? VegaValue.Bool)?.value == true
     if (kind == "grid" && !grid) return null
@@ -608,7 +619,11 @@ internal object Guides {
       if (kind == "grid") {
         axis.properties.forEach { (key, value) ->
           if (key == "encode") encodeFor(value, kind)?.let { put(key, it) }
-          else if (key !in setOf("scale", "orient", "zindex", "labelExpr") && key !in MAIN_ONLY)
+          else if (
+            key !in setOf("scale", "orient", "zindex", "labelExpr") &&
+              key !in MAIN_ONLY &&
+              !(key in NULLABLE_LABEL_PROPERTIES && value is VegaValue.Null)
+          )
             put(key, value)
         }
         put("domain", false)
@@ -642,7 +657,8 @@ internal object Guides {
             }
           } else if (
             key !in setOf("scale", "orient", "grid", "title", "zindex", "labelExpr") &&
-              key !in GRID_ONLY
+              key !in GRID_ONLY &&
+              !(key in NULLABLE_LABEL_PROPERTIES && value is VegaValue.Null)
           ) {
             put(key, value)
           }
