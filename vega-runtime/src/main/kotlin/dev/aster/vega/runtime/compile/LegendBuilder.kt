@@ -1021,10 +1021,25 @@ internal class LegendBuilder(
             "bar; this draws symbol swatches with the same colours and cut points instead",
           operator = scaleName,
         )
+        // `thresholdValues` prepends **negative infinity** and calls the far end positive
+        // infinity, and `formatRange` then reads each entry against the next: a bucket with no
+        // lower bound is written `< t`, one with no upper bound `≥ t`, and the rest as the span
+        // they cover. Labelling each swatch with one edge said nothing about which side of it the
+        // bucket lay on.
         val decimals = decimalsFor(scale.thresholds)
+        val edges = scale.thresholds
         scale.bucketRepresentatives.mapIndexed { index, value ->
-          val label = scale.thresholds.getOrNull(index - 1)
-          Entry(VegaValue.Num(value), label?.let { formatTickLabel(it, decimals) } ?: "")
+          val low = edges.getOrNull(index - 1)
+          val high = edges.getOrNull(index)
+          val label =
+            when {
+              low == null && high != null -> "< ${formatTickLabel(high, decimals)}"
+              low != null && high == null -> "≥ ${formatTickLabel(low, decimals)}"
+              low != null && high != null ->
+                "${formatTickLabel(low, decimals)} – ${formatTickLabel(high, decimals)}"
+              else -> ""
+            }
+          Entry(VegaValue.Num(value), label)
         }
       }
     }

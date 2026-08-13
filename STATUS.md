@@ -1969,6 +1969,43 @@ one interval per bucket, not one per instant — so the unit cannot stay on a ch
 the aggregate has already collapsed. A channel that is not itself temporal is then told to read
 that column as a *time*, nothing about an ordinal band otherwise saying so.
 
+### A child's transforms come after its parent's, not instead of them
+
+The plainest correctness bug of the sweep so far, and it had been sitting under a naming difference.
+A layer or a concatenated plot that writes its own `transform` was having it *replace* the chart's
+rather than follow it — so a population pyramid whose shared transforms compute a `gender` column
+and whose plots each filter on it filtered on a column nothing had written yet. Upstream keeps the
+parent's transforms in the parent model's own data chain and hangs each child's below; concatenating
+the two lists is the same shape, and the optimizers then hoist the shared prefix back above the fork
+by themselves. One example went from thirty differences to one.
+
+Beside it, four smaller rules:
+
+- **The size alias belongs to an axis, not to a scale.** `assembleAxisSignals` walks the assembled
+  axes and asks each one for the extent it will draw its grid across; a plot whose axis is switched
+  off has nothing to draw and needs no alias. Keying it off the *scales* gave a middle column of
+  labels a `width` signal upstream does not write.
+- **A plot's own `view` block paints its own plotting area**, exactly as the chart's does — which is
+  how a column drawn without a border says so on itself rather than on the chart.
+- **`config.concat.spacing`** settles the gap for every concatenation in a chart, and **an empty
+  description is no description** — `isEmpty` drops it rather than announcing a chart whose spoken
+  summary is the empty string.
+- **A discretizing size scale does not start at zero**: its range is a list of sizes to choose
+  between rather than a span to measure along. And a **stated** inner padding is the resolved one,
+  so the outer padding is half of *that* rather than half of the configured default.
+- **A mark configuration's paint reaches its swatch** — `applyMarkConfig({}, model,
+  FILL_STROKE_CONFIG)` — so a bar outlined two units thick has a swatch outlined two units thick.
+  The two colours are dropped again where this legend is the one explaining them.
+
+The fixture written for the first of those found a runtime defect and named a runtime gap. The
+defect: a **discretizing scale's legend labelled each swatch with one edge**, saying nothing about
+which side of it the bucket lay on. `thresholdValues` prepends negative infinity and calls the far
+end positive infinity, and `formatRange` reads each entry against the next — `< 12.2`, `12.2 –
+16.4`, `≥ 20.6`. That is fixed. The gap: a **plot whose `view` block sets `stroke: null` loses its
+group from the scene**. The compiler emits exactly what upstream emits — the specification
+comparison covers it — and the scene comes out one group short, so the fixture is written without
+that block and the case is recorded here rather than passed off as working.
+
 ### Two runtime gaps this batch names but does not close
 
 `density`'s fixture is not in the corpus, and `trail`'s draws no legend. Both compile exactly as

@@ -717,18 +717,23 @@ internal object Scales {
       if (type == "point") {
         set("padding", num(config.scaleConfig("pointPadding")!!))
       } else if (type == "band" && def.scale?.has("padding") != true) {
+        // A **stated** inner padding is the resolved one, and the outer is half of *that*: the two
+        // are one decision, and deriving the outer from the configured inner beside a stated one
+        // pads the ends against a gap the bands do not have.
         val inner =
-          if (view.hasNestedOffset(channel)) {
-            // A band holding several bars is padded more generously than one holding a single bar,
-            // because the gap now separates *groups* rather than bars.
-            config.scaleConfig("bandWithNestedOffsetPaddingInner")!!
-          } else {
-            when (view.spec.mark) {
-              "bar" -> config.scaleConfig("barBandPaddingInner")!!
-              "tick" -> config.scaleConfig("tickBandPaddingInner")!!
-              else -> config.scaleConfig("rectBandPaddingInner")!!
+          def.scale?.number("paddingInner")
+            ?: if (view.hasNestedOffset(channel)) {
+              // A band holding several bars is padded more generously than one holding a single
+              // bar,
+              // because the gap now separates *groups* rather than bars.
+              config.scaleConfig("bandWithNestedOffsetPaddingInner")!!
+            } else {
+              when (view.spec.mark) {
+                "bar" -> config.scaleConfig("barBandPaddingInner")!!
+                "tick" -> config.scaleConfig("tickBandPaddingInner")!!
+                else -> config.scaleConfig("rectBandPaddingInner")!!
+              }
             }
-          }
         set("paddingInner", num(inner))
         // Half the inner padding, so that a band's step stays a whole number of units — except
         // around a nested group, where upstream pads both sides alike.
@@ -842,7 +847,16 @@ internal object Scales {
       }
     }
 
-    if (channel == "size" && def.type == MeasureType.QUANTITATIVE) return true
+    // A **discretizing** size scale does not start at zero: its range is a list of sizes to choose
+    // between rather than a span to measure along, and starting it at zero spends the first of them
+    // on nothing.
+    if (
+      channel == "size" &&
+        def.type == MeasureType.QUANTITATIVE &&
+        type !in setOf("quantile", "quantize", "threshold", "bin-ordinal")
+    ) {
+      return true
+    }
 
     if (def.bin == null && (channelIsPosition(channel) || channelIsPolar(channel))) {
       val mark = view.spec.mark

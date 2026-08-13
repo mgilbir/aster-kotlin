@@ -188,7 +188,9 @@ private class Compilation(
 
     val vega = obj {
       put("\$schema", "https://vega.github.io/schema/vega/v6.json")
-      put("description", spec.string("description"))
+      // An empty description is no description: `isEmpty` drops it rather than announcing a chart
+      // whose spoken summary is the empty string.
+      put("description", spec.string("description")?.takeIf { it.isNotEmpty() })
       // The chart's own `background` beats the configured one: `config.background` is a theme's
       // default and a specification that states one is overriding the theme, not being overridden
       // by it.
@@ -299,6 +301,15 @@ private class Compilation(
     var views: List<UnitView> = emptyList()
     var scales: LinkedHashMap<String, ScaleComponent> = LinkedHashMap()
     var axes: List<VegaValue> = emptyList()
+
+    /**
+     * The channels this plot actually draws an axis on.
+     *
+     * `assembleAxisSignals` walks the axes rather than the scales, and that is the whole
+     * difference: a plot whose axis is switched off has no grid to draw across anything, so it
+     * needs no alias for the size it would have drawn it over.
+     */
+    var gridlessAxes: List<String> = emptyList()
     var legends: List<VegaValue> = emptyList()
     var size: LayoutSize? = null
     var sizeNames: Map<String, String> = mapOf("x" to "width", "y" to "height")
@@ -348,7 +359,7 @@ private class Compilation(
     val leaves = mutableListOf<Plot>()
 
     fun build(name: String, child: VegaValue.Obj): Node? {
-      val nested = Concat.of(child, diagnostics)
+      val nested = Concat.of(child, diagnostics, config)
       if (nested == null) {
         val plot = Plot(name, child)
         plot.views = views(plot.spec, plot.name) ?: return null
@@ -596,6 +607,12 @@ private class Compilation(
             obj {
               put("width", signalRef(plot.sizeNames.getValue("x")))
               put("height", signalRef(plot.sizeNames.getValue("y")))
+              // A plot's own `view` block paints its plotting area, the same as the chart's does:
+              // a middle column drawn without a border says so on itself rather than on the chart.
+              (viewEncode(plot.spec) as? VegaValue.Obj)?.obj("update")?.fields?.forEach {
+                (key, value) ->
+                put(key, value)
+              }
             },
           )
         },
@@ -618,10 +635,14 @@ private class Compilation(
    */
   private fun localSizeSignals(plot: Plot): List<VegaValue> {
     val out = LinkedHashMap<String, String>()
-    for (channel in Channels.POSITION_CHANNELS) {
+    // The alias belongs to an **axis**, not to a scale: `assembleAxisSignals` walks the assembled
+    // axes and asks each one without a `gridScale` for the size it will fall back to. A plot whose
+    // axis is switched off has nothing to draw a grid across and needs no alias at all.
+    for (channel in plot.gridlessAxes) {
       val other = if (channel == "x") "y" else "x"
-      val byChannel = plot.byChannel()
-      if (byChannel[channel] == null || byChannel[other] != null) continue
+      // Only where there is no other scale to draw the grid across: with one, the axis names it in
+      // `gridScale` and needs no size at all.
+      if (plot.byChannel()[other] != null) continue
       val name = if (other == "x") "width" else "height"
       val update = plot.views.first().sizeSignal(other)
       if (update != name) out[name] = update
@@ -741,8 +762,12 @@ private class Compilation(
     put("data", spec.fields["data"])
     put("width", spec.fields["width"])
     put("height", spec.fields["height"])
-    put("transform", spec.fields["transform"])
     putAll(child)
+    // A child's transforms come **after** its parent's rather than instead of them: the parent's
+    // belong to the parent's own data chain and the child's hang below. Letting the child's replace
+    // them ran a filter over a column the parent's formula had not yet written.
+    val inheritedTransforms = spec.array("transform").orEmpty() + child.array("transform").orEmpty()
+    put("transform", if (inheritedTransforms.isEmpty()) null else arr(inheritedTransforms))
     val shared = spec.obj("encoding")
     if (shared != null) {
       // Channel by channel, and **property by property within a channel**: `mergeEncoding` spreads
@@ -891,8 +916,8 @@ private class Compilation(
   }
 
   /** The chart group's own `encode`, which is where a top-level `view` block's paint lands. */
-  private fun viewEncode(): VegaValue? {
-    val view = spec.obj("view") ?: return null
+  private fun viewEncode(from: VegaValue.Obj = spec): VegaValue? {
+    val view = from.obj("view") ?: return null
     val painted =
       view.fields.filterKeys { it in setOf("fill", "stroke", "fillOpacity", "strokeOpacity") }
     if (painted.isEmpty()) return null
@@ -1173,6 +1198,10 @@ private class Compilation(
       }
     }
     faceOff(components.values.toList())
+    // Which axes will fall back to a *name* for the extent they draw their grid across:
+    // `assembleAxisSignals` asks each component without a `gridScale`, and a plot inside a
+    // composition then aliases that name to its own size.
+    plot.gridlessAxes = components.values.map { it.first }
     val ordered = components.values.map { it.second }
     // Gridlines first, so they are painted behind every mark, then the axes themselves.
     return ordered.mapNotNull { Guides.assembleAxis(it, "grid") } +

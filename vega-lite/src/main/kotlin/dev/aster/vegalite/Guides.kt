@@ -742,6 +742,20 @@ internal object Guides {
    *   mark's *default* colour instead looks identical whenever the mark has no colour encoding, and
    *   paints a size legend's swatches in the default blue on every chart that does.
    */
+  /** `FILL_STROKE_CONFIG`: the paint properties a mark's configuration carries into its swatch. */
+  private val FILL_STROKE_CONFIG =
+    listOf(
+      "stroke",
+      "strokeWidth",
+      "strokeDash",
+      "strokeDashOffset",
+      "strokeOpacity",
+      "strokeJoin",
+      "strokeMiterLimit",
+      "fill",
+      "fillOpacity",
+    )
+
   private fun symbolEncode(view: UnitView, channel: String): VegaValue.Obj? {
     // `symbols` in `legend/encode.ts` opens with `markDef.filled && mark !== 'trail'`. A trail is
     // filled as a mark — it is a solid ribbon — but its swatch is a *stroke*, so its legend is read
@@ -750,6 +764,18 @@ internal object Guides {
     val colors = Marks.colorEncode(view, filledOverride = filled)
 
     val fields = LinkedHashMap<String, VegaValue>()
+    // `applyMarkConfig({}, model, FILL_STROKE_CONFIG)` comes first: the paint a *theme* settles for
+    // every mark of this type settles the swatch too, so a bar outlined two units thick has a
+    // swatch outlined two units thick. Only the properties Vega names, and only from the
+    // configuration — the mark's own are already in the colour encoding below.
+    val markConfig = view.config.markConfig(view.spec.mark)
+    for (property in FILL_STROKE_CONFIG) {
+      // The two colours are dropped again where *this* legend is the one explaining them: a swatch
+      // cannot show a scale it is itself the key to. Upstream deletes them from the same block.
+      if (property == "fill" && (channel == "fill" || (filled && channel == "color"))) continue
+      if (property == "stroke" && (channel == "stroke" || (!filled && channel == "color"))) continue
+      markConfig.fields[property]?.let { fields[property] = obj { put("value", it) } }
+    }
     val fill = colors["fill"]
     if (fill != null && !(channel == "fill" || (filled && channel == "color"))) {
       if (scaled(fill)) {

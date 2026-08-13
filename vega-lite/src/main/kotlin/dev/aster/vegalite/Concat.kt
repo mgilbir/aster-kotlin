@@ -52,7 +52,7 @@ private constructor(
     /** `config.concat.spacing`. */
     private const val DEFAULT_SPACING = 20.0
 
-    fun of(spec: VegaValue.Obj, diagnostics: DiagnosticCollector): Concat? {
+    fun of(spec: VegaValue.Obj, diagnostics: DiagnosticCollector, config: Config? = null): Concat? {
       val kind = listOf("hconcat", "vconcat", "concat").firstOrNull { spec.has(it) } ?: return null
       val entries = spec.array(kind).orEmpty()
       if (entries.isEmpty()) {
@@ -81,8 +81,13 @@ private constructor(
           child.string("name") to
             obj {
               put("data", spec.fields["data"])
-              put("transform", spec.fields["transform"])
               putAll(child)
+              // A plot's own transforms come **after** the concatenation's rather than instead of
+              // them: the concatenation's belong to its own data chain and each plot's hangs below.
+              // Letting a plot's replace them ran its filter over a column the shared formula had
+              // not yet written.
+              val inherited = spec.array("transform").orEmpty() + child.array("transform").orEmpty()
+              put("transform", if (inherited.isEmpty()) null else arr(inherited))
             }
       }
       val columns =
@@ -94,7 +99,9 @@ private constructor(
       return Concat(
         children,
         columns,
-        spec.number("spacing") ?: DEFAULT_SPACING,
+        // `config.concat.spacing` settles it for every concatenation in the chart, which is how a
+        // mosaic pulls its two bands together without saying so on each of them.
+        spec.number("spacing") ?: config?.raw?.obj("concat")?.number("spacing") ?: DEFAULT_SPACING,
         spec,
       )
     }
