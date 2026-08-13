@@ -21,7 +21,7 @@ end to end — expressions, signals, 33 of upstream's 40 data transforms, every 
 and an event handler that recompiles the chart — and are verified against upstream Vega by
 differential tests.
 
-One hundred and thirty-six differential fixtures pass, all matching upstream exactly on every mark and
+One hundred and thirty-seven differential fixtures pass, all matching upstream exactly on every mark and
 scale output:
 
 | Fixture | Marks | Covers |
@@ -201,7 +201,7 @@ substantive compatibility items:
 | 6. View and Compose APIs | Yes |
 | 7. SVG, PNG, PDF export | Yes |
 | 8. TalkBack can describe and navigate | Partial — virtual nodes are tested by instrumentation, not with TalkBack itself |
-| 9. At least 100 compatibility fixtures pass | **Yes** — 136 |
+| 9. At least 100 compatibility fixtures pass | **Yes** — 137 |
 | 10. Core runtime has no Android dependency | Yes |
 | 11. Renders without WebView | Yes |
 | 12. Build and test loop runs from the terminal | Yes |
@@ -538,7 +538,7 @@ each example a deadline.
 
 ## Known failing fixtures
 
-None. One hundred and thirty-six fixtures exist and all of them pass — and that sentence became worth
+None. One hundred and thirty-seven fixtures exist and all of them pass — and that sentence became worth
 something only once the gate could no longer skip itself, below.
 
 **The gate could report success without running.** `FixtureDifferentialTest` reads the fixtures and
@@ -1867,6 +1867,18 @@ directive as it does everywhere else.
 Neither would have been found by the fixture the property belonged to. Both were found because a
 fixture *about something else* happened to put a format on a time axis, which is the argument for
 writing fixtures that combine features rather than isolate them.
+
+## Layout `center`, and two more diagnostics that were overstating
+
+`center` puts a cell narrower than its column in the middle of it rather than at its start. Upstream
+guards it twice over and both guards are load-bearing: horizontally it needs more than one **row**, and
+vertically more than one **column**, because a single row of cells has nothing to centre against —
+every column is exactly as wide as the one cell in it. The correction is `x > 0` too, so the widest
+cell in a column, which has no slack, is not pulled backwards out of it.
+
+The facet aggregate message went the way the `impute`, `pivot` and `window` ones did earlier: a facet
+measures with any aggregate operation, so with all 26 implemented the report fired only for a name
+upstream also rejects. It says that now.
 
 ## Performance observations
 

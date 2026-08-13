@@ -9,7 +9,7 @@ Branch `milestone-0-bootstrap`. Working tree clean, both gates green:
 - `./scripts/check.sh` — format, all tests, lint, demo APK
 - `./scripts/oracle.sh` — regenerates upstream references and runs the differential comparison
 
-**136 differential fixtures pass, all matching upstream exactly.** That is the only number here
+**137 differential fixtures pass, all matching upstream exactly.** That is the only number here
 that means what it says.
 
 ## Read this before trusting the other number
@@ -254,7 +254,7 @@ not the one Vega documents**, because Vega only forwards the parameters a specif
 
 ## What is left: two examples, and neither can be verified
 
-**136 differential fixtures pass. 91 of the 93 examples compile clean.** Everything that can be
+**137 differential fixtures pass. 91 of the 93 examples compile clean.** Everything that can be
 checked against upstream has been.
 
 ### `projections` — upstream refuses it too
@@ -406,12 +406,11 @@ As of this handoff the subtraction leaves **nothing** for `encodeEntry`, `axis`,
   deliberately **inert**: upstream's bound test runs before the label bounds exist, so it culls
   nothing, and implementing the documented behaviour would be a real difference. See STATUS.md.
 - **Title:** none. All 31 of upstream's title properties are read.
-- **Layout (6):** `center`, `offset`, `headerBand`, `footerBand`, `titleBand`, `titleAnchor`. The
-  grid itself works — `columns`, `padding`, `align` and `bounds` are read. The block now names what it
-  consumes and reports the rest, which is what caught `titleAnchor`: it had no entry in the old
-  exception table and no reader.
+- **Layout (5):** `offset`, `headerBand`, `footerBand`, `titleBand`, `titleAnchor`. `columns`,
+  `padding`, `align`, `bounds` and `center` are read.
 - **Mark (2):** a mark-level `description` and `key`.
-- **Tail:** facet aggregates. `timeunit` unit inference and its `step` are *done*.
+- **Tail:** none. Facet aggregates take all 26 operations; the report only ever fired for a name
+  upstream rejects too, and says so now. `timeunit` unit inference and its `step` are *done*.
   `config.range`, the named ranges, all four geo expression functions and the `lab`/`hcl` colour
   helpers are *done*. The colour interpolation spaces are *done*, and so are all 26
   aggregate operations — the `impute`, `pivot` and `window` reports were **never gaps**: each fired

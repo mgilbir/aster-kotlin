@@ -1458,6 +1458,16 @@ public data class LayoutSpec(
    * with the overhang allowed to collide. A chart with an axis on every cell reads better flush.
    */
   val bounds: String? = null,
+  /**
+   * `center`: a cell narrower than its column sits in the middle of it rather than at its start.
+   *
+   * One value for both directions or a per-direction object, like `padding` and `align`. Only
+   * meaningful alongside an alignment, and upstream guards it twice over — horizontally it needs
+   * more than one row, vertically more than one column, since a single row has nothing to centre
+   * against.
+   */
+  val centerColumn: Boolean = false,
+  val centerRow: Boolean = false,
 )
 
 /**

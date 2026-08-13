@@ -597,7 +597,8 @@ class GroupMarkTest {
         """
       )
     val messages = compiled.diagnostics.map { it.message }
-    for (name in listOf("offset", "center", "headerBand")) {
+    // `center` came off this list: a cell narrower than its column now sits in the middle of it.
+    for (name in listOf("offset", "headerBand")) {
       assertTrue(messages.any { it.contains("'$name'") }, "$name not reported in $messages")
     }
   }

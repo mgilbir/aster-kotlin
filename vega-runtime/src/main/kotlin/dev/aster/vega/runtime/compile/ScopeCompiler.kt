@@ -614,6 +614,8 @@ internal class ScopeCompiler(
         columnPadding = numbers.resolve(layout.columnPadding, "layout") ?: 0.0,
         alignColumn = GridLayout.Align.fromName(layout.alignColumn),
         alignRow = GridLayout.Align.fromName(layout.alignRow),
+        centerColumn = layout.centerColumn,
+        centerRow = layout.centerRow,
       )
     val offsets = GridLayout.place(boxes, options)
 
@@ -845,7 +847,8 @@ internal class ScopeCompiler(
         if (op == null) {
           diagnostics.error(
             DiagnosticCodes.TRANSFORM_INVALID_PARAMETER,
-            "Facet aggregate '${measure.op}' is not implemented",
+            "'${measure.op}' is not one of Vega's aggregate operations, " +
+              "so a facet cannot measure with it",
             operator = spec.name,
           )
           continue

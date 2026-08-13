@@ -56,6 +56,15 @@ internal object GridLayout {
     val columnPadding: Double = 0.0,
     val alignColumn: Align = Align.EACH,
     val alignRow: Align = Align.EACH,
+    /**
+     * `center`: a cell narrower than its column sits in the middle of it rather than at its start.
+     *
+     * Only meaningful **alongside an alignment**, and upstream guards it twice over: horizontally
+     * it needs more than one row, vertically more than one column. A single row of cells has
+     * nothing to centre against — every column is exactly as wide as the one cell in it.
+     */
+    val centerColumn: Boolean = false,
+    val centerRow: Boolean = false,
   )
 
   /**
@@ -173,6 +182,25 @@ internal object GridLayout {
         down += rowLead[i]
         ys[i] = down
         i += columns
+      }
+    }
+
+    // Centring runs last, on the placed cells: half the slack between a cell's own reach and the
+    // width its column was given. `x > 0` is upstream's, and it matters — the widest cell in a
+    // column
+    // has no slack, and a *negative* correction would pull it back out of its own column.
+    if (options.centerColumn && options.alignColumn != Align.NONE && rows > 1) {
+      for (i in 0 until n) {
+        val allotted = if (options.alignColumn == Align.ALL) widest else columnExtent[i % columns]
+        val slack = allotted - cells[i].right - xs[i]
+        if (slack > 0.0) xs[i] += slack / 2.0
+      }
+    }
+    if (options.centerRow && options.alignRow != Align.NONE && columns != 1) {
+      for (i in 0 until n) {
+        val allotted = if (options.alignRow == Align.ALL) tallest else rowExtent[i / columns]
+        val slack = allotted - cells[i].bottom - ys[i]
+        if (slack > 0.0) ys[i] += slack / 2.0
       }
     }
 

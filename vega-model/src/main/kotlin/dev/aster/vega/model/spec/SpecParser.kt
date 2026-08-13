@@ -450,7 +450,7 @@ private val PROJECTION_CONSUMED =
   )
 
 /** Layout properties this engine reads; the rest are named in [SpecParser.parseLayout]. */
-private val LAYOUT_CONSUMED = setOf("columns", "padding", "align", "bounds")
+private val LAYOUT_CONSUMED = setOf("columns", "padding", "align", "bounds", "center")
 
 /** Data properties this engine reads. */
 private val DATA_CONSUMED = setOf("name", "values", "source", "transform", "format", "url")
@@ -2242,6 +2242,14 @@ public class SpecParser {
    * generates around the grid, and they are reported rather than silently dropped, because a
    * trellis without its row and column labels is a chart nobody can read.
    */
+  /** One direction of a layout flag written either as one value or as `{row, column}`. */
+  private fun layoutFlag(value: VegaValue?, direction: String): Boolean =
+    when (value) {
+      null -> false
+      is VegaValue.Obj -> value.fields[direction]?.asBoolean() ?: false
+      else -> value.asBoolean()
+    }
+
   private fun parseLayout(value: VegaValue, path: String): LayoutSpec? {
     val obj = value as? VegaValue.Obj ?: return unexpected("a layout definition", path)
     // Named rather than listed by exception, like every other block: a layout property nobody
@@ -2259,7 +2267,6 @@ public class SpecParser {
         "footerBand" to "Layout footer bands are not implemented",
         "titleBand" to "Layout title bands are not implemented",
         "titleAnchor" to "Anchoring a cell's title within its row or column is not implemented",
-        "center" to "Centring cells within their row or column is not implemented",
         "offset" to "Layout offsets are not implemented",
       ),
     )
@@ -2287,6 +2294,8 @@ public class SpecParser {
       alignRow = layoutAlign(align, "row"),
       alignColumn = layoutAlign(align, "column"),
       bounds = obj.fields["bounds"]?.takeIf { it is VegaValue.Str }?.asString()?.lowercase(),
+      centerColumn = layoutFlag(obj.fields["center"], "column"),
+      centerRow = layoutFlag(obj.fields["center"], "row"),
     )
   }
 

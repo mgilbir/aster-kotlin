@@ -147,8 +147,9 @@ class UnhandledPropertiesTest {
              "marks": []}]"""
         )
       )
+    // `center` came off this list: a cell narrower than its column now sits in the middle of it.
     assertEquals(
-      listOf("center", "offset", "headerBand", "footerBand", "titleBand", "titleAnchor").sorted(),
+      listOf("offset", "headerBand", "footerBand", "titleBand", "titleAnchor").sorted(),
       reported.sorted(),
     )
   }
@@ -194,10 +195,10 @@ class UnhandledPropertiesTest {
       diagnostics(
           spec(
             """"marks": [{"type": "group", "from": {"facet": {"data": "t", "name": "cell",
-                "groupby": "c"}}, "layout": {"center": true}, "marks": []}]"""
+                "groupby": "c"}}, "layout": {"offset": 4}, "marks": []}]"""
           )
         )
-        .single { it.jsonPath?.endsWith("center") == true }
-    assertTrue("Centring cells" in tailored.message, tailored.message)
+        .single { it.jsonPath?.endsWith("offset") == true }
+    assertTrue("Layout offsets" in tailored.message, tailored.message)
   }
 }
