@@ -2117,17 +2117,22 @@ depends on them. Each has a test and a comment; this is the index.
 
 ## Next three tasks
 
-1. **What the interaction system still does not do.** The chain works end to end and four things
+1. **What the interaction system still does not do.** The chain works end to end and three things
    inside it are stubbed rather than finished: a `debounce` fires on every event instead of after
    the quiet period, because nothing schedules; a **timer** stream, which fires on its own rather
-   than in response to anything, needs the same missing clock; a `{"signal": "..."}` or
-   `{"scale": "..."}` source parses but only ever fires from a real event; and an `encode` handler,
-   which sets properties on the event's own mark rather than a signal, is reported and does nothing.
-   The first two need a scheduler the controller does not have; the third needs a signal to notice
-   its own change; the fourth needs the compiler to hand back a mutable node. All four are reported
-   by name today, the timer only since `config.events` was implemented — until then it read as a
-   view event of type `timer` that nothing ever raises, so the signal simply never changed and said
-   nothing about why.
+   than in response to anything, needs the same missing clock; and an `encode` handler, which sets
+   properties on the event's own mark rather than a signal, is reported and does nothing. The first
+   two need a scheduler the controller does not have; the third needs the compiler to hand back a
+   mutable node. All three are reported by name, the timer only since `config.events` was
+   implemented — until then it read as a view event of type `timer` that nothing ever raises, so the
+   signal simply never changed and said nothing about why.
+
+   A fourth came off this list: a handler sourced on **another signal** now fires and cascades. It
+   was the largest of the four by a distance — 79 handlers across twenty of Vega's 93 examples use
+   it, which is every pan, zoom and brush in the gallery — and the least visible, because nothing
+   fires at initialization and the differential harness only ever sees the initial scene. A handler
+   sourced on a **scale** is still reported: a recompile rebuilds every scale, so nothing here says
+   which one moved, and no published example asks for it.
 2. **The fixture descriptions are written for the wrong reader.** Now that a chart's
    `description` is announced, the corpus's own prose is what TalkBack says first — and it was
    written for a developer reading the corpus: "so both legend forms and both placement axes are

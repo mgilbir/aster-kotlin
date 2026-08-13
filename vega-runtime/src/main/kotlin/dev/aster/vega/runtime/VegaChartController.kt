@@ -13,6 +13,7 @@ import dev.aster.vega.model.spec.EventConfig
 import dev.aster.vega.runtime.compile.CompiledSpec
 import dev.aster.vega.runtime.compile.SpecCompiler
 import dev.aster.vega.runtime.interaction.EventDispatcher
+import dev.aster.vega.runtime.interaction.FiredHandler
 import dev.aster.vega.runtime.interaction.HandlerBinding
 import dev.aster.vega.runtime.interaction.InputEvent as VegaEvent
 import dev.aster.vega.runtime.interaction.SignalUpdater
@@ -367,12 +368,74 @@ public class VegaChartController(
       if (fired.isNotEmpty()) changed += signals.apply(fired, compiled.signals)
     }
     if (changed.isEmpty()) return
+    val cascaded = cascade(changed, compiled)
 
     // Recompile rather than patch. Measured at well under a frame for the heaviest fixture, which
     // is what makes this simple enough to be obviously correct (STATUS.md, Performance
     // observations).
     val json = loadedSpecJson ?: return
     publish(compiler.compileJson(json, signals.overrides))
+    // After publishing, which replaces the diagnostics with the new compile's: a cycle among the
+    // signal-driven handlers is a fact about this interaction rather than about the specification's
+    // text, and it would otherwise be wiped by the very recompile it caused.
+    for (diagnostic in cascaded) report(diagnostic)
+  }
+
+  /**
+   * Fires the handlers whose source is a **signal** rather than an event, until nothing more
+   * changes.
+   *
+   * `{"events": {"signal": "brush"}, "update": "..."}` is how one signal is derived from another,
+   * and it is what a specification writes when the value it wants is a function of a control rather
+   * than of a pointer. Upstream makes it a dataflow edge, so it fires whenever the source changes
+   * and cascades: probed with a chain two deep, setting `a` to 5 left `b` at 10 and `c` at 11 in
+   * the same run. Not at *initialization*, though — also probed: with no change there is nothing to
+   * fire, and both signals keep their declared values, which is why the differential fixtures see
+   * none of this.
+   *
+   * Ordering falls out of the loop rather than needing a sort: each round fires only the handlers
+   * whose source changed in the round before, so a chain is walked in dependency order however the
+   * signals were declared. A **cycle** would never settle, and upstream refuses such a
+   * specification outright; this engine reports it and stops, which is what [DataflowOrder] does
+   * with a cycle among `update` expressions — a chart that draws with one signal stuck beats a
+   * chart that does not draw.
+   */
+  private fun cascade(
+    changed: MutableSet<String>,
+    compiled: CompiledSpec,
+  ): List<VegaDiagnostic> {
+    val bindings =
+      compiled.spec?.signals.orEmpty().flatMap { signal ->
+        signal.on.filter { it.signalSources.isNotEmpty() }.map { HandlerBinding(signal.name, it) }
+      }
+    if (bindings.isEmpty()) return emptyList()
+    var frontier: Set<String> = changed.toSet()
+    var round = 0
+    while (frontier.isNotEmpty()) {
+      if (++round > MAX_CASCADE_ROUNDS) {
+        return listOf(
+          VegaDiagnostic(
+            code = DiagnosticCodes.PARSE_UNKNOWN_PROPERTY,
+            severity = DiagnosticSeverity.WARNING,
+            message =
+              "Signals '${frontier.sorted().joinToString("', '")}' are still changing after " +
+                "$MAX_CASCADE_ROUNDS rounds of signal-driven handlers, so they are on a cycle; " +
+                "their last values are kept",
+          )
+        )
+      }
+      val due =
+        bindings
+          .filter { binding -> binding.handler.signalSources.any { it in frontier } }
+          .map { FiredHandler(it.signalName, it.handler) }
+      if (due.isEmpty()) return emptyList()
+      // Read against the overrides accumulated so far, which is what makes a chain see the value
+      // the
+      // round before it produced rather than the one the last compile resolved.
+      frontier = signals.apply(due, compiled.signals)
+      changed += frontier
+    }
+    return emptyList()
   }
 
   private fun pointOf(event: ChartInputEvent): PointD? =
@@ -564,6 +627,15 @@ public class VegaChartController(
   public companion object {
     public const val MIN_ZOOM: Double = 0.1
     public const val MAX_ZOOM: Double = 50.0
+
+    /**
+     * How many rounds of signal-driven handlers to run before calling it a cycle.
+     *
+     * A chain is as deep as the specification is: the longest in the corpus is two. Anything past a
+     * handful is not depth but a loop, and the number only has to be far enough above real depth
+     * that no honest specification meets it.
+     */
+    private const val MAX_CASCADE_ROUNDS = 64
 
     /** Creates a controller for a hand-authored scene. */
     public fun fromScene(scene: Scene): VegaChartController = VegaChartController(scene)

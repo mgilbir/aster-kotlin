@@ -176,6 +176,58 @@ class ControllerInteractionTest {
     assertEquals(VegaValue.Num(0.0), controller.lastCompiled!!.signals["taps"])
   }
 
+  /**
+   * A handler whose source is another **signal**, which is how one control drives another.
+   *
+   * Upstream makes it a dataflow edge: it fires when the source changes and cascades to whatever is
+   * sourced on *it*. Probed rather than assumed, in both directions — setting `a` to 5 in a chain
+   * two deep left `b` at 10 and `c` at 11, and at **initialization** nothing fires at all, so both
+   * keep their declared values. That second half is why no differential fixture can cover this: the
+   * scene the harness compares is the one before anything has changed.
+   */
+  @Test
+  fun `a signal-sourced handler fires when its source changes, and cascades`() {
+    controller.setSpec(
+      json.replace(
+        """{"name": "taps", "value": 0,""",
+        """{"name": "doubled", "value": 0,
+          "on": [{"events": {"signal": "picked"}, "update": "picked + picked"}]},
+         {"name": "labelled", "value": "none",
+          "on": [{"events": {"signal": "doubled"}, "update": "'is ' + doubled"}]},
+         {"name": "taps", "value": 0,""",
+      )
+    )
+    // Nothing has changed yet, so nothing has fired: upstream's initial run leaves both alone.
+    assertEquals(VegaValue.Num(0.0), controller.lastCompiled!!.signals["doubled"])
+    assertEquals(VegaValue.Str("none"), controller.lastCompiled!!.signals["labelled"])
+
+    controller.dispatch(ChartInputEvent.Tap(onSecondBar))
+
+    // The tap set `picked` to "b"; the chain ran from there in one batch.
+    assertEquals(VegaValue.Str("b"), controller.lastCompiled!!.signals["picked"])
+    assertEquals(VegaValue.Str("bb"), controller.lastCompiled!!.signals["doubled"])
+    assertEquals(VegaValue.Str("is bb"), controller.lastCompiled!!.signals["labelled"])
+  }
+
+  /** A cycle would never settle. Upstream refuses the specification; this reports and stops. */
+  @Test
+  fun `a cycle among signal-driven handlers is reported`() {
+    controller.setSpec(
+      json.replace(
+        """{"name": "taps", "value": 0,""",
+        """{"name": "ping", "value": 0,
+          "on": [{"events": {"signal": "pong"}, "update": "pong + 1"}]},
+         {"name": "pong", "value": 0,
+          "on": [{"events": {"signal": "picked"}, "update": "1"},
+                 {"events": {"signal": "ping"}, "update": "ping + 1"}]},
+         {"name": "taps", "value": 0,""",
+      )
+    )
+    controller.dispatch(ChartInputEvent.Tap(onSecondBar))
+    val reported = controller.state.value.diagnostics.map { it.message }
+    assertTrue(reported.any { it.contains("are on a cycle") }, reported.toString())
+  }
+
   /** Loading a new specification forgets what the old one's handlers had set. */
   @Test
   fun `setSpec clears the accumulated signal values`() {

@@ -1254,6 +1254,23 @@ public class SpecParser {
       return null
     }
 
+    if (scales.isNotEmpty()) {
+      // A `{"scale": "x"}` source fires when the scale itself is rebuilt, which upstream knows
+      // because a scale is an operator in its dataflow. Here a changed signal recompiles the whole
+      // specification, so every scale is rebuilt every time and nothing says which of them *moved*
+      // —
+      // firing on all of them would run the handler when nothing about the scale had changed.
+      // Reported rather than approximated, and it is the rarest source there is: not one of Vega's
+      // 93
+      // published examples uses it, where 79 handlers across twenty of them are driven by a signal.
+      diagnostics.warn(
+        DiagnosticCodes.PARSE_UNKNOWN_PROPERTY,
+        "A handler on signal '$signalName' is fired by scale '${scales.joinToString("', '")}' " +
+          "being rebuilt, which this engine does not track; the signal will not update from it",
+        jsonPath = "$path.events",
+      )
+    }
+
     obj.reportUnhandled("Signal handler", path, SIGNAL_HANDLER_CONSUMED)
     return SignalHandler(
       streams = streams,

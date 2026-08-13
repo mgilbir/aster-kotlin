@@ -379,6 +379,30 @@ Three things to weigh first, none of them checked:
   contract, and STATUS's "Next three tasks" item 1 describes the neighbouring gaps in the same
   machinery.
 
+## A signal can now drive a signal, and that was the big one
+
+`{"events": {"signal": "brush"}}` is how one signal is derived from another, and it is not a corner:
+**79** handlers across twenty of Vega's 93 published examples use it — every pan, zoom, brush and
+overview-plus-detail in the gallery — against **none** for the `{"scale": ...}` form. It was parsed
+and never fired.
+
+It was invisible for a reason worth keeping: **nothing fires at initialization**. Probed both ways —
+a chain two deep takes `a = 5` to `b = 10` and `c = 11` in one run, and with no change at all both
+signals keep their declared values — so the scene the differential harness compares is the scene
+before anything has happened, and every fixture was right. A pan that did nothing looked like a chart
+with no pan in it.
+
+The implementation is a loop in `VegaChartController.cascade`, and two details are load-bearing.
+Dependency order falls out of it rather than needing a sort, because each round fires only the
+handlers whose source changed in the round before; and the diagnostics from a cycle are reported
+*after* `publish`, since publishing replaces them with the new compile's and the cycle is a fact about
+the interaction rather than about the specification's text. A cycle is capped and reported the way
+`DataflowOrder` reports one among `update` expressions — upstream refuses such a specification
+outright, and drawing with one signal stuck beats not drawing.
+
+The scale form stays reported. A recompile rebuilds every scale, so nothing here says which one
+*moved*, and firing on all of them would run the handler when nothing had changed.
+
 ## What is left, and the one technique that finds it
 
 The remaining inventory is **legend, title and layout properties**, plus a short tail. Every encode

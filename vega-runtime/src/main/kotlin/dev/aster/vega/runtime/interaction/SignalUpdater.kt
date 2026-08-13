@@ -107,10 +107,10 @@ public class SignalUpdater(
     private val entry: FiredHandler,
   ) : ExpressionScope {
 
-    private val event = entry.event.asValue()
+    private val event = entry.event?.asValue() ?: VegaValue.Null
 
     override val datum: VegaValue
-      get() = entry.event.datum
+      get() = entry.event?.datum ?: VegaValue.Null
 
     override fun signal(name: String): VegaValue =
       when (name) {

@@ -59,7 +59,14 @@ public data class InputEvent(
 public data class FiredHandler(
   val signalName: String,
   val handler: SignalHandler,
-  val event: InputEvent,
+  /**
+   * The event that fired it, or null when nothing did.
+   *
+   * A handler whose source is another **signal** — `{"events": {"signal": "width"}}` — is fired by
+   * that signal changing, so there is no event to read and `event` is absent from its update
+   * expression, exactly as upstream leaves it undefined.
+   */
+  val event: InputEvent? = null,
 )
 
 /** One `on` handler, bound to the signal it sets. */
