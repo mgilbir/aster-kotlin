@@ -23,6 +23,7 @@ import kotlin.math.cos
 import kotlin.math.exp
 import kotlin.math.expm1
 import kotlin.math.floor
+import kotlin.math.hypot
 import kotlin.math.ln
 import kotlin.math.ln1p
 import kotlin.math.pow
@@ -111,15 +112,6 @@ public object Functions {
       "vlSelectionResolve" to "selection helpers require the signal and selection subsystems",
       "vlSelectionIdTest" to "selection helpers require the signal and selection subsystems",
       "vlSelectionTuples" to "selection helpers require the signal and selection subsystems",
-      // Functions whose result is a **function**, which a value model of numbers, strings, arrays
-      // and
-      // objects has no way to hold. Each is written into a channel upstream reads back as a shape.
-      "pathShape" to
-        "returns a shape function, which is not a value this engine can carry; a symbol's " +
-          "'shape' takes the SVG path string directly",
-      "geoShape" to
-        "returns a shape function, which is not a value this engine can carry; the 'geoshape' " +
-          "transform draws a feature through a projection instead",
       "copy" to "copying a scale needs the scale itself as a value, which is not one here",
       "gradient" to "gradients cannot be produced from an expression yet",
       // Functions that read or write the running view rather than computing anything. A compiled
@@ -128,18 +120,8 @@ public object Functions {
       "modify" to "modifying a dataset from an expression needs the running dataflow",
       "inScope" to "asking whether an item is inside a scope needs the running view's scenegraph",
       "intersect" to "hit-testing a region against the scenegraph needs the running view",
-      // Functions that answer a question only a browser can answer.
-      "screen" to "there is no screen to measure",
-      "windowSize" to "there is no window to measure",
-      "pinchAngle" to "gesture geometry belongs to the event system, not to a compiled scene",
-      "pinchDistance" to "gesture geometry belongs to the event system, not to a compiled scene",
-      "lassoAppend" to "lasso selection belongs to the event system, not to a compiled scene",
-      "lassoPath" to "lasso selection belongs to the event system, not to a compiled scene",
-      "intersectLasso" to "lasso selection belongs to the event system, not to a compiled scene",
-      // Logging, which has a diagnostic collector here rather than a console.
-      "debug" to "expression logging is not wired to the diagnostic collector",
-      "info" to "expression logging is not wired to the diagnostic collector",
-      "warn" to "expression logging is not wired to the diagnostic collector",
+      "intersectLasso" to
+        "hit-testing a lasso against the scenegraph needs the running view, as `intersect` does",
     )
 
   /** A runaway step cannot spin forever; no axis has this many boundaries. */
@@ -905,6 +887,109 @@ public object Functions {
       VegaValue.Arr(listOf(VegaValue.Null, VegaValue.Null))
     }
 
+    /**
+     * `screen()` and `windowSize()` — the same headless answers, for the same reason.
+     *
+     * `screen()` is `window.screen` where there is a window and `{}` where there is not;
+     * `windowSize()` is `[innerWidth, innerHeight]` or `[undefined, undefined]`. Both verified in a
+     * `renderer: 'none'` view, which is the configuration every fixture is rendered in. Answering
+     * with the *view's* size instead would be a different chart from upstream's, and inventing a
+     * screen would be worse: a specification that scales itself to the display would silently size
+     * itself to something no reader is looking at.
+     */
+    map["screen"] = ExpressionFunction { VegaValue.EmptyObject }
+    map["windowSize"] = ExpressionFunction {
+      VegaValue.Arr(listOf(VegaValue.Null, VegaValue.Null))
+    }
+
+    // ---- gesture geometry ---------------------------------------------------
+    //
+    // Arithmetic over the two touches of a pinch, which is all upstream's are: the event object is
+    // read for `touches[0]` and `touches[1]` and nothing else about the browser is involved. They
+    // work here on any object shaped like one, which is what an event handler hands them.
+    map["pinchDistance"] = ExpressionFunction { args ->
+      val (first, second) =
+        touchPair(args.at(0)) ?: return@ExpressionFunction VegaValue.Num(Double.NaN)
+      VegaValue.Num(hypot(first.first - second.first, first.second - second.second))
+    }
+    map["pinchAngle"] = ExpressionFunction { args ->
+      val (first, second) =
+        touchPair(args.at(0)) ?: return@ExpressionFunction VegaValue.Num(Double.NaN)
+      VegaValue.Num(atan2(first.second - second.second, first.first - second.first))
+    }
+
+    // ---- lasso selection ----------------------------------------------------
+
+    /**
+     * `lassoAppend(lasso, x, y[, minDist])` — the point added only if it is far enough from the
+     * last.
+     *
+     * The comparison is strictly greater and the default distance is 5, so a drag that has not
+     * moved six units yet returns the **same** array rather than a longer one. That is what keeps a
+     * lasso from accumulating a point per mouse event.
+     */
+    map["lassoAppend"] = ExpressionFunction { args ->
+      val lasso = (args.at(0) as? VegaValue.Arr)?.values ?: emptyList()
+      val x = args.number(1)
+      val y = args.number(2)
+      val minimum = args.numberOr(3, 5.0).takeIf { it.isFinite() } ?: 5.0
+      val last = (lasso.lastOrNull() as? VegaValue.Arr)?.values
+      val point = VegaValue.Arr(listOf(VegaValue.Num(x), VegaValue.Num(y)))
+      if (last == null || last.size < 2) return@ExpressionFunction VegaValue.Arr(lasso + point)
+      val dx = JsSemantics.toNumber(last[0]) - x
+      val dy = JsSemantics.toNumber(last[1]) - y
+      if (hypot(dx, dy) > minimum) VegaValue.Arr(lasso + point) else VegaValue.Arr(lasso)
+    }
+
+    /**
+     * `lassoPath(lasso)` — the outline as an SVG path.
+     *
+     * Transcribed rather than rewritten, spacing included: upstream builds `"M x,y "` for the first
+     * point, `"L x,y "` for the middle ones and `" Z"` for the **last**, so a three-point lasso is
+     * `"M 0,0 L 10,0 Z"` with two spaces before the Z and the last point never written. A one-point
+     * lasso is `"M 1,2 "` — the first branch and the last both apply, and the first wins.
+     */
+    map["lassoPath"] = ExpressionFunction { args ->
+      val lasso = (args.at(0) as? VegaValue.Arr)?.values ?: emptyList()
+      val out = StringBuilder()
+      lasso.forEachIndexed { index, entry ->
+        val point = (entry as? VegaValue.Arr)?.values ?: return@forEachIndexed
+        val x =
+          JsSemantics.numberToString(JsSemantics.toNumber(point.getOrNull(0) ?: VegaValue.Null))
+        val y =
+          JsSemantics.numberToString(JsSemantics.toNumber(point.getOrNull(1) ?: VegaValue.Null))
+        out.append(
+          when {
+            index == 0 -> "M $x,$y "
+            index == lasso.size - 1 -> " Z"
+            else -> "L $x,$y "
+          }
+        )
+      }
+      VegaValue.Str(out.toString())
+    }
+
+    /**
+     * `pathShape(path)` — the path an SVG path string describes.
+     *
+     * Upstream returns a *function*: given a drawing context it strokes the parsed path, and given
+     * none it hands the string straight back — verified by calling `vega-functions`' own
+     * `pathShape('M0,0L10,10')()`, which answers `"M0,0L10,10"`. That string is what this engine
+     * returns, because it is the only part of the function a value model can hold and it is what a
+     * `shape` channel here takes.
+     *
+     * A **stated divergence**, and a narrow one: upstream's return value cannot be used from a
+     * specification at all. A `symbol`'s `shape` calls `customSymbol(path)`, which does
+     * `path.match(...)` and throws on a function; a `path` mark's `path` channel is written to an
+     * SVG attribute and stringifies it; and a `shape` **mark** wants a generator carrying
+     * `.context()`, which this closure has not got. All three were probed and all three throw. So
+     * there is no chart upstream draws that this draws differently — only charts upstream refuses
+     * that this draws.
+     */
+    map["pathShape"] = ExpressionFunction { args ->
+      (args.at(0) as? VegaValue.Str) ?: VegaValue.Null
+    }
+
     // ---- control flow -------------------------------------------------------
     map["if"] = ExpressionFunction { args ->
       if (JsSemantics.truthy(args.at(0))) args.at(1) else args.at(2)
@@ -940,6 +1025,18 @@ public object Functions {
    * reader is, `utcmonth` reads it where the data was recorded, and a chart that mixes them is
    * wrong in a way nothing complains about.
    */
+  /** The two touches of a pinch, as `(x, y)` pairs, or null when the event carries no pair. */
+  private fun touchPair(event: VegaValue): Pair<Pair<Double, Double>, Pair<Double, Double>>? {
+    val touches = ((event as? VegaValue.Obj)?.fields?.get("touches") as? VegaValue.Arr)?.values
+    if (touches == null || touches.size < 2) return null
+    fun at(index: Int): Pair<Double, Double> {
+      val touch = touches[index] as? VegaValue.Obj ?: return Double.NaN to Double.NaN
+      return JsSemantics.toNumber(touch.fields["clientX"] ?: VegaValue.Null) to
+        JsSemantics.toNumber(touch.fields["clientY"] ?: VegaValue.Null)
+    }
+    return at(0) to at(1)
+  }
+
   // ---- pan and zoom -------------------------------------------------------
 
   /**

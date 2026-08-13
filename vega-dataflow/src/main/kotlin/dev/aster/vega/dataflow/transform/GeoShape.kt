@@ -303,6 +303,21 @@ public object GeoMeasure {
   }
 
   /** A projection's own scale, `geoScale('name')`. */
+  /**
+   * `geoShape(projection, feature)` — the feature drawn through the projection, as an SVG path.
+   *
+   * The same machinery the `geoshape` transform uses, asked for one feature instead of a column of
+   * them. Null where nothing was drawn, which is upstream's path generator returning null rather
+   * than an empty string, and a projection that could not be built draws nothing at all.
+   */
+  public fun shape(definition: ProjectionDefinition?, geojson: VegaValue): String? {
+    val projection = definition?.build() ?: return null
+    val sink = PathStringSink(digits = null)
+    definition.pointRadius?.let { sink.pointRadius(it) }
+    GeoJsonStream.stream(geojson, projection.stream(sink))
+    return sink.result()
+  }
+
   public fun scaleOf(definition: ProjectionDefinition): Double? =
     (definition.build() as? Projection)?.scale
 }

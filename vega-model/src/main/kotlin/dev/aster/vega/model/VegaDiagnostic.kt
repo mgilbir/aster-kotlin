@@ -56,6 +56,9 @@ public object DiagnosticCodes {
   public const val EXPRESSION_PARSE_ERROR: String = "VEGA_EXPRESSION_PARSE_ERROR"
   public const val EXPRESSION_UNSUPPORTED_FUNCTION: String = "VEGA_EXPRESSION_UNSUPPORTED_FUNCTION"
 
+  /** A message a specification asked for itself, through `warn()`, `info()` or `debug()`. */
+  public const val EXPRESSION_LOG: String = "VEGA_EXPRESSION_LOG"
+
   public const val SCALE_UNSUPPORTED_TYPE: String = "VEGA_SCALE_UNSUPPORTED_TYPE"
   public const val SCALE_INVALID_DOMAIN: String = "VEGA_SCALE_INVALID_DOMAIN"
 

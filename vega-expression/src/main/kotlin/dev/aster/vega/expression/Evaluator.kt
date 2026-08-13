@@ -279,6 +279,26 @@ public class Evaluator(
       else scope.invertScale(scaleName, argument)
     }
 
+    // `warn`, `info` and `debug` say something and hand back their **last** argument, so wrapping a
+    // value in one leaves the expression computing the same thing. The message goes to whatever
+    // sink
+    // the scope has; the value comes back either way.
+    if (name == "warn" || name == "info" || name == "debug") {
+      val values = node.arguments.map { evaluate(it, scope) }
+      scope.log(name, values.joinToString(" ") { it.asString() })
+      return values.lastOrNull() ?: VegaValue.Null
+    }
+
+    // `geoShape(projection, feature)` — the outline, as a path this engine's `shape` channel takes.
+    if (name == "geoShape" && node.arguments.size >= 2) {
+      val projection = evaluate(node.arguments[0], scope)
+      val geojson = evaluate(node.arguments[1], scope)
+      return scope.geoShape(
+        if (projection is VegaValue.Null) null else projection.asString(),
+        geojson,
+      )
+    }
+
     // `geoCentroid(projection, feature)`, where the projection may be null for a measurement on
     // the globe itself rather than on the page.
     if (

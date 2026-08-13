@@ -133,6 +133,29 @@ public interface ExpressionScope {
    */
   public fun geoScale(projection: String?): VegaValue = VegaValue.Null
 
+  /**
+   * `geoShape(projection, feature)` — the feature drawn through the projection, as a path.
+   *
+   * The same stated divergence as `pathShape`, for the same reason: upstream returns a closure no
+   * channel can consume — probed on a `symbol`, on a `path` mark and on a `shape` mark, and all
+   * three throw — so the string that closure produces given no drawing context is what this
+   * returns. The `geoshape` **transform** is the route that does work upstream, and it is
+   * implemented and differentially verified; this is the same outline through the same machinery,
+   * asked for one feature rather than a column of them.
+   */
+  public fun geoShape(projection: String?, geojson: VegaValue): VegaValue = VegaValue.Null
+
+  /**
+   * `warn(...)`, `info(...)` and `debug(...)` — a message from inside an expression.
+   *
+   * Every one of them **returns its last argument**, which is what lets a specification wrap a
+   * value in one without changing what it computes. The message needs somewhere to go, and a scope
+   * that has a diagnostic collector sends it there; the default drops it, which is what a bare
+   * expression evaluated outside a chart can do — upstream in the same position throws on the
+   * missing dataflow and swallows the error.
+   */
+  public fun log(level: String, message: String) {}
+
   /** `bandwidth('name')` — a band scale's band width, or zero for a scale that has none. */
   public fun scaleBandwidth(name: String): VegaValue = VegaValue.Num(0.0)
 

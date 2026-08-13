@@ -168,8 +168,37 @@ class ExpressionReferenceTest {
         "zoomSymlog",
         "geoShape",
       )
+    // Resolved against the **scope** rather than through the function table, because each needs
+    // something the table cannot see: the scales, the datasets, the projections, or somewhere to
+    // send
+    // a message. `Evaluator` dispatches these by name before it consults the table at all.
+    val scopeBound =
+      setOf(
+        "scale",
+        "invert",
+        "domain",
+        "range",
+        "bandwidth",
+        "data",
+        "indata",
+        "setdata",
+        "treePath",
+        "treeAncestors",
+        "geoArea",
+        "geoBounds",
+        "geoCentroid",
+        "geoScale",
+        "geoShape",
+        "random",
+        "sampleNormal",
+        "sampleLogNormal",
+        "sampleUniform",
+        "warn",
+        "info",
+        "debug",
+      )
     val unaccounted = upstream.filterNot {
-      it in Functions.functions || it in Functions.knownUnsupported
+      it in Functions.functions || it in Functions.knownUnsupported || it in scopeBound
     }
     assertEquals(emptyList<String>(), unaccounted)
   }
@@ -685,6 +714,36 @@ class ExpressionReferenceTest {
         "flush([0, 100], 97, 5, 'L', 'R', 'C')|\"R\"",
         "flush([0, 100], 50, 5, 'L', 'R', 'C')|\"C\"",
         "flush([100, 0], 2, 5, 'L', 'R', 'C')|\"L\"",
+        // ---- lasso and pinch geometry ----
+        // `lassoAppend` adds the point only if it is **strictly** further than `minDist` from the
+        // last, which defaults to 5 — so a drag that has not moved six units returns the same
+        // array.
+        "lassoAppend([], 10, 20)|[[10,20]]",
+        "lassoAppend([[0,0]], 3, 4)|[[0,0]]",
+        "lassoAppend([[0,0]], 30, 40)|[[0,0],[30,40]]",
+        "lassoAppend([[0,0]], 3, 4, 1)|[[0,0],[3,4]]",
+        // `lassoPath` is transcribed spacing and all: the **last** point becomes " Z" and is never
+        // written, which is why a three-point lasso has two spaces before the Z, and a one-point
+        // one
+        // takes the first branch rather than the last.
+        "lassoPath([[0,0],[10,0],[10,10]])|\"M 0,0 L 10,0  Z\"",
+        "lassoPath([])|\"\"",
+        "lassoPath([[1,2]])|\"M 1,2 \"",
+        // The pinch pair is arithmetic over two touches and nothing else about a browser.
+        "pinchDistance({touches: [{clientX: 0, clientY: 0}, {clientX: 3, clientY: 4}]})|5",
+        "pinchAngle({touches: [{clientX: 0, clientY: 0}, {clientX: 3, clientY: 4}]})|-2.214297435588181",
+        // ---- messages a specification sends itself ----
+        // Each returns its **last** argument, which is what lets one wrap a value without changing
+        // what the expression computes. The message goes to the diagnostics.
+        "warn('hi', 42)|42",
+        "info(1, 2)|2",
+        "debug('x')|\"x\"",
+        // ---- the headless answers ----
+        // Upstream in a `renderer: 'none'` view, which is what the oracle renders every fixture in:
+        // no window means an empty object and a pair of absent numbers, not zeroes and not the
+        // view's own size.
+        "screen()|{}",
+        "windowSize()|[null,null]",
         "timeFormat(timeOffset('day', datetime(2019,2,31)), '%Y-%m-%d %H:%M')|\"2019-04-01 00:00\"",
         "timeFormat(timeOffset('day', datetime(2019,2,31), 2), '%Y-%m-%d %H:%M')|\"2019-04-02 00:00\"",
         "timeFormat(timeOffset('day', datetime(2019,2,31), 0), '%Y-%m-%d %H:%M')|\"2019-03-31 00:00\"",

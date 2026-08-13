@@ -340,6 +340,32 @@ public class SignalScope(
    * data, so a chart that draws anything sized in projected units — a symbol whose radius is in
    * kilometres — has no other way to ask what one unit currently means.
    */
+  /**
+   * `warn(...)`, `info(...)` and `debug(...)` — routed to the diagnostics rather than to a console.
+   *
+   * Upstream writes these to the dataflow's logger at the matching level. There is no console here
+   * and a compiled chart carries its diagnostics with it, so that is where they go: a specification
+   * that asks a question of itself gets the answer in the same list as everything else the compile
+   * has to say. The severity follows the function — `warn` warns, `info` and `debug` are
+   * informational — because a specification choosing `warn` is choosing to be noticed.
+   */
+  override fun log(level: String, message: String) {
+    val collector = diagnostics ?: return
+    val text = "Expression $level: $message"
+    if (level == "warn") {
+      collector.warn(DiagnosticCodes.EXPRESSION_LOG, text)
+    } else {
+      collector.info(DiagnosticCodes.EXPRESSION_LOG, text)
+    }
+  }
+
+  /** `geoShape('name', feature)` — the outline, which a `shape` channel draws directly. */
+  override fun geoShape(projection: String?, geojson: VegaValue): VegaValue {
+    val definition = projectionFor(projection, "geoShape") ?: return VegaValue.Null
+    return GeoMeasure.shape(definition.orNull(), geojson)?.let { VegaValue.Str(it) }
+      ?: VegaValue.Null
+  }
+
   override fun geoScale(projection: String?): VegaValue {
     val definition = projectionFor(projection, "geoScale")?.orNull() ?: return VegaValue.Null
     return GeoMeasure.scaleOf(definition)?.let { VegaValue.Num(it) } ?: VegaValue.Null
