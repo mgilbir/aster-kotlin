@@ -1767,6 +1767,18 @@ number that sum is done at compile time: upstream writes `datetime(2012, 0, 2, �
 `datetime(2012, 0, 1+1, …)` — two expressions that mean the same thing and compare as different
 text.
 
+### A bucket a rect is drawn *over* rather than after
+
+Seventeen files, and one rule: `offsetedRectFormulas`. A `bandPosition` other than the middle moves
+a bucketed rect within its bucket, and the two ends it is then drawn between are not the bucket's
+own — they are interpolated between the *previous* bucket's start and this one's, and between this
+one's start and its end, into two columns a formula writes. The scale reaches those columns and the
+mark is drawn between them.
+
+The chart that shows why is a line with a red band over each missing point: at `bandPosition: 0` the
+band has to sit *over* the gap, and reading the bucket's own edges put it after the gap instead —
+half a day late, every time.
+
 ### Two runtime gaps this batch names but does not close
 
 `density`'s fixture is not in the corpus, and `trail`'s draws no legend. Both compile exactly as

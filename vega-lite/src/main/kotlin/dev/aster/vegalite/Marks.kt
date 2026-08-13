@@ -1457,15 +1457,20 @@ internal object Marks {
     // the plain field references below.
     val band = relativeBandSize(view, channel)
     val near = (1 - band) / 2
+    // A rect shifted off the middle of its bucket is drawn between the two *interpolated* edges a
+    // formula wrote, not between the bucket's own — `useRectOffsetField` in `rectBinPosition`.
+    val shifted = view.offsettedRectPosition(def, channel) != null
+    val startName =
+      if (shifted) "${Fields.vgField(def, forAs = true)}_offsetted_rect_start"
+      else Fields.vgField(def)
+    val endName =
+      if (shifted) "${Fields.vgField(def, forAs = true)}_offsetted_rect_end" else endField
     return obj {
       put(
         channel2,
-        interpolated(view, channel, Fields.vgField(def), endField, near, offset(!startIsEnd)),
+        interpolated(view, channel, startName, endName, near, offset(!startIsEnd)),
       )
-      put(
-        channel,
-        interpolated(view, channel, Fields.vgField(def), endField, 1 - near, offset(startIsEnd)),
-      )
+      put(channel, interpolated(view, channel, startName, endName, 1 - near, offset(startIsEnd)))
     }
   }
 

@@ -29,6 +29,7 @@ internal class DataPipeline(
     binNode()?.let { head = head.then(it) }
     timeUnitNode()?.let { head = head.then(it) }
     binnedTimeUnitNode()?.let { head = head.then(it) }
+    offsettedRectNode()?.let { head = head.then(it) }
     sortIndexNode()?.let { head = head.then(it) }
 
     // The pre-aggregation table, named only when something reads it. A domain sorted by an
@@ -208,6 +209,46 @@ internal class DataPipeline(
    * There is nothing to bucket, so there is no `timeunit` transform: the column stays as it is and
    * a formula computes where its bucket ends, one unit of the smallest part on from the start.
    */
+  /**
+   * The two columns a bucket shifted off its own edges is drawn between.
+   *
+   * `offsetedRectFormulas`: a `bandPosition` other than the middle moves a bucketed rect *within*
+   * its bucket, and the two ends it is drawn between are then not the bucket's own — they are
+   * interpolated between the previous bucket's start and this one's, and between this one's start
+   * and its end. A rect marking the gaps in a series is written that way: the bar sits over the
+   * missing point rather than after it.
+   */
+  private fun offsettedRectNode(): PassThroughNode? {
+    val formulas =
+      view.spec.encoding.entries.flatMap { (channel, def) ->
+        val position = view.offsettedRectPosition(def, channel) ?: return@flatMap emptyList()
+        val timeUnit = def.timeUnit ?: return@flatMap emptyList()
+        val start = Fields.vgField(def, forAs = true)
+        val end = Fields.vgField(def, suffix = "end", forAs = true)
+        val fraction = position + 0.5
+        val before = Fields.expressionNumber(1 - fraction)
+        val after = Fields.expressionNumber(fraction)
+        val offset = if (timeUnit.contains("utc")) "utcOffset" else "timeOffset"
+        val part = Fields.timeUnitParts(timeUnit).lastOrNull() ?: return@flatMap emptyList()
+        listOf(
+          obj {
+            put("type", "formula")
+            put(
+              "expr",
+              "$before * $offset('$part', datum['$start'], -1) + $after * datum['$start']",
+            )
+            put("as", "${start}_offsetted_rect_start")
+          },
+          obj {
+            put("type", "formula")
+            put("expr", "$before * datum['$start'] + $after * datum['$end']")
+            put("as", "${start}_offsetted_rect_end")
+          },
+        )
+      }
+    return if (formulas.isEmpty()) null else PassThroughNode(formulas)
+  }
+
   private fun binnedTimeUnitNode(): PassThroughNode? {
     val formulas =
       view.spec.encoding.values.mapNotNull { def ->

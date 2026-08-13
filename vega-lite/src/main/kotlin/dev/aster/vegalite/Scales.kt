@@ -226,14 +226,21 @@ internal object Scales {
     // rect-shaped configurations define, so a bar over months reaches the end of December and a
     // point over the same months sits on the first of it.
     if (def.timeUnit != null && (type == "time" || type == "utc") && bandEnd(view)) {
+      // A rect shifted off the middle of its bucket covers the *interpolated* edges instead, so
+      // those are the columns the scale has to reach.
+      val shifted = view.offsettedRectPosition(def, channel) != null
+      val stem = Fields.vgField(def, forAs = true)
       return listOf(
         obj {
           put("data", dataName)
-          put("field", Fields.vgField(def))
+          put("field", if (shifted) "${stem}_offsetted_rect_start" else Fields.vgField(def))
         },
         obj {
           put("data", dataName)
-          put("field", Fields.vgField(def, suffix = "end"))
+          put(
+            "field",
+            if (shifted) "${stem}_offsetted_rect_end" else Fields.vgField(def, suffix = "end"),
+          )
         },
       )
     }

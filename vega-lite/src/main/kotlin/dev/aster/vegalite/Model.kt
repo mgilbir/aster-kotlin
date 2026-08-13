@@ -330,6 +330,23 @@ internal object Channels {
 internal val PATH_MARKS = setOf("line", "area", "trail")
 
 /**
+ * How far off the middle of its bucket a rect sits, or null where it sits in the middle.
+ *
+ * `getBandPosition` for a bucketed field with no far end of its own; anything but a half means the
+ * rect is drawn between two *interpolated* edges rather than the bucket's own.
+ */
+internal fun UnitView.offsettedRectPosition(def: ChannelDef, channel: String): Double? {
+  if (channel != "x" && channel != "y") return null
+  if (def.timeUnit == null || Fields.isBinnedTimeUnit(def.timeUnit)) return null
+  if (secondaryChannel(channel)?.let { spec.encoding[it] } != null) return null
+  val stated =
+    def.raw.number("bandPosition")
+      ?: config.markConfig(spec.mark).number("timeUnitBandPosition")
+      ?: return null
+  return stated.takeIf { it != 0.5 }
+}
+
+/**
  * The aggregates that compare their input rather than accumulating it.
  *
  * Every other operation coerces on the way through; these two would answer with the alphabetically
