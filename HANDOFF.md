@@ -9,7 +9,7 @@ Branch `milestone-0-bootstrap`. Working tree clean, both gates green:
 - `./scripts/check.sh` — format, all tests, lint, demo APK
 - `./scripts/oracle.sh` — regenerates upstream references and runs the differential comparison
 
-**143 differential fixtures pass, all matching upstream exactly.** That is the only number here
+**144 differential fixtures pass, all matching upstream exactly.** That is the only number here
 that means what it says.
 
 ## Read this before trusting the other number
@@ -254,7 +254,7 @@ not the one Vega documents**, because Vega only forwards the parameters a specif
 
 ## What is left: two examples, and neither can be verified
 
-**143 differential fixtures pass. 91 of the 93 examples compile clean.** Everything that can be
+**144 differential fixtures pass. 91 of the 93 examples compile clean.** Everything that can be
 checked against upstream has been.
 
 ### `projections` — upstream refuses it too
@@ -404,11 +404,15 @@ As of this handoff the subtraction leaves **nothing** for `encodeEntry`, `axis`,
   for some time. `labelBound` is consumed and deliberately **inert**: upstream's bound test runs
   before the label bounds exist, so it culls nothing, and implementing the documented behaviour would
   be a real difference. See STATUS.md.
-- **Title (1):** `encode`, of which only `dx`/`dy` are read. That is the whole remaining inventory
-  across every block. Upstream splits it three ways — `encode.group` styles the title's group,
-  `encode.title` its text, `encode.subtitle` the subtitle — and a block with none of those three keys
-  is the deprecated form that applies to the *text*, which is where the `dx`/`dy` this engine reads
-  come from. `style` is done: it **replaces** the `group-title` slot rather than adding to it.
+- **Title:** none. All 31 of upstream's title properties are read, `encode` and `style` included.
+  `encode` splits three ways — `group` for the group the heading sits in, `title` for its text,
+  `subtitle` for the second line — plus the deprecated form, where a block naming none of those three
+  applies to the *text*. `style` **replaces** the `group-title` slot rather than adding to it.
+
+**The subtraction is now empty for every block.** What is left is one level down: a **channel** a
+guide's `encode` cannot express is named one at a time — a title's `encode.title.update.x`, for
+instance — rather than the whole block being reported as unread. That is where to look next, and
+`UnhandledPropertiesTest` asserts the naming still happens.
 - **Layout:** none. All ten of upstream's layout properties are read, and `row-footer` and
   `column-footer` are recognised roles — they used to fall through to `CELL` and be gridded among the
   cells.

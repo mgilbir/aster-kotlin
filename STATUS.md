@@ -201,7 +201,7 @@ substantive compatibility items:
 | 6. View and Compose APIs | Yes |
 | 7. SVG, PNG, PDF export | Yes |
 | 8. TalkBack can describe and navigate | Partial — virtual nodes are tested by instrumentation, not with TalkBack itself |
-| 9. At least 100 compatibility fixtures pass | **Yes** — 143 |
+| 9. At least 100 compatibility fixtures pass | **Yes** — 144 |
 | 10. Core runtime has no Android dependency | Yes |
 | 11. Renders without WebView | Yes |
 | 12. Build and test loop runs from the terminal | Yes |
@@ -1600,8 +1600,27 @@ size suggests. All three go on both the heading and its subtitle, because upstre
 marks under one guide and either can be focused.
 
 The schema diff now finds **nothing** unaccounted for in `encodeEntry`, `axis`, `legend`, `layout`,
-`projection` or `scale`, and one entry in `title`: `encode`, of which only `dx`/`dy` are read. That is the whole
-remaining inventory.
+`projection` or `scale`, and **nothing** in `title` either. The whole inventory is closed: every property upstream
+defines in every block is read.
+
+What is left is one level down. A guide's `encode` block is a vocabulary of its own, and a channel it
+cannot express is now named one at a time — `A title's 'title' encode block sets 'x', which is not
+read` — rather than the block being written off whole. That is the difference between an unfinished
+feature and a wrong chart: a heading whose `encode` positioned its own text is a heading this engine
+would draw in the wrong place, and there is no property to warn about, only a channel.
+
+A title's `encode` splits three ways, which is worth knowing before reading the code: `group` styles
+the group the heading sits in, `title` its text, `subtitle` the second line — and a block naming none
+of the three is upstream's **deprecated** form, which applies to the *text*. That last one is the form
+`encode.update.dx` is written in, and it is the reason this engine had been reading `dx` out of an
+encode block for some time without reading anything else.
+
+The `group` block also produced the one scene-graph rule this needed: a title group's paint does not
+widen it. `titleLayout` finishes by writing the union of the heading's and subtitle's bounds *over* the
+group's, which discards the half-unit `boundStroke` had already added — so an outlined heading paints
+that outline round a rectangle of no size and the drawing does not grow. Ported as an explicit
+`boundsFromChildren` on the group node rather than by relaxing the general group rule, which is right
+for a group mark that declares a size.
 
 A title's `style` turned out not to be decoration. Upstream builds the heading's text mark with
 `style: "group-title"` and lets a specification's `style` take **that slot**, so naming one does not

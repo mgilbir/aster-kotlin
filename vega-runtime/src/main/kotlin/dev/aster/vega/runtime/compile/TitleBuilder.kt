@@ -1,6 +1,7 @@
 package dev.aster.vega.runtime.compile
 
 import dev.aster.vega.model.DiagnosticCollector
+import dev.aster.vega.model.VegaValue
 import dev.aster.vega.model.spec.Anchor
 import dev.aster.vega.model.spec.Orient
 import dev.aster.vega.model.spec.TitleSpec
@@ -13,6 +14,8 @@ import dev.aster.vega.scene.RectD
 import dev.aster.vega.scene.SceneColor
 import dev.aster.vega.scene.SceneNode
 import dev.aster.vega.scene.SceneNodeIdAllocator
+import dev.aster.vega.scene.ScenePaint
+import dev.aster.vega.scene.Stroke
 import dev.aster.vega.scene.TextAlign
 import dev.aster.vega.scene.TextBaseline
 import dev.aster.vega.scene.TextEngine
@@ -63,48 +66,102 @@ internal class TitleBuilder(
   private val textEngine: TextEngine,
   @Suppress("unused") private val diagnostics: DiagnosticCollector,
   private val numbers: NumberResolver,
+  /**
+   * Resolves a title's own `encode` channels, which have no property behind them.
+   *
+   * A heading may be coloured or sized from a signal, or have a panel painted behind it, and none
+   * of those can be said with a title property. Optional for the same reason the axis builder's is:
+   * a title built without one simply has no encode to resolve.
+   */
+  private val channels: MarkEncoder? = null,
 ) {
+
+  /**
+   * One channel of one part of a title's `encode`, as a number or as text.
+   *
+   * `update` beats `enter`, which is upstream's effective set for a single render. The datum is
+   * empty: a title's data source is upstream's one-element `Collect(null, [{}])`, so an expression
+   * here reads signals and nothing else.
+   */
+  private fun number(spec: TitleSpec, part: String, name: String): Double? {
+    val encoder = channels ?: return null
+    val entry = spec.encode[part]?.effective?.get(name) ?: return null
+    return encoder.channelNumber(entry, EMPTY_DATUM)?.takeIf { it.isFinite() }
+  }
+
+  private fun text(spec: TitleSpec, part: String, name: String): String? {
+    val encoder = channels ?: return null
+    val entry = spec.encode[part]?.effective?.get(name) ?: return null
+    return encoder.channelText(entry, EMPTY_DATUM)?.takeIf { it.isNotEmpty() }
+  }
+
+  private fun colour(spec: TitleSpec, part: String, name: String): SceneColor? =
+    text(spec, part, name)?.let { SceneColor.parse(it) }
 
   /**
    * @param content the bounds of everything else in this scope, in its coordinate space.
    * @param extent the plotting area, used when the title is framed to the group rather than the
    *   drawing.
    */
+  private companion object {
+    /** A title has one datum and it is empty, so an encode expression sees only signals. */
+    val EMPTY_DATUM: VegaValue = VegaValue.Obj(emptyMap())
+  }
+
   fun build(spec: TitleSpec, content: RectD, extent: PlotSize): SceneNode {
     val offset = numbers.resolve(spec.offset, "title") ?: TitleDefaults.OFFSET
     val padding = numbers.resolve(spec.subtitlePadding, "title") ?: TitleDefaults.SUBTITLE_PADDING
-    val fontSize = numbers.resolve(spec.fontSize, "title") ?: TitleDefaults.FONT_SIZE
+    // A title's `encode` overrides the property for the same channel, which is upstream's order:
+    // `extendEncode` lets the specification's entry win over the one the guide wrote.
+    val fontSize =
+      number(spec, "title", "fontSize")
+        ?: numbers.resolve(spec.fontSize, "title")
+        ?: TitleDefaults.FONT_SIZE
     val subtitleFontSize =
-      numbers.resolve(spec.subtitleFontSize, "title") ?: TitleDefaults.SUBTITLE_FONT_SIZE
+      number(spec, "subtitle", "fontSize")
+        ?: numbers.resolve(spec.subtitleFontSize, "title")
+        ?: TitleDefaults.SUBTITLE_FONT_SIZE
 
     // The derived angle and alignment, which an explicit `angle` or `align` overrides: upstream
     // writes these into the title's `enter` block and the explicit ones into `update`.
     val angle =
-      numbers.resolve(spec.angle, "title")
+      number(spec, "title", "angle")
+        ?: numbers.resolve(spec.angle, "title")
         ?: when (spec.orient) {
           Orient.LEFT -> -90.0
           Orient.RIGHT -> 90.0
           else -> 0.0
         }
     val align =
-      alignOf(spec.align)
+      alignOf(text(spec, "title", "align"))
+        ?: alignOf(spec.align)
         ?: when (spec.anchor) {
           Anchor.START -> TextAlign.LEFT
           Anchor.END -> TextAlign.RIGHT
           Anchor.MIDDLE -> TextAlign.CENTER
         }
-    val baseline = baselineOf(spec.baseline) ?: TextBaseline.TOP
-    val limit = numbers.resolve(spec.limit, "title") ?: 0.0
-    val colour = spec.color?.let { SceneColor.parse(it) } ?: TitleDefaults.color
-    val subtitleColour = spec.subtitleColor?.let { SceneColor.parse(it) } ?: TitleDefaults.color
+    val baseline =
+      baselineOf(text(spec, "title", "baseline")) ?: baselineOf(spec.baseline) ?: TextBaseline.TOP
+    val limit = number(spec, "title", "limit") ?: numbers.resolve(spec.limit, "title") ?: 0.0
+    val colour =
+      colour(spec, "title", "fill")
+        ?: spec.color?.let { SceneColor.parse(it) }
+        ?: TitleDefaults.color
+    val subtitleColour =
+      colour(spec, "subtitle", "fill")
+        ?: spec.subtitleColor?.let { SceneColor.parse(it) }
+        ?: TitleDefaults.color
 
     // A trellis header takes its words from the row it labels, so the text may be a signal.
-    val text = spec.textExpression?.let { numbers.resolveText(it, "title") } ?: spec.text
+    val text =
+      text(spec, "title", "text")
+        ?: spec.textExpression?.let { numbers.resolveText(it, "title") }
+        ?: spec.text
     // `dx`/`dy` shift the title after the anchor has placed it, and they move the surface with it:
     // a heading nudged one unit left to line up with an axis makes the whole drawing one unit
     // wider.
-    val nudgeX = numbers.resolve(spec.dx, "title") ?: 0.0
-    val nudgeY = numbers.resolve(spec.dy, "title") ?: 0.0
+    val nudgeX = number(spec, "title", "dx") ?: numbers.resolve(spec.dx, "title") ?: 0.0
+    val nudgeY = number(spec, "title", "dy") ?: numbers.resolve(spec.dy, "title") ?: 0.0
     val title =
       TextNode(
         id = ids.allocate(),
@@ -115,17 +172,17 @@ internal class TitleBuilder(
             run(
               text,
               fontSize,
-              titleWeight(spec),
+              weightOf(text(spec, "title", "fontWeight")) ?: titleWeight(spec),
               align,
-              styleOf(spec.fontStyle),
+              styleOf(text(spec, "title", "fontStyle") ?: spec.fontStyle),
               baseline,
-              spec.font,
-              numbers.resolve(spec.lineHeight, "title"),
+              text(spec, "title", "font") ?: spec.font,
+              number(spec, "title", "lineHeight") ?: numbers.resolve(spec.lineHeight, "title"),
               limit,
             )
           ),
         angleDegrees = angle,
-        fill = Fill.of(colour),
+        fill = Fill(ScenePaint.Solid(colour), opacityOf(spec, "title")),
         metadata =
           NodeMetadata(
             role = "title-text",
@@ -173,17 +230,20 @@ internal class TitleBuilder(
                 run(
                   text,
                   subtitleFontSize,
-                  weightOf(spec.subtitleFontWeight) ?: TitleDefaults.SUBTITLE_FONT_WEIGHT,
-                  align,
-                  styleOf(spec.subtitleFontStyle),
-                  baseline,
-                  spec.subtitleFont ?: spec.font,
-                  numbers.resolve(spec.subtitleLineHeight, "title"),
-                  limit,
+                  weightOf(text(spec, "subtitle", "fontWeight"))
+                    ?: weightOf(spec.subtitleFontWeight)
+                    ?: TitleDefaults.SUBTITLE_FONT_WEIGHT,
+                  alignOf(text(spec, "subtitle", "align")) ?: align,
+                  styleOf(text(spec, "subtitle", "fontStyle") ?: spec.subtitleFontStyle),
+                  baselineOf(text(spec, "subtitle", "baseline")) ?: baseline,
+                  text(spec, "subtitle", "font") ?: spec.subtitleFont ?: spec.font,
+                  number(spec, "subtitle", "lineHeight")
+                    ?: numbers.resolve(spec.subtitleLineHeight, "title"),
+                  number(spec, "subtitle", "limit") ?: limit,
                 )
               ),
-            angleDegrees = angle,
-            fill = Fill.of(subtitleColour),
+            angleDegrees = number(spec, "subtitle", "angle") ?: angle,
+            fill = Fill(ScenePaint.Solid(subtitleColour), opacityOf(spec, "subtitle")),
             metadata =
               NodeMetadata(
                 role = "title-subtitle",
@@ -218,9 +278,32 @@ internal class TitleBuilder(
       id = ids.allocate(),
       children = children,
       transform = Transform2D.translate(position.first, position.second),
+      // A `group` encode block paints the panel the heading sits in. Nothing else can: a title has
+      // no `fillColor` the way a legend does, so this block is the only way to put a band of colour
+      // behind a chart's name.
+      fill =
+        colour(spec, "group", "fill")?.let {
+          Fill(ScenePaint.Solid(it), opacityOf(spec, "group"))
+        },
+      stroke = colour(spec, "group", "stroke")?.let { Stroke(paint = ScenePaint.Solid(it)) },
+      cornerRadius = number(spec, "group", "cornerRadius") ?: 0.0,
+      // The heading measures as its words, whatever is painted behind them: upstream's
+      // `titleLayout`
+      // overwrites the group's bounds with the union of its texts', so the outline it drew round a
+      // rectangle of no size does not push the surface half a unit wider.
+      boundsFromChildren = true,
       metadata = NodeMetadata(role = "title"),
     )
   }
+
+  /**
+   * A part's opacity, from `fillOpacity` or from the item's own `opacity`.
+   *
+   * Upstream keeps them apart — `opacity` fades the whole item, `fillOpacity` only what is inside —
+   * but a title's text has no outline, so for these marks the two land in the same place.
+   */
+  private fun opacityOf(spec: TitleSpec, part: String): Double =
+    number(spec, part, "fillOpacity") ?: number(spec, part, "opacity") ?: 1.0
 
   /**
    * Where the title group sits.

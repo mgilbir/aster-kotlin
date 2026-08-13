@@ -653,6 +653,14 @@ public data class TitleSpec(
   val dy: NumberValue? = null,
   val subtitleFontSize: NumberValue? = null,
   val zindex: Int = 0,
+  /**
+   * `encode`, keyed by the part it addresses: `group`, `title` or `subtitle`.
+   *
+   * Upstream also accepts the **deprecated** form, where a block naming none of those three applies
+   * to the title's *text* — which is the form a specification writing `encode.update.dx` is using,
+   * and it is normalised to `title` here so there is one shape to read.
+   */
+  val encode: Map<String, EncodeSpec> = emptyMap(),
 )
 
 public data class AxisSpec(

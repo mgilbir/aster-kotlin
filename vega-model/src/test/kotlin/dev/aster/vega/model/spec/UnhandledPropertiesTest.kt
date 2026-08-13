@@ -175,8 +175,12 @@ class UnhandledPropertiesTest {
 
   /**
    * The generic message is the safety net: it fires for a property nobody has written a tailored
-   * explanation for, including one upstream adds later. A tailored explanation wins where it
-   * exists, because "what will be drawn instead" is the useful half.
+   * explanation for, including one upstream adds later.
+   *
+   * Every block's table of tailored explanations is now empty — there is no property left in the
+   * whole inventory to point at — so the second half of this test looks one level *down* instead,
+   * at a **channel** a guide's `encode` block cannot express. That is where the remaining gaps are,
+   * and they are named one at a time rather than being reported as a whole block nobody reads.
    */
   @Test
   fun `a property nobody anticipated is still reported`() {
@@ -190,12 +194,14 @@ class UnhandledPropertiesTest {
         .single { it.jsonPath?.endsWith("somethingUpstreamAddedLater") == true }
     assertTrue("not implemented" in invented.message, invented.message)
 
-    // A tailored explanation, from the one property in the whole inventory that still has one: a
-    // title's `encode`, of which only `dx` and `dy` are read.
-    val tailored =
-      diagnostics(spec(""""title": {"text": "T", "encode": {"title": {"update": {}}}}""")).single {
-        it.jsonPath?.endsWith("encode") == true
-      }
-    assertTrue("dx" in tailored.message, tailored.message)
+    val channel =
+      diagnostics(
+          spec(
+            """"title": {"text": "T", "encode": {"title": {"update": {"x": {"value": 4},
+                  "fill": {"value": "#333"}}}}}"""
+          )
+        )
+        .single { it.jsonPath?.endsWith("x") == true }
+    assertTrue("is not read" in channel.message, channel.message)
   }
 }

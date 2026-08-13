@@ -167,6 +167,32 @@ private fun guideStyleKeys(vararg prefixes: String): Set<String> =
 
 private val AXIS_UNSUPPORTED = emptyMap<String, String>()
 
+/** The parts a title's `encode` may address, in the order upstream builds them. */
+private val TITLE_ENCODE_PARTS = listOf("group", "title", "subtitle")
+
+/** What a title's or subtitle's `encode` can say about its text mark. */
+private val TITLE_TEXT_CHANNELS =
+  setOf(
+    "text",
+    "fill",
+    "fillOpacity",
+    "opacity",
+    "font",
+    "fontSize",
+    "fontStyle",
+    "fontWeight",
+    "lineHeight",
+    "align",
+    "baseline",
+    "angle",
+    "limit",
+    "dx",
+    "dy",
+  )
+
+/** What a title's `group` encode can say about the group the heading sits in. */
+private val TITLE_GROUP_CHANNELS = setOf("fill", "fillOpacity", "stroke", "opacity", "cornerRadius")
+
 /**
  * What a title's text falls back to once a `style` has taken the `group-title` slot.
  *
@@ -1850,6 +1876,44 @@ public class SpecParser {
     return listOf(TITLE_RENDERER_FALLBACKS, VegaValue.Obj(translated))
   }
 
+  /**
+   * A title's `encode`, normalised to one block per part, with anything unreadable reported.
+   *
+   * Upstream splits it three ways — `group` styles the group the heading sits in, `title` its text,
+   * `subtitle` the second line — and keeps a **deprecated** fourth form: a block naming none of
+   * those three applies to the *text*, which is the form `encode.update.dx` is written in. Both are
+   * folded onto `title` here.
+   *
+   * Channels beyond the ones each part can express are named rather than dropped: a heading whose
+   * `encode` positioned its own text is a heading this engine would draw in the wrong place, and
+   * saying so is the difference between an unfinished feature and a wrong chart.
+   */
+  private fun titleEncode(own: VegaValue.Obj, path: String): Map<String, EncodeSpec> {
+    val encode = own.fields["encode"] as? VegaValue.Obj ?: return emptyMap()
+    val named = encode.fields.keys.any { it in TITLE_ENCODE_PARTS }
+    val blocks = LinkedHashMap<String, EncodeSpec>()
+    if (named) {
+      for (part in TITLE_ENCODE_PARTS) {
+        encode.fields[part]?.let { blocks[part] = parseEncode(it, "$path.$part") }
+      }
+    } else {
+      blocks["title"] = parseEncode(encode, path)
+    }
+    for ((part, block) in blocks) {
+      val readable = if (part == "group") TITLE_GROUP_CHANNELS else TITLE_TEXT_CHANNELS
+      for (channel in block.effective.keys.sorted()) {
+        if (channel in readable) continue
+        diagnostics.warn(
+          DiagnosticCodes.PARSE_UNKNOWN_PROPERTY,
+          "A title's '$part' encode block sets '$channel', which is not read; the rest of the " +
+            "block was applied",
+          jsonPath = "$path.$part.$channel",
+        )
+      }
+    }
+    return blocks
+  }
+
   private fun titleNudge(obj: VegaValue.Obj, channel: String, path: String): NumberValue? {
     obj.numberOrSignal(channel, "$path.$channel")?.let {
       return it
@@ -1898,9 +1962,6 @@ public class SpecParser {
       "Title",
       path,
       TITLE_CONSUMED,
-      mapOf(
-        "encode" to "Only 'dx' and 'dy' are read from a title's encode block; the rest was ignored"
-      ),
     )
 
     return TitleSpec(
@@ -1928,6 +1989,7 @@ public class SpecParser {
           else -> null
         },
       subtitleFontSize = obj.numberOrSignal("subtitleFontSize", "$path.subtitleFontSize"),
+      encode = titleEncode(own, "$path.encode"),
       fontStyle = obj.fields["fontStyle"]?.takeIf { it is VegaValue.Str }?.asString(),
       subtitleFontStyle =
         obj.fields["subtitleFontStyle"]?.takeIf { it is VegaValue.Str }?.asString(),

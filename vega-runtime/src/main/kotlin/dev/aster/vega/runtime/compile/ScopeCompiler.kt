@@ -300,7 +300,8 @@ internal class ScopeCompiler(
     // Last, because a title is placed against everything else: it centres over the chart *and* its
     // axes and legends, not over the plotting area.
     title?.let {
-      val node = TitleBuilder(ids, textEngine, diagnostics, numbers).build(it, content, extent)
+      val node =
+        TitleBuilder(ids, textEngine, diagnostics, numbers, encoder).build(it, content, extent)
       children += node
       content = content.union(node.transformedBounds)
     }

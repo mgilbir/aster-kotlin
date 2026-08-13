@@ -201,6 +201,17 @@ public data class GroupNode(
    * border either have the border drawn over them or paint over it themselves.
    */
   val strokeForeground: Boolean = false,
+  /**
+   * Whether this group measures as its children alone, ignoring its own paint.
+   *
+   * A faithful port of one upstream rule, not a general relaxation. `titleLayout` finishes by
+   * writing the union of the heading's and subtitle's bounds over the group's — `group.bounds
+   * .clear().union(tempBounds)` — which discards the half-unit `boundStroke` had already added for
+   * the group's background. So a heading given an outline through its `encode.group` block paints
+   * that outline over a rectangle of no size and does **not** make the drawing half a unit wider,
+   * which it would under the ordinary group rule.
+   */
+  val boundsFromChildren: Boolean = false,
   /** Clip rectangle in this group's own coordinate space, applied before drawing children. */
   val clip: RectD? = null,
   val clipPath: PathData? = null,
@@ -261,6 +272,7 @@ public data class GroupNode(
         if (child.visible) result = result.union(child.transformedBounds)
       }
       if (clip != null) result = intersect(result, clip)
+      if (boundsFromChildren) return@lazy result.normalized()
       (stroke.wideningAt(opacity)?.let { result.expand(it.halfWidth) } ?: result).normalized()
     }
 }

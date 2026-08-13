@@ -1600,6 +1600,26 @@
   "caption": "Y-axis titled 'Events' for a linear scale with values from 0.0 to 3.0"
  },
  {
+  "fixture": "title-encode",
+  "kind": "axis",
+  "caption": "X-axis for a discrete scale with 2 values: a, b"
+ },
+ {
+  "fixture": "title-encode",
+  "kind": "title",
+  "caption": "Title text 'inner'"
+ },
+ {
+  "fixture": "title-encode",
+  "kind": "title",
+  "caption": "Title text 'Encoded heading'"
+ },
+ {
+  "fixture": "title-encode",
+  "kind": "subtitle",
+  "caption": "Subtitle text 'with its own subtitle'"
+ },
+ {
   "fixture": "title-style-block",
   "kind": "axis",
   "caption": "X-axis for a discrete scale with 2 values: a, b"
