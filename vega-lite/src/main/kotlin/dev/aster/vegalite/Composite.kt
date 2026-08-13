@@ -116,7 +116,21 @@ internal class Composite(
     if (!handles(type)) return null
 
     val encoding = unit.obj("encoding") ?: VegaValue.EmptyObject
-    val orient = orient(markDef, encoding, type) ?: return null
+    // `errorBarOrientAndInputType`: an interval whose ends the rows already carry is oriented by
+    // *which* ends they carry, not by which position is continuous. `x2` beside `x`, or an
+    // `xError` measured from it, both say the interval runs along x however the rest reads.
+    val ranged =
+      if (type == "boxplot") null
+      else
+        listOf("x", "y").firstOrNull { channel ->
+          listOf("${channel}2", "${channel}Error").any { encoding.fields[it] != null }
+        }
+    val orient =
+      when (ranged) {
+        "x" -> "horizontal"
+        "y" -> "vertical"
+        else -> orient(markDef, encoding, type) ?: return null
+      }
     // The continuous axis is the one being summarised; the other one groups the summary.
     val continuous = if (orient == "vertical") "y" else "x"
     val def = encoding.obj(continuous)
@@ -129,49 +143,66 @@ internal class Composite(
       )
       return null
     }
-    for (channel in listOf("x2", "y2", "xError", "yError", "xError2", "yError2")) {
-      if (encoding.fields[channel] == null) continue
-      diagnostics.error(
-        VegaLiteDiagnostics.UNSUPPORTED_ENCODING_PROPERTY,
-        "An `$type` over data that is *already* summarised — one giving `$channel` rather than " +
-          "the rows to summarise — is not implemented; give the raw rows, or draw the interval " +
-          "yourself with a `rule` between two fields.",
-        jsonPath = "$.encoding.$channel",
-      )
-      return null
+    if (type == "boxplot") {
+      for (channel in listOf("x2", "y2", "xError", "yError", "xError2", "yError2")) {
+        if (encoding.fields[channel] == null) continue
+        diagnostics.error(
+          VegaLiteDiagnostics.UNSUPPORTED_ENCODING_PROPERTY,
+          "A `boxplot` over data that is *already* summarised — one giving `$channel` rather " +
+            "than the rows to summarise — is not implemented; give the raw rows, or draw the " +
+            "quartiles yourself with a `bar` between two fields.",
+          jsonPath = "$.encoding.$channel",
+        )
+        return null
+      }
+      return boxPlot(unit, markDef, encoding, continuous, def, field, orient)
     }
 
-    if (type == "boxplot") return boxPlot(unit, markDef, encoding, continuous, def, field, orient)
-
-    val summary = summary(markDef, field, type) ?: return null
+    val summary =
+      if (ranged == null) summary(markDef, field, type) ?: return null
+      else preSummarised(encoding, continuous, field) ?: return null
 
     // Everything but the continuous axis is carried by every part, and it is also what the summary
     // is grouped by: one interval per category, per colour, per detail.
     val (units, shared) =
       extractTimeUnits(
-        encoding.fields.filterKeys { it != continuous && it != "${continuous}2" && it != "size" }
+        encoding.fields.filterKeys {
+          it != continuous &&
+            it != "${continuous}2" &&
+            it != "${continuous}Error" &&
+            it != "${continuous}Error2" &&
+            it != "size"
+        }
       )
-    val groupby = groupbyOf(shared)
+    // Rows that already carry their own interval are not summarised, so there is nothing to group.
+    val groupby = if (ranged == null) groupbyOf(shared) else emptyList()
 
     val outer = VegaValue.Obj(unit.fields.filterKeys { it != "mark" && it != "encoding" })
     val transform =
       (unit.array("transform") ?: emptyList()) +
         units +
-        obj {
-          put(
-            "aggregate",
-            arr(
-              summary.aggregates.map { (op, name) ->
-                obj {
-                  put("op", op)
-                  put("field", field)
-                  put("as", name)
-                }
-              }
-            ),
-          )
-          put("groupby", strings(groupby))
-        } +
+        // `aggregate.length === 0 ? [] : [{aggregate, groupby}]` — an interval the rows already
+        // carry has nothing to aggregate, and an empty aggregate would collapse the whole table
+        // into one row rather than leaving it alone.
+        (if (summary.aggregates.isEmpty()) emptyList()
+        else
+          listOf(
+            obj {
+              put(
+                "aggregate",
+                arr(
+                  summary.aggregates.map { (op, name) ->
+                    obj {
+                      put("op", op)
+                      put("field", field)
+                      put("as", name)
+                    }
+                  }
+                ),
+              )
+              put("groupby", strings(groupby))
+            }
+          )) +
         summary.calculates.map { (expression, name) ->
           obj {
             put("calculate", expression)
@@ -778,6 +809,67 @@ internal class Composite(
     val titles: List<Pair<String, String>>,
     val titleNamesField: Boolean,
   )
+
+  /**
+   * The interval the rows **already carry** — `inputType` other than `raw` in `errorbar.ts`.
+   *
+   * Nothing is summarised here: the ends are read off each row and only renamed, because every part
+   * below expects to find them under `upper_<field>` and `lower_<field>` whatever the columns they
+   * came from were called. Two forms say the same thing. `x2` beside `x` names both ends outright,
+   * and `xError` names a *width* measured from `x` — one arm where the interval is symmetric, two
+   * where `xError2` gives the other. Upstream signs the second arm rather than subtracting it, so a
+   * `yield_error2` of -10 reaches ten below the centre.
+   *
+   * The tooltip then reads the expression rather than the column: `yield_center + yield_error` is
+   * what the reader wrote, and `upper_yield_center` is only where this compiler put it.
+   */
+  private fun preSummarised(
+    encoding: VegaValue.Obj,
+    continuous: String,
+    field: String,
+  ): Summary? {
+    val second = encoding.obj("${continuous}2")
+    val error = encoding.obj("${continuous}Error")
+    val error2 = encoding.obj("${continuous}Error2")
+    fun read(def: VegaValue.Obj?) = def?.string("field")?.let { "datum['$it']" }
+    val calculates =
+      when {
+        second != null ->
+          listOfNotNull(
+            read(second)?.let { it to "upper_$field" },
+            "datum['$field']" to "lower_$field",
+          )
+        error != null ->
+          listOfNotNull(
+            read(error)?.let { "datum['$field'] + $it" to "upper_$field" },
+            (read(error2)?.let { "datum['$field'] + $it" }
+                ?: read(error)?.let { "datum['$field'] - $it" })
+              ?.let { it to "lower_$field" },
+          )
+        else -> null
+      }
+    if (calculates == null || calculates.size < 2) {
+      diagnostics.error(
+        VegaLiteDiagnostics.INVALID_ENCODING,
+        "An interval given by `${continuous}2` or `${continuous}Error` needs the column that " +
+          "holds it; this one names none, so there is nothing to draw between.",
+        jsonPath = "$.encoding",
+      )
+      return null
+    }
+    return Summary(
+      aggregates = emptyList(),
+      calculates = calculates,
+      // The centre is only in the tooltip where the row still has one to point at: an interval
+      // given by both its ends *is* the two ends, and upstream lists nothing else.
+      titles =
+        (if (error != null) listOf("" to field) else emptyList()) +
+          calculates.map { (expression, name) ->
+            name.take(6) to expression.replace("datum['", "").replace("']", "")
+          },
+      titleNamesField = false,
+    )
+  }
 
   private fun summary(markDef: VegaValue.Obj, field: String, type: String): Summary? {
     val extentName = markDef.string("extent")

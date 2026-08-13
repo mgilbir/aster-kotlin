@@ -727,11 +727,11 @@ private class Compilation(
   private fun plots(): List<Plot>? {
     val leaves = mutableListOf<Plot>()
 
-    fun build(name: String, child: VegaValue.Obj): Node? {
+    fun build(name: String, child: VegaValue.Obj, above: List<String>): Node? {
       val nested = Concat.of(child, diagnostics, config)
       if (nested == null) {
         val plot = Plot(name, child)
-        plot.views = views(plot.spec, plot.name) ?: return null
+        plot.views = views(plot.spec, plot.name, above) ?: return null
         plot.views.forEach { plotNames[it] = plot.name }
         leaves += plot
         return Node.Leaf(plot)
@@ -743,7 +743,10 @@ private class Compilation(
           // over the name its parent offered it. Below the first level the names compose.
           val here =
             declared ?: listOf(name, "concat_$index").filter { it.isNotEmpty() }.joinToString("_")
-          build(here, entry) ?: return null
+          // A concatenation's own transforms belong to *it*, not to each plot below it: they are
+          // one chain in upstream's tree, forking at the plots, and naming them for each plot in
+          // turn would leave three copies of one chain with nothing to fold them by.
+          build(here, entry, owning(entry, above, here)) ?: return null
         }
       return Node.Nest(name, nested, children, child)
     }
@@ -752,9 +755,18 @@ private class Compilation(
     // are: `getName` prefixes every scale, mark and step signal with the model's own name, so a
     // specification with `"name": "plotname"` reads `plotname_x` throughout. The sizes are the
     // exception — `width` and `height` are the chart's, not this level's.
-    plotTree = build(spec.string("name").orEmpty(), spec) ?: return null
+    plotTree =
+      build(
+        spec.string("name").orEmpty(),
+        spec,
+        List(spec.array("transform").orEmpty().size) { spec.string("name").orEmpty() },
+      ) ?: return null
     return leaves
   }
+
+  /** [above] extended so that everything [spec] adds of its own is owned by [name]. */
+  private fun owning(spec: VegaValue.Obj, above: List<String>, name: String): List<String> =
+    above + List((spec.array("transform").orEmpty().size - above.size).coerceAtLeast(0)) { name }
 
   /** Every concatenation in the tree, outermost first, which is the order the sizes merge in. */
   private fun nests(node: Node = plotTree): List<Node.Nest> =
@@ -1053,7 +1065,13 @@ private class Compilation(
   // Views
   // -----------------------------------------------------------------------------------------
 
-  private fun views(spec: VegaValue.Obj, namePrefix: String): List<UnitView>? {
+  private fun views(
+    spec: VegaValue.Obj,
+    namePrefix: String,
+    /** The model each of the chart's own transforms belongs to, from the levels above. */
+    above: List<String> = emptyList(),
+  ): List<UnitView>? {
+    val mineHere = owning(spec, above, namePrefix)
     fun named(suffix: String) =
       listOf(namePrefix, suffix).filter { it.isNotEmpty() }.joinToString("_")
 
@@ -1062,16 +1080,31 @@ private class Compilation(
     // A composite mark stands for a layer of ordinary ones and names its parts relative to itself —
     // a box plot's whiskers are `layer_0_layer_1_layer_0`, being a layer inside a layer. A path
     // overlay may then apply to each part and numbers its own results beneath that name.
-    fun expand(unit: VegaValue.Obj, prefix: String): List<Pair<String, VegaValue.Obj>> {
+    fun expand(
+      unit: VegaValue.Obj,
+      prefix: String,
+      /** The model each of [unit]'s own transforms belongs to. */
+      above: List<String>,
+    ): List<Triple<String, VegaValue.Obj, List<String>>> {
       val parts = composite.normalize(unit) ?: listOf("" to unit)
+      // Whatever the expansion **added** belongs to the model being expanded, not to the parts it
+      // expanded into: a box plot's aggregate is written once, above its five views, so all five
+      // carry the same node rather than one apiece.
+      fun owners(part: VegaValue.Obj): List<String> =
+        above +
+          List((part.array("transform").orEmpty().size - above.size).coerceAtLeast(0)) { prefix }
       return parts.flatMap { (name, part) ->
         val here = listOf(prefix, name).filter { it.isNotEmpty() }.joinToString("_")
         val overlaid = normalize.pathOverlay(part)
         if (overlaid == null) {
-          listOf(here to part)
+          listOf(Triple(here, part, owners(part)))
         } else {
           overlaid.mapIndexed { index, view ->
-            listOf(here, "layer_$index").filter { it.isNotEmpty() }.joinToString("_") to view
+            Triple(
+              listOf(here, "layer_$index").filter { it.isNotEmpty() }.joinToString("_"),
+              view,
+              owners(view),
+            )
           }
         }
       }
@@ -1119,20 +1152,14 @@ private class Compilation(
           if (child.has("layer")) {
             collect(merged, here, owner ?: here, here2, mine)
           } else {
-            expand(merged, here).forEach {
-              owners[it.second] = mine
+            expand(merged, here, mine).forEach {
+              owners[it.second] = it.third
               units += Triple(it.first, it.second, owner ?: here) to here2
             }
           }
         }
       }
-      collect(
-        spec,
-        namePrefix,
-        null,
-        "$",
-        List(spec.array("transform").orEmpty().size) { namePrefix },
-      )
+      collect(spec, namePrefix, null, "$", mineHere)
 
       return units.mapNotNull { (named, path) ->
         val (name, unit, child) = named
@@ -1161,13 +1188,17 @@ private class Compilation(
     // upstream does: the normalizer hands its result back to the compiler as a layer spec. One
     // that normalizes into exactly one stays a single view, and keeps its unprefixed names.
     if (composite.normalize(spec) != null || normalize.pathOverlay(spec) != null) {
-      return expand(spec, namePrefix).mapNotNull { (name, unit) ->
-        parser.unit(unit, "$")?.let { UnitView(it, config, name, name, parentIsLayer = true) }
+      return expand(spec, namePrefix, mineHere).mapNotNull { (name, unit, owned) ->
+        parser.unit(unit, "$")?.let {
+          UnitView(it, config, name, name, parentIsLayer = true).also { view ->
+            view.transformOwners = owned
+          }
+        }
       }
     }
 
     val unit = parser.unit(spec, "$") ?: return null
-    return listOf(UnitView(unit, config, namePrefix))
+    return listOf(UnitView(unit, config, namePrefix).also { it.transformOwners = mineHere })
   }
 
   /**

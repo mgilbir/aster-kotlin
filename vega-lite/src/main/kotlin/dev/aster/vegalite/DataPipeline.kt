@@ -679,6 +679,32 @@ internal class DataPipeline(
     return if (units.isEmpty()) null else TimeUnitNode(units)
   }
 
+  /**
+   * The stated `timeUnit` as the flow's own node — `TimeUnitNode.makeFromTransform`.
+   *
+   * As with the aggregate, being the same node as the one an encoding implies is what lets the two
+   * fold together: a composite mark writes the bucketing its encoding asked for as a *transform* on
+   * the layer it expands into, and the view drawn beside it asks for the same bucketing through its
+   * own encoding. Kept apart, one chart bucketed the same column twice.
+   */
+  private fun timeUnitFrom(transform: VegaValue): TimeUnitNode? {
+    if (transform.string("type") != "timeunit") return null
+    val field = transform.string("field") ?: return null
+    val outputs = transform.array("as").orEmpty().mapNotNull { text(it) }
+    val units = transform.array("units").orEmpty().mapNotNull { text(it) }
+    if (outputs.isEmpty() || units.isEmpty()) return null
+    return TimeUnitNode(
+      listOf(
+        TimeUnitComponent(
+          field,
+          units,
+          outputs.first(),
+          utc = transform.string("timezone") == "utc",
+        )
+      )
+    )
+  }
+
   /** The stated `aggregate` as the flow's own node, or null for anything else. */
   private fun aggregateFrom(transform: VegaValue): AggregateNode? {
     if (transform.string("type") != "aggregate") return null
@@ -713,7 +739,10 @@ internal class DataPipeline(
         // its own aggregate and the point drawn over it asks for a `mean`, both grouped the same
         // way, and upstream computes the grouping once. Carried as an opaque transform, the
         // grouping is computed twice into two datasets.
-        last = last.then(aggregateFrom(emitted) ?: PassThroughNode(listOf(emitted)))
+        val node =
+          aggregateFrom(emitted) ?: timeUnitFrom(emitted) ?: PassThroughNode(listOf(emitted))
+        node.fromAncestor = view.transformOwners.getOrNull(index)?.let { it != view.name } == true
+        last = last.then(node)
       }
     }
     return last

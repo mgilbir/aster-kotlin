@@ -13,6 +13,18 @@ import dev.aster.vega.model.VegaValue
  * is not a cosmetic difference; it is a specification that reads from the wrong dataset.
  */
 internal sealed class DataNode {
+
+  /**
+   * Whether this node came from a transform written **above** the view that carries it.
+   *
+   * A layer's members each carry a copy of the chain their parent wrote, and a composite mark's
+   * parts each carry the summary the composite wrote — but upstream has one node in both cases, on
+   * the model that wrote it, with the views hanging below. Folding the copies back into the *first*
+   * of them restores that tree, and with it the order the views were written in. A node a view
+   * built for itself is nothing of the sort, and merges by its own optimizer's rule.
+   */
+  var fromAncestor: Boolean = false
+
   val children: MutableList<DataNode> = mutableListOf()
 
   fun then(child: DataNode): DataNode {
@@ -213,7 +225,7 @@ internal sealed class DataNode {
   fun mergeTimeUnits() {
     children.forEach { it.mergeTimeUnits() }
     if (children.size <= 1) return
-    val units = children.filterIsInstance<TimeUnitNode>()
+    val units = foldCopies(children.filterIsInstance<TimeUnitNode>()) { a, b -> a.units == b.units }
     if (units.size > 1) {
       val kept = units.last()
       for (unit in units.dropLast(1)) {
@@ -284,6 +296,28 @@ internal sealed class DataNode {
     }
   }
 
+  /**
+   * Folds the copies an ancestor's transform left in every branch into the **first** of them.
+   *
+   * The copies are the same node upstream — written once, on the model above — so the branches
+   * below them belong under one node in the order the views were written. Every other merge keeps
+   * the *last* sibling, which would reorder them.
+   */
+  private fun <T : DataNode> foldCopies(nodes: List<T>, same: (T, T) -> Boolean): List<T> {
+    val kept = mutableListOf<T>()
+    for (node in nodes) {
+      val copy = kept.firstOrNull { it.fromAncestor && node.fromAncestor && same(it, node) }
+      if (copy == null) {
+        kept += node
+      } else {
+        copy.children += node.children
+        node.children.clear()
+        children.remove(node)
+      }
+    }
+    return kept
+  }
+
   fun mergeAggregates() {
     children.forEach { it.mergeAggregates() }
     if (children.size <= 1) return
@@ -300,19 +334,10 @@ internal sealed class DataNode {
       // gives each expanded view its own copy, and folding them into the first restores that tree.
       // Genuinely different aggregates are `MergeAggregates` proper — `mergeableAggs.pop()` keeps
       // the last, which is why an error bar's own aggregate ends up *under* the mean drawn over it.
-      val distinct = mutableListOf<AggregateNode>()
-      for (node in group) {
-        val same = distinct.firstOrNull { it.sameAs(node) }
-        if (same == null) {
-          distinct += node
-        } else {
-          same.children += node.children
-          children.remove(node)
-        }
-      }
+      val distinct = foldCopies(group) { a, b -> a.sameAs(b) }
       if (distinct.size < 2) continue
-      val kept = distinct.removeAt(distinct.size - 1)
-      for (folded in distinct) {
+      val kept = distinct.last()
+      for (folded in distinct.dropLast(1)) {
         kept.merge(folded)
         children.remove(folded)
         kept.children += folded.children
