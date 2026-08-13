@@ -9,7 +9,7 @@ Branch `milestone-0-bootstrap`. Working tree clean, both gates green:
 - `./scripts/check.sh` — format, all tests, lint, demo APK
 - `./scripts/oracle.sh` — regenerates upstream references and runs the differential comparison
 
-**170 differential fixtures pass, all matching upstream exactly.** That is the only number here
+**172 differential fixtures pass, all matching upstream exactly.** That is the only number here
 that means what it says.
 
 ## Read this before trusting the other number
@@ -254,7 +254,7 @@ not the one Vega documents**, because Vega only forwards the parameters a specif
 
 ## What is left: two examples, and neither can be verified
 
-**170 differential fixtures pass. 91 of the 93 examples compile clean.** Everything that can be
+**172 differential fixtures pass. 91 of the 93 examples compile clean.** Everything that can be
 checked against upstream has been.
 
 ### `projections` — upstream refuses it too
@@ -508,8 +508,12 @@ Run the same count over the **operation names** — aggregates and window operat
 rather than as a transform `type`, so a count of transform types misses them entirely. Seven of the 25
 aggregates had never been asked for, and the fixture written for them found `distinct` counting the
 wrong thing; ten of the thirteen window operations had never been asked for either, and those turned
-out to be right. Both counts are now zero, and the same trick is worth trying on anything else a
-specification names in a list rather than as a type.
+out to be right. Both counts are now zero. The same trick applies to every **vocabulary** a specification draws from,
+and the counts are worth re-running rather than trusting: scale types and mark types came back fully
+covered, while the symbol shapes were missing seven, the curve families three, and `timeunit` five of
+its eleven units — all now covered, all already correct. The **projections** are the one vocabulary
+still short: `albers`, `albersUsa`, `equirectangular`, `identity` and `mercator` are exercised and the
+conic, azimuthal, gnomonic, orthographic, stereographic and transverse families are not.
 
 One fixture is enough to catch a transform that does nothing and not enough to catch one whose
 *options* are ignored. `hierarchy-options` was written for exactly that — a radius column on `pack`,

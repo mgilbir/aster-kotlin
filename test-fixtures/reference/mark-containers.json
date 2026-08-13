@@ -15328,6 +15328,54 @@
   "hidden": false
  },
  {
+  "fixture": "symbols-and-curves",
+  "kind": "group",
+  "role": "graphics-object",
+  "roleDescription": "group mark container",
+  "label": null,
+  "hidden": false
+ },
+ {
+  "fixture": "symbols-and-curves",
+  "kind": "symbol",
+  "role": "graphics-symbol",
+  "roleDescription": "symbol mark container",
+  "label": null,
+  "hidden": false
+ },
+ {
+  "fixture": "symbols-and-curves",
+  "kind": "text",
+  "role": "graphics-object",
+  "roleDescription": "text mark container",
+  "label": null,
+  "hidden": false
+ },
+ {
+  "fixture": "symbols-and-curves",
+  "kind": "line",
+  "role": "graphics-symbol",
+  "roleDescription": "line mark container",
+  "label": null,
+  "hidden": false
+ },
+ {
+  "fixture": "symbols-and-curves",
+  "kind": "line",
+  "role": "graphics-symbol",
+  "roleDescription": "line mark container",
+  "label": null,
+  "hidden": false
+ },
+ {
+  "fixture": "symbols-and-curves",
+  "kind": "line",
+  "role": "graphics-symbol",
+  "roleDescription": "line mark container",
+  "label": null,
+  "hidden": false
+ },
+ {
   "fixture": "text-anchors",
   "kind": "group",
   "role": "graphics-object",
@@ -15489,6 +15537,38 @@
  },
  {
   "fixture": "timeunit-inferred",
+  "kind": "text",
+  "role": "graphics-object",
+  "roleDescription": "text mark container",
+  "label": null,
+  "hidden": false
+ },
+ {
+  "fixture": "timeunit-units",
+  "kind": "group",
+  "role": "graphics-object",
+  "roleDescription": "group mark container",
+  "label": null,
+  "hidden": false
+ },
+ {
+  "fixture": "timeunit-units",
+  "kind": "rect",
+  "role": "graphics-symbol",
+  "roleDescription": "rect mark container",
+  "label": null,
+  "hidden": false
+ },
+ {
+  "fixture": "timeunit-units",
+  "kind": "text",
+  "role": "graphics-object",
+  "roleDescription": "text mark container",
+  "label": null,
+  "hidden": false
+ },
+ {
+  "fixture": "timeunit-units",
   "kind": "text",
   "role": "graphics-object",
   "roleDescription": "text mark container",
