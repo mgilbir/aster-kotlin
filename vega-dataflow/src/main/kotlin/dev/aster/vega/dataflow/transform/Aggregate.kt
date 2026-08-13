@@ -3,8 +3,10 @@ package dev.aster.vega.dataflow.transform
 import dev.aster.vega.expression.JsSemantics
 import dev.aster.vega.model.DiagnosticCodes
 import dev.aster.vega.model.VegaValue
+import dev.aster.vega.model.asString
 import dev.aster.vega.model.field
 import dev.aster.vega.model.isMissing
+import dev.aster.vega.model.parseFieldPath
 import kotlin.math.pow
 import kotlin.math.sqrt
 
@@ -75,6 +77,25 @@ public enum class AggregateOp(public val opName: String, public val needsField: 
       it.opName.equals(name, ignoreCase = true)
     }
   }
+}
+
+/**
+ * Whether a row **has** the field at all, as opposed to having it empty.
+ *
+ * The distinction JavaScript makes between `undefined` and `null`, which this value model does not:
+ * `field()` answers [VegaValue.Null] for both. Only `distinct` needs to tell them apart, and it
+ * does because upstream counts by the string each coerces to.
+ */
+private fun hasField(row: VegaValue, path: String): Boolean {
+  var current: VegaValue = row
+  val segments = parseFieldPath(path)
+  for ((index, segment) in segments.withIndex()) {
+    val obj = current as? VegaValue.Obj ?: return false
+    if (!obj.fields.containsKey(segment)) return false
+    if (index == segments.lastIndex) return true
+    current = obj.fields.getValue(segment)
+  }
+  return false
 }
 
 /**
@@ -212,6 +233,20 @@ internal class Measure(
     // by a signal, so every fixture agreed while the array was the wrong thing entirely.
     if (op == AggregateOp.VALUES) return VegaValue.Arr(tuples)
     val path = fieldPath ?: return VegaValue.Null
+    // `distinct` counts over **every** row rather than the readable ones, and it counts them as
+    // upstream's map does: by `String(value)`, so an absent field and an explicit `null` are two
+    // different answers — `"undefined"` and `"null"` — and both count. Filtering the missing ones
+    // out
+    // first said a column of 4, 9, 4, null and nothing had two distinct values where upstream says
+    // four. The one place this still parts company is a column of *objects*: upstream coerces every
+    // one to `[object Object]` and counts them as a single value, which nothing sane asks for.
+    if (op == AggregateOp.DISTINCT) {
+      val seen = HashSet<String>(tuples.size)
+      for (tuple in tuples) {
+        seen += if (hasField(tuple, path)) tuple.field(path).asString() else "undefined"
+      }
+      return VegaValue.Num(seen.size.toDouble())
+    }
     if (op == AggregateOp.CI0 || op == AggregateOp.CI1) {
       val interval = confidence?.invoke(path) ?: return VegaValue.Null
       return VegaValue.Num(if (op == AggregateOp.CI0) interval.first else interval.second)
@@ -244,9 +279,6 @@ internal class Measure(
         }
       }
       return best ?: VegaValue.Null
-    }
-    if (op == AggregateOp.DISTINCT) {
-      return VegaValue.Num(present.map { it.asComparableKey() }.distinct().size.toDouble())
     }
 
     val numbers = present.map { JsSemantics.toNumber(it) }.filter { it.isFinite() }

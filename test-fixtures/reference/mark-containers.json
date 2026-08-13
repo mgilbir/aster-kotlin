@@ -1,5 +1,37 @@
 [
  {
+  "fixture": "aggregate-ops-rest",
+  "kind": "group",
+  "role": "graphics-object",
+  "roleDescription": "group mark container",
+  "label": null,
+  "hidden": false
+ },
+ {
+  "fixture": "aggregate-ops-rest",
+  "kind": "rect",
+  "role": "graphics-symbol",
+  "roleDescription": "rect mark container",
+  "label": null,
+  "hidden": false
+ },
+ {
+  "fixture": "aggregate-ops-rest",
+  "kind": "text",
+  "role": "graphics-object",
+  "roleDescription": "text mark container",
+  "label": null,
+  "hidden": false
+ },
+ {
+  "fixture": "aggregate-ops-rest",
+  "kind": "text",
+  "role": "graphics-object",
+  "roleDescription": "text mark container",
+  "label": null,
+  "hidden": false
+ },
+ {
   "fixture": "aggregate-ops-tail",
   "kind": "group",
   "role": "graphics-object",

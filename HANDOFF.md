@@ -9,7 +9,7 @@ Branch `milestone-0-bootstrap`. Working tree clean, both gates green:
 - `./scripts/check.sh` — format, all tests, lint, demo APK
 - `./scripts/oracle.sh` — regenerates upstream references and runs the differential comparison
 
-**168 differential fixtures pass, all matching upstream exactly.** That is the only number here
+**169 differential fixtures pass, all matching upstream exactly.** That is the only number here
 that means what it says.
 
 ## Read this before trusting the other number
@@ -254,7 +254,7 @@ not the one Vega documents**, because Vega only forwards the parameters a specif
 
 ## What is left: two examples, and neither can be verified
 
-**168 differential fixtures pass. 91 of the 93 examples compile clean.** Everything that can be
+**169 differential fixtures pass. 91 of the 93 examples compile clean.** Everything that can be
 checked against upstream has been.
 
 ### `projections` — upstream refuses it too
@@ -503,6 +503,10 @@ for each of the 49 implemented transforms, how many fixtures use it? Three had *
 `nest`, `pivot` — and fourteen have exactly **one**. The count is a few lines of Python over
 `override val type: String = "…"` in `vega-dataflow/.../transform/*.kt` against `"type": "…"` in
 `test-fixtures/specs/*.vg.json`; run it again after adding a transform.
+
+Run the same count over the **aggregate operations** — they are named in `ops` arrays rather than as a
+transform `type`, so the transform count misses them entirely. Seven of the 25 had never been asked for
+by any fixture, and the first one written found `distinct` counting the wrong thing.
 
 One fixture is enough to catch a transform that does nothing and not enough to catch one whose
 *options* are ignored. `hierarchy-options` was written for exactly that — a radius column on `pack`,
