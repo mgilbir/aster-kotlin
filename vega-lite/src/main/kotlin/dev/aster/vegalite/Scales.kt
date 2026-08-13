@@ -225,7 +225,7 @@ internal object Scales {
     // span. Upstream decides that by whether the mark has a `timeUnitBandPosition`, which only the
     // rect-shaped configurations define, so a bar over months reaches the end of December and a
     // point over the same months sits on the first of it.
-    if (def.timeUnit != null && (type == "time" || type == "utc") && bandEnd(view)) {
+    if (def.timeUnit != null && (type == "time" || type == "utc") && bandEnd(view, def)) {
       // A rect shifted off the middle of its bucket covers the *interpolated* edges instead, so
       // those are the columns the scale has to reach.
       val shifted = view.offsettedRectPosition(def, channel) != null
@@ -882,6 +882,7 @@ internal object Scales {
    * define (`defaultRectConfig`), so the question answers itself by mark type without a list of
    * mark types anywhere.
    */
-  private fun bandEnd(view: UnitView): Boolean =
-    view.config.markConfig(view.spec.mark).fields["timeUnitBandPosition"] != null
+  private fun bandEnd(view: UnitView, def: ChannelDef): Boolean =
+    def.raw.number("bandPosition") != null ||
+      view.config.markConfig(view.spec.mark).fields["timeUnitBandPosition"] != null
 }

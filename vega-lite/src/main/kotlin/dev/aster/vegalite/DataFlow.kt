@@ -48,6 +48,10 @@ internal sealed class DataNode {
    * the same rows, described twice. Identity is by the transforms a node emits, which is what the
    * comparison is over anyway.
    */
+  /** The tree's shape and content, for telling whether an optimizer pass changed anything. */
+  fun signature(): String =
+    "${this::class.simpleName}:${identity() ?: ""}(${children.joinToString(",") { it.signature() }})"
+
   fun mergeIdentical() {
     children.forEach { it.mergeIdentical() }
     if (children.size <= 1) return
@@ -69,14 +73,25 @@ internal sealed class DataNode {
   /**
    * What makes two nodes the same question, or null for a node that is never merged.
    *
+   * Upstream gives *every* node a `hash`, and it is over the transform the node emits — `Stack
+   * ${hash(this._stack)}`, `Impute ${hash(this.transform)}`. Every kind that emits one is compared
+   * on the same basis here, which matters most for the derived steps: a line drawn over its own
+   * area is two views asking one table for the same stack, and leaving them apart gave each a
+   * dataset of its own where upstream has both marks reading the source.
+   *
    * An [OutputNode] is excluded on purpose: it is a *name* something else reads by, and merging two
-   * of them would leave one of the readers pointing at a name that is no longer there.
+   * of them would leave one of the readers pointing at a name that is no longer there. A
+   * [SourceNode] is excluded because a root is nobody's sibling.
    */
   private fun identity(): String? =
     when (this) {
       is ParseNode -> "parse:$parse"
       is FilterInvalidNode -> "filter-invalid:$expressions"
-      is PassThroughNode -> "transforms:${transforms.map { it.toString() }}"
+      // A time-unit step is merged by `mergeTimeUnits` instead, which keeps a different one.
+      is PassThroughNode -> if (timeUnit) null else "transforms:${transforms.map { it.toString() }}"
+      is BinNode -> "bin:${transforms()}"
+      is ImputeNode -> "impute:${transforms()}"
+      is StackNode -> "stack:${transforms()}|$component"
       else -> null
     }
 
@@ -175,6 +190,36 @@ internal sealed class DataNode {
       head = tails[index]
     }
     main.children += below
+  }
+
+  /**
+   * Folds sibling time-unit steps into one — upstream's `MergeTimeUnits`.
+   *
+   * It keeps the **last** of the siblings, not the first: `timeUnitChildren.pop()` takes the end of
+   * the list and every earlier one is merged into it, so the earlier branches' subtrees end up
+   * *after* the last branch's own. That is not a detail — the walk names datasets in the order it
+   * meets them, so a chart whose layers all bucket one column has its second layer numbered
+   * `data_0` and its first `data_1`, and every scale domain and mark reads accordingly.
+   */
+  fun mergeTimeUnits() {
+    children.forEach { it.mergeTimeUnits() }
+    if (children.size <= 1) return
+    val units = children.filterIsInstance<TimeUnitNode>()
+    if (units.size > 1) {
+      val kept = units.last()
+      for (unit in units.dropLast(1)) {
+        kept.merge(unit)
+        children.remove(unit)
+      }
+    }
+    val formulas = children.filterIsInstance<PassThroughNode>().filter { it.timeUnit }
+    if (formulas.size > 1) {
+      val kept = formulas.last()
+      for (formula in formulas.dropLast(1)) {
+        kept.merge(formula)
+        children.remove(formula)
+      }
+    }
   }
 
   fun mergeAggregates() {
@@ -360,7 +405,17 @@ internal data class BinComponent(
   val rangeFormula: String?,
 )
 
-internal class TimeUnitNode(val units: List<TimeUnitComponent>) : DataNode() {
+internal class TimeUnitNode(units: List<TimeUnitComponent>) : DataNode() {
+  var units: List<TimeUnitComponent> = units
+    private set
+
+  /** `TimeUnitNode.merge`: the other's units are taken over, and its children hang below this. */
+  fun merge(other: TimeUnitNode) {
+    units = units + other.units.filterNot { it in units }
+    children += other.children
+    other.children.clear()
+  }
+
   fun transforms(): List<VegaValue> = units.map {
     obj {
       put("type", "timeunit")
@@ -457,6 +512,17 @@ internal class StackNode(
    * are its own: a gap filled across the cells would draw one cell's rows into another.
    */
   val imputeGroupby: List<String> = emptyList(),
+  /**
+   * The parts of upstream's `StackComponent` that never reach the transform, kept for the merge.
+   *
+   * Two stacks are the same question when their whole component is, and the component holds more
+   * than it emits: the channels that *segment* the column, and the dimension's field definitions
+   * rather than only their names. A pie chart's arcs and its labels stack the same column and
+   * segment it differently; a quantitative axis and an ordinal one over the same column emit the
+   * same transform from different definitions. Both pairs are two datasets upstream, and folding
+   * either into one drew the second plot from the first plot's accumulation.
+   */
+  val component: String = "",
 ) : DataNode() {
   fun transforms(): List<VegaValue> =
     imputeKeys.map { key ->
@@ -546,7 +612,28 @@ internal class FilterInvalidNode(val expressions: List<String>) : DataNode() {
 }
 
 /** A transform written by the specification, already in Vega's form. */
-internal class PassThroughNode(val transforms: List<VegaValue>) : DataNode()
+internal class PassThroughNode(
+  transforms: List<VegaValue>,
+  /**
+   * Whether this is a **time unit** step written as formulas — a bucket that arrived pre-cut.
+   *
+   * It is a `TimeUnitNode` upstream even though it emits `formula`, and that matters for the merge
+   * rather than for the output: time units are folded by their own optimizer, which keeps the
+   * *last* of the siblings where the general one keeps the first, and which of them survives is
+   * what decides the order the branches below the fork are walked — and so their names.
+   */
+  val timeUnit: Boolean = false,
+) : DataNode() {
+  var transforms: List<VegaValue> = transforms
+    private set
+
+  /** `TimeUnitNode.merge`: the other's units are taken over, and its children hang below this. */
+  fun merge(other: PassThroughNode) {
+    transforms = transforms + other.transforms.filterNot { it in transforms }
+    children += other.children
+    other.children.clear()
+  }
+}
 
 /** A named point in the flow that something else reads: a mark's source, a scale's domain. */
 internal class OutputNode(val key: String) : DataNode() {

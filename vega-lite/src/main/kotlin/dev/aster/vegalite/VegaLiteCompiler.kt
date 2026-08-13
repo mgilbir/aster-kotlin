@@ -953,12 +953,23 @@ private class Compilation(
     }
     // Every view built its own chain onto its source, so a shared tree forks there; the shared
     // parse is hoisted above the fork before the tree is named and flattened.
+    // `optimizeDataflow` runs its whole sequence again until nothing moves, at most five times,
+    // and that is not belt and braces: one optimizer's fold makes the next one's siblings. Two
+    // layers each bucketing an instant and then aggregating are not sibling aggregates until the
+    // time units have been folded together, so a single pass leaves the aggregates apart.
     for (root in roots.values) {
-      root.moveParseUp()
-      root.mergeParse()
-      root.mergeIdentical()
-      root.mergeAggregates()
-      root.mergeOutputs()
+      var previous = ""
+      repeat(5) {
+        root.moveParseUp()
+        root.mergeParse()
+        root.mergeAggregates()
+        root.mergeTimeUnits()
+        root.mergeIdentical()
+        root.mergeOutputs()
+        val settled = root.signature()
+        if (settled == previous) return@repeat
+        previous = settled
+      }
     }
     val datasets =
       DataAssembler()

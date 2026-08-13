@@ -278,7 +278,7 @@ internal class DataPipeline(
           put("as", "${field}_end")
         }
       }
-    return if (formulas.isEmpty()) null else PassThroughNode(formulas)
+    return if (formulas.isEmpty()) null else PassThroughNode(formulas, timeUnit = true)
   }
 
   private fun timeUnitNode(): TimeUnitNode? {
@@ -491,6 +491,9 @@ internal class DataPipeline(
         } else {
           emptyList()
         },
+      component =
+        "${stack.stackBy.map { it.raw }}|" +
+          "${stack.groupbyChannels.map { view.spec.encoding[it]?.raw }}",
     )
   }
 

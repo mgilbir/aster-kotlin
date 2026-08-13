@@ -1882,6 +1882,37 @@ The fixtures written for those found two defects in **this runtime**, both now f
   each entry against the next. Ticking the scale instead drew six swatches for four buckets, each
   labelled with an edge no row can take.
 
+### The optimizer runs until nothing moves, and which sibling survives decides the names
+
+Fifteen gallery examples were fixed by three changes to the data flow, and all three are about the
+*shape* of the tree rather than what any node does. The shape decides the naming — `data_0` versus
+`data_1` — and a mark reading the wrong name is a wrong chart, not a cosmetic difference.
+
+**Every node upstream has a `hash`, and it is over the transform it emits.** This compiler compared
+only three kinds and left the derived steps out, so a line drawn over its own area was two views
+asking one table for the same stack and getting a dataset each. But the hash is over the whole
+*component*, not only what reaches the transform: two stacks that segment the column differently, or
+whose dimension is quantitative in one plot and ordinal in another, emit the same transform from
+different questions and stay apart. Merging on the transform alone drew a pie chart's labels from
+the arcs' own accumulation, and one plot of `test_invalid_null` from another's.
+
+**Time units are folded by their own optimizer, and it keeps the _last_ sibling** —
+`timeUnitChildren.pop()` — where the general one keeps the first. Which of them survives is which
+branch the walk meets first, so a chart whose two layers both bucket one instant has its *second*
+layer numbered `data_0`. That is upstream's numbering, and every scale domain and mark reference in
+the file follows from it. A binned time unit is a `TimeUnitNode` upstream even though it emits
+`formula`, so it is folded the same way.
+
+**`optimizeDataflow` runs its whole sequence again until nothing moves, at most five times.** That
+is not belt and braces: one optimizer's fold makes the next one's siblings. Two layers each
+bucketing an instant and then aggregating it are not sibling aggregates until the time units have
+been folded together, so a single pass leaves the aggregates apart and the datasets doubled.
+
+Beside them, `hasBandEnd`: a bucketed **instant** is a bucket like any other, so a stated
+`bandPosition` puts the mark at a point inside it — a signal interpolating the two edges, since the
+edges are columns and the point between them is not — and the bucket's far edge joins the scale's
+domain. A label over a month asked for the middle of the month now sits in the middle of it.
+
 ### Two runtime gaps this batch names but does not close
 
 `density`'s fixture is not in the corpus, and `trail`'s draws no legend. Both compile exactly as

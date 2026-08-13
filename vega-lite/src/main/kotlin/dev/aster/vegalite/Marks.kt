@@ -1109,11 +1109,31 @@ internal object Marks {
         literalRef(def.datum)?.let { (key, it) -> put(key, it) }
       }
     }
-    if (def.bin is Binning.Bin && scaleType != null && !Scales.hasDiscreteDomain(scaleType)) {
-      // The middle of a bin has to be computed from both edges, since only the edges are fields.
+    // A **bucket** is placed by a point inside it rather than at its near edge, and a bucketed
+    // *instant* is a bucket too — `isBinning(bin) || (bandPosition && timeUnit && type ===
+    // TEMPORAL)`. A label over a month asked for the middle of the month sits in the middle of it,
+    // and only a signal can say so: the two edges are columns, and the point between them is not.
+    val bucketed =
+      def.bin is Binning.Bin ||
+        (def.timeUnit != null &&
+          def.type == MeasureType.TEMPORAL &&
+          bandPosition(view, def, view.spec.encoding[secondaryChannel(channel) ?: ""]) != null)
+    if (bucketed && scaleType != null && !Scales.hasDiscreteDomain(scaleType)) {
+      // The middle of a bucket has to be computed from both edges, since only the edges are fields.
+      val position = bandPosition(view, def) ?: 0.5
       val start = Fields.datumAccess(def)
       val end = Fields.datumAccess(def, suffix = "end")
-      return signalRef("scale(\"${view.scale(mainChannel(channel))}\", 0.5 * $start + 0.5 * $end)")
+      if (position == 0.0 || position == 1.0) {
+        return obj {
+          put("scale", scaleName(view, mainChannel(channel)))
+          put("field", Fields.vgField(def, suffix = if (position == 0.0) null else "end"))
+        }
+      }
+      return signalRef(
+        "scale(\"${view.scale(mainChannel(channel))}\", " +
+          "${Fields.expressionNumber(1 - position)} * $start + " +
+          "${Fields.expressionNumber(position)} * $end)"
+      )
     }
     return obj {
       put("scale", scaleName(view, mainChannel(channel)))
