@@ -201,7 +201,7 @@ substantive compatibility items:
 | 6. View and Compose APIs | Yes |
 | 7. SVG, PNG, PDF export | Yes |
 | 8. TalkBack can describe and navigate | Partial — virtual nodes are tested by instrumentation, not with TalkBack itself |
-| 9. At least 100 compatibility fixtures pass | **Yes** — 138 |
+| 9. At least 100 compatibility fixtures pass | **Yes** — 139 |
 | 10. Core runtime has no Android dependency | Yes |
 | 11. Renders without WebView | Yes |
 | 12. Build and test loop runs from the terminal | Yes |
@@ -1600,11 +1600,12 @@ size suggests. All three go on both the heading and its subtitle, because upstre
 marks under one guide and either can be focused.
 
 The schema diff now finds **nothing** unaccounted for in `encodeEntry`, `axis`, `title`, `projection`
-or `scale`, and two entries in `legend`: `titleAnchor`, which needs upstream's
-`legendTitleOffset` — a title anchored `end` is placed from the *entries'* extent and not the legend's,
-and a vertical gradient swaps which coordinate that is — and `gridAlign`, which only means anything to
-a multi-column entry grid. The `strokeDash` and `strokeWidth` the diff also lists are not gaps: on a
-legend those name **scales**.
+or `scale`, and three entries in `legend`: `gridAlign`, which only means anything to a multi-column
+entry grid, and the `strokeDash` and `strokeWidth` **channels**. Those last two were written off here
+as "not gaps, they name scales" — which is exactly what makes them gaps. A legend keyed to a
+`strokeDash` scale draws a swatch per dash pattern, and upstream does it; this engine refuses the
+legend for want of a channel it recognises. The legend background's own width and dash are a separate
+thing and do come from `config.legend` alone.
 
 ## The last block that listed its gaps by exception
 

@@ -5,6 +5,8 @@ import dev.aster.vega.model.DiagnosticCodes
 import dev.aster.vega.model.DiagnosticCollector
 import dev.aster.vega.model.VegaValue
 import dev.aster.vega.model.asString
+import dev.aster.vega.model.roundHalfUp
+import dev.aster.vega.model.spec.Anchor
 import dev.aster.vega.model.spec.Direction
 import dev.aster.vega.model.spec.LegendOrient
 import dev.aster.vega.model.spec.LegendSpec
@@ -182,15 +184,18 @@ internal class LegendBuilder(
     // labels under it, which is upstream's `entry.items[0]` and the reason a ramp's title sits
     // level with the colours rather than with the whole block.
     val alongside = spec.titleOrient == "left"
-    val centreOver =
+    // The same distinction decides what a `titleAnchor` measures along, for the same reason: a
+    // ramp's
+    // anchor runs the width of the bar, a symbol legend's the width of the whole column of entries.
+    val titleReference =
       if (type == LegendType.GRADIENT || type == LegendType.DISCRETE) {
-        entries.firstOrNull()?.transformedBounds?.bottom ?: 0.0
-      } else entries.fold(RectD.Empty) { acc, node -> acc.union(node.transformedBounds) }.bottom
+        entries.firstOrNull()?.transformedBounds ?: RectD.Empty
+      } else entries.fold(RectD.Empty) { acc, node -> acc.union(node.transformedBounds) }
     val title =
       // A legend may name itself from a signal, exactly as an axis does — a chart whose measure is
       // chosen by a control has no constant to write down.
       titleTextOf(spec, scaleName)?.let {
-        titleNode(spec, scaleName, it, padding, alongside, 0.5 * centreOver)
+        titleNode(spec, scaleName, it, padding, alongside, titleReference)
       }
     val titleReach = title?.let { it.bounds.height + titlePadding } ?: 0.0
     val titleAside =
@@ -256,8 +261,15 @@ internal class LegendBuilder(
     text: String,
     padding: Double,
     alongside: Boolean = false,
-    centre: Double = 0.0,
+    /**
+     * The extent a `titleAnchor` measures along: the entries' own far edge, which is upstream's
+     * `s`. A top title runs along its width, a left title down its height.
+     */
+    reference: RectD = RectD.Empty,
   ): TextNode {
+    // Upstream reads a left title as `middle`-anchored and a top one as `start`-anchored, and both
+    // the alignment and the position follow from the anchor rather than from the orientation.
+    val anchor = spec.titleAnchor ?: if (alongside) Anchor.MIDDLE else Anchor.START
     val fontSize = numbers.resolve(spec.titleFontSize, scaleName) ?: LegendDefaults.TITLE_FONT_SIZE
     val run =
       TextRun(
@@ -265,19 +277,47 @@ internal class LegendBuilder(
         style = GuideStyle.text(spec.titleStyle, fontSize, LegendDefaults.TITLE_FONT_WEIGHT),
         // `titleAlign` and `titleBaseline` are overrides: upstream derives both from the title's
         // orientation and its anchor in `enter` and writes the explicit ones into `update`.
-        align = GuideStyle.alignOf(spec.titleStyle.align) ?: TextAlign.LEFT,
+        // For a top title the anchor sets the alignment too — `end` right-aligns it so its far edge
+        // meets the entries' rather than starting there and running past. A left title always
+        // aligns
+        // `left`, and carries the anchor in its baseline instead.
+        align =
+          GuideStyle.alignOf(spec.titleStyle.align)
+            ?: when {
+              alongside -> TextAlign.LEFT
+              anchor == Anchor.END -> TextAlign.RIGHT
+              anchor == Anchor.MIDDLE -> TextAlign.CENTER
+              else -> TextAlign.LEFT
+            },
         limit = numbers.resolve(spec.titleLimit, scaleName) ?: LegendDefaults.TITLE_LIMIT,
-        // Upstream reads a left or right title as `middle`-anchored where a top one is
-        // `start`-anchored, and the baseline follows the anchor.
         baseline =
           GuideStyle.baselineOf(spec.titleStyle.baseline)
-            ?: if (alongside) TextBaseline.MIDDLE else TextBaseline.TOP,
+            ?: when {
+              !alongside -> TextBaseline.TOP
+              anchor == Anchor.START -> TextBaseline.TOP
+              anchor == Anchor.END -> TextBaseline.BOTTOM
+              else -> TextBaseline.MIDDLE
+            },
       )
+    val layout = textEngine.layout(run)
+    // The anchor slides the title along the entries it labels: upstream's `legendTitleOffset`,
+    // whose
+    // `s` is the entries' own far edge less the padding — so, in the entries' own coordinates, the
+    // extent they occupy. Its `o` keeps a multi-line title's *last* line level with the far edge
+    // rather than its first, and applies only when measuring downwards.
+    val span = if (alongside) reference.bottom else reference.right
+    val extraLines = if (alongside) (layout.lines.size - 1) * layout.metrics.lineHeight else 0.0
+    val along =
+      when (anchor) {
+        Anchor.START -> 0.0
+        Anchor.END -> roundHalfUp(span - extraLines)
+        Anchor.MIDDLE -> roundHalfUp(0.5 * (span - extraLines))
+      }
     return TextNode(
       id = ids.allocate(),
-      x = padding,
-      y = padding + if (alongside) centre else 0.0,
-      layout = textEngine.layout(run),
+      x = padding + if (alongside) 0.0 else along,
+      y = padding + if (alongside) along else 0.0,
+      layout = layout,
       fill = GuideStyle.fill(spec.titleStyle, LegendDefaults.titleColor),
       metadata = NodeMetadata(role = "legend-title", markName = spec.scale),
     )

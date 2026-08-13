@@ -9,7 +9,7 @@ Branch `milestone-0-bootstrap`. Working tree clean, both gates green:
 - `./scripts/check.sh` — format, all tests, lint, demo APK
 - `./scripts/oracle.sh` — regenerates upstream references and runs the differential comparison
 
-**138 differential fixtures pass, all matching upstream exactly.** That is the only number here
+**139 differential fixtures pass, all matching upstream exactly.** That is the only number here
 that means what it says.
 
 ## Read this before trusting the other number
@@ -254,7 +254,7 @@ not the one Vega documents**, because Vega only forwards the parameters a specif
 
 ## What is left: two examples, and neither can be verified
 
-**138 differential fixtures pass. 91 of the 93 examples compile clean.** Everything that can be
+**139 differential fixtures pass. 91 of the 93 examples compile clean.** Everything that can be
 checked against upstream has been.
 
 ### `projections` — upstream refuses it too
@@ -395,13 +395,13 @@ Anything left is either a gap or a stale diagnostic, and telling those two apart
 As of this handoff the subtraction leaves **nothing** for `encodeEntry`, `axis`, `title`, `scale`,
 `projection` or `mark`, and this for the rest:
 
-- **Legend (2):** `titleAnchor`, which needs upstream's `legendTitleOffset` — a title anchored `end`
-  is placed from the *entries'* extent rather than the legend's, and a vertical gradient swaps which
-  coordinate that is — and `gridAlign`, which only means anything to a multi-column entry grid. `strokeDash`/`strokeWidth` appear in the schema diff
-  and are **not** gaps: on a legend those name *scales*, and the background's width and dash come
-  from `config.legend`.
-  `clipHeight` and the background (`fillColor`, `strokeColor`, `cornerRadius`, with the width and
-  dash coming from `config.legend` alone) are *done* — do not re-report them.
+- **Legend (3):** `gridAlign`, which only means anything to a multi-column entry grid, and the
+  `strokeDash` and `strokeWidth` **channels** — on a legend those two name *scales*, so a legend can
+  be keyed to one and its swatches then vary in dash or in width (probed: upstream draws them, this
+  engine refuses the legend for want of a recognised channel). The legend *background's* width and
+  dash are a different thing and come from `config.legend` alone.
+  `titleAnchor`, `clipHeight` and the background (`fillColor`, `strokeColor`, `cornerRadius`) are
+  *done* — do not re-report them.
 - **Axis:** none. All 79 of upstream's axis properties are read. `labelBound` is consumed and
   deliberately **inert**: upstream's bound test runs before the label bounds exist, so it culls
   nothing, and implementing the documented behaviour would be a real difference. See STATUS.md.

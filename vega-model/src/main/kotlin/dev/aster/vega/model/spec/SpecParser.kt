@@ -238,6 +238,7 @@ private val LEGEND_CONSUMED =
     "padding",
     "titlePadding",
     "titleOrient",
+    "titleAnchor",
     "titleLimit",
     "titleFontSize",
     "labelFontSize",
@@ -1530,7 +1531,7 @@ public class SpecParser {
     return AxisSpec(
       scale = scale,
       orient = orient,
-      title = obj.fields["title"]?.takeIf { it is VegaValue.Str }?.asString(),
+      title = guideTitleText(obj.fields["title"]),
       titleExpression = (obj.fields["title"] as? VegaValue.Obj)?.fields?.get("signal")?.asString(),
       titlePadding = obj.numberOrSignal("titlePadding", "$path.titlePadding"),
       titleFontSize = obj.numberOrSignal("titleFontSize", "$path.titleFontSize"),
@@ -1621,6 +1622,20 @@ public class SpecParser {
    * `end`-anchored against the entries and a right one is measured from their far edge — and a
    * legend that quietly put its title on the wrong side would look finished.
    */
+  /**
+   * A guide's `title`, which upstream also lets be an **array** of lines.
+   *
+   * Axis and legend titles took the string form only, and an array was dropped without a word — a
+   * legend headed with two lines came out with no heading at all. Joined with the newline this
+   * engine lays lines out on, the same way a chart title's is.
+   */
+  private fun guideTitleText(value: VegaValue?): String? =
+    when (value) {
+      is VegaValue.Arr -> value.values.joinToString("\n") { it.asString() }.ifEmpty { null }
+      is VegaValue.Str -> value.value
+      else -> null
+    }
+
   private fun legendTitleOrient(value: VegaValue?, path: String): String? {
     val name = (value as? VegaValue.Str)?.value?.lowercase() ?: return null
     if (name == "top" || name == "left") return name
@@ -1925,7 +1940,7 @@ public class SpecParser {
             ?: LegendOrient.RIGHT,
         direction =
           obj.enumOrNull("direction", path, "legend direction") { Direction.fromName(it) },
-        title = obj.fields["title"]?.takeIf { it is VegaValue.Str }?.asString(),
+        title = guideTitleText(obj.fields["title"]),
         titleExpression =
           (obj.fields["title"] as? VegaValue.Obj)?.fields?.get("signal")?.asString(),
         values = (obj.fields["values"] as? VegaValue.Arr)?.values,
@@ -1935,6 +1950,8 @@ public class SpecParser {
         padding = obj.numberOrSignal("padding", "$path.padding"),
         titlePadding = obj.numberOrSignal("titlePadding", "$path.titlePadding"),
         titleOrient = legendTitleOrient(obj.fields["titleOrient"], "$path.titleOrient"),
+        titleAnchor =
+          obj.enumOrNull("titleAnchor", path, "legend title anchor") { Anchor.fromName(it) },
         titleLimit = obj.numberOrSignal("titleLimit", "$path.titleLimit"),
         titleFontSize = obj.numberOrSignal("titleFontSize", "$path.titleFontSize"),
         labelFontSize = obj.numberOrSignal("labelFontSize", "$path.labelFontSize"),
@@ -2012,12 +2029,7 @@ public class SpecParser {
       return null
     }
 
-    own.reportUnhandled(
-      "Legend",
-      path,
-      LEGEND_CONSUMED,
-      mapOf("titleAnchor" to "Legend title anchoring is not implemented"),
-    )
+    own.reportUnhandled("Legend", path, LEGEND_CONSUMED)
     return spec
   }
 

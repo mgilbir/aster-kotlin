@@ -1045,6 +1045,36 @@
   "caption": "Symbol legend titled 'uncapped' for size with values from 0 to 10"
  },
  {
+  "fixture": "legend-title-anchor",
+  "kind": "legend",
+  "caption": "Symbol legend titled 'start' for fill color with 3 values: alpha, beta, gamma-wide"
+ },
+ {
+  "fixture": "legend-title-anchor",
+  "kind": "legend",
+  "caption": "Symbol legend titled 'middle' for fill color with 3 values: alpha, beta, gamma-wide"
+ },
+ {
+  "fixture": "legend-title-anchor",
+  "kind": "legend",
+  "caption": "Symbol legend titled 'end' for fill color with 3 values: alpha, beta, gamma-wide"
+ },
+ {
+  "fixture": "legend-title-anchor",
+  "kind": "legend",
+  "caption": "Symbol legend titled 'down-end' for fill color with 3 values: alpha, beta, gamma-wide"
+ },
+ {
+  "fixture": "legend-title-anchor",
+  "kind": "legend",
+  "caption": "Symbol legend titled 'down-start' for fill color with 3 values: alpha, beta, gamma-wide"
+ },
+ {
+  "fixture": "legend-title-anchor",
+  "kind": "legend",
+  "caption": "Symbol legend titled 'two lines' for fill color with 3 values: alpha, beta, gamma-wide"
+ },
+ {
   "fixture": "legends",
   "kind": "axis",
   "caption": "X-axis for a discrete scale with 3 values: alpha, beta, gamma"

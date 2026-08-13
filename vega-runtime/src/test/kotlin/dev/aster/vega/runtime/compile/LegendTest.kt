@@ -488,19 +488,12 @@ class LegendTest {
 
   @Test
   fun `unimplemented legend properties are reported by name`() {
-    val compiled =
-      compile(
-        spec(
-          """{"fill": "s1", "symbolLimit": 4,
-             "gradientOpacity": 0.5, "titleAnchor": "start"}"""
-        )
-      )
+    val compiled = compile(spec("""{"fill": "s1", "gridAlign": "each"}"""))
     val messages = compiled.diagnostics.map { it.message }
-    // `gradientOpacity` came off this list, then `symbolLimit`. The first fades the whole ramp,
-    // outline included, because upstream puts it on the item rather than on either paint; the
-    // second
-    // keeps `limit - 1` entries and spends the last row saying how many it left out.
-    for (name in listOf("titleAnchor")) {
+    // `gradientOpacity` came off this list, then `symbolLimit`, then `titleAnchor`. What is left is
+    // `gridAlign`, which only means anything to a legend whose entries wrap into a grid: it decides
+    // whether the columns share one set of widths or each keeps its own.
+    for (name in listOf("gridAlign")) {
       assertTrue(messages.any { it.contains("'$name'") }, "$name not reported in $messages")
     }
   }

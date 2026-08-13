@@ -1030,6 +1030,15 @@ public data class LegendSpec(
    * where a top one is `start`-anchored — so it is not only a translation.
    */
   val titleOrient: String? = null,
+  /**
+   * `titleAnchor` — where along the entries the title sits.
+   *
+   * A top title runs along their width and takes its alignment from the anchor, so `end` puts the
+   * title's right edge at theirs. A left title runs down their height and takes its *baseline* from
+   * the anchor instead, staying left-aligned; there a multi-line title is anchored by its last
+   * line.
+   */
+  val titleAnchor: Anchor? = null,
   /** How wide the title may be drawn before it is truncated. Upstream's legend default is 180. */
   val titleLimit: NumberValue? = null,
   val titleFontSize: NumberValue? = null,

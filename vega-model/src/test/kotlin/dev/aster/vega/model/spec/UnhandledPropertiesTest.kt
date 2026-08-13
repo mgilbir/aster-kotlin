@@ -186,16 +186,11 @@ class UnhandledPropertiesTest {
         .single { it.jsonPath?.endsWith("somethingUpstreamAddedLater") == true }
     assertTrue("not implemented" in invented.message, invented.message)
 
-    // A tailored explanation, from a block that still has some: `layout` reports six by name.
-    // A tailored explanation, from the one block that still has one: a legend's `titleAnchor`.
+    // A tailored explanation, from the one block that still has any: a title's `style`.
     val tailored =
-      diagnostics(
-          spec(
-            """"scales": [{"name": "s", "type": "ordinal", "domain": ["a"], "range": ["#000"]}],
-             "legends": [{"fill": "s", "titleAnchor": "end"}]"""
-          )
-        )
-        .single { it.jsonPath?.endsWith("titleAnchor") == true }
-    assertTrue("title anchoring" in tailored.message, tailored.message)
+      diagnostics(spec(""""title": {"text": "T", "style": "group-title"}""")).single {
+        it.jsonPath?.endsWith("style") == true
+      }
+    assertTrue("Title styles" in tailored.message, tailored.message)
   }
 }
