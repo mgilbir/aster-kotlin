@@ -1155,6 +1155,16 @@
   "caption": "Symbol legend titled 'two lines' for fill color with 3 values: alpha, beta, gamma-wide"
  },
  {
+  "fixture": "legend-title-anchor",
+  "kind": "legend",
+  "caption": "Symbol legend titled 'under' for fill color with 3 values: alpha, beta, gamma-wide"
+ },
+ {
+  "fixture": "legend-title-anchor",
+  "kind": "legend",
+  "caption": "Symbol legend titled 'after' for fill color with 3 values: alpha, beta, gamma-wide"
+ },
+ {
   "fixture": "legends",
   "kind": "axis",
   "caption": "X-axis for a discrete scale with 3 values: alpha, beta, gamma"

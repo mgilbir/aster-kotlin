@@ -189,14 +189,23 @@ internal class LegendBuilder(
         LegendType.DISCRETE -> discreteEntries(spec, scale, scaleName)
       } ?: return null
 
-    // A title on the left is centred against what the entries drew, so it cannot be placed until
-    // they exist — and for a gradient it is centred against the **bar alone**, not against the
-    // labels under it, which is upstream's `entry.items[0]` and the reason a ramp's title sits
-    // level with the colours rather than with the whole block.
-    val alongside = spec.titleOrient == "left"
-    // The same distinction decides what a `titleAnchor` measures along, for the same reason: a
-    // ramp's
-    // anchor runs the width of the bar, a symbol legend's the width of the whole column of entries.
+    // Where the title sits relative to the entries, which decides three things at once. `beside`
+    // means left or right: the anchor then runs down the entries' **height**, the title aligns
+    // left,
+    // and it carries the anchor in its baseline. `after` means right or bottom: the title is placed
+    // past the entries rather than before them, so the entries stay at the padding and the title
+    // moves.
+    val orient = spec.titleOrient ?: "top"
+    val beside = orient == "left" || orient == "right"
+    val after = orient == "right" || orient == "bottom"
+    // A title beside the entries is centred against what they drew, so it cannot be placed until
+    // they
+    // exist — and for a gradient it is centred against the **bar alone**, not against the labels
+    // under
+    // it, which is upstream's `entry.items[0]` and the reason a ramp's title sits level with the
+    // colours rather than with the whole block. The same distinction decides what a `titleAnchor`
+    // measures along: a ramp's anchor runs the width of the bar, a symbol legend's the width of the
+    // whole column of entries.
     val titleReference =
       if (type == LegendType.GRADIENT || type == LegendType.DISCRETE) {
         entries.firstOrNull()?.transformedBounds ?: RectD.Empty
@@ -205,21 +214,22 @@ internal class LegendBuilder(
       // A legend may name itself from a signal, exactly as an axis does — a chart whose measure is
       // chosen by a control has no constant to write down.
       titleTextOf(spec, scaleName)?.let {
-        titleNode(spec, scaleName, it, padding, alongside, titleReference)
+        titleNode(spec, scaleName, it, padding, beside, after, titlePadding, titleReference)
       }
-    val titleReach = title?.let { it.bounds.height + titlePadding } ?: 0.0
+    // Only a title *before* the entries moves them: a `top` one pushes them down by its own height
+    // and a `left` one across by its width, both plus the title padding. A `bottom` or `right`
+    // title
+    // is placed past them instead, which is the same measurement read the other way round.
+    val titleReach =
+      if (!beside && !after && title != null) title.bounds.height + titlePadding else 0.0
     val titleAside =
-      if (alongside && title != null) ceil(title.bounds.width) + titlePadding else 0.0
+      if (orient == "left" && title != null) ceil(title.bounds.width) + titlePadding else 0.0
 
     val body =
       GroupNode(
         id = ids.allocate(),
         children = entries,
-        transform =
-          Transform2D.translate(
-            padding + titleAside,
-            padding + if (alongside) 0.0 else titleReach,
-          ),
+        transform = Transform2D.translate(padding + titleAside, padding + titleReach),
         metadata = NodeMetadata(role = "legend-entry", markName = scaleName),
       )
 
@@ -276,10 +286,6 @@ internal class LegendBuilder(
     }
   }
 
-  /**
-   * @param alongside `titleOrient: "left"`, which also changes the title's anchor.
-   * @param centre half the height the entries reach, for the vertical centring that anchor implies.
-   */
   /** The legend's title, whether written down or computed. */
   private fun titleTextOf(spec: LegendSpec, scaleName: String): String? =
     spec.title ?: spec.titleExpression?.let { numbers.resolveLines(it, scaleName) }
@@ -289,16 +295,20 @@ internal class LegendBuilder(
     scaleName: String,
     text: String,
     padding: Double,
-    alongside: Boolean = false,
+    /** Left or right: the anchor runs down the entries' height and the title aligns left. */
+    beside: Boolean = false,
+    /** Right or bottom: the title is placed *past* the entries rather than before them. */
+    after: Boolean = false,
+    titlePadding: Double = 0.0,
     /**
      * The extent a `titleAnchor` measures along: the entries' own far edge, which is upstream's
-     * `s`. A top title runs along its width, a left title down its height.
+     * `s`. A top or bottom title runs along their width, a left or right one down their height.
      */
     reference: RectD = RectD.Empty,
   ): TextNode {
     // Upstream reads a left title as `middle`-anchored and a top one as `start`-anchored, and both
     // the alignment and the position follow from the anchor rather than from the orientation.
-    val anchor = spec.titleAnchor ?: if (alongside) Anchor.MIDDLE else Anchor.START
+    val anchor = spec.titleAnchor ?: if (beside) Anchor.MIDDLE else Anchor.START
     val fontSize = numbers.resolve(spec.titleFontSize, scaleName) ?: LegendDefaults.TITLE_FONT_SIZE
     val run =
       TextRun(
@@ -313,7 +323,7 @@ internal class LegendBuilder(
         align =
           GuideStyle.alignOf(spec.titleStyle.align)
             ?: when {
-              alongside -> TextAlign.LEFT
+              beside -> TextAlign.LEFT
               anchor == Anchor.END -> TextAlign.RIGHT
               anchor == Anchor.MIDDLE -> TextAlign.CENTER
               else -> TextAlign.LEFT
@@ -322,7 +332,7 @@ internal class LegendBuilder(
         baseline =
           GuideStyle.baselineOf(spec.titleStyle.baseline)
             ?: when {
-              !alongside -> TextBaseline.TOP
+              !beside -> TextBaseline.TOP
               anchor == Anchor.START -> TextBaseline.TOP
               anchor == Anchor.END -> TextBaseline.BOTTOM
               else -> TextBaseline.MIDDLE
@@ -334,18 +344,23 @@ internal class LegendBuilder(
     // `s` is the entries' own far edge less the padding — so, in the entries' own coordinates, the
     // extent they occupy. Its `o` keeps a multi-line title's *last* line level with the far edge
     // rather than its first, and applies only when measuring downwards.
-    val span = if (alongside) reference.bottom else reference.right
-    val extraLines = if (alongside) (layout.lines.size - 1) * layout.metrics.lineHeight else 0.0
+    val span = if (beside) reference.bottom else reference.right
+    val extraLines = if (beside) (layout.lines.size - 1) * layout.metrics.lineHeight else 0.0
     val along =
       when (anchor) {
         Anchor.START -> 0.0
         Anchor.END -> roundHalfUp(span - extraLines)
         Anchor.MIDDLE -> roundHalfUp(0.5 * (span - extraLines))
       }
+    // A title placed *past* the entries starts at their far edge plus the title padding, which is
+    // upstream's `legendTitleOffset(..., End, ...) + tpad`: the same `s` the anchor measures along,
+    // read on the other axis.
+    val past =
+      if (after) (if (beside) reference.right else reference.bottom) + titlePadding else 0.0
     return TextNode(
       id = ids.allocate(),
-      x = padding + if (alongside) 0.0 else along,
-      y = padding + if (alongside) along else 0.0,
+      x = padding + (if (beside) past else along),
+      y = padding + (if (beside) along else past),
       layout = layout,
       fill = GuideStyle.fill(spec.titleStyle, LegendDefaults.titleColor),
       metadata = NodeMetadata(role = "legend-title", markName = spec.scale),

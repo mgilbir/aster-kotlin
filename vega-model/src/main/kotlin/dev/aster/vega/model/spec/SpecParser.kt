@@ -1819,12 +1819,21 @@ public class SpecParser {
       else -> null
     }
 
+  /**
+   * `titleOrient` — which side of the entries the title sits on, all four of them.
+   *
+   * `right` and `bottom` used to be reported, on the grounds that each needs its own anchoring
+   * rule. They do, and it is the same rule read the other way round: a `bottom` title anchors along
+   * the entries' width exactly as a `top` one does and is *placed* past their bottom edge, and a
+   * `right` title anchors down their height exactly as a `left` one does and is placed past their
+   * far edge.
+   */
   private fun legendTitleOrient(value: VegaValue?, path: String): String? {
     val name = (value as? VegaValue.Str)?.value?.lowercase() ?: return null
-    if (name == "top" || name == "left") return name
+    if (name == "top" || name == "left" || name == "right" || name == "bottom") return name
     diagnostics.warn(
       DiagnosticCodes.PARSE_UNKNOWN_PROPERTY,
-      "A legend title on the '$name' is not implemented; it is drawn above the entries",
+      "A legend title on the '$name' is not a side upstream has; it is drawn above the entries",
       jsonPath = path,
     )
     return null
