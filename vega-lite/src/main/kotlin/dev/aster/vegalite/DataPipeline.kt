@@ -633,7 +633,12 @@ internal class DataPipeline(
     }
     val expressions = byField.values.toList()
     return if (expressions.isEmpty()) null
-    else FilterInvalidNode(expressions.distinct(), definitions.toString())
+    else
+    // Sorted by column, because upstream hashes the map with a **stable** stringify: two views
+    // that drop rows for the same two columns are one node whichever channel each column is on.
+    // A scatter-plot matrix is where it tells — the cell for (a, b) and the cell for (b, a) drop
+    // exactly the same rows, and upstream gives them one dataset between them.
+    FilterInvalidNode(expressions.distinct(), definitions.toSortedMap().toString())
   }
 
   /**
