@@ -9,7 +9,7 @@ Branch `milestone-0-bootstrap`. Working tree clean, both gates green:
 - `./scripts/check.sh` — format, all tests, lint, demo APK
 - `./scripts/oracle.sh` — regenerates upstream references and runs the differential comparison
 
-**172 differential fixtures pass, all matching upstream exactly.** That is the only number here
+**173 differential fixtures pass, all matching upstream exactly.** That is the only number here
 that means what it says.
 
 ## Read this before trusting the other number
@@ -254,7 +254,7 @@ not the one Vega documents**, because Vega only forwards the parameters a specif
 
 ## What is left: two examples, and neither can be verified
 
-**172 differential fixtures pass. 91 of the 93 examples compile clean.** Everything that can be
+**173 differential fixtures pass. 91 of the 93 examples compile clean.** Everything that can be
 checked against upstream has been.
 
 ### `projections` — upstream refuses it too
@@ -511,9 +511,16 @@ wrong thing; ten of the thirteen window operations had never been asked for eith
 out to be right. Both counts are now zero. The same trick applies to every **vocabulary** a specification draws from,
 and the counts are worth re-running rather than trusting: scale types and mark types came back fully
 covered, while the symbol shapes were missing seven, the curve families three, and `timeunit` five of
-its eleven units — all now covered, all already correct. The **projections** are the one vocabulary
-still short: `albers`, `albersUsa`, `equirectangular`, `identity` and `mercator` are exercised and the
-conic, azimuthal, gnomonic, orthographic, stereographic and transverse families are not.
+its eleven units — all now covered, all already correct. The **projections** were the last vocabulary
+short and are now covered too — all twelve remaining families, all already correct.
+
+Writing that one cost two wrong drafts, both worth knowing about. A projection reference cannot be a
+**signal**: `{"projection": {"signal": "parent.p"}}` is rejected by upstream's parser, so a grid of
+projections has to name each one literally rather than facet over them. And `geopoint` belongs in the
+**data** pipeline: as a *mark* transform it runs after encoding and writes onto the items, so the
+symbols came back at `NaN` upstream while this engine put them at the projection's translate. The
+fixture was wrong both times, not the engine — but a fixture whose expected output is `NaN` is telling
+you to rewrite the fixture.
 
 One fixture is enough to catch a transform that does nothing and not enough to catch one whose
 *options* are ignored. `hierarchy-options` was written for exactly that — a radius column on `pack`,
