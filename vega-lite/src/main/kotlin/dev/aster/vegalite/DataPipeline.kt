@@ -582,7 +582,10 @@ internal class DataPipeline(
             }
           },
       component =
-        "${stack.stackBy.map { it.raw }}|" +
+        // `getStackByFields`: the segments are the **columns** they are keyed by, not the channels
+        // that named them. A bar coloured by a series and the label drawn on it detailed by the
+        // same series accumulate the same numbers the same way, and upstream stacks them once.
+        "${stack.stackBy.map { Fields.vgField(it) }}|" +
           "${stack.groupbyChannels.map { view.spec.encoding[it]?.raw }}",
     )
   }
