@@ -32,14 +32,108 @@ internal class Parse(
     val encoding = encoding(spec.obj("encoding") ?: VegaValue.EmptyObject, "$path.encoding")
     val markDef = markDef(markValue, encoding, path) ?: return null
 
+    // `alignStackOrderWithColorDomain`: a chart whose colours are listed in a stated order is drawn
+    // in that order too, and the rule reaches into the encoding to say so.
+    val aligned = alignStackOrderWithColorDomain(encoding, markDef)
+
     return UnitSpec(
       markDef = markDef,
-      encoding = encoding,
+      encoding = aligned.encoding,
       data = spec.fields["data"],
-      transforms = spec.array("transform") ?: emptyList(),
+      transforms = (spec.array("transform") ?: emptyList()) + aligned.transforms,
       width = spec.fields["width"],
       height = spec.fields["height"],
       params = spec.array("params").orEmpty(),
+    )
+  }
+
+  /** The encoding and the transforms `alignStackOrderWithColorDomain` produced between them. */
+  private class Aligned(
+    val encoding: Map<String, ChannelDef>,
+    val transforms: List<VegaValue> = emptyList(),
+  )
+
+  /**
+   * `alignStackOrderWithColorDomain` in `unit.ts` — a stated colour order orders the marks too.
+   *
+   * A chart that lists its colour domain has said what order the categories come in, and a reader
+   * expects to see them in that order: the bars of a group left to right, the segments of a stack
+   * bottom to top. Nothing else says so, since a domain orders the *legend*.
+   *
+   * Which of the two it does depends on how the chart is drawn. A **grouped** chart carries the
+   * order on its offset channel, as a `sort` list, and the offset scale's domain then reads the
+   * place each row holds in it. A **stacked** one has no such channel, so the place is computed as
+   * a column of its own and the `order` channel is pointed at it — descending, because a stack is
+   * accumulated from the bottom and the first listed colour belongs at the top.
+   *
+   * Only where the chart states no `order` of its own, and only for a *nominal* colour: an ordered
+   * or a measured one already has an order of its own to be drawn in.
+   */
+  private fun alignStackOrderWithColorDomain(
+    encoding: Map<String, ChannelDef>,
+    markDef: MarkDef,
+  ): Aligned {
+    if (encoding.containsKey("order")) return Aligned(encoding)
+    val colour = encoding["fill"] ?: encoding["color"] ?: return Aligned(encoding)
+    if (colour.type != MeasureType.NOMINAL) return Aligned(encoding)
+    val field = colour.field ?: return Aligned(encoding)
+    val domain = colour.scale?.array("domain") ?: return Aligned(encoding)
+
+    val offsetChannel =
+      listOf("xOffset", "yOffset").firstOrNull { encoding[it]?.isFieldDef == true }
+    if (offsetChannel != null) {
+      val offset = encoding.getValue(offsetChannel)
+      if (offset.sort != null) return Aligned(encoding)
+      val listed = arr(domain)
+      return Aligned(
+        encoding +
+          (offsetChannel to
+            offset.copy(
+              sort = listed,
+              raw = VegaValue.Obj(LinkedHashMap(offset.raw.fields).also { it["sort"] = listed }),
+            ))
+      )
+    }
+    // A stack, and only a stack: with neither an offset channel nor an accumulation there is
+    // nothing whose order this could be. An accumulation is an aggregated measure against a
+    // discrete other position, which is what `Stack.of` decides from the whole view — but the mark
+    // is not built yet here, so the question is asked of the encoding: a quantitative position
+    // that aggregates.
+    val accumulating =
+      listOf("x", "y").firstOrNull { channel ->
+        val def = encoding[channel] ?: return@firstOrNull false
+        def.aggregate != null && def.type == MeasureType.QUANTITATIVE
+      }
+    if (accumulating == null) return Aligned(encoding)
+    val order = "_${field}_sort_index"
+    // Written as Vega writes it, since it is the *text* of the list that reaches the expression:
+    // `indexof(["sun","fog"], datum['weather'])`.
+    val listedValues =
+      domain.joinToString(",") { value ->
+        when (value) {
+          is VegaValue.Str -> quoted(value.value)
+          else -> value.toString()
+        }
+      }
+    val calculate = obj {
+      put("calculate", "indexof([$listedValues], datum['$field'])")
+      put("as", order)
+    }
+    // A stack is accumulated from the origin outwards, so the *first* listed colour is the one
+    // nearest it: at the bottom of a vertical stack, which counts down, and at the left of a
+    // horizontal one, which counts up. The orientation is the mark's where it states one and the
+    // accumulating channel's otherwise — a bar measured along x is a horizontal bar.
+    val horizontal =
+      markDef.raw.string("orient")?.let { it == "horizontal" } ?: (accumulating == "x")
+    val direction = if (horizontal) "ascending" else "descending"
+    val orderDef = obj {
+      put("field", order)
+      put("type", "quantitative")
+      put("sort", direction)
+    }
+    return Aligned(
+      encoding + ("order" to channelDef("order", orderDef, "$.encoding.order")!!),
+      listOf(calculate),
     )
   }
 

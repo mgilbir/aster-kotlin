@@ -678,7 +678,7 @@ no data is needed to compare two compilers. So every one of them was compiled by
 by this one, and the outputs compared property by property. That is a *measurement*, not a gate: the
 examples are not fixtures here, and nothing about them is checked in.
 
-**124 of 627 matched exactly** at the start, and **475** do now. 16 were refused by name, and of those 8 are geographic,
+**124 of 627 matched exactly** at the start, and **478** do now. 16 were refused by name, and of those 8 are geographic,
 3 are a facet inside a facet, 2 a repeat inside a concatenation, and 2 are the `trail` mark — which
 this runtime draws and this compiler had simply not been told about.
 
@@ -2265,6 +2265,25 @@ runtime already had a Delaunay triangulation and a voronoi transform, and it was
 coordinates as *field names*: Vega-Lite writes them as expressions, `{"expr": "datum.datum.x || 0"}`,
 because the points are mark items and the coordinate wanted is the one the encoding resolved. Every
 cell came out without coordinates, so the diagram was empty and the overlay drew nothing.
+
+### A stated colour order is an order for the marks as well
+
+A chart that lists its colour domain has said what order its categories come in, and a reader
+expects to see that order in the *drawing* and not only in the legend. `alignStackOrderWithColorDomain`
+is upstream's answer, and which of two things it does depends on how the chart is drawn. A
+**grouped** chart carries the order on its offset channel, as a `sort` list, and the offset scale's
+domain then reads the place each row holds in it. A **stacked** one has no such channel, so the
+place becomes a column of its own — `indexof(["sun","fog",…], datum['weather'])` — and the `order`
+channel is pointed at it.
+
+The direction of that order is the part worth writing down: **descending** for a vertical stack and
+**ascending** for a horizontal one, because a stack is accumulated from the origin outwards and the
+first listed colour belongs nearest it — at the bottom of a column, at the left of a bar. The
+orientation is the mark's where it states one and the accumulating channel's otherwise, a bar
+measured along x being a horizontal bar.
+
+The rule applies only where the chart states no `order` of its own, and only to a *nominal* colour:
+an ordered or a measured one already has an order to be drawn in.
 
 ### A facet may bucket the column it splits on
 
