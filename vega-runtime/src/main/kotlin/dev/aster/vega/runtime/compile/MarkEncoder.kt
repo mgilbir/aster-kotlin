@@ -1318,6 +1318,7 @@ public class MarkEncoder(
       tooltip =
         channels["tooltip"]?.let { value(it, datum) }?.takeIf { it !is VegaValue.Null } ?: datum,
       cursor = string(channels["cursor"], datum),
+      href = string(channels["href"], datum)?.takeIf { it.isNotEmpty() },
       zindex = number(channels["zindex"], datum)?.toInt() ?: 0,
       accessibility = describe(spec, datum, channels),
     )

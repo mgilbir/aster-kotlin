@@ -883,6 +883,7 @@ public class AxisBuilder(
       channel("tooltip")?.let { encoder.channelAny(it, datum) }?.takeIf { it !is VegaValue.Null }
     val cursor =
       channel("cursor")?.let { encoder.channelText(it, datum) }?.takeIf { it.isNotEmpty() }
+    val href = channel("href")?.let { encoder.channelText(it, datum) }?.takeIf { it.isNotEmpty() }
     val zindex = channel("zindex")?.let { encoder.channelNumber(it, datum) }?.toInt()
     val hidden = channel("aria")?.let { encoder.channelBoolean(it, datum) } == false
     val description =
@@ -890,6 +891,7 @@ public class AxisBuilder(
     return base.copy(
       tooltip = tooltip ?: base.tooltip,
       cursor = cursor ?: base.cursor,
+      href = href ?: base.href,
       zindex = zindex ?: base.zindex,
       accessibility =
         when {

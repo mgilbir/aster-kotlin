@@ -114,6 +114,15 @@ public data class NodeMetadata(
    */
   val cursor: String? = null,
   /**
+   * `href` — the address this item links to.
+   *
+   * Upstream's SVG renderer wraps the drawn element in an `<a xlink:href="…">`, which is the whole
+   * mechanism: a bar that is a link, a legend swatch that filters a page. Kept on the item rather
+   * than turned into a click handler, because a link is a link — the renderer that knows how to
+   * draw one knows how to make it navigable, and one that does not can ignore it.
+   */
+  val href: String? = null,
+  /**
    * Paint order **within** the item's own mark, `zindex`.
    *
    * Zero for almost everything. It matters on hover — a raised item has to be drawn over its

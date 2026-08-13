@@ -132,6 +132,16 @@ public class SvgRenderer(private val options: SvgOptions = SvgOptions()) {
   ) {
     if (!node.visible || node.opacity <= 0.0) return
 
+    // An `href` makes the item a link, which in SVG means wrapping whatever it draws in an anchor —
+    // upstream emits `<a xlink:href="…">` around the element and nothing else. Done here rather
+    // than in
+    // each of the seven renderers below, because it is the same wrapper whatever the shape is.
+    val href = node.metadata.href
+    if (href != null) {
+      newline(out, depth)
+      out.append("<a xlink:href=\"").append(escapeXml(href)).append("\">")
+    }
+
     when (node) {
       is GroupNode -> renderGroup(node, out, defs, warnings, depth)
       is RectNode -> renderRect(node, out, defs, depth)
@@ -140,6 +150,11 @@ public class SvgRenderer(private val options: SvgOptions = SvgOptions()) {
       is SymbolNode -> renderSymbol(node, out, defs, depth)
       is TextNode -> renderText(node, out, defs, depth)
       is ImageNode -> renderImage(node, out, warnings, depth)
+    }
+
+    if (href != null) {
+      newline(out, depth)
+      out.append("</a>")
     }
   }
 

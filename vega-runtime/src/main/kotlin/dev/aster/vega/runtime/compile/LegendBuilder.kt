@@ -148,6 +148,7 @@ internal class LegendBuilder(
     val tooltip =
       block["tooltip"]?.let { encoder.channelAny(it, datum) }?.takeIf { it !is VegaValue.Null }
     val cursor = block["cursor"]?.let { encoder.channelText(it, datum) }?.takeIf { it.isNotEmpty() }
+    val href = block["href"]?.let { encoder.channelText(it, datum) }?.takeIf { it.isNotEmpty() }
     val zindex = block["zindex"]?.let { encoder.channelNumber(it, datum) }?.toInt()
     val hidden = block["aria"]?.let { encoder.channelBoolean(it, datum) } == false
     val description =
@@ -155,6 +156,7 @@ internal class LegendBuilder(
     return base.copy(
       tooltip = tooltip ?: base.tooltip,
       cursor = cursor ?: base.cursor,
+      href = href ?: base.href,
       zindex = zindex ?: base.zindex,
       accessibility =
         when {

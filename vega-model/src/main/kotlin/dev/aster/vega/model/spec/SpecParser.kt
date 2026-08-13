@@ -572,7 +572,8 @@ private fun textEncodeMap(prefix: String): Map<String, String> =
  * why they are listed as resolved rather than folded — a tooltip reading `datum.value` has no
  * constant to fold.
  */
-private val GUIDE_ITEM_CHANNELS = setOf("tooltip", "cursor", "zindex", "aria", "description")
+private val GUIDE_ITEM_CHANNELS =
+  setOf("tooltip", "cursor", "zindex", "aria", "description", "href")
 
 private val RESOLVED_GUIDE_CHANNELS =
   setOf(

@@ -198,8 +198,16 @@ public object Differential {
    * comparison could see it: a legend swatch faded to 0.6 by `symbolOpacity` has the same geometry,
    * the same fill and the same stroke as one at full strength.
    */
-  private fun withOpacity(node: SceneNode, mark: Mark): Mark =
-    mark.copy(numbers = mark.numbers + ("opacity" to node.opacity))
+  /**
+   * The two things every mark carries whatever its shape: its opacity and its link.
+   *
+   * `href` lives here rather than in `paintStrings` because a text, rule or group mark does not go
+   * through that — and those were exactly the marks whose links went uncompared when it did.
+   */
+  private fun withOpacity(node: SceneNode, mark: Mark): Mark {
+    val strings = node.metadata.href?.let { mark.strings + ("href" to it) } ?: mark.strings
+    return mark.copy(numbers = mark.numbers + ("opacity" to node.opacity), strings = strings)
+  }
 
   private fun rectMark(node: RectNode, world: Transform2D): Mark {
     val rect = node.rect

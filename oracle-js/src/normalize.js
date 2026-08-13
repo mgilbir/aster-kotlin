@@ -414,7 +414,17 @@ function record(type, role, item, dx, dy, precision) {
   // own width; a mitre limit decides whether a spike on a zig-zag is pointed or cut off; a blend mode
   // changes every pixel; a `limit` decides whether a label says "September" or "Sep…"; and a group's
   // `clip` decides whether its children are drawn at all outside it. Each of them was compared past.
-  for (const channel of ['strokeCap', 'strokeJoin', 'strokeMiterLimit', 'blend', 'limit', 'clip']) {
+  // `href` makes the item a link, which the SVG renderer turns into an `<a>` around whatever it drew.
+  // It is on the item in both engines, so it can be compared here rather than by reading the markup.
+  for (const channel of [
+    'strokeCap',
+    'strokeJoin',
+    'strokeMiterLimit',
+    'blend',
+    'limit',
+    'clip',
+    'href',
+  ]) {
     if (item[channel] !== undefined && item[channel] !== null) {
       entry[channel] = styleValue(item[channel], precision);
     }

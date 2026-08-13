@@ -990,6 +990,16 @@
   "caption": "Y-axis titled 'Count' for a linear scale with values from 0 to 8"
  },
  {
+  "fixture": "href-links",
+  "kind": "axis",
+  "caption": "X-axis for a discrete scale with 3 values: alpha, beta, gamma"
+ },
+ {
+  "fixture": "href-links",
+  "kind": "legend",
+  "caption": "Symbol legend titled 'series' for fill color with 3 values: alpha, beta, gamma"
+ },
+ {
   "fixture": "hypothetical-outcome-plots",
   "kind": "axis",
   "caption": "Y-axis for a linear scale with values from 0 to 10"
