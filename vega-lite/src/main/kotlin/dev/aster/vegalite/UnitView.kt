@@ -152,6 +152,22 @@ internal class UnitView(
   fun prefixed(suffix: String): String =
     Fields.varName(if (name.isEmpty()) suffix else "${name}_$suffix")
 
+  /**
+   * The model each of this view's transforms was written on, in the order they run.
+   *
+   * A layered chart's transforms are copied down into every member — the parent's chain and then
+   * the member's own — but they still *belong* to the model they were written on, and that is what
+   * names the signals they publish. A `bin` above the layers is the layer model's, so both members
+   * read one `bin_maxbins_10_x_bins`; a `bin` inside one member is that member's.
+   */
+  var transformOwners: List<String> = emptyList()
+
+  /** [prefixed], under the model that owns the transform at [index] rather than this view. */
+  fun prefixedForTransform(index: Int, suffix: String): String {
+    val owner = transformOwners.getOrNull(index) ?: name
+    return Fields.varName(if (owner.isEmpty()) suffix else "${owner}_$suffix")
+  }
+
   fun scaleType(channel: String): String? = if (hasScale(channel)) scaleTypes[channel] else null
 
   /**

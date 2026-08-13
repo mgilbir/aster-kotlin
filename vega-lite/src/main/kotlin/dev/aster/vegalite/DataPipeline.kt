@@ -692,8 +692,14 @@ internal class DataPipeline(
 
   private fun userTransforms(head: DataNode): DataNode {
     var last = head
-    val transforms = Transforms(diagnostics, registerLookup, view::prefixed, view.selections)
     view.spec.transforms.forEachIndexed { index, transform ->
+      val transforms =
+        Transforms(
+          diagnostics,
+          registerLookup,
+          { suffix -> view.prefixedForTransform(index, suffix) },
+          view.selections,
+        )
       val path = "$.transform[$index]"
       // `parseSelectionPredicate`: a filter that tests a selection is given the selection's own
       // bucketing as a parent. A brush over `month(date)` remembers a `month_date`, and a view that

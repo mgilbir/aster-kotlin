@@ -1081,6 +1081,8 @@ private class Compilation(
       // points is two marks — so the list is expanded first and only then numbered. The numbering
       // is what names `layer_0_marks`, so it has to count the views that actually exist.
       val units = mutableListOf<Pair<Triple<String, VegaValue.Obj, String>, String>>()
+      /** The model each collected view's transforms was written on, in the same order. */
+      val owners = mutableMapOf<VegaValue.Obj, List<String>>()
 
       /**
        * A layer's members, and the members of any layer among them.
@@ -1091,7 +1093,14 @@ private class Compilation(
        * the name of the **outermost** member, because that is the child a top-level `resolve`
        * speaks about; the nesting below it is not a level anything resolves against.
        */
-      fun collect(parent: VegaValue.Obj, prefix: String, owner: String?, path: String) {
+      fun collect(
+        parent: VegaValue.Obj,
+        prefix: String,
+        owner: String?,
+        path: String,
+        /** The model each of the parent's own transforms belongs to. */
+        above: List<String>,
+      ) {
         parent.array("layer").orEmpty().forEachIndexed { index, layer ->
           val child = layer as? VegaValue.Obj ?: return@forEachIndexed
           val merged = inherited(parent, child)
@@ -1101,20 +1110,37 @@ private class Compilation(
             child.string("name")
               ?: listOf(prefix, "layer_$index").filter { it.isNotEmpty() }.joinToString("_")
           val here2 = "$path.layer[$index]"
+          // A transform belongs to the model it was **written on**, and that model's name is what
+          // names the signals it publishes: a `bin` above a layer is the layer's, so its bounds are
+          // `bin_maxbins_10_x_bins` and both members read the same ones. Named for the member
+          // instead, one bucketing became two that no optimizer could fold, and the chart was
+          // drawn twice over two sets of buckets.
+          val mine = above + List(child.array("transform").orEmpty().size) { here }
           if (child.has("layer")) {
-            collect(merged, here, owner ?: here, here2)
+            collect(merged, here, owner ?: here, here2, mine)
           } else {
             expand(merged, here).forEach {
+              owners[it.second] = mine
               units += Triple(it.first, it.second, owner ?: here) to here2
             }
           }
         }
       }
-      collect(spec, namePrefix, null, "$")
+      collect(
+        spec,
+        namePrefix,
+        null,
+        "$",
+        List(spec.array("transform").orEmpty().size) { namePrefix },
+      )
 
       return units.mapNotNull { (named, path) ->
         val (name, unit, child) = named
-        parser.unit(unit, path)?.let { UnitView(it, config, name, child, parentIsLayer = true) }
+        parser.unit(unit, path)?.let {
+          UnitView(it, config, name, child, parentIsLayer = true).also { view ->
+            view.transformOwners = owners[unit].orEmpty()
+          }
+        }
       }
     }
 
