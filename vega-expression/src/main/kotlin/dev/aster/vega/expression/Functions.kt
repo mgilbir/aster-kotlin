@@ -96,7 +96,6 @@ public object Functions {
       "utcParse" to
         "parsing a date against a format string needs a strptime the engine does not have; " +
           "an ISO 8601 string works through toDate",
-      "gradient" to "gradients cannot be produced from an expression yet",
       // The three type predicates whose answer depends on a representation this engine does not
       // share, so each would be confidently wrong rather than unavailable.
       "isDate" to
@@ -110,6 +109,37 @@ public object Functions {
           "there is nothing here to tell the two apart",
       "vlSelectionTest" to "selection helpers require the signal and selection subsystems",
       "vlSelectionResolve" to "selection helpers require the signal and selection subsystems",
+      "vlSelectionIdTest" to "selection helpers require the signal and selection subsystems",
+      "vlSelectionTuples" to "selection helpers require the signal and selection subsystems",
+      // Functions whose result is a **function**, which a value model of numbers, strings, arrays
+      // and
+      // objects has no way to hold. Each is written into a channel upstream reads back as a shape.
+      "pathShape" to
+        "returns a shape function, which is not a value this engine can carry; a symbol's " +
+          "'shape' takes the SVG path string directly",
+      "geoShape" to
+        "returns a shape function, which is not a value this engine can carry; the 'geoshape' " +
+          "transform draws a feature through a projection instead",
+      "copy" to "copying a scale needs the scale itself as a value, which is not one here",
+      "gradient" to "gradients cannot be produced from an expression yet",
+      // Functions that read or write the running view rather than computing anything. A compiled
+      // scene is a value, so there is no view to ask and nothing to modify.
+      "encode" to "reading an item's encode block back needs the running view",
+      "modify" to "modifying a dataset from an expression needs the running dataflow",
+      "inScope" to "asking whether an item is inside a scope needs the running view's scenegraph",
+      "intersect" to "hit-testing a region against the scenegraph needs the running view",
+      // Functions that answer a question only a browser can answer.
+      "screen" to "there is no screen to measure",
+      "windowSize" to "there is no window to measure",
+      "pinchAngle" to "gesture geometry belongs to the event system, not to a compiled scene",
+      "pinchDistance" to "gesture geometry belongs to the event system, not to a compiled scene",
+      "lassoAppend" to "lasso selection belongs to the event system, not to a compiled scene",
+      "lassoPath" to "lasso selection belongs to the event system, not to a compiled scene",
+      "intersectLasso" to "lasso selection belongs to the event system, not to a compiled scene",
+      // Logging, which has a diagnostic collector here rather than a console.
+      "debug" to "expression logging is not wired to the diagnostic collector",
+      "info" to "expression logging is not wired to the diagnostic collector",
+      "warn" to "expression logging is not wired to the diagnostic collector",
     )
 
   /** A runaway step cannot spin forever; no axis has this many boundaries. */

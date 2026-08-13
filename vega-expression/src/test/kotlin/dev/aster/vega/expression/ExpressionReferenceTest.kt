@@ -45,6 +45,135 @@ class ExpressionReferenceTest {
         value.fields.entries.joinToString(",", "{", "}") { "\"${it.key}\":${asJson(it.value)}" }
     }
 
+  /**
+   * Every function upstream has either works or says why not.
+   *
+   * The list is upstream's own `functionContext`, read out of the pinned build:
+   * ```
+   * node --input-type=module -e "import * as vf from 'vega-functions';
+   *   console.log(Object.keys(vf.functionContext).sort().join(' '))"
+   * ```
+   *
+   * Nineteen of these had neither an implementation nor an entry in `knownUnsupported`, so an
+   * expression using one got "unknown function" and no hint that the reason was a browser, a
+   * running view or a value model that cannot hold a function. Sixteen more were simply missing and
+   * are now implemented. A function upstream adds later shows up here as a failure, which is the
+   * point.
+   *
+   * The five names not in the list below are resolved against the scope rather than this table —
+   * `scale`, `data`, `domain`, `bandwidth` and their kin live where the scales and datasets are.
+   */
+  @Test
+  fun `every upstream expression function is implemented or explained`() {
+    val upstream =
+      listOf(
+        "bandspace",
+        "clampRange",
+        "containerSize",
+        "contrast",
+        "copy",
+        "cumulativeLogNormal",
+        "cumulativeNormal",
+        "cumulativeUniform",
+        "dayAbbrevFormat",
+        "dayFormat",
+        "dayofyear",
+        "debug",
+        "densityLogNormal",
+        "densityNormal",
+        "densityUniform",
+        "encode",
+        "extent",
+        "flush",
+        "format",
+        "gradient",
+        "hcl",
+        "hsl",
+        "inScope",
+        "indexof",
+        "info",
+        "inrange",
+        "intersect",
+        "intersectLasso",
+        "isArray",
+        "isBoolean",
+        "isDate",
+        "isDefined",
+        "isNumber",
+        "isObject",
+        "isRegExp",
+        "isString",
+        "isTuple",
+        "isValid",
+        "join",
+        "lab",
+        "lassoAppend",
+        "lassoPath",
+        "lastindexof",
+        "lerp",
+        "luminance",
+        "merge",
+        "modify",
+        "monthAbbrevFormat",
+        "monthFormat",
+        "pad",
+        "panLinear",
+        "panLog",
+        "panPow",
+        "panSymlog",
+        "pathShape",
+        "peek",
+        "pinchAngle",
+        "pinchDistance",
+        "pluck",
+        "quantileLogNormal",
+        "quantileNormal",
+        "quantileUniform",
+        "quarter",
+        "replace",
+        "reverse",
+        "rgb",
+        "screen",
+        "sequence",
+        "slice",
+        "sort",
+        "span",
+        "timeFormat",
+        "timeOffset",
+        "timeParse",
+        "timeSequence",
+        "timeUnitSpecifier",
+        "toBoolean",
+        "toDate",
+        "toNumber",
+        "toString",
+        "truncate",
+        "utcFormat",
+        "utcOffset",
+        "utcParse",
+        "utcSequence",
+        "utcdayofyear",
+        "utcquarter",
+        "utcweek",
+        "vlSelectionIdTest",
+        "vlSelectionResolve",
+        "vlSelectionTest",
+        "vlSelectionTuples",
+        "warn",
+        "week",
+        "windowSize",
+        "zoomLinear",
+        "zoomLog",
+        "zoomPow",
+        "zoomSymlog",
+        "geoShape",
+      )
+    val unaccounted = upstream.filterNot {
+      it in Functions.functions || it in Functions.knownUnsupported
+    }
+    assertEquals(emptyList<String>(), unaccounted)
+  }
+
   private object EmptyScope : ExpressionScope {
     override val datum: VegaValue = VegaValue.EmptyObject
 
