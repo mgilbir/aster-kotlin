@@ -678,7 +678,7 @@ no data is needed to compare two compilers. So every one of them was compiled by
 by this one, and the outputs compared property by property. That is a *measurement*, not a gate: the
 examples are not fixtures here, and nothing about them is checked in.
 
-**124 of 627 matched exactly** at the start, and **467** do now. 16 were refused by name, and of those 8 are geographic,
+**124 of 627 matched exactly** at the start, and **469** do now. 16 were refused by name, and of those 8 are geographic,
 3 are a facet inside a facet, 2 a repeat inside a concatenation, and 2 are the `trail` mark — which
 this runtime draws and this compiler had simply not been told about.
 
@@ -2265,6 +2265,27 @@ runtime already had a Delaunay triangulation and a voronoi transform, and it was
 coordinates as *field names*: Vega-Lite writes them as expressions, `{"expr": "datum.datum.x || 0"}`,
 because the points are mark items and the coordinate wanted is the one the encoding resolved. Every
 cell came out without coordinates, so the diagram was empty and the overlay drew nothing.
+
+### One bucketing for two layers, and a scale that cannot be shared
+
+Two more of upstream's optimizers, both about *sharing*, and both with a twist in the tail.
+
+**`MergeBins`.** Two views bucketing one column the same way are one bucketing, and the **last**
+sibling is the one that survives — as with the time units. What makes it more than a fold is that a
+bin publishes signals named after the view that asked for it, `child__layer_US_Gross_bin_maxbins_10_
+IMDB_Rating_bins` and its `_extent`, and everything that read the folded view's names has to read
+the survivor's instead. Upstream keeps a rename map and consults it at every reference; here the
+references are written as they are produced, so the map is applied to the finished specification —
+and to each scale domain *before* it is deduplicated, since two domains that have become the same
+domain are one domain rather than a union of a thing with itself.
+
+**Incompatible scale types resolve independently.** A layer of counts over a layer of labels asks
+for a colour ramp and a pair of named colours on the same channel, and there is no one scale that is
+both. `parseNonUnitScaleCore` notices before merging: where the children's types belong to different
+families the channel is switched to `independent` whatever the resolve said, and the layers get
+`layer_0_color` and `layer_1_color`. The families are upstream's `SCALE_CATEGORY_INDEX`, with its
+one written-out exception — an ordinal *position* can stand for instants, a category being a place
+and so is a date.
 
 ### Two identical datasets, kept apart on purpose
 

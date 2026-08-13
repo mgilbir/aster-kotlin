@@ -64,6 +64,49 @@ internal object Scales {
       else -> 0
     }
 
+  /**
+   * `SCALE_CATEGORY_INDEX`: which scale types can stand for one another.
+   *
+   * Two views share a channel's scale only when their types belong to the same family — a colour
+   * ramp and a set of named colours are both `color`, and neither can be the other.
+   */
+  private fun category(type: String): String =
+    when (type) {
+      "linear",
+      "log",
+      "pow",
+      "sqrt",
+      "symlog",
+      "identity",
+      "sequential" -> "numeric"
+      "time",
+      "utc" -> "time"
+      "ordinal" -> "ordinal"
+      "bin-ordinal" -> "bin-ordinal"
+      "point",
+      "band" -> "ordinal-position"
+      "quantile",
+      "quantize",
+      "threshold" -> "discretizing"
+      else -> type
+    }
+
+  /**
+   * `scaleCompatible`: whether two views' scales for one channel can be merged into one.
+   *
+   * A band and a time scale are the exception that is written out: an ordinal *position* can stand
+   * for instants, since a category is a place and so is a date. Anything else has to match family,
+   * and where it does not the channel resolves **independently** — which is a layer of counts over
+   * a layer of labels ending up with a colour scale each rather than one that is neither.
+   */
+  fun compatible(first: String, second: String): Boolean {
+    val a = category(first)
+    val b = category(second)
+    return a == b ||
+      (a == "ordinal-position" && b == "time") ||
+      (b == "ordinal-position" && a == "time")
+  }
+
   fun hasContinuousDomain(type: String): Boolean =
     type in
       setOf(

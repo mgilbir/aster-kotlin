@@ -1,0 +1,241 @@
+{
+  "$schema": "https://vega.github.io/schema/vega/v6.json",
+  "description": "Two layers bucketing one column the same way, which is one bucketing: the second layer's bin signals are folded into the first's and everything reads the survivor's names.",
+  "background": "white",
+  "padding": 5,
+  "width": 300,
+  "height": 300,
+  "style": "cell",
+  "data": [
+    {
+      "name": "source_0",
+      "url": "data/movies.json",
+      "format": {
+        "type": "json"
+      },
+      "transform": [
+        {
+          "type": "extent",
+          "field": "IMDB Rating",
+          "signal": "layer_1_bin_maxbins_10_IMDB_Rating_extent"
+        },
+        {
+          "type": "bin",
+          "field": "IMDB Rating",
+          "as": [
+            "bin_maxbins_10_IMDB Rating",
+            "bin_maxbins_10_IMDB Rating_end"
+          ],
+          "signal": "layer_1_bin_maxbins_10_IMDB_Rating_bins",
+          "extent": {
+            "signal": "layer_1_bin_maxbins_10_IMDB_Rating_extent"
+          },
+          "maxbins": 10
+        },
+        {
+          "type": "aggregate",
+          "groupby": [
+            "bin_maxbins_10_IMDB Rating",
+            "bin_maxbins_10_IMDB Rating_end"
+          ],
+          "ops": [
+            "mean",
+            "mean"
+          ],
+          "fields": [
+            "US Gross",
+            "Worldwide Gross"
+          ],
+          "as": [
+            "mean_US Gross",
+            "mean_Worldwide Gross"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "data_0",
+      "source": "source_0",
+      "transform": [
+        {
+          "type": "filter",
+          "expr": "isValid(datum[\"bin_maxbins_10_IMDB Rating\"]) && isFinite(+datum[\"bin_maxbins_10_IMDB Rating\"]) && isValid(datum[\"mean_US Gross\"]) && isFinite(+datum[\"mean_US Gross\"])"
+        }
+      ]
+    },
+    {
+      "name": "data_1",
+      "source": "source_0",
+      "transform": [
+        {
+          "type": "filter",
+          "expr": "isValid(datum[\"bin_maxbins_10_IMDB Rating\"]) && isFinite(+datum[\"bin_maxbins_10_IMDB Rating\"]) && isValid(datum[\"mean_Worldwide Gross\"]) && isFinite(+datum[\"mean_Worldwide Gross\"])"
+        }
+      ]
+    }
+  ],
+  "marks": [
+    {
+      "name": "layer_0_marks",
+      "type": "rect",
+      "style": [
+        "bar"
+      ],
+      "from": {
+        "data": "data_0"
+      },
+      "encode": {
+        "update": {
+          "fill": {
+            "value": "#4c78a8"
+          },
+          "ariaRoleDescription": {
+            "value": "bar"
+          },
+          "description": {
+            "signal": "\"IMDB Rating (binned): \" + (!isValid(datum[\"bin_maxbins_10_IMDB Rating\"]) || !isFinite(+datum[\"bin_maxbins_10_IMDB Rating\"]) ? \"null\" : format(datum[\"bin_maxbins_10_IMDB Rating\"], \"\") + \" – \" + format(datum[\"bin_maxbins_10_IMDB Rating_end\"], \"\")) + \"; Mean of US Gross: \" + (format(datum[\"mean_US Gross\"], \"\"))"
+          },
+          "x2": {
+            "scale": "x",
+            "field": "bin_maxbins_10_IMDB Rating",
+            "offset": {
+              "signal": "0.5 + (abs(scale(\"x\", datum[\"bin_maxbins_10_IMDB Rating_end\"]) - scale(\"x\", datum[\"bin_maxbins_10_IMDB Rating\"])) < 0.25 ? -0.5 * (0.25 - (abs(scale(\"x\", datum[\"bin_maxbins_10_IMDB Rating_end\"]) - scale(\"x\", datum[\"bin_maxbins_10_IMDB Rating\"])))) : 0.5)"
+            }
+          },
+          "x": {
+            "scale": "x",
+            "field": "bin_maxbins_10_IMDB Rating_end",
+            "offset": {
+              "signal": "0.5 + (abs(scale(\"x\", datum[\"bin_maxbins_10_IMDB Rating_end\"]) - scale(\"x\", datum[\"bin_maxbins_10_IMDB Rating\"])) < 0.25 ? 0.5 * (0.25 - (abs(scale(\"x\", datum[\"bin_maxbins_10_IMDB Rating_end\"]) - scale(\"x\", datum[\"bin_maxbins_10_IMDB Rating\"])))) : -0.5)"
+            }
+          },
+          "y": {
+            "scale": "y",
+            "field": "mean_US Gross"
+          },
+          "y2": {
+            "scale": "y",
+            "value": 0
+          }
+        }
+      }
+    },
+    {
+      "name": "layer_1_marks",
+      "type": "symbol",
+      "style": [
+        "point"
+      ],
+      "from": {
+        "data": "data_1"
+      },
+      "encode": {
+        "update": {
+          "fill": {
+            "value": "transparent"
+          },
+          "stroke": {
+            "value": "#4c78a8"
+          },
+          "ariaRoleDescription": {
+            "value": "point"
+          },
+          "description": {
+            "signal": "\"IMDB Rating (binned): \" + (!isValid(datum[\"bin_maxbins_10_IMDB Rating\"]) || !isFinite(+datum[\"bin_maxbins_10_IMDB Rating\"]) ? \"null\" : format(datum[\"bin_maxbins_10_IMDB Rating\"], \"\") + \" – \" + format(datum[\"bin_maxbins_10_IMDB Rating_end\"], \"\")) + \"; Mean of Worldwide Gross: \" + (format(datum[\"mean_Worldwide Gross\"], \"\"))"
+          },
+          "x": {
+            "signal": "scale(\"x\", 0.5 * datum[\"bin_maxbins_10_IMDB Rating\"] + 0.5 * datum[\"bin_maxbins_10_IMDB Rating_end\"])"
+          },
+          "y": {
+            "scale": "y",
+            "field": "mean_Worldwide Gross"
+          }
+        }
+      }
+    }
+  ],
+  "scales": [
+    {
+      "name": "x",
+      "type": "linear",
+      "domain": {
+        "signal": "[layer_1_bin_maxbins_10_IMDB_Rating_bins.start, layer_1_bin_maxbins_10_IMDB_Rating_bins.stop]"
+      },
+      "range": [
+        0,
+        {
+          "signal": "width"
+        }
+      ],
+      "bins": {
+        "signal": "layer_1_bin_maxbins_10_IMDB_Rating_bins"
+      },
+      "zero": false
+    },
+    {
+      "name": "y",
+      "type": "linear",
+      "domain": {
+        "fields": [
+          {
+            "data": "data_0",
+            "field": "mean_US Gross"
+          },
+          {
+            "data": "data_1",
+            "field": "mean_Worldwide Gross"
+          }
+        ]
+      },
+      "range": [
+        {
+          "signal": "height"
+        },
+        0
+      ],
+      "nice": true,
+      "zero": true
+    }
+  ],
+  "axes": [
+    {
+      "scale": "y",
+      "orient": "left",
+      "gridScale": "x",
+      "grid": true,
+      "tickCount": {
+        "signal": "ceil(height/40)"
+      },
+      "domain": false,
+      "labels": false,
+      "aria": false,
+      "maxExtent": 0,
+      "minExtent": 0,
+      "ticks": false,
+      "zindex": 0
+    },
+    {
+      "scale": "x",
+      "orient": "bottom",
+      "grid": false,
+      "title": "IMDB Rating (binned)",
+      "labelFlush": true,
+      "labelOverlap": true,
+      "tickCount": {
+        "signal": "ceil(width/10)"
+      },
+      "zindex": 0
+    },
+    {
+      "scale": "y",
+      "orient": "left",
+      "grid": false,
+      "title": "Mean of US Gross, Mean of Worldwide Gross",
+      "labelOverlap": true,
+      "tickCount": {
+        "signal": "ceil(height/40)"
+      },
+      "zindex": 0
+    }
+  ]
+}

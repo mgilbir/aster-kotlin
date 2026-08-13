@@ -222,6 +222,33 @@ internal sealed class DataNode {
     }
   }
 
+  /**
+   * `MergeBins`: two views bucketing one column the same way are one bucketing — `optimizers.ts`.
+   *
+   * The **last** sibling survives, as with the time units, and the ones folded into it hand over
+   * their signal names: a bin publishes `…_bins` and `…_extent` signals named after the view that
+   * asked for it, and everything that read the folded view's names has to read the survivor's
+   * instead. The renames are collected here and applied to the whole specification once it is
+   * assembled, which is what upstream's `signalNameMap` does at every reference.
+   */
+  fun mergeBins(renames: MutableMap<String, String>) {
+    children.forEach { it.mergeBins(renames) }
+    if (children.size <= 1) return
+    val grouped = LinkedHashMap<String, MutableList<BinNode>>()
+    for (child in children.filterIsInstance<BinNode>()) {
+      grouped.getOrPut(child.key()) { mutableListOf() } += child
+    }
+    for (group in grouped.values) {
+      if (group.size < 2) continue
+      val kept = group.removeAt(group.size - 1)
+      for (folded in group) {
+        kept.merge(folded, renames)
+        children.remove(folded)
+        kept.children += folded.children
+      }
+    }
+  }
+
   fun mergeAggregates() {
     children.forEach { it.mergeAggregates() }
     if (children.size <= 1) return
@@ -364,7 +391,32 @@ internal class ParseNode(val parse: MutableMap<String, String>) : DataNode() {
     else text
 }
 
-internal class BinNode(val bins: List<BinComponent>) : DataNode() {
+internal class BinNode(bins: List<BinComponent>) : DataNode() {
+  var bins: List<BinComponent> = bins
+    private set
+
+  /** What makes two bin nodes the same one: the column, bucketed by the same parameters. */
+  fun key(): String = bins.joinToString("|") { "${it.field}:${it.params}:${it.extent}" }
+
+  /**
+   * Folds another node's bins into this one, recording the signals that changed their names.
+   *
+   * The output fields are **unioned** rather than replaced: two views may write the bucket under
+   * different names — one wanting a `_range` column and the other not — and both readers still have
+   * to find their own.
+   */
+  fun merge(other: BinNode, renames: MutableMap<String, String>) {
+    bins = bins.mapIndexed { index, mine ->
+      val theirs = other.bins.getOrNull(index) ?: return@mapIndexed mine
+      renames[theirs.signal] = mine.signal
+      renames[theirs.extentSignal] = mine.extentSignal
+      mine.copy(
+        output = (mine.output + theirs.output).distinct(),
+        rangeFormula = mine.rangeFormula ?: theirs.rangeFormula,
+      )
+    }
+  }
+
   fun transforms(): List<VegaValue> = bins.flatMap { bin ->
     val transforms = mutableListOf<VegaValue>()
     // Without an explicit extent the data's own is measured first and passed by signal, which is

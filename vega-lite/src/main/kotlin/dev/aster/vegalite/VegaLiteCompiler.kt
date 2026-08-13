@@ -179,6 +179,7 @@ private class Compilation(
     // `resolve` governs the *outermost* composition and nothing below it, as it does upstream where
     // every model carries its own: a top-level resolve settles a concatenation's plots against each
     // other, or, with no concatenation, a layer's views against each other.
+    findIncompatibleScales(views)
     val allScales = mergeScales(views) { view, channel -> scaleName(view, channel) }
     // Which plot each scale belongs to, or none where several share it. That is the whole of what
     // decides where a scale and its legend are written: a shared one at the top, an independent one
@@ -401,7 +402,10 @@ private class Compilation(
       config.forVega()?.let { put("config", it) }
     }
 
-    return VegaLiteCompilation(vega, diagnostics.diagnostics)
+    // The signals two merged bins agreed to share, applied everywhere they are read. Upstream keeps
+    // a rename map and consults it at every reference; here the references are already written, so
+    // the map is applied to the finished specification.
+    return VegaLiteCompilation(renamed(vega, signalRenames), diagnostics.diagnostics)
   }
 
   /**
@@ -417,6 +421,12 @@ private class Compilation(
     // polar extents; a **facet's** cells share everything but `theta`, which is the one channel
     // whose extent is a cell's own — a trellis of pies compares slices within each pie, not
     // across the grid.
+    // A channel whose children disagree about the *kind* of scale it is resolves independently
+    // whatever the resolve says, because there is no one scale for them to share.
+    if (channel in incompatibleChannels) {
+      val owner = if (concat != null) plotOf(view) else view.childName
+      return if (owner.isEmpty()) channel else "${owner}_$channel"
+    }
     val independent =
       resolve.scaleIsIndependent(
         channel,
@@ -427,6 +437,68 @@ private class Compilation(
     if (!independent) return channel
     val owner = if (concat != null) plotOf(view) else view.childName
     return if (owner.isEmpty()) channel else "${owner}_$channel"
+  }
+
+  /** Channels whose views disagree about the scale type, and so cannot share one. */
+  private val incompatibleChannels = mutableSetOf<String>()
+
+  /**
+   * `parseNonUnitScaleCore`: a shared channel is forced independent when the types cannot merge.
+   *
+   * The check is per **name**, not per channel outright: a concatenation that already resolves `x`
+   * per plot has nothing to disagree about, and two layers that would share a colour scale — one a
+   * ramp over counts, one a pair of named colours — have everything.
+   */
+  private fun findIncompatibleScales(views: List<UnitView>) {
+    val byName = mutableMapOf<String, MutableList<Pair<String, String>>>()
+    for (view in views) {
+      for ((channel, def) in view.scaledChannels()) {
+        val type =
+          Scales.scaleType(
+            channel,
+            def,
+            view.spec.mark,
+            hasOffset = offsetChannelFor(channel)?.let { view.spec.encoding[it] != null } == true,
+          )
+        byName.getOrPut(scaleName(view, channel)) { mutableListOf() } += channel to type
+      }
+    }
+    for ((_, entries) in byName) {
+      val types = entries.map { it.second }
+      if (types.any { one -> types.any { !Scales.compatible(one, it) } }) {
+        incompatibleChannels += entries.first().first
+      }
+    }
+  }
+
+  /** Signals that changed their name when two nodes were folded together. */
+  private val signalRenames = mutableMapOf<String, String>()
+
+  /**
+   * The specification with every renamed signal read under its new name.
+   *
+   * Textual, because a signal is read as *text*: `datum["…"]` in an expression, a `signal` field, a
+   * scale's `bins`. The names are the compiler's own — `child__layer_US_Gross_bin_maxbins_10_…` —
+   * so there is nothing else they could match.
+   */
+  private fun renamed(value: VegaValue, renames: Map<String, String>): VegaValue.Obj =
+    renamedValue(value, renames) as VegaValue.Obj
+
+  private fun renamedValue(value: VegaValue, renames: Map<String, String>): VegaValue {
+    if (renames.isEmpty()) return value
+    fun walk(node: VegaValue): VegaValue =
+      when (node) {
+        is VegaValue.Str -> {
+          var text = node.value
+          for ((from, to) in renames) text = text.replace(from, to)
+          VegaValue.Str(text)
+        }
+        is VegaValue.Arr -> VegaValue.Arr(node.values.map { walk(it) })
+        is VegaValue.Obj ->
+          VegaValue.Obj(node.fields.entries.associate { (key, own) -> key to walk(own) })
+        else -> node
+      }
+    return walk(value)
   }
 
   private fun plotOf(view: UnitView): String = plotNames[view] ?: ""
@@ -1198,6 +1270,7 @@ private class Compilation(
       var previous = ""
       repeat(5) {
         root.moveParseUp()
+        root.mergeBins(signalRenames)
         root.mergeParse()
         root.mergeAggregates()
         root.mergeTimeUnits()
@@ -1269,7 +1342,13 @@ private class Compilation(
     for (view in views) {
       for ((channel, def) in view.scaledChannels()) {
         val component = view.scaleComponents[channel] ?: continue
-        val domains = Scales.domain(view, channel, def, component.type, view.mainData)
+        // Renamed **before** the dedupe, not only in the finished specification: two layers that
+        // bucket one column now read one bin signal, and two domains that have become the same
+        // domain are one domain rather than a union of a thing with itself.
+        val domains =
+          Scales.domain(view, channel, def, component.type, view.mainData).map {
+            renamedValue(it, signalRenames)
+          }
         for (domain in domains) if (domain !in component.domains) component.domains += domain
         // `parseNonUnitScaleProperty` merges a shared scale **property by property**, not layer by
         // layer: the first layer to settle a property settles it, and the ones that say nothing
