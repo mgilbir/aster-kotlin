@@ -678,7 +678,7 @@ no data is needed to compare two compilers. So every one of them was compiled by
 by this one, and the outputs compared property by property. That is a *measurement*, not a gate: the
 examples are not fixtures here, and nothing about them is checked in.
 
-**124 of 627 matched exactly** at the start, and **499** do now. 16 were refused by name, and of those 8 are geographic,
+**124 of 627 matched exactly** at the start, and **501** do now. 16 were refused by name, and of those 8 are geographic,
 3 are a facet inside a facet, 2 a repeat inside a concatenation, and 2 are the `trail` mark — which
 this runtime draws and this compiler had simply not been told about.
 
@@ -2265,6 +2265,15 @@ runtime already had a Delaunay triangulation and a voronoi transform, and it was
 coordinates as *field names*: Vega-Lite writes them as expressions, `{"expr": "datum.datum.x || 0"}`,
 because the points are mark items and the coordinate wanted is the one the encoding resolved. Every
 cell came out without coordinates, so the diagram was empty and the overlay drew nothing.
+
+### A bucket that arrived bucketed is still a bucket
+
+`offsetedRectFormulas` runs on **both** branches of `timeunit.ts`, and this compiler ran it on one.
+A column cut by `timeUnit` here and a column that arrived as `binnedutcyear` are the same thing
+downstream: a bucket with a start and an end, and a `bandPosition` other than the middle moves the
+rect *within* it, between two interpolated edges rather than the bucket's own. Reading only the
+first branch left a chart configured to centre its bars on the year's start drawing them across the
+year instead.
 
 ### What a name reaches, and what a shared scale is required for
 

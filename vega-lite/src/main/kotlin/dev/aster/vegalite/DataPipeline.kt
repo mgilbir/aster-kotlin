@@ -260,11 +260,16 @@ internal class DataPipeline(
    * and its end. A rect marking the gaps in a series is written that way: the bar sits over the
    * missing point rather than after it.
    */
-  private fun offsettedRectFormulas(def: ChannelDef, channel: String): List<VegaValue> {
+  private fun offsettedRectFormulas(
+    def: ChannelDef,
+    channel: String,
+    startField: String? = null,
+    endField: String? = null,
+  ): List<VegaValue> {
     val position = view.offsettedRectPosition(def, channel) ?: return emptyList()
     val timeUnit = def.timeUnit ?: return emptyList()
-    val start = Fields.vgField(def, forAs = true)
-    val end = Fields.vgField(def, suffix = "end", forAs = true)
+    val start = startField ?: Fields.vgField(def, forAs = true)
+    val end = endField ?: Fields.vgField(def, suffix = "end", forAs = true)
     val fraction = position + 0.5
     val before = Fields.expressionNumber(1 - fraction)
     val after = Fields.expressionNumber(fraction)
@@ -292,22 +297,30 @@ internal class DataPipeline(
 
   private fun binnedTimeUnitNode(): PassThroughNode? {
     val formulas =
-      view.spec.encoding.values.mapNotNull { def ->
+      view.spec.encoding.values.flatMap { def ->
         val timeUnit =
-          def.timeUnit?.takeIf { Fields.isBinnedTimeUnit(it) } ?: return@mapNotNull null
+          def.timeUnit?.takeIf { Fields.isBinnedTimeUnit(it) } ?: return@flatMap emptyList()
         // The column's own name, unescaped: a formula reads and writes a *column*, where the
         // escaping is for references Vega would otherwise read as a path.
         val field =
-          def.field?.let { Fields.splitAccessPath(it).joinToString(".") } ?: return@mapNotNull null
-        val part = Fields.timeUnitParts(timeUnit).lastOrNull() ?: return@mapNotNull null
+          def.field?.let { Fields.splitAccessPath(it).joinToString(".") }
+            ?: return@flatMap emptyList()
+        val part = Fields.timeUnitParts(timeUnit).lastOrNull() ?: return@flatMap emptyList()
         // A **universal** bucket is stepped in universal time: `utcOffset`, not `timeOffset`, or
         // the far edge lands an hour out wherever the viewer keeps daylight saving.
         val offset = if (timeUnit.contains("utc")) "utcOffset" else "timeOffset"
-        obj {
-          put("type", "formula")
-          put("expr", "$offset('$part', ${Fields.datumPath(field)}, 1)")
-          put("as", "${field}_end")
-        }
+        val channel = view.spec.encoding.entries.firstOrNull { it.value === def }?.key
+        listOf(
+          obj {
+            put("type", "formula")
+            put("expr", "$offset('$part', ${Fields.datumPath(field)}, 1)")
+            put("as", "${field}_end")
+          }
+        ) +
+          // A bucket the rect sits **off the middle of** is drawn between two interpolated edges
+          // here as well: a column that arrived bucketed is still a bucket, and a `bandPosition`
+          // moves the rect within it exactly as it does one this compiler cut itself.
+          channel?.let { offsettedRectFormulas(def, it, field, "${field}_end") }.orEmpty()
       }
     return if (formulas.isEmpty()) null else PassThroughNode(formulas, timeUnit = true)
   }

@@ -352,7 +352,10 @@ internal val PATH_MARKS = setOf("line", "area", "trail")
  */
 internal fun UnitView.offsettedRectPosition(def: ChannelDef, channel: String): Double? {
   if (channel != "x" && channel != "y") return null
-  if (def.timeUnit == null || Fields.isBinnedTimeUnit(def.timeUnit)) return null
+  // A column that arrived **already bucketed** is a bucket like any other: `offsetedRectFormulas`
+  // runs on both branches of `timeunit.ts`, and a `bandPosition` moves the rect within its bucket
+  // whether this compiler cut it or the data came that way.
+  if (def.timeUnit == null) return null
   if (secondaryChannel(channel)?.let { spec.encoding[it] } != null) return null
   val stated =
     def.raw.number("bandPosition")

@@ -1634,7 +1634,11 @@ internal object Marks {
       when {
         declaredSize != null && useVlSizeChannel && sizeChannel != null ->
           nonPosition(view, "size", sizeChannel).fields[sizeChannel] ?: VegaValue.EmptyObject
-        markSize != null && useVlSizeChannel -> obj { put("value", markSize) }
+        // A mark's stated size may be an **expression** — `{"size": {"expr": 20}}` — and then it is
+        // a signal, as it is everywhere else a value is read.
+        markSize != null && useVlSizeChannel ->
+          literalRef(markSize)?.let { (key, value) -> obj { put(key, value) } }
+            ?: VegaValue.EmptyObject
         offsetChannel != null || bandingType == "band" -> {
           // The width of one *nested* mark where there is an offset scale, and of the whole band
           // where there is not — times the fraction of it the mark asked for, if it asked.
