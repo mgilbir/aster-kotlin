@@ -83,6 +83,31 @@ internal class Config(private val user: VegaValue.Obj = VegaValue.EmptyObject) {
   /** `config.axis.<name>`, which a theme uses to settle a property for every axis at once. */
   fun axisConfig(name: String): VegaValue? = user.obj("axis")?.fields?.get(name)
 
+  /**
+   * `getAxisConfigs`: the blocks an axis property may be configured in, most specific first.
+   *
+   * A theme can speak about every axis (`config.axis`), about one direction (`config.axisX`), about
+   * one edge (`config.axisBottom`) or about a kind of scale (`config.axisTemporal`, and the same
+   * again per direction). The Vega-Lite-only blocks — the ones named after a scale — outrank all
+   * the rest, since Vega has never heard of them and would apply nothing.
+   */
+  fun axisConfigChain(channel: String, scaleType: String, orient: String): List<VegaValue.Obj> {
+    val typeBased =
+      when {
+        scaleType == "band" -> listOf("Band", "Discrete")
+        scaleType == "point" -> listOf("Point", "Discrete")
+        scaleType == "time" || scaleType == "utc" -> listOf("Temporal")
+        Scales.hasContinuousDomain(scaleType) -> listOf("Quantitative")
+        else -> emptyList()
+      }
+    val axisChannel = if (channel == "x") "axisX" else "axisY"
+    val names =
+      typeBased.map { axisChannel + it } +
+        typeBased.map { "axis$it" } +
+        listOf(axisChannel, "axis${orient.replaceFirstChar { it.uppercase() }}", "axis")
+    return names.mapNotNull { user.obj(it) }
+  }
+
   /** `config.style.<name>`, which a mark's `style` list pulls in as well as its own block. */
   fun style(name: String): VegaValue.Obj? = user.obj("style")?.obj(name)
 

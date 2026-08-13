@@ -262,9 +262,26 @@ private class Compilation(
 
   private fun failed() = VegaLiteCompilation(null, diagnostics.diagnostics)
 
-  private fun style(views: List<UnitView>): String =
-    if (views.any { it.spec.encoding["x"] != null || it.spec.encoding["y"] != null }) "cell"
-    else "view"
+  /**
+   * The style a group is drawn in, from `assembleGroupStyle` in `unit.ts` and `layer.ts`.
+   *
+   * Each view answers for itself — `cell` if it has a Cartesian position, `view` if it does not —
+   * and a layer takes the union of its children's answers rather than one verdict for the lot. So a
+   * scatter plot with a caption pinned to its corner is styled `["cell", "view"]`: the points want
+   * a bordered plotting area and the caption, which has no position at all, does not.
+   */
+  private fun style(views: List<UnitView>): VegaValue? {
+    val styles = LinkedHashSet<String>()
+    for (view in views) {
+      styles +=
+        if (view.spec.encoding["x"] != null || view.spec.encoding["y"] != null) "cell" else "view"
+    }
+    return when (styles.size) {
+      0 -> null
+      1 -> VegaValue.Str(styles.first())
+      else -> strings(styles.toList())
+    }
+  }
 
   // -----------------------------------------------------------------------------------------
   // Plots
@@ -1006,9 +1023,15 @@ private class Compilation(
         val component = view.scaleComponents[channel] ?: continue
         val domains = Scales.domain(view, channel, def, component.type, view.mainData)
         for (domain in domains) if (domain !in component.domains) component.domains += domain
-        if (component.properties.isEmpty()) {
-          Scales.range(view, channel, def, component.type)?.let { component.set("range", it) }
-          Scales.properties(view, channel, def, component.type, component)
+        // `parseNonUnitScaleProperty` merges a shared scale **property by property**, not layer by
+        // layer: the first layer to settle a property settles it, and the ones that say nothing
+        // about it are passed over rather than ending the search. A candlestick's rules come first
+        // and have no width to speak of, so the bar's `padding` is the only one anybody states.
+        val contributed = ScaleComponent(channel, component.type, component.name())
+        Scales.range(view, channel, def, component.type)?.let { contributed.set("range", it) }
+        Scales.properties(view, channel, def, component.type, contributed)
+        contributed.properties.forEach { (key, value) ->
+          if (key !in component.properties) component.properties[key] = value
         }
         component.domainHasZero = Scales.domainHasZero(component)
       }
@@ -1110,7 +1133,8 @@ private class Compilation(
         if (!def.isFieldDef && def.datum == null) continue
         val component = view.scaleComponents[channel] ?: continue
         val hasOther = view.scaleComponents.containsKey(if (channel == "x") "y" else "x")
-        val parsed = Guides.parseAxis(view, channel, def, component.type, hasOther) ?: continue
+        val parsed =
+          Guides.parseAxis(view, channel, def, component.type, hasOther, diagnostics) ?: continue
         // Independence is resolved **between the children of the composition**, and a
         // concatenation's children are its plots — so the layers *inside* one plot still share an
         // axis. Keying per view there gave a layered plot two of every axis.

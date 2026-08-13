@@ -1838,6 +1838,50 @@ Beside it, the axis title order: `axis.title` first, then the field's own, then 
 position names — and the first of those that answers is the whole answer. A layer whose guide names
 the axis has said what the axis measures, so the fields' own titles add nothing after it.
 
+### Five rules read off the same ranking, and the two runtime defects they exposed
+
+A layer's group **style** is the union of its children's, not one verdict for the lot. A scatter
+plot with a caption pinned to its corner is `["cell", "view"]`: the points want a bordered plotting
+area and the caption, which has no position at all, does not.
+
+A shared scale merges **property by property**, not layer by layer — `parseNonUnitScaleProperty`.
+The first layer to settle a property settles it, and a layer that says nothing about it is passed
+over rather than ending the search. A candlestick's rules come first and have no width to speak of,
+so the bar's `padding` is the only one anybody states, and reading only the first layer lost it.
+
+A field named twice in a path mark's grouping is **listed twice**: one column driving both the
+colour and the dash pattern appears once per channel, because `pathGroupingFields` pushes without
+looking. Deduplicating it split a stocks chart's lines differently from upstream's.
+
+A conditionally written channel **waives `ignoreVgConfig`**. A test with nothing to fall through to
+leaves the mark unpainted when the test fails, so the configured value is written out as the rule's
+last arm even though the style block already says it — a style block is what Vega applies when a
+property is *absent*, and a production rule that reaches its end is not absent.
+
+A stacked value asked for a **band position** is drawn between the segment's two ends rather than at
+the far one, which is what puts a label in the middle of its own wedge instead of on the cut between
+it and the next; a text mark on a polar channel asks for the middle without saying so. The same
+interpolation runs for a *bucketed* column read through any scale, position or not — a size legend's
+swatches come from the scale, and a mark placed at a bucket's near edge would be a size the legend
+never shows. And a theme may write a Vega-Lite-only axis property in `config.axisX` as much as in
+`config.axis`: `labelExpr` and the conditional ones are resolved onto the axis here, because Vega
+has no name for them and would apply nothing. A guide's `test` is a *predicate* in the same grammar
+a `filter` is, and it compiles through the same function — passed through as an object it went
+unread, so a gridline told to dash everywhere but January dashed nowhere at all.
+
+The fixtures written for those found two defects in **this runtime**, both now fixed:
+
+- **A continuous scale ignored its `padding`.** A band scale pads by leaving gaps between bands, but
+  a continuous scale has none to leave gaps between, so Vega asks for the effect the other way round
+  — `padDomain` zooms the domain out by exactly the factor that pulls the data's ends inwards by
+  `padding` pixels, after `zero` and before `nice`. Without it the leftmost bar of a time-series bar
+  chart was sliced in half by the axis. The zoom happens in the scale's own space, so a log, power
+  or symlog domain is padded through its own transform rather than linearly.
+- **A binned scale's symbol legend drew one swatch per boundary.** A scale whose `bins` name cut
+  points has *buckets*, not values: `binValues` drops the last boundary and `formatRange` labels
+  each entry against the next. Ticking the scale instead drew six swatches for four buckets, each
+  labelled with an edge no row can take.
+
 ### Two runtime gaps this batch names but does not close
 
 `density`'s fixture is not in the corpus, and `trail`'s draws no legend. Both compile exactly as

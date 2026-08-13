@@ -984,6 +984,20 @@ internal class LegendBuilder(
     // its values are its own categories. `formatType` is where the specification says so, and the
     // specifier beside it may itself be computed — `timeUnitSpecifier([...])` for a bucketed one.
     val dates = discreteDateLabeller(spec, scaleName)
+    // A scale whose `bins` name cut points has **buckets**, not values, and a symbol legend shows
+    // one swatch per bucket labelled by the interval it covers — `binValues` drops the last
+    // boundary and `formatRange` writes each entry against the next one. Ticking the scale instead
+    // drew a swatch per boundary, one more than there are buckets, each labelled with an edge.
+    val boundaries = scale.bins
+    if (boundaries != null && boundaries.size >= 2) {
+      val decimals = decimalsFor(boundaries)
+      return boundaries.dropLast(1).mapIndexed { index, low ->
+        Entry(
+          VegaValue.Num(low),
+          "${formatTickLabel(low, decimals)} – " + formatTickLabel(boundaries[index + 1], decimals),
+        )
+      }
+    }
     return when (scale) {
       is OrdinalScale -> scale.domain.map { Entry(VegaValue.Str(it), dates?.invoke(it) ?: it) }
       is BandScale -> scale.domain.map { Entry(VegaValue.Str(it), dates?.invoke(it) ?: it) }

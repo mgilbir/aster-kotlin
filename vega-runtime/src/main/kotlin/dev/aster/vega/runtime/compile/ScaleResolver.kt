@@ -39,8 +39,13 @@ import dev.aster.vega.runtime.scale.TimeTicks
 import dev.aster.vega.runtime.scale.VegaScale
 import dev.aster.vega.scene.ColorSpaces
 import dev.aster.vega.scene.SceneColor
+import kotlin.math.abs
 import kotlin.math.ceil
+import kotlin.math.exp
 import kotlin.math.floor
+import kotlin.math.ln
+import kotlin.math.pow
+import kotlin.math.sign
 import kotlinx.datetime.TimeZone
 
 /** The chart's plotting size, which named ranges like `"width"` resolve against. */
@@ -113,6 +118,7 @@ public class ScaleResolver(
     var domain =
       continuousDomain(spec, zeroDefault = spec.bins == null, fallback = listOf(0.0, 1.0))
         ?: return null
+    domain = padded(domain, range, spec)
     if (spec.nice) domain = niceOf(domain, spec)
     return LinearScale(
       spec.name,
@@ -450,6 +456,15 @@ public class ScaleResolver(
     // here.
     var domain =
       continuousDomain(spec, zeroDefault = false, fallback = listOf(1.0, 10.0)) ?: return null
+    val logSign = if (domain.first() < 0) -1.0 else 1.0
+    domain =
+      padded(
+        domain,
+        range,
+        spec,
+        lift = { ln(it * logSign) },
+        ground = { logSign * exp(it) },
+      )
     if (spec.nice) domain = Ticks.niceLog(domain, base)
 
     val scale =
@@ -471,8 +486,16 @@ public class ScaleResolver(
     var domain =
       continuousDomain(spec, zeroDefault = spec.bins == null, fallback = listOf(0.0, 1.0))
         ?: return null
-    if (spec.nice) domain = niceOf(domain, spec)
     val exponent = numbers.resolve(spec.exponent, spec.name) ?: defaultExponent
+    domain =
+      padded(
+        domain,
+        range,
+        spec,
+        lift = { signedPow(it, exponent) },
+        ground = { signedPow(it, 1 / exponent) },
+      )
+    if (spec.nice) domain = niceOf(domain, spec)
     return PowScale(
       spec.name,
       domain,
@@ -488,8 +511,16 @@ public class ScaleResolver(
     // Symlog is not in upstream's zero list: its domain reaches both signs happily.
     var domain =
       continuousDomain(spec, zeroDefault = false, fallback = listOf(0.0, 1.0)) ?: return null
-    if (spec.nice) domain = niceOf(domain, spec)
     val constant = numbers.resolve(spec.constant, spec.name) ?: 1.0
+    domain =
+      padded(
+        domain,
+        range,
+        spec,
+        lift = { sign(it) * ln(1 + abs(it / constant)) },
+        ground = { sign(it) * (exp(abs(it)) - 1) * constant },
+      )
+    if (spec.nice) domain = niceOf(domain, spec)
     return SymlogScale(
       spec.name,
       domain,
@@ -585,18 +616,19 @@ public class ScaleResolver(
         val extent = numericExtent(spec.domain, spec.name) ?: return null
         listOf(extent.start, extent.endInclusive)
       }
+    val padded = padded(domain, range, spec)
     val niced =
       if (spec.nice) {
         val (lo, hi) =
           TimeTicks.nice(
-            domain.first(),
-            domain.last(),
+            padded.first(),
+            padded.last(),
             spec.niceCount ?: LinearScale.DEFAULT_TICK_COUNT,
             zone,
           )
         listOf(lo, hi)
       } else {
-        domain
+        padded
       }
     return TimeScale(
       spec.name,
@@ -862,6 +894,42 @@ public class ScaleResolver(
       domain,
       spec.niceCount ?: LinearScale.DEFAULT_TICK_COUNT,
     )
+
+  /**
+   * `padDomain`: a **continuous** scale's `padding`, which widens the domain rather than the range.
+   *
+   * A band scale pads by leaving gaps between its bands, but a continuous scale has no bands to
+   * leave gaps between — so Vega asks for the same effect the other way round, zooming the domain
+   * out by exactly the factor that pulls the data's own ends inwards by `padding` pixels. It is
+   * what keeps the leftmost bar of a time-series bar chart from being sliced in half by the axis.
+   *
+   * Applied after `zero` and any stated bounds, and **before** `nice` — the order is upstream's
+   * `configureDomain`, and it matters: rounding a padded domain and padding a rounded one differ.
+   */
+  /** Raising a negative value to a fractional power needs the sign handled separately. */
+  private fun signedPow(value: Double, power: Double): Double =
+    if (value < 0.0) -((-value).pow(power)) else value.pow(power)
+
+  private fun padded(
+    domain: List<Double>,
+    range: List<Double>,
+    spec: ScaleSpec,
+    lift: (Double) -> Double = { it },
+    ground: (Double) -> Double = { it },
+  ): List<Double> {
+    val pad = numbers.resolve(spec.padding, spec.name) ?: return domain
+    if (pad == 0.0 || domain.size < 2 || domain.first() == domain.last()) return domain
+    val span = abs(range.last() - range.first())
+    if (span - 2 * pad == 0.0) return domain
+    val factor = span / (span - 2 * pad)
+    val low = lift(domain.first())
+    val high = lift(domain.last())
+    val anchor = (low + high) / 2
+    return domain.toMutableList().also {
+      it[0] = ground(anchor + (low - anchor) * factor)
+      it[it.size - 1] = ground(anchor + (high - anchor) * factor)
+    }
+  }
 
   /**
    * Every value a union's parts contribute, in the order they were written.

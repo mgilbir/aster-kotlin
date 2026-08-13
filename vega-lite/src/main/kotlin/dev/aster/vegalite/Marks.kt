@@ -129,6 +129,9 @@ internal object Marks {
    * width means a new line; it does not group a *trail*, whose whole point is a width that varies
    * along one path. **`order`** groups an area, because a stacked area needs its slices in a stated
    * order, but not a line or a trail, where it only says which way to walk.
+   *
+   * A field named twice is listed twice: one column driving both the colour and the dash pattern
+   * appears in the grouping once per channel, because upstream pushes without looking.
    */
   fun pathGroupingFields(view: UnitView): List<String> {
     val mark = view.spec.mark
@@ -150,10 +153,10 @@ internal object Marks {
     return view.spec.encoding.entries
       .filter { (channel, def) -> channel in grouping && def.isFieldDef && def.aggregate == null }
       .filterNot { (channel, _) ->
-        (channel == "size" && mark == "trail") || (channel == "order" && mark != "area")
+        (channel == "size" && mark == "trail") ||
+          (channel == "order" && (mark == "line" || mark == "trail"))
       }
       .mapNotNull { (_, def) -> Fields.vgField(def) }
-      .distinct()
   }
 
   private fun markGroup(view: UnitView): VegaValue.Obj {
@@ -236,6 +239,7 @@ internal object Marks {
           putAll(pointPosition(view, "x", "mid", null))
           putAll(pointPosition(view, "y", "mid", null))
           putAll(nonPosition(view, "size", "size"))
+          putAll(nonPosition(view, "angle", "angle"))
           when (mark) {
             "circle" -> put("shape", obj { put("value", "circle") })
             "square" -> put("shape", obj { put("value", "square") })
@@ -321,11 +325,18 @@ internal object Marks {
           putAll(pointPosition(view, "y", "mid", null))
           textChannel(view)?.let { put("text", it) }
           putAll(nonPosition(view, "size", "fontSize"))
+          putAll(nonPosition(view, "angle", "angle"))
           // `getMarkPropOrConfig` reads the mark's **styles** as well as the mark: a text mark
           // that names a style whose block sets `align` has already been aligned, and writing the
           // default beside it overrides the very thing the style was for.
           if (styled(view, "align") == null) put("align", obj { put("value", "center") })
           if (styled(view, "baseline") == null) put("baseline", obj { put("value", "middle") })
+          // A text mark placed in **polar** coordinates, which is how a pie chart's slices get
+          // their labels: the two channels are read only where the encoding names them, since a
+          // text mark has no default angle or reach the way an arc does — and they keep their own
+          // names, an arc's `outerRadius` and `startAngle` being bounds rather than a placement.
+          putAll(pointPosition(view, "radius", null, "radius"))
+          putAll(pointPosition(view, "theta", null, "theta"))
         }
       }
     }
@@ -449,6 +460,10 @@ internal object Marks {
       "yOffset",
       "x2Offset",
       "y2Offset",
+      "thetaOffset",
+      "theta2Offset",
+      "radiusOffset",
+      "radius2Offset",
       // Consumed by the overlay normalizer before a mark is built. A `point: false` that reached
       // here would be emitted as an encode channel Vega has never heard of.
       "point",
@@ -541,7 +556,10 @@ internal object Marks {
     // that is white unless its box has no height says only when it is not white, and the white has
     // to come from somewhere for the rule to have anything to fall through to.
     val main =
-      valueRef(view, channel, def) ?: markDefault(view, channel, vgChannel)[vgChannel] ?: defaultRef
+      valueRef(view, channel, def)
+        ?: markDefault(view, channel, vgChannel, ignoreVgConfig = def.conditions.isEmpty())[
+          vgChannel]
+        ?: defaultRef
     // A non-position channel gets the same invalid arm a position does under the `show` mode —
     // `nonposition.ts` asks for one too. A size scaled from a column with nulls in it draws those
     // rows at the scale's own output for an invalid value rather than leaving them unsized.
@@ -561,12 +579,22 @@ internal object Marks {
    * consulted only where the two names differ. That last condition is upstream's `ignoreVgConfig`
    * and it is what keeps the output concise: `config.point.size` is already the `point` style block
    * Vega applies itself, so restating it here would be the same number written twice.
+   *
+   * It is waived for a channel written **conditionally**. A test with nothing to fall through to
+   * leaves the mark unpainted when the test fails, so the configured value has to be written out as
+   * the rule's last arm even though the style block already says it — the style block is what Vega
+   * applies when the property is absent, and a production rule that reaches its end is not absent.
    */
-  private fun markDefault(view: UnitView, channel: String, vgChannel: String): VegaValue.Obj {
+  private fun markDefault(
+    view: UnitView,
+    channel: String,
+    vgChannel: String,
+    ignoreVgConfig: Boolean = true,
+  ): VegaValue.Obj {
     val own = view.markDef.raw.fields[vgChannel] ?: view.markDef.raw.fields[channel]
     val value =
       own
-        ?: if (vgChannel != channel) {
+        ?: if (vgChannel != channel || !ignoreVgConfig) {
           view.config.markConfig(view.spec.mark).fields[vgChannel]
         } else {
           null
@@ -598,6 +626,24 @@ internal object Marks {
           put("scale", scaleName(view, channel))
           literalRef(def.datum)?.let { (key, it) -> put(key, it) }
         }
+      // A **bucketed** column read through a non-position scale is read at the bucket's middle,
+      // the same as a position is — `midPoint` in `valueref.ts` takes that branch for every scaled
+      // channel. It matters for the legend as much as for the mark: a size legend's swatches are
+      // drawn from the scale, and a mark placed at a bucket's near edge would be a size the legend
+      // never shows.
+      def.isFieldDef &&
+        def.bin is Binning.Bin &&
+        bandPosition(view, def) != null &&
+        view.scaleType(channel)?.let { !Scales.hasDiscreteDomain(it) } == true ->
+        interpolated(
+          view,
+          channel,
+          Fields.vgField(def),
+          Fields.vgField(def, suffix = "end"),
+          bandPosition(view, def)!!,
+          null,
+        )
+          as VegaValue.Obj
       def.isFieldDef ->
         obj {
           put("scale", scaleName(view, channel))
@@ -605,6 +651,23 @@ internal object Marks {
         }
       else -> null
     }
+
+  /**
+   * `getBandPosition`: where in its bucket a value is read, or null where the question is moot.
+   *
+   * A stated position wins. Failing that, a *bucketed* column is read at its middle, and a column
+   * cut to a time unit takes the configured `timeUnitBandPosition` — but only where nothing names
+   * the far end of the interval, since a stated end makes the interval a span rather than a bucket.
+   */
+  private fun bandPosition(view: UnitView, def: ChannelDef, def2: ChannelDef? = null): Double? =
+    def.raw.number("bandPosition")
+      ?: when {
+        !def.isFieldDef -> null
+        def.timeUnit != null && def2 == null ->
+          view.config.markConfig(view.spec.mark).number("timeUnitBandPosition")
+        def.bin is Binning.Bin -> 0.5
+        else -> null
+      }
 
   private fun scaleName(view: UnitView, channel: String): String? =
     if (view.hasScale(channel)) view.scale(channel) else null
@@ -973,19 +1036,55 @@ internal object Marks {
     val stack = view.stack
     val scaleType = view.scaleType(channel)
 
+    val offset = view.markDef.raw.fields["${channel}Offset"]
+
     if (def != null && stack != null && channel == stack.fieldChannel) {
-      // A stacked value is drawn at the accumulated end, so the segments sit on one another.
+      // A stacked value asked for a **band position** is drawn between the segment's two ends
+      // rather than at the far one — which is what puts a label in the middle of its own wedge
+      // instead of on the line between it and the next. A text mark on a polar channel asks for
+      // the middle without saying so, `positionRef` in `position-point.ts` giving it 0.5, because
+      // a pie chart's labels are for the slices and not for the cuts between them.
+      val bandPosition =
+        def.raw.number("bandPosition")
+          ?: 0.5.takeIf {
+            view.spec.mark == "text" && (channel == "radius" || channel == "theta")
+          }
+      if (def.isFieldDef && bandPosition != null) {
+        return interpolated(
+          view,
+          channel,
+          Fields.vgField(def, suffix = "start"),
+          Fields.vgField(def, suffix = "end"),
+          bandPosition,
+          offset,
+        )
+      }
+      // Otherwise it is drawn at the accumulated end, so the segments sit on one another.
       return obj {
         put("scale", scaleName(view, channel))
         put("field", Fields.vgField(def, suffix = "end"))
+        if (offset != null) put("offset", offset)
+      }
+    }
+
+    // A mark's own nudge applies wherever the position came from — a stated value, a datum, or the
+    // mark's default — and not only to a scaled field. It never displaces an offset an *encoding*
+    // asked for, which has already put the mark in a lane of its own.
+    fun nudged(ref: VegaValue?): VegaValue? {
+      if (ref == null || offset == null) return ref
+      val fields = (ref as? VegaValue.Obj)?.fields ?: return ref
+      if (fields.containsKey("offset")) return ref
+      return obj {
+        fields.forEach { (key, value) -> put(key, value) }
+        put("offset", offset)
       }
     }
 
     if (def != null && (def.isFieldDef || def.datum != null || def.isValueDef)) {
-      return midPoint(view, channel, def, scaleType)
+      return nudged(midPoint(view, channel, def, scaleType))
     }
 
-    return defaultPositionRef(view, channel, defaultPos)
+    return nudged(defaultPositionRef(view, channel, defaultPos))
   }
 
   private fun midPoint(
@@ -1519,7 +1618,7 @@ internal object Marks {
     startField: String,
     endField: String,
     position: Double,
-    offset: VegaValue,
+    offset: VegaValue?,
   ): VegaValue = obj {
     if (position == 0.0 || position == 1.0) {
       put("scale", view.scale(channel))

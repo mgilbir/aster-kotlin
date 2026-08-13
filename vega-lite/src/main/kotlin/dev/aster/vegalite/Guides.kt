@@ -1,5 +1,6 @@
 package dev.aster.vegalite
 
+import dev.aster.vega.model.DiagnosticCollector
 import dev.aster.vega.model.VegaValue
 
 /**
@@ -156,6 +157,7 @@ internal object Guides {
     def: ChannelDef,
     type: String,
     hasOtherPosition: Boolean,
+    diagnostics: DiagnosticCollector,
   ): AxisComponent? {
     if (def.axisDisabled) return null
     val axis = AxisComponent(channel)
@@ -295,7 +297,25 @@ internal object Guides {
           asSignal(value)
         }
     }
-    conditionalToEncode(axis)
+    // A property Vega has no name for cannot be left in the configuration for Vega to apply: it
+    // has to be resolved here, onto this axis, or nothing acts on it at all. That is upstream's
+    // `propsToAlwaysIncludeConfig` together with its conditional-value case, over the blocks a
+    // theme may write an axis in — `config.axisX` as much as `config.axis`.
+    val orient = (axis.properties["orient"] as? VegaValue.Str)?.value ?: "bottom"
+    for (property in VL_ONLY_AXIS_PROPERTIES) {
+      if (user?.fields?.containsKey(property) == true) continue
+      val configured =
+        view.config.axisConfigChain(channel, type, orient).firstNotNullOfOrNull {
+          it.fields[property]
+        } ?: continue
+      if (
+        property !in CONDITIONAL_AXIS_PARTS ||
+          (configured as? VegaValue.Obj)?.has("condition") == true
+      ) {
+        axis.properties[property] = asSignal(configured)
+      }
+    }
+    conditionalToEncode(axis, diagnostics)
 
     // `defaultTickMinStep`: a `d` format asks for whole numbers, so no tick may be closer than one.
     // Read *after* the specification's own block, because that is where the format usually comes
@@ -437,8 +457,18 @@ internal object Guides {
       "tickWidth" to ("ticks" to "strokeWidth"),
     )
 
+  /**
+   * The axis properties a configuration cannot simply hand to Vega.
+   *
+   * `labelExpr` becomes the labels' text and the conditional ones become an `encode` block, so a
+   * theme that writes either of them has written something Vega will not read. Upstream's list is
+   * longer — `grid`, `format`, `tickCount` and the rest are here as rules of their own instead.
+   */
+  private val VL_ONLY_AXIS_PROPERTIES = listOf("labelExpr") + CONDITIONAL_AXIS_PARTS.keys
+
   /** Moves every conditional property onto the encode block of the part it paints. */
-  private fun conditionalToEncode(axis: AxisComponent) {
+  private fun conditionalToEncode(axis: AxisComponent, diagnostics: DiagnosticCollector) {
+    val predicates = Transforms(diagnostics)
     val moved = LinkedHashMap<String, LinkedHashMap<String, VegaValue>>()
     for ((property, mapping) in CONDITIONAL_AXIS_PARTS) {
       val value = axis.properties[property] as? VegaValue.Obj ?: continue
@@ -450,7 +480,18 @@ internal object Guides {
           is VegaValue.Arr -> condition.values
           else -> listOf(condition)
         }
-      moved.getOrPut(part) { LinkedHashMap() }[vgProp] = arr(conditions + otherwise)
+      // A guide's `test` is a **predicate**, written in the same grammar a `filter` is, and Vega
+      // takes only an expression. Passing the object through left the test unread, so a gridline
+      // told to dash everywhere but January dashed nowhere at all.
+      val tested = conditions.mapIndexed { index, entry ->
+        val test = (entry as? VegaValue.Obj)?.fields?.get("test") ?: return@mapIndexed entry
+        if (test is VegaValue.Str) return@mapIndexed entry
+        val expression =
+          predicates.testExpression(test, "$.axis.$property.condition[$index].test")
+            ?: return@mapIndexed entry
+        obj { entry.fields.forEach { (k, v) -> put(k, if (k == "test") str(expression) else v) } }
+      }
+      moved.getOrPut(part) { LinkedHashMap() }[vgProp] = arr(tested + otherwise)
       axis.properties.remove(property)
     }
     if (moved.isEmpty()) return
@@ -753,9 +794,24 @@ internal object Guides {
       else -> false
     }
 
-  /** How solid a swatch is drawn, which is the mark's own opacity where it has one. */
-  private fun symbolOpacity(view: UnitView): Double? =
-    (view.spec.encoding["opacity"]?.value as? VegaValue.Num)?.value
+  /**
+   * How solid a swatch is drawn, which is the mark's own opacity where it has one.
+   *
+   * `getMaxValue` folds `Math.max` over the channel's conditions, **starting from the channel's own
+   * unconditional value** — and a channel written as conditions alone has none, so the fold starts
+   * at nothing and answers with nothing. Upstream then draws no swatch opacity at all rather than
+   * falling back to the mark's: a legend cannot show a condition, and showing one arm of it as if
+   * it were the whole would be a swatch that lies about half the marks.
+   */
+  private fun symbolOpacity(view: UnitView): Double? {
+    val def = view.spec.encoding["opacity"]
+    if (def != null && def.conditions.isNotEmpty()) {
+      val stated = (def.value as? VegaValue.Num)?.value ?: return null
+      val conditioned =
+        def.conditions.mapNotNull { (it.value as? VegaValue.Num)?.value }.maxOrNull()
+      return maxOf(stated, conditioned ?: stated).takeIf { it != 0.0 }
+    }
+    return (def?.value as? VegaValue.Num)?.value
       ?: view.markDef.number("opacity")
       ?: if (
         view.spec.mark in setOf("point", "tick", "circle", "square") &&
@@ -765,4 +821,5 @@ internal object Guides {
       } else {
         null
       }
+  }
 }
