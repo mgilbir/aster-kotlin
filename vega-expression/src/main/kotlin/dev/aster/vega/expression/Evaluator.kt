@@ -324,6 +324,38 @@ public class Evaluator(
       return fallback ?: item
     }
 
+    /*
+     * The `vlSelection*` family: a selection is an ordinary dataset, so these read one by name.
+     *
+     * `vlSelectionTuples` is the odd one out — it takes the *items* rather than a dataset name,
+     * because a Vega-Lite brush hands it the scene items it just collected.
+     */
+    if (name == "vlSelectionTest" && node.arguments.size >= 2) {
+      val dataset = scope.dataset(evaluate(node.arguments[0], scope).asString())
+      val datum = evaluate(node.arguments[1], scope)
+      val op = node.arguments.getOrNull(2)?.let { evaluate(it, scope).asString() }
+      return VegaValue.Bool(Selections.test(dataset, datum, op))
+    }
+    if (name == "vlSelectionIdTest" && node.arguments.size >= 2) {
+      val dataset = scope.dataset(evaluate(node.arguments[0], scope).asString())
+      val datum = evaluate(node.arguments[1], scope)
+      val op = node.arguments.getOrNull(2)?.let { evaluate(it, scope).asString() }
+      return VegaValue.Bool(Selections.idTest(dataset, datum, op))
+    }
+    if (name == "vlSelectionResolve" && node.arguments.isNotEmpty()) {
+      val dataset = scope.dataset(evaluate(node.arguments[0], scope).asString())
+      val op = node.arguments.getOrNull(1)?.let { evaluate(it, scope).asString() }
+      val isMulti =
+        node.arguments.getOrNull(2)?.let { JsSemantics.truthy(evaluate(it, scope)) } ?: false
+      val vl5 =
+        node.arguments.getOrNull(3)?.let { JsSemantics.truthy(evaluate(it, scope)) } ?: false
+      return Selections.resolve(dataset, op, isMulti, vl5)
+    }
+    if (name == "vlSelectionTuples" && node.arguments.size >= 2) {
+      val items = (evaluate(node.arguments[0], scope) as? VegaValue.Arr)?.values.orEmpty()
+      return Selections.tuples(items, evaluate(node.arguments[1], scope))
+    }
+
     // `inScope(item)` — whether the item sits inside the group the expression belongs to.
     if (name == "inScope" && node.arguments.isNotEmpty()) {
       return VegaValue.Bool(scope.inScope(evaluate(node.arguments[0], scope)))

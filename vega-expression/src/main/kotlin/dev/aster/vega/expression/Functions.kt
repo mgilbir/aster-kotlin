@@ -99,11 +99,7 @@ public object Functions {
       "isTuple" to
         "a tuple is a row carrying the dataflow's own identity, which this engine does not attach; " +
           "upstream answers true for a row from a dataset and false for an object literal, and " +
-          "there is nothing here to tell the two apart",
-      "vlSelectionTest" to "selection helpers require the signal and selection subsystems",
-      "vlSelectionResolve" to "selection helpers require the signal and selection subsystems",
-      "vlSelectionIdTest" to "selection helpers require the signal and selection subsystems",
-      "vlSelectionTuples" to "selection helpers require the signal and selection subsystems",
+          "there is nothing here to tell the two apart"
     )
 
   /** A runaway step cannot spin forever; no axis has this many boundaries. */

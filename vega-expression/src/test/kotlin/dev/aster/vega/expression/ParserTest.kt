@@ -245,16 +245,16 @@ class ParserTest {
 
   @Test
   fun `a deliberately excluded function explains why`() {
-    // `geoBounds` used to be the example here and is implemented now, along with `lab` and `hcl`.
-    // What is left on the list needs a subsystem rather than an algorithm.
+    // `geoBounds` used to be the example here, then `vlSelectionTest`; both are implemented now.
+    // What is left is one function whose answer depends on a **representation** rather than on an
+    // algorithm: a tuple is a row carrying the dataflow's own identity, and this engine's rows do
+    // not
+    // carry one, so `isTuple` cannot tell a datum from an object literal the way upstream can.
     val failure =
       assertThrows<ExpressionEvaluationException> {
-        compiled("vlSelectionTest('sel', datum)").evaluate(scopeOf())
+        compiled("isTuple(datum)").evaluate(scopeOf())
       }
-    assertTrue(
-      failure.diagnostic.message.contains("selection"),
-      failure.diagnostic.message,
-    )
+    assertTrue(failure.diagnostic.message.contains("tuple"), failure.diagnostic.message)
   }
 
   @Test

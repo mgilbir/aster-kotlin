@@ -209,17 +209,16 @@ class SignalCompileTest {
 
   @Test
   fun `an unsupported function inside an encoding is reported once, not per datum`() {
-    // `geoBounds` used to be the example here and is implemented now; what is left on the
-    // deliberately-excluded list needs a subsystem rather than an algorithm.
+    // `geoBounds` used to be the example here, then `vlSelectionTest`; both are implemented now.
+    // `isTuple` is what is left, and it is on the list for a reason no amount of work removes: it
+    // asks about a row's dataflow identity, which this engine's rows do not carry.
     val compiled =
-      compile(
-        spec(encode = """$basePosition, "opacity": {"signal": "vlSelectionTest('s', datum)"}""")
-      )
+      compile(spec(encode = """$basePosition, "opacity": {"signal": "isTuple(datum)"}"""))
     val failures =
       compiled.diagnostics.filter { it.code == DiagnosticCodes.EXPRESSION_UNSUPPORTED_FUNCTION }
     // Two data rows, but the expression fails identically for both.
     assertEquals(1, failures.size, failures.toString())
-    assertTrue(failures.single().message.contains("selection"))
+    assertTrue(failures.single().message.contains("tuple"))
   }
 
   // ---- conditional production rules -----------------------------------------
