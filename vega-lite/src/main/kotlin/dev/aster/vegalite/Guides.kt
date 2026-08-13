@@ -239,7 +239,11 @@ internal object Guides {
     // A bucketed instant is the exception among discrete labels: a reader who sees Jan, Mar, May
     // supplies February, so `defaultLabelOverlap` lets a time unit thin its own labels — unless the
     // specification stated an order, where a gap would leave the reader guessing what was skipped.
-    val timeUnitLabels = def.timeUnit != null && def.sort !is VegaValue.Obj
+    // `!isObject(sort)` — and in JavaScript an **array** is an object, so a written-out order
+    // suppresses the thinning as much as a sort object does: the reader is being shown a stated
+    // sequence, and a gap in a stated sequence is a question rather than an inference.
+    val timeUnitLabels =
+      def.timeUnit != null && def.sort !is VegaValue.Obj && def.sort !is VegaValue.Arr
     if (timeUnitLabels || (def.type != MeasureType.NOMINAL && def.type != MeasureType.ORDINAL)) {
       val greedy = type == "log" || type == "symlog"
       axis.set("labelOverlap", if (greedy) str("greedy") else bool(true))

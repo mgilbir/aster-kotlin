@@ -1755,6 +1755,18 @@ position's offset is centred in a lane at all.
 A **position** with an offset nested in it is a band whatever the mark, for the same reason: a point
 scale has no span for the nested marks to divide.
 
+### An array is an object, in JavaScript
+
+`defaultLabelOverlap` reads `!isObject(sort)`, and in JavaScript an **array** is an object — so a
+written-out order suppresses a time unit's label thinning as much as a sort object does. The reason
+is the same one the rule is for: a gap in a *stated* sequence is a question rather than an inference,
+and a reader who wrote out Monday to Sunday is owed all seven.
+
+Beside it, a day folded into a date. A weekday is one-based as a date, and where the day is a known
+number that sum is done at compile time: upstream writes `datetime(2012, 0, 2, …)` for Monday, not
+`datetime(2012, 0, 1+1, …)` — two expressions that mean the same thing and compare as different
+text.
+
 ### Two runtime gaps this batch names but does not close
 
 `density`'s fixture is not in the corpus, and `trail`'s draws no legend. Both compile exactly as

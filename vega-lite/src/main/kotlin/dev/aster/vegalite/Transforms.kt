@@ -714,7 +714,14 @@ internal class Transforms(
     // where `datetime()` counts months from zero. Passing the number through gave every dated
     // comparison a month too late — January read as February.
     val month = oneBased("month") ?: oneBased("quarter")?.let { "$it*3" } ?: "0"
-    val date = number("date") ?: number("day")?.let { "$it+1" } ?: "1"
+    // A day is one-based as a *date*, and where the day is a known number that sum is done here:
+    // upstream writes `datetime(2012, 0, 2, …)` for Monday, not `datetime(2012, 0, 1+1, …)`.
+    val date =
+      number("date")
+        ?: number("day")?.let { day ->
+          day.toDoubleOrNull()?.let { Fields.expressionNumber(it + 1) } ?: "$day+1"
+        }
+        ?: "1"
     val rest = listOf("hours", "minutes", "seconds", "milliseconds").map { number(it) ?: "0" }
     return (listOf(year, month, date) + rest).joinToString(", ")
   }
