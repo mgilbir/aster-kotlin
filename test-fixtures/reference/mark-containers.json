@@ -9312,6 +9312,46 @@
   "hidden": false
  },
  {
+  "fixture": "impute-pivot",
+  "kind": "group",
+  "role": "graphics-object",
+  "roleDescription": "group mark container",
+  "label": null,
+  "hidden": false
+ },
+ {
+  "fixture": "impute-pivot",
+  "kind": "rect",
+  "role": "graphics-symbol",
+  "roleDescription": "rect mark container",
+  "label": null,
+  "hidden": false
+ },
+ {
+  "fixture": "impute-pivot",
+  "kind": "rule",
+  "role": "graphics-symbol",
+  "roleDescription": "rule mark container",
+  "label": null,
+  "hidden": false
+ },
+ {
+  "fixture": "impute-pivot",
+  "kind": "text",
+  "role": "graphics-object",
+  "roleDescription": "text mark container",
+  "label": null,
+  "hidden": false
+ },
+ {
+  "fixture": "impute-pivot",
+  "kind": "group",
+  "role": "graphics-object",
+  "roleDescription": "group mark container",
+  "label": null,
+  "hidden": false
+ },
+ {
   "fixture": "indata-membership",
   "kind": "group",
   "role": "graphics-object",
@@ -10364,6 +10404,46 @@
   "kind": "group",
   "role": "graphics-object",
   "roleDescription": "group mark container",
+  "label": null,
+  "hidden": false
+ },
+ {
+  "fixture": "nest-treemap",
+  "kind": "group",
+  "role": "graphics-object",
+  "roleDescription": "group mark container",
+  "label": null,
+  "hidden": false
+ },
+ {
+  "fixture": "nest-treemap",
+  "kind": "rect",
+  "role": "graphics-symbol",
+  "roleDescription": "rect mark container",
+  "label": null,
+  "hidden": false
+ },
+ {
+  "fixture": "nest-treemap",
+  "kind": "rect",
+  "role": "graphics-symbol",
+  "roleDescription": "rect mark container",
+  "label": null,
+  "hidden": false
+ },
+ {
+  "fixture": "nest-treemap",
+  "kind": "text",
+  "role": "graphics-object",
+  "roleDescription": "text mark container",
+  "label": null,
+  "hidden": false
+ },
+ {
+  "fixture": "nest-treemap",
+  "kind": "text",
+  "role": "graphics-object",
+  "roleDescription": "text mark container",
   "label": null,
   "hidden": false
  },

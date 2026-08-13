@@ -319,15 +319,34 @@ internal fun applyTreeLayout(
 
 /** Numbers compare as numbers and everything else as text, which is how upstream's sort behaves. */
 private fun compareNodeField(a: TreeNode, b: TreeNode, path: String): Int {
-  val av = a.datum
-  val bv = b.datum
-  val an = if (av == null) Double.NaN else av.field(path).asDouble()
-  val bn = if (bv == null) Double.NaN else bv.field(path).asDouble()
+  val av = nodeField(a, path)
+  val bv = nodeField(b, path)
+  val an = av.asDouble()
+  val bn = bv.asDouble()
   if (!an.isNaN() && !bn.isNaN()) return an.compareTo(bn)
-  val at = if (av == null) "" else av.field(path).asString()
-  val bt = if (bv == null) "" else bv.field(path).asString()
-  return at.compareTo(bt)
+  return av.asString().compareTo(bv.asString())
 }
+
+/**
+ * What a sort field names: a property of the **node**, not of the row it came from.
+ *
+ * `sort: {"field": "value"}` on a `treemap` or a `pack` sorts by the total the layout computed —
+ * `node.value`, the sum over that node's leaves — which is the whole point of sorting a hierarchy
+ * and is not a column anywhere in the data. Reading it off the datum instead found nothing, so a
+ * specification that asked for its biggest group first got its groups in data order and a
+ * completely different picture; no fixture used `sort` on a layout, which is why it survived.
+ * Probed to be sure of the accessor: upstream sorts by `"value"` and does **nothing** at all for a
+ * bare `"v"`, because a node has no such property.
+ */
+private fun nodeField(node: TreeNode, path: String): VegaValue =
+  when {
+    path == "value" -> VegaValue.Num(node.value)
+    path == "depth" -> VegaValue.Num(node.depth.toDouble())
+    path == "height" -> VegaValue.Num(node.height.toDouble())
+    // The row itself is reachable, as it is upstream, under the name the node keeps it by.
+    path.startsWith("data.") -> node.datum?.field(path.removePrefix("data.")) ?: VegaValue.Null
+    else -> VegaValue.Null
+  }
 
 /** `size` defaults to a unit square, which is what makes a layout scalable by a scale. */
 private fun sizeOf(params: VegaValue.Obj): Pair<Double, Double> {

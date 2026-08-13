@@ -1030,6 +1030,21 @@
   "caption": "X-axis for a discrete scale with 12 values: Jan, Feb, Mar, Apr, May, ending with Dec"
  },
  {
+  "fixture": "impute-pivot",
+  "kind": "axis",
+  "caption": "X-axis for a discrete scale with 4 values: Q1, Q2, Q3, Q4"
+ },
+ {
+  "fixture": "impute-pivot",
+  "kind": "axis",
+  "caption": "Y-axis for a linear scale with values from 0 to 24"
+ },
+ {
+  "fixture": "impute-pivot",
+  "kind": "legend",
+  "caption": "Symbol legend titled 'series' for fill color with 2 values: north, south"
+ },
+ {
   "fixture": "indata-membership",
   "kind": "axis",
   "caption": "X-axis for a discrete scale with 6 values: a, b, c, d, 3, true"

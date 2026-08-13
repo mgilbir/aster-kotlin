@@ -9,7 +9,7 @@ Branch `milestone-0-bootstrap`. Working tree clean, both gates green:
 - `./scripts/check.sh` — format, all tests, lint, demo APK
 - `./scripts/oracle.sh` — regenerates upstream references and runs the differential comparison
 
-**163 differential fixtures pass, all matching upstream exactly.** That is the only number here
+**165 differential fixtures pass, all matching upstream exactly.** That is the only number here
 that means what it says.
 
 ## Read this before trusting the other number
@@ -254,7 +254,7 @@ not the one Vega documents**, because Vega only forwards the parameters a specif
 
 ## What is left: two examples, and neither can be verified
 
-**163 differential fixtures pass. 91 of the 93 examples compile clean.** Everything that can be
+**165 differential fixtures pass. 91 of the 93 examples compile clean.** Everything that can be
 checked against upstream has been.
 
 ### `projections` — upstream refuses it too
@@ -450,6 +450,22 @@ ordering rule was probed in both directions and is worth not re-deriving: the ov
 putting the block after `update` while it is fresh and before it once it is not — `ItemEncode.fresh`,
 aged by the controller once the compile has happened. And the handler changes no signal value at all,
 so the redraw has to be triggered by the overlay itself.
+
+## Pick the next fixture by counting, not by taste
+
+The three combinations STATUS named were used up, so the next candidates came from a mechanical count:
+for each of the 49 implemented transforms, how many fixtures use it? Three had **none** — `impute`,
+`nest`, `pivot` — and fourteen have exactly **one**. The count is a few lines of Python over
+`override val type: String = "…"` in `vega-dataflow/.../transform/*.kt` against `"type": "…"` in
+`test-fixtures/specs/*.vg.json`; run it again after adding a transform.
+
+One fixture is enough to catch a transform that does nothing and not enough to catch one whose
+*options* are ignored. That is exactly what `nest-treemap` found: `sort` on a hierarchy layout was
+reading its field off the row rather than off the node, so `{"field": "value"}` — the layout's own
+computed total, the only sensible thing to sort a hierarchy by — found nothing and sorted nothing.
+
+`label` is the one transform that can never have a fixture: its occupancy bitmap is built from a
+canvas upstream, and there is no canvas under Node to produce a reference from.
 
 ## What is left, and the one technique that finds it
 
