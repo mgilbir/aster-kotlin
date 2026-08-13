@@ -490,11 +490,87 @@ class ExpressionReferenceTest {
         // The step defaults to one and is *floored*; an absent argument is not `Number()`-coerced
         // to zero, which would hand the date straight back. Both forms below are the ones a
         // specification writes, and the two-argument one is the common one.
+        // ---- month and weekday names ----
+        // Upstream produces these by formatting a date it builds for the purpose, so both
+        // indices wrap: month 12 is January again and day -1 is Saturday. A non-integer gives
+        // the empty string rather than a name for a day that does not exist.
+        "monthFormat(0)|\"January\"",
+        "monthFormat(11)|\"December\"",
+        "monthFormat(12)|\"January\"",
+        "monthFormat(-1)|\"December\"",
+        "monthAbbrevFormat(2)|\"Mar\"",
+        "monthFormat(1.5)|\"\"",
+        "dayFormat(0)|\"Sunday\"",
+        "dayFormat(6)|\"Saturday\"",
+        "dayFormat(7)|\"Sunday\"",
+        "dayFormat(-1)|\"Saturday\"",
+        "dayAbbrevFormat(3)|\"Wed\"",
+        // ---- week numbers ----
+        // Sundays since the start of the year, not ISO weeks: the days before the first
+        // Sunday are week 0, and a year beginning on a Sunday has its first day in week 1.
+        "week(datetime(2020, 0, 5))|1",
+        "week(datetime(2021, 0, 1))|0",
+        "week(datetime(2017, 0, 1))|1",
+        "week(datetime(2020, 11, 31))|52",
+        "utcweek(datetime(2020, 0, 5))|0",
+        // ---- the UTC twins of timeOffset and timeSequence ----
+        // A local midnight in Amsterdam is 23:00 the day before in UTC, which is the whole
+        // reason both exist: "one day later" is 24 hours in UTC and 23 or 25 across a clock
+        // change locally.
+        "utcFormat(utcOffset('day', datetime(2020,0,1), 3), '%Y-%m-%d %H:%M')|\"2020-01-03 23:00\"",
+        "utcFormat(utcOffset('month', datetime(2020,0,31), 1), '%Y-%m-%d %H:%M')|\"2020-03-01 23:00\"",
+        "length(utcSequence('day', datetime(2020,0,1), datetime(2020,0,4)))|3",
+        "utcFormat(utcSequence('day', datetime(2020,0,1), datetime(2020,0,4))[0], " +
+          "'%Y-%m-%d %H:%M')|\"2020-01-01 00:00\"",
+        "utcFormat(utcSequence('month', datetime(2020,0,1), datetime(2020,6,1), 2)[1], " +
+          "'%Y-%m-%d %H:%M')|\"2020-03-01 00:00\"",
+        // A sequence yields the unit **boundaries**, so a start at noon is ceiled to the next
+        // midnight rather than stepped from. This pair contradicted the implementation, which
+        // walked from the start itself and carried a comment claiming that was upstream's rule.
+        "length(timeSequence('day', datetime(2020,0,1,12), datetime(2020,0,4)))|2",
+        "timeFormat(timeSequence('day', datetime(2020,0,1,12), datetime(2020,0,4))[0], " +
+          "'%m-%d %H:%M')|\"01-02 00:00\"",
+        // ---- pan and zoom ----
+        // What an interactive chart's `domainRaw` is written with. Each pair lifts the
+        // interval into the space its gesture is linear in, moves it there and puts it back.
+        "panLinear([0, 10], 0.5)|[-5,5]",
+        "panLinear([0, 10], -0.25)|[2.5,12.5]",
+        "panLog([1, 100], 0.5)|[0.09999999999999998,10.000000000000002]",
+        "panPow([1, 10], 0.5, 2)|[-6.96419413859206,7.106335201775948]",
+        "panSymlog([-10, 10], 0.5, 1)|[-120.00000000000003,0]",
+        "zoomLinear([0, 10], 5, 2)|[-5,15]",
+        // A null anchor is the interval's own midpoint, which is what makes a zoom with no
+        // pointer position behave like one centred on the plot.
+        "zoomLinear([0, 10], null, 2)|[-5,15]",
+        "zoomLog([1, 100], 10, 2)|[0.09999999999999998,1000.0000000000007]",
+        "zoomPow([1, 10], 5, 2, 2)|[-4.795831523312719,13.228756555322953]",
+        "zoomSymlog([-10, 10], 0, 2, 1)|[-120.00000000000003,120.00000000000003]",
+        // ---- merge and flush ----
+        // `merge` is `extend({}, ...)`: shallow, later arguments winning, and a key keeps the
+        // position of its *first* appearance while taking its value from the last.
+        "merge({a: 1}, {b: 2}, {a: 3})|{\"a\":3,\"b\":2}",
+        "merge()|{}",
+        // `flush`, the rule the axis builder already uses for `labelFlush`: the ends are
+        // sorted before the comparison, so a descending range still answers for its low end.
+        "flush([0, 100], 3, 5, 'L', 'R', 'C')|\"L\"",
+        "flush([0, 100], 97, 5, 'L', 'R', 'C')|\"R\"",
+        "flush([0, 100], 50, 5, 'L', 'R', 'C')|\"C\"",
+        "flush([100, 0], 2, 5, 'L', 'R', 'C')|\"L\"",
         "timeFormat(timeOffset('day', datetime(2019,2,31)), '%Y-%m-%d %H:%M')|\"2019-04-01 00:00\"",
         "timeFormat(timeOffset('day', datetime(2019,2,31), 2), '%Y-%m-%d %H:%M')|\"2019-04-02 00:00\"",
         "timeFormat(timeOffset('day', datetime(2019,2,31), 0), '%Y-%m-%d %H:%M')|\"2019-03-31 00:00\"",
         "timeFormat(timeOffset('day', datetime(2019,2,31), null), '%Y-%m-%d %H:%M')|\"2019-04-01 00:00\"",
         "timeFormat(timeOffset('day', datetime(2019,2,31), 1.7), '%Y-%m-%d %H:%M')|\"2019-04-01 00:00\"",
+        // A month or year step **overflows** rather than clamping, because that is what
+        // `Date.setMonth` does: 31 January plus a month asks for "31 February", which normalises to
+        // 2 March in a leap year and 3 March otherwise. Clamping to the 29th put every date past
+        // the
+        // 28th one to three days early, and the tick generator never noticed because it only ever
+        // offsets from the first of a month.
+        "timeFormat(timeOffset('month', datetime(2020,0,31), 1), '%Y-%m-%d')|\"2020-03-02\"",
+        "timeFormat(timeOffset('month', datetime(2020,4,31), 1), '%Y-%m-%d')|\"2020-07-01\"",
+        "timeFormat(timeOffset('month', datetime(2021,0,31), -1), '%Y-%m-%d')|\"2020-12-31\"",
+        "timeFormat(timeOffset('year', datetime(2020,1,29), 1), '%Y-%m-%d')|\"2021-03-01\"",
         "timeFormat(timeOffset('day', datetime(2019,2,31), -1), '%Y-%m-%d %H:%M')|\"2019-03-30 00:00\"",
         // ---- reading ----
         "toDate('2026-01-05T00:00:00Z')|1767571200000",

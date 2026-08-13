@@ -21,8 +21,10 @@ import kotlin.math.atan2
 import kotlin.math.ceil
 import kotlin.math.cos
 import kotlin.math.exp
+import kotlin.math.expm1
 import kotlin.math.floor
 import kotlin.math.ln
+import kotlin.math.ln1p
 import kotlin.math.pow
 import kotlin.math.sin
 import kotlin.math.sqrt
@@ -95,6 +97,17 @@ public object Functions {
         "parsing a date against a format string needs a strptime the engine does not have; " +
           "an ISO 8601 string works through toDate",
       "gradient" to "gradients cannot be produced from an expression yet",
+      // The three type predicates whose answer depends on a representation this engine does not
+      // share, so each would be confidently wrong rather than unavailable.
+      "isDate" to
+        "a date is epoch milliseconds here rather than a Date object, so nothing distinguishes " +
+          "one from a number; compare against a range instead",
+      "isRegExp" to
+        "the expression language has no regular-expression literal, so nothing can be one",
+      "isTuple" to
+        "a tuple is a row carrying the dataflow's own identity, which this engine does not attach; " +
+          "upstream answers true for a row from a dataset and false for an object literal, and " +
+          "there is nothing here to tell the two apart",
       "vlSelectionTest" to "selection helpers require the signal and selection subsystems",
       "vlSelectionResolve" to "selection helpers require the signal and selection subsystems",
     )
@@ -458,15 +471,11 @@ public object Functions {
      * is d3's rule — `step == null ? 1 : Math.floor(step)` — and it matters because the
      * two-argument form is the one specifications actually write.
      */
-    map["timeOffset"] = ExpressionFunction { args ->
-      val stepper =
-        stepperFor(args.string(0), TimeZone.currentSystemDefault())
-          ?: return@ExpressionFunction VegaValue.Null
-      val at = JsSemantics.toNumber(args.at(1))
-      if (!at.isFinite()) return@ExpressionFunction VegaValue.Null
-      val by = args.numberOr(2, 1.0).takeIf { it.isFinite() } ?: 1.0
-      VegaValue.Num(stepper.offset(at, floor(by).toInt()))
-    }
+    offsetFunction(map, "timeOffset") { localZone() }
+    // `utcOffset` is the twin, and the pair is not decoration: "one day later" is 23 or 25 hours on
+    // the two days a local clock changes and always 24 in UTC, so a chart that steps a local axis
+    // with the UTC function lands an hour off for half the year.
+    offsetFunction(map, "utcOffset") { TimeZone.UTC }
 
     /**
      * `timeSequence(unit, start, stop[, step])` — every boundary in a span, `stop` exclusive.
@@ -475,26 +484,8 @@ public object Functions {
      * upstream's behaviour and worth knowing: a sequence from the middle of a day steps by days
      * from the middle of the day.
      */
-    map["timeSequence"] = ExpressionFunction { args ->
-      val stepper =
-        stepperFor(args.string(0), TimeZone.currentSystemDefault())
-          ?: return@ExpressionFunction VegaValue.Arr(emptyList())
-      val start = JsSemantics.toNumber(args.at(1))
-      val stop = JsSemantics.toNumber(args.at(2))
-      if (!start.isFinite() || !stop.isFinite()) {
-        return@ExpressionFunction VegaValue.Arr(emptyList())
-      }
-      val by = JsSemantics.toNumber(args.at(3)).takeIf { it.isFinite() && it != 0.0 } ?: 1.0
-      val out = mutableListOf<VegaValue>()
-      var at = start
-      var guard = 0
-      while (at < stop && guard < MAX_SEQUENCE) {
-        out.add(VegaValue.Num(at))
-        at = stepper.offset(at, by.toInt())
-        guard++
-      }
-      VegaValue.Arr(out)
-    }
+    sequenceFunction(map, "timeSequence") { localZone() }
+    sequenceFunction(map, "utcSequence") { TimeZone.UTC }
 
     // ---- colour -------------------------------------------------------------
 
@@ -621,6 +612,62 @@ public object Functions {
       val b = JsSemantics.toNumber(range.values.last())
       VegaValue.Bool(value >= minOf(a, b) && value <= maxOf(a, b))
     }
+    /**
+     * `merge(a, b, ...)` — one object with every key, later arguments winning.
+     *
+     * Upstream's is `extend({}, ...)`, which is a **shallow** merge: a nested object is replaced
+     * whole rather than merged into. No arguments gives an empty object, which is what makes it
+     * safe to fold a list of optional overrides through it.
+     */
+    map["merge"] = ExpressionFunction { args ->
+      val fields = LinkedHashMap<String, VegaValue>()
+      for (arg in args) (arg as? VegaValue.Obj)?.let { fields.putAll(it.fields) }
+      VegaValue.Obj(fields)
+    }
+
+    /**
+     * `flush(range, value, threshold, left, right, center)` — which end of a range a value is near.
+     *
+     * The axis builder has this rule already, for `labelFlush`; this is the same rule as a
+     * function, which is how a specification writes its own version of it in an `encode` block. Two
+     * parts are easy to get backwards: the ends are **sorted** before the comparison, so a
+     * descending range still answers `left` for its low end, and the nearer end wins on `l < r`, so
+     * a value exactly between the two ends of an equally short range takes the *far* one.
+     */
+    map["flush"] = ExpressionFunction { args ->
+      val range = (args.at(0) as? VegaValue.Arr)?.values
+      if (range == null || range.size < 2) return@ExpressionFunction VegaValue.Null
+      val value = JsSemantics.toNumber(args.at(1))
+      val threshold = args.number(2)
+      val lo = minOf(JsSemantics.toNumber(range.first()), JsSemantics.toNumber(range.last()))
+      val hi = maxOf(JsSemantics.toNumber(range.first()), JsSemantics.toNumber(range.last()))
+      val fromLow = abs(value - lo)
+      val fromHigh = abs(hi - value)
+      when {
+        fromLow < fromHigh && fromLow <= threshold -> args.at(3)
+        fromHigh <= threshold -> args.at(4)
+        else -> args.at(5)
+      }
+    }
+
+    // ---- interval arithmetic ------------------------------------------------
+    //
+    // The pan and zoom family, which is what an interactive chart's `domainRaw` is written with: a
+    // drag publishes `panLinear(domain('x'), delta)` and a wheel `zoomLinear(domain('x'), anchor,
+    // factor)`. Each pair lifts the interval into a space where the gesture is *linear*, moves it
+    // there and puts it back, which is why there is one per scale family rather than one function
+    // taking a scale: panning a log axis by half its width has to multiply, not add.
+    panFunction(map, "panLinear", { it }, { it })
+    zoomFunction(map, "zoomLinear", { it }, { it })
+    // The sign comes from the **first** end of the domain, so a wholly negative log domain pans and
+    // zooms as its mirror image rather than producing NaN.
+    signedFunction(map, "panLog", ::logLift, ::logGround, pan = true)
+    signedFunction(map, "zoomLog", ::logLift, ::logGround, pan = false)
+    exponentFunction(map, "panPow", pan = true)
+    exponentFunction(map, "zoomPow", pan = false)
+    constantFunction(map, "panSymlog", pan = true)
+    constantFunction(map, "zoomSymlog", pan = false)
+
     map["clampRange"] = ExpressionFunction { args ->
       val range = args.at(0) as? VegaValue.Arr ?: return@ExpressionFunction VegaValue.Null
       if (range.values.size < 2) return@ExpressionFunction args.at(0)
@@ -665,6 +712,26 @@ public object Functions {
     dateField(map, "date") { it.day.toDouble() }
     dateField(map, "day") { (it.date.dayOfWeek.isoDayNumber % 7).toDouble() }
     dateField(map, "dayofyear") { it.date.dayOfYear.toDouble() }
+    // `week` counts **Sundays since the start of the year**, not ISO weeks: `timeWeek.count(year -
+    // 1
+    // ms, d)`, so the days before the first Sunday are week 0 and a year beginning on a Sunday has
+    // its first day in week 1. Reading it as an ISO week number puts the turn of the year one out.
+    dateField(map, "week") { sundaysBefore(it) }
+
+    // The month and weekday **names**, which upstream produces by formatting a date it builds for
+    // the purpose: `monthFormat(m)` is `%B` of 1 January 2000 with the month set to `m`, and
+    // `dayFormat(d)` is `%A` of 2 January 2000 *plus* `d` days — the 2nd because it was a Sunday,
+    // so
+    // day 0 is Sunday. Both wrap, so month 12 is January again and day −1 is Saturday, and a
+    // non-integer gives the empty string rather than a name for a day that does not exist.
+    map["monthFormat"] = ExpressionFunction { args -> monthName(args.at(0), abbreviate = false) }
+    map["monthAbbrevFormat"] = ExpressionFunction { args ->
+      monthName(args.at(0), abbreviate = true)
+    }
+    map["dayFormat"] = ExpressionFunction { args -> weekdayName(args.at(0), abbreviate = false) }
+    map["dayAbbrevFormat"] = ExpressionFunction { args ->
+      weekdayName(args.at(0), abbreviate = true)
+    }
     dateField(map, "hours") { it.hour.toDouble() }
     dateField(map, "minutes") { it.minute.toDouble() }
     dateField(map, "seconds") { it.second.toDouble() }
@@ -843,6 +910,235 @@ public object Functions {
    * reader is, `utcmonth` reads it where the data was recorded, and a chart that mixes them is
    * wrong in a way nothing complains about.
    */
+  // ---- pan and zoom -------------------------------------------------------
+
+  /**
+   * The two ends of a domain, lifted into the space the gesture is linear in.
+   *
+   * Upstream reads the **first** and the **last** element rather than the first two, so a
+   * three-stop domain pans by its outer ends. A domain of fewer than two elements is upstream's
+   * `error('Domain array must not be empty')`; here it comes back untouched, because an expression
+   * throwing takes the whole chart with it and a gesture over an empty domain has nothing to do.
+   */
+  private fun endsOf(value: VegaValue): Pair<Double, Double>? {
+    val values = (value as? VegaValue.Arr)?.values ?: return null
+    if (values.isEmpty()) return null
+    return JsSemantics.toNumber(values.first()) to JsSemantics.toNumber(values.last())
+  }
+
+  private fun interval(lo: Double, hi: Double): VegaValue =
+    VegaValue.Arr(listOf(VegaValue.Num(lo), VegaValue.Num(hi)))
+
+  /**
+   * `pan(domain, delta, lift, ground)`: shift both ends by `delta` spans of the lifted interval.
+   */
+  private fun panned(
+    domain: VegaValue,
+    delta: Double,
+    lift: (Double) -> Double,
+    ground: (Double) -> Double,
+  ): VegaValue {
+    val (d0, d1) = endsOf(domain) ?: return domain
+    val lifted0 = lift(d0)
+    val lifted1 = lift(d1)
+    val by = (lifted1 - lifted0) * delta
+    return interval(ground(lifted0 - by), ground(lifted1 - by))
+  }
+
+  /**
+   * `zoom(domain, anchor, scale, lift, ground)`: scale both ends about the anchor.
+   *
+   * A null or absent anchor is the lifted **midpoint**, which is what makes a keyboard zoom with no
+   * pointer position behave like one centred on the plot.
+   */
+  private fun zoomed(
+    domain: VegaValue,
+    anchor: VegaValue,
+    scale: Double,
+    lift: (Double) -> Double,
+    ground: (Double) -> Double,
+  ): VegaValue {
+    val (d0, d1) = endsOf(domain) ?: return domain
+    val lifted0 = lift(d0)
+    val lifted1 = lift(d1)
+    val at =
+      if (anchor is VegaValue.Null) (lifted0 + lifted1) / 2.0
+      else lift(JsSemantics.toNumber(anchor))
+    return interval(
+      ground(at + (lifted0 - at) * scale),
+      ground(at + (lifted1 - at) * scale),
+    )
+  }
+
+  private fun panFunction(
+    map: MutableMap<String, ExpressionFunction>,
+    name: String,
+    lift: (Double) -> Double,
+    ground: (Double) -> Double,
+  ) {
+    map[name] = ExpressionFunction { args -> panned(args.at(0), args.number(1), lift, ground) }
+  }
+
+  private fun zoomFunction(
+    map: MutableMap<String, ExpressionFunction>,
+    name: String,
+    lift: (Double) -> Double,
+    ground: (Double) -> Double,
+  ) {
+    map[name] = ExpressionFunction { args ->
+      zoomed(args.at(0), args.at(1), args.number(2), lift, ground)
+    }
+  }
+
+  private fun logLift(sign: Double): (Double) -> Double = { ln(sign * it) }
+
+  private fun logGround(sign: Double): (Double) -> Double = { sign * exp(it) }
+
+  /** The log pair, whose lift depends on the sign of the domain's first end. */
+  private fun signedFunction(
+    map: MutableMap<String, ExpressionFunction>,
+    name: String,
+    lift: (Double) -> (Double) -> Double,
+    ground: (Double) -> (Double) -> Double,
+    pan: Boolean,
+  ) {
+    map[name] = ExpressionFunction { args ->
+      val ends = endsOf(args.at(0)) ?: return@ExpressionFunction args.at(0)
+      val sign = kotlin.math.sign(ends.first)
+      if (pan) panned(args.at(0), args.number(1), lift(sign), ground(sign))
+      else zoomed(args.at(0), args.at(1), args.number(2), lift(sign), ground(sign))
+    }
+  }
+
+  /** `x < 0 ? -pow(-x, e) : pow(x, e)`, which is what makes a pow scale work across zero. */
+  private fun powLift(exponent: Double): (Double) -> Double = {
+    if (it < 0.0) -(-it).pow(exponent) else it.pow(exponent)
+  }
+
+  private fun exponentFunction(
+    map: MutableMap<String, ExpressionFunction>,
+    name: String,
+    pan: Boolean,
+  ) {
+    map[name] = ExpressionFunction { args ->
+      val exponent = if (pan) args.number(2) else args.number(3)
+      val lift = powLift(exponent)
+      val ground = powLift(1.0 / exponent)
+      if (pan) panned(args.at(0), args.number(1), lift, ground)
+      else zoomed(args.at(0), args.at(1), args.number(2), lift, ground)
+    }
+  }
+
+  private fun constantFunction(
+    map: MutableMap<String, ExpressionFunction>,
+    name: String,
+    pan: Boolean,
+  ) {
+    map[name] = ExpressionFunction { args ->
+      val constant = if (pan) args.number(2) else args.number(3)
+      val lift: (Double) -> Double = { kotlin.math.sign(it) * ln1p(abs(it / constant)) }
+      val ground: (Double) -> Double = { kotlin.math.sign(it) * expm1(abs(it)) * constant }
+      if (pan) panned(args.at(0), args.number(1), lift, ground)
+      else zoomed(args.at(0), args.at(1), args.number(2), lift, ground)
+    }
+  }
+
+  /** `monthFormat`/`monthAbbrevFormat`, over a month index that wraps. */
+  private fun monthName(value: VegaValue, abbreviate: Boolean): VegaValue {
+    val month = integerIndex(value) ?: return VegaValue.Str("")
+    val name = TimeFormat.MONTHS[((month % 12) + 12) % 12]
+    return VegaValue.Str(if (abbreviate) name.take(3) else name)
+  }
+
+  /** `dayFormat`/`dayAbbrevFormat`, over a weekday index that wraps; 0 is Sunday. */
+  private fun weekdayName(value: VegaValue, abbreviate: Boolean): VegaValue {
+    val day = integerIndex(value) ?: return VegaValue.Str("")
+    val name = TimeFormat.WEEKDAYS[((day % 7) + 7) % 7]
+    return VegaValue.Str(if (abbreviate) name.take(3) else name)
+  }
+
+  /**
+   * An argument upstream tests with `Number.isInteger`, which rejects a string as well as a
+   * fraction.
+   *
+   * `monthFormat("3")` is the empty string upstream, not March: the guard runs before any coercion.
+   */
+  private fun integerIndex(value: VegaValue): Int? {
+    val number = (value as? VegaValue.Num)?.value ?: return null
+    if (!number.isFinite() || floor(number) != number) return null
+    return number.toInt()
+  }
+
+  /**
+   * `week`: Sundays since the start of the year, as `d3.timeWeek.count(year - 1ms, d)` counts them.
+   *
+   * The reference instant is one millisecond *before* the year begins, so a year starting on a
+   * Sunday counts that Sunday: 1 January 2017 was a Sunday and is week 1, while 1 January 2021 was
+   * a Friday and is week 0.
+   */
+  private fun sundaysBefore(at: LocalDateTime): Double {
+    val yearStart = LocalDate(at.year, 1, 1)
+    val firstDay = yearStart.dayOfWeek.isoDayNumber % 7
+    val firstSunday = if (firstDay == 0) 0 else 7 - firstDay
+    val dayOfYear = at.date.dayOfYear - 1
+    return if (dayOfYear < firstSunday) 0.0 else ((dayOfYear - firstSunday) / 7 + 1).toDouble()
+  }
+
+  /** `timeOffset` and its UTC twin, which differ only in the calendar they step through. */
+  private fun offsetFunction(
+    map: MutableMap<String, ExpressionFunction>,
+    name: String,
+    zone: () -> TimeZone,
+  ) {
+    map[name] = ExpressionFunction { args ->
+      val stepper = stepperFor(args.string(0), zone()) ?: return@ExpressionFunction VegaValue.Null
+      val at = JsSemantics.toNumber(args.at(1))
+      if (!at.isFinite()) return@ExpressionFunction VegaValue.Null
+      // The step defaults to **one**, and it has to be read as absent rather than coerced:
+      // `Number()` of a missing argument is 0, which offsets by nothing and returns the date it was
+      // handed. That is d3's rule — `step == null ? 1 : Math.floor(step)`.
+      val by = args.numberOr(2, 1.0).takeIf { it.isFinite() } ?: 1.0
+      VegaValue.Num(stepper.offset(at, floor(by).toInt()))
+    }
+  }
+
+  /**
+   * `timeSequence` and its UTC twin: every unit **boundary** in `[start, stop)`.
+   *
+   * The boundaries, not the offsets. This walked from `start` itself and said in a comment that
+   * doing so was upstream's rule; it is not. d3's `interval.range` *ceils* the start to the next
+   * boundary and floors again after every step, so `timeSequence('day', Jan 1 at noon, Jan 4)`
+   * gives the two midnights Jan 2 and Jan 3 — where stepping from noon gave three entries, each
+   * half a day late. The re-floor matters for the uneven units: a month's step from 31 January
+   * lands on 2 or 3 March, and flooring puts it back on the first.
+   */
+  private fun sequenceFunction(
+    map: MutableMap<String, ExpressionFunction>,
+    name: String,
+    zone: () -> TimeZone,
+  ) {
+    map[name] = ExpressionFunction { args ->
+      val stepper =
+        stepperFor(args.string(0), zone()) ?: return@ExpressionFunction VegaValue.Arr(emptyList())
+      val start = JsSemantics.toNumber(args.at(1))
+      val stop = JsSemantics.toNumber(args.at(2))
+      if (!start.isFinite() || !stop.isFinite()) {
+        return@ExpressionFunction VegaValue.Arr(emptyList())
+      }
+      val by = JsSemantics.toNumber(args.at(3)).takeIf { it.isFinite() && it != 0.0 } ?: 1.0
+      val out = mutableListOf<VegaValue>()
+      val floored = stepper.floor(start)
+      var at = if (floored < start) stepper.floor(stepper.offset(floored, 1)) else floored
+      var guard = 0
+      while (at < stop && guard < MAX_SEQUENCE) {
+        out.add(VegaValue.Num(at))
+        at = stepper.floor(stepper.offset(at, by.toInt()))
+        guard++
+      }
+      VegaValue.Arr(out)
+    }
+  }
+
   private fun dateField(
     map: MutableMap<String, ExpressionFunction>,
     name: String,

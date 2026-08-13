@@ -18,7 +18,13 @@ import kotlinx.datetime.toLocalDateTime
  */
 public object TimeFormat {
 
-  private val MONTHS =
+  /**
+   * The month names `%B` writes, shared rather than restated.
+   *
+   * `monthFormat()` needs the same list, and upstream gets it the same way — by formatting a date
+   * it builds for the purpose — so two copies would be two things to keep in step.
+   */
+  public val MONTHS: List<String> =
     listOf(
       "January",
       "February",
@@ -34,7 +40,8 @@ public object TimeFormat {
       "December",
     )
 
-  private val WEEKDAYS =
+  /** The weekday names `%A` writes, Sunday first, which is the week d3 labels against. */
+  public val WEEKDAYS: List<String> =
     listOf("Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday")
 
   /** The local date and time at [millis] in [zone]. */
