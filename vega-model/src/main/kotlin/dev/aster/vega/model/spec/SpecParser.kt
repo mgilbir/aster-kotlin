@@ -31,10 +31,12 @@ private val CONFIG_HONOURED =
     // `config.range` is not a guide block: its entries are what a *named* range stands for.
     "range",
     "mark",
-    // The frame's own paint. Consumed here so the block walker keeps it rather than reporting it;
-    // it
-    // is read out of the raw config by name, because it belongs to the view and not to any mark.
+    // The frame's own paint, read out of the raw config by name because it belongs to the view
+    // rather
+    // than to any mark. Consumed here so the block walker keeps it instead of reporting it.
     "group",
+    // The event policy, read the same way and for the same reason.
+    "events",
     // A projection's defaults, merged under each projection the way `config.title` is merged under
     // the title: a theme naming `mercator` once means no chart has to name it again.
     "projection",
@@ -72,6 +74,9 @@ private val CONFIG_HONOURED =
  */
 /** Everything an `on` handler may say. */
 private val SIGNAL_HANDLER_CONSUMED = setOf("events", "update", "encode", "force")
+
+private val EVENT_CONFIG_CONSUMED =
+  setOf("view", "window", "selector", "timer", "defaults", "bind", "globalCursor")
 
 /** Everything the object form of an event stream may say. */
 private val EVENT_STREAM_CONSUMED =
@@ -971,6 +976,11 @@ public class SpecParser {
           (root.fields["description"] ?: configScalar(root, "description"))?.asString()?.takeIf {
             it.isNotBlank()
           },
+        events =
+          parseEventConfig(
+            (root.fields["config"] as? VegaValue.Obj)?.fields?.get("events"),
+            "$.config.events",
+          ),
       )
 
     reportUnsupportedTopLevel(root)
@@ -1017,6 +1027,31 @@ public class SpecParser {
       }
     }
     return GuideConfig(blocks)
+  }
+
+  /**
+   * `config.events` — the embedder's policy on listeners, upstream's `initializeEventConfig`.
+   *
+   * Read straight out of the raw config rather than through [parseConfig]'s block walk, because it
+   * is not a guide block: nothing about it reaches a mark's paint. What it decides is whether a
+   * listener is attached at all, which is enforced where the listeners are made.
+   */
+  private fun parseEventConfig(value: VegaValue?, path: String): EventConfig {
+    val obj = value as? VegaValue.Obj ?: return EventConfig()
+    val defaults = obj.fields["defaults"] as? VegaValue.Obj
+    defaults?.reportUnhandled("Event default", "$path.defaults", setOf("prevent", "allow"))
+    obj.reportUnhandled("Event config", path, EVENT_CONFIG_CONSUMED)
+    return EventConfig(
+      view = EventPermit.of(obj.fields["view"]),
+      window = EventPermit.of(obj.fields["window"]),
+      selector = EventPermit.of(obj.fields["selector"]),
+      // The one key upstream leaves un-unpacked; see [EventPermit.of].
+      timer = EventPermit.of(obj.fields["timer"], unpackArrays = false),
+      preventDefault = EventPermit.of(defaults?.fields?.get("prevent")),
+      allowDefault = EventPermit.of(defaults?.fields?.get("allow")),
+      bind = (obj.fields["bind"] as? VegaValue.Bool)?.value ?: true,
+      globalCursor = (obj.fields["globalCursor"] as? VegaValue.Bool)?.value ?: false,
+    )
   }
 
   /** A chart-level value written in `config` rather than at the top level. */
@@ -1258,22 +1293,28 @@ public class SpecParser {
       (obj.fields["between"] as? VegaValue.Arr)?.values?.mapNotNull {
         (it as? VegaValue.Obj)?.let { child -> parseEventStreamObject(child, path, defaultSource) }
       } ?: emptyList()
+    val throttle = obj.fields["throttle"]?.asDouble()?.takeIf { !it.isNaN() && it != 0.0 }
     obj.reportUnhandled("Event stream", path, EVENT_STREAM_CONSUMED)
-    return EventStream(
-      source = obj.fields["source"]?.asString()?.takeIf { it.isNotEmpty() } ?: defaultSource,
-      type = type,
-      markType = obj.fields["marktype"]?.asString()?.takeIf { it.isNotEmpty() },
-      markName = obj.fields["markname"]?.asString()?.takeIf { it.isNotEmpty() },
-      filters =
-        (obj.fields["filter"] as? VegaValue.Arr)?.values?.map { it.asString() }
-          ?: obj.fields["filter"]?.asString()?.let { listOf(it) }
-          ?: emptyList(),
-      throttle = obj.fields["throttle"]?.asDouble()?.takeIf { !it.isNaN() && it != 0.0 },
-      debounce = obj.fields["debounce"]?.asDouble()?.takeIf { !it.isNaN() && it != 0.0 },
-      consume = (obj.fields["consume"] as? VegaValue.Bool)?.value ?: false,
-      between = between,
+    return EventSelector.asTimerStream(
+      EventStream(
+        source = obj.fields["source"]?.asString()?.takeIf { it.isNotEmpty() } ?: defaultSource,
+        type = type,
+        markType = obj.fields["marktype"]?.asString()?.takeIf { it.isNotEmpty() },
+        markName = obj.fields["markname"]?.asString()?.takeIf { it.isNotEmpty() },
+        filters = obj.eventFilters(),
+        throttle = throttle,
+        debounce = obj.fields["debounce"]?.asDouble()?.takeIf { !it.isNaN() && it != 0.0 },
+        consume = (obj.fields["consume"] as? VegaValue.Bool)?.value ?: false,
+        between = between,
+      )
     )
   }
+
+  /** One filter or a list of them; both forms mean "all of these must hold". */
+  private fun VegaValue.Obj.eventFilters(): List<String> =
+    (fields["filter"] as? VegaValue.Arr)?.values?.map { it.asString() }
+      ?: fields["filter"]?.asString()?.let { listOf(it) }
+      ?: emptyList()
 
   private fun parsePadding(value: VegaValue?, path: String): Padding =
     when (value) {

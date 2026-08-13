@@ -341,6 +341,10 @@ shows them spread down the page.
 The reason there are frames at all is worth understanding before anyone touches it: the timer is not
 animating anything, it is standing in for a loop Vega's expression language cannot express.
 
+The stream itself now parses as what it is — a `timer` source rather than a view event of type
+`timer` — and the dispatcher reports that firing it needs a clock. Before that the loop below did not
+merely fail to run; nothing said so.
+
 | signal | role |
 | --- | --- |
 | `shiftArray` | how far each label must move to clear the one above it |
@@ -431,6 +435,26 @@ has one blind spot worth remembering: anything upstream decides at *render* time
 chart drawing in the wrong order agreed on every compared number. If you suspect a gap that the
 fixtures cannot see, ask whether the behaviour lives in the scene or in the renderer, and if it is the
 renderer then probe upstream's **SVG** and pin the answer in a unit test.
+
+**Every `config` block is now read, and the last one to arrive was the odd one out.** `config.events`
+is not a drawing instruction: it is the embedder's policy on which listeners a view may attach, so a
+host that writes `{"events": {"window": false}}` is refusing to let a chart it did not write watch the
+pointer across the whole page. Parsed-and-dropped meant that refusal was ignored in silence. It is
+enforced where the listeners are *made* — upstream's `permit`, called from `events()` — and not where
+events arrive, because a policy that let the listener register and then filtered the events would
+report nothing and behave almost the same until it did not. Two details are worth not re-deriving,
+both probed: a **list is an allow-list**, and `timer` is the one key upstream's
+`initializeEventConfig` leaves un-unpacked, so an array there matches nothing and permits nothing —
+carried through as upstream carries it rather than corrected.
+
+Implementing it turned up an unrelated silent gap in the same machinery. `{"type": "timer"}` is not an
+event type but a **source**, with the throttle as its interval, and upstream's stream parser rewrites
+it one layer above the selector grammar — which we had not. So a timer stream read as a view event of
+type `timer` that nothing ever raises: the signal simply never changed, and said nothing about why.
+Both spellings (`"timer{500}"` and the object form) are now folded onto a `timer` source in
+`EventSelector.asTimerStream`, which is also what makes the `timer` policy key reachable, and the
+dispatcher reports that firing one needs a clock it does not have. See "Possible future work: a timer
+used as a `for` loop" above — that is the one specification in the corpus that wants it.
 
 **`Functions.knownUnsupported` is empty, and it should stay that way.** It is a list of work, not a
 verdict: every entry that was ever on it came off, and each excuse was softer than it read. If you add

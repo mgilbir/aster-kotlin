@@ -1,6 +1,8 @@
 package dev.aster.vega.model.spec
 
 import dev.aster.vega.model.VegaValue
+import dev.aster.vega.model.asBoolean
+import dev.aster.vega.model.asString
 
 /**
  * Parsed Vega specification.
@@ -28,6 +30,8 @@ public data class VegaSpec(
    * `config.group` set, the root item carries the fill and an inner group mark does not.
    */
   val frameConfig: Map<String, VegaValue> = emptyMap(),
+  /** `config.events` — which event listeners a view is allowed to attach, and what it prevents. */
+  val events: EventConfig = EventConfig(),
   val signals: List<SignalSpec>,
   val data: List<DataSpec>,
   val scales: List<ScaleSpec>,
@@ -944,6 +948,84 @@ public data class AxisSpec(
  * prefix, and so are the widths, dashes and opacities. A label uses [color] as a fill and the rest
  * use it as a stroke, which is the only asymmetry.
  */
+/**
+ * `config.events` — the view's event-handling policy.
+ *
+ * Not a drawing instruction, which is why it took so long to reach: it decides which listeners a
+ * view may attach and which browser defaults it suppresses. Both halves matter to a host that
+ * embeds a chart it did not write. A specification asking for `window:mousemove` is asking to watch
+ * the pointer across the whole page, and `{"events": {"window": false}}` is how the embedder says
+ * no — upstream blocks the listener and *warns*, rather than failing the chart.
+ *
+ * [preventDefault] and [allowDefault] are upstream's `defaults.prevent` and `defaults.allow`, and
+ * the pair is read in that order: `prevent: true` suppresses everything, `allow: true` suppresses
+ * nothing, and a **list** names the types one way or the other. They reach a host rather than this
+ * engine, which has no browser event to suppress; carrying them is what lets the host obey the
+ * specification instead of guessing.
+ */
+public data class EventConfig(
+  /** Sources whose listeners are permitted. [EventPermit.Unrestricted] means "no rule". */
+  val view: EventPermit = EventPermit.Unrestricted,
+  val window: EventPermit = EventPermit.Unrestricted,
+  val selector: EventPermit = EventPermit.Unrestricted,
+  /**
+   * Timer streams, keyed by their **throttle** rather than by an event name — a timer has no type,
+   * so `{"timer": {"500": true}}` permits a stream that fires every 500ms and no other.
+   */
+  val timer: EventPermit = EventPermit.Unrestricted,
+  /** `true`/`false` for all types, or the named ones. */
+  val preventDefault: EventPermit = EventPermit.Unrestricted,
+  val allowDefault: EventPermit = EventPermit.Unrestricted,
+  /** `config.events.bind` — whether a signal may be bound to an input element at all. */
+  val bind: Boolean = true,
+  /**
+   * `config.events.globalCursor` — whether a cursor is set on the document rather than the view.
+   */
+  val globalCursor: Boolean = false,
+)
+
+/**
+ * A rule that is either a blanket answer or a list of event types.
+ *
+ * `{"window": false}` blocks every window listener; `{"window": ["mousemove"]}` blocks all but that
+ * one. Upstream stores the list as a set and tests membership, so a type it does not name is
+ * refused — a list is an allow-list, not a hint.
+ */
+public sealed interface EventPermit {
+  /** No rule at all, which permits everything and prevents nothing. */
+  public data object Unrestricted : EventPermit
+
+  public data class All(val value: Boolean) : EventPermit
+
+  public data class Types(val types: Set<String>) : EventPermit
+
+  public companion object {
+    /**
+     * @param unpackArrays whether a JSON array names the types. Upstream unpacks arrays into sets
+     *   for `view`, `window`, `selector` and the two `defaults`, but **not** for `timer` — so a
+     *   `{"timer": [500]}` is left an array and tested as an object, whose keys are indices. The
+     *   effect is that the array form permits nothing there, and it is passed through faithfully
+     *   rather than corrected: a host that copies a theme should behave as upstream does with it.
+     */
+    public fun of(value: VegaValue?, unpackArrays: Boolean = true): EventPermit =
+      when (value) {
+        null,
+        is VegaValue.Null -> Unrestricted
+        is VegaValue.Bool -> All(value.value)
+        // An un-unpacked array is tested as an object, whose keys are indices rather than event
+        // types — so nothing an event or a timer is ever called matches one, and it permits
+        // nothing.
+        is VegaValue.Arr ->
+          if (unpackArrays) Types(value.values.map { it.asString() }.toSet()) else Types(emptySet())
+        // `{"view": {"mousemove": true}}` — the same allow-list written out, and a key set to
+        // `false` is a refusal rather than a mention.
+        is VegaValue.Obj -> Types(value.fields.filterValues { it.asBoolean() }.keys.toSet())
+        // A number or a string is neither `false` nor an object, so upstream permits.
+        else -> Unrestricted
+      }
+  }
+}
+
 public data class GuideStroke(
   val color: String? = null,
   val width: Double? = null,

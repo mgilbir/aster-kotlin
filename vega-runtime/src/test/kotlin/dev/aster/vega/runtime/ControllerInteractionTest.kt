@@ -148,6 +148,34 @@ class ControllerInteractionTest {
     assertEquals(revision, controller.state.value.snapshot.revision)
   }
 
+  /**
+   * `config.events` refuses a listener, and the refusal is *told*.
+   *
+   * The dispatcher has always reported as it registered — a blocked stream, a debounce nothing can
+   * schedule — into a collector this controller threw away, so a host asking for the diagnostics
+   * saw only the compiler's. A policy whose enforcement is invisible is indistinguishable from one
+   * that was ignored, which is the failure this whole block exists to prevent.
+   */
+  @Test
+  fun `a refused listener is reported to the host`() {
+    controller.setSpec(
+      json.replace(
+        """"signals": [""",
+        """"config": {"events": {"view": ["click"]}},
+           "signals": [""",
+      )
+    )
+    val reported = controller.state.value.diagnostics.map { it.message }
+    assertTrue(
+      reported.any { it.startsWith("Blocked view mousedown event listener") },
+      reported.toString(),
+    )
+    // And the refusal is narrow: the click handler on the same chart still fires.
+    controller.dispatch(ChartInputEvent.Tap(onSecondBar))
+    assertEquals(VegaValue.Str("b"), controller.lastCompiled!!.signals["picked"])
+    assertEquals(VegaValue.Num(0.0), controller.lastCompiled!!.signals["taps"])
+  }
+
   /** Loading a new specification forgets what the old one's handlers had set. */
   @Test
   fun `setSpec clears the accumulated signal values`() {

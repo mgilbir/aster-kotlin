@@ -89,7 +89,22 @@ class EventSelectorTest {
     assertEquals("view:click throttle=200", parse("click{200}"))
     assertEquals("view:click throttle=200 debounce=300", parse("click{200, 300}"))
     assertEquals("view:mousemove debounce=100", parse("mousemove{, 100}"))
-    assertEquals("view:timer throttle=500", parse("timer{500}"))
+  }
+
+  /**
+   * `timer` reads as a **source** and not as an event type, with the throttle as its interval.
+   *
+   * The selector grammar alone cannot tell: upstream's `parseSelector("timer{500}")` returns
+   * `{source: "view", type: "timer", throttle: 500}`, and it is the *stream* parser one layer up
+   * that recognises the type and rewrites it. Folding that in here means no reader of an
+   * [EventStream] has to know that one type name is secretly a source — a clock that arrived
+   * labelled `view:timer` would wait forever for an event nothing ever raises.
+   */
+  @Test
+  fun `a timer is a source rather than a type`() {
+    assertEquals("timer:500 throttle=500", parse("timer{500}"))
+    // The spelling with the interval after the colon needs no rewriting; it says so already.
+    assertEquals("timer:500", parse("timer:500"))
   }
 
   /** A `!` consumes the event, so no other stream sees it. */

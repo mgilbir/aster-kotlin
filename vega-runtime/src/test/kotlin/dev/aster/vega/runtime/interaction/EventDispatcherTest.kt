@@ -5,7 +5,10 @@ import dev.aster.vega.expression.ExpressionScope
 import dev.aster.vega.expression.VegaExpressionCompiler
 import dev.aster.vega.model.DiagnosticCollector
 import dev.aster.vega.model.VegaValue
+import dev.aster.vega.model.spec.EventConfig
+import dev.aster.vega.model.spec.EventPermit
 import dev.aster.vega.model.spec.EventSelector
+import dev.aster.vega.model.spec.EventStream
 import dev.aster.vega.model.spec.SignalHandler
 import dev.aster.vega.model.spec.SignalUpdate
 import org.junit.jupiter.api.Assertions.assertEquals
@@ -40,12 +43,15 @@ class EventDispatcherTest {
       ),
     )
 
-  private fun dispatcher(vararg bindings: HandlerBinding) =
+  private fun dispatcher(vararg bindings: HandlerBinding) = dispatcher(EventConfig(), *bindings)
+
+  private fun dispatcher(events: EventConfig, vararg bindings: HandlerBinding) =
     EventDispatcher(
       bindings.toList(),
       CachingExpressionCompiler(VegaExpressionCompiler()),
       diagnostics,
       emptyScope,
+      events,
     )
 
   private fun event(
@@ -53,8 +59,17 @@ class EventDispatcherTest {
     at: Long = 0,
     markType: String? = null,
     markName: String? = null,
+    source: String = EventStream.SOURCE_VIEW,
     properties: Map<String, VegaValue> = emptyMap(),
-  ) = InputEvent(type, at, markType = markType, markName = markName, properties = properties)
+  ) =
+    InputEvent(
+      type,
+      at,
+      source = source,
+      markType = markType,
+      markName = markName,
+      properties = properties,
+    )
 
   private fun fired(dispatcher: EventDispatcher, event: InputEvent): String =
     dispatcher.dispatch(event).joinToString(",") { it.signalName }
@@ -227,6 +242,76 @@ class EventDispatcherTest {
     assertEquals("", fired(d, event("mousemove")))
     assertTrue(
       diagnostics.diagnostics.any { it.message.contains("wrapping another 'between'") },
+      diagnostics.diagnostics.toString(),
+    )
+  }
+
+  /**
+   * `config.events` refuses the listener rather than the event.
+   *
+   * A host that embeds a chart it did not write says `{"window": false}` to keep it from watching
+   * the pointer across the whole page. The rest of the chart still works, which is why this is a
+   * warning and not a failure — and the view listener below proves the refusal is narrow.
+   */
+  @Test
+  fun `a blocked source does not get a listener`() {
+    val d =
+      dispatcher(
+        EventConfig(window = EventPermit.All(false)),
+        binding("windowed", "window:mousemove"),
+        binding("viewed", "mousemove"),
+      )
+    assertEquals("viewed", fired(d, event("mousemove", source = EventStream.SOURCE_VIEW)))
+    assertEquals("", fired(d, event("mousemove", source = EventStream.SOURCE_WINDOW)))
+    assertTrue(
+      diagnostics.diagnostics.any {
+        it.message.startsWith("Blocked window mousemove event listener")
+      },
+      diagnostics.diagnostics.toString(),
+    )
+  }
+
+  /** A list names the types that are allowed, so one it does not name is refused. */
+  @Test
+  fun `a type list is an allow-list`() {
+    val d =
+      dispatcher(
+        EventConfig(view = EventPermit.Types(setOf("click"))),
+        binding("clicked", "click"),
+        binding("moved", "mousemove"),
+      )
+    assertEquals("clicked", fired(d, event("click")))
+    assertEquals("", fired(d, event("mousemove")))
+  }
+
+  /** A `scope` stream listens on the view, so the view rule governs it. */
+  @Test
+  fun `a scope stream is governed by the view rule`() {
+    val d =
+      dispatcher(
+        EventConfig(view = EventPermit.All(false)),
+        HandlerBinding(
+          "s",
+          SignalHandler(
+            streams = EventSelector.parse("click", EventStream.SOURCE_SCOPE),
+            update = SignalUpdate.Expression("1"),
+          ),
+        ),
+      )
+    assertEquals("", fired(d, event("click", source = EventStream.SOURCE_SCOPE)))
+    assertTrue(
+      diagnostics.diagnostics.any { it.message.startsWith("Blocked view click event listener") },
+      diagnostics.diagnostics.toString(),
+    )
+  }
+
+  /** A timer fires on its own, which needs a clock this dispatcher does not have. */
+  @Test
+  fun `a timer stream is reported as needing a clock`() {
+    val d = dispatcher(binding("s", "timer{500}"))
+    assertEquals("", fired(d, event("timer")))
+    assertTrue(
+      diagnostics.diagnostics.any { it.message.contains("needs a clock") },
       diagnostics.diagnostics.toString(),
     )
   }

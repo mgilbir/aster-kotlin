@@ -9,6 +9,7 @@ import dev.aster.vega.model.DiagnosticCollector
 import dev.aster.vega.model.DiagnosticSeverity
 import dev.aster.vega.model.VegaDiagnostic
 import dev.aster.vega.model.VegaValue
+import dev.aster.vega.model.spec.EventConfig
 import dev.aster.vega.runtime.compile.CompiledSpec
 import dev.aster.vega.runtime.compile.SpecCompiler
 import dev.aster.vega.runtime.interaction.EventDispatcher
@@ -247,16 +248,29 @@ public class VegaChartController(
       compiled.spec?.signals.orEmpty().flatMap { signal ->
         signal.on.map { HandlerBinding(signal.name, it) }
       }
+    // The dispatcher reports as it registers — a stream a policy blocked, a debounce nothing can
+    // schedule — and those went into a collector nobody read. They are published with the
+    // compiler's
+    // own, since a listener that was refused is exactly the kind of thing a host needs told.
+    val listenerDiagnostics = DiagnosticCollector()
     vegaEvents =
       if (bindings.isEmpty()) {
         null
       } else {
-        EventDispatcher(bindings, expressions, DiagnosticCollector(), compiled.signals)
+        EventDispatcher(
+          bindings,
+          expressions,
+          listenerDiagnostics,
+          compiled.signals,
+          // The embedder's event policy, refused at the listener rather than at the event.
+          compiled.spec?.events ?: EventConfig(),
+        )
       }
-    _diagnostics.value = compiled.diagnostics
+    val diagnostics = compiled.diagnostics + listenerDiagnostics.diagnostics
+    _diagnostics.value = diagnostics
     val scene = compiled.scene
     if (scene == null) {
-      _state.value = _state.value.copy(isLoading = false, diagnostics = compiled.diagnostics)
+      _state.value = _state.value.copy(isLoading = false, diagnostics = diagnostics)
       return compiled
     }
     val revision = nextRevision++
@@ -271,7 +285,7 @@ public class VegaChartController(
             revision = revision,
           ),
         isLoading = false,
-        diagnostics = compiled.diagnostics,
+        diagnostics = diagnostics,
       )
     return compiled
   }

@@ -1,5 +1,7 @@
 package dev.aster.vega.model.spec
 
+import dev.aster.vega.model.canonicalNumberString
+
 /**
  * One event stream: what to listen to, and what has to be true for it to fire.
  *
@@ -29,6 +31,13 @@ public data class EventStream(
 
     /** A stream reaching only into the group it was declared in, rather than the whole view. */
     public const val SOURCE_SCOPE: String = "scope"
+
+    /**
+     * A clock rather than an input: `{"type": "timer", "throttle": 500}`. It has no event type of
+     * its own, so the [type] carries the interval — which is also the key `config.events.timer`
+     * tests, upstream's `permit(view, 'timer', throttle)`.
+     */
+    public const val SOURCE_TIMER: String = "timer"
   }
 }
 
@@ -83,7 +92,31 @@ public object EventSelector {
   public fun parse(
     selector: String,
     defaultSource: String = EventStream.SOURCE_VIEW,
-  ): List<EventStream> = splitTopLevel(selector.trim()).map { parseOne(it, defaultSource) }
+  ): List<EventStream> =
+    splitTopLevel(selector.trim()).map { asTimerStream(parseOne(it, defaultSource)) }
+
+  /**
+   * Upstream's `eventStream`: a `type` of `"timer"` names a **source** and not an event.
+   *
+   * Both spellings mean the same clock — `"timer{500}"` as a selector string and `{"type": "timer",
+   * "throttle": 500}` as an object — so both are folded onto the [EventStream.SOURCE_TIMER] source
+   * here. The throttle becomes the stream's type because that is what a timer is identified and
+   * permitted by, and everything that only makes sense for a pointer is dropped, as upstream drops
+   * it.
+   */
+  public fun asTimerStream(stream: EventStream): EventStream =
+    if (stream.type != EventStream.SOURCE_TIMER || stream.source == EventStream.SOURCE_TIMER) {
+      stream
+    } else {
+      EventStream(
+        source = EventStream.SOURCE_TIMER,
+        type = canonicalNumberString(stream.throttle ?: 0.0),
+        throttle = stream.throttle,
+        filters = stream.filters,
+        consume = stream.consume,
+        between = stream.between,
+      )
+    }
 
   private fun parseOne(text: String, defaultSource: String): EventStream =
     if (text.startsWith("[")) parseBetween(text, defaultSource)
