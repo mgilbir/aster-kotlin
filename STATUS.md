@@ -2015,11 +2015,14 @@ one the stack groups by, and a stacked area over a binned column had gaps its ow
 see. The mark then reads that same column rather than working the midpoint out again: it is already
 there, because the imputation had to have it.
 
-The fixture written for it named another runtime gap. A path mark whose rows include a value no
-scale can place keeps those rows — that is what `break-paths-show-domains` means — and the *scene*
-is supposed to leave them out of the path, which is what the mark's `defined` says. This runtime
-includes them, so an area over a column with nulls in it is drawn through points upstream omits. The
-fixture is written over a column with no nulls rather than passed off as working.
+The fixture written for it named another runtime gap, and a later attempt on that gap narrowed what
+it actually is. A stacked area over a bucketed column *with nulls in it* comes out with the wrong
+number of vertices: upstream's outline has ten buckets in it and this runtime's has eleven. The
+obvious reading — that the path is drawn through points the mark's `defined` says to omit — is
+**wrong**: dropping the broken points gives nine, not ten. One bucket more than upstream's is
+reaching the mark, so the difference is in the *rows* the imputation produces rather than in how the
+path is traced. That is where the next attempt should start; the change that assumed otherwise was
+reverted rather than shipped. The fixture is written over a column with no nulls meanwhile.
 
 ### Three rules about what a channel *is*
 
