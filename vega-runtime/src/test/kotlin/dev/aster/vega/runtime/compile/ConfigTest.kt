@@ -260,18 +260,29 @@ class ConfigTest {
    */
   @Test
   fun `config blocks that do not reach the chart are reported`() {
-    // `range` came off this list: its entries are what a *named* range stands for, and the parser
-    // substitutes one for the name exactly as upstream does.
+    // The list emptied one block at a time. `range` came off first — its entries are what a *named*
+    // range stands for, and the parser substitutes one for the name as upstream does. Then `group`,
+    // which reaches a group mark through the same `config[type]` lookup every other mark type uses,
+    // and `projection`, which merges under each projection as `config.title` merges under the
+    // title.
+    // What is left is `events`, and it is not a drawing instruction at all: it decides which
+    // browser
+    // events a view calls `preventDefault` on, which a compiled scene has no equivalent of.
     val diagnostics =
-      compile("""{"group": {"fill": "#eee"}, "projection": {}}""").diagnostics.filter {
+      compile("""{"events": {"defaults": {"allow": ["wheel"]}}}""").diagnostics.filter {
         it.code == DiagnosticCodes.PARSE_UNKNOWN_PROPERTY
       }
-    for (name in listOf("group", "projection")) {
-      assertTrue(
-        diagnostics.any { it.jsonPath == "$.config.$name" },
-        "$name not reported in $diagnostics",
-      )
-    }
+    assertTrue(
+      diagnostics.any { it.jsonPath == "$.config.events" },
+      "events not reported in $diagnostics",
+    )
+    // And the four that are chart-level *values* rather than blocks are read, not reported: saying
+    // they had been ignored sent a reader looking for a bug that was not there.
+    val scalars =
+      compile("""{"background": "#eee", "padding": 7, "autosize": "fit", "description": "d"}""")
+        .diagnostics
+        .filter { it.code == DiagnosticCodes.PARSE_UNKNOWN_PROPERTY }
+    assertTrue(scalars.isEmpty(), scalars.toString())
   }
 
   /**

@@ -167,9 +167,9 @@ public class ParsedExpression(
 /**
  * Parses Vega expressions into evaluable trees.
  *
- * Replaces [UnsupportedExpressionCompiler]. Wrap it in [CachingExpressionCompiler] to avoid
- * reparsing the same source, which Vega specifications do constantly — the same encode expression
- * runs once per datum.
+ * The real one; [RefusingExpressionCompiler] is the stand-in that evaluates nothing. Wrap it in
+ * [CachingExpressionCompiler] to avoid reparsing the same source, which Vega specifications do
+ * constantly — the same encode expression runs once per datum.
  */
 public class VegaExpressionCompiler(private val evaluator: Evaluator = Evaluator()) :
   ExpressionCompiler {

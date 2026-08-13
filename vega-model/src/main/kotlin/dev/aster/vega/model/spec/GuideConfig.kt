@@ -67,7 +67,13 @@ public class GuideConfig(private val blocks: Map<String, VegaValue.Obj>) {
    */
   public fun markDefaults(type: String, styles: List<String>): Pair<VegaValue.Obj, VegaValue.Obj> {
     val above = LinkedHashMap<String, VegaValue>()
-    above.putAll(block(type).fields)
+    // `group` is the one type whose block is **not** a mark default: `config.group` paints the
+    // view's
+    // own frame and leaves group marks alone. Probed — with it set, upstream's root item carries
+    // the
+    // fill and an inner group mark does not — and reading it here as well put a tinted rectangle
+    // behind every group a specification wrote.
+    if (type != "group") above.putAll(block(type).fields)
     for (name in styles) above.putAll(styleBlock(name).fields)
     return block("mark") to VegaValue.Obj(above)
   }
@@ -90,6 +96,15 @@ public class GuideConfig(private val blocks: Map<String, VegaValue.Obj>) {
 
   /** `config.title` — the chart's own heading, which has no guide-style layer beneath it. */
   public fun titleDefaults(): List<VegaValue.Obj> = listOf(block("title"))
+
+  /**
+   * `config.projection` — what every projection starts from before it says anything for itself.
+   *
+   * A theme naming `mercator` once, or setting a `precision` for the whole chart, means no
+   * projection has to repeat it. Merged the same way a title's config is: the projection's own
+   * properties win.
+   */
+  public fun projectionDefaults(): List<VegaValue.Obj> = listOf(block("projection"))
 
   /**
    * `style["guide-label"]` and `style["guide-title"]` rewritten in guide property names.

@@ -8,8 +8,8 @@ import org.junit.jupiter.api.Test
 class ExpressionCompilerTest {
 
   @Test
-  fun `unsupported compiler reports a diagnostic instead of returning null`() {
-    val result = UnsupportedExpressionCompiler().compile("datum.value * 2")
+  fun `a refusing compiler reports a diagnostic instead of returning null`() {
+    val result = RefusingExpressionCompiler().compile("datum.value * 2")
     assertTrue(result is ExpressionResult.Failed, "expected a failure, got $result")
     val failure = result as ExpressionResult.Failed
     assertEquals(DiagnosticCodes.EXPRESSION_UNSUPPORTED_FUNCTION, failure.diagnostic.code)
@@ -59,7 +59,7 @@ class ExpressionCompilerTest {
 
   private class CountingCompiler : ExpressionCompiler {
     var calls = 0
-    private val delegate = UnsupportedExpressionCompiler()
+    private val delegate = RefusingExpressionCompiler()
 
     override fun compile(source: String): ExpressionResult {
       calls++

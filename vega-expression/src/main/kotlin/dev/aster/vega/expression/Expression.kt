@@ -331,20 +331,21 @@ public class CachingExpressionCompiler(
 }
 
 /**
- * The compiler in place until Milestone 4.
+ * A compiler that refuses everything, for a caller that has to hand one over and evaluates nothing.
  *
- * It refuses every expression with a structured diagnostic rather than returning a null value, so a
- * specification that needs expressions fails visibly instead of rendering something wrong
- * (PROJECT_BRIEF.md 3.3: "Never silently ignore an unsupported operator").
+ * What is left of the placeholder that stood in before there was an expression engine: it said
+ * "planned for Milestone 4", which stopped being true a long time ago and would have been a
+ * puzzling thing for a chart to report. It refuses with a **structured diagnostic** rather than a
+ * null, which is the part worth keeping — PROJECT_BRIEF.md 3.3, never silently ignore what you
+ * cannot do.
  */
-public class UnsupportedExpressionCompiler : ExpressionCompiler {
+public class RefusingExpressionCompiler : ExpressionCompiler {
   override fun compile(source: String): ExpressionResult =
     ExpressionResult.Failed(
       VegaDiagnostic(
         severity = dev.aster.vega.model.DiagnosticSeverity.ERROR,
         code = DiagnosticCodes.EXPRESSION_UNSUPPORTED_FUNCTION,
-        message =
-          "Expression evaluation is not implemented yet (planned for Milestone 4): '$source'",
+        message = "This compiler evaluates no expressions; '$source' was refused",
       )
     )
 }

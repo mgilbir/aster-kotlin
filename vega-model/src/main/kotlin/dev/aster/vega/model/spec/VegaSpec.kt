@@ -19,6 +19,15 @@ public data class VegaSpec(
   val padding: Padding,
   val autosize: Autosize,
   val background: String?,
+  /**
+   * `config.group` — the paint on the chart's own **frame**, not on its group marks.
+   *
+   * Worth stating because the name suggests otherwise and this engine got it wrong first:
+   * upstream's comment calls it "defaults for top-level group marks", but the block it reaches is
+   * the root frame, the rectangle the whole view is drawn inside. Probed both ways — with
+   * `config.group` set, the root item carries the fill and an inner group mark does not.
+   */
+  val frameConfig: Map<String, VegaValue> = emptyMap(),
   val signals: List<SignalSpec>,
   val data: List<DataSpec>,
   val scales: List<ScaleSpec>,

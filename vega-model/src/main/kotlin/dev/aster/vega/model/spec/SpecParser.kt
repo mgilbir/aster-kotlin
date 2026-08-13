@@ -31,6 +31,13 @@ private val CONFIG_HONOURED =
     // `config.range` is not a guide block: its entries are what a *named* range stands for.
     "range",
     "mark",
+    // The frame's own paint. Consumed here so the block walker keeps it rather than reporting it;
+    // it
+    // is read out of the raw config by name, because it belongs to the view and not to any mark.
+    "group",
+    // A projection's defaults, merged under each projection the way `config.title` is merged under
+    // the title: a theme naming `mercator` once means no chart has to name it again.
+    "projection",
     "rect",
     "symbol",
     "line",
@@ -166,6 +173,16 @@ private fun guideStyleKeys(vararg prefixes: String): Set<String> =
     .toSet()
 
 private val AXIS_UNSUPPORTED = emptyMap<String, String>()
+
+/**
+ * `config` entries that are chart-level **values** rather than blocks of properties.
+ *
+ * Each is read where the top-level property of the same name is read — `root.fields[key] ?:
+ * configScalar(root, key)` — so a theme can set the chart's frame, its background, its sizing rule
+ * or the sentence a screen reader hears. They are listed here only so the block walker does not
+ * report them as the wrong shape.
+ */
+private val CONFIG_SCALARS = setOf("autosize", "background", "padding", "description")
 
 /** The time units a scale's `nice` can round out to, which is `vega-time`'s own list. */
 private val NICE_INTERVALS =
@@ -841,7 +858,15 @@ public class SpecParser {
         projections =
           parseArray(root, "projections") { value, path -> parseProjection(value, path) },
         encode = parseEncode(root.fields["encode"], "$.encode"),
-        description = root.fields["description"]?.asString()?.takeIf { it.isNotBlank() },
+        // `config.group` paints the chart's frame; see [VegaSpec.frameConfig].
+        frameConfig =
+          ((root.fields["config"] as? VegaValue.Obj)?.fields?.get("group") as? VegaValue.Obj)
+            ?.fields
+            .orEmpty(),
+        description =
+          (root.fields["description"] ?: configScalar(root, "description"))?.asString()?.takeIf {
+            it.isNotBlank()
+          },
       )
 
     reportUnsupportedTopLevel(root)
@@ -863,6 +888,14 @@ public class SpecParser {
     for ((key, block) in obj.fields) {
       val child = block as? VegaValue.Obj
       when {
+        // `autosize`, `background`, `padding` and `description` are chart-level **values** rather
+        // than
+        // blocks, and they are read straight out of `config` where the top level does not say.
+        // Calling
+        // them "not an object" said they had been ignored when they had not — a diagnostic that
+        // sends
+        // a reader looking for a bug that is not there.
+        key in CONFIG_SCALARS -> Unit
         child == null ->
           diagnostics.warn(
             DiagnosticCodes.PARSE_UNKNOWN_PROPERTY,
@@ -1301,7 +1334,11 @@ public class SpecParser {
    * it is the common form rather than an exotic one.
    */
   private fun parseProjection(value: VegaValue, path: String): ProjectionSpec? {
-    val obj = value as? VegaValue.Obj ?: return unexpected("a projection definition", path)
+    val own = value as? VegaValue.Obj ?: return unexpected("a projection definition", path)
+    // `config.projection` under the projection's own properties, exactly as `config.title` sits
+    // under
+    // the title's: a theme naming `mercator` once means no projection has to name it again.
+    val obj = GuideConfig.merge(own, config.projectionDefaults())
     val name = obj.fields["name"]?.asString()
     if (name.isNullOrEmpty()) {
       diagnostics.error(

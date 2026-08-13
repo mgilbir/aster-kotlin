@@ -443,7 +443,15 @@ public class SpecCompiler(
       )
     val encoded =
       encoder.encodeGroup(
-        MarkSpec(type = MarkType.GROUP, name = "root", encode = rootEncode(spec, plot)),
+        MarkSpec(
+          type = MarkType.GROUP,
+          name = "root",
+          encode = rootEncode(spec, plot),
+          // `config.group` is the frame's paint, which is why it arrives here rather than through
+          // the
+          // mark-type config chain: the frame is the view, not a mark anyone wrote down.
+          configAboveDefaults = spec.frameConfig,
+        ),
         listOf(VegaValue.EmptyObject),
       ) { _, _, _ ->
         children
