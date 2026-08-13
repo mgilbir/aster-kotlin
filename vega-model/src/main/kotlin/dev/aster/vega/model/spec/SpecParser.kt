@@ -167,6 +167,22 @@ private fun guideStyleKeys(vararg prefixes: String): Set<String> =
 
 private val AXIS_UNSUPPORTED = emptyMap<String, String>()
 
+/**
+ * What a title's text falls back to once a `style` has taken the `group-title` slot.
+ *
+ * These are `vega-scenegraph`'s own defaults, not the title's: `fontSize(item)` answers 11 for a
+ * text item that names no size, and nothing supplies a weight. Materialising them means the
+ * runtime's `group-title` defaults — 13 point, bold — stop applying, which is the whole effect of
+ * naming a style.
+ *
+ * The **subtitle** is not here. Its own style slot is `group-subtitle`, which a title's `style`
+ * never takes, so a subtitle under a styled heading keeps its 12 point.
+ */
+private val TITLE_RENDERER_FALLBACKS: VegaValue.Obj =
+  VegaValue.Obj(
+    linkedMapOf("fontSize" to VegaValue.Num(11.0), "fontWeight" to VegaValue.Str("normal"))
+  )
+
 /** Scale properties this engine reads. */
 private val SCALE_CONSUMED =
   setOf(
@@ -1809,6 +1825,31 @@ public class SpecParser {
    * Upstream takes either; a specification that writes one usually writes it in the encode block,
    * because that is where every other guide's overrides go.
    */
+  /**
+   * A title's `style`, which **replaces** the layer its own look comes from.
+   *
+   * Upstream builds the title's text mark with `style: "group-title"` and lets a specification's
+   * `style` take that slot instead — so naming one does not decorate the heading, it removes the
+   * 13-point bold and leaves whatever the named block says. What it does not say falls through to
+   * the *renderer's* defaults, which are 11 point and unweighted, not the title's.
+   *
+   * Written as two configuration layers beneath `config.title` so the ordinary precedence still
+   * holds: a property on the title beats the theme, which beats the style, which beats the
+   * renderer. The names are translated because a style block speaks in mark channels — `fill` —
+   * where a title speaks in its own — `color`.
+   */
+  private fun titleStyleLayers(own: VegaValue.Obj): List<VegaValue.Obj> {
+    val names = markStyles(own)
+    if (names.isEmpty()) return emptyList()
+    val translated = LinkedHashMap<String, VegaValue>()
+    for (name in names) {
+      for ((key, field) in config.styleBlock(name).fields) {
+        translated[if (key == "fill") "color" else key] = field
+      }
+    }
+    return listOf(TITLE_RENDERER_FALLBACKS, VegaValue.Obj(translated))
+  }
+
   private fun titleNudge(obj: VegaValue.Obj, channel: String, path: String): NumberValue? {
     obj.numberOrSignal(channel, "$path.$channel")?.let {
       return it
@@ -1832,7 +1873,7 @@ public class SpecParser {
       )
     }
     val own = value as? VegaValue.Obj ?: return unexpected("a title definition", path)
-    val obj = GuideConfig.merge(own, config.titleDefaults())
+    val obj = GuideConfig.merge(own, titleStyleLayers(own) + config.titleDefaults())
 
     val textField = obj.fields["text"]
     val expression = (textField as? VegaValue.Obj)?.fields?.get("signal")?.asString()
@@ -1858,8 +1899,7 @@ public class SpecParser {
       path,
       TITLE_CONSUMED,
       mapOf(
-        "encode" to "Only 'dx' and 'dy' are read from a title's encode block; the rest was ignored",
-        "style" to "Title styles are not implemented",
+        "encode" to "Only 'dx' and 'dy' are read from a title's encode block; the rest was ignored"
       ),
     )
 

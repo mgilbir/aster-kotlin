@@ -1,0 +1,156 @@
+{
+  "marks": [
+    {
+      "opacity": 1,
+      "role": "axis-tick",
+      "stroke": "#888",
+      "strokeWidth": 1,
+      "type": "rule",
+      "x": 45.5,
+      "x2": 45.5,
+      "y": 80.5,
+      "y2": 85.5
+    },
+    {
+      "opacity": 1,
+      "role": "axis-tick",
+      "stroke": "#888",
+      "strokeWidth": 1,
+      "type": "rule",
+      "x": 135.5,
+      "x2": 135.5,
+      "y": 80.5,
+      "y2": 85.5
+    },
+    {
+      "align": "center",
+      "angle": 0,
+      "baseline": "top",
+      "fill": "#000",
+      "font": "sans-serif",
+      "fontSize": 10,
+      "opacity": 1,
+      "role": "axis-label",
+      "text": "a",
+      "type": "text",
+      "x": 45,
+      "y": 87.5
+    },
+    {
+      "align": "center",
+      "angle": 0,
+      "baseline": "top",
+      "fill": "#000",
+      "font": "sans-serif",
+      "fontSize": 10,
+      "opacity": 1,
+      "role": "axis-label",
+      "text": "b",
+      "type": "text",
+      "x": 135,
+      "y": 87.5
+    },
+    {
+      "opacity": 1,
+      "role": "axis-domain",
+      "stroke": "#888",
+      "strokeWidth": 1,
+      "type": "rule",
+      "x": 0.5,
+      "x2": 180.5,
+      "y": 80.5,
+      "y2": 80.5
+    },
+    {
+      "fill": "#4c78a8",
+      "height": 40,
+      "role": "mark",
+      "type": "rect",
+      "width": 72,
+      "x": 0,
+      "y": 40
+    },
+    {
+      "fill": "#4c78a8",
+      "height": 80,
+      "role": "mark",
+      "type": "rect",
+      "width": 72,
+      "x": 90,
+      "y": 0
+    },
+    {
+      "align": "left",
+      "angle": 0,
+      "baseline": "top",
+      "fill": "#008837",
+      "font": "serif",
+      "fontSize": 22,
+      "fontStyle": "italic",
+      "fontWeight": 800,
+      "opacity": 1,
+      "role": "title-text",
+      "text": "Styled heading",
+      "type": "text"
+    },
+    {
+      "align": "left",
+      "angle": 0,
+      "baseline": "top",
+      "fill": "#666666",
+      "font": "sans-serif",
+      "fontSize": 12,
+      "opacity": 1,
+      "role": "title-subtitle",
+      "text": "and its subtitle",
+      "type": "text",
+      "x": 0,
+      "y": -16
+    }
+  ],
+  "scales": {
+    "x": {
+      "bandwidth": 90,
+      "domain": [
+        "a",
+        "b"
+      ],
+      "range": [
+        0,
+        180
+      ],
+      "step": 90
+    },
+    "y": {
+      "domain": [
+        0,
+        6
+      ],
+      "range": [
+        80,
+        0
+      ],
+      "ticks": [
+        0,
+        0.5,
+        1,
+        1.5,
+        2,
+        2.5,
+        3,
+        3.5,
+        4,
+        4.5,
+        5,
+        5.5,
+        6
+      ]
+    }
+  },
+  "size": {
+    "height": 149,
+    "width": 256
+  },
+  "spec": "title-style-block.vg.json",
+  "vegaVersion": "6.3.1"
+}

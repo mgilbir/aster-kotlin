@@ -190,11 +190,12 @@ class UnhandledPropertiesTest {
         .single { it.jsonPath?.endsWith("somethingUpstreamAddedLater") == true }
     assertTrue("not implemented" in invented.message, invented.message)
 
-    // A tailored explanation, from the one block that still has any: a title's `style`.
+    // A tailored explanation, from the one property in the whole inventory that still has one: a
+    // title's `encode`, of which only `dx` and `dy` are read.
     val tailored =
-      diagnostics(spec(""""title": {"text": "T", "style": "group-title"}""")).single {
-        it.jsonPath?.endsWith("style") == true
+      diagnostics(spec(""""title": {"text": "T", "encode": {"title": {"update": {}}}}""")).single {
+        it.jsonPath?.endsWith("encode") == true
       }
-    assertTrue("Title styles" in tailored.message, tailored.message)
+    assertTrue("dx" in tailored.message, tailored.message)
   }
 }

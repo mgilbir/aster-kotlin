@@ -201,7 +201,7 @@ substantive compatibility items:
 | 6. View and Compose APIs | Yes |
 | 7. SVG, PNG, PDF export | Yes |
 | 8. TalkBack can describe and navigate | Partial — virtual nodes are tested by instrumentation, not with TalkBack itself |
-| 9. At least 100 compatibility fixtures pass | **Yes** — 142 |
+| 9. At least 100 compatibility fixtures pass | **Yes** — 143 |
 | 10. Core runtime has no Android dependency | Yes |
 | 11. Renders without WebView | Yes |
 | 12. Build and test loop runs from the terminal | Yes |
@@ -1600,8 +1600,16 @@ size suggests. All three go on both the heading and its subtitle, because upstre
 marks under one guide and either can be focused.
 
 The schema diff now finds **nothing** unaccounted for in `encodeEntry`, `axis`, `legend`, `layout`,
-`projection` or `scale`, and two entries in `title`: `encode`, of which only `dx`/`dy` are read, and
-`style`. That is the whole remaining inventory.
+`projection` or `scale`, and one entry in `title`: `encode`, of which only `dx`/`dy` are read. That is the whole
+remaining inventory.
+
+A title's `style` turned out not to be decoration. Upstream builds the heading's text mark with
+`style: "group-title"` and lets a specification's `style` take **that slot**, so naming one does not
+add to the 13-point bold — it removes it, and what the named block does not say falls through to the
+*renderer's* defaults of 11 point and no weight rather than to the title's. Written here as two
+configuration layers beneath `config.title`, so the ordinary precedence still holds: the title's own
+property beats the theme, which beats the style, which beats the renderer. The subtitle is untouched —
+its slot is `group-subtitle`, which a title's `style` never takes.
 
 Closing `legend` took admitting that a line in this file was wrong. `strokeDash` and `strokeWidth` had
 been written off here as "not gaps, they name scales" — which is exactly what makes them gaps. On a

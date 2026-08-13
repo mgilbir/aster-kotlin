@@ -9,7 +9,7 @@ Branch `milestone-0-bootstrap`. Working tree clean, both gates green:
 - `./scripts/check.sh` — format, all tests, lint, demo APK
 - `./scripts/oracle.sh` — regenerates upstream references and runs the differential comparison
 
-**142 differential fixtures pass, all matching upstream exactly.** That is the only number here
+**143 differential fixtures pass, all matching upstream exactly.** That is the only number here
 that means what it says.
 
 ## Read this before trusting the other number
@@ -254,7 +254,7 @@ not the one Vega documents**, because Vega only forwards the parameters a specif
 
 ## What is left: two examples, and neither can be verified
 
-**142 differential fixtures pass. 91 of the 93 examples compile clean.** Everything that can be
+**143 differential fixtures pass. 91 of the 93 examples compile clean.** Everything that can be
 checked against upstream has been.
 
 ### `projections` — upstream refuses it too
@@ -404,8 +404,11 @@ As of this handoff the subtraction leaves **nothing** for `encodeEntry`, `axis`,
   for some time. `labelBound` is consumed and deliberately **inert**: upstream's bound test runs
   before the label bounds exist, so it culls nothing, and implementing the documented behaviour would
   be a real difference. See STATUS.md.
-- **Title (2):** `encode`, of which only `dx`/`dy` are read, and `style`. Those two are the whole
-  remaining inventory across every block.
+- **Title (1):** `encode`, of which only `dx`/`dy` are read. That is the whole remaining inventory
+  across every block. Upstream splits it three ways — `encode.group` styles the title's group,
+  `encode.title` its text, `encode.subtitle` the subtitle — and a block with none of those three keys
+  is the deprecated form that applies to the *text*, which is where the `dx`/`dy` this engine reads
+  come from. `style` is done: it **replaces** the `group-title` slot rather than adding to it.
 - **Layout:** none. All ten of upstream's layout properties are read, and `row-footer` and
   `column-footer` are recognised roles — they used to fall through to `CELL` and be gridded among the
   cells.
