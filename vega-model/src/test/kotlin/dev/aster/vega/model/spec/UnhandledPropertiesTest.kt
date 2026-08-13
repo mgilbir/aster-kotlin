@@ -88,36 +88,40 @@ class UnhandledPropertiesTest {
   }
 
   /**
-   * A guide's styling properties are constants, and a signal in one of them is **reported**.
+   * A signal in a guide's styling is **read**, and a value of an unreadable shape is reported.
    *
-   * This was the quietest gap in the parser. `labelFontSize: {"signal": "n"}` works, because that
-   * property is read through `numberOrSignal`; `labelColor: {"signal": "c"}` did not, because the
-   * styling block accepts only a literal — and it said nothing, so a chart colouring its axis from
-   * a control drew black labels and looked finished. The two spellings sit side by side in a
-   * specification, so the difference has to be visible until the second one works.
+   * This was the quietest gap in the parser and it is now closed. `labelFontSize: {"signal": "n"}`
+   * always worked, because that property is read through `numberOrSignal`; `labelColor: {"signal":
+   * "c"}` did not, because the styling block took only a literal — and it said nothing, so a chart
+   * colouring its axis from a control drew black labels and looked finished. Both work now. What is
+   * still reported is a value that is neither: an array where a colour belongs is nothing anything
+   * can read, and saying so is the difference between a gap and a wrong chart.
    */
   @Test
-  fun `a signal in a guide's styling is reported rather than dropped`() {
-    val reported =
+  fun `a guide's styling reads a signal and reports what it cannot`() {
+    val honoured =
       ignored(
         spec(
           """"signals": [{"name": "c", "value": "#c00"}],
              "scales": [{"name": "s", "type": "linear", "domain": [0, 1], "range": "width"}],
              "axes": [{"scale": "s", "orient": "bottom", "labelColor": {"signal": "c"},
               "tickWidth": {"signal": "2"}, "gridDash": {"signal": "[2,2]"},
-              "titleFontWeight": {"signal": "'bold'"},
-              "labelFontSize": {"signal": "12"}}],
+              "titleFontWeight": {"signal": "'bold'"}, "labelFontSize": {"signal": "12"}}],
              "legends": [{"fill": "s", "labelColor": {"signal": "c"},
               "symbolSize": {"signal": "40"}}]"""
         )
       )
-    // `labelFontSize` and `symbolSize` are **not** on this list: both are read through
-    // `numberOrSignal` and a signal in either is honoured, which is what makes the rest worth
-    // saying.
-    assertEquals(
-      listOf("gridDash", "labelColor", "labelColor", "tickWidth", "titleFontWeight"),
-      reported.sorted(),
-    )
+    assertEquals(emptyList<String>(), honoured.sorted())
+
+    val unreadable =
+      ignored(
+        spec(
+          """"scales": [{"name": "s", "type": "linear", "domain": [0, 1], "range": "width"}],
+             "axes": [{"scale": "s", "orient": "bottom", "labelColor": [1, 2],
+              "tickWidth": "wide"}]"""
+        )
+      )
+    assertEquals(listOf("labelColor", "tickWidth"), unreadable.sorted())
   }
 
   @Test

@@ -1,5 +1,8 @@
 package dev.aster.vega.runtime.compile
 
+import dev.aster.vega.expression.JsSemantics
+import dev.aster.vega.model.VegaValue
+import dev.aster.vega.model.asString
 import dev.aster.vega.model.spec.GuideStroke
 import dev.aster.vega.scene.Fill
 import dev.aster.vega.scene.FontStyle
@@ -24,6 +27,55 @@ import dev.aster.vega.scene.TextStyle
  * its ticks and labels and leaves the gridlines out.
  */
 internal object GuideStyle {
+
+  /**
+   * Substitutes a guide style's signal-valued fields with what they resolve to, once.
+   *
+   * Returning a copy rather than resolving at each read is what keeps this change from spreading:
+   * every builder calls this on the blocks it is given and the rest of the code carries on reading
+   * plain constants. The signal names come from [GuideStroke.signals], whose keys are the property
+   * names of that class.
+   *
+   * A weight is the one that needs coercing: upstream accepts `700` as readily as `"bold"` and the
+   * renderer takes text either way, so a signal answering a number is spelled as an integer rather
+   * than dropped for being the wrong type.
+   */
+  fun resolved(style: GuideStroke, numbers: NumberResolver, owner: String): GuideStroke {
+    if (style.signals.isEmpty()) return style
+    fun text(field: String): String? =
+      style.signals[field]?.let { numbers.resolveText(it, owner) }?.takeIf { it.isNotEmpty() }
+    fun number(field: String): Double? =
+      style.signals[field]
+        ?.let { numbers.resolveValue(it, owner) }
+        ?.let { (it as? VegaValue.Num)?.value }
+        ?.takeIf { it.isFinite() }
+    return style.copy(
+      color = text("color") ?: style.color,
+      width = number("width") ?: style.width,
+      dash =
+        style.signals["dash"]
+          ?.let { numbers.resolveList(it, owner) }
+          ?.map { JsSemantics.toNumber(it) }
+          ?.takeIf { values -> values.isNotEmpty() && values.all { it.isFinite() } } ?: style.dash,
+      dashOffset = number("dashOffset") ?: style.dashOffset,
+      cap = text("cap") ?: style.cap,
+      opacity = number("opacity") ?: style.opacity,
+      font = text("font") ?: style.font,
+      fontWeight =
+        style.signals["fontWeight"]
+          ?.let { numbers.resolveValue(it, owner) }
+          ?.let { value ->
+            when (value) {
+              is VegaValue.Num -> value.value.takeIf { it.isFinite() }?.toInt()?.toString()
+              else -> value.asString().takeIf { it.isNotEmpty() }
+            }
+          } ?: style.fontWeight,
+      fontStyle = text("fontStyle") ?: style.fontStyle,
+      align = text("align") ?: style.align,
+      baseline = text("baseline") ?: style.baseline,
+      lineHeight = number("lineHeight") ?: style.lineHeight,
+    )
+  }
 
   fun stroke(style: GuideStroke, defaultColor: SceneColor): Stroke =
     Stroke(

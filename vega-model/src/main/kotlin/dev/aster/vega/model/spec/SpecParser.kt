@@ -1902,43 +1902,57 @@ public class SpecParser {
     subject: String,
     path: String,
   ): GuideStroke {
-    fun constantOnly(suffix: String, shape: String, accept: (VegaValue) -> Boolean): VegaValue? {
+    val signals = LinkedHashMap<String, String>()
+    fun constantOnly(
+      field: String,
+      suffix: String,
+      shape: String,
+      accept: (VegaValue) -> Boolean,
+    ): VegaValue? {
       val value = fields["$prefix$suffix"] ?: return null
       if (accept(value)) return value
+      // A `{"signal": ...}` is recorded for the builders to resolve; anything else is a value of a
+      // shape nothing can read, and is named.
+      (value as? VegaValue.Obj)?.fields?.get("signal")?.asString()?.let {
+        signals[field] = it
+        return null
+      }
       diagnostics.warn(
         DiagnosticCodes.PARSE_UNKNOWN_PROPERTY,
-        "$subject property '$prefix$suffix' is only implemented as $shape; it was ignored",
+        "$subject property '$prefix$suffix' is only implemented as $shape or a signal; it was " +
+          "ignored",
         jsonPath = "$path.$prefix$suffix",
       )
       return null
     }
-    val text = { suffix: String ->
-      constantOnly(suffix, "a constant string") { it is VegaValue.Str }
+    val text = { field: String, suffix: String ->
+      constantOnly(field, suffix, "a constant string") { it is VegaValue.Str }
     }
-    val number = { suffix: String ->
-      (constantOnly(suffix, "a constant number") { it is VegaValue.Num } as? VegaValue.Num)?.value
+    val number = { field: String, suffix: String ->
+      (constantOnly(field, suffix, "a constant number") { it is VegaValue.Num } as? VegaValue.Num)
+        ?.value
     }
     return GuideStroke(
-      color = text("Color")?.asString(),
-      width = number("Width"),
+      color = text("color", "Color")?.asString(),
+      width = number("width", "Width"),
       dash =
-        (constantOnly("Dash", "a constant array") { it is VegaValue.Arr } as? VegaValue.Arr)
+        (constantOnly("dash", "Dash", "a constant array") { it is VegaValue.Arr } as? VegaValue.Arr)
           ?.values
           ?.map { it.asDouble() }
           ?.takeIf { values -> values.isNotEmpty() && values.all { it.isFinite() } },
-      dashOffset = number("DashOffset"),
-      cap = text("Cap")?.asString(),
-      opacity = number("Opacity"),
-      font = text("Font")?.asString(),
-      align = text("Align")?.asString(),
-      baseline = text("Baseline")?.asString(),
-      lineHeight = number("LineHeight"),
+      dashOffset = number("dashOffset", "DashOffset"),
+      cap = text("cap", "Cap")?.asString(),
+      opacity = number("opacity", "Opacity"),
+      font = text("font", "Font")?.asString(),
+      align = text("align", "Align")?.asString(),
+      baseline = text("baseline", "Baseline")?.asString(),
+      lineHeight = number("lineHeight", "LineHeight"),
       // Vega accepts either a keyword (`"bold"`) or a number (`700`); both reach the renderer as
       // text, so a number is normalized to its integer spelling rather than kept as a double.
       fontWeight =
         when (
           val weight =
-            constantOnly("FontWeight", "a constant keyword or number") {
+            constantOnly("fontWeight", "FontWeight", "a constant keyword or number") {
               it is VegaValue.Str || it is VegaValue.Num
             }
         ) {
@@ -1946,7 +1960,8 @@ public class SpecParser {
           is VegaValue.Num -> weight.value.takeIf { it.isFinite() }?.toInt()?.toString()
           else -> null
         },
-      fontStyle = text("FontStyle")?.asString(),
+      fontStyle = text("fontStyle", "FontStyle")?.asString(),
+      signals = signals,
     )
   }
 

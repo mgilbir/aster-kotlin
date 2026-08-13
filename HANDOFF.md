@@ -9,7 +9,7 @@ Branch `milestone-0-bootstrap`. Working tree clean, both gates green:
 - `./scripts/check.sh` — format, all tests, lint, demo APK
 - `./scripts/oracle.sh` — regenerates upstream references and runs the differential comparison
 
-**147 differential fixtures pass, all matching upstream exactly.** That is the only number here
+**148 differential fixtures pass, all matching upstream exactly.** That is the only number here
 that means what it says.
 
 ## Read this before trusting the other number
@@ -254,7 +254,7 @@ not the one Vega documents**, because Vega only forwards the parameters a specif
 
 ## What is left: two examples, and neither can be verified
 
-**147 differential fixtures pass. 91 of the 93 examples compile clean.** Everything that can be
+**148 differential fixtures pass. 91 of the 93 examples compile clean.** Everything that can be
 checked against upstream has been.
 
 ### `projections` — upstream refuses it too
@@ -414,14 +414,15 @@ guide's `encode` cannot express is named one at a time — a title's `encode.tit
 instance — rather than the whole block being reported as unread. That is where to look next, and
 `UnhandledPropertiesTest` asserts the naming still happens.
 
-**The loudest thing left is a signal in a guide's styling.** `labelFontSize: {"signal": "n"}` works,
-because that property is read through `numberOrSignal`; `labelColor: {"signal": "c"}` does not,
-because the styling block accepts only a literal — and until now it said nothing, so a chart
-colouring its axis from a control drew black labels and looked finished. It is reported now, and
-that is the next thing to *implement*: the fix is to make `GuideStroke`'s string fields carry a
-signal the way `NumberValue` does, and resolve them where the builders already resolve numbers.
-The same applies to a guide `encode` channel valued by a signal rather than a constant, which is
-reported for the same reason.
+**A signal in a guide's styling now works**, which it did not until recently and said nothing about.
+`labelFontSize: {"signal": "n"}` always worked, because that property is read through
+`numberOrSignal`; `labelColor: {"signal": "c"}` was dropped in silence, because the styling block
+took only a literal — so a chart colouring its axis from a control drew black labels and looked
+finished. `GuideStroke` now carries a `signals` map beside its constants and the builders substitute
+a resolved copy once, before anything reads it, which is what kept the change from spreading. What is
+still reported is a guide **`encode` channel** valued by a signal rather than a constant: those fold
+into properties at parse time, where no signal has a value yet, so closing that one means resolving
+the channel in the builder instead of folding it.
 
 Run the same subtraction over the *encode* vocabulary and the pattern repeats: several channels
 reported as unimplemented had a property behind them all along, one map entry away in

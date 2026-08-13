@@ -116,7 +116,23 @@ public class AxisBuilder(
    * @param extent the enclosing group's encoded size, which positions a bottom or right axis.
    * @param gridSize the `width`/`height` signals in scope, which set how long a gridline is.
    */
-  public fun build(spec: AxisSpec, extent: PlotSize, gridSize: PlotSize = extent): BuiltAxis? {
+  public fun build(
+    declared: AxisSpec,
+    extent: PlotSize,
+    gridSize: PlotSize = extent,
+  ): BuiltAxis? {
+    // A styling property written as a signal is substituted here, once, so everything below reads
+    // plain constants: an axis whose label colour comes from a control is the ordinary case, and
+    // the
+    // alternative is resolving the same expression at each of a hundred reads.
+    val spec =
+      declared.copy(
+        labelStyle = GuideStyle.resolved(declared.labelStyle, numbers, declared.scale),
+        tickStyle = GuideStyle.resolved(declared.tickStyle, numbers, declared.scale),
+        gridStyle = GuideStyle.resolved(declared.gridStyle, numbers, declared.scale),
+        domainStyle = GuideStyle.resolved(declared.domainStyle, numbers, declared.scale),
+        titleStyle = GuideStyle.resolved(declared.titleStyle, numbers, declared.scale),
+      )
     val scale = scales[spec.scale]
     if (scale == null) {
       diagnostics.error(

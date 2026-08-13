@@ -923,6 +923,17 @@ public data class GuideStroke(
   val align: String? = null,
   val baseline: String? = null,
   val lineHeight: Double? = null,
+  /**
+   * The fields a specification wrote as a `{"signal": ...}`, keyed by the field's own name.
+   *
+   * Kept beside the constants rather than folded into their types, so nothing downstream changes
+   * shape: the builders substitute the resolved values into a copy of this block once, before
+   * anything reads it. The keys are the property names of this class — `"color"`, `"width"` —
+   * because one map is easier to keep complete than a dozen parallel nullable fields, and being
+   * complete is the point: half of these worked and half were silently dropped, which is a
+   * difference a specification cannot see.
+   */
+  val signals: Map<String, String> = emptyMap(),
 )
 
 /**

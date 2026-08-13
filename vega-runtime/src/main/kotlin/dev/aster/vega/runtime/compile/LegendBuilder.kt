@@ -155,9 +155,17 @@ internal class LegendBuilder(
 
   // ---- one legend's content ---------------------------------------------------
 
-  private fun buildOne(spec: LegendSpec): Built? {
+  private fun buildOne(declared: LegendSpec): Built? {
     val id = ids.allocate()
-    val scaleName = spec.scale ?: return null
+    val scaleName = declared.scale ?: return null
+    // As in the axis builder: a styling property written as a signal is substituted once, here, so
+    // nothing below has to know the difference.
+    val spec =
+      declared.copy(
+        labelStyle = GuideStyle.resolved(declared.labelStyle, numbers, scaleName),
+        titleStyle = GuideStyle.resolved(declared.titleStyle, numbers, scaleName),
+        symbolStyle = GuideStyle.resolved(declared.symbolStyle, numbers, scaleName),
+      )
     val scale = scales[scaleName]
     if (scale == null) {
       diagnostics.error(
