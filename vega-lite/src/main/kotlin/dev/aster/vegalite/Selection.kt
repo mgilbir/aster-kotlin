@@ -38,6 +38,14 @@ internal class Selection(
    */
   val inputs: VegaValue.Obj?,
   /**
+   * The streams a selection **bound to a legend** is picked with, or none where it is not.
+   *
+   * `{"bind": "legend"}` — or `{"bind": {"legend": "mouseover"}}` — makes the legend itself the
+   * control: clicking a swatch picks that category, and the marks are not clicked at all. It needs
+   * exactly one projected field, which is the one the legend explains.
+   */
+  val legendStreams: List<VegaValue>,
+  /**
    * `nearest`: the pick goes to the closest mark rather than to the one under the pointer.
    *
    * Vega has no such notion, so it is compiled: a **voronoi** mark is laid over the marks, each of
@@ -78,9 +86,10 @@ internal class Selection(
   /** Whether the pointer becomes a hand over a mark: a *hover* selection is not clicked. */
   val showsPointer: Boolean
     get() =
-      // A selection driven from **controls** is not clicked, so the marks say nothing about being
-      // clickable — upstream asks for `!s.bind`, a bound selection being driven from the widget.
-      if (inputs != null || bindsScales) false
+      // A selection driven from **controls** or from a **legend** is not clicked, so the marks say
+      // nothing about being clickable — upstream asks for `!s.bind`, a bound selection being driven
+      // from the widget rather than from the drawing.
+      if (inputs != null || bindsScales || legendStreams.isNotEmpty()) false
       else
         type == "point" && !bindsScales && (on as? VegaValue.Obj)?.string("type") != "pointerover"
 
@@ -173,8 +182,11 @@ internal class Selection(
               null ->
                 // `disableDirectManipulation`: a selection driven by **controls** does not toggle,
                 // clear or listen for a click unless the specification asked for one by name — the
-                // controls are the interaction.
-                if (type == "point" && bind !is VegaValue.Obj) "event.shiftKey" else null
+                // controls are the interaction. A **legend** binding is the exception upstream
+                // writes out: the toggle is handed back deliberately, so shift-clicking swatches
+                // adds to the picked set.
+                if (type != "point") null
+                else if (bind !is VegaValue.Obj || bind.has("legend")) "event.shiftKey" else null
               VegaValue.Bool(false) -> null
               is VegaValue.Str -> stated.value
               else -> "event.shiftKey"
@@ -182,8 +194,17 @@ internal class Selection(
           bindsScales = bind == VegaValue.Str("scales"),
           inputs =
             (bind as? VegaValue.Obj)?.takeIf {
-              type == "point" && options.string("resolve") == null
+              type == "point" && options.string("resolve") == null && !it.has("legend")
             },
+          legendStreams =
+            if (type != "point") emptyList()
+            else
+              when {
+                bind == VegaValue.Str("legend") -> EventSelector.parse("click", source = "view")
+                (bind as? VegaValue.Obj)?.has("legend") == true ->
+                  EventSelector.parse(bind.string("legend") ?: "click", source = "view")
+                else -> emptyList()
+              },
           nearest = options.fields["nearest"] == VegaValue.Bool(true),
           brushPaint =
             obj {
@@ -201,7 +222,10 @@ internal class Selection(
             when (val stated = options.fields["clear"]) {
               VegaValue.Bool(false) -> null
               is VegaValue.Str -> stated.value
-              null -> if (bind is VegaValue.Obj && type == "point") null else "dblclick"
+              null ->
+                if (bind == VegaValue.Str("legend") || (bind is VegaValue.Obj && type == "point")) {
+                  null
+                } else "dblclick"
               else -> "dblclick"
             },
           initial = param.fields["value"],
@@ -631,6 +655,69 @@ internal class Selection(
     )
   }
 
+  /** `<name>_<field>_legend` — the signal a legend-bound selection is picked into. */
+  fun legendSignalName(field: String): String =
+    Fields.varName("${name}_${Fields.varName(field)}_legend")
+
+  /** `<field>_legend` — what the legend's own parts are named after. */
+  fun legendPartPrefix(field: String): String = "${Fields.varName(field)}_legend"
+
+  /**
+   * `legendBindings.topLevelSignals`: the swatch a reader clicked, as a signal.
+   *
+   * A legend entry carries no tuple of its own, so the signal walks the scene graph to the symbol's
+   * datum — that is what `item().items[0].items[0].datum.value` is doing — and a click that lands
+   * anywhere else clears it back to null.
+   */
+  fun legendSignals(view: UnitView?): List<VegaValue> {
+    if (legendStreams.isEmpty()) return emptyList()
+    val field = legendField(view) ?: return emptyList()
+    val prefix = legendPartPrefix(field)
+    val signal = legendSignalName(field)
+    val scoped =
+      listOf("symbols", "labels", "entries").flatMap { part ->
+        legendStreams.map { stream ->
+          obj {
+            (stream as? VegaValue.Obj)?.fields?.forEach { (key, value) -> put(key, value) }
+            put("markname", "${prefix}_$part")
+          }
+        }
+      }
+    return listOf(
+      obj {
+        put("name", signal)
+        if (initial == null) put("value", VegaValue.Null)
+        put(
+          "on",
+          arr(
+            listOf(
+              obj {
+                put("events", arr(scoped))
+                put(
+                  "update",
+                  "isDefined(datum.value) ? datum.value : item().items[0].items[0].datum.value",
+                )
+                put("force", VegaValue.Bool(true))
+              },
+              obj {
+                put("events", arr(legendStreams))
+                put("update", "!event.item || !datum ? null : $signal")
+                put("force", VegaValue.Bool(true))
+              },
+            )
+          ),
+        )
+      }
+    )
+  }
+
+  /** The one field a legend-bound selection projects onto, which is what the legend explains. */
+  fun legendField(view: UnitView?): String? {
+    if (legendStreams.isEmpty()) return null
+    val projected = view?.let { projections(it) }?.map { it.second } ?: fields
+    return projected.singleOrNull()
+  }
+
   /**
    * `inputBindings.topLevelSignals`: one signal per projection, each bound to its own control.
    *
@@ -749,9 +836,19 @@ internal class Selection(
     val guard =
       "datum && item().mark.marktype !== 'group' && indexof(item().mark.role, 'legend') < 0" +
         brushes.joinToString("") { " && indexof(item().mark.name, '$it') < 0" }
-    // A selection driven by **controls** has no events to write its tuple: the tuple is whatever
-    // the controls hold, and it is null until every one of them holds something.
-    if (inputs != null) {
+    // A selection driven by a **legend** writes its tuple from the swatch signal, the same shape a
+    // control binding produces: the legend is the control.
+    val legendField = view?.let { legendField(it) } ?: fields.singleOrNull()
+    if (legendStreams.isNotEmpty() && legendField != null) {
+      val signal = legendSignalName(legendField)
+      out += obj {
+        put("name", "${name}_tuple")
+        put(
+          "update",
+          "$signal !== null ? {fields: ${name}_tuple_fields, values: [$signal]} : null",
+        )
+      }
+    } else if (inputs != null) {
       val values = projected.map { (_, field) -> Fields.varName("${name}_$field") }
       out += obj {
         put("name", "${name}_tuple")
@@ -827,7 +924,11 @@ internal class Selection(
           arr(
             listOfNotNull(
               obj {
-                put("events", arr(listOf(pickStream())))
+                // A legend-bound selection toggles on the legend's own stream — there is no click
+                // on a mark to read the shift key from.
+                if (legendStreams.isNotEmpty()) {
+                  put("events", obj { put("merge", arr(legendStreams)) })
+                } else put("events", arr(listOf(pickStream())))
                 put("update", expression)
               },
               clear?.let {

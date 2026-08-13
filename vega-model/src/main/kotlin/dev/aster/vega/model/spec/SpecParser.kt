@@ -1202,6 +1202,32 @@ public class SpecParser {
           when {
             !signal.isNullOrEmpty() -> signals += signal
             !scale.isNullOrEmpty() -> scales += scale
+            // A `{"merge": [...]}` stream is several streams read as one, which is what a selector
+            // written with commas parses to: the handler fires on any of them. Vega-Lite writes it
+            // for a legend binding, where the click may land on a swatch, a label or the row.
+            (entry.fields["merge"] as? VegaValue.Arr) != null -> {
+              for (part in (entry.fields["merge"] as VegaValue.Arr).values) {
+                val stream =
+                  when (part) {
+                    is VegaValue.Str ->
+                      try {
+                        streams += EventSelector.parse(part.value, defaultSource)
+                        continue
+                      } catch (failure: EventSelectorException) {
+                        diagnostics.error(
+                          DiagnosticCodes.PARSE_UNKNOWN_PROPERTY,
+                          "Could not read the event selector for signal '$signalName': " +
+                            "${failure.message}",
+                          jsonPath = "$path.events",
+                        )
+                        return null
+                      }
+                    is VegaValue.Obj -> parseEventStreamObject(part, "$path.events", defaultSource)
+                    else -> null
+                  } ?: return null
+                streams += stream
+              }
+            }
             else -> {
               val stream = parseEventStreamObject(entry, "$path.events", defaultSource)
               if (stream == null) return null
@@ -1321,15 +1347,6 @@ public class SpecParser {
     path: String,
     defaultSource: String,
   ): EventStream? {
-    (obj.fields["merge"] as? VegaValue.Arr)?.let {
-      diagnostics.error(
-        DiagnosticCodes.PARSE_UNKNOWN_PROPERTY,
-        "A 'merge' stream combines several streams into one; write them as a comma-separated " +
-          "selector string instead",
-        jsonPath = path,
-      )
-      return null
-    }
     val type = obj.fields["type"]?.asString()
     if (type.isNullOrEmpty()) {
       diagnostics.error(

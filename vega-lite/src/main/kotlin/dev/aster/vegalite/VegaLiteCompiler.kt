@@ -249,9 +249,15 @@ private class Compilation(
       }
     }
     // `scaleClip`: a mark whose position scale is driven by a selection is **clipped**, or a pan
-    // that moves the domain past the data draws the rows that fell outside the plot.
+    // that moves the domain past the data draws the rows that fell outside the plot. It asks about
+    // the *scale*, not the view: two plots sharing the panned scale are both clipped, which is what
+    // makes a pair of linked plots move together without either spilling over its neighbour.
     for (selection in selections.filter { it.bindsScales }) {
-      (selection.owner ?: views.firstOrNull())?.clippedByScale = true
+      val declaring = selection.owner ?: views.firstOrNull() ?: continue
+      val panned = selection.intervalChannels(declaring).map { declaring.scale(it.first) }.toSet()
+      for (view in views) {
+        if (setOf("x", "y").any { view.scale(it) in panned }) view.clippedByScale = true
+      }
     }
 
     // The sizes are named before anything reads them, because what a concatenation calls them
@@ -357,7 +363,8 @@ private class Compilation(
         selections
           .distinctBy { it.name }
           .flatMap {
-            it.inputSignals(it.owner ?: views.firstOrNull())
+            it.inputSignals(it.owner ?: views.firstOrNull()) +
+              it.legendSignals(it.owner ?: views.firstOrNull())
           } +
         selections
           .distinctBy { it.name }

@@ -687,7 +687,7 @@ no data is needed to compare two compilers. So every one of them was compiled by
 by this one, and the outputs compared property by property. That is a *measurement*, not a gate: the
 examples are not fixtures here, and nothing about them is checked in.
 
-**124 of 627 matched exactly** at the start, and **510** do now. 16 were refused by name, and of those 8 are geographic,
+**124 of 627 matched exactly** at the start, and **513** do now. 16 were refused by name, and of those 8 are geographic,
 3 are a facet inside a facet, 2 a repeat inside a concatenation, and 2 are the `trail` mark — which
 this runtime draws and this compiler had simply not been told about.
 
@@ -2275,6 +2275,25 @@ coordinates as *field names*: Vega-Lite writes them as expressions, `{"expr": "d
 because the points are mark items and the coordinate wanted is the one the encoding resolved. Every
 cell came out without coordinates, so the diagram was empty and the overlay drew nothing.
 
+### The legend as the control
+
+The last of the three bindings. `{"bind": "legend"}` makes the legend itself what the reader picks
+with, and it compiles to more than a signal: each of the legend's three parts — the swatches, their
+labels, the rows they sit in — is **named**, so the selection's signal can listen for a click on it,
+and made interactive, so the click reaches it at all. A legend entry carries no tuple, so the signal
+walks the scene graph to the symbol's datum, `item().items[0].items[0].datum.value`, and a click
+that lands anywhere else clears it back to null. The picked categories are drawn solid and the rest
+at `unselectedOpacity`, which is what turns a key into a set of switches.
+
+Direct manipulation goes, as it does for a control binding — but the **toggle** stays, handed back
+deliberately so shift-clicking swatches adds to the picked set.
+
+Two runtime gaps it named, one closed. A `{"merge": […]}` stream is several streams read as one,
+which is what a selector written with commas parses to; it was refused, so a legend binding's
+`toggle` had no events at all. That is fixed. The other is recorded below: a legend's `entries`
+block now paints the row, which is what catches a click along its whole width, but the row's own box
+is a unit short and as wide as its own contents rather than as the column.
+
 ### A bound scale in a chart of several views cannot be resolved from its store
 
 `vlSelectionResolve` knows nothing about bound scales, and in a chart of several views that matters:
@@ -2497,6 +2516,12 @@ by *this runtime*:
   the side as a fixed enum — so it is reported by name and the axis is dropped altogether. The
   compiler's side of it is right, including the label alignment written as a comparison; what the
   runtime needs is an orientation resolved where the signals are rather than where the JSON is.
+- **A legend entry's row is measured as its contents rather than as the column.** A selection bound
+  to a legend needs the row painted — a transparent fill along the whole width is what catches the
+  click — and that much is drawn now. Its `size` is not: upstream's entry group is a box as wide as
+  the column and a unit taller than this engine measures, and setting the box on every legend entry
+  widened the surface around several ordinary legends. The compiler's side is right and the gallery
+  covers it; a fixture here would pin the wrong number.
 - **A colour ramp over a bucketed instant samples one step out.** A `time` scale with a colour range
   is now built as the colour scale it is — it was reported as unbuildable, so a line coloured by
   quarter drew in the mark default and no legend at all — and the shades it produces are one step

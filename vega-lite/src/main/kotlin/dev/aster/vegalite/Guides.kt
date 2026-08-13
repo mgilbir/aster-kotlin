@@ -754,10 +754,100 @@ internal object Guides {
             )
           }
       } else {
-        symbolEncode(view, channel)?.let {
-          put("encode", obj { put("symbols", obj { put("update", it) }) })
+        // A legend a selection is **bound to** is the control: its parts are named so the signals
+        // can listen on them, made interactive, and faded where the category is not picked.
+        val bound =
+          view.selections.firstOrNull { selection ->
+            selection.legendStreams.isNotEmpty() &&
+              selection.legendField(view) == view.spec.fieldDef(channel)?.let { Fields.vgField(it) }
+          }
+        val swatches = symbolEncode(view, channel)
+        if (bound == null) {
+          swatches?.let { put("encode", obj { put("symbols", obj { put("update", it) }) }) }
+        } else {
+          put("encode", legendBindingEncode(view, bound, channel, swatches))
         }
       }
+    }
+  }
+
+  /**
+   * `parseInteractiveLegend`: the parts of a legend a selection picks through.
+   *
+   * Each of the three — the swatches, their labels and the rows they sit in — is **named**, so the
+   * selection's signal can listen for a click on it, and made interactive, so the click reaches it
+   * at all. The picked ones are drawn solid and the rest at `unselectedOpacity`, which is what
+   * makes a legend read as a set of switches rather than as a key.
+   */
+  private fun legendBindingEncode(
+    view: UnitView,
+    selection: Selection,
+    channel: String,
+    swatches: VegaValue.Obj?,
+  ): VegaValue {
+    val field = selection.legendField(view) ?: return VegaValue.EmptyObject
+    val prefix = selection.legendPartPrefix(field)
+    val faded = view.config.raw.obj("legend")?.number("unselectedOpacity") ?: 0.35
+    val test =
+      "(!length(data(${quoted(selection.store)})) || " +
+        "(${selection.name}[${quoted(field)}] && " +
+        "indexof(${selection.name}[${quoted(field)}], datum.value) >= 0))"
+    fun picked() =
+      arr(
+        listOf(
+          obj {
+            put("test", test)
+            put("value", 1)
+          },
+          obj { put("value", faded) },
+        )
+      )
+    return obj {
+      put(
+        "labels",
+        obj {
+          put("name", "${prefix}_labels")
+          put("interactive", VegaValue.Bool(true))
+          put(
+            "update",
+            obj {
+              put("opacity", picked())
+              put("cursor", obj { put("value", "pointer") })
+            },
+          )
+        },
+      )
+      put(
+        "symbols",
+        obj {
+          put("name", "${prefix}_symbols")
+          put("interactive", VegaValue.Bool(true))
+          put(
+            "update",
+            obj {
+              swatches?.fields?.forEach { (key, value) -> put(key, value) }
+              put("opacity", picked())
+              put("cursor", obj { put("value", "pointer") })
+            },
+          )
+        },
+      )
+      put(
+        "entries",
+        obj {
+          put("name", "${prefix}_entries")
+          put("interactive", VegaValue.Bool(true))
+          // A row is transparent and still catches the pointer, which is what makes the whole
+          // entry clickable rather than only the swatch and its label.
+          put(
+            "update",
+            obj {
+              put("fill", obj { put("value", "transparent") })
+              put("cursor", obj { put("value", "pointer") })
+            },
+          )
+        },
+      )
     }
   }
 

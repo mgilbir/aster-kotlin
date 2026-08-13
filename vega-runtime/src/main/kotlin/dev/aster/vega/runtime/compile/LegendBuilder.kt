@@ -611,7 +611,17 @@ internal class LegendBuilder(
     val columns =
       numbers.resolveInt(spec.columns, scaleName)?.coerceAtLeast(1)
         ?: if (vertical) 1 else cells.size
-    return place(cells, columns, rowPadding, columnPadding, scaleName, clipHeight, spec.gridAlign)
+    return place(
+      cells,
+      entries,
+      spec,
+      columns,
+      rowPadding,
+      columnPadding,
+      scaleName,
+      clipHeight,
+      spec.gridAlign,
+    )
   }
 
   /**
@@ -622,6 +632,9 @@ internal class LegendBuilder(
    */
   private fun place(
     cells: List<List<SceneNode>>,
+    /** The entries themselves, which the row's own encode block is resolved against. */
+    entries: List<Entry>,
+    spec: LegendSpec,
     columns: Int,
     rowPadding: Double,
     columnPadding: Double,
@@ -669,9 +682,15 @@ internal class LegendBuilder(
 
     return ordered.indices.map { position ->
       val offset = offsets[position]
+      // The `entries` block paints the **row**, which is how a legend a selection is bound to
+      // catches a click anywhere along it: the fill is transparent and the group is still there.
+      val entry = entries.getOrNull(order[position])
+      val painted =
+        entry?.let { entryText(spec, "entries", "fill", it) }?.let { SceneColor.parse(it) }
       GroupNode(
         id = ids.allocate(),
         children = ordered[position],
+        fill = painted?.let { Fill.of(it) },
         transform = Transform2D.translate(offset.x, offset.y),
         // With a `clipHeight` the entry is a **clipped** box: a symbol larger than the row spills
         // out of it, and the legend is sized as though it had not. That is what the property is
