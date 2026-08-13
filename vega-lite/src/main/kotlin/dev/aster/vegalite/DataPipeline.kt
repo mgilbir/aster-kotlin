@@ -33,9 +33,15 @@ internal class DataPipeline(
     var head: DataNode = source
     if (needsIdentity) head = head.then(identifierNode())
 
+    // A layer's member buckets its field **before** its own transforms: upstream calls it a hack
+    // "equivalent for merging bin extent for union scale", and it is what lets two layers over one
+    // binned field share a bin. Below a filter the two bins are no longer siblings and neither the
+    // extent nor the bin width can be merged, so each layer buckets what it can see.
+    if (view.parentIsLayer) binNode()?.let { head = head.then(it) }
+
     head = userTransforms(head)
     implicitParse()?.let { head = head.then(it) }
-    binNode()?.let { head = head.then(it) }
+    if (!view.parentIsLayer) binNode()?.let { head = head.then(it) }
     timeUnitNode()?.let { head = head.then(it) }
     binnedTimeUnitNode()?.let { head = head.then(it) }
     sortIndexNode()?.let { head = head.then(it) }

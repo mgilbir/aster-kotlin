@@ -25,6 +25,17 @@ internal class UnitView(
    * gives a line and its points a scale each and draws them apart.
    */
   val childName: String = name,
+  /**
+   * Whether this view is one member of a **layer**, which decides where its binning happens.
+   *
+   * `parseData` bins a layer's member *before* that member's own transforms rather than after them
+   * — the comment upstream calls it a hack "equivalent for merging bin extent for union scale", and
+   * it is what makes two layers over one binned field share a single bin. Left after the
+   * transforms, one layer's filter stands between the source and its bin, the two bins are no
+   * longer siblings, and each layer buckets the rows it can see: two histograms drawn on bins of
+   * different widths, over a domain that is the union of both.
+   */
+  val parentIsLayer: Boolean = false,
 ) {
   val markDef: MarkDef = spec.markDef
 

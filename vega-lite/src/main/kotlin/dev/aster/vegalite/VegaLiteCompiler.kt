@@ -1114,7 +1114,7 @@ private class Compilation(
 
       return units.mapNotNull { (named, path) ->
         val (name, unit, child) = named
-        parser.unit(unit, path)?.let { UnitView(it, config, name, child) }
+        parser.unit(unit, path)?.let { UnitView(it, config, name, child, parentIsLayer = true) }
       }
     }
 
@@ -1136,7 +1136,7 @@ private class Compilation(
     // that normalizes into exactly one stays a single view, and keeps its unprefixed names.
     if (composite.normalize(spec) != null || normalize.pathOverlay(spec) != null) {
       return expand(spec, namePrefix).mapNotNull { (name, unit) ->
-        parser.unit(unit, "$")?.let { UnitView(it, config, name) }
+        parser.unit(unit, "$")?.let { UnitView(it, config, name, name, parentIsLayer = true) }
       }
     }
 
@@ -1248,6 +1248,7 @@ private class Compilation(
             )
             .filter { it.isNotEmpty() }
             .joinToString("_"),
+          parentIsLayer = view.parentIsLayer,
         )
         .also {
           it.widthSignal = prefixed("child_width")
