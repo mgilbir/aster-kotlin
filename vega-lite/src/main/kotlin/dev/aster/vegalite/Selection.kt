@@ -699,6 +699,9 @@ internal class Selection(
               put("strokeWidth", obj { put("value", 0.35) })
               put("stroke", obj { put("value", "transparent") })
               put("isVoronoi", obj { put("value", VegaValue.Bool(true)) })
+              // The cells carry the marks' own tooltip: the pointer is over a cell rather than
+              // over a point, so without it a chart that explains its points explains nothing.
+              Marks.reactiveTooltip(view)?.let { put("tooltip", it) }
             },
           )
         },

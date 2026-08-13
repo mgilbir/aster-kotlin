@@ -128,7 +128,12 @@ internal class LayoutSize(
             // With marks nested inside the band, the step is no longer one mark wide: it has to
             // hold as many as the inner scale has, and is then divided by what the outer padding
             // takes away. That arithmetic is the whole width of a grouped bar chart.
-            val offset = scales[if (channel == "x") "xOffset" else "yOffset"]
+            // Only a **discrete** offset divides the band into lanes; a continuous one — a jitter
+            // — has no lanes to count, so the step is the band's own. `getStepFor` again.
+            val offset =
+              scales[if (channel == "x") "xOffset" else "yOffset"]?.takeIf {
+                it.type == "band" || it.type == "point"
+              }
             emitted +=
               if (offset == null || stepForPosition) {
                 obj {

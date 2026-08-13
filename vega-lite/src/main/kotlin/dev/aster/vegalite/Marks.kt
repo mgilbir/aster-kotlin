@@ -948,6 +948,20 @@ internal object Marks {
    * sentence. And `tooltip: true` on the mark asks for every encoded field, which is the same
    * object the first form builds by hand.
    */
+  /**
+   * The tooltip a mark drawn *from another mark's items* carries — `tooltip(model,
+   * {reactiveGeom})`.
+   *
+   * A voronoi cell's datum is the item it covers, so every field is one level deeper: upstream
+   * builds the same expression with `datum.datum` as its accessor, and this is that expression with
+   * the accessor rewritten, which is the same string by construction.
+   */
+  fun reactiveTooltip(view: UnitView): VegaValue? {
+    val tooltip = tooltipChannel(view) as? VegaValue.Obj ?: return null
+    val signal = tooltip.string("signal") ?: return tooltip
+    return signalRef(signal.replace("datum[", "datum.datum["))
+  }
+
   private fun tooltipChannel(view: UnitView): VegaValue? {
     val def = view.spec.encoding["tooltip"]
     if (def != null && view.spec.encoding["tooltip"]?.raw?.fields?.isEmpty() != true) {

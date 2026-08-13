@@ -574,7 +574,11 @@ internal object Scales {
         val stated = declared as? VegaValue.Obj
         val step =
           stated?.number("step") ?: (declared as? VegaValue.Num)?.let { null } ?: view.config.step
-        val stepFor = stated?.string("for") ?: "offset"
+        // `getStepFor`: a stated step is the **offset's** only where the offset scale is discrete.
+        // A continuous one — a jitter over `random()` — has no bands to be one step each, so the
+        // step sizes the outer band and the offset fills whatever that came out as.
+        val offsetIsDiscrete = hasDiscreteDomain(type)
+        val stepFor = if (offsetIsDiscrete) stated?.string("for") ?: "offset" else "position"
         if (declared is VegaValue.Num || stepFor != "offset") {
           arr(listOf(num(0.0), signalRef("bandwidth('${view.scale(position)}')")))
         } else {

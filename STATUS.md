@@ -687,7 +687,7 @@ no data is needed to compare two compilers. So every one of them was compiled by
 by this one, and the outputs compared property by property. That is a *measurement*, not a gate: the
 examples are not fixtures here, and nothing about them is checked in.
 
-**124 of 627 matched exactly** at the start, and **507** do now. 16 were refused by name, and of those 8 are geographic,
+**124 of 627 matched exactly** at the start, and **509** do now. 16 were refused by name, and of those 8 are geographic,
 3 are a facet inside a facet, 2 a repeat inside a concatenation, and 2 are the `trail` mark — which
 this runtime draws and this compiler had simply not been told about.
 
@@ -2274,6 +2274,21 @@ runtime already had a Delaunay triangulation and a voronoi transform, and it was
 coordinates as *field names*: Vega-Lite writes them as expressions, `{"expr": "datum.datum.x || 0"}`,
 because the points are mark items and the coordinate wanted is the one the encoding resolved. Every
 cell came out without coordinates, so the diagram was empty and the overlay drew nothing.
+
+### A jitter is not a lane, and a cell explains what it covers
+
+Two rules that turn on the same distinction — whether the thing nested inside a band is *discrete*.
+
+An **offset scale** divides a band into lanes only where it has lanes to divide it into.
+`getStepFor` says so: a stated `{"step": 50}` is the offset's own step where the offset scale is
+discrete, and the *position's* where it is not. A jitter over `random()` is the second kind, so the
+step sizes the band and the offset fills whatever the band came out as, `[0, bandwidth('y')]`. This
+compiler read every offset as a set of lanes and computed a band wide enough to hold them, which is
+a chart as many times too wide as the column had distinct values.
+
+And a **voronoi** cell carries the marks' own tooltip. The pointer is over a cell rather than over a
+point, so a chart that explains its points explained nothing; upstream builds the same expression
+with `datum.datum` as its accessor, the cell's datum being the item it covers.
 
 ### A parse that cannot climb, and a copy that is not its own members
 
