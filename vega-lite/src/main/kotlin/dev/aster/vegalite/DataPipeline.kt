@@ -312,6 +312,15 @@ internal class DataPipeline(
         if (hasBandEnd(def)) {
           dimensions += Fields.vgField(def, suffix = "end")
         }
+        // A rect shifted off the middle of its bucket is drawn between two *interpolated* edges,
+        // and those are columns like any other: the grouping has to carry them, or the aggregate
+        // throws away the very numbers the mark is placed by.
+        val shiftedChannel = view.spec.encoding.entries.firstOrNull { it.value === def }?.key
+        if (shiftedChannel != null && view.offsettedRectPosition(def, shiftedChannel) != null) {
+          val stem = Fields.vgField(def, forAs = true)
+          dimensions += "${stem}_offsetted_rect_start"
+          dimensions += "${stem}_offsetted_rect_end"
+        }
         // A binned field on a **discrete** scale groups by its label as well: the label is what
         // the axis lists, so it has to survive the aggregation alongside the two edges.
         if (

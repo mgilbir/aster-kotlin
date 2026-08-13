@@ -1779,6 +1779,9 @@ The chart that shows why is a line with a red band over each missing point: at `
 band has to sit *over* the gap, and reading the bucket's own edges put it after the gap instead —
 half a day late, every time.
 
+Those two columns are columns like any other, so the **grouping** has to carry them: an aggregate
+that throws them away throws away the very numbers the mark is placed by.
+
 ### Two runtime gaps this batch names but does not close
 
 `density`'s fixture is not in the corpus, and `trail`'s draws no legend. Both compile exactly as
