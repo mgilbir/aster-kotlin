@@ -10,6 +10,7 @@ import dev.aster.vega.model.spec.Anchor
 import dev.aster.vega.model.spec.AxisSpec
 import dev.aster.vega.model.spec.Orient
 import dev.aster.vega.model.spec.ScaleType
+import dev.aster.vega.model.time.TimeFormat
 import dev.aster.vega.runtime.scale.BandScale
 import dev.aster.vega.runtime.scale.LinearScale
 import dev.aster.vega.runtime.scale.PointScale
@@ -910,6 +911,17 @@ public class AxisBuilder(
       return { value ->
         val instant = value.asDouble()
         if (instant.isNaN()) value.asString() else write(instant)
+      }
+    }
+    // A **time** scale reads its specifier as a time specifier, without needing a `formatType` to
+    // say so: upstream's `tickFormat` asks the scale, and a temporal scale's own formatter is d3's
+    // `timeFormat`. Falling through to the numeric branch below fed `%b %d` to a number formatter,
+    // which printed the epoch milliseconds unchanged — a chart labelled `1580515200000` where
+    // upstream labelled it `Feb 01`.
+    if (format != null && scale is TimeScale) {
+      return { value ->
+        val instant = value.asDouble()
+        if (instant.isNaN()) value.asString() else TimeFormat.format(instant, format, scale.zone)
       }
     }
     // An explicit specifier replaces the precision the scale would have chosen, and applies only

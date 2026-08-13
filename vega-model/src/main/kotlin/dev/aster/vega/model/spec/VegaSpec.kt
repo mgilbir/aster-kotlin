@@ -494,6 +494,18 @@ public data class ScaleSpec(
   val clamp: Boolean = false,
   val nice: Boolean = false,
   val niceCount: Int? = null,
+  /**
+   * `nice` written as a **time unit** — `"month"`, or `{"interval": "month", "step": 3}`.
+   *
+   * A different rule from the count: a count-nice rounds a domain outward to whatever step d3's
+   * tick algorithm chose, where an interval-nice rounds it to a calendar boundary. `nice: "month"`
+   * over a domain from 17 January to 9 May gives 1 January to 1 June, and `nice: true` over the
+   * same one gives the two Sundays either side of it — a difference of eleven days at one end,
+   * which is the difference between an axis labelled by months and one labelled by weeks.
+   */
+  val niceInterval: String? = null,
+  /** The `step` of an interval-nice: `{"interval": "month", "step": 3}` rounds out to a quarter. */
+  val niceStep: Int? = null,
   /** `null` means "not stated", which matters because the default differs by scale type. */
   val zero: Boolean? = null,
   val padding: NumberValue? = null,

@@ -1470,6 +1470,21 @@
   "caption": "Y-axis for a linear scale with values from 0 to 45"
  },
  {
+  "fixture": "scale-nice-intervals",
+  "kind": "axis",
+  "caption": "X-axis for a utc scale with values from January 01 to June 01"
+ },
+ {
+  "fixture": "scale-nice-intervals",
+  "kind": "axis",
+  "caption": "X-axis for a utc scale with values from January 01 to July 01"
+ },
+ {
+  "fixture": "scale-nice-intervals",
+  "kind": "axis",
+  "caption": "Y-axis for a linear scale with values from 0 to 10"
+ },
+ {
   "fixture": "scale-variants",
   "kind": "axis",
   "caption": "X-axis titled 'Symlog, both signs' for a symlog scale with values from −900 to 1,400"

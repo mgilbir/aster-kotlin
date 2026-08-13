@@ -20,6 +20,8 @@ import dev.aster.vega.model.spec.RangeSpec
 import dev.aster.vega.model.spec.ScaleSpec
 import dev.aster.vega.model.spec.ScaleType
 import dev.aster.vega.model.spec.SchemeRef
+import dev.aster.vega.model.time.TimeInterval
+import dev.aster.vega.model.time.TimeStepper
 import dev.aster.vega.runtime.scale.BandScale
 import dev.aster.vega.runtime.scale.BinOrdinalScale
 import dev.aster.vega.runtime.scale.ColorSchemes
@@ -624,13 +626,27 @@ public class ScaleResolver(
       }
     val niced =
       if (spec.nice && spec.domainRaw == null) {
+        // `nice: "month"` rounds out to a **calendar boundary**, where `nice: true` rounds out to
+        // whatever step the tick algorithm chose. Over 17 January to 9 May those differ by eleven
+        // days at one end — the difference between an axis labelled by months and one by weeks.
+        val stepper =
+          spec.niceInterval
+            ?.let { name -> TimeInterval.entries.firstOrNull { it.name.equals(name, true) } }
+            ?.let { TimeStepper(it, spec.niceStep ?: 1, zone) }
         val (lo, hi) =
-          TimeTicks.nice(
-            domain.first(),
-            domain.last(),
-            spec.niceCount ?: LinearScale.DEFAULT_TICK_COUNT,
-            zone,
-          )
+          if (stepper != null) {
+            val start = stepper.floor(domain.first())
+            val flooredEnd = stepper.floor(domain.last())
+            val end = if (flooredEnd < domain.last()) stepper.offset(flooredEnd, 1) else flooredEnd
+            start to end
+          } else {
+            TimeTicks.nice(
+              domain.first(),
+              domain.last(),
+              spec.niceCount ?: LinearScale.DEFAULT_TICK_COUNT,
+              zone,
+            )
+          }
         listOf(lo, hi)
       } else {
         domain

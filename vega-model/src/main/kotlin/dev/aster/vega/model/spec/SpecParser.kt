@@ -167,6 +167,19 @@ private fun guideStyleKeys(vararg prefixes: String): Set<String> =
 
 private val AXIS_UNSUPPORTED = emptyMap<String, String>()
 
+/** The time units a scale's `nice` can round out to, which is `vega-time`'s own list. */
+private val NICE_INTERVALS =
+  setOf(
+    "millisecond",
+    "second",
+    "minute",
+    "hour",
+    "day",
+    "week",
+    "month",
+    "year",
+  )
+
 /**
  * Guide properties that can carry a `{"signal": ...}`, which is what decides whether one **folds**.
  *
@@ -1383,6 +1396,17 @@ public class SpecParser {
       clamp = obj.fields["clamp"]?.asBoolean() ?: false,
       nice = parseNice(obj.fields["nice"], "$path.nice"),
       niceCount = (obj.fields["nice"] as? VegaValue.Num)?.value?.toInt(),
+      niceInterval =
+        when (val nice = obj.fields["nice"]) {
+          is VegaValue.Str -> nice.value.lowercase()
+          is VegaValue.Obj -> nice.fields["interval"]?.asString()?.lowercase()
+          else -> null
+        },
+      niceStep =
+        ((obj.fields["nice"] as? VegaValue.Obj)?.fields?.get("step") as? VegaValue.Num)
+          ?.value
+          ?.toInt()
+          ?.takeIf { it >= 1 },
       zero = obj.fields["zero"]?.asBoolean(),
       padding = obj.numberOrSignal("padding", "$path.padding"),
       paddingInner = obj.numberOrSignal("paddingInner", "$path.paddingInner"),
@@ -1431,19 +1455,47 @@ public class SpecParser {
       }
     }
 
+  /**
+   * `nice`, in every form upstream accepts: a flag, a **count**, or a **time interval**.
+   *
+   * All three mean "round the domain outward" and they round to different things, which is why the
+   * count and the interval are kept beside the flag rather than folded into it. A name upstream
+   * does not have is reported: rounding a domain to a unit nobody recognises would leave the axis
+   * looking finished and labelled wrongly.
+   */
   private fun parseNice(value: VegaValue?, path: String): Boolean =
     when (value) {
       null -> false
       is VegaValue.Bool -> value.value
       is VegaValue.Num -> true
-      else -> {
-        diagnostics.warn(
-          DiagnosticCodes.PARSE_UNKNOWN_PROPERTY,
-          "Time-unit 'nice' values are not implemented; treating nice as false",
-          jsonPath = path,
-        )
-        false
+      is VegaValue.Str -> {
+        if (value.value.lowercase() in NICE_INTERVALS) {
+          true
+        } else {
+          diagnostics.warn(
+            DiagnosticCodes.PARSE_UNKNOWN_PROPERTY,
+            "Scale 'nice' does not know the interval '${value.value}'; " +
+              "known intervals are ${NICE_INTERVALS.sorted().joinToString(", ")}",
+            jsonPath = path,
+          )
+          false
+        }
       }
+      is VegaValue.Obj -> {
+        val interval = value.fields["interval"]?.asString()?.lowercase()
+        if (interval != null && interval in NICE_INTERVALS) {
+          true
+        } else {
+          diagnostics.warn(
+            DiagnosticCodes.PARSE_UNKNOWN_PROPERTY,
+            "Scale 'nice' as an object needs an 'interval' naming one of " +
+              NICE_INTERVALS.sorted().joinToString(", "),
+            jsonPath = path,
+          )
+          false
+        }
+      }
+      else -> false
     }
 
   /**
