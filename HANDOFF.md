@@ -9,7 +9,7 @@ Branch `milestone-0-bootstrap`. Working tree clean, both gates green:
 - `./scripts/check.sh` — format, all tests, lint, demo APK
 - `./scripts/oracle.sh` — regenerates upstream references and runs the differential comparison
 
-**174 differential fixtures pass, all matching upstream exactly.** That is the only number here
+**175 differential fixtures pass, all matching upstream exactly.** That is the only number here
 that means what it says.
 
 ## Read this before trusting the other number
@@ -273,13 +273,25 @@ things worth having, in the order the counts put them:
   turned every unset stroke into the word "null" and then into a complaint, on charts that were
   drawing correctly.
 
+A second pass over the same distribution found two more, both in the axis:
+
+- **`encode.ticks.update.y`, and the rest of a part's geometry.** Upstream merges a guide's `encode`
+  block into the part's own encoders and applies it **last**, so `y`, `x2` and their friends override
+  the geometry the guide computed. `warming-stripes` reaches through a tick to draw a marker at a
+  chosen temperature; nothing in the axis vocabulary can say that.
+- **A stroke channel that reads `datum`.** Folding a guide encode channel into the property it
+  duplicates is right for a constant and for a signal over the chart's state, and cannot work for
+  `{"signal": "datum.value === marked ? 2 : 1"}` — at parse time there is no tick to read, so every
+  tick got the false branch. The stroke channels are resolved again per tick now, which costs nothing
+  where they are constant and is the only way that form can work.
+
 The rest are honest: input widgets that have no equivalent here, the extended projection family
 upstream itself refuses, `wordcloud`, and two properties (`marknames`, a mark-level `index`) that are
 in nobody's schema and are ignored by both engines.
 
 ## What is left: two examples, and neither can be verified
 
-**174 differential fixtures pass. 91 of the 93 examples compile clean.** Everything that can be
+**175 differential fixtures pass. 91 of the 93 examples compile clean.** Everything that can be
 checked against upstream has been.
 
 ### `projections` — upstream refuses it too

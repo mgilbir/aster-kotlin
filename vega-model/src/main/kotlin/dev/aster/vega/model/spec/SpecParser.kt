@@ -585,6 +585,23 @@ private val RESOLVED_GUIDE_CHANNELS =
     // An axis label's position, which no property can say.
     "labels.update.x",
     "labels.update.y",
+    // The geometry of the **lines** an axis draws, which upstream applies last and so lets a
+    // specification override: a tick lifted off the axis, a gridline stretched across the plot, a
+    // domain line that starts short of its scale. `warming-stripes` reaches through a tick to mark
+    // a
+    // temperature, which no axis property could express.
+    "ticks.update.x",
+    "ticks.update.x2",
+    "ticks.update.y",
+    "ticks.update.y2",
+    "grid.update.x",
+    "grid.update.x2",
+    "grid.update.y",
+    "grid.update.y2",
+    "domain.update.x",
+    "domain.update.x2",
+    "domain.update.y",
+    "domain.update.y2",
     // A label's own nudge, and the text it draws when a scale supplies it rather than a format.
     "labels.update.dx",
     "labels.update.dy",
