@@ -1329,13 +1329,21 @@ private class Compilation(
   /** The chart group's own `encode`, which is where a top-level `view` block's paint lands. */
   private fun viewEncode(from: VegaValue.Obj = spec): VegaValue? {
     val view = from.obj("view") ?: return null
-    val painted =
-      view.fields.filterKeys { it in setOf("fill", "stroke", "fillOpacity", "strokeOpacity") }
-    if (painted.isEmpty()) return null
+    // `assembleEncodeFromView` writes **everything** the block holds but its `style`, each as a
+    // value ref: a `cursor` on the plotting area is how a chart says what the pointer looks like
+    // over it, and reading only the paint left it out.
+    val applied = view.fields.filterKeys { it != "style" }
+    if (applied.isEmpty()) return null
     return obj {
       put(
         "update",
-        obj { painted.forEach { (key, value) -> put(key, obj { put("value", value) }) } },
+        obj {
+          applied.forEach { (key, value) ->
+            val expression =
+              (value as? VegaValue.Obj)?.let { it.string("expr") ?: it.string("signal") }
+            put(key, if (expression != null) signalRef(expression) else obj { put("value", value) })
+          }
+        },
       )
     }
   }

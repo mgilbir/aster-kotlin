@@ -678,7 +678,7 @@ no data is needed to compare two compilers. So every one of them was compiled by
 by this one, and the outputs compared property by property. That is a *measurement*, not a gate: the
 examples are not fixtures here, and nothing about them is checked in.
 
-**124 of 627 matched exactly** at the start, and **503** do now. 16 were refused by name, and of those 8 are geographic,
+**124 of 627 matched exactly** at the start, and **506** do now. 16 were refused by name, and of those 8 are geographic,
 3 are a facet inside a facet, 2 a repeat inside a concatenation, and 2 are the `trail` mark — which
 this runtime draws and this compiler had simply not been told about.
 
@@ -2265,6 +2265,24 @@ runtime already had a Delaunay triangulation and a voronoi transform, and it was
 coordinates as *field names*: Vega-Lite writes them as expressions, `{"expr": "datum.datum.x || 0"}`,
 because the points are mark items and the coordinate wanted is the one the encoding resolved. Every
 cell came out without coordinates, so the diagram was empty and the overlay drew nothing.
+
+### A parse that cannot climb, and a copy that is not its own members
+
+Two placement rules, both about a step above deciding what a step below may do.
+
+A **`pivot`** turns a column of categories into a column each, so nothing above it can say what the
+table will hold — `PivotTransformNode.producedFields` answers `undefined` for exactly that reason.
+An implicit parse therefore cannot climb past one: it stays below and is written as `toDate(…)`
+formulas rather than as `format.parse` on the loader, which is right, because the loader never sees
+the columns the pivot invents.
+
+And a **repeat over a layer** names the *copy*, not its members. Where the repeated spec is itself a
+layer, upstream names the copy `child__layer_AAPL` and numbers its members under it —
+`child__layer_AAPL_layer_0` and `…_layer_1`. Naming every member after the copy gave a line and its
+halo the same name, which is one mark's name for two marks.
+
+Beside them: a `view` block writes **everything** it holds but its `style`, so a `cursor` on the
+plotting area reaches the group encode along with the paint.
 
 ### A cell that is as wide as its own categories need
 

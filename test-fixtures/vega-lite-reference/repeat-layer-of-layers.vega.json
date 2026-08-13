@@ -1,0 +1,355 @@
+{
+  "$schema": "https://vega.github.io/schema/vega/v6.json",
+  "description": "A line and its halo repeated over three columns, where each copy is a layer of two marks — so the copy is named and its members are numbered under it.",
+  "background": "white",
+  "padding": 5,
+  "width": 300,
+  "height": 300,
+  "style": "cell",
+  "data": [
+    {
+      "name": "source_0",
+      "values": [
+        {
+          "t": 1,
+          "AAPL": 10,
+          "GOOG": 20,
+          "MSFT": 15
+        },
+        {
+          "t": 2,
+          "AAPL": 14,
+          "GOOG": 18,
+          "MSFT": 17
+        },
+        {
+          "t": 3,
+          "AAPL": 12,
+          "GOOG": 22,
+          "MSFT": 13
+        }
+      ]
+    },
+    {
+      "name": "data_0",
+      "source": "source_0",
+      "transform": [
+        {
+          "type": "formula",
+          "expr": "toNumber(datum[\"t\"])",
+          "as": "t"
+        }
+      ]
+    }
+  ],
+  "marks": [
+    {
+      "name": "child__layer_AAPL_layer_0_marks",
+      "type": "line",
+      "style": [
+        "line"
+      ],
+      "sort": {
+        "field": "x"
+      },
+      "from": {
+        "data": "data_0"
+      },
+      "encode": {
+        "update": {
+          "stroke": {
+            "value": "white"
+          },
+          "strokeWidth": {
+            "value": 4
+          },
+          "description": {
+            "signal": "\"t: \" + (format(datum[\"t\"], \"\")) + \"; price: \" + (format(datum[\"AAPL\"], \"\"))"
+          },
+          "x": {
+            "scale": "x",
+            "field": "t"
+          },
+          "y": {
+            "scale": "y",
+            "field": "AAPL"
+          },
+          "defined": {
+            "signal": "isValid(datum[\"t\"]) && isFinite(+datum[\"t\"]) && isValid(datum[\"AAPL\"]) && isFinite(+datum[\"AAPL\"])"
+          }
+        }
+      }
+    },
+    {
+      "name": "child__layer_AAPL_layer_1_marks",
+      "type": "line",
+      "style": [
+        "line"
+      ],
+      "sort": {
+        "field": "x"
+      },
+      "from": {
+        "data": "data_0"
+      },
+      "encode": {
+        "update": {
+          "stroke": {
+            "value": "steelblue"
+          },
+          "description": {
+            "signal": "\"t: \" + (format(datum[\"t\"], \"\")) + \"; price: \" + (format(datum[\"AAPL\"], \"\"))"
+          },
+          "x": {
+            "scale": "x",
+            "field": "t"
+          },
+          "y": {
+            "scale": "y",
+            "field": "AAPL"
+          },
+          "defined": {
+            "signal": "isValid(datum[\"t\"]) && isFinite(+datum[\"t\"]) && isValid(datum[\"AAPL\"]) && isFinite(+datum[\"AAPL\"])"
+          }
+        }
+      }
+    },
+    {
+      "name": "child__layer_GOOG_layer_0_marks",
+      "type": "line",
+      "style": [
+        "line"
+      ],
+      "sort": {
+        "field": "x"
+      },
+      "from": {
+        "data": "data_0"
+      },
+      "encode": {
+        "update": {
+          "stroke": {
+            "value": "white"
+          },
+          "strokeWidth": {
+            "value": 4
+          },
+          "description": {
+            "signal": "\"t: \" + (format(datum[\"t\"], \"\")) + \"; price: \" + (format(datum[\"GOOG\"], \"\"))"
+          },
+          "x": {
+            "scale": "x",
+            "field": "t"
+          },
+          "y": {
+            "scale": "y",
+            "field": "GOOG"
+          },
+          "defined": {
+            "signal": "isValid(datum[\"t\"]) && isFinite(+datum[\"t\"]) && isValid(datum[\"GOOG\"]) && isFinite(+datum[\"GOOG\"])"
+          }
+        }
+      }
+    },
+    {
+      "name": "child__layer_GOOG_layer_1_marks",
+      "type": "line",
+      "style": [
+        "line"
+      ],
+      "sort": {
+        "field": "x"
+      },
+      "from": {
+        "data": "data_0"
+      },
+      "encode": {
+        "update": {
+          "stroke": {
+            "value": "steelblue"
+          },
+          "description": {
+            "signal": "\"t: \" + (format(datum[\"t\"], \"\")) + \"; price: \" + (format(datum[\"GOOG\"], \"\"))"
+          },
+          "x": {
+            "scale": "x",
+            "field": "t"
+          },
+          "y": {
+            "scale": "y",
+            "field": "GOOG"
+          },
+          "defined": {
+            "signal": "isValid(datum[\"t\"]) && isFinite(+datum[\"t\"]) && isValid(datum[\"GOOG\"]) && isFinite(+datum[\"GOOG\"])"
+          }
+        }
+      }
+    },
+    {
+      "name": "child__layer_MSFT_layer_0_marks",
+      "type": "line",
+      "style": [
+        "line"
+      ],
+      "sort": {
+        "field": "x"
+      },
+      "from": {
+        "data": "data_0"
+      },
+      "encode": {
+        "update": {
+          "stroke": {
+            "value": "white"
+          },
+          "strokeWidth": {
+            "value": 4
+          },
+          "description": {
+            "signal": "\"t: \" + (format(datum[\"t\"], \"\")) + \"; price: \" + (format(datum[\"MSFT\"], \"\"))"
+          },
+          "x": {
+            "scale": "x",
+            "field": "t"
+          },
+          "y": {
+            "scale": "y",
+            "field": "MSFT"
+          },
+          "defined": {
+            "signal": "isValid(datum[\"t\"]) && isFinite(+datum[\"t\"]) && isValid(datum[\"MSFT\"]) && isFinite(+datum[\"MSFT\"])"
+          }
+        }
+      }
+    },
+    {
+      "name": "child__layer_MSFT_layer_1_marks",
+      "type": "line",
+      "style": [
+        "line"
+      ],
+      "sort": {
+        "field": "x"
+      },
+      "from": {
+        "data": "data_0"
+      },
+      "encode": {
+        "update": {
+          "stroke": {
+            "value": "steelblue"
+          },
+          "description": {
+            "signal": "\"t: \" + (format(datum[\"t\"], \"\")) + \"; price: \" + (format(datum[\"MSFT\"], \"\"))"
+          },
+          "x": {
+            "scale": "x",
+            "field": "t"
+          },
+          "y": {
+            "scale": "y",
+            "field": "MSFT"
+          },
+          "defined": {
+            "signal": "isValid(datum[\"t\"]) && isFinite(+datum[\"t\"]) && isValid(datum[\"MSFT\"]) && isFinite(+datum[\"MSFT\"])"
+          }
+        }
+      }
+    }
+  ],
+  "scales": [
+    {
+      "name": "x",
+      "type": "linear",
+      "domain": {
+        "data": "data_0",
+        "field": "t"
+      },
+      "range": [
+        0,
+        {
+          "signal": "width"
+        }
+      ],
+      "nice": true,
+      "zero": false
+    },
+    {
+      "name": "y",
+      "type": "linear",
+      "domain": {
+        "data": "data_0",
+        "fields": [
+          "AAPL",
+          "GOOG",
+          "MSFT"
+        ]
+      },
+      "range": [
+        {
+          "signal": "height"
+        },
+        0
+      ],
+      "nice": true,
+      "zero": true
+    }
+  ],
+  "axes": [
+    {
+      "scale": "x",
+      "orient": "bottom",
+      "gridScale": "y",
+      "grid": true,
+      "tickCount": {
+        "signal": "ceil(width/40)"
+      },
+      "domain": false,
+      "labels": false,
+      "aria": false,
+      "maxExtent": 0,
+      "minExtent": 0,
+      "ticks": false,
+      "zindex": 0
+    },
+    {
+      "scale": "y",
+      "orient": "left",
+      "gridScale": "x",
+      "grid": true,
+      "tickCount": {
+        "signal": "ceil(height/40)"
+      },
+      "domain": false,
+      "labels": false,
+      "aria": false,
+      "maxExtent": 0,
+      "minExtent": 0,
+      "ticks": false,
+      "zindex": 0
+    },
+    {
+      "scale": "x",
+      "orient": "bottom",
+      "grid": false,
+      "title": "t",
+      "labelFlush": true,
+      "labelOverlap": true,
+      "tickCount": {
+        "signal": "ceil(width/40)"
+      },
+      "zindex": 0
+    },
+    {
+      "scale": "y",
+      "orient": "left",
+      "grid": false,
+      "title": "price",
+      "labelOverlap": true,
+      "tickCount": {
+        "signal": "ceil(height/40)"
+      },
+      "zindex": 0
+    }
+  ]
+}

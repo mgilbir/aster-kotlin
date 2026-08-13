@@ -131,6 +131,11 @@ internal sealed class DataNode {
         // `argmax_US_Gross['Production Budget']` even though the two names differ.
         val roots = parse.parse.keys.map { Fields.splitAccessPath(it).first() }.toSet()
         if (below.producedFields().any { it in parse.parse.keys || it in roots }) continue
+        // A step whose outputs are **unknown** blocks every parse: a `pivot` turns a column of
+        // categories into a column each, so nothing above it can say what the table will hold.
+        // `PivotTransformNode.producedFields` answers `undefined` for exactly this reason, and the
+        // parse then stays below it and is written as formulas rather than as `format.parse`.
+        if (below.producesUnknownFields()) continue
         val above = parse.children.toList()
         parse.children.clear()
         below.children.clear()
@@ -141,6 +146,10 @@ internal sealed class DataNode {
       }
     }
   }
+
+  /** Whether a step's outputs cannot be named — a `pivot`, whose columns are its rows' values. */
+  private fun producesUnknownFields(): Boolean =
+    this is PassThroughNode && transforms.any { (it as? VegaValue.Obj)?.string("type") == "pivot" }
 
   /** The columns a step writes, which is what a parse cannot climb past. */
   private fun producedFields(): Set<String> =

@@ -117,7 +117,15 @@ internal object Repeat {
   private fun copy(
     template: VegaValue.Obj,
     bound: Map<String, String>,
-    name: String,
+    /**
+     * The name of the copy — the **outermost** spec only.
+     *
+     * A copy that is itself a layer keeps its own numbering inside: upstream names the copy
+     * `child__layer_AAPL` and its members `child__layer_AAPL_layer_0` and `…_layer_1`. Naming every
+     * member after the copy gave a chart's halo and its line the same name, which is one mark's
+     * name for two marks.
+     */
+    name: String?,
   ): VegaValue.Obj = obj {
     template.fields.forEach { (key, value) ->
       when (key) {
@@ -129,14 +137,14 @@ internal object Repeat {
             "layer",
             arr(
               (value as? VegaValue.Arr)?.values.orEmpty().map { child ->
-                copy(child as? VegaValue.Obj ?: return@map child, bound, name)
+                copy(child as? VegaValue.Obj ?: return@map child, bound, name = null)
               }
             ),
           )
         else -> put(key, value)
       }
     }
-    put("name", name)
+    name?.let { put("name", it) }
   }
 
   /** `replaceRepeaterInMapping`: every channel of an encoding, resolved one at a time. */
