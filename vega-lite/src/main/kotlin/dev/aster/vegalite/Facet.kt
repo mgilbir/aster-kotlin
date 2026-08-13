@@ -387,8 +387,13 @@ internal class FacetGrid(val row: Facet?, val column: Facet?) : FacetLayout {
               // against the cells and centred on them.
               val angle = facet.def.raw.obj("header")?.number("labelAngle")
               if (angle != null && !facet.isColumn) {
+                // `defaultLabelAlign` through the header's own orientation, a row's captions
+                // being `left`/`y`: a caption turned a *quarter* turn is **centred** rather than
+                // pushed to one side, its own length now running across the band rather than
+                // along it, so there is no side left to push it to.
+                val turned = ((angle % 360) + 360) % 360
                 put("baseline", "middle")
-                put("align", if (facet.headerOrient("label") == "right") "left" else "right")
+                put("align", Guides.labelAlign(turned, "y", "left"))
                 put("angle", num(angle))
               }
               facet.headerProperties("label").forEach { (key, value) -> put(key, value) }

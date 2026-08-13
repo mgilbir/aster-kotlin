@@ -1,0 +1,319 @@
+{
+  "$schema": "https://vega.github.io/schema/vega/v6.json",
+  "description": "A domain widened by values beside the ones the data gives, and a rect spanning a bucketed instant.",
+  "background": "white",
+  "padding": 5,
+  "width": 300,
+  "height": 300,
+  "style": "cell",
+  "data": [
+    {
+      "name": "source_0",
+      "url": "data/cars.json",
+      "format": {
+        "type": "json",
+        "parse": {
+          "Year": "date"
+        }
+      },
+      "transform": [
+        {
+          "field": "Year",
+          "type": "timeunit",
+          "units": [
+            "month"
+          ],
+          "as": [
+            "month_Year",
+            "month_Year_end"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "data_0",
+      "source": "source_0",
+      "transform": [
+        {
+          "type": "aggregate",
+          "groupby": [
+            "month_Year"
+          ],
+          "ops": [
+            "count"
+          ],
+          "fields": [
+            null
+          ],
+          "as": [
+            "__count"
+          ]
+        },
+        {
+          "type": "filter",
+          "expr": "(isDate(datum[\"month_Year\"]) || (isValid(datum[\"month_Year\"]) && isFinite(+datum[\"month_Year\"])))"
+        }
+      ]
+    },
+    {
+      "name": "data_1",
+      "source": "source_0",
+      "transform": [
+        {
+          "type": "aggregate",
+          "groupby": [
+            "month_Year",
+            "month_Year_end"
+          ],
+          "ops": [
+            "count"
+          ],
+          "fields": [
+            null
+          ],
+          "as": [
+            "__count"
+          ]
+        },
+        {
+          "type": "filter",
+          "expr": "(isDate(datum[\"month_Year\"]) || (isValid(datum[\"month_Year\"]) && isFinite(+datum[\"month_Year\"])))"
+        }
+      ]
+    }
+  ],
+  "marks": [
+    {
+      "name": "layer_0_marks",
+      "type": "rect",
+      "style": [
+        "rect"
+      ],
+      "from": {
+        "data": "data_1"
+      },
+      "encode": {
+        "update": {
+          "fill": {
+            "value": "#4c78a8"
+          },
+          "description": {
+            "signal": "\"Year (month): \" + (timeFormat(datum[\"month_Year\"], timeUnitSpecifier([\"month\"], {\"year-month\":\"%b %Y \",\"year-month-date\":\"%b %d, %Y \"}))) + \"; Count of Records: \" + (format(datum[\"__count\"], \"\"))"
+          },
+          "x2": {
+            "scale": "x",
+            "field": "month_Year",
+            "offset": {
+              "signal": "0.5 + (abs(scale(\"x\", datum[\"month_Year_end\"]) - scale(\"x\", datum[\"month_Year\"])) < 0.25 ? -0.5 * (0.25 - (abs(scale(\"x\", datum[\"month_Year_end\"]) - scale(\"x\", datum[\"month_Year\"])))) : 0)"
+            }
+          },
+          "x": {
+            "scale": "x",
+            "field": "month_Year_end",
+            "offset": {
+              "signal": "0.5 + (abs(scale(\"x\", datum[\"month_Year_end\"]) - scale(\"x\", datum[\"month_Year\"])) < 0.25 ? 0.5 * (0.25 - (abs(scale(\"x\", datum[\"month_Year_end\"]) - scale(\"x\", datum[\"month_Year\"])))) : 0)"
+            }
+          },
+          "y": {
+            "scale": "y",
+            "field": "__count"
+          },
+          "y2": {
+            "scale": "y",
+            "value": 0
+          }
+        }
+      }
+    },
+    {
+      "name": "layer_1_marks",
+      "type": "symbol",
+      "style": [
+        "point"
+      ],
+      "from": {
+        "data": "data_0"
+      },
+      "encode": {
+        "update": {
+          "fill": {
+            "value": "transparent"
+          },
+          "stroke": {
+            "value": "#4c78a8"
+          },
+          "ariaRoleDescription": {
+            "value": "point"
+          },
+          "description": {
+            "signal": "\"Year (month): \" + (timeFormat(datum[\"month_Year\"], timeUnitSpecifier([\"month\"], {\"year-month\":\"%b %Y \",\"year-month-date\":\"%b %d, %Y \"}))) + \"; Count of Records: \" + (format(datum[\"__count\"], \"\"))"
+          },
+          "x": {
+            "scale": "x",
+            "field": "month_Year"
+          },
+          "y": {
+            "scale": "y",
+            "field": "__count"
+          },
+          "size": {
+            "scale": "size",
+            "field": "__count"
+          }
+        }
+      }
+    }
+  ],
+  "scales": [
+    {
+      "name": "x",
+      "type": "time",
+      "domain": {
+        "fields": [
+          {
+            "data": "data_1",
+            "field": "month_Year"
+          },
+          {
+            "data": "data_1",
+            "field": "month_Year_end"
+          },
+          {
+            "data": "data_0",
+            "field": "month_Year"
+          }
+        ]
+      },
+      "range": [
+        0,
+        {
+          "signal": "width"
+        }
+      ]
+    },
+    {
+      "name": "y",
+      "type": "linear",
+      "domain": {
+        "fields": [
+          {
+            "data": "data_1",
+            "field": "__count"
+          },
+          {
+            "data": "data_0",
+            "field": "__count"
+          }
+        ]
+      },
+      "range": [
+        {
+          "signal": "height"
+        },
+        0
+      ],
+      "nice": true,
+      "zero": true
+    },
+    {
+      "name": "size",
+      "type": "linear",
+      "domain": {
+        "fields": [
+          [
+            5,
+            600
+          ],
+          {
+            "data": "data_0",
+            "field": "__count"
+          }
+        ]
+      },
+      "range": [
+        4,
+        361
+      ],
+      "zero": false
+    }
+  ],
+  "axes": [
+    {
+      "scale": "x",
+      "orient": "bottom",
+      "gridScale": "y",
+      "grid": true,
+      "tickMinStep": {
+        "signal": "datetime(2001, 1, 1, 0, 0, 0, 0) - datetime(2001, 0, 1, 0, 0, 0, 0)"
+      },
+      "domain": false,
+      "labels": false,
+      "aria": false,
+      "maxExtent": 0,
+      "minExtent": 0,
+      "ticks": false,
+      "zindex": 0
+    },
+    {
+      "scale": "y",
+      "orient": "left",
+      "gridScale": "x",
+      "grid": true,
+      "tickCount": {
+        "signal": "ceil(height/40)"
+      },
+      "domain": false,
+      "labels": false,
+      "aria": false,
+      "maxExtent": 0,
+      "minExtent": 0,
+      "ticks": false,
+      "zindex": 0
+    },
+    {
+      "scale": "x",
+      "orient": "bottom",
+      "grid": false,
+      "title": "Year (month)",
+      "format": {
+        "signal": "timeUnitSpecifier([\"month\"], {\"year-month\":\"%b %Y \",\"year-month-date\":\"%b %d, %Y \"})"
+      },
+      "labelFlush": true,
+      "labelOverlap": true,
+      "tickMinStep": {
+        "signal": "datetime(2001, 1, 1, 0, 0, 0, 0) - datetime(2001, 0, 1, 0, 0, 0, 0)"
+      },
+      "zindex": 0
+    },
+    {
+      "scale": "y",
+      "orient": "left",
+      "grid": false,
+      "title": "Count of Records",
+      "labelOverlap": true,
+      "tickCount": {
+        "signal": "ceil(height/40)"
+      },
+      "zindex": 0
+    }
+  ],
+  "legends": [
+    {
+      "size": "size",
+      "symbolType": "circle",
+      "title": "Count of Records",
+      "encode": {
+        "symbols": {
+          "update": {
+            "fill": {
+              "value": "transparent"
+            },
+            "stroke": {
+              "value": "#4c78a8"
+            }
+          }
+        }
+      }
+    }
+  ]
+}

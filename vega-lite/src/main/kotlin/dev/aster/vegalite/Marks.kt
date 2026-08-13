@@ -1315,11 +1315,16 @@ internal object Marks {
     // *instant* is a bucket too — `isBinning(bin) || (bandPosition && timeUnit && type ===
     // TEMPORAL)`. A label over a month asked for the middle of the month sits in the middle of it,
     // and only a signal can say so: the two edges are columns, and the point between them is not.
+    // Only for a channel that is a bucket in its own right. A **secondary** channel names the far
+    // end of somebody else's — upstream reaches it as a `SecondaryFieldDef`, which carries no type
+    // and so never takes the bucketed branch — and reading it as a bucket of its own put a rect's
+    // far edge halfway into a bucket that does not exist.
     val bucketed =
-      def.bin is Binning.Bin ||
-        (def.timeUnit != null &&
-          def.type == MeasureType.TEMPORAL &&
-          bandPosition(view, def, view.spec.encoding[secondaryChannel(channel) ?: ""]) != null)
+      channel == mainChannel(channel) &&
+        (def.bin is Binning.Bin ||
+          (def.timeUnit != null &&
+            def.type == MeasureType.TEMPORAL &&
+            bandPosition(view, def, view.spec.encoding[secondaryChannel(channel) ?: ""]) != null))
     // Under an **imputed** stack the midpoint is already a column: the imputation had to compute it
     // to key on, so the mark reads it rather than working it out again.
     if (bucketed && view.stack?.impute == true) {

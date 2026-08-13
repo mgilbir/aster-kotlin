@@ -2021,6 +2021,23 @@ is supposed to leave them out of the path, which is what the mark's `defined` sa
 includes them, so an area over a column with nulls in it is drawn through points upstream omits. The
 fixture is written over a column with no nulls rather than passed off as working.
 
+### Three rules about what a channel *is*
+
+**A secondary channel is not a bucket of its own.** It names the far end of somebody else's, and
+upstream reaches it as a `SecondaryFieldDef` — a definition with no type, which never takes the
+bucketed branch. Reading it as a bucket put a rect's far edge halfway into a bucket that does not
+exist, between `month_date_end` and a `month_date_end_end` nothing had written.
+
+**A caption turned a quarter turn is centred**, not pushed to one side. `defaultLabelAlign` through
+the header's own orientation: at ninety degrees the caption's length runs *across* its band rather
+than along it, so there is no side left to push it to. Aligning every turned caption to one edge
+put a trellis's row labels half off their rows.
+
+**`{"domain": {"unionWith": […]}}` widens the domain rather than replacing it** — the stated values
+first, the derived domain after, both in the one union — and the stated values stay a single entry
+of that union rather than becoming one each. Vega takes a literal array as a domain in its own
+right, so splitting it hands the scale two domains of a single value.
+
 ### Two runtime gaps this batch names but does not close
 
 `density`'s fixture is not in the corpus, and `trail`'s draws no legend. Both compile exactly as

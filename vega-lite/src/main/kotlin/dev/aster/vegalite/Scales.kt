@@ -139,6 +139,15 @@ internal object Scales {
    * field contributes the bin signal's extent, which is how the axis lands on bin boundaries
    * instead of on the data's own minimum and maximum.
    */
+  /** The same definition with one scale property taken off, for a rule that has to ask again. */
+  private fun stripped(def: ChannelDef, property: String): ChannelDef {
+    val scale = def.scale ?: return def
+    val without = VegaValue.Obj(scale.fields.filterKeys { it != property })
+    return def.copy(
+      raw = VegaValue.Obj(LinkedHashMap(def.raw.fields).also { it["scale"] = without })
+    )
+  }
+
   fun domain(
     view: UnitView,
     channel: String,
@@ -146,6 +155,18 @@ internal object Scales {
     type: String,
     dataName: String,
   ): List<VegaValue> {
+    // `{"domain": {"unionWith": [...]}}` widens the domain the data would have given rather than
+    // replacing it: the stated values come first and the derived domain follows them, both in the
+    // one union. Emitting `unionWith` as a property of its own left Vega with a domain it does not
+    // read and the extra values unaccounted for.
+    (def.scale?.obj("domain")?.array("unionWith"))?.let { widened ->
+      val derived =
+        domain(view, channel, stripped(def, "domain"), type, dataName).filterNot { it in widened }
+      // The stated values stay **one** entry of the union rather than becoming one each: Vega
+      // takes a literal array as a domain in its own right, and splitting it hands the scale two
+      // domains of a single value.
+      return listOf(arr(widened)) + derived
+    }
     def.scale?.fields?.get("domain")?.let { stated ->
       // A domain written as **dates** cannot be handed to Vega as objects: each end becomes the
       // expression that builds the instant, wrapped in `{data: …}` so Vega reads it as a datum of

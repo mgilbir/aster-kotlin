@@ -410,7 +410,7 @@ internal object Guides {
    * label hanging off the top of a chart reads the other way round from the same label underneath
    * it, so ignoring the side anchored every moved axis's labels at the wrong end.
    */
-  private fun labelAlign(angle: Double, channel: String, orient: String): String? {
+  fun labelAlign(angle: Double, channel: String, orient: String): String? {
     val startAngle = if (channel == "x") 0.0 else 90.0
     val main = if (channel == "x") "bottom" else "left"
     if ((angle + startAngle) % 180.0 == 0.0) return if (channel == "x") null else "center"
@@ -418,12 +418,19 @@ internal object Guides {
     return if (forward == (orient == main)) "left" else "right"
   }
 
-  private fun labelBaseline(angle: Double, channel: String, orient: String): String? {
+  fun labelBaseline(
+    angle: Double,
+    channel: String,
+    orient: String,
+    alwaysIncludeMiddle: Boolean = false,
+  ): String? {
     if (channel == "x") {
       if ((45 < angle && angle < 135) || (225 < angle && angle < 315)) return "middle"
       return if ((angle <= 45 || 315 <= angle) == (orient == "top")) "bottom" else "top"
     }
-    if (angle <= 45 || 315 <= angle || (135 <= angle && angle <= 225)) return null
+    if (angle <= 45 || 315 <= angle || (135 <= angle && angle <= 225)) {
+      return if (alwaysIncludeMiddle) "middle" else null
+    }
     return if ((45 <= angle && angle <= 135) == (orient == "left")) "top" else "bottom"
   }
 
