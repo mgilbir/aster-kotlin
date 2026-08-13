@@ -2080,6 +2080,78 @@
   "hidden": false
  },
  {
+  "fixture": "density-options",
+  "kind": "group",
+  "role": "graphics-object",
+  "roleDescription": "group mark container",
+  "label": null,
+  "hidden": false
+ },
+ {
+  "fixture": "density-options",
+  "kind": "symbol",
+  "role": "graphics-symbol",
+  "roleDescription": "symbol mark container",
+  "label": null,
+  "hidden": false
+ },
+ {
+  "fixture": "density-options",
+  "kind": "group",
+  "role": "graphics-object",
+  "roleDescription": "group mark container",
+  "label": null,
+  "hidden": false
+ },
+ {
+  "fixture": "density-options",
+  "kind": "line",
+  "role": "graphics-symbol",
+  "roleDescription": "line mark container",
+  "label": null,
+  "hidden": false
+ },
+ {
+  "fixture": "density-options",
+  "kind": "line",
+  "role": "graphics-symbol",
+  "roleDescription": "line mark container",
+  "label": null,
+  "hidden": false
+ },
+ {
+  "fixture": "density-options",
+  "kind": "group",
+  "role": "graphics-object",
+  "roleDescription": "group mark container",
+  "label": null,
+  "hidden": false
+ },
+ {
+  "fixture": "density-options",
+  "kind": "area",
+  "role": "graphics-symbol",
+  "roleDescription": "area mark container",
+  "label": null,
+  "hidden": false
+ },
+ {
+  "fixture": "density-options",
+  "kind": "area",
+  "role": "graphics-symbol",
+  "roleDescription": "area mark container",
+  "label": null,
+  "hidden": false
+ },
+ {
+  "fixture": "density-options",
+  "kind": "line",
+  "role": "graphics-symbol",
+  "roleDescription": "line mark container",
+  "label": null,
+  "hidden": false
+ },
+ {
   "fixture": "density-plot",
   "kind": "group",
   "role": "graphics-object",
@@ -15244,6 +15316,46 @@
   "kind": "text",
   "role": "graphics-object",
   "roleDescription": "text mark container",
+  "label": null,
+  "hidden": false
+ },
+ {
+  "fixture": "text-and-cells",
+  "kind": "group",
+  "role": "graphics-object",
+  "roleDescription": "group mark container",
+  "label": null,
+  "hidden": false
+ },
+ {
+  "fixture": "text-and-cells",
+  "kind": "rect",
+  "role": "graphics-symbol",
+  "roleDescription": "rect mark container",
+  "label": null,
+  "hidden": false
+ },
+ {
+  "fixture": "text-and-cells",
+  "kind": "text",
+  "role": "graphics-object",
+  "roleDescription": "text mark container",
+  "label": null,
+  "hidden": false
+ },
+ {
+  "fixture": "text-and-cells",
+  "kind": "path",
+  "role": "graphics-symbol",
+  "roleDescription": "path mark container",
+  "label": null,
+  "hidden": false
+ },
+ {
+  "fixture": "text-and-cells",
+  "kind": "symbol",
+  "role": "graphics-symbol",
+  "roleDescription": "symbol mark container",
   "label": null,
   "hidden": false
  },

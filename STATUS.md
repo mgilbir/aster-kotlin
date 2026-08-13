@@ -152,6 +152,8 @@ scale output:
 | `impute-pivot` | 41 | a missing series filled in before stacking, and the same table pivoted so a column is named by the data |
 | `nest-treemap` | 28 | a hierarchy built from a flat table by nesting two keys, sized by a treemap that sorts its nodes by their own totals |
 | `hierarchy-options` | 40 | the pack, partition and tree layouts with their own options: a radius column, rounding, padding, the cluster method, separation off, and output names of the specification's choosing |
+| `density-options` | 37 | a kernel density with its own bandwidth, extent, steps, independent resolution, cumulative counts, beside a loess fit with its own bandwidth |
+| `text-and-cells` | 28 | a word count with its own pattern, case rule and stopwords, numbered by `identifier`, and Voronoi cells cut by a stated extent |
 
 The gate is wired into `./scripts/oracle.sh`, so every further scale, mark and transform is built
 against a harness that can say we are wrong — which golden tests cannot.
@@ -210,7 +212,7 @@ substantive compatibility items:
 | 6. View and Compose APIs | Yes |
 | 7. SVG, PNG, PDF export | Yes |
 | 8. TalkBack can describe and navigate | Partial — virtual nodes are tested by instrumentation, not with TalkBack itself |
-| 9. At least 100 compatibility fixtures pass | **Yes** — 166 |
+| 9. At least 100 compatibility fixtures pass | **Yes** — 168 |
 | 10. Core runtime has no Android dependency | Yes |
 | 11. Renders without WebView | Yes |
 | 12. Build and test loop runs from the terminal | Yes |
@@ -2165,7 +2167,9 @@ depends on them. Each has a test and a comment; this is the index.
    all** and are now covered, `label` cannot have one (its occupancy bitmap has no upstream
    reference), and fourteen more — `countpattern`, `cross`, `crossfilter`, `geojson`, `graticule`,
    `identifier`, `kde`, `loess`, `pack`, `partition`, `resolvefilter`, `sample`, `treemap`,
-   `voronoi` — are exercised by exactly **one** fixture each. One is enough to catch a transform that
+   `voronoi` — were exercised by exactly **one** fixture each, always with the defaults. Four of them
+   — `kde`, `loess`, `countpattern`, `identifier`, `voronoi` — now have their options exercised too,
+   and all passed on arrival, which is the outcome worth having and the reason to keep going. One is enough to catch a transform that
    does nothing and not enough to catch one whose options are ignored, which is precisely what
    `nest-treemap` found: `sort` on a hierarchy layout read the field off the *row* instead of the
    node, so a chart asking for its biggest group first got its groups in data order. The brief's 100 is reached; the corpus is now aimed at the three categories the brief used to rule out. Aiming it at *combinations* the

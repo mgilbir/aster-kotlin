@@ -785,6 +785,16 @@
   "caption": "Gradient legend titled 'Local Density (Normalized)' for fill color with values from 0.0 to 1.0"
  },
  {
+  "fixture": "density-options",
+  "kind": "axis",
+  "caption": "X-axis for a linear scale with values from 0 to 8"
+ },
+ {
+  "fixture": "density-options",
+  "kind": "axis",
+  "caption": "Y-axis for a linear scale with values from 0 to 14"
+ },
+ {
   "fixture": "density-plot",
   "kind": "axis",
   "caption": "X-axis for a linear scale with values from 0 to 14"
