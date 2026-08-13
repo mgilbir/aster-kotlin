@@ -688,17 +688,10 @@ internal class Transforms(
       predicate is VegaValue.Obj && predicate.has("param") -> {
         val named = predicate.string("param")
         val selection = selections.firstOrNull { it.name == named }
-        if (selection == null) {
-          diagnostics.error(
-            VegaLiteDiagnostics.UNSUPPORTED_TRANSFORM,
-            "This `$subject` tests the parameter `$named`, which the chart does not declare as a " +
-              "selection; only a selection can be filtered on.",
-            jsonPath = path,
-          )
-          null
-        } else {
-          selection.test(emptyPasses = predicate.fields["empty"] != VegaValue.Bool(false))
-        }
+        // A parameter that is not a selection is a **variable**, and filtering on one filters on
+        // its truth — `parseSelectionPredicate` coerces with `!!` rather than reporting.
+        if (selection == null) "!!${Fields.varName(named.orEmpty())}"
+        else selection.test(emptyPasses = predicate.fields["empty"] != VegaValue.Bool(false))
       }
       else -> {
         diagnostics.error(

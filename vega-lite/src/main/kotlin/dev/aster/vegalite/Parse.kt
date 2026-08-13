@@ -309,16 +309,11 @@ internal class Parse(
       val test =
         if (parameter != null) {
           val selection = selections.firstOrNull { it.name == parameter }
-          if (selection == null) {
-            diagnostics.error(
-              VegaLiteDiagnostics.UNSUPPORTED_ENCODING_PROPERTY,
-              "This condition tests the parameter `$parameter`, which the chart does not declare " +
-                "as a selection; the condition is dropped and the unconditional part is used.",
-              jsonPath = at,
-            )
-            return@mapIndexedNotNull null
-          }
-          selection.test(emptyPasses = obj.fields["empty"] != VegaValue.Bool(false))
+          // A parameter that is **not** a selection is a variable, and a condition on one is a
+          // condition on its truth: `parseSelectionPredicate` falls back to `!!name` rather than
+          // reporting, which is how a checkbox turns an encoding on and off.
+          if (selection == null) "!!${Fields.varName(parameter)}"
+          else selection.test(emptyPasses = obj.fields["empty"] != VegaValue.Bool(false))
         } else {
           Transforms(diagnostics, selections = selections)
             .testExpression(obj.fields["test"], "$at.test") ?: return@mapIndexedNotNull null
@@ -452,15 +447,24 @@ internal class Parse(
       if (y?.isFieldDef == true && x?.aggregate != null && y.aggregate == null) return "horizontal"
     }
 
-    if (mark == "rule") {
-      if (encoding["x2"] != null && encoding["y2"] != null) return null
-      if (x != null && y == null) return "vertical"
-      if (y != null && x == null) return "horizontal"
-    }
+    // A **line segment** — a rule with both ends given on both axes — has no orientation at all:
+    // it runs from one point to another and neither axis is the one it measures along.
+    if (mark == "rule" && encoding["x2"] != null && encoding["y2"] != null) return null
 
-    if (mark == "area" || mark == "bar") {
-      if (encoding["y2"] != null) return "vertical"
-      if (encoding["x2"] != null) return "horizontal"
+    // The *second position* decides before anything else does, and a **binned** first position
+    // turns the answer around: the pair of edges a bin produces is the extent of the bar's own
+    // band, not the direction it grows in.
+    if (mark == "rule" || mark == "area" || mark == "bar") {
+      encoding["y2"]?.let {
+        return if (y?.bin != null) "horizontal" else "vertical"
+      }
+      encoding["x2"]?.let {
+        return if (x?.bin != null) "vertical" else "horizontal"
+      }
+      if (mark == "rule") {
+        if (x != null && y == null) return "vertical"
+        if (y != null && x == null) return "horizontal"
+      }
     }
 
     val xIsMeasure = x?.isUnbinnedQuantitative == true || x?.datum is VegaValue.Num

@@ -345,7 +345,9 @@ private class Compilation(
       // default and a specification that states one is overriding the theme, not being overridden
       // by it.
       put("background", spec.fields["background"] ?: config.background)
-      put("padding", config.padding)
+      // A chart's own padding beats the theme's, as its background does: a specification stating
+      // one is overriding what the configuration settled, not the other way about.
+      put("padding", spec.fields["padding"] ?: config.padding)
       autosize(views)?.let { put("autosize", it) }
       put("width", mergedSize("width") ?: if (concat == null) root.width else null)
       put("height", mergedSize("height") ?: if (concat == null) root.height else null)

@@ -678,7 +678,7 @@ no data is needed to compare two compilers. So every one of them was compiled by
 by this one, and the outputs compared property by property. That is a *measurement*, not a gate: the
 examples are not fixtures here, and nothing about them is checked in.
 
-**124 of 627 matched exactly** at the start, and **488** do now. 16 were refused by name, and of those 8 are geographic,
+**124 of 627 matched exactly** at the start, and **493** do now. 16 were refused by name, and of those 8 are geographic,
 3 are a facet inside a facet, 2 a repeat inside a concatenation, and 2 are the `trail` mark — which
 this runtime draws and this compiler had simply not been told about.
 
@@ -2265,6 +2265,20 @@ runtime already had a Delaunay triangulation and a voronoi transform, and it was
 coordinates as *field names*: Vega-Lite writes them as expressions, `{"expr": "datum.datum.x || 0"}`,
 because the points are mark items and the coordinate wanted is the one the encoding resolved. Every
 cell came out without coordinates, so the diagram was empty and the overlay drew nothing.
+
+### What a mark measures along, decided in the right order
+
+`getDefaultOrient` reads a **second position** before it reads anything else, and this compiler read
+it last. A rule given `x2` runs from one x to another and is horizontal whatever its other channels
+say; only with neither `x2` nor `y2` does the question fall back to which axis carries a measure. A
+rule given *both* has no orientation at all — it is a line segment between two points, and neither
+axis is the one it measures along. And a **binned** first position turns the answer around: the pair
+of edges a bin produces is the extent of the bar's own band, not the direction it grows in.
+
+Beside it, a condition on a parameter that is **not** a selection. `parseSelectionPredicate` falls
+back to `!!name` rather than reporting: a checkbox turning an encoding on and off is a condition on
+a variable's truth, not on a set of picked rows. It was refused, which took the whole condition off
+the channel and drew the chart in its unconditional arm.
 
 ### A tooltip on a composite mark is two different requests
 

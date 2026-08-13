@@ -1,0 +1,169 @@
+{
+  "$schema": "https://vega.github.io/schema/vega/v6.json",
+  "description": "A rule spanning from one category to the next, which is a horizontal rule because its second position is on x — the axis a mark measures along is the one its two ends are given on.",
+  "background": "white",
+  "padding": 5,
+  "height": 300,
+  "style": "cell",
+  "data": [
+    {
+      "name": "source_0",
+      "values": [
+        {
+          "label": "Jan",
+          "sum": 20,
+          "lead": "Feb"
+        },
+        {
+          "label": "Feb",
+          "sum": 45,
+          "lead": "Mar"
+        },
+        {
+          "label": "Mar",
+          "sum": 30,
+          "lead": "Apr"
+        }
+      ]
+    },
+    {
+      "name": "data_0",
+      "source": "source_0",
+      "transform": [
+        {
+          "type": "filter",
+          "expr": "isValid(datum[\"sum\"]) && isFinite(+datum[\"sum\"])"
+        }
+      ]
+    }
+  ],
+  "signals": [
+    {
+      "name": "x_step",
+      "value": 20
+    },
+    {
+      "name": "width",
+      "update": "bandspace(domain('x').length, 0, 0) * x_step"
+    }
+  ],
+  "marks": [
+    {
+      "name": "layer_0_marks",
+      "type": "rule",
+      "style": [
+        "rule"
+      ],
+      "from": {
+        "data": "data_0"
+      },
+      "encode": {
+        "update": {
+          "opacity": {
+            "value": 1
+          },
+          "strokeWidth": {
+            "value": 2
+          },
+          "stroke": {
+            "value": "#404040"
+          },
+          "description": {
+            "signal": "\"label: \" + (isValid(datum[\"label\"]) ? isArray(datum[\"label\"]) ? join(datum[\"label\"], ' ') : datum[\"label\"] : \"\"+datum[\"label\"]) + \"; sum: \" + (format(datum[\"sum\"], \"\")) + \"; lead: \" + (isValid(datum[\"lead\"]) ? isArray(datum[\"lead\"]) ? join(datum[\"lead\"], ' ') : datum[\"lead\"] : \"\"+datum[\"lead\"])"
+          },
+          "x": {
+            "scale": "x",
+            "field": "label",
+            "offset": -22.5,
+            "band": 0.5
+          },
+          "x2": {
+            "scale": "x",
+            "field": "lead",
+            "offset": 22.5,
+            "band": 0.5
+          },
+          "y": {
+            "scale": "y",
+            "field": "sum"
+          }
+        }
+      }
+    }
+  ],
+  "scales": [
+    {
+      "name": "x",
+      "type": "band",
+      "domain": {
+        "data": "data_0",
+        "fields": [
+          "label",
+          "lead"
+        ]
+      },
+      "range": {
+        "step": {
+          "signal": "x_step"
+        }
+      },
+      "paddingInner": 0,
+      "paddingOuter": 0
+    },
+    {
+      "name": "y",
+      "type": "linear",
+      "domain": {
+        "data": "data_0",
+        "field": "sum"
+      },
+      "range": [
+        {
+          "signal": "height"
+        },
+        0
+      ],
+      "nice": true,
+      "zero": true
+    }
+  ],
+  "axes": [
+    {
+      "scale": "y",
+      "orient": "left",
+      "gridScale": "x",
+      "grid": true,
+      "tickCount": {
+        "signal": "ceil(height/40)"
+      },
+      "domain": false,
+      "labels": false,
+      "aria": false,
+      "maxExtent": 0,
+      "minExtent": 0,
+      "ticks": false,
+      "zindex": 0
+    },
+    {
+      "scale": "x",
+      "orient": "bottom",
+      "grid": false,
+      "title": "label, lead",
+      "labelAlign": "right",
+      "labelAngle": 270,
+      "labelBaseline": "middle",
+      "zindex": 0
+    },
+    {
+      "scale": "y",
+      "orient": "left",
+      "grid": false,
+      "title": "sum",
+      "labelOverlap": true,
+      "tickCount": {
+        "signal": "ceil(height/40)"
+      },
+      "zindex": 0
+    }
+  ]
+}

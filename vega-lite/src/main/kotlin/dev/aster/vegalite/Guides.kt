@@ -176,6 +176,11 @@ internal object Guides {
     diagnostics: DiagnosticCollector,
   ): AxisComponent? {
     if (def.axisDisabled) return null
+    // `config.axis.disable` turns every axis off at once, which is how a chart made of shapes
+    // rather
+    // than of measurements says it has no axes at all. A channel's own `axis` block is the explicit
+    // statement and outranks it either way.
+    if (def.axis == null && view.config.axisConfig("disable") == VegaValue.Bool(true)) return null
     val axis = AxisComponent(channel)
     val user = def.axis
 
