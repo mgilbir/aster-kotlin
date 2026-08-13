@@ -813,6 +813,7 @@ private class Compilation(
           it.widthSignal = "child_width"
           it.heightSignal = "child_height"
           it.facetFields = found.fields
+          it.facetDefs = found.defs
           // The cell's marks read the partition Vega facets out for them, named `facet`; the
           // scales still read the whole table, so every cell is scaled alike.
           it.markData = "facet"

@@ -1,0 +1,523 @@
+{
+  "$schema": "https://vega.github.io/schema/vega/v6.json",
+  "description": "A box plot coloured by the column it is already categorised by, which groups by it twice.",
+  "background": "white",
+  "padding": 5,
+  "height": 300,
+  "style": "cell",
+  "data": [
+    {
+      "name": "source_0",
+      "url": "data/cars.json",
+      "format": {
+        "type": "json"
+      }
+    },
+    {
+      "name": "data_0",
+      "source": "source_0",
+      "transform": [
+        {
+          "type": "joinaggregate",
+          "as": [
+            "lower_box_Horsepower",
+            "upper_box_Horsepower"
+          ],
+          "ops": [
+            "q1",
+            "q3"
+          ],
+          "fields": [
+            "Horsepower",
+            "Horsepower"
+          ],
+          "groupby": [
+            "Origin",
+            "Origin"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "data_1",
+      "source": "data_0",
+      "transform": [
+        {
+          "type": "filter",
+          "expr": "(datum['Horsepower'] < datum['lower_box_Horsepower'] - 1.5 * (datum['upper_box_Horsepower'] - datum['lower_box_Horsepower'])) || (datum['Horsepower'] > datum['upper_box_Horsepower'] + 1.5 * (datum['upper_box_Horsepower'] - datum['lower_box_Horsepower']))"
+        },
+        {
+          "type": "filter",
+          "expr": "isValid(datum[\"Horsepower\"]) && isFinite(+datum[\"Horsepower\"])"
+        }
+      ]
+    },
+    {
+      "name": "data_2",
+      "source": "data_0",
+      "transform": [
+        {
+          "type": "filter",
+          "expr": "(datum['lower_box_Horsepower'] - 1.5 * (datum['upper_box_Horsepower'] - datum['lower_box_Horsepower']) <= datum['Horsepower']) && (datum['Horsepower'] <= datum['upper_box_Horsepower'] + 1.5 * (datum['upper_box_Horsepower'] - datum['lower_box_Horsepower']))"
+        },
+        {
+          "type": "aggregate",
+          "groupby": [
+            "Origin"
+          ],
+          "ops": [
+            "min",
+            "max",
+            "min",
+            "max"
+          ],
+          "fields": [
+            "Horsepower",
+            "Horsepower",
+            "lower_box_Horsepower",
+            "upper_box_Horsepower"
+          ],
+          "as": [
+            "lower_whisker_Horsepower",
+            "upper_whisker_Horsepower",
+            "lower_box_Horsepower",
+            "upper_box_Horsepower"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "data_3",
+      "source": "data_2",
+      "transform": [
+        {
+          "type": "filter",
+          "expr": "isValid(datum[\"lower_whisker_Horsepower\"]) && isFinite(+datum[\"lower_whisker_Horsepower\"])"
+        }
+      ]
+    },
+    {
+      "name": "data_4",
+      "source": "data_2",
+      "transform": [
+        {
+          "type": "filter",
+          "expr": "isValid(datum[\"upper_box_Horsepower\"]) && isFinite(+datum[\"upper_box_Horsepower\"])"
+        }
+      ]
+    },
+    {
+      "name": "data_5",
+      "source": "source_0",
+      "transform": [
+        {
+          "type": "aggregate",
+          "groupby": [
+            "Origin"
+          ],
+          "ops": [
+            "q1",
+            "q3",
+            "median",
+            "min",
+            "max"
+          ],
+          "fields": [
+            "Horsepower",
+            "Horsepower",
+            "Horsepower",
+            "Horsepower",
+            "Horsepower"
+          ],
+          "as": [
+            "lower_box_Horsepower",
+            "upper_box_Horsepower",
+            "mid_box_Horsepower",
+            "min_Horsepower",
+            "max_Horsepower"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "data_6",
+      "source": "data_5",
+      "transform": [
+        {
+          "type": "filter",
+          "expr": "isValid(datum[\"lower_box_Horsepower\"]) && isFinite(+datum[\"lower_box_Horsepower\"])"
+        }
+      ]
+    },
+    {
+      "name": "data_7",
+      "source": "data_5",
+      "transform": [
+        {
+          "type": "filter",
+          "expr": "isValid(datum[\"mid_box_Horsepower\"]) && isFinite(+datum[\"mid_box_Horsepower\"])"
+        }
+      ]
+    }
+  ],
+  "signals": [
+    {
+      "name": "x_step",
+      "value": 20
+    },
+    {
+      "name": "width",
+      "update": "bandspace(domain('x').length, 0, 0) * x_step"
+    }
+  ],
+  "marks": [
+    {
+      "name": "layer_0_layer_0_marks",
+      "type": "symbol",
+      "style": [
+        "point",
+        "boxplot-outliers"
+      ],
+      "from": {
+        "data": "data_1"
+      },
+      "encode": {
+        "update": {
+          "opacity": {
+            "value": 0.7
+          },
+          "fill": {
+            "value": "transparent"
+          },
+          "stroke": {
+            "scale": "color",
+            "field": "Origin"
+          },
+          "ariaRoleDescription": {
+            "value": "point"
+          },
+          "description": {
+            "signal": "\"Origin: \" + (isValid(datum[\"Origin\"]) ? isArray(datum[\"Origin\"]) ? join(datum[\"Origin\"], ' ') : datum[\"Origin\"] : \"\"+datum[\"Origin\"]) + \"; Horsepower: \" + (format(datum[\"Horsepower\"], \"\"))"
+          },
+          "x": {
+            "scale": "x",
+            "field": "Origin",
+            "band": 0.5
+          },
+          "y": {
+            "scale": "y",
+            "field": "Horsepower"
+          }
+        }
+      }
+    },
+    {
+      "name": "layer_0_layer_1_layer_0_marks",
+      "type": "rule",
+      "style": [
+        "rule",
+        "boxplot-rule"
+      ],
+      "aria": false,
+      "from": {
+        "data": "data_3"
+      },
+      "encode": {
+        "update": {
+          "stroke": {
+            "value": "black"
+          },
+          "tooltip": {
+            "signal": "{\"Upper Whisker of Horsepower\": format(datum[\"upper_whisker_Horsepower\"], \"\"), \"Lower Whisker of Horsepower\": format(datum[\"lower_whisker_Horsepower\"], \"\"), \"Origin\": isValid(datum[\"Origin\"]) ? isArray(datum[\"Origin\"]) ? join(datum[\"Origin\"], '\\n') : datum[\"Origin\"] : \"\"+datum[\"Origin\"]}"
+          },
+          "x": {
+            "scale": "x",
+            "field": "Origin",
+            "band": 0.5
+          },
+          "y": {
+            "scale": "y",
+            "field": "lower_whisker_Horsepower"
+          },
+          "y2": {
+            "scale": "y",
+            "field": "lower_box_Horsepower"
+          }
+        }
+      }
+    },
+    {
+      "name": "layer_0_layer_1_layer_1_marks",
+      "type": "rule",
+      "style": [
+        "rule",
+        "boxplot-rule"
+      ],
+      "aria": false,
+      "from": {
+        "data": "data_4"
+      },
+      "encode": {
+        "update": {
+          "stroke": {
+            "value": "black"
+          },
+          "tooltip": {
+            "signal": "{\"Upper Whisker of Horsepower\": format(datum[\"upper_whisker_Horsepower\"], \"\"), \"Lower Whisker of Horsepower\": format(datum[\"lower_whisker_Horsepower\"], \"\"), \"Origin\": isValid(datum[\"Origin\"]) ? isArray(datum[\"Origin\"]) ? join(datum[\"Origin\"], '\\n') : datum[\"Origin\"] : \"\"+datum[\"Origin\"]}"
+          },
+          "x": {
+            "scale": "x",
+            "field": "Origin",
+            "band": 0.5
+          },
+          "y": {
+            "scale": "y",
+            "field": "upper_box_Horsepower"
+          },
+          "y2": {
+            "scale": "y",
+            "field": "upper_whisker_Horsepower"
+          }
+        }
+      }
+    },
+    {
+      "name": "layer_1_layer_0_marks",
+      "type": "rect",
+      "style": [
+        "bar",
+        "boxplot-box"
+      ],
+      "from": {
+        "data": "data_6"
+      },
+      "encode": {
+        "update": {
+          "ariaRoleDescription": {
+            "value": "box"
+          },
+          "fill": {
+            "scale": "color",
+            "field": "Origin"
+          },
+          "tooltip": {
+            "signal": "{\"Max of Horsepower\": format(datum[\"max_Horsepower\"], \"\"), \"Q3 of Horsepower\": format(datum[\"upper_box_Horsepower\"], \"\"), \"Median of Horsepower\": format(datum[\"mid_box_Horsepower\"], \"\"), \"Q1 of Horsepower\": format(datum[\"lower_box_Horsepower\"], \"\"), \"Min of Horsepower\": format(datum[\"min_Horsepower\"], \"\"), \"Origin\": isValid(datum[\"Origin\"]) ? isArray(datum[\"Origin\"]) ? join(datum[\"Origin\"], '\\n') : datum[\"Origin\"] : \"\"+datum[\"Origin\"]}"
+          },
+          "description": {
+            "signal": "\"Origin: \" + (isValid(datum[\"Origin\"]) ? isArray(datum[\"Origin\"]) ? join(datum[\"Origin\"], ' ') : datum[\"Origin\"] : \"\"+datum[\"Origin\"]) + \"; Horsepower: \" + (format(datum[\"lower_box_Horsepower\"], \"\")) + \"; upper_box_Horsepower: \" + (format(datum[\"upper_box_Horsepower\"], \"\")) + \"; Max of Horsepower: \" + (format(datum[\"max_Horsepower\"], \"\")) + \"; Q3 of Horsepower: \" + (format(datum[\"upper_box_Horsepower\"], \"\")) + \"; Median of Horsepower: \" + (format(datum[\"mid_box_Horsepower\"], \"\")) + \"; Q1 of Horsepower: \" + (format(datum[\"lower_box_Horsepower\"], \"\")) + \"; Min of Horsepower: \" + (format(datum[\"min_Horsepower\"], \"\"))"
+          },
+          "xc": {
+            "scale": "x",
+            "field": "Origin",
+            "band": 0.5
+          },
+          "width": {
+            "value": 14
+          },
+          "y": {
+            "scale": "y",
+            "field": "lower_box_Horsepower"
+          },
+          "y2": {
+            "scale": "y",
+            "field": "upper_box_Horsepower"
+          }
+        }
+      }
+    },
+    {
+      "name": "layer_1_layer_1_marks",
+      "type": "rect",
+      "style": [
+        "tick",
+        "boxplot-median"
+      ],
+      "aria": false,
+      "from": {
+        "data": "data_7"
+      },
+      "encode": {
+        "update": {
+          "opacity": {
+            "value": 0.7
+          },
+          "fill": [
+            {
+              "test": "datum['lower_box_Horsepower'] >= datum['upper_box_Horsepower']",
+              "scale": "color",
+              "field": "Origin"
+            },
+            {
+              "value": "white"
+            }
+          ],
+          "tooltip": {
+            "signal": "{\"Max of Horsepower\": format(datum[\"max_Horsepower\"], \"\"), \"Q3 of Horsepower\": format(datum[\"upper_box_Horsepower\"], \"\"), \"Median of Horsepower\": format(datum[\"mid_box_Horsepower\"], \"\"), \"Q1 of Horsepower\": format(datum[\"lower_box_Horsepower\"], \"\"), \"Min of Horsepower\": format(datum[\"min_Horsepower\"], \"\"), \"Origin\": isValid(datum[\"Origin\"]) ? isArray(datum[\"Origin\"]) ? join(datum[\"Origin\"], '\\n') : datum[\"Origin\"] : \"\"+datum[\"Origin\"]}"
+          },
+          "xc": {
+            "scale": "x",
+            "field": "Origin",
+            "band": 0.5
+          },
+          "width": {
+            "value": 14
+          },
+          "yc": {
+            "scale": "y",
+            "field": "mid_box_Horsepower"
+          },
+          "height": {
+            "value": 1
+          }
+        }
+      }
+    }
+  ],
+  "scales": [
+    {
+      "name": "x",
+      "type": "band",
+      "domain": {
+        "fields": [
+          {
+            "data": "data_1",
+            "field": "Origin"
+          },
+          {
+            "data": "data_3",
+            "field": "Origin"
+          },
+          {
+            "data": "data_4",
+            "field": "Origin"
+          },
+          {
+            "data": "data_6",
+            "field": "Origin"
+          },
+          {
+            "data": "data_7",
+            "field": "Origin"
+          }
+        ],
+        "sort": true
+      },
+      "range": {
+        "step": {
+          "signal": "x_step"
+        }
+      },
+      "paddingInner": 0,
+      "paddingOuter": 0
+    },
+    {
+      "name": "y",
+      "type": "linear",
+      "domain": {
+        "fields": [
+          {
+            "data": "data_1",
+            "field": "Horsepower"
+          },
+          {
+            "data": "data_3",
+            "field": "lower_whisker_Horsepower"
+          },
+          {
+            "data": "data_3",
+            "field": "lower_box_Horsepower"
+          },
+          {
+            "data": "data_4",
+            "field": "upper_box_Horsepower"
+          },
+          {
+            "data": "data_4",
+            "field": "upper_whisker_Horsepower"
+          },
+          {
+            "data": "data_6",
+            "field": "lower_box_Horsepower"
+          },
+          {
+            "data": "data_6",
+            "field": "upper_box_Horsepower"
+          },
+          {
+            "data": "data_7",
+            "field": "mid_box_Horsepower"
+          }
+        ]
+      },
+      "range": [
+        {
+          "signal": "height"
+        },
+        0
+      ],
+      "zero": false,
+      "nice": true
+    },
+    {
+      "name": "color",
+      "type": "ordinal",
+      "domain": {
+        "fields": [
+          {
+            "data": "data_1",
+            "field": "Origin"
+          },
+          {
+            "data": "data_6",
+            "field": "Origin"
+          },
+          {
+            "data": "data_7",
+            "field": "Origin"
+          }
+        ],
+        "sort": true
+      },
+      "range": "category"
+    }
+  ],
+  "axes": [
+    {
+      "scale": "y",
+      "orient": "left",
+      "gridScale": "x",
+      "grid": true,
+      "tickCount": {
+        "signal": "ceil(height/40)"
+      },
+      "domain": false,
+      "labels": false,
+      "aria": false,
+      "maxExtent": 0,
+      "minExtent": 0,
+      "ticks": false,
+      "zindex": 0
+    },
+    {
+      "scale": "x",
+      "orient": "bottom",
+      "grid": false,
+      "title": "Origin",
+      "labelAlign": "right",
+      "labelAngle": 270,
+      "labelBaseline": "middle",
+      "zindex": 0
+    },
+    {
+      "scale": "y",
+      "orient": "left",
+      "grid": false,
+      "title": "Horsepower",
+      "labelOverlap": true,
+      "tickCount": {
+        "signal": "ceil(height/40)"
+      },
+      "zindex": 0
+    }
+  ]
+}

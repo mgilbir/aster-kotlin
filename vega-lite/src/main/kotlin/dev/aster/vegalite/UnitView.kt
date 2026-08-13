@@ -67,6 +67,15 @@ internal class UnitView(
   var facetFields: List<String> = emptyList()
 
   /**
+   * The definitions the facet channels were lifted out of, for the steps that still need them.
+   *
+   * The cell's encoding no longer mentions them — a facet says nothing about what a cell looks like
+   * — but the column it breaks the chart down by may still have to be bucketed or binned, and
+   * upstream does that on the facet's own model, above the cell's.
+   */
+  var facetDefs: List<ChannelDef> = emptyList()
+
+  /**
    * The signals this view measures itself against.
    *
    * `width` and `height` for a plain chart; `child_width`/`child_height` inside a facet, where
@@ -141,16 +150,28 @@ internal class UnitView(
    * rather than being placed at some value of the other layer's scale.
    */
   fun hasScale(channel: String): Boolean {
-    val def = spec.encoding[channel] ?: return false
-    return (def.isFieldDef || def.datum != null) && !def.scaleDisabled
+    val def = scaledDef(spec.encoding[channel] ?: return false) ?: return false
+    return !def.scaleDisabled
   }
 
   /** The channels that own a scale in this view, in specification order. */
   fun scaledChannels(): List<Pair<String, ChannelDef>> =
     spec.encoding.entries
-      .filter {
-        it.key in Channels.SCALE_CHANNELS && (it.value.isFieldDef || it.value.datum != null)
+      .mapNotNull { (channel, def) ->
+        if (channel !in Channels.SCALE_CHANNELS) null else scaledDef(def)?.let { channel to it }
       }
-      .filter { !it.value.scaleDisabled }
-      .map { it.key to it.value }
+      .filter { (_, def) -> !def.scaleDisabled }
+
+  /**
+   * The definition a channel's scale is built from — `getFieldOrDatumDef`, which reads a condition.
+   *
+   * A channel written *only* as a test still names a field, and that field still needs a scale: a
+   * median tick that is its category's colour unless its box has no height says so conditionally,
+   * and reading the unconditional part alone left it with a colour it had no scale to look up.
+   */
+  private fun scaledDef(def: ChannelDef): ChannelDef? =
+    when {
+      def.isFieldDef || def.datum != null -> def
+      else -> def.conditions.firstOrNull { it.isFieldDef || it.datum != null }
+    }
 }

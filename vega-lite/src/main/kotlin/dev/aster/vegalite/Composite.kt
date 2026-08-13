@@ -22,6 +22,22 @@ internal class Composite(
   private val diagnostics: DiagnosticCollector,
 ) {
 
+  /**
+   * What a composite mark's summary is grouped by — `extractTransformsFromEncoding`.
+   *
+   * Every channel that is not the continuous axis contributes its field, and a field named on two
+   * channels is named twice: the list is pushed to without looking. A **tooltip** is the exception
+   * — `filterTooltipWithAggregatedField` takes it out of the encoding before the grouping is read,
+   * and puts back only the part of it that asks for an aggregate. Resting on a mark to read a
+   * column is not a request to break the summary down by that column.
+   */
+  private fun groupbyOf(shared: Map<String, VegaValue>): List<String> =
+    shared.entries
+      .filterNot { (channel, value) ->
+        channel == "tooltip" && (value as? VegaValue.Obj)?.has("aggregate") != true
+      }
+      .mapNotNull { (_, value) -> (value as? VegaValue.Obj)?.string("field") }
+
   /** The marks this handles. Anything else is not a composite mark. */
   fun handles(type: String): Boolean =
     type == "errorbar" || type == "errorband" || type == "boxplot"
@@ -76,8 +92,7 @@ internal class Composite(
     // is grouped by: one interval per category, per colour, per detail.
     val shared =
       encoding.fields.filterKeys { it != continuous && it != "${continuous}2" && it != "size" }
-    val groupby =
-      shared.entries.mapNotNull { (_, value) -> (value as? VegaValue.Obj)?.string("field") }
+    val groupby = groupbyOf(shared)
 
     val outer = VegaValue.Obj(unit.fields.filterKeys { it != "mark" && it != "encoding" })
     val transform =
@@ -197,8 +212,13 @@ internal class Composite(
       encoding.fields.filterKeys {
         it != continuous && it != "${continuous}2" && it != "size" && it != "color"
       }
+    // The **colour** is a grouping like any other, even where the parts do not each paint
+    // themselves with it: one box per category per colour. A field named on two channels is named
+    // twice, so a box plot coloured by the column it is categorised by groups by it twice.
     val groupby =
-      shared.entries.mapNotNull { (_, value) -> (value as? VegaValue.Obj)?.string("field") }
+      groupbyOf(
+        encoding.fields.filterKeys { it != continuous && it != "${continuous}2" && it != "size" }
+      )
     val outer = VegaValue.Obj(unit.fields.filterKeys { it != "mark" && it != "encoding" })
     val declared = unit.array("transform") ?: emptyList()
 

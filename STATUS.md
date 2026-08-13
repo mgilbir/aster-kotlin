@@ -1913,6 +1913,37 @@ Beside them, `hasBandEnd`: a bucketed **instant** is a bucket like any other, so
 edges are columns and the point between them is not — and the bucket's far edge joins the scale's
 domain. A label over a month asked for the middle of the month now sits in the middle of it.
 
+### Five more from the same list, and a facet channel that was left out of the data flow
+
+**A facet channel is lifted out of the encoding, but not out of the data flow.** It says nothing
+about what a cell *looks like*, so it is taken out before the scales are built — and the column it
+breaks the chart down by may still need bucketing. Upstream does that on the facet's own model,
+above the cell's, so a trellis broken down by `year(date)` buckets the year before it buckets the
+quarter. Left behind, there was no `year_date` column to break down by at all.
+
+**A cell's caption goes through the same rule a mark's text does** — `formatSignalRef` with
+`expr: "parent"`. A bucketed instant is spoken as a date with the specifier Vega picks at render
+time, so a trellis of years is captioned `2005` rather than `1104537600000`.
+
+**`bin` and `stack` written as _transforms_** now compile. They are the same nodes the encoding's
+own produce — `BinNode.makeFromTransform` and `StackNode.makeFromTransform` — with everything
+stated rather than derived, and only the output naming has a rule of its own: one name becomes the
+pair of edges.
+
+**A composite mark's grouping is every channel but the continuous axis**, colour included, and a
+field named on two channels is named twice: `extractTransformsFromEncoding` pushes without looking,
+so a box plot coloured by the column it is categorised by groups by it twice. A **tooltip** is the
+exception — it is taken out of the encoding before the grouping is read and only the part of it that
+asks for an aggregate is put back, because resting on a mark to read a column is not a request to
+break the summary down by it. The `joinaggregate` keeps the repetition and the `aggregate` does not,
+which is not an inconsistency: an aggregate's dimensions are a *set* in `makeFromTransform`, and a
+`joinaggregate` is a transform Vega takes as written.
+
+**A channel written only as a test still needs its scale.** `getFieldOrDatumDef` reads through a
+`condition`, so a median tick that is its category's colour unless its box has no height gets a
+colour scale; reading the unconditional part alone left the rule naming a field it could not look
+up, and the box plot's median was drawn unpainted.
+
 ### Two runtime gaps this batch names but does not close
 
 `density`'s fixture is not in the corpus, and `trail`'s draws no legend. Both compile exactly as

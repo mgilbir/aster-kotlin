@@ -3,6 +3,25 @@ package dev.aster.vegalite
 import dev.aster.vega.model.VegaValue
 
 /**
+ * A cell's caption: the value the cell holds, written the way that column is written elsewhere.
+ *
+ * `formatSignalRef` with `expr: "parent"`, the same rule a mark's text goes through. A *bucketed
+ * instant* is spoken as a date with the specifier Vega picks at render time — the same one the axis
+ * labels use, so a trellis of years is captioned "2005" and not "1104537600000".
+ */
+private fun headerText(def: ChannelDef, field: String): String {
+  val accessor = "parent[${quoted(field)}]"
+  val timeUnit = def.timeUnit
+  if (def.type == MeasureType.TEMPORAL || timeUnit != null) {
+    val utc = timeUnit?.contains("utc") == true || def.scale.string("type") == "utc"
+    val prefix = if (utc) "utc" else "time"
+    val specifier = if (timeUnit != null) Fields.timeUnitSpecifier(timeUnit) else "\"%b %d, %Y\""
+    return "${prefix}Format($accessor, $specifier)"
+  }
+  return "isValid($accessor) ? $accessor : \"\"+$accessor"
+}
+
+/**
  * One facet channel: the field a grid is split by along one direction.
  *
  * @see FacetGrid, which is what a chart actually has — `row` and `column` are two of these, and a
@@ -220,6 +239,16 @@ internal interface FacetLayout {
   val fields: List<String>
 
   /**
+   * The definitions those columns came from, which the data flow still has to honour.
+   *
+   * A facet channel is lifted out of the encoding before the scales are built — it says nothing
+   * about what happens *within* a cell — but the column it names may still need bucketing, and the
+   * transform that buckets it belongs to the facet's own model, above the cell's. Left behind, a
+   * trellis broken down by year had no `year_date` column to break down by.
+   */
+  val defs: List<ChannelDef>
+
+  /**
    * The facet's own values, and — for a wrapped facet — the grid's row and column counts.
    *
    * @param vertical whether any shared axis landed in a row band, [horizontal] the same for a
@@ -251,6 +280,8 @@ internal class FacetGrid(val row: Facet?, val column: Facet?) : FacetLayout {
 
   /** Row before column, which is the order upstream groups, sorts and crosses by. */
   override val fields: List<String> = listOfNotNull(row?.field, column?.field)
+
+  override val defs: List<ChannelDef> = listOfNotNull(row?.def, column?.def)
 
   /**
    * Column before row: `compile/data/facet.ts` assembles `for (const channel of [COLUMN, ROW])`.
@@ -337,10 +368,7 @@ internal class FacetGrid(val row: Facet?, val column: Facet?) : FacetLayout {
             obj {
               put(
                 "text",
-                signalRef(
-                  "isValid(parent[${quoted(facet.field)}]) ? parent[${quoted(facet.field)}] : " +
-                    "\"\"+parent[${quoted(facet.field)}]"
-                ),
+                signalRef(headerText(facet.def, facet.field)),
               )
               if (!isColumn) put("orient", "left")
               put("style", "guide-label")
@@ -531,6 +559,8 @@ internal class FacetWrap(val def: ChannelDef, private val columns: Int?) : Facet
 
   override val fields: List<String> = listOf(field)
 
+  override val defs: List<ChannelDef> = listOf(def)
+
   override fun domainDatasets(
     source: String,
     vertical: Boolean,
@@ -670,10 +700,7 @@ internal class FacetWrap(val def: ChannelDef, private val columns: Int?) : Facet
       obj {
         put(
           "text",
-          signalRef(
-            "isValid(parent[${quoted(field)}]) ? parent[${quoted(field)}] : " +
-              "\"\"+parent[${quoted(field)}]"
-          ),
+          signalRef(headerText(def, field)),
         )
         put("style", "guide-label")
         put("frame", "group")

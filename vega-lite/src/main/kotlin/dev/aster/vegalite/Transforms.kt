@@ -30,7 +30,110 @@ internal class Transforms(
    * `lookup` is reported instead.
    */
   private val registerLookup: ((VegaValue) -> String)? = null,
+  /** How a signal is named through the view it belongs to, a bin publishing two of them. */
+  private val prefix: (String) -> String = { it },
 ) {
+
+  /**
+   * A `bin` written as a **transform** rather than on a channel — `BinNode.makeFromTransform`.
+   *
+   * The same pair a binned encoding produces: the data's own extent measured into a signal, and the
+   * bin computed against it. The only difference is where the output names come from — the
+   * transform states its `as`, one name or two, where an encoding derives both from the field.
+   */
+  /**
+   * A `stack` written as a **transform** — `StackNode.makeFromTransform`.
+   *
+   * The same accumulation an encoding's `stack` produces, with everything stated rather than
+   * derived: what to accumulate, what to accumulate it within, which way the segments run, and what
+   * to call the two ends. Only the `as` has a rule of its own — one name becomes the pair.
+   */
+  private fun stack(transform: VegaValue, path: String): List<VegaValue> {
+    val field = transform.string("stack")
+    if (field == null) {
+      diagnostics.error(
+        VegaLiteDiagnostics.UNSUPPORTED_TRANSFORM,
+        "A `stack` transform names the column to accumulate in `stack`; this one names none.",
+        jsonPath = path,
+      )
+      return emptyList()
+    }
+    val sorts = transform.array("sort").orEmpty()
+    val names =
+      when (val asValue = transform["as"]) {
+        is VegaValue.Str -> listOf(asValue.value, "${asValue.value}_end")
+        is VegaValue.Arr -> asValue.values.mapNotNull { (it as? VegaValue.Str)?.value }
+        else -> listOf("${field}_start", "${field}_end")
+      }
+    return listOf(
+      obj {
+        put("type", "stack")
+        put("groupby", strings(fieldList(transform["groupby"])))
+        put("field", field)
+        put(
+          "sort",
+          obj {
+            put("field", strings(sorts.mapNotNull { it.string("field") }))
+            put("order", strings(sorts.map { it.string("order") ?: "ascending" }))
+          },
+        )
+        put("as", strings(names))
+        put("offset", transform.string("offset") ?: "zero")
+      }
+    )
+  }
+
+  private fun bin(transform: VegaValue, path: String): List<VegaValue> {
+    val field = transform.string("field")
+    if (field == null) {
+      diagnostics.error(
+        VegaLiteDiagnostics.UNSUPPORTED_TRANSFORM,
+        "A `bin` transform names the column to bucket in `field`; this one names none.",
+        jsonPath = path,
+      )
+      return emptyList()
+    }
+    val stated = transform["bin"]
+    val params =
+      when {
+        stated == VegaValue.Bool(true) -> obj { put("maxbins", 10) }
+        stated is VegaValue.Obj && stated.fields.isEmpty() -> obj { put("maxbins", 10) }
+        stated is VegaValue.Obj -> stated
+        else -> obj { put("maxbins", 10) }
+      }
+    val names =
+      when (val asValue = transform["as"]) {
+        is VegaValue.Str -> listOf(asValue.value, "${asValue.value}_end")
+        is VegaValue.Arr -> asValue.values.mapNotNull { (it as? VegaValue.Str)?.value }
+        else -> {
+          diagnostics.error(
+            VegaLiteDiagnostics.UNSUPPORTED_TRANSFORM,
+            "A `bin` transform names its output in `as`, as one name or as the pair of edges.",
+            jsonPath = path,
+          )
+          return emptyList()
+        }
+      }
+    val key = prefix("${Fields.binToString(params)}_$field")
+    val extent = params.fields["extent"]
+    val out = mutableListOf<VegaValue>()
+    if (extent == null) {
+      out += obj {
+        put("type", "extent")
+        put("field", field)
+        put("signal", "${key}_extent")
+      }
+    }
+    out += obj {
+      put("type", "bin")
+      put("field", field)
+      put("as", strings(names))
+      put("signal", "${key}_bins")
+      put("extent", extent ?: signalRef("${key}_extent"))
+      params.fields.forEach { (name, value) -> if (name != "extent") put(name, value) }
+    }
+    return out
+  }
 
   fun translate(transforms: List<VegaValue>, path: String): List<VegaValue> {
     val out = mutableListOf<VegaValue>()
@@ -53,11 +156,18 @@ internal class Transforms(
 
       transform.has("filter") -> filter(transform["filter"], path)
 
+      transform.has("bin") -> bin(transform, path)
+
+      transform.has("stack") -> stack(transform, path)
+
       transform.has("aggregate") ->
         listOf(
           obj {
             put("type", "aggregate")
-            put("groupby", strings(fieldList(transform["groupby"])))
+            // `AggregateNode.makeFromTransform` holds its dimensions in a **set**: an aggregate
+            // groups by a column once however many times it is named. A `joinaggregate`, which is
+            // a transform Vega takes as written, keeps the repetition.
+            put("groupby", strings(fieldList(transform["groupby"]).distinct()))
             putOps(transform.array("aggregate").orEmpty())
           }
         )

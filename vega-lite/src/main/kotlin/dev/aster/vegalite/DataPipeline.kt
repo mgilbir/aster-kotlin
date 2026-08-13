@@ -282,8 +282,10 @@ internal class DataPipeline(
   }
 
   private fun timeUnitNode(): TimeUnitNode? {
+    // The facet's own channels first: their transform belongs to the facet model, which sits above
+    // the cell's, so a trellis broken down by year buckets the year before it buckets the quarter.
     val units =
-      view.spec.encoding.values.mapNotNull { def ->
+      (view.facetDefs + view.spec.encoding.values).mapNotNull { def ->
         val timeUnit =
           def.timeUnit?.takeIf { !Fields.isBinnedTimeUnit(it) } ?: return@mapNotNull null
         val field = def.field ?: return@mapNotNull null
@@ -548,7 +550,8 @@ internal class DataPipeline(
   private fun userTransforms(head: DataNode): DataNode {
     var last = head
     for (transform in
-      Transforms(diagnostics, registerLookup).translate(view.spec.transforms, "$.transform")) {
+      Transforms(diagnostics, registerLookup, view::prefixed)
+        .translate(view.spec.transforms, "$.transform")) {
       last = last.then(PassThroughNode(listOf(transform)))
     }
     return last
