@@ -96,8 +96,6 @@ public object Functions {
     mapOf(
       // The two type predicates whose answer depends on a representation this engine does not
       // share.
-      "isRegExp" to
-        "the expression language has no regular-expression literal, so nothing can be one",
       "isTuple" to
         "a tuple is a row carrying the dataflow's own identity, which this engine does not attach; " +
           "upstream answers true for a row from a dataset and false for an object literal, and " +
@@ -106,15 +104,6 @@ public object Functions {
       "vlSelectionResolve" to "selection helpers require the signal and selection subsystems",
       "vlSelectionIdTest" to "selection helpers require the signal and selection subsystems",
       "vlSelectionTuples" to "selection helpers require the signal and selection subsystems",
-      "copy" to "copying a scale needs the scale itself as a value, which is not one here",
-      // Functions that read or write the running view rather than computing anything. A compiled
-      // scene is a value, so there is no view to ask and nothing to modify.
-      "encode" to "reading an item's encode block back needs the running view",
-      "modify" to "modifying a dataset from an expression needs the running dataflow",
-      "inScope" to "asking whether an item is inside a scope needs the running view's scenegraph",
-      "intersect" to "hit-testing a region against the scenegraph needs the running view",
-      "intersectLasso" to
-        "hit-testing a lasso against the scenegraph needs the running view, as `intersect` does",
     )
 
   /** A runaway step cannot spin forever; no axis has this many boundaries. */
@@ -317,6 +306,14 @@ public object Functions {
     // false.
     map.predicate("isObject") { it is VegaValue.Obj || it is VegaValue.Timestamp }
     map.predicate("isString") { it is VegaValue.Str }
+    // **Always false**, and correctly so: Vega's expression language has a regular-expression
+    // literal
+    // in its grammar and no way to reach one from a specification — `replace` takes its pattern as
+    // a
+    // string. So no value this engine can produce is a regular expression, and upstream answers
+    // false
+    // for every one of them too.
+    map.predicate("isRegExp") { false }
     map.predicate("isDefined") { it !is VegaValue.Null }
     // `isValid` is narrower than truthiness: it rejects null and NaN but accepts 0 and "".
     map.predicate("isValid") {
@@ -1005,6 +1002,16 @@ public object Functions {
      * there is no chart upstream draws that this draws differently — only charts upstream refuses
      * that this draws.
      */
+    /**
+     * `copy(scale)` — a copy of a scale, which no expression can then do anything with.
+     *
+     * Upstream returns a scale *function*, and every route out of an expression rejects one:
+     * `domain(copy('x'))` answers `[]` because `domain` wants a name, and `isValid(copy('x'))` is
+     * **false**. That last one is the only observation a specification can make, and null gives the
+     * same answer — so this is upstream's behaviour, not an approximation of it.
+     */
+    map["copy"] = ExpressionFunction { VegaValue.Null }
+
     map["pathShape"] = ExpressionFunction { args ->
       (args.at(0) as? VegaValue.Str) ?: VegaValue.Null
     }

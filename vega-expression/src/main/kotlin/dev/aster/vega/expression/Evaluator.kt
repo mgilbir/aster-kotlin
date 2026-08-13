@@ -289,6 +289,61 @@ public class Evaluator(
       return values.lastOrNull() ?: VegaValue.Null
     }
 
+    /*
+     * `modify(name, insert, remove, toggle, modify, values)` — a dataset changed from an expression.
+     *
+     * The one write besides `setdata`, and the interactive one: a click handler adds the clicked row
+     * to a selection dataset with `modify('sel', datum)` and removes it again with a `toggle`. Every
+     * argument is optional and the order is upstream's.
+     *
+     * Returns **0 when there is nothing to do** — no rows in the dataset and nothing to insert or
+     * toggle — and 1 otherwise, which is upstream's own early exit and worth keeping: a specification
+     * can tell whether its change landed.
+     */
+    if (name == "modify" && node.arguments.isNotEmpty()) {
+      val dataset = evaluate(node.arguments[0], scope).asString()
+      val insert = node.arguments.getOrNull(1)?.let { evaluate(it, scope) } ?: VegaValue.Null
+      val remove = node.arguments.getOrNull(2)?.let { evaluate(it, scope) } ?: VegaValue.Null
+      val toggle = node.arguments.getOrNull(3)?.let { evaluate(it, scope) } ?: VegaValue.Null
+      return VegaValue.Num(scope.modifyDataset(dataset, insert, remove, toggle))
+    }
+
+    /*
+     * `encode(item, name, retval)` — an item re-encoded through one of its own encode sets.
+     *
+     * A hover handler writes `encode(item, 'hover')` and the item takes its `hover` block. The value
+     * is the third argument when there is one and the **item** otherwise, so the common form returns
+     * what it was handed. With no item there is nothing to encode and the value comes back unchanged,
+     * which is upstream's guard rather than an omission.
+     */
+    if (name == "encode" && node.arguments.isNotEmpty()) {
+      val item = evaluate(node.arguments[0], scope)
+      val set = node.arguments.getOrNull(1)?.let { evaluate(it, scope).asString() } ?: "update"
+      val fallback = node.arguments.getOrNull(2)?.let { evaluate(it, scope) }
+      if (item !is VegaValue.Null) scope.encodeItem(item, set)
+      return fallback ?: item
+    }
+
+    // `inScope(item)` — whether the item sits inside the group the expression belongs to.
+    if (name == "inScope" && node.arguments.isNotEmpty()) {
+      return VegaValue.Bool(scope.inScope(evaluate(node.arguments[0], scope)))
+    }
+
+    // `intersect(box[, opt])` and `intersectLasso(mark, points, unit)` — what a region covers.
+    if (name == "intersect" && node.arguments.isNotEmpty()) {
+      return scope.intersect(
+        evaluate(node.arguments[0], scope),
+        node.arguments.getOrNull(1)?.let { evaluate(it, scope) } ?: VegaValue.Null,
+      )
+    }
+    if (name == "intersectLasso" && node.arguments.size >= 2) {
+      return scope.intersectLasso(
+        evaluate(node.arguments[0], scope).asString(),
+        evaluate(node.arguments[1], scope),
+        node.arguments.getOrNull(2)?.let { evaluate(it, scope) } ?: VegaValue.Null,
+      )
+    }
+
     // `gradient(scale, p0, p1[, count])` — the scale's ramp, as a paint value.
     if (name == "gradient" && node.arguments.size >= 3) {
       return scope.gradient(

@@ -112,7 +112,10 @@ public class ParsedExpression(
         when (callee.name) {
           in DATA_FUNCTIONS -> datasets
           in SCALE_FUNCTIONS -> scales
-          "setdata" -> written
+          // `modify` writes a dataset as surely as `setdata` replaces one, so anything reading that
+          // dataset has to be ordered behind the expression either way.
+          "setdata",
+          "modify" -> written
           else -> return@walk
         }
       val first = node.arguments.firstOrNull()

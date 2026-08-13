@@ -184,6 +184,52 @@ public interface ExpressionScope {
   public fun setDataset(name: String, rows: List<VegaValue>) {}
 
   /**
+   * `modify(name, insert, remove, toggle)` — rows added to or taken out of a dataset.
+   *
+   * Returns 1 when something was changed and **0 when there was nothing to do**, which is
+   * upstream's own early exit: an empty dataset with nothing to insert or toggle is left alone and
+   * says so.
+   */
+  public fun modifyDataset(
+    name: String,
+    insert: VegaValue,
+    remove: VegaValue,
+    toggle: VegaValue,
+  ): Double = 0.0
+
+  /**
+   * `encode(item, set)` — re-encodes one scene item through a named encode block of its own mark.
+   *
+   * A side effect on a live view. A compiled scene has no items to re-encode, so the default does
+   * nothing; the value the function returns is decided by the caller either way, which is why this
+   * returns nothing.
+   */
+  public fun encodeItem(item: VegaValue, set: String) {}
+
+  /**
+   * `inScope(item)` — whether the item is inside the group this expression belongs to.
+   *
+   * False with no enclosing group, which is what upstream answers when its `context.group` is unset
+   * — including for every expression in a top-level signal, where `inScope(anything)` is false
+   * there too.
+   */
+  public fun inScope(item: VegaValue): Boolean = false
+
+  /**
+   * `intersect([[x0, y0], [x1, y1]][, opt])` — the scene items a box covers.
+   *
+   * An empty array where there is no scenegraph to ask, which is upstream's answer in the same
+   * position: a signal is resolved before the scene exists, so `intersect` over a chart full of
+   * marks answers `[]` there as well. A scope that *has* a scene — an event handler's — overrides
+   * this.
+   */
+  public fun intersect(box: VegaValue, options: VegaValue): VegaValue = VegaValue.Arr(emptyList())
+
+  /** `intersectLasso(mark, points, unit)` — the same question asked with a freehand outline. */
+  public fun intersectLasso(mark: String, points: VegaValue, unit: VegaValue): VegaValue =
+    VegaValue.Arr(emptyList())
+
+  /**
    * `treePath('name', from, to)` — the rows between two nodes of a stratified dataset.
    *
    * A scope with no tree of that name returns null, which is what upstream returns for a link whose

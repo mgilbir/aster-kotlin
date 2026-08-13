@@ -1215,6 +1215,11 @@
   "caption": "Discrete legend titled 'Unemployment' for fill color with 6 boundaries: 2.1%, 4.3%, 6.4%, 8.6%, 10.7%, 12.9%"
  },
  {
+  "fixture": "modify-dataset",
+  "kind": "axis",
+  "caption": "X-axis for a discrete scale with 3 values: alpha, beta, gamma"
+ },
+ {
   "fixture": "multi-source-pluck",
   "kind": "axis",
   "caption": "X-axis for a discrete scale with 3 values: a1, a2, b1"
