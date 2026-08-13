@@ -8,6 +8,7 @@ import dev.aster.vega.scene.Fill
 import dev.aster.vega.scene.GradientStop
 import dev.aster.vega.scene.GroupNode
 import dev.aster.vega.scene.ImageNode
+import dev.aster.vega.scene.MarkAccessibility
 import dev.aster.vega.scene.MetricTextEngine
 import dev.aster.vega.scene.NodeMetadata
 import dev.aster.vega.scene.PathData
@@ -94,6 +95,58 @@ class SvgRendererTest {
     assertTrue(svg.contains("a &lt; b &amp; c &gt; d &quot;q&quot;"))
     assertTrue(svg.contains("""aria-label="label &amp; &lt;tag&gt;""""))
     assertFalse(svg.contains("<tag>"))
+  }
+
+  /**
+   * A mark's items are drawn inside one container, and the mark's own announcement hangs on it.
+   *
+   * Upstream's shape, and the reason it is rebuilt here rather than read off a node: this scene has
+   * no mark level, so the announcement travels on each item and the run of items that share it is
+   * the container. Two marks of the same type are two containers — the ordinal is what says so.
+   */
+  @Test
+  fun `each mark's items are wrapped in one announced container`() {
+    fun bar(x: Double, ordinal: Int, container: MarkAccessibility) =
+      RectNode(
+        id = ids.allocate(),
+        x = x,
+        y = 0.0,
+        width = 5.0,
+        height = 10.0,
+        fill = Fill.of(SceneColor.Black),
+        metadata =
+          NodeMetadata(
+            role = "mark",
+            markKind = "rect",
+            markOrdinal = ordinal,
+            markAccessibility = container,
+          ),
+      )
+    val bars =
+      MarkAccessibility(
+        role = "graphics-symbol",
+        roleDescription = "rect mark container",
+        label = "Revenue & margin",
+      )
+    val decoration = MarkAccessibility(role = null, roleDescription = null, hidden = true)
+    val svg =
+      sceneOf(
+          bar(0.0, 0, bars),
+          bar(10.0, 0, bars),
+          bar(20.0, 1, decoration),
+        )
+        .toSvg()
+
+    assertTrue(
+      svg.contains(
+        """<g role="graphics-symbol" aria-roledescription="rect mark container" """ +
+          """aria-label="Revenue &amp; margin">"""
+      ),
+      svg,
+    )
+    // One container for the two items of the first mark, and a separate hidden one for the second.
+    assertEquals(1, Regex("""aria-roledescription="rect mark container"""").findAll(svg).count())
+    assertTrue(svg.contains("""<g aria-hidden="true">"""), svg)
   }
 
   @Test

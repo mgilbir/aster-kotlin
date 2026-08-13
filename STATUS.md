@@ -143,6 +143,8 @@ scale output:
 | `dorling-cartogram` | 113 | Vega's Dorling cartogram: states as circles sized by `geoArea` over `albersUsa`, and a size legend whose rows are clipped so its biggest swatches overlap |
 | `geo-points` | 30 | Six cities placed by `geopoint` under three projections at once, joined by rules so a misplaced point moves a line as well as a dot |
 | `airport-connections` | 650 | Vega's airport map: 49 states through `albersUsa`, and a **Voronoi** cell over each of 597 airports so the pointer always has a nearest one — invisible, and compared outline by outline |
+| `mark-join-key` | 23 | a mark `key` collapsing two rows onto one item, as text and as a number, beside a mark with no key that draws every row |
+| `mark-descriptions` | 12 | what a reader is told about a *mark*: a described series, a decorative rule hidden with `aria: false`, and items that name their own role |
 
 The gate is wired into `./scripts/oracle.sh`, so every further scale, mark and transform is built
 against a harness that can say we are wrong — which golden tests cannot.
@@ -201,7 +203,7 @@ substantive compatibility items:
 | 6. View and Compose APIs | Yes |
 | 7. SVG, PNG, PDF export | Yes |
 | 8. TalkBack can describe and navigate | Partial — virtual nodes are tested by instrumentation, not with TalkBack itself |
-| 9. At least 100 compatibility fixtures pass | **Yes** — 157 |
+| 9. At least 100 compatibility fixtures pass | **Yes** — 159 |
 | 10. Core runtime has no Android dependency | Yes |
 | 11. Renders without WebView | Yes |
 | 12. Build and test loop runs from the terminal | Yes |

@@ -149,13 +149,9 @@ public fun paintOrder(children: List<SceneNode>): List<SceneNode> {
       index++
       continue
     }
+    val ordinal = node.metadata.markOrdinal
     var end = index
-    while (
-      end + 1 < children.size &&
-        children[end + 1].metadata.role == "mark" &&
-        children[end + 1].metadata.markName == name &&
-        children[end + 1].metadata.markKind == kind
-    ) {
+    while (end + 1 < children.size && sameMark(children[end + 1], name, kind, ordinal)) {
       end++
     }
     val run = children.subList(index, end + 1)
@@ -169,6 +165,19 @@ public fun paintOrder(children: List<SceneNode>): List<SceneNode> {
   }
   return out
 }
+
+/**
+ * Whether this node belongs to the same mark as the run being collected.
+ *
+ * The ordinal is what tells two unnamed marks of the same type apart. Before it was carried, two
+ * `rect` marks declared side by side read as one run, and an item `zindex` in the second could be
+ * painted among the first's items — upstream paints each mark's run whole.
+ */
+private fun sameMark(node: SceneNode, name: String?, kind: String?, ordinal: Int?): Boolean =
+  node.metadata.role == "mark" &&
+    node.metadata.markName == name &&
+    node.metadata.markKind == kind &&
+    node.metadata.markOrdinal == ordinal
 
 public fun SceneNode.walk(visit: (node: SceneNode, parentTransform: Transform2D) -> Unit) {
   walkInternal(Transform2D.Identity, visit)

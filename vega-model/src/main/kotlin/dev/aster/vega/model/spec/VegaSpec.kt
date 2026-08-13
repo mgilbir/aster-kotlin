@@ -1707,6 +1707,16 @@ public data class MarkSpec(
    */
   val role: String? = null,
   val from: FromSpec? = null,
+  /**
+   * `key` — the field that identifies an **item**, upstream's `DataJoin`.
+   *
+   * Not a hint about redraws, which is how it reads. Upstream maps each key to one item, so two
+   * rows sharing a key are **one** mark: the second overwrites the first's datum instead of adding
+   * a bar. The item keeps the place its key first appeared, so a repeated key draws the *later*
+   * row's values in the *earlier* row's position — a shape no filtering would produce, and the
+   * reason this has to be honoured rather than treated as advice.
+   */
+  val key: String? = null,
   /** `sort` — the order this mark's items are built and painted in; see [MarkSort]. */
   val sort: MarkSort? = null,
   /**
@@ -1744,6 +1754,14 @@ public data class MarkSpec(
    * chart with no way to say "ignore this" makes a reader listen to its scaffolding.
    */
   val aria: Boolean = true,
+  /**
+   * `description` on the **mark** rather than on an item, which a screen reader hears once.
+   *
+   * Upstream puts it on the container it draws every item of the mark inside — `aria-label` on the
+   * `<g class="mark-rect">` — so it names the whole series: "Monthly revenue, by month". An item's
+   * own `description` channel is the other half of the pair and names one bar.
+   */
+  val description: String? = null,
   val clip: Boolean = false,
   /**
    * Appearance defaults from `config`, either side of the engine's own built-in per-type block.

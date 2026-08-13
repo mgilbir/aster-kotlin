@@ -9,7 +9,7 @@ Branch `milestone-0-bootstrap`. Working tree clean, both gates green:
 - `./scripts/check.sh` — format, all tests, lint, demo APK
 - `./scripts/oracle.sh` — regenerates upstream references and runs the differential comparison
 
-**157 differential fixtures pass, all matching upstream exactly.** That is the only number here
+**159 differential fixtures pass, all matching upstream exactly.** That is the only number here
 that means what it says.
 
 ## Read this before trusting the other number
@@ -254,7 +254,7 @@ not the one Vega documents**, because Vega only forwards the parameters a specif
 
 ## What is left: two examples, and neither can be verified
 
-**157 differential fixtures pass. 91 of the 93 examples compile clean.** Everything that can be
+**159 differential fixtures pass. 91 of the 93 examples compile clean.** Everything that can be
 checked against upstream has been.
 
 ### `projections` — upstream refuses it too
@@ -429,6 +429,25 @@ property* can carry one — the styling block records it and everything read thr
 resolves it. A channel aimed at a plain string property (`symbolType`, `orient`, `format`) is still
 named, because folding an object into one would stringify it.
 
+**The scene has no mark level, and two things a mark carries had nowhere to live.** Upstream's group
+holds *marks* and each mark holds items; here a mark's items are the group's children directly. That
+is the right trade for a differential comparison — the harness reads a flat list of drawn things — but
+a mark's own `description` is announced on the container it draws its items inside, and there was no
+container. Both now travel on the items: `NodeMetadata.markOrdinal` (which of its parent's marks this
+came from, upstream's `markpath`) and `markAccessibility` (the announcement, one instance per mark held
+by reference), and the renderer rebuilds the container from a run of items that agree on both. The
+ordinal was needed for its own sake: without it two `rect` marks declared side by side read as one run,
+and an item `zindex` in the second could be painted among the first's items.
+
+Verified the way `zindex` had to be — by harvesting upstream's own output. `./scripts/oracle.sh` now
+writes `test-fixtures/reference/mark-containers.json` beside the captions, and `MarkContainerTest`
+compares 2,038 announcements across the corpus: role, role description, label and hidden, as a multiset
+per fixture. Two things it taught, both already in the code: upstream announces a **symbol** legend's
+entries as a group mark container and a gradient legend's as nothing, and a mark that produced no items
+still gets a container upstream — an empty one, which is skipped in the harvest because assistive
+technology walks past a group with no content and comparing it would fail over a difference nobody can
+hear. If you touch guide internals, expect this test rather than the differential to be what notices.
+
 **The harness compares the scene, not the drawing.** That is the right trade almost everywhere and it
 has one blind spot worth remembering: anything upstream decides at *render* time is invisible to it.
 `zindex` was the example — upstream keeps its items in data order and reorders inside `visit`, so a
@@ -484,7 +503,11 @@ that do have a property behind them; both maps now cover it exactly.
 - **Layout:** none. All ten of upstream's layout properties are read, and `row-footer` and
   `column-footer` are recognised roles — they used to fall through to `CELL` and be gridded among the
   cells.
-- **Mark (2):** a mark-level `description` and `key`.
+- **Mark:** none. The last two were `key` and a mark-level `description`, and both were more than
+  they looked. `key` reads like a hint about redraws and is upstream's `DataJoin`: it maps each key to
+  **one** item, so two rows sharing a key are one mark and the later row's values are drawn in the
+  earlier row's *position*. `description` belongs to the mark's **container**, a level this scene does
+  not have — see "The scene has no mark level" below.
 - **Tail:** none. Facet aggregates take all 26 operations; the report only ever fired for a name
   upstream rejects too, and says so now. `timeunit` unit inference and its `step` are *done*.
   `config.range`, the named ranges, all four geo expression functions and the `lab`/`hcl` colour

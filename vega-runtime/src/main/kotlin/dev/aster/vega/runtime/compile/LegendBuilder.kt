@@ -29,6 +29,7 @@ import dev.aster.vega.scene.AccessibilityDescriptor
 import dev.aster.vega.scene.Fill
 import dev.aster.vega.scene.GradientStop
 import dev.aster.vega.scene.GroupNode
+import dev.aster.vega.scene.MarkAccessibility
 import dev.aster.vega.scene.NodeMetadata
 import dev.aster.vega.scene.PathData
 import dev.aster.vega.scene.RectD
@@ -286,7 +287,30 @@ internal class LegendBuilder(
         id = ids.allocate(),
         children = entries,
         transform = Transform2D.translate(padding + titleAside, padding + titleReach),
-        metadata = NodeMetadata(role = "legend-entry", markName = scaleName),
+        metadata =
+          NodeMetadata(
+            role = "legend-entry",
+            markName = scaleName,
+            // A group, and upstream calls it a group *mark*: the entries are its items.
+            markKind = "group",
+            // A symbol legend's entries are a **group mark** upstream — one group per swatch, built
+            // from the scale's domain — so the collection is announced as a container like any
+            // other
+            // group mark, and a reader hears "group mark container" before stepping into the
+            // swatches. A gradient legend has no such mark: its bar and labels are drawn directly,
+            // and upstream emits no container for them. Confirmed against a fixture with one of
+            // each,
+            // which has exactly one.
+            markAccessibility =
+              if (entries.any { it.metadata.role == "legend-entry-item" }) {
+                MarkAccessibility(
+                  role = "graphics-object",
+                  roleDescription = "group mark container",
+                )
+              } else {
+                null
+              },
+          ),
       )
 
     // A title that reaches left of the legend's own origin drags the whole legend right rather than
@@ -1410,7 +1434,12 @@ internal class LegendBuilder(
                 null
               } else {
                 (spec.description ?: caption(built))?.let {
-                  AccessibilityDescriptor(label = it, role = "graphics-symbol", focusable = true)
+                  AccessibilityDescriptor(
+                    label = it,
+                    role = "graphics-symbol",
+                    roleDescription = "legend",
+                    focusable = true,
+                  )
                 }
               },
           ),

@@ -200,6 +200,7 @@ internal class TitleBuilder(
                   // out as one sentence rather than with the break in it.
                   label = "Title text '${text.replace('\n', ' ')}'",
                   role = "graphics-symbol",
+                  roleDescription = "title",
                   focusable = true,
                 )
               },
@@ -256,6 +257,7 @@ internal class TitleBuilder(
                     AccessibilityDescriptor(
                       label = "Subtitle text '${text.replace('\n', ' ')}'",
                       role = "graphics-symbol",
+                      roleDescription = "subtitle",
                       focusable = true,
                     )
                   },

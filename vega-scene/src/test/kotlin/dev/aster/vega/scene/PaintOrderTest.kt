@@ -18,7 +18,7 @@ import org.junit.jupiter.api.Test
  */
 class PaintOrderTest {
 
-  private fun item(x: Double, zindex: Int): SceneNode =
+  private fun item(x: Double, zindex: Int, ordinal: Int = 0, name: String? = "bars"): SceneNode =
     RectNode(
       id = SceneNodeId(x.toLong()),
       x = x,
@@ -26,7 +26,14 @@ class PaintOrderTest {
       width = 8.0,
       height = 30.0,
       fill = Fill.of(SceneColor.Black),
-      metadata = NodeMetadata(role = "mark", markName = "bars", markKind = "rect", zindex = zindex),
+      metadata =
+        NodeMetadata(
+          role = "mark",
+          markName = name,
+          markKind = "rect",
+          zindex = zindex,
+          markOrdinal = ordinal,
+        ),
     )
 
   private fun order(zindexes: List<Int>): List<Double> =
@@ -83,5 +90,36 @@ class PaintOrderTest {
     val ordered = paintOrder(bars + axis)
     assertEquals(listOf(0.0, 10.0), ordered.filterIsInstance<RectNode>().map { it.x })
     assertEquals(axis, ordered.last())
+  }
+
+  /**
+   * Two `rect` marks side by side are two runs, and neither reorders into the other.
+   *
+   * The case that needed [NodeMetadata.markOrdinal]: with only a name and a type to go by, two
+   * unnamed marks of the same kind read as one run, and the second mark's raised item was painted
+   * among the first mark's — `[a0, b0, a-raised, b-raised]` where upstream draws each mark whole.
+   * The expectation is upstream's own SVG for the same pair of marks, left to right.
+   */
+  @Test
+  fun `two marks of the same type are two runs`() {
+    // Upstream's own order for these two marks is 0, 20, 10 then 30, 50, 40 — each mark's zeroes in
+    // data order followed by its own raised item. Merged into one run it comes out 0, 20, 30, 50,
+    // 40, 10: the second mark's raised bar painted under the first's.
+    val first =
+      listOf(
+        item(0.0, 0, ordinal = 0, name = null),
+        item(10.0, 5, ordinal = 0, name = null),
+        item(20.0, 0, ordinal = 0, name = null),
+      )
+    val second =
+      listOf(
+        item(30.0, 0, ordinal = 1, name = null),
+        item(40.0, 3, ordinal = 1, name = null),
+        item(50.0, 0, ordinal = 1, name = null),
+      )
+    assertEquals(
+      listOf(0.0, 20.0, 10.0, 30.0, 50.0, 40.0),
+      paintOrder(first + second).map { (it as RectNode).x },
+    )
   }
 }

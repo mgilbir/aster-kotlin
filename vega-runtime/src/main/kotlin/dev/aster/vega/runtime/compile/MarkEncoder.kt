@@ -1810,12 +1810,25 @@ public class MarkEncoder(
     if (!spec.aria) return null
     if (boolean(channels["aria"], datum) == false) return null
 
-    val role = string(channels["ariaRole"], datum) ?: "graphics-symbol"
+    val kind = spec.type.name.lowercase()
+    // Upstream's defaults: a group is an object because a reader steps *into* it, everything else
+    // is
+    // a symbol; and the role description is the mark type in words, which is what is actually
+    // heard.
+    val role =
+      string(channels["ariaRole"], datum)
+        ?: if (spec.type == MarkType.GROUP) "graphics-object" else "graphics-symbol"
+    val roleDescription = string(channels["ariaRoleDescription"], datum) ?: "$kind mark"
     // The specification's own words win over anything derived from the channels.
     string(channels["description"], datum)
       ?.takeIf { it.isNotBlank() }
       ?.let {
-        return AccessibilityDescriptor(label = it, role = role, focusable = true)
+        return AccessibilityDescriptor(
+          label = it,
+          role = role,
+          roleDescription = roleDescription,
+          focusable = true,
+        )
       }
 
     val labelField =
@@ -1827,7 +1840,10 @@ public class MarkEncoder(
       label = spoken(datum.fieldOf(labelField)),
       value = valueField?.takeIf { it != labelField }?.let { spoken(datum.fieldOf(it)) },
       role = role,
+      roleDescription = roleDescription,
       focusable = true,
+      // Not asked for: this is the divergence above, and a mark's container role turns on it.
+      derived = true,
     )
   }
 

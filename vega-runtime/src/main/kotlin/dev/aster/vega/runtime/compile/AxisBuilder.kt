@@ -489,7 +489,13 @@ public class AxisBuilder(
                       spec.formatType,
                     ))
                   ?.let {
-                    AccessibilityDescriptor(label = it, role = "graphics-symbol", focusable = true)
+                    AccessibilityDescriptor(
+                      label = it,
+                      role = "graphics-symbol",
+                      // Upstream's `AriaGuides`: a reader hears "axis" and then the caption.
+                      roleDescription = "axis",
+                      focusable = true,
+                    )
                   }
               },
           ),

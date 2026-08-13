@@ -22,6 +22,7 @@ import dev.aster.vega.runtime.load.DataLoader
 import dev.aster.vega.runtime.load.DenyLoader
 import dev.aster.vega.runtime.scale.VegaScale
 import dev.aster.vega.scene.GroupNode
+import dev.aster.vega.scene.MarkAccessibility
 import dev.aster.vega.scene.MetricTextEngine
 import dev.aster.vega.scene.NodeMetadata
 import dev.aster.vega.scene.RectD
@@ -459,7 +460,22 @@ public class SpecCompiler(
     val node = encoded.single() as GroupNode
     // `encodeGroup` labels every group "scope", which is what upstream calls a group *mark*. The
     // chart's own group is a frame, and the differential harness finds it by that name.
-    return node.copy(metadata = node.metadata.copy(role = "frame", markName = "root"))
+    return node.copy(
+      metadata =
+        node.metadata.copy(
+          role = "frame",
+          markName = "root",
+          // Upstream announces the frame like any other group mark — "group mark container" — which
+          // is what a reader meets first, before any axis or bar. Deliberately unlabelled: a
+          // chart-level `description` belongs to the *view*, and upstream puts it on the element
+          // the
+          // chart is embedded in rather than on the frame. Checked against every described fixture
+          // in
+          // the corpus, none of which labels its frame.
+          markAccessibility =
+            MarkAccessibility(role = "graphics-object", roleDescription = "group mark container"),
+        )
+    )
   }
 
   /**
