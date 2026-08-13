@@ -151,6 +151,7 @@ scale output:
 | `legend-discretizing` | 71 | the stacked colour bar each discretizing scale is legended as, and the same scale asked for as symbols labelled by range |
 | `impute-pivot` | 41 | a missing series filled in before stacking, and the same table pivoted so a column is named by the data |
 | `nest-treemap` | 28 | a hierarchy built from a flat table by nesting two keys, sized by a treemap that sorts its nodes by their own totals |
+| `hierarchy-options` | 40 | the pack, partition and tree layouts with their own options: a radius column, rounding, padding, the cluster method, separation off, and output names of the specification's choosing |
 
 The gate is wired into `./scripts/oracle.sh`, so every further scale, mark and transform is built
 against a harness that can say we are wrong — which golden tests cannot.
@@ -209,7 +210,7 @@ substantive compatibility items:
 | 6. View and Compose APIs | Yes |
 | 7. SVG, PNG, PDF export | Yes |
 | 8. TalkBack can describe and navigate | Partial — virtual nodes are tested by instrumentation, not with TalkBack itself |
-| 9. At least 100 compatibility fixtures pass | **Yes** — 165 |
+| 9. At least 100 compatibility fixtures pass | **Yes** — 166 |
 | 10. Core runtime has no Android dependency | Yes |
 | 11. Renders without WebView | Yes |
 | 12. Build and test loop runs from the terminal | Yes |

@@ -9,7 +9,7 @@ Branch `milestone-0-bootstrap`. Working tree clean, both gates green:
 - `./scripts/check.sh` — format, all tests, lint, demo APK
 - `./scripts/oracle.sh` — regenerates upstream references and runs the differential comparison
 
-**165 differential fixtures pass, all matching upstream exactly.** That is the only number here
+**166 differential fixtures pass, all matching upstream exactly.** That is the only number here
 that means what it says.
 
 ## Read this before trusting the other number
@@ -254,7 +254,7 @@ not the one Vega documents**, because Vega only forwards the parameters a specif
 
 ## What is left: two examples, and neither can be verified
 
-**165 differential fixtures pass. 91 of the 93 examples compile clean.** Everything that can be
+**166 differential fixtures pass. 91 of the 93 examples compile clean.** Everything that can be
 checked against upstream has been.
 
 ### `projections` — upstream refuses it too
@@ -460,7 +460,10 @@ for each of the 49 implemented transforms, how many fixtures use it? Three had *
 `test-fixtures/specs/*.vg.json`; run it again after adding a transform.
 
 One fixture is enough to catch a transform that does nothing and not enough to catch one whose
-*options* are ignored. That is exactly what `nest-treemap` found: `sort` on a hierarchy layout was
+*options* are ignored. `hierarchy-options` was written for exactly that — a radius column on `pack`,
+rounding and padding on `partition`, the cluster method with separation off on `tree`, and output names
+of the specification's choosing on both — and it passed on arrival, which is the other outcome and
+worth having. That is exactly what `nest-treemap` found: `sort` on a hierarchy layout was
 reading its field off the row rather than off the node, so `{"field": "value"}` — the layout's own
 computed total, the only sensible thing to sort a hierarchy by — found nothing and sorted nothing.
 
