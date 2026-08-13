@@ -119,7 +119,7 @@ internal class Parse(private val config: Config, private val diagnostics: Diagno
         channelDef(channel, entry, at)
       }
       val def = parsed.firstOrNull() ?: continue
-      result[channel] = def.copy(siblings = parsed.drop(1))
+      result[channel] = def.copy(siblings = parsed.drop(1), isList = value is VegaValue.Arr)
     }
     // A secondary channel takes its type from the channel it bounds. `{"x2": {"field": "end"}}` is
     // how every ranged mark is written, and reading it as an untyped — therefore nominal — field

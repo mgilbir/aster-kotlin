@@ -1944,6 +1944,31 @@ which is not an inconsistency: an aggregate's dimensions are a *set* in `makeFro
 colour scale; reading the unconditional part alone left the rule naming a field it could not look
 up, and the box plot's median was drawn unpainted.
 
+### A stack drawn inside a group, so that the rounding belongs to the stack
+
+`getGroupsForStackedBarWithCornerRadius`: a corner radius on a stacked bar is a property of the
+*stack*, not of whichever segment happens to be at its end — rounding each segment would round the
+joins between them as well. So the whole stack is faceted into a group, the group is given the
+radius and clipped, and the segments are drawn inside it with none. The group's extent along the
+stack is the min and max of every segment's two ends **in pixels**: the accumulation is in data
+space and the rounding is not, so the scale is applied inside the expression. The inner group exists
+only to undo the outer one's translation, marks inside a group being positioned relative to it while
+their scaled positions are absolute.
+
+Two details decide whether the group appears at all. The test is `some(prop =>
+getMarkPropOrConfig(prop, ...))` — **truthy**, so a bar that states a radius of zero is a plain bar
+and stays one rect. And a bar with a `size` encoding is left alone: its segments would no longer
+fill the group's thickness, and upstream does not guess.
+
+Beside it, three smaller rules. A tooltip **written as a list** builds the `{title: expression}`
+object however many entries it holds — one field written `[{…}]` is titled where the same field
+written bare is not. A composite mark's tooltip keeps each channel's own title, so a bucketed column
+reads `Year (year)` rather than the `year_Year` its transform wrote. And a **time unit** on a
+composite mark's channel becomes a transform of its own: the summary happens after the bucketing —
+one interval per bucket, not one per instant — so the unit cannot stay on a channel whose column
+the aggregate has already collapsed. A channel that is not itself temporal is then told to read
+that column as a *time*, nothing about an ordinal band otherwise saying so.
+
 ### Two runtime gaps this batch names but does not close
 
 `density`'s fixture is not in the corpus, and `trail`'s draws no legend. Both compile exactly as

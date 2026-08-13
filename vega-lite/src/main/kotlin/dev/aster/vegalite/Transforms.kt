@@ -83,6 +83,36 @@ internal class Transforms(
     )
   }
 
+  /**
+   * A `timeUnit` written as a **transform** — `TimeUnitNode.makeFromTransform`.
+   *
+   * The bucket's far end is written beside its start, as it is for a bucketed encoding: the two
+   * columns are what a mark spanning the bucket is drawn between, and what its scale reaches.
+   */
+  private fun timeUnit(transform: VegaValue, path: String): List<VegaValue> {
+    val field = transform.string("field")
+    val unit = transform.string("timeUnit")
+    val name = transform.string("as")
+    if (field == null || unit == null || name == null) {
+      diagnostics.error(
+        VegaLiteDiagnostics.UNSUPPORTED_TRANSFORM,
+        "A `timeUnit` transform names the unit, the column to bucket in `field`, and the column " +
+          "to write in `as`.",
+        jsonPath = path,
+      )
+      return emptyList()
+    }
+    return listOf(
+      obj {
+        put("field", field)
+        put("type", "timeunit")
+        put("units", strings(Fields.timeUnitParts(unit)))
+        if (unit.contains("utc")) put("timezone", "utc")
+        put("as", strings(listOf(name, "${name}_end")))
+      }
+    )
+  }
+
   private fun bin(transform: VegaValue, path: String): List<VegaValue> {
     val field = transform.string("field")
     if (field == null) {
@@ -159,6 +189,8 @@ internal class Transforms(
       transform.has("bin") -> bin(transform, path)
 
       transform.has("stack") -> stack(transform, path)
+
+      transform.has("timeUnit") -> timeUnit(transform, path)
 
       transform.has("aggregate") ->
         listOf(
@@ -507,6 +539,12 @@ internal class Transforms(
   fun implicitParses(transforms: List<VegaValue>): Map<String, String> {
     val parses = LinkedHashMap<String, String>()
     for (transform in transforms) {
+      // A `timeUnit` transform reads an *instant*, so the column it names is a date whatever the
+      // loader would otherwise have made of it — the same rule a temporal encoding follows.
+      if (transform.has("timeUnit")) {
+        transform.string("field")?.let { parses[it] = "date" }
+        continue
+      }
       if (!transform.has("filter")) continue
       collectParses(transform["filter"], parses)
     }

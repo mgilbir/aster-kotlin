@@ -112,7 +112,207 @@ internal object Marks {
         }
       )
     }
+    // A **stacked bar with rounded corners** is drawn inside a group per stack, because the
+    // rounding belongs to the stack and not to any one segment of it: rounding each segment would
+    // round the joins between them as well.
+    stackedCornerRadiusGroup(view, mark)?.let {
+      return listOf(it)
+    }
     return listOf(mark)
+  }
+
+  /** The four corner radii Vega knows, which is what a rounded stack has to move onto its group. */
+  private val VG_CORNER_RADIUS =
+    listOf(
+      "cornerRadius",
+      "cornerRadiusTopLeft",
+      "cornerRadiusTopRight",
+      "cornerRadiusBottomLeft",
+      "cornerRadiusBottomRight",
+    )
+
+  private val STROKE_PROPERTIES =
+    listOf(
+      "stroke",
+      "strokeWidth",
+      "strokeJoin",
+      "strokeCap",
+      "strokeDash",
+      "strokeDashOffset",
+      "strokeMiterLimit",
+      "strokeOpacity",
+    )
+
+  /**
+   * `getGroupsForStackedBarWithCornerRadius`: a stack of bars drawn inside a group of its own.
+   *
+   * A corner radius on a stacked bar is a property of the *stack*, not of the segment that happens
+   * to be at its end — so the whole stack is faceted into a group, the group is given the radius
+   * and clipped, and the segments are drawn inside it with none. The group's own extent is the min
+   * and max of every segment's two ends, in **pixels**: the accumulation is in data space and the
+   * rounding is not, so the scale is applied inside the expression rather than after it.
+   *
+   * The inner group exists only to undo the outer one's translation, the marks inside a group being
+   * positioned relative to it while their scaled positions are absolute.
+   *
+   * Not for a bar with a `size` encoding: the segments would no longer fill the group's thickness,
+   * and upstream leaves that case alone rather than guessing.
+   */
+  private fun stackedCornerRadiusGroup(view: UnitView, mark: VegaValue.Obj): VegaValue? {
+    if (view.spec.mark != "bar") return null
+    val stack = view.stack ?: return null
+    if (view.spec.fieldDef("size") != null) return null
+    // `some(prop => getMarkPropOrConfig(prop, ...))` — a **truthy** test, so a bar that states a
+    // radius of zero is a plain bar and stays one rect.
+    fun rounded(value: VegaValue?): Boolean =
+      value != null &&
+        value != VegaValue.Null &&
+        value != VegaValue.Bool(false) &&
+        (value as? VegaValue.Num)?.value != 0.0
+    val hasRadius =
+      VG_CORNER_RADIUS.any { rounded(styled(view, it)) } ||
+        rounded(view.markDef.raw.fields["cornerRadiusEnd"])
+    if (!hasRadius) return null
+
+    val channel = stack.fieldChannel
+    if (channel != "x" && channel != "y") return null
+    val other = if (channel == "x") "y" else "x"
+    val thickness = if (channel == "x") "height" else "width"
+    val def = view.spec.encoding[channel] ?: return null
+    val scale = view.scale(channel)
+    val stem = Fields.vgField(def, forAs = true)
+
+    fun extent(op: String): String {
+      val fields =
+        listOf("min_${stem}_start", "max_${stem}_start", "min_${stem}_end", "max_${stem}_end")
+      return "$op(${fields.joinToString(",") { "scale('$scale',datum[${quoted(it)}])" }})"
+    }
+
+    val update = (mark.obj("encode")?.obj("update"))?.fields.orEmpty()
+    val groupUpdate = LinkedHashMap<String, VegaValue>()
+    // Everything that places the stack *across* its own direction belongs to the group; everything
+    // along it is the group's own measured extent.
+    for (key in listOf(other, "${other}c", "${other}2", thickness)) {
+      update[key]?.let { groupUpdate[key] = it }
+    }
+    groupUpdate[channel] = signalRef(extent("min"))
+    groupUpdate["${channel}2"] = signalRef(extent("max"))
+    groupUpdate["clip"] = obj { put("value", true) }
+
+    val innerUpdate = obj {
+      put(
+        channel,
+        obj {
+          put("field", obj { put("group", channel) })
+          put("mult", -1)
+        },
+      )
+      put(thickness, obj { put("field", obj { put("group", thickness) }) })
+    }
+
+    // The segments keep their own place *along* the stack and lose the one across it, the group
+    // having taken that: they are drawn at the group's full thickness, which is why a `size`
+    // encoding cannot come this way.
+    val markUpdate = LinkedHashMap<String, VegaValue>()
+    for ((key, value) in update) {
+      if (key == other || key == "${other}c" || key == "${other}2") continue
+      markUpdate[key] = value
+    }
+    markUpdate[thickness] = obj { put("field", obj { put("group", thickness) }) }
+
+    for (key in VG_CORNER_RADIUS) {
+      val configured = view.config.markConfig("bar").fields[key]
+      val own = markUpdate.remove(key)
+      if (own != null) groupUpdate[key] = own
+      else if (configured != null) groupUpdate[key] = obj { put("value", configured) }
+      // A radius the *configuration* put on every bar has already been moved up, so the segments
+      // have to say they have none — Vega would otherwise apply the style block underneath.
+      if (configured != null) markUpdate[key] = obj { put("value", 0) }
+    }
+    for (key in STROKE_PROPERTIES) {
+      val own = markUpdate[key]
+      if (own != null) groupUpdate[key] = own
+      else
+        view.config.markConfig("bar").fields[key]?.let {
+          groupUpdate[key] = obj { put("value", it) }
+        }
+    }
+    if (groupUpdate.containsKey("stroke")) {
+      groupUpdate["strokeForeground"] = obj { put("value", true) }
+      groupUpdate["strokeOffset"] = obj { put("value", 0) }
+    }
+
+    val groupby =
+      stack.groupbyChannels.flatMap { name ->
+        val dimension = view.spec.fieldDef(name) ?: return@flatMap emptyList()
+        listOfNotNull(
+          Fields.vgField(dimension),
+          if (dimension.bin != null || dimension.timeUnit != null)
+            Fields.vgField(dimension, suffix = "end")
+          else null,
+        )
+      }
+
+    // The facet is named after the *output node* rather than the dataset it resolved to — the
+    // name is not a data reference, so the pass that rewrites those leaves it as it was written.
+    val facetName = "stack_group_${view.prefixed("main")}"
+    val inner = obj {
+      mark.fields.forEach { (key, value) ->
+        when (key) {
+          "from" -> put("from", obj { put("data", facetName) })
+          "encode" ->
+            put(
+              "encode",
+              obj {
+                (value as? VegaValue.Obj)?.fields?.forEach { (part, block) ->
+                  if (part == "update") put("update", VegaValue.Obj(markUpdate))
+                  else put(part, block)
+                }
+              },
+            )
+          else -> put(key, value)
+        }
+      }
+    }
+    return obj {
+      put("type", "group")
+      put(
+        "from",
+        obj {
+          put(
+            "facet",
+            obj {
+              put("data", view.markData)
+              put("name", facetName)
+              put("groupby", strings(groupby))
+              put(
+                "aggregate",
+                obj {
+                  put(
+                    "fields",
+                    strings(listOf("${stem}_start", "${stem}_start", "${stem}_end", "${stem}_end")),
+                  )
+                  put("ops", strings(listOf("min", "max", "min", "max")))
+                },
+              )
+            },
+          )
+        },
+      )
+      put("encode", obj { put("update", VegaValue.Obj(groupUpdate)) })
+      put(
+        "marks",
+        arr(
+          listOf(
+            obj {
+              put("type", "group")
+              put("encode", obj { put("update", innerUpdate) })
+              put("marks", arr(listOf(inner)))
+            }
+          )
+        ),
+      )
+    }
   }
 
   private fun withSource(mark: VegaValue.Obj, dataName: String): VegaValue.Obj = obj {
@@ -709,7 +909,9 @@ internal object Marks {
     if (def != null && view.spec.encoding["tooltip"]?.raw?.fields?.isEmpty() != true) {
       if (def.isValueDef) return obj { literalRef(def.value)?.let { (key, it) -> put(key, it) } }
       val defs = listOf(def) + def.siblings
-      if (defs.size > 1) return tooltipObject(view, defs)
+      // A tooltip **written as a list** is the `{title: expression}` object however many entries
+      // it holds — one field written `[{...}]` is titled, and the same field written bare is not.
+      if (defs.size > 1 || def.isList) return tooltipObject(view, defs)
       if (def.isFieldDef) return signalRef(fieldExpression(view, def, separator = "\\n"))
       return null
     }

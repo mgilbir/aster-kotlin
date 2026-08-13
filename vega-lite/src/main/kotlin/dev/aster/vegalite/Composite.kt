@@ -23,6 +23,62 @@ internal class Composite(
 ) {
 
   /**
+   * `extractTransformsFromEncoding`, for the buckets: a **time unit** on a channel of a composite
+   * mark becomes a transform of its own, and the channel is rewritten to read what it wrote.
+   *
+   * The summary happens *after* the bucketing — one interval per bucket, not one per instant — so
+   * the unit cannot stay on the channel, where it would be applied to a column the aggregate has
+   * already collapsed. A channel that is not itself temporal is told to read the column it now
+   * holds as a *time*, since nothing about an ordinal band would otherwise say so.
+   */
+  private fun extractTimeUnits(
+    shared: Map<String, VegaValue>
+  ): Pair<List<VegaValue>, Map<String, VegaValue>> {
+    val transforms = mutableListOf<VegaValue>()
+    val rewritten = LinkedHashMap<String, VegaValue>()
+    for ((channel, value) in shared) {
+      val entry = value as? VegaValue.Obj
+      val unit = entry?.string("timeUnit")
+      val field = entry?.string("field")
+      if (entry == null || unit == null || field == null || Fields.isBinnedTimeUnit(unit)) {
+        rewritten[channel] = value
+        continue
+      }
+      val name = Fields.varName("${unit}_$field")
+      transforms += obj {
+        put("timeUnit", unit)
+        put("field", field)
+        put("as", name)
+      }
+      // A column with a time unit and no stated type is an instant — that is the type Vega-Lite
+      // infers for one, and the rewritten channel has to say so, the unit no longer being there to
+      // imply it.
+      val temporal = entry.string("type") == null || entry.string("type") == "temporal"
+      rewritten[channel] = obj {
+        if (entry.fields["title"] == null) {
+          put("title", "$field (${Fields.timeUnitParts(unit).joinToString("-")})")
+        }
+        entry.fields.forEach { (key, own) ->
+          if (key != "timeUnit" && key != "field") put(key, own)
+        }
+        if (entry.string("type") == null) put("type", "temporal")
+        put("field", name)
+        if (!temporal) {
+          val guide = if (channel == "x" || channel == "y") "axis" else "legend"
+          put(
+            guide,
+            obj {
+              put("formatType", "time")
+              entry.obj(guide)?.fields?.forEach { (key, own) -> put(key, own) }
+            },
+          )
+        }
+      }
+    }
+    return transforms to rewritten
+  }
+
+  /**
    * What a composite mark's summary is grouped by — `extractTransformsFromEncoding`.
    *
    * Every channel that is not the continuous axis contributes its field, and a field named on two
@@ -90,13 +146,16 @@ internal class Composite(
 
     // Everything but the continuous axis is carried by every part, and it is also what the summary
     // is grouped by: one interval per category, per colour, per detail.
-    val shared =
-      encoding.fields.filterKeys { it != continuous && it != "${continuous}2" && it != "size" }
+    val (units, shared) =
+      extractTimeUnits(
+        encoding.fields.filterKeys { it != continuous && it != "${continuous}2" && it != "size" }
+      )
     val groupby = groupbyOf(shared)
 
     val outer = VegaValue.Obj(unit.fields.filterKeys { it != "mark" && it != "encoding" })
     val transform =
       (unit.array("transform") ?: emptyList()) +
+        units +
         obj {
           put(
             "aggregate",
@@ -747,9 +806,15 @@ internal class Composite(
     for ((_, value) in shared) {
       val def = value as? VegaValue.Obj ?: continue
       if (def.string("field") == null) continue
+      // `toStringFieldDef` keeps the definition and only settles its type, so a channel that says
+      // what it is called says it in the tooltip too — a bucketed column reads `Year (year)`
+      // rather than the `year_Year` the transform wrote.
       entries += obj {
         put("field", def.string("field"))
         put("type", def.string("type") ?: "nominal")
+        def.fields["title"]?.let { put("title", it) }
+        def.fields["format"]?.let { put("format", it) }
+        def.fields["formatType"]?.let { put("formatType", it) }
       }
     }
     return arr(entries)

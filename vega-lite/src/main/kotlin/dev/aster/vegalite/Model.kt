@@ -71,6 +71,14 @@ internal data class ChannelDef(
    * the same function and only prepends the test (`compile/mark/encode/conditional.ts`).
    */
   val conditions: List<ChannelDef> = emptyList(),
+  /**
+   * Whether the channel was written as a **list**, however many entries it held.
+   *
+   * It is the writing that decides a tooltip's shape, not the count: `[{"field": "a"}]` builds the
+   * `{title: expression}` object a multi-field tooltip does, where the same definition written bare
+   * builds the expression alone. One entry is where the two spellings disagree.
+   */
+  val isList: Boolean = false,
   /** The expression this definition is gated on, when it is one of a channel's [conditions]. */
   val test: String? = null,
   /**
