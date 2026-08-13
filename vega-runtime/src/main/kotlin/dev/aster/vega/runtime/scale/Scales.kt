@@ -696,6 +696,16 @@ public sealed interface BinnedScale : VegaScale {
     get() = listOf(Double.NEGATIVE_INFINITY) + thresholds
 
   /**
+   * What bounds the **last** bucket from above, upstream's `values.max`.
+   *
+   * Infinite for three of the four, because nothing bounds them: a quantize, quantile or threshold
+   * scale's topmost bucket runs on for ever, and a legend that labels its swatches by range says "≥
+   * 75" rather than naming an end. A bin scale is the exception — its bins have a last edge.
+   */
+  public val legendMax: Double
+    get() = Double.POSITIVE_INFINITY
+
+  /**
    * Where a value sits along the legend's bar, in `0..1`.
    *
    * Measured against the scale's **input** extent rather than its cut points, so the bands are as
@@ -883,6 +893,10 @@ public class BinOrdinalScale(
   /** The bin edges are the labels, and the last one bounds rather than opens a bucket. */
   override val legendValues: List<Double>
     get() = domain.dropLast(1)
+
+  /** That last edge, which is what a range label ends with instead of running to infinity. */
+  override val legendMax: Double
+    get() = domain.lastOrNull() ?: Double.POSITIVE_INFINITY
 
   override val legendExtent: Pair<Double, Double>
     get() = (domain.firstOrNull() ?: 0.0) to (domain.lastOrNull() ?: 1.0)

@@ -1271,17 +1271,34 @@ internal class LegendBuilder(
       // rects of `gradientLength / buckets` each, bottom upwards, with the labels sitting at the
       // boundaries between them. This draws ordinary symbol swatches instead, which shows the right
       // colours against the right cut points but is not the same picture, so it is reported.
+      // A discretizing scale asked for as **symbols** rather than as the stacked bar it defaults
+      // to. The swatches are one per bucket as they are anywhere, and what makes them readable is
+      // the label: upstream names the *interval* each colour stands for — "< 25", "25 – 50",
+      // "≥ 75" — because a swatch labelled "25" alone does not say which side of 25 it is. This had
+      // been labelling each bucket with its lower edge and reporting that the whole legend was an
+      // approximation, which was two mistakes: the drawing was right, and the labels were the part
+      // that was wrong.
       is BinnedScale -> {
-        diagnostics.warn(
-          DiagnosticCodes.SCALE_UNSUPPORTED_TYPE,
-          "A legend for a '${scaleName}' discretizing scale is drawn upstream as a stacked colour " +
-            "bar; this draws symbol swatches with the same colours and cut points instead",
-          operator = scaleName,
-        )
-        val decimals = decimalsFor(scale.thresholds)
+        val number = bandLabeller(spec, scale, scaleName)
+        val values = scale.legendValues
         scale.bucketRepresentatives.mapIndexed { index, value ->
-          val label = scale.thresholds.getOrNull(index - 1)
-          Entry(VegaValue.Num(value), label?.let { formatTickLabel(it, decimals) } ?: "")
+          // `bandLabeller` writes nothing for the first band, where the bar's own label would bound
+          // nothing; a range label needs the number itself, so it is asked for the *next* index.
+          val low = values.getOrNull(index)?.takeIf { it.isFinite() }?.let { number(1, it) }
+          val high =
+            (values.getOrNull(index + 1) ?: scale.legendMax)
+              .takeIf { it.isFinite() }
+              ?.let {
+                number(1, it)
+              }
+          val label =
+            when {
+              low != null && high != null -> "$low \u2013 $high"
+              high != null -> "< $high"
+              low != null -> "\u2265 $low"
+              else -> ""
+            }
+          Entry(VegaValue.Num(value), label)
         }
       }
     }

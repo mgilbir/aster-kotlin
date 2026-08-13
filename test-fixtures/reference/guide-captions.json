@@ -1105,6 +1105,31 @@
   "caption": "Symbol legend for fill color with 5 values: aa, bb, cc, dd, ee"
  },
  {
+  "fixture": "legend-discretizing",
+  "kind": "axis",
+  "caption": "X-axis for a linear scale with values from 0 to 100"
+ },
+ {
+  "fixture": "legend-discretizing",
+  "kind": "legend",
+  "caption": "Discrete legend titled 'quantize' for fill color with 3 boundaries: 25, 50, 75"
+ },
+ {
+  "fixture": "legend-discretizing",
+  "kind": "legend",
+  "caption": "Discrete legend titled 'quantile' for fill color with 2 boundaries: 14, 41"
+ },
+ {
+  "fixture": "legend-discretizing",
+  "kind": "legend",
+  "caption": "Discrete legend titled 'threshold' for fill color with 2 boundaries: 20, 60"
+ },
+ {
+  "fixture": "legend-discretizing",
+  "kind": "legend",
+  "caption": "Symbol legend titled 'as symbols' for fill color with 3 boundaries: 25, 50, 75"
+ },
+ {
   "fixture": "legend-format-type",
   "kind": "axis",
   "caption": "X-axis for a utc scale with values from 15 January to 16 October"

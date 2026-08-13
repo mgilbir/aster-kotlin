@@ -148,6 +148,7 @@ scale output:
 | `axis-discretizing` | 89 | an axis on each of the four discretizing scales, whose ranges are steps rather than colours |
 | `scope-shadowing` | 11 | a group redeclaring a signal and a scale the outer scope already has, and an inner group shadowing the shadow |
 | `timeunit-dst-scale` | 37 | hourly readings bucketed by local and by UTC hours across the spring change, ticked by a two-hour interval |
+| `legend-discretizing` | 71 | the stacked colour bar each discretizing scale is legended as, and the same scale asked for as symbols labelled by range |
 
 The gate is wired into `./scripts/oracle.sh`, so every further scale, mark and transform is built
 against a harness that can say we are wrong — which golden tests cannot.
@@ -206,7 +207,7 @@ substantive compatibility items:
 | 6. View and Compose APIs | Yes |
 | 7. SVG, PNG, PDF export | Yes |
 | 8. TalkBack can describe and navigate | Partial — virtual nodes are tested by instrumentation, not with TalkBack itself |
-| 9. At least 100 compatibility fixtures pass | **Yes** — 162 |
+| 9. At least 100 compatibility fixtures pass | **Yes** — 163 |
 | 10. Core runtime has no Android dependency | Yes |
 | 11. Renders without WebView | Yes |
 | 12. Build and test loop runs from the terminal | Yes |
