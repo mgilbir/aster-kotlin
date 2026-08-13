@@ -342,7 +342,10 @@ internal class DataPipeline(
           offsettedRect = channel?.let { offsettedRectFormulas(def, it) }.orEmpty(),
         )
       }
-    return if (units.isEmpty()) null else TimeUnitNode(units)
+    // Two channels bucketing one column the same way are one bucket: an x and a tooltip over
+    // `yearmonthdate(date)` write the same column, and writing it twice is the same transform
+    // emitted twice. `TimeUnitNode`'s components are a set upstream, keyed by what they produce.
+    return if (units.isEmpty()) null else TimeUnitNode(units.distinctBy { it.output })
   }
 
   /**
