@@ -359,7 +359,32 @@ private class Compilation(
           .flatMap {
             it.inputSignals(it.owner ?: views.firstOrNull())
           } +
-        selections.distinctBy { it.name }.map { it.resolveSignal() } +
+        selections
+          .distinctBy { it.name }
+          .map { selection ->
+            // A selection **bound to the scales** in a chart of several views is resolved from the
+            // signals its plot pushes outward rather than from its store: `vlSelectionResolve`
+            // knows
+            // nothing about bound scales, so upstream reassembles the state by hand from the
+            // per-channel signals — and those are declared here, empty, for the plot to push into.
+            val bound = boundOutward(selection, views)
+            if (bound.isEmpty()) selection.resolveSignal()
+            else
+              obj {
+                put("name", selection.name)
+                put(
+                  "update",
+                  "{" +
+                    bound.joinToString(", ") { (field, signal) -> "${quoted(field)}: $signal" } +
+                    "}",
+                )
+              }
+          } +
+        selections
+          .distinctBy { it.name }
+          .flatMap { selection ->
+            boundOutward(selection, views).map { (_, signal) -> obj { put("name", signal) } }
+          } +
         Params.signals(spec, diagnostics) +
         // A concatenation writes each selection's machinery inside the plot that declared it,
         // where the marks it reacts to are; everything else is one plot, so it stays here.
@@ -411,11 +436,13 @@ private class Compilation(
       put(
         "data",
         arr(
+          // The **last** child's stores come first: `assembleSelectionData` folds the children in
+          // order and each prepends its own, so a chart whose second plot declares a selection has
+          // that selection's store at the head. Within one view the order is the declaration's.
           selections
             .distinctBy { it.name }
-            .map {
-              it.storeData(it.owner ?: views.firstOrNull(), it.initial)
-            } + data
+            .sortedByDescending { views.indexOf(it.owner) }
+            .map { it.storeData(it.owner ?: views.firstOrNull(), it.initial) } + data
         ),
       )
       if (sizeSignals.isNotEmpty()) put("signals", arr(sizeSignals))
@@ -534,6 +561,24 @@ private class Compilation(
       if (types.any { one -> types.any { !Scales.compatible(one, it) } }) {
         incompatibleChannels += entries.first().first
       }
+    }
+  }
+
+  /**
+   * The per-channel signals a scale-bound selection pushes out of its plot, where it is in one.
+   *
+   * `scales.ts`'s `topLevelSignals`: a chart of several views cannot resolve a bound selection from
+   * its store, because every unit writes a tuple and the state is whichever unit moved last. The
+   * signals themselves carry it instead, declared at the top and written from inside.
+   */
+  private fun boundOutward(
+    selection: Selection,
+    views: List<UnitView>,
+  ): List<Pair<String, String>> {
+    if (!selection.bindsScales || concat == null) return emptyList()
+    val view = selection.owner ?: views.firstOrNull() ?: return emptyList()
+    return selection.intervalChannels(view).map { (_, field) ->
+      field to Fields.varName("${selection.name}_$field")
     }
   }
 
@@ -936,7 +981,22 @@ private class Compilation(
       )
       val local =
         localSizeSignals(plot) +
-          selections.filter { it.owner in plot.views }.flatMap { machinery(it, plot.views) }
+          selections
+            .filter { it.owner in plot.views }
+            .flatMap { selection ->
+              val pushed = boundOutward(selection, plot.views).map { it.second }.toSet()
+              machinery(selection, plot.views).map { signal ->
+                // A signal the top level declares is *written* here and read there — `push:
+                // "outer"`
+                // is how Vega says which of the two directions this one goes.
+                if ((signal as? VegaValue.Obj)?.string("name") !in pushed) signal
+                else
+                  obj {
+                    (signal as VegaValue.Obj).fields.forEach { (key, value) -> put(key, value) }
+                    put("push", "outer")
+                  }
+              }
+            }
       if (local.isNotEmpty()) put("signals", arr(local))
       put("marks", arr(brushed(plot.views, plot.views.flatMap { Marks.marks(it) })))
       if (plot.axes.isNotEmpty()) put("axes", arr(plot.axes))

@@ -687,7 +687,7 @@ no data is needed to compare two compilers. So every one of them was compiled by
 by this one, and the outputs compared property by property. That is a *measurement*, not a gate: the
 examples are not fixtures here, and nothing about them is checked in.
 
-**124 of 627 matched exactly** at the start, and **509** do now. 16 were refused by name, and of those 8 are geographic,
+**124 of 627 matched exactly** at the start, and **510** do now. 16 were refused by name, and of those 8 are geographic,
 3 are a facet inside a facet, 2 a repeat inside a concatenation, and 2 are the `trail` mark — which
 this runtime draws and this compiler had simply not been told about.
 
@@ -2274,6 +2274,19 @@ runtime already had a Delaunay triangulation and a voronoi transform, and it was
 coordinates as *field names*: Vega-Lite writes them as expressions, `{"expr": "datum.datum.x || 0"}`,
 because the points are mark items and the coordinate wanted is the one the encoding resolved. Every
 cell came out without coordinates, so the diagram was empty and the overlay drew nothing.
+
+### A bound scale in a chart of several views cannot be resolved from its store
+
+`vlSelectionResolve` knows nothing about bound scales, and in a chart of several views that matters:
+every unit writes a tuple to the store and the state is whichever unit moved last, which the store
+cannot say. So upstream reassembles it from the **signals** instead — the per-channel data signals
+are declared at the top level, empty, the plot's own copies are marked `push: "outer"` to write into
+them, and the selection's named signal becomes `{"Displacement": grid_Displacement, …}` rather than
+a resolve call.
+
+One ordering fell out beside it. A chart's stores are emitted with the **last** child's first:
+`assembleSelectionData` folds the children in order and each prepends its own, so a concatenation
+whose second plot declares a selection has that selection's store at the head of the data list.
 
 ### A jitter is not a lane, and a cell explains what it covers
 
