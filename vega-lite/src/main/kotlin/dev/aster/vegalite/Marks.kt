@@ -369,6 +369,9 @@ internal object Marks {
       // is what keeps a line inside its declared domain instead of running off the plot.
       view.markDef.raw.fields["clip"]?.let { put("clip", it) }
       put("style", strings(styles(view)))
+      // `interactiveFlag`: a chart with a selection in it has to let the pointer reach its marks.
+      // Without a selection anywhere, the property is left off entirely rather than written false.
+      if (view.selections.isNotEmpty()) put("interactive", VegaValue.Bool(true))
       if (view.markDef.raw.fields["aria"] == VegaValue.Bool(false)) {
         put("aria", VegaValue.Bool(false))
       }
@@ -563,6 +566,11 @@ internal object Marks {
 
   /** `baseEncodeEntry`: the properties every mark shares, in upstream's order. */
   private fun baseEncode(view: UnitView): VegaValue.Obj = obj {
+    // A mark a reader can *click* says so with the pointer: upstream sets the cursor for any point
+    // selection that is not bound to an input, a bound one being driven from the widget instead.
+    if (view.selections.any { it.showsPointer }) {
+      put("cursor", obj { put("value", "pointer") })
+    }
     putAll(markDefProperties(view))
     putAll(colorEncode(view))
     putAll(nonPosition(view, "opacity", "opacity"))
@@ -981,7 +989,9 @@ internal object Marks {
       if (channel == "description") continue
       // Every entry of a channel written as a list, not only the first: a tooltip naming three
       // fields describes three, and the mark's spoken description names the same three.
-      for (def in listOf(first) + first.siblings) {
+      // A channel's **conditions** are announced too: a colour written entirely as a condition on
+      // a selection still names a field, and it is the only place that field appears.
+      for (def in listOf(first) + first.siblings + first.conditions) {
         if (!def.isFieldDef) continue
         // A pre-binned column is announced as the *span* it covers, and the channel naming the far
         // edge is then not announced separately — upstream's `toSkip`. Without it a bar over a bin

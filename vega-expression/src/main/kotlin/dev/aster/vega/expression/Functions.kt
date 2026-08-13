@@ -102,9 +102,6 @@ public object Functions {
         "a tuple is a row carrying the dataflow's own identity, which this engine does not attach; " +
           "upstream answers true for a row from a dataset and false for an object literal, and " +
           "there is nothing here to tell the two apart",
-      "vlSelectionTest" to "selection helpers require the signal and selection subsystems",
-      "vlSelectionResolve" to "selection helpers require the signal and selection subsystems",
-      "vlSelectionIdTest" to "selection helpers require the signal and selection subsystems",
       "vlSelectionTuples" to "selection helpers require the signal and selection subsystems",
       "copy" to "copying a scale needs the scale itself as a value, which is not one here",
       "gradient" to "gradients cannot be produced from an expression yet",

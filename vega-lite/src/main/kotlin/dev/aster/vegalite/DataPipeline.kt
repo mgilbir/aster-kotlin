@@ -16,6 +16,14 @@ internal class DataPipeline(
   private val diagnostics: DiagnosticCollector,
   /** Registers a `lookup`'s second dataset and answers with the name it was given. */
   private val registerLookup: ((VegaValue) -> String)? = null,
+  /**
+   * Whether a selection remembers its rows by **identity**, which needs a column to remember.
+   *
+   * `requiresSelectionId`: an `identifier` transform writes `_vgsid_` onto every row at the head of
+   * the flow, and again wherever new rows are *made* — after an aggregate, whose output tuples are
+   * not the rows that went in and so have no identity of their own yet.
+   */
+  private val needsIdentity: Boolean = false,
 ) {
 
   /** The two named points a view exposes: the table before aggregation, and the one marks read. */
@@ -23,6 +31,7 @@ internal class DataPipeline(
 
   fun build(source: SourceNode): Outputs {
     var head: DataNode = source
+    if (needsIdentity) head = head.then(identifierNode())
 
     head = userTransforms(head)
     implicitParse()?.let { head = head.then(it) }
@@ -46,7 +55,10 @@ internal class DataPipeline(
         null
       }
 
-    aggregateNode()?.let { head = head.then(it) }
+    aggregateNode()?.let {
+      head = head.then(it)
+      if (needsIdentity) head = head.then(identifierNode())
+    }
     imputeNode()?.let { head = head.then(it) }
     stackNode()?.let { head = head.then(it) }
     filterInvalidNode()?.let { head = head.then(it) }
@@ -55,6 +67,17 @@ internal class DataPipeline(
     head.then(main)
     return Outputs(raw, main)
   }
+
+  /** `IdentifierNode`: the transform that gives every row a `_vgsid_` to be remembered by. */
+  private fun identifierNode(): PassThroughNode =
+    PassThroughNode(
+      listOf(
+        obj {
+          put("type", "identifier")
+          put("as", Selection.SELECTION_ID)
+        }
+      )
+    )
 
   private fun needsRawTable(): Boolean =
     view.scaledChannels().any { (channel, def) ->
@@ -298,7 +321,13 @@ internal class DataPipeline(
    * a grouping.
    */
   private fun aggregateNode(): AggregateNode? {
-    if (view.spec.encoding.values.none { it.aggregate != null }) return null
+    if (
+      view.spec.encoding.values.none { def ->
+        (listOf(def) + def.conditions).any { it.aggregate != null }
+      }
+    ) {
+      return null
+    }
 
     val dimensions = LinkedHashSet<String>()
     val ops = mutableListOf<String>()
@@ -307,7 +336,10 @@ internal class DataPipeline(
 
     // Every field definition, not only the channels' own: a `tooltip` written as a **list** holds
     // several, and one of them may be the only thing asking for an aggregate.
-    val everyDef = view.spec.encoding.values.flatMap { listOf(it) + it.siblings }
+    // A channel's **conditions** hold field definitions of their own, and one may be the only
+    // thing asking for an aggregate: `{"condition": {"param": …, "aggregate": "count"}}` is how a
+    // chart counts the rows a reader picked.
+    val everyDef = view.spec.encoding.values.flatMap { listOf(it) + it.siblings + it.conditions }
     for (def in everyDef) {
       if (!def.isFieldDef) continue
       val aggregate = def.aggregate

@@ -2154,6 +2154,30 @@ cause:
 - **`errorband-single-part` keeps its narrowed form.** Its cause is the path-ordering gap below,
   which is still open.
 
+### Selections, which were the largest thing left unimplemented
+
+A hundred and seven of the gallery's differing examples turn on a **selection parameter**, and it
+was refused by name. It is refused no longer. A selection is a set of rows the reader has picked,
+and Vega has no such construct, so the whole of it compiles: a **store** dataset holding the picked
+tuples, an `identifier` transform giving every row a `_vgsid_` to be remembered by (and another
+after any aggregate, whose output tuples are new rows with no identity yet), the signals that write
+the store as events arrive — `_tuple`, `_tuple_fields`, `_toggle`, `_modify` — the `unit` signal
+each tuple records itself against, and a `vlSelectionResolve` the tests read back.
+
+The reading is what makes it worth compiling for an engine with no interaction loop. A chart whose
+colour is conditional on a selection has to draw something before anything is picked, and what it
+draws is decided by the same expression that decides it after a click: `!length(data("x_store")) ||
+vlSelectionIdTest(...)` — an empty store means *every* row passes. So the three selection helpers
+are implemented in the expression language rather than refused, and they answer honestly: with an
+empty store nothing is picked, which is a real state and not a stand-in.
+
+Two rules beside the machinery, both of which fell out of the fixtures rather than the reading: a
+channel's **conditions** hold field definitions of their own — a colour written entirely as
+`{"condition": {"param": …, "aggregate": "count"}}` is the only thing asking for that aggregate, the
+only thing naming that field in the mark's spoken description, and the only thing the legend can be
+built from. And the pointer becomes a hand over a clickable mark but not over a *hovered* one,
+`on: "pointerover"` being a selection nobody clicks.
+
 ### Two runtime gaps this batch names but does not close
 
 `density`'s fixture is not in the corpus, and `trail`'s draws no legend. Both compile exactly as

@@ -213,7 +213,7 @@ class SignalCompileTest {
     // deliberately-excluded list needs a subsystem rather than an algorithm.
     val compiled =
       compile(
-        spec(encode = """$basePosition, "opacity": {"signal": "vlSelectionTest('s', datum)"}""")
+        spec(encode = """$basePosition, "opacity": {"signal": "vlSelectionTuples('s', datum)"}""")
       )
     val failures =
       compiled.diagnostics.filter { it.code == DiagnosticCodes.EXPRESSION_UNSUPPORTED_FUNCTION }

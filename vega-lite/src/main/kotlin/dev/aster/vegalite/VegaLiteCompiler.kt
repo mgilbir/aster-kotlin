@@ -75,9 +75,12 @@ private class Compilation(
 
   private val config = Config(spec.obj("config") ?: VegaValue.EmptyObject)
 
+  /** The selections this chart declares, which the data, the signals and the marks all read. */
+  private val selections: List<Selection> = Selection.of(spec)
+
   /** Which of a composition's scales and guides its children share, and which they do not. */
   private val resolve = Resolve(spec.obj("resolve"))
-  private val parser = Parse(config, diagnostics)
+  private val parser = Parse(config, diagnostics, selections)
 
   /** `config.facet.spacing` and the gap a header title keeps from its cells. */
   private val FACET_SPACING = 20.0
@@ -108,6 +111,7 @@ private class Compilation(
     if (concat == null) plots.single().views = liftFacet(plots.single().views)
 
     val views = plots.flatMap { it.views }
+    views.forEach { it.selections = selections }
     // A concatenation scales each of its plots separately along the axes and shares everything
     // else — `defaultScaleResolve` — so the position scales are merged within a plot and the rest
     // across the whole chart. That is why two plots side by side have their own `y` but one colour
@@ -168,8 +172,38 @@ private class Compilation(
     // contribute theirs, and a size two levels agree on is named once by each. Vega reads the
     // first and warns about the rest, so the duplicates are not harmless — they are a chart that
     // logs on every render.
+    // `assembleTopLevelSignals`: a chart with any selection in it gets `unit`, which every tuple
+    // records so a picked row can be traced back to the plot it was picked in. It goes **first**,
+    // ahead of the sizes, because upstream unshifts it.
+    val selectionSignals =
+      if (selections.isEmpty()) emptyList()
+      else
+        listOf(
+          obj {
+            put("name", "unit")
+            put("value", VegaValue.EmptyObject)
+            put(
+              "on",
+              arr(
+                listOf(
+                  obj {
+                    put("events", "pointermove")
+                    put("update", "isTuple(group()) ? group() : unit")
+                  }
+                )
+              ),
+            )
+          }
+        )
+    // Upstream's order: the layout's own sizes, then `unit`, then what each selection *resolves*
+    // to — because a variable parameter may read one — then the variables, then the machinery that
+    // writes the stores.
     val sizeSignals =
-      sizeSignalsFor(plotTree).distinctBy { it.string("name") } + Params.signals(spec, diagnostics)
+      sizeSignalsFor(plotTree).distinctBy { it.string("name") } +
+        selectionSignals +
+        selections.map { it.resolveSignal() } +
+        Params.signals(spec, diagnostics) +
+        selections.flatMap { it.signals(unit = "\"\"") }
     val root = plots.first().size!!
     // The facets' own values, which the layout counts and the headers title themselves from — and,
     // for a wrapped facet, only along the directions a shared axis was actually drawn in.
@@ -209,7 +243,9 @@ private class Compilation(
       // it becomes an `encode` on the chart's own group — `background` is the surface, `view.fill`
       // is the paper the marks sit on, and the two are different colours in the same chart.
       viewEncode()?.let { put("encode", it) }
-      put("data", arr(data))
+      // A selection's **store** comes first, ahead of every table: nothing derives from it and
+      // everything reads it, and upstream's assembly puts the selection data at the head.
+      put("data", arr(selections.map { it.storeData() } + data))
       if (sizeSignals.isNotEmpty()) put("signals", arr(sizeSignals))
       // A stated `spacing` is the gap between cells, and it beats the configured twenty.
       facet?.let {
@@ -1027,7 +1063,8 @@ private class Compilation(
     val outputs = views.map { view ->
       val data = view.spec.data!!
       if (data !in order) order += data
-      DataPipeline(view, diagnostics, register).build(roots.getOrPut(data) { SourceNode(data) })
+      DataPipeline(view, diagnostics, register, Selection.needsIdentity(selections))
+        .build(roots.getOrPut(data) { SourceNode(data) })
     }
     // Every view built its own chain onto its source, so a shared tree forks there; the shared
     // parse is hoisted above the fork before the tree is named and flattened.
@@ -1316,8 +1353,10 @@ private class Compilation(
     val explicitlyTitled = mutableSetOf<String>()
     for (view in views) {
       for (channel in Channels.LEGEND_CHANNELS) {
-        val def = view.spec.encoding[channel] ?: continue
-        if (!def.isFieldDef && def.datum == null) continue
+        // The same definition the *scale* was built from, which for a channel written entirely as
+        // a condition is the condition's own: a colour that only exists once a row is picked still
+        // needs a key saying what its colours mean.
+        val def = view.spec.encoding[channel]?.let { view.scaledDef(it) } ?: continue
         val component = view.scaleComponents[channel] ?: continue
         val built = Guides.legend(view, channel, def, component.type) as? VegaValue.Obj ?: continue
         // Keyed by the **field**, not by the scale — `assembleLegends` groups by

@@ -11,7 +11,12 @@ import dev.aster.vega.model.VegaValue
  * channel definition with no `type` gets the one upstream would infer. Everything this compiler
  * does not implement is reported here by name rather than dropped.
  */
-internal class Parse(private val config: Config, private val diagnostics: DiagnosticCollector) {
+internal class Parse(
+  private val config: Config,
+  private val diagnostics: DiagnosticCollector,
+  /** The chart's selections, which a `{"param": …}` condition is a test against. */
+  private val selections: List<Selection> = emptyList(),
+) {
 
   fun unit(spec: VegaValue.Obj, path: String): UnitSpec? {
     val markValue = spec.fields["mark"]
@@ -202,18 +207,27 @@ internal class Parse(private val config: Config, private val diagnostics: Diagno
         )
         return@mapIndexedNotNull null
       }
-      if (obj.fields["param"] != null) {
-        diagnostics.error(
-          VegaLiteDiagnostics.UNSUPPORTED_ENCODING_PROPERTY,
-          "A condition on a selection parameter needs `params`, which are not implemented; this " +
-            "condition is dropped and the unconditional part of the definition is used.",
-          jsonPath = at,
-        )
-        return@mapIndexedNotNull null
-      }
+      // `{"param": "brush"}` — and `{"param": "brush", "empty": false}`, which turns the
+      // before-anything-is-picked case around: an empty store normally means *every* row passes,
+      // and `empty: false` means none does.
+      val parameter = (obj.fields["param"] as? VegaValue.Str)?.value
       val test =
-        Transforms(diagnostics).testExpression(obj.fields["test"], "$at.test")
-          ?: return@mapIndexedNotNull null
+        if (parameter != null) {
+          val selection = selections.firstOrNull { it.name == parameter }
+          if (selection == null) {
+            diagnostics.error(
+              VegaLiteDiagnostics.UNSUPPORTED_ENCODING_PROPERTY,
+              "This condition tests the parameter `$parameter`, which the chart does not declare " +
+                "as a selection; the condition is dropped and the unconditional part is used.",
+              jsonPath = at,
+            )
+            return@mapIndexedNotNull null
+          }
+          selection.test(negated = obj.fields["empty"] == VegaValue.Bool(false))
+        } else {
+          Transforms(diagnostics).testExpression(obj.fields["test"], "$at.test")
+            ?: return@mapIndexedNotNull null
+        }
       channelDef(channel, obj, at)?.copy(test = test)
     }
   }

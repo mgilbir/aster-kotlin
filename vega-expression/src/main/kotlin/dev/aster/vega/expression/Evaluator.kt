@@ -5,6 +5,7 @@ import dev.aster.vega.model.DiagnosticSeverity
 import dev.aster.vega.model.VegaDiagnostic
 import dev.aster.vega.model.VegaValue
 import dev.aster.vega.model.asString
+import dev.aster.vega.model.field
 
 /**
  * Raised when an expression cannot be evaluated: an unknown function, or one this engine does not
@@ -201,6 +202,48 @@ public class Evaluator(
     if (name == "data") {
       val dataset = scope.dataset(evaluate(node.arguments.first(), scope).asString())
       return VegaValue.Arr(dataset)
+    }
+
+    // The three selection helpers, which read a **store** dataset the same way `data` does. With
+    // no interaction loop a store is only ever as full as the specification made it, and that is a
+    // real answer rather than a stand-in: an empty store selects nothing, which is exactly what a
+    // chart shows before its reader has picked anything.
+    if (name == "vlSelectionIdTest" || name == "vlSelectionTest" || name == "vlSelectionResolve") {
+      val store = scope.dataset(evaluate(node.arguments.first(), scope).asString())
+      return when (name) {
+        "vlSelectionIdTest" -> {
+          val datum = evaluate(node.arguments[1], scope)
+          val id = datum.field(SELECTION_ID)
+          VegaValue.Bool(store.any { it.field(SELECTION_ID) == id })
+        }
+        "vlSelectionTest" -> {
+          val datum = evaluate(node.arguments[1], scope)
+          val union =
+            node.arguments.getOrNull(2)?.let { evaluate(it, scope).asString() } != "intersect"
+          val matches = store.map { tuple -> selectionMatches(tuple, datum) }
+          VegaValue.Bool(
+            if (union) matches.any { it } else matches.isNotEmpty() && matches.all { it }
+          )
+        }
+        // What the store resolves to: one entry per projected column, holding every value picked
+        // for it. A scale bound to a selection reads this as its domain, so an empty store leaves
+        // the scale at the domain the data gave it.
+        else -> {
+          val resolved = LinkedHashMap<String, MutableList<VegaValue>>()
+          for (tuple in store) {
+            val fields = (tuple.field("fields") as? VegaValue.Arr)?.values.orEmpty()
+            val values = (tuple.field("values") as? VegaValue.Arr)?.values.orEmpty()
+            fields.forEachIndexed { index, entry ->
+              val field = entry.field("field").asString()
+              val into = resolved.getOrPut(field) { mutableListOf() }
+              values.getOrNull(index)?.let { into += it }
+            }
+          }
+          VegaValue.Obj(
+            LinkedHashMap(resolved.mapValues { (_, values) -> VegaValue.Arr(values) as VegaValue })
+          )
+        }
+      }
     }
 
     // `indata` reaches the datasets the same way `data` does, through the scope, because the
@@ -416,4 +459,44 @@ public class Evaluator(
         message = "Unsupported operator '$operator'",
       )
     )
+}
+
+/** Vega's own name for the row identity an `identifier` transform writes. */
+private const val SELECTION_ID = "_vgsid_"
+
+/**
+ * Whether one stored tuple picks this row — `testPoint` in `vega-selections`.
+ *
+ * A tuple names the columns it was remembered by and the values it remembered for them, and the row
+ * matches when *every* one of them does. `E` is an exact value and `R` a range the value falls
+ * inside, which is how an interval selection remembers a drag rather than a click.
+ */
+private fun selectionMatches(tuple: VegaValue, datum: VegaValue): Boolean {
+  val fields = (tuple.field("fields") as? VegaValue.Arr)?.values.orEmpty()
+  val values = (tuple.field("values") as? VegaValue.Arr)?.values.orEmpty()
+  if (fields.isEmpty()) return false
+  return fields.indices.all { index ->
+    val entry = fields[index]
+    val field = entry.field("field").asString()
+    val kind = entry.field("type").asString()
+    val actual = datum.field(field)
+    val wanted = values.getOrNull(index) ?: return@all false
+    when (kind) {
+      "R",
+      "R-RE" -> {
+        val bounds = (wanted as? VegaValue.Arr)?.values.orEmpty()
+        val low = bounds.getOrNull(0)?.let { JsSemantics.toNumber(it) }
+        val high = bounds.getOrNull(1)?.let { JsSemantics.toNumber(it) }
+        val here = JsSemantics.toNumber(actual)
+        low != null &&
+          high != null &&
+          !here.isNaN() &&
+          here >= minOf(low, high) &&
+          here <= maxOf(low, high)
+      }
+      // A *set* of values, which is what a toggled point selection over one column remembers.
+      "E-RE" -> (wanted as? VegaValue.Arr)?.values?.any { it == actual } ?: (wanted == actual)
+      else -> wanted == actual
+    }
+  }
 }

@@ -75,6 +75,9 @@ internal class UnitView(
    */
   var facetDefs: List<ChannelDef> = emptyList()
 
+  /** The chart's selections, which decide whether this view's marks can be interacted with. */
+  var selections: List<Selection> = emptyList()
+
   /**
    * The signals this view measures itself against.
    *
@@ -169,7 +172,7 @@ internal class UnitView(
    * median tick that is its category's colour unless its box has no height says so conditionally,
    * and reading the unconditional part alone left it with a colour it had no scale to look up.
    */
-  private fun scaledDef(def: ChannelDef): ChannelDef? =
+  fun scaledDef(def: ChannelDef): ChannelDef? =
     when {
       def.isFieldDef || def.datum != null -> def
       else -> def.conditions.firstOrNull { it.isFieldDef || it.datum != null }

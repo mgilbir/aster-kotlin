@@ -32,17 +32,9 @@ internal object Params {
         )
         return@forEachIndexed
       }
-      if (param.has("select")) {
-        diagnostics.error(
-          VegaLiteDiagnostics.UNSUPPORTED_PARAMETER,
-          "The parameter `$name` is a **selection**, which is not implemented: it stands for the " +
-            "rows a reader picked, and needs an interaction loop this engine does not run. The " +
-            "chart still compiles without it. A parameter with a `value` — bound to an input or " +
-            "not — does work, and so does a `filter` or a condition that reads one.",
-          jsonPath = "$.params[$index].select",
-        )
-        return@forEachIndexed
-      }
+      // A **selection** is compiled by `Selection`, into a store, its signals and the tests that
+      // read them. It is not a variable and has no `value` to publish here.
+      if (param.has("select")) return@forEachIndexed
       out += obj {
         put("name", name)
         // `expr` and `value` are alternatives: one is computed from the other parameters and

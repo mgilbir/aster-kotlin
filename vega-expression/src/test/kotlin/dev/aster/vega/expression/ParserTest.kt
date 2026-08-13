@@ -249,7 +249,7 @@ class ParserTest {
     // What is left on the list needs a subsystem rather than an algorithm.
     val failure =
       assertThrows<ExpressionEvaluationException> {
-        compiled("vlSelectionTest('sel', datum)").evaluate(scopeOf())
+        compiled("vlSelectionTuples('sel', datum)").evaluate(scopeOf())
       }
     assertTrue(
       failure.diagnostic.message.contains("selection"),
