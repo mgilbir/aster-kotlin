@@ -414,6 +414,15 @@ guide's `encode` cannot express is named one at a time — a title's `encode.tit
 instance — rather than the whole block being reported as unread. That is where to look next, and
 `UnhandledPropertiesTest` asserts the naming still happens.
 
+**The loudest thing left is a signal in a guide's styling.** `labelFontSize: {"signal": "n"}` works,
+because that property is read through `numberOrSignal`; `labelColor: {"signal": "c"}` does not,
+because the styling block accepts only a literal — and until now it said nothing, so a chart
+colouring its axis from a control drew black labels and looked finished. It is reported now, and
+that is the next thing to *implement*: the fix is to make `GuideStroke`'s string fields carry a
+signal the way `NumberValue` does, and resolve them where the builders already resolve numbers.
+The same applies to a guide `encode` channel valued by a signal rather than a constant, which is
+reported for the same reason.
+
 Run the same subtraction over the *encode* vocabulary and the pattern repeats: several channels
 reported as unimplemented had a property behind them all along, one map entry away in
 `AXIS_ENCODE_PARTS`/`LEGEND_ENCODE_PARTS`. Both maps and both whole-block gaps (`encode.gradient` and

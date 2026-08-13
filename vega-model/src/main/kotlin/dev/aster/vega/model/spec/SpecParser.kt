@@ -1732,11 +1732,11 @@ public class SpecParser {
         (obj.fields["encode"] as? VegaValue.Obj)?.fields.orEmpty().mapValues { (part, block) ->
           parseEncode(block, "$path.encode.$part")
         },
-      labelStyle = obj.guideStroke("label"),
-      tickStyle = obj.guideStroke("tick"),
-      gridStyle = obj.guideStroke("grid"),
-      domainStyle = obj.guideStroke("domain"),
-      titleStyle = obj.guideStroke("title"),
+      labelStyle = obj.guideStroke("label", "Axis", path),
+      tickStyle = obj.guideStroke("tick", "Axis", path),
+      gridStyle = obj.guideStroke("grid", "Axis", path),
+      domainStyle = obj.guideStroke("domain", "Axis", path),
+      titleStyle = obj.guideStroke("title", "Axis", path),
     )
   }
 
@@ -1887,32 +1887,68 @@ public class SpecParser {
    * Upstream spells all five parts the same way — the prefix is the only thing that changes — so
    * they are read the same way rather than five times over.
    */
-  private fun VegaValue.Obj.guideStroke(prefix: String): GuideStroke =
-    GuideStroke(
-      color = fields["${prefix}Color"]?.takeIf { it is VegaValue.Str }?.asString(),
-      width = (fields["${prefix}Width"] as? VegaValue.Num)?.value,
+  /**
+   * The styling block behind one part of a guide: its colour, face, dash and alignment.
+   *
+   * Every one of these is a **constant** here, and a `{"signal": ...}` in any of them is reported
+   * rather than dropped. That report is the point of the `constantOnly` calls below: a
+   * signal-valued `labelFontSize` works, because that property is read through `numberOrSignal`,
+   * while a signal-valued `labelColor` did not and said nothing — a chart colouring its axis from a
+   * control drew black labels and looked finished. The two spellings sit side by side in a
+   * specification, so the difference has to be visible.
+   */
+  private fun VegaValue.Obj.guideStroke(
+    prefix: String,
+    subject: String,
+    path: String,
+  ): GuideStroke {
+    fun constantOnly(suffix: String, shape: String, accept: (VegaValue) -> Boolean): VegaValue? {
+      val value = fields["$prefix$suffix"] ?: return null
+      if (accept(value)) return value
+      diagnostics.warn(
+        DiagnosticCodes.PARSE_UNKNOWN_PROPERTY,
+        "$subject property '$prefix$suffix' is only implemented as $shape; it was ignored",
+        jsonPath = "$path.$prefix$suffix",
+      )
+      return null
+    }
+    val text = { suffix: String ->
+      constantOnly(suffix, "a constant string") { it is VegaValue.Str }
+    }
+    val number = { suffix: String ->
+      (constantOnly(suffix, "a constant number") { it is VegaValue.Num } as? VegaValue.Num)?.value
+    }
+    return GuideStroke(
+      color = text("Color")?.asString(),
+      width = number("Width"),
       dash =
-        (fields["${prefix}Dash"] as? VegaValue.Arr)
+        (constantOnly("Dash", "a constant array") { it is VegaValue.Arr } as? VegaValue.Arr)
           ?.values
           ?.map { it.asDouble() }
           ?.takeIf { values -> values.isNotEmpty() && values.all { it.isFinite() } },
-      dashOffset = (fields["${prefix}DashOffset"] as? VegaValue.Num)?.value,
-      cap = fields["${prefix}Cap"]?.takeIf { it is VegaValue.Str }?.asString(),
-      opacity = (fields["${prefix}Opacity"] as? VegaValue.Num)?.value,
-      font = fields["${prefix}Font"]?.takeIf { it is VegaValue.Str }?.asString(),
-      align = fields["${prefix}Align"]?.takeIf { it is VegaValue.Str }?.asString(),
-      baseline = fields["${prefix}Baseline"]?.takeIf { it is VegaValue.Str }?.asString(),
-      lineHeight = (fields["${prefix}LineHeight"] as? VegaValue.Num)?.value,
+      dashOffset = number("DashOffset"),
+      cap = text("Cap")?.asString(),
+      opacity = number("Opacity"),
+      font = text("Font")?.asString(),
+      align = text("Align")?.asString(),
+      baseline = text("Baseline")?.asString(),
+      lineHeight = number("LineHeight"),
       // Vega accepts either a keyword (`"bold"`) or a number (`700`); both reach the renderer as
       // text, so a number is normalized to its integer spelling rather than kept as a double.
       fontWeight =
-        when (val weight = fields["${prefix}FontWeight"]) {
+        when (
+          val weight =
+            constantOnly("FontWeight", "a constant keyword or number") {
+              it is VegaValue.Str || it is VegaValue.Num
+            }
+        ) {
           is VegaValue.Str -> weight.value
           is VegaValue.Num -> weight.value.takeIf { it.isFinite() }?.toInt()?.toString()
           else -> null
         },
-      fontStyle = fields["${prefix}FontStyle"]?.takeIf { it is VegaValue.Str }?.asString(),
+      fontStyle = text("FontStyle")?.asString(),
     )
+  }
 
   // ---- titles ---------------------------------------------------------------
 
@@ -2215,14 +2251,14 @@ public class SpecParser {
           (obj.fields["encode"] as? VegaValue.Obj)?.fields.orEmpty().mapValues { (part, block) ->
             parseEncode(block, "$path.encode.$part")
           },
-        labelStyle = obj.guideStroke("label"),
-        titleStyle = obj.guideStroke("title"),
+        labelStyle = obj.guideStroke("label", "Legend", path),
+        titleStyle = obj.guideStroke("title", "Legend", path),
         // `symbolStrokeColor`/`symbolStrokeWidth` rather than `symbolColor`/`symbolWidth`, so the
         // shared reader is pointed at the `symbolStroke` prefix and the dash and opacity are picked
         // up separately.
         symbolStyle =
           obj
-            .guideStroke("symbolStroke")
+            .guideStroke("symbolStroke", "Legend", path)
             .copy(
               dash =
                 (obj.fields["symbolDash"] as? VegaValue.Arr)
