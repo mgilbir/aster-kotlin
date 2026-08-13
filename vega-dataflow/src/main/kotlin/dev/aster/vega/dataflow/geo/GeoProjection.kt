@@ -324,6 +324,25 @@ internal class Projection(private var raw: RawProjection) : GeoProjector {
   private var reflectY = 1.0
   private var delta2 = 0.5
 
+  /**
+   * `geoIdentity`: coordinates already on the page rather than on a globe.
+   *
+   * Two differences, and both matter. There is **no spherical clipping** — a ring that would
+   * enclose a pole on a globe is just a ring here, and putting a five-sided polygon through the
+   * antimeridian clip made it measure as the whole world. And the vertical axis is **not flipped**:
+   * a map projection negates `y` so that north is up, where an identity projection leaves the
+   * coordinates as the data wrote them.
+   *
+   * Everything else — the scale, the translation, the reflections, the plane rotation, `clipExtent`
+   * and `fitExtent` — is shared, which is why this is a flag rather than a second class.
+   */
+  var planar: Boolean = false
+    set(value) {
+      field = value
+      if (value) preclip = { it }
+      recenter()
+    }
+
   private var preclip: (GeoStream) -> GeoStream = ClipAntimeridian::stream
   private var postclip: ((GeoStream) -> GeoStream)? = null
 
@@ -597,8 +616,11 @@ internal class Projection(private var raw: RawProjection) : GeoProjector {
     sy: Double,
     alpha: Double,
   ): (Double, Double) -> DoubleArray {
+    // A planar projection adds where a spherical one subtracts: `geoIdentity` is `k * y + ty` and
+    // `geoProjection` is `ty - k * y`, because only the second is trying to put north at the top.
+    val flip = if (planar) -1.0 else 1.0
     if (alpha == 0.0) {
-      return { x, y -> doubleArrayOf(dx + k * (x * sx), dy - k * (y * sy)) }
+      return { x, y -> doubleArrayOf(dx + k * (x * sx), dy - flip * k * (y * sy)) }
     }
     val cosAlpha = cos(alpha)
     val sinAlpha = sin(alpha)
@@ -607,7 +629,7 @@ internal class Projection(private var raw: RawProjection) : GeoProjector {
     return { x, y ->
       val px = x * sx
       val py = y * sy
-      doubleArrayOf(a * px - b * py + dx, dy - b * px - a * py)
+      doubleArrayOf(a * px - b * py + dx, dy - flip * (b * px + a * py))
     }
   }
 
@@ -638,6 +660,20 @@ internal object RawProjections {
 
   val equirectangular =
     invertible({ lambda, phi -> doubleArrayOf(lambda, phi) }, { x, y -> doubleArrayOf(x, y) })
+
+  /**
+   * The **planar** identity, for `geoIdentity`: coordinates that are already on the page.
+   *
+   * Divides by `RADIANS` because the wrapper multiplied by it. The two cancel, so a point reaches
+   * the scale-and-translate stage exactly as the data wrote it — which is what makes this the
+   * identity rather than the equirectangular projection, whose raw *is* the identity in radian
+   * space.
+   */
+  val planar =
+    invertible(
+      { lambda, phi -> doubleArrayOf(lambda / RADIANS, phi / RADIANS) },
+      { x, y -> doubleArrayOf(x * RADIANS, y * RADIANS) },
+    )
 
   val orthographic =
     invertible(
@@ -851,6 +887,22 @@ internal object Projections {
     when (name.lowercase()) {
       "mercator" -> Projection(RawProjections.mercator).apply { clipsToOneTurn = true }
       "equirectangular" -> Projection(RawProjections.equirectangular).scale(152.63)
+      // `geoIdentity`: no globe at all. The coordinates are already on the page and only the scale,
+      // the translation and a reflection touch them, which is what a chart drawing a map it has
+      // projected elsewhere — or one whose "geometry" is a floor plan — asks for.
+      //
+      // Built out of the ordinary machinery rather than beside it, by undoing the degree-to-radian
+      // step the wrapper applies: the raw formula divides by `RADIANS` again, so the pair arrives
+      // at
+      // the affine stage unchanged. That gives `clipExtent`, `fitExtent`, `reflect` and the
+      // resampler
+      // for nothing, all of which upstream's identity projection also has. Its defaults are its own
+      // —
+      // scale **1** and translate **[0, 0]**, where every spherical projection here starts at 150
+      // and
+      // the middle of a 960 by 500 page.
+      "identity" ->
+        Projection(RawProjections.planar).apply { planar = true }.scale(1.0).translate(0.0, 0.0)
       "orthographic" ->
         Projection(RawProjections.orthographic).scale(249.5).clipAngle(90 + EPSILON_DEGREES)
       "gnomonic" -> Projection(RawProjections.gnomonic).scale(144.049).clipAngle(60.0)
@@ -906,6 +958,7 @@ internal object Projections {
       "albers",
       "albersUsa",
       "azimuthalEqualArea",
+      "identity",
       "azimuthalEquidistant",
       "conicConformal",
       "conicEqualArea",
