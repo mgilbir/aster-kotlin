@@ -71,7 +71,11 @@ internal class Transforms(
             put("ops", strings(entries.map { it.string("op") ?: "" }))
             put(
               "fields",
-              arr(entries.map { entry -> entry.string("field")?.let(::str) ?: VegaValue.Null }),
+              arr(
+                entries.map { entry ->
+                  entry.string("field")?.let(::str) ?: VegaValue.Null
+                }
+              ),
             )
             // Written whenever the specification *stated* one, empty or not: an empty list and
             // silence are two different statements, and it is the statement that is carried
@@ -93,7 +97,11 @@ internal class Transforms(
             put("ops", strings(entries.map { it.string("op") ?: "" }))
             put(
               "fields",
-              arr(entries.map { entry -> entry.string("field")?.let(::str) ?: VegaValue.Null }),
+              arr(
+                entries.map { entry ->
+                  entry.string("field")?.let(::str) ?: VegaValue.Null
+                }
+              ),
             )
             // Always written, empty or not: `sortParams` builds the pair of lists whether or not
             // there is anything to sort by, and Vega reads a window's four arrays in step with it.
@@ -759,6 +767,8 @@ internal class Transforms(
       arr(
         entries.map { entry ->
           if (entry.string("op") == "count") VegaValue.Null
+          // A column named in a transform is *referenced*, so a dot in its name is escaped: an
+          // unescaped `properties.yield` tells Vega to look one level into `properties`.
           else entry.string("field")?.let(::str) ?: VegaValue.Null
         }
       ),

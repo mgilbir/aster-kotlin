@@ -1804,6 +1804,23 @@ whatever colour the box is — and that means the encoding's colour is withheld 
 state their own, not merely written under them. Colouring the whiskers made them disappear into the
 box they belong to.
 
+### A name the specification wrote, and a name this compiler derived
+
+`test_aggregate_nested` and a fixture built to mirror it disagreed about the same column, and both
+were right. A column an **encoding** aggregate reads is a *reference* this compiler derived, so a
+dot in it is escaped: `properties\.yield`, or Vega looks one level into `properties`. A column named
+in a `transform` the specification wrote is left exactly as the writer wrote it. The rule is not
+about the character, it is about who wrote the string.
+
+Beside it, three that are one line each. `{"expr": …}` on a **mark** property and on a **scale**
+property is a signal, as it already was on a guide — and a signal is a *reference*, so it replaces
+the whole entry rather than sitting inside a `value`. An angle is a turn from zero, so a label the
+specification wrote at minus forty-five degrees is a label at three hundred and fifteen; the two
+draw alike and compare as different numbers, and the normalisation has to happen *after* the
+specification's own block is copied over, not before. And an impute's grouping is
+`[...stackby, ...facetby]` **concatenated**, not merged: a field that is both a series and a facet
+is named twice, where the stack's *sort* names each field once.
+
 ### Two runtime gaps this batch names but does not close
 
 `density`'s fixture is not in the corpus, and `trail`'s draws no legend. Both compile exactly as

@@ -760,7 +760,11 @@ internal object Scales {
     // Anything else the specification stated on the scale passes through untouched.
     user?.fields?.forEach { (key, value) ->
       if (key !in setOf("type", "domain", "range", "scheme", "rangeMin", "rangeMax")) {
-        component.properties[key] = value
+        // `{"expr": …}` is a signal to Vega, which has no `expr` — a `domainRaw` written that way
+        // was read as an object and the scale left at its own domain.
+        val expression = (value as? VegaValue.Obj)?.takeIf { it.fields.keys == setOf("expr") }
+        component.properties[key] =
+          if (expression != null) signalRef(expression.string("expr").orEmpty()) else value
       }
     }
   }

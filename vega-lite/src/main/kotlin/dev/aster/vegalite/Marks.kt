@@ -410,7 +410,12 @@ internal object Marks {
     }
     for ((key, value) in view.markDef.raw.fields) {
       if (key in VL_ONLY_MARK_PROPERTIES) continue
-      put(key, obj { put("value", value) })
+      // `{"expr": …}` is Vega-Lite's way of writing a signal, and Vega's is `{"signal": …}` — and
+      // a signal is a *reference*, not a value, so it replaces the whole entry rather than sitting
+      // inside one.
+      val expression = (value as? VegaValue.Obj)?.takeIf { it.fields.keys == setOf("expr") }
+      if (expression != null) put(key, signalRef(expression.string("expr").orEmpty()))
+      else put(key, obj { put("value", value) })
     }
   }
 

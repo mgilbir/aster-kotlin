@@ -221,7 +221,9 @@ internal object Guides {
       turnedAlign(turned, channel, side)?.let { axis.encodeLabel("align", signalRef(it)) }
       turnedBaseline(turned, channel, side)?.let { axis.encodeLabel("baseline", signalRef(it)) }
     } else if (labelAngle != null) {
-      axis.set("labelAngle", num(labelAngle))
+      // `normalizeAngle`: an angle is a turn from zero, so a label at minus forty-five degrees is
+      // a label at three hundred and fifteen — the two draw alike and compare as different numbers.
+      axis.set("labelAngle", num(((labelAngle % 360) + 360) % 360))
       labelAlign(labelAngle, channel, side)?.let { axis.set("labelAlign", str(it)) }
       labelBaseline(labelAngle, channel, side)?.let { axis.set("labelBaseline", str(it)) }
     }
@@ -282,7 +284,16 @@ internal object Guides {
 
     // `replaceExprRef`: an `{"expr": …}` written on a guide is a *signal* to Vega, which has no
     // `expr`. Passing it through left the property unread and the guide at its default.
-    user?.fields?.forEach { (key, value) -> axis.properties[key] = asSignal(value) }
+    user?.fields?.forEach { (key, value) ->
+      // `normalizeAngle`: a turn is measured from zero, so a label the specification wrote at
+      // minus forty-five degrees is a label at three hundred and fifteen.
+      axis.properties[key] =
+        if (key == "labelAngle") {
+          (value as? VegaValue.Num)?.let { num(((it.value % 360) + 360) % 360) } ?: asSignal(value)
+        } else {
+          asSignal(value)
+        }
+    }
     conditionalToEncode(axis)
 
     // `defaultTickMinStep`: a `d` format asks for whole numbers, so no tick may be closer than one.

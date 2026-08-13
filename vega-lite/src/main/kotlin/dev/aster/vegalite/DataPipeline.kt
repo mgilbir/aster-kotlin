@@ -332,11 +332,14 @@ internal class DataPipeline(
       } else {
         ops += aggregate
         // An `argmin`/`argmax` is taken over the column it *names*, not the one being read.
+        // The column an *encoding* aggregate reads is a **reference**, so a dot in its name is
+        // escaped: an unescaped `properties.yield` tells Vega to look one level into `properties`.
+        // A column named in a `transform` the specification wrote is left as the writer wrote it.
         fields +=
           when {
             aggregate == "count" -> null
             def.argumentField != null -> def.argumentField
-            else -> def.field
+            else -> def.field?.let { Fields.splitAccessPath(it).joinToString("\\.") }
           }
         outputs += Fields.vgField(def, forAs = true)
       }
@@ -467,7 +470,9 @@ internal class DataPipeline(
           Fields.vgField(def, suffix = "end", forAs = true),
         ),
       offset = stack.offset,
-      imputeGroupby = stackBy + view.facetFields.filterNot { it in stackBy },
+      // `[...stackby, ...facetby]` — concatenated, not merged. A field that is both a series and
+      // a facet is named twice, and the two lists are what upstream writes.
+      imputeGroupby = stackBy + view.facetFields,
       imputeKeys =
         if (stack.impute) {
           stack.groupbyChannels.mapNotNull {
