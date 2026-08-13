@@ -75,6 +75,14 @@ internal class UnitView(
    */
   var facetDefs: List<ChannelDef> = emptyList()
 
+  /**
+   * Whether this view's marks are clipped because a selection drives one of its position scales.
+   *
+   * `scaleClip`: a pan or a zoom moves the domain, and the rows that fall outside it are still
+   * drawn — outside the plotting area — unless the mark is clipped.
+   */
+  var clippedByScale: Boolean = false
+
   /** The chart's selections, which decide whether this view's marks can be interacted with. */
   var selections: List<Selection> = emptyList()
 

@@ -73,6 +73,8 @@ internal class Selection(
         "threshold",
       )
 
+    fun isContinuous(type: String?): Boolean = type in CONTINUOUS_DOMAINS
+
     /** Vega's own name for the row identity an `identifier` transform writes. */
     const val SELECTION_ID: String = "_vgsid_"
 
@@ -99,7 +101,10 @@ internal class Selection(
         node.obj("spec")?.let(::walk)
       }
       walk(spec)
-      return found.distinctBy { it.name }
+      // **Not** deduplicated by name: a selection belongs to a unit, and two plots may each declare
+      // one called `hover`. They share a store and a resolve signal, and each still needs its own
+      // machinery in its own group, or only the plot that happened to be walked first reacts.
+      return found
     }
 
     fun from(declared: List<VegaValue>): List<Selection> {
@@ -197,6 +202,36 @@ internal class Selection(
     // drawn and everything reading it already filtered, rather than opening empty and waiting for a
     // drag that has in effect already happened.
     val projected = view?.let { intervalChannels(it) }.orEmpty()
+    // A **point** selection's stated value is a list of rows, each written as a field-to-value
+    // object: the chart opens with those rows already picked, which is a store with them in it.
+    if (type != "interval" && initial != null && fields.isNotEmpty()) {
+      val picked = (initial as? VegaValue.Arr)?.values ?: listOf(initial)
+      put(
+        "values",
+        arr(
+          picked.map { row ->
+            obj {
+              put("unit", owner?.name ?: "")
+              put(
+                "fields",
+                arr(
+                  fields.map {
+                    obj {
+                      put("type", "E")
+                      put("field", it)
+                    }
+                  }
+                ),
+              )
+              put(
+                "values",
+                arr(fields.map { (row as? VegaValue.Obj)?.fields?.get(it) ?: VegaValue.Null }),
+              )
+            }
+          }
+        ),
+      )
+    }
     if (view != null && initial != null && projected.isNotEmpty()) {
       put(
         "values",
@@ -308,7 +343,9 @@ internal class Selection(
     val onBrush = obj {
       put("source", "scope")
       put("type", "pointerdown")
-      put("markname", brush)
+      // A brush is grabbed **on the brush**; a bound scale is grabbed anywhere in the plot, there
+      // being no rectangle to take hold of.
+      if (!bindsScales) put("markname", brush)
     }
     out += obj {
       put("name", "${name}_translate_anchor")
@@ -323,7 +360,11 @@ internal class Selection(
                 "update",
                 "{x: x(unit), y: y(unit)" +
                   projected.joinToString("") { (channel, _) ->
-                    ", extent_$channel: slice(${name}_$channel)"
+                    // A bound scale is panned from its **domain**, a brush from its own pixels.
+                    val extent =
+                      if (bindsScales) "domain(${quoted(view.scale(channel))})"
+                      else "slice(${name}_$channel)"
+                    ", extent_$channel: $extent"
                   } +
                   "}",
               )
@@ -377,7 +418,7 @@ internal class Selection(
       put("source", "scope")
       put("type", "wheel")
       put("consume", VegaValue.Bool(true))
-      put("markname", brush)
+      if (!bindsScales) put("markname", brush)
     }
     out += obj {
       put("name", "${name}_zoom_anchor")
@@ -387,7 +428,18 @@ internal class Selection(
           listOf(
             obj {
               put("events", arr(listOf(onWheel)))
-              put("update", "{x: x(unit), y: y(unit)}")
+              // A zoom holds the point under the pointer still, and for a bound scale that point is
+              // a *value*: it is the domain that changes, so the anchor is in the domain's units.
+              put(
+                "update",
+                if (!bindsScales) "{x: x(unit), y: y(unit)}"
+                else
+                  "{" +
+                    projected.joinToString(", ") { (channel, _) ->
+                      "$channel: invert(${quoted(view.scale(channel))}, $channel(unit))"
+                    } +
+                    "}",
+              )
             }
           )
         ),
@@ -427,6 +479,8 @@ internal class Selection(
 
   /** The two rects a brush is drawn as: the background under the marks, the outline over them. */
   fun brushMarks(view: UnitView, unit: String, background: Boolean): List<VegaValue> {
+    // A selection bound to the scales has no brush: the drag moves the plot, not a rectangle on it.
+    if (bindsScales) return emptyList()
     val projected = intervalChannels(view)
     if (projected.isEmpty()) return emptyList()
     val channels = projected.map { it.first }.toSet()
@@ -671,6 +725,7 @@ internal class Selection(
     val out = mutableListOf<VegaValue>()
     val projected = intervalChannels(view)
     if (projected.isEmpty()) return out
+    if (bindsScales) return boundScaleSignals(view, projected)
     val brush = "${name}_brush"
     val notOnBrush = "!event.item || event.item.mark.name !== ${quoted(brush)}"
 
@@ -853,9 +908,114 @@ internal class Selection(
       else -> "E"
     }
 
+  /**
+   * `scales.ts` — a selection **bound to the scales** pans and zooms the plot instead of brushing.
+   *
+   * There is no rectangle and so no pixel extent: the drag moves the scale's *domain* directly, so
+   * each channel keeps only its data signal and the scale reads it back through `domainRaw`. Which
+   * is why the pan is divided by the plot's size rather than by the brush's span, and why the zoom
+   * anchors at the inverted pointer rather than at the pointer.
+   */
+  private fun boundScaleSignals(
+    view: UnitView,
+    projected: List<Pair<String, String>>,
+  ): List<VegaValue> {
+    val out = mutableListOf<VegaValue>()
+    for ((channel, field) in projected) {
+      val data = "${name}_${Fields.varName(field)}"
+      val size = if (channel == "x") view.widthSignal else view.heightSignal
+      val domain = "domain(${quoted(view.scale(channel))})"
+      val type = view.scaleType(channel)
+      // A pan or a zoom of a *transformed* scale is not a pan or a zoom of its domain: moving a log
+      // axis by a tenth of its width is a factor and not a distance, so Vega has a function each.
+      val panFn =
+        when (type) {
+          "log" -> "panLog"
+          "symlog" -> "panSymlog"
+          "pow",
+          "sqrt" -> "panPow"
+          else -> "panLinear"
+        }
+      val zoomFn =
+        when (type) {
+          "log" -> "zoomLog"
+          "symlog" -> "zoomSymlog"
+          "pow",
+          "sqrt" -> "zoomPow"
+          else -> "zoomLinear"
+        }
+      val argument =
+        when (type) {
+          "pow",
+          "sqrt" -> ", ${exponentOf(view, channel)}"
+          "symlog" -> ", ${constantOf(view, channel)}"
+          else -> ""
+        }
+      // The x sign is negative and the y sign is not: dragging right shows *lower* values, the two
+      // axes running opposite ways in pixels.
+      val sign = if (channel == "x") "-" else ""
+      out += obj {
+        put("name", data)
+        put(
+          "on",
+          arr(
+            listOfNotNull(
+              clear?.let {
+                obj {
+                  put(
+                    "events",
+                    arr(
+                      listOf(
+                        obj {
+                          put("source", "view")
+                          put("type", it)
+                        }
+                      )
+                    ),
+                  )
+                  put("update", "null")
+                }
+              },
+              obj {
+                put("events", obj { put("signal", "${name}_translate_delta") })
+                put(
+                  "update",
+                  "$panFn(${name}_translate_anchor.extent_$channel, " +
+                    "$sign${name}_translate_delta.$channel / $size$argument)",
+                )
+              },
+              obj {
+                put("events", obj { put("signal", "${name}_zoom_delta") })
+                put(
+                  "update",
+                  "$zoomFn($domain, ${name}_zoom_anchor.$channel, ${name}_zoom_delta$argument)",
+                )
+              },
+            )
+          ),
+        )
+      }
+    }
+    return out
+  }
+
+  /** A power scale's exponent, which its pan and its zoom both have to be told. */
+  private fun exponentOf(view: UnitView, channel: String): String {
+    val stated =
+      (view.scaleComponents[channel]?.properties?.get("exponent") as? VegaValue.Num)?.value
+    return canonicalNumberString(stated ?: if (view.scaleType(channel) == "sqrt") 0.5 else 1.0)
+  }
+
+  /** A symlog scale's constant, likewise. */
+  private fun constantOf(view: UnitView, channel: String): String {
+    val stated =
+      (view.scaleComponents[channel]?.properties?.get("constant") as? VegaValue.Num)?.value
+    return canonicalNumberString(stated ?: 1.0)
+  }
+
   /** `hasContinuousDomain`: whether a channel's scale can be inverted to a number. */
   private fun continuous(view: UnitView, channel: String): Boolean =
-    view.scaleType(channel) in CONTINUOUS_DOMAINS
+    isContinuous(view.scaleType(channel))
 
   fun intervalChannels(view: UnitView): List<Pair<String, String>> {
     if (type != "interval") return emptyList()

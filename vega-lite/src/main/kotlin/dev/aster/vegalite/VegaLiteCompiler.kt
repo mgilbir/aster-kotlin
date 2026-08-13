@@ -138,8 +138,12 @@ private class Compilation(
     // named: `brush` in the second plot of a concatenation records `"concat_1"` in every tuple, and
     // draws its brush in that plot rather than across the chart.
     for (view in views) {
-      val declared = Selection.from(view.spec.params).map { it.name }.toSet()
-      selections.filter { it.name in declared && it.owner == null }.forEach { it.owner = view }
+      // One per **name**: two plots that each declare a `hover` contribute one selection each, and
+      // the first unclaimed one of that name is this view's. Claiming every unclaimed match would
+      // give the first plot both and leave the second with nothing to react to.
+      for (name in Selection.from(view.spec.params).map { it.name }) {
+        selections.firstOrNull { it.name == name && it.owner == null }?.owner = view
+      }
     }
     // A concatenation scales each of its plots separately along the axes and shares everything
     // else — `defaultScaleResolve` — so the position scales are merged within a plot and the rest
@@ -167,6 +171,47 @@ private class Compilation(
         LinkedHashMap(
           allScales.filterKeys { name -> plot.views.any { name in it.scaleNames.values } }
         )
+    }
+
+    // A selection **bound to the scales** is read back by the scales it moves: `domainRaw` is the
+    // domain a pan or a zoom has arrived at, and Vega prefers it over the computed one whenever the
+    // signal is not null — which is what makes the plot itself the thing being dragged.
+    for (selection in selections.filter { it.bindsScales }) {
+      val view = selection.owner ?: views.firstOrNull() ?: continue
+      for ((channel, field) in selection.intervalChannels(view)) {
+        val scale = allScales.values.firstOrNull { it.name() == view.scale(channel) } ?: continue
+        // Only a continuous scale can be panned: there is no halfway between two categories.
+        if (!Selection.isContinuous(scale.type)) continue
+        scale.properties["domainRaw"] = signalRef("${selection.name}[${quoted(field)}]")
+      }
+    }
+    // A scale domain may also name a selection outright — `{"domain": {"param": "brush"}}` — which
+    // is one plot deciding another's extent rather than its rows. `parseSelectionExtent`: with no
+    // `field` or `encoding` stated it is the selection's first projection, so a brush on one
+    // channel needs nothing said about which.
+    for (view in views) {
+      for ((channel, def) in view.scaledChannels()) {
+        val stated = def.scale?.obj("domain")?.takeIf { it.has("param") } ?: continue
+        val named = stated.string("param") ?: continue
+        val selection = selections.firstOrNull { it.name == named } ?: continue
+        val projected = selection.intervalChannels(selection.owner ?: view)
+        val field =
+          stated.string("field")
+            ?: stated.string("encoding")?.let { wanted ->
+              projected.firstOrNull { it.first == wanted }?.second
+            }
+            ?: projected.firstOrNull()?.second
+            ?: selection.fields.firstOrNull()
+            ?: continue
+        val scale = view.scaleComponents[channel] ?: continue
+        scale.properties["domainRaw"] = signalRef("$named[${quoted(field)}]")
+        view.clippedByScale = true
+      }
+    }
+    // `scaleClip`: a mark whose position scale is driven by a selection is **clipped**, or a pan
+    // that moves the domain past the data draws the rows that fell outside the plot.
+    for (selection in selections.filter { it.bindsScales }) {
+      (selection.owner ?: views.firstOrNull())?.clippedByScale = true
     }
 
     // The sizes are named before anything reads them, because what a concatenation calls them
@@ -230,7 +275,7 @@ private class Compilation(
     val sizeSignals =
       sizeSignalsFor(plotTree).distinctBy { it.string("name") } +
         selectionSignals +
-        selections.map { it.resolveSignal() } +
+        selections.distinctBy { it.name }.map { it.resolveSignal() } +
         Params.signals(spec, diagnostics) +
         // A concatenation writes each selection's machinery inside the plot that declared it,
         // where the marks it reacts to are; everything else is one plot, so it stays here.
@@ -278,7 +323,13 @@ private class Compilation(
       // everything reads it, and upstream's assembly puts the selection data at the head.
       put(
         "data",
-        arr(selections.map { it.storeData(it.owner ?: views.firstOrNull(), it.initial) } + data),
+        arr(
+          selections
+            .distinctBy { it.name }
+            .map {
+              it.storeData(it.owner ?: views.firstOrNull(), it.initial)
+            } + data
+        ),
       )
       if (sizeSignals.isNotEmpty()) put("signals", arr(sizeSignals))
       // A stated `spacing` is the gap between cells, and it beats the configured twenty.

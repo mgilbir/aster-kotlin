@@ -691,8 +691,10 @@ internal object Guides {
         // A ramp is painted at the mark's own opacity, so a legend beside a chart of translucent
         // points is as translucent as they are — `gradient` in `legend/encode.ts`. Zero and absent
         // both mean "say nothing", since a legend drawn at zero opacity is not a legend.
+        // `gradient` tests the opacity for **truth**, not for absence: a ramp is drawn at full
+        // opacity where the mark is, and only a zero — which would be no ramp at all — is dropped.
         symbolOpacity(view)
-          ?.takeIf { it != 1.0 && it != 0.0 }
+          ?.takeIf { it != 0.0 }
           ?.let { opacity ->
             put(
               "encode",
@@ -785,16 +787,29 @@ internal object Guides {
     }
     val fill = colors["fill"]
     if (fill != null && !(channel == "fill" || (filled && channel == "color"))) {
-      if (scaled(fill)) {
-        fields["fill"] = obj { put("value", "black") }
-        fields["fillOpacity"] = obj { put("value", symbolOpacity(view) ?: 1.0) }
-      } else {
-        fields["fill"] = fill
+      when {
+        // A swatch cannot resolve a *scaled* paint, so it is drawn in the legend's own base colour
+        // at the mark's opacity.
+        fill is VegaValue.Obj && fill.fields.containsKey("field") -> {
+          fields["fill"] = obj { put("value", "black") }
+          fields["fillOpacity"] = obj { put("value", symbolOpacity(view) ?: 1.0) }
+        }
+        // A **conditional** paint is a rule array, and the swatch takes the arm that is a plain
+        // colour: a chart whose points are their category's colour only while picked is grey the
+        // rest of the time, and grey is what the other legend's swatches are.
+        fill is VegaValue.Arr ->
+          firstConditionValue(view, "fill")?.let { fields["fill"] = obj { put("value", it) } }
+        else -> fields["fill"] = fill
       }
     }
     val stroke = colors["stroke"]
     if (stroke != null && !(channel == "stroke" || (!filled && channel == "color"))) {
-      if (!scaled(stroke)) fields["stroke"] = stroke
+      when {
+        stroke is VegaValue.Obj && stroke.fields.containsKey("field") -> Unit
+        stroke is VegaValue.Arr ->
+          firstConditionValue(view, "stroke")?.let { fields["stroke"] = obj { put("value", it) } }
+        else -> fields["stroke"] = stroke
+      }
     }
 
     if (channel != "opacity") {
@@ -815,6 +830,20 @@ internal object Guides {
     }
 
     return if (fields.isEmpty()) null else VegaValue.Obj(fields)
+  }
+
+  /**
+   * `getFirstConditionValue`: the plain colour a conditional paint falls back to.
+   *
+   * The fold starts at the channel's **unconditional** value and keeps the first thing defined, so
+   * a colour written as `{"condition": {"param": …, "field": …}, "value": "grey"}` answers grey —
+   * the arm a swatch can actually be painted in. The channel's own definition is consulted first
+   * and `color` after it, a mark painted by `color` being painted on whichever of the two Vega
+   * names it fills or strokes with.
+   */
+  private fun firstConditionValue(view: UnitView, channel: String): VegaValue? {
+    val def = view.spec.encoding[channel] ?: view.spec.encoding["color"] ?: return null
+    return def.value ?: def.conditions.firstNotNullOfOrNull { it.value }
   }
 
   /** Whether a colour reference reads the data, in which case a swatch cannot resolve it. */

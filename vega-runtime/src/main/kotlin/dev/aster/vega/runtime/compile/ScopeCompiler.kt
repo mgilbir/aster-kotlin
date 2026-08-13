@@ -272,7 +272,15 @@ internal class ScopeCompiler(
         // The items a mark's own transforms produced, not the ones its encoding alone would: a
         // label drawn from a force-directed mark reads the position the simulation settled on.
         exposeItems(transformed.items ?: encoder.items(mark, rows))
-        for (node in built[index].orEmpty()) content = content.union(node.transformedBounds)
+        // `boundMark`: a **clipped** mark reaches no further than the group it is drawn in,
+        // whatever
+        // its items do. A detail plot whose domain is driven by a brush has rows on either side of
+        // that domain, and without this they push the surface out to cover rows nobody can see.
+        val window = RectD(0.0, 0.0, extent.width, extent.height)
+        for (node in built[index].orEmpty()) {
+          val reach = node.transformedBounds
+          content = content.union(if (mark.clip) intersectReach(reach, window) else reach)
+        }
       }
     }
     for (index in paintOrder(marks)) built[index]?.let { children += it }

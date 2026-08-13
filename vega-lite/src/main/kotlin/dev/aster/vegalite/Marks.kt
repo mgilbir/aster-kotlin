@@ -367,7 +367,9 @@ internal object Marks {
       put("type", VG_MARK[mark])
       // `clip` is a Vega mark property, not a Vega-Lite-only one: it goes straight through, and it
       // is what keeps a line inside its declared domain instead of running off the plot.
-      view.markDef.raw.fields["clip"]?.let { put("clip", it) }
+      val clip = view.markDef.raw.fields["clip"]
+      if (clip != null) put("clip", clip)
+      else if (view.clippedByScale) put("clip", VegaValue.Bool(true))
       put("style", strings(styles(view)))
       // `interactiveFlag`: a chart with a selection in it has to let the pointer reach its marks.
       // Without a selection anywhere, the property is left off entirely rather than written false.
@@ -576,7 +578,7 @@ internal object Marks {
   private fun baseEncode(view: UnitView): VegaValue.Obj = obj {
     // A mark a reader can *click* says so with the pointer: upstream sets the cursor for any point
     // selection that is not bound to an input, a bound one being driven from the widget instead.
-    if (view.selections.any { it.showsPointer }) {
+    if (view.selections.any { it.showsPointer && (it.owner == null || it.owner === view) }) {
       put("cursor", obj { put("value", "pointer") })
     }
     putAll(markDefProperties(view))
@@ -591,6 +593,15 @@ internal object Marks {
     // somewhere says so with the pointer, since nothing else about it looks clickable.
     hrefChannel(view)?.let { put("href", it) }
     putAll(aria(view))
+    // `zindex.ts`: an `order` written as a **value** raises the mark rather than sorting it. Only
+    // off a path, where `order` is what the points are threaded in, and only as a value: a field
+    // there is a sort key, and a number that came from a scale is not a stacking order. It is what
+    // draws the picked points on top of the rest, since a selection's condition is a value.
+    if (
+      view.spec.mark !in PATH_MARKS && view.spec.encoding["order"]?.let { it.value != null } == true
+    ) {
+      putAll(nonPosition(view, "order", "zindex"))
+    }
   }
 
   /**

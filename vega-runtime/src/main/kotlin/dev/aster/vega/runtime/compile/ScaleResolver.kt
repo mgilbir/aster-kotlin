@@ -119,7 +119,7 @@ public class ScaleResolver(
       continuousDomain(spec, zeroDefault = spec.bins == null, fallback = listOf(0.0, 1.0))
         ?: return null
     domain = padded(domain, range, spec)
-    if (spec.nice && spec.domainRaw == null) domain = niceOf(domain, spec)
+    if (spec.nice && !rawApplies(spec)) domain = niceOf(domain, spec)
     return LinearScale(
       spec.name,
       domain,
@@ -226,7 +226,7 @@ public class ScaleResolver(
     val domain =
       (continuousDomain(spec, zeroDefault = false, fallback = listOf(0.0, 1.0)) ?: return null)
         .let {
-          if (spec.nice && spec.domainRaw == null) niceOf(it, spec) else it
+          if (spec.nice && !rawApplies(spec)) niceOf(it, spec) else it
         }
     // A **scheme** carries its own interpolator, and `interpolate` does not reach it: upstream
     // hands `scale.interpolator(...)` the scheme's own function, where `interpolate` only ever
@@ -477,7 +477,7 @@ public class ScaleResolver(
         lift = { ln(it * logSign) },
         ground = { logSign * exp(it) },
       )
-    if (spec.nice && spec.domainRaw == null) domain = Ticks.niceLog(domain, base)
+    if (spec.nice && !rawApplies(spec)) domain = Ticks.niceLog(domain, base)
 
     val scale =
       LogScale(spec.name, domain, oriented(range, reversed(spec)), base, spec.clamp, spec.round)
@@ -507,7 +507,7 @@ public class ScaleResolver(
         lift = { signedPow(it, exponent) },
         ground = { signedPow(it, 1 / exponent) },
       )
-    if (spec.nice && spec.domainRaw == null) domain = niceOf(domain, spec)
+    if (spec.nice && !rawApplies(spec)) domain = niceOf(domain, spec)
     return PowScale(
       spec.name,
       domain,
@@ -532,7 +532,7 @@ public class ScaleResolver(
         lift = { sign(it) * ln(1 + abs(it / constant)) },
         ground = { sign(it) * (exp(abs(it)) - 1) * constant },
       )
-    if (spec.nice && spec.domainRaw == null) domain = niceOf(domain, spec)
+    if (spec.nice && !rawApplies(spec)) domain = niceOf(domain, spec)
     return SymlogScale(
       spec.name,
       domain,
@@ -577,11 +577,28 @@ public class ScaleResolver(
    */
   private fun rawDomain(spec: ScaleSpec): List<Double>? {
     val raw = spec.domainRaw ?: return null
+    // A raw domain that resolves to **nothing** is not an empty domain, it is no override at all:
+    // `{"signal": "brush[\"Horsepower\"]"}` is null until a reader drags something, and a chart
+    // that reported an error before its first interaction would be a chart that never drew. Asked
+    // quietly, because the ordinary domain path reports what it cannot resolve and this one must
+    // not.
+    if (raw is DomainSpec.FromSignal) {
+      val resolved = numbers.resolveList(raw.expression, spec.name)
+      if (resolved == null || resolved.size < 2) return null
+    }
     return literalNumbers(raw)
       ?: numericExtent(raw, spec.name)?.let {
         listOf(it.start, it.endInclusive)
       }
   }
+
+  /**
+   * Whether `domainRaw` actually settled the domain, which is what suspends `nice`.
+   *
+   * Not the same question as whether one was *written*: a selection that has picked nothing leaves
+   * the scale to compute its own domain, and a computed domain is rounded outwards as usual.
+   */
+  private fun rawApplies(spec: ScaleSpec): Boolean = (rawDomain(spec)?.size ?: 0) >= 2
 
   private fun continuousDomain(
     spec: ScaleSpec,
@@ -673,7 +690,7 @@ public class ScaleResolver(
       }
     val padded = padded(bounded, range, spec)
     val niced =
-      if (spec.nice && spec.domainRaw == null) {
+      if (spec.nice && !rawApplies(spec)) {
         val (lo, hi) =
           TimeTicks.nice(
             padded.first(),

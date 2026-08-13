@@ -678,7 +678,7 @@ no data is needed to compare two compilers. So every one of them was compiled by
 by this one, and the outputs compared property by property. That is a *measurement*, not a gate: the
 examples are not fixtures here, and nothing about them is checked in.
 
-**124 of 627 matched exactly** at the start, and **428** do now. 16 were refused by name, and of those 8 are geographic,
+**124 of 627 matched exactly** at the start, and **453** do now. 16 were refused by name, and of those 8 are geographic,
 3 are a facet inside a facet, 2 a repeat inside a concatenation, and 2 are the `trail` mark — which
 this runtime draws and this compiler had simply not been told about.
 
@@ -2215,12 +2215,49 @@ it instead drew every row picked until the first click and none of them after it
 A `filter` transform can now name a selection, which is the other half of one plot filtering another;
 `bind` — to `"scales"`, to `"legend"` or to an input element — is still not implemented.
 
+### Dragging the plot itself, and the two ways a selection reaches a scale
+
+A selection **bound to the scales** is not a brush at all. There is no rectangle, so there is no
+pixel extent: each channel keeps only its data signal, the scale reads it back through `domainRaw`,
+and the drag moves the *domain*. Which is why the pan is divided by the plot's size rather than by
+the brush's span, why the zoom anchors at the **inverted** pointer — the point held still is a
+value, not a pixel — and why a log or a power scale gets `panLog`/`zoomPow` with its base or its
+exponent passed along: moving a log axis by a tenth of its width is a factor, not a distance.
+
+A scale domain may also name a selection outright, `{"domain": {"param": "brush"}}`, which is one
+plot deciding another's extent. Two rules there, both upstream's and both counter-intuitive. The
+stated domain does **not** replace the computed one: the selection is assembled to `domainRaw` and
+the data's own domain stays in `domain`, because Vega prefers the raw one only while the selection
+holds something. And `nice` is suppressed by a stated domain only when that domain is an **array** —
+a domain that names a selection is empty until something is picked, so the scale still rounds the
+domain the data gave it outwards.
+
+Both of these make the mark **clipped**: a pan that moves the domain past the data would otherwise
+draw the rows that fell outside the plot. That named a runtime gap of its own — see below.
+
+### Two identical datasets, kept apart on purpose
+
+The clearest single lesson of this batch. Upstream compiles a concatenation whose two plots read the
+same table through the same validity filter into *two identical datasets*, `data_0` and `data_1`,
+and this compiler merged them into one. The merge is not wrong in general — it is what `data_0` is
+for — but the identity is: `FilterInvalidNode`'s hash is over the **field definitions** it was built
+from, `hash(this.filter)`, and not over the expression it emits. Two views that drop the same rows
+for the same columns are still two nodes when their definitions differ, and a detail plot whose `x`
+scale is driven by a brush differs from the overview beside it in exactly that way. Fifteen gallery
+examples turned on it.
+
 ### Two runtime gaps this batch names but does not close
 
 `density`'s fixture is not in the corpus, and `trail`'s draws no legend. Both compile exactly as
 upstream compiles them — the specification comparison covers them — and both are drawn differently
 by *this runtime*:
 
+- **A clipped mark is clipped in its *bounds* and not yet in its drawing.** `boundMark` intersects a
+  clipped mark's reach with the group it is drawn in, and that is now done — a plot whose domain a
+  brush drives no longer sizes its surface to the rows outside that domain. The renderers still draw
+  those rows: `clip` is a property of a group node here, and giving every item one reaches through
+  both renderers and the hit index. The mark comparison passes either way, both engines emitting the
+  same items; the picture differs.
 - **`kde` samples a different grid.** The transform exists and produces a curve; its extent and
   step count do not match upstream's, so the x domain comes out narrower and the axis carries 12
   ticks where upstream has 20.

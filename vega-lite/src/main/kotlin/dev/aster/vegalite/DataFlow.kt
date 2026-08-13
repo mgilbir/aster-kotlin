@@ -86,7 +86,7 @@ internal sealed class DataNode {
   private fun identity(): String? =
     when (this) {
       is ParseNode -> "parse:$parse"
-      is FilterInvalidNode -> "filter-invalid:$expressions"
+      is FilterInvalidNode -> "filter-invalid:$definitions"
       // A time-unit step is merged by `mergeTimeUnits` instead, which keeps a different one.
       is PassThroughNode -> if (timeUnit) null else "transforms:${transforms.map { it.toString() }}"
       is BinNode -> "bin:${transforms()}"
@@ -624,7 +624,18 @@ internal class ImputeNode(
 }
 
 /** Drops rows whose scaled fields are not finite numbers. See `compile/data/filterinvalid.ts`. */
-internal class FilterInvalidNode(val expressions: List<String>) : DataNode() {
+internal class FilterInvalidNode(
+  val expressions: List<String>,
+  /**
+   * The field **definitions** the filter was built from, which is what makes two of these the same.
+   *
+   * Upstream hashes the map it filters by — `hash(this.filter)`, field to the whole channel
+   * definition — and not the expression it emits. So two views that drop the same rows for the same
+   * columns are still two nodes when the definitions differ, which is why a detail plot whose x
+   * scale is driven by a brush gets a dataset of its own rather than sharing the overview's.
+   */
+  val definitions: String = "",
+) : DataNode() {
   fun transform(): VegaValue = obj {
     put("type", "filter")
     put("expr", expressions.joinToString(" && "))

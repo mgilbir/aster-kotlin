@@ -187,6 +187,13 @@ internal object Scales {
       return listOf(arr(widened)) + derived
     }
     def.scale?.fields?.get("domain")?.let { stated ->
+      // `{"domain": {"param": "brush"}}` does not *replace* the domain: `parseSelectionDomain`
+      // records it as the scale's selection extent and the domain stays whatever the data gives,
+      // because the two are assembled to different properties — the computed one to `domain` and
+      // the selection to `domainRaw`, which Vega prefers only while the selection holds something.
+      if (stated is VegaValue.Obj && stated.has("param")) {
+        return domain(view, channel, stripped(def, "domain"), type, dataName)
+      }
       val values = (stated as? VegaValue.Arr)?.values ?: return listOf(stated)
       // `convertDomainIfItIsDateTime`: on a scale that measures **time**, every end of a stated
       // domain becomes the expression that builds the instant, wrapped in `{data: …}` so Vega
@@ -738,9 +745,12 @@ internal object Scales {
     // `nice` rounds a domain outwards to readable bounds, but only where the reader reads bounds:
     // a position axis, with no binning (which already picked its edges), no stated domain, and not
     // a time scale — d3's time ticks already land on calendar boundaries.
+    // A stated domain suppresses it only where it is an **array**: `isArray(specifiedDomain)`. A
+    // domain that names a selection is not a pair of bounds — it is empty until something is
+    // picked — so the scale still rounds the domain the data gave it.
     if (
       def.bin == null &&
-        specifiedDomain == null &&
+        (specifiedDomain == null || (specifiedDomain as? VegaValue.Obj)?.has("param") == true) &&
         channelIsPosition(channel) &&
         type != "time" &&
         type != "utc"

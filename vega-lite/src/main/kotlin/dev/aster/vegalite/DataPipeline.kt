@@ -568,6 +568,9 @@ internal class DataPipeline(
     // reading one column through different buckets leave only the last of them: `d` bucketed by
     // month on x and by hour on y is filtered on the hour alone.
     val byField = LinkedHashMap<String, String>()
+    // Keyed the same way, and holding what upstream's node is *identified* by: the definitions
+    // themselves rather than the expression they compile to.
+    val definitions = LinkedHashMap<String, String>()
     for ((channel, def) in view.spec.encoding) {
       val field = def.field
       if (channel !in Channels.SCALE_CHANNELS || !def.isFieldDef || field == null) continue
@@ -585,6 +588,7 @@ internal class DataPipeline(
       // removed the very rows that answer was written for.
       if (view.config.scaleInvalid(channel) != null) continue
       val accessor = Fields.datumAccess(def)
+      definitions[field] = def.raw.toString()
       byField[field] =
         when (def.type) {
           MeasureType.TEMPORAL ->
@@ -593,7 +597,8 @@ internal class DataPipeline(
         }
     }
     val expressions = byField.values.toList()
-    return if (expressions.isEmpty()) null else FilterInvalidNode(expressions.distinct())
+    return if (expressions.isEmpty()) null
+    else FilterInvalidNode(expressions.distinct(), definitions.toString())
   }
 
   /**
