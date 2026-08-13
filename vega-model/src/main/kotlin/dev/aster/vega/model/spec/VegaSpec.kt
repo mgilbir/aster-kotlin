@@ -811,6 +811,13 @@ public data class AxisSpec(
    */
   val formatExpression: String? = null,
   /**
+   * `formatType` written as a signal, resolved where [formatExpression] is.
+   *
+   * A chart that lets a control switch a column between a count and a date has to switch the
+   * *grammar* the format string is read in as well as the string, and it cannot write either down.
+   */
+  val formatTypeExpression: String? = null,
+  /**
    * `formatType`: which grammar [format] is written in — `number`, `time` or `utc`.
    *
    * It overrides what the scale would have chosen, and that is the point: a `band` scale over
@@ -1153,6 +1160,10 @@ public data class LegendSpec(
    * instants reads as dates: its scale is a colour ramp and knows nothing about time.
    */
   val formatType: String? = null,
+  /** The same written as a signal, resolved in the builder as the format string's own signal is. */
+  val formatTypeExpression: String? = null,
+  /** `format` written as a signal, which is how a chart lets a control choose its own labels. */
+  val formatExpression: String? = null,
   /** A floor on the gap between a gradient legend's labelled values; see the axis's own. */
   val tickMinStep: NumberValue? = null,
   /**

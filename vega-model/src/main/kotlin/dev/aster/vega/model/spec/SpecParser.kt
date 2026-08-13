@@ -1749,6 +1749,8 @@ public class SpecParser {
       formatExpression =
         (obj.fields["format"] as? VegaValue.Obj)?.fields?.get("signal")?.asString(),
       formatType = axisFormatType(obj.fields["formatType"], "$path.formatType"),
+      formatTypeExpression =
+        (obj.fields["formatType"] as? VegaValue.Obj)?.fields?.get("signal")?.asString(),
       // `tickBand` is a shorthand for these three, and it wins: upstream's `tickBand()` reads the
       // others only when it is absent. `"extent"` puts a band scale's ticks on the band edges.
       bandPosition =
@@ -1851,15 +1853,9 @@ public class SpecParser {
       when (value) {
         null -> return null
         is VegaValue.Str -> value.value.lowercase()
-        else -> {
-          diagnostics.error(
-            DiagnosticCodes.PARSE_UNKNOWN_PROPERTY,
-            "A label format type chosen by a signal is not implemented; write one of " +
-              "'number', 'time' or 'utc'",
-            jsonPath = path,
-          )
-          return null
-        }
+        // A signal is read where the format string's own signal is read, in the builder. Null here
+        // means "nothing constant to check", not "ignored".
+        else -> return null
       }
     if (name !in setOf("number", "time", "utc")) {
       diagnostics.error(
@@ -2287,6 +2283,8 @@ public class SpecParser {
           (obj.fields["title"] as? VegaValue.Obj)?.fields?.get("signal")?.asString(),
         values = (obj.fields["values"] as? VegaValue.Arr)?.values,
         format = obj.fields["format"]?.takeIf { it is VegaValue.Str }?.asString(),
+        formatExpression =
+          (obj.fields["format"] as? VegaValue.Obj)?.fields?.get("signal")?.asString(),
         tickCount = obj.numberOrSignal("tickCount", "$path.tickCount"),
         offset = obj.numberOrSignal("offset", "$path.offset"),
         padding = obj.numberOrSignal("padding", "$path.padding"),
@@ -2320,7 +2318,10 @@ public class SpecParser {
           obj.numberOrSignal("gradientStrokeWidth", "$path.gradientStrokeWidth"),
         gradientOpacity = obj.numberOrSignal("gradientOpacity", "$path.gradientOpacity"),
         symbolLimit = obj.numberOrSignal("symbolLimit", "$path.symbolLimit"),
-        formatType = obj.fields["formatType"]?.asString()?.takeIf { it.isNotEmpty() },
+        formatType =
+          (obj.fields["formatType"] as? VegaValue.Str)?.value?.takeIf { it.isNotEmpty() },
+        formatTypeExpression =
+          (obj.fields["formatType"] as? VegaValue.Obj)?.fields?.get("signal")?.asString(),
         tickMinStep = obj.numberOrSignal("tickMinStep", "$path.tickMinStep"),
         aria = obj.fields["aria"]?.asBoolean() ?: true,
         description = obj.fields["description"]?.asString()?.takeIf { it.isNotBlank() },

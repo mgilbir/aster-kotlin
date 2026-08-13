@@ -54,6 +54,9 @@ import dev.aster.vega.scene.transformedBounds
  * and the domain line are excluded, so turning on a grid does not push the title away from the
  * axis.
  */
+/** The three grammars a guide's `format` can be written in, which is upstream's whole list. */
+private val FORMAT_TYPES = setOf("number", "time", "utc")
+
 public class AxisBuilder(
   private val scales: Map<String, VegaScale>,
   /**
@@ -127,6 +130,16 @@ public class AxisBuilder(
     // alternative is resolving the same expression at each of a hundred reads.
     val spec =
       declared.copy(
+        // `formatType` may be chosen by a signal, and it has to be resolved before anything reads
+        // it:
+        // it decides which *grammar* the format string is written in, so a chart switching a column
+        // between a count and a date switches both together.
+        formatType =
+          declared.formatType
+            ?: declared.formatTypeExpression
+              ?.let { numbers.resolveText(it, declared.scale) }
+              ?.lowercase()
+              ?.takeIf { it in FORMAT_TYPES },
         labelStyle = GuideStyle.resolved(declared.labelStyle, numbers, declared.scale),
         tickStyle = GuideStyle.resolved(declared.tickStyle, numbers, declared.scale),
         gridStyle = GuideStyle.resolved(declared.gridStyle, numbers, declared.scale),

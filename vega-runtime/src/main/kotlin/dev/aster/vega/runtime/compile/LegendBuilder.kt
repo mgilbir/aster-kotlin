@@ -30,6 +30,7 @@ import dev.aster.vega.scene.Fill
 import dev.aster.vega.scene.GradientStop
 import dev.aster.vega.scene.GroupNode
 import dev.aster.vega.scene.NodeMetadata
+import dev.aster.vega.scene.PathData
 import dev.aster.vega.scene.RectD
 import dev.aster.vega.scene.RectNode
 import dev.aster.vega.scene.SceneColor
@@ -39,6 +40,7 @@ import dev.aster.vega.scene.SceneNodeIdAllocator
 import dev.aster.vega.scene.ScenePaint
 import dev.aster.vega.scene.SizeD
 import dev.aster.vega.scene.Stroke
+import dev.aster.vega.scene.SvgPath
 import dev.aster.vega.scene.SymbolNode
 import dev.aster.vega.scene.SymbolShape
 import dev.aster.vega.scene.TextAlign
@@ -164,6 +166,17 @@ internal class LegendBuilder(
     // nothing below has to know the difference.
     val spec =
       declared.copy(
+        // As on an axis: a signal may choose the grammar, and it has to be resolved before the
+        // labels
+        // are formatted.
+        format =
+          declared.format ?: declared.formatExpression?.let { numbers.resolveText(it, scaleName) },
+        formatType =
+          declared.formatType
+            ?: declared.formatTypeExpression
+              ?.let { numbers.resolveText(it, scaleName) }
+              ?.lowercase()
+              ?.takeIf { it == "number" || it == "time" || it == "utc" },
         labelStyle = GuideStyle.resolved(declared.labelStyle, numbers, scaleName),
         titleStyle = GuideStyle.resolved(declared.titleStyle, numbers, scaleName),
         symbolStyle = GuideStyle.resolved(declared.symbolStyle, numbers, scaleName),
@@ -408,7 +421,8 @@ internal class LegendBuilder(
     val strokeWidth =
       numbers.resolve(spec.symbolStrokeWidth, scaleName) ?: LegendDefaults.SYMBOL_STROKE_WIDTH
     val declaredSize = numbers.resolve(spec.symbolSize, scaleName) ?: LegendDefaults.SYMBOL_SIZE
-    val shape = symbolShape(spec)
+    val shape = symbolShape(spec) ?: SymbolShape.CIRCLE
+    val outline = symbolOutline(spec)
 
     val sizes = entries.map { symbolSizeFor(spec, it.value, declaredSize) }
     // A `strokeWidth` scale widens the swatch's outline per entry — and upstream's row-height
@@ -461,6 +475,7 @@ internal class LegendBuilder(
           y = centre,
           size = sizes[index],
           shape = shape,
+          customPath = outline,
           fill =
             symbolFill(spec, entry.value)?.let { fill ->
               // `fillOpacity` fades what is inside the swatch and leaves its outline alone, which
@@ -578,7 +593,7 @@ internal class LegendBuilder(
     }
   }
 
-  private fun symbolShape(spec: LegendSpec): SymbolShape {
+  private fun symbolShape(spec: LegendSpec): SymbolShape? {
     val name = spec.symbolType ?: return SymbolShape.CIRCLE
     return when (name.lowercase()) {
       "circle" -> SymbolShape.CIRCLE
@@ -593,15 +608,36 @@ internal class LegendBuilder(
       "stroke" -> SymbolShape.STROKE
       "arrow" -> SymbolShape.ARROW
       "wedge" -> SymbolShape.WEDGE
-      else -> {
-        diagnostics.warn(
-          DiagnosticCodes.PARSE_UNKNOWN_PROPERTY,
-          "Legend symbolType '$name' is not implemented; drawing a circle instead",
-          operator = spec.scale,
-        )
-        SymbolShape.CIRCLE
-      }
+      // Anything that is not one of the twelve names is an **SVG path string**, exactly as it is on
+      // a
+      // mark's `shape` channel: that is how a specification asks for a swatch upstream does not
+      // ship.
+      // The path is parsed by the caller, which is also what decides whether to report it.
+      else -> null
     }
+  }
+
+  /**
+   * A `symbolType` that is a path rather than a name, scaled to the swatch like a mark's shape.
+   *
+   * The same rule as a `symbol` mark's `shape`, and the same reporting: a string that is neither
+   * one of the twelve names nor a path this engine can read draws a circle and says so, rather than
+   * drawing nothing.
+   */
+  private fun symbolOutline(spec: LegendSpec): PathData? {
+    val name = spec.symbolType ?: return null
+    if (symbolShape(spec) != null) return null
+    val parsed = SvgPath.parse(name)
+    if (!parsed.complete || parsed.path.isEmpty) {
+      diagnostics.warn(
+        DiagnosticCodes.PARSE_UNKNOWN_PROPERTY,
+        "Legend symbolType '$name' is neither one of the twelve names nor a path this engine " +
+          "could read; a circle was drawn instead",
+        operator = spec.scale,
+      )
+      return null
+    }
+    return parsed.path
   }
 
   /** A `size` legend takes each swatch's size from the scale; every other legend uses one size. */
