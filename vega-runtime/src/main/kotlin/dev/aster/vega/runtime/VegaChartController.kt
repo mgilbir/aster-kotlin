@@ -10,12 +10,15 @@ import dev.aster.vega.model.DiagnosticSeverity
 import dev.aster.vega.model.VegaDiagnostic
 import dev.aster.vega.model.VegaValue
 import dev.aster.vega.model.spec.EventConfig
+import dev.aster.vega.model.spec.EventStream
 import dev.aster.vega.runtime.compile.CompiledSpec
 import dev.aster.vega.runtime.compile.SpecCompiler
 import dev.aster.vega.runtime.interaction.EventDispatcher
 import dev.aster.vega.runtime.interaction.FiredHandler
 import dev.aster.vega.runtime.interaction.HandlerBinding
 import dev.aster.vega.runtime.interaction.InputEvent as VegaEvent
+import dev.aster.vega.runtime.interaction.ScheduledTask
+import dev.aster.vega.runtime.interaction.Scheduler
 import dev.aster.vega.runtime.interaction.SignalUpdater
 import dev.aster.vega.runtime.load.DataLoader
 import dev.aster.vega.runtime.load.DenyLoader
@@ -105,9 +108,33 @@ public class VegaChartController(
    * URL. Without this seam a host could not opt in at all, whatever the loader could do.
    */
   loader: DataLoader = DenyLoader,
+  /**
+   * How the chart waits, for the two constructs that need to be woken rather than prompted.
+   *
+   * A `debounce` fires after a quiet period and a **timer** stream fires with nothing to prompt it,
+   * so both need a clock the compiler cannot own — see [Scheduler]. Null by default, and then a
+   * debounce fires on every matching event and a timer does not fire at all, both saying so. A host
+   * that wants either passes one whose lifetime it controls, which on Android means the view's.
+   */
+  private val scheduler: Scheduler? = null,
 ) {
 
   private val compiler = SpecCompiler(textEngine, loader)
+
+  /** The debounced handlers waiting, by the signal and delay that identify them. */
+  private val pendingDebounces = mutableMapOf<Pair<String, Double>, ScheduledTask>()
+
+  /** The timer streams running, one per handler that asked for one. */
+  private var timerTasks: List<ScheduledTask> = emptyList()
+
+  /**
+   * What those timers are, so a redraw does not restart them.
+   *
+   * A tick recompiles, and a recompile used to start the timers again — which cancelled the ones
+   * mid-flight, reset the `elapsed` every handler reads, and dropped the ticks that were between
+   * the two. They are left alone unless the specification's timers have actually changed.
+   */
+  private var timerKeys: List<Pair<String, Double>> = emptyList()
 
   /** Serializes compilation, so one text engine is only ever used by one compile at a time. */
   private val compileLock = Mutex()
@@ -264,6 +291,7 @@ public class VegaChartController(
     // compiler's
     // own, since a listener that was refused is exactly the kind of thing a host needs told.
     val listenerDiagnostics = DiagnosticCollector()
+    startTimers(compiled)
     vegaEvents =
       if (bindings.isEmpty()) {
         null
@@ -275,6 +303,7 @@ public class VegaChartController(
           compiled.signals,
           // The embedder's event policy, refused at the listener rather than at the event.
           compiled.spec?.events ?: EventConfig(),
+          deferrable = scheduler != null,
         )
       }
     val diagnostics = compiled.diagnostics + listenerDiagnostics.diagnostics
@@ -383,13 +412,44 @@ public class VegaChartController(
             rootY = rootPoint.y,
           )
         )
-      if (fired.isNotEmpty()) changed += signals.apply(fired, compiled.signals)
+      // A stream carrying a `debounce` is *held* rather than applied: it fires after a quiet
+      // period, so each event cancels the one waiting and starts the wait again — upstream's
+      // `debounce`, which schedules with the latest event and keeps only that one. With no
+      // scheduler in hand nothing is deferred and the dispatcher says so instead.
+      val (deferred, immediate) = fired.partition { it.deferByMillis != null }
+      for (entry in deferred) defer(entry)
+      if (immediate.isNotEmpty()) changed += signals.apply(immediate, compiled.signals)
     }
+    applyFired(changed, compiled)
+  }
+
+  /**
+   * Holds a handler until its stream has been quiet for as long as it asked for.
+   *
+   * Keyed by the signal it sets *and* the delay, so two debounced handlers on one signal wait
+   * independently while a second event on the same one replaces the first — which is the whole
+   * behaviour: a drag that ends produces one update rather than four hundred.
+   */
+  private fun defer(entry: FiredHandler) {
+    val scheduler = this.scheduler ?: return
+    val delay = entry.deferByMillis ?: return
+    val key = entry.signalName to delay
+    pendingDebounces.remove(key)?.cancel()
+    pendingDebounces[key] =
+      scheduler.schedule(delay.toLong(), repeating = false) {
+        pendingDebounces.remove(key)
+        val compiled = lastCompiled ?: return@schedule
+        val changed = LinkedHashSet(signals.apply(listOf(entry), compiled.signals))
+        applyFired(changed, compiled)
+      }
+  }
+
+  /** What every handler ends with: cascade, redraw if anything moved, then say what went wrong. */
+  private fun applyFired(changed: MutableSet<String>, compiled: CompiledSpec) {
     // A handler whose whole effect is `encode(item(), 'select')` changes no signal value: its
-    // update
-    // expression returns the item it was handed, which is the same object as before. So a fresh
-    // overlay is a reason to redraw in its own right, and testing only the signals meant a press
-    // styled nothing.
+    // update expression returns the item it was handed, which is the same object as before. So a
+    // fresh overlay is a reason to redraw in its own right, and testing only the signals meant a
+    // press styled nothing.
     val overlaid = signals.itemEncodes.values.any { it.fresh }
     if (changed.isEmpty() && !overlaid) return
     val cascaded = cascade(changed, compiled) + drainHandlerDiagnostics()
@@ -471,6 +531,84 @@ public class VegaChartController(
       changed += frontier
     }
     return emptyList()
+  }
+
+  /**
+   * Starts a repeating run for every timer stream in the specification, and stops the last lot.
+   *
+   * A timer is not dispatched from an input event: nothing prompts it, which is why it needs the
+   * clock at all. `{"type": "timer", "throttle": 500}` asks for a tick every 500ms, and the event
+   * it fires with carries the two fields upstream's does — the wall-clock `timestamp` and the
+   * `elapsed` since the timer started, which is what an animation reads to know where it is.
+   *
+   * Restarted on every publish because the handlers come from the compile; a specification that no
+   * longer has a timer stops ticking, which is the behaviour a host reloading a chart expects.
+   */
+  private fun startTimers(compiled: CompiledSpec) {
+    val scheduler = this.scheduler
+    if (scheduler == null) {
+      stopTimers()
+      return
+    }
+    val bindings =
+      compiled.spec?.signals.orEmpty().flatMap { signal ->
+        signal.on.flatMap { handler ->
+          handler.streams
+            .filter { it.source == EventStream.SOURCE_TIMER }
+            .map { stream -> HandlerBinding(signal.name, handler) to stream }
+        }
+      }
+    val keys = bindings.map { (binding, stream) -> binding.signalName to (stream.throttle ?: 0.0) }
+    if (keys == timerKeys) return
+    stopTimers()
+    timerKeys = keys
+    if (bindings.isEmpty()) return
+    val started = clock()
+    timerTasks = bindings.map { (binding, stream) ->
+      val interval = (stream.throttle ?: 0.0).coerceAtLeast(1.0)
+      scheduler.schedule(interval.toLong(), repeating = true) {
+        val compiledNow = lastCompiled ?: return@schedule
+        val now = clock()
+        val event =
+          VegaEvent(
+            type = EventStream.SOURCE_TIMER,
+            timestampMillis = now,
+            source = EventStream.SOURCE_TIMER,
+            properties =
+              mapOf(
+                "timestamp" to VegaValue.Num(now.toDouble()),
+                "elapsed" to VegaValue.Num((now - started).toDouble()),
+              ),
+          )
+        val changed =
+          LinkedHashSet(
+            signals.apply(
+              listOf(FiredHandler(binding.signalName, binding.handler, event)),
+              compiledNow.signals,
+            )
+          )
+        applyFired(changed, compiledNow)
+      }
+    }
+  }
+
+  /**
+   * Stops everything waiting: the timers, and any debounced handler that has not fired.
+   *
+   * A host with a scheduler has to call this when the chart goes away — a timer that outlives the
+   * view it draws into is a leak with a repaint attached to it. Harmless without one, and safe to
+   * call twice.
+   */
+  public fun stop() {
+    stopTimers()
+    for (task in pendingDebounces.values) task.cancel()
+    pendingDebounces.clear()
+  }
+
+  private fun stopTimers() {
+    for (task in timerTasks) task.cancel()
+    timerTasks = emptyList()
+    timerKeys = emptyList()
   }
 
   private fun pointOf(event: ChartInputEvent): PointD? =

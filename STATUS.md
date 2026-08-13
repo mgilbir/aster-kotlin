@@ -2124,12 +2124,21 @@ depends on them. Each has a test and a comment; this is the index.
 
 ## Next three tasks
 
-1. **What the interaction system still does not do.** Two things, and they are the same thing: a
-   `debounce` fires on every event instead of after the quiet period, and a **timer** stream never
-   fires at all. Both need something that can wake up later, which the controller does not have. Both
-   are reported by name — the timer only since `config.events` was implemented, because until then it
-   read as a view event of type `timer` that nothing ever raises, so the signal simply never changed
-   and said nothing about why.
+1. **The interaction system is finished, and the last piece is opt-in.** A `debounce` and a timer
+   stream both needed something that can wake up later, which a compiler that is a pure function of
+   its specification has no business owning — so `Scheduler` is handed in, one method, with a
+   coroutine implementation beside it and virtual time in the tests. With one in hand a debounce is
+   upstream's trailing edge exactly and a timer ticks at its interval, carrying the `timestamp` and
+   `elapsed` upstream's timer event carries. With none, nothing changes from before: the debounce
+   fires eagerly, the timer does not fire, and both say so. That default is what keeps a chart
+   comparable against upstream at all.
+
+   What this does **not** do is make an animation verifiable. The differential harness compares the
+   scene upstream reaches after `runAsync`, and for a specification with a timer `runAsync` never
+   returns — so a ticking chart has no reference to be compared against, whatever the engine does
+   with it. The note in HANDOFF.md on `donut-chart-labelled` is still the interesting case: its timer
+   is a bounded loop rather than an animation, and running such a loop to convergence at *compile*
+   time would need no clock and would be comparable.
 
    Two came off this list. A handler sourced on **another signal** now fires and cascades: 79 handlers
    across twenty of Vega's 93 examples use it, which is every pan, zoom and brush in the gallery. And
