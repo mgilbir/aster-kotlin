@@ -1108,7 +1108,14 @@ public class MarkEncoder(
         is ChannelValue.Field -> datum.fieldOf(channel.ref)
         is ChannelValue.Signal -> evaluateExpression(channel.expression, datum) ?: return null
         is ChannelValue.Conditional -> return numberList(selectRule(channel, datum), datum)
-        is ChannelValue.Scaled -> return null
+        // A dash pattern can come from a **scale**, whose range is then a list of lists: an ordinal
+        // scale mapping each series to its own pattern, which is how a chart distinguishes lines
+        // without using colour. Dropped silently until now, so every such line came out solid.
+        is ChannelValue.Scaled -> {
+          val scale = scales[scaleNameOf(channel, datum)] ?: return null
+          val input = scaledInput(channel, datum) ?: return null
+          scale.scale(input)
+        }
         // A dash pattern is a list, and arithmetic on a list is not a thing upstream does either:
         // its generated expression would produce `[4,2]*2`, which is NaN.
         is ChannelValue.Adjusted -> return null

@@ -151,6 +151,7 @@ public class AxisBuilder(
     val labelStyle = GuideStyle.text(spec.labelStyle, fontSize, defaultWeight = 400)
     val labelLimit = numbers.resolve(spec.labelLimit, spec.scale) ?: AxisDefaults.LABEL_LIMIT
     val labelAlong = numbers.resolve(spec.labelOffset, spec.scale) ?: 0.0
+    val flushOffset = numbers.resolve(spec.labelFlushOffset, spec.scale) ?: 0.0
 
     val children = mutableListOf<SceneNode>()
     // Ticks and labels, in paint order, hidden labels included so the mark count does not change
@@ -290,7 +291,22 @@ public class AxisBuilder(
         // `labelOffset` slides the label along the axis — the other direction from `labelPadding`.
         // Applied here rather than where the ticks are generated, because it applies to every scale
         // type and a band scale's own centring is already in `labelPosition`.
-        val along = tick.labelPosition?.plus(labelAlong) ?: Double.NaN
+        // `labelFlushOffset` nudges a flushed label *further* along the axis, away from the end it
+        // was flushed to: the alignment alone puts a first label's left edge on the range's start,
+        // and this pushes it inwards from there. Upstream applies it as a `dx`/`dy` and only when
+        // the corresponding alignment was left to the flush rule to decide — an explicit
+        // `labelAlign` means the label is not being flushed, so there is nothing to nudge.
+        val flushNudge =
+          if (flushed == null || flushOffset == 0.0) {
+            0.0
+          } else if (spec.orient.isVertical) {
+            if (spec.labelBaseline != null) 0.0
+            else if (flushed == FlushEnd.START) -flushOffset else flushOffset
+          } else {
+            if (spec.labelAlign != null) 0.0
+            else if (flushed == FlushEnd.START) -flushOffset else flushOffset
+          }
+        val along = tick.labelPosition?.plus(labelAlong)?.plus(flushNudge) ?: Double.NaN
         val (defaultX, defaultY) =
           when (spec.orient) {
             Orient.BOTTOM -> along to labelOffset

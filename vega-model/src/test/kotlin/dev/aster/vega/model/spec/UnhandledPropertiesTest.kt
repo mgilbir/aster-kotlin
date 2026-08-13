@@ -63,11 +63,15 @@ class UnhandledPropertiesTest {
   }
 
   /**
-   * What remains is one layout property. `symbolFillColor` came off this list once it was
-   * understood to be a *fallback* rather than an override — upstream sets the channel from it and
-   * then overwrites it from the scale, so only a `size` or `shape` legend ever takes the colour —
-   * and `clipHeight` came off because it had been implemented all along and was simply missing from
-   * `LEGEND_CONSUMED`, so it reported a gap that was not there.
+   * Nothing remains: all 72 of upstream's legend properties are read.
+   *
+   * `symbolFillColor` came off this list once it was understood to be a *fallback* rather than an
+   * override — upstream sets the channel from it and then overwrites it from the scale, so only a
+   * `size` or `shape` legend ever takes the colour — and `clipHeight` came off because it had been
+   * implemented all along and was simply missing from `LEGEND_CONSUMED`, so it reported a gap that
+   * was not there. `gridAlign` was the last, and it is not the dead letter it looks like: upstream
+   * defaults it to `each` in `config.legend`, and the entry grid's row centring is conditional on
+   * being aligned, so a legend that set `none` was quietly centred anyway.
    */
   @Test
   fun `a legend reports the styling it cannot honour`() {
@@ -80,7 +84,7 @@ class UnhandledPropertiesTest {
               "cornerRadius": 4, "clipHeight": 10, "gridAlign": "each"}]"""
         )
       )
-    assertEquals(listOf("gridAlign"), reported.sorted())
+    assertEquals(emptyList<String>(), reported.sorted())
   }
 
   @Test

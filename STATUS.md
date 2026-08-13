@@ -201,7 +201,7 @@ substantive compatibility items:
 | 6. View and Compose APIs | Yes |
 | 7. SVG, PNG, PDF export | Yes |
 | 8. TalkBack can describe and navigate | Partial — virtual nodes are tested by instrumentation, not with TalkBack itself |
-| 9. At least 100 compatibility fixtures pass | **Yes** — 139 |
+| 9. At least 100 compatibility fixtures pass | **Yes** — 142 |
 | 10. Core runtime has no Android dependency | Yes |
 | 11. Renders without WebView | Yes |
 | 12. Build and test loop runs from the terminal | Yes |
@@ -1599,13 +1599,31 @@ drawn twice with one copy labelled — out of what a screen reader reads, so it 
 size suggests. All three go on both the heading and its subtitle, because upstream builds them as two
 marks under one guide and either can be focused.
 
-The schema diff now finds **nothing** unaccounted for in `encodeEntry`, `axis`, `title`, `projection`
-or `scale`, and three entries in `legend`: `gridAlign`, which only means anything to a multi-column
-entry grid, and the `strokeDash` and `strokeWidth` **channels**. Those last two were written off here
-as "not gaps, they name scales" — which is exactly what makes them gaps. A legend keyed to a
-`strokeDash` scale draws a swatch per dash pattern, and upstream does it; this engine refuses the
-legend for want of a channel it recognises. The legend background's own width and dash are a separate
-thing and do come from `config.legend` alone.
+The schema diff now finds **nothing** unaccounted for in `encodeEntry`, `axis`, `legend`, `layout`,
+`projection` or `scale`, and two entries in `title`: `encode`, of which only `dx`/`dy` are read, and
+`style`. That is the whole remaining inventory.
+
+Closing `legend` took admitting that a line in this file was wrong. `strokeDash` and `strokeWidth` had
+been written off here as "not gaps, they name scales" — which is exactly what makes them gaps. On a
+legend those two are **channels**: keyed to a `strokeDash` scale a legend draws a swatch per dash
+pattern, and keyed to a `strokeWidth` scale its rows are of different heights, because upstream's
+row-height expression reads that scale rather than the `symbolStrokeWidth` property. The legend
+background's own width and dash are a separate thing and do come from `config.legend` alone — which is
+why the channel has to be read from the legend's *own* object and not the config-layered one, or a
+themed border becomes a channel naming a scale called "2".
+
+Two more things fell out of that. `gridAlign` looked like a dead letter — it only means anything to a
+multi-column grid — but `config.legend` defaults it to `each`, and the entry grid's row **centring**
+is conditional on being aligned at all. So the default was doing work no legend had noticed until one
+had rows of unequal height. And a mark's `strokeDash` read through a **scale** was dropped silently:
+the encoder resolved a constant or a field but returned nothing for a scaled one, so every line in a
+chart that distinguished its series by line style came out solid.
+
+`labelFlushOffset`, the last axis property, was a **stale** report: its explanation said it needed
+`labelFlush`, which had been implemented for some time. It nudges a flushed label along the axis, and
+it is signed *outwards* — a label flushed to the start moves back towards it — applied only where the
+flush rule decided the alignment, since an explicit `labelAlign` means the label is not being flushed
+at all.
 
 ## The last block that listed its gaps by exception
 

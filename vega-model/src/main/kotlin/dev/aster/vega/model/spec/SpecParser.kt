@@ -126,6 +126,7 @@ private val AXIS_CONSUMED =
     "tickExtra",
     "gridScale",
     "labelFlush",
+    "labelFlushOffset",
     "minExtent",
     "maxExtent",
     "titleX",
@@ -164,8 +165,7 @@ private fun guideStyleKeys(vararg prefixes: String): Set<String> =
     }
     .toSet()
 
-private val AXIS_UNSUPPORTED =
-  mapOf("labelFlushOffset" to "Axis label flush offsets are not implemented; they need labelFlush")
+private val AXIS_UNSUPPORTED = emptyMap<String, String>()
 
 /** Scale properties this engine reads. */
 private val SCALE_CONSUMED =
@@ -227,6 +227,11 @@ private val LEGEND_CONSUMED =
     "size",
     "shape",
     "opacity",
+    // On a legend these two name **scales**, not the outline round the legend: that one takes its
+    // width and dash from `config.legend` alone.
+    "strokeWidth",
+    "strokeDash",
+    "gridAlign",
     "type",
     "format",
     "orient",
@@ -1601,6 +1606,7 @@ public class SpecParser {
       tickRound = obj.fields["tickRound"]?.asBoolean(),
       gridScale = obj.fields["gridScale"]?.takeIf { it is VegaValue.Str }?.asString(),
       labelFlush = flushThreshold(obj.fields["labelFlush"]),
+      labelFlushOffset = obj.numberOrSignal("labelFlushOffset", "$path.labelFlushOffset"),
       minExtent = obj.numberOrSignal("minExtent", "$path.minExtent"),
       maxExtent = obj.numberOrSignal("maxExtent", "$path.maxExtent"),
       encode =
@@ -1934,6 +1940,14 @@ public class SpecParser {
         size = obj.fields["size"]?.asString(),
         shape = obj.fields["shape"]?.asString(),
         opacity = obj.fields["opacity"]?.asString(),
+        // Read from the legend's **own** object and not from the config-layered one: this is the
+        // one
+        // property name whose two meanings collide. `config.legend.strokeWidth` is the width of the
+        // outline drawn round the legend, and layering it in would turn a themed border into a
+        // channel naming a scale called "2".
+        strokeWidthScale = own.fields["strokeWidth"]?.asString(),
+        strokeDashScale = own.fields["strokeDash"]?.asString(),
+        gridAlign = obj.fields["gridAlign"]?.asString(),
         type = obj.enumOrNull("type", path, "legend type") { LegendType.fromName(it) },
         orient =
           obj.enumOrNull("orient", path, "legend orientation") { LegendOrient.fromName(it) }

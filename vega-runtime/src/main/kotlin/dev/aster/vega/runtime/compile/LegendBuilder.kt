@@ -367,10 +367,18 @@ internal class LegendBuilder(
     val shape = symbolShape(spec)
 
     val sizes = entries.map { symbolSizeFor(spec, it.value, declaredSize) }
+    // A `strokeWidth` scale widens the swatch's outline per entry — and upstream's row-height
+    // expression reads that scale, not the `symbolStrokeWidth` property, so a legend keyed to it
+    // has
+    // rows of different heights.
+    val widths = entries.map { strokeWidthFor(spec, it.value, strokeWidth) }
+    val dashes = entries.map { strokeDashFor(spec, it.value) }
     val clipHeight = numbers.resolve(spec.clipHeight, scaleName)
     // A row is as tall as the taller of its symbol and its label, and upstream rounds the symbol's
     // contribution up before comparing: this is the number every offset within a cell derives from.
-    val measured = sizes.map { maxOf(ceil(sqrt(it) + strokeWidth), labelFontSize) }
+    val measured = sizes.mapIndexed { index, size ->
+      maxOf(ceil(sqrt(size) + widths[index]), labelFontSize)
+    }
     // `clipHeight` replaces that measurement **vertically only**. The horizontal anchor still comes
     // from the real symbols — upstream's `datum.offset` is the widest of them whatever the rows are
     // clipped to — so a clipped legend's labels still clear its biggest circle.
@@ -417,7 +425,7 @@ internal class LegendBuilder(
               entryNumber(spec, "symbols", "fillOpacity", entry)?.let { fill.copy(opacity = it) }
                 ?: fill
             },
-          stroke = symbolStroke(spec, entry.value, strokeWidth),
+          stroke = symbolStroke(spec, entry.value, widths[index], dashes[index]),
           // `symbolOpacity` is the item's overall opacity upstream, not a fill or stroke opacity —
           // it fades the outline with the swatch rather than only what is inside it. The `encode`
           // block wins over the property, and it is where an *interactive* legend lives: a swatch
@@ -446,7 +454,7 @@ internal class LegendBuilder(
     val columns =
       numbers.resolveInt(spec.columns, scaleName)?.coerceAtLeast(1)
         ?: if (vertical) 1 else cells.size
-    return place(cells, columns, rowPadding, columnPadding, scaleName, clipHeight)
+    return place(cells, columns, rowPadding, columnPadding, scaleName, clipHeight, spec.gridAlign)
   }
 
   /**
@@ -469,6 +477,15 @@ internal class LegendBuilder(
      * entire reason a specification sets one.
      */
     clipHeight: Double? = null,
+    /**
+     * `gridAlign`, which upstream defaults to `each` in `config.legend` rather than leaving unset.
+     *
+     * That default is what makes the entry grid centre its rows, since the centring is conditional
+     * on the alignment: a row of entries of unequal height — the natural shape of a legend keyed to
+     * a `strokeWidth` scale — has each shorter one lowered by half its slack. `none` turns both
+     * off.
+     */
+    gridAlign: String? = null,
   ): List<SceneNode> {
     val order = GridLayout.columnMajorOrder(cells.size, columns)
     val ordered = order.map { cells[it] }
@@ -476,7 +493,22 @@ internal class LegendBuilder(
       val measured = cell.fold(RectD.Empty) { acc, node -> acc.union(node.bounds) }
       if (clipHeight == null) measured else RectD(measured.left, 0.0, measured.right, clipHeight)
     }
-    val offsets = GridLayout.place(boxes, GridLayout.Options(columns, rowPadding, columnPadding))
+    val align = GridLayout.Align.fromName(gridAlign)
+    val offsets =
+      GridLayout.place(
+        boxes,
+        GridLayout.Options(
+          columns,
+          rowPadding,
+          columnPadding,
+          alignColumn = align,
+          alignRow = align,
+          // `center: {row: true, column: false}` — upstream's, and not symmetrical: entries in a
+          // row
+          // are centred against the tallest, while a column is left alone.
+          centerRow = true,
+        ),
+      )
 
     return ordered.indices.map { position ->
       val offset = offsets[position]
@@ -536,6 +568,26 @@ internal class LegendBuilder(
     return if (number != null && number.isFinite() && number > 0.0) number else declared
   }
 
+  /** The width a `strokeWidth` scale gives this entry's outline, or the declared one. */
+  private fun strokeWidthFor(spec: LegendSpec, value: VegaValue, declared: Double): Double {
+    val scale = spec.strokeWidthScale?.let { scales[it] } ?: return declared
+    val number = (scale.scale(value) as? VegaValue.Num)?.value
+    return if (number != null && number.isFinite() && number >= 0.0) number else declared
+  }
+
+  /**
+   * The dash pattern a `strokeDash` scale gives this entry, or none.
+   *
+   * The range of such a scale is a list *of lists*, so the mapped value is itself an array — a
+   * legend for a chart whose series are told apart by line style, which is the reason the channel
+   * exists.
+   */
+  private fun strokeDashFor(spec: LegendSpec, value: VegaValue): List<Double>? {
+    val scale = spec.strokeDashScale?.let { scales[it] } ?: return null
+    val mapped = scale.scale(value) as? VegaValue.Arr ?: return null
+    return mapped.values.mapNotNull { (it as? VegaValue.Num)?.value }.takeIf { it.isNotEmpty() }
+  }
+
   /**
    * A legend swatch's fill.
    *
@@ -572,8 +624,13 @@ internal class LegendBuilder(
    * When the legend maps no colour at all — a `size` or `shape` legend — upstream outlines the
    * swatch in grey and leaves it unfilled, rather than inventing a fill the scale never assigned.
    */
-  private fun symbolStroke(spec: LegendSpec, value: VegaValue, width: Double): Stroke? {
-    val dash = spec.symbolStyle.dash ?: emptyList()
+  private fun symbolStroke(
+    spec: LegendSpec,
+    value: VegaValue,
+    width: Double,
+    scaledDash: List<Double>? = null,
+  ): Stroke? {
+    val dash = scaledDash ?: spec.symbolStyle.dash ?: emptyList()
     val dashOffset = spec.symbolStyle.dashOffset ?: 0.0
     fun outline(colour: SceneColor) =
       Stroke(
@@ -593,7 +650,9 @@ internal class LegendBuilder(
       val colour = SceneColor.parse(strokeScale.scale(value).asString())
       if (colour != null) return outline(colour)
     }
-    if (spec.fill != null || spec.stroke != null) return null
+    // Upstream's test is on the **fill** channel alone: a legend that maps no fill gets the base
+    // outline colour, and that is what makes the swatches of a dash or width legend visible at all.
+    if (spec.fill != null) return null
     return outline(LegendDefaults.symbolBaseStrokeColor)
   }
 
@@ -1124,6 +1183,8 @@ internal class LegendBuilder(
         spec.shape?.let { "shape" },
         spec.fill?.let { "fill" },
         spec.stroke?.let { "stroke" },
+        spec.strokeWidthScale?.let { "strokeWidth" },
+        spec.strokeDashScale?.let { "strokeDash" },
         spec.opacity?.let { "opacity" },
       )
     val scaleName = spec.scale ?: return null

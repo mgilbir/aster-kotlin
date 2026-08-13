@@ -486,16 +486,25 @@ class LegendTest {
     )
   }
 
+  /**
+   * This test used to name what a legend could not do. The list emptied: `gradientOpacity` first,
+   * then `symbolLimit`, then `titleAnchor`, then `gridAlign` and the two stroke channels — so the
+   * assertion is now the inverse, and it is the stronger one. A legend that writes down every
+   * property upstream has, including the ones that reach it through `config.legend`, is told
+   * nothing.
+   */
   @Test
-  fun `unimplemented legend properties are reported by name`() {
-    val compiled = compile(spec("""{"fill": "s1", "gridAlign": "each"}"""))
-    val messages = compiled.diagnostics.map { it.message }
-    // `gradientOpacity` came off this list, then `symbolLimit`, then `titleAnchor`. What is left is
-    // `gridAlign`, which only means anything to a legend whose entries wrap into a grid: it decides
-    // whether the columns share one set of widths or each keeps its own.
-    for (name in listOf("gridAlign")) {
-      assertTrue(messages.any { it.contains("'$name'") }, "$name not reported in $messages")
-    }
+  fun `a legend using the whole vocabulary is told nothing`() {
+    val compiled =
+      compile(
+        spec(
+          """{"fill": "s1", "gridAlign": "none", "clipHeight": 12, "columns": 2,
+             "symbolLimit": 8, "gradientOpacity": 0.5, "titleAnchor": "end",
+             "symbolFillColor": "#eee", "labelColor": "#333", "cornerRadius": 4}"""
+        )
+      )
+    val reported = compiled.diagnostics.filter { it.message.contains("Legend property") }
+    assertTrue(reported.isEmpty(), reported.toString())
   }
 
   @Test

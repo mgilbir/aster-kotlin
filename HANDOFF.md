@@ -9,7 +9,7 @@ Branch `milestone-0-bootstrap`. Working tree clean, both gates green:
 - `./scripts/check.sh` — format, all tests, lint, demo APK
 - `./scripts/oracle.sh` — regenerates upstream references and runs the differential comparison
 
-**139 differential fixtures pass, all matching upstream exactly.** That is the only number here
+**142 differential fixtures pass, all matching upstream exactly.** That is the only number here
 that means what it says.
 
 ## Read this before trusting the other number
@@ -254,7 +254,7 @@ not the one Vega documents**, because Vega only forwards the parameters a specif
 
 ## What is left: two examples, and neither can be verified
 
-**139 differential fixtures pass. 91 of the 93 examples compile clean.** Everything that can be
+**142 differential fixtures pass. 91 of the 93 examples compile clean.** Everything that can be
 checked against upstream has been.
 
 ### `projections` — upstream refuses it too
@@ -395,17 +395,17 @@ Anything left is either a gap or a stale diagnostic, and telling those two apart
 As of this handoff the subtraction leaves **nothing** for `encodeEntry`, `axis`, `title`, `scale`,
 `projection` or `mark`, and this for the rest:
 
-- **Legend (3):** `gridAlign`, which only means anything to a multi-column entry grid, and the
-  `strokeDash` and `strokeWidth` **channels** — on a legend those two name *scales*, so a legend can
-  be keyed to one and its swatches then vary in dash or in width (probed: upstream draws them, this
-  engine refuses the legend for want of a recognised channel). The legend *background's* width and
-  dash are a different thing and come from `config.legend` alone.
-  `titleAnchor`, `clipHeight` and the background (`fillColor`, `strokeColor`, `cornerRadius`) are
-  *done* — do not re-report them.
-- **Axis:** none. All 79 of upstream's axis properties are read. `labelBound` is consumed and
-  deliberately **inert**: upstream's bound test runs before the label bounds exist, so it culls
-  nothing, and implementing the documented behaviour would be a real difference. See STATUS.md.
-- **Title:** none. All 31 of upstream's title properties are read.
+- **Legend:** none. All 72 of upstream's legend properties are read, including the `strokeDash` and
+  `strokeWidth` **channels** (on a legend those name *scales*; the legend background's own width and
+  dash are a separate thing and come from `config.legend` alone) and `gridAlign`. Do not re-report
+  `titleAnchor`, `clipHeight` or the background — they are done.
+- **Axis:** none. All 79 of upstream's axis properties are read. `labelFlushOffset` was the last, and
+  it was a **stale** report: the explanation said it "needs labelFlush", which had been implemented
+  for some time. `labelBound` is consumed and deliberately **inert**: upstream's bound test runs
+  before the label bounds exist, so it culls nothing, and implementing the documented behaviour would
+  be a real difference. See STATUS.md.
+- **Title (2):** `encode`, of which only `dx`/`dy` are read, and `style`. Those two are the whole
+  remaining inventory across every block.
 - **Layout:** none. All ten of upstream's layout properties are read, and `row-footer` and
   `column-footer` are recognised roles — they used to fall through to `CELL` and be gridded among the
   cells.

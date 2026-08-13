@@ -856,6 +856,15 @@ public data class AxisSpec(
    */
   val labelFlush: Double? = null,
   /**
+   * `labelFlushOffset` — how far a flushed label is nudged along the axis, once flushed.
+   *
+   * Signed the way upstream signs it, which is *outwards*: a label flushed to the start moves back
+   * towards it and one flushed to the end moves past it. Applied only where the flush rule decided
+   * the alignment — an explicit `labelAlign` on a horizontal axis, or `labelBaseline` on a vertical
+   * one, means the label is not being flushed and there is nothing to nudge.
+   */
+  val labelFlushOffset: NumberValue? = null,
+  /**
    * `minExtent`/`maxExtent` — how deep the axis is allowed to be, whatever its contents measure.
    *
    * Upstream clamps its measured depth into this range with defaults of 0 and 200, so a chart with
@@ -986,8 +995,9 @@ public enum class Direction {
 /**
  * A legend.
  *
- * At least one of [fill], [stroke], [size], [shape] or [opacity] names the scale being described; a
- * legend with none of them cannot say what it is a legend for, and is rejected.
+ * At least one of [fill], [stroke], [size], [shape], [strokeWidthScale], [strokeDashScale] or
+ * [opacity] names the scale being described; a legend with none of them cannot say what it is a
+ * legend for, and is rejected.
  */
 public data class LegendSpec(
   val fill: String? = null,
@@ -995,6 +1005,25 @@ public data class LegendSpec(
   val size: String? = null,
   val shape: String? = null,
   val opacity: String? = null,
+  /**
+   * The `strokeWidth` and `strokeDash` **channels**, which on a legend name scales like the rest.
+   *
+   * Spelled apart from the legend background's own [backgroundStrokeWidth] and
+   * [backgroundStrokeDash] because the two meanings collide on one property name: a legend's
+   * `strokeWidth` names a scale, while the outline drawn round the legend takes its width from
+   * `config.legend` alone. Keyed to one of these, each swatch is drawn at its own width or under
+   * its own dash pattern — the natural legend for a chart that distinguishes series by line style.
+   */
+  val strokeWidthScale: String? = null,
+  val strokeDashScale: String? = null,
+  /**
+   * `gridAlign` — how the entry grid lines its columns and rows up.
+   *
+   * `config.legend` defaults it to `each`, which is why it is not simply absent: the entry grid's
+   * row **centring** is conditional on being aligned at all, so `none` both packs the columns
+   * tightly and stops a short entry being centred against a tall one.
+   */
+  val gridAlign: String? = null,
   /** `null` means "derive from the scale type", which is what a specification usually wants. */
   val type: LegendType? = null,
   val orient: LegendOrient = LegendOrient.RIGHT,
@@ -1148,11 +1177,12 @@ public data class LegendSpec(
    * gives a legend with the right number of entries at the wrong values.
    */
   public val scale: String?
-    get() = size ?: shape ?: fill ?: stroke ?: opacity
+    get() = size ?: shape ?: fill ?: stroke ?: strokeWidthScale ?: strokeDashScale ?: opacity
 
   /** How many channels this legend maps, which is what decides whether the type can be derived. */
   public val channelCount: Int
-    get() = listOfNotNull(fill, stroke, size, shape, opacity).size
+    get() =
+      listOfNotNull(fill, stroke, size, shape, strokeWidthScale, strokeDashScale, opacity).size
 }
 
 /**
