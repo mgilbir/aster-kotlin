@@ -1,0 +1,290 @@
+{
+  "$schema": "https://vega.github.io/schema/vega/v6.json",
+  "description": "A trellis whose cells each scale x for themselves and are measured in steps, so each is as wide as its own categories need — a count taken per cell rather than a size the grid shares.",
+  "background": "white",
+  "padding": 5,
+  "data": [
+    {
+      "name": "source_0",
+      "url": "data/barley.json",
+      "format": {
+        "type": "json"
+      },
+      "transform": [
+        {
+          "type": "aggregate",
+          "groupby": [
+            "variety",
+            "site"
+          ],
+          "ops": [
+            "sum"
+          ],
+          "fields": [
+            "yield"
+          ],
+          "as": [
+            "sum_yield"
+          ]
+        },
+        {
+          "type": "filter",
+          "expr": "isValid(datum[\"sum_yield\"]) && isFinite(+datum[\"sum_yield\"])"
+        }
+      ]
+    },
+    {
+      "name": "column_domain",
+      "source": "source_0",
+      "transform": [
+        {
+          "type": "aggregate",
+          "groupby": [
+            "site"
+          ],
+          "fields": [
+            "variety"
+          ],
+          "ops": [
+            "distinct"
+          ],
+          "as": [
+            "distinct_variety"
+          ]
+        }
+      ]
+    }
+  ],
+  "signals": [
+    {
+      "name": "child_x_step",
+      "value": 17
+    },
+    {
+      "name": "child_height",
+      "value": 300
+    }
+  ],
+  "layout": {
+    "padding": 20,
+    "offset": {
+      "columnTitle": 10
+    },
+    "columns": {
+      "signal": "length(data('column_domain'))"
+    },
+    "bounds": "full",
+    "align": "none"
+  },
+  "marks": [
+    {
+      "name": "column-title",
+      "type": "group",
+      "role": "column-title",
+      "title": {
+        "text": "site",
+        "style": "guide-title",
+        "offset": 10
+      }
+    },
+    {
+      "name": "row_header",
+      "type": "group",
+      "role": "row-header",
+      "encode": {
+        "update": {
+          "height": {
+            "signal": "child_height"
+          }
+        }
+      },
+      "axes": [
+        {
+          "scale": "y",
+          "orient": "left",
+          "grid": false,
+          "title": "Sum of yield",
+          "labelOverlap": true,
+          "tickCount": {
+            "signal": "ceil(child_height/40)"
+          },
+          "zindex": 0
+        }
+      ]
+    },
+    {
+      "name": "column_header",
+      "type": "group",
+      "role": "column-header",
+      "from": {
+        "data": "column_domain"
+      },
+      "sort": {
+        "field": "datum[\"site\"]",
+        "order": "ascending"
+      },
+      "title": {
+        "text": {
+          "signal": "isValid(parent[\"site\"]) ? parent[\"site\"] : \"\"+parent[\"site\"]"
+        },
+        "style": "guide-label",
+        "frame": "group",
+        "offset": 10
+      },
+      "encode": {
+        "update": {
+          "width": {
+            "signal": "bandspace(datum[\"distinct_variety\"], 0.1, 0.05) * child_x_step"
+          }
+        }
+      }
+    },
+    {
+      "name": "cell",
+      "type": "group",
+      "style": "cell",
+      "from": {
+        "facet": {
+          "name": "facet",
+          "data": "source_0",
+          "groupby": [
+            "site"
+          ],
+          "aggregate": {
+            "fields": [
+              "variety"
+            ],
+            "ops": [
+              "distinct"
+            ],
+            "as": [
+              "distinct_variety"
+            ]
+          }
+        }
+      },
+      "sort": {
+        "field": [
+          "datum[\"site\"]"
+        ],
+        "order": [
+          "ascending"
+        ]
+      },
+      "encode": {
+        "update": {
+          "width": {
+            "signal": "bandspace(datum[\"distinct_variety\"], 0.1, 0.05) * child_x_step"
+          },
+          "height": {
+            "signal": "child_height"
+          }
+        }
+      },
+      "marks": [
+        {
+          "name": "child_marks",
+          "type": "rect",
+          "style": [
+            "bar"
+          ],
+          "from": {
+            "data": "facet"
+          },
+          "encode": {
+            "update": {
+              "fill": {
+                "value": "#4c78a8"
+              },
+              "ariaRoleDescription": {
+                "value": "bar"
+              },
+              "description": {
+                "signal": "\"variety: \" + (isValid(datum[\"variety\"]) ? isArray(datum[\"variety\"]) ? join(datum[\"variety\"], ' ') : datum[\"variety\"] : \"\"+datum[\"variety\"]) + \"; Sum of yield: \" + (format(datum[\"sum_yield\"], \"\"))"
+              },
+              "x": {
+                "scale": "child_x",
+                "field": "variety"
+              },
+              "width": {
+                "signal": "max(0.25, bandwidth('child_x'))"
+              },
+              "y": {
+                "scale": "y",
+                "field": "sum_yield"
+              },
+              "y2": {
+                "scale": "y",
+                "value": 0
+              }
+            }
+          }
+        }
+      ],
+      "scales": [
+        {
+          "name": "child_x",
+          "type": "band",
+          "domain": {
+            "data": "facet",
+            "field": "variety",
+            "sort": true
+          },
+          "range": {
+            "step": {
+              "signal": "child_x_step"
+            }
+          },
+          "paddingInner": 0.1,
+          "paddingOuter": 0.05
+        }
+      ],
+      "axes": [
+        {
+          "scale": "y",
+          "orient": "left",
+          "gridScale": "child_x",
+          "grid": true,
+          "tickCount": {
+            "signal": "ceil(child_height/40)"
+          },
+          "domain": false,
+          "labels": false,
+          "aria": false,
+          "maxExtent": 0,
+          "minExtent": 0,
+          "ticks": false,
+          "zindex": 0
+        },
+        {
+          "scale": "child_x",
+          "orient": "bottom",
+          "grid": false,
+          "title": "variety",
+          "labelAlign": "right",
+          "labelAngle": 270,
+          "labelBaseline": "middle",
+          "zindex": 0
+        }
+      ]
+    }
+  ],
+  "scales": [
+    {
+      "name": "y",
+      "type": "linear",
+      "domain": {
+        "data": "source_0",
+        "field": "sum_yield"
+      },
+      "range": [
+        {
+          "signal": "child_height"
+        },
+        0
+      ],
+      "nice": true,
+      "zero": true
+    }
+  ]
+}

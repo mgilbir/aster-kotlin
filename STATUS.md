@@ -678,7 +678,7 @@ no data is needed to compare two compilers. So every one of them was compiled by
 by this one, and the outputs compared property by property. That is a *measurement*, not a gate: the
 examples are not fixtures here, and nothing about them is checked in.
 
-**124 of 627 matched exactly** at the start, and **501** do now. 16 were refused by name, and of those 8 are geographic,
+**124 of 627 matched exactly** at the start, and **503** do now. 16 were refused by name, and of those 8 are geographic,
 3 are a facet inside a facet, 2 a repeat inside a concatenation, and 2 are the `trail` mark — which
 this runtime draws and this compiler had simply not been told about.
 
@@ -2265,6 +2265,18 @@ runtime already had a Delaunay triangulation and a voronoi transform, and it was
 coordinates as *field names*: Vega-Lite writes them as expressions, `{"expr": "datum.datum.x || 0"}`,
 because the points are mark items and the coordinate wanted is the one the encoding resolved. Every
 cell came out without coordinates, so the diagram was empty and the overlay drew nothing.
+
+### A cell that is as wide as its own categories need
+
+The last thing a facet's independent scale changes, and the least obvious. A cell whose position
+scale is its own and is measured in **steps** has no width the grid can share: each cell holds a
+different number of categories, so each is a different width. Upstream stops emitting the size
+signal altogether and writes the size as an *expression over the cell's row* —
+`bandspace(datum["distinct_age"], 0.1, 0.05) * child_x_step` — which means the facet has to count
+the categories per cell (`getCardinalityAggregateForChild`, a `distinct` in `from.facet.aggregate`)
+and the header band has to count them too, being drawn from the domain dataset rather than from the
+facet's partition. The step signal is then named after the **cell's** scale, `child_x_step`, since
+that is the scale it steps.
 
 ### A bucket that arrived bucketed is still a bucket
 

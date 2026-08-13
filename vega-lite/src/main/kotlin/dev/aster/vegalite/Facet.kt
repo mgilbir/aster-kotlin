@@ -173,7 +173,7 @@ internal class Facet(val channel: String, val def: ChannelDef) {
   /** `column_domain` — the facet's distinct values, which the layout counts and headers title. */
   val domainData: String = "${channel}_domain"
 
-  fun domainDataset(source: String): VegaValue = obj {
+  fun domainDataset(source: String, counted: Map<String, String> = emptyMap()): VegaValue = obj {
     put("name", domainData)
     put("source", source)
     put(
@@ -182,6 +182,14 @@ internal class Facet(val channel: String, val def: ChannelDef) {
         obj {
           put("type", "aggregate")
           put("groupby", strings(groupingFields))
+          // A cell that sizes itself counts its own categories here as well: the header band beside
+          // it is as wide as the cell, and it is drawn from this dataset rather than from the
+          // facet's own partition.
+          if (counted.isNotEmpty()) {
+            put("fields", strings(counted.values.map { it.removePrefix("distinct_") }))
+            put("ops", strings(counted.values.map { "distinct" }))
+            put("as", strings(counted.values.toList()))
+          }
           // The key the cells are ordered by, measured once per cell — which is what this dataset
           // already holds a row of. `assembleRowColumnHeaderData` puts it here rather than leaving
           // the header bands to sort on something they cannot see.
@@ -271,7 +279,12 @@ internal interface FacetLayout {
    * @param vertical whether any shared axis landed in a row band, [horizontal] the same for a
    *   column band. A wrapped facet counts a direction only when something is drawn along it.
    */
-  fun domainDatasets(source: String, vertical: Boolean, horizontal: Boolean): List<VegaValue>
+  fun domainDatasets(
+    source: String,
+    vertical: Boolean,
+    horizontal: Boolean,
+    counted: Map<String, String> = emptyMap(),
+  ): List<VegaValue>
 
   fun layout(
     spacing: Double,
@@ -287,6 +300,9 @@ internal interface FacetLayout {
     horizontal: List<VegaValue>,
     titleOffset: Double,
     config: Config,
+    /** What a cell's width and height are called, or the expressions they are. */
+    columnSize: String = "child_width",
+    rowSize: String = "child_height",
   ): List<VegaValue>
 
   fun cellGroup(
@@ -298,6 +314,13 @@ internal interface FacetLayout {
     titleOffset: Double,
     /** `cell` or `view`, by the same rule the chart's own group follows. */
     style: String,
+    /**
+     * The columns each cell counts its own categories in, where it sizes itself.
+     *
+     * `getCardinalityAggregateForChild`: a cell whose scale is its own is as wide as *its* rows
+     * need, so the facet counts them per cell and the group's width reads that count back.
+     */
+    counted: Map<String, String>,
     /**
      * The scales a cell owns rather than shares — a facet resolves `theta` independently.
      *
@@ -322,7 +345,8 @@ internal class FacetGrid(val row: Facet?, val column: Facet?) : FacetLayout {
     source: String,
     vertical: Boolean,
     horizontal: Boolean,
-  ): List<VegaValue> = listOfNotNull(column, row).map { it.domainDataset(source) }
+    counted: Map<String, String>,
+  ): List<VegaValue> = listOfNotNull(column, row).map { it.domainDataset(source, counted) }
 
   /**
    * The `layout` block.
@@ -382,6 +406,8 @@ internal class FacetGrid(val row: Facet?, val column: Facet?) : FacetLayout {
     kind: String,
     axes: List<VegaValue>,
     titleOffset: Double,
+    columnSize: String = "child_width",
+    rowSize: String = "child_height",
   ): VegaValue? {
     val isColumn = channel == "column"
     val facet = if (isColumn) column else row
@@ -450,7 +476,7 @@ internal class FacetGrid(val row: Facet?, val column: Facet?) : FacetLayout {
             obj {
               put(
                 if (isColumn) "width" else "height",
-                signalRef(if (isColumn) "child_width" else "child_height"),
+                signalRef(if (isColumn) columnSize else rowSize),
               )
             },
           )
@@ -488,6 +514,8 @@ internal class FacetGrid(val row: Facet?, val column: Facet?) : FacetLayout {
     horizontal: List<VegaValue>,
     titleOffset: Double,
     config: Config,
+    columnSize: String,
+    rowSize: String,
   ): List<VegaValue> {
     fun leading(axes: List<VegaValue>) = axes.filter {
       it.string("orient") == "left" || it.string("orient") == "top"
@@ -498,14 +526,23 @@ internal class FacetGrid(val row: Facet?, val column: Facet?) : FacetLayout {
       titles[facet.channel]?.let { facet.titleGroup(it, titleOffset) }
     } +
       listOfNotNull(
-        band("row", "header", leading(vertical), titleOffset),
-        band("row", "footer", vertical - leading(vertical).toSet(), titleOffset),
-        band("column", "header", leading(horizontal), titleOffset),
+        band("row", "header", leading(vertical), titleOffset, columnSize, rowSize),
+        band(
+          "row",
+          "footer",
+          vertical - leading(vertical).toSet(),
+          titleOffset,
+          columnSize,
+          rowSize,
+        ),
+        band("column", "header", leading(horizontal), titleOffset, columnSize, rowSize),
         band(
           "column",
           "footer",
           horizontal - leading(horizontal).toSet(),
           titleOffset,
+          columnSize,
+          rowSize,
         ),
       )
   }
@@ -526,6 +563,7 @@ internal class FacetGrid(val row: Facet?, val column: Facet?) : FacetLayout {
     heightSignal: String,
     titleOffset: Double,
     style: String,
+    counted: Map<String, String>,
     scales: List<VegaValue>,
   ): VegaValue = obj {
     put("name", "cell")
@@ -541,15 +579,28 @@ internal class FacetGrid(val row: Facet?, val column: Facet?) : FacetLayout {
             put("data", dataName)
             put("groupby", strings(fields))
             val sorted = listOfNotNull(row, column).filter { it.cellSortAggregate != null }
-            if (row != null && column != null || sorted.isNotEmpty()) {
+            val cardinal = counted.entries.toList()
+            if (row != null && column != null || sorted.isNotEmpty() || cardinal.isNotEmpty()) {
               put(
                 "aggregate",
                 obj {
                   if (row != null && column != null) put("cross", VegaValue.Bool(true))
-                  if (sorted.isNotEmpty()) {
-                    put("fields", strings(sorted.map { it.sortSourceField() }))
-                    put("ops", strings(sorted.map { it.sortOperation() }))
-                    put("as", strings(sorted.map { it.cellSortAggregate!! }))
+                  if (sorted.isNotEmpty() || cardinal.isNotEmpty()) {
+                    put(
+                      "fields",
+                      strings(
+                        sorted.map { it.sortSourceField() } +
+                          cardinal.map { it.value.removePrefix("distinct_") }
+                      ),
+                    )
+                    put(
+                      "ops",
+                      strings(sorted.map { it.sortOperation() } + cardinal.map { "distinct" }),
+                    )
+                    put(
+                      "as",
+                      strings(sorted.map { it.cellSortAggregate!! } + cardinal.map { it.value }),
+                    )
                   }
                 },
               )
@@ -615,6 +666,7 @@ internal class FacetWrap(val def: ChannelDef, private val columns: Int?) : Facet
     source: String,
     vertical: Boolean,
     horizontal: Boolean,
+    counted: Map<String, String>,
   ): List<VegaValue> {
     if (!vertical && !horizontal) return emptyList()
     val cardinality = "length(data(\"$domainData\"))"
@@ -678,6 +730,8 @@ internal class FacetWrap(val def: ChannelDef, private val columns: Int?) : Facet
     horizontal: List<VegaValue>,
     titleOffset: Double,
     config: Config,
+    columnSize: String,
+    rowSize: String,
   ): List<VegaValue> {
     fun leading(axes: List<VegaValue>) = axes.filter {
       it.string("orient") == "left" || it.string("orient") == "top"
@@ -700,10 +754,10 @@ internal class FacetWrap(val def: ChannelDef, private val columns: Int?) : Facet
       }
     return listOfNotNull(
       heading,
-      band("row", "header", leading(vertical)),
-      band("row", "footer", vertical - leading(vertical).toSet()),
-      band("column", "header", leading(horizontal)),
-      band("column", "footer", horizontal - leading(horizontal).toSet()),
+      band("row", "header", leading(vertical), columnSize, rowSize),
+      band("row", "footer", vertical - leading(vertical).toSet(), columnSize, rowSize),
+      band("column", "header", leading(horizontal), columnSize, rowSize),
+      band("column", "footer", horizontal - leading(horizontal).toSet(), columnSize, rowSize),
     )
   }
 
@@ -713,7 +767,13 @@ internal class FacetWrap(val def: ChannelDef, private val columns: Int?) : Facet
    * A wrapped facet's rows and columns are places, so the band reads the counting sequence and has
    * nothing to caption itself with — which is why the caption is on the cell instead.
    */
-  private fun band(channel: String, kind: String, axes: List<VegaValue>): VegaValue? {
+  private fun band(
+    channel: String,
+    kind: String,
+    axes: List<VegaValue>,
+    columnSize: String = "child_width",
+    rowSize: String = "child_height",
+  ): VegaValue? {
     if (axes.isEmpty()) return null
     val isColumn = channel == "column"
     return obj {
@@ -729,7 +789,7 @@ internal class FacetWrap(val def: ChannelDef, private val columns: Int?) : Facet
             obj {
               put(
                 if (isColumn) "width" else "height",
-                signalRef(if (isColumn) "child_width" else "child_height"),
+                signalRef(if (isColumn) columnSize else rowSize),
               )
             },
           )
@@ -747,6 +807,7 @@ internal class FacetWrap(val def: ChannelDef, private val columns: Int?) : Facet
     heightSignal: String,
     titleOffset: Double,
     style: String,
+    counted: Map<String, String>,
     scales: List<VegaValue>,
   ): VegaValue = obj {
     put("name", "cell")

@@ -32,6 +32,15 @@ internal class LayoutSize(
    * name `concat_1_x` rather than `x`, or every plot in a row comes out the width of the first.
    */
   private val scalePrefix: String = "",
+  /**
+   * The column each cell counts its own categories in, per channel — `distinct_age`.
+   *
+   * Set only where a **facet** resolves that channel independently and the cell's scale is discrete
+   * with a step range: the cell's width is then not a number the whole grid shares but an
+   * expression over the cell's own row, `bandspace(datum["distinct_age"], …) * child_x_step`. There
+   * is no size signal at all in that case — every reader of the size reads the expression.
+   */
+  private val cardinality: Map<String, String> = emptyMap(),
 ) {
   val signals: List<VegaValue>
   val width: VegaValue?
@@ -46,6 +55,9 @@ internal class LayoutSize(
    */
   val values: Map<String, VegaValue?>
 
+  /** The expression a cell's own size is, where the grid has no one size to share. */
+  val expressions: MutableMap<String, String> = mutableMapOf()
+
   init {
     val emitted = mutableListOf<VegaValue>()
     val sizes = LinkedHashMap<String, VegaValue?>()
@@ -58,6 +70,9 @@ internal class LayoutSize(
         spec.fields[if (channel == "x") "width" else "height"]
           ?: views.firstOrNull()?.spec?.let { if (channel == "x") it.width else it.height }
       val scale = scales[channel]
+      // The step signal is named after the **scale**, which inside a facet that resolves the
+      // channel independently is the cell's own — `child_x_step`, not `x_step`.
+      val scaleName = scale?.name() ?: "$scalePrefix$channel"
       val discrete = scale != null && (scale.type == "band" || scale.type == "point")
       val step = (declared as? VegaValue.Obj)?.number("step")
       // `{"step": 50, "for": "position"}` — the step belongs to the *outer* band, not to one mark
@@ -117,7 +132,7 @@ internal class LayoutSize(
             emitted +=
               if (offset == null || stepForPosition) {
                 obj {
-                  put("name", "$scalePrefix${channel}_step")
+                  put("name", "${scaleName}_step")
                   put("value", step ?: config.step)
                 }
               } else {
@@ -126,7 +141,7 @@ internal class LayoutSize(
                 val nestedOuter =
                   (offset.properties["paddingOuter"] as? VegaValue.Num)?.value ?: 0.0
                 obj {
-                  put("name", "$scalePrefix${channel}_step")
+                  put("name", "${scaleName}_step")
                   put(
                     "update",
                     // `bandspace` counts the *bands* a padded band scale needs; a **point** scale
@@ -140,13 +155,22 @@ internal class LayoutSize(
                   )
                 }
               }
-            emitted += obj {
-              put("name", sizeName)
-              put(
-                "update",
-                "bandspace(domain('$scalePrefix$channel').length, ${number(paddingInner)}, " +
-                  "${number(paddingOuter)}) * $scalePrefix${channel}_step",
-              )
+            val counted = cardinality[channel]
+            if (counted != null) {
+              // The cells count their own categories, so there is nothing for the grid to hold: the
+              // size is an expression over the cell's row and every reader of it reads that.
+              expressions[channel] =
+                "bandspace(datum[${quoted(counted)}], ${number(paddingInner)}, " +
+                  "${number(paddingOuter)}) * ${scaleName}_step"
+            } else {
+              emitted += obj {
+                put("name", sizeName)
+                put(
+                  "update",
+                  "bandspace(domain('$scaleName').length, ${number(paddingInner)}, " +
+                    "${number(paddingOuter)}) * ${scaleName}_step",
+                )
+              }
             }
             null
           }

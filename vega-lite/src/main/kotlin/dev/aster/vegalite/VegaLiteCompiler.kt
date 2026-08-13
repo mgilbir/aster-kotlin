@@ -261,10 +261,46 @@ private class Compilation(
 
     val data = assembleData(views).toMutableList()
     fillScaleDomains(views)
+    // A **facet** that resolves a position independently gives each cell its own scale, and a
+    // discrete one measured in steps then makes each cell its own width: there is no size for the
+    // grid to share, so the cells count their own categories — `getCardinalityAggregateForChild`.
+    cellCardinality =
+      if (facet == null || concat != null) emptyMap()
+      else {
+        val view = views.first()
+        setOf("x", "y")
+          .filter { channel ->
+            resolve.scaleIsIndependent(channel, defaultIndependent = false) &&
+              view.scaleType(channel)?.let { Scales.hasDiscreteDomain(it) } == true &&
+              // Keyed by **channel**, which is what `LayoutSize` reads: the merged map is keyed by
+              // scale name, and an independent facet scale is called `child_x` rather than `x`.
+              LayoutSize.value(views, plots.first().byChannel(), config, spec, channel) == null
+          }
+          .mapNotNull { channel ->
+            view.spec.fieldDef(channel)?.let { channel to "distinct_${Fields.vgField(it)}" }
+          }
+          .toMap()
+      }
     for (plot in plots) {
       plot.axes = assembleAxes(plot)
       plot.size =
-        LayoutSize(plot.views, plot.byChannel(), config, plot.spec, plot.sizeNames, plot.prefix)
+        LayoutSize(
+          plot.views,
+          plot.byChannel(),
+          config,
+          plot.spec,
+          plot.sizeNames,
+          plot.prefix,
+          cellCardinality,
+        )
+      // Where a cell sizes itself, the *expression* takes the place of the signal's name: it is
+      // read in a `{"signal": …}` everywhere a size is read, so nothing else has to know.
+      plot.size!!.expressions.forEach { (channel, expression) ->
+        plot.sizeNames = plot.sizeNames + (channel to expression)
+        plot.views.forEach {
+          if (channel == "x") it.widthSignal = expression else it.heightSignal = expression
+        }
+      }
     }
     // A legend belongs where its scale does. A concatenation whose plots share a colour scale draws
     // one key beside the whole chart; one that resolves colour independently draws a key inside
@@ -338,7 +374,8 @@ private class Compilation(
       }
       data +=
         current.domainDatasets(
-          views.first().mainData,
+          counted = cellCardinality,
+          source = views.first().mainData,
           vertical = (main - horizontal.toSet()).isNotEmpty(),
           horizontal = horizontal.isNotEmpty(),
         )
@@ -464,6 +501,9 @@ private class Compilation(
     val owner = if (concat != null) plotOf(view) else view.childName
     return if (owner.isEmpty()) channel else "${owner}_$channel"
   }
+
+  /** Per channel, the column a cell counts its own categories in — empty for every other chart. */
+  private var cellCardinality: Map<String, String> = emptyMap()
 
   /** Channels whose views disagree about the scale type, and so cannot share one. */
   private val incompatibleChannels = mutableSetOf<String>()
@@ -1189,18 +1229,26 @@ private class Compilation(
     }
     val vertical = mainAxes - horizontal.toSet()
 
-    return current.groups(vertical, horizontal, HEADER_OFFSET, config) +
+    return current.groups(
+      vertical,
+      horizontal,
+      HEADER_OFFSET,
+      config,
+      views.first().widthSignal,
+      views.first().heightSignal,
+    ) +
       current.cellGroup(
         views.first().mainData,
         childMarks,
         gridAxes,
-        "child_width",
-        "child_height",
+        views.first().widthSignal,
+        views.first().heightSignal,
         HEADER_OFFSET,
         // A cell is styled by the same rule the chart's own group is: `cell` where it has a
         // Cartesian position to border, `view` where it has none. A trellis of pies has no
         // plotting area in any of its cells.
         (style(views) as? VegaValue.Str)?.value ?: "cell",
+        cellCardinality,
         cellScales,
       )
   }
