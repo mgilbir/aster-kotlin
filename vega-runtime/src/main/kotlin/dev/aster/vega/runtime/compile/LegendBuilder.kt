@@ -126,6 +126,47 @@ internal class LegendBuilder(
   }
 
   /**
+   * The item metadata one part of a legend's `encode` can carry, as on an axis.
+   *
+   * A hoverable swatch, a pointer over the labels, a swatch raised over its neighbours, a
+   * decorative ramp kept out of the accessibility tree. Each of the five is already a mark channel
+   * and each was unreachable from a legend; the reading is the same, against the entry the part is
+   * drawing.
+   *
+   * `aria: false` removes the item from the tree and `description` replaces what would be spoken,
+   * so the two are read together: a description on an item that has opted out is unreachable rather
+   * than contradictory.
+   */
+  private fun partMetadata(
+    spec: LegendSpec,
+    part: String,
+    datum: VegaValue,
+    base: NodeMetadata,
+  ): NodeMetadata {
+    val block = spec.encode[part]?.effective ?: return base
+    val encoder = channels ?: return base
+    val tooltip =
+      block["tooltip"]?.let { encoder.channelAny(it, datum) }?.takeIf { it !is VegaValue.Null }
+    val cursor = block["cursor"]?.let { encoder.channelText(it, datum) }?.takeIf { it.isNotEmpty() }
+    val zindex = block["zindex"]?.let { encoder.channelNumber(it, datum) }?.toInt()
+    val hidden = block["aria"]?.let { encoder.channelBoolean(it, datum) } == false
+    val description =
+      block["description"]?.let { encoder.channelText(it, datum) }?.takeIf { it.isNotBlank() }
+    return base.copy(
+      tooltip = tooltip ?: base.tooltip,
+      cursor = cursor ?: base.cursor,
+      zindex = zindex ?: base.zindex,
+      accessibility =
+        when {
+          hidden -> null
+          description != null ->
+            AccessibilityDescriptor(label = description, role = "graphics-symbol", focusable = true)
+          else -> base.accessibility
+        },
+    )
+  }
+
+  /**
    * One legend, sized but not yet placed.
    *
    * Its node id is reserved before its content is built, so a legend group still numbers lower than
@@ -376,7 +417,13 @@ internal class LegendBuilder(
       y = padding + (if (beside) along else past),
       layout = layout,
       fill = GuideStyle.fill(spec.titleStyle, LegendDefaults.titleColor),
-      metadata = NodeMetadata(role = "legend-title", markName = spec.scale),
+      metadata =
+        partMetadata(
+          spec,
+          "title",
+          VegaValue.EmptyObject,
+          NodeMetadata(role = "legend-title", markName = spec.scale),
+        ),
     )
   }
 
@@ -492,7 +539,13 @@ internal class LegendBuilder(
           // property that could express one.
           opacity =
             entryNumber(spec, "symbols", "opacity", entry) ?: spec.symbolStyle.opacity ?: 1.0,
-          metadata = NodeMetadata(role = "legend-symbol", markName = scaleName, datumIndex = index),
+          metadata =
+            partMetadata(
+              spec,
+              "symbols",
+              entryDatum(entry),
+              NodeMetadata(role = "legend-symbol", markName = scaleName, datumIndex = index),
+            ),
         ),
         TextNode(
           id = ids.allocate(),
@@ -500,7 +553,13 @@ internal class LegendBuilder(
           y = centre,
           layout = textEngine.layout(run),
           fill = GuideStyle.fill(spec.labelStyle, LegendDefaults.labelColor),
-          metadata = NodeMetadata(role = "legend-label", markName = scaleName, datumIndex = index),
+          metadata =
+            partMetadata(
+              spec,
+              "labels",
+              entryDatum(entry),
+              NodeMetadata(role = "legend-label", markName = scaleName, datumIndex = index),
+            ),
         ),
       )
     }
@@ -794,7 +853,13 @@ internal class LegendBuilder(
         // `gradientOpacity` fades the whole ramp — the outline with the colours — because upstream
         // puts it on the item rather than on either paint.
         opacity = numbers.resolve(spec.gradientOpacity, scaleName) ?: 1.0,
-        metadata = NodeMetadata(role = "legend-gradient", markName = scaleName),
+        metadata =
+          partMetadata(
+            spec,
+            "gradient",
+            VegaValue.EmptyObject,
+            NodeMetadata(role = "legend-gradient", markName = scaleName),
+          ),
       )
 
     val nodes = mutableListOf<SceneNode>(swatch)
@@ -827,7 +892,13 @@ internal class LegendBuilder(
           y = if (vertical) (1.0 - fraction) * length else thickness + labelOffset,
           layout = textEngine.layout(run),
           fill = GuideStyle.fill(spec.labelStyle, LegendDefaults.labelColor),
-          metadata = NodeMetadata(role = "legend-label", markName = scaleName, datumIndex = index),
+          metadata =
+            partMetadata(
+              spec,
+              "labels",
+              entryDatum(entry),
+              NodeMetadata(role = "legend-label", markName = scaleName, datumIndex = index),
+            ),
         )
     }
 
@@ -950,7 +1021,16 @@ internal class LegendBuilder(
           y = if (vertical) (1.0 - fraction) * length else thickness + labelOffset,
           layout = textEngine.layout(run),
           fill = GuideStyle.fill(spec.labelStyle, LegendDefaults.labelColor),
-          metadata = NodeMetadata(role = "legend-label", markName = scaleName, datumIndex = index),
+          metadata =
+            partMetadata(
+              spec,
+              "labels",
+              // A ramp's label has the value it marks and the words it drew, which is the same
+              // datum
+              // shape a symbol legend's entry carries.
+              entryDatum(Entry(VegaValue.Num(values[index]), label(index, values[index]))),
+              NodeMetadata(role = "legend-label", markName = scaleName, datumIndex = index),
+            ),
           // The lowest band has no lower bound to write; the item is still here and still measured.
           absent = index == 0 && spec.values == null,
         )
@@ -1310,20 +1390,28 @@ internal class LegendBuilder(
       fill = backgroundFill,
       stroke = backgroundStroke,
       cornerRadius = numbers.resolve(spec.cornerRadius, spec.scale ?: "legend") ?: 0.0,
+      // The legend's own group takes the five item channels too, from its `encode.legend` block:
+      // a whole legend can be given a tooltip, a cursor or a place in the paint order.
       metadata =
-        NodeMetadata(
-          role = "legend",
-          markName = built.spec.scale,
-          // `aria: false` takes the legend out of the accessibility tree; a `description` replaces
-          // the caption this engine generates from the scale.
-          accessibility =
-            if (!spec.aria) {
-              null
-            } else {
-              (spec.description ?: caption(built))?.let {
-                AccessibilityDescriptor(label = it, role = "graphics-symbol", focusable = true)
-              }
-            },
+        partMetadata(
+          spec,
+          "legend",
+          VegaValue.EmptyObject,
+          NodeMetadata(
+            role = "legend",
+            markName = built.spec.scale,
+            // `aria: false` takes the legend out of the accessibility tree; a `description`
+            // replaces
+            // the caption this engine generates from the scale.
+            accessibility =
+              if (!spec.aria) {
+                null
+              } else {
+                (spec.description ?: caption(built))?.let {
+                  AccessibilityDescriptor(label = it, role = "graphics-symbol", focusable = true)
+                }
+              },
+          ),
         ),
     )
   }

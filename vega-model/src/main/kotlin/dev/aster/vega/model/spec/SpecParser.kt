@@ -563,6 +563,17 @@ private fun textEncodeMap(prefix: String): Map<String, String> =
  * budget example moves its labels to the start of each band with `{"scale": "x", "field":
  * "value"}`.
  */
+/**
+ * The five channels that reach a guide item rather than its geometry or its paint.
+ *
+ * A hoverable axis label, a tick that says what it marks, a label raised over its neighbours, a
+ * decorative title kept out of the accessibility tree. Each is already a mark channel and none was
+ * reachable from a guide; each is resolved against the part's own datum in the builder, which is
+ * why they are listed as resolved rather than folded — a tooltip reading `datum.value` has no
+ * constant to fold.
+ */
+private val GUIDE_ITEM_CHANNELS = setOf("tooltip", "cursor", "zindex", "aria", "description")
+
 private val RESOLVED_GUIDE_CHANNELS =
   setOf(
     // An axis label's position, which no property can say.
@@ -2094,6 +2105,9 @@ public class SpecParser {
           when {
             // Resolved later, against the item the guide is drawing, so nothing to say here.
             "$part.$pass.$channel" in RESOLVED_GUIDE_CHANNELS -> Unit
+            // The five item channels are resolved on **every** part, so they are matched by name
+            // rather than listed per part — eighty entries that would all say the same thing.
+            channel in GUIDE_ITEM_CHANNELS -> Unit
             // A guide writes its own text and position into `update` on every pass, so a
             // specification's `enter` for one of those is overwritten before anything is drawn.
             // Upstream ignores it too — `enter: {text: {value: 'E'}}` on an axis label leaves the

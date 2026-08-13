@@ -237,6 +237,9 @@ public class AxisBuilder(
         }
       for (tick in ticks) {
         val at = tickCoordinate(tick.position, spec)
+        // Per gridline, for the same reason as a tick: the `encode` block may read the value it
+        // marks.
+        val gridMetaFor = partMetadata(spec, "grid", tickDatum(tick), gridMeta)
         children +=
           when (spec.orient) {
             Orient.BOTTOM,
@@ -248,7 +251,7 @@ public class AxisBuilder(
                 at,
                 gridRange.second + undoOffset,
                 gridStroke,
-                metadata = gridMeta,
+                metadata = gridMetaFor,
               )
             Orient.LEFT,
             Orient.RIGHT ->
@@ -259,7 +262,7 @@ public class AxisBuilder(
                 gridRange.second + undoOffset,
                 at,
                 gridStroke,
-                metadata = gridMeta,
+                metadata = gridMetaFor,
               )
           }
       }
@@ -268,17 +271,20 @@ public class AxisBuilder(
     if (spec.ticks) {
       val tickMeta = NodeMetadata(role = "axis-tick")
       for (tick in ticks) {
+        // Per tick rather than once, because a tooltip may read the tick's own value: `{"signal":
+        // "datum.value"}` on a tick is how an axis says what each mark stands for.
+        val tickMetaFor = partMetadata(spec, "ticks", tickDatum(tick), tickMeta)
         val at = tickCoordinate(tick.position, spec)
         val tickNode =
           when (spec.orient) {
             Orient.BOTTOM ->
-              RuleNode(ids.allocate(), at, 0.0, at, tickSize, tickStroke, metadata = tickMeta)
+              RuleNode(ids.allocate(), at, 0.0, at, tickSize, tickStroke, metadata = tickMetaFor)
             Orient.TOP ->
-              RuleNode(ids.allocate(), at, 0.0, at, -tickSize, tickStroke, metadata = tickMeta)
+              RuleNode(ids.allocate(), at, 0.0, at, -tickSize, tickStroke, metadata = tickMetaFor)
             Orient.LEFT ->
-              RuleNode(ids.allocate(), 0.0, at, -tickSize, at, tickStroke, metadata = tickMeta)
+              RuleNode(ids.allocate(), 0.0, at, -tickSize, at, tickStroke, metadata = tickMetaFor)
             Orient.RIGHT ->
-              RuleNode(ids.allocate(), 0.0, at, tickSize, at, tickStroke, metadata = tickMeta)
+              RuleNode(ids.allocate(), 0.0, at, tickSize, at, tickStroke, metadata = tickMetaFor)
           }
         drawn += tickNode
         measured += tickNode
@@ -371,7 +377,8 @@ public class AxisBuilder(
             // It still measures: upstream bounds a text item from its geometry whatever its
             // opacity, and only overlap removal takes one out of the measurement.
             opacity = labelChannel(spec, "opacity", tick) ?: 1.0,
-            metadata = NodeMetadata(role = "axis-label"),
+            metadata =
+              partMetadata(spec, "labels", tickDatum(tick), NodeMetadata(role = "axis-label")),
           )
       }
       // An axis removes overlapping labels only when asked; a legend does it by default. The
@@ -415,7 +422,10 @@ public class AxisBuilder(
 
     if (spec.domainLine) {
       val domainStroke = GuideStyle.stroke(spec.domainStyle, AxisDefaults.domainColor)
-      val domainMeta = NodeMetadata(role = "axis-domain")
+      // The domain line has no tick of its own, so its `encode` resolves against nothing — the same
+      // empty datum a title uses.
+      val domainMeta =
+        partMetadata(spec, "domain", VegaValue.EmptyObject, NodeMetadata(role = "axis-domain"))
       // Upstream encodes the domain line's endpoints as range positions 0 and 1 of the axis scale,
       // so a scale that does not span the whole plotting area gets a correspondingly short line.
       val span = (scale as? PositionScale)?.range
@@ -628,7 +638,13 @@ public class AxisBuilder(
             else -> 0.0
           },
       fill = GuideStyle.fill(spec.titleStyle, AxisDefaults.titleColor),
-      metadata = NodeMetadata(role = "axis-title", markName = spec.scale),
+      metadata =
+        partMetadata(
+          spec,
+          "title",
+          VegaValue.EmptyObject,
+          NodeMetadata(role = "axis-title", markName = spec.scale),
+        ),
     )
   }
 
@@ -840,6 +856,55 @@ public class AxisBuilder(
    * Neither has a guide *property* upstream, which is why they are resolved here rather than
    * folded.
    */
+  /**
+   * The item metadata one part of a guide's `encode` can carry: a tooltip, a cursor, a paint order
+   * and what a screen reader hears.
+   *
+   * These are the five that reach the **item** rather than its geometry or its paint, and a guide
+   * had no way to set any of them: a hoverable axis label, a tick that says what it marks, a label
+   * raised over its neighbours, a decorative title kept out of the accessibility tree. Every one is
+   * already a mark channel, and this is the same reading against the guide's own datum.
+   *
+   * `aria: false` removes the item from the tree — upstream marks it `aria-hidden` — and
+   * `description` replaces what would otherwise be spoken. The two are read together for that
+   * reason: a description on an item that has opted out is not a contradiction, it is simply
+   * unreachable.
+   */
+  private fun partMetadata(
+    spec: AxisSpec,
+    part: String,
+    datum: VegaValue,
+    base: NodeMetadata,
+  ): NodeMetadata {
+    val block = spec.encode[part]?.update ?: return base
+    val encoder = channels ?: return base
+    fun channel(name: String) = block[name]
+    val tooltip =
+      channel("tooltip")?.let { encoder.channelAny(it, datum) }?.takeIf { it !is VegaValue.Null }
+    val cursor =
+      channel("cursor")?.let { encoder.channelText(it, datum) }?.takeIf { it.isNotEmpty() }
+    val zindex = channel("zindex")?.let { encoder.channelNumber(it, datum) }?.toInt()
+    val hidden = channel("aria")?.let { encoder.channelBoolean(it, datum) } == false
+    val description =
+      channel("description")?.let { encoder.channelText(it, datum) }?.takeIf { it.isNotBlank() }
+    return base.copy(
+      tooltip = tooltip ?: base.tooltip,
+      cursor = cursor ?: base.cursor,
+      zindex = zindex ?: base.zindex,
+      accessibility =
+        when {
+          hidden -> null
+          description != null ->
+            AccessibilityDescriptor(label = description, role = "graphics-symbol", focusable = true)
+          else -> base.accessibility
+        },
+    )
+  }
+
+  /** The datum a guide part's `encode` resolves against: the tick, or nothing for a title. */
+  private fun tickDatum(tick: Tick): VegaValue =
+    VegaValue.Obj(linkedMapOf("value" to tick.value, "label" to VegaValue.Str(tick.label)))
+
   /** A text channel of the axis **title**'s own `encode`, whose datum is empty. */
   private fun titleString(spec: AxisSpec, channel: String): String? {
     val encoder = channels ?: return null

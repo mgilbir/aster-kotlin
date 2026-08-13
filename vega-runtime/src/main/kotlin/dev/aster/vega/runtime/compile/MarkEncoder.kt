@@ -176,6 +176,19 @@ public class MarkEncoder(
   /** The same, as text: a legend label read through a scale turns an id into a name. */
   public fun channelText(channel: ChannelValue, datum: VegaValue): String? = string(channel, datum)
 
+  /** The same, as a boolean: `aria: false` takes an item out of the accessibility tree. */
+  public fun channelBoolean(channel: ChannelValue, datum: VegaValue): Boolean? =
+    boolean(channel, datum)
+
+  /**
+   * The same, as whatever it is: a tooltip may be a string, a number or a whole object.
+   *
+   * Exposed for the guides, whose parts can carry a tooltip the way a mark's items can — and a
+   * tooltip's *type* is the point, since an object becomes a table where a string becomes one line.
+   */
+  public fun channelAny(channel: ChannelValue, datum: VegaValue): VegaValue? =
+    channelValue(channel, datum)
+
   /**
    * A mark's scene items, as data another mark can be drawn from.
    *
