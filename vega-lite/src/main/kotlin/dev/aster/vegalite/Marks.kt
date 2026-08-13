@@ -371,7 +371,15 @@ internal object Marks {
       put("style", strings(styles(view)))
       // `interactiveFlag`: a chart with a selection in it has to let the pointer reach its marks.
       // Without a selection anywhere, the property is left off entirely rather than written false.
-      if (view.selections.isNotEmpty()) put("interactive", VegaValue.Bool(true))
+      // Which marks are reachable is the view's own business, not the chart's: a plot that declares
+      // no selection is written **false**, so a click there falls through to the plot that does.
+      if (view.selections.isNotEmpty()) {
+        val own =
+          view.selections.any { it.owner == null || it.owner === view } ||
+            view.spec.encoding.containsKey("tooltip") ||
+            view.markDef.raw.fields.containsKey("tooltip")
+        put("interactive", VegaValue.Bool(own))
+      }
       if (view.markDef.raw.fields["aria"] == VegaValue.Bool(false)) {
         put("aria", VegaValue.Bool(false))
       }

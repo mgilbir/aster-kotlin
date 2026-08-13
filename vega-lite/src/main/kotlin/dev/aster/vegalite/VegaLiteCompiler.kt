@@ -78,6 +78,28 @@ private class Compilation(
   /** The selections this chart declares, which the data, the signals and the marks all read. */
   private val selections: List<Selection> = Selection.of(spec)
 
+  /**
+   * The signals a selection is worked by: the tuple it writes, and for an interval the drag itself.
+   *
+   * These live beside the marks they react to — at the top of a chart that is one plot, and inside
+   * the plot's group in a concatenation — because the events they listen for are scoped to a group.
+   */
+  private fun machinery(selection: Selection, views: List<UnitView>): List<VegaValue> {
+    if (selection.type != "interval") return selection.signals(unit = selection.unitName())
+    val view = selection.owner ?: views.firstOrNull() ?: return emptyList()
+    return selection.intervalSignals(view, selection.initial) +
+      selection.intervalTail(view, unit = selection.unitName(), initial = selection.initial)
+  }
+
+  /** The brush a selection is dragged as, drawn around the marks of the plot that declared it. */
+  private fun brushed(views: List<UnitView>, marks: List<VegaValue>): List<VegaValue> {
+    val own = selections.filter { it.owner == null || it.owner in views }
+    val view = views.firstOrNull() ?: return marks
+    return own.flatMap { it.brushMarks(it.owner ?: view, it.unitName(), background = true) } +
+      marks +
+      own.flatMap { it.brushMarks(it.owner ?: view, it.unitName(), background = false) }
+  }
+
   /** Which of a composition's scales and guides its children share, and which they do not. */
   private val resolve = Resolve(spec.obj("resolve"))
   private val parser = Parse(config, diagnostics, selections)
@@ -112,6 +134,13 @@ private class Compilation(
 
     val views = plots.flatMap { it.views }
     views.forEach { it.selections = selections }
+    // A selection belongs to the view that declared it, which is only known now that the views are
+    // named: `brush` in the second plot of a concatenation records `"concat_1"` in every tuple, and
+    // draws its brush in that plot rather than across the chart.
+    for (view in views) {
+      val declared = Selection.from(view.spec.params).map { it.name }.toSet()
+      selections.filter { it.name in declared && it.owner == null }.forEach { it.owner = view }
+    }
     // A concatenation scales each of its plots separately along the axes and shares everything
     // else — `defaultScaleResolve` — so the position scales are merged within a plot and the rest
     // across the whole chart. That is why two plots side by side have their own `y` but one colour
@@ -203,7 +232,9 @@ private class Compilation(
         selectionSignals +
         selections.map { it.resolveSignal() } +
         Params.signals(spec, diagnostics) +
-        selections.flatMap { it.signals(unit = "\"\"") }
+        // A concatenation writes each selection's machinery inside the plot that declared it,
+        // where the marks it reacts to are; everything else is one plot, so it stays here.
+        selections.filter { concat == null || it.owner == null }.flatMap { machinery(it, views) }
     val root = plots.first().size!!
     // The facets' own values, which the layout counts and the headers title themselves from — and,
     // for a wrapped facet, only along the directions a shared axis was actually drawn in.
@@ -245,7 +276,10 @@ private class Compilation(
       viewEncode()?.let { put("encode", it) }
       // A selection's **store** comes first, ahead of every table: nothing derives from it and
       // everything reads it, and upstream's assembly puts the selection data at the head.
-      put("data", arr(selections.map { it.storeData() } + data))
+      put(
+        "data",
+        arr(selections.map { it.storeData(it.owner ?: views.firstOrNull(), it.initial) } + data),
+      )
       if (sizeSignals.isNotEmpty()) put("signals", arr(sizeSignals))
       // A stated `spacing` is the gap between cells, and it beats the configured twenty.
       facet?.let {
@@ -260,7 +294,15 @@ private class Compilation(
         cellScales =
           allScales.values.filter { it.name() != it.channel }.map { withinCell(assembleScale(it)) }
       }
-      put("marks", arr(if (concat == null) marks(views, plots.single().axes) else groups(plotTree)))
+      // A brush is drawn in **two** parts around the marks: its background under them so the data
+      // stays legible through it, and its outline over them so it can be grabbed.
+      put(
+        "marks",
+        arr(
+          if (concat != null) groups(plotTree)
+          else brushed(views, marks(views, plots.single().axes))
+        ),
+      )
       // Shared scales first, then each plot's own, which is the order upstream's assembly walks the
       // model tree in: the composition's own components before it recurses into its children.
       val scales =
@@ -668,9 +710,11 @@ private class Compilation(
           )
         },
       )
-      val local = localSizeSignals(plot)
+      val local =
+        localSizeSignals(plot) +
+          selections.filter { it.owner in plot.views }.flatMap { machinery(it, plot.views) }
       if (local.isNotEmpty()) put("signals", arr(local))
-      put("marks", arr(plot.views.flatMap { Marks.marks(it) }))
+      put("marks", arr(brushed(plot.views, plot.views.flatMap { Marks.marks(it) })))
       if (plot.axes.isNotEmpty()) put("axes", arr(plot.axes))
       if (plot.legends.isNotEmpty()) put("legends", arr(plot.legends))
     }

@@ -104,7 +104,9 @@ internal class DataPipeline(
     val parse = LinkedHashMap<String, String>()
     // A filter's comparisons say what type its column holds, and that has to be settled before the
     // filter runs — so these parses belong with the encoding's, not after them.
-    parse.putAll(Transforms(diagnostics).implicitParses(view.spec.transforms))
+    parse.putAll(
+      Transforms(diagnostics, selections = view.selections).implicitParses(view.spec.transforms)
+    )
     for ((_, def) in view.spec.encoding) {
       val field = def.field
       if (!def.isFieldDef || field == null) continue
@@ -154,7 +156,8 @@ internal class DataPipeline(
     // A column a transform computed is *derived*: it has the type its transform gave it, and the
     // loader has never seen it.
     parse.keys.removeAll(
-      Transforms(diagnostics).producedFields(view.spec.transforms, view.spec.data)
+      Transforms(diagnostics, selections = view.selections)
+        .producedFields(view.spec.transforms, view.spec.data)
     )
     return if (parse.isEmpty()) null else ParseNode(parse)
   }
@@ -169,7 +172,7 @@ internal class DataPipeline(
    * table, because the ordering is over the rows as they will be grouped.
    */
   private fun sortIndexNode(): PassThroughNode? {
-    val predicates = Transforms(diagnostics)
+    val predicates = Transforms(diagnostics, selections = view.selections)
     val transforms =
       view.spec.encoding.entries.mapNotNull { (channel, def) ->
         val order = def.sort as? VegaValue.Arr ?: return@mapNotNull null
@@ -604,7 +607,7 @@ internal class DataPipeline(
    */
   private fun userTransforms(head: DataNode): DataNode {
     var last = head
-    val transforms = Transforms(diagnostics, registerLookup, view::prefixed)
+    val transforms = Transforms(diagnostics, registerLookup, view::prefixed, view.selections)
     view.spec.transforms.forEachIndexed { index, transform ->
       val path = "$.transform[$index]"
       for (emitted in transforms.translateAt(transform, path)) {

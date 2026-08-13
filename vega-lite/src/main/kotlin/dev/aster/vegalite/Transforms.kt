@@ -32,6 +32,8 @@ internal class Transforms(
   private val registerLookup: ((VegaValue) -> String)? = null,
   /** How a signal is named through the view it belongs to, a bin publishing two of them. */
   private val prefix: (String) -> String = { it },
+  /** The chart's selections, which a `{"param": …}` predicate is tested against. */
+  private val selections: List<Selection> = emptyList(),
 ) {
 
   /**
@@ -677,6 +679,23 @@ internal class Transforms(
       predicate is VegaValue.Obj && predicate.has("not") ->
         predicateExpression(predicate.fields["not"], path, subject)?.let { "!($it)" }
       predicate is VegaValue.Obj && predicate.has("field") -> fieldPredicate(predicate, path)
+      // `{"param": "brush"}` — a row passes if the selection picked it, which is the whole of how
+      // one plot filters another. `empty: false` withdraws the empty store's blanket pass.
+      predicate is VegaValue.Obj && predicate.has("param") -> {
+        val named = predicate.string("param")
+        val selection = selections.firstOrNull { it.name == named }
+        if (selection == null) {
+          diagnostics.error(
+            VegaLiteDiagnostics.UNSUPPORTED_TRANSFORM,
+            "This `$subject` tests the parameter `$named`, which the chart does not declare as a " +
+              "selection; only a selection can be filtered on.",
+            jsonPath = path,
+          )
+          null
+        } else {
+          selection.test(emptyPasses = predicate.fields["empty"] != VegaValue.Bool(false))
+        }
+      }
       else -> {
         diagnostics.error(
           VegaLiteDiagnostics.UNSUPPORTED_TRANSFORM,

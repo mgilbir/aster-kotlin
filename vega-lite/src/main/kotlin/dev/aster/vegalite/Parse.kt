@@ -39,6 +39,7 @@ internal class Parse(
       transforms = spec.array("transform") ?: emptyList(),
       width = spec.fields["width"],
       height = spec.fields["height"],
+      params = spec.array("params").orEmpty(),
     )
   }
 
@@ -223,10 +224,10 @@ internal class Parse(
             )
             return@mapIndexedNotNull null
           }
-          selection.test(negated = obj.fields["empty"] == VegaValue.Bool(false))
+          selection.test(emptyPasses = obj.fields["empty"] != VegaValue.Bool(false))
         } else {
-          Transforms(diagnostics).testExpression(obj.fields["test"], "$at.test")
-            ?: return@mapIndexedNotNull null
+          Transforms(diagnostics, selections = selections)
+            .testExpression(obj.fields["test"], "$at.test") ?: return@mapIndexedNotNull null
         }
       channelDef(channel, obj, at)?.copy(test = test)
     }

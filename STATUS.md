@@ -678,7 +678,7 @@ no data is needed to compare two compilers. So every one of them was compiled by
 by this one, and the outputs compared property by property. That is a *measurement*, not a gate: the
 examples are not fixtures here, and nothing about them is checked in.
 
-**124 of 627 matched exactly** at the start, and **159** do now. 16 were refused by name, and of those 8 are geographic,
+**124 of 627 matched exactly** at the start, and **428** do now. 16 were refused by name, and of those 8 are geographic,
 3 are a facet inside a facet, 2 a repeat inside a concatenation, and 2 are the `trail` mark — which
 this runtime draws and this compiler had simply not been told about.
 
@@ -2177,6 +2177,43 @@ channel's **conditions** hold field definitions of their own — a colour writte
 only thing naming that field in the mark's spoken description, and the only thing the legend can be
 built from. And the pointer becomes a hand over a clickable mark but not over a *hovered* one,
 `on: "pointerover"` being a selection nobody clicks.
+
+### Intervals, and who a selection belongs to
+
+A **point** selection is a click; an **interval** is a drag, and a drag has to be represented before
+it can be recorded. Per projected channel there are two signals — the extent in *pixels*, which the
+pointer writes, and the extent in *data*, which is the first inverted through the scale — and the
+pixel signal answers to six streams: the press that starts the brush, the move that drags it, the
+scale change that rewrites it, the double click that clears it, and the pan and zoom that move it
+whole. Around them sit a `_scale_trigger` that fires when a scale the brush reads is rebuilt, and
+the brush itself, drawn as **two** rects: a background under the marks so the data stays legible
+through it, and an outline over them so the pointer can grab it.
+
+What a projection *stores* follows the scale, and it is not a detail: a continuous scale stores the
+**range** the drag named, because a drag over a continuous axis names an interval; a band or a point
+scale stores the **categories** the drag covered, because between two categories there is nothing.
+The same distinction decides what a scale change does — a continuous scale can be panned, so the
+brush is rewritten in its new pixels, while a discrete one cannot, so any other change to its domain
+clears the brush (`[0, 0]`). And the `+` that coerces both sides of the scale-trigger comparison is
+only written where the domain is numeric: `+"USA"` is not a comparison.
+
+The larger correction is about **ownership**. A selection is declared on a *unit*, and until now the
+compiler read only the chart's top-level `params` — which is right for a single view and wrong for
+everything else. Upstream reads `spec.params` off the unit model and nowhere else, so a brush in the
+second plot of a concatenation records `"concat_1"` in every tuple, writes its machinery inside that
+plot's group, and draws its brush around that plot's marks. That is what makes one plot filter
+another, and it is why `interactive` is per view rather than per chart: a plot that declares no
+selection is written `interactive: false`, so a click there falls through to the plot that does.
+
+Two rules that fell out of the fixtures. A projection is named by the field the **marks** are placed
+by — a brush over `yearmonth(date)` remembers `yearmonth_date`, not `date`, or an inverted pixel
+extent has nothing comparable to compare with — and a channel that *aggregates* cannot be projected
+at all, there being no row-level value to test. And `empty: false` does not **negate** a selection
+test: it withdraws the empty store's blanket pass, so nothing is picked until something is. Negating
+it instead drew every row picked until the first click and none of them after it.
+
+A `filter` transform can now name a selection, which is the other half of one plot filtering another;
+`bind` — to `"scales"`, to `"legend"` or to an input element — is still not implemented.
 
 ### Two runtime gaps this batch names but does not close
 

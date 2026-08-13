@@ -157,6 +157,13 @@ internal class UnitSpec(
   val transforms: List<VegaValue>,
   val width: VegaValue?,
   val height: VegaValue?,
+  /**
+   * The parameters this **unit** declares, which is where a selection is defined.
+   *
+   * `unit.ts` reads `spec.params` off the unit model and nowhere else: a selection belongs to the
+   * one view it was declared in, and that view's name is the `unit` every picked tuple records.
+   */
+  val params: List<VegaValue> = emptyList(),
 ) {
   val mark: String
     get() = markDef.type
