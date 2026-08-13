@@ -325,6 +325,28 @@ public class Evaluator(
     }
 
     /*
+     * `isTuple(x)` — whether the value is a **row of a dataset** rather than an object written down.
+     *
+     * Upstream answers from identity: every tuple its dataflow produces carries an id under a Symbol,
+     * and `isTuple` looks for it. This engine's rows are plain objects and attaching an id to all of
+     * them would cost the whole value model — memory, equality, serialisation — for one predicate.
+     *
+     * So the question is answered from **origin** instead, which is what that id records anyway: the
+     * argument is a tuple when it *came from* the data. `datum`, anything reached through it, an
+     * element of `data('name')`, and a scene item's `.datum` are tuples; an object or array literal is
+     * not, and neither is a number, a string or null. Every one of those was probed and every one
+     * agrees.
+     *
+     * What this cannot see is a value **laundered through a signal**: `isTuple(mySignal)` is false
+     * here whatever the signal holds, where upstream would answer from the value. A signal holding a
+     * row is not something a specification writes — probed: a signal holding an object *literal* is
+     * false on both sides — but it is the edge, and it is stated rather than hidden.
+     */
+    if (name == "isTuple" && node.arguments.isNotEmpty()) {
+      return VegaValue.Bool(fromData(node.arguments[0]))
+    }
+
+    /*
      * The `vlSelection*` family: a selection is an ordinary dataset, so these read one by name.
      *
      * `vlSelectionTuples` is the odd one out — it takes the *items* rather than a dataset name,
@@ -513,4 +535,23 @@ public class Evaluator(
         message = "Unsupported operator '$operator'",
       )
     )
+
+  /**
+   * Whether an expression names something that came out of the data, for `isTuple`.
+   *
+   * Walks the syntax rather than the value, because that is where the provenance still is. `datum`
+   * and `data(...)` are the two roots; a member or an index of either is still data, which is what
+   * makes `data('t')[0]` and `item.datum` both tuples.
+   */
+  private fun fromData(node: Node): Boolean =
+    when (node) {
+      is Node.Identifier -> node.name == "datum"
+      // `item.datum` is a tuple wherever the item came from, and so is anything reached through
+      // one — `data('t')[0]` is an index, `datum.nested` a member.
+      is Node.Member ->
+        (node.property as? Node.Identifier)?.name == "datum" || fromData(node.target)
+      is Node.Call ->
+        (node.callee as? Node.Identifier)?.name.let { it == "data" || it == "treePath" }
+      else -> false
+    }
 }

@@ -200,6 +200,7 @@ class ExpressionReferenceTest {
         "vlSelectionIdTest",
         "vlSelectionResolve",
         "vlSelectionTuples",
+        "isTuple",
         "random",
         "sampleNormal",
         "sampleLogNormal",

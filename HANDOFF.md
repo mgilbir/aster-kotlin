@@ -425,6 +425,19 @@ property* can carry one — the styling block records it and everything read thr
 resolves it. A channel aimed at a plain string property (`symbolType`, `orient`, `format`) is still
 named, because folding an object into one would stringify it.
 
+**`Functions.knownUnsupported` is empty, and it should stay that way.** It is a list of work, not a
+verdict: every entry that was ever on it came off, and each excuse was softer than it read. If you add
+one, add the reason too — the evaluator reads it out instead of saying "unknown function" — but treat
+it as a to-do. The two rules that survived the emptying are worth knowing:
+
+- A function whose *observable* answer with no browser and no running view matches upstream's in the
+  same position is **implemented**, not excused: `screen`, `windowSize`, `intersect`, `inScope`. A
+  compiled scene is permanently in that position and so is `renderer: 'none'`, which is what the
+  oracle renders every fixture in.
+- A function whose return value upstream cannot use from a specification at all — probed on every
+  channel that accepts one — is implemented as the part of it a value model can hold, and the
+  divergence is stated in the KDoc: `pathShape`, `geoShape`, `copy`.
+
 Run the same subtraction over the *encode* vocabulary and the pattern repeats: several channels
 reported as unimplemented had a property behind them all along, one map entry away in
 `AXIS_ENCODE_PARTS`/`LEGEND_ENCODE_PARTS`. Both maps and both whole-block gaps (`encode.gradient` and

@@ -87,20 +87,25 @@ public object Functions {
     )
 
   /**
-   * Functions upstream provides that this engine deliberately does not.
+   * Functions upstream provides that this engine deliberately does not — and there are none.
    *
-   * Listed by name with a reason so the evaluator can say *why* rather than just "unknown
-   * function".
+   * The table stays because it is the right shape for the answer: a name here gets a reason instead
+   * of a bare "unknown function". It emptied one entry at a time, and the last few are worth
+   * knowing about because each excuse turned out to be softer than it read. "Needs a strptime"
+   * became a strptime. "A date is indistinguishable from a number" became `VegaValue.Timestamp`,
+   * and finding that out exposed `isNumber` lying about dates. "Selection helpers need the
+   * selection subsystem" became the observation that a selection is an ordinary dataset. `screen`,
+   * `windowSize`, `intersect` and `inScope` answer what upstream answers with no browser and no
+   * running view, which is a compiled scene's permanent position rather than a gap. `pathShape`,
+   * `geoShape` and `copy` return the one part of upstream's answer a value model can hold, and
+   * upstream's own return value cannot be used from a specification at all — probed on every
+   * channel that accepts one.
+   *
+   * If something is genuinely not implemented, it belongs here with a reason. An empty map is a
+   * claim that nothing is, and `ExpressionReferenceTest` checks it against upstream's own function
+   * table.
    */
-  public val knownUnsupported: Map<String, String> =
-    mapOf(
-      // The two type predicates whose answer depends on a representation this engine does not
-      // share.
-      "isTuple" to
-        "a tuple is a row carrying the dataflow's own identity, which this engine does not attach; " +
-          "upstream answers true for a row from a dataset and false for an object literal, and " +
-          "there is nothing here to tell the two apart"
-    )
+  public val knownUnsupported: Map<String, String> = emptyMap()
 
   /** A runaway step cannot spin forever; no axis has this many boundaries. */
   private const val MAX_SEQUENCE: Int = 100_000

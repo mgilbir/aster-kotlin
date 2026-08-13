@@ -244,17 +244,22 @@ class ParserTest {
   }
 
   @Test
-  fun `a deliberately excluded function explains why`() {
-    // `geoBounds` used to be the example here, then `vlSelectionTest`; both are implemented now.
-    // What is left is one function whose answer depends on a **representation** rather than on an
-    // algorithm: a tuple is a row carrying the dataflow's own identity, and this engine's rows do
-    // not
-    // carry one, so `isTuple` cannot tell a datum from an object literal the way upstream can.
+  fun `nothing is deliberately excluded, and an unknown name still explains itself`() {
+    // The list this test was written for is **empty**. `geoBounds` was the first example, then
+    // `vlSelectionTest`, then `isTuple`; every one of them is implemented now. What is left to
+    // check
+    // is that the mechanism still works — a name upstream does not have either is a diagnostic
+    // rather
+    // than a silence, and it says what it could not find.
+    assertEquals(emptyMap<String, String>(), Functions.knownUnsupported)
     val failure =
       assertThrows<ExpressionEvaluationException> {
-        compiled("isTuple(datum)").evaluate(scopeOf())
+        compiled("notAFunctionAnywhere(datum)").evaluate(scopeOf())
       }
-    assertTrue(failure.diagnostic.message.contains("tuple"), failure.diagnostic.message)
+    assertTrue(
+      failure.diagnostic.message.contains("notAFunctionAnywhere"),
+      failure.diagnostic.message,
+    )
   }
 
   @Test

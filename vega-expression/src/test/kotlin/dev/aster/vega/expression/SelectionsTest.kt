@@ -79,6 +79,30 @@ class SelectionsTest {
         value.fields.entries.joinToString(",", "{", "}") { "\"${it.key}\":${asJson(it.value)}" }
     }
 
+  /**
+   * `isTuple` answered from **origin**, which is what upstream's row identity records.
+   *
+   * Upstream marks every tuple its dataflow produces with an id under a Symbol and looks for it.
+   * Attaching an id to every row here would cost the value model its equality and its serialisation
+   * for one predicate, so the question is answered from where the value *came from* instead:
+   * `datum`, anything reached through it, an element of `data('name')`, and an item's `.datum` are
+   * tuples; literals and scalars are not. Each of these was probed against upstream and each
+   * agrees.
+   *
+   * The edge, stated: a value **laundered through a signal** reads false here whatever it holds. A
+   * signal carrying a dataset row is not something a specification writes, and a signal carrying an
+   * object literal — which is what one does write — is false on both sides.
+   */
+  @Test
+  fun `isTuple tells a row of data from an object written down`() {
+    assertEquals("true", evaluate("""isTuple(datum)"""))
+    assertEquals("true", evaluate("""isTuple(data('sel')[0])"""))
+    assertEquals("false", evaluate("""isTuple({a: 1})"""))
+    assertEquals("false", evaluate("""isTuple(5)"""))
+    assertEquals("false", evaluate("""isTuple(null)"""))
+    assertEquals("false", evaluate("""isTuple([1, 2])"""))
+  }
+
   @Test
   fun `a range selection unions across units and intersects on request`() {
     assertEquals("true", evaluate("""vlSelectionTest('sel', {v: 3})"""))
