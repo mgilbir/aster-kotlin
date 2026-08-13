@@ -417,11 +417,15 @@ instance — rather than the whole block being reported as unread. That is where
 Run the same subtraction over the *encode* vocabulary and the pattern repeats: several channels
 reported as unimplemented had a property behind them all along, one map entry away in
 `AXIS_ENCODE_PARTS`/`LEGEND_ENCODE_PARTS`. Both maps and both whole-block gaps (`encode.gradient` and
-`encode.legend`) are now closed. One channel is deliberately **not** folded: a ramp label's `align`
-and `baseline`, because upstream derives a gradient label's alignment from where along the bar it sits
-and reads no property for it — so the channel works there and the property does not, and folding the
-two would quietly make the property work on the one kind of legend meant to ignore it. That
-distinction is why `legendEncodeParts` has to know what kind of legend it is looking at.
+`encode.legend`) are now closed. Two channels are deliberately **not** folded, both for the same reason read from opposite ends: the
+channel and the property are not one thing. A ramp label's `align`/`baseline` — upstream derives a
+gradient label's alignment from where along the bar it sits and reads no property for it, so the
+channel works there and the property does not, which is why `legendEncodeParts` has to know what kind
+of legend it is looking at. And a symbol swatch's `fill` — upstream sets it from `symbolFillColor` and
+then *overwrites* it from the legend's own colour scale, while an `encode` block is applied after both
+and beats the scale. Folding either one would make a property work where upstream ignores it. Checked
+against the `addEncoders` tables in `vega-parser/src/parsers/guides/`, which is the list of channels
+that do have a property behind them; both maps now cover it exactly.
 - **Layout:** none. All ten of upstream's layout properties are read, and `row-footer` and
   `column-footer` are recognised roles — they used to fall through to `CELL` and be gridded among the
   cells.

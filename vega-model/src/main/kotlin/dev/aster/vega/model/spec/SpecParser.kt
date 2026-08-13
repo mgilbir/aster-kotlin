@@ -466,9 +466,18 @@ private val LEGEND_ENCODE_PARTS: Map<String, Map<String, String>> =
     // `symbolStroke` prefix the colour and width use, which is why this one is written out.
     "symbols" to
       mapOf(
+        // `fill` is **not** here, and `symbolFillColor` is why: upstream sets the channel from that
+        // property and then *overwrites* it from the legend's own colour scale, so the property
+        // only
+        // ever shows on a legend that maps no fill. A specification's `encode` block is applied
+        // after
+        // both and does beat the scale — so the channel and the property are not the same thing,
+        // and
+        // folding one into the other would put a swatch's colour back under the scale's.
         "stroke" to "symbolStrokeColor",
         "strokeWidth" to "symbolStrokeWidth",
         "strokeDash" to "symbolDash",
+        "strokeDashOffset" to "symbolDashOffset",
         "strokeOpacity" to "symbolOpacity",
         "opacity" to "symbolOpacity",
         "size" to "symbolSize",

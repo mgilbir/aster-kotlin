@@ -611,11 +611,14 @@
       "fill": "#4c78a8",
       "opacity": 1,
       "role": "legend-symbol",
-      "shapeHeight": 10.954451,
-      "shapeLeft": 89.022774,
-      "shapeTop": 35.022774,
-      "shapeWidth": 10.954451,
+      "shapeHeight": 18.954451,
+      "shapeLeft": 85.022774,
+      "shapeTop": 31.022774,
+      "shapeWidth": 18.954451,
       "size": 120,
+      "stroke": "#333333",
+      "strokeDash": "3,2 @1",
+      "strokeWidth": 2,
       "type": "symbol",
       "x": 94.5,
       "y": 40.5
@@ -637,14 +640,17 @@
       "fill": "#f58518",
       "opacity": 1,
       "role": "legend-symbol",
-      "shapeHeight": 10.954451,
-      "shapeLeft": 89.022774,
+      "shapeHeight": 18.954451,
+      "shapeLeft": 85.022774,
       "shapeTop": 53.022774,
-      "shapeWidth": 10.954451,
+      "shapeWidth": 18.954451,
       "size": 120,
+      "stroke": "#333333",
+      "strokeDash": "3,2 @1",
+      "strokeWidth": 2,
       "type": "symbol",
       "x": 94.5,
-      "y": 58.5
+      "y": 62.5
     },
     {
       "align": "right",
@@ -657,7 +663,7 @@
       "text": "b",
       "type": "text",
       "x": 105,
-      "y": 58.5
+      "y": 62.5
     },
     {
       "align": "right",
