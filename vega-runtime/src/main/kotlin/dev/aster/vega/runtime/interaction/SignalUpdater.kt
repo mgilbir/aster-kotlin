@@ -4,10 +4,11 @@ import dev.aster.vega.expression.ExpressionCompiler
 import dev.aster.vega.expression.ExpressionEvaluationException
 import dev.aster.vega.expression.ExpressionResult
 import dev.aster.vega.expression.ExpressionScope
-import dev.aster.vega.model.DiagnosticCodes
 import dev.aster.vega.model.DiagnosticCollector
 import dev.aster.vega.model.VegaValue
 import dev.aster.vega.model.spec.SignalUpdate
+import dev.aster.vega.runtime.compile.ItemEncode
+import dev.aster.vega.scene.SceneNodeId
 
 /**
  * Applies fired handlers to the signals they set.
@@ -27,12 +28,34 @@ public class SignalUpdater(
 
   private val values = LinkedHashMap<String, VegaValue>()
 
+  private val encodes = LinkedHashMap<SceneNodeId, ItemEncode>()
+
+  /**
+   * Which items a handler has re-encoded, and through which of their mark's named blocks.
+   *
+   * Handed to the next compile beside [overrides], because the scene is rebuilt from the
+   * specification each time and an overlay that was not handed back would last exactly one frame.
+   * Everything already here is marked stale as the batch ends: the pass that *applies* an overlay
+   * puts it after the mark's `update` and every pass after that puts it before, which is upstream's
+   * behaviour — see [ItemEncode].
+   */
+  public val itemEncodes: Map<SceneNodeId, ItemEncode>
+    get() = encodes
+
+  /** Called once the compile that applied them has happened. */
+  public fun ageItemEncodes() {
+    for ((id, state) in encodes.entries.toList()) {
+      if (state.fresh) encodes[id] = state.copy(fresh = false)
+    }
+  }
+
   /** Everything a handler has set so far, to be passed to the next compile as overrides. */
   public val overrides: Map<String, VegaValue>
     get() = values
 
   public fun reset() {
     values.clear()
+    encodes.clear()
   }
 
   /**
@@ -44,18 +67,9 @@ public class SignalUpdater(
     val changed = LinkedHashSet<String>()
     for (entry in fired) {
       val handler = entry.handler
-      if (handler.encode != null) {
-        // `encode` sets properties on the event's own item rather than producing a signal value.
-        // Doing it means reaching into the scene graph and mutating a node the compiler owns,
-        // which is a different shape of change from everything here.
-        diagnostics.warn(
-          DiagnosticCodes.PARSE_UNKNOWN_PROPERTY,
-          "A handler on signal '${entry.signalName}' uses 'encode', which sets properties on the " +
-            "event's mark rather than a signal value; nothing was applied",
-          operator = entry.signalName,
-        )
-        continue
-      }
+      // `encode` needs no case of its own here: the parser rewrites it into
+      // `encode(item(), '<set>')`, which is upstream's own desugaring, so it arrives as an ordinary
+      // update expression whose side effect is recorded by [HandlerScope.encodeItem].
       val update = handler.update ?: continue
       val next = evaluate(update, entry, scope) ?: continue
       val previous = values[entry.signalName] ?: scope.signal(entry.signalName)
@@ -101,16 +115,16 @@ public class SignalUpdater(
    * `datum` is the datum of the mark the event landed on, which is what makes `{"events":
    * "rect:click", "update": "datum.category"}` — the commonest handler there is — work.
    */
-  private class HandlerScope(
+  private inner class HandlerScope(
     private val delegate: ExpressionScope,
     private val pending: Map<String, VegaValue>,
     private val entry: FiredHandler,
   ) : ExpressionScope {
 
-    private val event = entry.event.asValue()
+    private val event = entry.event?.asValue() ?: VegaValue.Null
 
     override val datum: VegaValue
-      get() = entry.event.datum
+      get() = entry.event?.datum ?: VegaValue.Null
 
     override fun signal(name: String): VegaValue =
       when (name) {
@@ -119,5 +133,28 @@ public class SignalUpdater(
       }
 
     override fun dataset(name: String): List<VegaValue> = delegate.dataset(name)
+
+    /**
+     * `encode(item, set)` — the item is overlaid with one of its mark's named blocks.
+     *
+     * Recorded rather than applied: this class produces values, and the overlay is a property of a
+     * scene node the compiler owns. The **event's** item is the one meant, which is why the id
+     * comes off the event rather than out of the value handed in — upstream's `item()` is the only
+     * way a handler expression can name an item at all.
+     */
+    override fun encodeItem(item: VegaValue, set: String) {
+      val id = entry.event?.itemId ?: return
+      encodes[id] = ItemEncode(set, fresh = true)
+    }
+
+    /** `item()` — upstream's `item || {}`, so a handler firing off a mark still has an object. */
+    override fun activeItem(): VegaValue =
+      (event as? VegaValue.Obj)?.fields?.get("item") ?: VegaValue.EmptyObject
+
+    /** `xy()`, and through it `x()` and `y()`; empty for a handler no event fired. */
+    override fun eventPoint(): VegaValue =
+      entry.event?.let {
+        VegaValue.Arr(listOf(VegaValue.Num(it.rootX), VegaValue.Num(it.rootY)))
+      } ?: VegaValue.Null
   }
 }

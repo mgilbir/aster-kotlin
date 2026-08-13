@@ -134,6 +134,21 @@ public interface ExpressionScope {
   public fun geoScale(projection: String?): VegaValue = VegaValue.Null
 
   /**
+   * `gradient(scale, p0, p1[, count])` — a colour scale as a gradient a mark can be filled with.
+   *
+   * Answers the same object a specification can write by hand — `{"gradient": "linear", "x1": …,
+   * "stops": [{"offset": …, "color": …}]}` — because that is what upstream's `Gradient` is: a plain
+   * object its renderer turns into an SVG definition. So the value is usable wherever a literal one
+   * is, and the encoder does not need to know which of the two it got.
+   */
+  public fun gradient(
+    scale: String,
+    from: VegaValue,
+    to: VegaValue,
+    count: VegaValue,
+  ): VegaValue = VegaValue.Null
+
+  /**
    * `geoShape(projection, feature)` — the feature drawn through the projection, as a path.
    *
    * The same stated divergence as `pathShape`, for the same reason: upstream returns a closure no
@@ -167,6 +182,72 @@ public interface ExpressionScope {
    * what a bare expression evaluated outside a chart should do.
    */
   public fun setDataset(name: String, rows: List<VegaValue>) {}
+
+  /**
+   * `modify(name, insert, remove, toggle)` — rows added to or taken out of a dataset.
+   *
+   * Returns 1 when something was changed and **0 when there was nothing to do**, which is
+   * upstream's own early exit: an empty dataset with nothing to insert or toggle is left alone and
+   * says so.
+   */
+  public fun modifyDataset(
+    name: String,
+    insert: VegaValue,
+    remove: VegaValue,
+    toggle: VegaValue,
+  ): Double = 0.0
+
+  /**
+   * `encode(item, set)` — re-encodes one scene item through a named encode block of its own mark.
+   *
+   * A side effect on a live view. A compiled scene has no items to re-encode, so the default does
+   * nothing; the value the function returns is decided by the caller either way, which is why this
+   * returns nothing.
+   */
+  public fun encodeItem(item: VegaValue, set: String) {}
+
+  /**
+   * `item()` — the scene item the event being handled landed on.
+   *
+   * One of upstream's five *event* functions, which read the event rather than the data: they are
+   * generated as `event.vega.<name>` and so answer only while an event is being handled. Empty when
+   * none is, which is upstream's `item || {}` and is why `encode(item(), 'select')` is a no-op
+   * outside a handler rather than an error.
+   */
+  public fun activeItem(): VegaValue = VegaValue.EmptyObject
+
+  /**
+   * `xy()` — the event's position in the **root frame's** own coordinates, as a two-element array.
+   *
+   * Not the same as `event.x`: that is the raw pointer position as the platform reported it, where
+   * this has the chart's padding and autosize origin taken off, so it is in the space marks are
+   * placed in. `x()` and `y()` are its two components. [VegaValue.Null] when no event is being
+   * handled.
+   */
+  public fun eventPoint(): VegaValue = VegaValue.Null
+
+  /**
+   * `inScope(item)` — whether the item is inside the group this expression belongs to.
+   *
+   * False with no enclosing group, which is what upstream answers when its `context.group` is unset
+   * — including for every expression in a top-level signal, where `inScope(anything)` is false
+   * there too.
+   */
+  public fun inScope(item: VegaValue): Boolean = false
+
+  /**
+   * `intersect([[x0, y0], [x1, y1]][, opt])` — the scene items a box covers.
+   *
+   * An empty array where there is no scenegraph to ask, which is upstream's answer in the same
+   * position: a signal is resolved before the scene exists, so `intersect` over a chart full of
+   * marks answers `[]` there as well. A scope that *has* a scene — an event handler's — overrides
+   * this.
+   */
+  public fun intersect(box: VegaValue, options: VegaValue): VegaValue = VegaValue.Arr(emptyList())
+
+  /** `intersectLasso(mark, points, unit)` — the same question asked with a freehand outline. */
+  public fun intersectLasso(mark: String, points: VegaValue, unit: VegaValue): VegaValue =
+    VegaValue.Arr(emptyList())
 
   /**
    * `treePath('name', from, to)` — the rows between two nodes of a stratified dataset.
@@ -270,20 +351,21 @@ public class CachingExpressionCompiler(
 }
 
 /**
- * The compiler in place until Milestone 4.
+ * A compiler that refuses everything, for a caller that has to hand one over and evaluates nothing.
  *
- * It refuses every expression with a structured diagnostic rather than returning a null value, so a
- * specification that needs expressions fails visibly instead of rendering something wrong
- * (PROJECT_BRIEF.md 3.3: "Never silently ignore an unsupported operator").
+ * What is left of the placeholder that stood in before there was an expression engine: it said
+ * "planned for Milestone 4", which stopped being true a long time ago and would have been a
+ * puzzling thing for a chart to report. It refuses with a **structured diagnostic** rather than a
+ * null, which is the part worth keeping — PROJECT_BRIEF.md 3.3, never silently ignore what you
+ * cannot do.
  */
-public class UnsupportedExpressionCompiler : ExpressionCompiler {
+public class RefusingExpressionCompiler : ExpressionCompiler {
   override fun compile(source: String): ExpressionResult =
     ExpressionResult.Failed(
       VegaDiagnostic(
         severity = dev.aster.vega.model.DiagnosticSeverity.ERROR,
         code = DiagnosticCodes.EXPRESSION_UNSUPPORTED_FUNCTION,
-        message =
-          "Expression evaluation is not implemented yet (planned for Milestone 4): '$source'",
+        message = "This compiler evaluates no expressions; '$source' was refused",
       )
     )
 }

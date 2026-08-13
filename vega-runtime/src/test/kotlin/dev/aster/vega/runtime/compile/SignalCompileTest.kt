@@ -209,17 +209,21 @@ class SignalCompileTest {
 
   @Test
   fun `an unsupported function inside an encoding is reported once, not per datum`() {
-    // `geoBounds` used to be the example here and is implemented now; what is left on the
-    // deliberately-excluded list needs a subsystem rather than an algorithm.
+    // `geoBounds` was the example here, then `vlSelectionTest`, then `isTuple`; all three are
+    // implemented and the deliberately-excluded list is empty. What this test is really about is
+    // the
+    // *once*: a function nobody has fails identically for every row, and reporting it per datum
+    // would
+    // bury a chart's real problems under a hundred copies of one.
     val compiled =
       compile(
-        spec(encode = """$basePosition, "opacity": {"signal": "vlSelectionTuples('s', datum)"}""")
+        spec(encode = """$basePosition, "opacity": {"signal": "notAFunctionAnywhere(datum)"}""")
       )
     val failures =
       compiled.diagnostics.filter { it.code == DiagnosticCodes.EXPRESSION_UNSUPPORTED_FUNCTION }
     // Two data rows, but the expression fails identically for both.
     assertEquals(1, failures.size, failures.toString())
-    assertTrue(failures.single().message.contains("selection"))
+    assertTrue(failures.single().message.contains("notAFunctionAnywhere"))
   }
 
   // ---- conditional production rules -----------------------------------------

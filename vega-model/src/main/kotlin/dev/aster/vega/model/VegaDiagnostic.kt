@@ -99,6 +99,17 @@ public class DiagnosticCollector {
     entries.add(diagnostic)
   }
 
+  /**
+   * Empties the collector.
+   *
+   * For a collector that is drained rather than read once: a chart's interaction reports as it
+   * runs, and publishing the same message again on the next event would be worse than not
+   * publishing it.
+   */
+  public fun clear() {
+    entries.clear()
+  }
+
   public fun info(
     code: String,
     message: String,

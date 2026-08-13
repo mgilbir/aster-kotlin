@@ -1,6 +1,8 @@
 package dev.aster.vega.model.spec
 
 import dev.aster.vega.model.VegaValue
+import dev.aster.vega.model.asBoolean
+import dev.aster.vega.model.asString
 
 /**
  * Parsed Vega specification.
@@ -19,6 +21,17 @@ public data class VegaSpec(
   val padding: Padding,
   val autosize: Autosize,
   val background: String?,
+  /**
+   * `config.group` — the paint on the chart's own **frame**, not on its group marks.
+   *
+   * Worth stating because the name suggests otherwise and this engine got it wrong first:
+   * upstream's comment calls it "defaults for top-level group marks", but the block it reaches is
+   * the root frame, the rectangle the whole view is drawn inside. Probed both ways — with
+   * `config.group` set, the root item carries the fill and an inner group mark does not.
+   */
+  val frameConfig: Map<String, VegaValue> = emptyMap(),
+  /** `config.events` — which event listeners a view is allowed to attach, and what it prevents. */
+  val events: EventConfig = EventConfig(),
   val signals: List<SignalSpec>,
   val data: List<DataSpec>,
   val scales: List<ScaleSpec>,
@@ -248,6 +261,15 @@ public data class DataSpec(
   val property: String? = null,
   /** `format.delimiter` for a `dsv` file. */
   val delimiter: String? = null,
+  /**
+   * `format.header` — the column names for a delimited file that carries none.
+   *
+   * Upstream prepends them as a header row and lets the ordinary parser take over, which is exactly
+   * what makes them behave like real column names: the delimiter is the file's own, and a name
+   * needing quoting is quoted. A file that *does* have a header and is given this list ends up with
+   * its first row read as data under the supplied names, which is upstream's behaviour too.
+   */
+  val header: List<String> = emptyList(),
   /** `format.feature`: which object of a TopoJSON file to decode, as one feature per geometry. */
   val feature: String? = null,
   /** `format.mesh`: the same object's arcs as a single line string, each drawn once. */
@@ -506,6 +528,18 @@ public data class ScaleSpec(
   val clamp: Boolean = false,
   val nice: Boolean = false,
   val niceCount: Int? = null,
+  /**
+   * `nice` written as a **time unit** — `"month"`, or `{"interval": "month", "step": 3}`.
+   *
+   * A different rule from the count: a count-nice rounds a domain outward to whatever step d3's
+   * tick algorithm chose, where an interval-nice rounds it to a calendar boundary. `nice: "month"`
+   * over a domain from 17 January to 9 May gives 1 January to 1 June, and `nice: true` over the
+   * same one gives the two Sundays either side of it — a difference of eleven days at one end,
+   * which is the difference between an axis labelled by months and one labelled by weeks.
+   */
+  val niceInterval: String? = null,
+  /** The `step` of an interval-nice: `{"interval": "month", "step": 3}` rounds out to a quarter. */
+  val niceStep: Int? = null,
   /** `null` means "not stated", which matters because the default differs by scale type. */
   val zero: Boolean? = null,
   val padding: NumberValue? = null,
@@ -771,6 +805,16 @@ public data class AxisSpec(
    * an axis of months does not offer a tick every other day.
    */
   val tickMinStep: NumberValue? = null,
+  /**
+   * `tickCount` written as a **time interval** — `"hours"`, or `{"interval": "hours", "step": 2}`.
+   *
+   * Not a count at all, which is why it needs its own field: it names the calendar unit the ticks
+   * land on, so an axis over one night is labelled every two hours rather than at whatever round
+   * number a count would have chosen. Upstream errors when a non-temporal scale is given one.
+   */
+  val tickInterval: String? = null,
+  /** How many of [tickInterval] make one step; `{"interval": "hours", "step": 2}`. */
+  val tickStep: Int? = null,
   val tickSize: NumberValue? = null,
   val labelPadding: NumberValue? = null,
   val labelFontSize: NumberValue? = null,
@@ -839,6 +883,13 @@ public data class AxisSpec(
    * follows the units, and `timeUnitSpecifier` is what turns one into the other.
    */
   val formatExpression: String? = null,
+  /**
+   * `formatType` written as a signal, resolved where [formatExpression] is.
+   *
+   * A chart that lets a control switch a column between a count and a date has to switch the
+   * *grammar* the format string is read in as well as the string, and it cannot write either down.
+   */
+  val formatTypeExpression: String? = null,
   /**
    * `formatType`: which grammar [format] is written in — `number`, `time` or `utc`.
    *
@@ -936,6 +987,84 @@ public data class AxisSpec(
  * prefix, and so are the widths, dashes and opacities. A label uses [color] as a fill and the rest
  * use it as a stroke, which is the only asymmetry.
  */
+/**
+ * `config.events` — the view's event-handling policy.
+ *
+ * Not a drawing instruction, which is why it took so long to reach: it decides which listeners a
+ * view may attach and which browser defaults it suppresses. Both halves matter to a host that
+ * embeds a chart it did not write. A specification asking for `window:mousemove` is asking to watch
+ * the pointer across the whole page, and `{"events": {"window": false}}` is how the embedder says
+ * no — upstream blocks the listener and *warns*, rather than failing the chart.
+ *
+ * [preventDefault] and [allowDefault] are upstream's `defaults.prevent` and `defaults.allow`, and
+ * the pair is read in that order: `prevent: true` suppresses everything, `allow: true` suppresses
+ * nothing, and a **list** names the types one way or the other. They reach a host rather than this
+ * engine, which has no browser event to suppress; carrying them is what lets the host obey the
+ * specification instead of guessing.
+ */
+public data class EventConfig(
+  /** Sources whose listeners are permitted. [EventPermit.Unrestricted] means "no rule". */
+  val view: EventPermit = EventPermit.Unrestricted,
+  val window: EventPermit = EventPermit.Unrestricted,
+  val selector: EventPermit = EventPermit.Unrestricted,
+  /**
+   * Timer streams, keyed by their **throttle** rather than by an event name — a timer has no type,
+   * so `{"timer": {"500": true}}` permits a stream that fires every 500ms and no other.
+   */
+  val timer: EventPermit = EventPermit.Unrestricted,
+  /** `true`/`false` for all types, or the named ones. */
+  val preventDefault: EventPermit = EventPermit.Unrestricted,
+  val allowDefault: EventPermit = EventPermit.Unrestricted,
+  /** `config.events.bind` — whether a signal may be bound to an input element at all. */
+  val bind: Boolean = true,
+  /**
+   * `config.events.globalCursor` — whether a cursor is set on the document rather than the view.
+   */
+  val globalCursor: Boolean = false,
+)
+
+/**
+ * A rule that is either a blanket answer or a list of event types.
+ *
+ * `{"window": false}` blocks every window listener; `{"window": ["mousemove"]}` blocks all but that
+ * one. Upstream stores the list as a set and tests membership, so a type it does not name is
+ * refused — a list is an allow-list, not a hint.
+ */
+public sealed interface EventPermit {
+  /** No rule at all, which permits everything and prevents nothing. */
+  public data object Unrestricted : EventPermit
+
+  public data class All(val value: Boolean) : EventPermit
+
+  public data class Types(val types: Set<String>) : EventPermit
+
+  public companion object {
+    /**
+     * @param unpackArrays whether a JSON array names the types. Upstream unpacks arrays into sets
+     *   for `view`, `window`, `selector` and the two `defaults`, but **not** for `timer` — so a
+     *   `{"timer": [500]}` is left an array and tested as an object, whose keys are indices. The
+     *   effect is that the array form permits nothing there, and it is passed through faithfully
+     *   rather than corrected: a host that copies a theme should behave as upstream does with it.
+     */
+    public fun of(value: VegaValue?, unpackArrays: Boolean = true): EventPermit =
+      when (value) {
+        null,
+        is VegaValue.Null -> Unrestricted
+        is VegaValue.Bool -> All(value.value)
+        // An un-unpacked array is tested as an object, whose keys are indices rather than event
+        // types — so nothing an event or a timer is ever called matches one, and it permits
+        // nothing.
+        is VegaValue.Arr ->
+          if (unpackArrays) Types(value.values.map { it.asString() }.toSet()) else Types(emptySet())
+        // `{"view": {"mousemove": true}}` — the same allow-list written out, and a key set to
+        // `false` is a refusal rather than a mention.
+        is VegaValue.Obj -> Types(value.fields.filterValues { it.asBoolean() }.keys.toSet())
+        // A number or a string is neither `false` nor an object, so upstream permits.
+        else -> Unrestricted
+      }
+  }
+}
+
 public data class GuideStroke(
   val color: String? = null,
   val width: Double? = null,
@@ -1101,8 +1230,17 @@ public data class LegendSpec(
    * `timeUnitSpecifier([...])`, which asks Vega at render time for the pattern that names a month
    * or a quarter, and there is no constant to write in its place.
    */
-  val formatExpression: String? = null,
   val tickCount: NumberValue? = null,
+  /**
+   * `tickCount` written as a **time interval** — `"hours"`, or `{"interval": "hours", "step": 2}`.
+   *
+   * Not a count at all, which is why it needs its own field: it names the calendar unit the ticks
+   * land on, so an axis over one night is labelled every two hours rather than at whatever round
+   * number a count would have chosen. Upstream errors when a non-temporal scale is given one.
+   */
+  val tickInterval: String? = null,
+  /** How many of [tickInterval] make one step; `{"interval": "hours", "step": 2}`. */
+  val tickStep: Int? = null,
   val offset: NumberValue? = null,
   val padding: NumberValue? = null,
   val titlePadding: NumberValue? = null,
@@ -1190,6 +1328,10 @@ public data class LegendSpec(
    * instants reads as dates: its scale is a colour ramp and knows nothing about time.
    */
   val formatType: String? = null,
+  /** The same written as a signal, resolved in the builder as the format string's own signal is. */
+  val formatTypeExpression: String? = null,
+  /** `format` written as a signal, which is how a chart lets a control choose its own labels. */
+  val formatExpression: String? = null,
   /** A floor on the gap between a gradient legend's labelled values; see the axis's own. */
   val tickMinStep: NumberValue? = null,
   /**
@@ -1523,6 +1665,16 @@ public data class EncodeSpec(
   val update: EncodeEntry = emptyMap(),
   val exit: EncodeEntry = emptyMap(),
   val hover: EncodeEntry = emptyMap(),
+  /**
+   * Blocks under any other name, which a handler applies by asking for them.
+   *
+   * `enter`, `update`, `exit` and `hover` are the four the dataflow runs by itself; a block called
+   * anything else — `select`, `release`, `leave` — is run only when something says `encode(item(),
+   * 'select')`, which is what `{"events": "...", "encode": "select"}` desugars to. There is no
+   * fixed list of names upstream, so these were being reported as unknown sets and dropped: a chart
+   * whose press styling lives in a `select` block lost it at parse time.
+   */
+  val named: Map<String, EncodeEntry> = emptyMap(),
 ) {
   /**
    * The channels in effect for a static render: `enter` overridden by `update`.
@@ -1632,6 +1784,16 @@ public data class MarkSpec(
    */
   val role: String? = null,
   val from: FromSpec? = null,
+  /**
+   * `key` — the field that identifies an **item**, upstream's `DataJoin`.
+   *
+   * Not a hint about redraws, which is how it reads. Upstream maps each key to one item, so two
+   * rows sharing a key are **one** mark: the second overwrites the first's datum instead of adding
+   * a bar. The item keeps the place its key first appeared, so a repeated key draws the *later*
+   * row's values in the *earlier* row's position — a shape no filtering would produce, and the
+   * reason this has to be honoured rather than treated as advice.
+   */
+  val key: String? = null,
   /** `sort` — the order this mark's items are built and painted in; see [MarkSort]. */
   val sort: MarkSort? = null,
   /**
@@ -1669,6 +1831,14 @@ public data class MarkSpec(
    * chart with no way to say "ignore this" makes a reader listen to its scaffolding.
    */
   val aria: Boolean = true,
+  /**
+   * `description` on the **mark** rather than on an item, which a screen reader hears once.
+   *
+   * Upstream puts it on the container it draws every item of the mark inside — `aria-label` on the
+   * `<g class="mark-rect">` — so it names the whole series: "Monthly revenue, by month". An item's
+   * own `description` channel is the other half of the pair and names one bar.
+   */
+  val description: String? = null,
   val clip: Boolean = false,
   /**
    * Appearance defaults from `config`, either side of the engine's own built-in per-type block.

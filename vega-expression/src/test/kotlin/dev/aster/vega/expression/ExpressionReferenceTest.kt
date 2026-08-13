@@ -167,6 +167,7 @@ class ExpressionReferenceTest {
         "zoomPow",
         "zoomSymlog",
         "geoShape",
+        "gradient",
       )
     // Resolved against the **scope** rather than through the function table, because each needs
     // something the table cannot see: the scales, the datasets, the projections, or somewhere to
@@ -189,6 +190,17 @@ class ExpressionReferenceTest {
         "geoCentroid",
         "geoScale",
         "geoShape",
+        "gradient",
+        "modify",
+        "encode",
+        "inScope",
+        "intersect",
+        "intersectLasso",
+        "vlSelectionTest",
+        "vlSelectionIdTest",
+        "vlSelectionResolve",
+        "vlSelectionTuples",
+        "isTuple",
         "random",
         "sampleNormal",
         "sampleLogNormal",
@@ -798,6 +810,18 @@ class ExpressionReferenceTest {
         // underneath.
         "datetime(2020,0,1) < datetime(2020,0,2)|true",
         "datetime(2020,0,2) - datetime(2020,0,1)|86400000",
+        // ---- what the view-bound functions answer with no view ----
+        // Each of these is upstream's answer in the same position, not a placeholder. A signal is
+        // resolved before the scenegraph exists, so `intersect` over a chart full of marks answers
+        // `[]` there too; `inScope` is false wherever there is no enclosing group; `copy` returns a
+        // scale function that `isValid` rejects, which null also is; and `encode` hands back its
+        // third argument.
+        "intersect([[0,0],[10,10]])|[]",
+        "inScope(null)|false",
+        "isValid(copy('x'))|false",
+        "encode(null, 'update', 7)|7",
+        "isRegExp(1)|false",
+        "isRegExp('x')|false",
         "screen()|{}",
         "windowSize()|[null,null]",
         "timeFormat(timeOffset('day', datetime(2019,2,31)), '%Y-%m-%d %H:%M')|\"2019-04-01 00:00\"",

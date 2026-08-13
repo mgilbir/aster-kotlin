@@ -87,33 +87,25 @@ public object Functions {
     )
 
   /**
-   * Functions upstream provides that this engine deliberately does not.
+   * Functions upstream provides that this engine deliberately does not — and there are none.
    *
-   * Listed by name with a reason so the evaluator can say *why* rather than just "unknown
-   * function".
+   * The table stays because it is the right shape for the answer: a name here gets a reason instead
+   * of a bare "unknown function". It emptied one entry at a time, and the last few are worth
+   * knowing about because each excuse turned out to be softer than it read. "Needs a strptime"
+   * became a strptime. "A date is indistinguishable from a number" became `VegaValue.Timestamp`,
+   * and finding that out exposed `isNumber` lying about dates. "Selection helpers need the
+   * selection subsystem" became the observation that a selection is an ordinary dataset. `screen`,
+   * `windowSize`, `intersect` and `inScope` answer what upstream answers with no browser and no
+   * running view, which is a compiled scene's permanent position rather than a gap. `pathShape`,
+   * `geoShape` and `copy` return the one part of upstream's answer a value model can hold, and
+   * upstream's own return value cannot be used from a specification at all — probed on every
+   * channel that accepts one.
+   *
+   * If something is genuinely not implemented, it belongs here with a reason. An empty map is a
+   * claim that nothing is, and `ExpressionReferenceTest` checks it against upstream's own function
+   * table.
    */
-  public val knownUnsupported: Map<String, String> =
-    mapOf(
-      // The two type predicates whose answer depends on a representation this engine does not
-      // share.
-      "isRegExp" to
-        "the expression language has no regular-expression literal, so nothing can be one",
-      "isTuple" to
-        "a tuple is a row carrying the dataflow's own identity, which this engine does not attach; " +
-          "upstream answers true for a row from a dataset and false for an object literal, and " +
-          "there is nothing here to tell the two apart",
-      "vlSelectionTuples" to "selection helpers require the signal and selection subsystems",
-      "copy" to "copying a scale needs the scale itself as a value, which is not one here",
-      "gradient" to "gradients cannot be produced from an expression yet",
-      // Functions that read or write the running view rather than computing anything. A compiled
-      // scene is a value, so there is no view to ask and nothing to modify.
-      "encode" to "reading an item's encode block back needs the running view",
-      "modify" to "modifying a dataset from an expression needs the running dataflow",
-      "inScope" to "asking whether an item is inside a scope needs the running view's scenegraph",
-      "intersect" to "hit-testing a region against the scenegraph needs the running view",
-      "intersectLasso" to
-        "hit-testing a lasso against the scenegraph needs the running view, as `intersect` does",
-    )
+  public val knownUnsupported: Map<String, String> = emptyMap()
 
   /** A runaway step cannot spin forever; no axis has this many boundaries. */
   private const val MAX_SEQUENCE: Int = 100_000
@@ -315,6 +307,14 @@ public object Functions {
     // false.
     map.predicate("isObject") { it is VegaValue.Obj || it is VegaValue.Timestamp }
     map.predicate("isString") { it is VegaValue.Str }
+    // **Always false**, and correctly so: Vega's expression language has a regular-expression
+    // literal
+    // in its grammar and no way to reach one from a specification — `replace` takes its pattern as
+    // a
+    // string. So no value this engine can produce is a regular expression, and upstream answers
+    // false
+    // for every one of them too.
+    map.predicate("isRegExp") { false }
     map.predicate("isDefined") { it !is VegaValue.Null }
     // Upstream tests `value instanceof Date`, so a *number* of milliseconds is not a date to it
     // either — which is answerable here only because an instant is its own type in this value
@@ -1018,6 +1018,16 @@ public object Functions {
      * there is no chart upstream draws that this draws differently — only charts upstream refuses
      * that this draws.
      */
+    /**
+     * `copy(scale)` — a copy of a scale, which no expression can then do anything with.
+     *
+     * Upstream returns a scale *function*, and every route out of an expression rejects one:
+     * `domain(copy('x'))` answers `[]` because `domain` wants a name, and `isValid(copy('x'))` is
+     * **false**. That last one is the only observation a specification can make, and null gives the
+     * same answer — so this is upstream's behaviour, not an approximation of it.
+     */
+    map["copy"] = ExpressionFunction { VegaValue.Null }
+
     map["pathShape"] = ExpressionFunction { args ->
       (args.at(0) as? VegaValue.Str) ?: VegaValue.Null
     }

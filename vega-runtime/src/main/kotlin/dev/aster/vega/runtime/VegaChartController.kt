@@ -9,9 +9,11 @@ import dev.aster.vega.model.DiagnosticCollector
 import dev.aster.vega.model.DiagnosticSeverity
 import dev.aster.vega.model.VegaDiagnostic
 import dev.aster.vega.model.VegaValue
+import dev.aster.vega.model.spec.EventConfig
 import dev.aster.vega.runtime.compile.CompiledSpec
 import dev.aster.vega.runtime.compile.SpecCompiler
 import dev.aster.vega.runtime.interaction.EventDispatcher
+import dev.aster.vega.runtime.interaction.FiredHandler
 import dev.aster.vega.runtime.interaction.HandlerBinding
 import dev.aster.vega.runtime.interaction.InputEvent as VegaEvent
 import dev.aster.vega.runtime.interaction.SignalUpdater
@@ -215,7 +217,17 @@ public class VegaChartController(
 
   private val expressions = CachingExpressionCompiler(VegaExpressionCompiler())
 
-  private val signals = SignalUpdater(expressions, DiagnosticCollector())
+  /**
+   * What a handler's own evaluation reported — an expression that could not be read, a function
+   * whose argument form this engine refuses.
+   *
+   * Collected separately from the compiler's and published beside them: a handler that failed at
+   * the moment it fired is exactly what a host needs told, and it went into a collector nobody
+   * read.
+   */
+  private val handlerDiagnostics = DiagnosticCollector()
+
+  private val signals = SignalUpdater(expressions, handlerDiagnostics)
 
   /** Rebuilt on every publish, because the handlers and the scales both come from the compile. */
   private var vegaEvents: EventDispatcher? = null
@@ -247,16 +259,29 @@ public class VegaChartController(
       compiled.spec?.signals.orEmpty().flatMap { signal ->
         signal.on.map { HandlerBinding(signal.name, it) }
       }
+    // The dispatcher reports as it registers — a stream a policy blocked, a debounce nothing can
+    // schedule — and those went into a collector nobody read. They are published with the
+    // compiler's
+    // own, since a listener that was refused is exactly the kind of thing a host needs told.
+    val listenerDiagnostics = DiagnosticCollector()
     vegaEvents =
       if (bindings.isEmpty()) {
         null
       } else {
-        EventDispatcher(bindings, expressions, DiagnosticCollector(), compiled.signals)
+        EventDispatcher(
+          bindings,
+          expressions,
+          listenerDiagnostics,
+          compiled.signals,
+          // The embedder's event policy, refused at the listener rather than at the event.
+          compiled.spec?.events ?: EventConfig(),
+        )
       }
-    _diagnostics.value = compiled.diagnostics
+    val diagnostics = compiled.diagnostics + listenerDiagnostics.diagnostics
+    _diagnostics.value = diagnostics
     val scene = compiled.scene
     if (scene == null) {
-      _state.value = _state.value.copy(isLoading = false, diagnostics = compiled.diagnostics)
+      _state.value = _state.value.copy(isLoading = false, diagnostics = diagnostics)
       return compiled
     }
     val revision = nextRevision++
@@ -271,7 +296,7 @@ public class VegaChartController(
             revision = revision,
           ),
         isLoading = false,
-        diagnostics = compiled.diagnostics,
+        diagnostics = diagnostics,
       )
     return compiled
   }
@@ -335,7 +360,12 @@ public class VegaChartController(
         else -> return
       }
     val point = pointOf(event)
-    val hit = point?.let { hitIndex.hitTest(toSceneSpace(it)) }?.node
+    val scenePoint = point?.let { toSceneSpace(it) }
+    val hit = scenePoint?.let { hitIndex.hitTest(it) }?.node
+    // What `x()`, `y()` and `xy()` answer: the point with the chart's padding and autosize origin
+    // taken off, which the root group carries as its own translation — upstream's `offset(view)`.
+    val origin = _state.value.snapshot.scene.root.transform
+    val rootPoint = scenePoint?.let { PointD(it.x - origin.e, it.y - origin.f) } ?: PointD(0.0, 0.0)
     val changed = LinkedHashSet<String>()
     for (type in types) {
       val fired =
@@ -343,22 +373,104 @@ public class VegaChartController(
           VegaEvent(
             type = type,
             timestampMillis = clock(),
+            itemId = hit?.id,
             markType = hit?.metadata?.markKind,
             markName = hit?.metadata?.markName,
             datum = hit?.metadata?.datum ?: VegaValue.Null,
             x = point?.x ?: 0.0,
             y = point?.y ?: 0.0,
+            rootX = rootPoint.x,
+            rootY = rootPoint.y,
           )
         )
       if (fired.isNotEmpty()) changed += signals.apply(fired, compiled.signals)
     }
-    if (changed.isEmpty()) return
+    // A handler whose whole effect is `encode(item(), 'select')` changes no signal value: its
+    // update
+    // expression returns the item it was handed, which is the same object as before. So a fresh
+    // overlay is a reason to redraw in its own right, and testing only the signals meant a press
+    // styled nothing.
+    val overlaid = signals.itemEncodes.values.any { it.fresh }
+    if (changed.isEmpty() && !overlaid) return
+    val cascaded = cascade(changed, compiled) + drainHandlerDiagnostics()
 
     // Recompile rather than patch. Measured at well under a frame for the heaviest fixture, which
     // is what makes this simple enough to be obviously correct (STATUS.md, Performance
     // observations).
     val json = loadedSpecJson ?: return
-    publish(compiler.compileJson(json, signals.overrides))
+    publish(compiler.compileJson(json, signals.overrides, signals.itemEncodes))
+    // The overlays that were fresh have now been applied once; from here on the mark's own `update`
+    // takes back the channels it sets, which is what ageing them expresses.
+    signals.ageItemEncodes()
+    // After publishing, which replaces the diagnostics with the new compile's: what a handler
+    // reported as it fired — a cycle among the signal-driven ones, an expression that could not be
+    // read — is a fact about this interaction rather than about the specification's text, and it
+    // would otherwise be wiped by the very recompile it caused.
+    for (diagnostic in cascaded) report(diagnostic)
+  }
+
+  /** Takes what the handlers reported and clears it, so the same message is not published twice. */
+  private fun drainHandlerDiagnostics(): List<VegaDiagnostic> {
+    val drained = handlerDiagnostics.diagnostics.toList()
+    if (drained.isNotEmpty()) handlerDiagnostics.clear()
+    return drained
+  }
+
+  /**
+   * Fires the handlers whose source is a **signal** rather than an event, until nothing more
+   * changes.
+   *
+   * `{"events": {"signal": "brush"}, "update": "..."}` is how one signal is derived from another,
+   * and it is what a specification writes when the value it wants is a function of a control rather
+   * than of a pointer. Upstream makes it a dataflow edge, so it fires whenever the source changes
+   * and cascades: probed with a chain two deep, setting `a` to 5 left `b` at 10 and `c` at 11 in
+   * the same run. Not at *initialization*, though — also probed: with no change there is nothing to
+   * fire, and both signals keep their declared values, which is why the differential fixtures see
+   * none of this.
+   *
+   * Ordering falls out of the loop rather than needing a sort: each round fires only the handlers
+   * whose source changed in the round before, so a chain is walked in dependency order however the
+   * signals were declared. A **cycle** would never settle, and upstream refuses such a
+   * specification outright; this engine reports it and stops, which is what [DataflowOrder] does
+   * with a cycle among `update` expressions — a chart that draws with one signal stuck beats a
+   * chart that does not draw.
+   */
+  private fun cascade(
+    changed: MutableSet<String>,
+    compiled: CompiledSpec,
+  ): List<VegaDiagnostic> {
+    val bindings =
+      compiled.spec?.signals.orEmpty().flatMap { signal ->
+        signal.on.filter { it.signalSources.isNotEmpty() }.map { HandlerBinding(signal.name, it) }
+      }
+    if (bindings.isEmpty()) return emptyList()
+    var frontier: Set<String> = changed.toSet()
+    var round = 0
+    while (frontier.isNotEmpty()) {
+      if (++round > MAX_CASCADE_ROUNDS) {
+        return listOf(
+          VegaDiagnostic(
+            code = DiagnosticCodes.PARSE_UNKNOWN_PROPERTY,
+            severity = DiagnosticSeverity.WARNING,
+            message =
+              "Signals '${frontier.sorted().joinToString("', '")}' are still changing after " +
+                "$MAX_CASCADE_ROUNDS rounds of signal-driven handlers, so they are on a cycle; " +
+                "their last values are kept",
+          )
+        )
+      }
+      val due =
+        bindings
+          .filter { binding -> binding.handler.signalSources.any { it in frontier } }
+          .map { FiredHandler(it.signalName, it.handler) }
+      if (due.isEmpty()) return emptyList()
+      // Read against the overrides accumulated so far, which is what makes a chain see the value
+      // the
+      // round before it produced rather than the one the last compile resolved.
+      frontier = signals.apply(due, compiled.signals)
+      changed += frontier
+    }
+    return emptyList()
   }
 
   private fun pointOf(event: ChartInputEvent): PointD? =
@@ -550,6 +662,15 @@ public class VegaChartController(
   public companion object {
     public const val MIN_ZOOM: Double = 0.1
     public const val MAX_ZOOM: Double = 50.0
+
+    /**
+     * How many rounds of signal-driven handlers to run before calling it a cycle.
+     *
+     * A chain is as deep as the specification is: the longest in the corpus is two. Anything past a
+     * handful is not depth but a loop, and the number only has to be far enough above real depth
+     * that no honest specification meets it.
+     */
+    private const val MAX_CASCADE_ROUNDS = 64
 
     /** Creates a controller for a hand-authored scene. */
     public fun fromScene(scene: Scene): VegaChartController = VegaChartController(scene)

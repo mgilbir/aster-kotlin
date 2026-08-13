@@ -134,4 +134,37 @@ public object TimeTicks {
   /** Convenience for callers that already know the pattern they want. */
   public fun format(millis: Double, pattern: String, zone: TimeZone): String =
     TimeFormat.format(millis, pattern, zone)
+
+  /**
+   * Every boundary of an interval inside a domain, upstream's `interval.range`.
+   *
+   * What a `tickCount` written as a unit — `"hours"`, or `{"interval": "hours", "step": 2}` — asks
+   * for: not a number of ticks but the calendar unit they land on, so an axis over one night is
+   * labelled every two hours rather than at whatever round number a count would have chosen. The
+   * first boundary is the one at or after the domain's start, and a step is snapped to the calendar
+   * rather than added to the start, so an axis crossing a daylight-saving change keeps its ticks on
+   * even hours instead of drifting an hour after it.
+   */
+  public fun intervalTicks(domain: List<Double>, stepper: TimeStepper): List<Double> {
+    if (domain.isEmpty()) return emptyList()
+    val low = minOf(domain.first(), domain.last())
+    val high = maxOf(domain.first(), domain.last())
+    val out = mutableListOf<Double>()
+    var at = stepper.floor(low)
+    if (at < low) at = stepper.offset(at, 1)
+    // A guard rather than a `while (true)`: a malformed interval that cannot advance would
+    // otherwise
+    // spin, and no guide has this many ticks.
+    var guard = 0
+    while (at <= high && guard++ < MAX_INTERVAL_TICKS) {
+      out += at
+      val next = stepper.offset(at, 1)
+      if (next <= at) break
+      at = next
+    }
+    return out
+  }
+
+  /** No guide has this many ticks; the guard exists so a step that cannot advance cannot spin. */
+  private const val MAX_INTERVAL_TICKS = 100_000
 }

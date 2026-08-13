@@ -1,0 +1,81 @@
+{
+  "marks": [
+    {
+      "fill": "#dbe9f6",
+      "role": "mark",
+      "shapeHeight": 0,
+      "shapeLeft": 0,
+      "shapeTop": 0,
+      "shapeWidth": 0,
+      "stroke": "#4c78a8",
+      "type": "path"
+    },
+    {
+      "fill": "#fde0dd",
+      "role": "mark",
+      "shapeHeight": 0,
+      "shapeLeft": 0,
+      "shapeTop": 0,
+      "shapeWidth": 0,
+      "stroke": "#e45756",
+      "type": "path"
+    },
+    {
+      "fill": "#e6f0d9",
+      "role": "mark",
+      "shapeHeight": 0,
+      "shapeLeft": 0,
+      "shapeTop": 0,
+      "shapeWidth": 0,
+      "stroke": "#4a7c1f",
+      "type": "path"
+    },
+    {
+      "fill": "#333",
+      "role": "mark",
+      "shapeHeight": 6.324555,
+      "shapeLeft": -3.162278,
+      "shapeTop": -3.162278,
+      "shapeWidth": 6.324555,
+      "size": 40,
+      "type": "symbol"
+    },
+    {
+      "fill": "#333",
+      "role": "mark",
+      "shapeHeight": 6.324555,
+      "shapeLeft": -3.162278,
+      "shapeTop": -3.162278,
+      "shapeWidth": 6.324555,
+      "size": 40,
+      "type": "symbol"
+    },
+    {
+      "fill": "#333",
+      "role": "mark",
+      "shapeHeight": 6.324555,
+      "shapeLeft": -3.162278,
+      "shapeTop": -3.162278,
+      "shapeWidth": 6.324555,
+      "size": 40,
+      "type": "symbol"
+    },
+    {
+      "fill": "#000",
+      "font": "sans-serif",
+      "fontSize": 9,
+      "role": "mark",
+      "text": "2,0.6",
+      "type": "text",
+      "x": 4,
+      "y": 116
+    }
+  ],
+  "scales": {},
+  "size": {
+    "height": 133.162278,
+    "width": 253.162278
+  },
+  "spec": "identity-projection.vg.json",
+  "vegaVersion": "6.3.1"
+}

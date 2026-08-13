@@ -27,6 +27,7 @@ import dev.aster.vega.scene.ArcPath
 import dev.aster.vega.scene.CurveKind
 import dev.aster.vega.scene.Fill
 import dev.aster.vega.scene.FontStyle
+import dev.aster.vega.scene.GradientStop
 import dev.aster.vega.scene.GroupNode
 import dev.aster.vega.scene.ImageAlign
 import dev.aster.vega.scene.ImageBaseline
@@ -188,6 +189,19 @@ public class MarkEncoder(
 
   /** The same, as text: a legend label read through a scale turns an id into a name. */
   public fun channelText(channel: ChannelValue, datum: VegaValue): String? = string(channel, datum)
+
+  /** The same, as a boolean: `aria: false` takes an item out of the accessibility tree. */
+  public fun channelBoolean(channel: ChannelValue, datum: VegaValue): Boolean? =
+    boolean(channel, datum)
+
+  /**
+   * The same, as whatever it is: a tooltip may be a string, a number or a whole object.
+   *
+   * Exposed for the guides, whose parts can carry a tooltip the way a mark's items can — and a
+   * tooltip's *type* is the point, since an object becomes a table where a string becomes one line.
+   */
+  public fun channelAny(channel: ChannelValue, datum: VegaValue): VegaValue? =
+    channelValue(channel, datum)
 
   /**
    * The same, as a colour: an axis picking one gridline out of the rest by a condition on its tick.
@@ -1042,15 +1056,25 @@ public class MarkEncoder(
     // grey, and a chart that hides the outline by encoding `stroke: null` has not thereby asked for
     // the fill to go as well. Suppressing both dropped the group from the scene altogether.
     val fillColour =
+      // An **encoded null** is a statement: this mark has no paint of that kind, so it must not
+      // fall through to the style block's. `paintedNothing` is what asks; the fall-through below is
+      // upstream's own default for the mark type.
       if (paintedNothing(channels["fill"], datum)) null
       else
-        paint(channels["fill"], datum, "fill", spec)
-          ?: defaults.colour("fill", MarkDefaults.fillFor(spec.type).takeIf { !paintsItself })
+        paintOf(channels["fill"], datum, "fill", spec)
+          // …the **built-in** default is what a mark painting itself gives up, not the style
+          // block's: a group styled `cell` is filled transparent and outlined grey, and a chart
+          // that hides the outline by encoding `stroke: null` has not asked for the fill to go too.
+          ?: defaults
+            .colour("fill", MarkDefaults.fillFor(spec.type).takeIf { !paintsItself })
+            ?.let { ScenePaint.Solid(it) }
     val strokeColour =
       if (paintedNothing(channels["stroke"], datum)) null
       else
-        paint(channels["stroke"], datum, "stroke", spec)
-          ?: defaults.colour("stroke", MarkDefaults.strokeFor(spec.type).takeIf { !paintsItself })
+        paintOf(channels["stroke"], datum, "stroke", spec)
+          ?: defaults
+            .colour("stroke", MarkDefaults.strokeFor(spec.type).takeIf { !paintsItself })
+            ?.let { ScenePaint.Solid(it) }
     val fillOpacity =
       number(channels["fillOpacity"], datum) ?: defaults.number("fillOpacity") ?: 1.0
     val strokeOpacity =
@@ -1072,11 +1096,11 @@ public class MarkEncoder(
         ?: Stroke.DEFAULT_MITER_LIMIT
 
     return Style(
-      fill = fillColour?.let { Fill(ScenePaint.Solid(it), fillOpacity) },
+      fill = fillColour?.let { Fill(it, fillOpacity) },
       stroke =
         strokeColour?.let {
           Stroke(
-            paint = ScenePaint.Solid(it),
+            paint = it,
             width = strokeWidth,
             cap = cap,
             join = join,
@@ -1357,6 +1381,7 @@ public class MarkEncoder(
       tooltip =
         channels["tooltip"]?.let { value(it, datum) }?.takeIf { it !is VegaValue.Null } ?: datum,
       cursor = string(channels["cursor"], datum),
+      href = string(channels["href"], datum)?.takeIf { it.isNotEmpty() },
       zindex = number(channels["zindex"], datum)?.toInt() ?: 0,
       accessibility = describe(spec, datum, channels),
     )
@@ -1741,6 +1766,72 @@ public class MarkEncoder(
       is ChannelValue.Adjusted -> adjustedNumber(channel, datum)
     }
 
+  /**
+   * A paint channel, which may resolve to a **gradient** rather than to a colour.
+   *
+   * Vega lets either channel hold an object — `{"gradient": "linear", "stops": [...]}` — and its
+   * renderer turns that into an SVG gradient definition. It arrives here as an ordinary channel
+   * value, so the object has to be recognised before the string coercion: stringifying one produced
+   * `gradient:linear,x1:0,…` and a diagnostic saying that was not a colour, which was true and
+   * useless.
+   */
+  private fun paintOf(
+    channel: ChannelValue?,
+    datum: VegaValue,
+    channelName: String,
+    spec: MarkSpec,
+  ): ScenePaint? {
+    channelValue(channel, datum)?.let { value ->
+      gradientPaint(value)?.let {
+        return it
+      }
+    }
+    return paint(channel, datum, channelName, spec)?.let { ScenePaint.Solid(it) }
+  }
+
+  /**
+   * A gradient object as scene paint, with upstream's defaults for whatever it leaves out.
+   *
+   * `gradientRef` fills in a linear gradient as left-to-right across the mark's own box — `x1: 0,
+   * y1: 0, x2: 1, y2: 0` — and a radial one as centred and half as wide. The coordinates are
+   * fractions of the box in both engines, which is SVG's `objectBoundingBox`, so they carry across
+   * unchanged.
+   */
+  private fun gradientPaint(value: VegaValue): ScenePaint? {
+    val fields = (value as? VegaValue.Obj)?.fields ?: return null
+    val kind = (fields["gradient"] as? VegaValue.Str)?.value ?: return null
+    val stops =
+      (fields["stops"] as? VegaValue.Arr)
+        ?.values
+        ?.mapNotNull { stop ->
+          val entry = (stop as? VegaValue.Obj)?.fields ?: return@mapNotNull null
+          val colour = SceneColor.parse(entry["color"]?.asString() ?: "") ?: return@mapNotNull null
+          GradientStop(entry["offset"]?.asDouble()?.takeIf { !it.isNaN() } ?: 0.0, colour)
+        }
+        .orEmpty()
+    if (stops.isEmpty()) return null
+    fun at(name: String, fallback: Double) =
+      fields[name]?.asDouble()?.takeIf { !it.isNaN() } ?: fallback
+    return if (kind == "radial") {
+      ScenePaint.RadialGradient(
+        cx = at("x2", 0.5),
+        cy = at("y2", 0.5),
+        radius = at("r2", 0.5),
+        focusX = at("x1", 0.5),
+        focusY = at("y1", 0.5),
+        stops = stops,
+      )
+    } else {
+      ScenePaint.LinearGradient(
+        x1 = at("x1", 0.0),
+        y1 = at("y1", 0.0),
+        x2 = at("x2", 1.0),
+        y2 = at("y2", 0.0),
+        stops = stops,
+      )
+    }
+  }
+
   private fun paint(
     channel: ChannelValue?,
     datum: VegaValue,
@@ -1834,12 +1925,25 @@ public class MarkEncoder(
     if (!spec.aria) return null
     if (boolean(channels["aria"], datum) == false) return null
 
-    val role = string(channels["ariaRole"], datum) ?: "graphics-symbol"
+    val kind = spec.type.name.lowercase()
+    // Upstream's defaults: a group is an object because a reader steps *into* it, everything else
+    // is
+    // a symbol; and the role description is the mark type in words, which is what is actually
+    // heard.
+    val role =
+      string(channels["ariaRole"], datum)
+        ?: if (spec.type == MarkType.GROUP) "graphics-object" else "graphics-symbol"
+    val roleDescription = string(channels["ariaRoleDescription"], datum) ?: "$kind mark"
     // The specification's own words win over anything derived from the channels.
     string(channels["description"], datum)
       ?.takeIf { it.isNotBlank() }
       ?.let {
-        return AccessibilityDescriptor(label = it, role = role, focusable = true)
+        return AccessibilityDescriptor(
+          label = it,
+          role = role,
+          roleDescription = roleDescription,
+          focusable = true,
+        )
       }
 
     val labelField =
@@ -1851,7 +1955,10 @@ public class MarkEncoder(
       label = spoken(datum.fieldOf(labelField)),
       value = valueField?.takeIf { it != labelField }?.let { spoken(datum.fieldOf(it)) },
       role = role,
+      roleDescription = roleDescription,
       focusable = true,
+      // Not asked for: this is the divergence above, and a mark's container role turns on it.
+      derived = true,
     )
   }
 

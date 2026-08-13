@@ -17,10 +17,12 @@ import dev.aster.vega.model.DiagnosticCodes
 import dev.aster.vega.model.DiagnosticCollector
 import dev.aster.vega.model.VegaValue
 import dev.aster.vega.model.asDouble
+import dev.aster.vega.model.asNumberOrNull
 import dev.aster.vega.model.asString
 import dev.aster.vega.model.spec.SignalSpec
 import dev.aster.vega.runtime.scale.BandScale
 import dev.aster.vega.runtime.scale.BinnedScale
+import dev.aster.vega.runtime.scale.IdentityScale
 import dev.aster.vega.runtime.scale.InvertibleScale
 import dev.aster.vega.runtime.scale.LinearScale
 import dev.aster.vega.runtime.scale.OrdinalScale
@@ -99,6 +101,76 @@ public class SignalScope(
 
   override fun setDataset(name: String, rows: List<VegaValue>) {
     datasetSink?.invoke(name, rows)
+  }
+
+  /**
+   * `modify(name, insert, remove, toggle)` — the interactive write, through the same sink `setdata`
+   * uses.
+   *
+   * The three are applied in upstream's order — remove, then insert, then toggle — and `toggle`
+   * removes what is already there and inserts what is not, which is how a click handler builds a
+   * multiple selection. `remove: true` empties the dataset; an object removes every row it matches
+   * **field by field**, which is upstream's `equalObject` and not identity: the row a click hands
+   * back is a copy, so matching on identity would never remove anything.
+   *
+   * The write happens **once**. Upstream queues a changeset and applies it after the run, and a
+   * `modify` written in a signal's `update` rather than in an event handler is then applied a
+   * second time — probed: toggling the one row out of a one-row dataset leaves *two* copies of it
+   * upstream rather than none. That is re-entrancy in its scheduler, not its documented behaviour,
+   * and an engine that compiles a scene once has no equivalent of it. The insert, remove and
+   * toggle-that-inserts branches all agree, and `modify-dataset` covers them.
+   */
+  override fun modifyDataset(
+    name: String,
+    insert: VegaValue,
+    remove: VegaValue,
+    toggle: VegaValue,
+  ): Double {
+    val sink = datasetSink ?: return 0.0
+    val current = dataset(name)
+    val inserting = rowsOf(insert)
+    val toggling = rowsOf(toggle)
+    // Upstream's early exit, and it is observable: with nothing in the dataset and nothing to add,
+    // `modify` answers 0 and changes nothing.
+    if (current.isEmpty() && inserting.isEmpty() && toggling.isEmpty()) return 0.0
+
+    var rows = current
+    when {
+      remove is VegaValue.Bool && remove.value -> rows = emptyList()
+      remove is VegaValue.Arr -> {
+        val gone = remove.values
+        rows = rows.filterNot { row -> gone.any { matches(it, row) } }
+      }
+      remove is VegaValue.Obj -> rows = rows.filterNot { matches(remove, it) }
+      else -> Unit
+    }
+    rows = rows + inserting
+    for (row in toggling) {
+      rows = if (rows.any { matches(row, it) }) rows.filterNot { matches(row, it) } else rows + row
+    }
+    sink(name, rows)
+    return 1.0
+  }
+
+  /** A parameter that may be one row or several. */
+  private fun rowsOf(value: VegaValue): List<VegaValue> =
+    when (value) {
+      is VegaValue.Arr -> value.values
+      is VegaValue.Obj -> listOf(value)
+      else -> emptyList()
+    }
+
+  /**
+   * Upstream's `equalObject`: every field of the *pattern* equal in the row, extras ignored.
+   *
+   * One-sided on purpose. A row carries whatever the transforms added to it, and a handler matching
+   * on `{"c": "alpha"}` means "the rows whose `c` is alpha" rather than "the rows that are only
+   * that".
+   */
+  private fun matches(pattern: VegaValue, row: VegaValue): Boolean {
+    val fields = (pattern as? VegaValue.Obj)?.fields ?: return pattern == row
+    val other = (row as? VegaValue.Obj)?.fields ?: return false
+    return fields.all { (key, value) -> other[key] == value }
   }
 
   override fun treePath(name: String, from: VegaValue, to: VegaValue): VegaValue =
@@ -180,6 +252,9 @@ public class SignalScope(
     val scale = resolveScale(name, "domain") ?: return VegaValue.Null
     return VegaValue.Arr(
       when (scale) {
+        // `[0, 1]`, which is d3's and never consulted by the scale itself: the pair exists so
+        // `domain('name')` answers something rather than because anything reads it.
+        is IdentityScale -> scale.domain.map { VegaValue.Num(it) }
         is LinearScale -> scale.domain.map { VegaValue.Num(it) }
         is TransformedScale -> scale.domain.map { VegaValue.Num(it) }
         is TimeScale -> scale.domain.map { VegaValue.Num(it) }
@@ -357,6 +432,58 @@ public class SignalScope(
     } else {
       collector.info(DiagnosticCodes.EXPRESSION_LOG, text)
     }
+  }
+
+  /**
+   * `gradient(scale, p0, p1[, count])` — a colour scale as a gradient object.
+   *
+   * The stop list is upstream's: the scale's own ticks at `count` or fifteen, with the domain's two
+   * ends forced in at either end, each offset being the value's *fraction* of the domain rather
+   * than its position in the list — so a log scale's stops bunch up exactly as its colours do. The
+   * object is the same shape a specification can write by hand, which is what makes it usable in a
+   * `fill` without the encoder knowing where it came from.
+   */
+  override fun gradient(
+    scale: String,
+    from: VegaValue,
+    to: VegaValue,
+    count: VegaValue,
+  ): VegaValue {
+    val resolved = resolveScale(scale, "gradient") as? SequentialColorScale ?: return VegaValue.Null
+    val requested = count.asNumberOrNull()?.takeIf { it.isFinite() && it >= 1.0 }?.toInt() ?: 15
+    val lo = resolved.domain.first()
+    val hi = resolved.domain.last()
+    val values = LinkedHashSet<Double>()
+    values += lo
+    values += resolved.ticks(requested).filter { it in minOf(lo, hi)..maxOf(lo, hi) }
+    values += hi
+    val stops =
+      values
+        .sortedBy { resolved.fraction(it) }
+        .mapNotNull { value ->
+          resolved.colorAt(value)?.let { colour ->
+            VegaValue.Obj(
+              linkedMapOf(
+                "offset" to VegaValue.Num(resolved.fraction(value)),
+                "color" to VegaValue.Str(colour.toCssRgb()),
+              )
+            )
+          }
+        }
+    fun coordinate(point: VegaValue, index: Int, fallback: Double): Double =
+      ((point as? VegaValue.Arr)?.values?.getOrNull(index))?.asNumberOrNull()?.takeIf {
+        it.isFinite()
+      } ?: fallback
+    return VegaValue.Obj(
+      linkedMapOf(
+        "gradient" to VegaValue.Str("linear"),
+        "x1" to VegaValue.Num(coordinate(from, 0, 0.0)),
+        "y1" to VegaValue.Num(coordinate(from, 1, 0.0)),
+        "x2" to VegaValue.Num(coordinate(to, 0, 1.0)),
+        "y2" to VegaValue.Num(coordinate(to, 1, 0.0)),
+        "stops" to VegaValue.Arr(stops),
+      )
+    )
   }
 
   /** `geoShape('name', feature)` — the outline, which a `shape` channel draws directly. */

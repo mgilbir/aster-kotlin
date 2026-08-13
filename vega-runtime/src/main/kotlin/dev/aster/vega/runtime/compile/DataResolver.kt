@@ -165,8 +165,8 @@ internal class DataResolver(
 
     val type = spec.formatType ?: inferFormat(url)
     return when (type) {
-      "csv" -> DelimitedText.parse(text, ',')
-      "tsv" -> DelimitedText.parse(text, '\t')
+      "csv" -> DelimitedText.parse(headed(text, spec, ','), ',')
+      "tsv" -> DelimitedText.parse(headed(text, spec, '\t'), '\t')
       "dsv" -> {
         val delimiter = spec.delimiter
         if (delimiter.isNullOrEmpty()) {
@@ -177,7 +177,7 @@ internal class DataResolver(
           )
           emptyList()
         } else {
-          DelimitedText.parse(text, delimiter.first())
+          DelimitedText.parse(headed(text, spec, delimiter.first()), delimiter.first())
         }
       }
       "json" -> readJson(spec, text)
@@ -188,6 +188,29 @@ internal class DataResolver(
       }
     }
   }
+
+  /**
+   * `format.header`, applied the way upstream applies it: as a header **row** prepended to the
+   * text.
+   *
+   * Not as a list of names handed to the parser, and the difference is visible. Upstream builds the
+   * row with `stringValue` — d3's own quoting — and joins it with the file's delimiter, so a column
+   * name containing the delimiter or a quote comes out quoted and parses back as one field. Handing
+   * the names to the parser directly would skip that and split such a name in two.
+   */
+  private fun headed(text: String, spec: DataSpec, delimiter: Char): String {
+    if (spec.header.isEmpty()) return text
+    val row = spec.header.joinToString(delimiter.toString()) { quoteField(it, delimiter) }
+    return "$row\n$text"
+  }
+
+  /** d3's `stringValue`: quoted only when it has to be, with inner quotes doubled. */
+  private fun quoteField(value: String, delimiter: Char): String =
+    if (value.contains('"') || value.contains(delimiter) || value.contains('\n')) {
+      "\"" + value.replace("\"", "\"\"") + "\""
+    } else {
+      value
+    }
 
   /**
    * A TopoJSON document, decoded into the features or the mesh a map mark draws.

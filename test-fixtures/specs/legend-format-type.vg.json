@@ -1,6 +1,6 @@
 {
   "$schema": "https://vega.github.io/schema/vega/v6.json",
-  "description": "A gradient legend over instants. Its scale is a colour ramp and knows nothing about time, so formatType is the only thing that makes its labels read as dates; and tickMinStep thins them the way it thins an axis's.",
+  "description": "A gradient legend over instants. Its scale is a colour ramp and knows nothing about time, so formatType is the only thing that makes its labels read as dates; and tickMinStep thins them the way it thins an axis's. The fourth is chosen by a **signal** rather than written down, on both the legend and an axis: a chart that lets a control switch a column between a count and a date has to switch the grammar the format string is read in as well as the string.",
   "width": 320,
   "height": 130,
   "padding": 5,
@@ -57,6 +57,15 @@
       "range": {
         "scheme": "viridis"
       }
+    },
+    {
+      "name": "clock",
+      "type": "utc",
+      "domain": [
+        1705276800000,
+        1729036800000
+      ],
+      "range": "width"
     }
   ],
   "legends": [
@@ -87,6 +96,20 @@
       "orient": "left",
       "gradientLength": 300,
       "tickMinStep": 7776000000
+    },
+    {
+      "fill": "when",
+      "type": "gradient",
+      "title": "by signal",
+      "formatType": {
+        "signal": "grammar"
+      },
+      "format": {
+        "signal": "spec"
+      },
+      "orient": "top-right",
+      "gradientLength": 120,
+      "direction": "horizontal"
     }
   ],
   "marks": [
@@ -113,6 +136,29 @@
           }
         }
       }
+    }
+  ],
+  "signals": [
+    {
+      "name": "grammar",
+      "value": "utc"
+    },
+    {
+      "name": "spec",
+      "value": "%d %b"
+    }
+  ],
+  "axes": [
+    {
+      "scale": "clock",
+      "orient": "top",
+      "formatType": {
+        "signal": "grammar"
+      },
+      "format": {
+        "signal": "spec"
+      },
+      "tickCount": 3
     }
   ]
 }

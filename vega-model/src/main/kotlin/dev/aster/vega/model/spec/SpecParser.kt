@@ -31,6 +31,15 @@ private val CONFIG_HONOURED =
     // `config.range` is not a guide block: its entries are what a *named* range stands for.
     "range",
     "mark",
+    // The frame's own paint, read out of the raw config by name because it belongs to the view
+    // rather
+    // than to any mark. Consumed here so the block walker keeps it instead of reporting it.
+    "group",
+    // The event policy, read the same way and for the same reason.
+    "events",
+    // A projection's defaults, merged under each projection the way `config.title` is merged under
+    // the title: a theme naming `mercator` once means no chart has to name it again.
+    "projection",
     "rect",
     "symbol",
     "line",
@@ -65,6 +74,9 @@ private val CONFIG_HONOURED =
  */
 /** Everything an `on` handler may say. */
 private val SIGNAL_HANDLER_CONSUMED = setOf("events", "update", "encode", "force")
+
+private val EVENT_CONFIG_CONSUMED =
+  setOf("view", "window", "selector", "timer", "defaults", "bind", "globalCursor")
 
 /** Everything the object form of an event stream may say. */
 private val EVENT_STREAM_CONSUMED =
@@ -169,6 +181,106 @@ private fun guideStyleKeys(vararg prefixes: String): Set<String> =
     .toSet()
 
 private val AXIS_UNSUPPORTED = emptyMap<String, String>()
+
+/**
+ * What each part of a guide **is**, and which channels the thing it is can draw.
+ *
+ * A tick is a rule and a label is a text mark, so `encode.ticks.update.text` is not a gap — it is a
+ * channel a rule has no use for. Upstream agrees in the only way that matters: it writes the value
+ * onto the item and its renderer never looks at it, so a tick given a `text` draws no text there
+ * either. Reporting those as "not implemented" claimed a deficiency that does not exist and buried
+ * the channels that *are* missing among a hundred that are not.
+ *
+ * The sets are what this engine's own node types can express, which is the same question asked from
+ * the other side.
+ */
+private val GUIDE_PART_SHAPES: Map<String, Pair<String, Set<String>>> = run {
+  val common =
+    setOf(
+      "opacity",
+      "blend",
+      "tooltip",
+      "cursor",
+      "href",
+      "aria",
+      "description",
+      "zindex",
+      "x",
+      "y",
+    )
+  val stroked =
+    common +
+      setOf(
+        "stroke",
+        "strokeWidth",
+        "strokeDash",
+        "strokeDashOffset",
+        "strokeCap",
+        "strokeOpacity",
+      )
+  val text =
+    common +
+      setOf(
+        "text",
+        "fill",
+        "fillOpacity",
+        "font",
+        "fontSize",
+        "fontStyle",
+        "fontWeight",
+        "lineHeight",
+        "align",
+        "baseline",
+        "angle",
+        "limit",
+        "ellipsis",
+        "lineBreak",
+        "dir",
+        "dx",
+        "dy",
+        "radius",
+        "theta",
+      )
+  val rule = stroked + setOf("x2", "y2")
+  val symbol =
+    stroked +
+      setOf("size", "shape", "angle", "fill", "fillOpacity", "strokeJoin", "strokeMiterLimit")
+  val rect = stroked + setOf("width", "height", "x2", "y2", "fill", "fillOpacity", "cornerRadius")
+  val group = rect + setOf("clip", "strokeOffset", "strokeForeground")
+  mapOf(
+    "labels" to ("text mark" to text),
+    "title" to ("text mark" to text),
+    "ticks" to ("rule" to rule),
+    "grid" to ("rule" to rule),
+    "domain" to ("rule" to rule),
+    "symbols" to ("symbol" to symbol),
+    "gradient" to ("rect" to rect),
+    "legend" to ("group" to group),
+  )
+}
+
+/**
+ * `config` entries that are chart-level **values** rather than blocks of properties.
+ *
+ * Each is read where the top-level property of the same name is read — `root.fields[key] ?:
+ * configScalar(root, key)` — so a theme can set the chart's frame, its background, its sizing rule
+ * or the sentence a screen reader hears. They are listed here only so the block walker does not
+ * report them as the wrong shape.
+ */
+private val CONFIG_SCALARS = setOf("autosize", "background", "padding", "description")
+
+/** The time units a scale's `nice` can round out to, which is `vega-time`'s own list. */
+private val NICE_INTERVALS =
+  setOf(
+    "millisecond",
+    "second",
+    "minute",
+    "hour",
+    "day",
+    "week",
+    "month",
+    "year",
+  )
 
 /**
  * Guide properties that can carry a `{"signal": ...}`, which is what decides whether one **folds**.
@@ -466,6 +578,18 @@ private fun textEncodeMap(prefix: String): Map<String, String> =
  * budget example moves its labels to the start of each band with `{"scale": "x", "field":
  * "value"}`.
  */
+/**
+ * The five channels that reach a guide item rather than its geometry or its paint.
+ *
+ * A hoverable axis label, a tick that says what it marks, a label raised over its neighbours, a
+ * decorative title kept out of the accessibility tree. Each is already a mark channel and none was
+ * reachable from a guide; each is resolved against the part's own datum in the builder, which is
+ * why they are listed as resolved rather than folded — a tooltip reading `datum.value` has no
+ * constant to fold.
+ */
+private val GUIDE_ITEM_CHANNELS =
+  setOf("tooltip", "cursor", "zindex", "aria", "description", "href")
+
 private val RESOLVED_GUIDE_CHANNELS =
   setOf(
     // An axis label's position, which no property can say.
@@ -480,6 +604,21 @@ private val RESOLVED_GUIDE_CHANNELS =
     // A legend label's text, which is how an id becomes a name — read through a scale, so there is
     // nothing constant to fold.
     "labels.update.text",
+    // How a label ends when it is truncated, and what it breaks on when it is long. Neither has a
+    // guide property upstream, and both change what the reader sees: `"lineBreak": "/"` shows a
+    // path
+    // as a stack.
+    "labels.update.ellipsis",
+    "labels.update.lineBreak",
+    "labels.enter.ellipsis",
+    "labels.enter.lineBreak",
+    // The same three on a guide's **title**, plus its own nudge. A title's `text` is the one a
+    // trellis writes: the words come from the cell rather than from the axis.
+    "title.update.text",
+    "title.update.ellipsis",
+    "title.update.lineBreak",
+    "title.update.dx",
+    "title.update.dy",
     // A legend swatch's fill opacity. Upstream has `symbolOpacity`, which fades the outline with
     // the swatch; this fades only what is inside it, and there is no property for that.
     "symbols.enter.fillOpacity",
@@ -597,6 +736,8 @@ private val MARK_CONSUMED =
     "name",
     "role",
     "from",
+    "key",
+    "description",
     "encode",
     "marks",
     "axes",
@@ -838,10 +979,23 @@ public class SpecParser {
         projections =
           parseArray(root, "projections") { value, path -> parseProjection(value, path) },
         encode = parseEncode(root.fields["encode"], "$.encode"),
-        description = root.fields["description"]?.asString()?.takeIf { it.isNotBlank() },
         // The chart's own group takes the `config.style` blocks its `style` property names, and
         // only those — see `GuideConfig.styleDefaults`.
         styleAboveDefaults = config.styleDefaults(markStyles(root)).fields,
+        // `config.group` paints the chart's frame; see [VegaSpec.frameConfig].
+        frameConfig =
+          ((root.fields["config"] as? VegaValue.Obj)?.fields?.get("group") as? VegaValue.Obj)
+            ?.fields
+            .orEmpty(),
+        description =
+          (root.fields["description"] ?: configScalar(root, "description"))?.asString()?.takeIf {
+            it.isNotBlank()
+          },
+        events =
+          parseEventConfig(
+            (root.fields["config"] as? VegaValue.Obj)?.fields?.get("events"),
+            "$.config.events",
+          ),
       )
 
     reportUnsupportedTopLevel(root)
@@ -863,6 +1017,14 @@ public class SpecParser {
     for ((key, block) in obj.fields) {
       val child = block as? VegaValue.Obj
       when {
+        // `autosize`, `background`, `padding` and `description` are chart-level **values** rather
+        // than
+        // blocks, and they are read straight out of `config` where the top level does not say.
+        // Calling
+        // them "not an object" said they had been ignored when they had not — a diagnostic that
+        // sends
+        // a reader looking for a bug that is not there.
+        key in CONFIG_SCALARS -> Unit
         child == null ->
           diagnostics.warn(
             DiagnosticCodes.PARSE_UNKNOWN_PROPERTY,
@@ -880,6 +1042,31 @@ public class SpecParser {
       }
     }
     return GuideConfig(blocks)
+  }
+
+  /**
+   * `config.events` — the embedder's policy on listeners, upstream's `initializeEventConfig`.
+   *
+   * Read straight out of the raw config rather than through [parseConfig]'s block walk, because it
+   * is not a guide block: nothing about it reaches a mark's paint. What it decides is whether a
+   * listener is attached at all, which is enforced where the listeners are made.
+   */
+  private fun parseEventConfig(value: VegaValue?, path: String): EventConfig {
+    val obj = value as? VegaValue.Obj ?: return EventConfig()
+    val defaults = obj.fields["defaults"] as? VegaValue.Obj
+    defaults?.reportUnhandled("Event default", "$path.defaults", setOf("prevent", "allow"))
+    obj.reportUnhandled("Event config", path, EVENT_CONFIG_CONSUMED)
+    return EventConfig(
+      view = EventPermit.of(obj.fields["view"]),
+      window = EventPermit.of(obj.fields["window"]),
+      selector = EventPermit.of(obj.fields["selector"]),
+      // The one key upstream leaves un-unpacked; see [EventPermit.of].
+      timer = EventPermit.of(obj.fields["timer"], unpackArrays = false),
+      preventDefault = EventPermit.of(defaults?.fields?.get("prevent")),
+      allowDefault = EventPermit.of(defaults?.fields?.get("allow")),
+      bind = (obj.fields["bind"] as? VegaValue.Bool)?.value ?: true,
+      globalCursor = (obj.fields["globalCursor"] as? VegaValue.Bool)?.value ?: false,
+    )
   }
 
   /** A chart-level value written in `config` rather than at the top level. */
@@ -1047,6 +1234,24 @@ public class SpecParser {
       return null
     }
 
+    // Upstream's own rewrite: `{"encode": "select"}` *is* `{"update": "encode(item(), 'select')"}`,
+    // spelled shorter. Doing it here means one code path applies both spellings, and a
+    // specification
+    // that writes the call out by hand behaves identically — which it should, because upstream's
+    // parser produces exactly this string.
+    val encodeSet = encode?.asString()?.takeIf { it.isNotBlank() }
+    if (encodeSet != null) {
+      obj.reportUnhandled("Signal handler", path, SIGNAL_HANDLER_CONSUMED)
+      return SignalHandler(
+        streams = streams,
+        signalSources = signals,
+        scaleSources = scales,
+        update = SignalUpdate.Expression("encode(item(), '$encodeSet')"),
+        encode = encode,
+        force = (obj.fields["force"] as? VegaValue.Bool)?.value ?: false,
+      )
+    }
+
     val update =
       when {
         updateValue == null -> null
@@ -1078,6 +1283,23 @@ public class SpecParser {
         jsonPath = path,
       )
       return null
+    }
+
+    if (scales.isNotEmpty()) {
+      // A `{"scale": "x"}` source fires when the scale itself is rebuilt, which upstream knows
+      // because a scale is an operator in its dataflow. Here a changed signal recompiles the whole
+      // specification, so every scale is rebuilt every time and nothing says which of them *moved*
+      // —
+      // firing on all of them would run the handler when nothing about the scale had changed.
+      // Reported rather than approximated, and it is the rarest source there is: not one of Vega's
+      // 93
+      // published examples uses it, where 79 handlers across twenty of them are driven by a signal.
+      diagnostics.warn(
+        DiagnosticCodes.PARSE_UNKNOWN_PROPERTY,
+        "A handler on signal '$signalName' is fired by scale '${scales.joinToString("', '")}' " +
+          "being rebuilt, which this engine does not track; the signal will not update from it",
+        jsonPath = "$path.events",
+      )
     }
 
     obj.reportUnhandled("Signal handler", path, SIGNAL_HANDLER_CONSUMED)
@@ -1121,22 +1343,28 @@ public class SpecParser {
       (obj.fields["between"] as? VegaValue.Arr)?.values?.mapNotNull {
         (it as? VegaValue.Obj)?.let { child -> parseEventStreamObject(child, path, defaultSource) }
       } ?: emptyList()
+    val throttle = obj.fields["throttle"]?.asDouble()?.takeIf { !it.isNaN() && it != 0.0 }
     obj.reportUnhandled("Event stream", path, EVENT_STREAM_CONSUMED)
-    return EventStream(
-      source = obj.fields["source"]?.asString()?.takeIf { it.isNotEmpty() } ?: defaultSource,
-      type = type,
-      markType = obj.fields["marktype"]?.asString()?.takeIf { it.isNotEmpty() },
-      markName = obj.fields["markname"]?.asString()?.takeIf { it.isNotEmpty() },
-      filters =
-        (obj.fields["filter"] as? VegaValue.Arr)?.values?.map { it.asString() }
-          ?: obj.fields["filter"]?.asString()?.let { listOf(it) }
-          ?: emptyList(),
-      throttle = obj.fields["throttle"]?.asDouble()?.takeIf { !it.isNaN() && it != 0.0 },
-      debounce = obj.fields["debounce"]?.asDouble()?.takeIf { !it.isNaN() && it != 0.0 },
-      consume = (obj.fields["consume"] as? VegaValue.Bool)?.value ?: false,
-      between = between,
+    return EventSelector.asTimerStream(
+      EventStream(
+        source = obj.fields["source"]?.asString()?.takeIf { it.isNotEmpty() } ?: defaultSource,
+        type = type,
+        markType = obj.fields["marktype"]?.asString()?.takeIf { it.isNotEmpty() },
+        markName = obj.fields["markname"]?.asString()?.takeIf { it.isNotEmpty() },
+        filters = obj.eventFilters(),
+        throttle = throttle,
+        debounce = obj.fields["debounce"]?.asDouble()?.takeIf { !it.isNaN() && it != 0.0 },
+        consume = (obj.fields["consume"] as? VegaValue.Bool)?.value ?: false,
+        between = between,
+      )
     )
   }
+
+  /** One filter or a list of them; both forms mean "all of these must hold". */
+  private fun VegaValue.Obj.eventFilters(): List<String> =
+    (fields["filter"] as? VegaValue.Arr)?.values?.map { it.asString() }
+      ?: fields["filter"]?.asString()?.let { listOf(it) }
+      ?: emptyList()
 
   private fun parsePadding(value: VegaValue?, path: String): Padding =
     when (value) {
@@ -1226,6 +1454,8 @@ public class SpecParser {
     if (format != null) {
       for ((key, value) in format.fields) {
         if (key == "type" || key == "property" || key == "delimiter") continue
+        // `header` names the columns of a delimited file that has none.
+        if (key == "header") continue
         // The TopoJSON three: which object in the file, and — for a mesh — which of its arcs.
         if (key == "feature" || key == "mesh" || key == "filter") continue
         if (key == "parse") {
@@ -1271,6 +1501,8 @@ public class SpecParser {
       urlSignal = urlSignal,
       formatType = formatType,
       property = format?.fields?.get("property")?.asString()?.takeIf { it.isNotEmpty() },
+      header =
+        (format?.fields?.get("header") as? VegaValue.Arr)?.values?.map { it.asString() }.orEmpty(),
       feature = format?.fields?.get("feature")?.asString()?.takeIf { it.isNotEmpty() },
       mesh = format?.fields?.get("mesh")?.asString()?.takeIf { it.isNotEmpty() },
       meshFilter = format?.fields?.get("filter")?.asString()?.takeIf { it.isNotEmpty() },
@@ -1297,7 +1529,11 @@ public class SpecParser {
    * it is the common form rather than an exotic one.
    */
   private fun parseProjection(value: VegaValue, path: String): ProjectionSpec? {
-    val obj = value as? VegaValue.Obj ?: return unexpected("a projection definition", path)
+    val own = value as? VegaValue.Obj ?: return unexpected("a projection definition", path)
+    // `config.projection` under the projection's own properties, exactly as `config.title` sits
+    // under
+    // the title's: a theme naming `mercator` once means no projection has to name it again.
+    val obj = GuideConfig.merge(own, config.projectionDefaults())
     val name = obj.fields["name"]?.asString()
     if (name.isNullOrEmpty()) {
       diagnostics.error(
@@ -1396,6 +1632,17 @@ public class SpecParser {
       clamp = obj.fields["clamp"]?.asBoolean() ?: false,
       nice = parseNice(obj.fields["nice"], "$path.nice"),
       niceCount = (obj.fields["nice"] as? VegaValue.Num)?.value?.toInt(),
+      niceInterval =
+        when (val nice = obj.fields["nice"]) {
+          is VegaValue.Str -> nice.value.lowercase()
+          is VegaValue.Obj -> nice.fields["interval"]?.asString()?.lowercase()
+          else -> null
+        },
+      niceStep =
+        ((obj.fields["nice"] as? VegaValue.Obj)?.fields?.get("step") as? VegaValue.Num)
+          ?.value
+          ?.toInt()
+          ?.takeIf { it >= 1 },
       zero = obj.fields["zero"]?.asBoolean(),
       padding = obj.numberOrSignal("padding", "$path.padding"),
       paddingInner = obj.numberOrSignal("paddingInner", "$path.paddingInner"),
@@ -1444,19 +1691,47 @@ public class SpecParser {
       }
     }
 
+  /**
+   * `nice`, in every form upstream accepts: a flag, a **count**, or a **time interval**.
+   *
+   * All three mean "round the domain outward" and they round to different things, which is why the
+   * count and the interval are kept beside the flag rather than folded into it. A name upstream
+   * does not have is reported: rounding a domain to a unit nobody recognises would leave the axis
+   * looking finished and labelled wrongly.
+   */
   private fun parseNice(value: VegaValue?, path: String): Boolean =
     when (value) {
       null -> false
       is VegaValue.Bool -> value.value
       is VegaValue.Num -> true
-      else -> {
-        diagnostics.warn(
-          DiagnosticCodes.PARSE_UNKNOWN_PROPERTY,
-          "Time-unit 'nice' values are not implemented; treating nice as false",
-          jsonPath = path,
-        )
-        false
+      is VegaValue.Str -> {
+        if (value.value.lowercase() in NICE_INTERVALS) {
+          true
+        } else {
+          diagnostics.warn(
+            DiagnosticCodes.PARSE_UNKNOWN_PROPERTY,
+            "Scale 'nice' does not know the interval '${value.value}'; " +
+              "known intervals are ${NICE_INTERVALS.sorted().joinToString(", ")}",
+            jsonPath = path,
+          )
+          false
+        }
       }
+      is VegaValue.Obj -> {
+        val interval = value.fields["interval"]?.asString()?.lowercase()
+        if (interval != null && interval in NICE_INTERVALS) {
+          true
+        } else {
+          diagnostics.warn(
+            DiagnosticCodes.PARSE_UNKNOWN_PROPERTY,
+            "Scale 'nice' as an object needs an 'interval' naming one of " +
+              NICE_INTERVALS.sorted().joinToString(", "),
+            jsonPath = path,
+          )
+          false
+        }
+      }
+      else -> false
     }
 
   /**
@@ -1738,6 +2013,21 @@ public class SpecParser {
       domainLine = obj.fields["domain"]?.asBoolean() ?: true,
       tickCount = obj.numberOrSignal("tickCount", "$path.tickCount"),
       tickMinStep = obj.numberOrSignal("tickMinStep", "$path.tickMinStep"),
+      // `tickCount` also takes a time interval, in the same two spellings `nice` does. Read here
+      // rather than through `numberOrSignal`, which sees a string or an object and has nothing to
+      // make a number of — so the interval form was dropped in silence and the axis fell back to a
+      // count, labelling a night at whatever round number the algorithm liked.
+      tickInterval =
+        when (val count = obj.fields["tickCount"]) {
+          is VegaValue.Str -> count.value.lowercase()
+          is VegaValue.Obj -> count.fields["interval"]?.asString()?.lowercase()
+          else -> null
+        },
+      tickStep =
+        ((obj.fields["tickCount"] as? VegaValue.Obj)?.fields?.get("step") as? VegaValue.Num)
+          ?.value
+          ?.toInt()
+          ?.takeIf { it >= 1 },
       tickSize = obj.numberOrSignal("tickSize", "$path.tickSize"),
       labelPadding = obj.numberOrSignal("labelPadding", "$path.labelPadding"),
       labelFontSize = obj.numberOrSignal("labelFontSize", "$path.labelFontSize"),
@@ -1763,6 +2053,8 @@ public class SpecParser {
       formatExpression =
         (obj.fields["format"] as? VegaValue.Obj)?.fields?.get("signal")?.asString(),
       formatType = axisFormatType(obj.fields["formatType"], "$path.formatType"),
+      formatTypeExpression =
+        (obj.fields["formatType"] as? VegaValue.Obj)?.fields?.get("signal")?.asString(),
       // `tickBand` is a shorthand for these three, and it wins: upstream's `tickBand()` reads the
       // others only when it is absent. `"extent"` puts a band scale's ticks on the band edges.
       bandPosition =
@@ -1832,12 +2124,21 @@ public class SpecParser {
       else -> null
     }
 
+  /**
+   * `titleOrient` — which side of the entries the title sits on, all four of them.
+   *
+   * `right` and `bottom` used to be reported, on the grounds that each needs its own anchoring
+   * rule. They do, and it is the same rule read the other way round: a `bottom` title anchors along
+   * the entries' width exactly as a `top` one does and is *placed* past their bottom edge, and a
+   * `right` title anchors down their height exactly as a `left` one does and is placed past their
+   * far edge.
+   */
   private fun legendTitleOrient(value: VegaValue?, path: String): String? {
     val name = (value as? VegaValue.Str)?.value?.lowercase() ?: return null
-    if (name == "top" || name == "left") return name
+    if (name == "top" || name == "left" || name == "right" || name == "bottom") return name
     diagnostics.warn(
       DiagnosticCodes.PARSE_UNKNOWN_PROPERTY,
-      "A legend title on the '$name' is not implemented; it is drawn above the entries",
+      "A legend title on the '$name' is not a side upstream has; it is drawn above the entries",
       jsonPath = path,
     )
     return null
@@ -1855,15 +2156,9 @@ public class SpecParser {
       when (value) {
         null -> return null
         is VegaValue.Str -> value.value.lowercase()
-        else -> {
-          diagnostics.error(
-            DiagnosticCodes.PARSE_UNKNOWN_PROPERTY,
-            "A label format type chosen by a signal is not implemented; write one of " +
-              "'number', 'time' or 'utc'",
-            jsonPath = path,
-          )
-          return null
-        }
+        // A signal is read where the format string's own signal is read, in the builder. Null here
+        // means "nothing constant to check", not "ignored".
+        else -> return null
       }
     if (name !in setOf("number", "time", "utc")) {
       diagnostics.error(
@@ -1917,6 +2212,9 @@ public class SpecParser {
           when {
             // Resolved later, against the item the guide is drawing, so nothing to say here.
             "$part.$pass.$channel" in RESOLVED_GUIDE_CHANNELS -> Unit
+            // The five item channels are resolved on **every** part, so they are matched by name
+            // rather than listed per part — eighty entries that would all say the same thing.
+            channel in GUIDE_ITEM_CHANNELS -> Unit
             // A guide writes its own text and position into `update` on every pass, so a
             // specification's `enter` for one of those is overwritten before anything is drawn.
             // Upstream ignores it too — `enter: {text: {value: 'E'}}` on an axis label leaves the
@@ -1928,6 +2226,19 @@ public class SpecParser {
                 "$subject encode sets '$channel' on '$part' in 'enter', which changes nothing: " +
                   "the guide writes that channel in 'update' on every pass and overwrites it. " +
                   "Move it to 'update'",
+                jsonPath = "$path.encode.$part.$pass.$channel",
+              )
+            // A channel the part's own mark type cannot draw is **not a gap**: upstream writes it
+            // onto
+            // the item and its renderer ignores it, so a tick given a `text` draws no text either
+            // way.
+            // Saying so is the difference between a report a reader can act on and a hundred they
+            // cannot.
+            property == null && GUIDE_PART_SHAPES[part]?.let { channel !in it.second } == true ->
+              diagnostics.info(
+                DiagnosticCodes.PARSE_UNKNOWN_PROPERTY,
+                "$subject '$part' is a ${GUIDE_PART_SHAPES.getValue(part).first}, which has no " +
+                  "'$channel' — upstream sets it on the item and draws nothing with it either",
                 jsonPath = "$path.encode.$part.$pass.$channel",
               )
             property == null ->
@@ -2297,8 +2608,23 @@ public class SpecParser {
         format = obj.fields["format"]?.takeIf { it is VegaValue.Str }?.asString(),
         formatExpression =
           (obj.fields["format"] as? VegaValue.Obj)?.fields?.get("signal")?.asString(),
-        formatType = axisFormatType(obj.fields["formatType"], "$path.formatType"),
         tickCount = obj.numberOrSignal("tickCount", "$path.tickCount"),
+        // `tickCount` also takes a time interval, in the same two spellings `nice` does. Read here
+        // rather than through `numberOrSignal`, which sees a string or an object and has nothing to
+        // make a number of — so the interval form was dropped in silence and the axis fell back to
+        // a
+        // count, labelling a night at whatever round number the algorithm liked.
+        tickInterval =
+          when (val count = obj.fields["tickCount"]) {
+            is VegaValue.Str -> count.value.lowercase()
+            is VegaValue.Obj -> count.fields["interval"]?.asString()?.lowercase()
+            else -> null
+          },
+        tickStep =
+          ((obj.fields["tickCount"] as? VegaValue.Obj)?.fields?.get("step") as? VegaValue.Num)
+            ?.value
+            ?.toInt()
+            ?.takeIf { it >= 1 },
         offset = obj.numberOrSignal("offset", "$path.offset"),
         padding = obj.numberOrSignal("padding", "$path.padding"),
         titlePadding = obj.numberOrSignal("titlePadding", "$path.titlePadding"),
@@ -2331,6 +2657,10 @@ public class SpecParser {
           obj.numberOrSignal("gradientStrokeWidth", "$path.gradientStrokeWidth"),
         gradientOpacity = obj.numberOrSignal("gradientOpacity", "$path.gradientOpacity"),
         symbolLimit = obj.numberOrSignal("symbolLimit", "$path.symbolLimit"),
+        formatType =
+          (obj.fields["formatType"] as? VegaValue.Str)?.value?.takeIf { it.isNotEmpty() },
+        formatTypeExpression =
+          (obj.fields["formatType"] as? VegaValue.Obj)?.fields?.get("signal")?.asString(),
         tickMinStep = obj.numberOrSignal("tickMinStep", "$path.tickMinStep"),
         aria = obj.fields["aria"]?.asBoolean() ?: true,
         description = obj.fields["description"]?.asString()?.takeIf { it.isNotBlank() },
@@ -2508,6 +2838,7 @@ public class SpecParser {
       name = obj.fields["name"]?.asString(),
       role = obj.fields["role"]?.takeIf { it is VegaValue.Str }?.asString(),
       from = from?.let { FromSpec(data = it.fields["data"]?.asString(), facet = facet) },
+      key = obj.fields["key"]?.asString()?.takeIf { it.isNotEmpty() },
       sort = sort,
       transform = markTransforms,
       encode = parseEncode(obj.fields["encode"], "$path.encode"),
@@ -2530,6 +2861,7 @@ public class SpecParser {
       zindex = (obj.fields["zindex"] as? VegaValue.Num)?.value?.toInt() ?: 0,
       interactive = obj.fields["interactive"]?.asBoolean() ?: true,
       aria = obj.fields["aria"]?.asBoolean() ?: true,
+      description = obj.fields["description"]?.asString()?.takeIf { it.isNotBlank() },
       clip = obj.fields["clip"]?.asBoolean() ?: false,
       configBelowDefaults = below.fields,
       configAboveDefaults = above.fields,
@@ -2771,20 +3103,18 @@ public class SpecParser {
 
   private fun parseEncode(value: VegaValue?, path: String): EncodeSpec {
     val obj = value as? VegaValue.Obj ?: return EncodeSpec()
-    for (key in obj.fields.keys) {
-      if (key !in setOf("enter", "update", "exit", "hover")) {
-        diagnostics.warn(
-          DiagnosticCodes.PARSE_UNKNOWN_PROPERTY,
-          "Unknown encode set '$key'",
-          jsonPath = "$path.$key",
-        )
-      }
-    }
+    val built = setOf("enter", "update", "exit", "hover")
     return EncodeSpec(
       enter = parseEncodeEntry(obj.fields["enter"], "$path.enter"),
       update = parseEncodeEntry(obj.fields["update"], "$path.update"),
       exit = parseEncodeEntry(obj.fields["exit"], "$path.exit"),
       hover = parseEncodeEntry(obj.fields["hover"], "$path.hover"),
+      // Any other name is a block a handler invokes rather than one the dataflow runs; upstream has
+      // no fixed list, so reporting these as unknown lost a chart's press styling at parse time.
+      named =
+        obj.fields
+          .filterKeys { it !in built }
+          .mapValues { (key, entry) -> parseEncodeEntry(entry, "$path.$key") },
     )
   }
 

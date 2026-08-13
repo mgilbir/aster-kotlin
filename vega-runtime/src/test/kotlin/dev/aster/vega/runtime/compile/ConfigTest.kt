@@ -1,6 +1,8 @@
 package dev.aster.vega.runtime.compile
 
 import dev.aster.vega.model.DiagnosticCodes
+import dev.aster.vega.model.spec.EventConfig
+import dev.aster.vega.model.spec.EventPermit
 import dev.aster.vega.scene.RuleNode
 import dev.aster.vega.scene.ScenePaint
 import dev.aster.vega.scene.TextNode
@@ -252,26 +254,64 @@ class ConfigTest {
     assertEquals(5.0, both.cornerRadius)
   }
 
-  // ---- what is still reported -----------------------------------------------
+  // ---- nothing is left to report ---------------------------------------------
 
   /**
    * A theme that reaches the axes and not the bars looks more broken than one that reaches neither,
-   * so the blocks nothing consumes say so by name.
+   * which is why every block used to say so by name. None is left to.
    */
   @Test
-  fun `config blocks that do not reach the chart are reported`() {
-    // `range` came off this list: its entries are what a *named* range stands for, and the parser
-    // substitutes one for the name exactly as upstream does.
+  fun `every config block reaches the chart`() {
+    // The list emptied one block at a time. `range` came off first — its entries are what a *named*
+    // range stands for, and the parser substitutes one for the name as upstream does. Then `group`,
+    // which paints the view's own frame rather than its group marks, and `projection`, which merges
+    // under each projection as `config.title` merges under the title.
+    //
+    // `events` was last, and it is the one that is not a drawing instruction: it decides which
+    // listeners a view may attach and which browser defaults it suppresses. Being unread meant an
+    // embedder's `{"window": false}` was ignored in silence — the opposite of what a policy is for.
     val diagnostics =
-      compile("""{"group": {"fill": "#eee"}, "projection": {}}""").diagnostics.filter {
-        it.code == DiagnosticCodes.PARSE_UNKNOWN_PROPERTY
-      }
-    for (name in listOf("group", "projection")) {
-      assertTrue(
-        diagnostics.any { it.jsonPath == "$.config.$name" },
-        "$name not reported in $diagnostics",
-      )
-    }
+      compile("""{"events": {"defaults": {"allow": ["wheel"]}, "window": false, "bind": false}}""")
+        .diagnostics
+        .filter { it.code == DiagnosticCodes.PARSE_UNKNOWN_PROPERTY }
+    assertTrue(diagnostics.isEmpty(), diagnostics.toString())
+    // And the four that are chart-level *values* rather than blocks are read, not reported: saying
+    // they had been ignored sent a reader looking for a bug that was not there.
+    val scalars =
+      compile("""{"background": "#eee", "padding": 7, "autosize": "fit", "description": "d"}""")
+        .diagnostics
+        .filter { it.code == DiagnosticCodes.PARSE_UNKNOWN_PROPERTY }
+    assertTrue(scalars.isEmpty(), scalars.toString())
+  }
+
+  /**
+   * The event policy is *read*, not merely unreported.
+   *
+   * Each shape is upstream's `initializeEventConfig`, which was probed rather than assumed: a list
+   * becomes an allow-list, an object naming types is the same list written out, and `timer` is the
+   * one key upstream leaves un-unpacked — so an array there permits nothing, which is carried
+   * through as upstream carries it rather than corrected.
+   */
+  @Test
+  fun `the event policy is read from config`() {
+    val events =
+      compile(
+          """{"events": {"window": false, "view": ["click"], "selector": {"wheel": true},
+              "timer": [500], "defaults": {"prevent": ["mousedown"], "allow": false},
+              "bind": false, "globalCursor": true}}"""
+        )
+        .spec!!
+        .events
+    assertEquals(EventPermit.All(false), events.window)
+    assertEquals(EventPermit.Types(setOf("click")), events.view)
+    assertEquals(EventPermit.Types(setOf("wheel")), events.selector)
+    assertEquals(EventPermit.Types(emptySet()), events.timer)
+    assertEquals(EventPermit.Types(setOf("mousedown")), events.preventDefault)
+    assertEquals(EventPermit.All(false), events.allowDefault)
+    assertEquals(false, events.bind)
+    assertEquals(true, events.globalCursor)
+    // No policy at all permits everything and prevents nothing.
+    assertEquals(EventConfig(), compile("""{}""").spec!!.events)
   }
 
   /**

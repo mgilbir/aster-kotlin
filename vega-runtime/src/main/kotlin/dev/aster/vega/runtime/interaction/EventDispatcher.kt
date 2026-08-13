@@ -8,8 +8,11 @@ import dev.aster.vega.expression.JsSemantics
 import dev.aster.vega.model.DiagnosticCodes
 import dev.aster.vega.model.DiagnosticCollector
 import dev.aster.vega.model.VegaValue
+import dev.aster.vega.model.spec.EventConfig
+import dev.aster.vega.model.spec.EventPermit
 import dev.aster.vega.model.spec.EventStream
 import dev.aster.vega.model.spec.SignalHandler
+import dev.aster.vega.scene.SceneNodeId
 
 /**
  * An input event, in terms the engine can reason about.
@@ -26,6 +29,13 @@ public data class InputEvent(
   val type: String,
   val timestampMillis: Long,
   val source: String = EventStream.SOURCE_VIEW,
+  /**
+   * The scene node the event landed on, when it landed on one.
+   *
+   * What `encode(item(), 'select')` needs: a handler's `encode` overlays a block on **one** item,
+   * and the id is how that item is found again after the scene has been rebuilt.
+   */
+  val itemId: SceneNodeId? = null,
   /** The mark instance under the pointer, if the event landed on one. */
   val markType: String? = null,
   val markName: String? = null,
@@ -33,6 +43,18 @@ public data class InputEvent(
   val datum: VegaValue = VegaValue.Null,
   val x: Double = 0.0,
   val y: Double = 0.0,
+  /**
+   * The same position in the **root frame's** own coordinates, which is what `x()`, `y()` and
+   * `xy()` answer.
+   *
+   * Distinct from [x] and [y] on purpose: those are the raw pointer position as the platform
+   * reported it, which is what upstream's `event.x` carries, while this has the chart's padding and
+   * autosize origin taken off — upstream's `offset(view)` — so it is in the space the marks are
+   * placed in. A brush written `[x(), x()]` reads this one, and reading the other would put it out
+   * by the padding.
+   */
+  val rootX: Double = 0.0,
+  val rootY: Double = 0.0,
   val properties: Map<String, VegaValue> = emptyMap(),
 ) {
   /** The `event` object a filter expression sees. */
@@ -57,7 +79,14 @@ public data class InputEvent(
 public data class FiredHandler(
   val signalName: String,
   val handler: SignalHandler,
-  val event: InputEvent,
+  /**
+   * The event that fired it, or null when nothing did.
+   *
+   * A handler whose source is another **signal** — `{"events": {"signal": "width"}}` — is fired by
+   * that signal changing, so there is no event to read and `event` is absent from its update
+   * expression, exactly as upstream leaves it undefined.
+   */
+  val event: InputEvent? = null,
 )
 
 /** One `on` handler, bound to the signal it sets. */
@@ -91,6 +120,14 @@ public class EventDispatcher(
   private val diagnostics: DiagnosticCollector,
   /** Signals and datasets a filter expression may read, alongside `event`. */
   private val scope: ExpressionScope,
+  /**
+   * `config.events` — the embedder's policy on which listeners this view may attach.
+   *
+   * Enforced *here* because this is the only place a listener comes into being. A specification
+   * asking for `window:mousemove` is asking to watch the pointer across the whole page, and a host
+   * that says no needs the request refused rather than honoured quietly.
+   */
+  private val events: EventConfig = EventConfig(),
 ) {
 
   /** One stream being watched, with whatever state it needs between events. */
@@ -124,6 +161,7 @@ public class EventDispatcher(
   }
 
   private fun register(stream: EventStream, binding: HandlerBinding) {
+    if (!permitted(stream, binding)) return
     if (stream.nested != null) {
       // A pair wrapping a pair. Honouring it means gating a gate, which the latch model can do,
       // but nothing in the corpus uses it and guessing at the ordering would be worse than saying
@@ -142,6 +180,19 @@ public class EventDispatcher(
       gateOf[watch] = gate
       gateWatches += Watch(stream.between[0], null, opens = mutableListOf(gate))
       gateWatches += Watch(stream.between[1], null, closes = mutableListOf(gate))
+    }
+    if (stream.source == EventStream.SOURCE_TIMER) {
+      // A timer fires on its own rather than in response to anything, so honouring it needs a clock
+      // this class does not have — `dispatch` is only ever called with an event that already
+      // happened. Reported rather than dropped, because a signal driven by a timer is one that
+      // never changes here and the reason is not visible from the drawing.
+      diagnostics.warn(
+        DiagnosticCodes.PARSE_UNKNOWN_PROPERTY,
+        "A timer stream needs a clock to fire it; signal '${binding.signalName}' will keep its " +
+          "initial value",
+        operator = binding.signalName,
+      )
+      return
     }
     if (stream.debounce != null) {
       // A debounce fires *after* a quiet period, so honouring it needs something that can wake up
@@ -180,6 +231,65 @@ public class EventDispatcher(
     }
     return fired
   }
+
+  /**
+   * Whether the policy allows a listener on this stream's source, upstream's `permit`.
+   *
+   * A rule of `false` blocks the source outright; a **list** is an allow-list, so a type it does
+   * not name is refused. Upstream warns and carries on rather than failing the chart, which is the
+   * right shape for a policy: the rest of the specification still draws.
+   *
+   * A stream nested inside a `between` pair is checked too — the gate needs a listener of its own,
+   * and a policy that blocked the outer source while the gate watched it anyway would be no policy
+   * at all.
+   */
+  private fun permitted(stream: EventStream, binding: HandlerBinding): Boolean {
+    val key = permitKey(stream.source)
+    val rule =
+      when (key) {
+        EventStream.SOURCE_WINDOW -> events.window
+        EventStream.SOURCE_VIEW -> events.view
+        EventStream.SOURCE_TIMER -> events.timer
+        else -> events.selector
+      }
+    val type = stream.type ?: return true
+    val blocked =
+      when (rule) {
+        is EventPermit.Unrestricted -> false
+        is EventPermit.All -> !rule.value
+        is EventPermit.Types -> type !in rule.types
+      }
+    if (!blocked) return true
+    diagnostics.warn(
+      DiagnosticCodes.PARSE_UNKNOWN_PROPERTY,
+      "Blocked $key $type event listener; 'config.events' does not permit it, so signal " +
+        "'${binding.signalName}' will not update from it",
+      operator = binding.signalName,
+    )
+    return false
+  }
+
+  /**
+   * Which of the four policy keys a source is governed by.
+   *
+   * A `scope` stream listens on the view and filters down to one group, so it is a `view` listener
+   * as far as the policy is concerned — upstream's `eventSource` rewrites it to `view` before the
+   * permit is tested. A mark type or `@name` is the same: those are view listeners with a target.
+   * Anything else is a CSS selector naming an element outside the chart, which is the `selector`
+   * key.
+   */
+  private fun permitKey(source: String): String =
+    when (source) {
+      EventStream.SOURCE_WINDOW -> EventStream.SOURCE_WINDOW
+      EventStream.SOURCE_TIMER -> EventStream.SOURCE_TIMER
+      EventStream.SOURCE_SCOPE -> EventStream.SOURCE_VIEW
+      EventStream.SOURCE_VIEW -> EventStream.SOURCE_VIEW
+      // Anything left is a CSS selector naming an element outside the chart. A mark selector never
+      // arrives here: `rect:click` and `@bars:mousedown` keep the view as their source and carry
+      // the
+      // mark as a target.
+      else -> "selector"
+    }
 
   private fun matches(stream: EventStream, event: InputEvent): Boolean {
     if (stream.type != null && stream.type != event.type) return false

@@ -1038,6 +1038,7 @@
       "shapeWidth": 5.6,
       "size": 2.56,
       "stroke": "red",
+      "strokeCap": "round",
       "type": "symbol",
       "x": 200,
       "y": 200
@@ -1051,6 +1052,7 @@
       "shapeWidth": 17.6,
       "size": 2.56,
       "stroke": "grey",
+      "strokeCap": "round",
       "strokeWidth": 1.6,
       "type": "symbol",
       "x": 200,
@@ -1065,6 +1067,7 @@
       "shapeWidth": 52.478461,
       "size": 2.56,
       "stroke": "grey",
+      "strokeCap": "round",
       "strokeWidth": 1.6,
       "type": "symbol",
       "x": 200,

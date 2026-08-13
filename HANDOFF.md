@@ -9,7 +9,7 @@ Branch `milestone-0-bootstrap`. Working tree clean, both gates green:
 - `./scripts/check.sh` — format, all tests, lint, demo APK
 - `./scripts/oracle.sh` — regenerates upstream references and runs the differential comparison
 
-**148 differential fixtures pass, all matching upstream exactly.** That is the only number here
+**166 differential fixtures pass, all matching upstream exactly.** That is the only number here
 that means what it says.
 
 ## Read this before trusting the other number
@@ -254,7 +254,7 @@ not the one Vega documents**, because Vega only forwards the parameters a specif
 
 ## What is left: two examples, and neither can be verified
 
-**148 differential fixtures pass. 91 of the 93 examples compile clean.** Everything that can be
+**166 differential fixtures pass. 91 of the 93 examples compile clean.** Everything that can be
 checked against upstream has been.
 
 ### `projections` — upstream refuses it too
@@ -341,6 +341,10 @@ shows them spread down the page.
 The reason there are frames at all is worth understanding before anyone touches it: the timer is not
 animating anything, it is standing in for a loop Vega's expression language cannot express.
 
+The stream itself now parses as what it is — a `timer` source rather than a view event of type
+`timer` — and the dispatcher reports that firing it needs a clock. Before that the loop below did not
+merely fail to run; nothing said so.
+
 | signal | role |
 | --- | --- |
 | `shiftArray` | how far each label must move to clear the one above it |
@@ -374,6 +378,97 @@ Three things to weigh first, none of them checked:
   interaction layer, on a real event; running them at compile time until they settle is a different
   contract, and STATUS's "Next three tasks" item 1 describes the neighbouring gaps in the same
   machinery.
+
+## A signal can now drive a signal, and that was the big one
+
+`{"events": {"signal": "brush"}}` is how one signal is derived from another, and it is not a corner:
+**79** handlers across twenty of Vega's 93 published examples use it — every pan, zoom, brush and
+overview-plus-detail in the gallery — against **none** for the `{"scale": ...}` form. It was parsed
+and never fired.
+
+It was invisible for a reason worth keeping: **nothing fires at initialization**. Probed both ways —
+a chain two deep takes `a = 5` to `b = 10` and `c = 11` in one run, and with no change at all both
+signals keep their declared values — so the scene the differential harness compares is the scene
+before anything has happened, and every fixture was right. A pan that did nothing looked like a chart
+with no pan in it.
+
+The implementation is a loop in `VegaChartController.cascade`, and two details are load-bearing.
+Dependency order falls out of it rather than needing a sort, because each round fires only the
+handlers whose source changed in the round before; and the diagnostics from a cycle are reported
+*after* `publish`, since publishing replaces them with the new compile's and the cycle is a fact about
+the interaction rather than about the specification's text. A cycle is capped and reported the way
+`DataflowOrder` reports one among `update` expressions — upstream refuses such a specification
+outright, and drawing with one signal stuck beats not drawing.
+
+The scale form stays reported. A recompile rebuilds every scale, so nothing here says which one
+*moved*, and firing on all of them would run the handler when nothing had changed.
+
+## Writing the three untried combinations found four bugs
+
+STATUS's "next tasks" named three combinations the corpus had never met. Two of the three failed on
+arrival, which is the method working:
+
+- **An axis on a discretizing scale** was skipped outright — a whole axis missing from a chart that
+  asked for one. Each of the four ticks at something different and upstream picks by what the scale
+  *has*: bins, then a `ticks` method, then the domain.
+- **A `tickCount` written as a time interval** was dropped in silence, so a night was ticked at
+  whatever round number the count algorithm liked.
+- **A group shadowing the outer scope's signals and scales** passed unchanged.
+
+Two more fell out of the first, and both were the kind that only a fixture finds. A `bin-ordinal`
+domain taken from a field kept its **duplicates**, so the bisection counted equal values and the
+lowest bin was painted with the highest bucket's colour. And **every plural interval name matched
+nothing** — `TimeInterval` is spelled `HOUR`, Vega's unit is `"hours"` — so `nice: "hours"` had been
+silently doing nothing too, and `"quarter"` is not an interval at all but three months. That one is
+now in `TimeInterval.forUnit`, which is the only place a unit name should ever be matched.
+
+The first draft of the discretizing fixture is worth remembering as a mistake: it gave the scales
+**colour** ranges, which is what a discretizing scale is usually for. Upstream then positions every
+tick at `NaN` — a colour is not a length — and the fixture would have been asking this engine to
+reproduce meaningless output, pixel for pixel. Numeric ranges make the same four rules visible and the
+comparison mean something. If a fixture's expected output looks like garbage, the fixture is wrong
+before the engine is.
+
+## The event functions were missing under everything else
+
+`x()` is the second commonest expression in an interactive specification after `datum` — forty uses
+across Vega's 93 examples, in every brush and every pan — and it, `y()`, `xy()` and `item()` were not
+implemented at all. Worth knowing why that stayed invisible: they only ever appear inside `on`
+handlers, so no fixture can reach them, and the handler that used one failed at evaluation time into a
+collector nobody read. Two of those collectors are now drained into the published diagnostics.
+
+`x()` is **not** `event.x`. Upstream takes `offset(view)` — padding plus the autosize origin — off the
+canvas point first, which is exactly what the root group carries as its translation, so the answer is
+in the space the marks are placed in. A chart with no padding hides the difference completely, so test
+with padding. The argument forms (`x(item)`, `group()`) walk the chain of groups above an item and are
+refused by name: the event value here does not carry that chain.
+
+With `item()` in place, `encode` handlers fell out. Upstream desugars `{"encode": "select"}` into
+`encode(item(), 'select')`, and doing the same in the parser means one path serves both spellings. The
+ordering rule was probed in both directions and is worth not re-deriving: the overlay beats the mark's
+`update` on the pass that applies it and loses to it on every pass after. That is reproduced by
+putting the block after `update` while it is fresh and before it once it is not — `ItemEncode.fresh`,
+aged by the controller once the compile has happened. And the handler changes no signal value at all,
+so the redraw has to be triggered by the overlay itself.
+
+## Pick the next fixture by counting, not by taste
+
+The three combinations STATUS named were used up, so the next candidates came from a mechanical count:
+for each of the 49 implemented transforms, how many fixtures use it? Three had **none** — `impute`,
+`nest`, `pivot` — and fourteen have exactly **one**. The count is a few lines of Python over
+`override val type: String = "…"` in `vega-dataflow/.../transform/*.kt` against `"type": "…"` in
+`test-fixtures/specs/*.vg.json`; run it again after adding a transform.
+
+One fixture is enough to catch a transform that does nothing and not enough to catch one whose
+*options* are ignored. `hierarchy-options` was written for exactly that — a radius column on `pack`,
+rounding and padding on `partition`, the cluster method with separation off on `tree`, and output names
+of the specification's choosing on both — and it passed on arrival, which is the other outcome and
+worth having. That is exactly what `nest-treemap` found: `sort` on a hierarchy layout was
+reading its field off the row rather than off the node, so `{"field": "value"}` — the layout's own
+computed total, the only sensible thing to sort a hierarchy by — found nothing and sorted nothing.
+
+`label` is the one transform that can never have a fixture: its occupancy bitmap is built from a
+canvas upstream, and there is no canvas under Node to produce a reference from.
 
 ## What is left, and the one technique that finds it
 
@@ -425,6 +520,65 @@ property* can carry one — the styling block records it and everything read thr
 resolves it. A channel aimed at a plain string property (`symbolType`, `orient`, `format`) is still
 named, because folding an object into one would stringify it.
 
+**The scene has no mark level, and two things a mark carries had nowhere to live.** Upstream's group
+holds *marks* and each mark holds items; here a mark's items are the group's children directly. That
+is the right trade for a differential comparison — the harness reads a flat list of drawn things — but
+a mark's own `description` is announced on the container it draws its items inside, and there was no
+container. Both now travel on the items: `NodeMetadata.markOrdinal` (which of its parent's marks this
+came from, upstream's `markpath`) and `markAccessibility` (the announcement, one instance per mark held
+by reference), and the renderer rebuilds the container from a run of items that agree on both. The
+ordinal was needed for its own sake: without it two `rect` marks declared side by side read as one run,
+and an item `zindex` in the second could be painted among the first's items.
+
+Verified the way `zindex` had to be — by harvesting upstream's own output. `./scripts/oracle.sh` now
+writes `test-fixtures/reference/mark-containers.json` beside the captions, and `MarkContainerTest`
+compares 2,038 announcements across the corpus: role, role description, label and hidden, as a multiset
+per fixture. Two things it taught, both already in the code: upstream announces a **symbol** legend's
+entries as a group mark container and a gradient legend's as nothing, and a mark that produced no items
+still gets a container upstream — an empty one, which is skipped in the harvest because assistive
+technology walks past a group with no content and comparing it would fail over a difference nobody can
+hear. If you touch guide internals, expect this test rather than the differential to be what notices.
+
+**The harness compares the scene, not the drawing.** That is the right trade almost everywhere and it
+has one blind spot worth remembering: anything upstream decides at *render* time is invisible to it.
+`zindex` was the example — upstream keeps its items in data order and reorders inside `visit`, so a
+chart drawing in the wrong order agreed on every compared number. If you suspect a gap that the
+fixtures cannot see, ask whether the behaviour lives in the scene or in the renderer, and if it is the
+renderer then probe upstream's **SVG** and pin the answer in a unit test.
+
+**Every `config` block is now read, and the last one to arrive was the odd one out.** `config.events`
+is not a drawing instruction: it is the embedder's policy on which listeners a view may attach, so a
+host that writes `{"events": {"window": false}}` is refusing to let a chart it did not write watch the
+pointer across the whole page. Parsed-and-dropped meant that refusal was ignored in silence. It is
+enforced where the listeners are *made* — upstream's `permit`, called from `events()` — and not where
+events arrive, because a policy that let the listener register and then filtered the events would
+report nothing and behave almost the same until it did not. Two details are worth not re-deriving,
+both probed: a **list is an allow-list**, and `timer` is the one key upstream's
+`initializeEventConfig` leaves un-unpacked, so an array there matches nothing and permits nothing —
+carried through as upstream carries it rather than corrected.
+
+Implementing it turned up an unrelated silent gap in the same machinery. `{"type": "timer"}` is not an
+event type but a **source**, with the throttle as its interval, and upstream's stream parser rewrites
+it one layer above the selector grammar — which we had not. So a timer stream read as a view event of
+type `timer` that nothing ever raises: the signal simply never changed, and said nothing about why.
+Both spellings (`"timer{500}"` and the object form) are now folded onto a `timer` source in
+`EventSelector.asTimerStream`, which is also what makes the `timer` policy key reachable, and the
+dispatcher reports that firing one needs a clock it does not have. See "Possible future work: a timer
+used as a `for` loop" above — that is the one specification in the corpus that wants it.
+
+**`Functions.knownUnsupported` is empty, and it should stay that way.** It is a list of work, not a
+verdict: every entry that was ever on it came off, and each excuse was softer than it read. If you add
+one, add the reason too — the evaluator reads it out instead of saying "unknown function" — but treat
+it as a to-do. The two rules that survived the emptying are worth knowing:
+
+- A function whose *observable* answer with no browser and no running view matches upstream's in the
+  same position is **implemented**, not excused: `screen`, `windowSize`, `intersect`, `inScope`. A
+  compiled scene is permanently in that position and so is `renderer: 'none'`, which is what the
+  oracle renders every fixture in.
+- A function whose return value upstream cannot use from a specification at all — probed on every
+  channel that accepts one — is implemented as the part of it a value model can hold, and the
+  divergence is stated in the KDoc: `pathShape`, `geoShape`, `copy`.
+
 Run the same subtraction over the *encode* vocabulary and the pattern repeats: several channels
 reported as unimplemented had a property behind them all along, one map entry away in
 `AXIS_ENCODE_PARTS`/`LEGEND_ENCODE_PARTS`. Both maps and both whole-block gaps (`encode.gradient` and
@@ -440,7 +594,11 @@ that do have a property behind them; both maps now cover it exactly.
 - **Layout:** none. All ten of upstream's layout properties are read, and `row-footer` and
   `column-footer` are recognised roles — they used to fall through to `CELL` and be gridded among the
   cells.
-- **Mark (2):** a mark-level `description` and `key`.
+- **Mark:** none. The last two were `key` and a mark-level `description`, and both were more than
+  they looked. `key` reads like a hint about redraws and is upstream's `DataJoin`: it maps each key to
+  **one** item, so two rows sharing a key are one mark and the later row's values are drawn in the
+  earlier row's *position*. `description` belongs to the mark's **container**, a level this scene does
+  not have — see "The scene has no mark level" below.
 - **Tail:** none. Facet aggregates take all 26 operations; the report only ever fired for a name
   upstream rejects too, and says so now. `timeunit` unit inference and its `step` are *done*.
   `config.range`, the named ranges, all four geo expression functions and the `lab`/`hcl` colour

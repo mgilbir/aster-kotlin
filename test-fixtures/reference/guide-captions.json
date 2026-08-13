@@ -65,6 +65,26 @@
   "caption": "Y-axis for a linear scale with values from 0 to 1,800,000"
  },
  {
+  "fixture": "axis-discretizing",
+  "kind": "axis",
+  "caption": "X-axis titled 'quantize' for a quantize scale with 4 boundaries: 20, 40, 60, 80"
+ },
+ {
+  "fixture": "axis-discretizing",
+  "kind": "axis",
+  "caption": "X-axis titled 'threshold' for a threshold scale with 3 boundaries: 25, 50, 75"
+ },
+ {
+  "fixture": "axis-discretizing",
+  "kind": "axis",
+  "caption": "X-axis titled 'quantile' for a quantile scale with 2 boundaries: 19, 49"
+ },
+ {
+  "fixture": "axis-discretizing",
+  "kind": "axis",
+  "caption": "X-axis titled 'bin-ordinal' for a discrete scale with 2 boundaries: 25, 50"
+ },
+ {
   "fixture": "axis-label-angle",
   "kind": "axis",
   "caption": "X-axis for a discrete scale with 4 values: alpha-long-name, bravo-long-name, charlie-long, delta-longer"
@@ -705,6 +725,16 @@
   "caption": "X-axis for a linear scale with values from 0 to 2,400"
  },
  {
+  "fixture": "csv-header",
+  "kind": "axis",
+  "caption": "X-axis for a discrete scale with 3 values: alpha, beta, gamma"
+ },
+ {
+  "fixture": "csv-header",
+  "kind": "axis",
+  "caption": "Y-axis for a linear scale with values from 0 to 7"
+ },
+ {
   "fixture": "curves",
   "kind": "axis",
   "caption": "X-axis for a linear scale with values from 0 to 5"
@@ -930,6 +960,16 @@
   "caption": "Symbol legend titled 'swatches' for fill color with 2 values: a, b"
  },
  {
+  "fixture": "guide-encode-text",
+  "kind": "axis",
+  "caption": "X-axis titled 'from the encode block' for a discrete scale with 3 values: one/two/three, alpha/beta, a-very-long-category-name"
+ },
+ {
+  "fixture": "guide-encode-text",
+  "kind": "axis",
+  "caption": "Y-axis titled 'stacked/title' for a linear scale with values from 0 to 7"
+ },
+ {
   "fixture": "guide-style-signals",
   "kind": "axis",
   "caption": "X-axis titled 'series' for a discrete scale with 3 values: alpha, beta, gamma"
@@ -970,6 +1010,16 @@
   "caption": "Y-axis titled 'Count' for a linear scale with values from 0 to 8"
  },
  {
+  "fixture": "href-links",
+  "kind": "axis",
+  "caption": "X-axis for a discrete scale with 3 values: alpha, beta, gamma"
+ },
+ {
+  "fixture": "href-links",
+  "kind": "legend",
+  "caption": "Symbol legend titled 'series' for fill color with 3 values: alpha, beta, gamma"
+ },
+ {
   "fixture": "hypothetical-outcome-plots",
   "kind": "axis",
   "caption": "Y-axis for a linear scale with values from 0 to 10"
@@ -978,6 +1028,21 @@
   "fixture": "hypothetical-outcome-plots",
   "kind": "axis",
   "caption": "X-axis for a discrete scale with 12 values: Jan, Feb, Mar, Apr, May, ending with Dec"
+ },
+ {
+  "fixture": "impute-pivot",
+  "kind": "axis",
+  "caption": "X-axis for a discrete scale with 4 values: Q1, Q2, Q3, Q4"
+ },
+ {
+  "fixture": "impute-pivot",
+  "kind": "axis",
+  "caption": "Y-axis for a linear scale with values from 0 to 24"
+ },
+ {
+  "fixture": "impute-pivot",
+  "kind": "legend",
+  "caption": "Symbol legend titled 'series' for fill color with 2 values: north, south"
  },
  {
   "fixture": "indata-membership",
@@ -1055,6 +1120,36 @@
   "caption": "Symbol legend for fill color with 5 values: aa, bb, cc, dd, ee"
  },
  {
+  "fixture": "legend-discretizing",
+  "kind": "axis",
+  "caption": "X-axis for a linear scale with values from 0 to 100"
+ },
+ {
+  "fixture": "legend-discretizing",
+  "kind": "legend",
+  "caption": "Discrete legend titled 'quantize' for fill color with 3 boundaries: 25, 50, 75"
+ },
+ {
+  "fixture": "legend-discretizing",
+  "kind": "legend",
+  "caption": "Discrete legend titled 'quantile' for fill color with 2 boundaries: 14, 41"
+ },
+ {
+  "fixture": "legend-discretizing",
+  "kind": "legend",
+  "caption": "Discrete legend titled 'threshold' for fill color with 2 boundaries: 20, 60"
+ },
+ {
+  "fixture": "legend-discretizing",
+  "kind": "legend",
+  "caption": "Symbol legend titled 'as symbols' for fill color with 3 boundaries: 25, 50, 75"
+ },
+ {
+  "fixture": "legend-format-type",
+  "kind": "axis",
+  "caption": "X-axis for a utc scale with values from 15 January to 16 October"
+ },
+ {
   "fixture": "legend-format-type",
   "kind": "legend",
   "caption": "Gradient legend titled 'as dates' for fill color with values from January 2024 to October 2024"
@@ -1068,6 +1163,11 @@
   "fixture": "legend-format-type",
   "kind": "legend",
   "caption": "Gradient legend titled 'thinned' for fill color with values from January to October"
+ },
+ {
+  "fixture": "legend-format-type",
+  "kind": "legend",
+  "caption": "Gradient legend titled 'by signal' for fill color with values from 15 January to 16 October"
  },
  {
   "fixture": "legend-grid-align",
@@ -1125,6 +1225,11 @@
   "caption": "Symbol legend titled 'uncapped' for size with values from 0 to 10"
  },
  {
+  "fixture": "legend-symbol-limit",
+  "kind": "legend",
+  "caption": "Symbol legend titled 'custom' for fill color with 10 values: alpha, beta, gamma, delta, epsilon, ending with kappa"
+ },
+ {
   "fixture": "legend-title-anchor",
   "kind": "legend",
   "caption": "Symbol legend titled 'start' for fill color with 3 values: alpha, beta, gamma-wide"
@@ -1153,6 +1258,16 @@
   "fixture": "legend-title-anchor",
   "kind": "legend",
   "caption": "Symbol legend titled 'two lines' for fill color with 3 values: alpha, beta, gamma-wide"
+ },
+ {
+  "fixture": "legend-title-anchor",
+  "kind": "legend",
+  "caption": "Symbol legend titled 'under' for fill color with 3 values: alpha, beta, gamma-wide"
+ },
+ {
+  "fixture": "legend-title-anchor",
+  "kind": "legend",
+  "caption": "Symbol legend titled 'after' for fill color with 3 values: alpha, beta, gamma-wide"
  },
  {
   "fixture": "legends",
@@ -1213,6 +1328,31 @@
   "fixture": "map-with-tooltip",
   "kind": "legend",
   "caption": "Discrete legend titled 'Unemployment' for fill color with 6 boundaries: 2.1%, 4.3%, 6.4%, 8.6%, 10.7%, 12.9%"
+ },
+ {
+  "fixture": "mark-descriptions",
+  "kind": "axis",
+  "caption": "X-axis for a discrete scale with 3 values: alpha, beta, gamma"
+ },
+ {
+  "fixture": "mark-descriptions",
+  "kind": "axis",
+  "caption": "Y-axis for a linear scale with values from 0 to 9"
+ },
+ {
+  "fixture": "mark-join-key",
+  "kind": "axis",
+  "caption": "X-axis for a discrete scale with 3 values: a, b, c"
+ },
+ {
+  "fixture": "mark-join-key",
+  "kind": "axis",
+  "caption": "Y-axis for a linear scale with values from 0 to 7"
+ },
+ {
+  "fixture": "modify-dataset",
+  "kind": "axis",
+  "caption": "X-axis for a discrete scale with 3 values: alpha, beta, gamma"
  },
  {
   "fixture": "multi-source-pluck",
@@ -1440,6 +1580,21 @@
   "caption": "Y-axis for a linear scale with values from 0 to 45"
  },
  {
+  "fixture": "scale-nice-intervals",
+  "kind": "axis",
+  "caption": "X-axis for a utc scale with values from January 01 to June 01"
+ },
+ {
+  "fixture": "scale-nice-intervals",
+  "kind": "axis",
+  "caption": "X-axis for a utc scale with values from January 01 to July 01"
+ },
+ {
+  "fixture": "scale-nice-intervals",
+  "kind": "axis",
+  "caption": "Y-axis for a linear scale with values from 0 to 10"
+ },
+ {
   "fixture": "scale-variants",
   "kind": "axis",
   "caption": "X-axis titled 'Symlog, both signs' for a symlog scale with values from −900 to 1,400"
@@ -1618,6 +1773,21 @@
   "fixture": "time-units",
   "kind": "subtitle",
   "caption": "Subtitle text '20k Sample, January - March 2001'"
+ },
+ {
+  "fixture": "timeunit-dst-scale",
+  "kind": "axis",
+  "caption": "X-axis titled 'local hours' for a time scale with values from 22:00 to 04:00"
+ },
+ {
+  "fixture": "timeunit-dst-scale",
+  "kind": "axis",
+  "caption": "X-axis titled 'utc hours' for a utc scale with values from 21:00 to 02:00"
+ },
+ {
+  "fixture": "timeunit-dst-scale",
+  "kind": "axis",
+  "caption": "Y-axis for a linear scale with values from 0 to 26"
  },
  {
   "fixture": "timeunit-inferred",

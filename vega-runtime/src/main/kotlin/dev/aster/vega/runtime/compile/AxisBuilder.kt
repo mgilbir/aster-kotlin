@@ -5,21 +5,30 @@ import dev.aster.vega.model.DiagnosticCodes
 import dev.aster.vega.model.DiagnosticCollector
 import dev.aster.vega.model.VegaValue
 import dev.aster.vega.model.asDouble
+import dev.aster.vega.model.asNumberOrNull
 import dev.aster.vega.model.asString
 import dev.aster.vega.model.spec.Anchor
 import dev.aster.vega.model.spec.AxisSpec
 import dev.aster.vega.model.spec.Orient
 import dev.aster.vega.model.spec.ScaleType
 import dev.aster.vega.model.time.TimeFormat
+import dev.aster.vega.model.time.TimeInterval
+import dev.aster.vega.model.time.TimeStepper
 import dev.aster.vega.runtime.scale.BandScale
+import dev.aster.vega.runtime.scale.BinOrdinalScale
+import dev.aster.vega.runtime.scale.BinnedScale
 import dev.aster.vega.runtime.scale.LinearScale
 import dev.aster.vega.runtime.scale.PointScale
 import dev.aster.vega.runtime.scale.PositionScale
+import dev.aster.vega.runtime.scale.QuantileScale
+import dev.aster.vega.runtime.scale.QuantizeScale
+import dev.aster.vega.runtime.scale.ThresholdScale
 import dev.aster.vega.runtime.scale.Ticks
 import dev.aster.vega.runtime.scale.TimeScale
 import dev.aster.vega.runtime.scale.TimeTicks
 import dev.aster.vega.runtime.scale.TransformedScale
 import dev.aster.vega.runtime.scale.VegaScale
+import dev.aster.vega.runtime.scale.formatTickLabel
 import dev.aster.vega.scene.AccessibilityDescriptor
 import dev.aster.vega.scene.GroupNode
 import dev.aster.vega.scene.NodeMetadata
@@ -58,6 +67,9 @@ import kotlin.math.floor
  * and the domain line are excluded, so turning on a grid does not push the title away from the
  * axis.
  */
+/** The three grammars a guide's `format` can be written in, which is upstream's whole list. */
+private val FORMAT_TYPES = setOf("number", "time", "utc")
+
 public class AxisBuilder(
   private val scales: Map<String, VegaScale>,
   /**
@@ -131,6 +143,16 @@ public class AxisBuilder(
     // alternative is resolving the same expression at each of a hundred reads.
     val spec =
       declared.copy(
+        // `formatType` may be chosen by a signal, and it has to be resolved before anything reads
+        // it:
+        // it decides which *grammar* the format string is written in, so a chart switching a column
+        // between a count and a date switches both together.
+        formatType =
+          declared.formatType
+            ?: declared.formatTypeExpression
+              ?.let { numbers.resolveText(it, declared.scale) }
+              ?.lowercase()
+              ?.takeIf { it in FORMAT_TYPES },
         labelStyle = GuideStyle.resolved(declared.labelStyle, numbers, declared.scale),
         tickStyle = GuideStyle.resolved(declared.tickStyle, numbers, declared.scale),
         gridStyle = GuideStyle.resolved(declared.gridStyle, numbers, declared.scale),
@@ -231,6 +253,9 @@ public class AxisBuilder(
         // zero line out of the rest, and Vega-Lite writes every conditional guide property this way
         // because Vega has no conditional guide properties of its own.
         val strokeHere = gridEncodeStroke(spec, tick) ?: gridStroke
+        // Per gridline, for the same reason as a tick: the `encode` block may read the value it
+        // marks.
+        val gridMetaFor = partMetadata(spec, "grid", tickDatum(tick), gridMeta)
         children +=
           when (spec.orient) {
             Orient.BOTTOM,
@@ -242,7 +267,7 @@ public class AxisBuilder(
                 at,
                 gridRange.second + undoOffset,
                 strokeHere,
-                metadata = gridMeta,
+                metadata = gridMetaFor,
               )
             Orient.LEFT,
             Orient.RIGHT ->
@@ -253,7 +278,7 @@ public class AxisBuilder(
                 gridRange.second + undoOffset,
                 at,
                 strokeHere,
-                metadata = gridMeta,
+                metadata = gridMetaFor,
               )
           }
       }
@@ -262,17 +287,20 @@ public class AxisBuilder(
     if (spec.ticks) {
       val tickMeta = NodeMetadata(role = "axis-tick")
       for (tick in ticks) {
+        // Per tick rather than once, because a tooltip may read the tick's own value: `{"signal":
+        // "datum.value"}` on a tick is how an axis says what each mark stands for.
+        val tickMetaFor = partMetadata(spec, "ticks", tickDatum(tick), tickMeta)
         val at = tickCoordinate(tick.position, spec)
         val tickNode =
           when (spec.orient) {
             Orient.BOTTOM ->
-              RuleNode(ids.allocate(), at, 0.0, at, tickSize, tickStroke, metadata = tickMeta)
+              RuleNode(ids.allocate(), at, 0.0, at, tickSize, tickStroke, metadata = tickMetaFor)
             Orient.TOP ->
-              RuleNode(ids.allocate(), at, 0.0, at, -tickSize, tickStroke, metadata = tickMeta)
+              RuleNode(ids.allocate(), at, 0.0, at, -tickSize, tickStroke, metadata = tickMetaFor)
             Orient.LEFT ->
-              RuleNode(ids.allocate(), 0.0, at, -tickSize, at, tickStroke, metadata = tickMeta)
+              RuleNode(ids.allocate(), 0.0, at, -tickSize, at, tickStroke, metadata = tickMetaFor)
             Orient.RIGHT ->
-              RuleNode(ids.allocate(), 0.0, at, tickSize, at, tickStroke, metadata = tickMeta)
+              RuleNode(ids.allocate(), 0.0, at, tickSize, at, tickStroke, metadata = tickMetaFor)
           }
         drawn += tickNode
         measured += tickNode
@@ -309,6 +337,8 @@ public class AxisBuilder(
                 ?: (if (spec.orient.isVertical) flushed?.let(::flushBaseline) else null)
                 ?: labelBaseline(spec.orient),
             limit = labelLimit,
+            ellipsis = labelString(spec, "ellipsis", tick) ?: "\u2026",
+            lineBreak = labelString(spec, "lineBreak", tick)?.takeIf { it.isNotEmpty() },
           )
         val layout = textEngine.layout(run)
         // A label sits where *it* was placed, which on a band axis is the band's centre whatever
@@ -367,7 +397,8 @@ public class AxisBuilder(
             // It still measures: upstream bounds a text item from its geometry whatever its
             // opacity, and only overlap removal takes one out of the measurement.
             opacity = labelChannel(spec, "opacity", tick) ?: 1.0,
-            metadata = NodeMetadata(role = "axis-label"),
+            metadata =
+              partMetadata(spec, "labels", tickDatum(tick), NodeMetadata(role = "axis-label")),
           )
       }
       // An axis removes overlapping labels only when asked; a legend does it by default. The
@@ -411,10 +442,13 @@ public class AxisBuilder(
 
     if (spec.domainLine) {
       val domainStroke = GuideStyle.stroke(spec.domainStyle, AxisDefaults.domainColor)
-      val domainMeta = NodeMetadata(role = "axis-domain")
+      // The domain line has no tick of its own, so its `encode` resolves against nothing — the same
+      // empty datum a title uses.
+      val domainMeta =
+        partMetadata(spec, "domain", VegaValue.EmptyObject, NodeMetadata(role = "axis-domain"))
       // Upstream encodes the domain line's endpoints as range positions 0 and 1 of the axis scale,
       // so a scale that does not span the whole plotting area gets a correspondingly short line.
-      val span = (scale as? PositionScale)?.range
+      val span = rangeEnds(scale)
       val from = span?.firstOrNull() ?: 0.0
       val to = span?.lastOrNull() ?: if (spec.orient.isVertical) extent.height else extent.width
       children +=
@@ -432,7 +466,15 @@ public class AxisBuilder(
     // with the choice, and there is no constant to write down.
     // `resolveLines`, not `resolveText`: an axis title given as an array is two lines, exactly as a
     // legend's is, and stringifying it would join them with a comma on one line.
-    val titleText = spec.title ?: spec.titleExpression?.let { numbers.resolveLines(it, spec.scale) }
+    // The title's own `encode` block may replace the words, and what a screen reader hears is what
+    // the
+    // axis actually says: upstream's caption is built from the item's text, so a title written in
+    // an
+    // encode block is read out and the one it replaced is not.
+    val titleText =
+      titleString(spec, "text")
+        ?: spec.title
+        ?: spec.titleExpression?.let { numbers.resolveLines(it, spec.scale) }
     val titleNode = titleText?.let { title(spec, it, scale, tickAndLabelReach) }
     titleNode?.let { children += it }
 
@@ -467,7 +509,13 @@ public class AxisBuilder(
                       spec.formatType,
                     ))
                   ?.let {
-                    AccessibilityDescriptor(label = it, role = "graphics-symbol", focusable = true)
+                    AccessibilityDescriptor(
+                      label = it,
+                      role = "graphics-symbol",
+                      // Upstream's `AriaGuides`: a reader hears "axis" and then the caption.
+                      roleDescription = "axis",
+                      focusable = true,
+                    )
                   }
               },
           ),
@@ -495,7 +543,7 @@ public class AxisBuilder(
    * whole scale range even when its outermost tick falls short of the domain's end.
    */
   private fun extentRect(spec: AxisSpec, scale: VegaScale, reach: RectD): RectD {
-    val range = (scale as? PositionScale)?.range
+    val range = rangeEnds(scale)
     val length =
       if (range == null || range.size < 2) 0.0 else kotlin.math.abs(range.last() - range.first())
     val depth = depth(spec, reach)
@@ -540,13 +588,10 @@ public class AxisBuilder(
     val anchor = spec.titleAnchor ?: Anchor.MIDDLE
 
     val depth = depth(spec, reach)
-    val away =
-      if (spec.orient == Orient.TOP || spec.orient == Orient.LEFT) -(depth + padding)
-      else depth + padding
 
     // Along the axis, the title sits wherever the anchor says on the *scale's range*, not on the
     // plotting area — the two differ inside a group.
-    val range = (scale as? PositionScale)?.range
+    val range = rangeEnds(scale)
     val from = range?.firstOrNull() ?: 0.0
     val to = range?.lastOrNull() ?: 0.0
     val along =
@@ -562,7 +607,13 @@ public class AxisBuilder(
     // flat along the bottom rather than turned up the side of its own axis.
     val run =
       TextRun(
-        text = text,
+        // A title's own `encode` block may replace the words, break them or truncate them, and none
+        // of the three has a property behind it: `titleLimit` says *how wide*, and `ellipsis` says
+        // what
+        // the truncation looks like. The datum is empty — an axis title labels the axis, not a tick
+        // —
+        // which is upstream's `Collect(null, [{}])` for the same mark.
+        text = titleString(spec, "text") ?: text,
         style = GuideStyle.text(spec.titleStyle, fontSize, AxisDefaults.TITLE_FONT_WEIGHT),
         align =
           alignOf(spec.titleAlign)
@@ -575,12 +626,36 @@ public class AxisBuilder(
           baselineOf(spec.titleBaseline)
             ?: if (spec.orient == Orient.BOTTOM) TextBaseline.TOP else TextBaseline.BOTTOM,
         limit = numbers.resolve(spec.titleLimit, spec.scale) ?: 0.0,
+        ellipsis = titleString(spec, "ellipsis") ?: "\u2026",
+        lineBreak = titleString(spec, "lineBreak")?.takeIf { it.isNotEmpty() },
       )
+    val layout = textEngine.layout(run)
+    // A **multi-line** title sits further out by the height of its extra lines: upstream's
+    // `axisTitleLayout` places it at `sign * (offset + dl + pad)` where `dl` is `multiLineOffset`.
+    // Without it a two-line title crept back towards the axis and overlapped the labels, because
+    // the
+    // block grows away from an anchor baselined at its bottom.
+    val extraLines = (layout.lines.size - 1) * layout.metrics.lineHeight
+    val away =
+      if (spec.orient == Orient.TOP || spec.orient == Orient.LEFT) {
+        -(depth + extraLines + padding)
+      } else {
+        depth + extraLines + padding
+      }
+    // `dx` and `dy` nudge the title without changing what it is anchored to, exactly as they do on
+    // a
+    // label, so they are added to whatever placed it.
+    val nudgeX = titleNumber(spec, "dx") ?: 0.0
+    val nudgeY = titleNumber(spec, "dy") ?: 0.0
     return TextNode(
       id = ids.allocate(),
-      x = numbers.resolve(spec.titleX, spec.scale) ?: if (spec.orient.isVertical) away else along,
-      y = numbers.resolve(spec.titleY, spec.scale) ?: if (spec.orient.isVertical) along else away,
-      layout = textEngine.layout(run),
+      x =
+        (numbers.resolve(spec.titleX, spec.scale) ?: if (spec.orient.isVertical) away else along) +
+          nudgeX,
+      y =
+        (numbers.resolve(spec.titleY, spec.scale) ?: if (spec.orient.isVertical) along else away) +
+          nudgeY,
+      layout = layout,
       angleDegrees =
         numbers.resolve(spec.titleAngle, spec.scale)
           ?: when (spec.orient) {
@@ -589,7 +664,13 @@ public class AxisBuilder(
             else -> 0.0
           },
       fill = GuideStyle.fill(spec.titleStyle, AxisDefaults.titleColor),
-      metadata = NodeMetadata(role = "axis-title", markName = spec.scale),
+      metadata =
+        partMetadata(
+          spec,
+          "title",
+          VegaValue.EmptyObject,
+          NodeMetadata(role = "axis-title", markName = spec.scale),
+        ),
     )
   }
 
@@ -755,6 +836,23 @@ public class AxisBuilder(
     return ticks + Tick("", at + tickOffset(positional, spec), VegaValue.Null, labelPosition = null)
   }
 
+  /**
+   * The two ends of the scale's range, which is what an axis is drawn along.
+   *
+   * Upstream reads them off the scale's own range whatever kind of scale it is — `{"scale": s,
+   * "range": 0}` and `{"scale": s, "range": 1}` for the domain line's endpoints, and
+   * `span(range(s))` for the length. That includes a **discretizing** scale, whose range is a list
+   * of steps rather than an interval: its first and last entries are still the two ends, so the
+   * axis spans them and its title is centred between them. Reading only [PositionScale] here left
+   * every such axis drawn from zero, with a title stacked at the origin.
+   */
+  private fun rangeEnds(scale: VegaScale): List<Double>? =
+    when (scale) {
+      is PositionScale -> scale.range
+      is BinnedScale -> scale.rangeValues.mapNotNull { it.asNumberOrNull() }.takeIf { it.size >= 2 }
+      else -> null
+    }
+
   private fun ticksFor(scale: VegaScale, spec: AxisSpec, specifier: String?): List<Tick>? {
     // A scale with `bins` has its tick values already decided: upstream's `tickValues` returns the
     // boundaries themselves rather than asking the scale to generate any. An axis that *also* names
@@ -819,9 +917,84 @@ public class AxisBuilder(
    * channel, which leaves the label where the orientation put it.
    */
   /** A label's `encode` text, when the specification replaces it rather than formatting it. */
-  private fun labelText(spec: AxisSpec, tick: Tick): String? {
+  private fun labelText(spec: AxisSpec, tick: Tick): String? = labelString(spec, "text", tick)
+
+  /**
+   * A text channel of a label's own `encode`, resolved against the tick.
+   *
+   * `text` is the one a specification usually writes, but `ellipsis` and `lineBreak` are read the
+   * same way and change what the reader sees: the first is the mark a truncated label ends with and
+   * the second is the character a long label is broken on, so a path can be shown as a stack.
+   * Neither has a guide *property* upstream, which is why they are resolved here rather than
+   * folded.
+   */
+  /**
+   * The item metadata one part of a guide's `encode` can carry: a tooltip, a cursor, a paint order
+   * and what a screen reader hears.
+   *
+   * These are the five that reach the **item** rather than its geometry or its paint, and a guide
+   * had no way to set any of them: a hoverable axis label, a tick that says what it marks, a label
+   * raised over its neighbours, a decorative title kept out of the accessibility tree. Every one is
+   * already a mark channel, and this is the same reading against the guide's own datum.
+   *
+   * `aria: false` removes the item from the tree — upstream marks it `aria-hidden` — and
+   * `description` replaces what would otherwise be spoken. The two are read together for that
+   * reason: a description on an item that has opted out is not a contradiction, it is simply
+   * unreachable.
+   */
+  private fun partMetadata(
+    spec: AxisSpec,
+    part: String,
+    datum: VegaValue,
+    base: NodeMetadata,
+  ): NodeMetadata {
+    val block = spec.encode[part]?.update ?: return base
+    val encoder = channels ?: return base
+    fun channel(name: String) = block[name]
+    val tooltip =
+      channel("tooltip")?.let { encoder.channelAny(it, datum) }?.takeIf { it !is VegaValue.Null }
+    val cursor =
+      channel("cursor")?.let { encoder.channelText(it, datum) }?.takeIf { it.isNotEmpty() }
+    val href = channel("href")?.let { encoder.channelText(it, datum) }?.takeIf { it.isNotEmpty() }
+    val zindex = channel("zindex")?.let { encoder.channelNumber(it, datum) }?.toInt()
+    val hidden = channel("aria")?.let { encoder.channelBoolean(it, datum) } == false
+    val description =
+      channel("description")?.let { encoder.channelText(it, datum) }?.takeIf { it.isNotBlank() }
+    return base.copy(
+      tooltip = tooltip ?: base.tooltip,
+      cursor = cursor ?: base.cursor,
+      href = href ?: base.href,
+      zindex = zindex ?: base.zindex,
+      accessibility =
+        when {
+          hidden -> null
+          description != null ->
+            AccessibilityDescriptor(label = description, role = "graphics-symbol", focusable = true)
+          else -> base.accessibility
+        },
+    )
+  }
+
+  /** The datum a guide part's `encode` resolves against: the tick, or nothing for a title. */
+  private fun tickDatum(tick: Tick): VegaValue =
+    VegaValue.Obj(linkedMapOf("value" to tick.value, "label" to VegaValue.Str(tick.label)))
+
+  /** A text channel of the axis **title**'s own `encode`, whose datum is empty. */
+  private fun titleString(spec: AxisSpec, channel: String): String? {
     val encoder = channels ?: return null
-    val entry = spec.encode["labels"]?.update?.get("text") ?: return null
+    val entry = spec.encode["title"]?.update?.get(channel) ?: return null
+    return encoder.channelText(entry, VegaValue.EmptyObject)?.takeIf { it.isNotEmpty() }
+  }
+
+  private fun titleNumber(spec: AxisSpec, channel: String): Double? {
+    val encoder = channels ?: return null
+    val entry = spec.encode["title"]?.update?.get(channel) ?: return null
+    return encoder.channelNumber(entry, VegaValue.EmptyObject)?.takeIf { it.isFinite() }
+  }
+
+  private fun labelString(spec: AxisSpec, channel: String, tick: Tick): String? {
+    val encoder = channels ?: return null
+    val entry = spec.encode["labels"]?.update?.get(channel) ?: return null
     val datum =
       VegaValue.Obj(linkedMapOf("value" to tick.value, "label" to VegaValue.Str(tick.label)))
     return encoder.channelText(entry, datum)
@@ -959,9 +1132,11 @@ public class AxisBuilder(
         if (instant.isNaN()) value.asString() else write(instant)
       }
     }
-    // A time scale formats its labels as *times* whether or not a `formatType` says so: the scale
-    // already knows they are instants, and upstream's own axis passes the specifier straight to
-    // `timeFormat` for it.
+    // A **time** scale reads its specifier as a time specifier, without needing a `formatType` to
+    // say so: upstream's `tickFormat` asks the scale, and a temporal scale's own formatter is d3's
+    // `timeFormat`. Falling through to the numeric branch below fed `%b %d` to a number formatter,
+    // which printed the epoch milliseconds unchanged — a chart labelled `1580515200000` where
+    // upstream labelled it `Feb 01`.
     if (format != null && scale is TimeScale) {
       return { value ->
         val instant = value.asDouble()
@@ -1083,6 +1258,28 @@ public class AxisBuilder(
         }
       }
       is TimeScale -> {
+        // `tickCount` may name a calendar unit instead of a number, and then it decides the ticks
+        // outright: every boundary of that unit inside the domain, however many that is. Upstream
+        // hands the interval to the scale in place of the count, so nothing downstream chooses a
+        // step at all.
+        val stepper =
+          TimeInterval.forUnit(spec.tickInterval)?.let { (interval, implied) ->
+            // `"quarter"` carries a step of its own — three months — and a `step` written beside it
+            // multiplies rather than replaces it, which is what `timeMonth.every(3).every(n)`
+            // means.
+            TimeStepper(interval, implied * (spec.tickStep ?: 1), scale.zone)
+          }
+        if (stepper != null) {
+          val format = labeller(scale, AxisDefaults.DEFAULT_TICK_COUNT, specifier, spec.formatType)
+          return TimeTicks.intervalTicks(scale.domain, stepper).map { value ->
+            Tick(
+              if (specifier == null && spec.formatType == null) TimeTicks.label(value, scale.zone)
+              else format(VegaValue.Num(value)),
+              scale.apply(value),
+              VegaValue.Num(value),
+            )
+          }
+        }
         val count =
           GuideFormat.countWithMinStep(
             numbers.resolveInt(spec.tickCount, spec.scale) ?: AxisDefaults.DEFAULT_TICK_COUNT,
@@ -1106,6 +1303,90 @@ public class AxisBuilder(
           )
         }
       }
+      // The four discretizing scales, whose output is a short list of steps rather than a length.
+      // Upstream's `tickValues` decides among them by what the scale *has*: bins first, then a
+      // `ticks` method, and the domain when it has neither — which is why each of the four ticks at
+      // something different, and only one of them is filtered.
+      is BinnedScale -> {
+        val count =
+          numbers.resolveInt(spec.tickCount, spec.scale) ?: AxisDefaults.DEFAULT_TICK_COUNT
+        val values =
+          when (scale) {
+            // d3's quantize delegates to the linear scale it is built on, so an axis on one is
+            // ticked over the *domain* it buckets rather than at the buckets.
+            is QuantizeScale -> Ticks.ticks(scale.domain.first(), scale.domain.last(), count)
+            // A quantile scale's domain is the column itself: one tick per sample.
+            is QuantileScale -> scale.sampleDomain
+            // A threshold scale's domain *is* its cut points.
+            is ThresholdScale -> scale.domain
+            // The one with `bins`, so the one that is filtered and thinned; see [validTicks].
+            is BinOrdinalScale -> validTicks(scale, scale.bins, maxOf(count, scale.bins.size))
+          }
+        val label = binnedLabeller(scale, count, specifier, spec.formatType)
+        values.map { value ->
+          // The position is whatever the scale maps the value *to*, which for a scale whose range
+          // is
+          // a list of colours is not a number at all: upstream writes NaN onto the item and draws
+          // nothing, and so does this.
+          val at = scale.scale(VegaValue.Num(value)).asNumberOrNull() ?: Double.NaN
+          Tick(label(VegaValue.Num(value)), at, VegaValue.Num(value))
+        }
+      }
       else -> null
     }
+
+  /**
+   * Upstream's `validTicks`: keep the candidates that land inside the range, in range order.
+   *
+   * The filter is what drops a bin scale's last edge — it bounds the topmost bucket rather than
+   * opening one, so it maps to nothing — and the thinning that follows is the same halving a long
+   * `values` list gets, ends restored when it overshoots below three.
+   */
+  /**
+   * How a discretizing scale's ticks are labelled, which is not how a positional scale's are.
+   *
+   * Upstream asks the scale for a `tickFormat` and falls back to plain string coercion when it has
+   * none — and of the four, only `quantize` has one, because d3 builds it on a linear scale. So a
+   * `format` specifier on an axis over a threshold, quantile or bin-ordinal scale is **ignored**
+   * upstream rather than applied, and ignoring it here is the faithful reading rather than an
+   * omission.
+   */
+  private fun binnedLabeller(
+    scale: BinnedScale,
+    count: Int,
+    specifier: String?,
+    formatType: String?,
+  ): (VegaValue) -> String {
+    if (scale is QuantizeScale) {
+      GuideFormat.timeLabeller(specifier, formatType)?.let { write ->
+        return { value ->
+          val instant = value.asDouble()
+          if (instant.isNaN()) value.asString() else write(instant)
+        }
+      }
+      val low = scale.domain.firstOrNull() ?: 0.0
+      val high = scale.domain.lastOrNull() ?: 1.0
+      if (specifier != null) {
+        val resolved = Ticks.spanSpecifier(specifier, low, high, count)
+        return { value -> NumberFormatSubset.format(value.asDouble(), resolved) }
+      }
+      val step = Ticks.stepFrom(Ticks.tickIncrement(low, high, count))
+      val precision = if (step.isFinite()) Ticks.precisionForStep(step) else 0
+      return { value -> formatTickLabel(value.asDouble(), precision) }
+    }
+    return { value -> value.asString() }
+  }
+
+  private fun validTicks(scale: BinnedScale, candidates: List<Double>, count: Int): List<Double> {
+    val positions = scale.rangeValues.mapNotNull { it.asNumberOrNull() }
+    if (positions.isEmpty()) return emptyList()
+    val low = kotlin.math.floor(positions.min())
+    val high = kotlin.math.ceil(positions.max())
+    val placed =
+      candidates
+        .map { it to (scale.scale(VegaValue.Num(it)).asNumberOrNull() ?: Double.NaN) }
+        .filter { (_, at) -> at.isFinite() && at >= low && at <= high }
+        .sortedBy { it.second }
+    return thin(placed, count).map { it.first }
+  }
 }

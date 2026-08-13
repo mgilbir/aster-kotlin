@@ -5,7 +5,6 @@ import dev.aster.vega.model.DiagnosticSeverity
 import dev.aster.vega.model.VegaDiagnostic
 import dev.aster.vega.model.VegaValue
 import dev.aster.vega.model.asString
-import dev.aster.vega.model.field
 
 /**
  * Raised when an expression cannot be evaluated: an unknown function, or one this engine does not
@@ -204,48 +203,6 @@ public class Evaluator(
       return VegaValue.Arr(dataset)
     }
 
-    // The three selection helpers, which read a **store** dataset the same way `data` does. With
-    // no interaction loop a store is only ever as full as the specification made it, and that is a
-    // real answer rather than a stand-in: an empty store selects nothing, which is exactly what a
-    // chart shows before its reader has picked anything.
-    if (name == "vlSelectionIdTest" || name == "vlSelectionTest" || name == "vlSelectionResolve") {
-      val store = scope.dataset(evaluate(node.arguments.first(), scope).asString())
-      return when (name) {
-        "vlSelectionIdTest" -> {
-          val datum = evaluate(node.arguments[1], scope)
-          val id = datum.field(SELECTION_ID)
-          VegaValue.Bool(store.any { it.field(SELECTION_ID) == id })
-        }
-        "vlSelectionTest" -> {
-          val datum = evaluate(node.arguments[1], scope)
-          val union =
-            node.arguments.getOrNull(2)?.let { evaluate(it, scope).asString() } != "intersect"
-          val matches = store.map { tuple -> selectionMatches(tuple, datum) }
-          VegaValue.Bool(
-            if (union) matches.any { it } else matches.isNotEmpty() && matches.all { it }
-          )
-        }
-        // What the store resolves to: one entry per projected column, holding every value picked
-        // for it. A scale bound to a selection reads this as its domain, so an empty store leaves
-        // the scale at the domain the data gave it.
-        else -> {
-          val resolved = LinkedHashMap<String, MutableList<VegaValue>>()
-          for (tuple in store) {
-            val fields = (tuple.field("fields") as? VegaValue.Arr)?.values.orEmpty()
-            val values = (tuple.field("values") as? VegaValue.Arr)?.values.orEmpty()
-            fields.forEachIndexed { index, entry ->
-              val field = entry.field("field").asString()
-              val into = resolved.getOrPut(field) { mutableListOf() }
-              values.getOrNull(index)?.let { into += it }
-            }
-          }
-          VegaValue.Obj(
-            LinkedHashMap(resolved.mapValues { (_, values) -> VegaValue.Arr(values) as VegaValue })
-          )
-        }
-      }
-    }
-
     // `indata` reaches the datasets the same way `data` does, through the scope, because the
     // evaluator has none of its own. Upstream additionally *requires* the first two arguments to be
     // string literals, since it resolves them into an index at parse time; nothing here needs them
@@ -330,6 +287,165 @@ public class Evaluator(
       val values = node.arguments.map { evaluate(it, scope) }
       scope.log(name, values.joinToString(" ") { it.asString() })
       return values.lastOrNull() ?: VegaValue.Null
+    }
+
+    /*
+     * `modify(name, insert, remove, toggle, modify, values)` — a dataset changed from an expression.
+     *
+     * The one write besides `setdata`, and the interactive one: a click handler adds the clicked row
+     * to a selection dataset with `modify('sel', datum)` and removes it again with a `toggle`. Every
+     * argument is optional and the order is upstream's.
+     *
+     * Returns **0 when there is nothing to do** — no rows in the dataset and nothing to insert or
+     * toggle — and 1 otherwise, which is upstream's own early exit and worth keeping: a specification
+     * can tell whether its change landed.
+     */
+    if (name == "modify" && node.arguments.isNotEmpty()) {
+      val dataset = evaluate(node.arguments[0], scope).asString()
+      val insert = node.arguments.getOrNull(1)?.let { evaluate(it, scope) } ?: VegaValue.Null
+      val remove = node.arguments.getOrNull(2)?.let { evaluate(it, scope) } ?: VegaValue.Null
+      val toggle = node.arguments.getOrNull(3)?.let { evaluate(it, scope) } ?: VegaValue.Null
+      return VegaValue.Num(scope.modifyDataset(dataset, insert, remove, toggle))
+    }
+
+    /*
+     * `encode(item, name, retval)` — an item re-encoded through one of its own encode sets.
+     *
+     * A hover handler writes `encode(item, 'hover')` and the item takes its `hover` block. The value
+     * is the third argument when there is one and the **item** otherwise, so the common form returns
+     * what it was handed. With no item there is nothing to encode and the value comes back unchanged,
+     * which is upstream's guard rather than an omission.
+     */
+    /*
+     * The **event** functions: `item()`, `xy()`, `x()`, `y()`, and `group()`.
+     *
+     * Upstream generates these as `event.vega.<name>`, so they answer about the event being handled
+     * and nothing else — which is why they belong here rather than in the function table. `x()` is
+     * the commonest expression in an interactive specification after `datum`: forty of the uses in
+     * Vega's own examples, in every brush and every pan. They are not `event.x`, which is the raw
+     * pointer position the platform reported; the chart's padding and autosize origin come off first,
+     * so the answer is in the space the marks are placed in.
+     *
+     * The **argument** forms are refused rather than guessed at. `x(item)` walks up from that item
+     * subtracting each ancestor group's own position, and `group()` answers with the enclosing group
+     * *item* — both need the chain of groups above the item, which the event carries in a live view
+     * and this engine's event value does not. Five uses across the 93 published examples, all in one
+     * of them.
+     */
+    if (name == "item" && node.arguments.isEmpty()) return scope.activeItem()
+    if (name == "xy" || name == "x" || name == "y" || name == "group" || name == "item") {
+      if (node.arguments.isNotEmpty() || name == "group") {
+        throw ExpressionEvaluationException(
+          VegaDiagnostic(
+            code = DiagnosticCodes.EXPRESSION_UNSUPPORTED_FUNCTION,
+            severity = DiagnosticSeverity.ERROR,
+            message =
+              if (name == "group") {
+                "'group()' answers with the enclosing group item, which needs the chain of groups " +
+                  "above the event's own item; this engine's event does not carry it"
+              } else {
+                "'$name(item)' measures from another item, which needs the chain of groups above " +
+                  "it; only the argument-less form is available"
+              },
+          )
+        )
+      }
+      val point = scope.eventPoint()
+      if (name == "xy") return point
+      val parts = (point as? VegaValue.Arr)?.values ?: return VegaValue.Null
+      return parts.getOrNull(if (name == "x") 0 else 1) ?: VegaValue.Null
+    }
+
+    if (name == "encode" && node.arguments.isNotEmpty()) {
+      val item = evaluate(node.arguments[0], scope)
+      val set = node.arguments.getOrNull(1)?.let { evaluate(it, scope).asString() } ?: "update"
+      val fallback = node.arguments.getOrNull(2)?.let { evaluate(it, scope) }
+      if (item !is VegaValue.Null) scope.encodeItem(item, set)
+      return fallback ?: item
+    }
+
+    /*
+     * `isTuple(x)` — whether the value is a **row of a dataset** rather than an object written down.
+     *
+     * Upstream answers from identity: every tuple its dataflow produces carries an id under a Symbol,
+     * and `isTuple` looks for it. This engine's rows are plain objects and attaching an id to all of
+     * them would cost the whole value model — memory, equality, serialisation — for one predicate.
+     *
+     * So the question is answered from **origin** instead, which is what that id records anyway: the
+     * argument is a tuple when it *came from* the data. `datum`, anything reached through it, an
+     * element of `data('name')`, and a scene item's `.datum` are tuples; an object or array literal is
+     * not, and neither is a number, a string or null. Every one of those was probed and every one
+     * agrees.
+     *
+     * What this cannot see is a value **laundered through a signal**: `isTuple(mySignal)` is false
+     * here whatever the signal holds, where upstream would answer from the value. A signal holding a
+     * row is not something a specification writes — probed: a signal holding an object *literal* is
+     * false on both sides — but it is the edge, and it is stated rather than hidden.
+     */
+    if (name == "isTuple" && node.arguments.isNotEmpty()) {
+      return VegaValue.Bool(fromData(node.arguments[0]))
+    }
+
+    /*
+     * The `vlSelection*` family: a selection is an ordinary dataset, so these read one by name.
+     *
+     * `vlSelectionTuples` is the odd one out — it takes the *items* rather than a dataset name,
+     * because a Vega-Lite brush hands it the scene items it just collected.
+     */
+    if (name == "vlSelectionTest" && node.arguments.size >= 2) {
+      val dataset = scope.dataset(evaluate(node.arguments[0], scope).asString())
+      val datum = evaluate(node.arguments[1], scope)
+      val op = node.arguments.getOrNull(2)?.let { evaluate(it, scope).asString() }
+      return VegaValue.Bool(Selections.test(dataset, datum, op))
+    }
+    if (name == "vlSelectionIdTest" && node.arguments.size >= 2) {
+      val dataset = scope.dataset(evaluate(node.arguments[0], scope).asString())
+      val datum = evaluate(node.arguments[1], scope)
+      val op = node.arguments.getOrNull(2)?.let { evaluate(it, scope).asString() }
+      return VegaValue.Bool(Selections.idTest(dataset, datum, op))
+    }
+    if (name == "vlSelectionResolve" && node.arguments.isNotEmpty()) {
+      val dataset = scope.dataset(evaluate(node.arguments[0], scope).asString())
+      val op = node.arguments.getOrNull(1)?.let { evaluate(it, scope).asString() }
+      val isMulti =
+        node.arguments.getOrNull(2)?.let { JsSemantics.truthy(evaluate(it, scope)) } ?: false
+      val vl5 =
+        node.arguments.getOrNull(3)?.let { JsSemantics.truthy(evaluate(it, scope)) } ?: false
+      return Selections.resolve(dataset, op, isMulti, vl5)
+    }
+    if (name == "vlSelectionTuples" && node.arguments.size >= 2) {
+      val items = (evaluate(node.arguments[0], scope) as? VegaValue.Arr)?.values.orEmpty()
+      return Selections.tuples(items, evaluate(node.arguments[1], scope))
+    }
+
+    // `inScope(item)` — whether the item sits inside the group the expression belongs to.
+    if (name == "inScope" && node.arguments.isNotEmpty()) {
+      return VegaValue.Bool(scope.inScope(evaluate(node.arguments[0], scope)))
+    }
+
+    // `intersect(box[, opt])` and `intersectLasso(mark, points, unit)` — what a region covers.
+    if (name == "intersect" && node.arguments.isNotEmpty()) {
+      return scope.intersect(
+        evaluate(node.arguments[0], scope),
+        node.arguments.getOrNull(1)?.let { evaluate(it, scope) } ?: VegaValue.Null,
+      )
+    }
+    if (name == "intersectLasso" && node.arguments.size >= 2) {
+      return scope.intersectLasso(
+        evaluate(node.arguments[0], scope).asString(),
+        evaluate(node.arguments[1], scope),
+        node.arguments.getOrNull(2)?.let { evaluate(it, scope) } ?: VegaValue.Null,
+      )
+    }
+
+    // `gradient(scale, p0, p1[, count])` — the scale's ramp, as a paint value.
+    if (name == "gradient" && node.arguments.size >= 3) {
+      return scope.gradient(
+        evaluate(node.arguments[0], scope).asString(),
+        evaluate(node.arguments[1], scope),
+        evaluate(node.arguments[2], scope),
+        node.arguments.getOrNull(3)?.let { evaluate(it, scope) } ?: VegaValue.Null,
+      )
     }
 
     // `geoShape(projection, feature)` — the outline, as a path this engine's `shape` channel takes.
@@ -459,44 +575,23 @@ public class Evaluator(
         message = "Unsupported operator '$operator'",
       )
     )
-}
 
-/** Vega's own name for the row identity an `identifier` transform writes. */
-private const val SELECTION_ID = "_vgsid_"
-
-/**
- * Whether one stored tuple picks this row — `testPoint` in `vega-selections`.
- *
- * A tuple names the columns it was remembered by and the values it remembered for them, and the row
- * matches when *every* one of them does. `E` is an exact value and `R` a range the value falls
- * inside, which is how an interval selection remembers a drag rather than a click.
- */
-private fun selectionMatches(tuple: VegaValue, datum: VegaValue): Boolean {
-  val fields = (tuple.field("fields") as? VegaValue.Arr)?.values.orEmpty()
-  val values = (tuple.field("values") as? VegaValue.Arr)?.values.orEmpty()
-  if (fields.isEmpty()) return false
-  return fields.indices.all { index ->
-    val entry = fields[index]
-    val field = entry.field("field").asString()
-    val kind = entry.field("type").asString()
-    val actual = datum.field(field)
-    val wanted = values.getOrNull(index) ?: return@all false
-    when (kind) {
-      "R",
-      "R-RE" -> {
-        val bounds = (wanted as? VegaValue.Arr)?.values.orEmpty()
-        val low = bounds.getOrNull(0)?.let { JsSemantics.toNumber(it) }
-        val high = bounds.getOrNull(1)?.let { JsSemantics.toNumber(it) }
-        val here = JsSemantics.toNumber(actual)
-        low != null &&
-          high != null &&
-          !here.isNaN() &&
-          here >= minOf(low, high) &&
-          here <= maxOf(low, high)
-      }
-      // A *set* of values, which is what a toggled point selection over one column remembers.
-      "E-RE" -> (wanted as? VegaValue.Arr)?.values?.any { it == actual } ?: (wanted == actual)
-      else -> wanted == actual
+  /**
+   * Whether an expression names something that came out of the data, for `isTuple`.
+   *
+   * Walks the syntax rather than the value, because that is where the provenance still is. `datum`
+   * and `data(...)` are the two roots; a member or an index of either is still data, which is what
+   * makes `data('t')[0]` and `item.datum` both tuples.
+   */
+  private fun fromData(node: Node): Boolean =
+    when (node) {
+      is Node.Identifier -> node.name == "datum"
+      // `item.datum` is a tuple wherever the item came from, and so is anything reached through
+      // one — `data('t')[0]` is an index, `datum.nested` a member.
+      is Node.Member ->
+        (node.property as? Node.Identifier)?.name == "datum" || fromData(node.target)
+      is Node.Call ->
+        (node.callee as? Node.Identifier)?.name.let { it == "data" || it == "treePath" }
+      else -> false
     }
-  }
 }

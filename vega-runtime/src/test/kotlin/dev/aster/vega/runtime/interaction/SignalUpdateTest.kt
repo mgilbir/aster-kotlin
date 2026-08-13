@@ -4,13 +4,16 @@ import dev.aster.vega.expression.CachingExpressionCompiler
 import dev.aster.vega.expression.VegaExpressionCompiler
 import dev.aster.vega.model.DiagnosticCollector
 import dev.aster.vega.model.VegaValue
+import dev.aster.vega.model.spec.SignalUpdate
 import dev.aster.vega.model.spec.SpecParser
+import dev.aster.vega.runtime.compile.ItemEncode
 import dev.aster.vega.runtime.compile.SpecCompiler
 import dev.aster.vega.scene.Fill
 import dev.aster.vega.scene.GroupNode
 import dev.aster.vega.scene.RectNode
 import dev.aster.vega.scene.SceneColor
 import dev.aster.vega.scene.SceneNode
+import dev.aster.vega.scene.SceneNodeId
 import dev.aster.vega.scene.ScenePaint
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertNotEquals
@@ -178,9 +181,18 @@ class SignalUpdateTest {
     )
   }
 
-  /** `encode` writes to the event's mark rather than to a signal, and is reported. */
+  /**
+   * `encode` is upstream's own shorthand for an `encode(item(), ...)` call, and arrives as one.
+   *
+   * The parser rewrites it exactly as upstream's does, so there is one code path for both spellings
+   * and the side effect is recorded here rather than in a special case: the item the event landed
+   * on is noted with the block to overlay on it, ready for the next compile. It used to be reported
+   * and dropped, on the grounds that the change belonged to a scene node this class does not own —
+   * which was true and led nowhere, because the *record* of it belongs exactly here, beside the
+   * signal values.
+   */
   @Test
-  fun `an encode handler is reported rather than half-applied`() {
+  fun `an encode handler records the item to overlay`() {
     val encodeSpec =
       SpecParser()
         .parseJson(
@@ -191,16 +203,25 @@ class SignalUpdateTest {
         )
         .spec!!
     val handler = encodeSpec.signals.first { it.name == "picked" }.on.first()
-    val changed =
-      updater.apply(
-        listOf(FiredHandler("picked", handler, InputEvent("click", 0, markType = "rect"))),
-        compile().signals,
-      )
-    assertTrue(changed.isEmpty())
-    assertTrue(
-      diagnostics.diagnostics.any { it.message.contains("'encode'") },
-      diagnostics.diagnostics.toString(),
+    assertEquals(
+      SignalUpdate.Expression("encode(item(), 'chosen')"),
+      handler.update,
+      "the parser should desugar `encode` the way upstream's does",
     )
+    val id = SceneNodeId(41)
+    updater.apply(
+      listOf(
+        FiredHandler("picked", handler, InputEvent("click", 0, itemId = id, markType = "rect"))
+      ),
+      compile().signals,
+    )
+    assertEquals(mapOf(id to ItemEncode("chosen", fresh = true)), updater.itemEncodes)
+    // Fresh until the compile that applies it has happened, and then not: the block beats the
+    // mark's
+    // `update` on the pass that applies it and loses to it on every pass after.
+    updater.ageItemEncodes()
+    assertEquals(mapOf(id to ItemEncode("chosen", fresh = false)), updater.itemEncodes)
+    assertTrue(diagnostics.diagnostics.isEmpty(), diagnostics.diagnostics.toString())
   }
 
   private fun datumFor(category: String): VegaValue =

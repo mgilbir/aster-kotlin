@@ -112,7 +112,10 @@ public class ParsedExpression(
         when (callee.name) {
           in DATA_FUNCTIONS -> datasets
           in SCALE_FUNCTIONS -> scales
-          "setdata" -> written
+          // `modify` writes a dataset as surely as `setdata` replaces one, so anything reading that
+          // dataset has to be ordered behind the expression either way.
+          "setdata",
+          "modify" -> written
           else -> return@walk
         }
       val first = node.arguments.firstOrNull()
@@ -164,9 +167,9 @@ public class ParsedExpression(
 /**
  * Parses Vega expressions into evaluable trees.
  *
- * Replaces [UnsupportedExpressionCompiler]. Wrap it in [CachingExpressionCompiler] to avoid
- * reparsing the same source, which Vega specifications do constantly — the same encode expression
- * runs once per datum.
+ * The real one; [RefusingExpressionCompiler] is the stand-in that evaluates nothing. Wrap it in
+ * [CachingExpressionCompiler] to avoid reparsing the same source, which Vega specifications do
+ * constantly — the same encode expression runs once per datum.
  */
 public class VegaExpressionCompiler(private val evaluator: Evaluator = Evaluator()) :
   ExpressionCompiler {

@@ -30,6 +30,7 @@ import dev.aster.vega.model.spec.ScaleType
 import dev.aster.vega.model.spec.TitleSpec
 import dev.aster.vega.runtime.scale.VegaScale
 import dev.aster.vega.scene.GroupNode
+import dev.aster.vega.scene.MarkAccessibility
 import dev.aster.vega.scene.PointD
 import dev.aster.vega.scene.RectD
 import dev.aster.vega.scene.SceneNode
@@ -37,6 +38,7 @@ import dev.aster.vega.scene.SceneNodeIdAllocator
 import dev.aster.vega.scene.TextEngine
 import dev.aster.vega.scene.Transform2D
 import dev.aster.vega.scene.transformedBounds
+import dev.aster.vega.scene.withMetadata
 import kotlin.math.ceil
 import kotlin.math.floor
 
@@ -115,6 +117,16 @@ internal class ScopeCompiler(
    */
   private val random: RandomStream = RandomStream(),
   private val clock: Clock = Clock.Fixed,
+  /**
+   * Which items a handler has re-encoded through one of their mark's named blocks, and how
+   * recently.
+   *
+   * `{"events": "*:mousedown", "encode": "select"}` desugars to `encode(item(), 'select')`, whose
+   * whole effect is to overlay that block on that one item. This scene is rebuilt from the
+   * specification on every change, so the overlay has to be handed back in to survive — see
+   * [ItemEncode] for why *when* it was applied matters.
+   */
+  private val itemEncodes: Map<dev.aster.vega.scene.SceneNodeId, ItemEncode> = emptyMap(),
 ) {
 
   /**
@@ -147,6 +159,23 @@ internal class ScopeCompiler(
   /** A mark as it looks under the pointer: its `hover` block layered over `update`. */
   private fun hoverSpec(mark: MarkSpec): MarkSpec =
     mark.copy(encode = mark.encode.copy(update = mark.encode.update + mark.encode.hover))
+
+  /**
+   * A mark with one of its named blocks overlaid, as a handler's `encode` leaves it.
+   *
+   * The ordering is the part that was probed rather than assumed, and it is not a fixed one. On the
+   * pass that *applies* the block it wins over `update`: upstream pulses the encode into the same
+   * dataflow run, and a `select` block setting `fill` red beats an `update` setting it green. On
+   * every pass after that, `update` runs again and takes back the channels it sets — the same probe
+   * with a second signal change returned the item to green — while the channels `update` says
+   * nothing about keep the overlay. So the block goes *after* `update` while it is fresh and
+   * *before* it once it is not, which reproduces both halves without keeping any per-channel state.
+   */
+  private fun overlaySpec(mark: MarkSpec, set: String, fresh: Boolean): MarkSpec {
+    val block = mark.encode.named[set] ?: return mark
+    val update = if (fresh) mark.encode.update + block else block + mark.encode.update
+    return mark.copy(encode = mark.encode.copy(update = update))
+  }
 
   fun compile(
     marks: List<MarkSpec>,
@@ -229,9 +258,13 @@ internal class ScopeCompiler(
         val group = group(mark, scope, encoder)
         expose(group.datums)
         if (layout != null) {
-          trellisParts += TrellisRole.of(mark.role) to group.content
+          // A trellis's cells and headers are group marks like any other and are announced the same
+          // way; they only differ in who places them.
+          trellisParts +=
+            TrellisRole.of(mark.role) to
+              group.content.copy(nodes = markContainer(mark, group.content.nodes, index))
         } else {
-          built[index] = group.content.nodes
+          built[index] = markContainer(mark, group.content.nodes, index)
           content = content.union(group.content.bounds)
           markReach = markReach.union(group.content.bounds)
         }
@@ -249,7 +282,11 @@ internal class ScopeCompiler(
         // specification raised draws over its neighbours and still under the axis. Stable, so items
         // sharing a `zindex` keep the order the data gave them.
         built[index] =
-          encoder.encode(mark, rows, transformed.written).sortedBy { it.metadata.zindex }
+          markContainer(
+            mark,
+            encoder.encode(mark, rows, transformed.written).sortedBy { it.metadata.zindex },
+            index,
+          )
         if (mark.encode.hover.isNotEmpty()) {
           val after = ids.mark()
           ids.rewind(before)
@@ -269,6 +306,31 @@ internal class ScopeCompiler(
             )
           }
         }
+        // A handler's `encode` overlays one of the mark's named blocks on one item. Applied after
+        // the
+        // hover pass and keyed by **id** rather than by position, because the resting list has been
+        // sorted by `zindex` and the freshly encoded one has not.
+        val overlaid = built[index].orEmpty().mapNotNull { itemEncodes[it.id] }.toSet()
+        for (state in overlaid) {
+          if (state.set !in mark.encode.named) continue
+          // The allocator is rewound to where the resting pass started so the variant comes back
+          // carrying the **same ids**, which is what lets the two be matched item for item — the
+          // hit
+          // index and the selection key are on those ids, and an item that changed its id under the
+          // pointer would leave the pointer over nothing. The same rewind the hover pass does, and
+          // for the same reason.
+          val resume = ids.mark()
+          ids.rewind(before)
+          val variant =
+            encoder.encode(overlaySpec(mark, state.set, state.fresh), rows, transformed.written)
+          ids.rewind(resume)
+          val byId = variant.associateBy { it.id }
+          built[index] =
+            built[index].orEmpty().map { node ->
+              if (itemEncodes[node.id] == state) byId[node.id] ?: node else node
+            }
+        }
+
         // The items a mark's own transforms produced, not the ones its encoding alone would: a
         // label drawn from a force-directed mark reads the position the simulation settled on.
         exposeItems(transformed.items ?: encoder.items(mark, rows))
@@ -939,7 +1001,9 @@ internal class ScopeCompiler(
       )
       return emptyList()
     }
-    return rows.map { Partition(it) }
+    // A group mark joins on its `key` like any other; upstream's `DataJoin` sits above every mark
+    // type and only the cleaning differs for a group.
+    return joinByKey(spec, rows).map { Partition(it) }
   }
 
   /**
@@ -1131,7 +1195,71 @@ internal class ScopeCompiler(
       )
       return emptyList()
     }
-    return rows
+    return joinByKey(mark, rows)
+  }
+
+  /**
+   * Stamps a mark's items with which mark they are and what a screen reader is told about it.
+   *
+   * Upstream's scene has a level this one does not — a group holds marks, and each mark holds items
+   * — so the two things a *mark* carries have to travel on its items: which mark they belong to
+   * ([NodeMetadata.markOrdinal], upstream's `markpath`) and the mark's own announcement
+   * ([MarkAccessibility], upstream's `ariaMarkAttributes`). A renderer rebuilds the container from
+   * a run of items that agree on both.
+   *
+   * The container's role is upstream's rule and not a guess: `graphics-object` for a group or a
+   * text mark, or for a mark whose items say something **of their own**, and `graphics-symbol`
+   * otherwise. "Of their own" is why [AccessibilityDescriptor.derived] exists: this engine labels
+   * items the specification said nothing about, and counting those would make every mark an object.
+   */
+  private fun markContainer(
+    mark: MarkSpec,
+    nodes: List<SceneNode>,
+    ordinal: Int,
+  ): List<SceneNode> {
+    val kind = mark.type.name.lowercase()
+    val describing = nodes.any { node -> node.metadata.accessibility?.let { !it.derived } == true }
+    val container =
+      if (!mark.aria) {
+        // `aria: false` hides the whole mark, and upstream emits nothing else for it.
+        MarkAccessibility(role = null, roleDescription = null, hidden = true)
+      } else {
+        MarkAccessibility(
+          role =
+            if (kind == "group" || kind == "text" || describing) "graphics-object"
+            else "graphics-symbol",
+          roleDescription = "$kind mark container",
+          label = mark.description,
+        )
+      }
+    return nodes.map {
+      withMetadata(it, it.metadata.copy(markOrdinal = ordinal, markAccessibility = container))
+    }
+  }
+
+  /**
+   * Upstream's `DataJoin`, which is what a mark's `key` actually does.
+   *
+   * It reads like a hint about redraws and it is not one: the join maps each key to **one** item,
+   * so two rows sharing a key produce one mark rather than two. The item keeps the position its key
+   * first appeared in and takes the *last* such row's datum — `x.datum = t` on every visit — so a
+   * repeated key draws the later row's values where the earlier row would have been. That is not a
+   * filter and no ordering produces it, which is why a specification saying `key` and getting one
+   * bar per row is drawing something that was never asked for.
+   *
+   * Keys are compared as **text** because upstream's `fastmap` is an object and its keys are
+   * coerced: a numeric `1` and the string `"1"` are one key there and one key here. The one thing a
+   * value model cannot reproduce is upstream's split between a field that is `null` and a field
+   * that is absent, since a missing field reads as null; both collapse together instead of into two
+   * items.
+   */
+  private fun joinByKey(mark: MarkSpec, rows: List<VegaValue>): List<VegaValue> {
+    val key = mark.key ?: return rows
+    // Insertion-ordered, and re-putting an existing key keeps its place while replacing the row:
+    // exactly the join's own behaviour, spelled by the data structure rather than by a loop.
+    val items = LinkedHashMap<String, VegaValue>(rows.size)
+    for (row in rows) items[row.field(key).asString()] = row
+    return items.values.toList()
   }
 
   /**

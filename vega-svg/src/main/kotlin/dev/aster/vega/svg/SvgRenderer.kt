@@ -25,6 +25,7 @@ import dev.aster.vega.scene.TextAlign
 import dev.aster.vega.scene.TextBaseline
 import dev.aster.vega.scene.TextNode
 import dev.aster.vega.scene.Transform2D
+import dev.aster.vega.scene.paintOrder
 
 /** How images are represented in exported SVG. */
 public enum class SvgImagePolicy {
@@ -131,6 +132,16 @@ public class SvgRenderer(private val options: SvgOptions = SvgOptions()) {
   ) {
     if (!node.visible || node.opacity <= 0.0) return
 
+    // An `href` makes the item a link, which in SVG means wrapping whatever it draws in an anchor —
+    // upstream emits `<a xlink:href="…">` around the element and nothing else. Done here rather
+    // than in
+    // each of the seven renderers below, because it is the same wrapper whatever the shape is.
+    val href = node.metadata.href
+    if (href != null) {
+      newline(out, depth)
+      out.append("<a xlink:href=\"").append(escapeXml(href)).append("\">")
+    }
+
     when (node) {
       is GroupNode -> renderGroup(node, out, defs, warnings, depth)
       is RectNode -> renderRect(node, out, defs, depth)
@@ -139,6 +150,11 @@ public class SvgRenderer(private val options: SvgOptions = SvgOptions()) {
       is SymbolNode -> renderSymbol(node, out, defs, depth)
       is TextNode -> renderText(node, out, defs, depth)
       is ImageNode -> renderImage(node, out, warnings, depth)
+    }
+
+    if (href != null) {
+      newline(out, depth)
+      out.append("</a>")
     }
   }
 
@@ -195,7 +211,12 @@ public class SvgRenderer(private val options: SvgOptions = SvgOptions()) {
       renderGroupPaint(node, background, out, defs, depth + 1, stroked = !node.strokeForeground)
     }
 
-    for (child in node.children) renderNode(child, out, defs, warnings, depth + 1)
+    // Painted in `zindex` order, which is a render-time question rather than a scene one: upstream
+    // keeps its items in data order and reorders in `visit`, and the differential harness compares
+    // the
+    // scene, so the reordering has to happen here or the two engines draw the same list
+    // differently.
+    renderChildren(paintOrder(node.children), out, defs, warnings, depth + 1)
 
     if (background != null && node.strokeForeground && node.stroke != null) {
       renderGroupPaint(node, background, out, defs, depth + 1, filled = false)
@@ -204,6 +225,63 @@ public class SvgRenderer(private val options: SvgOptions = SvgOptions()) {
     newline(out, depth)
     out.append("</g>")
   }
+
+  /**
+   * A group's children, with each mark's items inside a container element.
+   *
+   * Upstream draws every item of a mark inside one `<g>` and hangs the mark's own announcement on
+   * it: a `description` on the mark names the whole series, so a reader hears "Monthly revenue"
+   * once rather than on each of the twelve bars. This scene has no mark level — the items *are* the
+   * group's children — so the container is rebuilt from a run of items that agree on which mark
+   * they came from, which is what [NodeMetadata.markOrdinal] is for.
+   *
+   * Emitted only when there is something to say. Upstream's container carries CSS classes as well
+   * and so is always present; this one holds nothing but the announcement, and an export with
+   * accessibility switched off would otherwise gain a wrapper that means nothing.
+   */
+  private fun renderChildren(
+    children: List<SceneNode>,
+    out: StringBuilder,
+    defs: Defs,
+    warnings: MutableList<SvgExportWarning>,
+    depth: Int,
+  ) {
+    var index = 0
+    while (index < children.size) {
+      val first = children[index]
+      val container = first.metadata.markAccessibility.takeIf { options.includeAccessibility }
+      if (container == null) {
+        renderNode(first, out, defs, warnings, depth)
+        index++
+        continue
+      }
+      var end = index
+      while (end + 1 < children.size && sameMark(children[end + 1], first)) end++
+      newline(out, depth)
+      out.append("<g")
+      if (container.hidden) {
+        out.append(" aria-hidden=\"true\"")
+      } else {
+        container.role?.let { out.append(" role=\"").append(escapeXml(it)).append('"') }
+        container.roleDescription?.let {
+          out.append(" aria-roledescription=\"").append(escapeXml(it)).append('"')
+        }
+        container.label?.let { out.append(" aria-label=\"").append(escapeXml(it)).append('"') }
+      }
+      out.append('>')
+      for (i in index..end) renderNode(children[i], out, defs, warnings, depth + 1)
+      newline(out, depth)
+      out.append("</g>")
+      index = end + 1
+    }
+  }
+
+  /** Whether two nodes came from the same mark, and so belong in the same container. */
+  private fun sameMark(node: SceneNode, first: SceneNode): Boolean =
+    node.metadata.markAccessibility == first.metadata.markAccessibility &&
+      node.metadata.markOrdinal == first.metadata.markOrdinal &&
+      node.metadata.markName == first.metadata.markName &&
+      node.metadata.markKind == first.metadata.markKind
 
   private fun renderGroupPaint(
     node: GroupNode,
@@ -462,6 +540,11 @@ public class SvgRenderer(private val options: SvgOptions = SvgOptions()) {
     if (!options.includeAccessibility) return
     val descriptor = node.metadata.accessibility ?: return
     descriptor.role?.let { out.append(" role=\"").append(escapeXml(it)).append('"') }
+    // Said together with the role: "graphics-symbol" alone tells a reader nothing, and upstream
+    // pairs every label with the kind of thing in words.
+    descriptor.roleDescription?.let {
+      out.append(" aria-roledescription=\"").append(escapeXml(it)).append('"')
+    }
     val label = descriptor.value?.let { "${descriptor.label}: $it" } ?: descriptor.label
     out.append(" aria-label=\"").append(escapeXml(label)).append('"')
   }

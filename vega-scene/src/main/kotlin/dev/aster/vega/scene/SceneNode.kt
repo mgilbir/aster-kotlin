@@ -37,9 +37,26 @@ public data class AccessibilityDescriptor(
   val label: String,
   val value: String? = null,
   val role: String? = null,
+  /**
+   * `aria-roledescription` — what kind of thing this is, in words.
+   *
+   * The other half of [role], which is a machine name from a fixed list. A reader says the pair
+   * together: role `graphics-symbol` with "rect mark" is heard as "rect mark", where the role alone
+   * would be heard as nothing useful. Upstream emits one for every labelled item and every guide.
+   */
+  val roleDescription: String? = null,
   val focusable: Boolean = false,
   /** Ordering hint within the parent group; lower values are visited first. */
   val traversalIndex: Int = 0,
+  /**
+   * Whether this label was **derived** rather than asked for.
+   *
+   * This engine labels an item the specification said nothing about, which upstream does not; see
+   * `MarkEncoder.describe`. The distinction has to survive onto the node because a mark's container
+   * role depends on it — upstream's rule is whether any item says something *of its own* — and a
+   * derived label would otherwise make every mark look as though it did.
+   */
+  val derived: Boolean = false,
 )
 
 /**
@@ -114,6 +131,15 @@ public data class NodeMetadata(
    */
   val cursor: String? = null,
   /**
+   * `href` — the address this item links to.
+   *
+   * Upstream's SVG renderer wraps the drawn element in an `<a xlink:href="…">`, which is the whole
+   * mechanism: a bar that is a link, a legend swatch that filters a page. Kept on the item rather
+   * than turned into a click handler, because a link is a link — the renderer that knows how to
+   * draw one knows how to make it navigable, and one that does not can ignore it.
+   */
+  val href: String? = null,
+  /**
    * Paint order **within** the item's own mark, `zindex`.
    *
    * Zero for almost everything. It matters on hover — a raised item has to be drawn over its
@@ -122,11 +148,71 @@ public data class NodeMetadata(
    */
   val zindex: Int = 0,
   val accessibility: AccessibilityDescriptor? = null,
+  /**
+   * Which of its parent's marks this node came from, upstream's `markpath`.
+   *
+   * [markName] and [markKind] nearly identify a mark and not quite: two `rect` marks declared side
+   * by side with no names are indistinguishable by them, and this scene flattens every mark's items
+   * into its group's children, so the boundary between the two is not visible without this. It
+   * decides where one mark's run of items ends — which is what `zindex` reorders inside of, and
+   * what a screen reader is told about once.
+   */
+  val markOrdinal: Int? = null,
+  /**
+   * What a screen reader is told about the **mark**, repeated on each of its items.
+   *
+   * Upstream's scene has a level this one does not: a group holds *marks* and each mark holds
+   * items, so a mark's own announcement has somewhere to live. Here the items are the group's
+   * children, so the announcement travels on each of them and a renderer rebuilds the container
+   * from a run of items that share it. Cheaper than it looks — one instance per mark, held by
+   * reference.
+   */
+  val markAccessibility: MarkAccessibility? = null,
 ) {
   public companion object {
     public val None: NodeMetadata = NodeMetadata()
   }
 }
+
+/**
+ * What a screen reader is told about a whole mark, as opposed to one of its items.
+ *
+ * Upstream's `ariaMarkAttributes`. A mark is announced as a container — "rect mark container" — and
+ * that is where a mark-level `description` is heard: once, naming the series, rather than on each
+ * of the fifty bars inside it. [hidden] is `aria: false` on the mark, which takes the whole thing
+ * out of the tree and suppresses the rest of these.
+ */
+public data class MarkAccessibility(
+  /**
+   * `graphics-object` for a mark whose items say something of their own, `graphics-symbol` else.
+   *
+   * Null when [hidden], because upstream emits nothing but `aria-hidden` for a mark it hides.
+   */
+  val role: String?,
+  /** Upstream's `<type> mark container`, and null for the same reason as [role]. */
+  val roleDescription: String?,
+  /** The mark's own `description`, if it has one. */
+  val label: String? = null,
+  val hidden: Boolean = false,
+)
+
+/**
+ * The same node with different metadata.
+ *
+ * A `when` over the seven types because [SceneNode] is a sealed interface of data classes and
+ * Kotlin has no generic copy across them. Needed by anything that decides a property *after* the
+ * items are built — a mark's container role depends on what its items turned out to say.
+ */
+public fun withMetadata(node: SceneNode, metadata: NodeMetadata): SceneNode =
+  when (node) {
+    is GroupNode -> node.copy(metadata = metadata)
+    is RectNode -> node.copy(metadata = metadata)
+    is RuleNode -> node.copy(metadata = metadata)
+    is PathNode -> node.copy(metadata = metadata)
+    is SymbolNode -> node.copy(metadata = metadata)
+    is TextNode -> node.copy(metadata = metadata)
+    is ImageNode -> node.copy(metadata = metadata)
+  }
 
 public sealed interface SceneNode {
   public val id: SceneNodeId

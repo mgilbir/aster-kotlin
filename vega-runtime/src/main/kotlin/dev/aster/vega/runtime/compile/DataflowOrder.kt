@@ -295,8 +295,23 @@ internal class DataflowOrder(
      *
      * A signal with a plain `value` reads nothing, which is what puts every one of them first.
      */
-    private fun dependenciesOf(spec: SignalSpec): Set<Operator> =
-      spec.expression?.let(::readsOf) ?: emptySet()
+    private fun dependenciesOf(spec: SignalSpec): Set<Operator> {
+      val source = spec.expression ?: return emptySet()
+      val result = readsOf(source).toMutableSet()
+      // A signal that **writes** a dataset has to run after that dataset exists, or its rows are
+      // laid down first and then overwritten by the dataset's own declaration. Upstream never has
+      // the
+      // question: `modify` and `setdata` pulse a changeset that the dataflow applies once
+      // everything
+      // has settled, so the write is always last by construction.
+      val compiled = expressions.compile(source)
+      if (compiled is ExpressionResult.Compiled) {
+        for (name in compiled.expression.writtenDatasets) {
+          if (name in dataSpecs) result.add(Operator.Data(name))
+        }
+      }
+      return result
+    }
 
     /**
      * A dataset reads the dataset it sources from, and whatever its parameters reach for.

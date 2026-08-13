@@ -244,15 +244,20 @@ class ParserTest {
   }
 
   @Test
-  fun `a deliberately excluded function explains why`() {
-    // `geoBounds` used to be the example here and is implemented now, along with `lab` and `hcl`.
-    // What is left on the list needs a subsystem rather than an algorithm.
+  fun `nothing is deliberately excluded, and an unknown name still explains itself`() {
+    // The list this test was written for is **empty**. `geoBounds` was the first example, then
+    // `vlSelectionTest`, then `isTuple`; every one of them is implemented now. What is left to
+    // check
+    // is that the mechanism still works — a name upstream does not have either is a diagnostic
+    // rather
+    // than a silence, and it says what it could not find.
+    assertEquals(emptyMap<String, String>(), Functions.knownUnsupported)
     val failure =
       assertThrows<ExpressionEvaluationException> {
-        compiled("vlSelectionTuples('sel', datum)").evaluate(scopeOf())
+        compiled("notAFunctionAnywhere(datum)").evaluate(scopeOf())
       }
     assertTrue(
-      failure.diagnostic.message.contains("selection"),
+      failure.diagnostic.message.contains("notAFunctionAnywhere"),
       failure.diagnostic.message,
     )
   }

@@ -20,9 +20,12 @@ import dev.aster.vega.model.spec.RangeSpec
 import dev.aster.vega.model.spec.ScaleSpec
 import dev.aster.vega.model.spec.ScaleType
 import dev.aster.vega.model.spec.SchemeRef
+import dev.aster.vega.model.time.TimeInterval
+import dev.aster.vega.model.time.TimeStepper
 import dev.aster.vega.runtime.scale.BandScale
 import dev.aster.vega.runtime.scale.BinOrdinalScale
 import dev.aster.vega.runtime.scale.ColorSchemes
+import dev.aster.vega.runtime.scale.IdentityScale
 import dev.aster.vega.runtime.scale.LinearScale
 import dev.aster.vega.runtime.scale.LogScale
 import dev.aster.vega.runtime.scale.OrdinalScale
@@ -84,6 +87,10 @@ public class ScaleResolver(
       // A linear scale with a colour range is a colour scale, not a positional one.
       ScaleType.LINEAR -> if (hasColorRange(spec)) buildSequentialColor(spec) else buildLinear(spec)
       ScaleType.SEQUENTIAL -> buildSequentialColor(spec)
+      // Nothing to build: an identity scale has no domain, no range and no interpolation. It exists
+      // so
+      // a channel that wants a scale can be handed coordinates that are already final.
+      ScaleType.IDENTITY -> IdentityScale(spec.name)
       ScaleType.LOG -> buildLog(spec)
       ScaleType.POW -> buildPow(spec, defaultExponent = 1.0)
       ScaleType.SQRT -> buildPow(spec, defaultExponent = 0.5)
@@ -103,16 +110,11 @@ public class ScaleResolver(
       ScaleType.QUANTILE -> buildQuantile(spec)
       ScaleType.THRESHOLD -> buildThreshold(spec)
       ScaleType.BIN_ORDINAL -> buildBinOrdinal(spec)
-      else -> {
-        diagnostics.error(
-          DiagnosticCodes.SCALE_UNSUPPORTED_TYPE,
-          "Scale type '${spec.type.name.lowercase()}' is not implemented yet " +
-            "(scale '${spec.name}'); marks using it will not be positioned",
-          operator = spec.name,
-        )
-        null
-      }
     }
+
+  // No `else`, and the compiler now enforces it: every scale type upstream registers is built here.
+  // A type it does not have never reaches this point — `ScaleType.fromName` reports an unknown name
+  // and the scale is skipped before anything asks what to build.
 
   private fun buildLinear(spec: ScaleSpec): LinearScale? {
     val range = numericRange(spec) ?: return null
@@ -697,13 +699,30 @@ public class ScaleResolver(
     val padded = padded(bounded, range, spec)
     val niced =
       if (spec.nice && !rawApplies(spec)) {
+        // `nice: "month"` rounds out to a **calendar boundary**, where `nice: true` rounds out to
+        // whatever step the tick algorithm chose. Over 17 January to 9 May those differ by eleven
+        // days at one end — the difference between an axis labelled by months and one by weeks.
+        val stepper =
+          // By the specification's own unit names — `"hours"`, `"date"`, `"quarter"` — and not by
+          // this enum's; see [TimeInterval.forUnit], which is where matching them wrongly was
+          // found.
+          TimeInterval.forUnit(spec.niceInterval)?.let { (interval, implied) ->
+            TimeStepper(interval, implied * (spec.niceStep ?: 1), zone)
+          }
         val (lo, hi) =
-          TimeTicks.nice(
-            padded.first(),
-            padded.last(),
-            spec.niceCount ?: LinearScale.DEFAULT_TICK_COUNT,
-            zone,
-          )
+          if (stepper != null) {
+            val start = stepper.floor(domain.first())
+            val flooredEnd = stepper.floor(domain.last())
+            val end = if (flooredEnd < domain.last()) stepper.offset(flooredEnd, 1) else flooredEnd
+            start to end
+          } else {
+            TimeTicks.nice(
+              domain.first(),
+              domain.last(),
+              spec.niceCount ?: LinearScale.DEFAULT_TICK_COUNT,
+              zone,
+            )
+          }
         listOf(lo, hi)
       } else {
         padded
@@ -880,6 +899,15 @@ public class ScaleResolver(
   }
 
   private fun buildBinOrdinal(spec: ScaleSpec): BinOrdinalScale? {
+    // **Distinct**, unlike the other three: a bin-ordinal scale is a discrete scale whose domain is
+    // the bin *edges*, so a column of a thousand rows in four bins has a domain of four. Keeping
+    // the
+    // duplicates put every edge at the wrong bucket — the bisection counts equal values, so the
+    // lowest bin was painted with the highest bucket's colour. Order is first appearance, not
+    // sorted:
+    // upstream sorts only when the domain says `"sort": true`, and a jumbled column really does
+    // give
+    // a jumbled scale there.
     // With no domain of its own, **the bins are the domain** — `configureBins` in `vega-encode`,
     // where a `bin-ordinal` either states its edges as a domain or takes them from `bins`. That is
     // how a Vega-Lite binned colour scale is written: it says only which bins the transform chose,
@@ -898,7 +926,7 @@ public class ScaleResolver(
             return null
           }
       } else {
-        fullNumericDomain(spec) ?: return null
+        fullNumericDomain(spec)?.distinct() ?: return null
       }
     val range = binnedRange(spec, buckets = maxOf(1, edges.size - 1)) ?: return null
     return BinOrdinalScale(spec.name, edges, range)

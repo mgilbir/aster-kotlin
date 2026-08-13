@@ -15,6 +15,31 @@ class ScalesTest {
 
   private val tolerance = 1e-12
 
+  // ---- identity -------------------------------------------------------------
+
+  /**
+   * The value itself, and **nothing** where there is no number.
+   *
+   * d3's identity scale answers its `unknown` — `undefined` — for anything that does not coerce,
+   * and a channel handed that is a channel left unset: the mark does not draw rather than drawing
+   * at NaN. Verified against upstream, where `scale('i', 'x')` comes back undefined while
+   * `scale('i', 42)` is
+   * 42. The `[0, 1]` domain is d3's too and is never consulted; it exists so `domain('name')`
+   *     answers something.
+   */
+  @Test
+  fun `an identity scale maps the value itself`() {
+    val scale = IdentityScale("i")
+    assertEquals(VegaValue.Num(42.0), scale.scale(VegaValue.Num(42.0)))
+    assertEquals(VegaValue.Num(-3.5), scale.scale(VegaValue.Num(-3.5)))
+    // A numeric string coerces, exactly as `+value` coerces it.
+    assertEquals(VegaValue.Num(7.0), scale.scale(VegaValue.Str("7")))
+    assertEquals(VegaValue.Null, scale.scale(VegaValue.Str("not a number")))
+    assertEquals(VegaValue.Null, scale.scale(VegaValue.Null))
+    assertEquals(listOf(0.0, 1.0), scale.domain)
+    assertEquals(listOf(0.0, 1.0), scale.range)
+  }
+
   // ---- linear ---------------------------------------------------------------
 
   @Test

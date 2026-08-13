@@ -35,6 +35,37 @@ public enum class TimeInterval {
   MONTH,
   YEAR;
 
+  public companion object {
+    /**
+     * The interval a specification's **unit name** stands for, with the step it implies.
+     *
+     * Vega's names are not this enum's: they are the `timeunit` names — `"hours"`, `"minutes"`,
+     * `"date"`, `"dayofyear"`, `"quarter"` — and a scale's `nice` or an axis's `tickCount` is
+     * written in those. Matching on the enum's own names instead worked for `"month"` and `"year"`
+     * and quietly failed for everything plural, which is most of them, and for `"quarter"`, which
+     * is not an interval at all but three months.
+     *
+     * @return the interval and how many of it make one step, or null when nothing is named.
+     */
+    public fun forUnit(unit: String?): Pair<TimeInterval, Int>? =
+      when (unit?.lowercase()) {
+        "year" -> YEAR to 1
+        // Not an interval of its own anywhere: d3 has no quarter, and upstream spells it
+        // `timeMonth.every(3)`.
+        "quarter" -> MONTH to 3
+        "month" -> MONTH to 1
+        "week" -> WEEK to 1
+        "date",
+        "day",
+        "dayofyear" -> DAY to 1
+        "hours" -> HOUR to 1
+        "minutes" -> MINUTE to 1
+        "seconds" -> SECOND to 1
+        "milliseconds" -> MILLISECOND to 1
+        else -> null
+      }
+  }
+
   /** Nominal length in milliseconds, used only to choose between intervals, never to step. */
   public val approximateMillis: Double
     get() =

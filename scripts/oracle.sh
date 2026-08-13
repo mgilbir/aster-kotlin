@@ -77,8 +77,61 @@ json.dump(rows, open(out, 'w'), indent=1, ensure_ascii=False)
 print(f"Wrote {len(rows)} guide caption(s) to {out}")
 PYTHON
 
+# The container upstream draws every item of a mark inside, and the announcement it hangs on it: a
+# mark's own `description` is heard once there rather than on each of its items. Like the captions
+# above these are attributes rather than geometry, so the mark comparison is blind to them.
+echo "==> Harvesting mark containers"
+python3 - "$SCENE_DIR" "$REFERENCE_DIR/mark-containers.json" "$FIXTURES" <<'PYTHON'
+import glob, html, json, os, re, sys
+scene_dir, out, fixtures = sys.argv[1], sys.argv[2], sys.argv[3]
+current = {os.path.basename(p)[:-len('.vg.json')] for p in glob.glob(os.path.join(fixtures, '*.vg.json'))}
+# The roles that are a *mark* rather than a guide. A guide's container is announced as "axis" or
+# "legend" and is covered by the caption reference; these are the ones a specification's own marks
+# produce, the frame and a trellis's headers included.
+MARK_ROLES = re.compile(r'^(mark|scope|frame|row-header|row-footer|row-title|column-header|column-footer|column-title)$')
+ATTR = re.compile(r'([-a-z]+)="([^"]*)"')
+rows = []
+for path in sorted(glob.glob(os.path.join(scene_dir, '*.svg'))):
+    fixture = os.path.basename(path)[:-4]
+    if fixture not in current:
+        continue
+    svg = open(path).read()
+    for tag in re.finditer(r'<g class="mark-([a-z]+) role-([a-z-]+)[^"]*"([^>]*)>', svg):
+        kind, role, rest = tag.group(1), tag.group(2), tag.group(3)
+        if not MARK_ROLES.match(role):
+            continue
+        # A mark that produced no items still gets its container upstream, and this engine has no
+        # place for one: the announcement travels on the items, so with no items there is nothing to
+        # carry it. Skipped rather than compared, because an empty container is inaudible — assistive
+        # technology walks past a group with no content — and recording it would fail a comparison
+        # over a difference nobody can hear. A mark that draws *anything* is compared in full.
+        # Empty either way it is spelled: `<g ...></g>` or, when the mark has no items at all,
+        # `<g .../>`.
+        if rest.endswith('/') or svg[tag.end():tag.end() + 4] == '</g>':
+            continue
+        attrs = dict(ATTR.findall(rest))
+        described = attrs.get('aria-roledescription', '').endswith('mark container')
+        hidden = attrs.get('aria-hidden') == 'true'
+        if not described and not hidden:
+            continue
+        rows.append({"fixture": fixture, "kind": kind,
+                     "role": None if hidden else attrs.get('role'),
+                     "roleDescription": None if hidden else attrs.get('aria-roledescription'),
+                     "label": html.unescape(attrs['aria-label']) if 'aria-label' in attrs else None,
+                     "hidden": hidden})
+json.dump(rows, open(out, 'w'), indent=1, ensure_ascii=False)
+print(f"Wrote {len(rows)} mark container(s) to {out}")
+PYTHON
+
+# The caption and container references are read by tests of their own, which are run here beside the
+# comparison: this script is what regenerates what they read, so a fixture whose captions moved should
+# fail here rather than in the next full test run.
 echo "==> Comparing with the Kotlin runtime"
-if ./gradlew --console=plain :vega-runtime:test --tests '*Differential*' > "$DIFF_DIR/differential.log" 2>&1; then
+if ./gradlew --console=plain :vega-runtime:test \
+  --tests '*Differential*' \
+  --tests '*GuideCaptionTest' \
+  --tests '*MarkContainerTest' \
+  > "$DIFF_DIR/differential.log" 2>&1; then
   echo "Differential tests passed for ${#specs[@]} fixture(s)."
   echo "Reference data: $REFERENCE_DIR"
   echo "Upstream scenes and SVG: $SCENE_DIR"

@@ -32645,6 +32645,7 @@
       "font": "sans-serif",
       "fontSize": 11,
       "fontWeight": "bold",
+      "limit": 180,
       "opacity": 1,
       "role": "legend-title",
       "text": "Unemployment",
@@ -32653,6 +32654,7 @@
       "y": 266
     },
     {
+      "clip": true,
       "cornerRadius": 100,
       "fill": "#FFFFFF",
       "fillOpacity": 0.7,

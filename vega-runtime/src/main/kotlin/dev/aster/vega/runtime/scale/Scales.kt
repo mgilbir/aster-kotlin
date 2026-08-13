@@ -75,6 +75,30 @@ public sealed interface PositionScale : VegaScale {
  * @param domain at least two values; more than two makes it piecewise.
  * @param clamp when true, out-of-domain inputs clamp to the range ends instead of extrapolating.
  */
+/**
+ * `identity`: the value itself, coerced to a number.
+ *
+ * The one scale that maps nothing. It exists so a specification can name a scale where a channel
+ * expects one and still hand over coordinates it has already worked out — a chart drawing a legend
+ * by hand, or a layout computed in a `formula`. Upstream registers it beside the others, which is
+ * why a `"scale": "identity"` reference has to resolve rather than report.
+ *
+ * `domain` and `range` are both `[0, 1]` and are never consulted, which is d3's answer as well: the
+ * pair exists so `domain('name')` returns *something*, not because the scale uses them. A value
+ * that is not a number maps to **nothing** rather than to `NaN` — d3's `unknown`, which for a mark
+ * means a channel left unset and a mark that does not draw.
+ */
+public class IdentityScale(override val name: String) : VegaScale {
+  public val range: List<Double> = listOf(0.0, 1.0)
+
+  public val domain: List<Double> = listOf(0.0, 1.0)
+
+  override fun scale(value: VegaValue): VegaValue {
+    val number = value.asDouble()
+    return if (number.isNaN()) VegaValue.Null else VegaValue.Num(number)
+  }
+}
+
 public class LinearScale(
   override val name: String,
   public val domain: List<Double>,
@@ -684,6 +708,16 @@ public sealed interface BinnedScale : VegaScale {
     get() = listOf(Double.NEGATIVE_INFINITY) + thresholds
 
   /**
+   * What bounds the **last** bucket from above, upstream's `values.max`.
+   *
+   * Infinite for three of the four, because nothing bounds them: a quantize, quantile or threshold
+   * scale's topmost bucket runs on for ever, and a legend that labels its swatches by range says "≥
+   * 75" rather than naming an end. A bin scale is the exception — its bins have a last edge.
+   */
+  public val legendMax: Double
+    get() = Double.POSITIVE_INFINITY
+
+  /**
    * Where a value sits along the legend's bar, in `0..1`.
    *
    * Measured against the scale's **input** extent rather than its cut points, so the bands are as
@@ -758,6 +792,15 @@ public class QuantileScale(
 ) : BinnedScale {
 
   private val sorted: List<Double> = domain.filterNot { it.isNaN() }.sorted()
+
+  /**
+   * The scale's domain as d3 keeps it: the samples, sorted, with the unreadable ones dropped.
+   *
+   * A quantile scale's domain really is the whole column — that is what distinguishes it from
+   * `quantize` — so this is also what an axis on one ticks at, one tick per sample.
+   */
+  public val sampleDomain: List<Double>
+    get() = sorted
 
   override val thresholds: List<Double> =
     (1 until maxOf(1, rangeValues.size)).map { i ->
@@ -846,6 +889,15 @@ public class BinOrdinalScale(
   override val rangeValues: List<VegaValue>,
 ) : BinnedScale {
 
+  /**
+   * The bin edges are the scale's `bins`, which is what upstream ticks an axis on one at.
+   *
+   * The last edge bounds the topmost bucket rather than opening one, so it maps to nothing and
+   * drops out when the ticks are filtered to those that land inside the range.
+   */
+  override val bins: List<Double>
+    get() = domain
+
   /** The interior edges: the first and last bound the outermost buckets and label nothing. */
   override val thresholds: List<Double>
     get() = domain.drop(1).dropLast(1)
@@ -853,6 +905,10 @@ public class BinOrdinalScale(
   /** The bin edges are the labels, and the last one bounds rather than opens a bucket. */
   override val legendValues: List<Double>
     get() = domain.dropLast(1)
+
+  /** That last edge, which is what a range label ends with instead of running to infinity. */
+  override val legendMax: Double
+    get() = domain.lastOrNull() ?: Double.POSITIVE_INFINITY
 
   override val legendExtent: Pair<Double, Double>
     get() = (domain.firstOrNull() ?: 0.0) to (domain.lastOrNull() ?: 1.0)

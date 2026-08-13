@@ -1,0 +1,501 @@
+{
+  "marks": [
+    {
+      "fill": {
+        "gradient": "linear",
+        "stops": [
+          {
+            "color": "rgb(207, 225, 242)",
+            "offset": 0
+          },
+          {
+            "color": "rgb(199, 221, 239)",
+            "offset": 0.05
+          },
+          {
+            "color": "rgb(190, 216, 236)",
+            "offset": 0.1
+          },
+          {
+            "color": "rgb(179, 211, 233)",
+            "offset": 0.15
+          },
+          {
+            "color": "rgb(168, 206, 229)",
+            "offset": 0.2
+          },
+          {
+            "color": "rgb(156, 200, 226)",
+            "offset": 0.25
+          },
+          {
+            "color": "rgb(143, 193, 222)",
+            "offset": 0.3
+          },
+          {
+            "color": "rgb(130, 186, 219)",
+            "offset": 0.35
+          },
+          {
+            "color": "rgb(116, 178, 215)",
+            "offset": 0.4
+          },
+          {
+            "color": "rgb(104, 171, 211)",
+            "offset": 0.45
+          },
+          {
+            "color": "rgb(91, 163, 207)",
+            "offset": 0.5
+          },
+          {
+            "color": "rgb(80, 155, 203)",
+            "offset": 0.55
+          },
+          {
+            "color": "rgb(69, 146, 198)",
+            "offset": 0.6
+          },
+          {
+            "color": "rgb(59, 138, 194)",
+            "offset": 0.65
+          },
+          {
+            "color": "rgb(49, 129, 189)",
+            "offset": 0.7
+          },
+          {
+            "color": "rgb(41, 120, 184)",
+            "offset": 0.75
+          },
+          {
+            "color": "rgb(32, 111, 178)",
+            "offset": 0.8
+          },
+          {
+            "color": "rgb(25, 102, 171)",
+            "offset": 0.85
+          },
+          {
+            "color": "rgb(18, 92, 164)",
+            "offset": 0.9
+          },
+          {
+            "color": "rgb(14, 83, 154)",
+            "offset": 0.95
+          },
+          {
+            "color": "rgb(10, 74, 144)",
+            "offset": 1
+          }
+        ],
+        "x1": 0,
+        "x2": 0,
+        "y1": 1,
+        "y2": 0
+      },
+      "height": 37.142857,
+      "role": "mark",
+      "stroke": "#333",
+      "strokeWidth": 0.5,
+      "type": "rect",
+      "width": 64.761905,
+      "x": 11.428571,
+      "y": 92.857143
+    },
+    {
+      "fill": {
+        "gradient": "linear",
+        "stops": [
+          {
+            "color": "rgb(207, 225, 242)",
+            "offset": 0
+          },
+          {
+            "color": "rgb(199, 221, 239)",
+            "offset": 0.05
+          },
+          {
+            "color": "rgb(190, 216, 236)",
+            "offset": 0.1
+          },
+          {
+            "color": "rgb(179, 211, 233)",
+            "offset": 0.15
+          },
+          {
+            "color": "rgb(168, 206, 229)",
+            "offset": 0.2
+          },
+          {
+            "color": "rgb(156, 200, 226)",
+            "offset": 0.25
+          },
+          {
+            "color": "rgb(143, 193, 222)",
+            "offset": 0.3
+          },
+          {
+            "color": "rgb(130, 186, 219)",
+            "offset": 0.35
+          },
+          {
+            "color": "rgb(116, 178, 215)",
+            "offset": 0.4
+          },
+          {
+            "color": "rgb(104, 171, 211)",
+            "offset": 0.45
+          },
+          {
+            "color": "rgb(91, 163, 207)",
+            "offset": 0.5
+          },
+          {
+            "color": "rgb(80, 155, 203)",
+            "offset": 0.55
+          },
+          {
+            "color": "rgb(69, 146, 198)",
+            "offset": 0.6
+          },
+          {
+            "color": "rgb(59, 138, 194)",
+            "offset": 0.65
+          },
+          {
+            "color": "rgb(49, 129, 189)",
+            "offset": 0.7
+          },
+          {
+            "color": "rgb(41, 120, 184)",
+            "offset": 0.75
+          },
+          {
+            "color": "rgb(32, 111, 178)",
+            "offset": 0.8
+          },
+          {
+            "color": "rgb(25, 102, 171)",
+            "offset": 0.85
+          },
+          {
+            "color": "rgb(18, 92, 164)",
+            "offset": 0.9
+          },
+          {
+            "color": "rgb(14, 83, 154)",
+            "offset": 0.95
+          },
+          {
+            "color": "rgb(10, 74, 144)",
+            "offset": 1
+          }
+        ],
+        "x1": 0,
+        "x2": 0,
+        "y1": 1,
+        "y2": 0
+      },
+      "height": 130,
+      "role": "mark",
+      "stroke": "#333",
+      "strokeWidth": 0.5,
+      "type": "rect",
+      "width": 64.761905,
+      "x": 87.619048,
+      "y": 0
+    },
+    {
+      "fill": {
+        "gradient": "linear",
+        "stops": [
+          {
+            "color": "rgb(207, 225, 242)",
+            "offset": 0
+          },
+          {
+            "color": "rgb(199, 221, 239)",
+            "offset": 0.05
+          },
+          {
+            "color": "rgb(190, 216, 236)",
+            "offset": 0.1
+          },
+          {
+            "color": "rgb(179, 211, 233)",
+            "offset": 0.15
+          },
+          {
+            "color": "rgb(168, 206, 229)",
+            "offset": 0.2
+          },
+          {
+            "color": "rgb(156, 200, 226)",
+            "offset": 0.25
+          },
+          {
+            "color": "rgb(143, 193, 222)",
+            "offset": 0.3
+          },
+          {
+            "color": "rgb(130, 186, 219)",
+            "offset": 0.35
+          },
+          {
+            "color": "rgb(116, 178, 215)",
+            "offset": 0.4
+          },
+          {
+            "color": "rgb(104, 171, 211)",
+            "offset": 0.45
+          },
+          {
+            "color": "rgb(91, 163, 207)",
+            "offset": 0.5
+          },
+          {
+            "color": "rgb(80, 155, 203)",
+            "offset": 0.55
+          },
+          {
+            "color": "rgb(69, 146, 198)",
+            "offset": 0.6
+          },
+          {
+            "color": "rgb(59, 138, 194)",
+            "offset": 0.65
+          },
+          {
+            "color": "rgb(49, 129, 189)",
+            "offset": 0.7
+          },
+          {
+            "color": "rgb(41, 120, 184)",
+            "offset": 0.75
+          },
+          {
+            "color": "rgb(32, 111, 178)",
+            "offset": 0.8
+          },
+          {
+            "color": "rgb(25, 102, 171)",
+            "offset": 0.85
+          },
+          {
+            "color": "rgb(18, 92, 164)",
+            "offset": 0.9
+          },
+          {
+            "color": "rgb(14, 83, 154)",
+            "offset": 0.95
+          },
+          {
+            "color": "rgb(10, 74, 144)",
+            "offset": 1
+          }
+        ],
+        "x1": 0,
+        "x2": 0,
+        "y1": 1,
+        "y2": 0
+      },
+      "height": 92.857143,
+      "role": "mark",
+      "stroke": "#333",
+      "strokeWidth": 0.5,
+      "type": "rect",
+      "width": 64.761905,
+      "x": 163.809524,
+      "y": 37.142857
+    },
+    {
+      "fill": {
+        "gradient": "linear",
+        "stops": [
+          {
+            "color": "#eeeeee",
+            "offset": 0
+          },
+          {
+            "color": "#9ecae1",
+            "offset": 0.4
+          },
+          {
+            "color": "#08306b",
+            "offset": 1
+          }
+        ],
+        "x1": 0,
+        "x2": 1,
+        "y1": 0,
+        "y2": 0
+      },
+      "height": 14,
+      "role": "mark",
+      "type": "rect",
+      "width": 100,
+      "x": 10,
+      "y": 8
+    },
+    {
+      "fill": {
+        "gradient": "linear",
+        "stops": [
+          {
+            "color": "rgb(0, 0, 4)",
+            "offset": 0
+          },
+          {
+            "color": "rgb(66, 10, 104)",
+            "offset": 0.2
+          },
+          {
+            "color": "rgb(147, 38, 103)",
+            "offset": 0.4
+          },
+          {
+            "color": "rgb(221, 81, 58)",
+            "offset": 0.6
+          },
+          {
+            "color": "rgb(252, 165, 10)",
+            "offset": 0.8
+          },
+          {
+            "color": "rgb(252, 255, 164)",
+            "offset": 1
+          }
+        ],
+        "x1": 0,
+        "x2": 1,
+        "y1": 0,
+        "y2": 0
+      },
+      "height": 14,
+      "role": "mark",
+      "type": "rect",
+      "width": 100,
+      "x": 130,
+      "y": 8
+    },
+    {
+      "fill": {
+        "gradient": "radial",
+        "stops": [
+          {
+            "color": "#ffffcc",
+            "offset": 0
+          },
+          {
+            "color": "#bd0026",
+            "offset": 1
+          }
+        ]
+      },
+      "role": "mark",
+      "shapeHeight": 30,
+      "shapeLeft": 45,
+      "shapeTop": 95,
+      "shapeWidth": 30,
+      "size": 900,
+      "type": "symbol",
+      "x": 60,
+      "y": 110
+    }
+  ],
+  "scales": {
+    "ramp": {
+      "domain": [
+        0,
+        10
+      ],
+      "range": [
+        "rgb(207, 225, 242)",
+        "rgb(10, 74, 144)"
+      ],
+      "ticks": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10
+      ]
+    },
+    "warm": {
+      "domain": [
+        0,
+        10
+      ],
+      "range": [
+        "rgb(0, 0, 4)",
+        "rgb(252, 255, 164)"
+      ],
+      "ticks": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10
+      ]
+    },
+    "x": {
+      "bandwidth": 64.761905,
+      "domain": [
+        "a",
+        "b",
+        "c"
+      ],
+      "range": [
+        0,
+        240
+      ],
+      "step": 76.190476
+    },
+    "y": {
+      "domain": [
+        0,
+        7
+      ],
+      "range": [
+        130,
+        0
+      ],
+      "ticks": [
+        0,
+        0.5,
+        1,
+        1.5,
+        2,
+        2.5,
+        3,
+        3.5,
+        4,
+        4.5,
+        5,
+        5.5,
+        6,
+        6.5,
+        7
+      ]
+    }
+  },
+  "size": {
+    "height": 140.5,
+    "width": 250
+  },
+  "spec": "gradient-fills.vg.json",
+  "vegaVersion": "6.3.1"
+}

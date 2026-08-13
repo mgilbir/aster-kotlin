@@ -143,6 +143,15 @@ scale output:
 | `dorling-cartogram` | 113 | Vega's Dorling cartogram: states as circles sized by `geoArea` over `albersUsa`, and a size legend whose rows are clipped so its biggest swatches overlap |
 | `geo-points` | 30 | Six cities placed by `geopoint` under three projections at once, joined by rules so a misplaced point moves a line as well as a dot |
 | `airport-connections` | 650 | Vega's airport map: 49 states through `albersUsa`, and a **Voronoi** cell over each of 597 airports so the pointer always has a nearest one — invisible, and compared outline by outline |
+| `mark-join-key` | 23 | a mark `key` collapsing two rows onto one item, as text and as a number, beside a mark with no key that draws every row |
+| `mark-descriptions` | 12 | what a reader is told about a *mark*: a described series, a decorative rule hidden with `aria: false`, and items that name their own role |
+| `axis-discretizing` | 89 | an axis on each of the four discretizing scales, whose ranges are steps rather than colours |
+| `scope-shadowing` | 11 | a group redeclaring a signal and a scale the outer scope already has, and an inner group shadowing the shadow |
+| `timeunit-dst-scale` | 37 | hourly readings bucketed by local and by UTC hours across the spring change, ticked by a two-hour interval |
+| `legend-discretizing` | 71 | the stacked colour bar each discretizing scale is legended as, and the same scale asked for as symbols labelled by range |
+| `impute-pivot` | 41 | a missing series filled in before stacking, and the same table pivoted so a column is named by the data |
+| `nest-treemap` | 28 | a hierarchy built from a flat table by nesting two keys, sized by a treemap that sorts its nodes by their own totals |
+| `hierarchy-options` | 40 | the pack, partition and tree layouts with their own options: a radius column, rounding, padding, the cluster method, separation off, and output names of the specification's choosing |
 
 The gate is wired into `./scripts/oracle.sh`, so every further scale, mark and transform is built
 against a harness that can say we are wrong — which golden tests cannot.
@@ -201,7 +210,7 @@ substantive compatibility items:
 | 6. View and Compose APIs | Yes |
 | 7. SVG, PNG, PDF export | Yes |
 | 8. TalkBack can describe and navigate | Partial — virtual nodes are tested by instrumentation, not with TalkBack itself |
-| 9. At least 100 compatibility fixtures pass | **Yes** — 148 |
+| 9. At least 100 compatibility fixtures pass | **Yes** — 166 |
 | 10. Core runtime has no Android dependency | Yes |
 | 11. Renders without WebView | Yes |
 | 12. Build and test loop runs from the terminal | Yes |
@@ -4188,25 +4197,51 @@ depends on them. Each has a test and a comment; this is the index.
 
 ## Next three tasks
 
-1. **What the interaction system still does not do.** The chain works end to end and three things
-   inside it are stubbed rather than finished: a `debounce` fires on every event instead of after
-   the quiet period, because nothing schedules; a `{"signal": "..."}` or `{"scale": "..."}` source
-   parses but only ever fires from a real event; and an `encode` handler, which sets properties on
-   the event's own mark rather than a signal, is reported and does nothing. The first needs a
-   scheduler the controller does not have; the second needs a signal to notice its own change; the
-   third needs the compiler to hand back a mutable node. All three are reported by name today.
+1. **What the interaction system still does not do.** Two things, and they are the same thing: a
+   `debounce` fires on every event instead of after the quiet period, and a **timer** stream never
+   fires at all. Both need something that can wake up later, which the controller does not have. Both
+   are reported by name — the timer only since `config.events` was implemented, because until then it
+   read as a view event of type `timer` that nothing ever raises, so the signal simply never changed
+   and said nothing about why.
+
+   Two came off this list. A handler sourced on **another signal** now fires and cascades: 79 handlers
+   across twenty of Vega's 93 examples use it, which is every pan, zoom and brush in the gallery. And
+   an **`encode` handler** now overlays a named block on the event's own item, which needed the event
+   functions — `item()`, `x()`, `y()`, `xy()` — that were missing under it; `x()` alone is forty uses
+   across the corpus. What is left needs a *scheduler*, and the note in HANDOFF.md on
+   `donut-chart-labelled` argues that the commonest use of a timer is a bounded loop that can be run
+   to convergence at compile time instead — which is now the same machinery the signal cascade uses.
+
+   A fourth came off this list: a handler sourced on **another signal** now fires and cascades. It
+   was the largest of the four by a distance — 79 handlers across twenty of Vega's 93 examples use
+   it, which is every pan, zoom and brush in the gallery — and the least visible, because nothing
+   fires at initialization and the differential harness only ever sees the initial scene. A handler
+   sourced on a **scale** is still reported: a recompile rebuilds every scale, so nothing here says
+   which one moved, and no published example asks for it.
 2. **The fixture descriptions are written for the wrong reader.** Now that a chart's
    `description` is announced, the corpus's own prose is what TalkBack says first — and it was
    written for a developer reading the corpus: "so both legend forms and both placement axes are
    covered". That is the right sentence in the wrong place. Either the fixtures grow a second,
    reader-facing description, or the demo's bundled specifications stop being fixture files. The
    engine is not at fault; the demo reads badly and a user would notice before any of us did.
-3. **Keep growing the fixture corpus.** The brief's 100 is reached; the corpus is now aimed at the three categories the brief used to rule out. Aiming it at *combinations* the
+3. **Keep growing the fixture corpus.** The next candidates come from a mechanical check rather than
+   from taste: of the 49 transforms implemented, `impute`, `nest` and `pivot` had **no fixture at
+   all** and are now covered, `label` cannot have one (its occupancy bitmap has no upstream
+   reference), and fourteen more — `countpattern`, `cross`, `crossfilter`, `geojson`, `graticule`,
+   `identifier`, `kde`, `loess`, `pack`, `partition`, `resolvefilter`, `sample`, `treemap`,
+   `voronoi` — are exercised by exactly **one** fixture each. One is enough to catch a transform that
+   does nothing and not enough to catch one whose options are ignored, which is precisely what
+   `nest-treemap` found: `sort` on a hierarchy layout read the field off the *row* instead of the
+   node, so a chart asking for its biggest group first got its groups in data order. The brief's 100 is reached; the corpus is now aimed at the three categories the brief used to rule out. Aiming it at *combinations* the
    engine has not met rather than at more variations of a single feature is what makes it find
-   things: that is how `scale()` in an expression turned up missing. Untried combinations that
-   remain include an axis on a discretizing scale, a group whose signals shadow the outer scope's,
-   and a `timeunit` transform feeding a `time` scale across the same daylight-saving boundary the
-   `local-time-dst` fixture crosses.
+   things: that is how `scale()` in an expression turned up missing. The three combinations named here last time are
+   now fixtures, and two of the three failed on arrival: an axis on a **discretizing** scale was
+   skipped outright with a diagnostic, and a `tickCount` written as a time **interval** was dropped in
+   silence. The third, a group shadowing the outer scope's signals and scales, passed unchanged. Two
+   further bugs fell out of the first: a `bin-ordinal` domain taken from a field kept its duplicates,
+   so the lowest bin was painted with the highest bucket's colour, and every interval name in the
+   plural — `"hours"`, `"minutes"`, `"seconds"` — matched nothing, which `nice` had been getting wrong
+   too.
 
 Faceting came off this list by being finished, and what it leaves at the front of the Vega-Lite
 work is the **composite-mark normalizer** — `boxplot`, `errorbar` and `errorband`, which upstream
