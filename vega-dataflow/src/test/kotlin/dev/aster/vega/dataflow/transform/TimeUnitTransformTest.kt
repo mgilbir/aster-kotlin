@@ -180,11 +180,21 @@ class TimeUnitTransformTest {
   }
 
   @Test
-  fun `inferring units from the data is reported rather than guessed`() {
-    val (_, diagnostics) = bucket("""[]""")
+  fun `units are inferred, and only an empty table leaves nothing to infer from`() {
+    // The inference used to be reported as unimplemented. Over rows it now chooses its own units;
+    // what is left to report is the one case upstream cannot answer either — no `units`, no
+    // `extent`, and no dated row to take a span from.
+    val over = bucket("""[]""")
+    assertTrue(over.second.diagnostics.isEmpty(), over.second.diagnostics.toString())
+    assertTrue(over.first.isNotEmpty())
+
+    val context = Context()
+    val params =
+      VegaJson.parse("""{"type": "timeunit", "field": "d", "timezone": "utc"}""") as VegaValue.Obj
+    TimeUnitTransform.apply(emptyList(), params, context)
     assertTrue(
-      diagnostics.diagnostics.any { it.message.contains("inferring them") },
-      diagnostics.diagnostics.toString(),
+      context.diagnostics.diagnostics.any { it.message.contains("no dated rows") },
+      context.diagnostics.diagnostics.toString(),
     )
   }
 }

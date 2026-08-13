@@ -982,8 +982,20 @@ public class AxisBuilder(
             scale.domain,
             linear = false,
           )
+        // A time scale labels each tick at its own granularity — a January tick carries the year —
+        // *unless* the axis names a format, which then applies to every tick alike. The linear
+        // branch
+        // above has always made that distinction and this one had not, so an explicit `%b` on a
+        // time
+        // axis was ignored and every label came back multi-formatted.
+        val format = labeller(scale, count, specifier, spec.formatType)
         scale.ticks(count).zip(scale.tickLabels(count)).map { (value, label) ->
-          Tick(label, scale.apply(value), VegaValue.Num(value))
+          Tick(
+            if (specifier == null && spec.formatType == null) label
+            else format(VegaValue.Num(value)),
+            scale.apply(value),
+            VegaValue.Num(value),
+          )
         }
       }
       else -> null

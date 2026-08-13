@@ -137,9 +137,15 @@ internal object GuideCaption {
       is PointScale -> discrete(scale.domain.map { spoken(it, format, formatType) })
       is OrdinalScale -> discrete(scale.domain.map { spoken(it, format, formatType) })
       is TimeScale -> {
-        val suffix = if (scale.zone == TimeZone.UTC) " UTC" else ""
-        val from = TimeFormat.format(scale.domain.first(), DATE_PATTERN, scale.zone)
-        val to = TimeFormat.format(scale.domain.last(), DATE_PATTERN, scale.zone)
+        // A named format wins over the full date, expanded the way a caption expands one: a `%b`
+        // axis
+        // is *described* as "January" while its labels say "Jan". Without a format the whole
+        // timestamp is read out, and then it carries its zone — a caption that reads out a time
+        // should say which clock it is on.
+        val pattern = format?.replace("%a", "%A")?.replace("%b", "%B")
+        val suffix = if (pattern == null && scale.zone == TimeZone.UTC) " UTC" else ""
+        val from = TimeFormat.format(scale.domain.first(), pattern ?: DATE_PATTERN, scale.zone)
+        val to = TimeFormat.format(scale.domain.last(), pattern ?: DATE_PATTERN, scale.zone)
         "values from $from$suffix to $to$suffix"
       }
       is TransformedScale ->

@@ -7,6 +7,7 @@ import dev.aster.vega.model.time.DateValues
 import dev.aster.vega.model.time.TimeFormat
 import dev.aster.vega.model.time.TimeInterval
 import dev.aster.vega.model.time.TimeStepper
+import kotlin.math.pow
 import kotlinx.datetime.DateTimeUnit
 import kotlinx.datetime.LocalDate
 import kotlinx.datetime.LocalDateTime
@@ -71,14 +72,26 @@ public object TimeUnitTransform : Transform {
       return input
     }
 
-    val units = params.stringList("units")
+    val declared = params.stringList("units")
+    val inferred =
+      if (declared.isNotEmpty()) null
+      else {
+        val instants = input.mapNotNull {
+          (DateValues.parse(it.field(fieldPath)) as? VegaValue.Num)?.value?.takeIf { v ->
+            v.isFinite()
+          }
+        }
+        val stated = params.numberList("extent")
+        val extent =
+          if (stated.size >= 2) stated[0] to stated[1]
+          else if (instants.isEmpty()) null else instants.min() to instants.max()
+        extent?.let { timeBin(it.first, it.second, params.number("maxbins")?.toInt() ?: 40) }
+      }
+    val units = declared.ifEmpty { inferred?.first ?: emptyList() }
     if (units.isEmpty()) {
-      // Upstream infers units from the data extent and `maxbins`. Inferring differently would
-      // bucket
-      // the same data differently, so this asks rather than guessing.
       context.diagnostics.error(
-        DiagnosticCodes.TRANSFORM_NOT_IMPLEMENTED,
-        "timeunit needs explicit 'units'; inferring them from the data extent is not implemented",
+        DiagnosticCodes.TRANSFORM_INVALID_PARAMETER,
+        "timeunit has no 'units' and no dated rows to infer them from",
         operator = type,
       )
       return input
@@ -126,6 +139,10 @@ public object TimeUnitTransform : Transform {
       }
 
     val present = units.toSet()
+    // A declared `step` applies to whatever units were declared; an inferred one comes with the
+    // units it was chosen for, and upstream does not let the two mix — `inferUnits` overrides a
+    // step outright.
+    val step = (inferred?.second ?: params.number("step")?.toInt() ?: 1).coerceAtLeast(1)
     val stepper = finestStepper(present, zone)
     val names = params.stringList("as")
     val startName = names.getOrNull(0) ?: "unit0"
@@ -138,8 +155,8 @@ public object TimeUnitTransform : Transform {
       if (instant == null || !instant.isFinite()) {
         datum.withFields(mapOf(startName to VegaValue.Null, endName to VegaValue.Null))
       } else {
-        val start = floor(instant, present, zone)
-        val end = stepper.offset(start, 1)
+        val start = floor(instant, present, zone, step)
+        val end = stepper.offset(start, step)
         if (start < lowest) lowest = start
         if (end > highest) highest = end
         datum.withFields(mapOf(startName to VegaValue.Num(start), endName to VegaValue.Num(end)))
@@ -156,7 +173,7 @@ public object TimeUnitTransform : Transform {
           linkedMapOf(
             "unit" to VegaValue.Str(finestOf(present)),
             "units" to VegaValue.Arr(units.map { VegaValue.Str(it) }),
-            "step" to VegaValue.Num(params.number("step") ?: 1.0),
+            "step" to VegaValue.Num(step.toDouble()),
             "start" to VegaValue.Num(if (lowest.isFinite()) lowest else Double.NaN),
             "stop" to VegaValue.Num(if (highest.isFinite()) highest else Double.NaN),
           )
@@ -165,6 +182,93 @@ public object TimeUnitTransform : Transform {
     }
     return bucketed
   }
+
+  /**
+   * `timeBin`: the units and step a span of time falls into, when the specification names none.
+   *
+   * A table of seventeen intervals from a second to a year, chosen by which one's duration is
+   * nearest the span divided by `maxbins` — *nearest in ratio*, not in difference, which is why the
+   * choice between two neighbouring intervals compares `target / lower` against `upper / target`.
+   * Off the ends of the table the step comes from d3's own tick step instead: years above it,
+   * milliseconds below.
+   *
+   * Ported rather than approximated because the buckets are the data: a chart that inferred hours
+   * where upstream inferred six-hour blocks is a different chart, not a rounder one.
+   */
+  private fun timeBin(low: Double, high: Double, maxbins: Int): Pair<List<String>, Int> {
+    val target = kotlin.math.abs(high - low) / maxbins.coerceAtLeast(1)
+    val index =
+      BIN_INTERVALS.indexOfFirst { it.third > target }
+        .let {
+          if (it < 0) BIN_INTERVALS.size else it
+        }
+    return when {
+      index == BIN_INTERVALS.size ->
+        listOf("year") to
+          maxOf(1, tickStep(low / DURATION_YEAR, high / DURATION_YEAR, maxbins).toInt())
+      index > 0 -> {
+        val lower = BIN_INTERVALS[index - 1]
+        val upper = BIN_INTERVALS[index]
+        val chosen = if (target / lower.third < upper.third / target) lower else upper
+        chosen.first to chosen.second
+      }
+      else -> MILLI_UNITS to maxOf(1, tickStep(low, high, maxbins).toInt())
+    }
+  }
+
+  /**
+   * d3's `tickStep`, transcribed, because this module cannot reach the scale package.
+   *
+   * The three thresholds are `sqrt(50)`, `sqrt(10)` and `sqrt(2)`: the geometric midpoints between
+   * 1, 2, 5 and 10, so a step is rounded to whichever of those it is nearest *in ratio*.
+   */
+  private fun tickStep(start: Double, stop: Double, count: Int): Double {
+    val step0 = kotlin.math.abs(stop - start) / maxOf(1, count)
+    if (!step0.isFinite() || step0 == 0.0) return 1.0
+    var step1 = 10.0.pow(kotlin.math.floor(kotlin.math.log10(step0)))
+    val error = step0 / step1
+    if (error >= kotlin.math.sqrt(50.0)) step1 *= 10.0
+    else if (error >= kotlin.math.sqrt(10.0)) step1 *= 5.0
+    else if (error >= kotlin.math.sqrt(2.0)) step1 *= 2.0
+    return step1
+  }
+
+  private const val DURATION_SECOND = 1000.0
+  private const val DURATION_MINUTE = DURATION_SECOND * 60
+  private const val DURATION_HOUR = DURATION_MINUTE * 60
+  private const val DURATION_DAY = DURATION_HOUR * 24
+  private const val DURATION_WEEK = DURATION_DAY * 7
+  private const val DURATION_MONTH = DURATION_DAY * 30
+  private const val DURATION_YEAR = DURATION_DAY * 365
+
+  private val MILLI_UNITS =
+    listOf("year", "month", "date", "hours", "minutes", "seconds", "milliseconds")
+  private val SECOND_UNITS = MILLI_UNITS.dropLast(1)
+  private val MINUTE_UNITS = SECOND_UNITS.dropLast(1)
+  private val HOUR_UNITS = MINUTE_UNITS.dropLast(1)
+  private val DAY_UNITS = HOUR_UNITS.dropLast(1)
+
+  /** Upstream's table: the units, the step, and how long one bucket lasts. */
+  private val BIN_INTERVALS: List<Triple<List<String>, Int, Double>> =
+    listOf(
+      Triple(SECOND_UNITS, 1, DURATION_SECOND),
+      Triple(SECOND_UNITS, 5, 5 * DURATION_SECOND),
+      Triple(SECOND_UNITS, 15, 15 * DURATION_SECOND),
+      Triple(SECOND_UNITS, 30, 30 * DURATION_SECOND),
+      Triple(MINUTE_UNITS, 1, DURATION_MINUTE),
+      Triple(MINUTE_UNITS, 5, 5 * DURATION_MINUTE),
+      Triple(MINUTE_UNITS, 15, 15 * DURATION_MINUTE),
+      Triple(MINUTE_UNITS, 30, 30 * DURATION_MINUTE),
+      Triple(HOUR_UNITS, 1, DURATION_HOUR),
+      Triple(HOUR_UNITS, 3, 3 * DURATION_HOUR),
+      Triple(HOUR_UNITS, 6, 6 * DURATION_HOUR),
+      Triple(HOUR_UNITS, 12, 12 * DURATION_HOUR),
+      Triple(DAY_UNITS, 1, DURATION_DAY),
+      Triple(listOf("year", "week"), 1, DURATION_WEEK),
+      Triple(listOf("year", "month"), 1, DURATION_MONTH),
+      Triple(listOf("year", "month"), 3, 3 * DURATION_MONTH),
+      Triple(listOf("year"), 1, DURATION_YEAR),
+    )
 
   /** The finest unit named, which is the one a bucket is a bucket *of*. */
   private fun finestOf(units: Set<String>): String = KNOWN.last { it in units }
@@ -175,12 +279,27 @@ public object TimeUnitTransform : Transform {
    * Everything absent falls back to its origin — month and day to the first, time to midnight, and
    * the year to [CYCLE_YEAR] — which is what turns a units list into a bucket.
    */
-  private fun floor(instant: Double, units: Set<String>, zone: TimeZone): Double {
+  /**
+   * Applies `step` to the **finest** unit only, which is upstream's `getUnit`.
+   *
+   * `phase` is 1 for the units counted from one rather than from zero — a month, a date, a day of
+   * the year — because `3 * floor(month / 3)` would put January in a bucket starting at month zero,
+   * which is December of the year before. Only the finest unit is stepped: a `{year, month}` bucket
+   * at step 3 is a quarter, not three years of quarters.
+   */
+  private fun stepped(value: Int, step: Int, phase: Int): Int {
+    if (step <= 1) return value
+    return phase + step * kotlin.math.floor((value - phase).toDouble() / step).toInt()
+  }
+
+  private fun floor(instant: Double, units: Set<String>, zone: TimeZone, step: Int = 1): Double {
     val at = TimeFormat.at(instant, zone)
-    val year = if ("year" in units) at.year else CYCLE_YEAR
+    val finest = KNOWN.last { it in units }
+    fun stepOf(unit: String) = if (unit == finest) step else 1
+    val year = if ("year" in units) stepped(at.year, stepOf("year"), phase = 0) else CYCLE_YEAR
     val month =
       when {
-        "month" in units -> at.month.number
+        "month" in units -> stepped(at.month.number, stepOf("month"), phase = 1)
         // A quarter is the first month of the three it covers.
         "quarter" in units -> (at.month.number - 1) / 3 * 3 + 1
         else -> 1
@@ -217,11 +336,16 @@ public object TimeUnitTransform : Transform {
         .toEpochMilliseconds()
         .toDouble()
     }
-    val day = if ("date" in units) at.day else 1
-    val hour = if ("hours" in units) at.hour else 0
-    val minute = if ("minutes" in units) at.minute else 0
-    val second = if ("seconds" in units) at.second else 0
-    val nanos = if ("milliseconds" in units) at.nanosecond / 1_000_000 * 1_000_000 else 0
+    val day = if ("date" in units) stepped(at.day, stepOf("date"), phase = 1) else 1
+    val hour = if ("hours" in units) stepped(at.hour, stepOf("hours"), phase = 0) else 0
+    val minute = if ("minutes" in units) stepped(at.minute, stepOf("minutes"), phase = 0) else 0
+    val second = if ("seconds" in units) stepped(at.second, stepOf("seconds"), phase = 0) else 0
+    val nanos =
+      if ("milliseconds" in units) {
+        stepped(at.nanosecond / 1_000_000, stepOf("milliseconds"), phase = 0) * 1_000_000
+      } else {
+        0
+      }
 
     // A day-of-month carried onto a different month can be out of range — 31 January bucketed by
     // {year, date} into a 30-day month. Clamping keeps a valid date rather than throwing.

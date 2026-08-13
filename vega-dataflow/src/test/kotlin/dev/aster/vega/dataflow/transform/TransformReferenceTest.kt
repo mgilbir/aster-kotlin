@@ -10,6 +10,7 @@ import dev.aster.vega.model.DiagnosticCodes
 import dev.aster.vega.model.DiagnosticCollector
 import dev.aster.vega.model.VegaJson
 import dev.aster.vega.model.VegaValue
+import dev.aster.vega.model.asDouble
 import dev.aster.vega.model.asString
 import dev.aster.vega.model.field
 import org.junit.jupiter.api.Assertions.assertEquals
@@ -111,6 +112,75 @@ class TransformReferenceTest {
       ),
     )
   }
+
+  /**
+   * `timeunit` choosing its own units, and honouring a step.
+   *
+   * Both were gaps of a kind: the inference was reported as unimplemented, and `step` was
+   * *published* in the transform's own signal while the buckets ignored it — so `step: 3` bucketed
+   * by month and said it had bucketed by quarter.
+   *
+   * The inference is a table of seventeen intervals picked by which one's duration is nearest the
+   * span over `maxbins` — nearest **in ratio**, not in difference. Ninety days at the default 40
+   * bins gives days; the same ninety days at four bins gives months. Upstream, on the same rows:
+   * ```
+   * 3 months of days => ["date",["year","month","date"],1]
+   * 2 days hourly    => ["hours",["year","month","date","hours"],1]
+   * maxbins 4        => ["month",["year","month"],1]
+   * ```
+   */
+  @Test
+  fun `timeunit infers its units and honours a step`() {
+    val start = 1704067200000L // 2024-01-01T00:00:00Z
+    // rows, spacing, maxbins, declared step, expected finest unit, expected end of the first bucket
+    val cases =
+      listOf(
+        // 90 daily rows: days.
+        Case(90, 86_400_000L, 40, null, "date", "2024-01-02T00:00:00Z"),
+        // The same span asked to fit four buckets: months.
+        Case(90, 86_400_000L, 4, null, "month", "2024-02-01T00:00:00Z"),
+        // 48 hourly rows: hours.
+        Case(48, 3_600_000L, 40, null, "hours", "2024-01-01T01:00:00Z"),
+        // 60 monthly rows: months.
+        Case(60, 2_592_000_000L, 40, null, "month", "2024-02-01T00:00:00Z"),
+        // A declared unit with a step of three is a quarter, and its bucket is three months wide.
+        Case(12, 2_592_000_000L, 40, 3, "month", "2024-04-01T00:00:00Z"),
+      )
+    for (case in cases) {
+      val rows =
+        (0 until case.rows).joinToString(",", "[", "]") {
+          """{"t": ${start + it * case.spacing}}"""
+        }
+      val declared =
+        if (case.step == null) "" else ""","units": ["year", "month"], "step": ${case.step}"""
+      val output =
+        run(
+          """[{"type": "timeunit", "field": "t", "timezone": "utc", "maxbins": ${case.maxbins},
+              "signal": "tb"$declared}]""",
+          rows,
+        )
+      assertEquals(
+        case.unit,
+        (context.signals["tb"]?.field("unit") as? VegaValue.Str)?.value,
+        case.toString(),
+      )
+      val firstEnd = (VegaJson.parse(output) as VegaValue.Arr).values.first().field("unit1")
+      assertEquals(
+        case.end,
+        kotlin.time.Instant.fromEpochMilliseconds(firstEnd.asDouble().toLong()).toString(),
+        case.toString(),
+      )
+    }
+  }
+
+  private data class Case(
+    val rows: Int,
+    val spacing: Long,
+    val maxbins: Int,
+    val step: Int?,
+    val unit: String,
+    val end: String,
+  )
 
   private fun run(transforms: String, data: String = base): String {
     context = TestContext()

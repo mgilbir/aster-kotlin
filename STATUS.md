@@ -21,7 +21,7 @@ end to end — expressions, signals, 33 of upstream's 40 data transforms, every 
 and an event handler that recompiles the chart — and are verified against upstream Vega by
 differential tests.
 
-One hundred and thirty-five differential fixtures pass, all matching upstream exactly on every mark and
+One hundred and thirty-six differential fixtures pass, all matching upstream exactly on every mark and
 scale output:
 
 | Fixture | Marks | Covers |
@@ -201,7 +201,7 @@ substantive compatibility items:
 | 6. View and Compose APIs | Yes |
 | 7. SVG, PNG, PDF export | Yes |
 | 8. TalkBack can describe and navigate | Partial — virtual nodes are tested by instrumentation, not with TalkBack itself |
-| 9. At least 100 compatibility fixtures pass | **Yes** — 135 |
+| 9. At least 100 compatibility fixtures pass | **Yes** — 136 |
 | 10. Core runtime has no Android dependency | Yes |
 | 11. Renders without WebView | Yes |
 | 12. Build and test loop runs from the terminal | Yes |
@@ -538,7 +538,7 @@ each example a deadline.
 
 ## Known failing fixtures
 
-None. One hundred and thirty-five fixtures exist and all of them pass — and that sentence became worth
+None. One hundred and thirty-six fixtures exist and all of them pass — and that sentence became worth
 something only once the gate could no longer skip itself, below.
 
 **The gate could report success without running.** `FixtureDifferentialTest` reads the fixtures and
@@ -1833,6 +1833,40 @@ was the same case.
 Found by an axis, not by a formatting test: a `,` specifier over a domain of a million resolves to one
 significant figure, and one significant figure of 200,000 is `2e+5`. Six vectors for it now, including
 the two forms — `,.1` and `,.2e` — that reach exponential notation by different routes.
+
+## `timeunit` picks its own buckets, and its `step` was published but not applied
+
+Two gaps in one transform, and only one of them was on the list.
+
+**The inference** was reported as unimplemented, and it is a table: seventeen intervals from a second
+to a year, chosen by which one's duration is nearest the data's span divided by `maxbins` — *nearest in
+ratio*, not in difference, which is why choosing between two neighbouring intervals compares
+`target / lower` against `upper / target`. Off the ends of the table the step comes from d3's own tick
+step instead: years above, milliseconds below. Ninety daily rows at the default forty bins give days;
+the same ninety asked to fit four give months.
+
+**The step was worse, because it was silent.** `step` was read, published in the transform's own
+signal, and never applied: `step: 3` bucketed by month and then announced that it had bucketed by
+quarter. It applies to the **finest** unit only — a `{year, month}` bucket at step 3 is a quarter, not
+three years of quarters — with a phase of 1 for the units counted from one rather than zero, because
+`3 * floor(month / 3)` puts January in a bucket starting at month zero, which is December of the year
+before.
+
+## An explicit format on a time axis was ignored
+
+The fixture for the above wanted `"format": "%b"` on a `utc` axis and got `2024`, `February`, `March`
+— the multi-format, which writes each tick at its own granularity and carries the year on the first
+one of a year. A named format should replace that for every tick alike.
+
+The linear branch of the tick generator had always made that distinction and the **time** branch never
+had: it took `scale.tickLabels(count)` unconditionally, so an axis that named a format was labelled as
+if it had not. The accessibility caption had the same hole, one layer down — it read the whole
+timestamp out where upstream describes a `%b` axis as "January to March", expanding the abbreviating
+directive as it does everywhere else.
+
+Neither would have been found by the fixture the property belonged to. Both were found because a
+fixture *about something else* happened to put a format on a time axis, which is the argument for
+writing fixtures that combine features rather than isolate them.
 
 ## Performance observations
 
