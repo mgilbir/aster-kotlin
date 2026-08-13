@@ -485,14 +485,38 @@ internal class DataPipeline(
       // `[...stackby, ...facetby]` — concatenated, not merged. A field that is both a series and
       // a facet is named twice, and the two lists are what upstream writes.
       imputeGroupby = stackBy + view.facetFields,
+      // A **bucketed** dimension is imputed at its midpoint, a bucket being two columns and an
+      // imputation keying on one.
       imputeKeys =
         if (stack.impute) {
           stack.groupbyChannels.mapNotNull {
-            view.spec.fieldDef(it)?.let { d -> Fields.vgField(d) }
+            view.spec.fieldDef(it)?.let { d ->
+              Fields.vgField(d, suffix = if (d.bin is Binning.Bin) "mid" else null)
+            }
           }
         } else {
           emptyList()
         },
+      imputeFormulas =
+        if (!stack.impute) emptyList()
+        else
+          stack.groupbyChannels.mapNotNull { channel ->
+            val dimension = view.spec.fieldDef(channel) ?: return@mapNotNull null
+            if (dimension.bin !is Binning.Bin) return@mapNotNull null
+            val start = Fields.datumAccess(dimension)
+            val end = Fields.datumAccess(dimension, suffix = "end")
+            val near = dimension.raw.number("bandPosition") ?: 0.5
+            obj {
+              put("type", "formula")
+              put(
+                "expr",
+                "isValid($start) && isFinite(+$start) ? " +
+                  "${Fields.expressionNumber(near)}*$start+" +
+                  "${Fields.expressionNumber(1 - near)}*$end : $start",
+              )
+              put("as", Fields.vgField(dimension, suffix = "mid", forAs = true))
+            }
+          },
       component =
         "${stack.stackBy.map { it.raw }}|" +
           "${stack.groupbyChannels.map { view.spec.encoding[it]?.raw }}",
@@ -549,10 +573,12 @@ internal class DataPipeline(
    */
   private fun userTransforms(head: DataNode): DataNode {
     var last = head
-    for (transform in
-      Transforms(diagnostics, registerLookup, view::prefixed)
-        .translate(view.spec.transforms, "$.transform")) {
-      last = last.then(PassThroughNode(listOf(transform)))
+    val transforms = Transforms(diagnostics, registerLookup, view::prefixed)
+    view.spec.transforms.forEachIndexed { index, transform ->
+      val path = "$.transform[$index]"
+      for (emitted in transforms.translateAt(transform, path)) {
+        last = last.then(PassThroughNode(listOf(emitted)))
+      }
     }
     return last
   }

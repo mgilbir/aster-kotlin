@@ -1320,6 +1320,14 @@ internal object Marks {
         (def.timeUnit != null &&
           def.type == MeasureType.TEMPORAL &&
           bandPosition(view, def, view.spec.encoding[secondaryChannel(channel) ?: ""]) != null)
+    // Under an **imputed** stack the midpoint is already a column: the imputation had to compute it
+    // to key on, so the mark reads it rather than working it out again.
+    if (bucketed && view.stack?.impute == true) {
+      return obj {
+        put("scale", scaleName(view, mainChannel(channel)))
+        put("field", Fields.vgField(def, suffix = "mid"))
+      }
+    }
     if (bucketed && scaleType != null && !Scales.hasDiscreteDomain(scaleType)) {
       // The middle of a bucket has to be computed from both edges, since only the edges are fields.
       val position = bandPosition(view, def) ?: 0.5

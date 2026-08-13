@@ -2006,6 +2006,21 @@ group from the scene**. The compiler emits exactly what upstream emits — the s
 comparison covers it — and the scene comes out one group short, so the fixture is written without
 that block and the case is recorded here rather than passed off as working.
 
+### A bucket imputed at its middle
+
+An imputation fills the gaps in one column keyed on another, and a bucket is *two* columns — so
+`StackNode.assemble` computes the point between them into a column of its own and keys on that.
+Without it the imputation keyed on the bucket's near edge, which is a different set of keys from the
+one the stack groups by, and a stacked area over a binned column had gaps its own grouping could not
+see. The mark then reads that same column rather than working the midpoint out again: it is already
+there, because the imputation had to have it.
+
+The fixture written for it named another runtime gap. A path mark whose rows include a value no
+scale can place keeps those rows — that is what `break-paths-show-domains` means — and the *scene*
+is supposed to leave them out of the path, which is what the mark's `defined` says. This runtime
+includes them, so an area over a column with nulls in it is drawn through points upstream omits. The
+fixture is written over a column with no nulls rather than passed off as working.
+
 ### Two runtime gaps this batch names but does not close
 
 `density`'s fixture is not in the corpus, and `trail`'s draws no legend. Both compile exactly as

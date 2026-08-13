@@ -523,18 +523,28 @@ internal class StackNode(
    * either into one drew the second plot from the first plot's accumulation.
    */
   val component: String = "",
+  /**
+   * The midpoint columns an imputation over a **binned** dimension has to write first.
+   *
+   * An imputation fills the gaps in one column keyed on another, and a bucket is two columns — so
+   * upstream computes the point between them and keys on that. Without it the impute keyed on the
+   * bucket's near edge, which is a different set of keys from the one the stack groups by.
+   */
+  val imputeFormulas: List<VegaValue> = emptyList(),
 ) : DataNode() {
   fun transforms(): List<VegaValue> =
-    imputeKeys.map { key ->
-      obj {
-        put("type", "impute")
-        put("field", field)
-        put("groupby", strings(imputeGroupby))
-        put("key", key)
-        put("method", "value")
-        put("value", 0)
-      }
-    } + transform()
+    imputeFormulas +
+      imputeKeys.map { key ->
+        obj {
+          put("type", "impute")
+          put("field", field)
+          put("groupby", strings(imputeGroupby))
+          put("key", key)
+          put("method", "value")
+          put("value", 0)
+        }
+      } +
+      transform()
 
   private fun transform(): VegaValue = obj {
     put("type", "stack")

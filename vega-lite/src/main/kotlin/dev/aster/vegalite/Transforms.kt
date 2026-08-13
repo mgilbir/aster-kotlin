@@ -173,6 +173,10 @@ internal class Transforms(
     return out
   }
 
+  /** One transform, for a caller that walks the list itself to give a step a node of its own. */
+  fun translateAt(transform: VegaValue, path: String): List<VegaValue> =
+    translateOne(transform, path)
+
   private fun translateOne(transform: VegaValue, path: String): List<VegaValue> =
     when {
       transform.has("calculate") ->
