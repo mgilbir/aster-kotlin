@@ -88,8 +88,14 @@ public class ScaleResolver(
       ScaleType.POW -> buildPow(spec, defaultExponent = 1.0)
       ScaleType.SQRT -> buildPow(spec, defaultExponent = 0.5)
       ScaleType.SYMLOG -> buildSymlog(spec)
-      ScaleType.TIME -> buildTime(spec, TimeZone.currentSystemDefault())
-      ScaleType.UTC -> buildTime(spec, TimeZone.UTC)
+      // A **time** scale with a colour range is a colour scale as much as a linear one is: the
+      // domain is still a pair of instants and the ramp is still walked between them, and a chart
+      // that shades its lines by quarter asks for exactly that.
+      ScaleType.TIME ->
+        if (hasColorRange(spec)) buildSequentialColor(spec)
+        else buildTime(spec, TimeZone.currentSystemDefault())
+      ScaleType.UTC ->
+        if (hasColorRange(spec)) buildSequentialColor(spec) else buildTime(spec, TimeZone.UTC)
       ScaleType.BAND -> buildBand(spec)
       ScaleType.POINT -> buildPoint(spec)
       ScaleType.ORDINAL -> buildOrdinal(spec)

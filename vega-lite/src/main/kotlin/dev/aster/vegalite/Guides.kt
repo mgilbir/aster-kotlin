@@ -645,7 +645,11 @@ internal object Guides {
         type == "symlog" ||
         type == "time" ||
         type == "utc"
-    val gradient = channel in setOf("color", "fill", "stroke") && continuous
+    // `defaultType`: a colour ramp explains a continuous scale — except over a **quarter**, a
+    // **month** or a **day**, which are continuous in the data and a short list to the reader. Four
+    // quarters are four swatches, not a bar with a gradient along it.
+    val namedUnits = def.timeUnit in setOf("quarter", "month", "day")
+    val gradient = channel in setOf("color", "fill", "stroke") && continuous && !namedUnits
 
     return obj {
       put(scaleChannel, view.scale(channel))
@@ -671,6 +675,12 @@ internal object Guides {
         // so a ramp measured against it came out the wrong length or not at all.
         put("gradientLength", signalRef("clamp(${view.sizeSignal("y")}, 64, 200)"))
       } else {
+        // The type is written only where it *disagrees* with what Vega would pick: a symbol legend
+        // over a continuous colour scale has to say so, and everywhere else a symbol is already
+        // the default and saying it again is noise.
+        if (namedUnits && continuous && channel in setOf("color", "fill", "stroke")) {
+          put("type", "symbol")
+        }
         put("symbolType", defaultSymbolType(view, channel))
       }
       Fields.title(def, view.config)?.let { put("title", it) }

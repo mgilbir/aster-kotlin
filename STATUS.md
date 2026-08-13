@@ -678,7 +678,7 @@ no data is needed to compare two compilers. So every one of them was compiled by
 by this one, and the outputs compared property by property. That is a *measurement*, not a gate: the
 examples are not fixtures here, and nothing about them is checked in.
 
-**124 of 627 matched exactly** at the start, and **482** do now. 16 were refused by name, and of those 8 are geographic,
+**124 of 627 matched exactly** at the start, and **484** do now. 16 were refused by name, and of those 8 are geographic,
 3 are a facet inside a facet, 2 a repeat inside a concatenation, and 2 are the `trail` mark — which
 this runtime draws and this compiler had simply not been told about.
 
@@ -2372,6 +2372,13 @@ examples turned on it.
 upstream compiles them — the specification comparison covers them — and both are drawn differently
 by *this runtime*:
 
+- **A colour ramp over a bucketed instant samples one step out.** A `time` scale with a colour range
+  is now built as the colour scale it is — it was reported as unbuildable, so a line coloured by
+  quarter drew in the mark default and no legend at all — and the shades it produces are one step
+  paler than upstream's. The compiled specification matches upstream property for property, so the
+  difference is in the scale: either the extent this engine samples the scheme over or the fractions
+  the four quarters land at. It has no fixture: the gallery's `line_quarter_legend` covers the
+  compiler's side of it, and a fixture here would pin a colour that is still wrong.
 - **A clipped mark is clipped in its *bounds* and not yet in its drawing.** `boundMark` intersects a
   clipped mark's reach with the group it is drawn in, and that is now done — a plot whose domain a
   brush drives no longer sizes its surface to the rows outside that domain. The renderers still draw

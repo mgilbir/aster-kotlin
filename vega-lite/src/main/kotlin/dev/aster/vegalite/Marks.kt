@@ -1758,14 +1758,20 @@ internal object Marks {
       // and one filling a *fraction* of the band starts half of what is left over in, so the two
       // gaps either side of it match — `(1 - band) / 2`.
       val fraction = relativeBandSize(view, channel)
-      if (scaleType == "band" && centred) put("band", num(0.5))
-      else if (scaleType == "band" && fraction != 1.0) put("band", num((1 - fraction) / 2))
+      // A nested offset moves the mark within its band, which is what puts the second bar of a
+      // group beside the first rather than on top of it.
+      val nested = offsetRef(view, channel, centred)
+      // A centred mark sits in the middle of its band — *unless* an **encoding** has already put it
+      // in the middle of a lane inside that band, where centring again would move it half a group
+      // over. `positionAndSize`: `center ? (offsetType === 'encoding' ? 0 : 0.5) : …`.
+      if (scaleType == "band" && centred && nested == null) put("band", num(0.5))
+      else if (scaleType == "band" && !centred && fraction != 1.0) {
+        put("band", num((1 - fraction) / 2))
+      }
       // A `xOffset`/`yOffset` on the **mark** is a plain nudge, unlike the same name in an
       // encoding: `positionOffset` reads it as a visual offset and adds it to the position.
       markOffset(view, channel)?.let { put("offset", it) }
-      // A nested offset moves the mark within its band, which is what puts the second bar of a
-      // group beside the first rather than on top of it.
-      offsetRef(view, channel, centred)?.let { put("offset", it) }
+      nested?.let { put("offset", it) }
     }
   }
 
