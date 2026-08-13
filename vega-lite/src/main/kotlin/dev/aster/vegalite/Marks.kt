@@ -827,8 +827,12 @@ internal object Marks {
         } else {
           null
         }
-    return if (value == null) VegaValue.EmptyObject
-    else obj { put(vgChannel, obj { put("value", value) }) }
+    if (value == null) return VegaValue.EmptyObject
+    // `signalOrValueRef`: a mark property written as `{"expr": …}` is a **signal**, not a literal —
+    // it is how a chart reads a bound parameter into a graphic property, and written out as a value
+    // it paints the mark with an object.
+    val (key, resolved) = literalRef(value) ?: return VegaValue.EmptyObject
+    return obj { put(vgChannel, obj { put(key, resolved) }) }
   }
 
   /**

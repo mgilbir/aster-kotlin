@@ -266,12 +266,18 @@ internal class DataPipeline(
     return listOf(
       obj {
         put("type", "formula")
-        put("expr", "$before * $offset('$part', datum['$start'], -1) + $after * datum['$start']")
+        put(
+          "expr",
+          "$before * $offset('$part', ${Fields.datumPath(start)}, -1) + $after * ${Fields.datumPath(start)}",
+        )
         put("as", "${start}_offsetted_rect_start")
       },
       obj {
         put("type", "formula")
-        put("expr", "$before * datum['$start'] + $after * datum['$end']")
+        put(
+          "expr",
+          "$before * ${Fields.datumPath(start)} + $after * ${Fields.datumPath(end)}",
+        )
         put("as", "${start}_offsetted_rect_end")
       },
     )
@@ -292,7 +298,7 @@ internal class DataPipeline(
         val offset = if (timeUnit.contains("utc")) "utcOffset" else "timeOffset"
         obj {
           put("type", "formula")
-          put("expr", "$offset('$part', datum['$field'], 1)")
+          put("expr", "$offset('$part', ${Fields.datumPath(field)}, 1)")
           put("as", "${field}_end")
         }
       }

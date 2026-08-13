@@ -91,13 +91,40 @@ private class Compilation(
       selection.intervalTail(view, unit = selection.unitName(), initial = selection.initial)
   }
 
+  /**
+   * The voronoi overlay a `nearest` selection picks through, laid over the marks it was built from.
+   *
+   * Directly **after** the mark it covers, which is where upstream splices it: the cells have to be
+   * over the points to catch the pointer, and under anything drawn later.
+   */
+  private fun withVoronoi(views: List<UnitView>, marks: List<VegaValue>): List<VegaValue> {
+    val overlays = views.mapNotNull { view ->
+      selections
+        .firstOrNull { it.nearest && (it.owner == null || it.owner === view) }
+        ?.voronoiMark(view)
+        ?.let { view.prefixed("marks") to it }
+    }
+    if (overlays.isEmpty()) return marks
+    return marks.flatMap { mark ->
+      val after = overlays.filter { it.first == mark.string("name") }.map { it.second }
+      listOf(mark) + after
+    }
+  }
+
   /** The brush a selection is dragged as, drawn around the marks of the plot that declared it. */
   private fun brushed(views: List<UnitView>, marks: List<VegaValue>): List<VegaValue> {
     val own = selections.filter { it.owner == null || it.owner in views }
     val view = views.firstOrNull() ?: return marks
-    return own.flatMap { it.brushMarks(it.owner ?: view, it.unitName(), background = true) } +
-      marks +
-      own.flatMap { it.brushMarks(it.owner ?: view, it.unitName(), background = false) }
+    // Each brush **wraps** the list rather than joining it: upstream's `marks` hook returns
+    // `[background, ...marks, brush]`, so a second selection's background lands outside the first's
+    // and its outline outside that one's. Two brushes over one plot are drawn in opposite orders
+    // above and below the marks, and that is why.
+    return own.fold(withVoronoi(views, marks)) { inner, selection ->
+      val where = selection.owner ?: view
+      selection.brushMarks(where, selection.unitName(), background = true) +
+        inner +
+        selection.brushMarks(where, selection.unitName(), background = false)
+    }
   }
 
   /** Which of a composition's scales and guides its children share, and which they do not. */

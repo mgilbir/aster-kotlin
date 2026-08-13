@@ -60,6 +60,14 @@ internal object Fields {
     return if (forAs) removePathFromField(resolved) else replacePathInField(resolved)
   }
 
+  /**
+   * `accessWithDatumToUnescapedPath`: `datum['a']` over a column named as it is in the data.
+   *
+   * A single quote in the name would end the string it is written in, so it is escaped — a column
+   * called `monthly(date_trunc('day', date))` is a real one, and reading it needs `\'`.
+   */
+  fun datumPath(field: String): String = "datum['${field.replace("'", "\\'")}']"
+
   /** `datum["mean_b"]`, the accessor an emitted expression uses to read the field. */
   fun datumAccess(def: ChannelDef, suffix: String? = null, datum: String = "datum"): String =
     "$datum[${quoted(removePathFromField(vgField(def, suffix, forAs = true)))}]" + argAccessor(def)

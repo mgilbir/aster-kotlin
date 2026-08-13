@@ -28,6 +28,25 @@ internal class Selection(
   val on: VegaValue,
   val toggle: String?,
   val bindsScales: Boolean,
+  /**
+   * `nearest`: the pick goes to the closest mark rather than to the one under the pointer.
+   *
+   * Vega has no such notion, so it is compiled: a **voronoi** mark is laid over the marks, each of
+   * its cells covering the region closer to one point than to any other, and the selection listens
+   * on that instead. Which is why the events are scoped to it by name — a click anywhere in the
+   * plot lands in some cell, and without the scoping it would also land on the group.
+   */
+  val nearest: Boolean,
+  /**
+   * How the brush is painted — `defaultConfig.interval.mark`, with the selection's own over it.
+   *
+   * Split between the two rects it is drawn as: the fill goes under the marks and everything else
+   * over them, so a stroke can be seen against the data it surrounds.
+   */
+  val brushPaint: VegaValue.Obj,
+  /** The streams a brush is dragged and wheeled by, parsed from their selectors. */
+  val translate: List<VegaValue>,
+  val zoom: List<VegaValue>,
   val clear: String?,
   /** The extent this selection opens with, if it states one — the param's own `value`. */
   val initial: VegaValue? = null,
@@ -140,6 +159,19 @@ internal class Selection(
               else -> "event.shiftKey"
             },
           bindsScales = bind == VegaValue.Str("scales"),
+          nearest = options.fields["nearest"] == VegaValue.Bool(true),
+          brushPaint =
+            obj {
+              put("fill", "#333")
+              put("fillOpacity", 0.125)
+              put("stroke", "white")
+              options.obj("mark")?.fields?.forEach { (key, value) -> put(key, value) }
+            },
+          // `defaultConfig`: a brush is dragged and wheeled unless the selection says otherwise,
+          // and `false` says otherwise — a brush that cannot be moved is a brush that is only ever
+          // drawn afresh.
+          translate = selector(options.fields["translate"], DEFAULT_DRAG, type == "interval"),
+          zoom = selector(options.fields["zoom"], "wheel!", type == "interval"),
           clear =
             when (val stated = options.fields["clear"]) {
               VegaValue.Bool(false) -> null
@@ -159,12 +191,28 @@ internal class Selection(
      * Anything with selector syntax in it is passed through as written, there being no parser here
      * for a grammar Vega already has one for.
      */
+    /** `[pointerdown, window:pointerup] > window:pointermove!` — how a drag is written. */
+    private const val DEFAULT_DRAG = "[pointerdown, window:pointerup] > window:pointermove!"
+
+    /**
+     * An event selector as the streams it stands for, or none where the selection turned it off.
+     */
+    private fun selector(stated: VegaValue?, default: String, applies: Boolean): List<VegaValue> {
+      if (!applies || stated == VegaValue.Bool(false)) return emptyList()
+      val written = (stated as? VegaValue.Str)?.value ?: default
+      return EventSelector.parse(written, source = "scope")
+    }
+
     private fun stream(stated: VegaValue?, type: String): VegaValue {
-      val default = if (type == "point") "click" else null
+      val default = if (type == "point") "click" else DEFAULT_DRAG
       val name = (stated as? VegaValue.Str)?.value ?: default
       if (stated != null && stated !is VegaValue.Str) return stated
-      if (name == null) return VegaValue.Null
-      if (name.any { it in "[],>:!@ " }) return VegaValue.Str(name)
+      // Anything with selector syntax in it is *parsed*, not passed through: a drag is written as
+      // `[pointerdown, pointerup] > pointermove`, and a stream listening for an event of that name
+      // listens for nothing at all.
+      if (name.any { it in "[],>:!@ " }) {
+        return EventSelector.parse(name, source = "scope").firstOrNull() ?: VegaValue.Str(name)
+      }
       return obj {
         put("source", "scope")
         put("type", name)
@@ -340,13 +388,13 @@ internal class Selection(
         ),
       )
     }
-    val onBrush = obj {
-      put("source", "scope")
-      put("type", "pointerdown")
-      // A brush is grabbed **on the brush**; a bound scale is grabbed anywhere in the plot, there
-      // being no rectangle to take hold of.
-      if (!bindsScales) put("markname", brush)
+    // A brush is grabbed **on the brush** — the selector's own streams, each scoped to the brush
+    // mark; a bound scale is grabbed anywhere in the plot, there being no rectangle to take hold
+    // of.
+    val drags = translate.map { stream ->
+      if (bindsScales) stream else scopedTo(stream, brush, onWindowOpener = true)
     }
+    val openers = drags.mapNotNull { (it as? VegaValue.Obj)?.array("between")?.firstOrNull() ?: it }
     out += obj {
       put("name", "${name}_translate_anchor")
       put("value", VegaValue.EmptyObject)
@@ -355,7 +403,7 @@ internal class Selection(
         arr(
           listOf(
             obj {
-              put("events", arr(listOf(onBrush)))
+              put("events", arr(openers))
               put(
                 "update",
                 "{x: x(unit), y: y(unit)" +
@@ -381,30 +429,7 @@ internal class Selection(
         arr(
           listOf(
             obj {
-              put(
-                "events",
-                arr(
-                  listOf(
-                    obj {
-                      put("source", "window")
-                      put("type", "pointermove")
-                      put("consume", VegaValue.Bool(true))
-                      put(
-                        "between",
-                        arr(
-                          listOf(
-                            onBrush,
-                            obj {
-                              put("source", "window")
-                              put("type", "pointerup")
-                            },
-                          )
-                        ),
-                      )
-                    }
-                  )
-                ),
-              )
+              put("events", arr(drags))
               put(
                 "update",
                 "{x: ${name}_translate_anchor.x - x(unit), y: ${name}_translate_anchor.y - y(unit)}",
@@ -414,12 +439,7 @@ internal class Selection(
         ),
       )
     }
-    val onWheel = obj {
-      put("source", "scope")
-      put("type", "wheel")
-      put("consume", VegaValue.Bool(true))
-      if (!bindsScales) put("markname", brush)
-    }
+    val wheels = zoom.map { stream -> if (bindsScales) stream else scopedTo(stream, brush) }
     out += obj {
       put("name", "${name}_zoom_anchor")
       put(
@@ -427,7 +447,7 @@ internal class Selection(
         arr(
           listOf(
             obj {
-              put("events", arr(listOf(onWheel)))
+              put("events", arr(wheels))
               // A zoom holds the point under the pointer still, and for a bound scale that point is
               // a *value*: it is the domain that changes, so the anchor is in the domain's units.
               put(
@@ -452,7 +472,7 @@ internal class Selection(
         arr(
           listOf(
             obj {
-              put("events", arr(listOf(onWheel)))
+              put("events", arr(wheels))
               put("force", VegaValue.Bool(true))
               put("update", "pow(1.001, event.deltaY * pow(16, event.deltaMode))")
             }
@@ -525,8 +545,8 @@ internal class Selection(
               put(
                 "enter",
                 obj {
-                  put("fill", obj { put("value", "#333") })
-                  put("fillOpacity", obj { put("value", 0.125) })
+                  put("fill", obj { put("value", brushPaint.fields["fill"]) })
+                  put("fillOpacity", obj { put("value", brushPaint.fields["fillOpacity"]) })
                 },
               )
               put("update", update)
@@ -541,19 +561,28 @@ internal class Selection(
         projected.joinToString(" && ") { (channel, _) ->
           "${name}_$channel[0] !== ${name}_$channel[1]"
         }
-      put(
-        "stroke",
-        arr(
-          listOf(
-            obj {
-              put("test", visible)
-              put("value", "white")
-            },
-            obj { put("value", VegaValue.Null) },
-          )
-        ),
-      )
+      // Everything but the fill is painted **over** the marks, and only while the brush has extent:
+      // a rectangle of no width is a click, and outlining it would draw a line across the plot.
+      brushPaint.fields.forEach { (key, value) ->
+        if (key == "fill" || key == "fillOpacity" || key == "cursor") return@forEach
+        put(
+          key,
+          arr(
+            listOf(
+              obj {
+                put("test", visible)
+                put("value", value)
+              },
+              obj { put("value", VegaValue.Null) },
+            )
+          ),
+        )
+      }
     }
+    // The pointer says the brush can be moved, and where it cannot be — a selection that states
+    // `translate: false` — it says nothing rather than promising a drag that does not happen.
+    val cursor =
+      brushPaint.fields["cursor"] ?: if (translate.isNotEmpty()) VegaValue.Str("move") else null
     return listOf(
       obj {
         put("name", "${name}_brush")
@@ -565,7 +594,7 @@ internal class Selection(
             put(
               "enter",
               obj {
-                put("cursor", obj { put("value", "move") })
+                cursor?.let { put("cursor", obj { put("value", it) }) }
                 put("fill", obj { put("value", "transparent") })
               },
             )
@@ -574,6 +603,73 @@ internal class Selection(
         )
       }
     )
+  }
+
+  /** The name of the voronoi overlay this selection picks through, when it picks by nearness. */
+  fun voronoiName(): String =
+    listOf(owner?.name.orEmpty(), "voronoi").filter { it.isNotEmpty() }.joinToString("_")
+
+  /** The stream a pick listens on, scoped to the voronoi overlay where there is one. */
+  private fun pickStream(): VegaValue {
+    val stream = on as? VegaValue.Obj ?: return on
+    if (!nearest) return stream
+    return obj {
+      stream.fields.forEach { (key, value) -> put(key, value) }
+      put("markname", voronoiName())
+    }
+  }
+
+  /**
+   * The voronoi overlay a `nearest` selection picks through — `nearest.ts`.
+   *
+   * One transparent cell per point, each covering the ground closer to that point than to any
+   * other, laid straight over the marks it was built from. A path mark has none: what would be
+   * nearest to a *line* is the line itself everywhere along it.
+   */
+  fun voronoiMark(view: UnitView): VegaValue? {
+    if (!nearest || view.spec.mark in PATH_MARKS) return null
+    val hasX = intervalChannels(view).any { it.first == "x" } || channels.isEmpty()
+    val hasY = intervalChannels(view).any { it.first == "y" } || channels.isEmpty()
+    return obj {
+      put("name", voronoiName())
+      put("type", "path")
+      put("interactive", VegaValue.Bool(true))
+      put("aria", VegaValue.Bool(false))
+      put("from", obj { put("data", view.prefixed("marks")) })
+      put(
+        "encode",
+        obj {
+          put(
+            "update",
+            obj {
+              put("fill", obj { put("value", "transparent") })
+              put("strokeWidth", obj { put("value", 0.35) })
+              put("stroke", obj { put("value", "transparent") })
+              put("isVoronoi", obj { put("value", VegaValue.Bool(true)) })
+            },
+          )
+        },
+      )
+      put(
+        "transform",
+        arr(
+          listOf(
+            obj {
+              put("type", "voronoi")
+              // A selection projected onto **one** channel makes cells that are stripes rather than
+              // tiles: the other coordinate is held at zero, so the nearest point is the nearest
+              // along the axis that was projected.
+              put("x", obj { put("expr", if (hasX || !hasY) "datum.datum.x || 0" else "0") })
+              put("y", obj { put("expr", if (hasY || !hasX) "datum.datum.y || 0" else "0") })
+              put(
+                "size",
+                arr(listOf(signalRef(view.widthSignal), signalRef(view.heightSignal))),
+              )
+            }
+          )
+        ),
+      )
+    }
   }
 
   fun signals(unit: String): List<VegaValue> {
@@ -598,7 +694,7 @@ internal class Selection(
         arr(
           listOfNotNull(
             obj {
-              put("events", arr(listOf(on)))
+              put("events", arr(listOf(pickStream())))
               put("update", "$guard ? {$picked} : null")
               put("force", VegaValue.Bool(true))
             },
@@ -650,7 +746,7 @@ internal class Selection(
           arr(
             listOfNotNull(
               obj {
-                put("events", arr(listOf(on)))
+                put("events", arr(listOf(pickStream())))
                 put("update", expression)
               },
               clear?.let {
@@ -721,13 +817,91 @@ internal class Selection(
    * the data one, and a change of scale re-scales the data one back into pixels — which is why a
    * brush survives a chart resizing under it.
    */
+  /**
+   * The streams a brush is drawn by, with the guard that keeps a drag *on* the brush from redrawing
+   * it.
+   *
+   * `translate`'s parse step pushes `!event.item || event.item.mark.name !== "…_brush"` onto the
+   * event that opens the window — a press on the brush is a move, not a new selection — and it is
+   * pushed onto the filters the selector already stated rather than replacing them.
+   */
+  private fun dragStreams(): List<VegaValue> {
+    val guard = "!event.item || event.item.mark.name !== ${quoted("${name}_brush")}"
+    return on
+      .let { if (it is VegaValue.Arr) it.values else listOf(it) }
+      .map { drag ->
+        val stream = drag as? VegaValue.Obj ?: return@map drag
+        val window = stream.array("between") ?: return@map stream
+        if (translate.isEmpty() || bindsScales) return@map stream
+        obj {
+          stream.fields.forEach { (key, value) -> put(key, value) }
+          put(
+            "between",
+            arr(
+              window.mapIndexed { index, event ->
+                if (index != 0) event else withFilter(event, guard)
+              }
+            ),
+          )
+        }
+      }
+  }
+
+  /**
+   * A stream scoped to the brush mark, which is what makes a drag *on* the brush move it.
+   *
+   * `translate` names the mark on the event that **opens** its window and `zoom` on the event
+   * itself, the one being a drag that starts on the brush and the other a wheel that happens over
+   * it.
+   */
+  private fun scopedTo(
+    stream: VegaValue,
+    mark: String,
+    onWindowOpener: Boolean = false,
+  ): VegaValue {
+    val event = stream as? VegaValue.Obj ?: return stream
+    val window = event.array("between")
+    if (!onWindowOpener || window == null) {
+      return obj {
+        event.fields.forEach { (key, value) -> put(key, value) }
+        put("markname", mark)
+      }
+    }
+    return obj {
+      event.fields.forEach { (key, value) -> if (key != "between") put(key, value) }
+      put(
+        "between",
+        arr(
+          window.mapIndexed { index, part ->
+            if (index != 0) part
+            else
+              obj {
+                (part as? VegaValue.Obj)?.fields?.forEach { (key, value) -> put(key, value) }
+                put("markname", mark)
+              }
+          }
+        ),
+      )
+    }
+  }
+
+  /** One more filter on a stream, after whatever the selector stated. */
+  private fun withFilter(event: VegaValue, extra: String): VegaValue {
+    val stream = event as? VegaValue.Obj ?: return event
+    val stated = stream.array("filter").orEmpty()
+    if (stated.contains(VegaValue.Str(extra))) return stream
+    return obj {
+      stream.fields.forEach { (key, value) -> if (key != "filter") put(key, value) }
+      put("filter", arr(stated + VegaValue.Str(extra)))
+    }
+  }
+
   fun intervalSignals(view: UnitView, initial: VegaValue?): List<VegaValue> {
     val out = mutableListOf<VegaValue>()
     val projected = intervalChannels(view)
     if (projected.isEmpty()) return out
     if (bindsScales) return boundScaleSignals(view, projected)
-    val brush = "${name}_brush"
-    val notOnBrush = "!event.item || event.item.mark.name !== ${quoted(brush)}"
+    val dragStreams = dragStreams()
 
     for ((channel, field) in projected) {
       val pixels = "${name}_$channel"
@@ -749,89 +923,70 @@ internal class Selection(
         put(
           "on",
           arr(
-            listOfNotNull(
-              obj {
-                put(
-                  "events",
+            // Two entries per stream the selection listens on: the press that starts the brush —
+            // the *first* event of the drag's window — sets both ends to where it landed, and the
+            // drag itself moves the far one. Built from the parsed selector rather than assumed,
+            // since a chart may say `[pointerdown[!event.shiftKey], pointerup] > pointermove` and
+            // mean a brush that shares the plot with another.
+            dragStreams.flatMap { drag ->
+              listOfNotNull(
+                (drag as? VegaValue.Obj)?.array("between")?.firstOrNull()?.let { press ->
                   obj {
-                    put("source", "scope")
-                    put("type", "pointerdown")
-                    put("filter", arr(listOf(str(notOnBrush))))
-                  },
-                )
-                put("update", "[$channel(unit), $channel(unit)]")
-              },
-              obj {
-                put(
-                  "events",
+                    put("events", press)
+                    put("update", "[$channel(unit), $channel(unit)]")
+                  }
+                },
+                obj {
+                  put("events", drag)
+                  put("update", "[$pixels[0], clamp($channel(unit), 0, $size)]")
+                },
+              )
+            } +
+              listOfNotNull(
+                obj {
+                  put("events", obj { put("signal", "${name}_scale_trigger") })
+                  // A **continuous** scale can be panned and zoomed, so the brush is rewritten in
+                  // its new pixels; a band or a point scale cannot be, so any other change to its
+                  // domain — a filter, a new category — clears the brush instead of moving it.
+                  put(
+                    "update",
+                    if (continuous(view, channel))
+                      "[scale(${quoted(scale)}, $data[0]), scale(${quoted(scale)}, $data[1])]"
+                    else "[0, 0]",
+                  )
+                },
+                clear?.let {
                   obj {
-                    put("source", "window")
-                    put("type", "pointermove")
-                    put("consume", VegaValue.Bool(true))
                     put(
-                      "between",
+                      "events",
                       arr(
                         listOf(
                           obj {
-                            put("source", "scope")
-                            put("type", "pointerdown")
-                            put("filter", arr(listOf(str(notOnBrush))))
-                          },
-                          obj {
-                            put("source", "window")
-                            put("type", "pointerup")
-                          },
+                            put("source", "view")
+                            put("type", it)
+                          }
                         )
                       ),
                     )
-                  },
-                )
-                put("update", "[$pixels[0], clamp($channel(unit), 0, $size)]")
-              },
-              obj {
-                put("events", obj { put("signal", "${name}_scale_trigger") })
-                // A **continuous** scale can be panned and zoomed, so the brush is rewritten in
-                // its new pixels; a band or a point scale cannot be, so any other change to its
-                // domain — a filter, a new category — clears the brush instead of moving it.
-                put(
-                  "update",
-                  if (continuous(view, channel))
-                    "[scale(${quoted(scale)}, $data[0]), scale(${quoted(scale)}, $data[1])]"
-                  else "[0, 0]",
-                )
-              },
-              clear?.let {
+                    put("update", "[0, 0]")
+                  }
+                },
                 obj {
+                  put("events", obj { put("signal", "${name}_translate_delta") })
                   put(
-                    "events",
-                    arr(
-                      listOf(
-                        obj {
-                          put("source", "view")
-                          put("type", it)
-                        }
-                      )
-                    ),
+                    "update",
+                    "clampRange(panLinear(${name}_translate_anchor.extent_$channel, " +
+                      "${name}_translate_delta.$channel / span(${name}_translate_anchor.extent_$channel)), 0, $size)",
                   )
-                  put("update", "[0, 0]")
-                }
-              },
-              obj {
-                put("events", obj { put("signal", "${name}_translate_delta") })
-                put(
-                  "update",
-                  "clampRange(panLinear(${name}_translate_anchor.extent_$channel, " +
-                    "${name}_translate_delta.$channel / span(${name}_translate_anchor.extent_$channel)), 0, $size)",
-                )
-              },
-              obj {
-                put("events", obj { put("signal", "${name}_zoom_delta") })
-                put(
-                  "update",
-                  "clampRange(zoomLinear($pixels, ${name}_zoom_anchor.$channel, ${name}_zoom_delta), 0, $size)",
-                )
-              },
-            )
+                },
+                obj {
+                  put("events", obj { put("signal", "${name}_zoom_delta") })
+                  put(
+                    "update",
+                    "clampRange(zoomLinear($pixels, ${name}_zoom_anchor.$channel, ${name}_zoom_delta), 0, $size)",
+                  )
+                },
+              )
           ),
         )
       }

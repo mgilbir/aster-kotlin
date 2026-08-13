@@ -678,7 +678,7 @@ no data is needed to compare two compilers. So every one of them was compiled by
 by this one, and the outputs compared property by property. That is a *measurement*, not a gate: the
 examples are not fixtures here, and nothing about them is checked in.
 
-**124 of 627 matched exactly** at the start, and **453** do now. 16 were refused by name, and of those 8 are geographic,
+**124 of 627 matched exactly** at the start, and **467** do now. 16 were refused by name, and of those 8 are geographic,
 3 are a facet inside a facet, 2 a repeat inside a concatenation, and 2 are the `trail` mark — which
 this runtime draws and this compiler had simply not been told about.
 
@@ -2234,6 +2234,37 @@ domain the data gave it outwards.
 
 Both of these make the mark **clipped**: a pan that moves the domain past the data would otherwise
 draw the rows that fell outside the plot. That named a runtime gap of its own — see below.
+
+### The selector was a string, and it was being listened for by name
+
+A selection states the events it reacts to as a *string* in Vega's event-selector grammar —
+`"[pointerdown[!event.shiftKey], pointerup] > pointermove"` is a drag that begins only while the
+shift key is up. This compiler passed anything with selector syntax in it straight through, which
+writes a stream listening for an event of that whole name, and so for nothing at all. The grammar is
+now parsed, ported from `vega-event-selector`: a source before a colon, a mark name after an `@`,
+filters in brackets that may contain brackets of their own, a throttle in braces, a `!` for
+consumption, and commas that separate whole selectors except inside any of those.
+
+Everything a brush listens on now follows from that parse rather than from an assumption. The press
+that starts the brush is the *first* event of the drag's window, whatever that window is; the guard
+that keeps a drag **on** the brush from redrawing it is pushed onto the filters the selector already
+stated rather than replacing them; and a chart with two brushes over one plot — one plain, one with
+the shift key — comes out right for the first time.
+
+Two rules found beside it. A brush's own `mark` block splits between the two rects it is drawn as:
+the fill goes to the background under the marks and everything else to the outline over them, as a
+production rule that paints nothing while the brush has no extent. And the brushes **nest** rather
+than queue: upstream's mark hook returns `[background, …marks, brush]`, so a second selection's
+background lands outside the first's and its outline outside that one's — two brushes are drawn in
+opposite orders above and below the marks.
+
+`nearest: true` is also compiled now. Vega has no notion of picking the closest mark, so Vega-Lite
+lays a **voronoi** overlay over the marks — one transparent cell per point, each covering the ground
+closer to that point than to any other — and scopes the selection's events to it by name. The
+runtime already had a Delaunay triangulation and a voronoi transform, and it was reading the cell
+coordinates as *field names*: Vega-Lite writes them as expressions, `{"expr": "datum.datum.x || 0"}`,
+because the points are mark items and the coordinate wanted is the one the encoding resolved. Every
+cell came out without coordinates, so the diagram was empty and the overlay drew nothing.
 
 ### Two identical datasets, kept apart on purpose
 
