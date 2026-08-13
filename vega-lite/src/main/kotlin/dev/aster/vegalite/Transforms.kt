@@ -206,7 +206,11 @@ internal class Transforms(
             // groups by a column once however many times it is named. A `joinaggregate`, which is
             // a transform Vega takes as written, keeps the repetition.
             put("groupby", strings(fieldList(transform["groupby"]).distinct()))
-            putOps(transform.array("aggregate").orEmpty())
+            // Grouped by the **field** they read, in the order the fields first appear:
+            // `AggregateNode` keeps its measures as a map of field to operation, and assembles by
+            // walking it, so two measures of one column come out together however far apart they
+            // were asked for. A box plot whose tooltip asks for a mean is where it shows.
+            putOps(byField(transform.array("aggregate").orEmpty()))
           }
         )
 
@@ -927,6 +931,16 @@ internal class Transforms(
         else -> -1
       }
     return if (index >= 0) index.toString() else quoted(name)
+  }
+
+  /** `AggregateNode`'s measure map, as an order: field by first appearance, operations within. */
+  private fun byField(entries: List<VegaValue>): List<VegaValue> {
+    val grouped = LinkedHashMap<String?, MutableList<VegaValue>>()
+    for (entry in entries) {
+      val field = if (entry.string("op") == "count") null else entry.string("field")
+      grouped.getOrPut(field) { mutableListOf() } += entry
+    }
+    return grouped.values.flatten()
   }
 
   private fun ObjectBuilder.putOps(entries: List<VegaValue>) {

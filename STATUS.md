@@ -678,7 +678,7 @@ no data is needed to compare two compilers. So every one of them was compiled by
 by this one, and the outputs compared property by property. That is a *measurement*, not a gate: the
 examples are not fixtures here, and nothing about them is checked in.
 
-**124 of 627 matched exactly** at the start, and **478** do now. 16 were refused by name, and of those 8 are geographic,
+**124 of 627 matched exactly** at the start, and **482** do now. 16 were refused by name, and of those 8 are geographic,
 3 are a facet inside a facet, 2 a repeat inside a concatenation, and 2 are the `trail` mark — which
 this runtime draws and this compiler had simply not been told about.
 
@@ -2265,6 +2265,24 @@ runtime already had a Delaunay triangulation and a voronoi transform, and it was
 coordinates as *field names*: Vega-Lite writes them as expressions, `{"expr": "datum.datum.x || 0"}`,
 because the points are mark items and the coordinate wanted is the one the encoding resolved. Every
 cell came out without coordinates, so the diagram was empty and the overlay drew nothing.
+
+### A tooltip on a composite mark is two different requests
+
+`filterTooltipWithAggregatedField` takes a stated tooltip **out** of a composite mark's encoding
+before anything is derived from it, and only its aggregating arms go back — and that turns out to
+settle three things at once. A tooltip that names a column outright is not a request to break the
+summary down by that column: with a box plot tooltipped on the very column it summarises, grouping
+by it gives one box per row. It belongs to the **outliers**, which explain a row; the box explains
+itself, with its own five numbers. And a tooltip that asks for an *aggregate* is a measure of the
+summary: the mean joins the aggregate transform, the parts read it back under the name it wrote,
+and the definition carries its original title over, or a tooltip that read `Mean of Body Mass (g)`
+would read `mean_Body Mass (g)` instead.
+
+Two orderings fell out of it. A composite mark's summary is named by the summarised channel's own
+**title** where it has one — `Mean of Miles per Gallon`, not `Mean of Miles_per_Gallon`. And an
+`aggregate` transform's measures are emitted grouped by the **field** they read, in the order the
+fields first appear: `AggregateNode` keeps them as a map of field to operation and assembles by
+walking it, so two measures of one column come out together however far apart they were asked for.
 
 ### A stated colour order is an order for the marks as well
 

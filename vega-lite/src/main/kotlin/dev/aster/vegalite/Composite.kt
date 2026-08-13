@@ -179,7 +179,9 @@ internal class Composite(
           }
         }
 
-    val tooltip = tooltip(summary, field, shared)
+    // `getTitle`: the summarised column is named by its own **title** where it has one — a
+    // tooltip that reads `Mean of Miles per Gallon` is the axis's title, not the column's name.
+    val tooltip = tooltip(summary, field, shared, def.string("title") ?: field)
     val parts =
       if (type == "errorbar") errorBarParts(markDef, orient) else errorBandParts(markDef, encoding)
 
@@ -270,28 +272,66 @@ internal class Composite(
     val ticksOrient = if (orient == "vertical") "horizontal" else "vertical"
     val boxOrient = orient
 
-    val shared =
-      encoding.fields.filterKeys {
-        it != continuous && it != "${continuous}2" && it != "size" && it != "color"
+    // `filterTooltipWithAggregatedField`: the stated tooltip comes **out** of the encoding before
+    // anything is derived from it, and only its aggregating arms go back. Those become measures of
+    // the summary — a tooltip asking for a mean adds a mean to the aggregate — while the plain arms
+    // belong to the outlier layer alone: a box is explained by its own five numbers, and a far-out
+    // row by the column that put it there.
+    val statedTooltip = encoding.fields["tooltip"]
+    val aggregatedTooltip =
+      (statedTooltip as? VegaValue.Obj)?.takeIf {
+        it.has("aggregate") && it.string("field") != null
       }
+    val plainTooltip = if (aggregatedTooltip == null) statedTooltip else null
+    val withoutTooltip = encoding.fields.filterKeys { it != "tooltip" }
+
+    val shared = withoutTooltip.filterKeys {
+      it != continuous && it != "${continuous}2" && it != "size" && it != "color"
+    }
     // The **colour** is a grouping like any other, even where the parts do not each paint
     // themselves with it: one box per category per colour. A field named on two channels is named
     // twice, so a box plot coloured by the column it is categorised by groups by it twice.
     val groupby =
       groupbyOf(
-        encoding.fields.filterKeys { it != continuous && it != "${continuous}2" && it != "size" }
+        withoutTooltip.filterKeys { it != continuous && it != "${continuous}2" && it != "size" }
       )
+    // The aggregate the tooltip asked for, as a measure of the summary and as the tooltip the
+    // summary's parts then carry.
+    val tooltipMeasure = aggregatedTooltip?.let {
+      val op = it.string("aggregate") ?: return@let null
+      val on = it.string("field") ?: return@let null
+      Triple(op, on, "${op}_$on")
+    }
+    // Kept in the **shape** it was written in — a bare definition stays bare, which is what makes
+    // the tooltip a plain value rather than a titled object.
+    val aggregatedTooltipDef = tooltipMeasure?.let { (op, on, output) ->
+      obj {
+        // The **title** is written out, because the rewritten definition no longer says what it
+        // was: `extractTransformsFromEncoding` puts the original's own title on it, so a tooltip
+        // asking for a mean still reads `Mean of Body Mass (g)` and not `mean_Body Mass (g)`.
+        if (aggregatedTooltip.fields["title"] == null) {
+          put("title", "${op.replaceFirstChar { it.uppercase() }} of $on")
+        }
+        aggregatedTooltip.fields.forEach { (key, value) ->
+          if (key != "aggregate" && key != "field") put(key, value)
+        }
+        put("field", output)
+        put("type", aggregatedTooltip.string("type") ?: "quantitative")
+      }
+    }
     val outer = VegaValue.Obj(unit.fields.filterKeys { it != "mark" && it != "encoding" })
     val declared = unit.array("transform") ?: emptyList()
 
     /** `Max of v`, `Q3 of v`, … — what resting on a part of the box says. */
+    val summarisedTitle = def.string("title") ?: field
+
     fun summaryTooltip(entries: List<Pair<String, String>>): VegaValue =
       arr(
         entries.map { (prefix, title) ->
           obj {
             put("field", "$prefix$field")
             put("type", "quantitative")
-            put("title", "$title of $field")
+            put("title", "$title of $summarisedTitle")
           }
         } +
           shared.values.mapNotNull { value ->
@@ -331,6 +371,7 @@ internal class Composite(
       rawPosition: Boolean = false,
       tooltip: VegaValue? = null,
       colour: VegaValue? = null,
+      summarised: Boolean = true,
     ): Pair<String, VegaValue.Obj>? {
       if (!enabled(markDef, name, "boxplot")) return null
       return relative to
@@ -373,17 +414,30 @@ internal class Composite(
                   ?.let {
                     put("color", it)
                   }
-              if (encoding.fields["tooltip"] == null) tooltip?.let { put("tooltip", it) }
+              // A summary part explains the summary; the outliers explain a row, and the tooltip
+              // the specification stated for *them* is the one with no aggregate in it.
+              (if (summarised) aggregatedTooltipDef ?: tooltip else tooltip)?.let {
+                put("tooltip", it)
+              }
             },
           )
         }
     }
 
-    fun aggregate(measures: List<Triple<String, String, String>>): VegaValue = obj {
+    /**
+     * @param measureFirst where the tooltip's own aggregate goes. Upstream writes the box's summary
+     *   as `[...aggregate, ...boxplotSpecificAggregate]` and the whiskers' the other way about, and
+     *   the emitted order follows the fields' first appearance from there.
+     */
+    fun aggregate(
+      measures: List<Triple<String, String, String>>,
+      measureFirst: Boolean = true,
+    ): VegaValue = obj {
+      val asked = listOfNotNull(tooltipMeasure)
       put(
         "aggregate",
         arr(
-          measures.map { (op, from, into) ->
+          (if (measureFirst) asked + measures else measures + asked).map { (op, from, into) ->
             obj {
               put("op", op)
               put("field", from)
@@ -544,12 +598,14 @@ internal class Composite(
     val inside = obj { put("filter", "($low <= $value) && ($value <= $high)") }
     val whiskerSummary =
       aggregate(
-        listOf(
-          Triple("min", field, "lower_whisker_$field"),
-          Triple("max", field, "upper_whisker_$field"),
-          Triple("min", "lower_box_$field", "lower_box_$field"),
-          Triple("max", "upper_box_$field", "upper_box_$field"),
-        )
+        measureFirst = false,
+        measures =
+          listOf(
+            Triple("min", field, "lower_whisker_$field"),
+            Triple("max", field, "upper_whisker_$field"),
+            Triple("min", "lower_box_$field", "lower_box_$field"),
+            Triple("max", "upper_box_$field", "upper_box_$field"),
+          ),
       )
 
     // `"outliers": false` takes the scatter of far-out rows off, and with it a whole layer — so
@@ -565,6 +621,8 @@ internal class Composite(
           obj { put("type", "point") },
           start = field,
           rawPosition = true,
+          tooltip = plainTooltip,
+          summarised = false,
         )
     // With no outlier layer the whiskers *are* the first layer, so every name below loses a level.
     val whiskerPrefix = if (wantsOutliers) "layer_0_layer_1" else "layer_0"
@@ -797,13 +855,14 @@ internal class Composite(
     summary: Summary,
     field: String,
     shared: Map<String, VegaValue>,
+    title: String = field,
   ): VegaValue {
     val entries = mutableListOf<VegaValue>()
-    for ((prefix, title) in summary.titles) {
+    for ((prefix, prefixTitle) in summary.titles) {
       entries += obj {
         put("field", "$prefix$field")
         put("type", "quantitative")
-        put("title", if (summary.titleNamesField) "$title of $field" else title)
+        put("title", if (summary.titleNamesField) "$prefixTitle of $title" else prefixTitle)
       }
     }
     for ((_, value) in shared) {

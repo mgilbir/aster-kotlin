@@ -1,0 +1,498 @@
+{
+  "$schema": "https://vega.github.io/schema/vega/v6.json",
+  "description": "The same box plot with a tooltip that names a column outright: it explains a far-out row rather than a box, so it lands on the outliers and the summary keeps its five numbers.",
+  "background": "white",
+  "padding": 5,
+  "width": 300,
+  "style": "cell",
+  "data": [
+    {
+      "name": "source_0",
+      "url": "data/cars.json",
+      "format": {
+        "type": "json"
+      }
+    },
+    {
+      "name": "data_0",
+      "source": "source_0",
+      "transform": [
+        {
+          "type": "joinaggregate",
+          "as": [
+            "lower_box_Miles_per_Gallon",
+            "upper_box_Miles_per_Gallon"
+          ],
+          "ops": [
+            "q1",
+            "q3"
+          ],
+          "fields": [
+            "Miles_per_Gallon",
+            "Miles_per_Gallon"
+          ],
+          "groupby": [
+            "Origin"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "data_1",
+      "source": "data_0",
+      "transform": [
+        {
+          "type": "filter",
+          "expr": "(datum['Miles_per_Gallon'] < datum['lower_box_Miles_per_Gallon'] - 1.5 * (datum['upper_box_Miles_per_Gallon'] - datum['lower_box_Miles_per_Gallon'])) || (datum['Miles_per_Gallon'] > datum['upper_box_Miles_per_Gallon'] + 1.5 * (datum['upper_box_Miles_per_Gallon'] - datum['lower_box_Miles_per_Gallon']))"
+        },
+        {
+          "type": "filter",
+          "expr": "isValid(datum[\"Miles_per_Gallon\"]) && isFinite(+datum[\"Miles_per_Gallon\"])"
+        }
+      ]
+    },
+    {
+      "name": "data_2",
+      "source": "data_0",
+      "transform": [
+        {
+          "type": "filter",
+          "expr": "(datum['lower_box_Miles_per_Gallon'] - 1.5 * (datum['upper_box_Miles_per_Gallon'] - datum['lower_box_Miles_per_Gallon']) <= datum['Miles_per_Gallon']) && (datum['Miles_per_Gallon'] <= datum['upper_box_Miles_per_Gallon'] + 1.5 * (datum['upper_box_Miles_per_Gallon'] - datum['lower_box_Miles_per_Gallon']))"
+        },
+        {
+          "type": "aggregate",
+          "groupby": [
+            "Origin"
+          ],
+          "ops": [
+            "min",
+            "max",
+            "min",
+            "max"
+          ],
+          "fields": [
+            "Miles_per_Gallon",
+            "Miles_per_Gallon",
+            "lower_box_Miles_per_Gallon",
+            "upper_box_Miles_per_Gallon"
+          ],
+          "as": [
+            "lower_whisker_Miles_per_Gallon",
+            "upper_whisker_Miles_per_Gallon",
+            "lower_box_Miles_per_Gallon",
+            "upper_box_Miles_per_Gallon"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "data_3",
+      "source": "data_2",
+      "transform": [
+        {
+          "type": "filter",
+          "expr": "isValid(datum[\"lower_whisker_Miles_per_Gallon\"]) && isFinite(+datum[\"lower_whisker_Miles_per_Gallon\"])"
+        }
+      ]
+    },
+    {
+      "name": "data_4",
+      "source": "data_2",
+      "transform": [
+        {
+          "type": "filter",
+          "expr": "isValid(datum[\"upper_box_Miles_per_Gallon\"]) && isFinite(+datum[\"upper_box_Miles_per_Gallon\"])"
+        }
+      ]
+    },
+    {
+      "name": "data_5",
+      "source": "source_0",
+      "transform": [
+        {
+          "type": "aggregate",
+          "groupby": [
+            "Origin"
+          ],
+          "ops": [
+            "q1",
+            "q3",
+            "median",
+            "min",
+            "max"
+          ],
+          "fields": [
+            "Miles_per_Gallon",
+            "Miles_per_Gallon",
+            "Miles_per_Gallon",
+            "Miles_per_Gallon",
+            "Miles_per_Gallon"
+          ],
+          "as": [
+            "lower_box_Miles_per_Gallon",
+            "upper_box_Miles_per_Gallon",
+            "mid_box_Miles_per_Gallon",
+            "min_Miles_per_Gallon",
+            "max_Miles_per_Gallon"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "data_6",
+      "source": "data_5",
+      "transform": [
+        {
+          "type": "filter",
+          "expr": "isValid(datum[\"lower_box_Miles_per_Gallon\"]) && isFinite(+datum[\"lower_box_Miles_per_Gallon\"])"
+        }
+      ]
+    },
+    {
+      "name": "data_7",
+      "source": "data_5",
+      "transform": [
+        {
+          "type": "filter",
+          "expr": "isValid(datum[\"mid_box_Miles_per_Gallon\"]) && isFinite(+datum[\"mid_box_Miles_per_Gallon\"])"
+        }
+      ]
+    }
+  ],
+  "signals": [
+    {
+      "name": "y_step",
+      "value": 20
+    },
+    {
+      "name": "height",
+      "update": "bandspace(domain('y').length, 0, 0) * y_step"
+    }
+  ],
+  "marks": [
+    {
+      "name": "layer_0_layer_0_marks",
+      "type": "symbol",
+      "style": [
+        "point",
+        "boxplot-outliers"
+      ],
+      "from": {
+        "data": "data_1"
+      },
+      "encode": {
+        "update": {
+          "opacity": {
+            "value": 0.7
+          },
+          "fill": {
+            "value": "transparent"
+          },
+          "stroke": {
+            "value": "#4c78a8"
+          },
+          "tooltip": {
+            "signal": "format(datum[\"Miles_per_Gallon\"], \"\")"
+          },
+          "ariaRoleDescription": {
+            "value": "point"
+          },
+          "description": {
+            "signal": "\"Miles per Gallon: \" + (format(datum[\"Miles_per_Gallon\"], \"\")) + \"; Origin: \" + (isValid(datum[\"Origin\"]) ? isArray(datum[\"Origin\"]) ? join(datum[\"Origin\"], ' ') : datum[\"Origin\"] : \"\"+datum[\"Origin\"]) + \"; Miles_per_Gallon: \" + (format(datum[\"Miles_per_Gallon\"], \"\"))"
+          },
+          "x": {
+            "scale": "x",
+            "field": "Miles_per_Gallon"
+          },
+          "y": {
+            "scale": "y",
+            "field": "Origin",
+            "band": 0.5
+          }
+        }
+      }
+    },
+    {
+      "name": "layer_0_layer_1_layer_0_marks",
+      "type": "rule",
+      "style": [
+        "rule",
+        "boxplot-rule"
+      ],
+      "aria": false,
+      "from": {
+        "data": "data_3"
+      },
+      "encode": {
+        "update": {
+          "stroke": {
+            "value": "black"
+          },
+          "tooltip": {
+            "signal": "{\"Upper Whisker of Miles per Gallon\": format(datum[\"upper_whisker_Miles_per_Gallon\"], \"\"), \"Lower Whisker of Miles per Gallon\": format(datum[\"lower_whisker_Miles_per_Gallon\"], \"\"), \"Origin\": isValid(datum[\"Origin\"]) ? isArray(datum[\"Origin\"]) ? join(datum[\"Origin\"], '\\n') : datum[\"Origin\"] : \"\"+datum[\"Origin\"]}"
+          },
+          "x": {
+            "scale": "x",
+            "field": "lower_whisker_Miles_per_Gallon"
+          },
+          "x2": {
+            "scale": "x",
+            "field": "lower_box_Miles_per_Gallon"
+          },
+          "y": {
+            "scale": "y",
+            "field": "Origin",
+            "band": 0.5
+          }
+        }
+      }
+    },
+    {
+      "name": "layer_0_layer_1_layer_1_marks",
+      "type": "rule",
+      "style": [
+        "rule",
+        "boxplot-rule"
+      ],
+      "aria": false,
+      "from": {
+        "data": "data_4"
+      },
+      "encode": {
+        "update": {
+          "stroke": {
+            "value": "black"
+          },
+          "tooltip": {
+            "signal": "{\"Upper Whisker of Miles per Gallon\": format(datum[\"upper_whisker_Miles_per_Gallon\"], \"\"), \"Lower Whisker of Miles per Gallon\": format(datum[\"lower_whisker_Miles_per_Gallon\"], \"\"), \"Origin\": isValid(datum[\"Origin\"]) ? isArray(datum[\"Origin\"]) ? join(datum[\"Origin\"], '\\n') : datum[\"Origin\"] : \"\"+datum[\"Origin\"]}"
+          },
+          "x": {
+            "scale": "x",
+            "field": "upper_box_Miles_per_Gallon"
+          },
+          "x2": {
+            "scale": "x",
+            "field": "upper_whisker_Miles_per_Gallon"
+          },
+          "y": {
+            "scale": "y",
+            "field": "Origin",
+            "band": 0.5
+          }
+        }
+      }
+    },
+    {
+      "name": "layer_1_layer_0_marks",
+      "type": "rect",
+      "style": [
+        "bar",
+        "boxplot-box"
+      ],
+      "from": {
+        "data": "data_6"
+      },
+      "encode": {
+        "update": {
+          "ariaRoleDescription": {
+            "value": "box"
+          },
+          "fill": {
+            "value": "#4c78a8"
+          },
+          "tooltip": {
+            "signal": "{\"Max of Miles per Gallon\": format(datum[\"max_Miles_per_Gallon\"], \"\"), \"Q3 of Miles per Gallon\": format(datum[\"upper_box_Miles_per_Gallon\"], \"\"), \"Median of Miles per Gallon\": format(datum[\"mid_box_Miles_per_Gallon\"], \"\"), \"Q1 of Miles per Gallon\": format(datum[\"lower_box_Miles_per_Gallon\"], \"\"), \"Min of Miles per Gallon\": format(datum[\"min_Miles_per_Gallon\"], \"\"), \"Origin\": isValid(datum[\"Origin\"]) ? isArray(datum[\"Origin\"]) ? join(datum[\"Origin\"], '\\n') : datum[\"Origin\"] : \"\"+datum[\"Origin\"]}"
+          },
+          "description": {
+            "signal": "\"Miles per Gallon: \" + (format(datum[\"lower_box_Miles_per_Gallon\"], \"\")) + \"; Origin: \" + (isValid(datum[\"Origin\"]) ? isArray(datum[\"Origin\"]) ? join(datum[\"Origin\"], ' ') : datum[\"Origin\"] : \"\"+datum[\"Origin\"]) + \"; upper_box_Miles_per_Gallon: \" + (format(datum[\"upper_box_Miles_per_Gallon\"], \"\")) + \"; Max of Miles per Gallon: \" + (format(datum[\"max_Miles_per_Gallon\"], \"\")) + \"; Q3 of Miles per Gallon: \" + (format(datum[\"upper_box_Miles_per_Gallon\"], \"\")) + \"; Median of Miles per Gallon: \" + (format(datum[\"mid_box_Miles_per_Gallon\"], \"\")) + \"; Q1 of Miles per Gallon: \" + (format(datum[\"lower_box_Miles_per_Gallon\"], \"\")) + \"; Min of Miles per Gallon: \" + (format(datum[\"min_Miles_per_Gallon\"], \"\"))"
+          },
+          "x": {
+            "scale": "x",
+            "field": "lower_box_Miles_per_Gallon"
+          },
+          "x2": {
+            "scale": "x",
+            "field": "upper_box_Miles_per_Gallon"
+          },
+          "yc": {
+            "scale": "y",
+            "field": "Origin",
+            "band": 0.5
+          },
+          "height": {
+            "value": 14
+          }
+        }
+      }
+    },
+    {
+      "name": "layer_1_layer_1_marks",
+      "type": "rect",
+      "style": [
+        "tick",
+        "boxplot-median"
+      ],
+      "aria": false,
+      "from": {
+        "data": "data_7"
+      },
+      "encode": {
+        "update": {
+          "opacity": {
+            "value": 0.7
+          },
+          "fill": [
+            {
+              "test": "datum['lower_box_Miles_per_Gallon'] >= datum['upper_box_Miles_per_Gallon']",
+              "value": "#4c78a8"
+            },
+            {
+              "value": "white"
+            }
+          ],
+          "tooltip": {
+            "signal": "{\"Max of Miles per Gallon\": format(datum[\"max_Miles_per_Gallon\"], \"\"), \"Q3 of Miles per Gallon\": format(datum[\"upper_box_Miles_per_Gallon\"], \"\"), \"Median of Miles per Gallon\": format(datum[\"mid_box_Miles_per_Gallon\"], \"\"), \"Q1 of Miles per Gallon\": format(datum[\"lower_box_Miles_per_Gallon\"], \"\"), \"Min of Miles per Gallon\": format(datum[\"min_Miles_per_Gallon\"], \"\"), \"Origin\": isValid(datum[\"Origin\"]) ? isArray(datum[\"Origin\"]) ? join(datum[\"Origin\"], '\\n') : datum[\"Origin\"] : \"\"+datum[\"Origin\"]}"
+          },
+          "yc": {
+            "scale": "y",
+            "field": "Origin",
+            "band": 0.5
+          },
+          "height": {
+            "value": 14
+          },
+          "xc": {
+            "scale": "x",
+            "field": "mid_box_Miles_per_Gallon"
+          },
+          "width": {
+            "value": 1
+          }
+        }
+      }
+    }
+  ],
+  "scales": [
+    {
+      "name": "x",
+      "type": "linear",
+      "domain": {
+        "fields": [
+          {
+            "data": "data_1",
+            "field": "Miles_per_Gallon"
+          },
+          {
+            "data": "data_3",
+            "field": "lower_whisker_Miles_per_Gallon"
+          },
+          {
+            "data": "data_3",
+            "field": "lower_box_Miles_per_Gallon"
+          },
+          {
+            "data": "data_4",
+            "field": "upper_box_Miles_per_Gallon"
+          },
+          {
+            "data": "data_4",
+            "field": "upper_whisker_Miles_per_Gallon"
+          },
+          {
+            "data": "data_6",
+            "field": "lower_box_Miles_per_Gallon"
+          },
+          {
+            "data": "data_6",
+            "field": "upper_box_Miles_per_Gallon"
+          },
+          {
+            "data": "data_7",
+            "field": "mid_box_Miles_per_Gallon"
+          }
+        ]
+      },
+      "range": [
+        0,
+        {
+          "signal": "width"
+        }
+      ],
+      "zero": false,
+      "nice": true
+    },
+    {
+      "name": "y",
+      "type": "band",
+      "domain": {
+        "fields": [
+          {
+            "data": "data_1",
+            "field": "Origin"
+          },
+          {
+            "data": "data_3",
+            "field": "Origin"
+          },
+          {
+            "data": "data_4",
+            "field": "Origin"
+          },
+          {
+            "data": "data_6",
+            "field": "Origin"
+          },
+          {
+            "data": "data_7",
+            "field": "Origin"
+          }
+        ],
+        "sort": true
+      },
+      "range": {
+        "step": {
+          "signal": "y_step"
+        }
+      },
+      "paddingInner": 0,
+      "paddingOuter": 0
+    }
+  ],
+  "axes": [
+    {
+      "scale": "x",
+      "orient": "bottom",
+      "gridScale": "y",
+      "grid": true,
+      "tickCount": {
+        "signal": "ceil(width/40)"
+      },
+      "domain": false,
+      "labels": false,
+      "aria": false,
+      "maxExtent": 0,
+      "minExtent": 0,
+      "ticks": false,
+      "zindex": 0
+    },
+    {
+      "scale": "x",
+      "orient": "bottom",
+      "grid": false,
+      "title": "Miles per Gallon",
+      "labelFlush": true,
+      "labelOverlap": true,
+      "tickCount": {
+        "signal": "ceil(width/40)"
+      },
+      "zindex": 0
+    },
+    {
+      "scale": "y",
+      "orient": "left",
+      "grid": false,
+      "title": "Origin",
+      "zindex": 0
+    }
+  ]
+}
