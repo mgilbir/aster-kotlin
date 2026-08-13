@@ -1797,6 +1797,13 @@ Beside them, the stack's sort names each field **once**: two channels over one c
 to sort by, and repeating it in the pair of parallel lists is a comparator that reads the same
 column twice.
 
+### The chart's colour names the box, not the whiskers
+
+A whisker marks the *extent* of the data rather than naming a category, so it is drawn black
+whatever colour the box is — and that means the encoding's colour is withheld from the parts that
+state their own, not merely written under them. Colouring the whiskers made them disappear into the
+box they belong to.
+
 ### Two runtime gaps this batch names but does not close
 
 `density`'s fixture is not in the corpus, and `trail`'s draws no legend. Both compile exactly as

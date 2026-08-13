@@ -282,7 +282,15 @@ internal class Composite(
               )
               end?.let { put("${continuous}2", obj { put("field", "${it}_$field") }) }
               shared.forEach { (channel, value) -> put(channel, value) }
-              colour?.let { put("color", it) } ?: encoding.fields["color"]?.let { put("color", it) }
+              // The chart's colour names the *box*, not the whiskers: a whisker marks the extent
+              // of the data and is drawn black whatever category the box belongs to, so the
+              // encoding's colour is withheld from the parts that state their own.
+              colour?.let { put("color", it) }
+                ?: encoding.fields["color"]
+                  ?.takeIf { mark.string("color") == null }
+                  ?.let {
+                    put("color", it)
+                  }
               if (encoding.fields["tooltip"] == null) tooltip?.let { put("tooltip", it) }
             },
           )
