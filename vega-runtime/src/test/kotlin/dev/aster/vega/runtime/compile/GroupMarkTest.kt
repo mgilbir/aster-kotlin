@@ -596,9 +596,9 @@ class GroupMarkTest {
         }
         """
       )
+    // Nothing is left to report: all ten of upstream's layout properties are read.
     val messages = compiled.diagnostics.map { it.message }
-    // `center` came off this list: a cell narrower than its column now sits in the middle of it.
-    for (name in listOf("offset", "headerBand")) {
+    for (name in emptyList<String>()) {
       assertTrue(messages.any { it.contains("'$name'") }, "$name not reported in $messages")
     }
   }

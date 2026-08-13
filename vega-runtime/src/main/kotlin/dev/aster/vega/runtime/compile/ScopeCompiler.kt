@@ -508,8 +508,15 @@ internal class ScopeCompiler(
     val columns =
       numbers.resolveInt(layout.columns, "layout")?.coerceAtLeast(1)
         ?: cellNodes.size.coerceAtLeast(1)
+    val rows = kotlin.math.ceil(cellNodes.size / columns.toDouble()).toInt().coerceAtLeast(1)
 
     var bounds = cells.fold(RectD.Empty) { acc, part -> acc.union(part.bounds) }
+    // The **cells'** extent, captured before the headers widen it: a title is centred on the grid
+    // it
+    // titles, not on the grid plus whatever hangs off it. Upstream returns this from `gridLayout`
+    // and
+    // lays the headers out afterwards, which is the same thing said by construction.
+    val gridBounds = bounds
 
     // Where the grid begins on each axis: what a header hangs off.
     val left =
@@ -523,24 +530,83 @@ internal class ScopeCompiler(
     // Headers first, because a title is placed just outside whatever they reached. The results are
     // kept per declaration so the scene can be emitted in specification order, which is the order
     // upstream emits it in.
+    // The far edges, which the footers hang off: the rightmost reach of the last column and the
+    // lowest of the last row.
+    val right =
+      cellNodes.indices
+        .filter { it % columns == columns - 1 || it == cellNodes.lastIndex }
+        .maxOfOrNull { cellNodes[it].transform.e + cellBoxes[it].right } ?: 0.0
+    val bottom =
+      cellNodes.indices
+        .filter { it >= cellNodes.size - columns }
+        .maxOfOrNull { cellNodes[it].transform.f + cellBoxes[it].bottom } ?: 0.0
+
     val placed = HashMap<Int, List<SceneNode>>()
     val edges = HashMap<TrellisRole, RectD>()
+    val headerRoles =
+      setOf(
+        TrellisRole.ROW_HEADER,
+        TrellisRole.COLUMN_HEADER,
+        TrellisRole.ROW_FOOTER,
+        TrellisRole.COLUMN_FOOTER,
+      )
     gridded.forEachIndexed { index, (role, part) ->
-      if (role != TrellisRole.ROW_HEADER && role != TrellisRole.COLUMN_HEADER) return@forEachIndexed
-      val alongRows = role == TrellisRole.ROW_HEADER
+      if (role !in headerRoles) return@forEachIndexed
+      val alongRows = role == TrellisRole.ROW_HEADER || role == TrellisRole.ROW_FOOTER
+      val footer = role == TrellisRole.ROW_FOOTER || role == TrellisRole.COLUMN_FOOTER
+      // A band places a header **along** the cell it labels rather than at the cell's own origin:
+      // `null`, which is upstream's default, means the origin, and a fraction means that far across
+      // the cell's own extent. The offset pushes it further out, away from the grid, which is why a
+      // header's is negative and a footer's is not.
+      val band = if (footer) layout.footerBand(alongRows) else layout.headerBand(alongRows)
+      val away =
+        layout.offsetFor(
+          when (role) {
+            TrellisRole.ROW_HEADER -> "rowHeader"
+            TrellisRole.COLUMN_HEADER -> "columnHeader"
+            TrellisRole.ROW_FOOTER -> "rowFooter"
+            else -> "columnFooter"
+          }
+        )
       var edge = edges[role] ?: RectD.Empty
       val moved =
-        part.nodes.mapIndexedNotNull { position, node ->
-          // Header j labels the first cell of row j, or the j-th cell of the top row.
-          val cell = cellNodes.getOrNull(if (alongRows) position * columns else position)
-          if (cell == null) null
-          else {
+        part.nodes.mapIndexed { position, node ->
+          // Header j labels the first cell of row j, or the j-th cell of the top row. A footer
+          // labels the same rows and columns from the other side.
+          //
+          // More headers than rows is not an error and not a reason to drop one: upstream warns and
+          // lays out the first `limit` of them, leaving the rest where they were. Dropping them
+          // would change the mark count, which is a bigger difference than a label in the wrong
+          // place.
+          // The limit is the number of rows for a row label and of columns for a column one, and it
+          // is not the number of *cells*: six column headers over a two-by-three grid label three
+          // columns, and the other three are left alone rather than lining up under the second row.
+          val limit = if (alongRows) rows else columns
+          val cellIndex = if (alongRows) position * columns else position
+          val cell = if (position >= limit) null else cellNodes.getOrNull(cellIndex)
+          if (cell == null) {
+            node
+          } else {
+            val extent = cellBoxes[cellIndex]
+            val across =
+              if (alongRows) {
+                band?.let { roundHalfUp(cell.transform.f + extent.top + it * extent.height) }
+                  ?: cell.transform.f
+              } else {
+                band?.let { roundHalfUp(cell.transform.e + extent.left + it * extent.width) }
+                  ?: cell.transform.e
+              }
             val at =
-              if (alongRows) PointD(left, cell.transform.f) else PointD(cell.transform.e, top)
+              when {
+                alongRows && footer -> PointD(right + away, across)
+                alongRows -> PointD(left - away, across)
+                footer -> PointD(across, bottom + away)
+                else -> PointD(across, top - away)
+              }
             val node2 = moveTo(node, at)
-            val box = node2.transform.mapBounds(part.boxOf(position))
-            bounds = bounds.union(box)
-            edge = edge.union(box)
+            val drawn = node2.transform.mapBounds(part.boxOf(position))
+            bounds = bounds.union(drawn)
+            edge = edge.union(drawn)
             node2
           }
         }
@@ -548,26 +614,37 @@ internal class ScopeCompiler(
       placed[index] = moved
     }
 
-    val gridBounds = bounds
     gridded.forEachIndexed { index, (role, part) ->
       if (role != TrellisRole.ROW_TITLE && role != TrellisRole.COLUMN_TITLE) return@forEachIndexed
       val alongRows = role == TrellisRole.ROW_TITLE
-      val headerEdge =
-        edges[if (alongRows) TrellisRole.ROW_HEADER else TrellisRole.COLUMN_HEADER] ?: RectD.Empty
+      // A title sits just outside whatever the headers reached — or, under `titleAnchor: "end"`,
+      // just outside the *footers* on the far side. Its own offset then pushes it further out, in
+      // whichever direction that is.
+      val atEnd = layout.titleAtEnd(alongRows)
+      val edgeRole =
+        when {
+          alongRows && atEnd -> TrellisRole.ROW_FOOTER
+          alongRows -> TrellisRole.ROW_HEADER
+          atEnd -> TrellisRole.COLUMN_FOOTER
+          else -> TrellisRole.COLUMN_HEADER
+        }
+      val guideEdge = edges[edgeRole] ?: RectD.Empty
+      val away = layout.offsetFor(if (alongRows) "rowTitle" else "columnTitle")
+      val band = layout.titleBand(alongRows)
       val moved =
         part.nodes.mapIndexed { position, node ->
-          val at =
+          val across =
+            if (alongRows) roundHalfUp(gridBounds.top + band * gridBounds.height)
+            else roundHalfUp(gridBounds.left + band * gridBounds.width)
+          val outward =
             if (alongRows) {
-              PointD(
-                if (headerEdge.isEmpty) left else headerEdge.left,
-                roundHalfUp(gridBounds.top + 0.5 * gridBounds.height),
-              )
+              if (atEnd) (if (guideEdge.isEmpty) right else guideEdge.right) + away
+              else (if (guideEdge.isEmpty) left else guideEdge.left) - away
             } else {
-              PointD(
-                roundHalfUp(gridBounds.left + 0.5 * gridBounds.width),
-                if (headerEdge.isEmpty) top else headerEdge.top,
-              )
+              if (atEnd) (if (guideEdge.isEmpty) bottom else guideEdge.bottom) + away
+              else (if (guideEdge.isEmpty) top else guideEdge.top) - away
             }
+          val at = if (alongRows) PointD(outward, across) else PointD(across, outward)
           val node2 = moveTo(node, at)
           bounds = bounds.union(node2.transform.mapBounds(part.boxOf(position)))
           node2

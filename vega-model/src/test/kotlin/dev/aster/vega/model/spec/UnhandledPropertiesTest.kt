@@ -128,11 +128,11 @@ class UnhandledPropertiesTest {
   }
 
   /**
-   * A `layout` block, which listed its gaps by exception until now and so had no way of noticing
-   * one.
+   * A `layout` block reports nothing: all ten of upstream's properties are read.
    *
-   * `titleAnchor` is what that cost: it had neither an entry in the table nor a reader, so a
-   * trellis that anchored its cell titles was told nothing at all.
+   * Kept because inverting this block from a table of exceptions into a table of what it *consumes*
+   * is what found the last gap — `titleAnchor` had neither an entry nor a reader, so a trellis that
+   * anchored its cell titles was told nothing at all.
    */
   @Test
   fun `a layout reports the properties it cannot honour`() {
@@ -147,11 +147,7 @@ class UnhandledPropertiesTest {
              "marks": []}]"""
         )
       )
-    // `center` came off this list: a cell narrower than its column now sits in the middle of it.
-    assertEquals(
-      listOf("offset", "headerBand", "footerBand", "titleBand", "titleAnchor").sorted(),
-      reported.sorted(),
-    )
+    assertEquals(emptyList<String>(), reported.sorted())
   }
 
   /** A channel the engine does read is not reported, or the diagnostics would be noise. */
@@ -191,14 +187,15 @@ class UnhandledPropertiesTest {
     assertTrue("not implemented" in invented.message, invented.message)
 
     // A tailored explanation, from a block that still has some: `layout` reports six by name.
+    // A tailored explanation, from the one block that still has one: a legend's `titleAnchor`.
     val tailored =
       diagnostics(
           spec(
-            """"marks": [{"type": "group", "from": {"facet": {"data": "t", "name": "cell",
-                "groupby": "c"}}, "layout": {"offset": 4}, "marks": []}]"""
+            """"scales": [{"name": "s", "type": "ordinal", "domain": ["a"], "range": ["#000"]}],
+             "legends": [{"fill": "s", "titleAnchor": "end"}]"""
           )
         )
-        .single { it.jsonPath?.endsWith("offset") == true }
-    assertTrue("Layout offsets" in tailored.message, tailored.message)
+        .single { it.jsonPath?.endsWith("titleAnchor") == true }
+    assertTrue("title anchoring" in tailored.message, tailored.message)
   }
 }

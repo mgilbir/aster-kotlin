@@ -1468,7 +1468,44 @@ public data class LayoutSpec(
    */
   val centerColumn: Boolean = false,
   val centerRow: Boolean = false,
-)
+  /**
+   * `headerBand`, `footerBand` and `titleBand`: how far **along** a cell or the grid a label sits.
+   *
+   * `null` is upstream's default for a header or a footer and means the cell's own origin; a
+   * fraction means that far across the cell's extent, so `0.5` centres it. A title's default is
+   * `0.5`, because a row title centred on the grid is what a trellis usually wants.
+   */
+  val headerBandRow: Double? = null,
+  val headerBandColumn: Double? = null,
+  val footerBandRow: Double? = null,
+  val footerBandColumn: Double? = null,
+  val titleBandRow: Double? = null,
+  val titleBandColumn: Double? = null,
+  /** `titleAnchor`: `"end"` puts a title past the **footers** rather than before the headers. */
+  val titleAnchorRow: String? = null,
+  val titleAnchorColumn: String? = null,
+  /**
+   * `offset`: how far outside the grid each kind of label sits.
+   *
+   * One number for all six, or an object naming any of `rowHeader`, `columnHeader`, `rowFooter`,
+   * `columnFooter`, `rowTitle` and `columnTitle`.
+   */
+  val offsets: Map<String, Double> = emptyMap(),
+) {
+  /** The band for a header, by direction. */
+  public fun headerBand(row: Boolean): Double? = if (row) headerBandRow else headerBandColumn
+
+  public fun footerBand(row: Boolean): Double? = if (row) footerBandRow else footerBandColumn
+
+  /** A title's band, whose default is the middle rather than the origin. */
+  public fun titleBand(row: Boolean): Double = (if (row) titleBandRow else titleBandColumn) ?: 0.5
+
+  public fun titleAtEnd(row: Boolean): Boolean =
+    (if (row) titleAnchorRow else titleAnchorColumn) == "end"
+
+  /** How far outside the grid one kind of label sits; zero when the layout says nothing. */
+  public fun offsetFor(role: String): Double = offsets[role] ?: 0.0
+}
 
 /**
  * A mark definition.

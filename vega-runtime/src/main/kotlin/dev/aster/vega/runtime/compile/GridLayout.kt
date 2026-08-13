@@ -239,6 +239,15 @@ internal enum class TrellisRole {
   CELL,
   ROW_HEADER,
   COLUMN_HEADER,
+  /**
+   * The mirror of a header, on the far side of the grid.
+   *
+   * These were missing and so fell through to [CELL], which does not merely misplace them — it
+   * grids them *among the cells*, so a trellis of four cells with four row footers laid out as a
+   * two-column grid of eight.
+   */
+  ROW_FOOTER,
+  COLUMN_FOOTER,
   ROW_TITLE,
   COLUMN_TITLE;
 
@@ -247,6 +256,8 @@ internal enum class TrellisRole {
       when (role) {
         "row-header" -> ROW_HEADER
         "column-header" -> COLUMN_HEADER
+        "row-footer" -> ROW_FOOTER
+        "column-footer" -> COLUMN_FOOTER
         "row-title" -> ROW_TITLE
         "column-title" -> COLUMN_TITLE
         else -> CELL

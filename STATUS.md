@@ -21,7 +21,7 @@ end to end — expressions, signals, 33 of upstream's 40 data transforms, every 
 and an event handler that recompiles the chart — and are verified against upstream Vega by
 differential tests.
 
-One hundred and thirty-seven differential fixtures pass, all matching upstream exactly on every mark and
+One hundred and thirty-eight differential fixtures pass, all matching upstream exactly on every mark and
 scale output:
 
 | Fixture | Marks | Covers |
@@ -201,7 +201,7 @@ substantive compatibility items:
 | 6. View and Compose APIs | Yes |
 | 7. SVG, PNG, PDF export | Yes |
 | 8. TalkBack can describe and navigate | Partial — virtual nodes are tested by instrumentation, not with TalkBack itself |
-| 9. At least 100 compatibility fixtures pass | **Yes** — 137 |
+| 9. At least 100 compatibility fixtures pass | **Yes** — 138 |
 | 10. Core runtime has no Android dependency | Yes |
 | 11. Renders without WebView | Yes |
 | 12. Build and test loop runs from the terminal | Yes |
@@ -538,7 +538,7 @@ each example a deadline.
 
 ## Known failing fixtures
 
-None. One hundred and thirty-seven fixtures exist and all of them pass — and that sentence became worth
+None. One hundred and thirty-eight fixtures exist and all of them pass — and that sentence became worth
 something only once the gate could no longer skip itself, below.
 
 **The gate could report success without running.** `FixtureDifferentialTest` reads the fixtures and
@@ -1879,6 +1879,32 @@ cell in a column, which has no slack, is not pulled backwards out of it.
 The facet aggregate message went the way the `impute`, `pivot` and `window` ones did earlier: a facet
 measures with any aggregate operation, so with all 26 implemented the report fired only for a name
 upstream also rejects. It says that now.
+
+## A trellis has footers, and this engine was gridding them
+
+`row-footer` and `column-footer` were not in `TrellisRole`, so they fell through to `CELL` — which does
+not merely misplace them, it **grids them among the cells**. A trellis of four cells with four row
+footers laid out as an eight-cell grid. Nothing reported it, because a group mark with no recognised
+role is a cell by design and that is exactly what an unrecognised one looked like.
+
+With the two roles added, the whole `layout` block closes: `headerBand`, `footerBand`, `titleBand`,
+`titleAnchor` and `offset`, which is all ten of upstream's properties. Four things in it are upstream's
+and none is guessable:
+
+- **a band is `null` by default for a header and `0.5` for a title.** `null` means the cell's own
+  origin, not its middle — so a header without a band lines up with the corner of the cell it names,
+  and a title without one is centred on the grid.
+- **a title is centred on the *cells*, not on the grid plus its headers.** Upstream returns the cell
+  bounds from `gridLayout` and lays the headers out afterwards, so the question never arises there;
+  here the header pass had already widened the bounds the title was centred on, which moved every
+  title by half the width of its own row labels.
+- **`titleAnchor: "end"` measures from the footers**, not from the far side of the cells — so a title
+  anchored to the end of a trellis that has footers clears them.
+- **more headers than rows is not an error and not a reason to drop one.** Upstream lays out the first
+  `limit` and leaves the rest where they were; the limit is the number of rows or columns and *not*
+  the number of cells, so six column headers over a two-by-three grid label three columns and the
+  other three stay put. Dropping them changes the mark count, which is a bigger difference than a
+  label in the wrong place.
 
 ## Performance observations
 

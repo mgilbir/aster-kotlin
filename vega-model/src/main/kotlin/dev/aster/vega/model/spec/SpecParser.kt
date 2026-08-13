@@ -450,7 +450,19 @@ private val PROJECTION_CONSUMED =
   )
 
 /** Layout properties this engine reads; the rest are named in [SpecParser.parseLayout]. */
-private val LAYOUT_CONSUMED = setOf("columns", "padding", "align", "bounds", "center")
+private val LAYOUT_CONSUMED =
+  setOf(
+    "columns",
+    "padding",
+    "align",
+    "bounds",
+    "center",
+    "headerBand",
+    "footerBand",
+    "titleBand",
+    "titleAnchor",
+    "offset",
+  )
 
 /** Data properties this engine reads. */
 private val DATA_CONSUMED = setOf("name", "values", "source", "transform", "format", "url")
@@ -2242,6 +2254,26 @@ public class SpecParser {
    * generates around the grid, and they are reported rather than silently dropped, because a
    * trellis without its row and column labels is a chart nobody can read.
    */
+  /** The six labels a layout `offset` can name, when it names one number for all of them. */
+  private val OFFSET_PARTS =
+    listOf("rowHeader", "columnHeader", "rowFooter", "columnFooter", "rowTitle", "columnTitle")
+
+  /** One direction of a layout band, written either as one number or as `{row, column}`. */
+  private fun layoutBand(value: VegaValue?, direction: String): Double? =
+    when (value) {
+      is VegaValue.Obj -> (value.fields[direction] as? VegaValue.Num)?.value
+      is VegaValue.Num -> value.value
+      else -> null
+    }?.takeIf { it.isFinite() }
+
+  /** The same for a layout property whose value is a word. */
+  private fun layoutText(value: VegaValue?, direction: String): String? =
+    when (value) {
+      is VegaValue.Obj -> value.fields[direction]?.asString()
+      is VegaValue.Str -> value.value
+      else -> null
+    }?.takeIf { it.isNotEmpty() }
+
   /** One direction of a layout flag written either as one value or as `{row, column}`. */
   private fun layoutFlag(value: VegaValue?, direction: String): Boolean =
     when (value) {
@@ -2262,13 +2294,7 @@ public class SpecParser {
       "Layout",
       path,
       LAYOUT_CONSUMED,
-      mapOf(
-        "headerBand" to "Layout header bands are not implemented",
-        "footerBand" to "Layout footer bands are not implemented",
-        "titleBand" to "Layout title bands are not implemented",
-        "titleAnchor" to "Anchoring a cell's title within its row or column is not implemented",
-        "offset" to "Layout offsets are not implemented",
-      ),
+      emptyMap(),
     )
 
     // `padding` is either one number for both directions or a per-direction object.
@@ -2296,6 +2322,30 @@ public class SpecParser {
       bounds = obj.fields["bounds"]?.takeIf { it is VegaValue.Str }?.asString()?.lowercase(),
       centerColumn = layoutFlag(obj.fields["center"], "column"),
       centerRow = layoutFlag(obj.fields["center"], "row"),
+      headerBandRow = layoutBand(obj.fields["headerBand"], "row"),
+      headerBandColumn = layoutBand(obj.fields["headerBand"], "column"),
+      footerBandRow = layoutBand(obj.fields["footerBand"], "row"),
+      footerBandColumn = layoutBand(obj.fields["footerBand"], "column"),
+      titleBandRow = layoutBand(obj.fields["titleBand"], "row"),
+      titleBandColumn = layoutBand(obj.fields["titleBand"], "column"),
+      titleAnchorRow = layoutText(obj.fields["titleAnchor"], "row"),
+      titleAnchorColumn = layoutText(obj.fields["titleAnchor"], "column"),
+      // One number for all six, or an object naming any of them. Upstream reads each key on demand,
+      // so a partial object leaves the rest at zero rather than at the single value.
+      offsets =
+        (obj.fields["offset"] as? VegaValue.Obj)
+          ?.fields
+          ?.mapNotNull { (key, value) ->
+            (value as? VegaValue.Num)?.value?.takeIf { it.isFinite() }?.let { key to it }
+          }
+          ?.toMap()
+          ?: (obj.fields["offset"] as? VegaValue.Num)
+            ?.value
+            ?.takeIf { it.isFinite() }
+            ?.let { one ->
+              OFFSET_PARTS.associateWith { one }
+            }
+          ?: emptyMap(),
     )
   }
 
