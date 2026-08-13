@@ -1037,12 +1037,20 @@ public class MarkEncoder(
     // default. So a rect outlined with a stroke and no fill is an outline, where checking only
     // `fill` would have filled it with the built-in blue.
     val paintsItself = channels["fill"] != null || channels["stroke"] != null
+    // …the **built-in** default, that is. A style block's own paint is not a default in that sense:
+    // a plotting area is a group styled `cell`, whose block fills it transparent and outlines it
+    // grey, and a chart that hides the outline by encoding `stroke: null` has not thereby asked for
+    // the fill to go as well. Suppressing both dropped the group from the scene altogether.
     val fillColour =
-      paint(channels["fill"], datum, "fill", spec)
-        ?: defaults.colour("fill", MarkDefaults.fillFor(spec.type)).takeIf { !paintsItself }
+      if (paintedNothing(channels["fill"], datum)) null
+      else
+        paint(channels["fill"], datum, "fill", spec)
+          ?: defaults.colour("fill", MarkDefaults.fillFor(spec.type).takeIf { !paintsItself })
     val strokeColour =
-      paint(channels["stroke"], datum, "stroke", spec)
-        ?: defaults.colour("stroke", MarkDefaults.strokeFor(spec.type)).takeIf { !paintsItself }
+      if (paintedNothing(channels["stroke"], datum)) null
+      else
+        paint(channels["stroke"], datum, "stroke", spec)
+          ?: defaults.colour("stroke", MarkDefaults.strokeFor(spec.type).takeIf { !paintsItself })
     val fillOpacity =
       number(channels["fillOpacity"], datum) ?: defaults.number("fillOpacity") ?: 1.0
     val strokeOpacity =
@@ -1767,6 +1775,10 @@ public class MarkEncoder(
         // adjustments are dropped rather than applied so at least the colour survives.
         is ChannelValue.Adjusted -> return paint(channel.base, datum, channelName, spec)
       }
+    // An explicit `null` is a *statement*: it says this mark has no paint of that kind, and it is
+    // how a chart hides a border its style block would otherwise draw. It is not an unreadable
+    // colour and it must not fall through to the configuration, or the border comes back.
+    if (text == "null") return null
     val colour = SceneColor.parse(text)
     if (colour == null) {
       diagnostics.warn(
@@ -1777,6 +1789,15 @@ public class MarkEncoder(
     }
     return colour
   }
+
+  /** Whether a paint channel is present and says, in so many words, that there is no paint. */
+  private fun paintedNothing(channel: ChannelValue?, datum: VegaValue): Boolean =
+    when (channel) {
+      null -> false
+      is ChannelValue.Constant -> channel.value is VegaValue.Null
+      is ChannelValue.Conditional -> paintedNothing(selectRule(channel, datum), datum)
+      else -> false
+    }
 
   /**
    * Builds an accessibility label from the encoded channels.

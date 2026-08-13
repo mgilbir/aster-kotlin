@@ -49,6 +49,9 @@
           "field": "Origin",
           "type": "nominal"
         }
+      },
+      "view": {
+        "stroke": null
       }
     },
     {

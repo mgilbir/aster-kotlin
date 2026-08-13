@@ -2135,6 +2135,25 @@ Three of their rules had to be narrowed, and three of mine:
   until a stacked bar with rounded corners did exactly that, and every segment was drawn its own
   group's height too far down. The enclosing group's origin is now what the reference reads.
 
+### Three narrowed fixtures, two of them now whole
+
+Three fixtures had been written narrower than the rule they were for, each because a runtime gap
+made the honest version fail. The merge closed two of them and the work above closed the third's
+cause:
+
+- **`stated-parse` is back.** It was withdrawn because reading a stated `format.parse` means
+  emitting `utcParse`, which this engine refused for want of a `strptime`. The main line has one
+  now, so the chart compiles *and* renders.
+- **`concat-shared-transform` has its `view: {stroke: null}` back**, and the gap it named turned
+  out to be two bugs of this engine's own, both fixed here. A **style block's paint is not a
+  built-in default**: a plotting area is a group styled `cell`, whose block fills it transparent and
+  outlines it grey, and a chart that hides the outline by encoding `stroke: null` has not thereby
+  asked for the fill to go too — suppressing both dropped the group from the scene altogether. And
+  an **explicit `null` paint is a statement**, not an unreadable colour: it says this mark has no
+  paint of that kind, so it must not fall through to the configuration and bring the border back.
+- **`errorband-single-part` keeps its narrowed form.** Its cause is the path-ordering gap below,
+  which is still open.
+
 ### Two runtime gaps this batch names but does not close
 
 `density`'s fixture is not in the corpus, and `trail`'s draws no legend. Both compile exactly as
