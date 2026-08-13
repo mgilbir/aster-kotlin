@@ -155,6 +155,7 @@ scale output:
 | `density-options` | 37 | a kernel density with its own bandwidth, extent, steps, independent resolution, cumulative counts, beside a loess fit with its own bandwidth |
 | `text-and-cells` | 28 | a word count with its own pattern, case rule and stopwords, numbered by `identifier`, and Voronoi cells cut by a stated extent |
 | `aggregate-ops-rest` | 14 | the seven aggregate operations no fixture had asked for, read out as text so the numbers themselves are compared |
+| `window-ops` | 18 | the ten window operations no fixture had asked for, over a column with ties so the ranking family separates |
 
 The gate is wired into `./scripts/oracle.sh`, so every further scale, mark and transform is built
 against a harness that can say we are wrong — which golden tests cannot.
@@ -213,7 +214,7 @@ substantive compatibility items:
 | 6. View and Compose APIs | Yes |
 | 7. SVG, PNG, PDF export | Yes |
 | 8. TalkBack can describe and navigate | Partial — virtual nodes are tested by instrumentation, not with TalkBack itself |
-| 9. At least 100 compatibility fixtures pass | **Yes** — 169 |
+| 9. At least 100 compatibility fixtures pass | **Yes** — 170 |
 | 10. Core runtime has no Android dependency | Yes |
 | 11. Renders without WebView | Yes |
 | 12. Build and test loop runs from the terminal | Yes |

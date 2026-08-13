@@ -1,0 +1,243 @@
+{
+  "marks": [
+    {
+      "fill": "#4c78a8",
+      "height": 18,
+      "role": "mark",
+      "type": "rect",
+      "width": 90,
+      "x": 70,
+      "y": 6
+    },
+    {
+      "fill": "#08519c",
+      "height": 18,
+      "role": "mark",
+      "type": "rect",
+      "width": 180,
+      "x": 70,
+      "y": 30
+    },
+    {
+      "fill": "#4c78a8",
+      "height": 18,
+      "role": "mark",
+      "type": "rect",
+      "width": 90,
+      "x": 70,
+      "y": 54
+    },
+    {
+      "fill": "#4c78a8",
+      "height": 18,
+      "role": "mark",
+      "type": "rect",
+      "width": 120,
+      "x": 70,
+      "y": 78
+    },
+    {
+      "fill": "#08519c",
+      "height": 18,
+      "role": "mark",
+      "type": "rect",
+      "width": 180,
+      "x": 70,
+      "y": 102
+    },
+    {
+      "fill": "#9ecae1",
+      "height": 18,
+      "role": "mark",
+      "type": "rect",
+      "width": 30,
+      "x": 70,
+      "y": 126
+    },
+    {
+      "align": "right",
+      "baseline": "middle",
+      "fill": "#333333",
+      "font": "sans-serif",
+      "fontSize": 9,
+      "role": "mark",
+      "text": "a 4 r2/d2",
+      "type": "text",
+      "x": 66,
+      "y": 15
+    },
+    {
+      "align": "right",
+      "baseline": "middle",
+      "fill": "#333333",
+      "font": "sans-serif",
+      "fontSize": 9,
+      "role": "mark",
+      "text": "b 9 r5/d4",
+      "type": "text",
+      "x": 66,
+      "y": 39
+    },
+    {
+      "align": "right",
+      "baseline": "middle",
+      "fill": "#333333",
+      "font": "sans-serif",
+      "fontSize": 9,
+      "role": "mark",
+      "text": "c 4 r2/d2",
+      "type": "text",
+      "x": 66,
+      "y": 63
+    },
+    {
+      "align": "right",
+      "baseline": "middle",
+      "fill": "#333333",
+      "font": "sans-serif",
+      "fontSize": 9,
+      "role": "mark",
+      "text": "d 7 r4/d3",
+      "type": "text",
+      "x": 66,
+      "y": 87
+    },
+    {
+      "align": "right",
+      "baseline": "middle",
+      "fill": "#333333",
+      "font": "sans-serif",
+      "fontSize": 9,
+      "role": "mark",
+      "text": "e 9 r5/d4",
+      "type": "text",
+      "x": 66,
+      "y": 111
+    },
+    {
+      "align": "right",
+      "baseline": "middle",
+      "fill": "#333333",
+      "font": "sans-serif",
+      "fontSize": 9,
+      "role": "mark",
+      "text": "f 2 r1/d1",
+      "type": "text",
+      "x": 66,
+      "y": 135
+    },
+    {
+      "baseline": "middle",
+      "fill": "#666666",
+      "font": "sans-serif",
+      "fontSize": 8,
+      "role": "mark",
+      "text": "0.20 0.50 fae aa",
+      "type": "text",
+      "x": 164,
+      "y": 15
+    },
+    {
+      "baseline": "middle",
+      "fill": "#666666",
+      "font": "sans-serif",
+      "fontSize": 8,
+      "role": "mark",
+      "text": "0.80 1.00 fae bb",
+      "type": "text",
+      "x": 254,
+      "y": 39
+    },
+    {
+      "baseline": "middle",
+      "fill": "#666666",
+      "font": "sans-serif",
+      "fontSize": 8,
+      "role": "mark",
+      "text": "0.20 0.50 fae cc",
+      "type": "text",
+      "x": 164,
+      "y": 63
+    },
+    {
+      "baseline": "middle",
+      "fill": "#666666",
+      "font": "sans-serif",
+      "fontSize": 8,
+      "role": "mark",
+      "text": "0.60 0.67 fae dd",
+      "type": "text",
+      "x": 194,
+      "y": 87
+    },
+    {
+      "baseline": "middle",
+      "fill": "#666666",
+      "font": "sans-serif",
+      "fontSize": 8,
+      "role": "mark",
+      "text": "0.80 1.00 fae ee",
+      "type": "text",
+      "x": 254,
+      "y": 111
+    },
+    {
+      "baseline": "middle",
+      "fill": "#666666",
+      "font": "sans-serif",
+      "fontSize": 8,
+      "role": "mark",
+      "text": "0.00 0.17 fae ff",
+      "type": "text",
+      "x": 104,
+      "y": 135
+    }
+  ],
+  "scales": {
+    "x": {
+      "domain": [
+        0,
+        1
+      ],
+      "range": [
+        70,
+        250
+      ],
+      "ticks": [
+        0,
+        0.1,
+        0.2,
+        0.3,
+        0.4,
+        0.5,
+        0.6,
+        0.7,
+        0.8,
+        0.9,
+        1
+      ]
+    },
+    "y": {
+      "bandwidth": 18,
+      "domain": [
+        "a",
+        "b",
+        "c",
+        "d",
+        "e",
+        "f"
+      ],
+      "range": [
+        0,
+        150
+      ],
+      "step": 24
+    }
+  },
+  "size": {
+    "height": 180,
+    "width": 366
+  },
+  "spec": "window-ops.vg.json",
+  "vegaVersion": "6.3.1"
+}
