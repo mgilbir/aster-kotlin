@@ -550,6 +550,11 @@ internal class DataPipeline(
       // filtered a binned colour column, whose scale is `bin-ordinal` and shows every bucket.
       val type = view.scaleType(channel) ?: continue
       if (!Scales.hasContinuousDomain(type)) continue
+      // A channel the *configuration* gives its own answer for an invalid value is not filtered
+      // at all: whatever the mode says, `config.scale.invalid.<channel>` means the scale can show
+      // one, so the row stays and the encoding's production rule paints it. Filtering it as well
+      // removed the very rows that answer was written for.
+      if (view.config.scaleInvalid(channel) != null) continue
       val accessor = Fields.datumAccess(def)
       byField[field] =
         when (def.type) {

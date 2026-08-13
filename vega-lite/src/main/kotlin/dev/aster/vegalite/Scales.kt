@@ -148,6 +148,25 @@ internal object Scales {
     )
   }
 
+  /** Whether a channel's values are *instants*, which is what turns a domain into expressions. */
+  private fun measuresTime(def: ChannelDef): Boolean =
+    def.type == MeasureType.TEMPORAL || def.timeUnit != null
+
+  /**
+   * `valueExpr`: one end of a temporal domain, as the expression that builds it.
+   *
+   * A stated object is a `datetime()` of its parts; a number or a string is a `datetime()` of
+   * itself, epoch milliseconds and a parseable date being the two ways of writing one down.
+   */
+  private fun instantExpression(value: VegaValue): String =
+    when {
+      value is VegaValue.Obj && looksLikeADateTime(value) ->
+        Transforms(DiagnosticCollector()).dateTimeExpression(value)
+      value is VegaValue.Num -> "datetime(${canonicalNumberString(value.value)})"
+      value is VegaValue.Str -> "datetime(\"${value.value}\")"
+      else -> canonicalNumberString((value as? VegaValue.Num)?.value ?: 0.0)
+    }
+
   fun domain(
     view: UnitView,
     channel: String,
@@ -168,20 +187,14 @@ internal object Scales {
       return listOf(arr(widened)) + derived
     }
     def.scale?.fields?.get("domain")?.let { stated ->
-      // A domain written as **dates** cannot be handed to Vega as objects: each end becomes the
-      // expression that builds the instant, wrapped in `{data: …}` so Vega reads it as a datum of
-      // the domain rather than as a signal to be scaled.
-      val values = (stated as? VegaValue.Arr)?.values
-      if (values != null && values.any { it is VegaValue.Obj && looksLikeADateTime(it) }) {
-        return values.map { value ->
-          if (value is VegaValue.Obj && looksLikeADateTime(value)) {
-            signalRef("{data: ${Transforms(DiagnosticCollector()).dateTimeExpression(value)}}")
-          } else {
-            value
-          }
-        }
-      }
-      return listOf(stated)
+      val values = (stated as? VegaValue.Arr)?.values ?: return listOf(stated)
+      // `convertDomainIfItIsDateTime`: on a scale that measures **time**, every end of a stated
+      // domain becomes the expression that builds the instant, wrapped in `{data: …}` so Vega
+      // reads it as a datum of the domain rather than as a signal to be scaled. It is the
+      // *channel* that decides — a temporal field, or one cut to a time unit — not whether the
+      // value happens to look like a date: a domain of two epoch milliseconds is two instants.
+      if (!measuresTime(def)) return listOf(stated)
+      return values.map { signalRef("{data: ${instantExpression(it)}}") }
     }
 
     val stack = view.stack
@@ -785,6 +798,12 @@ internal object Scales {
 
     // Anything else the specification stated on the scale passes through untouched.
     user?.fields?.forEach { (key, value) ->
+      // …except a **bound** on a temporal domain, which is an instant like any other end of one
+      // and has to be written as the expression that builds it.
+      if ((key == "domainMin" || key == "domainMax") && measuresTime(def)) {
+        component.properties[key] = signalRef(instantExpression(value))
+        return@forEach
+      }
       if (key !in setOf("type", "domain", "range", "scheme", "rangeMin", "rangeMax")) {
         // `{"expr": …}` is a signal to Vega, which has no `expr` — a `domainRaw` written that way
         // was read as an object and the scale left at its own domain.

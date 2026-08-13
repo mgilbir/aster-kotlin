@@ -616,7 +616,15 @@ public class ScaleResolver(
         val extent = numericExtent(spec.domain, spec.name) ?: return null
         listOf(extent.start, extent.endInclusive)
       }
-    val padded = padded(domain, range, spec)
+    // A **bound** replaces an end of the domain here as it does on any other continuous scale:
+    // upstream's `configureDomain` runs the same block whatever the type, and a time scale that
+    // ignored them drew the whole of the data where a chart had asked for one year of it.
+    val bounded =
+      domain.toMutableList().also {
+        numbers.resolve(spec.domainMin, spec.name)?.let { low -> it[0] = low }
+        numbers.resolve(spec.domainMax, spec.name)?.let { high -> it[it.size - 1] = high }
+      }
+    val padded = padded(bounded, range, spec)
     val niced =
       if (spec.nice) {
         val (lo, hi) =

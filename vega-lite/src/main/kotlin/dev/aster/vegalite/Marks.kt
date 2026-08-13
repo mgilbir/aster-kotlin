@@ -1208,9 +1208,12 @@ internal object Marks {
    * breaking the path at it, so this is the only one that reaches the encoding.
    */
   private fun invalidPositionRef(view: UnitView, channel: String): VegaValue? {
-    if (view.invalidDataMode != "show") return null
     if (channel !in Channels.SCALE_CHANNELS) return null
     val main = mainChannel(channel)
+    // `getScaleInvalidDataMode` asks **per channel**, not once for the mark: a channel the
+    // configuration gives its own answer for is shown whatever the mark's mode says, because
+    // there is now something to show it as. That answer is the rule's first arm below.
+    if (view.invalidDataMode != "show" && view.config.scaleInvalid(main) == null) return null
     // A **stacked** position is not read from the row at all: it is the accumulated end the stack
     // transform wrote, which is a number whatever the row held. Only the refs that go through
     // `midPointRefWithPositionInvalidTest` get the test, and a stacked one does not.

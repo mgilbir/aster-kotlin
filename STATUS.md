@@ -2038,6 +2038,26 @@ first, the derived domain after, both in the one union — and the stated values
 of that union rather than becoming one each. Vega takes a literal array as a domain in its own
 right, so splitting it hands the scale two domains of a single value.
 
+### An invalid value the theme has an answer for
+
+`getScaleInvalidDataMode` asks **per channel**, not once for the mark. A theme that writes
+`config.scale.invalid.color` has said what an unplaceable value looks like on that channel — so
+whatever the mark's `invalid` mode says, those rows stay and the channel's production rule paints
+them. Filtering them as well removed the very rows the answer was written for, and leaving the arm
+off the encoding painted them as if they had been valid. Both halves are the same rule, read in two
+places.
+
+Beside it, `convertDomainIfItIsDateTime` in full. On a scale that measures **time**, every end of a
+stated domain becomes the expression that builds the instant, wrapped in `{data: …}` so Vega reads
+it as a datum rather than as a signal to be scaled — and it is the *channel* that decides, not
+whether the value happens to look like a date, so a domain of two epoch milliseconds is two
+instants. `domainMin` and `domainMax` are ends of a domain like any other and go the same way.
+
+The fixture written for that found a runtime defect: **a time scale ignored `domainMin` and
+`domainMax` outright**, where every other continuous scale applies them. A chart asking for one year
+of a decade was drawn with the whole decade in it. `configureDomain` runs the same block whatever
+the scale's type, and so does this now.
+
 ### Two runtime gaps this batch names but does not close
 
 `density`'s fixture is not in the corpus, and `trail`'s draws no legend. Both compile exactly as
