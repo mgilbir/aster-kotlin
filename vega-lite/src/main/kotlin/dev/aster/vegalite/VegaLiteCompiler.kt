@@ -244,7 +244,14 @@ private class Compilation(
     // channel needs nothing said about which.
     for (view in views) {
       for ((channel, def) in view.scaledChannels()) {
-        val stated = def.scale?.obj("domain")?.takeIf { it.has("param") } ?: continue
+        // `parseSelectionDomain` asks two places: the scale's own `domain`, and the **bin's**
+        // extent. A bucketing whose width a brush sets is measuring the same thing the domain is,
+        // so the scale follows the brush too — the second plot of a chart with an overview above it
+        // shows what the brush has picked, cut into buckets as wide as the brush makes them.
+        val stated =
+          def.scale?.obj("domain")?.takeIf { it.has("param") }
+            ?: (def.bin as? Binning.Bin)?.params?.obj("extent")?.takeIf { it.has("param") }
+            ?: continue
         val named = stated.string("param") ?: continue
         val selection = selections.firstOrNull { it.name == named } ?: continue
         val projected = selection.intervalChannels(selection.owner ?: view)

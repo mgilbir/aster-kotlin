@@ -234,6 +234,12 @@ internal object Fields {
       is VegaValue.Str -> value.value
       is VegaValue.Bool -> value.value.toString()
       is VegaValue.Arr -> value.values.joinToString(",") { literalText(it) }
+      // A bin extent naming a **selection** is written from the object's *entries* —
+      // `entries(bin[p])` in `binToString` — so `{"param": "brush"}` reads `param,brush` and the
+      // bucketing is named `bin_maxbins_30_extent_param_brush`. Stringified as an object it read
+      // as nothing at all, and two different bucketings of one column shared a name.
+      is VegaValue.Obj ->
+        value.fields.entries.joinToString(",") { "${it.key},${literalText(it.value)}" }
       else -> ""
     }
 

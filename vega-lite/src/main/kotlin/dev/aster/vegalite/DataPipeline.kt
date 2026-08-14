@@ -302,9 +302,26 @@ internal class DataPipeline(
         // signals are named plainly where a cell's carry the cell's prefix. And it needs no range
         // formula — `binRequiresRange` asks about a *scale* channel, and a facet has no scale.
         val facetted = def in view.facetDefs
+        // `parseSelectionExtent`: an extent naming a **selection** is not an extent Vega
+        // understands. The bucketing keeps the data's own, and how wide one bucket is becomes a
+        // `span` read off the brush — so dragging the brush narrower cuts finer buckets over the
+        // same range. The column is the one the selection projects onto, since that is the one the
+        // brush's numbers are in.
+        val selected = (bin.params.fields["extent"] as? VegaValue.Obj)?.string("param")
+        val span = selected?.let { name ->
+          val selection = view.selections.firstOrNull { it.name == name }
+          val on =
+            (bin.params.fields["extent"] as? VegaValue.Obj)?.string("field")
+              ?: selection?.owner?.let { owner ->
+                selection.projections(owner).firstOrNull()?.second
+              }
+              ?: field
+          "${Fields.varName(name)}[${quoted(on)}]"
+        }
         BinComponent(
           field = field,
           params = bin.params,
+          span = span,
           output =
             listOf(
               Fields.vgField(def, forAs = true),
@@ -312,7 +329,7 @@ internal class DataPipeline(
             ),
           signal = if (facetted) "${key}_bins" else view.prefixed("${key}_bins"),
           extentSignal = if (facetted) "${key}_extent" else view.prefixed("${key}_extent"),
-          extent = bin.params.fields["extent"],
+          extent = bin.params.fields["extent"]?.takeIf { selected == null },
           // `binRequiresRange`: a binned field the specification forced onto a **discrete** scale
           // needs its range written out as text, because that text is what the axis labels and the
           // legend entries then read — there is no numeric axis left to derive them from.

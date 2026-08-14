@@ -637,6 +637,11 @@ internal class BinNode(bins: List<BinComponent>) : DataNode() {
       put("as", strings(bin.output))
       put("signal", bin.signal)
       put("extent", bin.extent ?: signalRef(bin.extentSignal))
+      // A bucketing whose width a **selection** sets keeps the data's own extent and takes its
+      // *span* from the brush: `span(brush["time"])` is how wide one bucket is, so dragging the
+      // brush narrower cuts finer buckets over the same range. Upstream deletes the selection from
+      // the bin's parameters for exactly this reason — Vega has no `extent: {param}`.
+      bin.span?.let { put("span", signalRef("span($it)")) }
       bin.params.fields.forEach { (key, value) -> if (key != "extent") put(key, value) }
     }
     if (bin.rangeFormula != null) {
@@ -653,6 +658,8 @@ internal class BinNode(bins: List<BinComponent>) : DataNode() {
 internal data class BinComponent(
   val field: String,
   val params: VegaValue.Obj,
+  /** What a **selection** says one bucket is as wide as, where a selection says it. */
+  val span: String? = null,
   val output: List<String>,
   val signal: String,
   val extentSignal: String,
