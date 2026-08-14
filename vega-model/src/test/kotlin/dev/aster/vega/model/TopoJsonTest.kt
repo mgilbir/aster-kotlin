@@ -60,6 +60,9 @@ class TopoJsonTest {
         value.fields.entries
           .sortedBy { it.key }
           .joinToString(",", "{", "}") { "\"${it.key}\":${asJson(it.value)}" }
+      // `JSON.stringify(/a/)` is `{}` — a RegExp has no enumerable properties, and none of these
+      // vectors can produce one anyway.
+      is VegaValue.Pattern -> "{}"
     }
 
   private fun number(value: Double): String =

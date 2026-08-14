@@ -26,6 +26,53 @@ public sealed interface VegaValue {
   /** Insertion-ordered so that canonical serialization can sort keys explicitly. */
   @JvmInline public value class Obj(public val fields: Map<String, VegaValue>) : VegaValue
 
+  /**
+   * A regular expression, which `regexp()` makes and `test()` uses.
+   *
+   * A variant of its own for the same reason [Timestamp] is one: `isRegExp` has to be able to
+   * answer **true**, and a value that stringifies to `/pattern/flags` is not an object with two
+   * fields. It carries the compiled [regex] so a filter over ten thousand rows compiles the pattern
+   * once, and the [source] and [flags] it was made from because that is what the string form is
+   * built out of.
+   */
+  public class Pattern(public val source: String, public val flags: String = "") : VegaValue {
+
+    /** Compiled once, here, because a `test()` in a filter runs per row. */
+    public val regex: Regex = Regex(source, flagOptions(flags))
+
+    /** Upstream's `String(new RegExp(p, f))`, which is the literal a reader would have written. */
+    public val text: String
+      get() = "/$source/$flags"
+
+    override fun equals(other: Any?): Boolean =
+      other is Pattern && other.source == source && other.flags == flags
+
+    override fun hashCode(): Int = 31 * source.hashCode() + flags.hashCode()
+
+    override fun toString(): String = text
+
+    private companion object {
+      /**
+       * The JavaScript flags that have a Kotlin equivalent.
+       *
+       * `i`, `m` and `s` map across; `g`, `y` and `u` are about *where a search resumes* and about
+       * Unicode escapes, neither of which changes the answer `test()` gives, so they are accepted
+       * and ignored rather than refused — a specification carrying `g` should not stop working.
+       */
+      fun flagOptions(flags: String): Set<RegexOption> =
+        flags
+          .mapNotNull {
+            when (it) {
+              'i' -> RegexOption.IGNORE_CASE
+              'm' -> RegexOption.MULTILINE
+              's' -> RegexOption.DOT_MATCHES_ALL
+              else -> null
+            }
+          }
+          .toSet()
+    }
+  }
+
   public companion object {
     public val EmptyObject: Obj = Obj(emptyMap())
     public val EmptyArray: Arr = Arr(emptyList())
@@ -79,6 +126,8 @@ public fun VegaValue.asDouble(): Double =
     is VegaValue.Null -> Double.NaN
     is VegaValue.Arr -> if (values.size == 1) values[0].asDouble() else Double.NaN
     is VegaValue.Obj -> Double.NaN
+    // `+/a/` in JavaScript is NaN too: a pattern is not a quantity.
+    is VegaValue.Pattern -> Double.NaN
   }
 
 /**
@@ -94,6 +143,8 @@ public fun VegaValue.asString(): String =
     is VegaValue.Null -> "null"
     is VegaValue.Arr -> values.joinToString(",") { it.asString() }
     is VegaValue.Obj -> fields.entries.joinToString(",") { "${it.key}:${it.value.asString()}" }
+    // `'' + regexp('a.b','i')` is `/a.b/i`, which is the literal a reader would have written.
+    is VegaValue.Pattern -> text
   }
 
 /** Vega truthiness: `null`, `false`, `0`, `NaN` and the empty string are falsey. */
@@ -106,6 +157,8 @@ public fun VegaValue.asBoolean(): Boolean =
     is VegaValue.Null -> false
     is VegaValue.Arr -> true
     is VegaValue.Obj -> true
+    // Every object is truthy in JavaScript, and a pattern is one.
+    is VegaValue.Pattern -> true
   }
 
 /**

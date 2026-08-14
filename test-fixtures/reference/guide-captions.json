@@ -905,6 +905,16 @@
   "caption": "X-axis for a discrete scale with 3 values: Q1, Q2, Q3"
  },
  {
+  "fixture": "filter-by-pattern",
+  "kind": "axis",
+  "caption": "X-axis for a discrete scale with 6 values: Farmer, Teacher, Physician, Carpenter, Clerk, Lawyer"
+ },
+ {
+  "fixture": "filter-by-pattern",
+  "kind": "axis",
+  "caption": "Y-axis for a linear scale with values from 0 to 45"
+ },
+ {
   "fixture": "flatten-arrays",
   "kind": "axis",
   "caption": "X-axis for a discrete scale with 3 values: 1, 2, 3"

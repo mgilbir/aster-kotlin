@@ -77,6 +77,8 @@ class SelectionsTest {
       is VegaValue.Arr -> value.values.joinToString(",", "[", "]") { asJson(it) }
       is VegaValue.Obj ->
         value.fields.entries.joinToString(",", "{", "}") { "\"${it.key}\":${asJson(it.value)}" }
+      // `JSON.stringify(/a/)` is `{}` — a RegExp has no enumerable properties.
+      is VegaValue.Pattern -> "{}"
     }
 
   /**
