@@ -81,19 +81,18 @@ class NoAndroidTypesTest {
    * for JVM-only APIs. Calendar work goes through `kotlinx-datetime`; rounding goes through
    * `roundHalfUp`, which is also more faithful to d3 than `java.lang.Math.round`.
    *
-   * One file is exempt, [dev.aster.vega.model.PlatformDecimals], and it explains itself: rounding a
-   * decimal at N places has to round the double's exact binary value, which needs
-   * arbitrary-precision arithmetic common Kotlin does not have. Confining it to one file is what
-   * makes the eventual `expect`/`actual` split mechanical. Anything else fails here.
+   * **Nothing is exempt any more.** `Decimals` used to be, on the argument that rounding a decimal
+   * at N places needs arbitrary-precision arithmetic; it needs *exactness*, and a finite double is
+   * `m × 2^e`, so its decimal expansion is finite and common Kotlin can produce it. Removing the
+   * seam also fixed a divergence the seam had introduced — Java's `%e` rounds the shortest
+   * printable form rather than the exact value — so the list below is the whole rule, with no
+   * asterisk.
    */
   @Test
   fun `core modules use no JVM-only APIs outside the one platform seam`() {
-    // The single permitted exception, and the file's own documentation says why: rounding a decimal
-    // at
-    // N places has to round the double's exact binary value, which needs arbitrary-precision
-    // arithmetic that common Kotlin does not have. It becomes the `expect` when the core goes
-    // multiplatform.
-    val allowed = setOf("vega-model/main/kotlin/dev/aster/vega/model/PlatformDecimals.kt")
+    // Empty, and meant to stay that way: a JVM-only API in the core is a portability bug, not a
+    // documented exception. `Decimals` was the last entry here.
+    val allowed = emptySet<String>()
     val banned =
       listOf(
         Regex("""\bjava\.(util|math|text|time)\."""),

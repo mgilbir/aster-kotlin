@@ -269,6 +269,76 @@ fields — `isRegExp` has to answer true, and `'' + regexp('a.b','i')` has to be
 variant broke four exhaustive `when`s in main sources and three in tests, which is the whole cost of
 doing it properly. Flags: `i`, `m`, `s` map onto Kotlin's; `g`, `y`, `u` are accepted and ignored,
 except in `replace`, where `g` decides first-match against all-matches.
+## A portability seam was hiding a correctness bug
+
+The core had one JVM-only file, `PlatformDecimals`, and it explained itself well enough that nobody
+questioned it for six milestones: rounding a double at N places must round its **exact** binary value,
+and common Kotlin has no arbitrary-precision arithmetic. The first half is right and the second is a
+non sequitur. A finite double *is* `m × 2^e`, so its decimal expansion is finite — `m × 2^-k` is
+`(m × 5^k) × 10^-k`, at most ~767 digits — and producing it needs multiply-by-a-word, a shift, and a
+divide-by-a-billion to read the digits off. `Decimals` is eighty lines of that and no library.
+
+**What the seam was hiding.** `exponential` had been `String.format("%.Ne")`, and Java's `%e` rounds
+the double's *shortest printable form* rather than its exact value. So `format('.2e', 2.675)` gave
+`2.68e+0` where upstream gives `2.67e+0` — the exact value is `2.674999…`, which is the very case the
+file's own documentation used as its argument. Wrong since the formatter existed, and invisible
+because nothing compared that path against upstream. The replacement disagreed with the reference on
+its first run, which is how it surfaced.
+
+Two lessons worth keeping:
+
+- **A platform seam is where a comparison stops.** Everything else in the engine is checked against
+  upstream; this one file was checked against the JVM, and the JVM is not the thing being ported.
+- **Keep the oracle in the test.** `BigDecimal` is still here — as `DecimalsTest.Reference`, run over
+  150,000 random bit patterns. Removing a dependency from the *engine* is not the same as giving up
+  the check, and the check is what caught this.
+
+Writing the vectors for it also found a second gap in the neighbourhood: the specifier grammar
+accepted `d`, `f`, `e` and `%` but not `g` or `~`, so `format(x, ".3g")` fell through to plain number
+text — `g` had been implemented all along and was only reachable through the *typeless* specifier,
+which d3 aliases to `.12~g`. Fixed. What is still outside the grammar (`s`, `r`, `b`/`o`/`x`/`X`/`c`,
+`n`, and the fill/align/sign/width slots) is now stated plainly in SUPPORTED_FEATURES, including the
+uncomfortable part: an unreadable specifier is **not** reported, because an expression evaluates where
+no diagnostic collector reaches. Upstream throws "invalid format" there.
+
+## `bind` is described, not drawn — and building the demo found two bugs under it
+
+The 149 "bindings have no equivalent here" diagnostics were the wrong conclusion. Upstream's binding is
+a *description* of a control bolted to a DOM implementation of it; only the second half belongs to a
+browser. So the description is parsed like any other grammar (`SignalBind`, five shapes matching
+`bind.js`), the runtime exposes `controller.inputs` — control plus current value, republished on every
+compile — and `controller.setSignal` is the way back, taking the same path a fired handler does.
+
+**Keep the widgets out of the library.** `SignalControls.kt` lives in the demo, draws Material 3, and is
+about 170 lines; a host with other widgets writes its own against the same two members. Putting Material
+into `vega-compose` would make that choice for every host, and there is nothing in the file worth
+sharing.
+
+**A generic input's extra properties are grammar, and are carried rather than reported.** The two
+diagnostics `job-voyager` produced were `bind.placeholder` and `bind.autocomplete`, and the answer was
+not to special-case either: upstream's generic generator copies *every* remaining property onto the
+input element, and its schema agrees — of the five `bind` variants, the one for an input outside the
+four structured kinds is the only one with `additionalProperties: true`. So `Field.attributes` carries
+all of them and a host uses what it has a widget for (the demo shows `placeholder`, ignores
+`autocomplete` — there is no form here for a browser to autofill from). The four structured kinds went
+the *other* way, from a pooled key list to a per-shape one, because upstream closes each with
+`additionalProperties: false`: `{"input": "checkbox", "min": 0}` is now reported as a mistake rather
+than as an unimplemented feature, which is the accurate statement. Checked against the corpus before
+committing — two false gaps gone, no example newly reported.
+
+Two bugs came out of driving it on a device, and neither could have been found any other way:
+
+- **`setSpecAsync` recorded neither the specification's text nor a fresh set of overrides.** A chart
+  loaded through it had nothing to recompile *from*, so no signal change could redraw it — not a
+  control, not a handler, not a tap on a mark. Every JVM test used `setSpec`; the demo uses the other
+  one. Every interactive specification in the demo had been inert.
+- **A domain `sort` whose `order` is a signal was read with `asString()`**, so the object stringified to
+  something that did not begin with "desc" and every such domain came out ascending. `domain-sort-order`
+  pins it, and also pins the upstream quirk found while writing it: two domains differing *only* in the
+  signal share one sort operator, and the second silently takes the first's order.
+
+If you touch the controls, drive them on the emulator rather than trusting the tests: both of the above
+passed every JVM test in the repository.
 
 ## Read the diagnostics the 93 examples produce, not just the clean count
 
