@@ -958,6 +958,53 @@ internal class PassThroughNode(
   }
 }
 
+/**
+ * Where the flow **splits into cells** — upstream's `FacetNode`.
+ *
+ * Everything above it is computed once, over the whole table; everything below it is computed
+ * inside each cell, over the rows that cell was handed. The node is also where the facet's own
+ * domain datasets are written, since they are read from the table the facet reads and have to stand
+ * beside it in the output.
+ *
+ * `moveFacetDown` hoists the cell's chain above the facet wherever it can, adding the facet's
+ * fields to any grouping it passes, and only where it *cannot* — a named point the scales read, or
+ * a fork — does the split stay. So this node exists only in the charts that need it.
+ */
+internal class FacetNode(
+  /** What Vega calls the partition each cell is handed, which the cell's own chain reads from. */
+  val partition: String
+) : DataNode() {
+  /** The table the facet reads, filled in by the assembler as it passes. */
+  var data: String = ""
+    private set
+
+  /**
+   * Where the facet's own domain datasets belong in the finished list.
+   *
+   * They are written at the point the facet stands in the flow — after the table it reads and
+   * before whatever the scales derive beside it — so the assembler records the place and the
+   * compiler puts them there once it knows what they are.
+   */
+  var at: Int = -1
+    private set
+
+  /** The `facet_main` output above it, once a first view has put the facet into the flow. */
+  var main: OutputNode? = null
+    private set
+
+  val attached: Boolean
+    get() = main != null
+
+  fun attachedTo(output: OutputNode) {
+    main = output
+  }
+
+  fun readsFrom(name: String, position: Int) {
+    data = name
+    at = position
+  }
+}
+
 /** A named point in the flow that something else reads: a mark's source, a scale's domain. */
 internal class OutputNode(val key: String) : DataNode() {
   var source: String? = null
@@ -1074,6 +1121,21 @@ internal class DataAssembler {
     }
   }
 
+  /**
+   * `assembleFacetData`: the datasets a **cell** computes for itself.
+   *
+   * A fresh walk, with its own numbering, rooted at the partition Vega hands each cell. They are
+   * written into the cell's group rather than beside the chart, because each cell computes them
+   * over its own rows.
+   */
+  fun assembleFacetData(facet: FacetNode): List<VegaValue> {
+    val inner = DataAssembler()
+    for (child in facet.children) {
+      inner.walk(child, MutableDataset(name = null, source = facet.partition), facet)
+    }
+    return inner.datasets.map { it.build() }
+  }
+
   private fun walk(node: DataNode, incoming: MutableDataset, parent: DataNode? = null) {
     var dataset = incoming
 
@@ -1107,6 +1169,20 @@ internal class DataAssembler {
       is ImputeNode -> dataset.transform += node.transforms()
       is FilterInvalidNode -> dataset.transform += node.transform()
       is PassThroughNode -> dataset.transform += node.transforms
+      is FacetNode -> {
+        // The facet reads whatever has been assembled so far: the dataset itself where it has
+        // transforms of its own, and otherwise the table that dataset is a name for. The name is
+        // taken either way, which is why a facet consumes a `data_n` even when it uses none.
+        if (dataset.name == null) dataset.name = "data_${datasetIndex++}"
+        if (dataset.source == null || dataset.transform.isNotEmpty()) {
+          datasets += dataset
+          node.readsFrom(dataset.name!!, datasets.size)
+        } else {
+          node.readsFrom(dataset.source!!, datasets.size)
+        }
+        // Everything below belongs to the cells, and is assembled into their group instead.
+        return
+      }
       is OutputNode -> {
         if (dataset.source != null && dataset.transform.isEmpty()) {
           node.setSource(dataset.source!!)

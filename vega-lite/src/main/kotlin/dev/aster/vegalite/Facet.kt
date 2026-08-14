@@ -405,6 +405,13 @@ internal interface FacetLayout {
      * null` meant to take the border off every cell took it off nothing that was drawn.
      */
     viewEncode: VegaValue? = null,
+    /**
+     * The datasets a **cell** computes for itself, where the flow splits at the facet.
+     *
+     * Empty in the ordinary case: the cell's chain is hoisted above the facet and every cell reads
+     * the partition Vega hands it.
+     */
+    cellData: List<VegaValue> = emptyList(),
   ): VegaValue
 }
 
@@ -660,6 +667,7 @@ internal class FacetGrid(val row: Facet?, val column: Facet?, private val prefix
     counted: Map<String, String>,
     scales: List<VegaValue>,
     viewEncode: VegaValue?,
+    cellData: List<VegaValue>,
   ): VegaValue = obj {
     put("name", named("cell"))
     put("type", "group")
@@ -732,6 +740,7 @@ internal class FacetGrid(val row: Facet?, val column: Facet?, private val prefix
         )
       },
     )
+    if (cellData.isNotEmpty()) put("data", arr(cellData))
     put("marks", arr(marks))
     if (axes.isNotEmpty()) put("axes", arr(axes))
     if (scales.isNotEmpty()) put("scales", arr(scales))
@@ -762,6 +771,14 @@ internal class FacetWrap(
 
   override fun named(suffix: String): String =
     listOf(prefix, suffix).filter { it.isNotEmpty() }.joinToString("_")
+
+  /** The column the cells are ordered by, the operation over it, and what it is written as. */
+  private fun sortField(): Triple<String, String, String>? {
+    val sort = (def.sort as? VegaValue.Obj)?.takeIf { it.has("field") } ?: return null
+    val source = sort.string("field") ?: return null
+    val op = sort.string("op") ?: "min"
+    return Triple(source, op, if (sort.string("op") != null) "${op}_$source" else source)
+  }
 
   private val field: String = Fields.vgField(def)
 
@@ -802,6 +819,13 @@ internal class FacetWrap(
               // its near edge alone leaves the far one off every row the headers are captioned
               // from. `FacetNode`'s fields are the same two.
               put("groupby", strings(fields))
+              // The key the cells are ordered by, measured once per cell — which is what this
+              // dataset already holds a row of, as it is for a grid.
+              sortField()?.let { (source, op, name) ->
+                put("fields", strings(listOf(source)))
+                put("ops", strings(listOf(op)))
+                put("as", strings(listOf(name)))
+              }
             }
           ),
         )
@@ -924,6 +948,7 @@ internal class FacetWrap(
     counted: Map<String, String>,
     scales: List<VegaValue>,
     viewEncode: VegaValue?,
+    cellData: List<VegaValue>,
   ): VegaValue = obj {
     put("name", named("cell"))
     put("type", "group")
@@ -950,6 +975,18 @@ internal class FacetWrap(
             put("name", named("facet"))
             put("data", dataName)
             put("groupby", strings(fields))
+            // The key each cell is ordered by, measured over the cell's own rows and suffixed with
+            // the faceted column so it cannot collide with the one the domain dataset holds.
+            sortField()?.let { (source, op, name) ->
+              put(
+                "aggregate",
+                obj {
+                  put("fields", strings(listOf(source)))
+                  put("ops", strings(listOf(op)))
+                  put("as", strings(listOf("${name}_by_$field")))
+                },
+              )
+            }
           },
         )
       },
@@ -958,10 +995,18 @@ internal class FacetWrap(
       "sort",
       obj {
         // The **near** edge alone orders a bucketed grid: a bucket's far edge follows from its
-        // near one, so sorting on both says the same thing twice. `assembleFacet` sorts by the
-        // facet's own key, which `vgField` answers with one name.
-        put("field", strings(listOf("datum[${quoted(field)}]")))
-        put("order", strings(listOf("ascending")))
+        // near one, so sorting on both says the same thing twice. `facetSortFields` answers with
+        // one name: the key a stated `sort` had the cell measure, and the facet's own column
+        // otherwise.
+        val key = sortField()?.let { (_, _, name) -> "${name}_by_$field" } ?: field
+        put("field", strings(listOf("datum[${quoted(key)}]")))
+        // `facetSortOrder`: a `sort` object says which way in its `order`, a bare `"descending"`
+        // says it by itself, and anything else runs up.
+        val order =
+          (def.sort as? VegaValue.Obj)?.string("order")
+            ?: (def.sort as? VegaValue.Str)?.value?.takeIf { it == "descending" }
+            ?: "ascending"
+        put("order", strings(listOf(order)))
       },
     )
     put(
@@ -979,6 +1024,7 @@ internal class FacetWrap(
         )
       },
     )
+    if (cellData.isNotEmpty()) put("data", arr(cellData))
     put("marks", arr(marks))
     if (axes.isNotEmpty()) put("axes", arr(axes))
     if (scales.isNotEmpty()) put("scales", arr(scales))

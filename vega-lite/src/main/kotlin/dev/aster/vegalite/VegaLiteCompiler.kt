@@ -440,13 +440,18 @@ private class Compilation(
       val horizontal = main.filter {
         it.string("orient") == "bottom" || it.string("orient") == "top"
       }
-      data +=
+      val domains =
         current.domainDatasets(
           counted = cellCardinality,
-          source = views.first().mainData,
+          // The table the **facet** reads, which is the one above the split where there is one:
+          // the cells' values are the whole table's values, not one cell's.
+          source = facetReads ?: views.first().mainData,
           vertical = (main - horizontal.toSet()).isNotEmpty(),
           horizontal = horizontal.isNotEmpty(),
         )
+      // At the point the facet stands in the flow, where the flow splits there; at the end
+      // otherwise, nothing else having been derived after it.
+      if (facetDomainsAt >= 0) data.addAll(facetDomainsAt, domains) else data += domains
     }
 
     val vega = obj {
@@ -1448,7 +1453,9 @@ private class Compilation(
       views.first().heightSignal,
     ) +
       current.cellGroup(
-        views.first().mainData,
+        // The table the **facet** reads: above the split where the flow splits there, and the
+        // view's own main output otherwise.
+        facetReads ?: views.first().mainData,
         childMarks,
         gridAxes,
         views.first().widthSignal,
@@ -1461,6 +1468,7 @@ private class Compilation(
         cellCardinality,
         cellScales,
         viewEncode(),
+        facetGroupData,
       )
   }
 
@@ -1581,6 +1589,19 @@ private class Compilation(
   // Data
   // -----------------------------------------------------------------------------------------
 
+  /**
+   * What a **cell** computes for itself, where the flow splits at the facet.
+   *
+   * Empty in the ordinary case, where the whole chain is hoisted above the facet and every cell
+   * reads the partition directly.
+   */
+  private var facetGroupData: List<VegaValue> = emptyList()
+
+  /** The table the facet reads, and where its own domain datasets belong beside it. */
+  private var facetReads: String? = null
+
+  private var facetDomainsAt: Int = -1
+
   private fun assembleData(views: List<UnitView>): List<VegaValue> {
     if (views.any { it.spec.data == null }) {
       diagnostics.error(
@@ -1603,6 +1624,13 @@ private class Compilation(
     // chart's table `source_0`. It is left out where nothing hangs off it, as an unused subtree is.
     spec.fields["data"]?.let { own -> if (views.any { it.spec.data == own }) order += own }
     val roots = LinkedHashMap<VegaValue, SourceNode>()
+    // One facet, however many layers are drawn in each of its cells: `facetRoot` is a single node
+    // with every child's chain hanging under it, so the layers share the partition rather than
+    // each cutting one of their own.
+    val split =
+      facet
+        ?.takeIf { views.any { view -> DataPipeline.needsRawTable(view) } }
+        ?.let { FacetNode(it.named("facet")) }
     val register: (VegaValue) -> String = { table ->
       val existing = order.indexOf(table)
       "source_${if (existing >= 0) existing else order.size.also { order += table }}"
@@ -1621,6 +1649,11 @@ private class Compilation(
           register,
           Selection.needsIdentity(selections),
           Selection.needsIdentity(selections.filter { it.owner === view }),
+          // `moveFacetDown` hoists a cell's chain above the facet until it meets a named point the
+          // scales read. The pre-aggregation table a sorted domain asks for is such a point, and
+          // where there is one the chain stays below the facet and a copy of it — with the facet's
+          // own fields added to every grouping — is hung beside it for the scales to measure.
+          facetSplit = split,
         )
         .build(roots.getOrPut(data) { SourceNode(data) })
     }
@@ -1654,6 +1687,13 @@ private class Compilation(
       DataAssembler()
         .also { it.named = spec.obj("datasets")?.fields.orEmpty() }
         .assemble(order.map { roots[it] ?: it })
+    // The facet's own values stand where the facet does: after the table it reads and before what
+    // the scales derive beside it. `assembleFacetData` then gives each cell the chain below.
+    if (split != null && facet != null) {
+      facetGroupData = DataAssembler().assembleFacetData(split)
+      facetReads = split.data
+      facetDomainsAt = split.at
+    }
     views.forEachIndexed { index, view ->
       // The **scales** read one named point and the marks another, where the specification asked
       // for a path that breaks at a gap the domain does not want. They are the same node
@@ -1663,6 +1703,8 @@ private class Compilation(
       val main = outputs[index].main
       view.mainData = scales.source ?: ""
       if (scales !== main) view.markData = main.source ?: ""
+      // Inside a facet the marks read the cell's own chain, which is below the split.
+      outputs[index].cell?.source?.let { view.markData = it }
       view.rawData = outputs[index].raw?.source ?: view.mainData
     }
     return datasets

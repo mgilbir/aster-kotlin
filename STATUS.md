@@ -697,7 +697,7 @@ no data is needed to compare two compilers. So every one of them was compiled by
 by this one, and the outputs compared property by property. That is a *measurement*, not a gate: the
 examples are not fixtures here, and nothing about them is checked in.
 
-**124 of 627 matched exactly** at the start, and **577** do now.
+**124 of 627 matched exactly** at the start, and **579** do now.
 
 The value is the *ranking*. The first sweep clustered by root cause, and the three most damaging
 causes were fixed straight away — chosen for what they do to the *picture* rather than for
@@ -712,12 +712,12 @@ frequency:
   where this compiler used `step - 2`, making it nearly four times too wide. `getBandSize` asks the
   scale's kind first and reaches `discreteBandSize` only where the domain is discrete.
 
-The sweep has been the working list ever since, and the 50 that still differ cluster like this:
+The sweep has been the working list ever since, and the 48 that still differ cluster like this:
 
 | Files | Cause |
 | --- | --- |
 | 21 | geographic: projections, `topojson`, `geoshape` — another worker's ground |
-| 13 | the **facet data flow**: upstream keeps the chain below the facet *inside* the cell group and clones it outward, with the facet's fields added, for the scales to read. This compiler hoists all of it above the facet, so the cell has no data of its own and the `*_domain` datasets sit after the aggregate rather than before it |
+| 11 | the rest of the **facet data flow**: the split itself is implemented (below), but a facet gridded *both* ways, one whose cells carry scales of their own, and one a selection reads still hoist their chains above the facet |
 | 9 | crossfilter charts and scatter-plot matrices: several selections over one table, whose datasets fork differently and whose diagonal cells are not the cells upstream builds |
 | 2 | `time` channel animations, set aside |
 | 5 | one-offs, each its own rule |
@@ -4326,6 +4326,39 @@ depends on them. Each has a test and a comment; this is the index.
    so the lowest bin was painted with the highest bucket's colour, and every interval name in the
    plural — `"hours"`, `"minutes"`, `"seconds"` — matched nothing, which `nice` had been getting wrong
    too.
+
+### A cell that computes its own rows
+
+Until now every faceted chart hoisted its whole chain **above** the facet: the aggregate ran once
+over the table, the facet cut the result into cells, and the cells had no data of their own. That is
+what upstream does too, most of the time — `moveFacetDown` walks the facet down past every step that
+takes it, adding the facet's own fields to each grouping it passes, until the chain would go on
+without it. What it stops at is a **named point the scales read**, and the pre-aggregation table a
+domain sorted by an aggregate asks for is one.
+
+Where it stops, the chain stays where it is and is computed once per cell, over the rows that cell
+was handed — and a *copy* of it, with the facet's fields added to every grouping, is hung beside the
+facet for the scales to measure (`subtree.ts`, `cloneSubtree`). The two answer different questions.
+A cell's median is the median of its own site; the scale's is the median of every site, and a domain
+built from the first would be a different axis in every cell.
+
+Three things follow, and each was a difference on its own:
+
+- The cell's datasets are assembled by a **second walk** rooted at the facet's *name* — the
+  partition, `trellis_barley_facet` — not at the table the facet reads. They are emitted in the
+  group mark's own `data`, and they share the outer walk's numbering, which is why a cell's first
+  dataset can be `data_1`.
+- The facet's `*_domain` datasets belong **where the facet is**, after the table it reads and before
+  what the scales derive beside it, rather than at the end of the list.
+- The cell group's `from.facet.data` is the table **above** the split, and its `sort.field` is the
+  key the cell measured for itself — `median_yield_by_site`, suffixed with the faceted column so it
+  cannot collide with the one the domain dataset holds. A wrapped facet was reading the faceted
+  column itself and ordering its cells alphabetically.
+
+One facet serves however many layers are drawn in a cell. `facetRoot` is a single node with every
+child's chain hanging under it, so the second layer does not cut a partition of its own: it hangs
+its steps below the shared one and a copy beside it, and the two layers' datasets number in the
+order they were written.
 
 Faceting came off this list by being finished, and what it leaves at the front of the Vega-Lite
 work is the **composite-mark normalizer** — `boxplot`, `errorbar` and `errorband`, which upstream

@@ -35,7 +35,18 @@ internal class DataPipeline(
    * is what makes the two of them two datasets rather than one chain with a stray identifier in it.
    */
   private val ownsIdentity: Boolean = false,
+  /**
+   * Where the flow **splits into cells**, or null where the whole chain is computed once.
+   *
+   * Supplied by the compiler, which knows whether the cell's chain can be hoisted above the facet:
+   * `moveFacetDown` stops at a named point the scales read, and the pre-aggregation table a sorted
+   * domain asks for is such a point.
+   */
+  private val facetSplit: FacetNode? = null,
 ) {
+
+  /** The facet fields the chain being built groups by, which the cell's own chain does not. */
+  private var facetting: List<String> = emptyList()
 
   /** The two named points a view exposes: the table before aggregation, and the one marks read. */
   /**
@@ -44,11 +55,62 @@ internal class DataPipeline(
    * [main] is what the marks read and [scales] what the domains measure, and they are the same node
    * unless the specification asked for a path that breaks at a gap the domain does not want.
    */
-  class Outputs(val raw: OutputNode?, val main: OutputNode, val scales: OutputNode = main)
+  class Outputs(
+    val raw: OutputNode?,
+    val main: OutputNode,
+    val scales: OutputNode = main,
+    /**
+     * What the **cell's** marks read, where the flow splits at the facet.
+     *
+     * The chain below a facet is computed inside each cell, over the rows that cell was handed; the
+     * one beside it is the same chain with the facet's own fields added to every grouping, computed
+     * once for the scales to measure. Null where nothing splits, which is the ordinary case.
+     */
+    val cell: OutputNode? = null,
+    val facet: FacetNode? = null,
+  )
 
   fun build(source: SourceNode): Outputs {
-    var head: DataNode = source
-    if (needsIdentity) head = head.then(identifierNode())
+    // A **later** layer of a faceted cell hangs from the partition the first one put in.
+    // `facetRoot` is one node with every child's chain under it, so the second layer does not get
+    // a facet of its own; its own steps go below the shared one, and beside it in the copy the
+    // scales measure.
+    facetSplit
+      ?.takeIf { it.attached }
+      ?.let { shared ->
+        val inside = cellChain(headChain(shared), emptyList())
+        val outside = cellChain(headChain(shared.main!!), view.facetFields)
+        return Outputs(outside.raw, outside.main, outside.scales, inside.main, shared)
+      }
+
+    val head = headChain(source)
+
+    // Where the flow **splits into cells**. `moveFacetDown` hoists the cell's chain above the facet
+    // wherever it can, adding the facet's own fields to every grouping it passes — which is what
+    // this compiler does for every faceted chart — and stops at a named point the scales read. Then
+    // the chain below stays where it is, computed per cell, and a *copy* of it with the facet's
+    // fields added is hung beside the facet for the scales. The two answer different questions: a
+    // cell's aggregate is over its own rows, and the scale's is over all of them.
+    val facetNode = facetSplit
+    if (facetNode != null) {
+      val facetRaw = OutputNode(view.prefixed("facet_raw"))
+      head.then(facetRaw)
+      val facetMain = OutputNode(view.prefixed("facet_main"))
+      facetRaw.then(facetMain)
+      facetMain.then(facetNode)
+      facetNode.attachedTo(facetMain)
+      val inside = cellChain(facetNode, emptyList())
+      val outside = cellChain(facetMain, view.facetFields)
+      return Outputs(outside.raw, outside.main, outside.scales, inside.main, facetNode)
+    }
+
+    return cellChain(head, view.facetFields)
+  }
+
+  /** Everything a view does **before** it aggregates: its transforms, its buckets, its instants. */
+  private fun headChain(parent: DataNode): DataNode {
+    var head: DataNode = parent
+    if (needsIdentity && parent is SourceNode) head = head.then(identifierNode())
 
     // A layer's member buckets its field **before** its own transforms: upstream calls it a hack
     // "equivalent for merging bin extent for union scale", and it is what lets two layers over one
@@ -63,7 +125,18 @@ internal class DataPipeline(
     binnedTimeUnitNode()?.let { head = head.then(it) }
     sortIndexNode()?.let { head = head.then(it) }
     facetSortKeys()?.let { head = head.then(it) }
+    return head
+  }
 
+  /**
+   * The part of the flow that answers for one view's own rows: the aggregate and everything after.
+   *
+   * Built twice where a facet splits the flow — once below it without the facet's fields, once
+   * beside it with them — and once otherwise.
+   */
+  private fun cellChain(parent: DataNode, facetFields: List<String>): Outputs {
+    facetting = facetFields
+    var head: DataNode = parent
     // The pre-aggregation table, named only when something reads it. A domain sorted by an
     // aggregate of another field is that something: the ordering has to be computed from the rows
     // themselves, independently of the aggregation being drawn. Upstream always creates this node
@@ -127,6 +200,23 @@ internal class DataPipeline(
         }
       )
     )
+
+  companion object {
+    /**
+     * Whether this view needs the **pre-aggregation** table named.
+     *
+     * A sort the specification stated may read a column the aggregation removes, and that is what
+     * the pre-aggregation table is for. It is also what stops a facet from being moved down past
+     * the cell's chain, so the compiler asks the same question before it decides to split.
+     */
+    fun needsRawTable(view: UnitView): Boolean =
+      view.scaledChannels().any { (channel, def) ->
+        val type = view.scaleType(channel) ?: return@any false
+        def.sort != null &&
+          Scales.hasDiscreteDomain(type) &&
+          Scales.sortsFromRawTable(Scales.settledSort(view, channel, def, type))
+      }
+  }
 
   private fun needsRawTable(): Boolean =
     view.scaledChannels().any { (channel, def) ->
@@ -519,7 +609,7 @@ internal class DataPipeline(
       }
     }
 
-    for (field in view.facetFields) dimensions += field
+    for (field in facetting) dimensions += field
     return AggregateNode(dimensions.toList(), ops, fields, outputs)
   }
 
@@ -625,7 +715,7 @@ internal class DataPipeline(
     return StackNode(
       field = Fields.vgField(def),
       // The facet's own fields group every accumulation, so a stack stays inside its cell.
-      groupby = dimensions + view.facetFields.filterNot { it in dimensions },
+      groupby = dimensions + facetting.filterNot { it in dimensions },
       // `if (!s.field.includes(field))` — the stack's sort names each field **once**. Two channels
       // over one column is one thing to sort by, and repeating it in the pair of parallel lists is
       // a comparator that reads the same column twice.
@@ -646,7 +736,7 @@ internal class DataPipeline(
       offset = stack.offset,
       // `[...stackby, ...facetby]` — concatenated, not merged. A field that is both a series and
       // a facet is named twice, and the two lists are what upstream writes.
-      imputeGroupby = stackBy + view.facetFields,
+      imputeGroupby = stackBy + facetting,
       // A **bucketed** dimension is imputed at its midpoint, a bucket being two columns and an
       // imputation keying on one.
       imputeKeys =
