@@ -370,45 +370,6 @@ which d3 aliases to `.12~g`. Fixed. What is still outside the grammar (`s`, `r`,
 uncomfortable part: an unreadable specifier is **not** reported, because an expression evaluates where
 no diagnostic collector reaches. Upstream throws "invalid format" there.
 
-## `bind` is described, not drawn — and building the demo found two bugs under it
-
-The 149 "bindings have no equivalent here" diagnostics were the wrong conclusion. Upstream's binding is
-a *description* of a control bolted to a DOM implementation of it; only the second half belongs to a
-browser. So the description is parsed like any other grammar (`SignalBind`, five shapes matching
-`bind.js`), the runtime exposes `controller.inputs` — control plus current value, republished on every
-compile — and `controller.setSignal` is the way back, taking the same path a fired handler does.
-
-**Keep the widgets out of the library.** `SignalControls.kt` lives in the demo, draws Material 3, and is
-about 170 lines; a host with other widgets writes its own against the same two members. Putting Material
-into `vega-compose` would make that choice for every host, and there is nothing in the file worth
-sharing.
-
-**A generic input's extra properties are grammar, and are carried rather than reported.** The two
-diagnostics `job-voyager` produced were `bind.placeholder` and `bind.autocomplete`, and the answer was
-not to special-case either: upstream's generic generator copies *every* remaining property onto the
-input element, and its schema agrees — of the five `bind` variants, the one for an input outside the
-four structured kinds is the only one with `additionalProperties: true`. So `Field.attributes` carries
-all of them and a host uses what it has a widget for (the demo shows `placeholder`, ignores
-`autocomplete` — there is no form here for a browser to autofill from). The four structured kinds went
-the *other* way, from a pooled key list to a per-shape one, because upstream closes each with
-`additionalProperties: false`: `{"input": "checkbox", "min": 0}` is now reported as a mistake rather
-than as an unimplemented feature, which is the accurate statement. Checked against the corpus before
-committing — two false gaps gone, no example newly reported.
-
-Two bugs came out of driving it on a device, and neither could have been found any other way:
-
-- **`setSpecAsync` recorded neither the specification's text nor a fresh set of overrides.** A chart
-  loaded through it had nothing to recompile *from*, so no signal change could redraw it — not a
-  control, not a handler, not a tap on a mark. Every JVM test used `setSpec`; the demo uses the other
-  one. Every interactive specification in the demo had been inert.
-- **A domain `sort` whose `order` is a signal was read with `asString()`**, so the object stringified to
-  something that did not begin with "desc" and every such domain came out ascending. `domain-sort-order`
-  pins it, and also pins the upstream quirk found while writing it: two domains differing *only* in the
-  signal share one sort operator, and the second silently takes the first's order.
-
-If you touch the controls, drive them on the emulator rather than trusting the tests: both of the above
-passed every JVM test in the repository.
-
 ## Read the diagnostics the 93 examples produce, not just the clean count
 
 The triage reports a *count* of warnings per example and nothing about what they say, which hides both
