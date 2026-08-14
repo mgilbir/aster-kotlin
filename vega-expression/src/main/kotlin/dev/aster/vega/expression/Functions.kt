@@ -1,7 +1,7 @@
 package dev.aster.vega.expression
 
+import dev.aster.vega.model.Decimals
 import dev.aster.vega.model.MINUS_SIGN
-import dev.aster.vega.model.PlatformDecimals
 import dev.aster.vega.model.VegaValue
 import dev.aster.vega.model.asNumberOrNull
 import dev.aster.vega.model.asString
@@ -1553,11 +1553,12 @@ public object NumberFormatSubset {
     val group = match.groupValues[3] == ","
     val precision =
       match.groupValues[4].takeIf { it.isNotEmpty() }?.removePrefix(".")?.toIntOrNull()
-    val type = match.groupValues[5].firstOrNull()
+    val trim = match.groupValues[5] == "~"
+    val type = match.groupValues[6].firstOrNull()
     return if (type == null) {
       Spec(group, precision ?: DEFAULT_SIGNIFICANT_DIGITS, 'g', trim = true, currency = currency)
     } else {
-      Spec(group, precision, type, currency = currency)
+      Spec(group, precision, type, trim = trim, currency = currency)
     }
   }
 
@@ -1570,17 +1571,17 @@ public object NumberFormatSubset {
     val raw =
       when (spec.type) {
         'd' -> roundHalfUp(value).toLong().toString()
-        'e' -> PlatformDecimals.exponential(value, spec.precision ?: 6)
+        'e' -> Decimals.exponential(value, spec.precision ?: 6)
         'g' ->
-          PlatformDecimals.significant(
+          Decimals.significant(
             value,
             (spec.precision ?: DEFAULT_SIGNIFICANT_DIGITS).coerceAtLeast(1),
           )
         '%' -> {
           val scaled = value * 100.0
-          PlatformDecimals.fixed(scaled, spec.precision ?: 0) + "%"
+          Decimals.fixed(scaled, spec.precision ?: 0) + "%"
         }
-        else -> PlatformDecimals.fixed(value, spec.precision ?: 6)
+        else -> Decimals.fixed(value, spec.precision ?: 6)
       }
     val text = if (spec.trim) trimInsignificantZeros(raw) else raw
     val grouped = if (spec.group) groupThousands(text) else text
@@ -1640,5 +1641,20 @@ public object NumberFormatSubset {
    * a width, which this subset does not implement, and refusing the whole specifier over it would
    * turn `$0.2f` into unformatted output.
    */
-  private val PATTERN = Regex("^(\\$?)(0?)(,?)(\\.\\d+)?([dfe%]?)$")
+  /**
+   * d3's specifier grammar, as much of it as this subset honours: `[$][0][,][.precision][~][type]`.
+   *
+   * `~` and `g` were missing, and their absence was invisible rather than reported — an unparsed
+   * specifier falls back to plain number text, so `format(x, ".3g")` answered `2.675` where
+   * upstream answers `2.67`. `g` had been implemented all along and was only unreachable: a
+   * specifier naming *no* type is aliased to `.12~g`, which is the path every bare `format(x, "")`
+   * already took.
+   *
+   * Still outside it, and still silent, which is the honest statement: `s` and its SI prefixes,
+   * `r`, the radix types `b`/`o`/`x`/`X`/`c`, `n` (which is `,g`), and the leading
+   * `[[fill]align][sign]` and `width` slots. Upstream throws "invalid format" on a specifier it
+   * cannot read; this returns the number as JavaScript would write it, which is a wrong label
+   * rather than a broken chart.
+   */
+  private val PATTERN = Regex("^(\\$?)(0?)(,?)(\\.\\d+)?(~?)([dfeg%]?)$")
 }
