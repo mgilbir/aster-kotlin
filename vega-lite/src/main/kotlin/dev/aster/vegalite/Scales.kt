@@ -565,11 +565,18 @@ internal object Scales {
               Fields.timeUnitDuration(it) { expr -> "scale('${view.scale(position)}', $expr)" }
             } ?: return null
           val padding = config.scaleConfig("bandWithNestedOffsetPaddingInner") ?: 0.0
-          if (padding == 0.0) return arr(listOf(num(0.0), signalRef(duration)))
+          // Where the bucket sits relative to the instant: a `bandPosition` of a half puts the
+          // bucket after it, which is the default and runs from zero to one step; a **zero**
+          // centres the bucket on the instant, so the offsets run from minus half a step to plus
+          // half. The inset is taken off each end either way.
+          val at = positionDef.raw.number("bandPosition") ?: 0.5
+          val start = at - 0.5 + padding / 2
+          val end = at + 0.5 - padding / 2
+          if (padding == 0.0 && at == 0.5) return arr(listOf(num(0.0), signalRef(duration)))
           return arr(
             listOf(
-              signalRef("${canonicalNumberString(padding / 2)} * ($duration)"),
-              signalRef("${canonicalNumberString(1 - padding / 2)} * ($duration)"),
+              signalRef("${canonicalNumberString(start)} * ($duration)"),
+              signalRef("${canonicalNumberString(end)} * ($duration)"),
             )
           )
         }
