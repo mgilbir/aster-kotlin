@@ -9,6 +9,20 @@ import dev.aster.vega.model.VegaValue
  * instant* is spoken as a date with the specifier Vega picks at render time — the same one the axis
  * labels use, so a trellis of years is captioned "2005" and not "1104537600000".
  */
+/**
+ * A caption the header writes itself — `header.labelExpr`.
+ *
+ * The expression is the reader's, and it speaks in terms of the *cell*: `datum.value` is the column
+ * the grid is broken down by and `datum.label` is what this compiler would otherwise have written.
+ * Both are substituted rather than evaluated, exactly as `assembleLabelTitle` does, so a trellis of
+ * hours can caption midnight "Midnight" and everything else by the clock.
+ */
+private fun headerLabel(def: ChannelDef, field: String): String {
+  val derived = headerText(def, field)
+  val stated = def.raw.obj("header")?.string("labelExpr") ?: return derived
+  return stated.replace("datum.label", derived).replace("datum.value", "parent[${quoted(field)}]")
+}
+
 private fun headerText(def: ChannelDef, field: String): String {
   val accessor = "parent[${quoted(field)}]"
   // A **bucketed** column is captioned by the bucket rather than by its near edge: `binFormat`
@@ -122,7 +136,13 @@ internal class Facet(
    * `vgField(sortField, {forAs: true})`: the plain aggregate name, which is what the header bands
    * read, since they are drawn from that dataset and each of its rows is already one cell's worth.
    */
-  val sortAggregate: String? = sortOp?.let { "${it}_$sortSource" }
+  // Named for the operation only where the specification **stated** one. `vgField(sortField,
+  // {forAs: true})` reads the definition as written, and a sort that names a column and no
+  // operation names a column: the aggregate is still a `min`, since that is the default the data
+  // is computed with, but the column it lands in is called what the reader called it.
+  val sortAggregate: String? = sortObject?.let {
+    if (it.string("op") != null) "${sortOp}_$sortSource" else sortSource
+  }
 
   /**
    * What the *cell* group calls the same aggregate — `sum_amount_by_era`.
@@ -303,7 +323,8 @@ internal interface FacetLayout {
   ): List<VegaValue>
 
   fun layout(
-    spacing: Double,
+    /** The gap between cells: one number, or a `{row, column}` pair where the two differ. */
+    spacing: VegaValue,
     titleOffset: Double,
     config: Config,
     /** The position channels the cells resolve **independently**, which cannot be aligned. */
@@ -344,6 +365,14 @@ internal interface FacetLayout {
      * handed it, so the scale has to be built where `facet` is the data it can see.
      */
     scales: List<VegaValue>,
+    /**
+     * What a `view` block says about the plotting area, which in a trellis is the **cell**.
+     *
+     * The block is written on the spec inside the facet — the one describing a single cell — and a
+     * trellis has a plotting area per cell. Applied to the chart's own group instead, a `"stroke":
+     * null` meant to take the border off every cell took it off nothing that was drawn.
+     */
+    viewEncode: VegaValue? = null,
   ): VegaValue
 }
 
@@ -377,13 +406,14 @@ internal class FacetGrid(val row: Facet?, val column: Facet?, private val prefix
    * and is 1 when a chart is faceted by rows alone.
    */
   override fun layout(
-    spacing: Double,
+    /** The gap between cells: one number, or a `{row, column}` pair where the two differ. */
+    spacing: VegaValue,
     titleOffset: Double,
     config: Config,
     independent: Set<String>,
   ): VegaValue = obj {
     val titled = titles(config).keys
-    put("padding", num(spacing))
+    put("padding", spacing)
     val offsets =
       listOfNotNull(row?.takeIf { it.channel in titled }, column?.takeIf { it.channel in titled })
     if (offsets.isNotEmpty()) {
@@ -455,7 +485,7 @@ internal class FacetGrid(val row: Facet?, val column: Facet?, private val prefix
             obj {
               put(
                 "text",
-                signalRef(headerText(facet.def, facet.field)),
+                signalRef(headerLabel(facet.def, facet.field)),
               )
               if (!isColumn) put("orient", "left")
               put("style", "guide-label")
@@ -594,6 +624,7 @@ internal class FacetGrid(val row: Facet?, val column: Facet?, private val prefix
     style: String,
     counted: Map<String, String>,
     scales: List<VegaValue>,
+    viewEncode: VegaValue?,
   ): VegaValue = obj {
     put("name", named("cell"))
     put("type", "group")
@@ -656,6 +687,9 @@ internal class FacetGrid(val row: Facet?, val column: Facet?, private val prefix
           obj {
             put("width", signalRef(widthSignal))
             put("height", signalRef(heightSignal))
+            (viewEncode?.get("update") as? VegaValue.Obj)?.fields?.forEach { (key, value) ->
+              put(key, value)
+            }
           },
         )
       },
@@ -748,12 +782,13 @@ internal class FacetWrap(
   }
 
   override fun layout(
-    spacing: Double,
+    /** The gap between cells: one number, or a `{row, column}` pair where the two differ. */
+    spacing: VegaValue,
     titleOffset: Double,
     config: Config,
     independent: Set<String>,
   ): VegaValue = obj {
-    put("padding", num(spacing))
+    put("padding", spacing)
     put("bounds", "full")
     put("align", "all")
     // Only where the specification said so: with no `columns`, the whole facet is one row and the
@@ -845,6 +880,7 @@ internal class FacetWrap(
     style: String,
     counted: Map<String, String>,
     scales: List<VegaValue>,
+    viewEncode: VegaValue?,
   ): VegaValue = obj {
     put("name", named("cell"))
     put("type", "group")
@@ -854,7 +890,7 @@ internal class FacetWrap(
       obj {
         put(
           "text",
-          signalRef(headerText(def, field)),
+          signalRef(headerLabel(def, field)),
         )
         put("style", "guide-label")
         put("frame", "group")
@@ -890,6 +926,9 @@ internal class FacetWrap(
           obj {
             put("width", signalRef(widthSignal))
             put("height", signalRef(heightSignal))
+            (viewEncode?.get("update") as? VegaValue.Obj)?.fields?.forEach { (key, value) ->
+              put(key, value)
+            }
           },
         )
       },

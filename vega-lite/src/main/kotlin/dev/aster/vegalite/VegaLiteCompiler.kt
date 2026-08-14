@@ -466,7 +466,8 @@ private class Compilation(
       // A top-level `view` block paints the *plotting area* rather than the surface around it, so
       // it becomes an `encode` on the chart's own group — `background` is the surface, `view.fill`
       // is the paper the marks sit on, and the two are different colours in the same chart.
-      viewEncode()?.let { put("encode", it) }
+      // In a trellis the `view` block describes a **cell**, and the cell group carries it.
+      if (facet == null) viewEncode()?.let { put("encode", it) }
       // A selection's **store** comes first, ahead of every table: nothing derives from it and
       // everything reads it, and upstream's assembly puts the selection data at the head.
       put(
@@ -484,8 +485,18 @@ private class Compilation(
       if (sizeSignals.isNotEmpty()) put("signals", arr(sizeSignals))
       // A stated `spacing` is the gap between cells, and it beats the configured twenty.
       facet?.let {
+        // `spacing` is a number or a `{row, column}` pair, and a pair states only the side it
+        // means: a trellis of rows an inch apart still wants the configured gap between its
+        // columns, so the side left out is filled in rather than dropped.
+        val stated = spec.fields["spacing"] ?: config.raw.obj("facet")?.fields?.get("spacing")
+        val configured = config.raw.obj("facet")?.number("spacing") ?: FACET_SPACING
         val spacing =
-          spec.number("spacing") ?: config.raw.obj("facet")?.number("spacing") ?: FACET_SPACING
+          if (stated is VegaValue.Obj)
+            obj {
+              put("row", stated.number("row") ?: configured)
+              put("column", stated.number("column") ?: configured)
+            }
+          else num((stated as? VegaValue.Num)?.value ?: configured)
         val independent =
           setOf("x", "y").filter { channel ->
             resolve.scaleIsIndependent(channel, defaultIndependent = false)
@@ -1441,6 +1452,7 @@ private class Compilation(
         (style(views) as? VegaValue.Str)?.value ?: "cell",
         cellCardinality,
         cellScales,
+        viewEncode(),
       )
   }
 
