@@ -58,7 +58,12 @@ internal object FacetOperator {
         obj {
           template.obj("encoding")?.let { putAll(it) }
           if (mapping) {
-            for (channel in listOf("row", "column")) facet.fields[channel]?.let { put(channel, it) }
+            // In the order the specification **wrote** them: `forEachFieldDef` walks a model's
+            // encoding as it stands, and a grid that names its column before its row writes that
+            // column's sort index first.
+            facet.fields.forEach { (channel, def) ->
+              if (channel == "row" || channel == "column") put(channel, def)
+            }
           } else {
             // A single field becomes the `facet` channel: one construct from here down.
             put("facet", facet)

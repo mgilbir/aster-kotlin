@@ -697,7 +697,7 @@ no data is needed to compare two compilers. So every one of them was compiled by
 by this one, and the outputs compared property by property. That is a *measurement*, not a gate: the
 examples are not fixtures here, and nothing about them is checked in.
 
-**124 of 627 matched exactly** at the start, and **581** do now.
+**124 of 627 matched exactly** at the start, and **583** do now.
 
 The value is the *ranking*. The first sweep clustered by root cause, and the three most damaging
 causes were fixed straight away — chosen for what they do to the *picture* rather than for
@@ -712,12 +712,12 @@ frequency:
   where this compiler used `step - 2`, making it nearly four times too wide. `getBandSize` asks the
   scale's kind first and reaches `discreteBandSize` only where the domain is discrete.
 
-The sweep has been the working list ever since, and the 46 that still differ cluster like this:
+The sweep has been the working list ever since, and the 44 that still differ cluster like this:
 
 | Files | Cause |
 | --- | --- |
 | 21 | geographic: projections, `topojson`, `geoshape` — another worker's ground |
-| 9 | the rest of the **facet data flow**: the split itself is implemented (below), but a chart whose cells are read by a selection, and one whose second layer brings transforms of its own, still write a step twice or in the wrong cell |
+| 7 | the rest of the **facet data flow**: a chart whose cells are read by a selection, and one whose cells each carry a scale of their own, still put a step in the wrong place |
 | 9 | crossfilter charts and scatter-plot matrices: several selections over one table, whose datasets fork differently and whose diagonal cells are not the cells upstream builds |
 | 2 | `time` channel animations, set aside |
 | 5 | one-offs, each its own rule |
@@ -4363,7 +4363,10 @@ Three rules about the **shape** above and below it followed from the same readin
   one too high.
 - **A later layer rebuilds only its own steps** below the facet. What an ancestor wrote is the facet
   model's and already stands above the partition; writing it again below ran a crossed grid's sort
-  keys twice over rows that already carried them.
+  keys twice over rows that already carried them. Which transform belongs to which model was already
+  tracked — `transformOwners` — and the cell was simply not being handed it when the facet was
+  lifted out of the encoding, so every one of them looked like the cell's own. The sort *index* a
+  facet listed by hand is the same kind of column and follows the same rule.
 - **An independent axis is drawn inside the cell**, and it is `parseGuideResolve` that says so: an
   independent *scale* forces an independent guide, but `resolve: {axis: {x: "independent"}}` asks
   for one on its own. A band can only label a scale every cell shares, so a chart that resolves its
@@ -4376,6 +4379,11 @@ field; each band then takes the greatest of its own rather than counting again o
 longer has. Each band counts along **its own** direction only — a row band is as tall as a cell and
 knows nothing of how wide one is, which is `assembleRowColumnHeaderData` reading
 `{row: 'y', column: 'x'}[channel]`.
+
+One more thing follows the model rather than the grid: `forEachFieldDef` walks a model's encoding
+**as it was written**, so a grid naming its column before its row writes that column's sort index
+first. Everything else about a facet is ordered row-before-column, which is why the declared order
+is kept as a second list rather than a sort of the first.
 
 One facet serves however many layers are drawn in a cell. `facetRoot` is a single node with every
 child's chain hanging under it, so the second layer does not cut a partition of its own: it hangs

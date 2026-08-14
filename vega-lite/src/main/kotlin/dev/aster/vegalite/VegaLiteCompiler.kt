@@ -1376,10 +1376,18 @@ private class Compilation(
           parentIsLayer = view.parentIsLayer,
         )
         .also {
+          // A transform still belongs to the model it was written on. The facet's own are the
+          // *facet model's*, whatever the cell is called, and that is what says they stand above
+          // the partition rather than being rebuilt inside every cell.
+          it.transformOwners = view.transformOwners
           it.widthSignal = prefixed("child_width")
           it.heightSignal = prefixed("child_height")
           it.facetFields = found.fields
           it.facetDefs = found.defs
+          it.facetDeclared =
+            view.spec.encoding.entries
+              .filter { entry -> entry.key in Channels.FACET_CHANNELS }
+              .map { entry -> entry.value }
           // The cell's marks read the partition Vega facets out for them, named `facet`; the
           // scales still read the whole table, so every cell is scaled alike.
           it.markData = found.named("facet")

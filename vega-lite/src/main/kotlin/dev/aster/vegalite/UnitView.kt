@@ -114,6 +114,15 @@ internal class UnitView(
   var facetDefs: List<ChannelDef> = emptyList()
 
   /**
+   * The same definitions in the order the specification **wrote** them.
+   *
+   * `forEachFieldDef` walks a model's encoding as it stands, and a crossed grid that names its
+   * column before its row writes the column's sort index first. Everything else about a facet is
+   * ordered row-before-column, which is why this is a second list rather than a sort of the first.
+   */
+  var facetDeclared: List<ChannelDef> = emptyList()
+
+  /**
    * Whether this view's marks are clipped because a selection drives one of its position scales.
    *
    * `scaleClip`: a pan or a zoom moves the domain, and the rows that fall outside it are still

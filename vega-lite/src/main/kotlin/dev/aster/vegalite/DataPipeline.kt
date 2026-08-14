@@ -125,10 +125,13 @@ internal class DataPipeline(
     if (!view.parentIsLayer) binNode()?.let { head = head.then(it) }
     timeUnitNode()?.let { head = head.then(it) }
     binnedTimeUnitNode()?.let { head = head.then(it) }
-    sortIndexNode()?.let { head = head.then(it) }
+    sortIndexNode(belowFacet)?.let { head = head.then(it) }
     // The key a crossed grid's cells are ordered by is written onto every row *above* the facet,
     // where every cell's rows can still be seen at once — never again below it.
-    if (!belowFacet) facetSortKeys()?.let { head = head.then(it) }
+    if (!belowFacet)
+      facetSortKeys()?.let {
+        head = head.then(it)
+      }
     return head
   }
 
@@ -346,14 +349,17 @@ internal class DataPipeline(
     return if (transforms.isEmpty()) null else PassThroughNode(transforms)
   }
 
-  private fun sortIndexNode(): PassThroughNode? {
+  private fun sortIndexNode(belowFacet: Boolean = false): PassThroughNode? {
     val predicates = Transforms(diagnostics, selections = view.selections)
     // The **facet's** own channels as well as the encoding's: a trellis whose rows are listed in a
     // stated order needs the same index column, and the facet channel was lifted out of the
-    // encoding before this ran. `parseAllForSortIndex` is asked on the facet's model too.
+    // encoding before this ran. `parseAllForSortIndex` is asked on the facet's model too — on that
+    // model, though, so below the partition the column is already there and is not written again.
+    // `forEachFieldDef` walks the facet as it was **written**, which is what orders the two
+    // formulas a crossed grid needs.
     val channels =
       view.spec.encoding.entries.map { it.key to it.value } +
-        view.facetDefs.map { it.channel to it }
+        if (belowFacet) emptyList() else view.facetDeclared.map { it.channel to it }
     val transforms = channels.mapNotNull { (channel, def) ->
       val order = def.sort as? VegaValue.Arr ?: return@mapNotNull null
       val field = def.field ?: return@mapNotNull null
