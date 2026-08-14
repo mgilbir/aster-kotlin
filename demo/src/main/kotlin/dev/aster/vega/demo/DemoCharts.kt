@@ -33,6 +33,8 @@ public enum class DemoChart(
   SPEC_TITLES("Spec: titles", "titles.vg.json"),
   SPEC_LEGENDS("Spec: legends", "legends.vg.json"),
   SPEC_FACETS("Spec: facets", "facet-trellis.vg.json"),
+  // The entry that shows `bind`: every control under the chart is one the specification asked for.
+  SPEC_BOUND("Spec: controls", "bound-controls.vg.json"),
   PASTED("Paste your own", isPasted = true);
 
   /** True when this entry is compiled from a specification rather than built by hand. */
@@ -59,6 +61,7 @@ public enum class DemoChart(
       SPEC_TITLES,
       SPEC_LEGENDS,
       SPEC_FACETS,
+      SPEC_BOUND,
       PASTED -> null
     }
   }

@@ -168,6 +168,20 @@ public class VegaChartController(
 
   public val diagnostics: StateFlow<List<VegaDiagnostic>> = _diagnostics.asStateFlow()
 
+  private val _inputs = MutableStateFlow<List<SignalInput>>(emptyList())
+
+  /**
+   * The controls this chart asks a reader for, with the values they currently hold.
+   *
+   * A specification's `bind` says what control a signal wants — a slider, a checkbox, a choice —
+   * and this is the list of them, in declaration order, republished on every compile. That is what
+   * makes the binding **two-way**: a signal moved by a tap, by another signal or by a timer moves
+   * the control that shows it, with no host code involved.
+   *
+   * Empty for a chart that binds nothing, which is most of them. See [setSignal] for the way back.
+   */
+  public val inputs: StateFlow<List<SignalInput>> = _inputs.asStateFlow()
+
   /** Hit index for the current scene, rebuilt only when the scene itself changes. */
   private var hitIndex: SceneHitIndex = SceneHitIndex(initialScene, HitTestOptions.Touch)
   private var hitOptions: HitTestOptions = HitTestOptions.Touch
@@ -277,6 +291,15 @@ public class VegaChartController(
         _state.value = _state.value.copy(isLoading = false)
         throw e
       }
+    // The same two lines [setSpec] runs, and leaving them out made this the quietest bug in the
+    // controller: a chart loaded through here had no text to recompile from, so **no signal change
+    // could redraw it** — not a control, not a handler, not a tap on a mark. Every JVM test used
+    // the
+    // synchronous path and every interactive specification in the demo was inert. Recorded after
+    // the
+    // compile rather than before it, so a load that was cancelled leaves the chart on screen alone.
+    loadedSpecJson = json
+    signals.reset()
     return publish(compiled)
   }
 
@@ -308,6 +331,9 @@ public class VegaChartController(
       }
     val diagnostics = compiled.diagnostics + listenerDiagnostics.diagnostics
     _diagnostics.value = diagnostics
+    // Re-read rather than remembered: a signal a handler or a timer changed has to move the control
+    // that shows it, and the compile that just happened is where its new value is.
+    _inputs.value = SignalInput.of(compiled.spec?.signals.orEmpty(), compiled.signals.values)
     val scene = compiled.scene
     if (scene == null) {
       _state.value = _state.value.copy(isLoading = false, diagnostics = diagnostics)
@@ -338,6 +364,29 @@ public class VegaChartController(
   public fun clearDiagnostics() {
     _diagnostics.value = emptyList()
     _state.value = _state.value.copy(diagnostics = emptyList())
+  }
+
+  /**
+   * Sets a signal from outside the chart, which is how a control drives one.
+   *
+   * The same path a fired handler takes: the value is pinned, the handlers sourced on that signal
+   * cascade from it, and the specification is compiled again with the new value in place. So a
+   * slider bound to `size` reaches everything that reads `size`, including a signal derived from it
+   * and a scale built on that — which is the whole point of a binding and is not something a host
+   * could arrange from outside.
+   *
+   * Ignores a name the specification does not declare, rather than inventing a signal: a stray
+   * write from a control that outlived its chart should do nothing.
+   */
+  public fun setSignal(name: String, value: VegaValue) {
+    val compiled = lastCompiled ?: return
+    val spec = compiled.spec ?: return
+    if (spec.signals.none { it.name == name }) return
+    if (compiled.signals.signal(name) == value) return
+    val changed = LinkedHashSet<String>()
+    signals.set(name, value)
+    changed += name
+    applyFired(changed, compiled)
   }
 
   /**
