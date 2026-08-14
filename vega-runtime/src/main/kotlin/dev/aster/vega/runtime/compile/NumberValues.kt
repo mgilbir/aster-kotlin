@@ -6,6 +6,7 @@ import dev.aster.vega.expression.ExpressionResult
 import dev.aster.vega.expression.JsSemantics
 import dev.aster.vega.model.DiagnosticCollector
 import dev.aster.vega.model.VegaValue
+import dev.aster.vega.model.spec.ChannelValue
 import dev.aster.vega.model.spec.NumberValue
 
 /**
@@ -20,12 +21,35 @@ public class NumberResolver(
   private val expressions: ExpressionCompiler,
   private val scope: SignalScope,
   private val diagnostics: DiagnosticCollector,
+  /**
+   * How a **scaled** guide number is read, when there are scales to read it through.
+   *
+   * Upstream's `numberValue` is a value reference, so `{"scale": "ord", "value": "Cylinders"}` is a
+   * legal axis `offset` — and resolving one needs the scales, which this class has no business
+   * holding. The guide builders pass the encoder's own channel resolution instead, so a guide
+   * number and a mark channel are read by exactly the same code. Absent where no scales exist yet,
+   * and then a scaled value is reported rather than guessed at.
+   */
+  private val scaled: ((ChannelValue) -> Double?)? = null,
 ) {
 
   public fun resolve(value: NumberValue?, owner: String): Double? =
     when (value) {
       null -> null
       is NumberValue.Constant -> value.value
+      is NumberValue.Reference -> {
+        val read = scaled
+        if (read == null) {
+          diagnostics.warn(
+            dev.aster.vega.model.DiagnosticCodes.SCALE_UNSUPPORTED_TYPE,
+            "'$owner' takes a scaled value, which needs a scale that is not built yet",
+            operator = owner,
+          )
+          null
+        } else {
+          read(value.channel)
+        }
+      }
       is NumberValue.Signal ->
         when (val compiled = expressions.compile(value.expression)) {
           is ExpressionResult.Failed -> {

@@ -87,6 +87,15 @@ public data class FiredHandler(
    * expression, exactly as upstream leaves it undefined.
    */
   val event: InputEvent? = null,
+  /**
+   * How long to wait before applying this, when the stream carries a `debounce`.
+   *
+   * Null for everything else, which is almost everything. The dispatcher decides *what* matched and
+   * says how long it should be held for; the waiting itself belongs to whoever has a clock, which
+   * is the controller and its [Scheduler]. Keeping the two apart is what leaves this class testable
+   * without one.
+   */
+  val deferByMillis: Double? = null,
 )
 
 /** One `on` handler, bound to the signal it sets. */
@@ -128,6 +137,14 @@ public class EventDispatcher(
    * that says no needs the request refused rather than honoured quietly.
    */
   private val events: EventConfig = EventConfig(),
+  /**
+   * Whether the caller can wait: whether it holds a [Scheduler].
+   *
+   * Only changes what is *reported*. A debounce and a timer stream are honoured by whoever has the
+   * clock, so with one in hand there is nothing to warn about; with none, both still say what they
+   * cannot do.
+   */
+  private val deferrable: Boolean = false,
 ) {
 
   /** One stream being watched, with whatever state it needs between events. */
@@ -181,6 +198,11 @@ public class EventDispatcher(
       gateWatches += Watch(stream.between[0], null, opens = mutableListOf(gate))
       gateWatches += Watch(stream.between[1], null, closes = mutableListOf(gate))
     }
+    if (stream.source == EventStream.SOURCE_TIMER && deferrable) {
+      // Someone else has the clock; the controller starts it and this stream is not dispatched from
+      // an input event at all.
+      return
+    }
     if (stream.source == EventStream.SOURCE_TIMER) {
       // A timer fires on its own rather than in response to anything, so honouring it needs a clock
       // this class does not have — `dispatch` is only ever called with an event that already
@@ -194,7 +216,7 @@ public class EventDispatcher(
       )
       return
     }
-    if (stream.debounce != null) {
+    if (stream.debounce != null && !deferrable) {
       // A debounce fires *after* a quiet period, so honouring it needs something that can wake up
       // later. Nothing here schedules, and silently treating it as a throttle would fire on the
       // leading edge instead of the trailing one — the opposite behaviour.
@@ -225,7 +247,14 @@ public class EventDispatcher(
       val since = watch.lastFired
       if (throttle != null && since != null && event.timestampMillis - since < throttle) continue
       watch.lastFired = event.timestampMillis
-      fired += FiredHandler(binding.signalName, binding.handler, event)
+      fired +=
+        FiredHandler(
+          binding.signalName,
+          binding.handler,
+          event,
+          // Held rather than applied when the stream asked to be, and the caller can wait.
+          deferByMillis = if (deferrable) watch.stream.debounce else null,
+        )
       // `!` on the type: this stream consumed the event, so nothing after it sees it.
       if (watch.stream.consume) break
     }

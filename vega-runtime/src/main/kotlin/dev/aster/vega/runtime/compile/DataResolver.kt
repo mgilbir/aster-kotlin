@@ -20,10 +20,12 @@ import dev.aster.vega.model.asString
 import dev.aster.vega.model.isMissing
 import dev.aster.vega.model.spec.DataSpec
 import dev.aster.vega.model.time.DateValues
+import dev.aster.vega.model.time.TimeParse
 import dev.aster.vega.runtime.load.DataLoader
 import dev.aster.vega.runtime.load.DenyLoader
 import dev.aster.vega.runtime.load.LoadDeniedException
 import dev.aster.vega.runtime.scale.VegaScale
+import kotlinx.datetime.TimeZone
 
 /**
  * The datasets visible at one point in a specification, and the tree each of them carries.
@@ -498,6 +500,25 @@ internal class DataResolver(
   }
 
   /**
+   * A date read with a **stated** format, upstream's `date:` and `utc:` parse types.
+   *
+   * The specifier is everything after the first colon, unquoted if it was quoted — upstream's
+   * `split(/:(.+)?/, 2)` and its quote strip, both of which matter: a time pattern contains colons
+   * of its own, and a specification written by a human usually quotes it.
+   */
+  private fun patternedDate(raw: VegaValue, kind: String): VegaValue? {
+    val utc = kind.startsWith("utc:")
+    var pattern = kind.substringAfter(':')
+    if (pattern.length >= 2 && (pattern.first() == '\'' || pattern.first() == '"')) {
+      if (pattern.last() == pattern.first()) pattern = pattern.substring(1, pattern.length - 1)
+    }
+    if (pattern.isEmpty()) return null
+    val zone = if (utc) TimeZone.UTC else TimeZone.currentSystemDefault()
+    val millis = TimeParse.parse(raw.asString(), pattern, zone, utc) ?: return null
+    return VegaValue.Timestamp(millis)
+  }
+
+  /**
    * Applies `format.parse` to one row.
    *
    * JSON has no date type, so a specification has to say which fields hold one. Everything
@@ -510,11 +531,19 @@ internal class DataResolver(
     for ((field, kind) in spec.parse) {
       val raw = fields[field] ?: continue
       val converted =
-        when (kind.lowercase()) {
-          "date" -> DateValues.parse(raw)
-          "number" -> VegaValue.Num(raw.asDouble())
-          "string" -> VegaValue.Str(raw.asString())
-          "boolean" -> VegaValue.Bool(JsSemantics.truthy(raw))
+        when {
+          // `date:%d/%m/%Y` and `utc:%Y-%m-%d` — a column whose dates are written in a format
+          // `Date.parse` cannot read, which is most of the world's. Upstream splits on the
+          // **first**
+          // colon so a pattern may contain one, strips a quoted pattern's quotes, and hands the
+          // rest
+          // to `timeParse` or `utcParse`. Without it a whole column stayed text: 406 rows of one
+          // published example, whose year axis was drawn from strings.
+          kind.startsWith("date:") || kind.startsWith("utc:") -> patternedDate(raw, kind)
+          kind.equals("date", ignoreCase = true) -> DateValues.parse(raw)
+          kind.equals("number", ignoreCase = true) -> VegaValue.Num(raw.asDouble())
+          kind.equals("string", ignoreCase = true) -> VegaValue.Str(raw.asString())
+          kind.equals("boolean", ignoreCase = true) -> VegaValue.Bool(JsSemantics.truthy(raw))
           else -> {
             diagnostics.warn(
               DiagnosticCodes.PARSE_UNKNOWN_PROPERTY,

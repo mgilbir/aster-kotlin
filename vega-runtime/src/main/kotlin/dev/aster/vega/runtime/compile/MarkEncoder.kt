@@ -1838,11 +1838,11 @@ public class MarkEncoder(
     channelName: String,
     spec: MarkSpec,
   ): SceneColor? {
-    val text =
+    val resolved =
       when (channel) {
         null -> return null
-        is ChannelValue.Constant -> channel.value.asString()
-        is ChannelValue.Field -> datum.fieldOf(channel.ref).asString()
+        is ChannelValue.Constant -> channel.value
+        is ChannelValue.Field -> datum.fieldOf(channel.ref)
         is ChannelValue.Scaled -> {
           val scale = scales[scaleNameOf(channel, datum)]
           if (scale == null) {
@@ -1854,10 +1854,9 @@ public class MarkEncoder(
             return null
           }
           val input = scaledInput(channel, datum) ?: return null
-          scale.scale(input).asString()
+          scale.scale(input)
         }
-        is ChannelValue.Signal ->
-          evaluateExpression(channel.expression, datum)?.asString() ?: return null
+        is ChannelValue.Signal -> evaluateExpression(channel.expression, datum) ?: return null
         is ChannelValue.Conditional -> {
           val selected = selectRule(channel, datum) ?: return null
           return paint(selected, datum, channelName, spec)
@@ -1866,10 +1865,15 @@ public class MarkEncoder(
         // adjustments are dropped rather than applied so at least the colour survives.
         is ChannelValue.Adjusted -> return paint(channel.base, datum, channelName, spec)
       }
-    // An explicit `null` is a *statement*: it says this mark has no paint of that kind, and it is
-    // how a chart hides a border its style block would otherwise draw. It is not an unreadable
-    // colour and it must not fall through to the configuration, or the border comes back.
-    if (text == "null") return null
+    // A colour that resolves to **nothing** is no paint, not a bad colour. `{"value": null}` and a
+    // field a row has not got both mean "leave this channel unset", which is how a specification
+    // says "no stroke on these rows" — upstream draws the mark without one and says nothing.
+    // Stringifying first turned every one of those into the word "null" and then into a complaint:
+    // 318 of them across the published examples, all of which were drawing correctly. It is also
+    // how a chart hides a border its style block would otherwise draw, so it must not fall through
+    // to the configuration.
+    if (resolved.isMissing) return null
+    val text = resolved.asString()
     val colour = SceneColor.parse(text)
     if (colour == null) {
       diagnostics.warn(

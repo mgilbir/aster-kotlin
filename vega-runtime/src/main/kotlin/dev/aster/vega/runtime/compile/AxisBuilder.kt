@@ -34,6 +34,7 @@ import dev.aster.vega.scene.GroupNode
 import dev.aster.vega.scene.NodeMetadata
 import dev.aster.vega.scene.RectD
 import dev.aster.vega.scene.RuleNode
+import dev.aster.vega.scene.SceneColor
 import dev.aster.vega.scene.SceneNode
 import dev.aster.vega.scene.SceneNodeIdAllocator
 import dev.aster.vega.scene.ScenePaint
@@ -252,11 +253,10 @@ public class AxisBuilder(
         // A gridline's own `encode` block, resolved against the tick: this is how a chart picks the
         // zero line out of the rest, and Vega-Lite writes every conditional guide property this way
         // because Vega has no conditional guide properties of its own.
-        val strokeHere = gridEncodeStroke(spec, tick) ?: gridStroke
         // Per gridline, for the same reason as a tick: the `encode` block may read the value it
         // marks.
         val gridMetaFor = partMetadata(spec, "grid", tickDatum(tick), gridMeta)
-        children +=
+        val gridNode =
           when (spec.orient) {
             Orient.BOTTOM,
             Orient.TOP ->
@@ -266,7 +266,7 @@ public class AxisBuilder(
                 gridRange.first + undoOffset,
                 at,
                 gridRange.second + undoOffset,
-                strokeHere,
+                strokeFor(spec, "grid", tickDatum(tick), gridStroke),
                 metadata = gridMetaFor,
               )
             Orient.LEFT,
@@ -277,10 +277,11 @@ public class AxisBuilder(
                 at,
                 gridRange.second + undoOffset,
                 at,
-                strokeHere,
+                strokeFor(spec, "grid", tickDatum(tick), gridStroke),
                 metadata = gridMetaFor,
               )
           }
+        children += positioned(gridNode, spec, "grid", tickDatum(tick))
       }
     }
 
@@ -291,19 +292,21 @@ public class AxisBuilder(
         // "datum.value"}` on a tick is how an axis says what each mark stands for.
         val tickMetaFor = partMetadata(spec, "ticks", tickDatum(tick), tickMeta)
         val at = tickCoordinate(tick.position, spec)
+        val paint = strokeFor(spec, "ticks", tickDatum(tick), tickStroke)
         val tickNode =
           when (spec.orient) {
             Orient.BOTTOM ->
-              RuleNode(ids.allocate(), at, 0.0, at, tickSize, tickStroke, metadata = tickMetaFor)
+              RuleNode(ids.allocate(), at, 0.0, at, tickSize, paint, metadata = tickMetaFor)
             Orient.TOP ->
-              RuleNode(ids.allocate(), at, 0.0, at, -tickSize, tickStroke, metadata = tickMetaFor)
+              RuleNode(ids.allocate(), at, 0.0, at, -tickSize, paint, metadata = tickMetaFor)
             Orient.LEFT ->
-              RuleNode(ids.allocate(), 0.0, at, -tickSize, at, tickStroke, metadata = tickMetaFor)
+              RuleNode(ids.allocate(), 0.0, at, -tickSize, at, paint, metadata = tickMetaFor)
             Orient.RIGHT ->
-              RuleNode(ids.allocate(), 0.0, at, tickSize, at, tickStroke, metadata = tickMetaFor)
+              RuleNode(ids.allocate(), 0.0, at, tickSize, at, paint, metadata = tickMetaFor)
           }
-        drawn += tickNode
-        measured += tickNode
+        val placedTick = positioned(tickNode, spec, "ticks", tickDatum(tick))
+        drawn += placedTick
+        measured += placedTick
       }
     }
 
@@ -329,11 +332,11 @@ public class AxisBuilder(
             // leaves the axis property off. Reading only the property left the labels at the
             // anchor the orientation would have chosen.
             align =
-              alignOf(labelText(spec, "align", tick) ?: spec.labelAlign)
+              alignOf(labelString(spec, "align", tick) ?: spec.labelAlign)
                 ?: (if (spec.orient.isVertical) null else flushed?.let(::flushAlign))
                 ?: labelAlign(spec.orient),
             baseline =
-              baselineOf(labelText(spec, "baseline", tick) ?: spec.labelBaseline)
+              baselineOf(labelString(spec, "baseline", tick) ?: spec.labelBaseline)
                 ?: (if (spec.orient.isVertical) flushed?.let(::flushBaseline) else null)
                 ?: labelBaseline(spec.orient),
             limit = labelLimit,
@@ -451,7 +454,7 @@ public class AxisBuilder(
       val span = rangeEnds(scale)
       val from = span?.firstOrNull() ?: 0.0
       val to = span?.lastOrNull() ?: if (spec.orient.isVertical) extent.height else extent.width
-      children +=
+      val domainNode =
         when (spec.orient) {
           Orient.BOTTOM,
           Orient.TOP ->
@@ -460,6 +463,9 @@ public class AxisBuilder(
           Orient.RIGHT ->
             RuleNode(ids.allocate(), 0.0, from, 0.0, to, domainStroke, metadata = domainMeta)
         }
+      // The domain line has no tick of its own, so its `encode` resolves against the same empty
+      // datum its metadata does.
+      children += positioned(domainNode, spec, "domain", VegaValue.EmptyObject)
     }
 
     // A title may be a signal: a chart that lets a control choose the measure retitles the axis
@@ -1000,23 +1006,70 @@ public class AxisBuilder(
     return encoder.channelText(entry, datum)
   }
 
-  /** The stroke an `encode.grid` block gives this gridline, or null where it says nothing. */
-  private fun gridEncodeStroke(spec: AxisSpec, tick: Tick): Stroke? {
-    val encoder = channels ?: return null
-    val entry = spec.encode["grid"]?.update?.get("stroke") ?: return null
-    val datum = VegaValue.Obj(linkedMapOf("value" to tick.value))
-    val colour = encoder.channelColor(entry, datum) ?: return null
-    return GuideStyle.stroke(spec.gridStyle, AxisDefaults.gridColor)
-      .copy(paint = ScenePaint.Solid(colour))
+  /**
+   * A part's own `encode` restyling **one** line rather than all of them.
+   *
+   * A guide encode channel is normally folded into the property it duplicates at parse time —
+   * `encode.ticks.update.strokeWidth` *is* `tickWidth` — and that fold is right for a constant and
+   * for a signal over the chart's own state. It cannot carry a signal that reads `datum`, because
+   * at parse time there is no tick to read: `{"signal": "datum.value === marked ? 2 : 1"}` resolved
+   * to the false branch for every tick. Resolving the same channels again here, per tick, costs
+   * nothing where they are constant — the answer is the one the fold already produced — and is the
+   * only way the datum-dependent form can work at all.
+   */
+  private fun strokeFor(
+    spec: AxisSpec,
+    part: String,
+    datum: VegaValue,
+    base: Stroke,
+  ): Stroke {
+    val block = spec.encode[part]?.update ?: return base
+    val encoder = channels ?: return base
+    fun number(name: String) = block[name]?.let { encoder.channelNumber(it, datum) }
+    fun text(name: String) =
+      block[name]?.let { encoder.channelText(it, datum) }?.takeIf { it.isNotEmpty() }
+    val colour = text("stroke")?.let { SceneColor.parse(it) }
+    // A dash pattern is an array, so it comes back as a value rather than a number.
+    val dash =
+      (block["strokeDash"]?.let { encoder.channelAny(it, datum) } as? VegaValue.Arr)
+        ?.values
+        ?.map { it.asDouble() }
+        ?.takeIf { it.isNotEmpty() }
+    return base.copy(
+      paint = colour?.let { ScenePaint.Solid(it) } ?: base.paint,
+      width = number("strokeWidth") ?: base.width,
+      cap = text("strokeCap")?.let { GuideStyle.capOf(it) } ?: base.cap,
+      dashArray = dash ?: base.dashArray,
+      dashOffset = number("strokeDashOffset") ?: base.dashOffset,
+      opacity = number("strokeOpacity") ?: base.opacity,
+    )
   }
 
-  /** The same as [labelChannel], for a channel whose answer is a word rather than a number. */
-  private fun labelText(spec: AxisSpec, channel: String, tick: Tick): String? {
-    val encoder = channels ?: return null
-    val entry = spec.encode["labels"]?.update?.get(channel) ?: return null
-    val datum =
-      VegaValue.Obj(linkedMapOf("value" to tick.value, "label" to VegaValue.Str(tick.label)))
-    return encoder.channelText(entry, datum)
+  /**
+   * A part's own `encode` moving the line the axis drew.
+   *
+   * `encode.ticks.update.y` is not decoration: upstream merges the block into the tick's own
+   * encoders and applies it **last**, so a specification can lift every tick off the axis or
+   * stretch one across the plot — `warming-stripes` reaches through a tick to draw a marker at a
+   * temperature. Probed rather than assumed, because a guide writing its own geometry on every pass
+   * could just as easily have overwritten it: `{"y": {"value": -3}, "x2": {"value": 13}}` on a
+   * bottom axis gives `y = -3` and `x2 = 13` with the computed `x` and `y2` left alone.
+   */
+  private fun positioned(node: RuleNode, spec: AxisSpec, part: String, datum: VegaValue): RuleNode {
+    val block = spec.encode[part]?.update ?: return node
+    val encoder = channels ?: return node
+    fun at(name: String) = block[name]?.let { encoder.channelNumber(it, datum) }
+    val x1 = at("x")
+    val y1 = at("y")
+    val x2 = at("x2")
+    val y2 = at("y2")
+    if (x1 == null && y1 == null && x2 == null && y2 == null) return node
+    return node.copy(
+      x1 = x1 ?: node.x1,
+      y1 = y1 ?: node.y1,
+      x2 = x2 ?: node.x2,
+      y2 = y2 ?: node.y2,
+    )
   }
 
   private fun labelChannel(spec: AxisSpec, channel: String, tick: Tick): Double? {

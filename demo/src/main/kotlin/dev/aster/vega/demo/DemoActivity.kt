@@ -30,6 +30,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -44,6 +45,7 @@ import dev.aster.vega.loader.VegaDataLoaders
 import dev.aster.vega.model.DiagnosticSeverity
 import dev.aster.vega.runtime.ChartEvent
 import dev.aster.vega.runtime.VegaChartController
+import dev.aster.vega.runtime.interaction.CoroutineScheduler
 import dev.aster.vega.svg.toSvg
 import dev.aster.vegalite.VegaLiteInput
 import java.io.File
@@ -98,8 +100,20 @@ private fun DemoScreen() {
     remember(context) {
       VegaDataLoaders.directoryThenNetwork(context.cacheDir, cacheDownloads = true)
     }
+  // The scheduler is what makes a `debounce` and a **timer** stream work, and its scope is the
+  // whole
+  // of the lifecycle question: a timer that outlives the composition it draws into is a leak with a
+  // repaint attached, and a scope that goes away when the composition does cancels every pending
+  // tick without anything having to remember to.
+  val scope = rememberCoroutineScope()
   val controller =
-    remember(loader) { VegaChartController(textEngine = AndroidTextEngine(), loader = loader) }
+    remember(loader, scope) {
+      VegaChartController(
+        textEngine = AndroidTextEngine(),
+        loader = loader,
+        scheduler = CoroutineScheduler(scope),
+      )
+    }
 
   LaunchedEffect(chart, dark, pasted) {
     val asset = chart.specAsset

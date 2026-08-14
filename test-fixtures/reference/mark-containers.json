@@ -1,5 +1,37 @@
 [
  {
+  "fixture": "aggregate-ops-rest",
+  "kind": "group",
+  "role": "graphics-object",
+  "roleDescription": "group mark container",
+  "label": null,
+  "hidden": false
+ },
+ {
+  "fixture": "aggregate-ops-rest",
+  "kind": "rect",
+  "role": "graphics-symbol",
+  "roleDescription": "rect mark container",
+  "label": null,
+  "hidden": false
+ },
+ {
+  "fixture": "aggregate-ops-rest",
+  "kind": "text",
+  "role": "graphics-object",
+  "roleDescription": "text mark container",
+  "label": null,
+  "hidden": false
+ },
+ {
+  "fixture": "aggregate-ops-rest",
+  "kind": "text",
+  "role": "graphics-object",
+  "roleDescription": "text mark container",
+  "label": null,
+  "hidden": false
+ },
+ {
   "fixture": "aggregate-ops-tail",
   "kind": "group",
   "role": "graphics-object",
@@ -2076,6 +2108,78 @@
   "kind": "image",
   "role": "graphics-symbol",
   "roleDescription": "image mark container",
+  "label": null,
+  "hidden": false
+ },
+ {
+  "fixture": "density-options",
+  "kind": "group",
+  "role": "graphics-object",
+  "roleDescription": "group mark container",
+  "label": null,
+  "hidden": false
+ },
+ {
+  "fixture": "density-options",
+  "kind": "symbol",
+  "role": "graphics-symbol",
+  "roleDescription": "symbol mark container",
+  "label": null,
+  "hidden": false
+ },
+ {
+  "fixture": "density-options",
+  "kind": "group",
+  "role": "graphics-object",
+  "roleDescription": "group mark container",
+  "label": null,
+  "hidden": false
+ },
+ {
+  "fixture": "density-options",
+  "kind": "line",
+  "role": "graphics-symbol",
+  "roleDescription": "line mark container",
+  "label": null,
+  "hidden": false
+ },
+ {
+  "fixture": "density-options",
+  "kind": "line",
+  "role": "graphics-symbol",
+  "roleDescription": "line mark container",
+  "label": null,
+  "hidden": false
+ },
+ {
+  "fixture": "density-options",
+  "kind": "group",
+  "role": "graphics-object",
+  "roleDescription": "group mark container",
+  "label": null,
+  "hidden": false
+ },
+ {
+  "fixture": "density-options",
+  "kind": "area",
+  "role": "graphics-symbol",
+  "roleDescription": "area mark container",
+  "label": null,
+  "hidden": false
+ },
+ {
+  "fixture": "density-options",
+  "kind": "area",
+  "role": "graphics-symbol",
+  "roleDescription": "area mark container",
+  "label": null,
+  "hidden": false
+ },
+ {
+  "fixture": "density-options",
+  "kind": "line",
+  "role": "graphics-symbol",
+  "roleDescription": "line mark container",
   "label": null,
   "hidden": false
  },
@@ -9088,6 +9192,22 @@
   "hidden": false
  },
  {
+  "fixture": "guide-encode-geometry",
+  "kind": "group",
+  "role": "graphics-object",
+  "roleDescription": "group mark container",
+  "label": null,
+  "hidden": false
+ },
+ {
+  "fixture": "guide-encode-geometry",
+  "kind": "rect",
+  "role": "graphics-symbol",
+  "roleDescription": "rect mark container",
+  "label": null,
+  "hidden": false
+ },
+ {
   "fixture": "guide-encode-text",
   "kind": "group",
   "role": "graphics-object",
@@ -13960,6 +14080,38 @@
   "hidden": false
  },
  {
+  "fixture": "parse-date-patterns",
+  "kind": "group",
+  "role": "graphics-object",
+  "roleDescription": "group mark container",
+  "label": null,
+  "hidden": false
+ },
+ {
+  "fixture": "parse-date-patterns",
+  "kind": "line",
+  "role": "graphics-symbol",
+  "roleDescription": "line mark container",
+  "label": null,
+  "hidden": false
+ },
+ {
+  "fixture": "parse-date-patterns",
+  "kind": "symbol",
+  "role": "graphics-symbol",
+  "roleDescription": "symbol mark container",
+  "label": null,
+  "hidden": false
+ },
+ {
+  "fixture": "parse-date-patterns",
+  "kind": "text",
+  "role": "graphics-object",
+  "roleDescription": "text mark container",
+  "label": null,
+  "hidden": false
+ },
+ {
   "fixture": "path-marks",
   "kind": "group",
   "role": "graphics-object",
@@ -14180,6 +14332,398 @@
   "kind": "group",
   "role": "graphics-object",
   "roleDescription": "group mark container",
+  "label": null,
+  "hidden": false
+ },
+ {
+  "fixture": "projection-families",
+  "kind": "group",
+  "role": "graphics-object",
+  "roleDescription": "group mark container",
+  "label": null,
+  "hidden": false
+ },
+ {
+  "fixture": "projection-families",
+  "kind": "group",
+  "role": "graphics-object",
+  "roleDescription": "group mark container",
+  "label": null,
+  "hidden": false
+ },
+ {
+  "fixture": "projection-families",
+  "kind": "path",
+  "role": "graphics-symbol",
+  "roleDescription": "path mark container",
+  "label": null,
+  "hidden": false
+ },
+ {
+  "fixture": "projection-families",
+  "kind": "symbol",
+  "role": "graphics-symbol",
+  "roleDescription": "symbol mark container",
+  "label": null,
+  "hidden": false
+ },
+ {
+  "fixture": "projection-families",
+  "kind": "text",
+  "role": "graphics-object",
+  "roleDescription": "text mark container",
+  "label": null,
+  "hidden": false
+ },
+ {
+  "fixture": "projection-families",
+  "kind": "group",
+  "role": "graphics-object",
+  "roleDescription": "group mark container",
+  "label": null,
+  "hidden": false
+ },
+ {
+  "fixture": "projection-families",
+  "kind": "path",
+  "role": "graphics-symbol",
+  "roleDescription": "path mark container",
+  "label": null,
+  "hidden": false
+ },
+ {
+  "fixture": "projection-families",
+  "kind": "symbol",
+  "role": "graphics-symbol",
+  "roleDescription": "symbol mark container",
+  "label": null,
+  "hidden": false
+ },
+ {
+  "fixture": "projection-families",
+  "kind": "text",
+  "role": "graphics-object",
+  "roleDescription": "text mark container",
+  "label": null,
+  "hidden": false
+ },
+ {
+  "fixture": "projection-families",
+  "kind": "group",
+  "role": "graphics-object",
+  "roleDescription": "group mark container",
+  "label": null,
+  "hidden": false
+ },
+ {
+  "fixture": "projection-families",
+  "kind": "path",
+  "role": "graphics-symbol",
+  "roleDescription": "path mark container",
+  "label": null,
+  "hidden": false
+ },
+ {
+  "fixture": "projection-families",
+  "kind": "symbol",
+  "role": "graphics-symbol",
+  "roleDescription": "symbol mark container",
+  "label": null,
+  "hidden": false
+ },
+ {
+  "fixture": "projection-families",
+  "kind": "text",
+  "role": "graphics-object",
+  "roleDescription": "text mark container",
+  "label": null,
+  "hidden": false
+ },
+ {
+  "fixture": "projection-families",
+  "kind": "group",
+  "role": "graphics-object",
+  "roleDescription": "group mark container",
+  "label": null,
+  "hidden": false
+ },
+ {
+  "fixture": "projection-families",
+  "kind": "path",
+  "role": "graphics-symbol",
+  "roleDescription": "path mark container",
+  "label": null,
+  "hidden": false
+ },
+ {
+  "fixture": "projection-families",
+  "kind": "symbol",
+  "role": "graphics-symbol",
+  "roleDescription": "symbol mark container",
+  "label": null,
+  "hidden": false
+ },
+ {
+  "fixture": "projection-families",
+  "kind": "text",
+  "role": "graphics-object",
+  "roleDescription": "text mark container",
+  "label": null,
+  "hidden": false
+ },
+ {
+  "fixture": "projection-families",
+  "kind": "group",
+  "role": "graphics-object",
+  "roleDescription": "group mark container",
+  "label": null,
+  "hidden": false
+ },
+ {
+  "fixture": "projection-families",
+  "kind": "path",
+  "role": "graphics-symbol",
+  "roleDescription": "path mark container",
+  "label": null,
+  "hidden": false
+ },
+ {
+  "fixture": "projection-families",
+  "kind": "symbol",
+  "role": "graphics-symbol",
+  "roleDescription": "symbol mark container",
+  "label": null,
+  "hidden": false
+ },
+ {
+  "fixture": "projection-families",
+  "kind": "text",
+  "role": "graphics-object",
+  "roleDescription": "text mark container",
+  "label": null,
+  "hidden": false
+ },
+ {
+  "fixture": "projection-families",
+  "kind": "group",
+  "role": "graphics-object",
+  "roleDescription": "group mark container",
+  "label": null,
+  "hidden": false
+ },
+ {
+  "fixture": "projection-families",
+  "kind": "path",
+  "role": "graphics-symbol",
+  "roleDescription": "path mark container",
+  "label": null,
+  "hidden": false
+ },
+ {
+  "fixture": "projection-families",
+  "kind": "symbol",
+  "role": "graphics-symbol",
+  "roleDescription": "symbol mark container",
+  "label": null,
+  "hidden": false
+ },
+ {
+  "fixture": "projection-families",
+  "kind": "text",
+  "role": "graphics-object",
+  "roleDescription": "text mark container",
+  "label": null,
+  "hidden": false
+ },
+ {
+  "fixture": "projection-families",
+  "kind": "group",
+  "role": "graphics-object",
+  "roleDescription": "group mark container",
+  "label": null,
+  "hidden": false
+ },
+ {
+  "fixture": "projection-families",
+  "kind": "path",
+  "role": "graphics-symbol",
+  "roleDescription": "path mark container",
+  "label": null,
+  "hidden": false
+ },
+ {
+  "fixture": "projection-families",
+  "kind": "symbol",
+  "role": "graphics-symbol",
+  "roleDescription": "symbol mark container",
+  "label": null,
+  "hidden": false
+ },
+ {
+  "fixture": "projection-families",
+  "kind": "text",
+  "role": "graphics-object",
+  "roleDescription": "text mark container",
+  "label": null,
+  "hidden": false
+ },
+ {
+  "fixture": "projection-families",
+  "kind": "group",
+  "role": "graphics-object",
+  "roleDescription": "group mark container",
+  "label": null,
+  "hidden": false
+ },
+ {
+  "fixture": "projection-families",
+  "kind": "path",
+  "role": "graphics-symbol",
+  "roleDescription": "path mark container",
+  "label": null,
+  "hidden": false
+ },
+ {
+  "fixture": "projection-families",
+  "kind": "symbol",
+  "role": "graphics-symbol",
+  "roleDescription": "symbol mark container",
+  "label": null,
+  "hidden": false
+ },
+ {
+  "fixture": "projection-families",
+  "kind": "text",
+  "role": "graphics-object",
+  "roleDescription": "text mark container",
+  "label": null,
+  "hidden": false
+ },
+ {
+  "fixture": "projection-families",
+  "kind": "group",
+  "role": "graphics-object",
+  "roleDescription": "group mark container",
+  "label": null,
+  "hidden": false
+ },
+ {
+  "fixture": "projection-families",
+  "kind": "path",
+  "role": "graphics-symbol",
+  "roleDescription": "path mark container",
+  "label": null,
+  "hidden": false
+ },
+ {
+  "fixture": "projection-families",
+  "kind": "symbol",
+  "role": "graphics-symbol",
+  "roleDescription": "symbol mark container",
+  "label": null,
+  "hidden": false
+ },
+ {
+  "fixture": "projection-families",
+  "kind": "text",
+  "role": "graphics-object",
+  "roleDescription": "text mark container",
+  "label": null,
+  "hidden": false
+ },
+ {
+  "fixture": "projection-families",
+  "kind": "group",
+  "role": "graphics-object",
+  "roleDescription": "group mark container",
+  "label": null,
+  "hidden": false
+ },
+ {
+  "fixture": "projection-families",
+  "kind": "path",
+  "role": "graphics-symbol",
+  "roleDescription": "path mark container",
+  "label": null,
+  "hidden": false
+ },
+ {
+  "fixture": "projection-families",
+  "kind": "symbol",
+  "role": "graphics-symbol",
+  "roleDescription": "symbol mark container",
+  "label": null,
+  "hidden": false
+ },
+ {
+  "fixture": "projection-families",
+  "kind": "text",
+  "role": "graphics-object",
+  "roleDescription": "text mark container",
+  "label": null,
+  "hidden": false
+ },
+ {
+  "fixture": "projection-families",
+  "kind": "group",
+  "role": "graphics-object",
+  "roleDescription": "group mark container",
+  "label": null,
+  "hidden": false
+ },
+ {
+  "fixture": "projection-families",
+  "kind": "path",
+  "role": "graphics-symbol",
+  "roleDescription": "path mark container",
+  "label": null,
+  "hidden": false
+ },
+ {
+  "fixture": "projection-families",
+  "kind": "symbol",
+  "role": "graphics-symbol",
+  "roleDescription": "symbol mark container",
+  "label": null,
+  "hidden": false
+ },
+ {
+  "fixture": "projection-families",
+  "kind": "text",
+  "role": "graphics-object",
+  "roleDescription": "text mark container",
+  "label": null,
+  "hidden": false
+ },
+ {
+  "fixture": "projection-families",
+  "kind": "group",
+  "role": "graphics-object",
+  "roleDescription": "group mark container",
+  "label": null,
+  "hidden": false
+ },
+ {
+  "fixture": "projection-families",
+  "kind": "path",
+  "role": "graphics-symbol",
+  "roleDescription": "path mark container",
+  "label": null,
+  "hidden": false
+ },
+ {
+  "fixture": "projection-families",
+  "kind": "symbol",
+  "role": "graphics-symbol",
+  "roleDescription": "symbol mark container",
+  "label": null,
+  "hidden": false
+ },
+ {
+  "fixture": "projection-families",
+  "kind": "text",
+  "role": "graphics-object",
+  "roleDescription": "text mark container",
   "label": null,
   "hidden": false
  },
@@ -15224,6 +15768,54 @@
   "hidden": false
  },
  {
+  "fixture": "symbols-and-curves",
+  "kind": "group",
+  "role": "graphics-object",
+  "roleDescription": "group mark container",
+  "label": null,
+  "hidden": false
+ },
+ {
+  "fixture": "symbols-and-curves",
+  "kind": "symbol",
+  "role": "graphics-symbol",
+  "roleDescription": "symbol mark container",
+  "label": null,
+  "hidden": false
+ },
+ {
+  "fixture": "symbols-and-curves",
+  "kind": "text",
+  "role": "graphics-object",
+  "roleDescription": "text mark container",
+  "label": null,
+  "hidden": false
+ },
+ {
+  "fixture": "symbols-and-curves",
+  "kind": "line",
+  "role": "graphics-symbol",
+  "roleDescription": "line mark container",
+  "label": null,
+  "hidden": false
+ },
+ {
+  "fixture": "symbols-and-curves",
+  "kind": "line",
+  "role": "graphics-symbol",
+  "roleDescription": "line mark container",
+  "label": null,
+  "hidden": false
+ },
+ {
+  "fixture": "symbols-and-curves",
+  "kind": "line",
+  "role": "graphics-symbol",
+  "roleDescription": "line mark container",
+  "label": null,
+  "hidden": false
+ },
+ {
   "fixture": "text-anchors",
   "kind": "group",
   "role": "graphics-object",
@@ -15244,6 +15836,46 @@
   "kind": "text",
   "role": "graphics-object",
   "roleDescription": "text mark container",
+  "label": null,
+  "hidden": false
+ },
+ {
+  "fixture": "text-and-cells",
+  "kind": "group",
+  "role": "graphics-object",
+  "roleDescription": "group mark container",
+  "label": null,
+  "hidden": false
+ },
+ {
+  "fixture": "text-and-cells",
+  "kind": "rect",
+  "role": "graphics-symbol",
+  "roleDescription": "rect mark container",
+  "label": null,
+  "hidden": false
+ },
+ {
+  "fixture": "text-and-cells",
+  "kind": "text",
+  "role": "graphics-object",
+  "roleDescription": "text mark container",
+  "label": null,
+  "hidden": false
+ },
+ {
+  "fixture": "text-and-cells",
+  "kind": "path",
+  "role": "graphics-symbol",
+  "roleDescription": "path mark container",
+  "label": null,
+  "hidden": false
+ },
+ {
+  "fixture": "text-and-cells",
+  "kind": "symbol",
+  "role": "graphics-symbol",
+  "roleDescription": "symbol mark container",
   "label": null,
   "hidden": false
  },
@@ -15345,6 +15977,38 @@
  },
  {
   "fixture": "timeunit-inferred",
+  "kind": "text",
+  "role": "graphics-object",
+  "roleDescription": "text mark container",
+  "label": null,
+  "hidden": false
+ },
+ {
+  "fixture": "timeunit-units",
+  "kind": "group",
+  "role": "graphics-object",
+  "roleDescription": "group mark container",
+  "label": null,
+  "hidden": false
+ },
+ {
+  "fixture": "timeunit-units",
+  "kind": "rect",
+  "role": "graphics-symbol",
+  "roleDescription": "rect mark container",
+  "label": null,
+  "hidden": false
+ },
+ {
+  "fixture": "timeunit-units",
+  "kind": "text",
+  "role": "graphics-object",
+  "roleDescription": "text mark container",
+  "label": null,
+  "hidden": false
+ },
+ {
+  "fixture": "timeunit-units",
   "kind": "text",
   "role": "graphics-object",
   "roleDescription": "text mark container",
@@ -16572,6 +17236,38 @@
   "kind": "arc",
   "role": "graphics-symbol",
   "roleDescription": "arc mark container",
+  "label": null,
+  "hidden": false
+ },
+ {
+  "fixture": "window-ops",
+  "kind": "group",
+  "role": "graphics-object",
+  "roleDescription": "group mark container",
+  "label": null,
+  "hidden": false
+ },
+ {
+  "fixture": "window-ops",
+  "kind": "rect",
+  "role": "graphics-symbol",
+  "roleDescription": "rect mark container",
+  "label": null,
+  "hidden": false
+ },
+ {
+  "fixture": "window-ops",
+  "kind": "text",
+  "role": "graphics-object",
+  "roleDescription": "text mark container",
+  "label": null,
+  "hidden": false
+ },
+ {
+  "fixture": "window-ops",
+  "kind": "text",
+  "role": "graphics-object",
+  "roleDescription": "text mark container",
   "label": null,
   "hidden": false
  },

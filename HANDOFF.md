@@ -9,7 +9,7 @@ Branch `milestone-0-bootstrap`. Working tree clean, both gates green:
 - `./scripts/check.sh` — format, all tests, lint, demo APK
 - `./scripts/oracle.sh` — regenerates upstream references and runs the differential comparison
 
-**166 differential fixtures pass, all matching upstream exactly.** That is the only number here
+**175 differential fixtures pass, all matching upstream exactly.** That is the only number here
 that means what it says.
 
 ## Read this before trusting the other number
@@ -252,9 +252,46 @@ is arithmetic. See SUPPORTED_FEATURES.md for the three behaviours that had to co
 rather than from its schema — in particular that **an omitted force parameter falls to d3's default,
 not the one Vega documents**, because Vega only forwards the parameters a specification wrote.
 
+## Read the diagnostics the 93 examples produce, not just the clean count
+
+The triage reports a *count* of warnings per example and nothing about what they say, which hides both
+real gaps and pure noise. Compile all 93 through `SpecCompiler` and group the messages — twenty lines
+of throwaway test — and the distribution is the work list. It has now been run once and found three
+things worth having, in the order the counts put them:
+
+- **406 × "Cannot read field 'Year' as 'date:%Y-%m-%d'".** Upstream's `parse` takes `date:` and `utc:`
+  followed by a d3 pattern, quoted or not, split on the *first* colon. Without it a whole column stays
+  text and an axis is drawn from strings. The parser for it already existed — `TimeParse`, written for
+  the expression `timeParse` — and was simply not wired to the loader.
+- **7 × "'offset' must be a number or a signal reference".** Upstream's `numberValue` is a **value
+  reference**, so a guide's number may go through a scale: parallel coordinates writes
+  `{"scale": "ord", "value": "Cylinders", "mult": -1}` on each of seven axes, which is how they end up
+  side by side rather than stacked. Resolved by the encoder's own channel code against the empty datum
+  a guide has.
+- **318 × "Could not parse colour 'null'".** Pure noise, and the third time this class of thing has
+  turned up: a colour that resolves to nothing is *no paint*, not a bad colour. Stringifying first
+  turned every unset stroke into the word "null" and then into a complaint, on charts that were
+  drawing correctly.
+
+A second pass over the same distribution found two more, both in the axis:
+
+- **`encode.ticks.update.y`, and the rest of a part's geometry.** Upstream merges a guide's `encode`
+  block into the part's own encoders and applies it **last**, so `y`, `x2` and their friends override
+  the geometry the guide computed. `warming-stripes` reaches through a tick to draw a marker at a
+  chosen temperature; nothing in the axis vocabulary can say that.
+- **A stroke channel that reads `datum`.** Folding a guide encode channel into the property it
+  duplicates is right for a constant and for a signal over the chart's state, and cannot work for
+  `{"signal": "datum.value === marked ? 2 : 1"}` — at parse time there is no tick to read, so every
+  tick got the false branch. The stroke channels are resolved again per tick now, which costs nothing
+  where they are constant and is the only way that form can work.
+
+The rest are honest: input widgets that have no equivalent here, the extended projection family
+upstream itself refuses, `wordcloud`, and two properties (`marknames`, a mark-level `index`) that are
+in nobody's schema and are ignored by both engines.
+
 ## What is left: two examples, and neither can be verified
 
-**166 differential fixtures pass. 91 of the 93 examples compile clean.** Everything that can be
+**175 differential fixtures pass. 91 of the 93 examples compile clean.** Everything that can be
 checked against upstream has been.
 
 ### `projections` — upstream refuses it too
@@ -329,7 +366,52 @@ reference carrying a `strokeWidth` with no `stroke` colour describes an outline 
 painted, and this engine records no stroke at all for it. A reference carrying a stroke colour still
 demands a stroke of that width.
 
-## Possible future work: a timer used as a `for` loop
+## The chart can be handed a clock now
+
+`Scheduler` is one method — run this later, once or repeating — passed to `VegaChartController` and
+defaulting to null. With one, a `debounce` is upstream's trailing edge exactly and a timer stream ticks
+at its interval with `timestamp` and `elapsed` on its event. Without one, nothing changed: the debounce
+fires eagerly, the timer does not fire, and both say so. **Keep that default.** It is what makes a
+chart a pure function of its specification, and so comparable against upstream at all; every fixture in
+the corpus depends on it without knowing.
+
+Three things worth not rediscovering:
+
+- **A tick recompiles, and a recompile must not restart the timers.** Doing so cancels the running ones
+  mid-flight, resets every `elapsed`, and drops the ticks in between. They are keyed by
+  (signal, interval) and left alone unless the specification's own timers change.
+- **Test against virtual time.** `SchedulerInteractionTest` has a fake scheduler whose clock the test
+  advances by hand, and the controller's own `clock` is moved with it. That is exact, where sleeping
+  would be slow and flaky at once — and it caught the restart bug on the first run.
+- **The scope is the whole lifecycle question.** The demo passes `CoroutineScheduler(rememberCoroutineScope())`,
+  so every pending tick is cancelled when the composition goes away and nothing has to remember to.
+  `controller.stop()` is there for a host without that luxury.
+
+What this does *not* do is make an animation verifiable. The harness compares the scene upstream
+reaches after `runAsync`, and for a specification with a timer `runAsync` never returns — so a ticking
+chart has no reference to compare against, whatever this engine does with it.
+
+## The timer-as-a-loop is resolved, and it found a transform bug
+
+The section below was written as future work: `donut-chart-labelled` passes the differential and still
+looks wrong, because its timer is standing in for a loop and the fixture compares the frame *before*
+the loop runs. With a scheduler it now runs to its own fixed point and the labels spread —
+`TimerLoopTest` pins that, and pins that running the clock on afterwards changes nothing, which is
+what makes it a loop rather than an animation. Compile-time convergence, which the note below
+proposes, would be a *divergence* from the only reference obtainable: upstream's `runAsync` never
+returns for this specification, so the reference is the unsettled frame and the fixture is right to
+match it.
+
+Writing that test found a real bug two layers down, and the way it hid is the lesson. The `values`
+aggregate operation collects the **rows** of a group, not the column the schema makes you name;
+upstream pushes the tuple and ignores the field. Ours collected the column, so
+`pluck(datum.shiftArray, 'shift')` — reading a *different* column back out of those rows — returned
+nothing but nulls and every label's shift was zero. No fixture could see it: the array is only ever
+read by a **signal**, so every compared scene agreed. If a transform's output is consumed by an
+expression rather than by a mark, the corpus is blind to it, and the only way in is a test that runs
+the thing.
+
+## The note that was: a timer used as a `for` loop
 
 `donut-chart-labelled` passes the differential and still looks wrong in the demo: its three most
 crowded labels — United States, France, Germany — are drawn on top of each other, where the gallery
@@ -458,6 +540,24 @@ for each of the 49 implemented transforms, how many fixtures use it? Three had *
 `nest`, `pivot` — and fourteen have exactly **one**. The count is a few lines of Python over
 `override val type: String = "…"` in `vega-dataflow/.../transform/*.kt` against `"type": "…"` in
 `test-fixtures/specs/*.vg.json`; run it again after adding a transform.
+
+Run the same count over the **operation names** — aggregates and window operations live in `ops` arrays
+rather than as a transform `type`, so a count of transform types misses them entirely. Seven of the 25
+aggregates had never been asked for, and the fixture written for them found `distinct` counting the
+wrong thing; ten of the thirteen window operations had never been asked for either, and those turned
+out to be right. Both counts are now zero. The same trick applies to every **vocabulary** a specification draws from,
+and the counts are worth re-running rather than trusting: scale types and mark types came back fully
+covered, while the symbol shapes were missing seven, the curve families three, and `timeunit` five of
+its eleven units — all now covered, all already correct. The **projections** were the last vocabulary
+short and are now covered too — all twelve remaining families, all already correct.
+
+Writing that one cost two wrong drafts, both worth knowing about. A projection reference cannot be a
+**signal**: `{"projection": {"signal": "parent.p"}}` is rejected by upstream's parser, so a grid of
+projections has to name each one literally rather than facet over them. And `geopoint` belongs in the
+**data** pipeline: as a *mark* transform it runs after encoding and writes onto the items, so the
+symbols came back at `NaN` upstream while this engine put them at the projection's translate. The
+fixture was wrong both times, not the engine — but a fixture whose expected output is `NaN` is telling
+you to rewrite the fixture.
 
 One fixture is enough to catch a transform that does nothing and not enough to catch one whose
 *options* are ignored. `hierarchy-options` was written for exactly that — a radius column on `pack`,

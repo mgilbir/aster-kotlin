@@ -1,5 +1,10 @@
 [
  {
+  "fixture": "aggregate-ops-rest",
+  "kind": "axis",
+  "caption": "X-axis titled 'variance' for a linear scale with values from 0 to 14"
+ },
+ {
   "fixture": "aggregate-ops-tail",
   "kind": "axis",
   "caption": "X-axis for a discrete scale with 3 values: a, b, c"
@@ -785,6 +790,16 @@
   "caption": "Gradient legend titled 'Local Density (Normalized)' for fill color with values from 0.0 to 1.0"
  },
  {
+  "fixture": "density-options",
+  "kind": "axis",
+  "caption": "X-axis for a linear scale with values from 0 to 8"
+ },
+ {
+  "fixture": "density-options",
+  "kind": "axis",
+  "caption": "Y-axis for a linear scale with values from 0 to 14"
+ },
+ {
   "fixture": "density-plot",
   "kind": "axis",
   "caption": "X-axis for a linear scale with values from 0 to 14"
@@ -958,6 +973,16 @@
   "fixture": "guide-encode-channels",
   "kind": "legend",
   "caption": "Symbol legend titled 'swatches' for fill color with 2 values: a, b"
+ },
+ {
+  "fixture": "guide-encode-geometry",
+  "kind": "axis",
+  "caption": "X-axis for a discrete scale with 4 values: a, b, c, d"
+ },
+ {
+  "fixture": "guide-encode-geometry",
+  "kind": "axis",
+  "caption": "Y-axis for a linear scale with values from 0 to 60"
  },
  {
   "fixture": "guide-encode-text",
@@ -1440,6 +1465,16 @@
   "caption": "Y-axis titled 'Year' for a linear scale with values from 1970 to 1982"
  },
  {
+  "fixture": "parse-date-patterns",
+  "kind": "axis",
+  "caption": "X-axis for a utc scale with values from 03 April to 28 June"
+ },
+ {
+  "fixture": "parse-date-patterns",
+  "kind": "axis",
+  "caption": "Y-axis for a linear scale with values from 0 to 16"
+ },
+ {
   "fixture": "path-marks",
   "kind": "axis",
   "caption": "X-axis for a discrete scale with 4 values: 0, 1, 2, 3"
@@ -1793,6 +1828,11 @@
   "fixture": "timeunit-inferred",
   "kind": "axis",
   "caption": "X-axis for a utc scale with values from January to March"
+ },
+ {
+  "fixture": "timeunit-units",
+  "kind": "axis",
+  "caption": "X-axis for a utc scale with values from January 01 to October 01"
  },
  {
   "fixture": "timeunit",

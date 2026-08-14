@@ -152,6 +152,15 @@ scale output:
 | `impute-pivot` | 41 | a missing series filled in before stacking, and the same table pivoted so a column is named by the data |
 | `nest-treemap` | 28 | a hierarchy built from a flat table by nesting two keys, sized by a treemap that sorts its nodes by their own totals |
 | `hierarchy-options` | 40 | the pack, partition and tree layouts with their own options: a radius column, rounding, padding, the cluster method, separation off, and output names of the specification's choosing |
+| `density-options` | 37 | a kernel density with its own bandwidth, extent, steps, independent resolution, cumulative counts, beside a loess fit with its own bandwidth |
+| `text-and-cells` | 28 | a word count with its own pattern, case rule and stopwords, numbered by `identifier`, and Voronoi cells cut by a stated extent |
+| `aggregate-ops-rest` | 14 | the seven aggregate operations no fixture had asked for, read out as text so the numbers themselves are compared |
+| `window-ops` | 18 | the ten window operations no fixture had asked for, over a column with ties so the ranking family separates |
+| `symbols-and-curves` | 17 | the seven built-in symbol shapes and three curve families nothing had drawn |
+| `timeunit-units` | 25 | quarter, dayofyear, minutes, seconds and milliseconds, labelled by the instant each bucket starts |
+| `projection-families` | 84 | the twelve projections nothing had drawn, each with the same graticule and the same four cities |
+| `parse-date-patterns` | 27 | a column of dates read with a stated format rather than a guessed one, local and UTC, one pattern quoted |
+| `guide-encode-geometry` | 32 | an axis whose encode blocks move the lines it drew, and a tick restyled by a rule over its own value |
 
 The gate is wired into `./scripts/oracle.sh`, so every further scale, mark and transform is built
 against a harness that can say we are wrong — which golden tests cannot.
@@ -210,7 +219,7 @@ substantive compatibility items:
 | 6. View and Compose APIs | Yes |
 | 7. SVG, PNG, PDF export | Yes |
 | 8. TalkBack can describe and navigate | Partial — virtual nodes are tested by instrumentation, not with TalkBack itself |
-| 9. At least 100 compatibility fixtures pass | **Yes** — 166 |
+| 9. At least 100 compatibility fixtures pass | **Yes** — 175 |
 | 10. Core runtime has no Android dependency | Yes |
 | 11. Renders without WebView | Yes |
 | 12. Build and test loop runs from the terminal | Yes |
@@ -4250,12 +4259,21 @@ depends on them. Each has a test and a comment; this is the index.
 
 ## Next three tasks
 
-1. **What the interaction system still does not do.** Two things, and they are the same thing: a
-   `debounce` fires on every event instead of after the quiet period, and a **timer** stream never
-   fires at all. Both need something that can wake up later, which the controller does not have. Both
-   are reported by name — the timer only since `config.events` was implemented, because until then it
-   read as a view event of type `timer` that nothing ever raises, so the signal simply never changed
-   and said nothing about why.
+1. **The interaction system is finished, and the last piece is opt-in.** A `debounce` and a timer
+   stream both needed something that can wake up later, which a compiler that is a pure function of
+   its specification has no business owning — so `Scheduler` is handed in, one method, with a
+   coroutine implementation beside it and virtual time in the tests. With one in hand a debounce is
+   upstream's trailing edge exactly and a timer ticks at its interval, carrying the `timestamp` and
+   `elapsed` upstream's timer event carries. With none, nothing changes from before: the debounce
+   fires eagerly, the timer does not fire, and both say so. That default is what keeps a chart
+   comparable against upstream at all.
+
+   What this does **not** do is make an animation verifiable. The differential harness compares the
+   scene upstream reaches after `runAsync`, and for a specification with a timer `runAsync` never
+   returns — so a ticking chart has no reference to be compared against, whatever the engine does
+   with it. The note in HANDOFF.md on `donut-chart-labelled` is still the interesting case: its timer
+   is a bounded loop rather than an animation, and running such a loop to convergence at *compile*
+   time would need no clock and would be comparable.
 
    Two came off this list. A handler sourced on **another signal** now fires and cascades: 79 handlers
    across twenty of Vega's 93 examples use it, which is every pan, zoom and brush in the gallery. And
@@ -4282,7 +4300,9 @@ depends on them. Each has a test and a comment; this is the index.
    all** and are now covered, `label` cannot have one (its occupancy bitmap has no upstream
    reference), and fourteen more — `countpattern`, `cross`, `crossfilter`, `geojson`, `graticule`,
    `identifier`, `kde`, `loess`, `pack`, `partition`, `resolvefilter`, `sample`, `treemap`,
-   `voronoi` — are exercised by exactly **one** fixture each. One is enough to catch a transform that
+   `voronoi` — were exercised by exactly **one** fixture each, always with the defaults. Four of them
+   — `kde`, `loess`, `countpattern`, `identifier`, `voronoi` — now have their options exercised too,
+   and all passed on arrival, which is the outcome worth having and the reason to keep going. One is enough to catch a transform that
    does nothing and not enough to catch one whose options are ignored, which is precisely what
    `nest-treemap` found: `sort` on a hierarchy layout read the field off the *row* instead of the
    node, so a chart asking for its biggest group first got its groups in data order. The brief's 100 is reached; the corpus is now aimed at the three categories the brief used to rule out. Aiming it at *combinations* the

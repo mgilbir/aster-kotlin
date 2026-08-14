@@ -85,6 +85,17 @@ public sealed interface NumberValue {
   public data class Constant(val value: Double) : NumberValue
 
   public data class Signal(val expression: String) : NumberValue
+
+  /**
+   * A **value reference**, which is what upstream's `numberValue` actually is.
+   *
+   * A guide's number may be put through a scale like any encode channel: parallel coordinates
+   * writes `"offset": {"scale": "ord", "value": "Cylinders", "mult": -1}` on each of its seven
+   * axes, which is how they end up side by side. There is no datum to resolve against — a guide
+   * property is resolved once — so only the datum-free forms mean anything here, and they are the
+   * ones a specification writes.
+   */
+  public data class Reference(val channel: ChannelValue) : NumberValue
 }
 
 /**
@@ -1804,6 +1815,13 @@ public data class MarkSpec(
    * and it reads the item's datum and writes the item's `path`. This engine's transforms are pure
    * functions over rows, so they run over the rows and write the same column — which draws the same
    * picture, because nothing between the two reads anything a mark transform touches.
+   *
+   * One **stated divergence** falls out of that, found by probing rather than by reasoning. A mark
+   * transform whose output column happens to name an encode *channel* positions the item here,
+   * where upstream leaves it unset: `geopoint` as a mark transform writes `x` and `y`, so this
+   * engine places the symbols and upstream's come back at `NaN` and draw nowhere. Neither is a
+   * chart anyone wants — `geopoint` belongs in the data pipeline, where both engines agree exactly
+   * — and doing something rather than nothing is the safer of the two, so it stands.
    */
   val transform: List<VegaValue> = emptyList(),
   val encode: EncodeSpec = EncodeSpec(),
