@@ -30,6 +30,8 @@ public object JsSemantics {
       is VegaValue.Str -> value.value.isNotEmpty()
       is VegaValue.Arr -> true
       is VegaValue.Obj -> true
+      // An object, and every object is truthy.
+      is VegaValue.Pattern -> true
     }
 
   // ---- number coercion ------------------------------------------------------
@@ -54,6 +56,8 @@ public object JsSemantics {
           else -> Double.NaN
         }
       is VegaValue.Obj -> Double.NaN
+      // `Number(/a/)` is NaN.
+      is VegaValue.Pattern -> Double.NaN
     }
 
   /** `Number(string)`: trims, accepts hex and binary, and treats the empty string as 0. */
@@ -91,6 +95,9 @@ public object JsSemantics {
           if (it is VegaValue.Null) "" else toStringValue(it)
         }
       is VegaValue.Obj -> "[object Object]"
+      // Not `[object Object]`: a RegExp has a `toString` of its own, and it is the literal —
+      // `'' + regexp('a.b','i')` is `/a.b/i`, probed against upstream.
+      is VegaValue.Pattern -> value.text
     }
 
   /**
@@ -179,6 +186,12 @@ public object JsSemantics {
       is VegaValue.Arr -> left.values === (right as VegaValue.Arr).values
       is VegaValue.Obj -> left.fields === (right as VegaValue.Obj).fields
       is VegaValue.Num -> false // handled above
+      // Two patterns are two objects, and JavaScript compares those by reference. Equal literals
+      // are
+      // therefore *not* equal, which `Pattern` reproduces by comparing identity here rather than
+      // its
+      // own `equals` — the same choice `Arr` and `Obj` make just above.
+      is VegaValue.Pattern -> left === right
     }
   }
 

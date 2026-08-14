@@ -9,7 +9,7 @@ Branch `milestone-0-bootstrap`. Working tree clean, both gates green:
 - `./scripts/check.sh` — format, all tests, lint, demo APK
 - `./scripts/oracle.sh` — regenerates upstream references and runs the differential comparison
 
-**175 differential fixtures pass, all matching upstream exactly.** That is the only number here
+**176 differential fixtures pass, all matching upstream exactly.** That is the only number here
 that means what it says.
 
 ## Read this before trusting the other number
@@ -252,6 +252,24 @@ is arithmetic. See SUPPORTED_FEATURES.md for the three behaviours that had to co
 rather than from its schema — in particular that **an omitted force parameter falls to d3's default,
 not the one Vega documents**, because Vega only forwards the parameters a specification wrote.
 
+## `regexp` and `test` were missing, and a bound text field is what showed it
+
+Vega's job-voyager example filters with `test(regexp(query,'i'), datum.job)`. Neither function existed
+here, so the filter **threw for every row** the moment the query was not empty: every row dropped and
+the chart went blank. Nothing in the corpus caught it, because no fixture typed anything into anything
+— it took a control bound to that signal for the failure to become visible.
+
+`isRegExp` was the tell, and it had been rationalised: "no value this engine can produce is a regular
+expression, and upstream answers false for every one of them too". True only because `regexp()` was
+missing. If a predicate's justification is that nothing can reach the state it tests, check whether the
+thing that produces that state exists.
+
+A pattern is now `VegaValue.Pattern`, a variant beside `Timestamp` rather than an object with marker
+fields — `isRegExp` has to answer true, and `'' + regexp('a.b','i')` has to be `/a.b/i`. Adding the
+variant broke four exhaustive `when`s in main sources and three in tests, which is the whole cost of
+doing it properly. Flags: `i`, `m`, `s` map onto Kotlin's; `g`, `y`, `u` are accepted and ignored,
+except in `replace`, where `g` decides first-match against all-matches.
+
 ## Read the diagnostics the 93 examples produce, not just the clean count
 
 The triage reports a *count* of warnings per example and nothing about what they say, which hides both
@@ -291,7 +309,7 @@ in nobody's schema and are ignored by both engines.
 
 ## What is left: two examples, and neither can be verified
 
-**175 differential fixtures pass. 91 of the 93 examples compile clean.** Everything that can be
+**176 differential fixtures pass. 91 of the 93 examples compile clean.** Everything that can be
 checked against upstream has been.
 
 ### `projections` — upstream refuses it too

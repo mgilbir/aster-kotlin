@@ -199,6 +199,50 @@ class HoverEncodeTest {
     assertEquals("bar b", tooltipText(controller.snapshot.interactionState.tooltip!!))
   }
 
+  /**
+   * A mark that **raises one of its own items** and also has a `hover` block.
+   *
+   * The two passes are paired by id rather than by position, and this is the arrangement that tells
+   * the difference: the resting list is sorted by `zindex` and the hovered one is not, so pairing
+   * by position hands the pointed-at item another item's hover appearance. Only the bar under the
+   * pointer may change, whichever order the sort left them in.
+   */
+  @Test
+  fun `a raised item still gets its own hover appearance`() {
+    controller.setSpec(
+      json
+        .replace(
+          """"tooltip": {"field": "c"}""",
+          """"zindex": {"signal": "datum.c === 'a' ? 3 : 0"}""",
+        )
+        .replace(
+          """"hover": {"fill": {"value": "firebrick"}, "fillOpacity": {"value": 0.5}}""",
+          """"hover": {"fill": {"signal": "datum.c === 'b' ? 'firebrick' : 'seagreen'"}}""",
+        )
+    )
+    val resting = rects().map { (it.fill?.paint as? ScenePaint.Solid)?.color }
+
+    controller.dispatch(ChartInputEvent.PointerMoved(onMiddle))
+
+    val hovered = rects()
+    val changed =
+      hovered.indices.filter {
+        (hovered[it].fill?.paint as? ScenePaint.Solid)?.color != resting[it]
+      }
+    assertEquals(1, changed.size, "only the pointed-at bar may change: $changed")
+    // And it is the middle bar's own hover colour, not the raised bar's.
+    assertEquals(
+      SceneColor.parse("firebrick"),
+      (hovered[changed.single()].fill?.paint as? ScenePaint.Solid)?.color,
+    )
+    assertEquals("b", hovered[changed.single()].metadata.datum?.let { datumC(it) })
+  }
+
+  private fun datumC(value: dev.aster.vega.model.VegaValue): String? =
+    ((value as? dev.aster.vega.model.VegaValue.Obj)?.fields?.get("c")
+        as? dev.aster.vega.model.VegaValue.Str)
+      ?.value
+
   @Test
   fun `pointing at nothing leaves every item resting`() {
     controller.setSpec(json)

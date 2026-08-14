@@ -301,7 +301,12 @@ internal class ScopeCompiler(
           ids.rewind(after)
           val resting = built[index].orEmpty()
           if (hovered.size == resting.size) {
-            for (i in resting.indices) hoverVariants[resting[i].id] = hovered[i]
+            // Paired by **id**, not by position: `resting` has been sorted by `zindex` and the
+            // hovered pass has not, so a mark that raises one of its items and also has a `hover`
+            // block would otherwise swap in another item's hover appearance. The ids match because
+            // the allocator was rewound before the second pass.
+            val byId = hovered.associateBy { it.id }
+            for (node in resting) byId[node.id]?.let { hoverVariants[node.id] = it }
           } else {
             // A hover block that changes *which* items exist cannot be swapped in item for item.
             diagnostics.warn(

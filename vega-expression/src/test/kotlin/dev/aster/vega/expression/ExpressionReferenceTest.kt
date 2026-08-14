@@ -43,6 +43,8 @@ class ExpressionReferenceTest {
       is VegaValue.Arr -> value.values.joinToString(",", "[", "]") { asJson(it) }
       is VegaValue.Obj ->
         value.fields.entries.joinToString(",", "{", "}") { "\"${it.key}\":${asJson(it.value)}" }
+      // `JSON.stringify(/a/)` is `{}` — a RegExp has no enumerable properties.
+      is VegaValue.Pattern -> "{}"
     }
 
   /**
@@ -310,6 +312,25 @@ class ExpressionReferenceTest {
     delimiter = '|',
     value =
       [
+        // ---- regular expressions ----
+        // The pair a text filter is written with. Every value here came off upstream: a pattern
+        // stringifies to the literal a reader would have written, `test` takes a bare string as a
+        // pattern because upstream compiles it to `RegExp(a).test(b)`, and only `g` makes `replace`
+        // do more than the first match.
+        "test(regexp('farmer','i'), 'Farmer')|true",
+        "test(regexp('farmer'), 'Farmer')|false",
+        "test('far', 'Farmer')|false",
+        "test(regexp('^f','i'), 'Farmer')|true",
+        "test(regexp('[0-9]+'), 'abc')|false",
+        "test(regexp(''), 'anything')|true",
+        "isRegExp(regexp('a'))|true",
+        "isRegExp('a')|false",
+        "'' + regexp('a.b','i')|\"/a.b/i\"",
+        "length(regexp('abc') + '')|5",
+        "replace('a-b-c', '-', '+')|\"a+b-c\"",
+        "replace('a-b-c', regexp('-','g'), '+')|\"a+b+c\"",
+        "replace('a-b-c', regexp('-'), '+')|\"a+b-c\"",
+        "replace('Farmer', regexp('f','i'), 'F')|\"Farmer\"",
         // ---- math ----
         "abs(-3)|3",
         // `hypot` is variadic, not the two-argument function its name suggests, and with no
