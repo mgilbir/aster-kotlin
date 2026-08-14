@@ -1173,9 +1173,14 @@ internal object Marks {
       }
       def.type == MeasureType.QUANTITATIVE || stated != null -> "format($accessor, \"$number\")"
       !arrays -> "isValid($accessor) ? $accessor : \"\"+$accessor"
-      else ->
-        "isValid($accessor) ? isArray($accessor) ? join($accessor, '$separator') : $accessor : " +
-          "\"\"+$accessor"
+      else -> {
+        // `addLineBreaksToTooltip` builds this one from the **column's own name** rather than from
+        // what the aggregate wrote: `datum["<field>"]`, spelled out. It tells on an `argmin`, whose
+        // value lives inside the row the aggregate kept — upstream reads the bare column there and
+        // this reads what upstream reads.
+        val plain = def.field?.let { "datum[${quoted(it)}]" } ?: accessor
+        "isValid($plain) ? isArray($plain) ? join($plain, '$separator') : $plain : \"\"+$plain"
+      }
     }
   }
 
