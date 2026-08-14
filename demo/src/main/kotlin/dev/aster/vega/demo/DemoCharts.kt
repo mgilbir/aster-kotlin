@@ -35,6 +35,12 @@ public enum class DemoChart(
   SPEC_FACETS("Spec: facets", "facet-trellis.vg.json"),
   // The entry that shows `bind`: every control under the chart is one the specification asked for.
   SPEC_BOUND("Spec: controls", "bound-controls.vg.json"),
+  // Vega's own `job-voyager`, bundled because it is the specification the controls were built for:
+  // a
+  // radio group and a text field, the second filtering a hundred years of census rows by a pattern.
+  // Its data is a 900KB file the gallery hosts, so this is the one bundled entry that fetches — the
+  // demo's loader reads it from the cache directory after the first time.
+  SPEC_VOYAGER("Spec: job voyager", "job-voyager.vg.json"),
   PASTED("Paste your own", isPasted = true);
 
   /** True when this entry is compiled from a specification rather than built by hand. */
@@ -62,6 +68,7 @@ public enum class DemoChart(
       SPEC_LEGENDS,
       SPEC_FACETS,
       SPEC_BOUND,
+      SPEC_VOYAGER,
       PASTED -> null
     }
   }
