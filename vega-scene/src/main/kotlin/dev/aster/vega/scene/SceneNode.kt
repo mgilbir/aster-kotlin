@@ -1,6 +1,7 @@
 package dev.aster.vega.scene
 
 import dev.aster.vega.model.VegaValue
+import kotlin.jvm.JvmInline
 
 @JvmInline
 public value class SceneNodeId(public val value: Long) {

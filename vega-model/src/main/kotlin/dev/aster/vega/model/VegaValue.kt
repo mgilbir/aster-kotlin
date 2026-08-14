@@ -1,5 +1,7 @@
 package dev.aster.vega.model
 
+import kotlin.jvm.JvmInline
+
 /**
  * The generic value model used everywhere in the runtime: parsed specification literals, datum
  * fields, signal values, transform output and expression results.

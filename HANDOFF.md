@@ -269,6 +269,75 @@ fields — `isRegExp` has to answer true, and `'' + regexp('a.b','i')` has to be
 variant broke four exhaustive `when`s in main sources and three in tests, which is the whole cost of
 doing it properly. Flags: `i`, `m`, `s` map onto Kotlin's; `g`, `y`, `u` are accepted and ignored,
 except in `replace`, where `g` decides first-match against all-matches.
+## The core is multiplatform, and compiling it found what the grep could not
+
+`vega-model`, `-expression`, `-dataflow`, `-scene`, `-runtime` and `-svg` are now
+`kotlin("multiplatform")`: a `jvm` target plus `macosArm64`, `iosArm64`, `iosSimulatorArm64` and
+`linuxX64`, all four compiled by `scripts/check.sh`. `vega-loader` and `test-fixtures` stay Kotlin/JVM
+on purpose — a socket, a file on disk, and test scaffolding are the platform, not the port.
+
+Sources did **not** move. Each module points `commonMain` at `src/main/kotlin` and `jvmTest` at
+`src/test/kotlin`, so the diff is a build change rather than two hundred renamed files.
+
+**What compiling found that six milestones of `NoAndroidTypesTest` did not.** `LinkedHashMap` is
+common Kotlin, so two caches that *subclassed* it — `TextLayoutCache` and `CachingExpressionCompiler`,
+both using the three-argument access-order constructor and `removeEldestEntry` — passed the grep
+cleanly. Neither exists off the JVM, where the class is final besides. Both are now an explicit LRU in
+four lines: remove-and-reinsert on a hit, evict `keys.first()` when over capacity. `Character.digit`
+was the third, replaced by the ASCII digit rule — which is what `parseInt` does anyway, so the
+narrower answer is the more faithful one.
+
+**The trap, which cost a green run.** The multiplatform plugin gives a module `jvmTest` and **no
+`test` task**. `./gradlew test` therefore matched nothing in six modules, ran no core tests at all,
+and printed BUILD SUCCESSFUL. If you add a module or a script, check that what you run actually runs:
+there is now a `test` alias registered in every multiplatform module, and `oracle.sh` says `jvmTest`
+outright because `--tests` only takes a real `Test` task.
+
+**Still to do here.** The tests are all JVM. They exercise common code, so they cover the logic, but
+nothing yet *runs* on a native target — `commonTest` with a multiplatform assertion library would be
+the honest next step, and the differential fixtures cannot move there because they read files off
+disk. And `Regex` is the platform's, not ECMA-262: see the note below.
+
+## `Regex` is the platform's, and upstream's is ECMA-262
+
+Vega's `regexp`, `test` and `replace` take a pattern **from the specification**, and upstream runs it
+through JavaScript's own engine. Kotlin's `Regex` delegates to whatever the target has — `java.util.regex`
+on the JVM and Android, Kotlin/Native's own engine on the native targets, the real thing on JS — so the
+same specification can behave three ways, none of them guaranteed to be upstream's. Measured, not
+assumed:
+
+| pattern, subject | ECMA-262 (upstream) | JVM (what Android runs) |
+| --- | --- | --- |
+| `a$` on `"a\n"` | no match | **matches** — Java's `$` sits before a final line terminator |
+| `x{` on `"x{"` | matches, `{` is literal | **throws** `Illegal repetition` |
+| `\a` on `"a"` | matches, identity escape (Annex B) | no match |
+| `[]` on `"a"` | never matches, by definition | **throws** `Unclosed character class` |
+
+The two throws are the serious half: `test(regexp('x{'), 'x{')` is `true` upstream and an exception
+here, and a specification is data — often *pasted* data — so that is a chart taken down by a string
+someone typed.
+
+**The swap surface is one line.** `VegaValue.Pattern.regex` is the only place a specification's own
+pattern becomes a `Regex`, and it has exactly three readers: `test` (`Functions.kt:375`) and the two
+branches of `replace` (`386`, `388`). Everything else that uses `Regex` in the core — twelve sites —
+is a fixed pattern this repository wrote, where the only requirement is that the platforms agree with
+each other.
+
+The owner is porting an ECMA-262 engine to Kotlin in a separate effort and will supply the URL; when it
+lands, point `Pattern` at it and the divergence closes on every target at once. The table above is the
+first four vectors to write. Until then this is a **known**, measured divergence rather than an
+unexamined one — and note that no test in this repository runs on a native target, so Kotlin/Native's
+regex behaviour is unmeasured even for our own internal patterns.
+
+## Reported and not yet chased: an arc with an inverted radius
+
+The owner reports that this engine draws **nothing** for an arc whose `outerRadius` is smaller than its
+`innerRadius`, where upstream draws one. Not yet reproduced or fixed — written down here so it is not
+lost. The route is the usual one: a fixture with the two radii swapped, which should fail, then find out
+what upstream's arc path generator does when the radii are the wrong way round (d3-shape swaps them
+rather than refusing) and match it. Worth checking the same question for a **negative** radius while
+there.
+
 ## A portability seam was hiding a correctness bug
 
 The core had one JVM-only file, `PlatformDecimals`, and it explained itself well enough that nobody
