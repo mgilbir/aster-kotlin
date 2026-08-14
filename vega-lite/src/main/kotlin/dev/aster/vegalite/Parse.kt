@@ -183,8 +183,29 @@ internal class Parse(
       type = type,
       raw = raw,
       filled = filled,
-      orient = raw.string("orient") ?: markConfig.string("orient") ?: defaultOrient(type, encoding),
+      // A **style** block outranks every other configuration of a mark property —
+      // `getMarkConfig` puts it first — and the styles a mark has are its own type followed by
+      // whatever its `style` names, the last one that says anything winning. A parallel-coordinate
+      // plot turning its ticks on their side in `config.style.tick` is where it tells.
+      orient =
+        raw.string("orient")
+          ?: styleOrient(config, type, raw)
+          ?: markConfig.string("orient")
+          ?: defaultOrient(type, encoding),
     )
+  }
+
+  /**
+   * `getStyleConfig`: the mark's own type first, then each style it names, the last one winning.
+   */
+  private fun styleOrient(config: Config, type: String, raw: VegaValue.Obj): String? {
+    val named =
+      when (val style = raw.fields["style"]) {
+        is VegaValue.Str -> listOf(style.value)
+        is VegaValue.Arr -> style.values.mapNotNull { (it as? VegaValue.Str)?.value }
+        else -> emptyList()
+      }
+    return (listOf(type) + named).mapNotNull { config.style(it)?.string("orient") }.lastOrNull()
   }
 
   /**

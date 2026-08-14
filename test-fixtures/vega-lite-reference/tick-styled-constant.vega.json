@@ -1,0 +1,172 @@
+{
+  "$schema": "https://vega.github.io/schema/vega/v6.json",
+  "description": "A styled tick pinned to a constant, beside a label sharing the same position.",
+  "background": "white",
+  "padding": 5,
+  "height": 20,
+  "style": "cell",
+  "data": [
+    {
+      "name": "source_0",
+      "url": "data/cars.json",
+      "format": {
+        "type": "json",
+        "parse": {
+          "Horsepower": "number"
+        }
+      }
+    },
+    {
+      "name": "data_0",
+      "source": "source_0",
+      "transform": [
+        {
+          "type": "aggregate",
+          "groupby": [
+            "Origin"
+          ],
+          "ops": [
+            "max"
+          ],
+          "fields": [
+            "Horsepower"
+          ],
+          "as": [
+            "max_Horsepower"
+          ]
+        }
+      ]
+    }
+  ],
+  "signals": [
+    {
+      "name": "x_step",
+      "value": 20
+    },
+    {
+      "name": "width",
+      "update": "bandspace(domain('x').length, 0, 0) * x_step"
+    }
+  ],
+  "marks": [
+    {
+      "name": "layer_0_marks",
+      "type": "text",
+      "style": [
+        "text",
+        "label"
+      ],
+      "from": {
+        "data": "data_0"
+      },
+      "encode": {
+        "update": {
+          "fill": {
+            "value": "black"
+          },
+          "description": {
+            "signal": "\"Origin: \" + (isValid(datum[\"Origin\"]) ? isArray(datum[\"Origin\"]) ? join(datum[\"Origin\"], ' ') : datum[\"Origin\"] : \"\"+datum[\"Origin\"]) + \"; Max of Horsepower: \" + (format(datum[\"max_Horsepower\"], \"\"))"
+          },
+          "x": {
+            "scale": "x",
+            "field": "Origin",
+            "band": 0.5
+          },
+          "y": {
+            "value": 0
+          },
+          "text": {
+            "signal": "format(datum[\"max_Horsepower\"], \"\")"
+          },
+          "align": {
+            "value": "center"
+          },
+          "baseline": {
+            "value": "middle"
+          }
+        }
+      }
+    },
+    {
+      "name": "layer_1_marks",
+      "type": "rect",
+      "style": [
+        "tick",
+        "tick"
+      ],
+      "from": {
+        "data": "source_0"
+      },
+      "encode": {
+        "update": {
+          "opacity": {
+            "value": 0.7
+          },
+          "fill": {
+            "value": "#ccc"
+          },
+          "ariaRoleDescription": {
+            "value": "tick"
+          },
+          "description": {
+            "signal": "\"Origin: \" + (isValid(datum[\"Origin\"]) ? isArray(datum[\"Origin\"]) ? join(datum[\"Origin\"], ' ') : datum[\"Origin\"] : \"\"+datum[\"Origin\"])"
+          },
+          "y": {
+            "value": 0
+          },
+          "y2": {
+            "field": {
+              "group": "height"
+            }
+          },
+          "xc": {
+            "scale": "x",
+            "field": "Origin",
+            "band": 0.5
+          },
+          "width": {
+            "value": 1
+          }
+        }
+      }
+    }
+  ],
+  "scales": [
+    {
+      "name": "x",
+      "type": "band",
+      "domain": {
+        "fields": [
+          {
+            "data": "data_0",
+            "field": "Origin"
+          },
+          {
+            "data": "source_0",
+            "field": "Origin"
+          }
+        ],
+        "sort": true
+      },
+      "range": {
+        "step": {
+          "signal": "x_step"
+        }
+      },
+      "paddingInner": 0,
+      "paddingOuter": 0
+    }
+  ],
+  "axes": [
+    {
+      "scale": "x",
+      "orient": "bottom",
+      "grid": false,
+      "title": "Origin",
+      "labelAlign": "right",
+      "labelAngle": 270,
+      "labelBaseline": "middle",
+      "zindex": 0
+    }
+  ]
+}

@@ -192,13 +192,20 @@ internal object Guides {
     diagnostics: DiagnosticCollector,
   ): AxisComponent? {
     if (def.axisDisabled) return null
+    val user = def.axis
+    // The blocks a theme may write this axis in, most specific first — `config.axisX` as much as
+    // `config.axis`. `getAxisConfig` asks the same chain for **every** axis property, not only the
+    // ones Vega has never heard of, so a theme that turns its horizontal labels upright or takes
+    // every caption off is read here and not just where a conditional value is.
+    val configuredSide = user?.string("orient") ?: if (channel == "x") "bottom" else "left"
+    val axisConfigs = view.config.axisConfigChain(channel, type, configuredSide)
+    fun configured(name: String): VegaValue? = axisConfigs.firstNotNullOfOrNull { it.fields[name] }
     // `config.axis.disable` turns every axis off at once, which is how a chart made of shapes
     // rather
     // than of measurements says it has no axes at all. A channel's own `axis` block is the explicit
     // statement and outranks it either way.
-    if (def.axis == null && view.config.axisConfig("disable") == VegaValue.Bool(true)) return null
+    if (def.axis == null && configured("disable") == VegaValue.Bool(true)) return null
     val axis = AxisComponent(channel)
-    val user = def.axis
 
     axis.set("scale", str(view.scale(channel)))
     axis.explicitOrient = user?.fields?.get("orient") != null
@@ -209,7 +216,7 @@ internal object Guides {
     // `config.axis.grid: false` settles it for every axis at once, which is how a chart turns them
     // all off in one line. Reading only the channel's own `axis` block left them on.
     val grid =
-      (def.axis?.fields?.get("grid") ?: view.config.axisConfig("grid"))?.let {
+      (def.axis?.fields?.get("grid") ?: configured("grid"))?.let {
         (it as? VegaValue.Bool)?.value == true
       } ?: (!Scales.hasDiscreteDomain(type) && def.isFieldDef && def.bin == null)
     if (grid && hasOtherPosition)
@@ -232,12 +239,12 @@ internal object Guides {
     // `config.axis.title` settles it for every axis in the chart that has not been titled itself,
     // and **null** is the useful value: it is how a chart whose columns explain themselves takes
     // every caption off at once, rather than writing `"title": null` on each of them.
-    val configured = if (guideTitle != null) null else view.config.axisConfig("title")
+    val themeTitle = if (guideTitle != null) null else configured("title")
     val stated =
       if (guideTitle != null) listOf(guideTitle)
-      else if (configured != null) listOfNotNull(configured.takeIf { it !is VegaValue.Null })
+      else if (themeTitle != null) listOfNotNull(themeTitle.takeIf { it !is VegaValue.Null })
       else listOfNotNull(def.explicitTitle, secondary?.explicitTitle)
-    if (configured is VegaValue.Null) {
+    if (themeTitle is VegaValue.Null) {
       axis.explicitTitle = true
     } else if (stated.isNotEmpty()) {
       axis.explicitTitle = true
@@ -267,8 +274,15 @@ internal object Guides {
 
     // A nominal category on the horizontal axis is turned on its side, because side-by-side labels
     // collide as soon as there are more than a handful of them.
+    val statedAngle = user?.number("labelAngle")
+    // A theme's own angle still decides which way the labels are aligned, but it is **not written
+    // back onto the axis**: Vega knows `labelAngle` and applies the configuration itself, and
+    // writing it here would say the same thing twice. Only a stated angle, or the default this
+    // compiler supplies, is written.
+    val themeAngle = (configured("labelAngle") as? VegaValue.Num)?.value
     val labelAngle =
-      user?.number("labelAngle")
+      statedAngle
+        ?: themeAngle
         ?: if (channel == "x" && def.type?.isDiscrete == true && def.timeUnit == null) 270.0
         else null
     val side = user?.string("orient") ?: if (channel == "x") "bottom" else "left"
@@ -287,7 +301,7 @@ internal object Guides {
       // `normalizeAngle`: an angle is a turn from zero, so a label at minus forty-five degrees is
       // a label at three hundred and fifteen — the two draw alike and compare as different numbers.
       val angle = ((labelAngle % 360) + 360) % 360
-      axis.set("labelAngle", num(angle))
+      if (statedAngle != null || themeAngle == null) axis.set("labelAngle", num(angle))
       // An **orient** the specification drives from a parameter cannot be compared here either: the
       // side the axis will be drawn on is not known until the reader picks it, so the alignment is
       // written as the comparison and handed to Vega, on the labels' own encode block.

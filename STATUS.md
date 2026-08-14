@@ -697,7 +697,7 @@ no data is needed to compare two compilers. So every one of them was compiled by
 by this one, and the outputs compared property by property. That is a *measurement*, not a gate: the
 examples are not fixtures here, and nothing about them is checked in.
 
-**124 of 627 matched exactly** at the start, and **585** do now.
+**124 of 627 matched exactly** at the start, and **586** do now.
 
 The value is the *ranking*. The first sweep clustered by root cause, and the three most damaging
 causes were fixed straight away — chosen for what they do to the *picture* rather than for
@@ -712,7 +712,7 @@ frequency:
   where this compiler used `step - 2`, making it nearly four times too wide. `getBandSize` asks the
   scale's kind first and reaches `discreteBandSize` only where the domain is discrete.
 
-The sweep has been the working list ever since, and the 42 that still differ cluster like this:
+The sweep has been the working list ever since, and the 41 that still differ cluster like this:
 
 | Files | Cause |
 | --- | --- |
@@ -720,7 +720,7 @@ The sweep has been the working list ever since, and the 42 that still differ clu
 | 5 | the rest of the **facet data flow**: what is left is a chart whose cells are read by a **selection**, where the brush's own datasets have to be cut per cell as well |
 | 9 | crossfilter charts and scatter-plot matrices: several selections over one table, whose datasets fork differently and whose diagonal cells are not the cells upstream builds |
 | 2 | `time` channel animations, set aside |
-| 5 | one-offs, each its own rule |
+| 4 | one-offs, each its own rule |
 
 Fourteen are still refused by name: eight geographic, three a facet inside a facet, two a repeat
 inside a concatenation, and one the `url` channel.
@@ -4397,6 +4397,25 @@ A last one, off the same reading: `toFieldDefBase` keeps a field's bucketing, it
 aggregate, and **not its type**. Two layers over one column, one calling it ordinal and the other
 saying nothing, are the same field to a title; keying the title by the type as well titled the axis
 "age, age".
+
+### A theme speaks in blocks, and the most specific one wins
+
+Two rules, both about where a property is *read* rather than what it means, and both found in one
+gallery chart drawing its axes by hand out of ticks and rules.
+
+A **style** block outranks every other configuration of a mark property. `getMarkConfig` puts
+`config.style` first, ahead of the per-mark block and `config.mark`, and the styles a mark has are
+its own type followed by whatever its `style` names — the last one that answers winning. That is how
+a parallel-coordinate plot turns its ticks on their side, `config.style.tick.orient: "horizontal"`,
+which swaps which axis the tick's size runs along and which carries its thickness.
+
+`getAxisConfig` asks the **whole chain** for every axis property, not only the ones Vega has never
+heard of. `config.axisX` settling the label angle or taking every caption off was being read only
+where a conditional value was. What a theme settles that way is not written back onto the axis,
+though: Vega knows `labelAngle` and applies the configuration itself, so the angle is used to decide
+which way the labels are aligned and then left where it was — writing it out would say the same
+thing twice, and upstream's rule is exactly that (a value is set only when it is explicit or when
+there is no configured one).
 
 One facet serves however many layers are drawn in a cell. `facetRoot` is a single node with every
 child's chain hanging under it, so the second layer does not cut a partition of its own: it hangs
