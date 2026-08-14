@@ -402,7 +402,18 @@ internal object Guides {
     // `config.numberFormat`: a chart that asks for whole numbers everywhere asks for them on its
     // axes too. Read after the specification's own block, so a stated format still wins.
     if (def.type == MeasureType.QUANTITATIVE && def.timeUnit == null) {
-      view.config.numberFormat?.let { axis.set("format", str(it)) }
+      // A **custom** format type is a function the page registered, not a specifier Vega can read,
+      // so `guideFormat` answers nothing for it and the label becomes an expression calling the
+      // function — written into the labels' own encode block, where a `datum.value` exists to pass.
+      val custom = view.config.numberFormatType.takeIf { def.format == null }
+      if (custom != null) {
+        axis.encodeLabel(
+          "text",
+          signalRef("$custom(datum.value, \"${view.config.numberFormat.orEmpty()}\")"),
+        )
+      } else {
+        view.config.numberFormat?.let { axis.set("format", str(it)) }
+      }
     }
 
     // `defaultTickMinStep`: a `d` format asks for whole numbers, so no tick may be closer than one.
@@ -790,6 +801,16 @@ internal object Guides {
       // entries are unevenly spaced drops labels *greedily*, keeping the first of each collision
       // rather than every other one, because parity would thin the crowded end alone.
       if (type in setOf("quantile", "threshold", "log", "symlog")) put("labelOverlap", "greedy")
+      // A **custom** format type is a function the page registered rather than a specifier, so the
+      // entry's label is written out as an expression calling it — the same rule the axes follow.
+      val customLabel =
+        view.config.numberFormatType
+          ?.takeIf { def.type == MeasureType.QUANTITATIVE && def.format == null }
+          ?.let { signalRef("$it(datum.value, \"${view.config.numberFormat.orEmpty()}\")") }
+      val parts = LinkedHashMap<String, VegaValue>()
+      customLabel?.let {
+        parts["labels"] = obj { put("update", obj { put("text", it) }) }
+      }
       if (gradient) {
         // A colour ramp is drawn as a bar whose length follows the plot, within Vega's own limits —
         // and **which** measure of the plot depends on which way the ramp runs. A horizontal one is
@@ -836,15 +857,9 @@ internal object Guides {
         symbolOpacity(view)
           ?.takeIf { it != 0.0 }
           ?.let { opacity ->
-            put(
-              "encode",
-              obj {
-                put(
-                  "gradient",
-                  obj { put("update", obj { put("opacity", obj { put("value", opacity) }) }) },
-                )
-              },
-            )
+            parts["gradient"] = obj {
+              put("update", obj { put("opacity", obj { put("value", opacity) }) })
+            }
           }
       } else {
         // A legend a selection is **bound to** is the control: its parts are named so the signals
@@ -856,10 +871,15 @@ internal object Guides {
           }
         val swatches = symbolEncode(view, channel)
         if (bound == null) {
-          swatches?.let { put("encode", obj { put("symbols", obj { put("update", it) }) }) }
+          swatches?.let { parts["symbols"] = obj { put("update", it) } }
         } else {
-          put("encode", legendBindingEncode(view, bound, channel, swatches))
+          (legendBindingEncode(view, bound, channel, swatches) as? VegaValue.Obj)
+            ?.fields
+            ?.forEach { (key, value) -> parts[key] = value }
         }
+      }
+      if (parts.isNotEmpty()) {
+        put("encode", obj { parts.forEach { (key, value) -> put(key, value) } })
       }
     }
   }

@@ -30,6 +30,17 @@ internal class Config(private val user: VegaValue.Obj = VegaValue.EmptyObject) {
   val numberFormat: String? = user.string("numberFormat")
 
   /**
+   * `config.numberFormatType`, honoured only where `customFormatTypes` says to honour it.
+   *
+   * A **custom** format type is not a d3 specifier but the name of a function the embedding page
+   * registered, so Vega cannot be handed it as a `format`: `guideFormat` answers nothing and the
+   * label is written out as an expression calling it instead — `pow(datum.value, "1.0")`. The flag
+   * is a safety catch, since an unregistered name would be a runtime error on every label.
+   */
+  val numberFormatType: String? =
+    user.string("numberFormatType")?.takeIf { user.boolean("customFormatTypes") == true }
+
+  /**
    * The same configuration under `config.tooltipFormat` — `{...config, ...config.tooltipFormat}`.
    *
    * A tooltip is a small table rather than a caption, and a chart may want more precision there

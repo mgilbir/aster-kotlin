@@ -1194,9 +1194,16 @@ internal object Marks {
         }
       }
       def.bin != null && binEnd != null -> {
+        // Both edges through the custom format type where one is configured, as the single value
+        // below goes: a bucket reads `1 – 2` whichever function writes the numbers.
+        val write = if (stated == null) config.numberFormatType ?: "format" else "format"
         "!isValid($accessor) || !isFinite(+$accessor) ? \"null\" : " +
-          "format($accessor, \"$number\") + \" $BIN_RANGE_DELIMITER \" + format($binEnd, \"$number\")"
+          "$write($accessor, \"$number\") + \" $BIN_RANGE_DELIMITER \" + $write($binEnd, \"$number\")"
       }
+      // The same custom format type the guides use, where the configuration named one and this
+      // definition stated no format of its own: `pow(datum["a"], "1.0")` rather than `format(…)`.
+      def.type == MeasureType.QUANTITATIVE && stated == null && config.numberFormatType != null ->
+        "${config.numberFormatType}($accessor, \"$number\")"
       def.type == MeasureType.QUANTITATIVE || stated != null -> "format($accessor, \"$number\")"
       !arrays -> "isValid($accessor) ? $accessor : \"\"+$accessor"
       else -> {

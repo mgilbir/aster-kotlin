@@ -697,7 +697,7 @@ no data is needed to compare two compilers. So every one of them was compiled by
 by this one, and the outputs compared property by property. That is a *measurement*, not a gate: the
 examples are not fixtures here, and nothing about them is checked in.
 
-**124 of 627 matched exactly** at the start, and **571** do now.
+**124 of 627 matched exactly** at the start, and **572** do now.
 
 The value is the *ranking*. The first sweep clustered by root cause, and the three most damaging
 causes were fixed straight away — chosen for what they do to the *picture* rather than for
@@ -712,7 +712,7 @@ frequency:
   where this compiler used `step - 2`, making it nearly four times too wide. `getBandSize` asks the
   scale's kind first and reaches `discreteBandSize` only where the domain is discrete.
 
-The sweep has been the working list ever since, and the 56 that still differ cluster like this:
+The sweep has been the working list ever since, and the 55 that still differ cluster like this:
 
 | Files | Cause |
 | --- | --- |
@@ -720,7 +720,7 @@ The sweep has been the working list ever since, and the 56 that still differ clu
 | 13 | the **facet data flow**: upstream keeps the chain below the facet *inside* the cell group and clones it outward, with the facet's fields added, for the scales to read. This compiler hoists all of it above the facet, so the cell has no data of its own and the `*_domain` datasets sit after the aggregate rather than before it |
 | 9 | crossfilter charts and scatter-plot matrices: several selections over one table, whose datasets fork differently and whose diagonal cells are not the cells upstream builds |
 | 2 | `time` channel animations, set aside |
-| 11 | one-offs, each its own rule |
+| 10 | one-offs, each its own rule |
 
 Fourteen are still refused by name: eight geographic, three a facet inside a facet, two a repeat
 inside a concatenation, and one the `url` channel.

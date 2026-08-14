@@ -1338,6 +1338,7 @@ private class Compilation(
           wrapped,
           (spec.number("columns") ?: wrapped.raw.number("columns"))?.toInt(),
           spec.string("name").orEmpty(),
+          config,
         )
       else FacetGrid(row, column, spec.string("name").orEmpty())
     facet = found

@@ -17,21 +17,24 @@ import dev.aster.vega.model.VegaValue
  * Both are substituted rather than evaluated, exactly as `assembleLabelTitle` does, so a trellis of
  * hours can caption midnight "Midnight" and everything else by the clock.
  */
-private fun headerLabel(def: ChannelDef, field: String): String {
-  val derived = headerText(def, field)
+private fun headerLabel(def: ChannelDef, field: String, config: Config? = null): String {
+  val derived = headerText(def, field, config)
   val stated = def.raw.obj("header")?.string("labelExpr") ?: return derived
   return stated.replace("datum.label", derived).replace("datum.value", "parent[${quoted(field)}]")
 }
 
-private fun headerText(def: ChannelDef, field: String): String {
+private fun headerText(def: ChannelDef, field: String, config: Config? = null): String {
   val accessor = "parent[${quoted(field)}]"
   // A **bucketed** column is captioned by the bucket rather than by its near edge: `binFormat`
   // writes both ends with an en dash between them, and says `"null"` where the row had no value —
   // an empty bucket is a real cell of the grid and has to be captioned as one.
   if (def.bin is Binning.Bin) {
     val end = "parent[${quoted("${field}_end")}]"
+    // The same custom format type the guides use, where the configuration named one.
+    val number = config?.numberFormatType?.let { "$it(" } ?: "format("
+    val specifier = if (config?.numberFormatType != null) config.numberFormat.orEmpty() else ""
     return "!isValid($accessor) || !isFinite(+$accessor) ? \"null\" : " +
-      "format($accessor, \"\") + \" – \" + format($end, \"\")"
+      "$number$accessor, \"$specifier\") + \" – \" + $number$end, \"$specifier\")"
   }
   val timeUnit = def.timeUnit
   if (def.type == MeasureType.TEMPORAL || timeUnit != null) {
@@ -485,6 +488,7 @@ internal class FacetGrid(val row: Facet?, val column: Facet?, private val prefix
     kind: String,
     axes: List<VegaValue>,
     titleOffset: Double,
+    config: Config,
     columnSize: String = "child_width",
     rowSize: String = "child_height",
   ): VegaValue? {
@@ -514,7 +518,7 @@ internal class FacetGrid(val row: Facet?, val column: Facet?, private val prefix
             obj {
               put(
                 "text",
-                signalRef(headerLabel(facet.def, facet.field)),
+                signalRef(headerLabel(facet.def, facet.field, config)),
               )
               if (!isColumn) put("orient", "left")
               put("style", "guide-label")
@@ -614,21 +618,23 @@ internal class FacetGrid(val row: Facet?, val column: Facet?, private val prefix
       titles[facet.channel]?.let { facet.titleGroup(it, titleOffset) }
     } +
       listOfNotNull(
-        band("row", "header", leading(vertical), titleOffset, columnSize, rowSize),
+        band("row", "header", leading(vertical), titleOffset, config, columnSize, rowSize),
         band(
           "row",
           "footer",
           vertical - leading(vertical).toSet(),
           titleOffset,
+          config,
           columnSize,
           rowSize,
         ),
-        band("column", "header", leading(horizontal), titleOffset, columnSize, rowSize),
+        band("column", "header", leading(horizontal), titleOffset, config, columnSize, rowSize),
         band(
           "column",
           "footer",
           horizontal - leading(horizontal).toSet(),
           titleOffset,
+          config,
           columnSize,
           rowSize,
         ),
@@ -750,6 +756,8 @@ internal class FacetWrap(
   val def: ChannelDef,
   private val columns: Int?,
   private val prefix: String = "",
+  /** Kept because a wrapped facet captions its **cells**, and a caption reads the number format. */
+  private val config: Config? = null,
 ) : FacetLayout {
 
   override fun named(suffix: String): String =
@@ -790,7 +798,10 @@ internal class FacetWrap(
           arr(
             obj {
               put("type", "aggregate")
-              put("groupby", strings(listOf(field)))
+              // Both edges where the column is **bucketed**: a bucket is the pair, and grouping by
+              // its near edge alone leaves the far one off every row the headers are captioned
+              // from. `FacetNode`'s fields are the same two.
+              put("groupby", strings(fields))
             }
           ),
         )
@@ -922,7 +933,7 @@ internal class FacetWrap(
       obj {
         put(
           "text",
-          signalRef(headerLabel(def, field)),
+          signalRef(headerLabel(def, field, config)),
         )
         put("style", "guide-label")
         put("frame", "group")
@@ -946,8 +957,11 @@ internal class FacetWrap(
     put(
       "sort",
       obj {
-        put("field", strings(fields.map { "datum[${quoted(it)}]" }))
-        put("order", strings(fields.map { "ascending" }))
+        // The **near** edge alone orders a bucketed grid: a bucket's far edge follows from its
+        // near one, so sorting on both says the same thing twice. `assembleFacet` sorts by the
+        // facet's own key, which `vgField` answers with one name.
+        put("field", strings(listOf("datum[${quoted(field)}]")))
+        put("order", strings(listOf("ascending")))
       },
     )
     put(
