@@ -1881,11 +1881,15 @@ private class Compilation(
         val discrete = if (Scales.hasDiscreteDomain(component.type)) "d" else "c"
         // A legend the composition resolves per child is keyed by that child as well, since the
         // whole point of resolving it independently is that there is one of it per plot.
-        val ownPlot =
-          plotNames[view].takeIf {
-            concat != null && resolve.guideIsIndependent(channel, scaleIsIndependent = false)
-          }
-        val key = "$prefix|${def.field ?: channel}|$discrete|${ownPlot.orEmpty()}"
+        // A legend the composition resolves per child is keyed by that child as well, since the
+        // whole point of resolving it independently is that there is one of it per child. Which
+        // child depends on the composition: a concatenation's are its plots, and each keeps its
+        // key inside its own group; a **layer**'s are its members, and they have no group to keep
+        // it in, so two keys stand side by side beside the chart saying two different things.
+        val independent = resolve.guideIsIndependent(channel, scaleIsIndependent = false)
+        val ownPlot = plotNames[view].takeIf { independent && concat != null }
+        val ownChild = if (!independent) "" else ownPlot ?: view.childName
+        val key = "$prefix|${def.field ?: channel}|$discrete|$ownChild"
         // `mergeValuesWithExplicit` settles a property before any tie-breaker runs: a value the
         // specification stated beats one this compiler derived. A field encoded as both a colour
         // and a size, with a title written on only one of them, is titled by the one that was
