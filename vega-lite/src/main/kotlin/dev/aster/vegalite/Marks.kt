@@ -351,13 +351,33 @@ internal object Marks {
         "key",
         "order",
       )
+    // The paint channels read a **condition** where the channel has no field of its own —
+    // `getFieldDef(encoding[channel])` — and `detail`, `key` and `order` do not. A line coloured by
+    // its series only where the reader is hovering over it is still one line per series: without
+    // this the whole chart joined into a single zigzag as soon as the colour was written as a test.
+    val conditional =
+      setOf(
+        "color",
+        "fill",
+        "stroke",
+        "opacity",
+        "fillOpacity",
+        "strokeOpacity",
+        "strokeDash",
+        "strokeWidth",
+        "size",
+      )
     return view.spec.encoding.entries
-      .filter { (channel, def) -> channel in grouping && def.isFieldDef && def.aggregate == null }
+      .filter { (channel, _) -> channel in grouping }
       .filterNot { (channel, _) ->
         (channel == "size" && mark == "trail") ||
           (channel == "order" && (mark == "line" || mark == "trail"))
       }
-      .mapNotNull { (_, def) -> Fields.vgField(def) }
+      .mapNotNull { (channel, own) ->
+        val def =
+          if (channel in conditional) view.spec.fieldDef(channel) else own.takeIf { it.isFieldDef }
+        def?.takeIf { it.aggregate == null }?.let { Fields.vgField(it) }
+      }
   }
 
   private fun markGroup(view: UnitView): VegaValue.Obj {
