@@ -413,6 +413,29 @@ internal object Guides {
   }
 
   /**
+   * Which way a legend runs — `getFirstDefined(legend.direction, legendConfig.direction, …)`.
+   *
+   * Stated on the legend, then on the configuration, and only then derived from where the legend
+   * sits: along the top or the bottom it runs horizontally, and a **gradient** does so in the inner
+   * corners too. Everywhere else it is vertical, which is Vega's own default and so goes unsaid.
+   */
+  private fun legendDirection(view: UnitView, def: ChannelDef, gradient: Boolean): String {
+    val stated =
+      def.legend?.string("direction") ?: view.config.raw.obj("legend")?.string("direction")
+    if (stated != null) return stated
+    val orient =
+      def.legend?.string("orient") ?: view.config.raw.obj("legend")?.string("orient") ?: "right"
+    return when (orient) {
+      "top",
+      "bottom" -> "horizontal"
+      "left",
+      "right",
+      "none" -> "vertical"
+      else -> if (gradient) "horizontal" else "vertical"
+    }
+  }
+
+  /**
    * `defaultLabelAlign`, written out for an angle nobody can read yet.
    *
    * The rule is the same as the constant one — is the label turned past the axis's own side? — but
@@ -768,11 +791,17 @@ internal object Guides {
       // rather than every other one, because parity would thin the crowded end alone.
       if (type in setOf("quantile", "threshold", "log", "symlog")) put("labelOverlap", "greedy")
       if (gradient) {
-        // A colour ramp is drawn as a bar whose length follows the plot, within Vega's own limits.
-        // The *view's* own height signal, not the plain name: inside a concatenation the plotting
+        // A colour ramp is drawn as a bar whose length follows the plot, within Vega's own limits —
+        // and **which** measure of the plot depends on which way the ramp runs. A horizontal one is
+        // as long as the plot is wide and no shorter than a hundred units; a vertical one follows
+        // the height and may be as short as sixty-four.
+        // The *view's* own size signal, not the plain name: inside a concatenation the plotting
         // area is `concat_0_childHeight` and `height` is either something else or nothing at all,
         // so a ramp measured against it came out the wrong length or not at all.
-        put("gradientLength", signalRef("clamp(${view.sizeSignal("y")}, 64, 200)"))
+        val horizontal = legendDirection(view, def, gradient) == "horizontal"
+        val measure = if (horizontal) view.sizeSignal("x") else view.sizeSignal("y")
+        val shortest = if (horizontal) 100 else 64
+        put("gradientLength", signalRef("clamp($measure, $shortest, 200)"))
       } else {
         // The type is written only where it *disagrees* with what Vega would pick: a symbol legend
         // over a continuous colour scale has to say so, and everywhere else a symbol is already
@@ -786,6 +815,8 @@ internal object Guides {
       // A legend along the top or bottom of a chart runs **horizontally**; Vega's own default is
       // vertical, and every other orientation keeps it — `defaultDirection`, with the inner
       // corners taking it only for a gradient.
+      // Written out only where the *legend itself* settles it: a direction the configuration
+      // states is already in Vega's own config block, and repeating it here would say it twice.
       when (def.legend?.string("orient")) {
         "top",
         "bottom" -> put("direction", "horizontal")
