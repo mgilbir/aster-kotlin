@@ -490,12 +490,14 @@ internal class Composite(
           Triple("max", field, "max_$field"),
         )
       )
+    // The whisker's end tick takes **no** size: `endTick` in `boxplot.ts` is written out without
+    // one, so it is as thick as a tick is by default — the band it stands in, or three quarters of
+    // the plot where there is no band. Only the box and the median take the box plot's own size.
     fun tick(colour: String?) = obj {
       put("type", "tick")
       colour?.let { put("color", it) }
       if (colour != null) put("opacity", 1)
       put("orient", ticksOrient)
-      size?.let { put("size", it) }
       put("aria", VegaValue.Bool(false))
     }
     val box = obj {
