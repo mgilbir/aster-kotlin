@@ -137,10 +137,24 @@ internal class Facet(
   private val sortIndex: String? =
     (def.sort as? VegaValue.Arr)?.let { Fields.sortIndexField(channel, def, forAs = true) }
 
-  /** The column each cell's key is measured from: the stated one, or the index of the list. */
+  /**
+   * The column each cell's key is measured from, and the operation that measures it.
+   *
+   * A grid **crossed** both ways cannot compute the key here: the aggregate groups by every facet
+   * field at once, and this key is grouped by one of them. So a joinaggregate writes it onto every
+   * row first and the cell takes the *greatest* of its own, every row of a cell carrying the same
+   * number. `assembleFacet`: "apply max and assign them to the same name". A list-sorted facet is
+   * keyed the same way for the same reason, crossed or not.
+   */
+  fun cellSortSource(crossed: Boolean): String =
+    if (crossed && sortSource != null) cellSortAggregate!! else sortSource ?: sortIndex!!
+
+  fun cellSortOperation(crossed: Boolean): String =
+    if (crossed && sortSource != null) "max" else sortOp ?: "max"
+
+  /** The column the *domain* dataset measures the key from, which is never pre-computed. */
   fun sortSourceField(): String = sortSource ?: sortIndex!!
 
-  /** A list is keyed by the greatest index in the cell, which is the only one the cell has. */
   fun sortOperation(): String = sortOp ?: "max"
 
   /**
@@ -194,9 +208,6 @@ internal class Facet(
     val reason =
       when {
         sortObject == null -> "names no `field` to aggregate"
-        crossed ->
-          "names an aggregate on a facet that is crossed both ways, where the key has to be " +
-            "written onto the rows first so that each cell can take the greatest of its own"
         else -> return
       }
     diagnostics.error(
@@ -658,6 +669,7 @@ internal class FacetGrid(val row: Facet?, val column: Facet?, private val prefix
             put("groupby", strings(fields))
             val sorted = listOfNotNull(row, column).filter { it.cellSortAggregate != null }
             val cardinal = counted.entries.toList()
+            val crossed = row != null && column != null
             if (row != null && column != null || sorted.isNotEmpty() || cardinal.isNotEmpty()) {
               put(
                 "aggregate",
@@ -667,13 +679,15 @@ internal class FacetGrid(val row: Facet?, val column: Facet?, private val prefix
                     put(
                       "fields",
                       strings(
-                        sorted.map { it.sortSourceField() } +
+                        sorted.map { it.cellSortSource(crossed) } +
                           cardinal.map { it.value.removePrefix("distinct_") }
                       ),
                     )
                     put(
                       "ops",
-                      strings(sorted.map { it.sortOperation() } + cardinal.map { "distinct" }),
+                      strings(
+                        sorted.map { it.cellSortOperation(crossed) } + cardinal.map { "distinct" }
+                      ),
                     )
                     put(
                       "as",

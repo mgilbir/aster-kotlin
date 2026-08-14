@@ -45,6 +45,7 @@ internal class DataPipeline(
     timeUnitNode()?.let { head = head.then(it) }
     binnedTimeUnitNode()?.let { head = head.then(it) }
     sortIndexNode()?.let { head = head.then(it) }
+    facetSortKeys()?.let { head = head.then(it) }
 
     // The pre-aggregation table, named only when something reads it. A domain sorted by an
     // aggregate of another field is that something: the ordering has to be computed from the rows
@@ -177,6 +178,38 @@ internal class DataPipeline(
    * what puts it last. It runs after the bin and the time unit and before the pre-aggregation
    * table, because the ordering is over the rows as they will be grouped.
    */
+  /**
+   * `makeJoinAggregateFromFacet`: the key a **crossed** grid orders its cells by, written onto the
+   * rows before the cells are made.
+   *
+   * A cell of a crossed grid is one row-value and one column-value together, so its group is keyed
+   * by both — and a sort that orders the *rows* by an aggregate is grouped by the row field alone.
+   * The two groupings cannot be the same aggregate, so upstream computes the sort key first, over
+   * its own grouping, and the cell then takes the greatest of what its rows already carry. In a
+   * grid of one direction the cell's own aggregate is that grouping, and no such column is needed.
+   */
+  private fun facetSortKeys(): PassThroughNode? {
+    val facets = view.facetDefs.filter { it.channel == "row" || it.channel == "column" }
+    if (facets.size < 2) return null
+    val transforms = facets.mapNotNull { def ->
+      val sort = (def.sort as? VegaValue.Obj)?.takeIf { it.has("field") } ?: return@mapNotNull null
+      val source = sort.string("field") ?: return@mapNotNull null
+      val op = sort.string("op") ?: "min"
+      val named = if (sort.string("op") != null) "${op}_$source" else source
+      obj {
+        put(
+          "type",
+          "joinaggregate",
+        )
+        put("as", strings(listOf("${named}_by_${Fields.vgField(def)}")))
+        put("ops", strings(listOf(op)))
+        put("fields", strings(listOf(source)))
+        put("groupby", strings(listOf(Fields.vgField(def))))
+      }
+    }
+    return if (transforms.isEmpty()) null else PassThroughNode(transforms)
+  }
+
   private fun sortIndexNode(): PassThroughNode? {
     val predicates = Transforms(diagnostics, selections = view.selections)
     // The **facet's** own channels as well as the encoding's: a trellis whose rows are listed in a
