@@ -248,10 +248,13 @@ internal object Guides {
         // Keyed by what makes the definition the one it is, not by the JSON it arrived as: the
         // parse settles a `"bin": "binned"` and a stated type into properties of their own, so two
         // definitions that differ only there arrive looking alike.
+        // `toFieldDefBase` keeps the field, the bucketing, the instant and the aggregate — and not
+        // the **type**. Two layers over one column, one of them calling it ordinal and the other
+        // saying nothing, are the same field to a title, and keying by the type as well titled the
+        // axis "age, age".
         val key =
           listOf(
               channelDef.field,
-              channelDef.type,
               channelDef.bin,
               channelDef.timeUnit,
               channelDef.aggregate,

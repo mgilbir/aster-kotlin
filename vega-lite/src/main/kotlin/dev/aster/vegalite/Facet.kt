@@ -431,6 +431,8 @@ internal interface FacetLayout {
      * the partition Vega hands it.
      */
     cellData: List<VegaValue> = emptyList(),
+    /** The sizes the cell's own axes fall back to by name, aliased to the cell's own. */
+    cellSignals: List<VegaValue> = emptyList(),
   ): VegaValue
 }
 
@@ -718,6 +720,7 @@ internal class FacetGrid(val row: Facet?, val column: Facet?, private val prefix
     scales: List<VegaValue>,
     viewEncode: VegaValue?,
     cellData: List<VegaValue>,
+    cellSignals: List<VegaValue>,
   ): VegaValue = obj {
     put("name", named("cell"))
     put("type", "group")
@@ -790,6 +793,7 @@ internal class FacetGrid(val row: Facet?, val column: Facet?, private val prefix
         )
       },
     )
+    if (cellSignals.isNotEmpty()) put("signals", arr(cellSignals))
     if (cellData.isNotEmpty()) put("data", arr(cellData))
     put("marks", arr(marks))
     if (axes.isNotEmpty()) put("axes", arr(axes))
@@ -999,6 +1003,7 @@ internal class FacetWrap(
     scales: List<VegaValue>,
     viewEncode: VegaValue?,
     cellData: List<VegaValue>,
+    cellSignals: List<VegaValue>,
   ): VegaValue = obj {
     put("name", named("cell"))
     put("type", "group")
@@ -1074,6 +1079,7 @@ internal class FacetWrap(
         )
       },
     )
+    if (cellSignals.isNotEmpty()) put("signals", arr(cellSignals))
     if (cellData.isNotEmpty()) put("data", arr(cellData))
     put("marks", arr(marks))
     if (axes.isNotEmpty()) put("axes", arr(axes))

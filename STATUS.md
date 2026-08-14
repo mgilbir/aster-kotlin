@@ -697,7 +697,7 @@ no data is needed to compare two compilers. So every one of them was compiled by
 by this one, and the outputs compared property by property. That is a *measurement*, not a gate: the
 examples are not fixtures here, and nothing about them is checked in.
 
-**124 of 627 matched exactly** at the start, and **583** do now.
+**124 of 627 matched exactly** at the start, and **585** do now.
 
 The value is the *ranking*. The first sweep clustered by root cause, and the three most damaging
 causes were fixed straight away — chosen for what they do to the *picture* rather than for
@@ -712,12 +712,12 @@ frequency:
   where this compiler used `step - 2`, making it nearly four times too wide. `getBandSize` asks the
   scale's kind first and reaches `discreteBandSize` only where the domain is discrete.
 
-The sweep has been the working list ever since, and the 44 that still differ cluster like this:
+The sweep has been the working list ever since, and the 42 that still differ cluster like this:
 
 | Files | Cause |
 | --- | --- |
 | 21 | geographic: projections, `topojson`, `geoshape` — another worker's ground |
-| 7 | the rest of the **facet data flow**: a chart whose cells are read by a selection, and one whose cells each carry a scale of their own, still put a step in the wrong place |
+| 5 | the rest of the **facet data flow**: what is left is a chart whose cells are read by a **selection**, where the brush's own datasets have to be cut per cell as well |
 | 9 | crossfilter charts and scatter-plot matrices: several selections over one table, whose datasets fork differently and whose diagonal cells are not the cells upstream builds |
 | 2 | `time` channel animations, set aside |
 | 5 | one-offs, each its own rule |
@@ -4384,6 +4384,19 @@ One more thing follows the model rather than the grid: `forEachFieldDef` walks a
 **as it was written**, so a grid naming its column before its row writes that column's sort index
 first. Everything else about a facet is ordered row-before-column, which is why the declared order
 is kept as a second list rather than a sort of the first.
+
+**Independence is resolved between the children of the composition**, and a facet's child is the
+*cell* — never the layers inside one. A trellis of layers measuring its `x` per cell has one
+`child_x`, not one scale per layer, and one axis over the picture rather than two. Where the flow
+splits, that cell scale reads the cell's **own** tables: a domain over several of them names each,
+and each already has a counterpart computed inside the cell. And an axis in the cell that draws its
+grid across no other scale falls back to `width` or `height` by name — which means the whole chart
+until the cell aliases the name to its own, `assembleAxisSignals` again but one level down.
+
+A last one, off the same reading: `toFieldDefBase` keeps a field's bucketing, its instant and its
+aggregate, and **not its type**. Two layers over one column, one calling it ordinal and the other
+saying nothing, are the same field to a title; keying the title by the type as well titled the axis
+"age, age".
 
 One facet serves however many layers are drawn in a cell. `facetRoot` is a single node with every
 child's chain hanging under it, so the second layer does not cut a partition of its own: it hangs

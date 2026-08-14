@@ -522,6 +522,10 @@ private class Compilation(
       // The cells' own scales are assembled before the marks that read them, the cell group being
       // where they are written.
       if (facet != null && concat == null) {
+        // `assembleAxisSignals` on the **cell**: an axis inside it that draws its grid across no
+        // other scale falls back to `width` or `height` by name, and inside the cell those names
+        // mean the whole chart until the cell aliases them to its own.
+        cellSignals = localSizeSignals(plots.single())
         cellScales =
           allScales.values
             .filter { it.name() != prefixed(it.channel) }
@@ -578,7 +582,7 @@ private class Compilation(
     // A channel whose children disagree about the *kind* of scale it is resolves independently
     // whatever the resolve says, because there is no one scale for them to share.
     if (channel in incompatibleChannels) {
-      val owner = if (concat != null) plotOf(view) else view.childName
+      val owner = independenceOwner(view)
       return if (owner.isEmpty()) channel else "${owner}_$channel"
     }
     val independent =
@@ -589,9 +593,24 @@ private class Compilation(
           else facet != null && channel == "theta",
       )
     if (!independent) return prefixed(channel)
-    val owner = if (concat != null) plotOf(view) else view.childName
+    val owner = independenceOwner(view)
     return if (owner.isEmpty()) channel else "${owner}_$channel"
   }
+
+  /**
+   * Which child of the composition a scale or a guide resolved **independently** belongs to.
+   *
+   * Independence is settled between the children of the composition, and those are a
+   * concatenation's plots or a facet's single cell — never the layers *inside* one. A trellis of
+   * layers that measures its `x` per cell has one `child_x`, not one scale per layer: the layers
+   * are one model to the facet, and two scales there would be two axes over the same picture.
+   */
+  private fun independenceOwner(view: UnitView): String =
+    when {
+      concat != null -> plotOf(view)
+      facet != null -> prefixed("child")
+      else -> view.childName
+    }
 
   /** Per channel, the column a cell counts its own categories in — empty for every other chart. */
   private var cellCardinality: Map<String, String> = emptyMap()
@@ -1407,6 +1426,12 @@ private class Compilation(
    */
   private var cellScales: List<VegaValue> = emptyList()
 
+  /** The sizes a cell's own axes fall back to by name, aliased to the cell's own. */
+  private var cellSignals: List<VegaValue> = emptyList()
+
+  /** Where the flow splits at the facet: each outer dataset's counterpart inside the cell. */
+  private val cellDataFor = mutableMapOf<String, String>()
+
   /**
    * A cell-owned scale, reading the cell's own rows.
    *
@@ -1417,6 +1442,48 @@ private class Compilation(
   private fun withinCell(scale: VegaValue): VegaValue {
     val block = scale as? VegaValue.Obj ?: return scale
     val domain = block.obj("domain") ?: return scale
+    fun inside(name: VegaValue) = cellDataFor[(name as? VegaValue.Str)?.value] ?: "facet"
+    // A domain measured over **several** datasets — two layers of one cell — names each of them,
+    // and where the flow splits at the facet each already has a counterpart computed inside the
+    // cell. Those are the tables to measure; the partition itself is what a chain that could not
+    // split has instead.
+    domain.array("fields")?.let { entries ->
+      return obj {
+        block.fields.forEach { (key, value) ->
+          if (key != "domain") put(key, value)
+          else
+            put(
+              "domain",
+              obj {
+                domain.fields.forEach { (name, own) ->
+                  // A stacked domain names its table once and its two ends in `fields`, so the
+                  // table is still rewritten here; a domain over several tables names one in each
+                  // entry and has none of its own.
+                  if (name == "data") put(name, VegaValue.Str(inside(own)))
+                  else if (name != "fields") put(name, own)
+                  else
+                    put(
+                      "fields",
+                      arr(
+                        entries.map { entry ->
+                          val part = entry as? VegaValue.Obj ?: return@map entry
+                          obj {
+                            part.fields.forEach { (key, own) ->
+                              put(
+                                key,
+                                if (key == "data") VegaValue.Str(inside(own)) else own,
+                              )
+                            }
+                          }
+                        }
+                      ),
+                    )
+                }
+              },
+            )
+        }
+      }
+    }
     if (!domain.fields.containsKey("data")) return scale
     return obj {
       block.fields.forEach { (key, value) ->
@@ -1426,7 +1493,7 @@ private class Compilation(
             "domain",
             obj {
               domain.fields.forEach { (name, own) ->
-                put(name, if (name == "data") VegaValue.Str("facet") else own)
+                put(name, if (name == "data") VegaValue.Str(inside(own)) else own)
               }
             },
           )
@@ -1478,6 +1545,10 @@ private class Compilation(
         cellScales,
         viewEncode(),
         facetGroupData,
+        // `assembleAxisSignals` on the **cell**: an axis inside it that draws its grid across no
+        // other scale falls back to `width` or `height` by name, and inside the cell those names
+        // mean the whole chart until the cell aliases them to its own.
+        cellSignals,
       )
   }
 
@@ -1716,8 +1787,12 @@ private class Compilation(
       val main = outputs[index].main
       view.mainData = scales.source ?: ""
       if (scales !== main) view.markData = main.source ?: ""
-      // Inside a facet the marks read the cell's own chain, which is below the split.
-      outputs[index].cell?.source?.let { view.markData = it }
+      // Inside a facet the marks read the cell's own chain, which is below the split — and so does
+      // a scale the *cell* owns, whose extent is measured over the rows that cell was handed.
+      outputs[index].cell?.source?.let {
+        view.markData = it
+        cellDataFor[view.mainData] = it
+      }
       view.rawData = outputs[index].raw?.source ?: view.mainData
     }
     return datasets
@@ -1908,7 +1983,7 @@ private class Compilation(
         // concatenation's children are its plots — so the layers *inside* one plot still share an
         // axis. Keying per view there gave a layered plot two of every axis.
         val key =
-          if (concat == null && guideIsIndependent(channel)) "${view.childName}|$channel"
+          if (concat == null && guideIsIndependent(channel)) "${independenceOwner(view)}|$channel"
           else component.name()
         val existing = components[key]
         if (existing == null) {
