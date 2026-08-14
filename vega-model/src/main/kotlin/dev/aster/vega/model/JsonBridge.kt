@@ -64,6 +64,11 @@ private fun writeJson(value: VegaValue, out: StringBuilder, depth: Int) {
     is VegaValue.Num -> out.append(jsonNumber(value.value))
     is VegaValue.Timestamp -> out.append(jsonNumber(value.epochMillis))
     is VegaValue.Str -> writeJsonString(value.value, out)
+    // `JSON.stringify(/a.b/i)` is `{}`: a regular expression has no enumerable properties of its
+    // own, so JavaScript writes the empty object and loses it. This writer exists to say what
+    // JavaScript says, and a pattern is a *runtime* value in any case — nothing that compiles into
+    // a specification can hold one.
+    is VegaValue.Pattern -> out.append("{}")
     is VegaValue.Arr ->
       if (value.values.isEmpty()) {
         out.append("[]")
