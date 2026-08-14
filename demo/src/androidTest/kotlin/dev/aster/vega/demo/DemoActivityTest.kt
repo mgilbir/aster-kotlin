@@ -94,6 +94,12 @@ class DemoActivityTest {
    *
    * The differential tests prove these specifications match upstream using a stand-in text engine;
    * this proves they also survive real font measurement, which is what the chart on screen uses.
+   *
+   * One of them names its data by **URL** — `job-voyager` reads the 900KB file the gallery hosts —
+   * and that one alone is given the loader the demo itself uses, which fetches once and then reads
+   * the cache directory. The rest keep the refusing default on purpose: a specification with its
+   * data inline must not need a network to compile, and using one loader for all of them would hide
+   * it if one day one did.
    */
   @Test
   fun everySpecificationCompilesOnDevice() {
@@ -102,7 +108,15 @@ class DemoActivityTest {
     for (chart in DemoChart.entries.filter { it.specAsset != null }) {
       val asset = requireNotNull(chart.specAsset)
       val json = context.assets.open(asset).bufferedReader().use { it.readText() }
-      val controller = VegaChartController(textEngine = AndroidTextEngine())
+      val controller =
+        if (""""url"""" in json) {
+          VegaChartController(
+            textEngine = AndroidTextEngine(),
+            loader = VegaDataLoaders.directoryThenNetwork(context.cacheDir, cacheDownloads = true),
+          )
+        } else {
+          VegaChartController(textEngine = AndroidTextEngine())
+        }
       val compiled = controller.setSpec(json)
 
       assertTrue("$asset produced no scene", compiled.isUsable)
