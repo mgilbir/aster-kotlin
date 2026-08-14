@@ -540,19 +540,32 @@ internal object Marks {
           // where a donut names its own hole and its own reach and neither is derived.
           putAll(pointPosition(view, "x", "mid", null))
           putAll(pointPosition(view, "y", "mid", null))
+          // A polar bound the **mark definition** states, under Vega's own name for it:
+          // `getVgPositionChannel` reads `theta` as a start angle and `radius` as an outer one, so
+          // an arc whose reach and sweep are bound to four range sliders says so in those terms.
+          // Only where the *encoding* names no such channel: a definition and an encoding both
+          // speaking about the sweep is the encoding's to settle, `positionRef` reading the channel
+          // definition first and the mark's own value only as a fallback.
+          val stated =
+            POLAR_MARK_PROPERTIES.mapNotNull { (key, vega) ->
+                if (view.spec.encoding[key] != null) null
+                else view.markDef.raw.fields[key]?.let { vega to markProperty(it) }
+              }
+              .toMap()
+          stated.forEach { (vega, value) -> put(vega, value) }
           val statedRadius =
             view.markDef.raw.fields["outerRadius"] != null ||
               view.markDef.raw.fields["radius"] != null
           if (statedRadius) {
             // A stated outer radius still needs an inner one: an arc with no hole is a wedge, and
             // Vega draws nothing at all where neither radius is given.
-            if (view.markDef.raw.fields["innerRadius"] == null) {
+            if (view.markDef.raw.fields["innerRadius"] == null && "innerRadius" !in stated) {
               put("innerRadius", obj { put("value", 0) })
             }
           } else {
             putAll(rectPosition(view, "radius"))
           }
-          putAll(rectPosition(view, "theta"))
+          if ("startAngle" !in stated) putAll(rectPosition(view, "theta"))
         }
         "text" -> {
           putAll(pointPosition(view, "x", "mid", null))
@@ -669,6 +682,10 @@ internal object Marks {
     }
     for ((key, value) in view.markDef.raw.fields) {
       if (key in VL_ONLY_MARK_PROPERTIES) continue
+      // An **arc** ignores `theta` — `baseEncodeEntry(model, {theta: 'ignore'})` — and Vega has no
+      // `theta2` or `radius2` on any mark, so those three are written above under Vega's own names
+      // instead. `radius` is a Vega property and goes out under its own name as well.
+      if (view.spec.mark == "arc" && key in setOf("theta", "theta2", "radius2")) continue
       // `{"expr": …}` is Vega-Lite's way of writing a signal, and Vega's is `{"signal": …}` — and
       // a signal is a *reference*, not a value, so it replaces the whole entry rather than sitting
       // inside one.
@@ -676,6 +693,22 @@ internal object Marks {
       if (expression != null) put(key, signalRef(expression.string("expr").orEmpty()))
       else put(key, obj { put("value", value) })
     }
+  }
+
+  /** What an arc's own polar bounds are called once they reach Vega. */
+  private val POLAR_MARK_PROPERTIES =
+    mapOf(
+      "theta" to "startAngle",
+      "theta2" to "endAngle",
+      "radius" to "outerRadius",
+      "radius2" to "innerRadius",
+    )
+
+  /** A mark-definition value as an encode entry: a signal where it is an `expr`, a value else. */
+  private fun markProperty(value: VegaValue): VegaValue {
+    val expression = (value as? VegaValue.Obj)?.takeIf { it.fields.keys == setOf("expr") }
+    return if (expression != null) signalRef(expression.string("expr").orEmpty())
+    else obj { put("value", value) }
   }
 
   /** `isRectBasedMark`: the marks whose size along a channel is a *band* rather than a symbol. */
