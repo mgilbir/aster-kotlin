@@ -237,6 +237,12 @@ internal object Scales {
       if (stated is VegaValue.Obj && stated.has("param")) {
         return domain(view, channel, stripped(def, "domain"), type, dataName)
       }
+      // `{"domain": {"expr": …}}` is a **signal**, which is what Vega calls the same thing: a
+      // domain computed from the chart's own parameters rather than from its rows. Passed through
+      // as written, Vega read an object where it wanted a domain and scaled nothing.
+      if (stated is VegaValue.Obj && stated.fields.keys == setOf("expr")) {
+        return listOf(signalRef(stated.string("expr").orEmpty()))
+      }
       val values = (stated as? VegaValue.Arr)?.values ?: return listOf(stated)
       // `convertDomainIfItIsDateTime`: on a scale that measures **time**, every end of a stated
       // domain becomes the expression that builds the instant, wrapped in `{data: …}` so Vega

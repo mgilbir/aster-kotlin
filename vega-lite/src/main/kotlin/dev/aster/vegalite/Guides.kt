@@ -885,16 +885,24 @@ internal object Guides {
       "(!length(data(${quoted(selection.store)})) || " +
         "(${selection.name}[${quoted(field)}] && " +
         "indexof(${selection.name}[${quoted(field)}], datum.value) >= 0))"
-    fun picked() =
+    // A picked **swatch** is drawn at the mark's own opacity — a legend beside a chart of
+    // translucent points is as translucent as they are — and a picked *label* is drawn solid, since
+    // a word at seven tenths is only harder to read. `symbols` reads `opacity ?? 1` and `labels`
+    // reads 1 outright.
+    fun picked(selected: Double) =
       arr(
         listOf(
           obj {
             put("test", test)
-            put("value", 1)
+            put("value", selected)
           },
           obj { put("value", faded) },
         )
       )
+    val stated =
+      view.spec.fieldDef(channel)?.legend?.number("symbolOpacity")
+        ?: view.config.raw.obj("legend")?.number("symbolOpacity")
+    val swatchOpacity = if (stated != null) 1.0 else symbolOpacity(view) ?: 1.0
     return obj {
       put(
         "labels",
@@ -904,7 +912,7 @@ internal object Guides {
           put(
             "update",
             obj {
-              put("opacity", picked())
+              put("opacity", picked(1.0))
               put("cursor", obj { put("value", "pointer") })
             },
           )
@@ -919,7 +927,7 @@ internal object Guides {
             "update",
             obj {
               swatches?.fields?.forEach { (key, value) -> put(key, value) }
-              put("opacity", picked())
+              put("opacity", picked(swatchOpacity))
               put("cursor", obj { put("value", "pointer") })
             },
           )

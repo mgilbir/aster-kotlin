@@ -35,13 +35,25 @@ internal object Params {
       // A **selection** is compiled by `Selection`, into a store, its signals and the tests that
       // read them. It is not a variable and has no `value` to publish here.
       if (param.has("select")) return@forEachIndexed
+      val expr = param.fields["expr"]
+      val bind = param.fields["bind"]
       out += obj {
-        put("name", name)
-        // `expr` and `value` are alternatives: one is computed from the other parameters and
-        // recomputed when they change, the other is simply held.
-        param.fields["expr"]?.let { put("update", it) }
-        if (!param.has("expr")) put("value", param.fields["value"])
-        param.fields["bind"]?.let { put("bind", it) }
+        // `{expr, bind, ...rest}` — everything but those two goes through untouched, which is how
+        // a `react: false` reaches Vega. A parameter is a signal and almost nothing else, so what
+        // the specification wrote about it is what Vega is told.
+        param.fields.forEach { (key, value) ->
+          if (key != "expr" && key != "bind") put(key, value)
+        }
+        // A parameter that is both **bound** and **computed** initialises from the expression and
+        // is then the widget's to set: an `init` signal rather than an `update` one, which would
+        // recompute it and overwrite whatever the reader had chosen.
+        if (bind != null && expr != null) {
+          put("bind", bind)
+          put("init", expr)
+        } else {
+          expr?.let { put("update", it) }
+          bind?.let { put("bind", it) }
+        }
       }
     }
     return out
