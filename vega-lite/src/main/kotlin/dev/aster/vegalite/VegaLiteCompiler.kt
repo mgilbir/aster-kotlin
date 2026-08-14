@@ -1602,7 +1602,18 @@ private class Compilation(
     val outputs = views.map { view ->
       val data = view.spec.data!!
       if (data !in order) order += data
-      DataPipeline(view, diagnostics, register, Selection.needsIdentity(selections))
+      // `requiresSelectionId(model)` asks the **unit**, not the chart: the identity column is
+      // written where a selection that remembers rows by identity was declared, and nowhere else. A
+      // layer of two bars, one of them hovered over, is the case — the hovered one needs a
+      // `_vgsid_` after its aggregate and the other does not, which is what makes the two of them
+      // two datasets rather than one chain with a stray identifier in it.
+      DataPipeline(
+          view,
+          diagnostics,
+          register,
+          Selection.needsIdentity(selections),
+          Selection.needsIdentity(selections.filter { it.owner === view }),
+        )
         .build(roots.getOrPut(data) { SourceNode(data) })
     }
     // Every view built its own chain onto its source, so a shared tree forks there; the shared

@@ -24,6 +24,17 @@ internal class DataPipeline(
    * not the rows that went in and so have no identity of their own yet.
    */
   private val needsIdentity: Boolean = false,
+  /**
+   * Whether **this view** declares a selection that remembers rows by identity.
+   *
+   * The identifier at the head of the flow is the chart's — one column serving every dataset below
+   * it, kept while anything in the chart needs it. The one *after an aggregate* is the view's own:
+   * `requiresSelectionId(model)` asks the unit, because an aggregate's output rows are not the rows
+   * that went in and have no identity yet. A layer of two bars, one of them hovered over, is where
+   * it tells — the hovered one needs a `_vgsid_` after its aggregate and the other does not, which
+   * is what makes the two of them two datasets rather than one chain with a stray identifier in it.
+   */
+  private val ownsIdentity: Boolean = false,
 ) {
 
   /** The two named points a view exposes: the table before aggregation, and the one marks read. */
@@ -64,7 +75,7 @@ internal class DataPipeline(
 
     aggregateNode()?.let {
       head = head.then(it)
-      if (needsIdentity) head = head.then(identifierNode())
+      if (ownsIdentity) head = head.then(identifierNode())
     }
     imputeNode()?.let { head = head.then(it) }
     stackNode()?.let { head = head.then(it) }
