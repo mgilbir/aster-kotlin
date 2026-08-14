@@ -697,7 +697,7 @@ no data is needed to compare two compilers. So every one of them was compiled by
 by this one, and the outputs compared property by property. That is a *measurement*, not a gate: the
 examples are not fixtures here, and nothing about them is checked in.
 
-**124 of 627 matched exactly** at the start, and **567** do now.
+**124 of 627 matched exactly** at the start, and **569** do now.
 
 The value is the *ranking*. The first sweep clustered by root cause, and the three most damaging
 causes were fixed straight away — chosen for what they do to the *picture* rather than for
@@ -1317,6 +1317,17 @@ with the row.
 where `defined.ts` asks it once per *scaled* channel and answers from the scale's domain. A line
 coloured by a continuous field breaks where that colour is missing too, and a channel whose scale
 has a discrete domain is never invalid — a null is simply another category.
+
+The marks and the *scales* then need not read the same rows, and where they do not the flow has two
+named points rather than one. `break-paths-show-domains` keeps a gap in the domain while dropping it
+from a non-path mark, so the scales read a copy taken **above** the filter;
+`break-paths-filter-domains` does the reverse for a path — draw the break, leave the gap out of the
+extent — so they read one taken *below* it. Both are compiled.
+
+An **area** told to break at its gaps is not yet drawn broken by this runtime: the compiled
+specification matches upstream's, and the scene comes out as one continuous polygon where upstream
+draws several. The compiler's half is covered by `invalid-break-paths-domains`, which is a
+non-path mark for that reason.
 
 Two runtime defects came out of the fixture, both in the same function. **A series whose defined
 points never numbered two vanished entirely**: runs of one point were dropped, and with no run left

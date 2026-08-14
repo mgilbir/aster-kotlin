@@ -38,7 +38,13 @@ internal class DataPipeline(
 ) {
 
   /** The two named points a view exposes: the table before aggregation, and the one marks read. */
-  class Outputs(val raw: OutputNode?, val main: OutputNode)
+  /**
+   * The named points a view exposes.
+   *
+   * [main] is what the marks read and [scales] what the domains measure, and they are the same node
+   * unless the specification asked for a path that breaks at a gap the domain does not want.
+   */
+  class Outputs(val raw: OutputNode?, val main: OutputNode, val scales: OutputNode = main)
 
   fun build(source: SourceNode): Outputs {
     var head: DataNode = source
@@ -79,11 +85,36 @@ internal class DataPipeline(
     }
     imputeNode()?.let { head = head.then(it) }
     stackNode()?.let { head = head.then(it) }
-    filterInvalidNode()?.let { head = head.then(it) }
+
+    // The scales measure the rows *before* the filter where they want the invalid ones and the
+    // marks do not — a named point above the filter, which is upstream's `preFilterInvalid`.
+    val preFilter =
+      if (view.marksExcludeInvalid && !view.scalesExcludeInvalid) {
+        OutputNode(view.prefixed("prefilter")).also {
+          head.then(it)
+          head = it
+        }
+      } else {
+        null
+      }
+    if (view.marksExcludeInvalid) filterInvalidNode()?.let { head = head.then(it) }
 
     val main = OutputNode(view.prefixed("main"))
     head.then(main)
-    return Outputs(raw, main)
+    head = main
+
+    // And *below* the filter where the marks want the invalid rows and the scales do not: a path
+    // drawn with a break at the gap, over a domain measured without it — `postFilterInvalid`.
+    val post =
+      if (!view.marksExcludeInvalid && view.scalesExcludeInvalid) {
+        filterInvalidNode(force = true)?.let { filter ->
+          head = head.then(filter)
+          OutputNode(view.prefixed("postfilter")).also { head.then(it) }
+        }
+      } else {
+        null
+      }
+    return Outputs(raw, main, post ?: preFilter ?: main)
   }
 
   /** `IdentifierNode`: the transform that gives every row a `_vgsid_` to be remembered by. */
@@ -646,11 +677,13 @@ internal class DataPipeline(
    * A path mark is the exception and gets no filter at all — a line breaks at a gap instead,
    * through the mark's own `defined`, so that the gap is visible rather than closed over.
    */
-  private fun filterInvalidNode(): FilterInvalidNode? {
-    // `getDataSourcesForHandlingInvalidValues`: only a mode that *excludes* invalid values from the
-    // marks filters here. A path that breaks at the gap still needs the row — the break is drawn
-    // from it — and `show` draws the row outright.
-    if (view.invalidDataMode != "filter") return null
+  private fun filterInvalidNode(force: Boolean = false): FilterInvalidNode? {
+    // `getDataSourcesForHandlingInvalidValues`: only a mode that *excludes* invalid values filters
+    // here, and it is asked twice — once about the marks and once about the *scales*. A path that
+    // breaks at the gap still needs the row, the break being drawn from it, so the filter that
+    // keeps the gap out of the **domain** is made below the point the marks read rather than above
+    // it. `show` draws the row outright and filters nothing.
+    if (!force && !view.marksExcludeInvalid) return null
 
     // Keyed by the **raw** field, which is how upstream's aggregator is keyed, so two channels
     // reading one column through different buckets leave only the last of them: `d` bucketed by

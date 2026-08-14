@@ -1647,7 +1647,14 @@ private class Compilation(
         .also { it.named = spec.obj("datasets")?.fields.orEmpty() }
         .assemble(order.map { roots[it] ?: it })
     views.forEachIndexed { index, view ->
-      view.mainData = outputs[index].main.source ?: ""
+      // The **scales** read one named point and the marks another, where the specification asked
+      // for a path that breaks at a gap the domain does not want. They are the same node
+      // otherwise, and `markData` then stays whatever it already was — inside a facet it is the
+      // cell's own partition, which is not this question.
+      val scales = outputs[index].scales
+      val main = outputs[index].main
+      view.mainData = scales.source ?: ""
+      if (scales !== main) view.markData = main.source ?: ""
       view.rawData = outputs[index].raw?.source ?: view.mainData
     }
     return datasets

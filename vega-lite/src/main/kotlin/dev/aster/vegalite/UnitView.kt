@@ -63,6 +63,33 @@ internal class UnitView(
       }
     }
 
+  /**
+   * `getDataSourcesForHandlingInvalidValues`: which rows the **marks** draw and which the *scales*
+   * measure, which are not always the same rows.
+   *
+   * A path that breaks at a gap needs the row the gap is at — the break is drawn from it — while
+   * the domain may or may not want it. `break-paths-filter-domains` says draw the break and leave
+   * the gap out of the extent; `break-paths-show-domains` says draw it and keep it. Where the two
+   * answers differ the flow needs two named points rather than one: the marks read the main output
+   * and the scales read a filtered copy below it, or an unfiltered one above.
+   */
+  val marksExcludeInvalid: Boolean
+    get() =
+      when (invalidDataMode) {
+        "filter" -> true
+        "break-paths-show-domains",
+        "break-paths-filter-domains" -> spec.mark !in PATH_MARKS
+        else -> false
+      }
+
+  val scalesExcludeInvalid: Boolean
+    get() =
+      when (invalidDataMode) {
+        "filter",
+        "break-paths-filter-domains" -> true
+        else -> false
+      }
+
   /** Merged scale type per channel, filled in once every view has contributed. */
   var scaleTypes: Map<String, String> = emptyMap()
 
