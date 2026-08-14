@@ -711,16 +711,15 @@ frequency:
   where this compiler used `step - 2`, making it nearly four times too wide. `getBandSize` asks the
   scale's kind first and reaches `discreteBandSize` only where the domain is discrete.
 
-The sweep has been the working list ever since, and the 66 that still differ cluster like this:
+The sweep has been the working list ever since, and the 60 that still differ cluster like this:
 
 | Files | Cause |
 | --- | --- |
 | 21 | geographic: projections, `topojson`, `geoshape` — another worker's ground |
-| 9 | the **facet data flow**: upstream keeps the chain below the facet *inside* the cell group and clones it outward, with the facet's fields added, for the scales to read. This compiler hoists all of it above the facet, so the cell has no data of its own and the `*_domain` datasets sit after the aggregate rather than before it |
-| 6 | crossfilter and brush-bound layers: several selections over one table, whose datasets fork differently |
+| 13 | the **facet data flow**: upstream keeps the chain below the facet *inside* the cell group and clones it outward, with the facet's fields added, for the scales to read. This compiler hoists all of it above the facet, so the cell has no data of its own and the `*_domain` datasets sit after the aggregate rather than before it |
+| 9 | crossfilter charts and scatter-plot matrices: several selections over one table, whose datasets fork differently and whose diagonal cells are not the cells upstream builds |
 | 2 | `time` channel animations, set aside |
-| 2 | a `preFilterInvalid`/`postFilterInvalid` pair, where marks and scales want the same rows filtered differently |
-| 26 | one-offs, each its own rule |
+| 15 | one-offs, each its own rule |
 
 Fourteen are still refused by name: eight geographic, three a facet inside a facet, two a repeat
 inside a concatenation, and one the `url` channel.
