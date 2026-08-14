@@ -1589,6 +1589,11 @@ private class Compilation(
     // chart rather than a missing one — and a `lookup`'s joined table is a root here too, since a
     // join reads a second table rather than deriving from the first.
     val order = mutableListOf<VegaValue>()
+    // The **chart's own** table is the first source, whatever the first view reads. `parseData`
+    // walks the model tree from the top, and the root model creates its source before any child
+    // creates one of its own: a chart whose first layer brings its own rows still numbers the
+    // chart's table `source_0`. It is left out where nothing hangs off it, as an unused subtree is.
+    spec.fields["data"]?.let { own -> if (views.any { it.spec.data == own }) order += own }
     val roots = LinkedHashMap<VegaValue, SourceNode>()
     val register: (VegaValue) -> String = { table ->
       val existing = order.indexOf(table)
