@@ -307,14 +307,7 @@ public object Functions {
     // false.
     map.predicate("isObject") { it is VegaValue.Obj || it is VegaValue.Timestamp }
     map.predicate("isString") { it is VegaValue.Str }
-    // **Always false**, and correctly so: Vega's expression language has a regular-expression
-    // literal
-    // in its grammar and no way to reach one from a specification — `replace` takes its pattern as
-    // a
-    // string. So no value this engine can produce is a regular expression, and upstream answers
-    // false
-    // for every one of them too.
-    map.predicate("isRegExp") { false }
+    map.predicate("isRegExp") { it is VegaValue.Pattern }
     map.predicate("isDefined") { it !is VegaValue.Null }
     // `isValid` is narrower than truthiness: it rejects null and NaN but accepts 0 and "".
     map.predicate("isValid") {
@@ -360,9 +353,44 @@ public object Functions {
       val to = if (args.size > 2) clampIndex(args.number(2), text.length) else text.length
       VegaValue.Str(text.substring(minOf(from, to), maxOf(from, to)))
     }
+    /*
+     * `regexp(pattern, flags)` — upstream's `new RegExp(pattern, flags)`.
+     *
+     * The pair this and `test` make is how a specification filters by text: the job-voyager example
+     * writes `test(regexp(query,'i'), datum.job)` against a signal a reader types into. Neither
+     * existed here, so that filter threw for every row the moment the query was not empty and the
+     * chart went blank — which is what a bound text field made visible.
+     */
+    map["regexp"] = ExpressionFunction { args ->
+      VegaValue.Pattern(args.string(0), if (args.size > 1) args.string(1) else "")
+    }
+    /*
+     * `test(pattern, string)` — whether the pattern matches anywhere in the string.
+     *
+     * Upstream compiles it to `RegExp(a).test(b)`, and `RegExp` of a *string* compiles that string as
+     * a pattern — so `test('far', 'Farmer')` is legal and false, where `test(regexp('far','i'), …)`
+     * is true. Both spellings are accepted here for the same reason.
+     */
+    map["test"] = ExpressionFunction { args ->
+      VegaValue.Bool(args.pattern(0).regex.containsMatchIn(args.string(1)))
+    }
     map["replace"] = ExpressionFunction { args ->
-      // Vega's `replace` takes a string pattern and replaces the first occurrence only.
-      VegaValue.Str(args.string(0).replaceFirst(args.string(1), args.string(2)))
+      val text = args.string(0)
+      val pattern = args.getOrNull(1)
+      // A **pattern** replaces by match rather than by literal text, and only `g` makes it replace
+      // more than the first — `replace('a-b-c', regexp('-','g'), '+')` is `a+b+c` where the same
+      // without the flag is `a+b-c`. A string pattern stays literal, which is what it was before.
+      VegaValue.Str(
+        if (pattern is VegaValue.Pattern) {
+          if ('g' in pattern.flags) {
+            pattern.regex.replace(text, args.string(2))
+          } else {
+            pattern.regex.replaceFirst(text, args.string(2))
+          }
+        } else {
+          text.replaceFirst(args.string(1), args.string(2))
+        }
+      )
     }
     map["split"] = ExpressionFunction { args ->
       val parts = args.string(0).split(args.string(1))
@@ -1392,6 +1420,18 @@ public object Functions {
   private fun List<VegaValue>.number(index: Int): Double = JsSemantics.toNumber(at(index))
 
   private fun List<VegaValue>.string(index: Int): String = JsSemantics.toStringValue(at(index))
+
+  /**
+   * The argument as a **pattern**, whether it was written as one or as a string.
+   *
+   * Upstream's `test` compiles to `RegExp(a).test(b)`, and `RegExp` of a string compiles that
+   * string as a pattern — so a bare `test('far', …)` works there and works here.
+   */
+  private fun List<VegaValue>.pattern(index: Int): VegaValue.Pattern =
+    when (val value = at(index)) {
+      is VegaValue.Pattern -> value
+      else -> VegaValue.Pattern(JsSemantics.toStringValue(value))
+    }
 
   /** `Math.min`/`Math.max`: variadic, and NaN if any argument does not coerce to a number. */
   private fun extreme(arguments: List<VegaValue>, takeSmaller: Boolean): VegaValue {
