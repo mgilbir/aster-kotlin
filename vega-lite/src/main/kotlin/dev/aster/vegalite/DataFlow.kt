@@ -136,8 +136,19 @@ internal sealed class DataNode {
     while (moved) {
       moved = false
       for ((index, below) in children.withIndex()) {
-        if (below is ParseNode) continue
         val parse = below.children.singleOrNull() as? ParseNode ?: continue
+        // A parse below a parse is one parse: `node.merge(child)` rather than a swap. The two are
+        // only ever chained because this compiler brought them together — one lifted out of a
+        // branch to meet the one already there — and leaving them chained wrote the second as a
+        // formula over a column the first had already read.
+        if (below is ParseNode) {
+          below.parse.putAll(parse.parse)
+          below.children.clear()
+          below.children += parse.children
+          parse.children.clear()
+          moved = true
+          continue
+        }
         // A parse cannot climb past a step that produces what it reads — and a *nested* parse
         // reads the whole path, so a step producing `argmax_US_Gross` blocks a parse of
         // `argmax_US_Gross['Production Budget']` even though the two names differ.
@@ -279,22 +290,122 @@ internal sealed class DataNode {
       }
   }
 
-  fun mergeBins(renames: MutableMap<String, String>) {
-    children.forEach { it.mergeBins(renames) }
-    if (children.size <= 1) return
-    // **Every** sibling bin folds into one node, not only those bucketing the same column the same
-    // way: a node holds a *set* of bucketings keyed by what they bucket, and `remainingBins.pop()`
-    // takes the lot. Two plots each binning a different column, or one column two ways, therefore
-    // cut both buckets in one place above them rather than each in a dataset of its own.
-    val bins = children.filterIsInstance<BinNode>()
-    if (bins.size < 2) return
+  /**
+   * Whether a bucketing may climb above this step — `moveBinsUp` in `MergeBins`.
+   *
+   * A **filter** is the one that matters: a bucketing measures the extent of the rows it can see,
+   * so lifting it above a filter would cut its buckets from rows the chart is not drawing. A parse
+   * or an identifier is excluded for the same reason upstream excludes the source itself — there is
+   * nothing above them to climb to.
+   */
+  private fun letsBinsClimb(): Boolean =
+    when (this) {
+      is SourceNode,
+      is ParseNode -> false
+      is PassThroughNode ->
+        transforms.none {
+          (it as? VegaValue.Obj)?.string("type") in setOf("filter", "identifier")
+        }
+      else -> true
+    }
+
+  fun mergeBins(
+    renames: MutableMap<String, String>,
+    /** Puts a promoted bucketing where this node stood — `swapWithParent`, from the parent. */
+    replaceInParent: ((DataNode, DataNode) -> Unit)? = null,
+  ) {
+    // Deepest first, as `BottomUpOptimizer` runs: a fork nested inside a branch settles before the
+    // branch above it, and a bucketing promoted below can then be promoted again from here.
+    for (child in children.toList()) {
+      child.mergeBins(renames) { old, new ->
+        val at = children.indexOf(old)
+        if (at >= 0) children[at] = new
+      }
+    }
+
+    // `MergeBins` splits this node's bucketings in two. One that does not read a column *this* step
+    // writes can climb above it, so that every branch below shares it; one that does has to stay.
+    // A chart with a histogram of a computed column beside one of a column the table already had is
+    // where it tells — the second bucketing belongs above the formula, the first cannot leave it.
+    val canClimb = letsBinsClimb()
+    val produced = producedFields()
+    val promotable = mutableListOf<BinNode>()
+    val remaining = mutableListOf<BinNode>()
+    for (bin in children.filterIsInstance<BinNode>()) {
+      if (canClimb && bin.bins.none { it.field in produced }) promotable += bin
+      else remaining += bin
+    }
+
+    if (promotable.isNotEmpty()) {
+      val promoted = fold(promotable, renames)
+      if (this is BinNode) {
+        // Nothing to climb past: the step above is a bucketing too, and the two are one node.
+        merge(promoted, renames)
+        children.remove(promoted)
+        children += promoted.children
+        promoted.children.clear()
+      } else if (replaceInParent != null) {
+        children.remove(promoted)
+        val below = promoted.children.toList()
+        promoted.children.clear()
+        children += below
+        promoted.children += this
+        replaceInParent(this, promoted)
+      } else {
+        // A root has nothing above it, so its own bucketings only merge.
+        remaining += promoted
+      }
+    }
+    if (remaining.size > 1) fold(remaining, renames)
+  }
+
+  /** Folds bucketings into the **last** of them — `remainingBins.pop()` — and answers with it. */
+  private fun fold(bins: List<BinNode>, renames: MutableMap<String, String>): BinNode {
     val kept = bins.last()
     for (folded in bins.dropLast(1)) {
       kept.merge(folded, renames)
       children.remove(folded)
       kept.children += folded.children
+      folded.children.clear()
     }
+    return kept
   }
+
+  /**
+   * Folds the copies of an ancestor's transforms that every branch below it carries.
+   *
+   * Upstream's models are a hierarchy: a chart's transforms are parsed on the chart's own model,
+   * once, and its layers or its plots hang below the chain they make. This compiler copies them
+   * down into every view instead, so the same node appears in every branch. Folding the copies back
+   * into the **first** restores upstream's tree — and it has to happen *before* the optimizers run,
+   * because an optimizer that moves one copy leaves the rest unable to fold at all: a bucketing
+   * lifted above one branch's copy of a formula is no longer a sibling of the other branches'.
+   */
+  fun foldAncestorCopies() {
+    val kept = mutableListOf<DataNode>()
+    for (child in children.toList()) {
+      val key = child.contentKey()
+      val copy = kept.firstOrNull {
+        it.fromAncestor && child.fromAncestor && key != null && it.contentKey() == key
+      }
+      if (copy == null) {
+        kept += child
+      } else {
+        copy.children += child.children
+        child.children.clear()
+        children.remove(child)
+      }
+    }
+    children.forEach { it.foldAncestorCopies() }
+  }
+
+  /** What makes two nodes the same node written twice, for the fold above. */
+  private fun contentKey(): String? =
+    when (this) {
+      is AggregateNode -> "aggregate:$dimensions|$ops|$fields|$outputs"
+      is TimeUnitNode -> "timeunit:$units"
+      else -> identity()
+    }
 
   /**
    * Folds the copies an ancestor's transform left in every branch into the **first** of them.

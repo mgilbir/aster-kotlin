@@ -1554,6 +1554,10 @@ private class Compilation(
     // layers each bucketing an instant and then aggregating are not sibling aggregates until the
     // time units have been folded together, so a single pass leaves the aggregates apart.
     for (root in roots.values) {
+      // Before anything moves: the copies of an ancestor's transforms that every branch carries are
+      // one node upstream, and an optimizer that lifts one of them past its branch leaves the rest
+      // unable to fold at all.
+      root.foldAncestorCopies()
       var previous = ""
       repeat(5) {
         root.moveParseUp()
