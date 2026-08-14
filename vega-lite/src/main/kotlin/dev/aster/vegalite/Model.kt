@@ -95,6 +95,27 @@ internal data class ChannelDef(
   val isValueDef: Boolean = value != null
 
   /**
+   * Whether this definition says nothing about what to draw.
+   *
+   * It is what is left of a **shared** encoding a layer never filled in: a chart that writes
+   * `{"type": "quantitative", "axis": {…}}` above its layers so that each need only name its field
+   * leaves that behind on any layer that names none. Upstream's `getFieldDef` answers nothing for
+   * it, and everything downstream reads the channel as unencoded — which is what makes a rule with
+   * no `y` span the plot rather than sit halfway up it.
+   */
+  val isBlank: Boolean =
+    field == null &&
+      datum == null &&
+      value == null &&
+      aggregate == null &&
+      // `isOrderOnlyDef`: an `order` that states only how to sort is a definition in its own right,
+      // and the only thing it has to say is the thing it says.
+      sort == null &&
+      stack == null &&
+      conditions.isEmpty() &&
+      siblings.isEmpty()
+
+  /**
    * `impute` — how the gaps in this series are filled, when the specification says to fill them.
    *
    * Kept as written: the parameters go straight into Vega's own `impute` transform, and the one

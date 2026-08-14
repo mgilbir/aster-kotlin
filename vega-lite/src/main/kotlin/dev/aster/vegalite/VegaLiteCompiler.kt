@@ -792,8 +792,13 @@ private class Compilation(
   }
 
   /** [above] extended so that everything [spec] adds of its own is owned by [name]. */
-  private fun owning(spec: VegaValue.Obj, above: List<String>, name: String): List<String> =
-    above + List((spec.array("transform").orEmpty().size - above.size).coerceAtLeast(0)) { name }
+  private fun owning(spec: VegaValue.Obj, above: List<String>, name: String): List<String> {
+    val own = spec.array("transform").orEmpty().size
+    // A level that reads its own table stands on nothing above it, so every transform it carries is
+    // its own.
+    if (own < above.size) return List(own) { name }
+    return above + List(own - above.size) { name }
+  }
 
   /** Every concatenation in the tree, outermost first, which is the order the sizes merge in. */
   private fun nests(node: Node = plotTree): List<Node.Nest> =
@@ -1175,7 +1180,9 @@ private class Compilation(
           // `bin_maxbins_10_x_bins` and both members read the same ones. Named for the member
           // instead, one bucketing became two that no optimizer could fold, and the chart was
           // drawn twice over two sets of buckets.
-          val mine = above + List(child.array("transform").orEmpty().size) { here }
+          val mine =
+            if (child.has("data")) List(child.array("transform").orEmpty().size) { here }
+            else above + List(child.array("transform").orEmpty().size) { here }
           if (child.has("layer")) {
             collect(merged, here, owner ?: here, here2, mine)
           } else {
@@ -1244,7 +1251,14 @@ private class Compilation(
     // A child's transforms come **after** its parent's rather than instead of them: the parent's
     // belong to the parent's own data chain and the child's hang below. Letting the child's replace
     // them ran a filter over a column the parent's formula had not yet written.
-    val inheritedTransforms = spec.array("transform").orEmpty() + child.array("transform").orEmpty()
+    //
+    // Unless the child states its own `data`, in which case it inherits none of them. `parseData`
+    // starts a new source for such a child rather than descending from its parent's main output,
+    // so the parent's chain is not above it at all — and a formula written for the chart's own
+    // table has no business running over a second table that has no such column.
+    val inheritedTransforms =
+      if (child.has("data")) child.array("transform").orEmpty()
+      else spec.array("transform").orEmpty() + child.array("transform").orEmpty()
     put("transform", if (inheritedTransforms.isEmpty()) null else arr(inheritedTransforms))
     val shared = spec.obj("encoding")
     if (shared != null) {
@@ -1797,11 +1811,16 @@ private class Compilation(
             // said what the axis measures, and the other layer's derived name adds nothing.
             parsed.explicitTitle && !merged.explicitTitle -> {
               merged.titles.clear()
+              merged.titleKeys.clear()
               merged.titles += parsed.titles
+              merged.titleKeys += parsed.titleKeys
               merged.explicitTitle = true
             }
             merged.explicitTitle && !parsed.explicitTitle -> Unit
-            else -> parsed.titles.forEach { if (it !in merged.titles) merged.titles += it }
+            else ->
+              parsed.titleKeys.forEachIndexed { at, key ->
+                merged.addTitle(key, parsed.titles[at])
+              }
           }
           // `mergeValuesWithExplicit`: a property one layer settled and the other left alone is
           // the merged axis's. A layer of an error band over a line is where it tells — the band

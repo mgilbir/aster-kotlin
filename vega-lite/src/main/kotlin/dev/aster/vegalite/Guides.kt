@@ -117,6 +117,22 @@ internal object Guides {
     val titles: MutableList<String> = mutableListOf()
 
     /**
+     * What each title came from, which is what makes two of them one.
+     *
+     * `mergeTitleFieldDefs` folds the **definitions**, not the words they render to: two layers
+     * naming the same column in the same way contribute one title, and two naming it differently —
+     * one bucketed and one not — contribute two, which read alike and are still two. Deduplicating
+     * the rendered words instead quietly dropped the second.
+     */
+    val titleKeys: MutableList<String> = mutableListOf()
+
+    fun addTitle(key: String, text: String) {
+      if (key in titleKeys) return
+      titleKeys += key
+      titles += text
+    }
+
+    /**
      * Whether the specification named this axis's title itself.
      *
      * An **explicit** title short-circuits the merge, across layers as well as across the two ends
@@ -213,16 +229,36 @@ internal object Guides {
     // first of those that answers is the whole answer. A layer whose *guide* names the axis has
     // said what the axis measures, so the fields' own titles add nothing after it.
     val guideTitle = def.axis?.fields?.get("title") ?: def.legend?.fields?.get("title")
+    // `config.axis.title` settles it for every axis in the chart that has not been titled itself,
+    // and **null** is the useful value: it is how a chart whose columns explain themselves takes
+    // every caption off at once, rather than writing `"title": null` on each of them.
+    val configured = if (guideTitle != null) null else view.config.axisConfig("title")
     val stated =
       if (guideTitle != null) listOf(guideTitle)
+      else if (configured != null) listOfNotNull(configured.takeIf { it !is VegaValue.Null })
       else listOfNotNull(def.explicitTitle, secondary?.explicitTitle)
-    if (stated.isNotEmpty()) {
+    if (configured is VegaValue.Null) {
       axis.explicitTitle = true
-      stated.mapNotNull { (it as? VegaValue.Str)?.value }.forEach { axis.titles += it }
+    } else if (stated.isNotEmpty()) {
+      axis.explicitTitle = true
+      stated.mapNotNull { (it as? VegaValue.Str)?.value }.forEach { axis.addTitle(it, it) }
     } else {
       for (channelDef in listOfNotNull(def, secondary)) {
         val title = Fields.title(channelDef, view.config) as? VegaValue.Str ?: continue
-        if (title.value !in axis.titles) axis.titles += title.value
+        // Keyed by what makes the definition the one it is, not by the JSON it arrived as: the
+        // parse settles a `"bin": "binned"` and a stated type into properties of their own, so two
+        // definitions that differ only there arrive looking alike.
+        val key =
+          listOf(
+              channelDef.field,
+              channelDef.type,
+              channelDef.bin,
+              channelDef.timeUnit,
+              channelDef.aggregate,
+              channelDef.explicitTitle,
+            )
+            .joinToString("|")
+        axis.addTitle(key, title.value)
       }
     }
 
@@ -641,8 +677,11 @@ internal object Guides {
         // `assembleTitle`: a falsy title is not written at all — `titleString ? {title} : {}`. An
         // axis the specification titled `""` has *no* caption, which is not the same as one
         // captioned with nothing.
+        // Not deduplicated here: `assembleTitle` joins the definitions the merge kept, and the
+        // merge is where two of them become one — by *definition*, not by the words they render
+        // to. Two layers naming one column differently, one bucketed and one not, say its name
+        // twice, and upstream writes it twice.
         axis.titles
-          .distinct()
           .filter { it.isNotEmpty() }
           .takeIf { it.isNotEmpty() }
           ?.let { put("title", str(it.joinToString(", "))) }

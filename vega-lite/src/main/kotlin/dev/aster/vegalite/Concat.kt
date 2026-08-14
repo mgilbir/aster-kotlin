@@ -86,7 +86,12 @@ private constructor(
               // them: the concatenation's belong to its own data chain and each plot's hangs below.
               // Letting a plot's replace them ran its filter over a column the shared formula had
               // not yet written.
-              val inherited = spec.array("transform").orEmpty() + child.array("transform").orEmpty()
+              // A plot that reads its own table inherits none of the concatenation's transforms:
+              // `parseData` starts a new source for it rather than descending from the level above,
+              // so that chain is not over it at all.
+              val inherited =
+                if (child.has("data")) child.array("transform").orEmpty()
+                else spec.array("transform").orEmpty() + child.array("transform").orEmpty()
               put("transform", if (inherited.isEmpty()) null else arr(inherited))
             }
       }

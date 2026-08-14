@@ -219,6 +219,12 @@ internal class Parse(
         channelDef(channel, entry, at)
       }
       val def = parsed.firstOrNull() ?: continue
+      // A definition that names no column, no datum and no value is not an encoding: it is the
+      // part of a shared one a layer never filled in — `{"type": "quantitative", "axis": {…}}`
+      // written above the layers so that each of them need only name its field. The layer that
+      // names none has nothing on that channel, and upstream's `getFieldDef` answers accordingly:
+      // a rule with no `y` spans the plot rather than sitting halfway up it.
+      if (def.isBlank) continue
       result[channel] = def.copy(siblings = parsed.drop(1), isList = value is VegaValue.Arr)
     }
     // A secondary channel takes its type from the channel it bounds. `{"x2": {"field": "end"}}` is
