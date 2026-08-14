@@ -1,0 +1,188 @@
+{
+  "$schema": "https://vega.github.io/schema/vega/v6.json",
+  "description": "A line bucketed two years at a time, which is a unit with a step of its own.",
+  "background": "white",
+  "padding": 5,
+  "width": 300,
+  "height": 300,
+  "style": "cell",
+  "data": [
+    {
+      "name": "source_0",
+      "url": "data/stocks.csv",
+      "format": {
+        "type": "csv",
+        "parse": {
+          "date": "date"
+        }
+      },
+      "transform": [
+        {
+          "type": "filter",
+          "expr": "datum.symbol==='GOOG'"
+        },
+        {
+          "field": "date",
+          "type": "timeunit",
+          "units": [
+            "year"
+          ],
+          "step": 2,
+          "as": [
+            "year_step_2_date",
+            "year_step_2_date_end"
+          ]
+        },
+        {
+          "type": "aggregate",
+          "groupby": [
+            "year_step_2_date"
+          ],
+          "ops": [
+            "average"
+          ],
+          "fields": [
+            "price"
+          ],
+          "as": [
+            "average_price"
+          ]
+        }
+      ]
+    }
+  ],
+  "marks": [
+    {
+      "name": "marks",
+      "type": "line",
+      "style": [
+        "line"
+      ],
+      "sort": {
+        "field": "x"
+      },
+      "from": {
+        "data": "source_0"
+      },
+      "encode": {
+        "update": {
+          "stroke": {
+            "value": "#4c78a8"
+          },
+          "description": {
+            "signal": "\"date (year): \" + (timeFormat(datum[\"year_step_2_date\"], timeUnitSpecifier([\"year\"], {\"year-month\":\"%b %Y \",\"year-month-date\":\"%b %d, %Y \"}))) + \"; Average of price: \" + (format(datum[\"average_price\"], \"\"))"
+          },
+          "x": {
+            "scale": "x",
+            "field": "year_step_2_date"
+          },
+          "y": {
+            "scale": "y",
+            "field": "average_price"
+          },
+          "defined": {
+            "signal": "isValid(datum[\"year_step_2_date\"]) && isFinite(+datum[\"year_step_2_date\"]) && isValid(datum[\"average_price\"]) && isFinite(+datum[\"average_price\"])"
+          }
+        }
+      }
+    }
+  ],
+  "scales": [
+    {
+      "name": "x",
+      "type": "time",
+      "domain": {
+        "data": "source_0",
+        "field": "year_step_2_date"
+      },
+      "range": [
+        0,
+        {
+          "signal": "width"
+        }
+      ]
+    },
+    {
+      "name": "y",
+      "type": "linear",
+      "domain": {
+        "data": "source_0",
+        "field": "average_price"
+      },
+      "range": [
+        {
+          "signal": "height"
+        },
+        0
+      ],
+      "nice": true,
+      "zero": true
+    }
+  ],
+  "axes": [
+    {
+      "scale": "x",
+      "orient": "bottom",
+      "gridScale": "y",
+      "grid": true,
+      "tickCount": {
+        "signal": "ceil(width/40)"
+      },
+      "tickMinStep": {
+        "signal": "datetime(2003, 0, 1, 0, 0, 0, 0) - datetime(2001, 0, 1, 0, 0, 0, 0)"
+      },
+      "domain": false,
+      "labels": false,
+      "aria": false,
+      "maxExtent": 0,
+      "minExtent": 0,
+      "ticks": false,
+      "zindex": 0
+    },
+    {
+      "scale": "y",
+      "orient": "left",
+      "gridScale": "x",
+      "grid": true,
+      "tickCount": {
+        "signal": "ceil(height/40)"
+      },
+      "domain": false,
+      "labels": false,
+      "aria": false,
+      "maxExtent": 0,
+      "minExtent": 0,
+      "ticks": false,
+      "zindex": 0
+    },
+    {
+      "scale": "x",
+      "orient": "bottom",
+      "grid": false,
+      "title": "date (year)",
+      "format": {
+        "signal": "timeUnitSpecifier([\"year\"], {\"year-month\":\"%b %Y \",\"year-month-date\":\"%b %d, %Y \"})"
+      },
+      "labelFlush": true,
+      "labelOverlap": true,
+      "tickCount": {
+        "signal": "ceil(width/40)"
+      },
+      "tickMinStep": {
+        "signal": "datetime(2003, 0, 1, 0, 0, 0, 0) - datetime(2001, 0, 1, 0, 0, 0, 0)"
+      },
+      "zindex": 0
+    },
+    {
+      "scale": "y",
+      "orient": "left",
+      "grid": false,
+      "title": "Average of price",
+      "labelOverlap": true,
+      "tickCount": {
+        "signal": "ceil(height/40)"
+      },
+      "zindex": 0
+    }
+  ]
+}

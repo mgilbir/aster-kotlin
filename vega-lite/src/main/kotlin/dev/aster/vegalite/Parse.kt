@@ -238,6 +238,32 @@ internal class Parse(
     return result
   }
 
+  /**
+   * `timeUnitToString`: a time unit written as an **object** spelled back into a name.
+   *
+   * `{"unit": "year", "step": 2}` buckets two years at a time, and the column it writes is called
+   * `year_step_2_date` — the unit, then every other parameter as `_<name>_<value>`. Keeping the
+   * name is what lets everything downstream go on treating a time unit as a word: the parts are
+   * still read off the front of it, and the step is read back out where the transform needs it.
+   */
+  private fun timeUnitName(params: VegaValue.Obj?): String? {
+    val unit = params?.string("unit") ?: return null
+    return buildString {
+      append(unit)
+      params.fields.forEach { (key, value) ->
+        if (key != "unit" && key != "utc" && key != "binned") {
+          append(
+            Fields.varName(
+              "_${key}_${(value as? VegaValue.Num)?.value?.let {
+            if (it == it.toLong().toDouble()) it.toLong().toString() else it.toString()
+          } ?: (value as? VegaValue.Str)?.value ?: value.toString()}"
+            )
+          )
+        }
+      }
+    }
+  }
+
   private fun channelDef(channel: String, value: VegaValue, path: String): ChannelDef? {
     if (value !is VegaValue.Obj) {
       diagnostics.error(
@@ -257,7 +283,7 @@ internal class Parse(
       value.string("aggregate")
         ?: aggregateObject?.fields?.keys?.firstOrNull { it == "argmin" || it == "argmax" }
     val argumentField = aggregate?.let { aggregateObject?.string(it) }
-    val timeUnit = value.string("timeUnit")
+    val timeUnit = value.string("timeUnit") ?: timeUnitName(value.obj("timeUnit"))
     val bin = binning(value.fields["bin"], path, channel)
 
     val conditions = conditions(channel, value.fields["condition"], "$path.condition")

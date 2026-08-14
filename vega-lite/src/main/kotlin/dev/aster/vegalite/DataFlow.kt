@@ -681,6 +681,7 @@ internal class TimeUnitNode(units: List<TimeUnitComponent>) : DataNode() {
         put("type", "timeunit")
         put("field", it.field)
         put("units", strings(it.units))
+        it.step?.let { step -> put("step", step) }
         // Which calendar the bucket is cut against. A `utcmonth` says so and a `month` says
         // nothing, taking the viewer's own zone — and the two put a midnight instant in
         // different months.
@@ -700,6 +701,8 @@ internal data class TimeUnitComponent(
   val field: String,
   val units: List<String>,
   val output: String,
+  /** How many of the unit each bucket spans, where the specification asked for more than one. */
+  val step: Int? = null,
   val utc: Boolean = false,
   /** The two interpolated edges a rect off the middle of this bucket is drawn between. */
   val offsettedRect: List<VegaValue> = emptyList(),

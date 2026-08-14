@@ -382,6 +382,7 @@ internal class DataPipeline(
           field,
           Fields.timeUnitParts(timeUnit),
           Fields.vgField(def, forAs = true),
+          step = Fields.timeUnitStep(timeUnit),
           utc = timeUnit.startsWith("utc"),
           offsettedRect = channel?.let { offsettedRectFormulas(def, it) }.orEmpty(),
         )
@@ -718,6 +719,7 @@ internal class DataPipeline(
             def.field!!,
             Fields.timeUnitParts(unit),
             Fields.vgField(def, forAs = true),
+            step = Fields.timeUnitStep(unit),
             utc = unit.startsWith("utc"),
           )
         }
@@ -745,6 +747,7 @@ internal class DataPipeline(
           field,
           units,
           outputs.first(),
+          step = transform.number("step")?.toInt(),
           utc = transform.string("timezone") == "utc",
         )
       )

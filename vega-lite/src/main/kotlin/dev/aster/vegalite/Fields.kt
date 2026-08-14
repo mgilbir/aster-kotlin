@@ -136,6 +136,10 @@ internal object Fields {
 
   fun timeUnitToString(timeUnit: String): String = timeUnit
 
+  /** `{"unit": …, "step": n}` — how many of the unit each bucket spans, where more than one. */
+  fun timeUnitStep(timeUnit: String): Int? =
+    Regex("_step_(\\d+)").find(timeUnit)?.groupValues?.get(1)?.toIntOrNull()
+
   /** `binnedyearmonth` — a time unit the *data* was bucketed by before it arrived. */
   fun isBinnedTimeUnit(timeUnit: String): Boolean = timeUnit.startsWith("binned")
 
@@ -175,12 +179,15 @@ internal object Fields {
         "seconds" to 0,
         "milliseconds" to 0,
       )
+    // A bucket spanning several of the unit is that many times as wide, and the tick step follows
+    // it: a chart bucketed two years at a time has no tick closer than two years.
+    val span = timeUnitStep(timeUnit) ?: 1
     val (part, step) =
       when (smallest) {
-        "dayofyear" -> "date" to 1
-        "quarter" -> "month" to 3
-        "week" -> "date" to 7
-        else -> smallest to 1
+        "dayofyear" -> "date" to span
+        "quarter" -> "month" to 3 * span
+        "week" -> "date" to 7 * span
+        else -> smallest to span
       }
     if (part !in start) return null
     val end = start.toMutableMap()
