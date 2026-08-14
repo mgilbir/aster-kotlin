@@ -525,7 +525,16 @@ internal class FacetGrid(val row: Facet?, val column: Facet?, private val prefix
       // layout was keeping for them. It is not the same as a header with nothing in it.
       .filter { it.def.raw.fields["header"] != VegaValue.Null }
       .mapNotNull { facet ->
-        (Fields.title(facet.def, config) as? VegaValue.Str)?.let { facet.channel to it.value }
+        // The **header's** own title where it states one, and the column's derived name where it
+        // does not. A heading the specification emptied is no heading at all — `assembleTitleGroup`
+        // writes nothing for a falsy title — and the room the layout was keeping for it goes with
+        // it. That is not the same as leaving the heading out: the band of captions stays either
+        // way, since the captions are what name the cells.
+        val stated = facet.def.raw.obj("header")?.fields?.get("title")
+        val text =
+          if (stated != null) (stated as? VegaValue.Str)?.value
+          else (Fields.title(facet.def, config) as? VegaValue.Str)?.value
+        text?.takeIf { it.isNotEmpty() }?.let { facet.channel to it }
       }
       .toMap()
 
