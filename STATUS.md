@@ -697,7 +697,7 @@ no data is needed to compare two compilers. So every one of them was compiled by
 by this one, and the outputs compared property by property. That is a *measurement*, not a gate: the
 examples are not fixtures here, and nothing about them is checked in.
 
-**124 of 627 matched exactly** at the start, and **579** do now.
+**124 of 627 matched exactly** at the start, and **581** do now.
 
 The value is the *ranking*. The first sweep clustered by root cause, and the three most damaging
 causes were fixed straight away — chosen for what they do to the *picture* rather than for
@@ -712,12 +712,12 @@ frequency:
   where this compiler used `step - 2`, making it nearly four times too wide. `getBandSize` asks the
   scale's kind first and reaches `discreteBandSize` only where the domain is discrete.
 
-The sweep has been the working list ever since, and the 48 that still differ cluster like this:
+The sweep has been the working list ever since, and the 46 that still differ cluster like this:
 
 | Files | Cause |
 | --- | --- |
 | 21 | geographic: projections, `topojson`, `geoshape` — another worker's ground |
-| 11 | the rest of the **facet data flow**: the split itself is implemented (below), but a facet gridded *both* ways, one whose cells carry scales of their own, and one a selection reads still hoist their chains above the facet |
+| 9 | the rest of the **facet data flow**: the split itself is implemented (below), but a chart whose cells are read by a selection, and one whose second layer brings transforms of its own, still write a step twice or in the wrong cell |
 | 9 | crossfilter charts and scatter-plot matrices: several selections over one table, whose datasets fork differently and whose diagonal cells are not the cells upstream builds |
 | 2 | `time` channel animations, set aside |
 | 5 | one-offs, each its own rule |
@@ -4354,6 +4354,28 @@ Three things follow, and each was a difference on its own:
   key the cell measured for itself — `median_yield_by_site`, suffixed with the faceted column so it
   cannot collide with the one the domain dataset holds. A wrapped facet was reading the faceted
   column itself and ordering its cells alphabetically.
+
+Three rules about the **shape** above and below it followed from the same reading:
+
+- **One output stands between the table and the partition**, not two. `moveMainDownToFacet` walks
+  the facet model's own main output down until the facet is its only child, and a raw one beside it
+  would spend a dataset name upstream's numbering never spends — every dataset after it was named
+  one too high.
+- **A later layer rebuilds only its own steps** below the facet. What an ancestor wrote is the facet
+  model's and already stands above the partition; writing it again below ran a crossed grid's sort
+  keys twice over rows that already carried them.
+- **An independent axis is drawn inside the cell**, and it is `parseGuideResolve` that says so: an
+  independent *scale* forces an independent guide, but `resolve: {axis: {x: "independent"}}` asks
+  for one on its own. A band can only label a scale every cell shares, so a chart that resolves its
+  axes independently has no band at all — and then no `*_domain` dataset for a band to read.
+
+A grid faceted **both** ways whose cells size themselves cannot count from the whole table either.
+A column is as wide as its widest cell, and a cell is one row-value and one column-value together,
+so the counting happens once per cell in a `cross_<column>_<row>` dataset grouped by every facet
+field; each band then takes the greatest of its own rather than counting again over rows it no
+longer has. Each band counts along **its own** direction only — a row band is as tall as a cell and
+knows nothing of how wide one is, which is `assembleRowColumnHeaderData` reading
+`{row: 'y', column: 'x'}[channel]`.
 
 One facet serves however many layers are drawn in a cell. `facetRoot` is a single node with every
 child's chain hanging under it, so the second layer does not cut a partition of its own: it hangs

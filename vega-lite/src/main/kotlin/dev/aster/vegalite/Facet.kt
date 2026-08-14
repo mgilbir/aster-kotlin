@@ -227,7 +227,12 @@ internal class Facet(
   val domainData: String =
     listOf(prefix, "${channel}_domain").filter { it.isNotEmpty() }.joinToString("_")
 
-  fun domainDataset(source: String, counted: Map<String, String> = emptyMap()): VegaValue = obj {
+  fun domainDataset(
+    source: String,
+    counted: Map<String, String> = emptyMap(),
+    /** Whether [source] is the **crossed** table, whose rows already hold one count per cell. */
+    fromCrossed: Boolean = false,
+  ): VegaValue = obj {
     put("name", domainData)
     put("source", source)
     put(
@@ -236,25 +241,39 @@ internal class Facet(
         obj {
           put("type", "aggregate")
           put("groupby", strings(groupingFields))
+          val fields = mutableListOf<String>()
+          val ops = mutableListOf<String>()
+          val names = mutableListOf<String>()
           // A cell that sizes itself counts its own categories here as well: the header band beside
           // it is as wide as the cell, and it is drawn from this dataset rather than from the
-          // facet's own partition.
-          if (counted.isNotEmpty()) {
-            put("fields", strings(counted.values.map { it.removePrefix("distinct_") }))
-            put("ops", strings(counted.values.map { "distinct" }))
-            put("as", strings(counted.values.toList()))
+          // facet's own partition. Only the count along **this** band's direction, though — a row
+          // band is as tall as a cell and knows nothing of how wide one is, which is
+          // `assembleRowColumnHeaderData` reading `{row: 'y', column: 'x'}[channel]`.
+          counted[if (isColumn) "x" else "y"]?.let { name ->
+            // Over the crossed table the counting is already done, one row per cell, so the band
+            // takes the **greatest** of what its cells carry rather than counting again over rows
+            // it no longer has. "Although it is technically a max, just name it distinct so it's
+            // easier to refer to it."
+            fields += if (fromCrossed) name else name.removePrefix("distinct_")
+            ops += if (fromCrossed) "max" else "distinct"
+            names += name
           }
           // The key the cells are ordered by, measured once per cell — which is what this dataset
           // already holds a row of. `assembleRowColumnHeaderData` puts it here rather than leaving
           // the header bands to sort on something they cannot see.
           if (sortAggregate != null) {
-            put("fields", strings(listOf(sortSource!!)))
-            put("ops", strings(listOf(sortOp!!)))
-            put("as", strings(listOf(sortAggregate)))
+            fields += sortSource!!
+            ops += sortOp!!
+            names += sortAggregate
           } else if (sortIndex != null) {
-            put("fields", strings(listOf(sortIndex)))
-            put("ops", strings(listOf("max")))
-            put("as", strings(listOf(sortIndex)))
+            fields += sortIndex
+            ops += "max"
+            names += sortIndex
+          }
+          if (fields.isNotEmpty()) {
+            put("fields", strings(fields))
+            put("ops", strings(ops))
+            put("as", strings(names))
           }
         }
       ),
@@ -434,7 +453,38 @@ internal class FacetGrid(val row: Facet?, val column: Facet?, private val prefix
     vertical: Boolean,
     horizontal: Boolean,
     counted: Map<String, String>,
-  ): List<VegaValue> = listOfNotNull(column, row).map { it.domainDataset(source, counted) }
+  ): List<VegaValue> {
+    // A grid faceted **both** ways whose cells size themselves cannot count from the whole table:
+    // a column's width is the widest of its cells and each cell is one row-value and one
+    // column-value together, so the counting is done once per cell first — grouped by every facet
+    // field — and each band then takes the greatest of its own. `assemble` calls it
+    // `cross_<column>_<row>`.
+    val crossed =
+      if (column != null && row != null && counted.isNotEmpty())
+        "cross_${column.domainData}_${row.domainData}"
+      else null
+    val crossing = crossed?.let { name ->
+      obj {
+        put("name", name)
+        put("source", source)
+        put(
+          "transform",
+          arr(
+            obj {
+              put("type", "aggregate")
+              put("groupby", strings(fields))
+              put("fields", strings(counted.values.map { it.removePrefix("distinct_") }))
+              put("ops", strings(counted.values.map { "distinct" }))
+            }
+          ),
+        )
+      }
+    }
+    return listOfNotNull(crossing) +
+      listOfNotNull(column, row).map {
+        it.domainDataset(crossed ?: source, counted, fromCrossed = crossed != null)
+      }
+  }
 
   /**
    * The `layout` block.

@@ -436,7 +436,10 @@ private class Compilation(
     // The facets' own values, which the layout counts and the headers title themselves from — and,
     // for a wrapped facet, only along the directions a shared axis was actually drawn in.
     facet?.let { current ->
-      val main = plots.single().axes.filter { (it["grid"] as? VegaValue.Bool)?.value != true }
+      val main =
+        plots.single().axes.filter {
+          (it["grid"] as? VegaValue.Bool)?.value != true && !cellOwnsAxis(it)
+        }
       val horizontal = main.filter {
         it.string("orient") == "bottom" || it.string("orient") == "top"
       }
@@ -1434,9 +1437,7 @@ private class Compilation(
       setOf("x", "y").filter { channel ->
         resolve.scaleIsIndependent(channel, defaultIndependent = false)
       }
-    fun cellsOwn(axis: VegaValue): Boolean = independent.any { channel ->
-      axis.string("scale")?.endsWith(channel) == true
-    }
+    fun cellsOwn(axis: VegaValue): Boolean = cellOwnsAxis(axis)
     val gridAxes = axes.filter { (it["grid"] as? VegaValue.Bool)?.value == true || cellsOwn(it) }
     val mainAxes = axes.filter { (it["grid"] as? VegaValue.Bool)?.value != true && !cellsOwn(it) }
     val horizontal = mainAxes.filter {
@@ -1627,9 +1628,13 @@ private class Compilation(
     // One facet, however many layers are drawn in each of its cells: `facetRoot` is a single node
     // with every child's chain hanging under it, so the layers share the partition rather than
     // each cutting one of their own.
+    // `moveFacetDown` walks the facet down past every step that takes it and stops at the first
+    // **fork or named output** below it. A cell of several layers is that fork, and the
+    // pre-aggregation table a sorted domain asks for is that output; either way the chain stays
+    // below and is computed per cell.
     val split =
       facet
-        ?.takeIf { views.any { view -> DataPipeline.needsRawTable(view) } }
+        ?.takeIf { views.size > 1 || views.any { view -> DataPipeline.needsRawTable(view) } }
         ?.let { FacetNode(it.named("facet")) }
     val register: (VegaValue) -> String = { table ->
       val existing = order.indexOf(table)
@@ -1937,6 +1942,18 @@ private class Compilation(
     return ordered.mapNotNull { Guides.assembleAxis(it, "grid") } +
       ordered.mapNotNull { Guides.assembleAxis(it, "main") }
   }
+
+  /**
+   * Whether an axis is drawn **inside** each cell rather than once in a band beside the grid.
+   *
+   * A band can only label a scale every cell shares, so a channel resolved independently keeps its
+   * axis in the cell — and `parseGuideResolve` settles that for the *guide*, which an independent
+   * scale forces but an `axis: "independent"` asks for on its own.
+   */
+  private fun cellOwnsAxis(axis: VegaValue): Boolean =
+    setOf("x", "y").any { channel ->
+      guideIsIndependent(channel) && axis.string("scale")?.endsWith(channel) == true
+    }
 
   private fun guideIsIndependent(channel: String): Boolean =
     resolve.guideIsIndependent(

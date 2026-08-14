@@ -78,8 +78,8 @@ internal class DataPipeline(
     facetSplit
       ?.takeIf { it.attached }
       ?.let { shared ->
-        val inside = cellChain(headChain(shared), emptyList())
-        val outside = cellChain(headChain(shared.main!!), view.facetFields)
+        val inside = cellChain(headChain(shared, belowFacet = true), emptyList())
+        val outside = cellChain(headChain(shared.main!!, belowFacet = true), view.facetFields)
         return Outputs(outside.raw, outside.main, outside.scales, inside.main, shared)
       }
 
@@ -93,10 +93,12 @@ internal class DataPipeline(
     // cell's aggregate is over its own rows, and the scale's is over all of them.
     val facetNode = facetSplit
     if (facetNode != null) {
-      val facetRaw = OutputNode(view.prefixed("facet_raw"))
-      head.then(facetRaw)
+      // One output above the facet, not two. `moveMainDownToFacet` walks the facet model's own
+      // **main** output down until the facet is its only child, and that is the whole of what
+      // stands between the table and the partition — a second, raw one would spend a dataset name
+      // that upstream's numbering never spends.
       val facetMain = OutputNode(view.prefixed("facet_main"))
-      facetRaw.then(facetMain)
+      head.then(facetMain)
       facetMain.then(facetNode)
       facetNode.attachedTo(facetMain)
       val inside = cellChain(facetNode, emptyList())
@@ -108,7 +110,7 @@ internal class DataPipeline(
   }
 
   /** Everything a view does **before** it aggregates: its transforms, its buckets, its instants. */
-  private fun headChain(parent: DataNode): DataNode {
+  private fun headChain(parent: DataNode, belowFacet: Boolean = false): DataNode {
     var head: DataNode = parent
     if (needsIdentity && parent is SourceNode) head = head.then(identifierNode())
 
@@ -118,13 +120,15 @@ internal class DataPipeline(
     // extent nor the bin width can be merged, so each layer buckets what it can see.
     if (view.parentIsLayer) binNode()?.let { head = head.then(it) }
 
-    head = userTransforms(head)
+    head = userTransforms(head, ownOnly = belowFacet)
     implicitParse()?.let { head = head.then(it) }
     if (!view.parentIsLayer) binNode()?.let { head = head.then(it) }
     timeUnitNode()?.let { head = head.then(it) }
     binnedTimeUnitNode()?.let { head = head.then(it) }
     sortIndexNode()?.let { head = head.then(it) }
-    facetSortKeys()?.let { head = head.then(it) }
+    // The key a crossed grid's cells are ordered by is written onto every row *above* the facet,
+    // where every cell's rows can still be seen at once — never again below it.
+    if (!belowFacet) facetSortKeys()?.let { head = head.then(it) }
     return head
   }
 
@@ -916,9 +920,14 @@ internal class DataPipeline(
     )
   }
 
-  private fun userTransforms(head: DataNode): DataNode {
+  private fun userTransforms(head: DataNode, ownOnly: Boolean = false): DataNode {
     var last = head
     view.spec.transforms.forEachIndexed { index, transform ->
+      // Below the facet only the view's **own** steps are rebuilt: what an ancestor wrote is the
+      // facet model's and stands above the partition already, so writing it again here would run
+      // it twice over rows it has already been run over.
+      val inherited = view.transformOwners.getOrNull(index)?.let { it != view.name } == true
+      if (ownOnly && inherited) return@forEachIndexed
       val transforms =
         Transforms(
           diagnostics,
@@ -941,7 +950,7 @@ internal class DataPipeline(
         // grouping is computed twice into two datasets.
         val node =
           aggregateFrom(emitted) ?: timeUnitFrom(emitted) ?: PassThroughNode(listOf(emitted))
-        node.fromAncestor = view.transformOwners.getOrNull(index)?.let { it != view.name } == true
+        node.fromAncestor = inherited
         last = last.then(node)
       }
     }
