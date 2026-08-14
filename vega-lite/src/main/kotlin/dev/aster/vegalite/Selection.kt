@@ -538,7 +538,12 @@ internal class Selection(
           listOf(
             obj {
               put("events", obj { put("signal", "${name}_tuple") })
-              put("update", "modify(${quoted(store)}, ${name}_tuple, true)")
+              // `modifyExpr`: what the store is told to do with the drag that has just finished.
+              // A selection resolved **globally** replaces everything in the store; one resolved
+              // per unit replaces only what that unit put there, so a brush dragged in one cell of
+              // a matrix leaves the brushes in the other cells alone.
+              val scope = if (resolve == "global") "true" else "{unit: $unit}"
+              put("update", "modify(${quoted(store)}, ${name}_tuple, $scope)")
             }
           )
         ),

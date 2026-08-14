@@ -75,8 +75,16 @@ private class Compilation(
 
   private val config = Config(spec.obj("config") ?: VegaValue.EmptyObject)
 
-  /** The selections this chart declares, which the data, the signals and the marks all read. */
-  private val selections: List<Selection> = Selection.of(spec)
+  /**
+   * The selections this chart declares, which the data, the signals and the marks all read.
+   *
+   * Read **after** a repetition has been rewritten, because a repetition's copies each declare the
+   * selection its template declared: a scatter-plot matrix with one brush in the template has a
+   * brush in every cell, each with its own drag signals and its own rectangle, all writing into one
+   * store. Read from the template instead, the chart had a single brush that only the first cell
+   * could be dragged in.
+   */
+  private var selections: List<Selection> = emptyList()
 
   /**
    * The signals a selection is worked by: the tuple it writes, and for an interval the drag itself.
@@ -141,7 +149,9 @@ private class Compilation(
 
   /** Which of a composition's scales and guides its children share, and which they do not. */
   private val resolve = Resolve(spec.obj("resolve"))
-  private val parser = Parse(config, diagnostics, selections)
+  // Built lazily, because the selections it resolves conditions against are only known once a
+  // repetition has been rewritten into the concatenation its copies each declare one in.
+  private val parser by lazy { Parse(config, diagnostics, selections) }
 
   /** `config.facet.spacing` and the gap a header title keeps from its cells. */
   private val FACET_SPACING = 20.0
@@ -162,6 +172,7 @@ private class Compilation(
     // A `row`/`column` facet operator is the same chart as the same two channels written in the
     // encoding, so it becomes one before anything else looks at it.
     if (spec.has("facet")) spec = FacetOperator.normalize(spec, diagnostics) ?: return failed()
+    selections = Selection.of(spec)
     val plots = plots() ?: return failed()
     concat = (plotTree as? Node.Nest)?.concat
     if (plots.any { it.views.isEmpty() }) return failed()
