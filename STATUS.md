@@ -1324,10 +1324,12 @@ from a non-path mark, so the scales read a copy taken **above** the filter;
 `break-paths-filter-domains` does the reverse for a path — draw the break, leave the gap out of the
 extent — so they read one taken *below* it. Both are compiled.
 
-An **area** told to break at its gaps is not yet drawn broken by this runtime: the compiled
-specification matches upstream's, and the scene comes out as one continuous polygon where upstream
-draws several. The compiler's half is covered by `invalid-break-paths-domains`, which is a
-non-path mark for that reason.
+One runtime gap was found doing this and is not fixed. A stacked **area** whose gaps an `impute`
+has already filled is drawn *broken* by this engine where upstream draws it whole: the compiled
+specification matches upstream's, so the `defined` expression is the same one, but this runtime
+answers false for rows the imputation filled and splits the polygon at them — leaving a pair of
+coincident points at each break. The compiler's half of the mode is covered by
+`invalid-break-paths-domains`, which is a non-path mark for that reason.
 
 Two runtime defects came out of the fixture, both in the same function. **A series whose defined
 points never numbered two vanished entirely**: runs of one point were dropped, and with no run left
