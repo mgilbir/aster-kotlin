@@ -138,6 +138,12 @@ private fun ChoiceControl(
  * is expected to hold: a specification computing `size * 2` from a `number` field needs a number,
  * and a `color` field's `#4c78a8` is a string wherever it goes. An input type this host has no
  * widget for lands here too, which is what a browser does with one it does not recognise.
+ *
+ * `placeholder` is the one carried attribute this host has somewhere to put — the hint an empty
+ * field shows, which on `job-voyager` is the difference between a blank box and one that says what
+ * to type in it. The others are used or ignored by the same rule: `autocomplete` is deliberately
+ * ignored, because it asks a browser to offer a value it has saved from a *form* and there is no
+ * form here, and ignoring it costs the reader nothing.
  */
 @Composable
 private fun FieldControl(
@@ -157,6 +163,10 @@ private fun FieldControl(
       controller.setSignal(input.signal, value)
     },
     label = { Text(input.label, style = MaterialTheme.typography.labelSmall) },
+    placeholder =
+      bind.attributeText("placeholder")?.let { hint ->
+        { Text(hint, style = MaterialTheme.typography.bodySmall) }
+      },
     singleLine = true,
     modifier = Modifier.fillMaxWidth().padding(vertical = 2.dp),
   )
