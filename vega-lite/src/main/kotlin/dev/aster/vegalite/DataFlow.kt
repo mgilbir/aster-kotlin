@@ -205,12 +205,20 @@ internal sealed class DataNode {
       }
       last
     }
+    // Collected in the order the children stand in, output chains and everything else alike:
+    // upstream walks `node.children` once and pushes each child — or, for an output, whatever hangs
+    // below it — onto one list. Taking the outputs' children first reverses a fork whose *first*
+    // branch is the one with transforms on it, and every dataset below it comes out renumbered.
     val below = mutableListOf<DataNode>()
-    for (tail in tails) {
-      below += tail.children
-      tail.children.clear()
+    for (child in children) {
+      if (child is OutputNode) {
+        val tail = tails[outputs.indexOf(child)]
+        below += tail.children
+        tail.children.clear()
+      } else {
+        below += child
+      }
     }
-    for (child in children) if (child !is OutputNode) below += child
 
     val main = tails.first()
     children.clear()
