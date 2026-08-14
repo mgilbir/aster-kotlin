@@ -479,19 +479,29 @@ internal class Parse(
       if (y?.isFieldDef == true && x?.aggregate != null && y.aggregate == null) return "horizontal"
     }
 
-    // A **line segment** — a rule with both ends given on both axes — has no orientation at all:
-    // it runs from one point to another and neither axis is the one it measures along.
-    if (mark == "rule" && encoding["x2"] != null && encoding["y2"] != null) return null
+    val x2 = encoding["x2"]
+    val y2 = encoding["y2"]
 
-    // The *second position* decides before anything else does, and a **binned** first position
-    // turns the answer around: the pair of edges a bin produces is the extent of the bar's own
-    // band, not the direction it grows in.
+    // The *second position* decides before anything else does — but only where **one** of the two
+    // is ranged. A mark ranged along both axes has no orientation at all: it runs from one point to
+    // another and neither axis is the one it measures along, which is as true of a bar drawn as a
+    // lane between four coordinates as it is of a line segment. Upstream falls the ranged bar
+    // through to the rule's own rule for exactly that.
     if (mark == "rule" || mark == "area" || mark == "bar") {
-      encoding["y2"]?.let {
-        return if (y?.bin != null) "horizontal" else "vertical"
+      if (y2 != null || x2 != null) {
+        if (x2 == null) {
+          // A *pre-binned* first position turns the answer around: the pair of edges the data
+          // arrived with is the extent of the bar's own band, not the direction it grows in.
+          val xIsNumber = x?.isUnbinnedQuantitative == true || x?.datum is VegaValue.Num
+          return if (xIsNumber && y?.bin == Binning.PreBinned) "horizontal" else "vertical"
+        }
+        if (y2 == null) {
+          val yIsNumber = y?.isUnbinnedQuantitative == true || y?.datum is VegaValue.Num
+          return if (yIsNumber && x?.bin == Binning.PreBinned) "vertical" else "horizontal"
+        }
       }
-      encoding["x2"]?.let {
-        return if (x?.bin != null) "vertical" else "horizontal"
+      if (x2 != null && x?.bin != Binning.PreBinned && y2 != null && y?.bin != Binning.PreBinned) {
+        return null
       }
       if (mark == "rule") {
         if (x != null && y == null) return "vertical"

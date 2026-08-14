@@ -1959,6 +1959,17 @@ private class Compilation(
         // discreteness with it, since a ramp and a set of swatches cannot be the same legend.
         val prefix = component.name().removeSuffix(channel)
         val discrete = if (Scales.hasDiscreteDomain(component.type)) "d" else "c"
+        // `getFieldKeyForChannel` asks the **children**: where they all name one column the key is
+        // that column, and where they disagree it is the *channel*. Two layers colouring by
+        // different columns on one shared scale are one key to the reader — a heat lane's two bars
+        // both explain "count" — and keyed by their own fields they came out as two keys side by
+        // side saying the same thing.
+        val agreed =
+          views
+            .filter { it.scaleComponents[channel]?.name() == component.name() }
+            .mapNotNull { it.scaledDef(it.spec.encoding[channel] ?: return@mapNotNull null)?.field }
+            .distinct()
+        val fieldKey = if (agreed.size == 1) agreed.single() else "channel:$channel"
         // A legend the composition resolves per child is keyed by that child as well, since the
         // whole point of resolving it independently is that there is one of it per plot.
         // A legend the composition resolves per child is keyed by that child as well, since the
@@ -1982,7 +1993,7 @@ private class Compilation(
             byPlot -> plotName
             else -> ""
           }
-        val key = "$prefix|${def.field ?: channel}|$discrete|$ownChild"
+        val key = "$prefix|${def.field?.let { fieldKey } ?: channel}|$discrete|$ownChild"
         // `mergeValuesWithExplicit` settles a property before any tie-breaker runs: a value the
         // specification stated beats one this compiler derived. A field encoded as both a colour
         // and a size, with a title written on only one of them, is titled by the one that was

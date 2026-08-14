@@ -295,14 +295,21 @@ internal object Scales {
     val secondaryChannel = secondaryChannel(channel)
     val secondary = secondaryChannel?.let { view.spec.fieldDef(it) }
     if (secondary != null) {
+      // Each end carries the channel's own sort, which on a **discrete** scale is a plain `true`.
+      // The two then agree and the union takes it — a lane drawn between two categorical bounds is
+      // sorted as a whole, where sorting each end separately and concatenating them is a different
+      // answer. `mergeDomains` lifts a sort every part agrees on for exactly that reason.
+      val ranged = domainSort(view, channel, def, type)
       return listOf(
         obj {
           put("data", dataName)
           put("field", Fields.vgField(def))
+          put("sort", ranged)
         },
         obj {
           put("data", dataName)
           put("field", Fields.vgField(secondary))
+          put("sort", ranged)
         },
       )
     }
