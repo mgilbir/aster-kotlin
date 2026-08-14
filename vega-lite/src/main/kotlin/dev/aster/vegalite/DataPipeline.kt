@@ -179,33 +179,38 @@ internal class DataPipeline(
    */
   private fun sortIndexNode(): PassThroughNode? {
     val predicates = Transforms(diagnostics, selections = view.selections)
-    val transforms =
-      view.spec.encoding.entries.mapNotNull { (channel, def) ->
-        val order = def.sort as? VegaValue.Arr ?: return@mapNotNull null
-        val field = def.field ?: return@mapNotNull null
-        // Each step is the same equality a `filter` would compile, through the same compiler:
-        // upstream builds it as `fieldFilterExpression({field, timeUnit, equal: value})`, and a
-        // second spelling of "is this row that value" would drift the day one of them was fixed.
-        val cases =
-          order.values.mapIndexed { index, value ->
-            val test =
-              predicates.testExpression(
-                obj {
-                  put("field", field)
-                  def.timeUnit?.let { put("timeUnit", it) }
-                  put("equal", value)
-                },
-                "$.encoding.$channel.sort[$index]",
-              )
-            "$test ? $index : "
-          }
-        obj {
-          put("type", "formula")
-          // A value the list never names falls past the end, which is what puts it last.
-          put("expr", cases.joinToString("") + order.values.size)
-          put("as", Fields.sortIndexField(channel, def, forAs = true))
+    // The **facet's** own channels as well as the encoding's: a trellis whose rows are listed in a
+    // stated order needs the same index column, and the facet channel was lifted out of the
+    // encoding before this ran. `parseAllForSortIndex` is asked on the facet's model too.
+    val channels =
+      view.spec.encoding.entries.map { it.key to it.value } +
+        view.facetDefs.map { it.channel to it }
+    val transforms = channels.mapNotNull { (channel, def) ->
+      val order = def.sort as? VegaValue.Arr ?: return@mapNotNull null
+      val field = def.field ?: return@mapNotNull null
+      // Each step is the same equality a `filter` would compile, through the same compiler:
+      // upstream builds it as `fieldFilterExpression({field, timeUnit, equal: value})`, and a
+      // second spelling of "is this row that value" would drift the day one of them was fixed.
+      val cases =
+        order.values.mapIndexed { index, value ->
+          val test =
+            predicates.testExpression(
+              obj {
+                put("field", field)
+                def.timeUnit?.let { put("timeUnit", it) }
+                put("equal", value)
+              },
+              "$.encoding.$channel.sort[$index]",
+            )
+          "$test ? $index : "
         }
+      obj {
+        put("type", "formula")
+        // A value the list never names falls past the end, which is what puts it last.
+        put("expr", cases.joinToString("") + order.values.size)
+        put("as", Fields.sortIndexField(channel, def, forAs = true))
       }
+    }
     return if (transforms.isEmpty()) null else PassThroughNode(transforms)
   }
 

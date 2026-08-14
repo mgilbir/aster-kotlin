@@ -126,9 +126,22 @@ internal class Facet(
 
   private val sortSource: String? = sortObject?.string("field")
 
-  fun sortSourceField(): String = sortSource!!
+  /**
+   * `sortArrayIndexField`: the column a facet sorted by a **list** is really ordered by.
+   *
+   * The list is a stated sequence, and a cell's place in it cannot be read off the column being
+   * faceted on. So the place is computed onto every row first — a chain of equalities written by
+   * `parseAllForSortIndex` — and the grid then orders itself by the greatest of each cell's, which
+   * is the only one each cell has.
+   */
+  private val sortIndex: String? =
+    (def.sort as? VegaValue.Arr)?.let { Fields.sortIndexField(channel, def, forAs = true) }
 
-  fun sortOperation(): String = sortOp!!
+  /** The column each cell's key is measured from: the stated one, or the index of the list. */
+  fun sortSourceField(): String = sortSource ?: sortIndex!!
+
+  /** A list is keyed by the greatest index in the cell, which is the only one the cell has. */
+  fun sortOperation(): String = sortOp ?: "max"
 
   /**
    * What the *domain* dataset calls the aggregate the cells are ordered by — `sum_amount`.
@@ -150,7 +163,7 @@ internal class Facet(
    * `facetSortFieldName` suffixes it with the field being faceted on, because the facet computes it
    * a second time over its own partition and the two names must not collide.
    */
-  val cellSortAggregate: String? = sortAggregate?.let { "${it}_by_$field" }
+  val cellSortAggregate: String? = sortAggregate?.let { "${it}_by_$field" } ?: sortIndex
 
   /**
    * Which way the cells run — `facetSortOrder` in `compile/facet.ts`.
@@ -166,7 +179,8 @@ internal class Facet(
     }
 
   /** What the cells are ordered *by*: the facet's own column, or the aggregate standing for it. */
-  fun sortKey(inCell: Boolean): String = (if (inCell) cellSortAggregate else sortAggregate) ?: field
+  fun sortKey(inCell: Boolean): String =
+    (if (inCell) cellSortAggregate else sortAggregate ?: sortIndex) ?: field
 
   fun reportUnsupportedSort(
     diagnostics: dev.aster.vega.model.DiagnosticCollector,
@@ -174,11 +188,11 @@ internal class Facet(
   ) {
     val sort = def.sort ?: return
     if (sort is VegaValue.Str || sort == VegaValue.Null) return
+    // A stated list is honoured: its place is computed onto every row as a column of its own, and
+    // the grid orders itself by the greatest of each cell's.
+    if (sort is VegaValue.Arr) return
     val reason =
       when {
-        sort is VegaValue.Arr ->
-          "names a list of values, whose place in it has to be computed onto every row as a " +
-            "column of its own before the cells are made"
         sortObject == null -> "names no `field` to aggregate"
         crossed ->
           "names an aggregate on a facet that is crossed both ways, where the key has to be " +
@@ -223,6 +237,10 @@ internal class Facet(
             put("fields", strings(listOf(sortSource!!)))
             put("ops", strings(listOf(sortOp!!)))
             put("as", strings(listOf(sortAggregate)))
+          } else if (sortIndex != null) {
+            put("fields", strings(listOf(sortIndex)))
+            put("ops", strings(listOf("max")))
+            put("as", strings(listOf(sortIndex)))
           }
         }
       ),
