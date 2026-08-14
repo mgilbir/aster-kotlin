@@ -1460,12 +1460,27 @@ public object Functions {
     return match.value.toDoubleOrNull() ?: Double.NaN
   }
 
+  /**
+   * A digit's value in base 36, or -1: `Character.digit` without the JVM.
+   *
+   * ASCII only, which is `parseInt`'s rule as well — JavaScript reads `٣` (Arabic-Indic three) as
+   * nothing, and so does this. `Character.digit` would have accepted it, so the narrower answer is
+   * also the more faithful one.
+   */
+  private fun digitValue(char: Char): Int =
+    when (char) {
+      in '0'..'9' -> char - '0'
+      in 'a'..'z' -> char - 'a' + 10
+      in 'A'..'Z' -> char - 'A' + 10
+      else -> -1
+    }
+
   private fun parseInteger(text: String, radix: Int): Double {
     val trimmed = text.trim()
     if (radix == 10) return parseLeadingNumber(trimmed, allowDecimal = false)
     val effective = radix.takeIf { it in 2..36 } ?: return Double.NaN
     val body = if (effective == 16) trimmed.removePrefix("0x").removePrefix("0X") else trimmed
-    val digits = body.takeWhile { Character.digit(it, effective) >= 0 }
+    val digits = body.takeWhile { digitValue(it) in 0 until effective }
     if (digits.isEmpty()) return Double.NaN
     return digits.toLongOrNull(effective)?.toDouble() ?: Double.NaN
   }

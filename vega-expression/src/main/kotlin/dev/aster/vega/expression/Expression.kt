@@ -330,20 +330,28 @@ public class CachingExpressionCompiler(
   private val maxEntries: Int = 512,
 ) : ExpressionCompiler {
 
-  private val cache =
-    object : LinkedHashMap<String, ExpressionResult>(64, 0.75f, true) {
-      override fun removeEldestEntry(
-        eldest: MutableMap.MutableEntry<String, ExpressionResult>?
-      ): Boolean = size > maxEntries
-    }
+  // Insertion-ordered, with a hit moved back to the young end by hand — `LinkedHashMap`'s
+  // access-order mode is a JVM-only facility, and this is the same policy in three lines. See
+  // `TextLayoutCache`, which caches layouts the same way for the same reason.
+  private val cache = LinkedHashMap<String, ExpressionResult>()
 
   public val size: Int
     get() = cache.size
 
-  override fun compile(source: String): ExpressionResult =
-    cache.getOrPut(source) {
-      delegate.compile(source)
+  override fun compile(source: String): ExpressionResult {
+    cache.remove(source)?.let { hit ->
+      cache[source] = hit
+      return hit
     }
+    return compiled(source)
+  }
+
+  private fun compiled(source: String): ExpressionResult {
+    val result = cache.getOrPut(source) { delegate.compile(source) }
+    // Insertion order puts the least recently used first, which is the one to drop.
+    if (cache.size > maxEntries) cache.remove(cache.keys.first())
+    return result
+  }
 
   public fun clear() {
     cache.clear()

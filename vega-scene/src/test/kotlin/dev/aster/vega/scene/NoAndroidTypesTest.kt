@@ -75,10 +75,18 @@ class NoAndroidTypesTest {
   }
 
   /**
-   * Guards the core's portability to Kotlin Multiplatform.
+   * A fast first line under the core's portability. **The compiler is the real one.**
    *
-   * The core is plain Kotlin/JVM today but is meant to move to KMP unchanged, so it must not reach
-   * for JVM-only APIs. Calendar work goes through `kotlinx-datetime`; rounding goes through
+   * The core is multiplatform now — `jvm`, `iosArm64`, `iosSimulatorArm64`, `macosArm64` and
+   * `linuxX64`, all four native targets compiled by `scripts/check.sh` — so a JVM-only API in
+   * common code is a *build failure* rather than something a regular expression has to notice. Keep
+   * this test anyway: it fails in a second with the file and line, where a native compile takes a
+   * minute and reports the symptom, and it catches an import in a module nobody has added a target
+   * to yet.
+   *
+   * What it cannot see is why the compiler had to be the arbiter. `LinkedHashMap` is common Kotlin,
+   * so the two caches that **subclassed** it for its JVM-only access-order mode passed every check
+   * here for six milestones. Calendar work goes through `kotlinx-datetime`; rounding goes through
    * `roundHalfUp`, which is also more faithful to d3 than `java.lang.Math.round`.
    *
    * **Nothing is exempt any more.** `Decimals` used to be, on the argument that rounding a decimal

@@ -127,7 +127,9 @@ PYTHON
 # comparison: this script is what regenerates what they read, so a fixture whose captions moved should
 # fail here rather than in the next full test run.
 echo "==> Comparing with the Kotlin runtime"
-if ./gradlew --console=plain :vega-runtime:test \
+# `jvmTest` rather than `test`: a multiplatform module's JVM tests live there, and `--tests` only
+# takes a real Test task — the `test` alias is a lifecycle task and would refuse the filter.
+if ./gradlew --console=plain :vega-runtime:jvmTest \
   --tests '*Differential*' \
   --tests '*GuideCaptionTest' \
   --tests '*MarkContainerTest' \
