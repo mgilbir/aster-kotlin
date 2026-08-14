@@ -581,7 +581,6 @@ internal class Parse(
         "geojson",
         "xError",
         "yError",
-        "angle",
         "url",
         "time",
       )

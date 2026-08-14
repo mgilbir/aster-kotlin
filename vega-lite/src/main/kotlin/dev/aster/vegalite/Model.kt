@@ -323,7 +323,6 @@ internal object Channels {
       "opacity",
       "strokeWidth",
       "strokeDash",
-      "angle",
     )
 
   /**

@@ -1305,7 +1305,11 @@ internal object Marks {
     val def = view.spec.encoding["text"] ?: return null
     if (def.isValueDef) return obj { literalRef(def.value)?.let { (key, it) -> put(key, it) } }
     if (!def.isFieldDef) return null
-    return signalRef(fieldExpression(view, def, arrays = false))
+    // A **bucketed** column is spoken as the bucket, not as its near edge: `binFormatExpression`
+    // writes both ends with an en dash between them and says "null" where the row had none. A text
+    // mark labelling the slices of a radial histogram is where it shows.
+    val binEnd = if (def.bin is Binning.Bin) Fields.datumAccess(def, suffix = "end") else null
+    return signalRef(fieldExpression(view, def, binEnd = binEnd, arrays = false))
   }
 
   // ---------------------------------------------------------------------------------------------
@@ -1899,7 +1903,10 @@ internal object Marks {
     val markConfig = view.config.markConfig(view.spec.mark)
     val spacing = view.markDef.number("binSpacing") ?: markConfig.number("binSpacing") ?: 0.0
     val minBandSize = markConfig.number("minBandSize")
-    val axisTranslate = 0.5
+    // The half-unit nudge is the **axis's** translation, and only a Cartesian position has one: an
+    // angle is not drawn against a ruler that sits half a pixel off the data.
+    val polar = channel == "theta" || channel == "radius"
+    val axisTranslate = if (polar) 0.0 else 0.5
     val sizeExpression =
       "abs(scale(\"${view.scale(channel)}\", ${Fields.datumAccess(def, suffix = "end")}) - " +
         "scale(\"${view.scale(channel)}\", ${Fields.datumAccess(def)}))"
@@ -1909,10 +1916,13 @@ internal object Marks {
     // the condition out rather than folding it, since a `reverse` may itself be a signal.
     val reversed =
       (view.scaleComponents[channel]?.properties?.get("reverse") as? VegaValue.Bool)?.value == true
-    fun offset(isEnd: Boolean): VegaValue {
+    fun offset(isEnd: Boolean): VegaValue? {
       val spacingOffset = if (isEnd) -spacing / 2 else spacing / 2
       if (minBandSize == null) {
-        return num(axisTranslate + if (reversed) -spacingOffset else spacingOffset)
+        val total = axisTranslate + if (reversed) -spacingOffset else spacingOffset
+        // Nothing to say where the edge is exactly the bucket's: `offset` is written only where it
+        // moves the mark.
+        return if (total == 0.0) null else num(total)
       }
       val sign = if (isEnd) "" else "-"
       // Every number here is written the way JavaScript writes it — `2`, not `2.0`. A Kotlin
@@ -1961,10 +1971,13 @@ internal object Marks {
       if (shifted) "${Fields.vgField(def, forAs = true)}_offsetted_rect_end" else endField
     return obj {
       put(
-        channel2,
+        vgPositionChannel(channel2),
         interpolated(view, channel, startName, endName, near, offset(!startIsEnd)),
       )
-      put(channel, interpolated(view, channel, startName, endName, 1 - near, offset(startIsEnd)))
+      put(
+        vgPositionChannel(channel),
+        interpolated(view, channel, startName, endName, 1 - near, offset(startIsEnd)),
+      )
     }
   }
 
