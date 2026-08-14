@@ -696,27 +696,10 @@ no data is needed to compare two compilers. So every one of them was compiled by
 by this one, and the outputs compared property by property. That is a *measurement*, not a gate: the
 examples are not fixtures here, and nothing about them is checked in.
 
-**124 of 627 matched exactly** at the start, and **561** do now. 14 were refused by name, and of those 8 are geographic,
-3 are a facet inside a facet, 2 a repeat inside a concatenation, and 2 are the `trail` mark — which
-this runtime draws and this compiler had simply not been told about.
+**124 of 627 matched exactly** at the start, and **561** do now.
 
-The value is the *ranking*. Clustered by root cause, by how many example files each one affects:
-
-| Files | Cause |
-| --- | --- |
-| 135 | the accessibility description string differs |
-| 86 | `as` defaults missing on `fold`/`flatten` |
-| 56 | `mark.clip` dropped |
-| 42 | a stack's `sort` block missing |
-| 41 | an explicit axis title should short-circuit the merge |
-| 36 | a one-dimensional chart sized 300, not 20 |
-| 24 | a bar on a continuous scale sized `step - 2`, not `continuousBandSize` |
-| 15 | `tickMinStep` on a binned axis |
-| 8 | a gradient legend's opacity encode |
-| 5 | `config.scale` leaking into the Vega config |
-| 2 | `toNumber` emitted as `tonumber` |
-
-Three were fixed here, and they were chosen for what they do to the *picture* rather than for
+The value is the *ranking*. The first sweep clustered by root cause, and the three most damaging
+causes were fixed straight away — chosen for what they do to the *picture* rather than for
 frequency:
 
 - **`mark.clip` was being stripped** as a Vega-Lite-only property. It is a Vega mark property and
@@ -727,6 +710,21 @@ frequency:
 - **A rect-based mark on a continuous scale takes `continuousBandSize`** — five units for a bar —
   where this compiler used `step - 2`, making it nearly four times too wide. `getBandSize` asks the
   scale's kind first and reaches `discreteBandSize` only where the domain is discrete.
+
+The sweep has been the working list ever since, and the 66 that still differ cluster like this:
+
+| Files | Cause |
+| --- | --- |
+| 21 | geographic: projections, `topojson`, `geoshape` — another worker's ground |
+| 9 | the **facet data flow**: upstream keeps the chain below the facet *inside* the cell group and clones it outward, with the facet's fields added, for the scales to read. This compiler hoists all of it above the facet, so the cell has no data of its own and the `*_domain` datasets sit after the aggregate rather than before it |
+| 6 | crossfilter and brush-bound layers: several selections over one table, whose datasets fork differently |
+| 2 | `time` channel animations, set aside |
+| 2 | a `preFilterInvalid`/`postFilterInvalid` pair, where marks and scales want the same rows filtered differently |
+| 26 | one-offs, each its own rule |
+
+Fourteen are still refused by name: eight geographic, three a facet inside a facet, two a repeat
+inside a concatenation, and one the `url` channel.
+
 
 The count went 124 → 138 clean, which understates it: a cause is fixed for every file that carries
 it, and most of those files carry several.
