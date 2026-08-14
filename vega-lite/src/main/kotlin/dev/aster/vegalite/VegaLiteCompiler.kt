@@ -315,7 +315,12 @@ private class Compilation(
     // each plot, because two keys standing for different scales cannot be one.
     val legendScale = mutableMapOf<String, String>()
     val legendPlot = mutableMapOf<String, String>()
-    val allLegends = assembleLegends(views, legendScale, legendPlot)
+    // Every model in upstream's hierarchy carries its own `resolve`, and a legend is settled by the
+    // composition it belongs to: a `resolve` written on one plot of a concatenation governs the
+    // layers inside *that* plot and nothing else.
+    val resolveOf =
+      plots.flatMap { plot -> plot.views.map { it to Resolve(plot.spec.obj("resolve")) } }.toMap()
+    val allLegends = assembleLegends(views, legendScale, legendPlot, resolveOf)
     // A legend the specification resolves **independently** belongs to the plot that raised it even
     // where the scale is shared: `resolve: {"legend": {"color": "independent"}}` is how a
     // concatenation puts a key inside the plot it explains rather than beside the whole chart.
@@ -1860,6 +1865,8 @@ private class Compilation(
     scaleOf: MutableMap<String, String> = mutableMapOf(),
     /** Which plot a legend belongs to, where the composition resolves that legend per plot. */
     plotOf: MutableMap<String, String> = mutableMapOf(),
+    /** The `resolve` of the composition each view sits in, which may not be the chart's own. */
+    resolveOf: Map<UnitView, Resolve> = emptyMap(),
   ): LinkedHashMap<String, VegaValue> {
     val legends = LinkedHashMap<String, LinkedHashMap<String, VegaValue>>()
     val explicitlyTitled = mutableSetOf<String>()
@@ -1886,9 +1893,22 @@ private class Compilation(
         // child depends on the composition: a concatenation's are its plots, and each keeps its
         // key inside its own group; a **layer**'s are its members, and they have no group to keep
         // it in, so two keys stand side by side beside the chart saying two different things.
-        val independent = resolve.guideIsIndependent(channel, scaleIsIndependent = false)
-        val ownPlot = plotNames[view].takeIf { independent && concat != null }
-        val ownChild = if (!independent) "" else ownPlot ?: view.childName
+        // Two levels can each ask for a key of their own, and they mean different children. The
+        // chart's `resolve` speaks about the *concatenation* — one key per plot — and a `resolve`
+        // written on a plot speaks about the layers inside it. Both put the key in the plot's own
+        // group; only the second splits one plot's layers into two keys.
+        val byPlot =
+          concat != null && resolve.guideIsIndependent(channel, scaleIsIndependent = false)
+        val byLayer =
+          resolveOf[view]?.guideIsIndependent(channel, scaleIsIndependent = false) == true
+        val plotName = plotNames[view].orEmpty()
+        val ownPlot = plotName.takeIf { (byPlot || byLayer) && concat != null }
+        val ownChild =
+          when {
+            byLayer -> "$plotName|${view.childName}"
+            byPlot -> plotName
+            else -> ""
+          }
         val key = "$prefix|${def.field ?: channel}|$discrete|$ownChild"
         // `mergeValuesWithExplicit` settles a property before any tie-breaker runs: a value the
         // specification stated beats one this compiler derived. A field encoded as both a colour
