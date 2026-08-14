@@ -171,7 +171,18 @@ internal class UnitSpec(
   fun channel(name: String): ChannelDef? = encoding[name]
 
   /** The definition that carries a field, ignoring value-only entries. */
-  fun fieldDef(name: String): ChannelDef? = encoding[name]?.takeIf { it.isFieldDef }
+  /**
+   * `getFieldDef`: the definition a channel names a column in, **condition included**.
+   *
+   * A channel written entirely as a test still names a column — a colour that is the weather only
+   * where a row was picked, and grey otherwise — and everything that asks a channel what column it
+   * reads has to find it: the scale, and the selection projected onto that channel. Reading only
+   * the unconditional part left a click over a colour legend remembering nothing at all.
+   */
+  fun fieldDef(name: String): ChannelDef? =
+    encoding[name]?.let { def ->
+      if (def.isFieldDef) def else def.conditions.firstOrNull { it.isFieldDef }
+    }
 }
 
 internal object Channels {
