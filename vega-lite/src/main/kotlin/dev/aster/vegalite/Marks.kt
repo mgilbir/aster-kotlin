@@ -970,7 +970,8 @@ internal object Marks {
       // A tooltip **written as a list** is the `{title: expression}` object however many entries
       // it holds — one field written `[{...}]` is titled, and the same field written bare is not.
       if (defs.size > 1 || def.isList) return tooltipObject(view, defs)
-      if (def.isFieldDef) return signalRef(fieldExpression(view, def, separator = "\\n"))
+      if (def.isFieldDef)
+        return signalRef(fieldExpression(view, def, view.config.forTooltip, separator = "\\n"))
       return null
     }
     // `{"type": "bar", "tooltip": true}` asks for the whole encoding — and so does
@@ -1000,10 +1001,10 @@ internal object Marks {
           if (!def.isFieldDef) continue
           val title =
             def.explicitTitle?.takeIf { it != VegaValue.Str("") }
-              ?: Fields.defaultTitle(def, view.config)?.let(VegaValue::Str)
+              ?: Fields.defaultTitle(def, view.config.forTooltip)?.let(VegaValue::Str)
           val key = (title as? VegaValue.Str)?.value ?: continue
           if (out.containsKey(key)) continue
-          out[key] = fieldExpression(view, def, separator = "\\n")
+          out[key] = fieldExpression(view, def, view.config.forTooltip, separator = "\\n")
         }
         out
       }
@@ -1026,6 +1027,7 @@ internal object Marks {
 
   /** Title-to-expression pairs for every encoded field, in specification order. */
   private fun tooltipData(view: UnitView, separator: String = " "): Map<String, String> {
+    val config = view.config.forTooltip
     val out = LinkedHashMap<String, String>()
     val skipped =
       view.spec.encoding.entries
@@ -1056,7 +1058,7 @@ internal object Marks {
         // the field's own name rather than announcing a channel with no name at all.
         val title =
           def.explicitTitle?.takeIf { it != VegaValue.Null && it != VegaValue.Str("") }
-            ?: Fields.defaultTitle(def, view.config)?.let(VegaValue::Str)
+            ?: Fields.defaultTitle(def, config)?.let(VegaValue::Str)
         val key = (title as? VegaValue.Str)?.value ?: continue
         if (out.containsKey(key)) continue
         // A **normalized** stack is announced as the share it takes, not the number behind it: the
@@ -1073,6 +1075,7 @@ internal object Marks {
           fieldExpression(
             view,
             def,
+            config,
             normalized,
             binEnd =
               when (def.bin) {
@@ -1106,6 +1109,11 @@ internal object Marks {
   private fun fieldExpression(
     view: UnitView,
     def: ChannelDef,
+    /**
+     * The configuration the formats come from, which for a tooltip is the chart's own under
+     * `config.tooltipFormat` — `{...config, ...config.tooltipFormat}`.
+     */
+    config: Config = view.config,
     normalizeStack: Boolean = false,
     /** Where the far edge of a bin is read from, when this definition is a binned one. */
     binEnd: String? = null,
@@ -1135,9 +1143,7 @@ internal object Marks {
         Fields.datumAccess(def)
       }
     val number =
-      stated
-        ?: if (normalizeStack) view.config.normalizedNumberFormat
-        else view.config.numberFormat ?: ""
+      stated ?: if (normalizeStack) config.normalizedNumberFormat else config.numberFormat ?: ""
     return when {
       // `isFieldOrDatumDefForTimeFormat` in `channeldef.ts`: an instant is one a *time unit*
       // buckets
@@ -1164,7 +1170,7 @@ internal object Marks {
           // A bucketed instant is otherwise spoken with the specifier Vega chooses at render time,
           // the same one its axis labels use — so the description and the axis never disagree.
           timeUnit != null -> "${prefix}Format($accessor, ${Fields.timeUnitSpecifier(timeUnit)})"
-          else -> "${prefix}Format($accessor, \"${view.config.timeFormat}\")"
+          else -> "${prefix}Format($accessor, \"${config.timeFormat}\")"
         }
       }
       def.bin != null && binEnd != null -> {

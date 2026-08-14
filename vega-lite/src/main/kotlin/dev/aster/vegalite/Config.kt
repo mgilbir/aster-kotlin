@@ -29,6 +29,24 @@ internal class Config(private val user: VegaValue.Obj = VegaValue.EmptyObject) {
 
   val numberFormat: String? = user.string("numberFormat")
 
+  /**
+   * The same configuration under `config.tooltipFormat` — `{...config, ...config.tooltipFormat}`.
+   *
+   * A tooltip is a small table rather than a caption, and a chart may want more precision there
+   * than on its axes: `{"numberFormat": "d", "tooltipFormat": {"numberFormat": ".8f"}}` rounds the
+   * labels and spells the tooltip out. The block overrides key by key, so anything it leaves out is
+   * still the chart's own.
+   */
+  val forTooltip: Config by lazy {
+    val block = user.obj("tooltipFormat") ?: return@lazy this
+    Config(
+      obj {
+        putAll(user)
+        block.fields.forEach { (key, value) -> put(key, value) }
+      }
+    )
+  }
+
   /** `config.mark.invalid`: what every mark does with a null it cannot place. */
   val markInvalid: VegaValue? = user.obj("mark")?.fields?.get("invalid")
 
@@ -261,7 +279,6 @@ internal class Config(private val user: VegaValue.Obj = VegaValue.EmptyObject) {
         "headerColumn",
         "headerFacet",
         "selection",
-        "customFormatTypes",
         "axisQuantitative",
         "axisTemporal",
         "axisDiscrete",

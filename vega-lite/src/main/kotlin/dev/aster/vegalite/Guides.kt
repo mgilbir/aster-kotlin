@@ -398,6 +398,13 @@ internal object Guides {
     }
     conditionalToEncode(axis, diagnostics)
 
+    // `guideFormat` ends at `numberFormat`, which for a quantitative field with nothing stated is
+    // `config.numberFormat`: a chart that asks for whole numbers everywhere asks for them on its
+    // axes too. Read after the specification's own block, so a stated format still wins.
+    if (def.type == MeasureType.QUANTITATIVE && def.timeUnit == null) {
+      view.config.numberFormat?.let { axis.set("format", str(it)) }
+    }
+
     // `defaultTickMinStep`: a `d` format asks for whole numbers, so no tick may be closer than one.
     // Read *after* the specification's own block, because that is where the format usually comes
     // from — and `set` leaves a stated `tickMinStep` alone.
