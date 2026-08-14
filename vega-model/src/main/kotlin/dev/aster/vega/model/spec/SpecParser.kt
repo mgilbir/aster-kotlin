@@ -75,6 +75,10 @@ private val CONFIG_HONOURED =
 /** Everything an `on` handler may say. */
 private val SIGNAL_HANDLER_CONSUMED = setOf("events", "update", "encode", "force")
 
+/** Everything a `bind` may say. `element` is reported rather than consumed; see `parseBind`. */
+private val BIND_CONSUMED =
+  setOf("input", "name", "debounce", "min", "max", "step", "options", "labels", "element")
+
 private val EVENT_CONFIG_CONSUMED =
   setOf("view", "window", "selector", "timer", "defaults", "bind", "globalCursor")
 
@@ -1140,22 +1144,13 @@ public class SpecParser {
         ->
         parseSignalHandler(entry, "$path.on[$index]", name, subscope)
       }
-    if (obj.fields["bind"] != null) {
-      diagnostics.warn(
-        DiagnosticCodes.PARSE_UNKNOWN_PROPERTY,
-        "Signal bindings create input widgets, which have no equivalent here; signal '$name' " +
-          "will keep its initial value",
-        jsonPath = "$path.bind",
-      )
-    }
-
     return SignalSpec(
       name = name,
       value = obj.fields["value"],
       init = obj.fields["init"]?.asString(),
       update = obj.fields["update"]?.asString(),
       on = on,
-      bind = obj.fields["bind"],
+      bind = parseBind(obj.fields["bind"], "$path.bind", name),
     )
   }
 
@@ -1166,6 +1161,74 @@ public class SpecParser {
    * `{"scale": ...}` entries that fire when *those* change. Upstream treats both as sources pushing
    * a new value, which is why a chart can be made reactive with no events at all.
    */
+  /**
+   * `bind` — the control a reader changes the signal with.
+   *
+   * Described rather than built: what a host draws for it is the host's business, and this is the
+   * grammar. See [SignalBind]. The one form with no equivalent anywhere off a page is the last of
+   * upstream's five — a binding to an **existing element**, named by a CSS selector, whose value
+   * the signal takes; there is no page here to find it in, so it says so.
+   */
+  private fun parseBind(value: VegaValue?, path: String, signal: String): SignalBind? {
+    val obj = value as? VegaValue.Obj ?: return null
+    val name = obj.fields["name"]?.asString()?.takeIf { it.isNotBlank() }
+    val debounce = (obj.fields["debounce"] as? VegaValue.Num)?.value?.takeIf { it > 0.0 }
+    val input = obj.fields["input"]?.asString()?.takeIf { it.isNotBlank() }
+    if (obj.fields["element"] != null) {
+      diagnostics.warn(
+        DiagnosticCodes.PARSE_UNKNOWN_PROPERTY,
+        "Binding signal '$signal' names an 'element' to put the control in, which is a page's " +
+          "idea; the control is described and a host places it",
+        jsonPath = "$path.element",
+      )
+    }
+    if (input == null) {
+      diagnostics.warn(
+        DiagnosticCodes.PARSE_MISSING_PROPERTY,
+        "Binding signal '$signal' takes its value from an element already on the page, which there " +
+          "is none of here; the signal keeps its own value",
+        jsonPath = path,
+      )
+      return null
+    }
+    obj.reportUnhandled("Signal binding", path, BIND_CONSUMED)
+    return when (input) {
+      "checkbox" -> SignalBind.Checkbox(name, debounce)
+      "range" ->
+        SignalBind.Range(
+          min = (obj.fields["min"] as? VegaValue.Num)?.value,
+          max = (obj.fields["max"] as? VegaValue.Num)?.value,
+          step = (obj.fields["step"] as? VegaValue.Num)?.value,
+          name = name,
+          debounceMillis = debounce,
+        )
+      "select",
+      "radio" -> {
+        val options = (obj.fields["options"] as? VegaValue.Arr)?.values
+        if (options.isNullOrEmpty()) {
+          // Upstream's schema requires them, and a choice of nothing is not a control.
+          diagnostics.error(
+            DiagnosticCodes.PARSE_MISSING_PROPERTY,
+            "Binding signal '$signal' as a '$input' needs 'options' to choose between",
+            jsonPath = path,
+          )
+          return null
+        }
+        SignalBind.Choice(
+          options = options,
+          labels =
+            (obj.fields["labels"] as? VegaValue.Arr)?.values?.map { it.asString() } ?: emptyList(),
+          radio = input == "radio",
+          name = name,
+          debounceMillis = debounce,
+        )
+      }
+      // Everything else is an input *type* passed straight through, as upstream passes it to the
+      // browser: `text`, `number`, `color`, `date`, and whatever is added next.
+      else -> SignalBind.Field(input, name, debounce)
+    }
+  }
+
   private fun parseSignalHandler(
     value: VegaValue,
     path: String,
@@ -1856,9 +1919,13 @@ public class SpecParser {
       }
     val op = obj.fields["op"]?.asString()?.takeIf { it.isNotEmpty() }
     val field = obj.fields["field"]?.asString()?.takeIf { it.isNotEmpty() }
-    val descending = obj.fields["order"]?.asString()?.startsWith("desc") == true
+    val order = obj.fields["order"]
+    val orderSignal = (order as? VegaValue.Obj)?.fields?.get("signal")?.asString()
+    // Only a *string* says the direction outright; a signal decides it when the chart runs, and
+    // reading one with `asString()` quietly meant "ascending".
+    val descending = (order as? VegaValue.Str)?.value?.startsWith("desc") == true
     return when {
-      op == null && field == null -> DomainSort.ByValue(descending)
+      op == null && field == null -> DomainSort.ByValue(descending, orderSignal)
       op == null -> {
         diagnostics.warn(
           DiagnosticCodes.PARSE_UNKNOWN_PROPERTY,
@@ -1886,7 +1953,7 @@ public class SpecParser {
         )
         null
       }
-      else -> DomainSort.ByAggregate(op, field, descending)
+      else -> DomainSort.ByAggregate(op, field, descending, orderSignal)
     }
   }
 

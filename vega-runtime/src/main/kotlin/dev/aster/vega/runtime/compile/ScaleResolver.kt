@@ -1014,14 +1014,28 @@ public class ScaleResolver(
       fields
         .flatMap { path -> dataset.map { it.field(path) }.filterNot { it.isMissing } }
         .distinctBy { it.asString() }
+    val descending = descendingOrder(sort, scaleName)
     return when (sort) {
       null -> keys
-      is DomainSort.ByValue -> keys.sortedWith(domainOrder(sort.descending) { it })
+      is DomainSort.ByValue -> keys.sortedWith(domainOrder(descending) { it })
       is DomainSort.ByAggregate -> {
         val summaries = aggregateSortKeys(dataset, fields, sort, scaleName) ?: return keys
-        keys.sortedWith(domainOrder(sort.descending) { summaries[it.asString()] ?: VegaValue.Null })
+        keys.sortedWith(domainOrder(descending) { summaries[it.asString()] ?: VegaValue.Null })
       }
     }
+  }
+
+  /**
+   * Which way a domain sorts, once a signal has had its say.
+   *
+   * `{"order": {"signal": "order"}}` is how a control reverses a chart, and it cannot be read at
+   * parse time — so the expression is carried and evaluated here. Anything beginning with "desc" is
+   * descending, which is upstream's own test rather than an equality against the whole word.
+   */
+  private fun descendingOrder(sort: DomainSort?, scaleName: String): Boolean {
+    val expression = sort?.orderSignal ?: return sort?.descending ?: false
+    val resolved = numbers.resolveText(expression, scaleName) ?: return sort.descending
+    return resolved.startsWith("desc")
   }
 
   /**

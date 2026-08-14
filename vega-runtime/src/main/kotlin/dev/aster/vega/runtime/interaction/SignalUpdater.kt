@@ -53,6 +53,17 @@ public class SignalUpdater(
   public val overrides: Map<String, VegaValue>
     get() = values
 
+  /**
+   * Pins a signal to a value, as a **control** does rather than as a handler does.
+   *
+   * The same store a fired handler writes to, so everything downstream — the cascade, the next
+   * compile's overrides — behaves identically whether a reader moved a slider or a tap fired a
+   * handler. Which is the point: a binding is not a second way of changing a chart.
+   */
+  public fun set(name: String, value: VegaValue) {
+    values[name] = value
+  }
+
   public fun reset() {
     values.clear()
     encodes.clear()

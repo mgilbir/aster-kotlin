@@ -243,6 +243,44 @@ class UnhandledPropertiesTest {
   }
 
   /**
+   * `bind` is grammar, not a widget, and the two forms that cannot work say why.
+   *
+   * The description of a control parses like anything else — see `SignalBind` — so a chart that
+   * asks for a slider no longer reports that bindings have no equivalent here. Two forms still
+   * cannot: a binding that takes its value from an **element already on the page**, which there is
+   * no page for, and a `radio` or `select` with nothing to choose between, which upstream's own
+   * schema requires.
+   */
+  @Test
+  fun `a binding is read, and the two forms that cannot work are reported`() {
+    val bound =
+      SpecParser()
+        .parseJson(
+          spec(
+            """"signals": [{"name": "size", "value": 40,
+                 "bind": {"input": "range", "min": 10, "max": 100, "name": "bar size"}}]"""
+          )
+        )
+    assertTrue(bound.diagnostics.isEmpty(), bound.diagnostics.toString())
+    assertEquals(
+      SignalBind.Range(min = 10.0, max = 100.0, name = "bar size"),
+      bound.spec!!.signals.single().bind,
+    )
+
+    val element =
+      diagnostics(spec(""""signals": [{"name": "s", "bind": {"element": "#slider"}}]""")).single {
+        it.code == DiagnosticCodes.PARSE_MISSING_PROPERTY
+      }
+    assertTrue("already on the page" in element.message, element.message)
+
+    val empty =
+      diagnostics(spec(""""signals": [{"name": "s", "bind": {"input": "radio"}}]""")).single {
+        it.code == DiagnosticCodes.PARSE_MISSING_PROPERTY
+      }
+    assertTrue("needs 'options'" in empty.message, empty.message)
+  }
+
+  /**
    * A handler fired by a **scale** being rebuilt says so, and one fired by a signal says nothing.
    *
    * The pair matters more than either half. A recompile rebuilds every scale, so nothing here knows

@@ -102,7 +102,13 @@ public data class SignalSpec(
   val init: String? = null,
   val update: String? = null,
   val on: List<SignalHandler> = emptyList(),
-  val bind: VegaValue? = null,
+  /**
+   * `bind` — the control a reader changes this signal with, when the specification asked for one.
+   *
+   * A *description*, not a widget: see [SignalBind], and `VegaChartController.inputs` for the list
+   * a host draws from.
+   */
+  val bind: SignalBind? = null,
 ) {
   /** The expression that produces this signal's value for a static render, if any. */
   public val expression: String?
@@ -338,9 +344,22 @@ public sealed interface DomainSort {
   public val descending: Boolean
 
   /**
+   * `order` written as a **signal**, which decides the direction when the chart runs.
+   *
+   * `{"order": {"signal": "order"}}` is how a control reverses a bar chart, and it was read with
+   * `asString()` — so the object stringified to something that did not begin with "desc" and every
+   * such domain came out ascending, in silence. The direction cannot be known at parse time, so it
+   * is carried and resolved where the signals are.
+   */
+  public val orderSignal: String?
+
+  /**
    * `sort: true`, or an object naming neither `op` nor `field`: order by the domain value itself.
    */
-  public data class ByValue(override val descending: Boolean = false) : DomainSort
+  public data class ByValue(
+    override val descending: Boolean = false,
+    override val orderSignal: String? = null,
+  ) : DomainSort
 
   /**
    * `sort: {"op": "sum", "field": "amount"}`: order by an aggregate computed per distinct domain
@@ -350,6 +369,7 @@ public sealed interface DomainSort {
     val op: String,
     val field: String?,
     override val descending: Boolean = false,
+    override val orderSignal: String? = null,
   ) : DomainSort
 }
 
