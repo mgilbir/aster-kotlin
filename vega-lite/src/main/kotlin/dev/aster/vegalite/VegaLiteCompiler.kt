@@ -1725,7 +1725,18 @@ private class Compilation(
           Scales.domain(view, channel, def, component.type, view.mainData).map {
             renamedValue(it, signalRenames)
           }
-        for (domain in domains) if (domain !in component.domains) component.domains += domain
+        // A domain the specification **states** is explicit, and an explicit value settles a
+        // merged property outright — `mergeValuesWithExplicit`. A layer whose colours are listed
+        // once, on one of its members, is that list: unioned with the other member's derived domain
+        // it became the list *and* whatever the data happened to hold.
+        val explicit = def.scale?.fields?.get("domain") is VegaValue.Arr
+        if (explicit && !component.explicitDomain) {
+          component.explicitDomain = true
+          component.domains.clear()
+        }
+        if (explicit || !component.explicitDomain) {
+          for (domain in domains) if (domain !in component.domains) component.domains += domain
+        }
         // `parseNonUnitScaleProperty` merges a shared scale **property by property**, not layer by
         // layer: the first layer to settle a property settles it, and the ones that say nothing
         // about it are passed over rather than ending the search. A candlestick's rules come first

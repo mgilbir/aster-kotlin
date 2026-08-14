@@ -16,6 +16,15 @@ internal class ScaleComponent(val channel: String, val type: String, private val
   val properties: LinkedHashMap<String, VegaValue> = LinkedHashMap()
 
   /**
+   * Whether some view **stated** this scale's domain, which settles it for the whole scale.
+   *
+   * `mergeValuesWithExplicit`: an explicit value beats a derived one rather than joining it. A
+   * layer whose colours are listed once, on one of its members, is that list — unioned with the
+   * other member's derived domain it becomes the list *and* whatever the data happens to hold.
+   */
+  var explicitDomain: Boolean = false
+
+  /**
    * Whether the domain includes zero — `definitely`, `definitely-not`, or `maybe`.
    *
    * Three answers rather than two, because the third is the common one and it is *not* the same as
@@ -505,6 +514,17 @@ internal object Scales {
             },
           )
         }
+      }
+      // An entry written as `{"expr": …}` is a **signal**, which is Vega's word for the same thing:
+      // a chart whose colours are bound to a set of pickers names each of them by parameter, and
+      // the list has to be a list of references rather than of objects Vega cannot read.
+      if (stated is VegaValue.Arr) {
+        return arr(
+          stated.values.map { entry ->
+            val expression = (entry as? VegaValue.Obj)?.takeIf { it.fields.keys == setOf("expr") }
+            if (expression != null) signalRef(expression.string("expr").orEmpty()) else entry
+          }
+        )
       }
       return stated
     }
