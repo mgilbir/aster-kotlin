@@ -1,6 +1,6 @@
 {
   "$schema": "https://vega.github.io/schema/vega/v6.json",
-  "description": "A bar chart a reader can change. Every control below the chart was asked for by the specification itself, through the bind blocks on its signals: a slider for the bars' width, a checkbox for the labels, a choice of palette and of what to sort by, and a field for the heading. Nothing about the controls is in the app \u2014 the specification names them, the engine describes them, and the host draws whatever it has.",
+  "description": "A bar chart a reader can change. Every control below the chart was asked for by the specification itself, through the bind blocks on its signals: a slider for the bars' width, a checkbox for the labels, a choice of palette and of what to sort by, and a field for the heading — which carries a placeholder, an attribute upstream hands straight to the browser and this host shows as the hint in an empty field. Nothing about the controls is in the app \u2014 the specification names them, the engine describes them, and the host draws whatever it has.",
   "width": 300,
   "height": 200,
   "padding": 5,
@@ -67,7 +67,8 @@
       "value": "Regional totals",
       "bind": {
         "input": "text",
-        "name": "heading"
+        "name": "heading",
+        "placeholder": "e.g. Regional totals"
       }
     },
     {

@@ -417,6 +417,18 @@ about 170 lines; a host with other widgets writes its own against the same two m
 into `vega-compose` would make that choice for every host, and there is nothing in the file worth
 sharing.
 
+**A generic input's extra properties are grammar, and are carried rather than reported.** The two
+diagnostics `job-voyager` produced were `bind.placeholder` and `bind.autocomplete`, and the answer was
+not to special-case either: upstream's generic generator copies *every* remaining property onto the
+input element, and its schema agrees — of the five `bind` variants, the one for an input outside the
+four structured kinds is the only one with `additionalProperties: true`. So `Field.attributes` carries
+all of them and a host uses what it has a widget for (the demo shows `placeholder`, ignores
+`autocomplete` — there is no form here for a browser to autofill from). The four structured kinds went
+the *other* way, from a pooled key list to a per-shape one, because upstream closes each with
+`additionalProperties: false`: `{"input": "checkbox", "min": 0}` is now reported as a mistake rather
+than as an unimplemented feature, which is the accurate statement. Checked against the corpus before
+committing — two false gaps gone, no example newly reported.
+
 Two bugs came out of driving it on a device, and neither could have been found any other way:
 
 - **`setSpecAsync` recorded neither the specification's text nor a fresh set of overrides.** A chart

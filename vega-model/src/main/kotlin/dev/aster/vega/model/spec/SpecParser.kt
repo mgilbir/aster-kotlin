@@ -76,8 +76,20 @@ private val CONFIG_HONOURED =
 private val SIGNAL_HANDLER_CONSUMED = setOf("events", "update", "encode", "force")
 
 /** Everything a `bind` may say. `element` is reported rather than consumed; see `parseBind`. */
-private val BIND_CONSUMED =
-  setOf("input", "name", "debounce", "min", "max", "step", "options", "labels", "element")
+/**
+ * What each shape of `bind` may say, which upstream's schema states one variant at a time.
+ *
+ * Per shape rather than pooled, because the four structured kinds each build a fixed control and
+ * upstream's schema closes them with `additionalProperties: false`: `min` on a checkbox or
+ * `options` on a range is a mistake there, and its generator ignores it. A generic input is the
+ * opposite — see [SignalBind.Field.attributes] — so it has no list here at all; everything but
+ * these four keys is carried.
+ */
+private val BIND_KEYS = setOf("input", "name", "debounce", "element")
+
+private val BIND_KEYS_RANGE = BIND_KEYS + setOf("min", "max", "step")
+
+private val BIND_KEYS_CHOICE = BIND_KEYS + setOf("options", "labels")
 
 private val EVENT_CONFIG_CONSUMED =
   setOf("view", "window", "selector", "timer", "defaults", "bind", "globalCursor")
@@ -1191,10 +1203,13 @@ public class SpecParser {
       )
       return null
     }
-    obj.reportUnhandled("Signal binding", path, BIND_CONSUMED)
     return when (input) {
-      "checkbox" -> SignalBind.Checkbox(name, debounce)
-      "range" ->
+      "checkbox" -> {
+        obj.reportBindExtras(path, input, BIND_KEYS)
+        SignalBind.Checkbox(name, debounce)
+      }
+      "range" -> {
+        obj.reportBindExtras(path, input, BIND_KEYS_RANGE)
         SignalBind.Range(
           min = (obj.fields["min"] as? VegaValue.Num)?.value,
           max = (obj.fields["max"] as? VegaValue.Num)?.value,
@@ -1202,8 +1217,10 @@ public class SpecParser {
           name = name,
           debounceMillis = debounce,
         )
+      }
       "select",
       "radio" -> {
+        obj.reportBindExtras(path, input, BIND_KEYS_CHOICE)
         val options = (obj.fields["options"] as? VegaValue.Arr)?.values
         if (options.isNullOrEmpty()) {
           // Upstream's schema requires them, and a choice of nothing is not a control.
@@ -1224,8 +1241,35 @@ public class SpecParser {
         )
       }
       // Everything else is an input *type* passed straight through, as upstream passes it to the
-      // browser: `text`, `number`, `color`, `date`, and whatever is added next.
-      else -> SignalBind.Field(input, name, debounce)
+      // browser: `text`, `number`, `color`, `date`, and whatever is added next — and with it every
+      // remaining property, which upstream sets as an attribute on the element and its schema
+      // explicitly allows. Nothing to report: a host takes what it can use.
+      else ->
+        SignalBind.Field(
+          input = input,
+          attributes = obj.fields.filterKeys { it !in BIND_KEYS },
+          name = name,
+          debounceMillis = debounce,
+        )
+    }
+  }
+
+  /**
+   * An extra property on one of the four **structured** bindings, which upstream ignores too.
+   *
+   * Worded as a mistake rather than as a gap here, because that is what it is: the property is not
+   * missing from this engine, it means nothing to that control anywhere. `{"input": "checkbox",
+   * "min": 0}` is forbidden by upstream's own schema and dropped by its own generator.
+   */
+  private fun VegaValue.Obj.reportBindExtras(path: String, input: String, allowed: Set<String>) {
+    for (key in fields.keys) {
+      if (key in allowed) continue
+      diagnostics.warn(
+        DiagnosticCodes.PARSE_UNKNOWN_PROPERTY,
+        "A '$input' binding has no use for '$key', and neither has upstream's — its schema forbids " +
+          "the property on this input and its generator builds the control without it",
+        jsonPath = "$path.$key",
+      )
     }
   }
 
