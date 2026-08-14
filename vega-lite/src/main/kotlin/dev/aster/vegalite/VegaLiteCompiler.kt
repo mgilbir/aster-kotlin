@@ -314,14 +314,25 @@ private class Compilation(
     // one key beside the whole chart; one that resolves colour independently draws a key inside
     // each plot, because two keys standing for different scales cannot be one.
     val legendScale = mutableMapOf<String, String>()
-    val allLegends = assembleLegends(views, legendScale)
+    val legendPlot = mutableMapOf<String, String>()
+    val allLegends = assembleLegends(views, legendScale, legendPlot)
+    // A legend the specification resolves **independently** belongs to the plot that raised it even
+    // where the scale is shared: `resolve: {"legend": {"color": "independent"}}` is how a
+    // concatenation puts a key inside the plot it explains rather than beside the whole chart.
+    fun ownedBy(key: String, plot: Plot): Boolean =
+      legendPlot[key]?.let { it == plot.name } ?: (owner[legendScale[key]] === plot)
     for (plot in plots) {
       plot.legends =
         if (concat == null) emptyList()
-        else allLegends.filterKeys { owner[legendScale[it]] === plot }.values.toList()
+        else allLegends.filterKeys { ownedBy(it, plot) }.values.toList()
     }
     val legends =
-      allLegends.filterKeys { concat == null || owner[legendScale[it]] == null }.values.toList()
+      allLegends
+        .filterKeys { key ->
+          concat == null || (legendPlot[key] == null && owner[legendScale[key]] == null)
+        }
+        .values
+        .toList()
     // In the order upstream's `assembleLayoutSignals` walks the model tree: each level's own sizes
     // before it recurses, and within a level `width`, `height`, `childWidth`, `childHeight`. Then
     // the parameters, which is `assembleTopLevelModel`'s order — a parameter may read a size and
@@ -1847,6 +1858,8 @@ private class Compilation(
      * keys are not the same and the second has to be recorded on the way past.
      */
     scaleOf: MutableMap<String, String> = mutableMapOf(),
+    /** Which plot a legend belongs to, where the composition resolves that legend per plot. */
+    plotOf: MutableMap<String, String> = mutableMapOf(),
   ): LinkedHashMap<String, VegaValue> {
     val legends = LinkedHashMap<String, LinkedHashMap<String, VegaValue>>()
     val explicitlyTitled = mutableSetOf<String>()
@@ -1866,7 +1879,13 @@ private class Compilation(
         // discreteness with it, since a ramp and a set of swatches cannot be the same legend.
         val prefix = component.name().removeSuffix(channel)
         val discrete = if (Scales.hasDiscreteDomain(component.type)) "d" else "c"
-        val key = "$prefix|${def.field ?: channel}|$discrete"
+        // A legend the composition resolves per child is keyed by that child as well, since the
+        // whole point of resolving it independently is that there is one of it per plot.
+        val ownPlot =
+          plotNames[view].takeIf {
+            concat != null && resolve.guideIsIndependent(channel, scaleIsIndependent = false)
+          }
+        val key = "$prefix|${def.field ?: channel}|$discrete|${ownPlot.orEmpty()}"
         // `mergeValuesWithExplicit` settles a property before any tie-breaker runs: a value the
         // specification stated beats one this compiler derived. A field encoded as both a colour
         // and a size, with a title written on only one of them, is titled by the one that was
@@ -1876,6 +1895,7 @@ private class Compilation(
         if (existing == null) {
           legends[key] = LinkedHashMap(built.fields)
           scaleOf[key] = component.name()
+          ownPlot?.let { plotOf[key] = it }
           if (titled) explicitlyTitled += key
         } else {
           merge(
