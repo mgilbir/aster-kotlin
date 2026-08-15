@@ -1,0 +1,18 @@
+{
+  "$schema": "https://vega.github.io/schema/vega-lite/v6.json",
+  "description": "A grid of maps: the outlines are joined on as whole records, gathered into a collection of their own, and the grid has one projection so every cell is drawn at the same scale.",
+  "width": 300,
+  "height": 180,
+  "data": {"url": "data/unemployment.tsv"},
+  "transform": [
+    {"calculate": "datum.rate > 0.08 ? 'high' : 'low'", "as": "band"},
+    {"lookup": "id", "from": {"data": {"url": "data/us-10m.json", "format": {"type": "topojson", "feature": "counties"}}, "key": "id"}, "as": "geo"}
+  ],
+  "projection": {"type": "albersUsa"},
+  "mark": "geoshape",
+  "encoding": {
+    "shape": {"field": "geo", "type": "geojson"},
+    "color": {"field": "rate", "type": "quantitative"},
+    "row": {"field": "band"}
+  }
+}

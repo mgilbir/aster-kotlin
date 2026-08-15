@@ -543,11 +543,10 @@ internal class Transforms(
     }
     val key = from.string("key")
     val values = from.array("fields")
-    if (key == null || values == null) {
+    if (key == null) {
       diagnostics.error(
         VegaLiteDiagnostics.UNSUPPORTED_TRANSFORM,
-        "A `lookup` needs `from.key` — the column to match on — and `from.fields` — the columns " +
-          "to bring across. A selection lookup, which has neither, is not implemented.",
+        "A `lookup` needs `from.key` — the column to match on; this one names none.",
         jsonPath = path,
       )
       return emptyList()
@@ -570,8 +569,15 @@ internal class Transforms(
         put("from", register(data))
         put("key", key)
         put("fields", strings(listOf(local)))
-        put("values", strings(values.mapNotNull { (it as? VegaValue.Str)?.value }))
-        transform["as"]?.let { put("as", it) }
+        // "Lookup a few fields and create a flat output" where `from.fields` names them, and
+        // otherwise "lookup the full record and nest it" under a name — a map's outlines joined
+        // onto a table of figures arrive as one column holding the whole shape.
+        if (values != null) {
+          put("values", strings(values.mapNotNull { (it as? VegaValue.Str)?.value }))
+          transform["as"]?.let { put("as", it) }
+        } else {
+          put("as", strings(listOf(transform.string("as") ?: "_lookup")))
+        }
         transform["default"]?.let { put("default", it) }
       }
     )

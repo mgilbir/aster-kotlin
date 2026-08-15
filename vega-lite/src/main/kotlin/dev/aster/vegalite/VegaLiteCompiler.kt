@@ -176,48 +176,6 @@ private class Compilation(
     selections = Selection.of(spec)
     val plots = plots() ?: return failed()
     allPlots = plots
-    // A **projection** belongs to the unit whose places it puts on the page. A view with a
-    // geographic channel has one whether or not the specification stated any properties for it, and
-    // one that states properties has one whether or not it has drawn anything yet.
-    for (plot in plots) {
-      for (view in plot.views) {
-        val stated = view.spec.projection ?: plot.spec.obj("projection") ?: spec.obj("projection")
-        val geographic =
-          view.spec.encoding.keys.any { it in Channels.GEO_POSITION_CHANNELS } ||
-            view.spec.mark == "geoshape"
-        if (!geographic && stated == null) continue
-        view.projection = obj {
-          config.raw.obj("projection")?.fields?.forEach { (key, value) -> put(key, value) }
-          stated?.fields?.forEach { (key, value) -> put(key, value) }
-        }
-        // The order `gatherFitData` walks the pairs in, which is the order the signals were named.
-        view.geoJsonSignals =
-          listOf(listOf("longitude", "latitude"), listOf("longitude2", "latitude2"))
-            .mapIndexedNotNull { index, pair ->
-              if (pair.none { view.spec.encoding[it] != null }) null
-              else view.prefixed("geojson_$index")
-            }
-        // With nothing to fit to, the projection measures itself against the view's own table:
-        // "main source is geojson, so we can just use that".
-        if (view.geoJsonSignals.isEmpty() && view.projectionFits) view.fitsTable = true
-      }
-      // `parseNonUnitProjections`: a layer whose members agree about the projection has one, named
-      // for the layer. It is fitted to everything they all draw — a map of states under a map of
-      // routes is one map, and fitting each layer on its own would draw two of different sizes.
-      val geographic = plot.views.filter { it.hasProjection }
-      if (
-        geographic.size > 1 && geographic.all { it.projection == geographic.first().projection }
-      ) {
-        val name =
-          Fields.varName(
-            listOf(plot.name, "projection").filter { it.isNotEmpty() }.joinToString("_")
-          )
-        geographic.forEachIndexed { index, view ->
-          view.projectionName = name
-          if (index == 0) view.projectionFitViews = geographic else view.projectionMerged = true
-        }
-      }
-    }
     concat = (plotTree as? Node.Nest)?.concat
     if (plots.any { it.views.isEmpty() }) return failed()
 
@@ -239,6 +197,60 @@ private class Compilation(
       // the split in the data flow, the cell's scales, the machinery in its signals — belongs to
       // that plot rather than to the chart.
       if (concat == null) facet = lifted.second
+    }
+    // A **projection** belongs to the unit whose places it puts on the page. A view with a
+    // geographic channel has one whether or not the specification stated any properties for it, and
+    // one that states properties has one whether or not it has drawn anything yet.
+    for (plot in plots) {
+      for (view in plot.views) {
+        val stated = view.spec.projection ?: plot.spec.obj("projection") ?: spec.obj("projection")
+        val geographic =
+          view.spec.encoding.keys.any { it in Channels.GEO_POSITION_CHANNELS } ||
+            view.spec.mark == "geoshape"
+        if (!geographic && stated == null) continue
+        view.projection = obj {
+          config.raw.obj("projection")?.fields?.forEach { (key, value) -> put(key, value) }
+          stated?.fields?.forEach { (key, value) -> put(key, value) }
+        }
+        // The order `gatherFitData` walks the pairs in, which is the order the signals were named.
+        view.geoJsonSignals =
+          listOf(listOf("longitude", "latitude"), listOf("longitude2", "latitude2"))
+            .mapIndexedNotNull { index, pair ->
+              if (pair.none { view.spec.encoding[it] != null }) null
+              else view.prefixed("geojson_$index")
+            }
+        // A **shape** column of outlines is gathered too, after the coordinate pairs.
+        if (
+          view.spec.encoding["shape"]?.let { it.isFieldDef && it.type == MeasureType.GEOJSON } ==
+            true
+        ) {
+          view.geoJsonSignals =
+            view.geoJsonSignals + view.prefixed("geojson_${view.geoJsonSignals.size}")
+        }
+        // With nothing to fit to, the projection measures itself against the view's own table:
+        // "main source is geojson, so we can just use that".
+        if (view.geoJsonSignals.isEmpty() && view.projectionFits) view.fitsTable = true
+      }
+      // `parseNonUnitProjections`: a layer whose members agree about the projection has one, named
+      // for the layer. It is fitted to everything they all draw — a map of states under a map of
+      // routes is one map, and fitting each layer on its own would draw two of different sizes.
+      val geographic = plot.views.filter { it.hasProjection }
+      // `parseNonUnitProjections` runs for any composition, a **facet** as much as a layer: a grid
+      // whose cells are maps has one projection, named for the grid and not for the cell, so every
+      // cell is drawn at the same scale.
+      if (
+        (geographic.size > 1 || (plot.facet != null && geographic.isNotEmpty())) &&
+          geographic.all { it.projection == geographic.first().projection }
+      ) {
+        val name =
+          Fields.varName(
+            listOf(plot.name, "projection").filter { it.isNotEmpty() }.joinToString("_")
+          )
+        geographic.forEachIndexed { index, view ->
+          view.projectionName = name
+          if (index == 0) view.projectionFitViews = geographic else view.projectionMerged = true
+        }
+      }
     }
 
     val views = plots.flatMap { it.views }

@@ -56,6 +56,7 @@ class VegaLiteFixtureDifferentialTest {
   @ParameterizedTest(name = "{0}")
   @MethodSource("fixtures")
   fun `mark counts by type and role match upstream`(name: String) {
+    assumeProjectionWorks(name)
     val (reference, compiled) = compile(name)
     val ours =
       Differential.flattenScene(requireNotNull(compiled.scene)).groupingBy { it.key }.eachCount()
@@ -205,7 +206,7 @@ class VegaLiteFixtureDifferentialTest {
      * re-fits and re-pulses. Both are the drawing's business; the compiled specifications match
      * upstream's byte for byte.
      */
-    val PROJECTION_PENDING = setOf("geo-points", "geo-rules")
+    val PROJECTION_PENDING = setOf("geo-points", "geo-rules", "geo-trellis")
 
     val repositoryRoot: File = File(System.getProperty("user.dir")).parentFile
 

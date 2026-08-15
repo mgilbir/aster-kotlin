@@ -288,6 +288,9 @@ internal class UnitView(
         if (channel !in Channels.SCALE_CHANNELS) null else scaledDef(def)?.let { channel to it }
       }
       .filter { (_, def) -> !def.scaleDisabled }
+      // An outline has no scale: `geojson` is not a measurement, and a `shape` channel carrying one
+      // names the column the projection draws rather than a set of symbols to choose between.
+      .filter { (_, def) -> def.type != MeasureType.GEOJSON }
 
   /**
    * The definition a channel's scale is built from — `getFieldOrDatumDef`, which reads a condition.

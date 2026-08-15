@@ -433,7 +433,7 @@ internal object Marks {
                 put("projection", view.projectionName)
                 view.spec.encoding["shape"]
                   ?.takeIf { it.isFieldDef && it.type == MeasureType.GEOJSON }
-                  ?.let { put("field", Fields.datumPath(Fields.vgField(it))) }
+                  ?.let { put("field", "datum[${quoted(Fields.vgField(it))}]") }
               }
             )
           ),
@@ -1249,6 +1249,9 @@ internal object Marks {
     val number =
       stated ?: if (normalizeStack) config.normalizedNumberFormat else config.numberFormat ?: ""
     return when {
+      // An **outline** is not text and is never joined: it is one object, and `isArray` on it would
+      // spell a country out as a list of its own coordinates.
+      def.type == MeasureType.GEOJSON -> "isValid($accessor) ? $accessor : \"\"+$accessor"
       // `isFieldOrDatumDefForTimeFormat` in `channeldef.ts`: an instant is one a *time unit*
       // buckets
       // as much as one typed temporal. A month named on an ordinal scale is still a month, and

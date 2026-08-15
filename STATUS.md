@@ -697,7 +697,7 @@ no data is needed to compare two compilers. So every one of them was compiled by
 by this one, and the outputs compared property by property. That is a *measurement*, not a gate: the
 examples are not fixtures here, and nothing about them is checked in.
 
-**124 of 627 matched exactly** at the start, and **619** do now.
+**124 of 627 matched exactly** at the start, and **620** do now.
 
 The value is the *ranking*. The first sweep clustered by root cause, and the three most damaging
 causes were fixed straight away — chosen for what they do to the *picture* rather than for
@@ -712,11 +712,11 @@ frequency:
   where this compiler used `step - 2`, making it nearly four times too wide. `getBandSize` asks the
   scale's kind first and reaches `discreteBandSize` only where the domain is discrete.
 
-The sweep has been the working list ever since, and the 8 that still differ cluster like this:
+The sweep has been the working list ever since, and the 7 that still differ cluster like this:
 
 | Files | Cause |
 | --- | --- |
-| 5 | geographic: what is left is a projection inside a **repetition** or a **facet**, and the two interactive maps that brush one |
+| 4 | geographic: a projection inside a **repetition**, and the three interactive maps that brush or facet one |
 | 5 | the rest of the **facet data flow**: what is left is a chart whose cells are read by a **selection**, where the brush's own datasets have to be cut per cell as well |
 | 0 | nothing outside the geographic work; the one refusal left of my own is a facet inside a **facet**, described below |
 
@@ -4397,6 +4397,25 @@ A last one, off the same reading: `toFieldDefBase` keeps a field's bucketing, it
 aggregate, and **not its type**. Two layers over one column, one calling it ordinal and the other
 saying nothing, are the same field to a title; keying the title by the type as well titled the axis
 "age, age".
+
+### A column of outlines, and the grid that draws them all alike
+
+A `lookup` that names no `from.fields` brings the **whole matched record** across and nests it under
+a name — a map's outlines joined onto a table of figures arrive as one column holding the shape. It
+is then a `shape` channel typed `geojson`, and three things follow from a column of outlines being
+neither a measurement nor a name:
+
+- It is a **feature collection** of its own, gathered like a coordinate pair so that the projection
+  can be fitted to it. The rows with nothing to draw are dropped first — a row without an outline
+  would otherwise widen the extent the map is fitted to by nothing at all.
+- It has **no scale**: `geojson` is not something to choose symbols between, and a scale there put a
+  legend of shapes beside a map.
+- It is **one object** in a spoken description, never joined: `isArray` on a country would spell it
+  out as a list of its own coordinates.
+
+And `parseNonUnitProjections` runs for a **facet** as much as for a layer. A grid whose cells are
+maps has one projection, named for the grid rather than for the cell, so every cell is drawn at the
+same scale — the whole point of a trellis of maps being that its cells can be compared.
 
 ### A line between two places, and the table it was joined from
 

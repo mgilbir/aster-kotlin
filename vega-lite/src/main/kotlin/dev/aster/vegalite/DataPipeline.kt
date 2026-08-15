@@ -585,17 +585,41 @@ internal class DataPipeline(
    */
   private fun geoJsonNodes(): List<PassThroughNode> {
     if (!view.hasProjection || !view.projectionFits) return emptyList()
-    return geoPairs().map { (index, refs) ->
-      PassThroughNode(
-        listOf(
-          obj {
-            put("type", "geojson")
-            put("fields", arr(refs))
-            put("signal", view.prefixed("geojson_$index"))
-          }
+    val pairs =
+      geoPairs().map { (index, refs) ->
+        PassThroughNode(
+          listOf(
+            obj {
+              put("type", "geojson")
+              put("fields", arr(refs))
+              put("signal", view.prefixed("geojson_$index"))
+            }
+          )
         )
-      )
-    }
+      }
+    // A **shape** column of outlines is a feature collection of its own, and the rows that have no
+    // outline are dropped first: `isValid` before the gathering, because a row with nothing to draw
+    // would otherwise widen the extent the map is fitted to by nothing at all.
+    val outlines =
+      view.spec.encoding["shape"]
+        ?.takeIf { it.isFieldDef && it.type == MeasureType.GEOJSON }
+        ?.let { def ->
+          val field = Fields.vgField(def)
+          PassThroughNode(
+            listOf(
+              obj {
+                put("type", "filter")
+                put("expr", "isValid(datum[${quoted(field)}])")
+              },
+              obj {
+                put("type", "geojson")
+                put("geojson", field)
+                put("signal", view.prefixed("geojson_${pairs.size}"))
+              },
+            )
+          )
+        }
+    return pairs + listOfNotNull(outlines)
   }
 
   /** `GeoPointNode.parseAll`: the two pixels a projection puts each pair at. */
