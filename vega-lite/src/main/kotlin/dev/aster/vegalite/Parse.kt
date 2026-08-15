@@ -551,6 +551,8 @@ internal class Parse(
         "bar",
         "trail",
         "circle",
+        // A picture placed where a point would be: a rect-based mark whose `url` names the file.
+        "image",
         "line",
         "point",
         "rect",
@@ -602,7 +604,6 @@ internal class Parse(
         "geojson",
         "xError",
         "yError",
-        "url",
       )
   }
 }

@@ -1241,8 +1241,13 @@ public class MarkEncoder(
       )
       return null
     }
-    val width = number(channels["width"], datum)
-    val height = number(channels["height"], datum)
+    // A picture is placed the way a rect is: Vega accepts `x`/`x2`, `x`/`width` or a centre and a
+    // width for it, and `adjustSpatial` is what turns whichever pair was written into the one the
+    // scene item holds. Reading `x` alone left a picture centred on a scaled value at the origin.
+    val horizontal = resolveSpan(channels, datum, "x", "x2", "width", "xc", index, spec)
+    val vertical = resolveSpan(channels, datum, "y", "y2", "height", "yc", index, spec)
+    val width = horizontal?.extent ?: number(channels["width"], datum)
+    val height = vertical?.extent ?: number(channels["height"], datum)
     if (width == null || height == null) {
       diagnostics.warn(
         DiagnosticCodes.EXPORT_IMAGE_UNRESOLVED,
@@ -1261,8 +1266,8 @@ public class MarkEncoder(
       id = ids.allocate(),
       url = url ?: "",
       raster = raster,
-      x = number(channels["x"], datum) ?: 0.0,
-      y = number(channels["y"], datum) ?: 0.0,
+      x = horizontal?.start ?: number(channels["x"], datum) ?: 0.0,
+      y = vertical?.start ?: number(channels["y"], datum) ?: 0.0,
       width = w,
       height = h,
       fit = if (aspect) ImageFit.CONTAIN else ImageFit.FILL,

@@ -32,6 +32,8 @@ internal object Marks {
       // A trail is Vega's own mark: a line whose thickness follows the data, so its `size` channel
       // becomes a width along the path rather than an area.
       "trail" to "trail",
+      // A picture is its own Vega mark, positioned like a rect and painted from a file.
+      "image" to "image",
     )
 
   /**
@@ -463,6 +465,9 @@ internal object Marks {
       putAll(baseEncode(view))
       when (mark) {
         "bar",
+        // A picture is positioned exactly as a rect is: a stated width and height centre it where
+        // a point would have been, and a channel pair spans it between two positions instead.
+        "image",
         "rect" -> {
           putAll(rectPosition(view, "x"))
           putAll(rectPosition(view, "y"))
@@ -615,7 +620,9 @@ internal object Marks {
       put("cursor", obj { put("value", "pointer") })
     }
     putAll(markDefProperties(view))
-    putAll(colorEncode(view))
+    // `color: 'ignore'` for an **image**: a picture is not painted, it is fetched. A fill written
+    // on one is a colour nothing shows.
+    if (view.spec.mark != "image") putAll(colorEncode(view))
     putAll(nonPosition(view, "opacity", "opacity"))
     putAll(nonPosition(view, "fillOpacity", "fillOpacity"))
     putAll(nonPosition(view, "strokeOpacity", "strokeOpacity"))
@@ -625,6 +632,9 @@ internal object Marks {
     // `href` is a link the mark carries, written the way a text channel is — and a mark that links
     // somewhere says so with the pointer, since nothing else about it looks clickable.
     hrefChannel(view)?.let { put("href", it) }
+    // `url` is where an **image** mark fetches its picture from, read as text exactly as `href` is:
+    // a column of file names becomes a column of pictures.
+    urlChannel(view)?.let { put("url", it) }
     putAll(aria(view))
     // `zindex.ts`: an `order` written as a **value** raises the mark rather than sorting it. Only
     // off a path, where `order` is what the points are threaded in, and only as a value: a field
@@ -1293,6 +1303,14 @@ internal object Marks {
     view.invalidDataMode == "break-paths-filter-domains" ||
       view.invalidDataMode == "break-paths-show-domains"
 
+  /** `url`: the picture an image mark draws, read as text and never joined. */
+  private fun urlChannel(view: UnitView): VegaValue? {
+    val def = view.spec.encoding["url"] ?: return null
+    if (def.isValueDef) return obj { literalRef(def.value)?.let { (key, it) -> put(key, it) } }
+    if (!def.isFieldDef) return null
+    return signalRef(fieldExpression(view, def, arrays = false))
+  }
+
   /** `href`: where a mark links to, read as text and never joined. */
   private fun hrefChannel(view: UnitView): VegaValue? {
     val def = view.spec.encoding["href"] ?: return null
@@ -1594,6 +1612,18 @@ internal object Marks {
   ): VegaValue.Obj {
     val channel2 = secondaryChannel(channel)!!
     val pos2 = position2Ref(view, channel, channel2, defaultPos2)
+    // With no second position but a **size** the mark states outright, the extent is that size and
+    // the position becomes an *aligned* one: `vgAlignedPositionChannel` centres it by default, so
+    // a picture fifty units wide is placed with its middle where a point would have been.
+    val sizeChannel = if (channel == "x") "width" else if (channel == "y") "height" else null
+    val stated = sizeChannel?.let { view.markDef.raw.fields[it] }
+    if (view.spec.encoding[channel2] == null && stated != null) {
+      val centred = if (channel == "x") "xc" else "yc"
+      return obj {
+        putAll(pointPosition(view, channel, defaultPos, centred))
+        put(sizeChannel, markProperty(stated))
+      }
+    }
     return obj {
       putAll(pointPosition(view, channel, defaultPos, null))
       if (pos2 != null) put(vgPositionChannel(channel2), pos2)

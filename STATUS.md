@@ -697,7 +697,7 @@ no data is needed to compare two compilers. So every one of them was compiled by
 by this one, and the outputs compared property by property. That is a *measurement*, not a gate: the
 examples are not fixtures here, and nothing about them is checked in.
 
-**124 of 627 matched exactly** at the start, and **599** do now.
+**124 of 627 matched exactly** at the start, and **600** do now.
 
 The value is the *ranking*. The first sweep clustered by root cause, and the three most damaging
 causes were fixed straight away — chosen for what they do to the *picture* rather than for
@@ -712,7 +712,7 @@ frequency:
   where this compiler used `step - 2`, making it nearly four times too wide. `getBandSize` asks the
   scale's kind first and reaches `discreteBandSize` only where the domain is discrete.
 
-The sweep has been the working list ever since, and the 28 that still differ cluster like this:
+The sweep has been the working list ever since, and the 27 that still differ cluster like this:
 
 | Files | Cause |
 | --- | --- |
@@ -4397,6 +4397,24 @@ A last one, off the same reading: `toFieldDefBase` keeps a field's bucketing, it
 aggregate, and **not its type**. Two layers over one column, one calling it ordinal and the other
 saying nothing, are the same field to a title; keying the title by the type as well titled the axis
 "age, age".
+
+### A picture is fetched, not painted
+
+The `image` mark and the `url` channel that feeds it. A picture is positioned exactly as a rect is —
+a stated width and height centre it where a point would have been, a channel pair spans it between
+two positions — and its `url` is read as text, the same way `href` is: a column of file names
+becomes a column of pictures. What it is *not* is painted, so no fill is written on it;
+`baseEncodeEntry` ignores colour for an image, and a fill there is a colour nothing shows.
+
+The rule that made it work is more general than the mark: with no second position but a **size** the
+mark states outright, the extent is that size and the position becomes an *aligned* one —
+`vgAlignedPositionChannel` centres it by default. That is why a picture fifty units wide is placed
+with its middle where the value falls, and it holds for a bar given a width as much as for an image.
+
+The fixture found a second gap in **this runtime**, also fixed: the image mark read `x` alone, where
+Vega accepts `x`/`x2`, `x`/`width` or a centre and a width and lets `adjustSpatial` reduce whichever
+pair was written to the one the scene item holds. The machinery was already there for rects; the
+image mark simply was not using it, and every picture was drawn at the origin.
 
 ### A chart animated by a clock
 
