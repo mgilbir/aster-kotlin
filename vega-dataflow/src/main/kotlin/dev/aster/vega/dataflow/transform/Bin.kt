@@ -3,6 +3,7 @@ package dev.aster.vega.dataflow.transform
 import dev.aster.vega.expression.JsSemantics
 import dev.aster.vega.model.DiagnosticCodes
 import dev.aster.vega.model.VegaValue
+import dev.aster.vega.model.asBoolean
 import dev.aster.vega.model.field
 import dev.aster.vega.model.isMissing
 import dev.aster.vega.model.roundHalfUp
@@ -110,6 +111,13 @@ public object BinTransform : Transform {
     val names = params.stringList("as")
     val lowName = names.getOrNull(0) ?: "bin0"
     val highName = names.getOrNull(1) ?: "bin1"
+    // `interval: false` asks for the bin's **start only**, which is what a specification writes
+    // when
+    // it wants a bin as a category rather than as a span — upstream's `band` flag, and its `!band`
+    // branch writes `b0` and nothing else. This wrote `bin1` regardless, so such a field carried an
+    // end nobody asked for and a downstream `groupby` on the pair grouped by something different
+    // from what upstream groups by. Found by replaying upstream's own `bin` vectors.
+    val interval = params.fields["interval"]?.let { it.asBoolean() } ?: true
 
     return input.map { datum ->
       val value = datum.field(path)
@@ -122,13 +130,13 @@ public object BinTransform : Transform {
       // low
       // one plus a step.
       if (value.isMissing || number.isNaN()) {
-        datum.withFields(mapOf(lowName to VegaValue.Null, highName to VegaValue.Null))
+        datum.withFields(binFields(lowName, highName, VegaValue.Null, VegaValue.Null, interval))
       } else if (number < settings.start || number > settings.stop) {
         val edge =
           VegaValue.Num(
             if (number < settings.start) Double.NEGATIVE_INFINITY else Double.POSITIVE_INFINITY
           )
-        datum.withFields(mapOf(lowName to edge, highName to edge))
+        datum.withFields(binFields(lowName, highName, edge, edge, interval))
       } else {
         // Upstream's arithmetic, and the epsilon is the whole of it: a value that lands *exactly*
         // on a boundary divides to a whole number only in exact arithmetic. In doubles
@@ -145,14 +153,31 @@ public object BinTransform : Transform {
         val index = floor(BIN_EPSILON + (clamped - settings.start) / settings.step)
         val low = settings.start + index * settings.step
         datum.withFields(
-          mapOf(
-            lowName to VegaValue.Num(low),
-            highName to VegaValue.Num(low + settings.step),
+          binFields(
+            lowName,
+            highName,
+            VegaValue.Num(low),
+            // Upstream's own arithmetic for the upper edge — `start + step * (1 + (v - start) /
+            // step)` rather than `low + step` — which agrees to the last bit where adding does not.
+            VegaValue.Num(
+              settings.start + settings.step * (1 + (low - settings.start) / settings.step)
+            ),
+            interval,
           )
         )
       }
     }
   }
+
+  /** The bin's fields: both edges, or only the start when `interval: false`. */
+  private fun binFields(
+    lowName: String,
+    highName: String,
+    low: VegaValue,
+    high: VegaValue,
+    interval: Boolean,
+  ): Map<String, VegaValue> =
+    if (interval) mapOf(lowName to low, highName to high) else mapOf(lowName to low)
 
   /** Vega's default; the transform's own default, not the 10 that `maxbins` suggests elsewhere. */
   public const val DEFAULT_MAXBINS: Int = 20

@@ -2,12 +2,14 @@ package dev.aster.vega.dataflow.transform
 
 import dev.aster.vega.model.DiagnosticCodes
 import dev.aster.vega.model.VegaValue
+import dev.aster.vega.model.asBoolean
 import dev.aster.vega.model.asNumberOrNull
 import dev.aster.vega.model.field
 import dev.aster.vega.model.time.DateValues
 import dev.aster.vega.model.time.TimeFormat
 import dev.aster.vega.model.time.TimeInterval
 import dev.aster.vega.model.time.TimeStepper
+import dev.aster.vega.model.time.TimeUnits
 import kotlin.math.pow
 import kotlinx.datetime.DateTimeUnit
 import kotlinx.datetime.LocalDate
@@ -73,7 +75,41 @@ public object TimeUnitTransform : Transform {
       return input
     }
 
-    val declared = params.stringList("units")
+    val inferUnits = params.fields["inferUnits"]?.asBoolean() == true
+    // `inferUnits` **overrides** whatever else was said. Upstream warns and then ignores `units`,
+    // `step`, `maxbins` and `extent` outright — "TimeUnit inferUnits overrides units, step, maxbins
+    // and extent" — where this engine let a declaration win and inferred nothing. A specification
+    // that says both gets upstream's answer now, and the warning that explains it.
+    val stated = params.stringList("units")
+    if (
+      inferUnits &&
+        (stated.isNotEmpty() ||
+          params.fields["step"] != null ||
+          params.fields["maxbins"] != null ||
+          params.fields["extent"] != null)
+    ) {
+      context.diagnostics.warn(
+        DiagnosticCodes.TRANSFORM_INVALID_PARAMETER,
+        "timeunit 'inferUnits' overrides 'units', 'step', 'maxbins' and 'extent'",
+        operator = type,
+      )
+    }
+    val declared = if (inferUnits) emptyList() else stated
+    val zone =
+      when ((params.fields["timezone"] as? VegaValue.Str)?.value?.lowercase()) {
+        null,
+        "local" -> TimeZone.currentSystemDefault()
+        "utc" -> TimeZone.UTC
+        else -> {
+          context.diagnostics.warn(
+            DiagnosticCodes.TRANSFORM_INVALID_PARAMETER,
+            "timeunit knows only 'local' and 'utc' timezones; using local",
+            operator = type,
+          )
+          TimeZone.currentSystemDefault()
+        }
+      }
+
     val inferred =
       if (declared.isNotEmpty()) null
       else {
@@ -82,11 +118,20 @@ public object TimeUnitTransform : Transform {
             v.isFinite()
           }
         }
-        val stated = params.numberList("extent")
-        val extent =
-          if (stated.size >= 2) stated[0] to stated[1]
-          else if (instants.isEmpty()) null else instants.min() to instants.max()
-        extent?.let { timeBin(it.first, it.second, params.number("maxbins")?.toInt() ?: 40) }
+        // Two different questions, and this engine only ever answered the second. `inferUnits` asks
+        // what granularity the data is **aligned to** — every instant on a month boundary means
+        // months — while the fallback bins by *span*, which for a year of month starts says days.
+        // Upstream branches on the flag; so does this now. Found by replaying upstream's own
+        // `timeunit` vectors, where three month starts came back bucketed by day.
+        if (inferUnits) {
+          TimeUnits.detect(instants, zone)
+        } else {
+          val stated = params.numberList("extent")
+          val extent =
+            if (stated.size >= 2) stated[0] to stated[1]
+            else if (instants.isEmpty()) null else instants.min() to instants.max()
+          extent?.let { timeBin(it.first, it.second, params.number("maxbins")?.toInt() ?: 40) }
+        }
       }
     val units = declared.ifEmpty { inferred?.first ?: emptyList() }
     if (units.isEmpty()) {
@@ -124,21 +169,6 @@ public object TimeUnitTransform : Transform {
       return input
     }
 
-    val zone =
-      when ((params.fields["timezone"] as? VegaValue.Str)?.value?.lowercase()) {
-        null,
-        "local" -> TimeZone.currentSystemDefault()
-        "utc" -> TimeZone.UTC
-        else -> {
-          context.diagnostics.warn(
-            DiagnosticCodes.TRANSFORM_INVALID_PARAMETER,
-            "timeunit knows only 'local' and 'utc' timezones; using local",
-            operator = type,
-          )
-          TimeZone.currentSystemDefault()
-        }
-      }
-
     val present = units.toSet()
     // A declared `step` applies to whatever units were declared; an inferred one comes with the
     // units it was chosen for, and upstream does not let the two mix — `inferUnits` overrides a
@@ -146,6 +176,9 @@ public object TimeUnitTransform : Transform {
     val step = (inferred?.second ?: params.number("step")?.toInt() ?: 1).coerceAtLeast(1)
     val stepper = finestStepper(present, zone)
     val names = params.stringList("as")
+    // The same `interval` rule `bin` has: false means the bucket's **start only**, which is what a
+    // specification writes when it wants the bucket as a category rather than as a span.
+    val interval = params.fields["interval"]?.asBoolean() ?: true
     val startName = names.getOrNull(0) ?: "unit0"
     val endName = names.getOrNull(1) ?: "unit1"
 
@@ -154,13 +187,25 @@ public object TimeUnitTransform : Transform {
     val bucketed = input.map { datum ->
       val instant = DateValues.parse(datum.field(fieldPath))?.asNumberOrNull()
       if (instant == null || !instant.isFinite()) {
-        datum.withFields(mapOf(startName to VegaValue.Null, endName to VegaValue.Null))
+        datum.withFields(
+          if (interval) {
+            mapOf(startName to VegaValue.Null, endName to VegaValue.Null)
+          } else {
+            mapOf(startName to VegaValue.Null)
+          }
+        )
       } else {
         val start = floor(instant, present, zone, step)
         val end = stepper.offset(start, step)
         if (start < lowest) lowest = start
         if (end > highest) highest = end
-        datum.withFields(mapOf(startName to VegaValue.Num(start), endName to VegaValue.Num(end)))
+        datum.withFields(
+          if (interval) {
+            mapOf(startName to VegaValue.Num(start), endName to VegaValue.Num(end))
+          } else {
+            mapOf(startName to VegaValue.Num(start))
+          }
+        )
       }
     }
 

@@ -3,6 +3,7 @@ package dev.aster.vega.dataflow.transform
 import dev.aster.vega.expression.JsSemantics
 import dev.aster.vega.model.DiagnosticCodes
 import dev.aster.vega.model.VegaValue
+import dev.aster.vega.model.asBoolean
 import dev.aster.vega.model.asString
 import dev.aster.vega.model.field
 import dev.aster.vega.model.isMissing
@@ -116,7 +117,22 @@ public object AggregateTransform : Transform {
     val measures = measures(params, context) ?: return input
 
     val groups = groupTuples(input, groupBy)
-    return groups.map { (key, tuples) ->
+    // `cross: true` asks for a cell per **combination** of the group-by values, not just per
+    // combination that occurs: a heatmap with a gap wants the gap drawn, so the empty cells are
+    // emitted with a zero count rather than left out. Upstream's own documentation is the rule —
+    // "the full cross-product of groupby values ... including empty cells" — and the empty ones
+    // come
+    // *after* the observed ones, in the order the product enumerates them. Found by replaying
+    // upstream's own aggregate vectors, where two rows produce four cells.
+    val crossed =
+      if (params.fields["cross"]?.asBoolean() == true && groupBy.isNotEmpty()) {
+        crossProduct(groups.keys.toList(), groupBy.size).filterNot { it in groups }
+      } else {
+        emptyList()
+      }
+    val cells =
+      groups.entries.map { it.key to it.value } + crossed.map { it to emptyList<VegaValue>() }
+    return cells.map { (key, tuples) ->
       val output = LinkedHashMap<String, VegaValue>(groupBy.size + measures.size)
       groupBy.forEachIndexed { index, path -> output[path] = key[index] }
       // One bootstrap per group and field, memoized: `ci0` and `ci1` are two ends of the same
@@ -147,6 +163,25 @@ public object AggregateTransform : Transform {
       VegaValue.Obj(output)
     }
   }
+}
+
+/**
+ * Every combination of the values each group-by dimension takes, in first-appearance order.
+ *
+ * The order is the product's own — the first dimension varies slowest — which is what puts
+ * upstream's empty cells where it puts them once the observed ones are removed.
+ */
+private fun crossProduct(observed: List<List<VegaValue>>, dimensions: Int): List<List<VegaValue>> {
+  if (observed.isEmpty()) return emptyList()
+  val values =
+    List(dimensions) { index ->
+      observed.map { it[index] }.distinctBy { it.asComparableKey() }
+    }
+  var product = listOf(emptyList<VegaValue>())
+  for (dimension in values) {
+    product = product.flatMap { prefix -> dimension.map { prefix + it } }
+  }
+  return product
 }
 
 /**

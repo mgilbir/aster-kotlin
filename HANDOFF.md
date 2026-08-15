@@ -682,43 +682,33 @@ What is not replayed is named in the ledger: `count` (266), `ceil` (144), `round
 are d3 methods this engine does not model, and weekday-anchored weeks — `timeMonday` through
 `timeSaturday` — have no equivalent because Vega's grammar exposes one `week`, starting Sunday.
 
-## What upstream's own tests found: five real transform bugs
+## The five transform bugs upstream's tests found are fixed
 
-151 of the replayable `vega-transforms` vectors match exactly. **13 do not**, in five transforms, and
-each is a bug rather than an accepted difference. They are pinned *exactly* in
-`test-fixtures/upstream-vectors/known-divergences.json` — a new divergence fails the build, and fixing
-one fails it too until the entry is deleted, so the list cannot go stale.
+All five are closed and the operator replay is at **zero mismatches** over 167 vectors. Each was
+invisible to the 178 differential fixtures, because no fixture happens to use those parameters.
 
-- **`window` ignores peer rows.** Rows tied on the sort key are a *peer group* upstream: `rank` and
-  `dense_rank` repeat within it, `percent_rank` and `cume_dist` are computed from it, and with
-  `ignorePeers: false` a frame aggregate covers the whole group. This computes every row as if it were
-  unique, so `dense_rank` came back as 1 for every row of a five-row table.
-- **`timeunit` with `inferUnits: true` picks the wrong granularity.** Upstream infers `month` for a
-  series of month starts; this infers `day`, so `unit1` lands a day later instead of a month later.
-- **`impute` does not mark what it invented.** Upstream sets `_impute: true` on a synthesised tuple,
-  which is how a downstream mark can tell it from a real row. One combination is also missing where a
-  group has no rows at a key.
-- **`aggregate` ignores `cross`.** `cross: true` must emit the full cross-product of the group-by
-  values including empty cells with a zero count; this emits only the combinations that occur.
-- **`bin` ignores `interval: false`**, which means "emit `bin0` only", so a binned field carries an
-  end nobody asked for.
+- **`window` ranked every row 1 without a `sort`.** The peer-group scan tested `comparator != null`
+  *first*, so an unsorted window never advanced: `rank` and `dense_rank` came back as 1 for every row
+  of the table where upstream counts 1, 2, 3. With no comparator every row is its own peer group,
+  which the `cume_dist` scan beside it already assumed.
+- **`timeunit` never inferred anything.** `inferUnits` has its own algorithm upstream —
+  `detectTimeUnits`, a table of grains tested for *alignment* — and this engine fell through to the
+  extent-binning path, which chooses by span. A year of month starts came back bucketed by **day**.
+  The table is transcribed in `TimeUnits.detect`, including the wrinkle that makes it work: the weekly
+  grain is **skippable**, so a run of dates that is not weekly does not stop the scan reaching the
+  monthly grain below it. `inferUnits` also *overrides* `units`, `step`, `maxbins` and `extent`, with
+  the warning upstream emits.
+- **`impute` invented rows without saying so, and missed one.** Upstream marks a synthesised tuple
+  `_impute: true`, which is how a downstream mark tells it from a real row. And the key domain is
+  `keyvals` **and then** the keys the data has: taking `keyvals` *instead* lost a row wherever a group
+  was missing an observed key as well.
+- **`aggregate` ignored `cross`.** The full cross-product of the group-by values is now emitted, empty
+  cells and all, in the product's own order after the observed ones.
+- **`bin` and `timeunit` ignored `interval: false`**, which means "the start only". Both wrote an end
+  nobody asked for, so a `groupby` on the pair grouped by something upstream does not have.
 
-None of these is visible to the 178 differential fixtures, because no fixture happens to use those
-parameters. That is the argument for the whole exercise: a corpus of *inputs* someone else chose finds
-what a corpus of charts we chose cannot.
-
-**The Kotlin side is an adapter per package**, not generated code: `UpstreamTimeVectorsTest` maps
-upstream function names onto ours, prints a coverage ledger, and asserts a **floor** on how many
-vectors replay so the harness cannot shrink into a pass. 281 of 460 `vega-time` vectors replay today;
-the rest are named in the output.
-
-It found a real gap on its first run, which is the argument for doing the other packages.
-`timeUnitSpecifier(units, overrides)` builds its table with `extend({}, defaults, specifiers)` and then
-tests `s[key] != null`, so an override set to **null** *removes* an entry instead of falling back to
-the default — the only way to say "do not combine these two units".
-`timeUnitSpecifier(['hours','minutes'], {'hours-minutes': null})` is `%H %Mmin` upstream where taking
-the built-in combination gives `%H:%M`. Our signature was `Map<String, String>`, which cannot express
-it at all. It is `Map<String, String?>` now.
+Three existing tests asserted the old impute output and were corrected against upstream's source
+rather than deleted — the same pattern as the arc and tick tests before them.
 
 ## The inverted-radius arc: it was a guard, not the geometry
 

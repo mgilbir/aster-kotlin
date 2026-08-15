@@ -141,11 +141,15 @@ class UpstreamTransformVectorsTest {
       }
       is JsonObject ->
         when (element["\$"]?.jsonPrimitive?.content) {
-          // An accessor is its field path, which is what a specification writes.
-          "accessor" ->
-            element["fields"]?.jsonArray?.firstOrNull()?.jsonPrimitive?.content?.let {
-              VegaValue.Str(it)
-            }
+          // An accessor is its field path — which is what a specification writes — unless it also
+          // carries a **name** that differs from it. `field('k1', 'key')` reads `k1` and is named
+          // `key`, and upstream names an aggregate's output column after the *name*; a bare string
+          // cannot say that, so those vectors are counted rather than compared as a naming bug.
+          "accessor" -> {
+            val path = element["fields"]?.jsonArray?.firstOrNull()?.jsonPrimitive?.content
+            val name = element["name"]?.jsonPrimitive?.content
+            if (name != null && name != path) null else path?.let { VegaValue.Str(it) }
+          }
           "NaN" -> VegaValue.Num(Double.NaN)
           "Infinity" -> VegaValue.Num(Double.POSITIVE_INFINITY)
           "-Infinity" -> VegaValue.Num(Double.NEGATIVE_INFINITY)

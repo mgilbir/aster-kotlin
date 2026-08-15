@@ -95,7 +95,13 @@ function encode(value, seen = new Set()) {
     if (Array.isArray(value.fields) && Array.isArray(value.orders)) {
       return {$: 'comparator', fields: value.fields, orders: value.orders};
     }
-    if (Array.isArray(value.fields)) return {$: 'accessor', fields: value.fields};
+    if (Array.isArray(value.fields)) {
+      // An accessor carries a **name** as well as the field it reads, and they are not always the
+      // same: `field('k1', 'key')` reads `k1` and is named `key`, and upstream names an aggregate's
+      // output column after the *name*. Recording only the field made that vector look like a
+      // column-naming bug here.
+      return {$: 'accessor', fields: value.fields, ...(value.fname ? {name: value.fname} : {})};
+    }
     return {$: 'function', name: value.name || '(anonymous)'};
   }
   if (typeof value === 'symbol') return {$: 'symbol'};

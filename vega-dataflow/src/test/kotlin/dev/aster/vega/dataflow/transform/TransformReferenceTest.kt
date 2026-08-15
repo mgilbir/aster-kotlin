@@ -1111,7 +1111,7 @@ class TransformReferenceTest {
   fun `impute fills a group's missing keys from the whole dataset's`() {
     val expected =
       """[{"c":"a","t":1,"v":10},{"c":"a","t":3,"v":30},{"c":"b","t":1,"v":7},""" +
-        """{"c":"b","t":2,"v":9},{"c":"b","t":3,"v":11},{"c":"a","t":2,"v":0}]"""
+        """{"c":"b","t":2,"v":9},{"c":"b","t":3,"v":11},{"_impute":true,"c":"a","t":2,"v":0}]"""
     assertEquals(
       expected,
       run(
@@ -1132,7 +1132,7 @@ class TransformReferenceTest {
   fun `impute can fill from an aggregate of the group`() {
     assertEquals(
       """[{"c":"a","t":1,"v":10},{"c":"a","t":3,"v":30},{"c":"b","t":1,"v":7},""" +
-        """{"c":"b","t":2,"v":9},{"c":"b","t":3,"v":11},{"c":"a","t":2,"v":20}]""",
+        """{"c":"b","t":2,"v":9},{"c":"b","t":3,"v":11},{"_impute":true,"c":"a","t":2,"v":20}]""",
       run(
         """[{"type": "impute", "key": "t", "field": "v", "groupby": ["c"], "method": "mean"}]""",
         imputeRows,
@@ -1145,8 +1145,8 @@ class TransformReferenceTest {
   fun `keyvals can name keys nothing in the data has`() {
     assertEquals(
       """[{"c":"a","t":1,"v":10},{"c":"a","t":3,"v":30},{"c":"b","t":1,"v":7},""" +
-        """{"c":"b","t":2,"v":9},{"c":"b","t":3,"v":11},{"c":"a","t":2,"v":0},""" +
-        """{"c":"a","t":4,"v":0},{"c":"b","t":4,"v":0}]""",
+        """{"c":"b","t":2,"v":9},{"c":"b","t":3,"v":11},{"_impute":true,"c":"a","t":2,"v":0},""" +
+        """{"_impute":true,"c":"a","t":4,"v":0},{"_impute":true,"c":"b","t":4,"v":0}]""",
       run(
         """[{"type": "impute", "key": "t", "field": "v", "groupby": ["c"],
              "keyvals": [1, 2, 3, 4], "method": "value", "value": 0}]""",
