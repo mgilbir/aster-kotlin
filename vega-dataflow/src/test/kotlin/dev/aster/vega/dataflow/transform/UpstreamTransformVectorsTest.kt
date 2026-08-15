@@ -96,6 +96,34 @@ class UpstreamTransformVectorsTest {
     }
   }
 
+  /**
+   * Every package whose meaning lives in an **operator**, not just `vega-transforms`.
+   *
+   * `vega-encode` holds `stack`, `vega-geo` holds `geojson`, `vega-hierarchy` holds `nest` and
+   * `stratify`, and each is recorded through the same `prototype.transform` seam — so one replay
+   * covers them all, and an operator this engine does not have is counted rather than skipped in
+   * silence. A package with no vector file is simply absent, not an error: the recorder drops a
+   * file that recorded nothing.
+   */
+  private fun operatorPackages(): List<JsonObject> =
+    listOf(
+        "vega-transforms",
+        "vega-encode",
+        "vega-geo",
+        "vega-hierarchy",
+        "vega-regression",
+        "vega-crossfilter",
+        "vega-voronoi",
+      )
+      .flatMap { pkg ->
+        val file =
+          File(
+            File(System.getProperty("user.dir")).parentFile,
+            "test-fixtures/upstream-vectors/$pkg.json",
+          )
+        if (file.isFile) vectors(pkg) else emptyList()
+      }
+
   /** A recorded value as one of ours, or null when it carries something a vector cannot hold. */
   private fun translate(element: JsonElement): VegaValue? =
     when (element) {
@@ -150,7 +178,7 @@ class UpstreamTransformVectorsTest {
     val unreplayable = mutableMapOf<String, Int>()
     val failures = mutableListOf<String>()
 
-    for (vector in vectors("vega-transforms")) {
+    for (vector in operatorPackages()) {
       val op = vector["op"]?.jsonPrimitive?.content ?: continue
       // Only an operator's **first** call can be replayed. A transform operator is stateful —
       // `aggregate` remembers every group value it has seen — so a later pulse's output depends on
@@ -201,6 +229,14 @@ class UpstreamTransformVectorsTest {
         unreplayable.merge("$op (pulse truncated or empty)", 1, Int::plus)
         continue
       }
+      // Some operators publish something that is not tuples at all: `crossfilter` maintains an
+      // **index** — its pulse carries the positions it has filtered to, and `resolvefilter` reads
+      // that index rather than rows. Comparing an index against rows compares two different
+      // contracts, so it is counted rather than called a divergence.
+      if (expected.any { it !is VegaValue.Obj } || input.any { it !is VegaValue.Obj }) {
+        unreplayable.merge("$op (publishes an index rather than tuples)", 1, Int::plus)
+        continue
+      }
       val fields = LinkedHashMap<String, VegaValue>()
       fields["type"] = VegaValue.Str(op)
       params.forEach { (key, value) -> fields[key] = value!! }
@@ -223,7 +259,8 @@ class UpstreamTransformVectorsTest {
 
     // Written to a file rather than printed: the ledger is the useful output of this test, the
     // build suppresses standard streams, and a reviewer wants to read it after the fact.
-    val ledger = StringBuilder("replayed $replayed vega-transforms vectors\n")
+    val ledger =
+      StringBuilder("replayed $replayed operator vectors across every recorded package\n")
     unreplayable.entries
       .sortedByDescending { it.value }
       .forEach { ledger.append("  ${it.key}: ${it.value}\n") }

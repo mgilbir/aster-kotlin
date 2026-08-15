@@ -590,6 +590,17 @@ test that checks the endpoints passes on every implementation. These sample t = 
 which is where a wrong space shows. The comparison is channel by channel with a half-unit tolerance,
 because upstream prints `rgb(94, 108, 146)` with its channels already rounded.
 
+## One replay covers every operator package now
+
+`UpstreamTransformVectorsTest` reads all seven packages whose meaning lives in an operator —
+`vega-transforms`, `-encode`, `-geo`, `-hierarchy`, `-regression`, `-crossfilter`, `-voronoi` — because
+they share the `prototype.transform` seam. 151 replayed vectors became **169**, `stack` among them.
+
+It also learned a distinction worth keeping: some operators publish something that is **not tuples**.
+`crossfilter` maintains an *index* — its pulse carries positions, and `resolvefilter` reads that index
+rather than rows — so comparing it against rows compares two different contracts. Detected by shape
+rather than by name, and counted rather than called a divergence.
+
 ## Where the remaining packages stand
 
 Replayed: `d3-time` (366), `d3-array` (252), `d3-color` (34), `vega-time` (281), `vega-transforms`
