@@ -597,10 +597,6 @@ internal class Parse(
 
     val UNSUPPORTED_CHANNELS =
       setOf(
-        "latitude",
-        "longitude",
-        "latitude2",
-        "longitude2",
         "geojson",
         "xError",
         "yError",

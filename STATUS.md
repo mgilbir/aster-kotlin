@@ -697,7 +697,7 @@ no data is needed to compare two compilers. So every one of them was compiled by
 by this one, and the outputs compared property by property. That is a *measurement*, not a gate: the
 examples are not fixtures here, and nothing about them is checked in.
 
-**124 of 627 matched exactly** at the start, and **602** do now.
+**124 of 627 matched exactly** at the start, and **606** do now.
 
 The value is the *ranking*. The first sweep clustered by root cause, and the three most damaging
 causes were fixed straight away — chosen for what they do to the *picture* rather than for
@@ -712,11 +712,11 @@ frequency:
   where this compiler used `step - 2`, making it nearly four times too wide. `getBandSize` asks the
   scale's kind first and reaches `discreteBandSize` only where the domain is discrete.
 
-The sweep has been the working list ever since, and the 25 that still differ cluster like this:
+The sweep has been the working list ever since, and the 21 that still differ cluster like this:
 
 | Files | Cause |
 | --- | --- |
-| 21 | geographic: projections, `topojson`, `geoshape` — another worker's ground |
+| 20 | geographic: what is left is `geoshape`, `topojson`, `graticule` and `sphere`; the projection itself and the two geographic *position* channels now compile (below) |
 | 5 | the rest of the **facet data flow**: what is left is a chart whose cells are read by a **selection**, where the brush's own datasets have to be cut per cell as well |
 | 0 | nothing outside the geographic work; the one refusal left of my own is a facet inside a **facet**, described below |
 
@@ -4397,6 +4397,38 @@ A last one, off the same reading: `toFieldDefBase` keeps a field's bucketing, it
 aggregate, and **not its type**. Two layers over one column, one calling it ordinal and the other
 saying nothing, are the same field to a title; keying the title by the type as well titled the axis
 "age, age".
+
+### A place is not a position until a projection has been asked
+
+The `longitude` and `latitude` channels, and the `projection` that turns them into pixels. Three
+nodes in the flow and one component beside it:
+
+- `GeoJSONNode` gathers each coordinate pair into a **feature collection**, published as a signal,
+  so that a projection can be fitted to everything the chart draws. Only where the projection is
+  fitted at all: one that states its own `scale` or `translate` has been placed by hand and has
+  nothing to measure itself against.
+- `GeoPointNode` then asks the projection where each pair lands, writing the two pixels onto every
+  row as `x` and `y` — which the mark reads as *columns*, not through a scale. That is the whole of
+  `pointPosition`'s geographic branch: with a longitude or a latitude encoded and nothing said about
+  `x`, the position is the column `geopoint` wrote.
+- A **fitted** projection is given the plotting area to fill and the collections to fill it with, so
+  the map is as large as it can be without anything being said about where it sits; one placed by
+  hand takes the middle of the plotting area unless it says otherwise. The type every chart falls
+  back to is `equalEarth`.
+- A **layer** whose members agree about the projection has one, named for the layer rather than for
+  any member, fitted to everything they all draw — `parseNonUnitProjections`. A map of states under
+  a map of routes is one map, and fitting each layer on its own would draw two of different sizes.
+  The members still name it: their `geopoint` reads the merged projection, and only the writing of
+  it moves up.
+
+One rule came with them that is not geographic at all: `config.aria: false` takes the **whole chart**
+out of the accessibility tree, so no mark carries a role description or a spoken summary and every
+guide says `aria: false` on itself.
+
+The compiled specifications match upstream's byte for byte. What this runtime does not yet do is
+**fit a projection** the way d3 does — `albersUsa` is three projections in a coat, and fitting one to
+an extent is arithmetic of its own — so `geo-points` sits in `PROJECTION_PENDING` with its reason
+beside it, checked against upstream's compiler and not yet against upstream's drawing.
 
 ### What a facet inside a facet would take
 

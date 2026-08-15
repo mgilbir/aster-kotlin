@@ -185,6 +185,50 @@ internal class UnitView(
    * words and fails on. Anything outside `[A-Za-z0-9_]` becomes an underscore, and a leading digit
    * takes one in front of it.
    */
+  /**
+   * The `projection` this view's places are put on the page by, where it has one.
+   *
+   * A projection belongs to the **unit**: it is what turns a longitude and a latitude into two
+   * pixels, and a view with no geographic channel has nothing for one to do.
+   */
+  var projection: VegaValue.Obj? = null
+
+  val hasProjection: Boolean
+    get() = projection != null
+
+  /**
+   * The name it is written under, which every `geopoint` in the flow reads it by.
+   *
+   * A layer whose members agree about the projection has **one** of them, named for the layer and
+   * not for any member — `parseNonUnitProjections` merges them and renames the children's to it, so
+   * every member's places are put on the page by the same map.
+   */
+  var projectionName: String = ""
+    get() = field.ifEmpty { prefixed("projection") }
+
+  /**
+   * Whether the projection is **fitted** to the data rather than placed by hand.
+   *
+   * `const fit = !(proj && (proj.scale != null || proj.translate != null))`: a projection that
+   * states either has been placed already, and has nothing to measure itself against.
+   */
+  /** The feature collections a fitted projection measures itself against, in the order gathered. */
+  var geoJsonSignals: List<String> = emptyList()
+
+  /** Whether it is fitted to the view's own table, there being no feature collection to fit to. */
+  var fitsTable: Boolean = false
+
+  /**
+   * Whether a level above took this projection over — `component.projection.merged`.
+   *
+   * The view still needs it: its places are still put on the page, and the `geopoint` in its chain
+   * still names it. What it does not do is *write* it, the level that merged them having done so.
+   */
+  var projectionMerged: Boolean = false
+
+  val projectionFits: Boolean
+    get() = projection?.let { it.fields["scale"] == null && it.fields["translate"] == null } == true
+
   fun prefixed(suffix: String): String =
     Fields.varName(if (name.isEmpty()) suffix else "${name}_$suffix")
 

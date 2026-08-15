@@ -176,6 +176,49 @@ private class Compilation(
     selections = Selection.of(spec)
     val plots = plots() ?: return failed()
     allPlots = plots
+    // A **projection** belongs to the unit whose places it puts on the page. A view with a
+    // geographic channel has one whether or not the specification stated any properties for it, and
+    // one that states properties has one whether or not it has drawn anything yet.
+    for (plot in plots) {
+      for (view in plot.views) {
+        val stated = plot.spec.obj("projection") ?: spec.obj("projection")
+        val geographic =
+          view.spec.encoding.keys.any { it in Channels.GEO_POSITION_CHANNELS } ||
+            view.spec.mark == "geoshape"
+        if (!geographic && stated == null) continue
+        view.projection = obj {
+          config.raw.obj("projection")?.fields?.forEach { (key, value) -> put(key, value) }
+          stated?.fields?.forEach { (key, value) -> put(key, value) }
+        }
+        // The order `gatherFitData` walks the pairs in, which is the order the signals were named.
+        view.geoJsonSignals =
+          listOf(listOf("longitude", "latitude"), listOf("longitude2", "latitude2"))
+            .mapIndexedNotNull { index, pair ->
+              if (pair.none { view.spec.encoding[it] != null }) null
+              else view.prefixed("geojson_$index")
+            }
+        // With nothing to fit to, the projection measures itself against the view's own table:
+        // "main source is geojson, so we can just use that".
+        if (view.geoJsonSignals.isEmpty() && view.projectionFits) view.fitsTable = true
+      }
+      // `parseNonUnitProjections`: a layer whose members agree about the projection has one, named
+      // for the layer. It is fitted to everything they all draw — a map of states under a map of
+      // routes is one map, and fitting each layer on its own would draw two of different sizes.
+      val geographic = plot.views.filter { it.hasProjection }
+      if (
+        geographic.size > 1 && geographic.all { it.projection == geographic.first().projection }
+      ) {
+        val name =
+          Fields.varName(
+            listOf(plot.name, "projection").filter { it.isNotEmpty() }.joinToString("_")
+          )
+        val fits = geographic.flatMap { it.geoJsonSignals }.distinct()
+        geographic.forEachIndexed { index, view ->
+          view.projectionName = name
+          if (index == 0) view.geoJsonSignals = fits else view.projectionMerged = true
+        }
+      }
+    }
     concat = (plotTree as? Node.Nest)?.concat
     if (plots.any { it.views.isEmpty() }) return failed()
 
@@ -637,6 +680,9 @@ private class Compilation(
             .filter { it.name() != prefixed(it.channel) }
             .map { withinCell(assembleScale(it)) }
       }
+      // The projections a chart's places are put on the page by, which stand before the marks that
+      // read them — `assembleProjections`, walking the model tree.
+      projections(views).takeIf { it.isNotEmpty() }?.let { put("projections", arr(it)) }
       // A brush is drawn in **two** parts around the marks: its background under them so the data
       // stays legible through it, and its outline over them so it can be grabbed.
       put(
@@ -800,6 +846,37 @@ private class Compilation(
       Fields.varName("${selection.name}_$field")
     }
   }
+
+  /**
+   * `assembleProjectionForModel`: the projections the chart writes.
+   *
+   * A **fitted** projection is given the plotting area to fill and the features to fill it with, so
+   * that the map is as large as it can be and centred without anything being said about where it
+   * sits. One that states its own `scale` or `translate` has been placed by hand, and takes the
+   * middle of the plotting area unless it says otherwise.
+   */
+  private fun projections(views: List<UnitView>): List<VegaValue> =
+    views
+      .filter { it.hasProjection && !it.projectionMerged }
+      .distinctBy { it.projectionName }
+      .map { view ->
+        obj {
+          put("name", view.projectionName)
+          if (view.projectionFits) {
+            put("size", signalRef("[${view.widthSignal}, ${view.heightSignal}]"))
+            val fits = view.geoJsonSignals.ifEmpty { listOf("data('${view.mainData}')") }.distinct()
+            put(
+              "fit",
+              signalRef(if (fits.size > 1) "[${fits.joinToString(", ")}]" else fits.first()),
+            )
+          } else {
+            put("translate", signalRef("[width / 2, height / 2]"))
+          }
+          view.projection?.fields?.forEach { (key, value) -> put(key, value) }
+          // `projComp.set('type', 'equalEarth', false)`: the projection every chart falls back to.
+          if (view.projection?.string("type") == null) put("type", "equalEarth")
+        }
+      }
 
   /** The plot a view belongs to, where the compiler has been told about it. */
   private fun plotOfView(view: UnitView): Plot? =
@@ -1753,16 +1830,7 @@ private class Compilation(
       )
   }
 
-  private fun reportUnsupportedTopLevel() {
-    if (spec.fields.containsKey("projection")) {
-      diagnostics.error(
-        VegaLiteDiagnostics.UNSUPPORTED_TOP_LEVEL_PROPERTY,
-        "`projection` is not implemented; a geographic chart needs projection support in the " +
-          "runtime first.",
-        jsonPath = "$.projection",
-      )
-    }
-  }
+  private fun reportUnsupportedTopLevel() = Unit
 
   /**
    * `normalizeAutoSize` and `getTopLevelProperties`, which settle the same property in two places.

@@ -139,6 +139,11 @@ internal class DataPipeline(
 
     head = userTransforms(head, Written.OWN)
     implicitParse()?.let { head = head.then(it) }
+    // A place on the globe is not a position on the page until a **projection** has been asked
+    // where it lands. `GeoJSONNode` gathers the pairs into a feature collection the projection can
+    // be fitted to, and `GeoPointNode` then asks it, writing the two pixels onto every row.
+    geoJsonNodes().forEach { head = head.then(it) }
+    geoPointNodes().forEach { head = head.then(it) }
     if (!view.parentIsLayer) binNode()?.let { head = head.then(it) }
     timeUnitNode()?.let { head = head.then(it) }
     binnedTimeUnitNode()?.let { head = head.then(it) }
@@ -543,6 +548,73 @@ internal class DataPipeline(
   private fun bandPositionOf(def: ChannelDef): Double? =
     def.raw.number("bandPosition")
       ?: view.config.markConfig(view.spec.mark).number("timeUnitBandPosition")
+
+  /** A stated coordinate as JavaScript writes it, which is what `${def.datum}` amounts to. */
+  private fun plainly(value: VegaValue): String =
+    when (value) {
+      is VegaValue.Str -> value.value
+      is VegaValue.Num -> Fields.expressionNumber(value.value)
+      else -> value.toString()
+    }
+
+  /** The coordinate pairs a view encodes, in `[longitude, latitude]` order and outermost first. */
+  private fun geoPairs(): List<Pair<Int, List<VegaValue>>> =
+    listOf(listOf("longitude", "latitude"), listOf("longitude2", "latitude2")).mapIndexedNotNull {
+      index,
+      pair ->
+      val refs = pair.map { channel ->
+        val def = view.spec.encoding[channel]
+        when {
+          def == null -> VegaValue.Null
+          def.isFieldDef -> VegaValue.Str(def.field ?: "")
+          // `{expr: "${def.datum}"}` — the value written out as an expression, which for a number
+          // is the number itself and for a name is the name Vega will evaluate.
+          def.datum != null -> obj { put("expr", plainly(def.datum)) }
+          def.value != null -> obj { put("expr", plainly(def.value)) }
+          else -> VegaValue.Null
+        }
+      }
+      if (refs.all { it == VegaValue.Null }) null else index to refs
+    }
+
+  /**
+   * `GeoJSONNode.parseAll`: the feature collection a projection is **fitted** to.
+   *
+   * Only where the projection is fitted at all — one that states its own `scale` or `translate` has
+   * been placed by hand and needs nothing to measure itself against.
+   */
+  private fun geoJsonNodes(): List<PassThroughNode> {
+    if (!view.hasProjection || !view.projectionFits) return emptyList()
+    return geoPairs().map { (index, refs) ->
+      PassThroughNode(
+        listOf(
+          obj {
+            put("type", "geojson")
+            put("fields", arr(refs))
+            put("signal", view.prefixed("geojson_$index"))
+          }
+        )
+      )
+    }
+  }
+
+  /** `GeoPointNode.parseAll`: the two pixels a projection puts each pair at. */
+  private fun geoPointNodes(): List<PassThroughNode> {
+    if (!view.hasProjection) return emptyList()
+    return geoPairs().map { (index, refs) ->
+      val suffix = if (index == 1) "2" else ""
+      PassThroughNode(
+        listOf(
+          obj {
+            put("type", "geopoint")
+            put("projection", view.projectionName)
+            put("fields", arr(refs))
+            put("as", strings(listOf(view.prefixed("x$suffix"), view.prefixed("y$suffix"))))
+          }
+        )
+      )
+    }
+  }
 
   private fun binnedTimeUnitNode(): PassThroughNode? {
     val formulas =

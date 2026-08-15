@@ -803,6 +803,15 @@ internal object Guides {
 
     return obj {
       put(scaleChannel, view.scale(channel))
+      // `config.aria: false` takes the whole chart out of the accessibility tree, and a guide says
+      // so on itself: there is nothing to read a key out to. A legend that states its own `aria`
+      // has already answered the question.
+      if (
+        view.config.raw.fields["aria"] == VegaValue.Bool(false) &&
+          def.legend?.fields?.get("aria") == null
+      ) {
+        put("aria", VegaValue.Bool(false))
+      }
       // A legend labels a bucketed instant the same way an axis does, and for the same reason: the
       // swatch beside a colour ramp of months should read `Jan`, not the month's number.
       if (def.timeUnit != null) {

@@ -255,6 +255,9 @@ internal object Channels {
       "description",
     )
 
+  /** The channels that name a place on the globe rather than a position on the page. */
+  val GEO_POSITION_CHANNELS = setOf("longitude", "latitude", "longitude2", "latitude2")
+
   /** Every channel that can own a scale, in the order upstream iterates them. */
   val SCALE_CHANNELS =
     listOf(

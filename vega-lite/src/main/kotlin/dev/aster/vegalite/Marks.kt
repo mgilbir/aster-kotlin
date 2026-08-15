@@ -991,6 +991,9 @@ internal object Marks {
     // channel, and it is how a composite mark hides its own scaffolding — an error bar's two caps
     // are read as part of the bar, not as three separate objects.
     if (view.markDef.raw.fields["aria"] == VegaValue.Bool(false)) return@obj
+    // `config.aria: false` says the same thing about the **whole chart**: there is no accessibility
+    // tree to describe anything to, so neither the role nor the summary is written.
+    if (view.config.raw.fields["aria"] == VegaValue.Bool(false)) return@obj
     val mark = view.spec.mark
     // A mark may say what it *is* rather than what it is drawn with: a box plot's box is a rect,
     // and calling it a rect to a screen reader is naming the tool instead of the thing.
@@ -1341,6 +1344,17 @@ internal object Marks {
     defaultPos: String?,
     vgChannel: String?,
   ): VegaValue.Obj {
+    // A place the **projection** put on the page: with a longitude or a latitude encoded and
+    // nothing said about `x` or `y`, the position is the column `geopoint` wrote, not a scaled one.
+    if (
+      channel in setOf("x", "y") &&
+        view.spec.encoding[channel] == null &&
+        (view.spec.encoding["longitude"] != null || view.spec.encoding["latitude"] != null)
+    ) {
+      return obj {
+        put(vgChannel ?: channel, obj { put("field", view.prefixed(channel)) })
+      }
+    }
     val ref = positionRef(view, channel, defaultPos) ?: return VegaValue.EmptyObject
     val invalid = invalidPositionRef(view, channel)
     return obj {
