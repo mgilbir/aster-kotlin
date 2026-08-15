@@ -4772,6 +4772,18 @@ explored with it; the tree was already correct and two things it *said* were wro
 and pinned by instrumented tests. What remains untested there is physical hardware and a real user,
 which is a different claim from "not verified at all".
 
+A note on what the repository carries. The Vega-Lite gate has two kinds of upstream output behind
+it, and they are not kept the same way. The **compiled specifications** — what upstream's compiler
+makes of each fixture — are in the repository, because a diff of one is exactly how a change to a
+compiler rule is reviewed: the rule moves, and the property it moved shows up beside it. The
+**scenes** upstream draws from them are not. They were sixteen megabytes, and they are the one kind
+of reference a diff never explains — nobody reads a forty-thousand-line scene dump to see what
+changed. `scripts/vega-lite-oracle.sh` rebuilds them, so the repository carries the recipe.
+
+A fresh clone therefore has no scenes, and the drawing comparison says so as an **assumption**
+rather than passing: a green tick for a check that did not happen is the failure this repository has
+already had once, which is why the upstream vectors are kept the same way.
+
 A note on the harness, because it is now the fifteenth time. The differential comparison has had to be
 taught to see a symbol's outline, fill and stroke opacity, a dash pattern, a node's own opacity, an
 unfilled mark's missing opacity, the corners a curve puts between a series' points, a rectangle's four

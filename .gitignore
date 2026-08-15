@@ -25,3 +25,10 @@ node_modules/
 
 # Vega-Lite specifications compiled by the oracle, re-derivable by scripts/vega-lite-oracle.sh.
 test-fixtures/vega-lite-compiled/
+
+# The *scenes* upstream draws from those specifications, re-derivable by the same script. Sixteen
+# megabytes of somebody else's output, and the one kind of reference a diff never explains: nobody
+# reads a forty-thousand-line scene dump to see what a rule changed. The compiled specifications
+# beside them stay in the repository, because a diff of one of those is exactly how a change to a
+# compiler rule is reviewed.
+test-fixtures/vega-lite-reference/*.reference.json

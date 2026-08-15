@@ -33,10 +33,16 @@ class VegaLiteFixtureDifferentialTest {
     val source = File(repositoryRoot, "test-fixtures/vega-lite/$name.vl.json").readText()
     val compiled = VegaLiteCompiler().compileJson(source)
     val vega = requireNotNull(compiled.toJson()) { "$name produced no Vega specification" }
-    val reference =
-      Differential.readReference(
-        File(repositoryRoot, "test-fixtures/vega-lite-reference/$name.reference.json")
-      )
+    // The scene upstream draws is **derived**: `scripts/vega-lite-oracle.sh` rebuilds it, so the
+    // repository carries the recipe rather than sixteen megabytes of somebody else's output. A
+    // fresh clone has none, and says so as an *assumption* rather than passing — a green tick for a
+    // check that did not happen is the failure this repository has already had once.
+    val scene = File(repositoryRoot, "test-fixtures/vega-lite-reference/$name.reference.json")
+    org.junit.jupiter.api.Assumptions.assumeTrue(
+      scene.isFile,
+      "no upstream scene at ${scene.path} — run scripts/vega-lite-oracle.sh to draw them",
+    )
+    val reference = Differential.readReference(scene)
     return reference to SpecCompiler(VegaHeadlessTextEngine(), fixtureLoader).compileJson(vega)
   }
 
