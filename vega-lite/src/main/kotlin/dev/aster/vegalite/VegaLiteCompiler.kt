@@ -426,7 +426,10 @@ private class Compilation(
                       "}",
                   )
                 }
-            listOf(resolved) + bound.map { (_, signal) -> obj { put("name", signal) } }
+            listOf(resolved) +
+              bound.map { (_, signal) -> obj { put("name", signal) } } +
+              // The clock a `timer` selection is advanced by, which ticks for the whole chart.
+              selection.clockSignals()
           } +
         Params.signals(spec, diagnostics) +
         // A concatenation writes each selection's machinery inside the plot that declared it,
@@ -1933,6 +1936,50 @@ private class Compilation(
             }
           }
         }
+    // A chart advanced by a **clock** draws one frame at a time, and the frame is a table of its
+    // own: `assembleUnitSelectionData` lifts the selection's filter out of the view's main table
+    // and hangs it on a `<name>_curr` beside it. The scales still measure the whole column — an
+    // axis that moved with the frame would be a different chart every tick — and only the marks
+    // read the frame.
+    val animated = selections.firstOrNull { it.isTimer }
+    var frames = joined
+    if (animated != null) {
+      val test = animated.test()
+      val source = views.firstOrNull()?.let { it.spec.data }?.let { order.indexOf(it) } ?: 0
+      val holds = frames.firstOrNull { dataset ->
+        dataset.array("transform").orEmpty().any { it.string("expr") == test }
+      }
+      if (holds != null) {
+        val name = holds.string("name") ?: "source_$source"
+        val kept = holds.array("transform").orEmpty().filter { it.string("expr") != test }
+        frames =
+          frames.map { dataset ->
+            if (dataset !== holds) dataset
+            else
+              obj {
+                (dataset as VegaValue.Obj).fields.forEach { (key, value) ->
+                  if (key != "transform") put(key, value) else put("transform", arr(kept))
+                }
+              }
+          } +
+            obj {
+              put("name", "${name}_curr")
+              put("source", name)
+              put(
+                "transform",
+                arr(
+                  listOf(
+                    obj {
+                      put("type", "filter")
+                      put("expr", test)
+                    }
+                  )
+                ),
+              )
+            }
+        views.forEach { it.markData = "${name}_curr" }
+      }
+    }
     views.forEachIndexed { index, view ->
       // The **scales** read one named point and the marks another, where the specification asked
       // for a path that breaks at a gap the domain does not want. They are the same node
@@ -1950,7 +1997,7 @@ private class Compilation(
       }
       view.rawData = outputs[index].raw?.source ?: view.mainData
     }
-    return joined
+    return frames
   }
 
   // -----------------------------------------------------------------------------------------

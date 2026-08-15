@@ -697,7 +697,7 @@ no data is needed to compare two compilers. So every one of them was compiled by
 by this one, and the outputs compared property by property. That is a *measurement*, not a gate: the
 examples are not fixtures here, and nothing about them is checked in.
 
-**124 of 627 matched exactly** at the start, and **597** do now.
+**124 of 627 matched exactly** at the start, and **599** do now.
 
 The value is the *ranking*. The first sweep clustered by root cause, and the three most damaging
 causes were fixed straight away — chosen for what they do to the *picture* rather than for
@@ -712,14 +712,14 @@ frequency:
   where this compiler used `step - 2`, making it nearly four times too wide. `getBandSize` asks the
   scale's kind first and reaches `discreteBandSize` only where the domain is discrete.
 
-The sweep has been the working list ever since, and the 30 that still differ cluster like this:
+The sweep has been the working list ever since, and the 28 that still differ cluster like this:
 
 | Files | Cause |
 | --- | --- |
 | 21 | geographic: projections, `topojson`, `geoshape` — another worker's ground |
 | 5 | the rest of the **facet data flow**: what is left is a chart whose cells are read by a **selection**, where the brush's own datasets have to be cut per cell as well |
 | 1 | a facet inside a **concatenation**, which this compiler has as one grid per chart rather than one per plot |
-| 2 | `time` channel animations, set aside |
+
 | 3 | one-offs, each its own rule |
 
 Fourteen are still refused by name: eight geographic, three a facet inside a facet, two a repeat
@@ -4397,6 +4397,30 @@ A last one, off the same reading: `toFieldDefBase` keeps a field's bucketing, it
 aggregate, and **not its type**. Two layers over one column, one calling it ordinal and the other
 saying nothing, are the same field to a title; keying the title by the type as well titled the axis
 "age, age".
+
+### A chart animated by a clock
+
+The `time` channel is a scale like any other: a **band** over the column the frames run through,
+stepped at `config.scale.framesPerSecond` — half a second a frame. Nothing is drawn with it, which
+is why it has no guide; it is read by the signals that advance the frame.
+
+Those are a `timer` selection, `{"on": "timer"}` on a point parameter. The clock itself belongs at
+the top of the chart — `anim_clock`, `last_tick_at`, `is_playing` — and what advances is the time
+*elapsed* since the last tick, so a paused chart keeps its place and a resumed one carries on rather
+than starting over. Each view then reads the scale it walks: where the domain starts, how far the
+range runs, and what value the elapsed time inverts to. The tuple is written from that value, forced
+so a frame is written again even where the value has not changed, and there is no toggle: a frame
+replaces the one before it.
+
+The frame is a **table of its own**. `assembleUnitSelectionData` lifts the selection's filter out of
+the view's main table and hangs it on a `<name>_curr` beside it; the scales still measure the whole
+column — an axis that moved with the frame would be a different chart every tick — and only the
+marks read the frame.
+
+The fixture written for it found a gap in **this runtime**, now fixed: a band scale could not be
+inverted. It has no continuous inverse, but it does have an answer — the domain value whose band a
+position falls in, `scaleBand.invertRange` — and a position in the *gap* between two bands belongs
+to neither. Without it the clock had nothing to read and the chart drew one frame for ever.
 
 ### A brush is dragged in a cell, not across a grid
 

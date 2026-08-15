@@ -275,6 +275,10 @@ internal object Channels {
       "angle",
       "theta",
       "radius",
+      // The clock a chart is **animated** by is a scale like any other: a band over the column the
+      // frames run through, stepped at the frame rate. Nothing is drawn with it — it is read by the
+      // signals that advance the frame — which is why it is last, and why it has no guide.
+      "time",
     )
 
   /**

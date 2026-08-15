@@ -603,7 +603,6 @@ internal class Parse(
         "xError",
         "yError",
         "url",
-        "time",
       )
   }
 }

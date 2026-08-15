@@ -235,6 +235,17 @@ public class SignalScope(
       return VegaValue.Arr(listOf(VegaValue.Num(place[0]), VegaValue.Num(place[1])))
     }
     val scale = resolveScale(name, "invert") ?: return VegaValue.Null
+    // A **band** has an inverse after all — not a number but a *value*: the band a position falls
+    // in. `scaleBand.invert` is what a chart animated by a clock reads its frame from, walking the
+    // range a step at a time and asking which value each step lands on.
+    if (scale is BandScale) {
+      val position = value.asDouble()
+      return scale.invert(position)?.let { VegaValue.Str(it) } ?: VegaValue.Null
+    }
+    if (scale is PointScale) {
+      val position = value.asDouble()
+      return scale.invert(position)?.let { VegaValue.Str(it) } ?: VegaValue.Null
+    }
     if (scale !is InvertibleScale) {
       diagnostics?.error(
         DiagnosticCodes.SCALE_UNSUPPORTED_TYPE,

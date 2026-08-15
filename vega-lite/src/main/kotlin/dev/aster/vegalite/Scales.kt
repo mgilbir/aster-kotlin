@@ -146,6 +146,9 @@ internal object Scales {
       MeasureType.NOMINAL,
       MeasureType.ORDINAL -> {
         if (channel in COLOR_CHANNELS || channel in DISCRETE_RANGE_CHANNELS) return "ordinal"
+        // The **clock**: a band, always. Its range is a step per frame, and there is no other
+        // shape a scale whose whole job is to be stepped through could take.
+        if (channel == "time") return "band"
         // An offset scale divides a band between the marks nested in it, and *how* it divides
         // follows the mark: a bar takes a band of its own inside the group, a point sits at a
         // place in it. The same rule the position channels use, one level in.
@@ -566,6 +569,9 @@ internal object Scales {
   ): VegaValue? {
     val config = view.config
     return when (channel) {
+      // A frame is a step of the clock, and the clock runs at `config.scale.framesPerSecond` —
+      // `{step: 1000 / framesPerSecond}`, half a second a frame by default.
+      "time" -> obj { put("step", num(1000.0 / (config.scaleConfig("framesPerSecond") ?: 2.0))) }
       // An offset scale's range is the *inner* band, and what it spans depends on whether the
       // outer one was given a step to grow by. `getOffsetRange`: a declared `{step}` on the
       // position — unless it says `for: "position"` — makes the step the offset's own, and the

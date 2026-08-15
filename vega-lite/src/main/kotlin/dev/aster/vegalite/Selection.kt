@@ -898,12 +898,114 @@ internal class Selection(
     }
   }
 
+  /**
+   * Whether this selection is advanced by a **clock** rather than by a pointer —
+   * `isTimerSelection`.
+   *
+   * `{"on": "timer"}` on a point selection is what animates a chart: the frame is a row of the
+   * store, and the store is written by a signal that walks the `time` scale's domain.
+   */
+  val isTimer: Boolean
+    get() = (on as? VegaValue.Obj)?.string("type") == "timer"
+
+  /**
+   * The clock itself, which belongs at the top of the chart — `point.topLevelSignals`.
+   *
+   * It runs whether or not anything is drawn from it: a `timer` stream ticks sixty times a second,
+   * and what advances is the time *elapsed* since the last tick, so that a paused chart keeps its
+   * place and a resumed one carries on rather than starting over.
+   */
+  fun clockSignals(): List<VegaValue> {
+    if (!isTimer) return emptyList()
+    return listOf(
+      obj {
+        put("name", "anim_clock")
+        put("init", "0")
+        put(
+          "on",
+          arr(
+            listOf(
+              obj {
+                put(
+                  "events",
+                  obj {
+                    put("type", "timer")
+                    put("throttle", num(1000.0 / 60.0))
+                  },
+                )
+                put(
+                  "update",
+                  "is_playing ? (anim_clock + (now() - last_tick_at) > max_range_extent ? 0 : " +
+                    "anim_clock + (now() - last_tick_at)) : anim_clock",
+                )
+              }
+            )
+          ),
+        )
+      },
+      obj {
+        put("name", "last_tick_at")
+        put("init", "now()")
+        put(
+          "on",
+          arr(
+            listOf(
+              obj {
+                put(
+                  "events",
+                  arr(
+                    listOf(
+                      obj { put("signal", "anim_clock") },
+                      obj { put("signal", "is_playing") },
+                    )
+                  ),
+                )
+                put("update", "now()")
+              }
+            )
+          ),
+        )
+      },
+      obj {
+        put("name", "is_playing")
+        put("init", "true")
+      },
+    )
+  }
+
   fun signals(
     unit: String,
     brushes: List<String> = emptyList(),
     view: UnitView? = null,
   ): List<VegaValue> {
     val out = mutableListOf<VegaValue>()
+    // A clock's own reading of the scale it walks: where the domain starts, how far the range
+    // runs, and what value the elapsed time inverts to. `animationSignals`, one set per view.
+    if (isTimer && view != null) {
+      // Single-quoted, as `animationSignals` writes them: these are expressions handed to Vega,
+      // and the name inside one is a literal like any other.
+      val clock = "'${view.scale("time")}'"
+      out += obj {
+        put("name", "eased_anim_clock")
+        put("update", "anim_clock")
+      }
+      out += obj {
+        put("name", "${name}_domain")
+        put("init", "domain($clock)")
+      }
+      out += obj {
+        put("name", "min_extent")
+        put("init", "extent(${name}_domain)[0]")
+      }
+      out += obj {
+        put("name", "max_range_extent")
+        put("init", "extent(range($clock))[1]")
+      }
+      out += obj {
+        put("name", "anim_value")
+        put("update", "invert($clock, eased_anim_clock)")
+      }
+    }
     val datum = "(item().isVoronoi ? datum.datum : datum)"
     val projected = view?.let { projections(it) } ?: fields.map { null to it }
     val picked =
@@ -930,10 +1032,42 @@ internal class Selection(
     val guard =
       "datum && item().mark.marktype !== 'group' && indexof(item().mark.role, 'legend') < 0" +
         brushes.joinToString("") { " && indexof(item().mark.name, '$it') < 0" }
+    // A **clock** writes its tuple from the value the elapsed time inverts to, forced so that a
+    // frame is written again even where the value has not changed — a paused chart still ticks.
+    if (isTimer) {
+      out += obj {
+        put("name", "${name}_tuple")
+        put(
+          "on",
+          arr(
+            listOf(
+              obj {
+                put(
+                  "events",
+                  arr(
+                    listOf(
+                      obj { put("signal", "eased_anim_clock") },
+                      obj { put("signal", "anim_value") },
+                    )
+                  ),
+                )
+                put(
+                  "update",
+                  "{unit: $unit, fields: ${name}_tuple_fields, " +
+                    "values: [anim_value ? anim_value : min_extent]}",
+                )
+                put("force", VegaValue.Bool(true))
+              }
+            )
+          ),
+        )
+      }
+    }
     // A selection driven by a **legend** writes its tuple from the swatch signal, the same shape a
     // control binding produces: the legend is the control.
     val legendField = view?.let { legendField(it) } ?: fields.singleOrNull()
-    if (legendStreams.isNotEmpty() && legendField != null) {
+    if (isTimer) Unit
+    else if (legendStreams.isNotEmpty() && legendField != null) {
       val signal = legendSignalName(legendField)
       out += obj {
         put("name", "${name}_tuple")
@@ -1009,43 +1143,46 @@ internal class Selection(
         )
       }
     }
-    toggle?.let { expression ->
-      out += obj {
-        put("name", "${name}_toggle")
-        put("value", VegaValue.Bool(false))
-        put(
-          "on",
-          arr(
-            listOfNotNull(
-              obj {
-                // A legend-bound selection toggles on the legend's own stream — there is no click
-                // on a mark to read the shift key from.
-                if (legendStreams.isNotEmpty()) {
-                  put("events", obj { put("merge", arr(legendStreams)) })
-                } else put("events", arr(listOf(pickStream(view))))
-                put("update", expression)
-              },
-              clear?.let {
+    // A clock has nothing to toggle: a frame replaces the one before it, always.
+    toggle
+      ?.takeIf { !isTimer }
+      ?.let { expression ->
+        out += obj {
+          put("name", "${name}_toggle")
+          put("value", VegaValue.Bool(false))
+          put(
+            "on",
+            arr(
+              listOfNotNull(
                 obj {
-                  put(
-                    "events",
-                    arr(
-                      listOf(
-                        obj {
-                          put("source", "view")
-                          put("type", it)
-                        }
-                      )
-                    ),
-                  )
-                  put("update", "false")
-                }
-              },
-            )
-          ),
-        )
+                  // A legend-bound selection toggles on the legend's own stream — there is no click
+                  // on a mark to read the shift key from.
+                  if (legendStreams.isNotEmpty()) {
+                    put("events", obj { put("merge", arr(legendStreams)) })
+                  } else put("events", arr(listOf(pickStream(view))))
+                  put("update", expression)
+                },
+                clear?.let {
+                  obj {
+                    put(
+                      "events",
+                      arr(
+                        listOf(
+                          obj {
+                            put("source", "view")
+                            put("type", it)
+                          }
+                        )
+                      ),
+                    )
+                    put("update", "false")
+                  }
+                },
+              )
+            ),
+          )
+        }
       }
-    }
     out += obj {
       put("name", "${name}_modify")
       put(
@@ -1074,7 +1211,8 @@ internal class Selection(
     val tuple = "${name}_tuple"
     val scope = if (resolve == "global") "true" else "{unit: ${name}_tuple.unit}"
     val toggleSignal = "${name}_toggle"
-    return if (toggle == null) "$tuple, $scope"
+    // A clock has no toggle to gate on: each frame replaces the one before it.
+    return if (toggle == null || isTimer) "$tuple, $scope"
     else
       "$toggleSignal ? null : $tuple, " +
         (if (resolve == "global") "$toggleSignal ? null : true, "
