@@ -26,6 +26,14 @@ internal class Selection(
   val resolve: String,
   /** The event that picks a row, as a Vega stream — `click` unless the selection says otherwise. */
   val on: VegaValue,
+  /**
+   * Whether the specification **stated** the stream, rather than falling to the default.
+   *
+   * `disableDirectManipulation`: a selection driven from controls is driven from them alone unless
+   * it asked for the pointer by name. The default click is dropped for it, so a widget-bound
+   * parameter does not also change when a mark happens to be clicked.
+   */
+  val statedStreams: Boolean = false,
   val toggle: String?,
   val bindsScales: Boolean,
   /**
@@ -81,7 +89,20 @@ internal class Selection(
   var owner: UnitView? = null
 
   /** `unitName`: the declaring view's name, as the expression a tuple records. */
-  fun unitName(): String = quoted(owner?.name ?: "")
+  /**
+   * The name a picked tuple records — the model it was picked in.
+   *
+   * Inside a facet that is not a *name* but an expression: every cell of the grid is the same model
+   * drawn once per value, so the unit is the cell's name and the values it holds. `unitName`.
+   */
+  fun unitName(cell: UnitView? = null, grid: FacetLayout? = null): String {
+    val base = quoted(cell?.name ?: owner?.name ?: "")
+    if (grid == null) return base
+    return base +
+      grid.byChannel.joinToString("") { (channel, field) ->
+        " + '__facet_${channel}_' + (facet[${quoted(field)}])"
+      }
+  }
 
   /** Whether the pointer becomes a hand over a mark: a *hover* selection is not clicked. */
   val showsPointer: Boolean
@@ -174,6 +195,7 @@ internal class Selection(
           channels = encodings,
           resolve = options.string("resolve") ?: "global",
           on = stream(options.fields["on"], type),
+          statedStreams = options.fields["on"] != null,
           // `toggle: false` turns it off; anything else is the expression, and the default is the
           // shift key — which is what makes a second click add to the picked set rather than
           // replace it.
@@ -194,7 +216,12 @@ internal class Selection(
           bindsScales = bind == VegaValue.Str("scales"),
           inputs =
             (bind as? VegaValue.Obj)?.takeIf {
-              type == "point" && options.string("resolve") == null && !it.has("legend")
+              // `selCmpt.resolve === 'global'`, which is the **default** and not only the silence:
+              // a selection that says so itself is bound to its controls exactly as one that says
+              // nothing is.
+              type == "point" &&
+                options.string("resolve").let { stated -> stated == null || stated == "global" } &&
+                !it.has("legend")
             },
           legendStreams =
             if (type != "point") emptyList()
@@ -768,6 +795,27 @@ internal class Selection(
           put("name", Fields.varName("${name}_$field"))
           val start = started?.fields?.get(field)
           if (start != null) put("init", literal(start)) else put("value", VegaValue.Null)
+          // The control is written **into** by the chart as well as by the reader: a pick still
+          // moves the widget. `disableDirectManipulation` takes the pointer streams off unless the
+          // specification asked for them by name, so a binding that named none has no `on` at all.
+          if (statedStreams) {
+            val datum = if (nearest) "(item().isVoronoi ? datum.datum : datum)" else "datum"
+            put(
+              "on",
+              arr(
+                listOf(
+                  obj {
+                    put("events", arr(listOf(pickStream(view))))
+                    put(
+                      "update",
+                      "datum && item().mark.marktype !== 'group' ? " +
+                        "$datum[${quoted(field)}] : null",
+                    )
+                  }
+                )
+              ),
+            )
+          }
           // The control for this field, the one for its channel, or — where the binding names
           // neither — the one control the whole selection is driven from.
           val own = bind.fields[field] ?: channel?.let { bind.fields[it] }
@@ -778,16 +826,18 @@ internal class Selection(
   }
 
   /** The name of the voronoi overlay this selection picks through, when it picks by nearness. */
-  fun voronoiName(): String =
-    listOf(owner?.name.orEmpty(), "voronoi").filter { it.isNotEmpty() }.joinToString("_")
+  fun voronoiName(view: UnitView? = null): String =
+    // Named for the view it covers, which inside a facet is the **cell's** — `child_voronoi`. The
+    // owner is the model the parameter was declared on, and a facet's cell is not that model.
+    listOf((view ?: owner)?.name.orEmpty(), "voronoi").filter { it.isNotEmpty() }.joinToString("_")
 
   /** The stream a pick listens on, scoped to the voronoi overlay where there is one. */
-  private fun pickStream(): VegaValue {
+  private fun pickStream(view: UnitView? = null): VegaValue {
     val stream = on as? VegaValue.Obj ?: return on
     if (!nearest) return stream
     return obj {
       stream.fields.forEach { (key, value) -> put(key, value) }
-      put("markname", voronoiName())
+      put("markname", voronoiName(view))
     }
   }
 
@@ -804,7 +854,7 @@ internal class Selection(
     val hasX = "x" in projectedOn || projectedOn.isEmpty()
     val hasY = "y" in projectedOn || projectedOn.isEmpty()
     return obj {
-      put("name", voronoiName())
+      put("name", voronoiName(view))
       put("type", "path")
       put("interactive", VegaValue.Bool(true))
       put("aria", VegaValue.Bool(false))
@@ -912,7 +962,7 @@ internal class Selection(
           arr(
             listOfNotNull(
               obj {
-                put("events", arr(listOf(pickStream())))
+                put("events", arr(listOf(pickStream(view))))
                 put("update", "$guard ? {$picked} : null")
                 put("force", VegaValue.Bool(true))
               },
@@ -972,7 +1022,7 @@ internal class Selection(
                 // on a mark to read the shift key from.
                 if (legendStreams.isNotEmpty()) {
                   put("events", obj { put("merge", arr(legendStreams)) })
-                } else put("events", arr(listOf(pickStream())))
+                } else put("events", arr(listOf(pickStream(view))))
                 put("update", expression)
               },
               clear?.let {

@@ -697,7 +697,7 @@ no data is needed to compare two compilers. So every one of them was compiled by
 by this one, and the outputs compared property by property. That is a *measurement*, not a gate: the
 examples are not fixtures here, and nothing about them is checked in.
 
-**124 of 627 matched exactly** at the start, and **596** do now.
+**124 of 627 matched exactly** at the start, and **597** do now.
 
 The value is the *ranking*. The first sweep clustered by root cause, and the three most damaging
 causes were fixed straight away — chosen for what they do to the *picture* rather than for
@@ -712,13 +712,13 @@ frequency:
   where this compiler used `step - 2`, making it nearly four times too wide. `getBandSize` asks the
   scale's kind first and reaches `discreteBandSize` only where the domain is discrete.
 
-The sweep has been the working list ever since, and the 31 that still differ cluster like this:
+The sweep has been the working list ever since, and the 30 that still differ cluster like this:
 
 | Files | Cause |
 | --- | --- |
 | 21 | geographic: projections, `topojson`, `geoshape` — another worker's ground |
 | 5 | the rest of the **facet data flow**: what is left is a chart whose cells are read by a **selection**, where the brush's own datasets have to be cut per cell as well |
-| 2 | one-offs, each its own rule — a facet inside a concatenation, and a trellis of selections needing a voronoi and an input binding |
+| 1 | a facet inside a **concatenation**, which this compiler has as one grid per chart rather than one per plot |
 | 2 | `time` channel animations, set aside |
 | 3 | one-offs, each its own rule |
 
@@ -4397,6 +4397,33 @@ A last one, off the same reading: `toFieldDefBase` keeps a field's bucketing, it
 aggregate, and **not its type**. Two layers over one column, one calling it ordinal and the other
 saying nothing, are the same field to a title; keying the title by the type as well titled the axis
 "age, age".
+
+### A brush is dragged in a cell, not across a grid
+
+A faceted chart's selection machinery belongs **inside the cell group**. Every signal in it reads
+the pointer against one cell's scales, and there is one of each per cell rather than one for the
+grid; so does the brush rectangle, which is dragged across one cell's rows and no others. This
+compiler was writing all of it at the top and drawing the brush outside the cells altogether.
+
+What stays outside is what a cell cannot own: the store, the signal the store resolves into, and
+whatever a **control** writes — a widget is part of the page rather than of the drawing, and one per
+cell would be a row of them. A selection bound to the *scales* keeps its per-channel signals in the
+cell but pushes them outward, `push: "outer"`, to bare signals declared at the top; and those are
+declared beside the selection's own, one selection at a time, because upstream calls each compiler's
+`topLevelSignals` while it is on that selection.
+
+Four smaller rules came with it, each its own difference:
+
+- A cell whose child declares a selection carries a **`facet` signal** — the datum of the cell the
+  pointer is in — so that a pick made anywhere in the grid is attributed to the right one.
+- The unit a picked tuple records is then not a name but an **expression**: every cell is the same
+  model drawn once per value, so the unit is `"child" + '__facet_column_' + (facet["Series"])`.
+- The voronoi overlay a `nearest` selection picks through is named for the view it covers, which
+  inside a facet is the cell's — `child_voronoi`.
+- A selection bound to controls is bound to them **alone** unless it asked for the pointer by name.
+  `disableDirectManipulation` drops the default click, so a widget-bound parameter does not also
+  change when a mark happens to be clicked — and `resolve: "global"` stated outright is the same as
+  saying nothing, which had been switching the binding off.
 
 ### Only what is drawn between two edges needs to know where they are
 

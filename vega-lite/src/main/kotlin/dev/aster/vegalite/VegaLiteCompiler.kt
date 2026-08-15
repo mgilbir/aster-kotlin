@@ -101,14 +101,15 @@ private class Compilation(
           .filter { it.type == "interval" && !it.bindsScales && it.owner === selection.owner }
           .map { "${it.name}_brush" }
       return selection.signals(
-        unit = selection.unitName(),
+        unit = selection.unitName(views.firstOrNull().takeIf { facet != null }, facet),
         brushes = brushes,
         view = selection.owner ?: views.firstOrNull(),
       )
     }
     val view = selection.owner ?: views.firstOrNull() ?: return emptyList()
+    val unit = selection.unitName(views.firstOrNull().takeIf { facet != null }, facet)
     return selection.intervalSignals(view, selection.initial) +
-      selection.intervalTail(view, unit = selection.unitName(), initial = selection.initial)
+      selection.intervalTail(view, unit = unit, initial = selection.initial)
   }
 
   /**
@@ -404,34 +405,50 @@ private class Compilation(
           } +
         selections
           .distinctBy { it.name }
-          .map { selection ->
+          .flatMap { selection ->
             // A selection **bound to the scales** in a chart of several views is resolved from the
             // signals its plot pushes outward rather than from its store: `vlSelectionResolve`
             // knows
             // nothing about bound scales, so upstream reassembles the state by hand from the
             // per-channel signals — and those are declared here, empty, for the plot to push into.
+            // One selection at a time, its own signal and then what it pushes: upstream calls each
+            // compiler's `topLevelSignals` while it is on that selection, so the two stay together.
             val bound = boundOutward(selection, views)
-            if (bound.isEmpty()) selection.resolveSignal()
-            else
-              obj {
-                put("name", selection.name)
-                put(
-                  "update",
-                  "{" +
-                    bound.joinToString(", ") { (field, signal) -> "${quoted(field)}: $signal" } +
-                    "}",
-                )
-              }
-          } +
-        selections
-          .distinctBy { it.name }
-          .flatMap { selection ->
-            boundOutward(selection, views).map { (_, signal) -> obj { put("name", signal) } }
+            val resolved =
+              if (bound.isEmpty()) selection.resolveSignal()
+              else
+                obj {
+                  put("name", selection.name)
+                  put(
+                    "update",
+                    "{" +
+                      bound.joinToString(", ") { (field, signal) -> "${quoted(field)}: $signal" } +
+                      "}",
+                  )
+                }
+            listOf(resolved) + bound.map { (_, signal) -> obj { put("name", signal) } }
           } +
         Params.signals(spec, diagnostics) +
         // A concatenation writes each selection's machinery inside the plot that declared it,
         // where the marks it reacts to are; everything else is one plot, so it stays here.
-        selections.filter { concat == null || it.owner == null }.flatMap { machinery(it, views) }
+        // Inside a facet the machinery belongs to the **cell**: every signal in it reads the
+        // pointer against one cell's scales, and there is one of each per cell rather than one for
+        // the grid. What stays here is what a cell cannot own — the store, the signal the store
+        // resolves into, and whatever a binding writes from outside the chart.
+        selections
+          .filter { facet == null && (concat == null || it.owner == null) }
+          .flatMap { machinery(it, views) } +
+        // A control's own signals stand at the top even where everything else about the selection
+        // is written inside a cell: one widget for the chart, not one per cell.
+        selections
+          .distinctBy { it.name }
+          .filter { facet != null }
+          .flatMap { selection ->
+            val outside = boundInward(selection, views).toSet()
+            machinery(selection, views).filter {
+              (it as? VegaValue.Obj)?.string("name") in outside
+            }
+          }
     val root = plots.first().size!!
     // The facets' own values, which the layout counts and the headers title themselves from — and,
     // for a wrapped facet, only along the directions a shared axis was actually drawn in.
@@ -521,11 +538,68 @@ private class Compilation(
       concat?.let { put("layout", it.layout()) }
       // The cells' own scales are assembled before the marks that read them, the cell group being
       // where they are written.
-      if (facet != null && concat == null) {
+      val grid = facet
+      if (grid != null && concat == null) {
         // `assembleAxisSignals` on the **cell**: an axis inside it that draws its grid across no
         // other scale falls back to `width` or `height` by name, and inside the cell those names
         // mean the whole chart until the cell aliases them to its own.
-        cellSignals = localSizeSignals(plots.single())
+        val own = selections.distinctBy { it.name }
+        cellSignals =
+          // `assembleFacetSignals`: a cell whose child declares a selection carries the datum of
+          // the cell the pointer is in, so that a pick made anywhere in the grid is attributed to
+          // the right one. A grid nothing is selected in needs no such signal.
+          (if (own.isEmpty()) emptyList()
+          else
+            listOf(
+              obj {
+                put("name", "facet")
+                put("value", VegaValue.EmptyObject)
+                put(
+                  "on",
+                  arr(
+                    listOf(
+                      obj {
+                        put(
+                          "events",
+                          arr(
+                            listOf(
+                              obj {
+                                put("source", "scope")
+                                put("type", "pointermove")
+                              }
+                            )
+                          ),
+                        )
+                        put(
+                          "update",
+                          "isTuple(facet) ? facet : group(${quoted(grid.named("cell"))}).datum",
+                        )
+                      }
+                    )
+                  ),
+                )
+              }
+            )) +
+            localSizeSignals(plots.single()) +
+            own.flatMap { selection ->
+              // A signal the top level declares is *written* here and read there — `push: "outer"`
+              // is how Vega says which of the two directions this one goes — and one a **control**
+              // writes is not written here at all: it belongs beside the widget, outside the grid.
+              val pushed = boundOutward(selection, views).map { it.second }.toSet()
+              val outside = boundInward(selection, views).toSet()
+              machinery(selection, views).mapNotNull { signal ->
+                val named = (signal as? VegaValue.Obj)?.string("name")
+                when {
+                  named in outside -> null
+                  named !in pushed -> signal
+                  else ->
+                    obj {
+                      (signal as VegaValue.Obj).fields.forEach { (key, value) -> put(key, value) }
+                      put("push", "outer")
+                    }
+                }
+              }
+            }
         cellScales =
           allScales.values
             .filter { it.name() != prefixed(it.channel) }
@@ -537,6 +611,8 @@ private class Compilation(
         "marks",
         arr(
           if (concat != null) groups(plotTree)
+          // A facet's marks are its cell and its headers, and the brush is already inside the cell.
+          else if (facet != null) marks(views, plots.single().axes)
           else brushed(views, marks(views, plots.single().axes))
         ),
       )
@@ -658,7 +734,7 @@ private class Compilation(
     selection: Selection,
     views: List<UnitView>,
   ): List<Pair<String, String>> {
-    if (!selection.bindsScales || concat == null) return emptyList()
+    if (!selection.bindsScales || (concat == null && facet == null)) return emptyList()
     // Every view that declares it, not just the one that owns the component. `topLevelSignals` is
     // called once per unit and **appends** the mappings it does not already have — "no single
     // selCmpt has a global view" — so a repeated plot's bound signal names every field any of its
@@ -676,6 +752,21 @@ private class Compilation(
       }
     }
     return out.toList()
+  }
+
+  /**
+   * The signals a selection **bound to a control** publishes, which stand at the top of the chart.
+   *
+   * `inputs.ts`'s `topLevelSignals`: one per projection, carrying the binding itself. The widget is
+   * outside the drawing, so the signal it writes cannot live inside a cell that is drawn once per
+   * value of the facet — there would be one control per cell.
+   */
+  private fun boundInward(selection: Selection, views: List<UnitView>): List<String> {
+    if (selection.inputs == null) return emptyList()
+    val view = selection.owner ?: views.firstOrNull() ?: return emptyList()
+    return selection.projections(view).map { (_, field) ->
+      Fields.varName("${selection.name}_$field")
+    }
   }
 
   /** Signals that changed their name when two nodes were folded together. */
@@ -1515,8 +1606,12 @@ private class Compilation(
   }
 
   private fun marks(views: List<UnitView>, axes: List<VegaValue>): List<VegaValue> {
-    val childMarks = views.flatMap { Marks.marks(it) }
-    val current = facet ?: return childMarks
+    val drawn = views.flatMap { Marks.marks(it) }
+    val current = facet ?: return drawn
+    // A brush is drawn **in the cell**, where the marks it reacts to are. The rectangle belongs to
+    // one cell's plotting area — it is dragged across those rows and no others — and the signals
+    // that follow the pointer read that cell's own scales, so both go inside the group.
+    val childMarks = brushed(views, drawn)
 
     // An axis is drawn **once for the grid** only where its scale is the grid's: a channel each
     // cell scales for itself has an axis per cell, since one band of labels cannot stand for

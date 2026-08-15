@@ -351,6 +351,14 @@ internal interface FacetLayout {
   val fields: List<String>
 
   /**
+   * Each facet channel and the column it breaks the chart down by, in `FACET_CHANNELS` order.
+   *
+   * `unitName` reads them: a cell of a trellis is not named by the grid but by the *values* it
+   * holds, so a tuple picked in it records `"child" + '__facet_column_' + (facet["Series"])`.
+   */
+  val byChannel: List<Pair<String, String>>
+
+  /**
    * The definitions those columns came from, which the data flow still has to honour.
    *
    * A facet channel is lifted out of the encoding before the scales are built — it says nothing
@@ -444,6 +452,9 @@ internal class FacetGrid(val row: Facet?, val column: Facet?, private val prefix
 
   /** Row before column, which is the order upstream groups, sorts and crosses by. */
   override val fields: List<String> = listOfNotNull(row, column).flatMap { it.groupingFields }
+
+  override val byChannel: List<Pair<String, String>> =
+    listOfNotNull(row, column).map { it.channel to Fields.vgField(it.def) }
 
   override val defs: List<ChannelDef> = listOfNotNull(row?.def, column?.def)
 
@@ -840,6 +851,8 @@ internal class FacetWrap(
 
   override val fields: List<String> =
     if (def.bin is Binning.Bin) listOf(field, "${field}_end") else listOf(field)
+
+  override val byChannel: List<Pair<String, String>> = listOf("facet" to field)
 
   override val defs: List<ChannelDef> = listOf(def)
 
