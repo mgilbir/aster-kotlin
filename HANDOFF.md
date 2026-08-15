@@ -447,6 +447,13 @@ One command, and the only thing it needs told is nothing:
 ./scripts/record-upstream-vectors.sh
 ```
 
+**The vectors themselves are not committed.** They are derived — nearly 5 MB of somebody else's
+inputs, rebuildable byte-identically — so the repository carries the *recipe* instead. Two consequences
+to know: a fresh clone has no vectors, so `UpstreamTimeVectorsTest` and `UpstreamTransformVectorsTest`
+are **skipped** rather than passing (an assumption, and `scripts/check.sh` prints a note saying so);
+and `known-divergences.json` *is* committed, because it is not a copy of upstream but this engine's
+own list of places it disagrees, with a bug behind each entry.
+
 It reads the pinned version from the **installed** Vega (`oracle-js/node_modules/vega/package.json`),
 clones that exact tag of the monorepo into `build/vega-upstream` — the tests are not published to npm —
 records every package, and drops any file that recorded nothing rather than leaving an empty one that

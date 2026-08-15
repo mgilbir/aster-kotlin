@@ -18,6 +18,13 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
+# The upstream-vector replays are conditional on data this repository does not carry, so say when
+# they are not running rather than letting a green tick imply they did.
+if [ -z "$(ls test-fixtures/upstream-vectors/vega-*.json 2>/dev/null)" ]; then
+  echo "note: no upstream vectors present, so UpstreamTimeVectorsTest and UpstreamTransformVectorsTest"
+  echo "      will be skipped. Run scripts/record-upstream-vectors.sh to replay Vega's own tests."
+fi
+
 ./gradlew \
   spotlessCheck \
   test \
