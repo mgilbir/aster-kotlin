@@ -1,6 +1,7 @@
 package dev.aster.vega.model.spec
 
 import dev.aster.vega.model.DiagnosticCodes
+import dev.aster.vega.model.VegaValue
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
@@ -240,6 +241,86 @@ class UnhandledPropertiesTest {
         )
         .single { it.jsonPath?.endsWith("x") == true }
     assertTrue("is not read" in channel.message, channel.message)
+  }
+
+  /**
+   * `bind` is grammar, not a widget, and the two forms that cannot work say why.
+   *
+   * The description of a control parses like anything else — see `SignalBind` — so a chart that
+   * asks for a slider no longer reports that bindings have no equivalent here. Two forms still
+   * cannot: a binding that takes its value from an **element already on the page**, which there is
+   * no page for, and a `radio` or `select` with nothing to choose between, which upstream's own
+   * schema requires.
+   */
+  @Test
+  fun `a binding is read, and the two forms that cannot work are reported`() {
+    val bound =
+      SpecParser()
+        .parseJson(
+          spec(
+            """"signals": [{"name": "size", "value": 40,
+                 "bind": {"input": "range", "min": 10, "max": 100, "name": "bar size"}}]"""
+          )
+        )
+    assertTrue(bound.diagnostics.isEmpty(), bound.diagnostics.toString())
+    assertEquals(
+      SignalBind.Range(min = 10.0, max = 100.0, name = "bar size"),
+      bound.spec!!.signals.single().bind,
+    )
+
+    val element =
+      diagnostics(spec(""""signals": [{"name": "s", "bind": {"element": "#slider"}}]""")).single {
+        it.code == DiagnosticCodes.PARSE_MISSING_PROPERTY
+      }
+    assertTrue("already on the page" in element.message, element.message)
+
+    val empty =
+      diagnostics(spec(""""signals": [{"name": "s", "bind": {"input": "radio"}}]""")).single {
+        it.code == DiagnosticCodes.PARSE_MISSING_PROPERTY
+      }
+    assertTrue("needs 'options'" in empty.message, empty.message)
+  }
+
+  /**
+   * A generic input carries every extra property; a structured one reports it.
+   *
+   * The asymmetry is upstream's, in both halves of it. Its generic generator copies all remaining
+   * properties onto the element and its schema marks that variant `additionalProperties: true`, so
+   * `placeholder` is grammar and a diagnostic on it would report a gap that is really a decision
+   * not to carry the hint. The four structured kinds close the door — `additionalProperties:
+   * false`, and a generator that builds a fixed control — so `placeholder` on a checkbox means
+   * nothing anywhere and is worded as the mistake it is, not as something unimplemented here.
+   */
+  @Test
+  fun `a text binding carries its extra attributes and a checkbox reports them`() {
+    val field =
+      SpecParser()
+        .parseJson(
+          spec(
+            """"signals": [{"name": "q", "value": "",
+                 "bind": {"input": "text", "placeholder": "search jobs", "autocomplete": "off",
+                          "maxlength": 40}}]"""
+          )
+        )
+    assertTrue(field.diagnostics.isEmpty(), field.diagnostics.toString())
+    val bind = field.spec!!.signals.single().bind as SignalBind.Field
+    assertEquals(
+      mapOf(
+        "placeholder" to VegaValue.Str("search jobs"),
+        "autocomplete" to VegaValue.Str("off"),
+        "maxlength" to VegaValue.Num(40.0),
+      ),
+      bind.attributes,
+    )
+    assertEquals("search jobs", bind.attributeText("placeholder"))
+    assertEquals(null, bind.attributeText("title"))
+
+    val checkbox =
+      diagnostics(
+          spec(""""signals": [{"name": "s", "bind": {"input": "checkbox", "placeholder": "x"}}]""")
+        )
+        .single()
+    assertTrue("neither has upstream's" in checkbox.message, checkbox.message)
   }
 
   /**

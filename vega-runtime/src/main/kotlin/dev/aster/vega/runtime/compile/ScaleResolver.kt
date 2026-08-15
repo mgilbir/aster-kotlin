@@ -1145,12 +1145,13 @@ public class ScaleResolver(
     // the domain rather than none at all. Vega's `distinct` counts a null as a value.
     val keys =
       fields.flatMap { path -> dataset.map { it.field(path) } }.distinctBy { it.asString() }
+    val descending = descendingOrder(sort, scaleName)
     return when (sort) {
       null -> keys
-      is DomainSort.ByValue -> keys.sortedWith(domainOrder(sort.descending) { it })
+      is DomainSort.ByValue -> keys.sortedWith(domainOrder(descending) { it })
       is DomainSort.ByAggregate -> {
         val summaries = aggregateSortKeys(dataset, fields, sort, scaleName) ?: return keys
-        keys.sortedWith(domainOrder(sort.descending) { summaries[it.asString()] ?: VegaValue.Null })
+        keys.sortedWith(domainOrder(descending) { summaries[it.asString()] ?: VegaValue.Null })
       }
     }
   }
@@ -1168,9 +1169,12 @@ public class ScaleResolver(
    */
   private fun sortedUnion(domain: DomainSpec.Union, scaleName: String): List<VegaValue> {
     val keys = unionValues(domain.parts, scaleName).distinctBy { it.asString() }
+    // A union's order is settled the same way a single domain's is, a signal having its say first:
+    // `{"order": {"signal": …}}` reverses a shared scale as much as it reverses a lone one.
+    val descending = descendingOrder(domain.sort, scaleName)
     return when (val sort = domain.sort) {
       null -> keys
-      is DomainSort.ByValue -> keys.sortedWith(domainOrder(sort.descending) { it })
+      is DomainSort.ByValue -> keys.sortedWith(domainOrder(descending) { it })
       is DomainSort.ByAggregate -> {
         val parts =
           domain.parts.flatMap { part ->
@@ -1187,9 +1191,22 @@ public class ScaleResolver(
             } ?: return keys
           }
         val summaries = aggregateSortKeys(parts, sort, scaleName) ?: return keys
-        keys.sortedWith(domainOrder(sort.descending) { summaries[it.asString()] ?: VegaValue.Null })
+        keys.sortedWith(domainOrder(descending) { summaries[it.asString()] ?: VegaValue.Null })
       }
     }
+  }
+
+  /**
+   * Which way a domain sorts, once a signal has had its say.
+   *
+   * `{"order": {"signal": "order"}}` is how a control reverses a chart, and it cannot be read at
+   * parse time — so the expression is carried and evaluated here. Anything beginning with "desc" is
+   * descending, which is upstream's own test rather than an equality against the whole word.
+   */
+  private fun descendingOrder(sort: DomainSort?, scaleName: String): Boolean {
+    val expression = sort?.orderSignal ?: return sort?.descending ?: false
+    val resolved = numbers.resolveText(expression, scaleName) ?: return sort.descending
+    return resolved.startsWith("desc")
   }
 
   /**

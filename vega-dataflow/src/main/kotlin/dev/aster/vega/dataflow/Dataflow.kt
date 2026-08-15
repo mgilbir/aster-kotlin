@@ -1,6 +1,7 @@
 package dev.aster.vega.dataflow
 
 import dev.aster.vega.model.VegaValue
+import kotlin.jvm.JvmInline
 
 /**
  * Dataflow API surface.

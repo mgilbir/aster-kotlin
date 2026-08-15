@@ -1,5 +1,6 @@
 package dev.aster.vega.scene
 
+import kotlin.jvm.JvmInline
 import kotlin.math.roundToInt
 
 /** Non-premultiplied sRGB colour with components in `0..1`. */

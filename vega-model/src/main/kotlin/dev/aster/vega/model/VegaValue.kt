@@ -1,5 +1,8 @@
 package dev.aster.vega.model
 
+import io.github.mgilbir.ecma262.RegExp
+import kotlin.jvm.JvmInline
+
 /**
  * The generic value model used everywhere in the runtime: parsed specification literals, datum
  * fields, signal values, transform output and expression results.
@@ -37,8 +40,18 @@ public sealed interface VegaValue {
    */
   public class Pattern(public val source: String, public val flags: String = "") : VegaValue {
 
-    /** Compiled once, here, because a `test()` in a filter runs per row. */
-    public val regex: Regex = Regex(source, flagOptions(flags))
+    /**
+     * Compiled once, here, because a `test()` in a filter runs per row.
+     *
+     * An **ECMA-262** engine rather than Kotlin's `Regex`, because a pattern in a specification is
+     * JavaScript's and Kotlin's is the platform's — `java.util.regex` on Android, a different
+     * engine on each native target. The four measured divergences that motivated the swap: Java's
+     * `$` matches before a final newline where JavaScript's does not, `\a` is an identity escape in
+     * Annex B and an error in Java, and `x{` and `[]` — legal, ordinary patterns in a browser —
+     * *throw* on the JVM. A specification is data, often pasted data, so those two throws were a
+     * chart taken down by a string someone typed.
+     */
+    public val regex: RegExp = RegExp.compile(source, flags)
 
     /** Upstream's `String(new RegExp(p, f))`, which is the literal a reader would have written. */
     public val text: String
@@ -51,26 +64,11 @@ public sealed interface VegaValue {
 
     override fun toString(): String = text
 
-    private companion object {
-      /**
-       * The JavaScript flags that have a Kotlin equivalent.
-       *
-       * `i`, `m` and `s` map across; `g`, `y` and `u` are about *where a search resumes* and about
-       * Unicode escapes, neither of which changes the answer `test()` gives, so they are accepted
-       * and ignored rather than refused — a specification carrying `g` should not stop working.
-       */
-      fun flagOptions(flags: String): Set<RegexOption> =
-        flags
-          .mapNotNull {
-            when (it) {
-              'i' -> RegexOption.IGNORE_CASE
-              'm' -> RegexOption.MULTILINE
-              's' -> RegexOption.DOT_MATCHES_ALL
-              else -> null
-            }
-          }
-          .toSet()
-    }
+    // No flag translation any more. `i`, `m`, `s`, `g`, `y`, `u`, `v` and `d` all mean here what
+    // they mean in a browser, including the three that had to be dropped before: `u`/`v` change
+    // what
+    // an escape denotes, and `g` decides whether `replace` replaces once or throughout — which this
+    // engine applies itself, so the caller no longer branches on the flag text.
   }
 
   public companion object {

@@ -1,6 +1,6 @@
 package dev.aster.vega.runtime.scale
 
-import dev.aster.vega.model.PlatformDecimals
+import dev.aster.vega.model.Decimals
 import dev.aster.vega.model.VegaValue
 import dev.aster.vega.model.asDouble
 import dev.aster.vega.model.asString
@@ -1096,6 +1096,6 @@ public fun formatNumber(value: Double, decimals: Int): String {
     val rounded = roundHalfUp(normalized).toLong()
     return rounded.toString()
   }
-  val text = PlatformDecimals.fixed(normalized, decimals)
+  val text = Decimals.fixed(normalized, decimals)
   return if (text == "-0" || text.matches(Regex("-0\\.0+"))) text.substring(1) else text
 }

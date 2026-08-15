@@ -162,6 +162,7 @@ scale output:
 | `parse-date-patterns` | 27 | a column of dates read with a stated format rather than a guessed one, local and UTC, one pattern quoted |
 | `guide-encode-geometry` | 32 | an axis whose encode blocks move the lines it drew, and a tick restyled by a rule over its own value |
 | `filter-by-pattern` | 35 | rows kept and rejected by a regular expression built from a signal, and labels built with `replace` over a pattern |
+| `domain-sort-order` | 32 | a band domain whose sort direction is named by a signal rather than written as a word |
 
 The gate is wired into `./scripts/oracle.sh`, so every further scale, mark and transform is built
 against a harness that can say we are wrong — which golden tests cannot.
@@ -220,7 +221,7 @@ substantive compatibility items:
 | 6. View and Compose APIs | Yes |
 | 7. SVG, PNG, PDF export | Yes |
 | 8. TalkBack can describe and navigate | Partial — virtual nodes are tested by instrumentation, not with TalkBack itself |
-| 9. At least 100 compatibility fixtures pass | **Yes** — 176 |
+| 9. At least 100 compatibility fixtures pass | **Yes** — 177 |
 | 10. Core runtime has no Android dependency | Yes |
 | 11. Renders without WebView | Yes |
 | 12. Build and test loop runs from the terminal | Yes |

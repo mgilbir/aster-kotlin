@@ -403,6 +403,35 @@ class ExpressionReferenceTest {
         // ---- control flow ----
         "if(true,\"a\",\"b\")|\"a\"",
         "if(false,\"a\",\"b\")|\"b\"",
+        // ---- ECMA-262 regular expressions ----
+        // `split` takes a pattern upstream, and had been stringifying it and splitting on the
+        // literal `/\\d+/` — so it returned the whole string, silently. A capture group's text is
+        // part of the result, and one that did not participate is a hole rather than an omission.
+        "split(\"a1b22c\", regexp(\"\\\\d+\"))|[\"a\",\"b\",\"c\"]",
+        "split(\"a1b22c\", regexp(\"(\\\\d)\\\\d*\"))|[\"a\",\"1\",\"b\",\"2\",\"c\"]",
+        "split(\"a1b22c\", regexp(\"\\\\d+\"), 2)|[\"a\",\"b\"]",
+        "split(\"a1b\", regexp(\"(x)?(\\\\d)\"))|[\"a\",null,\"1\",\"b\"]",
+        "split(\"abc\", regexp(\"x\"))|[\"abc\"]",
+        // A pattern in a specification is JavaScript's, and Kotlin's `Regex` is the platform's.
+        // Each
+        // of the first four was measured wrong against upstream before `VegaValue.Pattern` moved to
+        // an ECMA-262 engine: Java's `$` matches before a final newline, `\\a` is an identity
+        // escape
+        // in Annex B and an error in Java, and `x{` and `[]` — ordinary patterns in a browser —
+        // *threw*, which is a chart taken down by a pasted string rather than a wrong answer.
+        "test(regexp(\"a$\"), \"a\\n\")|false",
+        "test(regexp(\"x{\"), \"x{\")|true",
+        "test(regexp(\"[]\"), \"a\")|false",
+        "test(regexp(\"\\\\a\"), \"a\")|true",
+        // The flags mean what they mean in a browser, including the two that used to be dropped.
+        "test(regexp(\"^b\",\"m\"), \"a\\nb\")|true",
+        "test(regexp(\"a.b\",\"s\"), \"a\\nb\")|true",
+        // `$`-substitution in a replacement is JavaScript's, not Kotlin's — and `g` alone decides
+        // whether the replacement happens once or throughout.
+        "replace(\"Ada Lovelace\", regexp(\"(\\\\w+) (\\\\w+)\"), \"$2, $1\")|\"Lovelace, Ada\"",
+        "replace(\"price 5\", regexp(\"(\\\\d)\"), \"[$&]\")|\"price [5]\"",
+        "replace(\"a-b-c\", regexp(\"-\",\"g\"), \"+\")|\"a+b+c\"",
+        "replace(\"a-b-c\", regexp(\"-\"), \"+\")|\"a+b-c\"",
         // ---- formatting ----
         "format(1234.5678,\".2f\")|\"1234.57\"",
         "format(0.1234,\".1%\")|\"12.3%\"",
@@ -417,6 +446,35 @@ class ExpressionReferenceTest {
         "format(-7,\"d\")|\"−7\"",
         // Only the leading sign: the exponent keeps its own hyphen.
         "format(-0.005,\".2e\")|\"−5.00e-3\"",
+        // A **tie**, which is where a formatter is either exact or merely plausible. 2.675 is
+        // stored
+        // as 2.67499999999999982…, so every one of these rounds *down* — and 8.835, which is stored
+        // just above its tie, rounds up. The engine got the `f` cases right and the `e` and `g`
+        // cases
+        // wrong for as long as it had a formatter, because it reached those two through Java's
+        // `String.format("%.Ne")`, which rounds the shortest printable form rather than the exact
+        // value and answers 2.68e+0 where JavaScript's `toExponential` answers 2.67e+0. Read out of
+        // upstream with `eval-probe.js`, and the reason `Decimals` now expands the double itself.
+        "format(2.675,\".2e\")|\"2.67e+0\"",
+        "format(2.675,\".3g\")|\"2.67\"",
+        "format(1.005,\".2e\")|\"1.00e+0\"",
+        "format(9.995,\".2e\")|\"9.99e+0\"",
+        "format(8.835,\".2f\")|\"8.84\"",
+        "format(1.0000000000000002,\".17e\")|\"1.00000000000000022e+0\"",
+        // `g` and `~`, which the specifier grammar did not accept until these vectors said so. An
+        // unparsed specifier is not reported — it falls back to plain number text — so `.3g` had
+        // been
+        // answering `2.675` where upstream answers `2.67`, which is a wrong label that looks like a
+        // right one.
+        "format(1200,\".3g\")|\"1.20e+3\"",
+        "format(0.000012345,\".3g\")|\"0.0000123\"",
+        "format(1e21,\".3g\")|\"1.00e+21\"",
+        "format(0,\".3g\")|\"0.00\"",
+        "format(-2.675,\".3g\")|\"−2.67\"",
+        "format(1.5,\".3~g\")|\"1.5\"",
+        "format(1.5,\".3~f\")|\"1.5\"",
+        "format(1200,\".3~g\")|\"1.2e+3\"",
+        "format(1234.5,\",.3~f\")|\"1,234.5\"",
         "format(-0.001,\".2f\")|\"0.00\"",
         "toString(-5)|\"-5\"",
         "\"\" + -5|\"-5\"",

@@ -11,6 +11,9 @@ coroutines = "1.10.2"
 ## Calendar arithmetic for the core. JetBrains' recommendation for dates in shared KMP code, so
 ## the core stays portable rather than reaching for java.time or java.util.Calendar.
 kotlinx-datetime = "0.8.0"
+## An ECMA-262 regular expression engine in common Kotlin. A pattern in a specification is
+## JavaScript's, and Kotlin's `Regex` is the platform's — see VegaValue.Pattern.
+ktecma262 = "0.1.4"
 androidx-core = "1.17.0"
 androidx-customview = "1.2.0"
 androidx-appcompat = "1.7.1"
@@ -29,6 +32,7 @@ ktfmt = "0.64"
 android-application = { id = "com.android.application", version.ref = "agp" }
 android-library = { id = "com.android.library", version.ref = "agp" }
 kotlin-jvm = { id = "org.jetbrains.kotlin.jvm", version.ref = "kotlin" }
+kotlin-multiplatform = { id = "org.jetbrains.kotlin.multiplatform", version.ref = "kotlin" }
 kotlin-serialization = { id = "org.jetbrains.kotlin.plugin.serialization", version.ref = "kotlin" }
 kotlin-compose = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "kotlin" }
 spotless = { id = "com.diffplug.spotless", version.ref = "spotless" }
@@ -39,6 +43,7 @@ kotlinx-coroutines-core = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-c
 kotlinx-coroutines-android = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-android", version.ref = "coroutines" }
 kotlinx-coroutines-test = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-test", version.ref = "coroutines" }
 kotlinx-datetime = { module = "org.jetbrains.kotlinx:kotlinx-datetime", version.ref = "kotlinx-datetime" }
+ktecma262 = { module = "io.github.mgilbir:ktecma262", version.ref = "ktecma262" }
 
 androidx-core-ktx = { module = "androidx.core:core-ktx", version.ref = "androidx-core" }
 androidx-customview = { module = "androidx.customview:customview", version.ref = "androidx-customview" }

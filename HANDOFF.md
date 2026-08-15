@@ -9,7 +9,7 @@ Branch `milestone-0-bootstrap`. Working tree clean, both gates green:
 - `./scripts/check.sh` — format, all tests, lint, demo APK
 - `./scripts/oracle.sh` — regenerates upstream references and runs the differential comparison
 
-**176 differential fixtures pass, all matching upstream exactly.** That is the only number here
+**177 differential fixtures pass, all matching upstream exactly.** That is the only number here
 that means what it says.
 
 ## Read this before trusting the other number
@@ -269,6 +269,179 @@ fields — `isRegExp` has to answer true, and `'' + regexp('a.b','i')` has to be
 variant broke four exhaustive `when`s in main sources and three in tests, which is the whole cost of
 doing it properly. Flags: `i`, `m`, `s` map onto Kotlin's; `g`, `y`, `u` are accepted and ignored,
 except in `replace`, where `g` decides first-match against all-matches.
+## The core is multiplatform, and compiling it found what the grep could not
+`vega-model`, `-expression`, `-dataflow`, `-scene`, `-runtime` and `-svg` are now
+`kotlin("multiplatform")`: a `jvm` target plus `macosArm64`, `iosArm64`, `iosSimulatorArm64` and
+`linuxX64`, all four compiled by `scripts/check.sh`. `vega-loader` and `test-fixtures` stay Kotlin/JVM
+on purpose — a socket, a file on disk, and test scaffolding are the platform, not the port.
+Sources did **not** move. Each module points `commonMain` at `src/main/kotlin` and `jvmTest` at
+`src/test/kotlin`, so the diff is a build change rather than two hundred renamed files.
+**What compiling found that six milestones of `NoAndroidTypesTest` did not.** `LinkedHashMap` is
+common Kotlin, so two caches that *subclassed* it — `TextLayoutCache` and `CachingExpressionCompiler`,
+both using the three-argument access-order constructor and `removeEldestEntry` — passed the grep
+cleanly. Neither exists off the JVM, where the class is final besides. Both are now an explicit LRU in
+four lines: remove-and-reinsert on a hit, evict `keys.first()` when over capacity. `Character.digit`
+was the third, replaced by the ASCII digit rule — which is what `parseInt` does anyway, so the
+narrower answer is the more faithful one.
+**The trap, which cost a green run.** The multiplatform plugin gives a module `jvmTest` and **no
+`test` task**. `./gradlew test` therefore matched nothing in six modules, ran no core tests at all,
+and printed BUILD SUCCESSFUL. If you add a module or a script, check that what you run actually runs:
+there is now a `test` alias registered in every multiplatform module, and `oracle.sh` says `jvmTest`
+outright because `--tests` only takes a real `Test` task.
+**Still to do here.** The tests are all JVM. They exercise common code, so they cover the logic, but
+nothing yet *runs* on a native target — `commonTest` with a multiplatform assertion library would be
+the honest next step, and the differential fixtures cannot move there because they read files off
+disk. And `Regex` is the platform's, not ECMA-262: see the note below.
+
+## Regular expressions are ECMA-262 now
+
+`VegaValue.Pattern` compiles with **`io.github.mgilbir:ktecma262`**, an ECMA-262 engine in common
+Kotlin, instead of Kotlin's `Regex`. A pattern in a specification is JavaScript's; Kotlin's `Regex` is
+whatever the platform has — `java.util.regex` on Android, a different engine on each native target.
+The four divergences that had been measured are now vectors, and they pass:
+
+| pattern, subject | upstream | before | now |
+| --- | --- | --- | --- |
+| `a$` on `"a\n"` | no match | matched | no match |
+| `x{` on `"x{"` | matches | **threw** | matches |
+| `\a` on `"a"` | matches | no match | matches |
+| `[]` on `"a"` | never matches | **threw** | never matches |
+
+Three things came with the swap, all of them upstream behaviour this engine had approximated:
+
+- **Flags are honoured, not translated.** `g`, `y`, `u`, `v` and `d` used to be accepted and dropped
+  because Kotlin had no equivalent. `g` in particular decides whether `replace` replaces once or
+  throughout, and the engine applies that itself — so `Functions.replace` no longer branches on flag
+  text.
+- **`$` substitution in a replacement is JavaScript's**: `$&`, `` $` ``, `$'`, `$1`, `$<name>`, with an
+  invalid reference emitted literally. Kotlin's `Regex` spells that differently.
+- **`split` takes a pattern.** It had been stringifying one to `/\d+/` and splitting on that literal,
+  so it silently returned the whole string. Capture groups now appear in the result and a
+  non-participating group is a hole (`null`), which is what JavaScript does.
+
+`test` deliberately calls `findAll(...).isNotEmpty()` rather than the engine's `test`. JavaScript's
+`RegExp.test` advances `lastIndex` under `g`, so consecutive calls alternate; upstream gets away with it
+because it builds a fresh `RegExp` per evaluation, while a `Pattern` here is built once and read per
+row. The stateless form is what keeps a filter's answer independent of how many rows preceded it.
+
+**Not blocked any more.** `io.github.mgilbir:ktecma262:0.1.4` is on Maven Central with all seven
+modules — `common`, `jvm`, `js` and the four native ones — so it resolves like any other dependency
+and `settings.gradle.kts` is back to `google()` and `mavenCentral()` alone. Verified by moving the
+locally published copies out of `~/.m2` and resolving every target from Central with
+`--refresh-dependencies`: a green build quietly reading a local artifact would prove nothing.
+
+Two things about that dependency are worth remembering. A published version cannot be amended, so a
+release that omits a target needs a new number rather than a re-upload — 0.1.2 shipped `jvm` and `js`
+only, and 0.1.3 declared native variants whose per-target modules were absent, which fails later and
+more confusingly than omitting them would. And if a `mavenLocal()` is ever added back, it belongs
+**above** `mavenCentral()`: Gradle takes the first repository holding a coordinate, so a partially
+published version of the same number would otherwise win.
+
+Worth knowing about that repository's release workflow, since it caused a false alarm: it publishes to
+Central and **never creates a GitHub Release**, so `gh release list` showing only v0.1.0 says nothing
+about what is published. Its version comes from `build.gradle.kts` and is *guarded* against the tag
+name, so a tag/version mismatch fails the run loudly rather than silently shipping the wrong number.
+The v0.1.2 tag run did fail — 401 from the staging API — and a later manual dispatch is what published
+it, as a `user_managed` deployment needing a click in the portal.
+
+
+## `Regex` is the platform's, and upstream's is ECMA-262
+Vega's `regexp`, `test` and `replace` take a pattern **from the specification**, and upstream runs it
+through JavaScript's own engine. Kotlin's `Regex` delegates to whatever the target has — `java.util.regex`
+on the JVM and Android, Kotlin/Native's own engine on the native targets, the real thing on JS — so the
+same specification can behave three ways, none of them guaranteed to be upstream's. Measured, not
+assumed:
+| pattern, subject | ECMA-262 (upstream) | JVM (what Android runs) |
+| --- | --- | --- |
+| `a$` on `"a\n"` | no match | **matches** — Java's `$` sits before a final line terminator |
+| `x{` on `"x{"` | matches, `{` is literal | **throws** `Illegal repetition` |
+| `\a` on `"a"` | matches, identity escape (Annex B) | no match |
+| `[]` on `"a"` | never matches, by definition | **throws** `Unclosed character class` |
+The two throws are the serious half: `test(regexp('x{'), 'x{')` is `true` upstream and an exception
+here, and a specification is data — often *pasted* data — so that is a chart taken down by a string
+someone typed.
+**The swap surface is one line.** `VegaValue.Pattern.regex` is the only place a specification's own
+pattern becomes a `Regex`, and it has exactly three readers: `test` (`Functions.kt:375`) and the two
+branches of `replace` (`386`, `388`). Everything else that uses `Regex` in the core — twelve sites —
+is a fixed pattern this repository wrote, where the only requirement is that the platforms agree with
+each other.
+The owner is porting an ECMA-262 engine to Kotlin in a separate effort and will supply the URL; when it
+lands, point `Pattern` at it and the divergence closes on every target at once. The table above is the
+first four vectors to write. Until then this is a **known**, measured divergence rather than an
+unexamined one — and note that no test in this repository runs on a native target, so Kotlin/Native's
+regex behaviour is unmeasured even for our own internal patterns.
+## Reported and not yet chased: an arc with an inverted radius
+The owner reports that this engine draws **nothing** for an arc whose `outerRadius` is smaller than its
+`innerRadius`, where upstream draws one. Not yet reproduced or fixed — written down here so it is not
+lost. The route is the usual one: a fixture with the two radii swapped, which should fail, then find out
+what upstream's arc path generator does when the radii are the wrong way round (d3-shape swaps them
+rather than refusing) and match it. Worth checking the same question for a **negative** radius while
+there.
+## A portability seam was hiding a correctness bug
+The core had one JVM-only file, `PlatformDecimals`, and it explained itself well enough that nobody
+questioned it for six milestones: rounding a double at N places must round its **exact** binary value,
+and common Kotlin has no arbitrary-precision arithmetic. The first half is right and the second is a
+non sequitur. A finite double *is* `m × 2^e`, so its decimal expansion is finite — `m × 2^-k` is
+`(m × 5^k) × 10^-k`, at most ~767 digits — and producing it needs multiply-by-a-word, a shift, and a
+divide-by-a-billion to read the digits off. `Decimals` is eighty lines of that and no library.
+**What the seam was hiding.** `exponential` had been `String.format("%.Ne")`, and Java's `%e` rounds
+the double's *shortest printable form* rather than its exact value. So `format('.2e', 2.675)` gave
+`2.68e+0` where upstream gives `2.67e+0` — the exact value is `2.674999…`, which is the very case the
+file's own documentation used as its argument. Wrong since the formatter existed, and invisible
+because nothing compared that path against upstream. The replacement disagreed with the reference on
+its first run, which is how it surfaced.
+Two lessons worth keeping:
+- **A platform seam is where a comparison stops.** Everything else in the engine is checked against
+  upstream; this one file was checked against the JVM, and the JVM is not the thing being ported.
+- **Keep the oracle in the test.** `BigDecimal` is still here — as `DecimalsTest.Reference`, run over
+  150,000 random bit patterns. Removing a dependency from the *engine* is not the same as giving up
+  the check, and the check is what caught this.
+Writing the vectors for it also found a second gap in the neighbourhood: the specifier grammar
+accepted `d`, `f`, `e` and `%` but not `g` or `~`, so `format(x, ".3g")` fell through to plain number
+text — `g` had been implemented all along and was only reachable through the *typeless* specifier,
+which d3 aliases to `.12~g`. Fixed. What is still outside the grammar (`s`, `r`, `b`/`o`/`x`/`X`/`c`,
+`n`, and the fill/align/sign/width slots) is now stated plainly in SUPPORTED_FEATURES, including the
+uncomfortable part: an unreadable specifier is **not** reported, because an expression evaluates where
+no diagnostic collector reaches. Upstream throws "invalid format" there.
+
+## `bind` is described, not drawn — and building the demo found two bugs under it
+
+The 149 "bindings have no equivalent here" diagnostics were the wrong conclusion. Upstream's binding is
+a *description* of a control bolted to a DOM implementation of it; only the second half belongs to a
+browser. So the description is parsed like any other grammar (`SignalBind`, five shapes matching
+`bind.js`), the runtime exposes `controller.inputs` — control plus current value, republished on every
+compile — and `controller.setSignal` is the way back, taking the same path a fired handler does.
+
+**Keep the widgets out of the library.** `SignalControls.kt` lives in the demo, draws Material 3, and is
+about 170 lines; a host with other widgets writes its own against the same two members. Putting Material
+into `vega-compose` would make that choice for every host, and there is nothing in the file worth
+sharing.
+
+**A generic input's extra properties are grammar, and are carried rather than reported.** The two
+diagnostics `job-voyager` produced were `bind.placeholder` and `bind.autocomplete`, and the answer was
+not to special-case either: upstream's generic generator copies *every* remaining property onto the
+input element, and its schema agrees — of the five `bind` variants, the one for an input outside the
+four structured kinds is the only one with `additionalProperties: true`. So `Field.attributes` carries
+all of them and a host uses what it has a widget for (the demo shows `placeholder`, ignores
+`autocomplete` — there is no form here for a browser to autofill from). The four structured kinds went
+the *other* way, from a pooled key list to a per-shape one, because upstream closes each with
+`additionalProperties: false`: `{"input": "checkbox", "min": 0}` is now reported as a mistake rather
+than as an unimplemented feature, which is the accurate statement. Checked against the corpus before
+committing — two false gaps gone, no example newly reported.
+
+Two bugs came out of driving it on a device, and neither could have been found any other way:
+
+- **`setSpecAsync` recorded neither the specification's text nor a fresh set of overrides.** A chart
+  loaded through it had nothing to recompile *from*, so no signal change could redraw it — not a
+  control, not a handler, not a tap on a mark. Every JVM test used `setSpec`; the demo uses the other
+  one. Every interactive specification in the demo had been inert.
+- **A domain `sort` whose `order` is a signal was read with `asString()`**, so the object stringified to
+  something that did not begin with "desc" and every such domain came out ascending. `domain-sort-order`
+  pins it, and also pins the upstream quirk found while writing it: two domains differing *only* in the
+  signal share one sort operator, and the second silently takes the first's order.
+
+If you touch the controls, drive them on the emulator rather than trusting the tests: both of the above
+passed every JVM test in the repository.
 
 ## Read the diagnostics the 93 examples produce, not just the clean count
 
@@ -309,7 +482,7 @@ in nobody's schema and are ignored by both engines.
 
 ## What is left: two examples, and neither can be verified
 
-**176 differential fixtures pass. 91 of the 93 examples compile clean.** Everything that can be
+**177 differential fixtures pass. 91 of the 93 examples compile clean.** Everything that can be
 checked against upstream has been.
 
 ### `projections` — upstream refuses it too

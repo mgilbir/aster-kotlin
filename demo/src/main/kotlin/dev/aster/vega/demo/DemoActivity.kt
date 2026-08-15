@@ -207,6 +207,10 @@ private fun DemoScreen() {
           )
         }
 
+        // Whatever controls the specification asked for, between the chart and the buttons. A chart
+        // that binds nothing draws nothing here, which is most of them.
+        SignalControls(controller)
+
         Row(
           modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
           horizontalArrangement = Arrangement.spacedBy(8.dp),

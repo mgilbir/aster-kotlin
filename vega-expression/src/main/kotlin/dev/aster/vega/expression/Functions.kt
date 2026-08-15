@@ -1,7 +1,7 @@
 package dev.aster.vega.expression
 
+import dev.aster.vega.model.Decimals
 import dev.aster.vega.model.MINUS_SIGN
-import dev.aster.vega.model.PlatformDecimals
 import dev.aster.vega.model.VegaValue
 import dev.aster.vega.model.asNumberOrNull
 import dev.aster.vega.model.asString
@@ -377,30 +377,48 @@ public object Functions {
      * is true. Both spellings are accepted here for the same reason.
      */
     map["test"] = ExpressionFunction { args ->
-      VegaValue.Bool(args.pattern(0).regex.containsMatchIn(args.string(1)))
+      // `findAll` rather than `test`, deliberately. JavaScript's `RegExp.test` *advances*
+      // `lastIndex` when the pattern carries `g`, so the same call on the same string alternates
+      // between true and false — and upstream builds a fresh `RegExp` per evaluation, so its cursor
+      // is always at zero. A `Pattern` here is built once and read per row, so calling the stateful
+      // form would make the answer depend on how many rows came before it.
+      VegaValue.Bool(args.pattern(0).regex.findAll(args.string(1)).isNotEmpty())
     }
     map["replace"] = ExpressionFunction { args ->
       val text = args.string(0)
       val pattern = args.getOrNull(1)
       // A **pattern** replaces by match rather than by literal text, and only `g` makes it replace
       // more than the first — `replace('a-b-c', regexp('-','g'), '+')` is `a+b+c` where the same
-      // without the flag is `a+b-c`. A string pattern stays literal, which is what it was before.
+      // without the flag is `a+b-c`. That rule is the engine's own now, so there is no flag test
+      // here; and the replacement's `$1`, `$&`, `` $` ``, `$'` and `$<name>` are expanded as
+      // JavaScript expands them, which Kotlin's `Regex` spells differently. A string pattern stays
+      // literal, which is what it was before.
       VegaValue.Str(
         if (pattern is VegaValue.Pattern) {
-          if ('g' in pattern.flags) {
-            pattern.regex.replace(text, args.string(2))
-          } else {
-            pattern.regex.replaceFirst(text, args.string(2))
-          }
+          pattern.regex.replace(text, args.string(2))
         } else {
           text.replaceFirst(args.string(1), args.string(2))
         }
       )
     }
     map["split"] = ExpressionFunction { args ->
-      val parts = args.string(0).split(args.string(1))
+      val text = args.string(0)
+      val separator = args.getOrNull(1)
+      // A **pattern** separator splits by match, and JavaScript puts each capture group into the
+      // result between the pieces — `split('a1b', /(x)?(\d)/)` is `['a', undefined, '1', 'b']`, a
+      // group that did not participate included as a hole. This had been stringifying the pattern
+      // to
+      // `/\d+/` and splitting on that literally, so it silently returned the whole string.
+      val parts =
+        if (separator is VegaValue.Pattern) {
+          separator.regex.split(text).map { piece ->
+            if (piece == null) VegaValue.Null else VegaValue.Str(piece)
+          }
+        } else {
+          text.split(args.string(1)).map { VegaValue.Str(it) }
+        }
       val limit = if (args.size > 2) args.number(2).toInt() else parts.size
-      VegaValue.Arr(parts.take(limit.coerceAtLeast(0)).map { VegaValue.Str(it) })
+      VegaValue.Arr(parts.take(limit.coerceAtLeast(0)))
     }
     map["truncate"] = ExpressionFunction { args ->
       val text = args.string(0)
@@ -1475,12 +1493,27 @@ public object Functions {
     return match.value.toDoubleOrNull() ?: Double.NaN
   }
 
+  /**
+   * A digit's value in base 36, or -1: `Character.digit` without the JVM.
+   *
+   * ASCII only, which is `parseInt`'s rule as well — JavaScript reads `٣` (Arabic-Indic three) as
+   * nothing, and so does this. `Character.digit` would have accepted it, so the narrower answer is
+   * also the more faithful one.
+   */
+  private fun digitValue(char: Char): Int =
+    when (char) {
+      in '0'..'9' -> char - '0'
+      in 'a'..'z' -> char - 'a' + 10
+      in 'A'..'Z' -> char - 'A' + 10
+      else -> -1
+    }
+
   private fun parseInteger(text: String, radix: Int): Double {
     val trimmed = text.trim()
     if (radix == 10) return parseLeadingNumber(trimmed, allowDecimal = false)
     val effective = radix.takeIf { it in 2..36 } ?: return Double.NaN
     val body = if (effective == 16) trimmed.removePrefix("0x").removePrefix("0X") else trimmed
-    val digits = body.takeWhile { Character.digit(it, effective) >= 0 }
+    val digits = body.takeWhile { digitValue(it) in 0 until effective }
     if (digits.isEmpty()) return Double.NaN
     return digits.toLongOrNull(effective)?.toDouble() ?: Double.NaN
   }
@@ -1568,11 +1601,12 @@ public object NumberFormatSubset {
     val group = match.groupValues[3] == ","
     val precision =
       match.groupValues[4].takeIf { it.isNotEmpty() }?.removePrefix(".")?.toIntOrNull()
-    val type = match.groupValues[5].firstOrNull()
+    val trim = match.groupValues[5] == "~"
+    val type = match.groupValues[6].firstOrNull()
     return if (type == null) {
       Spec(group, precision ?: DEFAULT_SIGNIFICANT_DIGITS, 'g', trim = true, currency = currency)
     } else {
-      Spec(group, precision, type, currency = currency)
+      Spec(group, precision, type, trim = trim, currency = currency)
     }
   }
 
@@ -1600,23 +1634,23 @@ public object NumberFormatSubset {
     val raw =
       when (spec.type) {
         'd' -> roundHalfUp(value).toLong().toString()
-        'e' -> PlatformDecimals.exponential(value, spec.precision ?: 6)
+        'e' -> Decimals.exponential(value, spec.precision ?: 6)
         'g' ->
-          PlatformDecimals.significant(
+          Decimals.significant(
             value,
             (spec.precision ?: DEFAULT_SIGNIFICANT_DIGITS).coerceAtLeast(1),
           )
         '%' -> {
           val scaled = value * 100.0
-          PlatformDecimals.fixed(scaled, spec.precision ?: 0) + "%"
+          Decimals.fixed(scaled, spec.precision ?: 0) + "%"
         }
         's' -> {
           val exponent = siExponentOf(prefixMagnitude ?: value)
           val scaled = value / tenTo(exponent)
           val symbol = SI_PREFIXES.getOrElse(exponent / 3 + 8) { "" }
-          PlatformDecimals.fixed(scaled, spec.precision ?: 6) + symbol
+          Decimals.fixed(scaled, spec.precision ?: 6) + symbol
         }
-        else -> PlatformDecimals.fixed(value, spec.precision ?: 6)
+        else -> Decimals.fixed(value, spec.precision ?: 6)
       }
     val text = if (spec.trim) trimInsignificantZeros(raw) else raw
     val grouped = if (spec.group) groupThousands(text) else text
@@ -1687,5 +1721,19 @@ public object NumberFormatSubset {
    * a width, which this subset does not implement, and refusing the whole specifier over it would
    * turn `$0.2f` into unformatted output.
    */
-  private val PATTERN = Regex("^(\\$?)(0?)(,?)(\\.\\d+)?([dfes%]?)$")
+  /**
+   * d3's specifier grammar, as much of it as this subset honours: `[$][0][,][.precision][~][type]`.
+   *
+   * `~` and `g` were missing, and their absence was invisible rather than reported — an unparsed
+   * specifier falls back to plain number text, so `format(x, ".3g")` answered `2.675` where
+   * upstream answers `2.67`. `g` had been implemented all along and was only unreachable: a
+   * specifier naming *no* type is aliased to `.12~g`, which is the path every bare `format(x, "")`
+   * already took.
+   *
+   * Still outside it, and still silent, which is the honest statement: `r`, the radix types
+   * `b`/`o`/`x`/`X`/`c`, `n` (which is `,g`), and the leading `[[fill]align][sign]` and `width`
+   * slots. Upstream throws "invalid format" on a specifier it cannot read; this returns the number
+   * as JavaScript would write it, which is a wrong label rather than a broken chart.
+   */
+  private val PATTERN = Regex("^(\\$?)(0?)(,?)(\\.\\d+)?(~?)([dfegs%]?)$")
 }

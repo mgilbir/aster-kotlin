@@ -22,7 +22,7 @@ public fun canonicalNumberString(
   if (value == Double.NEGATIVE_INFINITY) return "-Infinity"
 
   val normalized = normalizeZero(value)
-  val text = PlatformDecimals.trimmed(normalized, precision)
+  val text = Decimals.trimmed(normalized, precision)
   // stripTrailingZeros can leave "0E-6"-style values; toPlainString already expands those, but a
   // rounded-to-zero negative still needs the sign removed.
   return if (text == "-0") "0" else text

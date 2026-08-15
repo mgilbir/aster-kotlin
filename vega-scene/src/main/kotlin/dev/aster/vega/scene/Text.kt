@@ -265,18 +265,20 @@ public fun textBounds(run: TextRun, metrics: TextMetrics): RectD {
  * Bounded text-layout cache.
  *
  * Owned by whoever creates it (a renderer or a runtime instance) rather than being global, so its
- * lifetime is explicit. Eviction is insertion-order LRU via [LinkedHashMap].
+ * lifetime is explicit. Eviction is least-recently-*used*: a hit is as good as a write.
+ *
+ * Written out rather than delegated to `LinkedHashMap`'s access-order mode, which is a JVM-only
+ * facility — the three-argument constructor and `removeEldestEntry` do not exist off it, and the
+ * class is final there besides. A map that keeps insertion order does exist everywhere, and moving
+ * an entry to the young end by removing and re-adding it turns that into the same policy in four
+ * lines. This was the only place in the core where portability was a claim rather than a fact.
  */
 public class TextLayoutCache(private val engine: TextEngine, private val maxEntries: Int = 2048) :
   TextEngine {
 
   private data class Key(val run: TextRun, val constraint: SizeD?)
 
-  private val cache =
-    object : LinkedHashMap<Key, TextLayout>(128, 0.75f, true) {
-      override fun removeEldestEntry(eldest: MutableMap.MutableEntry<Key, TextLayout>?): Boolean =
-        size > maxEntries
-    }
+  private val cache = LinkedHashMap<Key, TextLayout>()
 
   public val size: Int
     get() = cache.size
@@ -284,8 +286,20 @@ public class TextLayoutCache(private val engine: TextEngine, private val maxEntr
   override fun measure(text: TextRun, constraint: SizeD?): TextMetrics =
     layout(text, constraint).metrics
 
-  override fun layout(text: TextRun, constraint: SizeD?): TextLayout =
-    cache.getOrPut(Key(text, constraint)) { engine.layout(text, constraint) }
+  override fun layout(text: TextRun, constraint: SizeD?): TextLayout {
+    val key = Key(text, constraint)
+    val hit = cache.remove(key)
+    if (hit != null) {
+      // Re-inserted, so it goes back at the young end and is the last thing to be evicted.
+      cache[key] = hit
+      return hit
+    }
+    val layout = engine.layout(text, constraint)
+    cache[key] = layout
+    // Insertion order puts the least recently used first, which is the one to drop.
+    if (cache.size > maxEntries) cache.remove(cache.keys.first())
+    return layout
+  }
 
   public fun clear() {
     cache.clear()
