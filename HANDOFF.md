@@ -298,7 +298,7 @@ nothing yet *runs* on a native target — `commonTest` with a multiplatform asse
 the honest next step, and the differential fixtures cannot move there because they read files off
 disk. And `Regex` is the platform's, not ECMA-262: see the note below.
 
-## Regular expressions are ECMA-262 now, and one merge blocker remains
+## Regular expressions are ECMA-262 now
 
 `VegaValue.Pattern` compiles with **`io.github.mgilbir:ktecma262`**, an ECMA-262 engine in common
 Kotlin, instead of Kotlin's `Regex`. A pattern in a specification is JavaScript's; Kotlin's `Regex` is
@@ -329,16 +329,18 @@ Three things came with the swap, all of them upstream behaviour this engine had 
 because it builds a fresh `RegExp` per evaluation, while a `Pattern` here is built once and read per
 row. The stateless form is what keeps a filter's answer independent of how many rows preceded it.
 
-**The blocker.** The build reads `io.github.mgilbir:ktecma262:0.1.4` from `mavenLocal()`, because no
-complete release of it is on Maven Central yet — 0.1.2 shipped `jvm` and `js` only, and 0.1.3's root
-metadata declares native variants whose per-target modules are absent, which fails later and more
-confusingly than omitting them would. So a fresh clone needs `./gradlew publishToMavenLocal` in a
-checkout of that repository first, and this branch must not merge until it does not.
+**Not blocked any more.** `io.github.mgilbir:ktecma262:0.1.4` is on Maven Central with all seven
+modules — `common`, `jvm`, `js` and the four native ones — so it resolves like any other dependency
+and `settings.gradle.kts` is back to `google()` and `mavenCentral()` alone. Verified by moving the
+locally published copies out of `~/.m2` and resolving every target from Central with
+`--refresh-dependencies`: a green build quietly reading a local artifact would prove nothing.
 
-`mavenLocal()` sits **above** `mavenCentral()` deliberately: Gradle takes the first repository holding
-a coordinate, so a partially published version of the same number wins over the local one otherwise.
-When 0.1.4 is public, delete the block — the catalogue already names the version to resolve, so
-nothing else changes. Publishing is being handled in that repository, not here.
+Two things about that dependency are worth remembering. A published version cannot be amended, so a
+release that omits a target needs a new number rather than a re-upload — 0.1.2 shipped `jvm` and `js`
+only, and 0.1.3 declared native variants whose per-target modules were absent, which fails later and
+more confusingly than omitting them would. And if a `mavenLocal()` is ever added back, it belongs
+**above** `mavenCentral()`: Gradle takes the first repository holding a coordinate, so a partially
+published version of the same number would otherwise win.
 
 Worth knowing about that repository's release workflow, since it caused a false alarm: it publishes to
 Central and **never creates a GitHub Release**, so `gh release list` showing only v0.1.0 says nothing
