@@ -31,7 +31,10 @@ class TicksCommonTest {
     assertEquals(-2.0, Ticks.tickIncrement(0.0, 1.0, 2))
     assertEquals(-5.0, Ticks.tickIncrement(0.0, 1.0, 5))
     assertEquals(Double.NEGATIVE_INFINITY, Ticks.tickIncrement(1.0, 1.0, 10))
-    assertEquals(Double.NEGATIVE_INFINITY, Ticks.tickIncrement(0.0, Double.NaN, 10))
+    // NaN, not -Infinity: a NaN bound propagates through d3's arithmetic untouched, and this test
+    // asserted the old guard's answer rather than upstream's until d3-array's vectors said
+    // otherwise.
+    assertTrue(Ticks.tickIncrement(0.0, Double.NaN, 10).isNaN())
   }
 
   /**

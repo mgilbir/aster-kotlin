@@ -514,6 +514,40 @@ same solution applies: record the chain per object and replay it in order. `d3-f
 at all yet (24 files, all skipped) and is worth a look, because it is what `Decimals` and the
 `format` expression implement.
 
+## Replaying d3-array rewrote the tick algorithm, and found three bugs
+
+`UpstreamD3ArrayVectorsTest` replays 252 of d3-array's `ticks`, `tickIncrement`, `tickStep` and `nice`
+vectors against `Ticks`. It started at 62 disagreements and ends at **zero**, and the reason is worth
+knowing: this engine had transcribed the *older* d3 algorithm.
+
+**d3-array 3.2 rewrote it.** `tickSpec` now returns the first and last tick *indices* along with the
+increment, and — the part that matters — **retries with twice the count** when the interval comes back
+empty and the count is between a half and two:
+
+```js
+if (i2 < i1 && 0.5 <= count && count < 2) return tickSpec(start, stop, count * 2);
+```
+
+So `ticks(1, 364, 1)` is `[200]` upstream and was *nothing* here. `"tickCount": 1` is an ordinary thing
+to write, and it produced an axis with no ticks at all. The count also has to be a **`Double`**: the
+retry passes `count * 2` and the condition is fractional, so an `Int` cannot express the algorithm.
+
+Two more, both from the same corpus:
+
+- **A NaN bound came back as -Infinity.** `tickIncrement` had an early guard d3 does not have. `nice`
+  then multiplied that infinity out and returned a domain of `[NaN, NaN]` — a chart that does not
+  draw — where upstream leaves the domain alone. `nice` now also stops on a zero or non-finite step,
+  as d3 does.
+- **`tickStep` is its own function**, not `stepFrom(tickIncrement(...))`. That composition loses the
+  sign of a reversed span and answers NaN where d3 answers 0. `Ticks.step` is the transcription.
+
+And one found by the harness rather than in it: `NumberValues.resolveInt` used Kotlin's `toInt`, where
+`Double.POSITIVE_INFINITY.toInt()` is `Int.MAX_VALUE` — so a `"tickCount": {"signal": "1/0"}` asked an
+axis for two billion ticks and exhausted the heap. It is zero now, which is upstream's answer.
+
+Two JVM tests asserted the old behaviour in so many words and were corrected against upstream, the same
+way the arc test was: `TicksTest` on the NaN bound, and `TicksCommonTest` on the same value.
+
 ## Replaying d3-time found a daylight-saving bug in `TimeStepper`
 
 `UpstreamD3TimeVectorsTest` replays 366 of d3-time's 1,047 recorded calls against `TimeStepper`, in
