@@ -20,6 +20,9 @@ kotlin {
         // Calendar arithmetic for dates. JetBrains' recommendation for shared Kotlin Multiplatform
         // code, which is what keeps the core off java.time.
         api(libs.kotlinx.datetime)
+        // `VegaValue.Pattern.regex` is public and is one of these, so this is `api` rather than
+        // `implementation`: a host reading a pattern off a value needs the type.
+        api(libs.ktecma262)
       }
     }
     jvmTest { kotlin.srcDir("src/test/kotlin") }

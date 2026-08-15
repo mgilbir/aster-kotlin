@@ -372,30 +372,48 @@ public object Functions {
      * is true. Both spellings are accepted here for the same reason.
      */
     map["test"] = ExpressionFunction { args ->
-      VegaValue.Bool(args.pattern(0).regex.containsMatchIn(args.string(1)))
+      // `findAll` rather than `test`, deliberately. JavaScript's `RegExp.test` *advances*
+      // `lastIndex` when the pattern carries `g`, so the same call on the same string alternates
+      // between true and false — and upstream builds a fresh `RegExp` per evaluation, so its cursor
+      // is always at zero. A `Pattern` here is built once and read per row, so calling the stateful
+      // form would make the answer depend on how many rows came before it.
+      VegaValue.Bool(args.pattern(0).regex.findAll(args.string(1)).isNotEmpty())
     }
     map["replace"] = ExpressionFunction { args ->
       val text = args.string(0)
       val pattern = args.getOrNull(1)
       // A **pattern** replaces by match rather than by literal text, and only `g` makes it replace
       // more than the first — `replace('a-b-c', regexp('-','g'), '+')` is `a+b+c` where the same
-      // without the flag is `a+b-c`. A string pattern stays literal, which is what it was before.
+      // without the flag is `a+b-c`. That rule is the engine's own now, so there is no flag test
+      // here; and the replacement's `$1`, `$&`, `` $` ``, `$'` and `$<name>` are expanded as
+      // JavaScript expands them, which Kotlin's `Regex` spells differently. A string pattern stays
+      // literal, which is what it was before.
       VegaValue.Str(
         if (pattern is VegaValue.Pattern) {
-          if ('g' in pattern.flags) {
-            pattern.regex.replace(text, args.string(2))
-          } else {
-            pattern.regex.replaceFirst(text, args.string(2))
-          }
+          pattern.regex.replace(text, args.string(2))
         } else {
           text.replaceFirst(args.string(1), args.string(2))
         }
       )
     }
     map["split"] = ExpressionFunction { args ->
-      val parts = args.string(0).split(args.string(1))
+      val text = args.string(0)
+      val separator = args.getOrNull(1)
+      // A **pattern** separator splits by match, and JavaScript puts each capture group into the
+      // result between the pieces — `split('a1b', /(x)?(\d)/)` is `['a', undefined, '1', 'b']`, a
+      // group that did not participate included as a hole. This had been stringifying the pattern
+      // to
+      // `/\d+/` and splitting on that literally, so it silently returned the whole string.
+      val parts =
+        if (separator is VegaValue.Pattern) {
+          separator.regex.split(text).map { piece ->
+            if (piece == null) VegaValue.Null else VegaValue.Str(piece)
+          }
+        } else {
+          text.split(args.string(1)).map { VegaValue.Str(it) }
+        }
       val limit = if (args.size > 2) args.number(2).toInt() else parts.size
-      VegaValue.Arr(parts.take(limit.coerceAtLeast(0)).map { VegaValue.Str(it) })
+      VegaValue.Arr(parts.take(limit.coerceAtLeast(0)))
     }
     map["truncate"] = ExpressionFunction { args ->
       val text = args.string(0)
