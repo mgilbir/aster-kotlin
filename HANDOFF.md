@@ -288,10 +288,27 @@ narrower answer is the more faithful one.
 and printed BUILD SUCCESSFUL. If you add a module or a script, check that what you run actually runs:
 there is now a `test` alias registered in every multiplatform module, and `oracle.sh` says `jvmTest`
 outright because `--tests` only takes a real `Test` task.
-**Still to do here.** The tests are all JVM. They exercise common code, so they cover the logic, but
-nothing yet *runs* on a native target — `commonTest` with a multiplatform assertion library would be
-the honest next step, and the differential fixtures cannot move there because they read files off
-disk. And `Regex` is the platform's, not ECMA-262: see the note below.
+**Tests run on a native target now.** `commonTest` source sets in `vega-model`, `-scene`,
+`-expression` and `-runtime` hold 23 tests that execute on **Kotlin/Native as well as the JVM**, and
+`scripts/check.sh` runs `macosArm64Test`. They cover exactly what was in doubt: the decimal expansion
+(bit manipulation and 64-bit arithmetic), a specification's own regular expressions (which also
+exercises `ktecma262`'s native artifacts), d3's tick algorithm (`kotlin.math` is the platform's
+library on each target), and the two LRU caches that only exist in their present form because of
+these targets.
+
+Three things to know before adding more:
+
+- **A backtick test name cannot contain a comma** — or `.`, `;`, `:`, brackets — on Kotlin/Native,
+  where it becomes a symbol name. It fails the *compile*, not the run.
+- `iosSimulatorArm64Test` is the natural addition, and this machine cannot run it: no simulator
+  runtime is installed, so Xcode refuses the task ("does not support simulator tests for
+  ios_simulator_arm64"). The Apple targets still **compile** in the gate.
+- The differential fixtures stay on the JVM: they read specifications and references off disk.
+
+The suite has already earned itself. `TicksCommonTest` asserted that `tickIncrement(0, 1, 2)` is 0.5;
+d3 returns **-2**, a negative *divisor*, because a step below one is expressed as something to divide
+by. The native run is what refused it, and the fix was to read the answer out of `d3-array` instead of
+assuming it.
 
 ## Regular expressions are ECMA-262 now
 

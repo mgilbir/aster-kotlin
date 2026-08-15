@@ -7,6 +7,12 @@
 # nowhere else — a grep for `java.` never saw a `LinkedHashMap` subclassed for its access-order mode,
 # and that had been in the text-layout cache since Milestone 1.
 #
+# `macosArm64Test` goes further and *runs* the `commonTest` suites on Kotlin/Native: the decimal
+# expansion, a specification's own regular expressions, and the two LRU caches that only exist in
+# their present form because of these targets. Compiling proves the code links; running is what says
+# it agrees. `iosSimulatorArm64Test` would be the natural addition on a machine with the iOS platform
+# installed — this one has no simulator runtime, so Xcode refuses the task outright.
+#
 # Requires the Kotlin/Native toolchain (downloaded once, into ~/.konan) and, for the Apple targets,
 # Xcode command-line tools. `linuxX64` cross-compiles from macOS.
 set -euo pipefail
@@ -19,5 +25,6 @@ cd "$(dirname "$0")/.."
   compileKotlinIosArm64 \
   compileKotlinIosSimulatorArm64 \
   compileKotlinLinuxX64 \
+  macosArm64Test \
   lint \
   :demo:assembleDebug
