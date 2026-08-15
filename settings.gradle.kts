@@ -9,15 +9,14 @@ pluginManagement {
 dependencyResolutionManagement {
   repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
   repositories {
-    // TEMPORARY, and the one thing blocking this branch from merging. `io.github.mgilbir:ktecma262`
-    // 0.1.2 *is* on Maven Central now, but it publishes only the `jvm` and `js` variants — this core
-    // also compiles for macosArm64, iosArm64, iosSimulatorArm64 and linuxX64, and there are no klibs
-    // for those. So the engine is built and published locally with the four native targets added.
+    // TEMPORARY, and the only thing blocking this branch: `io.github.mgilbir:ktecma262` 0.1.4 —
+    // the engine this core's regular expressions are — is not on Maven Central yet, so it is built
+    // from source with `./gradlew publishToMavenLocal`.
     //
-    // **Ahead of mavenCentral() on purpose.** Gradle takes the first repository that has the
-    // coordinate, and Central's 0.1.2 would otherwise shadow the local one — same version string,
-    // fewer variants, and the native compiles fail with "No matching variant". Publishing a version
-    // that carries the native targets removes this whole block.
+    // **Ahead of mavenCentral() on purpose.** Gradle takes the first repository holding a
+    // coordinate, and an earlier version published without its native modules would otherwise win
+    // over the local one. Delete this block when 0.1.4 is public: the catalogue already names the
+    // version to resolve, so nothing else changes.
     mavenLocal()
     google()
     mavenCentral()
