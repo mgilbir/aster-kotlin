@@ -1106,7 +1106,15 @@ internal object Marks {
           val title =
             def.explicitTitle?.takeIf { it != VegaValue.Str("") }
               ?: Fields.defaultTitle(def, view.config.forTooltip)?.let(VegaValue::Str)
-          val key = (title as? VegaValue.Str)?.value ?: continue
+          // A title written as a **list** is one caption on two lines, and one name in a sentence:
+          // a description reads it joined, because a screen reader has no lines to break on.
+          val key =
+            when (title) {
+              is VegaValue.Str -> title.value
+              is VegaValue.Arr ->
+                title.values.mapNotNull { (it as? VegaValue.Str)?.value }.joinToString(", ")
+              else -> continue
+            }
           if (out.containsKey(key)) continue
           out[key] = fieldExpression(view, def, view.config.forTooltip, separator = "\\n")
         }
@@ -1163,7 +1171,15 @@ internal object Marks {
         val title =
           def.explicitTitle?.takeIf { it != VegaValue.Null && it != VegaValue.Str("") }
             ?: Fields.defaultTitle(def, config)?.let(VegaValue::Str)
-        val key = (title as? VegaValue.Str)?.value ?: continue
+        // A title written as a **list** is one caption on two lines, and one name in a sentence:
+        // a description reads it joined, having no lines to break on.
+        val key =
+          when (title) {
+            is VegaValue.Str -> title.value
+            is VegaValue.Arr ->
+              title.values.mapNotNull { (it as? VegaValue.Str)?.value }.joinToString(", ")
+            else -> continue
+          }
         if (out.containsKey(key)) continue
         // A **normalized** stack is announced as the share it takes, not the number behind it: the
         // position channel carrying the stack reads `end - start`, which is the fraction, and takes

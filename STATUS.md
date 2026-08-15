@@ -697,7 +697,7 @@ no data is needed to compare two compilers. So every one of them was compiled by
 by this one, and the outputs compared property by property. That is a *measurement*, not a gate: the
 examples are not fixtures here, and nothing about them is checked in.
 
-**124 of 627 matched exactly** at the start, and **620** do now.
+**124 of 627 matched exactly** at the start, and **621** do now.
 
 The value is the *ranking*. The first sweep clustered by root cause, and the three most damaging
 causes were fixed straight away — chosen for what they do to the *picture* rather than for
@@ -712,11 +712,11 @@ frequency:
   where this compiler used `step - 2`, making it nearly four times too wide. `getBandSize` asks the
   scale's kind first and reaches `discreteBandSize` only where the domain is discrete.
 
-The sweep has been the working list ever since, and the 7 that still differ cluster like this:
+The sweep has been the working list ever since, and the 6 that still differ cluster like this:
 
 | Files | Cause |
 | --- | --- |
-| 4 | geographic: a projection inside a **repetition**, and the three interactive maps that brush or facet one |
+| 3 | geographic: a projection inside a **repetition**, and the two interactive maps that brush one |
 | 5 | the rest of the **facet data flow**: what is left is a chart whose cells are read by a **selection**, where the brush's own datasets have to be cut per cell as well |
 | 0 | nothing outside the geographic work; the one refusal left of my own is a facet inside a **facet**, described below |
 
@@ -4397,6 +4397,18 @@ A last one, off the same reading: `toFieldDefBase` keeps a field's bucketing, it
 aggregate, and **not its type**. Two layers over one column, one calling it ordinal and the other
 saying nothing, are the same field to a title; keying the title by the type as well titled the axis
 "age, age".
+
+### A cell captions itself, and a caption may be two lines
+
+A wrapped facet whose header states `"title": null` has **no heading over the grid** at all: the
+cells name themselves, and a caption above them naming the column would say it twice. Its header's
+*label* properties belong on the cell's own title, a wrapped facet captioning its cells where a grid
+captions its bands.
+
+Beside it, a rule about titles anywhere: one written as a **list** is one caption on two lines, and
+one name in a sentence. A spoken description reads it joined with commas, having no lines to break
+on — and read as though it were absent, the channel fell back to its field's own name, collided with
+another channel already announced under that name, and dropped out of the description entirely.
 
 ### A column of outlines, and the grid that draws them all alike
 

@@ -847,6 +847,28 @@ internal class FacetWrap(
 
   private val field: String = Fields.vgField(def)
 
+  /** `header.label…` as a text property: the caption on each cell is a header's label. */
+  private fun labelProperties(): Map<String, VegaValue> {
+    val header = def.raw.obj("header") ?: return emptyMap()
+    val renamed =
+      mapOf(
+        "labelAlign" to "align",
+        "labelAnchor" to "anchor",
+        "labelAngle" to "angle",
+        "labelBaseline" to "baseline",
+        "labelColor" to "color",
+        "labelFont" to "font",
+        "labelFontSize" to "fontSize",
+        "labelFontStyle" to "fontStyle",
+        "labelFontWeight" to "fontWeight",
+        "labelLimit" to "limit",
+        "labelLineHeight" to "lineHeight",
+      )
+    val out = LinkedHashMap<String, VegaValue>()
+    for ((stated, name) in renamed) header.fields[stated]?.let { out[name] = it }
+    return out
+  }
+
   private val domainData: String = named("facet_domain")
 
   override val fields: List<String> =
@@ -941,22 +963,27 @@ internal class FacetWrap(
     fun leading(axes: List<VegaValue>) = axes.filter {
       it.string("orient") == "left" || it.string("orient") == "top"
     }
+    // A header that states `"title": null` has no heading over the grid at all: the cells name
+    // themselves, and a caption above them naming the column would say it twice.
+    val titled = def.raw.obj("header")?.fields?.get("title") != VegaValue.Null
     val heading =
-      (Fields.title(def, config) as? VegaValue.Str)?.let { title ->
-        obj {
-          put("name", "facet-title")
-          put("type", "group")
-          put("role", "column-title")
-          put(
-            "title",
-            obj {
-              put("text", title.value)
-              put("style", "guide-title")
-              put("offset", num(titleOffset))
-            },
-          )
+      (Fields.title(def, config) as? VegaValue.Str)
+        ?.takeIf { titled }
+        ?.let { title ->
+          obj {
+            put("name", "facet-title")
+            put("type", "group")
+            put("role", "column-title")
+            put(
+              "title",
+              obj {
+                put("text", title.value)
+                put("style", "guide-title")
+                put("offset", num(titleOffset))
+              },
+            )
+          }
         }
-      }
     return listOfNotNull(
       heading,
       band("row", "header", leading(vertical), columnSize, rowSize),
@@ -1030,6 +1057,9 @@ internal class FacetWrap(
         )
         put("style", "guide-label")
         put("frame", "group")
+        // A wrapped facet captions its **cells**, so the header's *label* properties belong on the
+        // cell's own title — a grid captions its bands with them instead.
+        labelProperties().forEach { (key, value) -> put(key, value) }
         put("offset", num(titleOffset))
       },
     )
