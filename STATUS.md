@@ -697,7 +697,7 @@ no data is needed to compare two compilers. So every one of them was compiled by
 by this one, and the outputs compared property by property. That is a *measurement*, not a gate: the
 examples are not fixtures here, and nothing about them is checked in.
 
-**124 of 627 matched exactly** at the start, and **600** do now.
+**124 of 627 matched exactly** at the start, and **601** do now.
 
 The value is the *ranking*. The first sweep clustered by root cause, and the three most damaging
 causes were fixed straight away — chosen for what they do to the *picture* rather than for
@@ -712,13 +712,13 @@ frequency:
   where this compiler used `step - 2`, making it nearly four times too wide. `getBandSize` asks the
   scale's kind first and reaches `discreteBandSize` only where the domain is discrete.
 
-The sweep has been the working list ever since, and the 27 that still differ cluster like this:
+The sweep has been the working list ever since, and the 26 that still differ cluster like this:
 
 | Files | Cause |
 | --- | --- |
 | 21 | geographic: projections, `topojson`, `geoshape` — another worker's ground |
 | 5 | the rest of the **facet data flow**: what is left is a chart whose cells are read by a **selection**, where the brush's own datasets have to be cut per cell as well |
-| 1 | a facet inside a **concatenation**, which this compiler has as one grid per chart rather than one per plot |
+| 1 | a facet inside a **concatenation**, which this compiler has as one grid per chart rather than one per plot — the same generalisation the three remaining refusals want, a facet inside a facet |
 
 | 3 | one-offs, each its own rule |
 
@@ -4397,6 +4397,13 @@ A last one, off the same reading: `toFieldDefBase` keeps a field's bucketing, it
 aggregate, and **not its type**. Two layers over one column, one calling it ordinal and the other
 saying nothing, are the same field to a title; keying the title by the type as well titled the axis
 "age, age".
+
+### A repetition inside a concatenation is a concatenation
+
+A `repeat` nested in a `vconcat` was refused. It needs nothing new: a repetition *is* a
+concatenation of its copies, and that is already what `Repeat.normalize` makes of one at the top of
+a chart. Normalising the child where it stands rather than refusing it lets the ordinary nesting
+take it, a concatenation's plot being allowed to be a concatenation.
 
 ### A picture is fetched, not painted
 

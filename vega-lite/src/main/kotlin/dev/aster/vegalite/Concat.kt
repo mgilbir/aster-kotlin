@@ -65,7 +65,13 @@ private constructor(
       }
       val children = mutableListOf<Pair<String?, VegaValue.Obj>>()
       entries.forEachIndexed { index, entry ->
-        val child = entry as? VegaValue.Obj ?: return@forEachIndexed
+        val declared = entry as? VegaValue.Obj ?: return@forEachIndexed
+        // A **repetition** inside a concatenation is a concatenation of its copies, exactly as one
+        // at the top of a chart is: normalising it here rather than refusing it lets the ordinary
+        // nesting take it, a concatenation's plot being allowed to be a concatenation.
+        val child =
+          if (!declared.has("repeat")) declared
+          else Repeat.normalize(declared, diagnostics) ?: return null
         for (nested in listOf("repeat", "facet")) {
           if (child.has(nested)) {
             diagnostics.fatal(
