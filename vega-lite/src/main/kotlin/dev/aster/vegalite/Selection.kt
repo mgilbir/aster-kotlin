@@ -860,7 +860,18 @@ internal class Selection(
       if (byIdentity) {
         "unit: $unit, ${SELECTION_ID}: $datum[${quoted(SELECTION_ID)}]"
       } else {
-        val values = projected.joinToString(", ") { (_, field) -> "$datum[${quoted(field)}]" }
+        // "Binned fields should capture extents, for a range test against the raw field": a click
+        // on a bucket remembers the bucket, which is its two edges, and the test then asks whether
+        // a row's raw value falls between them. Remembering the raw column instead picked the one
+        // row clicked rather than the bar it was drawn in.
+        val values =
+          projected.joinToString(", ") { (channel, field) ->
+            val binned = channel?.let { view?.spec?.fieldDef(it) }?.takeIf { it.bin != null }
+            if (binned == null) "$datum[${quoted(field)}]"
+            else
+              "[$datum[${quoted(Fields.vgField(binned))}], " +
+                "$datum[${quoted(Fields.vgField(binned, "end"))}]]"
+          }
         "unit: $unit, fields: ${name}_tuple_fields, values: [$values]"
       }
     // A click on a group, on a legend or on another selection's brush is not a pick: the first is

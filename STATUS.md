@@ -697,7 +697,7 @@ no data is needed to compare two compilers. So every one of them was compiled by
 by this one, and the outputs compared property by property. That is a *measurement*, not a gate: the
 examples are not fixtures here, and nothing about them is checked in.
 
-**124 of 627 matched exactly** at the start, and **592** do now.
+**124 of 627 matched exactly** at the start, and **595** do now.
 
 The value is the *ranking*. The first sweep clustered by root cause, and the three most damaging
 causes were fixed straight away — chosen for what they do to the *picture* rather than for
@@ -712,13 +712,13 @@ frequency:
   where this compiler used `step - 2`, making it nearly four times too wide. `getBandSize` asks the
   scale's kind first and reaches `discreteBandSize` only where the domain is discrete.
 
-The sweep has been the working list ever since, and the 35 that still differ cluster like this:
+The sweep has been the working list ever since, and the 32 that still differ cluster like this:
 
 | Files | Cause |
 | --- | --- |
 | 21 | geographic: projections, `topojson`, `geoshape` — another worker's ground |
 | 5 | the rest of the **facet data flow**: what is left is a chart whose cells are read by a **selection**, where the brush's own datasets have to be cut per cell as well |
-| 4 | crossfilter charts: several selections over one table, whose datasets fork differently |
+| 3 | one-offs, each its own rule — a facet inside a concatenation, a trellis of selections, a bucketed month's label |
 | 2 | `time` channel animations, set aside |
 | 3 | one-offs, each its own rule |
 
@@ -4397,6 +4397,24 @@ A last one, off the same reading: `toFieldDefBase` keeps a field's bucketing, it
 aggregate, and **not its type**. Two layers over one column, one calling it ordinal and the other
 saying nothing, are the same field to a title; keying the title by the type as well titled the axis
 "age, age".
+
+### A bucketing cannot climb above the step that computes its column
+
+A layer's member buckets its field **before its own transforms** — upstream's own hack, "equivalent
+for merging bin extent for union scale", and what lets two layers over one binned field share a bin.
+Before its *own*: what an ancestor wrote ran in that model's pass, above everything the member does.
+Placing the ancestors' steps below the bucketing put a histogram of a computed column above the
+formula that computes it, and the extent was measured over a column that did not exist yet.
+
+The optimizer's rule was already right — a bucketing that reads a column this step writes cannot
+climb past it — but the step was in the wrong place for it to apply. With the two the right way
+round the crossfilter charts fall out: the two plain columns' bins are shared above, the computed
+one's stays below its formula, and the datasets fork where upstream forks.
+
+Beside it, one rule about a **point** selection on a bucketed field. "Binned fields should capture
+extents, for a range test against the raw field": a click on a bucket remembers the bucket, which is
+its two edges, and the test then asks whether a row's raw value falls between them. Remembering the
+raw column instead picked the one row clicked rather than the bar it was drawn in.
 
 ### One column, two channels, one projection
 

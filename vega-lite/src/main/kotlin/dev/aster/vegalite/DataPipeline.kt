@@ -118,13 +118,16 @@ internal class DataPipeline(
     var head: DataNode = parent
     if (needsIdentity && parent is SourceNode) head = head.then(identifierNode())
 
-    // A layer's member buckets its field **before** its own transforms: upstream calls it a hack
+    // A layer's member buckets its field before **its own** transforms: upstream calls it a hack
     // "equivalent for merging bin extent for union scale", and it is what lets two layers over one
     // binned field share a bin. Below a filter the two bins are no longer siblings and neither the
-    // extent nor the bin width can be merged, so each layer buckets what it can see.
+    // extent nor the bin width can be merged, so each layer buckets what it can see. What an
+    // *ancestor* wrote still stands above it — that model's pass ran first — and a bucketing of a
+    // column an ancestor computes cannot climb above the step that computes it.
+    if (!belowFacet) head = userTransforms(head, Written.ANCESTOR)
     if (view.parentIsLayer) binNode()?.let { head = head.then(it) }
 
-    head = userTransforms(head, ownOnly = belowFacet)
+    head = userTransforms(head, Written.OWN)
     implicitParse()?.let { head = head.then(it) }
     if (!view.parentIsLayer) binNode()?.let { head = head.then(it) }
     timeUnitNode()?.let { head = head.then(it) }
@@ -950,14 +953,23 @@ internal class DataPipeline(
     )
   }
 
-  private fun userTransforms(head: DataNode, ownOnly: Boolean = false): DataNode {
+  /** Which of a view's transforms a pass writes: everything, an ancestor's, or the view's own. */
+  private enum class Written {
+    ALL,
+    ANCESTOR,
+    OWN,
+  }
+
+  private fun userTransforms(head: DataNode, which: Written = Written.ALL): DataNode {
     var last = head
     view.spec.transforms.forEachIndexed { index, transform ->
-      // Below the facet only the view's **own** steps are rebuilt: what an ancestor wrote is the
-      // facet model's and stands above the partition already, so writing it again here would run
-      // it twice over rows it has already been run over.
+      // A transform belongs to the model it was written on, and the ones an ancestor wrote were
+      // run in *that* model's pass — above everything this view does. It matters twice: below a
+      // facet they are not written again at all, and a layer's member buckets its field between
+      // the two, above its own steps and below its ancestors'.
       val inherited = view.transformOwners.getOrNull(index)?.let { it != view.name } == true
-      if (ownOnly && inherited) return@forEachIndexed
+      if (which == Written.OWN && inherited) return@forEachIndexed
+      if (which == Written.ANCESTOR && !inherited) return@forEachIndexed
       val transforms =
         Transforms(
           diagnostics,
