@@ -76,8 +76,55 @@ cd "$ROOT"
 find test-fixtures/upstream-vectors -name '*.json' ! -name 'known-divergences.json' -print0 |
   while IFS= read -r -d '' file; do
     count="$(node -p "JSON.parse(require('fs').readFileSync('$file','utf8')).calls.length")"
-    [ "$count" = "0" ] && rm "$file" && echo "    removed $(basename "$file") (recorded nothing)"
+    # An `if`, not `[ ... ] && rm`: the and-list returns 1 for every file that *does* have vectors,
+    # and under `set -e` that ended the script silently — everything after this was never reached.
+    if [ "$count" = "0" ]; then
+      rm "$file"
+      echo "    removed $(basename "$file") (recorded nothing)"
+    fi
   done
+
+# ---- d3 ----------------------------------------------------------------------------------------
+#
+# Most of the *arithmetic* this engine ports is d3's, not Vega's: ticks, scales, curves, arcs, colour,
+# number and time formatting, calendar intervals. Each d3 package is its own repository, tagged
+# `v<version>`, and its tests are mocha rather than tape — the recorder handles both. Their suites are
+# large: `d3-time` alone yields more vectors than all of `vega-transforms`.
+#
+# The timezone comes from the package's *own* test script (`TZ=America/Los_Angeles mocha ...`), because
+# a local interval's answer depends on it, and it is written into the vector file so a replay knows
+# which zone produced it.
+D3_PACKAGES=(
+  d3-array
+  d3-time
+  d3-format
+  d3-color
+  d3-shape
+  d3-scale
+  d3-interpolate
+  d3-path
+  d3-hierarchy
+)
+
+echo "==> d3"
+for package in "${D3_PACKAGES[@]}"; do
+  version="$(node -p "require('./oracle-js/node_modules/$package/package.json').version" 2>/dev/null || true)"
+  if [ -z "$version" ]; then
+    echo "    $package is not installed; skipping"
+    continue
+  fi
+  clone="$ROOT/build/d3-upstream/$package"
+  if [ -d "$clone/.git" ] && [ "$(git -C "$clone" describe --tags --exact-match 2>/dev/null || true)" = "v$version" ]; then
+    :
+  else
+    rm -rf "$clone"
+    mkdir -p "$(dirname "$clone")"
+    git clone --quiet --depth 1 --branch "v$version" "https://github.com/d3/$package.git" "$clone" ||
+      { echo "    $package: no tag v$version upstream; skipping"; continue; }
+  fi
+  zone="$(node -p "((require('$clone/package.json').scripts||{}).test||'').match(/TZ=([\w\/]+)/)?.[1] || 'Europe/Amsterdam'")"
+  (cd oracle-js && TZ="$zone" node src/record-upstream-tests.mjs "$clone" "$package")
+done
 
 total="$(node -e '
   const fs = require("fs");

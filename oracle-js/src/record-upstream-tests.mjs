@@ -52,6 +52,18 @@ Math.random = () => {
   return seedState / 4294967296;
 };
 Date.now = () => NOW;
+// `new Date()` reads the clock directly, so pinning `Date.now` alone leaves it moving — d3-time's
+// tests are full of `new Date` and would record a different answer every run.
+const RealDate = Date;
+globalThis.Date = class extends RealDate {
+  constructor(...args) {
+    super(...(args.length === 0 ? [NOW] : args));
+  }
+
+  static now() {
+    return NOW;
+  }
+};
 
 const here = dirname(fileURLToPath(import.meta.url));
 const outputDir = resolve(here, '../../test-fixtures/upstream-vectors');
@@ -124,7 +136,7 @@ function recordExports(moduleNamespace, packageName, calls) {
         } catch (error) {
           threw = error;
         }
-        calls.push({
+        pushCall(calls, {
           package: packageName,
           fn: name,
           args: args.map(a => encode(a)),
@@ -135,6 +147,33 @@ function recordExports(moduleNamespace, packageName, calls) {
       },
       construct(target, args, newTarget) {
         return Reflect.construct(target, args, newTarget);
+      },
+      // d3 keeps most of its meaning on **methods of an exported object**: `timeDay` is a function
+      // with `floor`, `ceil`, `range` and `count` hanging off it, and a test calls those far more
+      // often than it calls the export itself. Reading one returns a wrapper that records as
+      // `timeDay.floor`, so the vector says which method it was.
+      get(target, key, receiver) {
+        const property = Reflect.get(target, key, receiver);
+        if (typeof property !== 'function' || typeof key !== 'string') return property;
+        // `bind`, `call` and friends belong to every function alive and say nothing about the
+        // library; recording them produced vectors named `monthAbbrevFormat.bind`.
+        if (key === 'constructor' || key.startsWith('_') || key in Function.prototype) return property;
+        return function (...args) {
+          let result, threw = null;
+          try {
+            result = property.apply(target, args);
+          } catch (error) {
+            threw = error;
+          }
+          pushCall(calls, {
+            package: packageName,
+            fn: `${name}.${key}`,
+            args: args.map(a => encode(a)),
+            ...(threw ? {threw: threw.message.split('\n')[0]} : {result: encode(result)}),
+          });
+          if (threw) throw threw;
+          return result;
+        };
       },
     });
   }
@@ -159,6 +198,7 @@ async function runTestFile(file, packageName, calls, skipped, checkout) {
   const restoreTransforms = recordTransforms(namespace, packageName, calls);
   globalThis.__vegaRecorded = wrapped;
   globalThis.__vegaTape = tapeShim(where, skipped);
+  installMochaShim(where, skipped);
 
   let rewritten;
   try {
@@ -210,12 +250,32 @@ function rewriteImports(source, file) {
   for (const node of ast.body) {
     if (node.type !== 'ImportDeclaration') continue;
     const from = node.source.value;
-    const isPackage = from === '../index.js' || from === '../index';
+    // `../index.js` is Vega's shape; `../src/index.js` is d3's. Both mean "the package
+    // under test", and both are pointed at the *installed* build, which is what every reference
+    // and vector in this repository is generated from.
+    const isPackage =
+      from === '../index.js' || from === '../index' || from === '../src/index.js';
     if (!isPackage && from !== 'tape' && !from.startsWith('./')) continue;
 
     if (from.startsWith('./')) {
+      // Rebuilt from the AST rather than patched in the text. The first version swapped `'${from}'`
+      // for the resolved URL and quietly did nothing to d3, which writes its imports with double
+      // quotes — 36 of 36 files then failed to resolve a helper that was right beside them.
       const url = pathToFileURL(resolve(dirname(file), from)).href;
-      edits.push([node.start, node.end, source.slice(node.start, node.end).replace(`'${from}'`, `'${url}'`)]);
+      const clauses = [];
+      const named = [];
+      for (const specifier of node.specifiers) {
+        if (specifier.type === 'ImportDefaultSpecifier') clauses.push(specifier.local.name);
+        else if (specifier.type === 'ImportNamespaceSpecifier') clauses.push(`* as ${specifier.local.name}`);
+        else if (specifier.imported.name === specifier.local.name) named.push(specifier.local.name);
+        else named.push(`${specifier.imported.name} as ${specifier.local.name}`);
+      }
+      if (named.length) clauses.push(`{${named.join(', ')}}`);
+      edits.push([
+        node.start,
+        node.end,
+        clauses.length ? `import ${clauses.join(', ')} from ${JSON.stringify(url)};` : `import ${JSON.stringify(url)};`,
+      ]);
       continue;
     }
     const binding = isPackage ? 'globalThis.__vegaRecorded' : 'globalThis.__vegaTape';
@@ -280,18 +340,16 @@ function recordTransforms(moduleNamespace, packageName, calls) {
       // operator. A vector without it would record that `extent` changed nothing, which is true of
       // the tuples and useless as a check.
       const value = this.value === undefined || typeof this.value === 'function' ? undefined : encode(this.value);
-      calls.push(
-        withinBudget({
-          package: packageName,
-          op: name,
-          instance: this.__vegaInstance,
-          sequence,
-          params: encodeParams(params),
-          input,
-          output: capturePulse(output && output.add !== undefined ? output : pulse),
-          ...(value === undefined ? {} : {value}),
-        })
-      );
+      pushCall(calls, {
+        package: packageName,
+        op: name,
+        instance: this.__vegaInstance,
+        sequence,
+        params: encodeParams(params),
+        input,
+        output: capturePulse(output && output.add !== undefined ? output : pulse),
+        ...(value === undefined ? {} : {value}),
+      });
       return output;
     };
     patched.push(() => {
@@ -304,27 +362,37 @@ function recordTransforms(moduleNamespace, packageName, calls) {
 
 const MAX_TUPLES = 200;
 
-/** The most JSON one vector may occupy, before its pulses are replaced by a note. */
+/** The most JSON one vector may occupy, before its payload is replaced by a note. */
 const MAX_VECTOR_BYTES = 64 * 1024;
 
 /**
- * Keeps one vector to a readable size.
+ * Records one call, or a note that it was too big to record.
  *
- * Capping the *number* of tuples is not enough, because a single tuple can be enormous: a `facet`
- * group tuple carries its whole partition, and recording three of those produced a 52 MB vector and a
- * 452 MB file. What matters for a replay is the parameters — the pulses are dropped with a note
- * saying so, which is visible in the ledger rather than silently short.
+ * Every site goes through here, which the transform seam learned the hard way and the d3 seam
+ * learned again: `d3-array`'s tests operate on million-element arrays, and stringifying those
+ * exceeded the maximum length of a JavaScript string — the recorder died rather than writing a file.
+ * A vector nobody can read is worth no more than a note saying how big it was.
  */
-function withinBudget(call) {
-  const text = JSON.stringify(call);
-  if (text.length <= MAX_VECTOR_BYTES) return call;
-  return {
-    ...call,
-    input: {$: 'oversized', bytes: text.length},
-    output: {$: 'oversized', bytes: text.length},
-    ...(call.value === undefined ? {} : {value: {$: 'oversized'}}),
-  };
+function pushCall(calls, call) {
+  let text;
+  try {
+    text = JSON.stringify(call);
+  } catch {
+    text = null;
+  }
+  if (text !== null && text.length <= MAX_VECTOR_BYTES) {
+    calls.push(call);
+    return;
+  }
+  const {package: pkg, fn, op, instance, sequence} = call;
+  calls.push({
+    package: pkg,
+    ...(fn ? {fn} : {}),
+    ...(op ? {op, instance, sequence} : {}),
+    oversized: text === null ? 'unserialisable' : text.length,
+  });
 }
+
 
 /** A pulse's three change sets and its backing source, each capped and encoded. */
 function capturePulse(pulse) {
@@ -373,6 +441,30 @@ function scrub(message, scratch) {
     .join('<oracle-js>/');
 }
 
+/**
+ * Enough of **mocha** to run a d3 test body.
+ *
+ * d3 runs `mocha`, which injects `it` as a *global* rather than something a file imports — so unlike
+ * the `tape` shim this is installed on `globalThis` and the file is left alone. Assertions come from
+ * Node's `assert` and are left to throw: a case that fails is recorded as a skip with its reason,
+ * which is information rather than an error, since the vectors come from what upstream *returned*.
+ */
+function installMochaShim(where, skipped) {
+  const run = (name, body) => {
+    try {
+      const done = body?.();
+      if (done && typeof done.then === 'function') done.catch(() => {});
+    } catch (error) {
+      skipped.push({file: where, case: name, reason: `case threw: ${error.message.split('\n')[0]}`});
+    }
+  };
+  run.skip = () => {};
+  run.only = run;
+  globalThis.it = run;
+  globalThis.describe = (_name, body) => body?.();
+  globalThis.before = globalThis.after = globalThis.beforeEach = globalThis.afterEach = () => {};
+}
+
 /** Enough of `tape` to run a test body: assertions are accepted and ignored. */
 function tapeShim(file, skipped) {
   const noop = () => {};
@@ -398,6 +490,15 @@ function tapeShim(file, skipped) {
 // its index by them. Recording two packages in one process therefore makes the second one's vectors
 // depend on how many tuples the first one built, so a regenerated file differs from the committed one
 // with no change in behaviour. A fresh process starts the counter at zero.
+/** The version actually installed, which is what was recorded — not what a checkout claims. */
+function installedVersion(packageName) {
+  try {
+    return JSON.parse(readFileSync(resolve(here, '..', 'node_modules', packageName, 'package.json'), 'utf8')).version;
+  } catch {
+    return null;
+  }
+}
+
 const [, , checkout, ...packages] = process.argv;
 if (packages.length > 1) {
   console.error('record one package per process: tuple ids are a module-level counter');
@@ -410,14 +511,22 @@ if (!checkout || packages.length === 0) {
 mkdirSync(outputDir, {recursive: true});
 
 for (const packageName of packages) {
-  const testDir = join(resolve(checkout), 'packages', packageName, 'test');
+  // Two layouts: Vega is a monorepo with `packages/<name>/test`, and each d3 package is its own
+  // repository with `test` at the root.
+  const candidates = [
+    join(resolve(checkout), 'packages', packageName, 'test'),
+    join(resolve(checkout), 'test'),
+  ];
+  const testDir = candidates.find(existsSync) ?? candidates[0];
   if (!existsSync(testDir)) {
     console.error(`${packageName}: no test directory at ${testDir}`);
     continue;
   }
   const calls = [];
   const skipped = [];
-  const files = readdirSync(testDir).filter(f => f.endsWith('-test.js')).sort();
+  const files = readdirSync(testDir)
+    .filter(f => f.endsWith('-test.js') || f.endsWith('-test.mjs'))
+    .sort();
   for (const file of files) {
     await runTestFile(join(testDir, file), packageName, calls, skipped, resolve(checkout));
   }
@@ -435,7 +544,20 @@ for (const packageName of packages) {
   for (const call of unique) { const k = call.fn || call.op; byFunction[k] = (byFunction[k] || 0) + 1; }
   writeFileSync(
     join(outputDir, `${packageName}.json`),
-    JSON.stringify({package: packageName, vega: '6.3.1', files: files.length, skipped, calls: unique}, null, 2) + '\n'
+    JSON.stringify(
+      {
+        package: packageName,
+        version: installedVersion(packageName),
+        // Recorded, because a `local` interval's answer depends on it — d3-time's own suite runs in
+        // America/Los_Angeles and Vega's in this repository's zone, so a replay has to know which.
+        timeZone: process.env.TZ,
+        files: files.length,
+        skipped,
+        calls: unique,
+      },
+      null,
+      2
+    ) + '\n'
   );
   console.log(
     `${packageName}: ${unique.length} vectors from ${files.length - skipped.filter(s => !s.case).length}/${files.length} files` +

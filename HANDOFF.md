@@ -480,6 +480,40 @@ every regeneration is worse than no artifact:
 
 Two consecutive runs are now byte-identical, which is the property that makes the diff readable.
 
+## d3's tests are in the corpus too, and they are the bigger half
+
+Most of the *arithmetic* this engine ports is d3's rather than Vega's — ticks, scales, curves, arcs,
+colour, number and time formatting, calendar intervals — and d3 tests it far more thoroughly than any
+chart-level fixture can. `scripts/record-upstream-vectors.sh` records nine d3 packages beside the Vega
+ones, taking the corpus to **4,898 vectors**: `d3-array` 1,538, `d3-time` 1,047, `d3-interpolate` 253,
+`d3-color` 216, `d3-scale` 55, `d3-shape` 31, `d3-path` 7.
+
+Five differences from Vega, all handled by the same recorder:
+
+- **mocha, not tape**, and `it` is a *global* there rather than an import, so it is installed on
+  `globalThis` and the file is left alone.
+- **`../src/index.js`**, not `../index.js` — d3 tests import the source; both are pointed at the
+  installed build, which is what every reference here is generated from.
+- **One repository per package**, tagged `v<version>`; the version comes from `node_modules`, so the
+  tag is derived rather than written down.
+- **Its own timezone.** `d3-time` runs its suite in `America/Los_Angeles` and its answers depend on
+  it, so the zone is read from the package's own `scripts.test` and **recorded in the vector file** —
+  a replay has to know which zone produced a local interval.
+- **`new Date()`**, which pinning `Date.now` does not cover. The `Date` constructor is replaced too,
+  or `d3-time`'s vectors change on every run.
+
+`d3-time` alone yields more vectors than all of `vega-transforms`, and it lands squarely on
+`TimeIntervals`: every interval's `floor`, `ceil`, `round`, `offset`, `range`, `count` and `every`,
+local and UTC.
+
+**Where it is thin, and why.** `d3-shape` (31), `d3-scale` (55) and `d3-hierarchy` (1) are
+builder-shaped: `arc()`, `scaleLinear()` and `stratify()` return an object that is *configured* by
+chained calls and only then asked a question, so a single call is not a vector — the state is the
+input. That is the same problem the transform seam solved with an instance-and-sequence stamp, and the
+same solution applies: record the chain per object and replay it in order. `d3-format` records nothing
+at all yet (24 files, all skipped) and is worth a look, because it is what `Decimals` and the
+`format` expression implement.
+
 ## What upstream's own tests found: five real transform bugs
 
 151 of the replayable `vega-transforms` vectors match exactly. **13 do not**, in five transforms, and
