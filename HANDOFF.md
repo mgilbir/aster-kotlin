@@ -329,21 +329,16 @@ Three things came with the swap, all of them upstream behaviour this engine had 
 because it builds a fresh `RegExp` per evaluation, while a `Pattern` here is built once and read per
 row. The stateless form is what keeps a filter's answer independent of how many rows preceded it.
 
-**The blocker, and it is now precise.** `ktecma262:0.1.2` *is* on Maven Central — it landed on
-2026-08-15 — but it publishes `common`, `jvm` and `js` variants and **no native ones**, which this core
-needs for `macosArm64`, `iosArm64`, `iosSimulatorArm64` and `linuxX64`. So `settings.gradle.kts` still
-carries a `mavenLocal()` line, fed by `./gradlew publishToMavenLocal` in a checkout of that repository
-with the four targets added.
+**The blocker.** The build reads `io.github.mgilbir:ktecma262:0.1.4` from `mavenLocal()`, because no
+complete release of it is on Maven Central yet — 0.1.2 shipped `jvm` and `js` only, and 0.1.3's root
+metadata declares native variants whose per-target modules are absent, which fails later and more
+confusingly than omitting them would. So a fresh clone needs `./gradlew publishToMavenLocal` in a
+checkout of that repository first, and this branch must not merge until it does not.
 
-That line sits **above** `mavenCentral()` deliberately. Gradle takes the first repository holding the
-coordinate, and when Central gained 0.1.2 it began shadowing the locally published one — same version
-string, fewer variants, native compiles failing with "No matching variant". A published version cannot
-be amended, so what unblocks this is a **new version** carrying the native targets, after which the
-whole block goes away.
-
-Adding `macosArm64() iosArm64() iosSimulatorArm64() linuxX64()` to that project's `build.gradle.kts` is
-the entire change — verified by doing exactly that and compiling all four, so the engine's README claim
-that "other Kotlin targets need only a build-file change" holds as written.
+`mavenLocal()` sits **above** `mavenCentral()` deliberately: Gradle takes the first repository holding
+a coordinate, so a partially published version of the same number wins over the local one otherwise.
+When 0.1.4 is public, delete the block — the catalogue already names the version to resolve, so
+nothing else changes. Publishing is being handled in that repository, not here.
 
 Worth knowing about that repository's release workflow, since it caused a false alarm: it publishes to
 Central and **never creates a GitHub Release**, so `gh release list` showing only v0.1.0 says nothing
