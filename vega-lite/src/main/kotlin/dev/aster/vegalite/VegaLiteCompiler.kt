@@ -659,10 +659,23 @@ private class Compilation(
     views: List<UnitView>,
   ): List<Pair<String, String>> {
     if (!selection.bindsScales || concat == null) return emptyList()
-    val view = selection.owner ?: views.firstOrNull() ?: return emptyList()
-    return selection.intervalChannels(view).map { (_, field) ->
-      field to Fields.varName("${selection.name}_$field")
+    // Every view that declares it, not just the one that owns the component. `topLevelSignals` is
+    // called once per unit and **appends** the mappings it does not already have — "no single
+    // selCmpt has a global view" — so a repeated plot's bound signal names every field any of its
+    // copies is scaled by, in the order the copies were written. The diagonal of a scatter-plot
+    // matrix projects one field where the others project two, and taking a single copy's answer
+    // left a whole column of the grid unbound.
+    val declaring = views.filter { view ->
+      Selection.from(view.spec.params).any { it.name == selection.name }
     }
+    val over = (listOfNotNull(selection.owner) + declaring).distinct().ifEmpty { views.take(1) }
+    val out = LinkedHashMap<String, String>()
+    for (view in over) {
+      selection.intervalChannels(view).forEach { (_, field) ->
+        out.putIfAbsent(field, Fields.varName("${selection.name}_$field"))
+      }
+    }
+    return out.toList()
   }
 
   /** Signals that changed their name when two nodes were folded together. */

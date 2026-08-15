@@ -526,10 +526,16 @@ internal class Selection(
                 "update",
                 if (!bindsScales) "{x: x(unit), y: y(unit)}"
                 else
-                  "{" +
-                    projected.joinToString(", ") { (channel, _) ->
-                      "$channel: invert(${quoted(view.scale(channel))}, $channel(unit))"
-                    } +
+                // The **scales**, not the projection: `model.scaleName(X)` and `scaleName(Y)`,
+                // whether or not either channel has a projection of its own. The diagonal cell
+                // of a scatter-plot matrix plots one column against itself and so projects once,
+                // but it is still panned and zoomed in both directions.
+                "{" +
+                    listOf("x", "y")
+                      .filter { view.spec.encoding.containsKey(it) }
+                      .joinToString(", ") { channel ->
+                        "$channel: invert(${quoted(view.scale(channel))}, $channel(unit))"
+                      } +
                     "}",
               )
             }
@@ -1400,18 +1406,26 @@ internal class Selection(
     // A selection that states neither is projected onto **x and y** if it is dragged, and onto the
     // row's own identity if it is clicked — so a click has no channel projection at all.
     val wanted = channels.ifEmpty { if (type == "interval") listOf("x", "y") else emptyList() }
-    return wanted.mapNotNull { channel ->
-      val def = view.spec.fieldDef(channel) ?: return@mapNotNull null
-      // A channel that *aggregates* cannot be projected: there is no row-level value to compare a
-      // dragged extent against. Upstream warns and skips it.
-      if (def.aggregate != null) return@mapNotNull null
-      if (def.field == null) return@mapNotNull null
-      // A bucketed field is stored under the name the bucketing wrote, not the raw column: a brush
-      // over `yearmonth(date)` remembers `yearmonth_date`, which is the field the marks are placed
-      // by and so the one an inverted pixel extent can be compared with.
-      val field = if (def.timeUnit != null) Fields.vgField(def) else def.field
-      channel to field
-    }
+    return wanted
+      .mapNotNull { channel ->
+        val def = view.spec.fieldDef(channel) ?: return@mapNotNull null
+        // A channel that *aggregates* cannot be projected: there is no row-level value to compare a
+        // dragged extent against. Upstream warns and skips it.
+        if (def.aggregate != null) return@mapNotNull null
+        if (def.field == null) return@mapNotNull null
+        // A bucketed field is stored under the name the bucketing wrote, not the raw column: a
+        // brush
+        // over `yearmonth(date)` remembers `yearmonth_date`, which is the field the marks are
+        // placed
+        // by and so the one an inverted pixel extent can be compared with.
+        val field = if (def.timeUnit != null) Fields.vgField(def) else def.field
+        channel to field
+      }
+      // "Prevent duplicate projections on the same field." One column bound to **both** channels
+      // is one projection, keyed by the field and keeping the channel that reached it first: the
+      // diagonal cell of a scatter-plot matrix plots a column against itself, and remembering it
+      // twice gave the brush there two pixel extents and two stored values for one drag.
+      .distinctBy { (_, field) -> field }
   }
 
   /**
