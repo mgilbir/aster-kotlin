@@ -507,7 +507,8 @@ internal class SourceNode(val data: VegaValue, val name: String? = null) : DataN
    * flow does *not* fork below it — a generator is not something Vega might overwrite, so the
    * view's own transforms belong in the same dataset rather than in a derived one.
    */
-  val isGenerator: Boolean = data["sequence"] != null
+  val isGenerator: Boolean =
+    data["sequence"] != null || data["graticule"] != null || data["sphere"] != null
 
   val isNamed: Boolean =
     data.string("name") != null && !isUrl && !isGenerator && data["values"] == null
@@ -1069,7 +1070,10 @@ internal class DataAssembler {
           // `values` of its own; the specification's own block is where the rows are, and Vega
           // wants them written out beside the name.
           inline = stated?.let { named[it] },
-          values = data["values"],
+          // `{"sphere": true}` is the whole globe as one feature, which Vega draws from a row
+          // saying so: there is no transform that makes a sphere, only the word for it.
+          values =
+            data["values"] ?: data["sphere"]?.let { arr(listOf(obj { put("type", "Sphere") })) },
           url = data.string("url"),
           format = sourceFormat(data),
           transform = generatorTransform(data),
@@ -1083,13 +1087,28 @@ internal class DataAssembler {
     return (plain + derived).map { it.build() }
   }
 
-  /** `{"sequence": {...}}` — the one data source that is a transform. */
+  /**
+   * The data sources that are a **transform** rather than a table.
+   *
+   * `{"sequence": …}` counts rows out; `{"graticule": …}` draws the globe's own grid of meridians
+   * and parallels. A `{"sphere": true}` is neither — it is one row saying `{"type": "Sphere"}`,
+   * which is the whole globe as a feature — and it is handled where the values are.
+   */
   private fun generatorTransform(data: VegaValue): MutableList<VegaValue> {
-    val sequence = data.obj("sequence") ?: return mutableListOf()
+    data.obj("sequence")?.let { sequence ->
+      return mutableListOf(
+        obj {
+          put("type", "sequence")
+          sequence.fields.forEach { (key, value) -> put(key, value) }
+        }
+      )
+    }
+    if (data["graticule"] == null) return mutableListOf()
     return mutableListOf(
       obj {
-        put("type", "sequence")
-        sequence.fields.forEach { (key, value) -> put(key, value) }
+        put("type", "graticule")
+        // `{"graticule": true}` is the default grid; an object states the extents and steps.
+        data.obj("graticule")?.fields?.forEach { (key, value) -> put(key, value) }
       }
     )
   }

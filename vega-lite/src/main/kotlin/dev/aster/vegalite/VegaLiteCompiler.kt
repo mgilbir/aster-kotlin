@@ -181,7 +181,7 @@ private class Compilation(
     // one that states properties has one whether or not it has drawn anything yet.
     for (plot in plots) {
       for (view in plot.views) {
-        val stated = plot.spec.obj("projection") ?: spec.obj("projection")
+        val stated = view.spec.projection ?: plot.spec.obj("projection") ?: spec.obj("projection")
         val geographic =
           view.spec.encoding.keys.any { it in Channels.GEO_POSITION_CHANNELS } ||
             view.spec.mark == "geoshape"
@@ -212,10 +212,9 @@ private class Compilation(
           Fields.varName(
             listOf(plot.name, "projection").filter { it.isNotEmpty() }.joinToString("_")
           )
-        val fits = geographic.flatMap { it.geoJsonSignals }.distinct()
         geographic.forEachIndexed { index, view ->
           view.projectionName = name
-          if (index == 0) view.geoJsonSignals = fits else view.projectionMerged = true
+          if (index == 0) view.projectionFitViews = geographic else view.projectionMerged = true
         }
       }
     }
@@ -864,7 +863,13 @@ private class Compilation(
           put("name", view.projectionName)
           if (view.projectionFits) {
             put("size", signalRef("[${view.widthSignal}, ${view.heightSignal}]"))
-            val fits = view.geoJsonSignals.ifEmpty { listOf("data('${view.mainData}')") }.distinct()
+            // What each view the projection was merged over contributes, in order — its feature
+            // collections, or its own table where it gathered none.
+            val over = view.projectionFitViews.ifEmpty { listOf(view) }
+            val fits =
+              over
+                .flatMap { it.geoJsonSignals.ifEmpty { listOf("data('${it.mainData}')") } }
+                .distinct()
             put(
               "fit",
               signalRef(if (fits.size > 1) "[${fits.joinToString(", ")}]" else fits.first()),
@@ -872,9 +877,22 @@ private class Compilation(
           } else {
             put("translate", signalRef("[width / 2, height / 2]"))
           }
-          view.projection?.fields?.forEach { (key, value) -> put(key, value) }
-          // `projComp.set('type', 'equalEarth', false)`: the projection every chart falls back to.
-          if (view.projection?.string("type") == null) put("type", "equalEarth")
+          // `replaceExprRef`: a property written as an **expression** is a signal to Vega, which
+          // has no notion of `expr` — a projection whose type a parameter chooses says
+          // `{"signal": "projection"}`, not `{"expr": "projection"}`.
+          view.projection?.fields?.forEach { (key, value) ->
+            val expression = (value as? VegaValue.Obj)?.takeIf { it.has("expr") }?.string("expr")
+            put(key, if (expression != null) signalRef(expression) else value)
+          }
+          // `projComp.set('type', 'equalEarth', false)`: the projection a **unit** falls back to.
+          // A merged one is built from what its members *specified* and carries no default with it,
+          // so a layer that says nothing about the kind of map it wants writes nothing.
+          if (
+            view.projection?.fields?.containsKey("type") != true &&
+              view.projectionFitViews.isEmpty()
+          ) {
+            put("type", "equalEarth")
+          }
         }
       }
 
@@ -1565,6 +1583,9 @@ private class Compilation(
     put("data", spec.fields["data"])
     put("width", spec.fields["width"])
     put("height", spec.fields["height"])
+    // A projection is handed down as the data is: a chart that states one draws every member
+    // through it, and a member that states its own overrides it.
+    put("projection", spec.fields["projection"])
     putAll(child)
     // A child's transforms come **after** its parent's rather than instead of them: the parent's
     // belong to the parent's own data chain and the child's hang below. Letting the child's replace

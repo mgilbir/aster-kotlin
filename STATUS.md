@@ -697,7 +697,7 @@ no data is needed to compare two compilers. So every one of them was compiled by
 by this one, and the outputs compared property by property. That is a *measurement*, not a gate: the
 examples are not fixtures here, and nothing about them is checked in.
 
-**124 of 627 matched exactly** at the start, and **606** do now.
+**124 of 627 matched exactly** at the start, and **616** do now.
 
 The value is the *ranking*. The first sweep clustered by root cause, and the three most damaging
 causes were fixed straight away — chosen for what they do to the *picture* rather than for
@@ -712,11 +712,11 @@ frequency:
   where this compiler used `step - 2`, making it nearly four times too wide. `getBandSize` asks the
   scale's kind first and reaches `discreteBandSize` only where the domain is discrete.
 
-The sweep has been the working list ever since, and the 21 that still differ cluster like this:
+The sweep has been the working list ever since, and the 11 that still differ cluster like this:
 
 | Files | Cause |
 | --- | --- |
-| 20 | geographic: what is left is `geoshape`, `topojson`, `graticule` and `sphere`; the projection itself and the two geographic *position* channels now compile (below) |
+| 8 | geographic: what is left is `topojson`, the second coordinate pair, and a projection inside a repetition or a facet |
 | 5 | the rest of the **facet data flow**: what is left is a chart whose cells are read by a **selection**, where the brush's own datasets have to be cut per cell as well |
 | 0 | nothing outside the geographic work; the one refusal left of my own is a facet inside a **facet**, described below |
 
@@ -4397,6 +4397,30 @@ A last one, off the same reading: `toFieldDefBase` keeps a field's bucketing, it
 aggregate, and **not its type**. Two layers over one column, one calling it ordinal and the other
 saying nothing, are the same field to a title; keying the title by the type as well titled the axis
 "age, age".
+
+### An outline is drawn by the projection, not placed by two scales
+
+The `geoshape` mark, and the two data sources that make geography out of nothing.
+
+A shape has **no position**: the projection draws it, through a `geoshape` transform hung below the
+mark — `postEncodingTransform`, which runs after the encoding has said what colour the outline is.
+Where the rows carry their own outlines the transform names the column; a sphere or a graticule is
+the row itself and names nothing.
+
+`{"sphere": true}` is the whole globe as one feature, which Vega draws from a row saying
+`{"type": "Sphere"}` — there is no transform that makes a sphere, only the word for it.
+`{"graticule": true}` is a transform, the globe's own grid of meridians and parallels. A view drawn
+from a graticule is **not filled**: `defaultFilled` says so outright, and filling each cell of the
+grid would paint over the map underneath. A geoshape joins the marks that take a transparent fill
+when they are not filled, so that an outline still has a hit area.
+
+Four rules about the projection came with them. It is **handed down** as the data is, so a chart
+that states one draws every member through it and a member that states its own overrides it. A
+property written as an expression is a *signal* to Vega, which has no notion of `expr`. A merged
+projection is built from what its members **specified** and carries no default with it, so a layer
+that says nothing about the kind of map it wants writes nothing — where a single view falls back to
+`equalEarth`. And a member that gathered no feature collection, because what it draws *is* geography,
+contributes its own table to the fit.
 
 ### A place is not a position until a projection has been asked
 

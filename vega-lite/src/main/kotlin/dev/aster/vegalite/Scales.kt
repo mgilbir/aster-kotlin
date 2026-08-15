@@ -143,6 +143,9 @@ internal object Scales {
       return it
     }
     return when (def.type) {
+      // An outline is not measured against anything: the projection draws it, and there is no
+      // scale between the column and the page.
+      MeasureType.GEOJSON -> "ordinal"
       MeasureType.NOMINAL,
       MeasureType.ORDINAL -> {
         if (channel in COLOR_CHANNELS || channel in DISCRETE_RANGE_CHANNELS) return "ordinal"

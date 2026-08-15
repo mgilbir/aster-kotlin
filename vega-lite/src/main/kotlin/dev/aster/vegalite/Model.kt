@@ -16,7 +16,11 @@ internal enum class MeasureType(val jsonName: String) {
   QUANTITATIVE("quantitative"),
   TEMPORAL("temporal"),
   ORDINAL("ordinal"),
-  NOMINAL("nominal");
+  NOMINAL("nominal"),
+  /**
+   * An outline on the globe rather than a measurement: the type a `geoshape` reads its shape as.
+   */
+  GEOJSON("geojson");
 
   val isDiscrete: Boolean
     get() = this == ORDINAL || this == NOMINAL
@@ -185,6 +189,10 @@ internal class UnitSpec(
    * one view it was declared in, and that view's name is the `unit` every picked tuple records.
    */
   val params: List<VegaValue> = emptyList(),
+  /**
+   * The `projection` this view's places are put on the page by, where it states or inherits one.
+   */
+  val projection: VegaValue.Obj? = null,
 ) {
   val mark: String
     get() = markDef.type

@@ -34,6 +34,8 @@ internal object Marks {
       "trail" to "trail",
       // A picture is its own Vega mark, positioned like a rect and painted from a file.
       "image" to "image",
+      // An outline on the globe is a **shape**: a path the projection draws, not a position.
+      "geoshape" to "shape",
     )
 
   /**
@@ -392,6 +394,9 @@ internal object Marks {
       val clip = view.markDef.raw.fields["clip"]
       if (clip != null) put("clip", clip)
       else if (view.clippedByScale) put("clip", VegaValue.Bool(true))
+      // `projectionClip`: a projection **placed by hand** is not fitted to the plotting area, so
+      // what it draws may run off the edge — a globe at a stated scale is wider than the chart.
+      else if (view.hasProjection && !view.projectionFits) put("clip", VegaValue.Bool(true))
       put("style", strings(styles(view)))
       // `interactiveFlag`: a chart with a selection in it has to let the pointer reach its marks.
       // Without a selection anywhere, the property is left off entirely rather than written false.
@@ -412,6 +417,25 @@ internal object Marks {
       sortOrder(view)?.let { put("sort", it) }
       put("from", obj { put("data", view.markData) })
       put("encode", obj { put("update", encodeEntry(view)) })
+      // `postEncodingTransform`: the **projection draws** a geographic shape, after the encoding
+      // has said what colour it is. A `shape` field names the outline where the rows carry one; a
+      // sphere or a graticule is the row itself and names nothing.
+      if (mark == "geoshape") {
+        put(
+          "transform",
+          arr(
+            listOf(
+              obj {
+                put("type", "geoshape")
+                put("projection", view.projectionName)
+                view.spec.encoding["shape"]
+                  ?.takeIf { it.isFieldDef && it.type == MeasureType.GEOJSON }
+                  ?.let { put("field", Fields.datumPath(Fields.vgField(it))) }
+              }
+            )
+          ),
+        )
+      }
     }
   }
 
@@ -464,6 +488,9 @@ internal object Marks {
     return obj {
       putAll(baseEncode(view))
       when (mark) {
+        // A shape has no position at all: the projection draws it where it belongs, and the
+        // `geoshape` transform below the mark is what does the drawing.
+        "geoshape" -> Unit
         "bar",
         // A picture is positioned exactly as a rect is: a stated width and height centre it where
         // a point would have been, and a channel pair spans it between two positions instead.
@@ -786,7 +813,10 @@ internal object Marks {
     val defaultColor = declaredColor ?: markConfig.fields["color"]
 
     val transparentIfNeeded =
-      if (view.spec.mark in setOf("bar", "point", "circle", "square")) VegaValue.Str("transparent")
+      // A **geoshape** is on the list too: an outline drawn but not filled still wants a hit area,
+      // and a transparent fill is what gives one — the same reason a hollow point has one.
+      if (view.spec.mark in setOf("bar", "point", "circle", "square", "geoshape"))
+        VegaValue.Str("transparent")
       else null
 
     val defaultFill = if (filled) defaultColor else transparentIfNeeded

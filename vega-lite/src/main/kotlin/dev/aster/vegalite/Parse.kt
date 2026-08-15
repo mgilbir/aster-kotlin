@@ -30,7 +30,9 @@ internal class Parse(
     }
 
     val encoding = encoding(spec.obj("encoding") ?: VegaValue.EmptyObject, "$path.encoding")
-    val markDef = markDef(markValue, encoding, path) ?: return null
+    val markDef =
+      markDef(markValue, encoding, path, spec.obj("data")?.fields?.containsKey("graticule") == true)
+        ?: return null
 
     // `alignStackOrderWithColorDomain`: a chart whose colours are listed in a stated order is drawn
     // in that order too, and the rule reaches into the encoding to say so.
@@ -44,6 +46,9 @@ internal class Parse(
       width = spec.fields["width"],
       height = spec.fields["height"],
       params = spec.array("params").orEmpty(),
+      // A **projection** belongs to the unit that draws through it. A layer may state one of its
+      // own, and a chart's own is handed down to the members that did not.
+      projection = spec.obj("projection"),
     )
   }
 
@@ -137,7 +142,13 @@ internal class Parse(
     )
   }
 
-  fun markDef(value: VegaValue, encoding: Map<String, ChannelDef>, path: String): MarkDef? {
+  fun markDef(
+    value: VegaValue,
+    encoding: Map<String, ChannelDef>,
+    path: String,
+    /** Whether the view's rows are the globe's own grid, which is drawn rather than filled. */
+    graticule: Boolean = false,
+  ): MarkDef? {
     val raw =
       when (value) {
         is VegaValue.Str -> obj { put("type", value.value) }
@@ -177,7 +188,10 @@ internal class Parse(
     val filled =
       raw.boolean("filled")
         ?: markConfig.boolean("filled")
-        ?: (type != "point" && type != "line" && type != "rule")
+        // `defaultFilled`: a **graticule** is not filled. It is the globe's grid of meridians and
+        // parallels — lines, whatever mark draws them — and filling each cell of it would paint
+        // over the map underneath.
+        ?: if (graticule) false else (type != "point" && type != "line" && type != "rule")
 
     return MarkDef(
       type = type,
@@ -553,6 +567,8 @@ internal class Parse(
         "circle",
         // A picture placed where a point would be: a rect-based mark whose `url` names the file.
         "image",
+        // An outline on the globe, drawn through a projection rather than through two scales.
+        "geoshape",
         "line",
         "point",
         "rect",

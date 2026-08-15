@@ -1,0 +1,40 @@
+{
+  "marks": [
+    {
+      "fill": "transparent",
+      "height": 200,
+      "role": "frame",
+      "type": "group",
+      "width": 200,
+      "x": 0,
+      "y": 0
+    },
+    {
+      "fill": "aliceblue",
+      "role": "mark",
+      "shapeHeight": 200,
+      "shapeLeft": 0,
+      "shapeTop": 0,
+      "shapeWidth": 200,
+      "type": "shape"
+    },
+    {
+      "fill": "transparent",
+      "role": "mark",
+      "shapeHeight": 202,
+      "shapeLeft": -1,
+      "shapeTop": -1,
+      "shapeWidth": 202,
+      "stroke": "black",
+      "strokeWidth": 0.5,
+      "type": "shape"
+    }
+  ],
+  "scales": {},
+  "size": {
+    "height": 210,
+    "width": 210
+  },
+  "spec": "geo-shapes.vg.json",
+  "vegaVersion": "6.3.1"
+}

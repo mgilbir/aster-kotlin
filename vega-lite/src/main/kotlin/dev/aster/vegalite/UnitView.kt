@@ -219,6 +219,15 @@ internal class UnitView(
   var fitsTable: Boolean = false
 
   /**
+   * The views a **merged** projection is fitted to, where this one carries the merge.
+   *
+   * Each contributes what it gathered — its feature collections, or its own table where what it
+   * draws *is* geography and there was nothing to gather. Which table that is not being known until
+   * the flow has been walked and named, the list is kept as views and read at assembly.
+   */
+  var projectionFitViews: List<UnitView> = emptyList()
+
+  /**
    * Whether a level above took this projection over — `component.projection.merged`.
    *
    * The view still needs it: its places are still put on the page, and the `geopoint` in its chain
