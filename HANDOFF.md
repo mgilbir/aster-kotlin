@@ -567,6 +567,29 @@ down because the next adapter will meet the same two shapes.
 it and each must assert only its own: a list asserted whole fails as soon as a second replay adds to
 it.
 
+## Wrapping a **returned function** tripled the corpus
+
+d3's interpolators, its scales, `timeFloor('year')`, a regression's `predict` — a whole family of APIs
+is *built and then called*, and recording only the construction recorded `{$: 'function'}` and nothing
+else. The recorder now wraps what comes back, and every call on it becomes a vector carrying the
+arguments it was **built with**:
+
+```json
+{"fn": "interpolateRgb()", "constructedWith": ["steelblue", "brown"], "args": [0.25],
+ "result": "rgb(94, 108, 146)"}
+```
+
+`d3-interpolate` went from 253 vectors to 533 and the whole corpus from 4,898 to **15,220**. One level
+only: a longer chain is a builder, and belongs to the instance-and-sequence recording the transforms
+use.
+
+`UpstreamInterpolateVectorsTest` replays 68 of them against `ColorSpaces` — `rgb`, `lab`, `hcl`, `hsl`,
+`cubehelix`, both hue directions, and the generic `interpolate` — and **all agree**. Worth noting why
+these vectors are worth having: which space a ramp passes *through* is invisible at its ends, so a
+test that checks the endpoints passes on every implementation. These sample t = 0, 0.25, 0.5, 0.75, 1,
+which is where a wrong space shows. The comparison is channel by channel with a half-unit tolerance,
+because upstream prints `rgb(94, 108, 146)` with its channels already rounded.
+
 ## Where the remaining packages stand
 
 Replayed: `d3-time` (366), `d3-array` (252), `d3-color` (34), `vega-time` (281), `vega-transforms`

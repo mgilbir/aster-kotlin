@@ -143,7 +143,15 @@ function recordExports(moduleNamespace, packageName, calls) {
           ...(threw ? {threw: threw.message.split('\n')[0]} : {result: encode(result)}),
         });
         if (threw) throw threw;
-        return result;
+        // A function **returned** is where a whole family of packages keeps its meaning:
+        // `interpolateRgb(a, b)` hands back the interpolator, `timeFloor('year')` hands back the
+        // flooring function. Recording only the construction records nothing at all — the result is
+        // `{$: 'function'}` — so the returned function is wrapped too, and every call on it becomes a
+        // vector carrying the arguments it was *built* with. One level only: a longer chain is a
+        // builder, and belongs to the instance-and-sequence recording the transforms use.
+        return typeof result === 'function'
+          ? applied(result, packageName, name, args, calls)
+          : result;
       },
       construct(target, args, newTarget) {
         return Reflect.construct(target, args, newTarget);
@@ -316,6 +324,29 @@ function rewriteImports(source, file) {
  * hundred rows do not. Anything larger is recorded as a count, so the skip is visible rather than a
  * silently short array.
  */
+/** Wraps a returned function so calling it records what it was built with and what it answered. */
+function applied(fn, packageName, name, constructedWith, calls) {
+  return new Proxy(fn, {
+    apply(target, thisArg, args) {
+      let result, threw = null;
+      try {
+        result = Reflect.apply(target, thisArg, args);
+      } catch (error) {
+        threw = error;
+      }
+      pushCall(calls, {
+        package: packageName,
+        fn: `${name}()`,
+        constructedWith: constructedWith.map(a => encode(a)),
+        args: args.map(a => encode(a)),
+        ...(threw ? {threw: threw.message.split('\n')[0]} : {result: encode(result)}),
+      });
+      if (threw) throw threw;
+      return result;
+    },
+  });
+}
+
 function recordTransforms(moduleNamespace, packageName, calls) {
   const patched = [];
   const instanceCounter = {n: 0};
