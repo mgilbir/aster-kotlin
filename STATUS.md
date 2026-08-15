@@ -716,7 +716,7 @@ The sweep has been the working list ever since, and the 6 that still differ clus
 
 | Files | Cause |
 | --- | --- |
-| 3 | geographic: a projection inside a **repetition**, and the two interactive maps that brush one |
+| 3 | geographic: a projection inside a **repetition** — whose cause is now known and written below — and the two interactive maps that brush one |
 | 5 | the rest of the **facet data flow**: what is left is a chart whose cells are read by a **selection**, where the brush's own datasets have to be cut per cell as well |
 | 0 | nothing outside the geographic work; the one refusal left of my own is a facet inside a **facet**, described below |
 
@@ -4397,6 +4397,23 @@ A last one, off the same reading: `toFieldDefBase` keeps a field's bucketing, it
 aggregate, and **not its type**. Two layers over one column, one calling it ordinal and the other
 saying nothing, are the same field to a title; keying the title by the type as well titled the axis
 "age, age".
+
+### What a projection inside a repetition still wants
+
+`geo_repeat` is three maps of one table, each joined against the same outlines, and it comes out
+one dataset short: the three copies' joins fold into a single node above the fork, where upstream
+keeps one per copy.
+
+The cause is **naming**, and it is upstream's own rule read the other way round. A join is named
+through the model that wrote it — `model.getName('lookup_n')` — so three copies of a plot each write
+a differently-named join and no optimizer can see them as one node, while four layers of a *shared*
+model write the same name and fold into one. This compiler names a join for the table it reads, so
+both cases fold, and the two charts want opposite answers.
+
+Naming it through the view was tried and is not enough on its own: `transformOwners` is empty for
+the layered chart as well as for the repeated one, so the two cannot yet be told apart at the point
+the join is registered. What is missing is the ownership record reaching that far, which is the same
+plumbing the facet lift needed and the same shape of fix.
 
 ### A cell captions itself, and a caption may be two lines
 
