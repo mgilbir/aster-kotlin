@@ -718,7 +718,7 @@ The sweep has been the working list ever since, and the 25 that still differ clu
 | --- | --- |
 | 21 | geographic: projections, `topojson`, `geoshape` — another worker's ground |
 | 5 | the rest of the **facet data flow**: what is left is a chart whose cells are read by a **selection**, where the brush's own datasets have to be cut per cell as well |
-| 0 | nothing outside the geographic work: what is left of the refusals is a facet inside a **facet**, a grid whose every cell is itself a grid, which needs a second level of cell groups |
+| 0 | nothing outside the geographic work; the one refusal left of my own is a facet inside a **facet**, described below |
 
 | 3 | one-offs, each its own rule |
 
@@ -4397,6 +4397,25 @@ A last one, off the same reading: `toFieldDefBase` keeps a field's bucketing, it
 aggregate, and **not its type**. Two layers over one column, one calling it ordinal and the other
 saying nothing, are the same field to a title; keying the title by the type as well titled the axis
 "age, age".
+
+### What a facet inside a facet would take
+
+The last refusal that is not geographic, and the shape of it is now known rather than guessed —
+read off upstream's own output for the three gallery charts that ask for it.
+
+A grid whose every cell is itself a grid is two levels of cell group. The outer `cell` carries the
+**inner grid's** domain dataset, its layout and its bands; the inner `child_cell` partitions the
+outer partition — `{"facet": {"name": "child_facet", "data": "facet", …}}` — and holds the marks'
+own chain in its `data`. The names run one level deeper at each step: `child_row_header` inside
+`cell`, and the cell's size is `child_child_width`.
+
+Three things stand between here and there. The levels have to be **kept apart**: the operator form
+writes the inner facet's channels into the same encoding as the outer's, where a single lift reads
+them as one crossed grid, so the peeling has to record a definition per level rather than merge them.
+`marks` has to **recurse**, building the innermost cell first and wrapping it in each grid outwards.
+And the data flow splits at the *inner* level: the marks' rows are computed inside `child_cell` from
+the partition it was handed, which is the machinery already written for a cell that computes its own
+rows, applied one level down.
 
 ### A grid belongs to the plot that holds it
 
