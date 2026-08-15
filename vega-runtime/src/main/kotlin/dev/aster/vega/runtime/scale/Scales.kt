@@ -415,9 +415,13 @@ public abstract class TransformedScale(
     val r0 = range.first()
     val r1 = range.last()
     if (r0 == r1) return Double.NaN
+    // Clamped both ways, as in `LinearScale` and for the same reason: d3's `clamp` bounds the input
+    // to `invert` as well as to the scale, so a pointer past the end of a log or power axis reads
+    // the end of the domain rather than a value beyond it.
+    val clamped = if (clamp) position.coerceIn(minOf(r0, r1), maxOf(r0, r1)) else position
     val d0 = forward(domain.first())
     val d1 = forward(domain.last())
-    return backward(d0 + ((position - r0) / (r1 - r0)) * (d1 - d0))
+    return backward(d0 + ((clamped - r0) / (r1 - r0)) * (d1 - d0))
   }
 
   public open fun ticks(count: Int = LinearScale.DEFAULT_TICK_COUNT): List<Double> =

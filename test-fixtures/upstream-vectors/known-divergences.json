@@ -92,6 +92,12 @@
       "note": "A path that starts with a **drawing** command rather than a move. Upstream's parser emits two lines from the origin; this one refuses the string, which is what the SVG grammar requires and what a browser does with it \u2014 so the same specification draws nothing in a browser and two lines through Vega's canvas renderer. Upstream disagrees with itself here, so neither answer is simply right; refusing is the one that matches what a reader sees in the DOM. Pinned so a change of mind is a decision.",
       "kind": "parser",
       "subject": "SvgPath.parse"
+    },
+    {
+      "signature": "scaleThreshold.domain([\"10\",\"2\"]).range([0,1,2]).(call)([\"12\"])",
+      "kind": "scale",
+      "subject": "ThresholdScale",
+      "note": "A threshold scale whose cut points are **strings**. d3 compares them with JavaScript's `<`, which is lexicographic \u2014 `\"12\" < \"2\"` \u2014 so `\"12\"` lands in the first bucket; this engine's `ThresholdScale` holds `Double` cut points, parses them, and puts 12 above both. Supporting it would mean carrying `VegaValue` thresholds and JS comparison through the scale, for a specification that writes a numeric cut point as a quoted string. Pinned rather than fixed, and worth revisiting if a real specification ever does it."
     }
   ]
 }

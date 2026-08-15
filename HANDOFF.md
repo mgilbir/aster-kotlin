@@ -623,11 +623,35 @@ plausible, and both were found by a wrong answer:
 - **d3 takes configuration as constructor arguments too**: `scaleLinear([1, 2])` sets the range, and
   ignoring that made a configured scale look like the default one.
 
-`UpstreamD3ScaleVectorsTest` replays 73 linear-scale vectors — evaluating, inverting, ticks — and
-found a real bug: **`clamp` works both ways in d3 and only one way here.** Inverting a position past
+`UpstreamD3ScaleVectorsTest` replays **109** vectors across seven scale families — linear, pow, sqrt,
+log, symlog, band, point, quantize, threshold — evaluating, inverting and ticking each, and found a
+real bug: **`clamp` works both ways in d3 and only one way here.** Inverting a position past
 the end of the range, which is every pointer event past the end of an axis, returned a value outside
 the domain: with domain [0, 1] and range [10, 20], `invert(30)` read **2** where upstream reads 1. A
 brush or a tooltip built on that selects data the scale says is not there.
+
+## What the scale replay counts as *not comparable*, and why
+
+Of 1,134 recorded `d3-scale` vectors, 109 replay. The rest are named in the ledger, and the reasons are
+the interesting part — each is a place where this engine is built differently rather than wrongly:
+
+- **88 are upstream's reflection API**: `domain()` with no arguments asks a d3 scale what it holds. A
+  Vega scale is built from a specification and does not answer questions about itself.
+- **A colour or string range** — `range(["red", "blue"])`, `range(["0px", "2px"])` — is a *different
+  scale* here: colour ramps live in `SequentialColorScale` and nothing interpolates a string.
+- **A domain with more than two stops** is upstream's polylinear scale, modelled apart.
+- `scaleTime`, `scaleQuantile`, `scaleOrdinal`, `scaleSequential`, `scaleDiverging` and `scaleRadial`
+  have no adapter yet — the next mechanical step, not a limit of the recording.
+
+Two more scale-shaped facts learned by getting them wrong: a **log** scale's default domain is
+`[1, 10]`, not `[0, 1]` — taking the usual default made every unconfigured log scale answer NaN — and
+the numeric-range restriction belongs to the *continuous* families only, since `quantize` and
+`threshold` are supposed to have value ranges.
+
+One divergence is pinned rather than fixed: a threshold scale whose **cut points are strings**. d3
+compares them with JavaScript's `<`, which is lexicographic (`"12" < "2"`), where this engine parses
+them to numbers. Supporting it means carrying `VegaValue` thresholds and JS comparison through the
+scale, for a specification that writes a numeric cut point in quotes.
 
 ## Where the remaining packages stand
 
