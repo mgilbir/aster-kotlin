@@ -1,0 +1,189 @@
+{
+  "package": "vega-force",
+  "vega": "6.3.1",
+  "files": 1,
+  "skipped": [],
+  "calls": [
+    {
+      "package": "vega-force",
+      "op": "force",
+      "instance": 1,
+      "sequence": 0,
+      "params": {
+        "static": true,
+        "forces": [
+          {
+            "force": "x",
+            "x": 100
+          },
+          {
+            "force": "y",
+            "y": 100
+          },
+          {
+            "force": "nbody"
+          }
+        ]
+      },
+      "input": {
+        "add": [
+          {
+            "label": "a"
+          },
+          {
+            "label": "b"
+          },
+          {
+            "label": "c"
+          },
+          {
+            "label": "d"
+          }
+        ],
+        "source": [
+          {
+            "label": "a"
+          },
+          {
+            "label": "b"
+          },
+          {
+            "label": "c"
+          },
+          {
+            "label": "d"
+          }
+        ]
+      },
+      "output": {
+        "add": [
+          {
+            "label": "a",
+            "index": 0,
+            "x": 119.72555199765348,
+            "y": 93.23909793590971,
+            "vy": -0.000005505468270445624,
+            "vx": 0.000039487136550661894
+          },
+          {
+            "label": "b",
+            "index": 1,
+            "x": 80.17840537947443,
+            "y": 106.761179208637,
+            "vy": 0.000005989741741230204,
+            "vx": -0.00002392511944338863
+          },
+          {
+            "label": "c",
+            "index": 2,
+            "x": 93.01019347304765,
+            "y": 79.73798264592888,
+            "vy": 0.000013510504547267548,
+            "vx": 0.00001667788108325206
+          },
+          {
+            "label": "d",
+            "index": 3,
+            "x": 106.85616690836244,
+            "y": 120.52216381092047,
+            "vy": -0.00005448952958567424,
+            "vx": 0.00000347470393323565
+          }
+        ],
+        "source": [
+          {
+            "label": "a",
+            "index": 0,
+            "x": 119.72555199765348,
+            "y": 93.23909793590971,
+            "vy": -0.000005505468270445624,
+            "vx": 0.000039487136550661894
+          },
+          {
+            "label": "b",
+            "index": 1,
+            "x": 80.17840537947443,
+            "y": 106.761179208637,
+            "vy": 0.000005989741741230204,
+            "vx": -0.00002392511944338863
+          },
+          {
+            "label": "c",
+            "index": 2,
+            "x": 93.01019347304765,
+            "y": 79.73798264592888,
+            "vy": 0.000013510504547267548,
+            "vx": 0.00001667788108325206
+          },
+          {
+            "label": "d",
+            "index": 3,
+            "x": 106.85616690836244,
+            "y": 120.52216381092047,
+            "vy": -0.00005448952958567424,
+            "vx": 0.00000347470393323565
+          }
+        ]
+      },
+      "value": {
+        "tick": {
+          "$": "function",
+          "name": "tick"
+        },
+        "restart": {
+          "$": "function",
+          "name": "(anonymous)"
+        },
+        "stop": {
+          "$": "function",
+          "name": "(anonymous)"
+        },
+        "nodes": {
+          "$": "function",
+          "name": "nodes"
+        },
+        "alpha": {
+          "$": "function",
+          "name": "alpha"
+        },
+        "alphaMin": {
+          "$": "function",
+          "name": "alphaMin"
+        },
+        "alphaDecay": {
+          "$": "function",
+          "name": "alphaDecay"
+        },
+        "alphaTarget": {
+          "$": "function",
+          "name": "alphaTarget"
+        },
+        "velocityDecay": {
+          "$": "function",
+          "name": "velocityDecay"
+        },
+        "randomSource": {
+          "$": "function",
+          "name": "randomSource"
+        },
+        "force": {
+          "$": "function",
+          "name": "force"
+        },
+        "find": {
+          "$": "function",
+          "name": "find"
+        },
+        "on": {
+          "$": "function",
+          "name": "on"
+        },
+        "stopped": {
+          "$": "function",
+          "name": "(anonymous)"
+        },
+        "numForces": 3
+      }
+    }
+  ]
+}

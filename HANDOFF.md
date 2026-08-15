@@ -415,13 +415,54 @@ regex version it replaced did not survive the *current* version: it handled `imp
 | `vega-event-selector` | 18 | 1/1 |
 | `vega-format` | 11 | 3/3 |
 
-**Where it stops, and why that is not a dead end.** `vega-crossfilter`, `vega-encode`, `vega-force`, `vega-geo`, `vega-hierarchy`, `vega-label`, `vega-regression`, `vega-transforms`, `vega-util`, `vega-voronoi` record *nothing*, because those packages
-export operator **classes** driven through a `Dataflow` — nothing crosses the export boundary with
-plain arguments. Their tests do run to completion (30/30 for `vega-transforms`), so the machinery is
-sound; the seam is one level in, at `prototype.transform(_, pulse)`, where params and the input and
-output pulses are all capturable. Two details to solve there: a params object holds **accessor
-functions** (encode them by their `fields`, not as `{$:'function'}`), and a pulse needs its tuples
-serialised. That is the highest-value extension by far — `vega-transforms` alone is 938 assertions.
+**The transform seam is in, and it was the whole prize.** `vega-transforms` and its neighbours export
+operator *classes* driven through a `Dataflow`, so nothing crosses the export boundary with plain
+arguments — the export recorder saw zero calls from 30 files that ran perfectly. One level in,
+`prototype.transform(_, pulse)` sees everything: parameters, the tuples in, the tuples out, and the
+operator's own value where it keeps one. That took the corpus from 1,007 vectors to **1,749**, with 548
+from `vega-transforms` alone.
+
+Four things had to be right, and each was learned by getting it wrong:
+
+- **Accessors and comparators both carry `fields`.** Reducing `compare(['count'], ['descending'])` to
+  the string `count` drops the direction, and a sorted `collect` then looks like an unsorted one. A
+  comparator also has `orders`, which is how they are told apart; where the direction is genuinely
+  lost the vector is marked unreplayable rather than mis-compared.
+- **A tuple can be enormous.** Capping the number of tuples is not enough: a `facet` group tuple
+  carries its whole partition, and three of them produced a 52 MB vector inside a **452 MB** file that
+  exhausted a 2 GB heap before a single transform ran. Vectors are now capped by encoded size.
+- **Operators are stateful.** `aggregate` remembers every group value it has seen, so a later pulse's
+  output depends on every pulse before it — one recorded output contains a cell for a value that is
+  not in its input. Each call is stamped with its operator instance and sequence number, and only the
+  first call on a fresh operator is replayed.
+- **An `expr` recorded as an accessor was a JavaScript function.** `d => d.id * 2` keeps only the
+  field it read, so replaying it as the expression `id` computes something else and looks like a bug
+  in `formula`.
+
+## What upstream's own tests found: five real transform bugs
+
+151 of the replayable `vega-transforms` vectors match exactly. **13 do not**, in five transforms, and
+each is a bug rather than an accepted difference. They are pinned *exactly* in
+`test-fixtures/upstream-vectors/known-divergences.json` — a new divergence fails the build, and fixing
+one fails it too until the entry is deleted, so the list cannot go stale.
+
+- **`window` ignores peer rows.** Rows tied on the sort key are a *peer group* upstream: `rank` and
+  `dense_rank` repeat within it, `percent_rank` and `cume_dist` are computed from it, and with
+  `ignorePeers: false` a frame aggregate covers the whole group. This computes every row as if it were
+  unique, so `dense_rank` came back as 1 for every row of a five-row table.
+- **`timeunit` with `inferUnits: true` picks the wrong granularity.** Upstream infers `month` for a
+  series of month starts; this infers `day`, so `unit1` lands a day later instead of a month later.
+- **`impute` does not mark what it invented.** Upstream sets `_impute: true` on a synthesised tuple,
+  which is how a downstream mark can tell it from a real row. One combination is also missing where a
+  group has no rows at a key.
+- **`aggregate` ignores `cross`.** `cross: true` must emit the full cross-product of the group-by
+  values including empty cells with a zero count; this emits only the combinations that occur.
+- **`bin` ignores `interval: false`**, which means "emit `bin0` only", so a binned field carries an
+  end nobody asked for.
+
+None of these is visible to the 178 differential fixtures, because no fixture happens to use those
+parameters. That is the argument for the whole exercise: a corpus of *inputs* someone else chose finds
+what a corpus of charts we chose cannot.
 
 **The Kotlin side is an adapter per package**, not generated code: `UpstreamTimeVectorsTest` maps
 upstream function names onto ours, prints a coverage ledger, and asserts a **floor** on how many

@@ -1,0 +1,76 @@
+{
+  "_comment": [
+    "Divergences between these transforms and upstream, found by replaying Vega's own test vectors.",
+    "Every entry is a BUG TO FIX, not an accepted difference. The test asserts this set EXACTLY:",
+    "a new divergence fails the build, and fixing one also fails it until its entry is deleted here.",
+    "Recorded rather than left red so the harness can be committed green while the work is queued;",
+    "each is written up in HANDOFF.md under 'What upstream's own tests found'."
+  ],
+  "divergences": [
+    {
+      "signature": "aggregate params={\"cross\":true,\"groupby\":[\"a\",\"b\"],\"type\":\"aggregate\"}",
+      "transform": "aggregate",
+      "note": "`cross: true` must emit the full cross-product of the group-by values, including empty cells with a zero count. Not implemented here: only the observed combinations are emitted."
+    },
+    {
+      "signature": "bin params={\"extent\":[0,10],\"field\":\"v\",\"interval\":false,\"nice\":false,\"step\":1,\"type\":\"bin\"}",
+      "transform": "bin",
+      "note": "`interval: false` means emit `bin0` only. This emits `bin1` regardless, so a binned field carries an end nobody asked for."
+    },
+    {
+      "signature": "impute params={\"field\":\"y\",\"groupby\":[\"c\"],\"key\":\"x\",\"method\":\"value\",\"type\":\"impute\",\"value\":-1}",
+      "transform": "impute",
+      "note": "An imputed tuple is marked `_impute: true` upstream, which is how a downstream mark can tell a synthesised row from a real one. Also incomplete: one combination is missing where a group has no rows at a key."
+    },
+    {
+      "signature": "impute params={\"field\":\"y\",\"groupby\":[\"c\"],\"key\":\"x\",\"keyvals\":[2,3],\"method\":\"value\",\"type\":\"impute\",\"value\":-1}",
+      "transform": "impute",
+      "note": "An imputed tuple is marked `_impute: true` upstream, which is how a downstream mark can tell a synthesised row from a real one. Also incomplete: one combination is missing where a group has no rows at a key."
+    },
+    {
+      "signature": "impute params={\"field\":\"y\",\"key\":\"x\",\"keyvals\":[2,3],\"method\":\"value\",\"type\":\"impute\",\"value\":-1}",
+      "transform": "impute",
+      "note": "An imputed tuple is marked `_impute: true` upstream, which is how a downstream mark can tell a synthesised row from a real one. Also incomplete: one combination is missing where a group has no rows at a key."
+    },
+    {
+      "signature": "timeunit params={\"field\":\"date\",\"inferUnits\":true,\"type\":\"timeunit\"}",
+      "transform": "timeunit",
+      "note": "`inferUnits: true` picks the wrong granularity: upstream infers `month` for these instants and this infers `day`, so `unit1` is a day later instead of a month later."
+    },
+    {
+      "signature": "timeunit params={\"field\":\"date\",\"inferUnits\":true,\"timezone\":\"utc\",\"type\":\"timeunit\"}",
+      "transform": "timeunit",
+      "note": "`inferUnits: true` picks the wrong granularity: upstream infers `month` for these instants and this infers `day`, so `unit1` is a day later instead of a month later."
+    },
+    {
+      "signature": "timeunit params={\"field\":\"date\",\"inferUnits\":true,\"type\":\"timeunit\"}",
+      "transform": "timeunit",
+      "note": "`inferUnits: true` picks the wrong granularity: upstream infers `month` for these instants and this infers `day`, so `unit1` is a day later instead of a month later."
+    },
+    {
+      "signature": "timeunit params={\"field\":\"date\",\"inferUnits\":true,\"type\":\"timeunit\",\"units\":[\"year\"]}",
+      "transform": "timeunit",
+      "note": "`inferUnits: true` picks the wrong granularity: upstream infers `month` for these instants and this infers `day`, so `unit1` is a day later instead of a month later."
+    },
+    {
+      "signature": "timeunit params={\"field\":\"date\",\"interval\":false,\"type\":\"timeunit\",\"units\":[\"year\"]}",
+      "transform": "timeunit",
+      "note": "`inferUnits: true` picks the wrong granularity: upstream infers `month` for these instants and this infers `day`, so `unit1` is a day later instead of a month later."
+    },
+    {
+      "signature": "aggregate params={\"groupby\":\"k1\",\"type\":\"aggregate\"}",
+      "transform": "aggregate",
+      "note": "`cross: true` must emit the full cross-product of the group-by values, including empty cells with a zero count. Not implemented here: only the observed combinations are emitted."
+    },
+    {
+      "signature": "aggregate params={\"groupby\":\"k2\",\"type\":\"aggregate\"}",
+      "transform": "aggregate",
+      "note": "`cross: true` must emit the full cross-product of the group-by values, including empty cells with a zero count. Not implemented here: only the observed combinations are emitted."
+    },
+    {
+      "signature": "window params={\"ops\":[\"rank\",\"dense_rank\"],\"type\":\"window\"}",
+      "transform": "window",
+      "note": "Peer rows \u2014 rows tied on the sort key \u2014 are not handled. `rank`, `dense_rank` and `percent_rank` are computed as if every row were unique, and with `ignorePeers: false` an aggregate must cover the whole peer group."
+    }
+  ]
+}

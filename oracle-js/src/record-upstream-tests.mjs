@@ -46,7 +46,20 @@ function encode(value, seen = new Set()) {
     return value;
   }
   if (typeof value === 'bigint') return {$: 'bigint', value: value.toString()};
-  if (typeof value === 'function') return {$: 'function', name: value.name || '(anonymous)'};
+  if (typeof value === 'function') {
+    // A Vega **accessor** is a function that carries the field path it reads, and a transform's
+    // parameters are full of them — `{field: field('v')}`. Recorded as an opaque function they would
+    // make every transform vector unreplayable; recorded by their `fields` they are exactly what a
+    // Kotlin adapter needs.
+    // A **comparator** carries `fields` as well, so `fields` alone cannot tell one from an
+    // accessor — and reducing `compare(['count'], ['descending'])` to the string "count" silently
+    // drops the direction, which is how a sorted `collect` looked like an unsorted one.
+    if (Array.isArray(value.fields) && Array.isArray(value.orders)) {
+      return {$: 'comparator', fields: value.fields, orders: value.orders};
+    }
+    if (Array.isArray(value.fields)) return {$: 'accessor', fields: value.fields};
+    return {$: 'function', name: value.name || '(anonymous)'};
+  }
   if (typeof value === 'symbol') return {$: 'symbol'};
   if (value instanceof Date) return {$: 'date', epochMillis: value.getTime()};
   if (value instanceof RegExp) return {$: 'regexp', source: value.source, flags: value.flags};
@@ -114,6 +127,7 @@ async function runTestFile(file, packageName, calls, skipped) {
   const source = readFileSync(file, 'utf8');
   const namespace = await import(packageName);
   const wrapped = recordExports(namespace, packageName, calls);
+  const restoreTransforms = recordTransforms(namespace, packageName, calls);
   globalThis.__vegaRecorded = wrapped;
   globalThis.__vegaTape = tapeShim(file, skipped);
 
@@ -138,6 +152,7 @@ async function runTestFile(file, packageName, calls, skipped) {
     skipped.push({file, reason: `threw while running: ${error.message.split('\n')[0]}`});
   } finally {
     rmSync(temporary, {force: true});
+    restoreTransforms();
   }
 }
 
@@ -191,6 +206,126 @@ function rewriteImports(source, file) {
   return out;
 }
 
+/**
+ * Records what a **transform operator** does, which is where the interesting packages keep their
+ * meaning.
+ *
+ * `vega-transforms` and its neighbours export operator *classes*, not functions: a test constructs
+ * one through a `Dataflow` and pushes tuples at it, so nothing crosses the export boundary with plain
+ * arguments and the export-level recorder sees nothing at all. One level in is a seam that sees
+ * everything — `prototype.transform(_, pulse)`, called once per pulse with the resolved parameters.
+ *
+ * What is captured is a transform's whole contract: the parameters, the tuples that went in, and the
+ * tuples that came out. Tuple identity is a `Symbol`, so it does not appear in the JSON and the
+ * vectors stay comparable.
+ *
+ * Output is **capped**. Some of upstream's tests push tens of thousands of tuples through a
+ * `crossfilter`; a vector that large is unreadable, slow to replay, and proves nothing the first two
+ * hundred rows do not. Anything larger is recorded as a count, so the skip is visible rather than a
+ * silently short array.
+ */
+function recordTransforms(moduleNamespace, packageName, calls) {
+  const patched = [];
+  const instanceCounter = {n: 0};
+  for (const name of Object.keys(moduleNamespace)) {
+    const operator = moduleNamespace[name];
+    const proto = operator && operator.prototype;
+    if (!proto || typeof proto.transform !== 'function' || proto.__vegaRecorded) continue;
+    const original = proto.transform;
+    proto.__vegaRecorded = true;
+    proto.transform = function (params, pulse) {
+      // A transform operator is **stateful**: `aggregate` accumulates the values it has seen, and a
+      // later pulse's output depends on every pulse before it. A replay that calls a pure
+      // `apply(rows, params)` can only reproduce the *first* call on a fresh operator, so each call
+      // is stamped with which operator it belongs to and how many calls that operator has had. Vector
+      // 2 of the cross-product test is what taught this: its input has no `b: 2` and its output does.
+      if (this.__vegaInstance === undefined) this.__vegaInstance = ++instanceCounter.n;
+      const sequence = (this.__vegaSequence = (this.__vegaSequence ?? -1) + 1);
+      const input = capturePulse(pulse);
+      const output = original.call(this, params, pulse);
+      // Several operators put their answer on **themselves** rather than in the pulse: `extent`
+      // leaves `[min, max]` in `this.value`, and a chart reads it as a parameter of the next
+      // operator. A vector without it would record that `extent` changed nothing, which is true of
+      // the tuples and useless as a check.
+      const value = this.value === undefined || typeof this.value === 'function' ? undefined : encode(this.value);
+      calls.push(
+        withinBudget({
+          package: packageName,
+          op: name,
+          instance: this.__vegaInstance,
+          sequence,
+          params: encodeParams(params),
+          input,
+          output: capturePulse(output && output.add !== undefined ? output : pulse),
+          ...(value === undefined ? {} : {value}),
+        })
+      );
+      return output;
+    };
+    patched.push(() => {
+      proto.transform = original;
+      delete proto.__vegaRecorded;
+    });
+  }
+  return () => patched.forEach(undo => undo());
+}
+
+const MAX_TUPLES = 200;
+
+/** The most JSON one vector may occupy, before its pulses are replaced by a note. */
+const MAX_VECTOR_BYTES = 64 * 1024;
+
+/**
+ * Keeps one vector to a readable size.
+ *
+ * Capping the *number* of tuples is not enough, because a single tuple can be enormous: a `facet`
+ * group tuple carries its whole partition, and recording three of those produced a 52 MB vector and a
+ * 452 MB file. What matters for a replay is the parameters — the pulses are dropped with a note
+ * saying so, which is visible in the ledger rather than silently short.
+ */
+function withinBudget(call) {
+  const text = JSON.stringify(call);
+  if (text.length <= MAX_VECTOR_BYTES) return call;
+  return {
+    ...call,
+    input: {$: 'oversized', bytes: text.length},
+    output: {$: 'oversized', bytes: text.length},
+    ...(call.value === undefined ? {} : {value: {$: 'oversized'}}),
+  };
+}
+
+/** A pulse's three change sets and its backing source, each capped and encoded. */
+function capturePulse(pulse) {
+  if (!pulse || typeof pulse !== 'object') return null;
+  const part = tuples => {
+    if (!Array.isArray(tuples)) return undefined;
+    if (tuples.length > MAX_TUPLES) return {$: 'truncated', count: tuples.length};
+    return tuples.map(t => encode(t));
+  };
+  const out = {};
+  for (const key of ['add', 'rem', 'mod', 'source']) {
+    const value = part(pulse[key]);
+    if (value !== undefined && (!Array.isArray(value) || value.length)) out[key] = value;
+  }
+  return out;
+}
+
+/** Parameters, with an operator parameter replaced by the value it holds. */
+function encodeParams(params) {
+  if (!params || typeof params !== 'object') return encode(params);
+  const out = {};
+  for (const key of Object.keys(params)) {
+    if (key === 'pulse' || key.startsWith('$')) continue;
+    const value = params[key];
+    // A parameter can be an `Operator` — `df.add([0, 10])` — and what a Kotlin adapter needs is the
+    // value it currently holds, not the operator wrapper.
+    out[key] = value && typeof value === 'object' && typeof value.value === 'function'
+      ? encode(value.value())
+      : encode(value);
+  }
+  return out;
+}
+
 /** Enough of `tape` to run a test body: assertions are accepted and ignored. */
 function tapeShim(file, skipped) {
   const noop = () => {};
@@ -235,13 +370,13 @@ for (const packageName of packages) {
   const unique = [];
   const seen = new Set();
   for (const call of calls) {
-    const key = JSON.stringify([call.fn, call.args, call.result, call.threw]);
+    const key = JSON.stringify([call.fn, call.op, call.instance, call.sequence, call.args, call.params, call.input, call.result, call.output, call.threw]);
     if (seen.has(key)) continue;
     seen.add(key);
     unique.push(call);
   }
   const byFunction = {};
-  for (const call of unique) byFunction[call.fn] = (byFunction[call.fn] || 0) + 1;
+  for (const call of unique) { const k = call.fn || call.op; byFunction[k] = (byFunction[k] || 0) + 1; }
   writeFileSync(
     join(outputDir, `${packageName}.json`),
     JSON.stringify({package: packageName, vega: '6.3.1', files: files.length, skipped, calls: unique}, null, 2) + '\n'

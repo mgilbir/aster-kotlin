@@ -1,0 +1,2684 @@
+{
+  "package": "vega-label",
+  "vega": "6.3.1",
+  "files": 1,
+  "skipped": [],
+  "calls": [
+    {
+      "package": "vega-label",
+      "op": "label",
+      "params": {
+        "size": [
+          50,
+          30
+        ],
+        "anchor": [
+          "left"
+        ],
+        "offset": [
+          2
+        ]
+      },
+      "input": {
+        "add": [
+          {
+            "text": "foo",
+            "x": 20,
+            "y": 15,
+            "fontSize": 10
+          },
+          {
+            "text": "bar",
+            "x": 30,
+            "y": 15,
+            "fontSize": 10
+          }
+        ],
+        "source": [
+          {
+            "text": "foo",
+            "x": 20,
+            "y": 15,
+            "fontSize": 10
+          },
+          {
+            "text": "bar",
+            "x": 30,
+            "y": 15,
+            "fontSize": 10
+          }
+        ]
+      },
+      "output": {
+        "add": [
+          {
+            "text": "foo",
+            "x": {
+              "$": "undefined"
+            },
+            "y": {
+              "$": "undefined"
+            },
+            "fontSize": 10,
+            "opacity": 0,
+            "align": {
+              "$": "undefined"
+            },
+            "baseline": {
+              "$": "undefined"
+            }
+          },
+          {
+            "text": "bar",
+            "x": {
+              "$": "undefined"
+            },
+            "y": {
+              "$": "undefined"
+            },
+            "fontSize": 10,
+            "opacity": 0,
+            "align": {
+              "$": "undefined"
+            },
+            "baseline": {
+              "$": "undefined"
+            }
+          }
+        ],
+        "source": [
+          {
+            "text": "foo",
+            "x": {
+              "$": "undefined"
+            },
+            "y": {
+              "$": "undefined"
+            },
+            "fontSize": 10,
+            "opacity": 0,
+            "align": {
+              "$": "undefined"
+            },
+            "baseline": {
+              "$": "undefined"
+            }
+          },
+          {
+            "text": "bar",
+            "x": {
+              "$": "undefined"
+            },
+            "y": {
+              "$": "undefined"
+            },
+            "fontSize": 10,
+            "opacity": 0,
+            "align": {
+              "$": "undefined"
+            },
+            "baseline": {
+              "$": "undefined"
+            }
+          }
+        ]
+      },
+      "value": null
+    },
+    {
+      "package": "vega-label",
+      "op": "label",
+      "params": {
+        "size": [
+          50,
+          30
+        ],
+        "anchor": [
+          "right"
+        ],
+        "offset": [
+          2
+        ]
+      },
+      "input": {
+        "add": [
+          {
+            "text": "foo",
+            "x": 20,
+            "y": 15,
+            "fontSize": 10
+          },
+          {
+            "text": "bar",
+            "x": 30,
+            "y": 15,
+            "fontSize": 10
+          }
+        ],
+        "rem": [
+          {
+            "text": "foo",
+            "x": {
+              "$": "undefined"
+            },
+            "y": {
+              "$": "undefined"
+            },
+            "fontSize": 10,
+            "opacity": 0,
+            "align": {
+              "$": "undefined"
+            },
+            "baseline": {
+              "$": "undefined"
+            }
+          },
+          {
+            "text": "bar",
+            "x": {
+              "$": "undefined"
+            },
+            "y": {
+              "$": "undefined"
+            },
+            "fontSize": 10,
+            "opacity": 0,
+            "align": {
+              "$": "undefined"
+            },
+            "baseline": {
+              "$": "undefined"
+            }
+          }
+        ],
+        "source": [
+          {
+            "text": "foo",
+            "x": 20,
+            "y": 15,
+            "fontSize": 10
+          },
+          {
+            "text": "bar",
+            "x": 30,
+            "y": 15,
+            "fontSize": 10
+          }
+        ]
+      },
+      "output": {
+        "add": [
+          {
+            "text": "foo",
+            "x": {
+              "$": "undefined"
+            },
+            "y": {
+              "$": "undefined"
+            },
+            "fontSize": 10,
+            "opacity": 0,
+            "align": {
+              "$": "undefined"
+            },
+            "baseline": {
+              "$": "undefined"
+            }
+          },
+          {
+            "text": "bar",
+            "x": {
+              "$": "undefined"
+            },
+            "y": {
+              "$": "undefined"
+            },
+            "fontSize": 10,
+            "opacity": 0,
+            "align": {
+              "$": "undefined"
+            },
+            "baseline": {
+              "$": "undefined"
+            }
+          }
+        ],
+        "rem": [
+          {
+            "text": "foo",
+            "x": {
+              "$": "undefined"
+            },
+            "y": {
+              "$": "undefined"
+            },
+            "fontSize": 10,
+            "opacity": 0,
+            "align": {
+              "$": "undefined"
+            },
+            "baseline": {
+              "$": "undefined"
+            }
+          },
+          {
+            "text": "bar",
+            "x": {
+              "$": "undefined"
+            },
+            "y": {
+              "$": "undefined"
+            },
+            "fontSize": 10,
+            "opacity": 0,
+            "align": {
+              "$": "undefined"
+            },
+            "baseline": {
+              "$": "undefined"
+            }
+          }
+        ],
+        "source": [
+          {
+            "text": "foo",
+            "x": {
+              "$": "undefined"
+            },
+            "y": {
+              "$": "undefined"
+            },
+            "fontSize": 10,
+            "opacity": 0,
+            "align": {
+              "$": "undefined"
+            },
+            "baseline": {
+              "$": "undefined"
+            }
+          },
+          {
+            "text": "bar",
+            "x": {
+              "$": "undefined"
+            },
+            "y": {
+              "$": "undefined"
+            },
+            "fontSize": 10,
+            "opacity": 0,
+            "align": {
+              "$": "undefined"
+            },
+            "baseline": {
+              "$": "undefined"
+            }
+          }
+        ]
+      },
+      "value": null
+    },
+    {
+      "package": "vega-label",
+      "op": "label",
+      "params": {
+        "size": [
+          50,
+          30
+        ],
+        "anchor": [
+          "top"
+        ],
+        "offset": [
+          2
+        ]
+      },
+      "input": {
+        "add": [
+          {
+            "text": "foo",
+            "x": 20,
+            "y": 15,
+            "fontSize": 10
+          },
+          {
+            "text": "bar",
+            "x": 30,
+            "y": 15,
+            "fontSize": 10
+          }
+        ],
+        "rem": [
+          {
+            "text": "foo",
+            "x": {
+              "$": "undefined"
+            },
+            "y": {
+              "$": "undefined"
+            },
+            "fontSize": 10,
+            "opacity": 0,
+            "align": {
+              "$": "undefined"
+            },
+            "baseline": {
+              "$": "undefined"
+            }
+          },
+          {
+            "text": "bar",
+            "x": {
+              "$": "undefined"
+            },
+            "y": {
+              "$": "undefined"
+            },
+            "fontSize": 10,
+            "opacity": 0,
+            "align": {
+              "$": "undefined"
+            },
+            "baseline": {
+              "$": "undefined"
+            }
+          }
+        ],
+        "source": [
+          {
+            "text": "foo",
+            "x": 20,
+            "y": 15,
+            "fontSize": 10
+          },
+          {
+            "text": "bar",
+            "x": 30,
+            "y": 15,
+            "fontSize": 10
+          }
+        ]
+      },
+      "output": {
+        "add": [
+          {
+            "text": "foo",
+            "x": 20,
+            "y": 13,
+            "fontSize": 10,
+            "opacity": 1,
+            "align": "center",
+            "baseline": "bottom"
+          },
+          {
+            "text": "bar",
+            "x": {
+              "$": "undefined"
+            },
+            "y": {
+              "$": "undefined"
+            },
+            "fontSize": 10,
+            "opacity": 0,
+            "align": {
+              "$": "undefined"
+            },
+            "baseline": {
+              "$": "undefined"
+            }
+          }
+        ],
+        "rem": [
+          {
+            "text": "foo",
+            "x": {
+              "$": "undefined"
+            },
+            "y": {
+              "$": "undefined"
+            },
+            "fontSize": 10,
+            "opacity": 0,
+            "align": {
+              "$": "undefined"
+            },
+            "baseline": {
+              "$": "undefined"
+            }
+          },
+          {
+            "text": "bar",
+            "x": {
+              "$": "undefined"
+            },
+            "y": {
+              "$": "undefined"
+            },
+            "fontSize": 10,
+            "opacity": 0,
+            "align": {
+              "$": "undefined"
+            },
+            "baseline": {
+              "$": "undefined"
+            }
+          }
+        ],
+        "source": [
+          {
+            "text": "foo",
+            "x": 20,
+            "y": 13,
+            "fontSize": 10,
+            "opacity": 1,
+            "align": "center",
+            "baseline": "bottom"
+          },
+          {
+            "text": "bar",
+            "x": {
+              "$": "undefined"
+            },
+            "y": {
+              "$": "undefined"
+            },
+            "fontSize": 10,
+            "opacity": 0,
+            "align": {
+              "$": "undefined"
+            },
+            "baseline": {
+              "$": "undefined"
+            }
+          }
+        ]
+      },
+      "value": null
+    },
+    {
+      "package": "vega-label",
+      "op": "label",
+      "params": {
+        "size": [
+          50,
+          30
+        ],
+        "anchor": [
+          "bottom"
+        ],
+        "offset": [
+          2
+        ]
+      },
+      "input": {
+        "add": [
+          {
+            "text": "foo",
+            "x": 20,
+            "y": 15,
+            "fontSize": 10
+          },
+          {
+            "text": "bar",
+            "x": 30,
+            "y": 15,
+            "fontSize": 10
+          }
+        ],
+        "rem": [
+          {
+            "text": "foo",
+            "x": 20,
+            "y": 13,
+            "fontSize": 10,
+            "opacity": 1,
+            "align": "center",
+            "baseline": "bottom"
+          },
+          {
+            "text": "bar",
+            "x": {
+              "$": "undefined"
+            },
+            "y": {
+              "$": "undefined"
+            },
+            "fontSize": 10,
+            "opacity": 0,
+            "align": {
+              "$": "undefined"
+            },
+            "baseline": {
+              "$": "undefined"
+            }
+          }
+        ],
+        "source": [
+          {
+            "text": "foo",
+            "x": 20,
+            "y": 15,
+            "fontSize": 10
+          },
+          {
+            "text": "bar",
+            "x": 30,
+            "y": 15,
+            "fontSize": 10
+          }
+        ]
+      },
+      "output": {
+        "add": [
+          {
+            "text": "foo",
+            "x": 20,
+            "y": 17,
+            "fontSize": 10,
+            "opacity": 1,
+            "align": "center",
+            "baseline": "top"
+          },
+          {
+            "text": "bar",
+            "x": {
+              "$": "undefined"
+            },
+            "y": {
+              "$": "undefined"
+            },
+            "fontSize": 10,
+            "opacity": 0,
+            "align": {
+              "$": "undefined"
+            },
+            "baseline": {
+              "$": "undefined"
+            }
+          }
+        ],
+        "rem": [
+          {
+            "text": "foo",
+            "x": 20,
+            "y": 13,
+            "fontSize": 10,
+            "opacity": 1,
+            "align": "center",
+            "baseline": "bottom"
+          },
+          {
+            "text": "bar",
+            "x": {
+              "$": "undefined"
+            },
+            "y": {
+              "$": "undefined"
+            },
+            "fontSize": 10,
+            "opacity": 0,
+            "align": {
+              "$": "undefined"
+            },
+            "baseline": {
+              "$": "undefined"
+            }
+          }
+        ],
+        "source": [
+          {
+            "text": "foo",
+            "x": 20,
+            "y": 17,
+            "fontSize": 10,
+            "opacity": 1,
+            "align": "center",
+            "baseline": "top"
+          },
+          {
+            "text": "bar",
+            "x": {
+              "$": "undefined"
+            },
+            "y": {
+              "$": "undefined"
+            },
+            "fontSize": 10,
+            "opacity": 0,
+            "align": {
+              "$": "undefined"
+            },
+            "baseline": {
+              "$": "undefined"
+            }
+          }
+        ]
+      },
+      "value": null
+    },
+    {
+      "package": "vega-label",
+      "op": "label",
+      "params": {
+        "size": [
+          50,
+          30
+        ],
+        "anchor": [
+          "top-left"
+        ],
+        "offset": [
+          2
+        ]
+      },
+      "input": {
+        "add": [
+          {
+            "text": "foo",
+            "x": 20,
+            "y": 15,
+            "fontSize": 10
+          },
+          {
+            "text": "bar",
+            "x": 30,
+            "y": 15,
+            "fontSize": 10
+          }
+        ],
+        "rem": [
+          {
+            "text": "foo",
+            "x": 20,
+            "y": 17,
+            "fontSize": 10,
+            "opacity": 1,
+            "align": "center",
+            "baseline": "top"
+          },
+          {
+            "text": "bar",
+            "x": {
+              "$": "undefined"
+            },
+            "y": {
+              "$": "undefined"
+            },
+            "fontSize": 10,
+            "opacity": 0,
+            "align": {
+              "$": "undefined"
+            },
+            "baseline": {
+              "$": "undefined"
+            }
+          }
+        ],
+        "source": [
+          {
+            "text": "foo",
+            "x": 20,
+            "y": 15,
+            "fontSize": 10
+          },
+          {
+            "text": "bar",
+            "x": 30,
+            "y": 15,
+            "fontSize": 10
+          }
+        ]
+      },
+      "output": {
+        "add": [
+          {
+            "text": "foo",
+            "x": {
+              "$": "undefined"
+            },
+            "y": {
+              "$": "undefined"
+            },
+            "fontSize": 10,
+            "opacity": 0,
+            "align": {
+              "$": "undefined"
+            },
+            "baseline": {
+              "$": "undefined"
+            }
+          },
+          {
+            "text": "bar",
+            "x": 28.585786437626904,
+            "y": 13.585786437626904,
+            "fontSize": 10,
+            "opacity": 1,
+            "align": "right",
+            "baseline": "bottom"
+          }
+        ],
+        "rem": [
+          {
+            "text": "foo",
+            "x": 20,
+            "y": 17,
+            "fontSize": 10,
+            "opacity": 1,
+            "align": "center",
+            "baseline": "top"
+          },
+          {
+            "text": "bar",
+            "x": {
+              "$": "undefined"
+            },
+            "y": {
+              "$": "undefined"
+            },
+            "fontSize": 10,
+            "opacity": 0,
+            "align": {
+              "$": "undefined"
+            },
+            "baseline": {
+              "$": "undefined"
+            }
+          }
+        ],
+        "source": [
+          {
+            "text": "foo",
+            "x": {
+              "$": "undefined"
+            },
+            "y": {
+              "$": "undefined"
+            },
+            "fontSize": 10,
+            "opacity": 0,
+            "align": {
+              "$": "undefined"
+            },
+            "baseline": {
+              "$": "undefined"
+            }
+          },
+          {
+            "text": "bar",
+            "x": 28.585786437626904,
+            "y": 13.585786437626904,
+            "fontSize": 10,
+            "opacity": 1,
+            "align": "right",
+            "baseline": "bottom"
+          }
+        ]
+      },
+      "value": null
+    },
+    {
+      "package": "vega-label",
+      "op": "label",
+      "params": {
+        "size": [
+          50,
+          30
+        ],
+        "anchor": [
+          "top-right"
+        ],
+        "offset": [
+          2
+        ]
+      },
+      "input": {
+        "add": [
+          {
+            "text": "foo",
+            "x": 20,
+            "y": 15,
+            "fontSize": 10
+          },
+          {
+            "text": "bar",
+            "x": 30,
+            "y": 15,
+            "fontSize": 10
+          }
+        ],
+        "rem": [
+          {
+            "text": "foo",
+            "x": {
+              "$": "undefined"
+            },
+            "y": {
+              "$": "undefined"
+            },
+            "fontSize": 10,
+            "opacity": 0,
+            "align": {
+              "$": "undefined"
+            },
+            "baseline": {
+              "$": "undefined"
+            }
+          },
+          {
+            "text": "bar",
+            "x": 28.585786437626904,
+            "y": 13.585786437626904,
+            "fontSize": 10,
+            "opacity": 1,
+            "align": "right",
+            "baseline": "bottom"
+          }
+        ],
+        "source": [
+          {
+            "text": "foo",
+            "x": 20,
+            "y": 15,
+            "fontSize": 10
+          },
+          {
+            "text": "bar",
+            "x": 30,
+            "y": 15,
+            "fontSize": 10
+          }
+        ]
+      },
+      "output": {
+        "add": [
+          {
+            "text": "foo",
+            "x": 21.414213562373092,
+            "y": 13.585786437626904,
+            "fontSize": 10,
+            "opacity": 1,
+            "align": "left",
+            "baseline": "bottom"
+          },
+          {
+            "text": "bar",
+            "x": {
+              "$": "undefined"
+            },
+            "y": {
+              "$": "undefined"
+            },
+            "fontSize": 10,
+            "opacity": 0,
+            "align": {
+              "$": "undefined"
+            },
+            "baseline": {
+              "$": "undefined"
+            }
+          }
+        ],
+        "rem": [
+          {
+            "text": "foo",
+            "x": {
+              "$": "undefined"
+            },
+            "y": {
+              "$": "undefined"
+            },
+            "fontSize": 10,
+            "opacity": 0,
+            "align": {
+              "$": "undefined"
+            },
+            "baseline": {
+              "$": "undefined"
+            }
+          },
+          {
+            "text": "bar",
+            "x": 28.585786437626904,
+            "y": 13.585786437626904,
+            "fontSize": 10,
+            "opacity": 1,
+            "align": "right",
+            "baseline": "bottom"
+          }
+        ],
+        "source": [
+          {
+            "text": "foo",
+            "x": 21.414213562373092,
+            "y": 13.585786437626904,
+            "fontSize": 10,
+            "opacity": 1,
+            "align": "left",
+            "baseline": "bottom"
+          },
+          {
+            "text": "bar",
+            "x": {
+              "$": "undefined"
+            },
+            "y": {
+              "$": "undefined"
+            },
+            "fontSize": 10,
+            "opacity": 0,
+            "align": {
+              "$": "undefined"
+            },
+            "baseline": {
+              "$": "undefined"
+            }
+          }
+        ]
+      },
+      "value": null
+    },
+    {
+      "package": "vega-label",
+      "op": "label",
+      "params": {
+        "size": [
+          50,
+          30
+        ],
+        "anchor": [
+          "bottom-left"
+        ],
+        "offset": [
+          2
+        ]
+      },
+      "input": {
+        "add": [
+          {
+            "text": "foo",
+            "x": 20,
+            "y": 15,
+            "fontSize": 10
+          },
+          {
+            "text": "bar",
+            "x": 30,
+            "y": 15,
+            "fontSize": 10
+          }
+        ],
+        "rem": [
+          {
+            "text": "foo",
+            "x": 21.414213562373092,
+            "y": 13.585786437626904,
+            "fontSize": 10,
+            "opacity": 1,
+            "align": "left",
+            "baseline": "bottom"
+          },
+          {
+            "text": "bar",
+            "x": {
+              "$": "undefined"
+            },
+            "y": {
+              "$": "undefined"
+            },
+            "fontSize": 10,
+            "opacity": 0,
+            "align": {
+              "$": "undefined"
+            },
+            "baseline": {
+              "$": "undefined"
+            }
+          }
+        ],
+        "source": [
+          {
+            "text": "foo",
+            "x": 20,
+            "y": 15,
+            "fontSize": 10
+          },
+          {
+            "text": "bar",
+            "x": 30,
+            "y": 15,
+            "fontSize": 10
+          }
+        ]
+      },
+      "output": {
+        "add": [
+          {
+            "text": "foo",
+            "x": {
+              "$": "undefined"
+            },
+            "y": {
+              "$": "undefined"
+            },
+            "fontSize": 10,
+            "opacity": 0,
+            "align": {
+              "$": "undefined"
+            },
+            "baseline": {
+              "$": "undefined"
+            }
+          },
+          {
+            "text": "bar",
+            "x": 28.585786437626904,
+            "y": 16.414213562373096,
+            "fontSize": 10,
+            "opacity": 1,
+            "align": "right",
+            "baseline": "top"
+          }
+        ],
+        "rem": [
+          {
+            "text": "foo",
+            "x": 21.414213562373092,
+            "y": 13.585786437626904,
+            "fontSize": 10,
+            "opacity": 1,
+            "align": "left",
+            "baseline": "bottom"
+          },
+          {
+            "text": "bar",
+            "x": {
+              "$": "undefined"
+            },
+            "y": {
+              "$": "undefined"
+            },
+            "fontSize": 10,
+            "opacity": 0,
+            "align": {
+              "$": "undefined"
+            },
+            "baseline": {
+              "$": "undefined"
+            }
+          }
+        ],
+        "source": [
+          {
+            "text": "foo",
+            "x": {
+              "$": "undefined"
+            },
+            "y": {
+              "$": "undefined"
+            },
+            "fontSize": 10,
+            "opacity": 0,
+            "align": {
+              "$": "undefined"
+            },
+            "baseline": {
+              "$": "undefined"
+            }
+          },
+          {
+            "text": "bar",
+            "x": 28.585786437626904,
+            "y": 16.414213562373096,
+            "fontSize": 10,
+            "opacity": 1,
+            "align": "right",
+            "baseline": "top"
+          }
+        ]
+      },
+      "value": null
+    },
+    {
+      "package": "vega-label",
+      "op": "label",
+      "params": {
+        "size": [
+          50,
+          30
+        ],
+        "anchor": [
+          "bottom-right"
+        ],
+        "offset": [
+          2
+        ]
+      },
+      "input": {
+        "add": [
+          {
+            "text": "foo",
+            "x": 20,
+            "y": 15,
+            "fontSize": 10
+          },
+          {
+            "text": "bar",
+            "x": 30,
+            "y": 15,
+            "fontSize": 10
+          }
+        ],
+        "rem": [
+          {
+            "text": "foo",
+            "x": {
+              "$": "undefined"
+            },
+            "y": {
+              "$": "undefined"
+            },
+            "fontSize": 10,
+            "opacity": 0,
+            "align": {
+              "$": "undefined"
+            },
+            "baseline": {
+              "$": "undefined"
+            }
+          },
+          {
+            "text": "bar",
+            "x": 28.585786437626904,
+            "y": 16.414213562373096,
+            "fontSize": 10,
+            "opacity": 1,
+            "align": "right",
+            "baseline": "top"
+          }
+        ],
+        "source": [
+          {
+            "text": "foo",
+            "x": 20,
+            "y": 15,
+            "fontSize": 10
+          },
+          {
+            "text": "bar",
+            "x": 30,
+            "y": 15,
+            "fontSize": 10
+          }
+        ]
+      },
+      "output": {
+        "add": [
+          {
+            "text": "foo",
+            "x": 21.414213562373092,
+            "y": 16.414213562373096,
+            "fontSize": 10,
+            "opacity": 1,
+            "align": "left",
+            "baseline": "top"
+          },
+          {
+            "text": "bar",
+            "x": {
+              "$": "undefined"
+            },
+            "y": {
+              "$": "undefined"
+            },
+            "fontSize": 10,
+            "opacity": 0,
+            "align": {
+              "$": "undefined"
+            },
+            "baseline": {
+              "$": "undefined"
+            }
+          }
+        ],
+        "rem": [
+          {
+            "text": "foo",
+            "x": {
+              "$": "undefined"
+            },
+            "y": {
+              "$": "undefined"
+            },
+            "fontSize": 10,
+            "opacity": 0,
+            "align": {
+              "$": "undefined"
+            },
+            "baseline": {
+              "$": "undefined"
+            }
+          },
+          {
+            "text": "bar",
+            "x": 28.585786437626904,
+            "y": 16.414213562373096,
+            "fontSize": 10,
+            "opacity": 1,
+            "align": "right",
+            "baseline": "top"
+          }
+        ],
+        "source": [
+          {
+            "text": "foo",
+            "x": 21.414213562373092,
+            "y": 16.414213562373096,
+            "fontSize": 10,
+            "opacity": 1,
+            "align": "left",
+            "baseline": "top"
+          },
+          {
+            "text": "bar",
+            "x": {
+              "$": "undefined"
+            },
+            "y": {
+              "$": "undefined"
+            },
+            "fontSize": 10,
+            "opacity": 0,
+            "align": {
+              "$": "undefined"
+            },
+            "baseline": {
+              "$": "undefined"
+            }
+          }
+        ]
+      },
+      "value": null
+    },
+    {
+      "package": "vega-label",
+      "op": "label",
+      "params": {
+        "size": [
+          50,
+          30
+        ],
+        "anchor": [
+          "middle"
+        ],
+        "offset": [
+          2
+        ],
+        "avoidBaseMark": false
+      },
+      "input": {
+        "add": [
+          {
+            "text": "foo",
+            "fontSize": 10,
+            "datum": {
+              "x": 20,
+              "y": 15,
+              "width": 2,
+              "height": 2,
+              "fill": "black",
+              "bounds": {
+                "x1": 20,
+                "y1": 15,
+                "x2": 22,
+                "y2": 17
+              },
+              "mark": {
+                "marktype": "rect"
+              }
+            }
+          },
+          {
+            "text": "bar",
+            "fontSize": 10,
+            "datum": {
+              "x": 30,
+              "y": 15,
+              "width": 2,
+              "height": 2,
+              "fill": "black",
+              "bounds": {
+                "x1": 30,
+                "y1": 15,
+                "x2": 32,
+                "y2": 17
+              },
+              "mark": {
+                "marktype": "rect"
+              }
+            }
+          }
+        ],
+        "rem": [
+          {
+            "text": "foo",
+            "fontSize": 10,
+            "datum": {
+              "x": 20,
+              "y": 15,
+              "width": 2,
+              "height": 2,
+              "fill": "black",
+              "bounds": {
+                "x1": 20,
+                "y1": 15,
+                "x2": 22,
+                "y2": 17
+              },
+              "mark": {
+                "marktype": "rect"
+              }
+            }
+          },
+          {
+            "text": "bar",
+            "fontSize": 10,
+            "datum": {
+              "x": 30,
+              "y": 15,
+              "width": 2,
+              "height": 2,
+              "fill": "black",
+              "bounds": {
+                "x1": 30,
+                "y1": 15,
+                "x2": 32,
+                "y2": 17
+              },
+              "mark": {
+                "marktype": "rect"
+              }
+            }
+          }
+        ],
+        "source": [
+          {
+            "text": "foo",
+            "fontSize": 10,
+            "datum": {
+              "x": 20,
+              "y": 15,
+              "width": 2,
+              "height": 2,
+              "fill": "black",
+              "bounds": {
+                "x1": 20,
+                "y1": 15,
+                "x2": 22,
+                "y2": 17
+              },
+              "mark": {
+                "marktype": "rect"
+              }
+            }
+          },
+          {
+            "text": "bar",
+            "fontSize": 10,
+            "datum": {
+              "x": 30,
+              "y": 15,
+              "width": 2,
+              "height": 2,
+              "fill": "black",
+              "bounds": {
+                "x1": 30,
+                "y1": 15,
+                "x2": 32,
+                "y2": 17
+              },
+              "mark": {
+                "marktype": "rect"
+              }
+            }
+          }
+        ]
+      },
+      "output": {
+        "add": [
+          {
+            "text": "foo",
+            "fontSize": 10,
+            "datum": {
+              "x": 20,
+              "y": 15,
+              "width": 2,
+              "height": 2,
+              "fill": "black",
+              "bounds": {
+                "x1": 20,
+                "y1": 15,
+                "x2": 22,
+                "y2": 17
+              },
+              "mark": {
+                "marktype": "rect"
+              }
+            },
+            "x": 21,
+            "y": 16,
+            "opacity": 1,
+            "align": "center",
+            "baseline": "middle"
+          },
+          {
+            "text": "bar",
+            "fontSize": 10,
+            "datum": {
+              "x": 30,
+              "y": 15,
+              "width": 2,
+              "height": 2,
+              "fill": "black",
+              "bounds": {
+                "x1": 30,
+                "y1": 15,
+                "x2": 32,
+                "y2": 17
+              },
+              "mark": {
+                "marktype": "rect"
+              }
+            },
+            "x": {
+              "$": "undefined"
+            },
+            "y": {
+              "$": "undefined"
+            },
+            "opacity": 0,
+            "align": {
+              "$": "undefined"
+            },
+            "baseline": {
+              "$": "undefined"
+            }
+          }
+        ],
+        "rem": [
+          {
+            "text": "foo",
+            "fontSize": 10,
+            "datum": {
+              "x": 20,
+              "y": 15,
+              "width": 2,
+              "height": 2,
+              "fill": "black",
+              "bounds": {
+                "x1": 20,
+                "y1": 15,
+                "x2": 22,
+                "y2": 17
+              },
+              "mark": {
+                "marktype": "rect"
+              }
+            }
+          },
+          {
+            "text": "bar",
+            "fontSize": 10,
+            "datum": {
+              "x": 30,
+              "y": 15,
+              "width": 2,
+              "height": 2,
+              "fill": "black",
+              "bounds": {
+                "x1": 30,
+                "y1": 15,
+                "x2": 32,
+                "y2": 17
+              },
+              "mark": {
+                "marktype": "rect"
+              }
+            }
+          }
+        ],
+        "source": [
+          {
+            "text": "foo",
+            "fontSize": 10,
+            "datum": {
+              "x": 20,
+              "y": 15,
+              "width": 2,
+              "height": 2,
+              "fill": "black",
+              "bounds": {
+                "x1": 20,
+                "y1": 15,
+                "x2": 22,
+                "y2": 17
+              },
+              "mark": {
+                "marktype": "rect"
+              }
+            },
+            "x": 21,
+            "y": 16,
+            "opacity": 1,
+            "align": "center",
+            "baseline": "middle"
+          },
+          {
+            "text": "bar",
+            "fontSize": 10,
+            "datum": {
+              "x": 30,
+              "y": 15,
+              "width": 2,
+              "height": 2,
+              "fill": "black",
+              "bounds": {
+                "x1": 30,
+                "y1": 15,
+                "x2": 32,
+                "y2": 17
+              },
+              "mark": {
+                "marktype": "rect"
+              }
+            },
+            "x": {
+              "$": "undefined"
+            },
+            "y": {
+              "$": "undefined"
+            },
+            "opacity": 0,
+            "align": {
+              "$": "undefined"
+            },
+            "baseline": {
+              "$": "undefined"
+            }
+          }
+        ]
+      },
+      "value": null
+    },
+    {
+      "package": "vega-label",
+      "op": "label",
+      "params": {
+        "size": [
+          10,
+          10
+        ],
+        "anchor": [
+          "left"
+        ],
+        "offset": [
+          2
+        ],
+        "padding": {
+          "$": "Infinity"
+        }
+      },
+      "input": {
+        "add": [
+          {
+            "text": "very-long-label",
+            "x": 5,
+            "y": 5,
+            "fontSize": 10
+          }
+        ],
+        "source": [
+          {
+            "text": "very-long-label",
+            "x": 5,
+            "y": 5,
+            "fontSize": 10
+          }
+        ]
+      },
+      "output": {
+        "add": [
+          {
+            "text": "very-long-label",
+            "x": 3,
+            "y": 5,
+            "fontSize": 10,
+            "opacity": 1,
+            "align": "right",
+            "baseline": "middle"
+          }
+        ],
+        "source": [
+          {
+            "text": "very-long-label",
+            "x": 3,
+            "y": 5,
+            "fontSize": 10,
+            "opacity": 1,
+            "align": "right",
+            "baseline": "middle"
+          }
+        ]
+      },
+      "value": null
+    },
+    {
+      "package": "vega-label",
+      "op": "label",
+      "params": {
+        "size": [
+          10,
+          10
+        ],
+        "anchor": [
+          "right"
+        ],
+        "offset": [
+          2
+        ],
+        "padding": {
+          "$": "Infinity"
+        }
+      },
+      "input": {
+        "add": [
+          {
+            "text": "very-long-label",
+            "x": 5,
+            "y": 5,
+            "fontSize": 10
+          }
+        ],
+        "rem": [
+          {
+            "text": "very-long-label",
+            "x": 3,
+            "y": 5,
+            "fontSize": 10,
+            "opacity": 1,
+            "align": "right",
+            "baseline": "middle"
+          }
+        ],
+        "source": [
+          {
+            "text": "very-long-label",
+            "x": 5,
+            "y": 5,
+            "fontSize": 10
+          }
+        ]
+      },
+      "output": {
+        "add": [
+          {
+            "text": "very-long-label",
+            "x": 7,
+            "y": 5,
+            "fontSize": 10,
+            "opacity": 1,
+            "align": "left",
+            "baseline": "middle"
+          }
+        ],
+        "rem": [
+          {
+            "text": "very-long-label",
+            "x": 3,
+            "y": 5,
+            "fontSize": 10,
+            "opacity": 1,
+            "align": "right",
+            "baseline": "middle"
+          }
+        ],
+        "source": [
+          {
+            "text": "very-long-label",
+            "x": 7,
+            "y": 5,
+            "fontSize": 10,
+            "opacity": 1,
+            "align": "left",
+            "baseline": "middle"
+          }
+        ]
+      },
+      "value": null
+    },
+    {
+      "package": "vega-label",
+      "op": "label",
+      "params": {
+        "size": [
+          10,
+          10
+        ],
+        "anchor": [
+          "left"
+        ],
+        "offset": [
+          2
+        ],
+        "padding": 0
+      },
+      "input": {
+        "add": [
+          {
+            "text": "very-long-label",
+            "x": 5,
+            "y": 5,
+            "fontSize": 10
+          }
+        ],
+        "rem": [
+          {
+            "text": "very-long-label",
+            "x": 7,
+            "y": 5,
+            "fontSize": 10,
+            "opacity": 1,
+            "align": "left",
+            "baseline": "middle"
+          }
+        ],
+        "source": [
+          {
+            "text": "very-long-label",
+            "x": 5,
+            "y": 5,
+            "fontSize": 10
+          }
+        ]
+      },
+      "output": {
+        "add": [
+          {
+            "text": "very-long-label",
+            "x": {
+              "$": "undefined"
+            },
+            "y": {
+              "$": "undefined"
+            },
+            "fontSize": 10,
+            "opacity": 0,
+            "align": {
+              "$": "undefined"
+            },
+            "baseline": {
+              "$": "undefined"
+            }
+          }
+        ],
+        "rem": [
+          {
+            "text": "very-long-label",
+            "x": 7,
+            "y": 5,
+            "fontSize": 10,
+            "opacity": 1,
+            "align": "left",
+            "baseline": "middle"
+          }
+        ],
+        "source": [
+          {
+            "text": "very-long-label",
+            "x": {
+              "$": "undefined"
+            },
+            "y": {
+              "$": "undefined"
+            },
+            "fontSize": 10,
+            "opacity": 0,
+            "align": {
+              "$": "undefined"
+            },
+            "baseline": {
+              "$": "undefined"
+            }
+          }
+        ]
+      },
+      "value": null
+    },
+    {
+      "package": "vega-label",
+      "op": "label",
+      "params": {
+        "size": [
+          10,
+          10
+        ],
+        "anchor": [
+          "right"
+        ],
+        "offset": [
+          2
+        ],
+        "padding": 0
+      },
+      "input": {
+        "add": [
+          {
+            "text": "very-long-label",
+            "x": 5,
+            "y": 5,
+            "fontSize": 10
+          }
+        ],
+        "rem": [
+          {
+            "text": "very-long-label",
+            "x": {
+              "$": "undefined"
+            },
+            "y": {
+              "$": "undefined"
+            },
+            "fontSize": 10,
+            "opacity": 0,
+            "align": {
+              "$": "undefined"
+            },
+            "baseline": {
+              "$": "undefined"
+            }
+          }
+        ],
+        "source": [
+          {
+            "text": "very-long-label",
+            "x": 5,
+            "y": 5,
+            "fontSize": 10
+          }
+        ]
+      },
+      "output": {
+        "add": [
+          {
+            "text": "very-long-label",
+            "x": {
+              "$": "undefined"
+            },
+            "y": {
+              "$": "undefined"
+            },
+            "fontSize": 10,
+            "opacity": 0,
+            "align": {
+              "$": "undefined"
+            },
+            "baseline": {
+              "$": "undefined"
+            }
+          }
+        ],
+        "rem": [
+          {
+            "text": "very-long-label",
+            "x": {
+              "$": "undefined"
+            },
+            "y": {
+              "$": "undefined"
+            },
+            "fontSize": 10,
+            "opacity": 0,
+            "align": {
+              "$": "undefined"
+            },
+            "baseline": {
+              "$": "undefined"
+            }
+          }
+        ],
+        "source": [
+          {
+            "text": "very-long-label",
+            "x": {
+              "$": "undefined"
+            },
+            "y": {
+              "$": "undefined"
+            },
+            "fontSize": 10,
+            "opacity": 0,
+            "align": {
+              "$": "undefined"
+            },
+            "baseline": {
+              "$": "undefined"
+            }
+          }
+        ]
+      },
+      "value": null
+    },
+    {
+      "package": "vega-label",
+      "op": "label",
+      "params": {
+        "size": [
+          10,
+          10
+        ],
+        "anchor": [
+          "left"
+        ],
+        "offset": [
+          2
+        ],
+        "padding": null
+      },
+      "input": {
+        "add": [
+          {
+            "text": "very-long-label",
+            "x": 5,
+            "y": 5,
+            "fontSize": 10
+          }
+        ],
+        "rem": [
+          {
+            "text": "very-long-label",
+            "x": {
+              "$": "undefined"
+            },
+            "y": {
+              "$": "undefined"
+            },
+            "fontSize": 10,
+            "opacity": 0,
+            "align": {
+              "$": "undefined"
+            },
+            "baseline": {
+              "$": "undefined"
+            }
+          }
+        ],
+        "source": [
+          {
+            "text": "very-long-label",
+            "x": 5,
+            "y": 5,
+            "fontSize": 10
+          }
+        ]
+      },
+      "output": {
+        "add": [
+          {
+            "text": "very-long-label",
+            "x": 3,
+            "y": 5,
+            "fontSize": 10,
+            "opacity": 1,
+            "align": "right",
+            "baseline": "middle"
+          }
+        ],
+        "rem": [
+          {
+            "text": "very-long-label",
+            "x": {
+              "$": "undefined"
+            },
+            "y": {
+              "$": "undefined"
+            },
+            "fontSize": 10,
+            "opacity": 0,
+            "align": {
+              "$": "undefined"
+            },
+            "baseline": {
+              "$": "undefined"
+            }
+          }
+        ],
+        "source": [
+          {
+            "text": "very-long-label",
+            "x": 3,
+            "y": 5,
+            "fontSize": 10,
+            "opacity": 1,
+            "align": "right",
+            "baseline": "middle"
+          }
+        ]
+      },
+      "value": null
+    },
+    {
+      "package": "vega-label",
+      "op": "label",
+      "params": {
+        "size": [
+          10,
+          10
+        ],
+        "anchor": [
+          "right"
+        ],
+        "offset": [
+          2
+        ],
+        "padding": null
+      },
+      "input": {
+        "add": [
+          {
+            "text": "very-long-label",
+            "x": 5,
+            "y": 5,
+            "fontSize": 10
+          }
+        ],
+        "rem": [
+          {
+            "text": "very-long-label",
+            "x": 3,
+            "y": 5,
+            "fontSize": 10,
+            "opacity": 1,
+            "align": "right",
+            "baseline": "middle"
+          }
+        ],
+        "source": [
+          {
+            "text": "very-long-label",
+            "x": 5,
+            "y": 5,
+            "fontSize": 10
+          }
+        ]
+      },
+      "output": {
+        "add": [
+          {
+            "text": "very-long-label",
+            "x": 7,
+            "y": 5,
+            "fontSize": 10,
+            "opacity": 1,
+            "align": "left",
+            "baseline": "middle"
+          }
+        ],
+        "rem": [
+          {
+            "text": "very-long-label",
+            "x": 3,
+            "y": 5,
+            "fontSize": 10,
+            "opacity": 1,
+            "align": "right",
+            "baseline": "middle"
+          }
+        ],
+        "source": [
+          {
+            "text": "very-long-label",
+            "x": 7,
+            "y": 5,
+            "fontSize": 10,
+            "opacity": 1,
+            "align": "left",
+            "baseline": "middle"
+          }
+        ]
+      },
+      "value": null
+    },
+    {
+      "package": "vega-label",
+      "op": "label",
+      "params": {
+        "size": [
+          10,
+          10
+        ],
+        "anchor": [
+          "left"
+        ],
+        "offset": [
+          2
+        ],
+        "padding": 5
+      },
+      "input": {
+        "add": [
+          {
+            "text": "very-long-label",
+            "x": 5,
+            "y": 5,
+            "fontSize": 10
+          }
+        ],
+        "rem": [
+          {
+            "text": "very-long-label",
+            "x": 7,
+            "y": 5,
+            "fontSize": 10,
+            "opacity": 1,
+            "align": "left",
+            "baseline": "middle"
+          }
+        ],
+        "source": [
+          {
+            "text": "very-long-label",
+            "x": 5,
+            "y": 5,
+            "fontSize": 10
+          }
+        ]
+      },
+      "output": {
+        "add": [
+          {
+            "text": "very-long-label",
+            "x": {
+              "$": "undefined"
+            },
+            "y": {
+              "$": "undefined"
+            },
+            "fontSize": 10,
+            "opacity": 0,
+            "align": {
+              "$": "undefined"
+            },
+            "baseline": {
+              "$": "undefined"
+            }
+          }
+        ],
+        "rem": [
+          {
+            "text": "very-long-label",
+            "x": 7,
+            "y": 5,
+            "fontSize": 10,
+            "opacity": 1,
+            "align": "left",
+            "baseline": "middle"
+          }
+        ],
+        "source": [
+          {
+            "text": "very-long-label",
+            "x": {
+              "$": "undefined"
+            },
+            "y": {
+              "$": "undefined"
+            },
+            "fontSize": 10,
+            "opacity": 0,
+            "align": {
+              "$": "undefined"
+            },
+            "baseline": {
+              "$": "undefined"
+            }
+          }
+        ]
+      },
+      "value": null
+    },
+    {
+      "package": "vega-label",
+      "op": "label",
+      "params": {
+        "size": [
+          10,
+          10
+        ],
+        "anchor": [
+          "right"
+        ],
+        "offset": [
+          2
+        ],
+        "padding": 5
+      },
+      "input": {
+        "add": [
+          {
+            "text": "very-long-label",
+            "x": 5,
+            "y": 5,
+            "fontSize": 10
+          }
+        ],
+        "rem": [
+          {
+            "text": "very-long-label",
+            "x": {
+              "$": "undefined"
+            },
+            "y": {
+              "$": "undefined"
+            },
+            "fontSize": 10,
+            "opacity": 0,
+            "align": {
+              "$": "undefined"
+            },
+            "baseline": {
+              "$": "undefined"
+            }
+          }
+        ],
+        "source": [
+          {
+            "text": "very-long-label",
+            "x": 5,
+            "y": 5,
+            "fontSize": 10
+          }
+        ]
+      },
+      "output": {
+        "add": [
+          {
+            "text": "very-long-label",
+            "x": {
+              "$": "undefined"
+            },
+            "y": {
+              "$": "undefined"
+            },
+            "fontSize": 10,
+            "opacity": 0,
+            "align": {
+              "$": "undefined"
+            },
+            "baseline": {
+              "$": "undefined"
+            }
+          }
+        ],
+        "rem": [
+          {
+            "text": "very-long-label",
+            "x": {
+              "$": "undefined"
+            },
+            "y": {
+              "$": "undefined"
+            },
+            "fontSize": 10,
+            "opacity": 0,
+            "align": {
+              "$": "undefined"
+            },
+            "baseline": {
+              "$": "undefined"
+            }
+          }
+        ],
+        "source": [
+          {
+            "text": "very-long-label",
+            "x": {
+              "$": "undefined"
+            },
+            "y": {
+              "$": "undefined"
+            },
+            "fontSize": 10,
+            "opacity": 0,
+            "align": {
+              "$": "undefined"
+            },
+            "baseline": {
+              "$": "undefined"
+            }
+          }
+        ]
+      },
+      "value": null
+    },
+    {
+      "package": "vega-label",
+      "op": "label",
+      "params": {
+        "size": [
+          10,
+          10
+        ],
+        "anchor": [
+          "left"
+        ],
+        "offset": [
+          2
+        ],
+        "padding": 100
+      },
+      "input": {
+        "add": [
+          {
+            "text": "very-long-label",
+            "x": 5,
+            "y": 5,
+            "fontSize": 10
+          }
+        ],
+        "rem": [
+          {
+            "text": "very-long-label",
+            "x": {
+              "$": "undefined"
+            },
+            "y": {
+              "$": "undefined"
+            },
+            "fontSize": 10,
+            "opacity": 0,
+            "align": {
+              "$": "undefined"
+            },
+            "baseline": {
+              "$": "undefined"
+            }
+          }
+        ],
+        "source": [
+          {
+            "text": "very-long-label",
+            "x": 5,
+            "y": 5,
+            "fontSize": 10
+          }
+        ]
+      },
+      "output": {
+        "add": [
+          {
+            "text": "very-long-label",
+            "x": {
+              "$": "undefined"
+            },
+            "y": {
+              "$": "undefined"
+            },
+            "fontSize": 10,
+            "opacity": 0,
+            "align": {
+              "$": "undefined"
+            },
+            "baseline": {
+              "$": "undefined"
+            }
+          }
+        ],
+        "rem": [
+          {
+            "text": "very-long-label",
+            "x": {
+              "$": "undefined"
+            },
+            "y": {
+              "$": "undefined"
+            },
+            "fontSize": 10,
+            "opacity": 0,
+            "align": {
+              "$": "undefined"
+            },
+            "baseline": {
+              "$": "undefined"
+            }
+          }
+        ],
+        "source": [
+          {
+            "text": "very-long-label",
+            "x": {
+              "$": "undefined"
+            },
+            "y": {
+              "$": "undefined"
+            },
+            "fontSize": 10,
+            "opacity": 0,
+            "align": {
+              "$": "undefined"
+            },
+            "baseline": {
+              "$": "undefined"
+            }
+          }
+        ]
+      },
+      "value": null
+    },
+    {
+      "package": "vega-label",
+      "op": "label",
+      "params": {
+        "size": [
+          10,
+          10
+        ],
+        "anchor": [
+          "right"
+        ],
+        "offset": [
+          2
+        ],
+        "padding": 100
+      },
+      "input": {
+        "add": [
+          {
+            "text": "very-long-label",
+            "x": 5,
+            "y": 5,
+            "fontSize": 10
+          }
+        ],
+        "rem": [
+          {
+            "text": "very-long-label",
+            "x": {
+              "$": "undefined"
+            },
+            "y": {
+              "$": "undefined"
+            },
+            "fontSize": 10,
+            "opacity": 0,
+            "align": {
+              "$": "undefined"
+            },
+            "baseline": {
+              "$": "undefined"
+            }
+          }
+        ],
+        "source": [
+          {
+            "text": "very-long-label",
+            "x": 5,
+            "y": 5,
+            "fontSize": 10
+          }
+        ]
+      },
+      "output": {
+        "add": [
+          {
+            "text": "very-long-label",
+            "x": {
+              "$": "undefined"
+            },
+            "y": {
+              "$": "undefined"
+            },
+            "fontSize": 10,
+            "opacity": 0,
+            "align": {
+              "$": "undefined"
+            },
+            "baseline": {
+              "$": "undefined"
+            }
+          }
+        ],
+        "rem": [
+          {
+            "text": "very-long-label",
+            "x": {
+              "$": "undefined"
+            },
+            "y": {
+              "$": "undefined"
+            },
+            "fontSize": 10,
+            "opacity": 0,
+            "align": {
+              "$": "undefined"
+            },
+            "baseline": {
+              "$": "undefined"
+            }
+          }
+        ],
+        "source": [
+          {
+            "text": "very-long-label",
+            "x": {
+              "$": "undefined"
+            },
+            "y": {
+              "$": "undefined"
+            },
+            "fontSize": 10,
+            "opacity": 0,
+            "align": {
+              "$": "undefined"
+            },
+            "baseline": {
+              "$": "undefined"
+            }
+          }
+        ]
+      },
+      "value": null
+    },
+    {
+      "package": "vega-label",
+      "op": "label",
+      "params": {
+        "size": [
+          10,
+          10
+        ],
+        "anchor": [
+          "left"
+        ],
+        "offset": [
+          10
+        ],
+        "padding": {
+          "$": "Infinity"
+        }
+      },
+      "input": {
+        "add": [
+          {
+            "text": "l",
+            "x": 0,
+            "y": 5,
+            "fontSize": 10
+          },
+          {
+            "text": "l",
+            "x": 9,
+            "y": 5,
+            "fontSize": 10
+          }
+        ],
+        "source": [
+          {
+            "text": "l",
+            "x": 0,
+            "y": 5,
+            "fontSize": 10
+          },
+          {
+            "text": "l",
+            "x": 9,
+            "y": 5,
+            "fontSize": 10
+          }
+        ]
+      },
+      "output": {
+        "add": [
+          {
+            "text": "l",
+            "x": -10,
+            "y": 5,
+            "fontSize": 10,
+            "opacity": 1,
+            "align": "right",
+            "baseline": "middle"
+          },
+          {
+            "text": "l",
+            "x": -1,
+            "y": 5,
+            "fontSize": 10,
+            "opacity": 1,
+            "align": "right",
+            "baseline": "middle"
+          }
+        ],
+        "source": [
+          {
+            "text": "l",
+            "x": -10,
+            "y": 5,
+            "fontSize": 10,
+            "opacity": 1,
+            "align": "right",
+            "baseline": "middle"
+          },
+          {
+            "text": "l",
+            "x": -1,
+            "y": 5,
+            "fontSize": 10,
+            "opacity": 1,
+            "align": "right",
+            "baseline": "middle"
+          }
+        ]
+      },
+      "value": null
+    }
+  ]
+}

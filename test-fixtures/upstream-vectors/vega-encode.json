@@ -1,0 +1,3850 @@
+{
+  "package": "vega-encode",
+  "vega": "6.3.1",
+  "files": 4,
+  "skipped": [],
+  "calls": [
+    {
+      "package": "vega-encode",
+      "op": "scale",
+      "instance": 1,
+      "sequence": 0,
+      "params": {
+        "type": "linear",
+        "domain": [
+          0,
+          10
+        ],
+        "range": [
+          0,
+          500
+        ],
+        "zero": false
+      },
+      "input": {},
+      "output": {}
+    },
+    {
+      "package": "vega-encode",
+      "op": "axisticks",
+      "instance": 2,
+      "sequence": 0,
+      "params": {
+        "values": [
+          0,
+          2,
+          4,
+          6,
+          8,
+          10
+        ],
+        "scale": {
+          "$": "function",
+          "name": "scale"
+        }
+      },
+      "input": {},
+      "output": {
+        "add": [
+          {
+            "index": 0,
+            "tickIndex": 0,
+            "value": 0,
+            "label": "0"
+          },
+          {
+            "index": 0.2,
+            "tickIndex": 1,
+            "value": 2,
+            "label": "2"
+          },
+          {
+            "index": 0.4,
+            "tickIndex": 2,
+            "value": 4,
+            "label": "4"
+          },
+          {
+            "index": 0.6,
+            "tickIndex": 3,
+            "value": 6,
+            "label": "6"
+          },
+          {
+            "index": 0.8,
+            "tickIndex": 4,
+            "value": 8,
+            "label": "8"
+          },
+          {
+            "index": 1,
+            "tickIndex": 5,
+            "value": 10,
+            "label": "10"
+          }
+        ],
+        "source": [
+          {
+            "index": 0,
+            "tickIndex": 0,
+            "value": 0,
+            "label": "0"
+          },
+          {
+            "index": 0.2,
+            "tickIndex": 1,
+            "value": 2,
+            "label": "2"
+          },
+          {
+            "index": 0.4,
+            "tickIndex": 2,
+            "value": 4,
+            "label": "4"
+          },
+          {
+            "index": 0.6,
+            "tickIndex": 3,
+            "value": 6,
+            "label": "6"
+          },
+          {
+            "index": 0.8,
+            "tickIndex": 4,
+            "value": 8,
+            "label": "8"
+          },
+          {
+            "index": 1,
+            "tickIndex": 5,
+            "value": 10,
+            "label": "10"
+          }
+        ]
+      },
+      "value": [
+        {
+          "index": 0,
+          "tickIndex": 0,
+          "value": 0,
+          "label": "0"
+        },
+        {
+          "index": 0.2,
+          "tickIndex": 1,
+          "value": 2,
+          "label": "2"
+        },
+        {
+          "index": 0.4,
+          "tickIndex": 2,
+          "value": 4,
+          "label": "4"
+        },
+        {
+          "index": 0.6,
+          "tickIndex": 3,
+          "value": 6,
+          "label": "6"
+        },
+        {
+          "index": 0.8,
+          "tickIndex": 4,
+          "value": 8,
+          "label": "8"
+        },
+        {
+          "index": 1,
+          "tickIndex": 5,
+          "value": 10,
+          "label": "10"
+        }
+      ]
+    },
+    {
+      "package": "vega-encode",
+      "op": "scale",
+      "instance": 3,
+      "sequence": 0,
+      "params": {
+        "type": "linear",
+        "domain": [
+          0,
+          10
+        ],
+        "range": [
+          0,
+          500
+        ],
+        "zero": false
+      },
+      "input": {},
+      "output": {}
+    },
+    {
+      "package": "vega-encode",
+      "op": "axisticks",
+      "instance": 4,
+      "sequence": 0,
+      "params": {
+        "values": [
+          0,
+          5,
+          10
+        ],
+        "scale": {
+          "$": "function",
+          "name": "scale"
+        }
+      },
+      "input": {},
+      "output": {
+        "add": [
+          {
+            "index": 0,
+            "tickIndex": 0,
+            "value": 0,
+            "label": "0"
+          },
+          {
+            "index": 0.5,
+            "tickIndex": 1,
+            "value": 5,
+            "label": "5"
+          },
+          {
+            "index": 1,
+            "tickIndex": 2,
+            "value": 10,
+            "label": "10"
+          }
+        ],
+        "source": [
+          {
+            "index": 0,
+            "tickIndex": 0,
+            "value": 0,
+            "label": "0"
+          },
+          {
+            "index": 0.5,
+            "tickIndex": 1,
+            "value": 5,
+            "label": "5"
+          },
+          {
+            "index": 1,
+            "tickIndex": 2,
+            "value": 10,
+            "label": "10"
+          }
+        ]
+      },
+      "value": [
+        {
+          "index": 0,
+          "tickIndex": 0,
+          "value": 0,
+          "label": "0"
+        },
+        {
+          "index": 0.5,
+          "tickIndex": 1,
+          "value": 5,
+          "label": "5"
+        },
+        {
+          "index": 1,
+          "tickIndex": 2,
+          "value": 10,
+          "label": "10"
+        }
+      ]
+    },
+    {
+      "package": "vega-encode",
+      "op": "scale",
+      "instance": 5,
+      "sequence": 0,
+      "params": {
+        "type": "linear",
+        "domain": [
+          0,
+          10
+        ],
+        "range": [
+          0,
+          500
+        ],
+        "zero": false
+      },
+      "input": {},
+      "output": {}
+    },
+    {
+      "package": "vega-encode",
+      "op": "axisticks",
+      "instance": 6,
+      "sequence": 0,
+      "params": {
+        "values": [
+          0,
+          5,
+          10
+        ],
+        "extra": true,
+        "scale": {
+          "$": "function",
+          "name": "scale"
+        }
+      },
+      "input": {},
+      "output": {
+        "add": [
+          {
+            "index": 0,
+            "tickIndex": 0,
+            "value": 0,
+            "label": "0"
+          },
+          {
+            "index": 0.5,
+            "tickIndex": 1,
+            "value": 5,
+            "label": "5"
+          },
+          {
+            "index": 1,
+            "tickIndex": 2,
+            "value": 10,
+            "label": "10"
+          },
+          {
+            "index": -1,
+            "tickIndex": -1,
+            "extra": {
+              "value": 0
+            },
+            "label": ""
+          }
+        ],
+        "source": [
+          {
+            "index": 0,
+            "tickIndex": 0,
+            "value": 0,
+            "label": "0"
+          },
+          {
+            "index": 0.5,
+            "tickIndex": 1,
+            "value": 5,
+            "label": "5"
+          },
+          {
+            "index": 1,
+            "tickIndex": 2,
+            "value": 10,
+            "label": "10"
+          },
+          {
+            "index": -1,
+            "tickIndex": -1,
+            "extra": {
+              "value": 0
+            },
+            "label": ""
+          }
+        ]
+      },
+      "value": [
+        {
+          "index": 0,
+          "tickIndex": 0,
+          "value": 0,
+          "label": "0"
+        },
+        {
+          "index": 0.5,
+          "tickIndex": 1,
+          "value": 5,
+          "label": "5"
+        },
+        {
+          "index": 1,
+          "tickIndex": 2,
+          "value": 10,
+          "label": "10"
+        },
+        {
+          "index": -1,
+          "tickIndex": -1,
+          "extra": {
+            "value": 0
+          },
+          "label": ""
+        }
+      ]
+    },
+    {
+      "package": "vega-encode",
+      "op": "scale",
+      "instance": 7,
+      "sequence": 0,
+      "params": {
+        "type": "linear",
+        "domain": [
+          0,
+          10
+        ],
+        "range": [
+          0,
+          500
+        ],
+        "zero": false
+      },
+      "input": {},
+      "output": {}
+    },
+    {
+      "package": "vega-encode",
+      "op": "axisticks",
+      "instance": 8,
+      "sequence": 0,
+      "params": {
+        "values": [
+          5
+        ],
+        "scale": {
+          "$": "function",
+          "name": "scale"
+        }
+      },
+      "input": {},
+      "output": {
+        "add": [
+          {
+            "index": 0,
+            "tickIndex": 0,
+            "value": 5,
+            "label": "5"
+          }
+        ],
+        "source": [
+          {
+            "index": 0,
+            "tickIndex": 0,
+            "value": 5,
+            "label": "5"
+          }
+        ]
+      },
+      "value": [
+        {
+          "index": 0,
+          "tickIndex": 0,
+          "value": 5,
+          "label": "5"
+        }
+      ]
+    },
+    {
+      "package": "vega-encode",
+      "op": "datajoin",
+      "instance": 1,
+      "sequence": 0,
+      "params": {
+        "key": {
+          "$": "accessor",
+          "fields": [
+            "key"
+          ]
+        }
+      },
+      "input": {
+        "add": [
+          {
+            "key": "a",
+            "value": 1
+          },
+          {
+            "key": "b",
+            "value": 2
+          },
+          {
+            "key": "c",
+            "value": 3
+          }
+        ],
+        "source": [
+          {
+            "key": "a",
+            "value": 1
+          },
+          {
+            "key": "b",
+            "value": 2
+          },
+          {
+            "key": "c",
+            "value": 3
+          }
+        ]
+      },
+      "output": {
+        "add": [
+          {
+            "datum": {
+              "key": "a",
+              "value": 1
+            },
+            "exit": false
+          },
+          {
+            "datum": {
+              "key": "b",
+              "value": 2
+            },
+            "exit": false
+          },
+          {
+            "datum": {
+              "key": "c",
+              "value": 3
+            },
+            "exit": false
+          }
+        ]
+      },
+      "value": {
+        "size": 3,
+        "empty": 0,
+        "object": {
+          "a": {
+            "datum": {
+              "key": "a",
+              "value": 1
+            },
+            "exit": false
+          },
+          "b": {
+            "datum": {
+              "key": "b",
+              "value": 2
+            },
+            "exit": false
+          },
+          "c": {
+            "datum": {
+              "key": "c",
+              "value": 3
+            },
+            "exit": false
+          }
+        },
+        "has": {
+          "$": "function",
+          "name": "has"
+        },
+        "get": {
+          "$": "function",
+          "name": "get"
+        },
+        "set": {
+          "$": "function",
+          "name": "set"
+        },
+        "delete": {
+          "$": "function",
+          "name": "delete"
+        },
+        "clear": {
+          "$": "function",
+          "name": "clear"
+        },
+        "test": {
+          "$": "function",
+          "name": "test"
+        },
+        "clean": {
+          "$": "function",
+          "name": "clean"
+        },
+        "lookup": {
+          "$": "function",
+          "name": "(anonymous)"
+        }
+      }
+    },
+    {
+      "package": "vega-encode",
+      "op": "datajoin",
+      "instance": 1,
+      "sequence": 1,
+      "params": {
+        "key": {
+          "$": "accessor",
+          "fields": [
+            "key"
+          ]
+        }
+      },
+      "input": {
+        "add": [
+          {
+            "key": "a",
+            "value": 1
+          }
+        ],
+        "source": [
+          {
+            "key": "a",
+            "value": 1
+          },
+          {
+            "key": "b",
+            "value": 2
+          },
+          {
+            "key": "c",
+            "value": 3
+          },
+          {
+            "key": "a",
+            "value": 1
+          }
+        ]
+      },
+      "output": {
+        "mod": [
+          {
+            "datum": {
+              "key": "a",
+              "value": 1
+            },
+            "exit": false
+          }
+        ]
+      },
+      "value": {
+        "size": 3,
+        "empty": 0,
+        "object": {
+          "a": {
+            "datum": {
+              "key": "a",
+              "value": 1
+            },
+            "exit": false
+          },
+          "b": {
+            "datum": {
+              "key": "b",
+              "value": 2
+            },
+            "exit": false
+          },
+          "c": {
+            "datum": {
+              "key": "c",
+              "value": 3
+            },
+            "exit": false
+          }
+        },
+        "has": {
+          "$": "function",
+          "name": "has"
+        },
+        "get": {
+          "$": "function",
+          "name": "get"
+        },
+        "set": {
+          "$": "function",
+          "name": "set"
+        },
+        "delete": {
+          "$": "function",
+          "name": "delete"
+        },
+        "clear": {
+          "$": "function",
+          "name": "clear"
+        },
+        "test": {
+          "$": "function",
+          "name": "test"
+        },
+        "clean": {
+          "$": "function",
+          "name": "clean"
+        },
+        "lookup": {
+          "$": "function",
+          "name": "(anonymous)"
+        }
+      }
+    },
+    {
+      "package": "vega-encode",
+      "op": "datajoin",
+      "instance": 1,
+      "sequence": 2,
+      "params": {
+        "key": {
+          "$": "accessor",
+          "fields": [
+            "key"
+          ]
+        }
+      },
+      "input": {
+        "rem": [
+          {
+            "key": "a",
+            "value": 1
+          },
+          {
+            "key": "a",
+            "value": 1
+          }
+        ],
+        "source": [
+          {
+            "key": "b",
+            "value": 2
+          },
+          {
+            "key": "c",
+            "value": 3
+          }
+        ]
+      },
+      "output": {
+        "rem": [
+          {
+            "datum": {
+              "key": "a",
+              "value": 1
+            },
+            "exit": true
+          }
+        ]
+      },
+      "value": {
+        "size": 3,
+        "empty": 1,
+        "object": {
+          "a": {
+            "datum": {
+              "key": "a",
+              "value": 1
+            },
+            "exit": true
+          },
+          "b": {
+            "datum": {
+              "key": "b",
+              "value": 2
+            },
+            "exit": false
+          },
+          "c": {
+            "datum": {
+              "key": "c",
+              "value": 3
+            },
+            "exit": false
+          }
+        },
+        "has": {
+          "$": "function",
+          "name": "has"
+        },
+        "get": {
+          "$": "function",
+          "name": "get"
+        },
+        "set": {
+          "$": "function",
+          "name": "set"
+        },
+        "delete": {
+          "$": "function",
+          "name": "delete"
+        },
+        "clear": {
+          "$": "function",
+          "name": "clear"
+        },
+        "test": {
+          "$": "function",
+          "name": "test"
+        },
+        "clean": {
+          "$": "function",
+          "name": "clean"
+        },
+        "lookup": {
+          "$": "function",
+          "name": "(anonymous)"
+        }
+      }
+    },
+    {
+      "package": "vega-encode",
+      "op": "datajoin",
+      "instance": 1,
+      "sequence": 3,
+      "params": {
+        "key": {
+          "$": "accessor",
+          "fields": [
+            "key"
+          ]
+        }
+      },
+      "input": {
+        "add": [
+          {
+            "key": "a",
+            "value": 1
+          }
+        ],
+        "source": [
+          {
+            "key": "b",
+            "value": 2
+          },
+          {
+            "key": "c",
+            "value": 3
+          },
+          {
+            "key": "a",
+            "value": 1
+          }
+        ]
+      },
+      "output": {
+        "add": [
+          {
+            "datum": {
+              "key": "a",
+              "value": 1
+            },
+            "exit": false
+          }
+        ]
+      },
+      "value": {
+        "size": 3,
+        "empty": 0,
+        "object": {
+          "b": {
+            "datum": {
+              "key": "b",
+              "value": 2
+            },
+            "exit": false
+          },
+          "c": {
+            "datum": {
+              "key": "c",
+              "value": 3
+            },
+            "exit": false
+          },
+          "a": {
+            "datum": {
+              "key": "a",
+              "value": 1
+            },
+            "exit": false
+          }
+        },
+        "has": {
+          "$": "function",
+          "name": "has"
+        },
+        "get": {
+          "$": "function",
+          "name": "get"
+        },
+        "set": {
+          "$": "function",
+          "name": "set"
+        },
+        "delete": {
+          "$": "function",
+          "name": "delete"
+        },
+        "clear": {
+          "$": "function",
+          "name": "clear"
+        },
+        "test": {
+          "$": "function",
+          "name": "test"
+        },
+        "clean": {
+          "$": "function",
+          "name": "clean"
+        },
+        "lookup": {
+          "$": "function",
+          "name": "(anonymous)"
+        }
+      }
+    },
+    {
+      "package": "vega-encode",
+      "op": "datajoin",
+      "instance": 1,
+      "sequence": 4,
+      "params": {
+        "key": {
+          "$": "accessor",
+          "fields": [
+            "key"
+          ]
+        }
+      },
+      "input": {
+        "mod": [
+          {
+            "key": "b",
+            "value": 5
+          }
+        ],
+        "source": [
+          {
+            "key": "b",
+            "value": 5
+          },
+          {
+            "key": "c",
+            "value": 3
+          },
+          {
+            "key": "a",
+            "value": 1
+          }
+        ]
+      },
+      "output": {
+        "mod": [
+          {
+            "datum": {
+              "key": "b",
+              "value": 5
+            },
+            "exit": false
+          }
+        ]
+      },
+      "value": {
+        "size": 3,
+        "empty": 0,
+        "object": {
+          "b": {
+            "datum": {
+              "key": "b",
+              "value": 5
+            },
+            "exit": false
+          },
+          "c": {
+            "datum": {
+              "key": "c",
+              "value": 3
+            },
+            "exit": false
+          },
+          "a": {
+            "datum": {
+              "key": "a",
+              "value": 1
+            },
+            "exit": false
+          }
+        },
+        "has": {
+          "$": "function",
+          "name": "has"
+        },
+        "get": {
+          "$": "function",
+          "name": "get"
+        },
+        "set": {
+          "$": "function",
+          "name": "set"
+        },
+        "delete": {
+          "$": "function",
+          "name": "delete"
+        },
+        "clear": {
+          "$": "function",
+          "name": "clear"
+        },
+        "test": {
+          "$": "function",
+          "name": "test"
+        },
+        "clean": {
+          "$": "function",
+          "name": "clean"
+        },
+        "lookup": {
+          "$": "function",
+          "name": "(anonymous)"
+        }
+      }
+    },
+    {
+      "package": "vega-encode",
+      "op": "datajoin",
+      "instance": 2,
+      "sequence": 0,
+      "params": {
+        "clean": true
+      },
+      "input": {
+        "$": "oversized",
+        "bytes": 459525
+      },
+      "output": {
+        "$": "oversized",
+        "bytes": 459525
+      },
+      "value": {
+        "$": "oversized"
+      }
+    },
+    {
+      "package": "vega-encode",
+      "op": "datajoin",
+      "instance": 2,
+      "sequence": 1,
+      "params": {
+        "clean": true
+      },
+      "input": {
+        "$": "oversized",
+        "bytes": 449487
+      },
+      "output": {
+        "$": "oversized",
+        "bytes": 449487
+      },
+      "value": {
+        "$": "oversized"
+      }
+    },
+    {
+      "package": "vega-encode",
+      "op": "scale",
+      "instance": 1,
+      "sequence": 0,
+      "params": {
+        "type": "linear",
+        "domain": [
+          1,
+          9.5
+        ]
+      },
+      "input": {},
+      "output": {}
+    },
+    {
+      "package": "vega-encode",
+      "op": "scale",
+      "instance": 2,
+      "sequence": 0,
+      "params": {
+        "zero": true,
+        "type": "linear",
+        "domain": [
+          1,
+          9.5
+        ]
+      },
+      "input": {},
+      "output": {}
+    },
+    {
+      "package": "vega-encode",
+      "op": "scale",
+      "instance": 3,
+      "sequence": 0,
+      "params": {
+        "zero": false,
+        "type": "linear",
+        "domain": [
+          1,
+          9.5
+        ]
+      },
+      "input": {},
+      "output": {}
+    },
+    {
+      "package": "vega-encode",
+      "op": "scale",
+      "instance": 4,
+      "sequence": 0,
+      "params": {
+        "nice": true,
+        "type": "linear",
+        "domain": [
+          1,
+          9.5
+        ]
+      },
+      "input": {},
+      "output": {}
+    },
+    {
+      "package": "vega-encode",
+      "op": "scale",
+      "instance": 5,
+      "sequence": 0,
+      "params": {
+        "domainMin": -1,
+        "domainMax": 10,
+        "type": "linear",
+        "domain": [
+          1,
+          9.5
+        ]
+      },
+      "input": {},
+      "output": {}
+    },
+    {
+      "package": "vega-encode",
+      "op": "scale",
+      "instance": 6,
+      "sequence": 0,
+      "params": {
+        "zero": true,
+        "domainMin": 0.5,
+        "domainMax": 10,
+        "type": "linear",
+        "domain": [
+          1,
+          9.5
+        ]
+      },
+      "input": {},
+      "output": {}
+    },
+    {
+      "package": "vega-encode",
+      "op": "scale",
+      "instance": 7,
+      "sequence": 0,
+      "params": {
+        "domainMid": 5,
+        "type": "linear",
+        "domain": [
+          1,
+          9.5
+        ]
+      },
+      "input": {},
+      "output": {}
+    },
+    {
+      "package": "vega-encode",
+      "op": "scale",
+      "instance": 8,
+      "sequence": 0,
+      "params": {
+        "domainRaw": [
+          2,
+          11
+        ],
+        "type": "linear",
+        "domain": [
+          1,
+          9.5
+        ]
+      },
+      "input": {},
+      "output": {}
+    },
+    {
+      "package": "vega-encode",
+      "op": "scale",
+      "instance": 9,
+      "sequence": 0,
+      "params": {
+        "type": "linear",
+        "domain": [
+          5,
+          95
+        ],
+        "range": [
+          0,
+          100
+        ],
+        "padding": 5,
+        "zero": false
+      },
+      "input": {},
+      "output": {}
+    },
+    {
+      "package": "vega-encode",
+      "op": "scale",
+      "instance": 10,
+      "sequence": 0,
+      "params": {
+        "type": "linear",
+        "domain": [
+          0,
+          100
+        ],
+        "range": [
+          0,
+          100
+        ],
+        "padding": 5,
+        "domainMin": 5,
+        "domainMax": 95,
+        "zero": false
+      },
+      "input": {},
+      "output": {}
+    },
+    {
+      "package": "vega-encode",
+      "op": "scale",
+      "instance": 11,
+      "sequence": 0,
+      "params": {
+        "type": "log",
+        "domain": [
+          1,
+          10
+        ],
+        "range": [
+          0,
+          60
+        ],
+        "padding": 20,
+        "zero": false
+      },
+      "input": {},
+      "output": {}
+    },
+    {
+      "package": "vega-encode",
+      "op": "scale",
+      "instance": 12,
+      "sequence": 0,
+      "params": {
+        "type": "sqrt",
+        "domain": [
+          4,
+          9
+        ],
+        "range": [
+          0,
+          60
+        ],
+        "padding": 20,
+        "zero": false
+      },
+      "input": {},
+      "output": {}
+    },
+    {
+      "package": "vega-encode",
+      "op": "scale",
+      "instance": 13,
+      "sequence": 0,
+      "params": {
+        "type": "pow",
+        "exponent": 0.3333333333333333,
+        "domain": [
+          8,
+          27
+        ],
+        "range": [
+          0,
+          60
+        ],
+        "padding": 20,
+        "zero": false
+      },
+      "input": {},
+      "output": {}
+    },
+    {
+      "package": "vega-encode",
+      "op": "scale",
+      "instance": 14,
+      "sequence": 0,
+      "params": {
+        "type": "ordinal",
+        "domain": [],
+        "range": [
+          "a",
+          "b",
+          "c"
+        ]
+      },
+      "input": {},
+      "output": {}
+    },
+    {
+      "package": "vega-encode",
+      "op": "scale",
+      "instance": 15,
+      "sequence": 0,
+      "params": {
+        "domainImplicit": false,
+        "type": "ordinal",
+        "domain": [],
+        "range": [
+          "a",
+          "b",
+          "c"
+        ]
+      },
+      "input": {},
+      "output": {}
+    },
+    {
+      "package": "vega-encode",
+      "op": "scale",
+      "instance": 16,
+      "sequence": 0,
+      "params": {
+        "domainImplicit": true,
+        "type": "ordinal",
+        "domain": [],
+        "range": [
+          "a",
+          "b",
+          "c"
+        ]
+      },
+      "input": {},
+      "output": {}
+    },
+    {
+      "package": "vega-encode",
+      "op": "scale",
+      "instance": 17,
+      "sequence": 0,
+      "params": {
+        "type": "linear",
+        "domain": [
+          0,
+          10
+        ],
+        "range": [
+          0,
+          10
+        ]
+      },
+      "input": {},
+      "output": {}
+    },
+    {
+      "package": "vega-encode",
+      "op": "scale",
+      "instance": 18,
+      "sequence": 0,
+      "params": {
+        "round": true,
+        "type": "linear",
+        "domain": [
+          0,
+          10
+        ],
+        "range": [
+          0,
+          10
+        ]
+      },
+      "input": {},
+      "output": {}
+    },
+    {
+      "package": "vega-encode",
+      "op": "scale",
+      "instance": 19,
+      "sequence": 0,
+      "params": {
+        "reverse": true,
+        "type": "linear",
+        "domain": [
+          0,
+          10
+        ],
+        "range": [
+          0,
+          10
+        ]
+      },
+      "input": {},
+      "output": {}
+    },
+    {
+      "package": "vega-encode",
+      "op": "scale",
+      "instance": 20,
+      "sequence": 0,
+      "params": {
+        "type": "band",
+        "domain": [
+          "a",
+          "b",
+          "c"
+        ],
+        "rangeStep": 20,
+        "padding": 0
+      },
+      "input": {},
+      "output": {}
+    },
+    {
+      "package": "vega-encode",
+      "op": "scale",
+      "instance": 21,
+      "sequence": 0,
+      "params": {
+        "type": "ordinal",
+        "scheme": "category10"
+      },
+      "input": {},
+      "output": {}
+    },
+    {
+      "package": "vega-encode",
+      "op": "scale",
+      "instance": 22,
+      "sequence": 0,
+      "params": {
+        "type": "sequential",
+        "scheme": "viridis"
+      },
+      "input": {},
+      "output": {}
+    },
+    {
+      "package": "vega-encode",
+      "op": "scale",
+      "instance": 23,
+      "sequence": 0,
+      "params": {
+        "type": "sequential",
+        "scheme": "viridis",
+        "schemeExtent": [
+          0.2,
+          0.9
+        ]
+      },
+      "input": {},
+      "output": {}
+    },
+    {
+      "package": "vega-encode",
+      "op": "scale",
+      "instance": 24,
+      "sequence": 0,
+      "params": {
+        "type": "sequential",
+        "scheme": "viridis",
+        "schemeExtent": [
+          0.2,
+          0.9
+        ],
+        "reverse": true
+      },
+      "input": {},
+      "output": {}
+    },
+    {
+      "package": "vega-encode",
+      "op": "scale",
+      "instance": 25,
+      "sequence": 0,
+      "params": {
+        "type": "sequential",
+        "range": [
+          "#000",
+          "#f00"
+        ]
+      },
+      "input": {},
+      "output": {}
+    },
+    {
+      "package": "vega-encode",
+      "op": "scale",
+      "instance": 26,
+      "sequence": 0,
+      "params": {
+        "type": "quantize",
+        "scheme": "viridis",
+        "schemeCount": 3
+      },
+      "input": {},
+      "output": {}
+    },
+    {
+      "package": "vega-encode",
+      "op": "scale",
+      "instance": 27,
+      "sequence": 0,
+      "params": {
+        "type": "linear",
+        "domain": [
+          0,
+          1
+        ],
+        "range": [
+          0,
+          1
+        ]
+      },
+      "input": {},
+      "output": {}
+    },
+    {
+      "package": "vega-encode",
+      "op": "scale",
+      "instance": 28,
+      "sequence": 0,
+      "params": {
+        "type": "linear",
+        "domain": [
+          0,
+          1
+        ],
+        "range": [
+          true,
+          false
+        ]
+      },
+      "input": {},
+      "output": {}
+    },
+    {
+      "package": "vega-encode",
+      "op": "scale",
+      "instance": 29,
+      "sequence": 0,
+      "params": {
+        "type": "linear",
+        "domain": [
+          0,
+          1
+        ],
+        "range": [
+          "blue",
+          "red"
+        ]
+      },
+      "input": {},
+      "output": {}
+    },
+    {
+      "package": "vega-encode",
+      "op": "scale",
+      "instance": 30,
+      "sequence": 0,
+      "params": {
+        "type": "linear",
+        "domain": [
+          0,
+          1,
+          2
+        ],
+        "range": [
+          "blue",
+          "red"
+        ]
+      },
+      "input": {},
+      "output": {}
+    },
+    {
+      "package": "vega-encode",
+      "op": "scale",
+      "instance": 31,
+      "sequence": 0,
+      "params": {
+        "type": "linear",
+        "domain": [
+          0,
+          1,
+          2,
+          3
+        ],
+        "range": [
+          "blue",
+          "red"
+        ]
+      },
+      "input": {},
+      "output": {}
+    },
+    {
+      "package": "vega-encode",
+      "op": "scale",
+      "instance": 32,
+      "sequence": 0,
+      "params": {
+        "type": "linear",
+        "domain": [
+          0,
+          1
+        ],
+        "scheme": "blues"
+      },
+      "input": {},
+      "output": {}
+    },
+    {
+      "package": "vega-encode",
+      "op": "scale",
+      "instance": 33,
+      "sequence": 0,
+      "params": {
+        "type": "linear",
+        "domain": [
+          0,
+          1,
+          2
+        ],
+        "scheme": "blues"
+      },
+      "input": {},
+      "output": {}
+    },
+    {
+      "package": "vega-encode",
+      "op": "scale",
+      "instance": 34,
+      "sequence": 0,
+      "params": {
+        "type": "linear",
+        "domain": [
+          0,
+          1,
+          2,
+          3
+        ],
+        "scheme": "blues"
+      },
+      "input": {},
+      "output": {}
+    },
+    {
+      "package": "vega-encode",
+      "op": "scale",
+      "instance": 35,
+      "sequence": 0,
+      "params": {
+        "type": "log",
+        "domain": [
+          0,
+          1
+        ],
+        "range": [
+          0,
+          1
+        ]
+      },
+      "input": {},
+      "output": {}
+    },
+    {
+      "package": "vega-encode",
+      "op": "scale",
+      "instance": 36,
+      "sequence": 0,
+      "params": {
+        "type": "log",
+        "domain": [
+          0,
+          1
+        ],
+        "range": [
+          true,
+          false
+        ]
+      },
+      "input": {},
+      "output": {}
+    },
+    {
+      "package": "vega-encode",
+      "op": "scale",
+      "instance": 37,
+      "sequence": 0,
+      "params": {
+        "type": "log",
+        "domain": [
+          0,
+          1
+        ],
+        "range": [
+          "blue",
+          "red"
+        ]
+      },
+      "input": {},
+      "output": {}
+    },
+    {
+      "package": "vega-encode",
+      "op": "scale",
+      "instance": 38,
+      "sequence": 0,
+      "params": {
+        "type": "log",
+        "domain": [
+          0,
+          1,
+          2
+        ],
+        "range": [
+          "blue",
+          "red"
+        ]
+      },
+      "input": {},
+      "output": {}
+    },
+    {
+      "package": "vega-encode",
+      "op": "scale",
+      "instance": 39,
+      "sequence": 0,
+      "params": {
+        "type": "log",
+        "domain": [
+          0,
+          1,
+          2,
+          3
+        ],
+        "range": [
+          "blue",
+          "red"
+        ]
+      },
+      "input": {},
+      "output": {}
+    },
+    {
+      "package": "vega-encode",
+      "op": "scale",
+      "instance": 40,
+      "sequence": 0,
+      "params": {
+        "type": "log",
+        "domain": [
+          0,
+          1
+        ],
+        "scheme": "blues"
+      },
+      "input": {},
+      "output": {}
+    },
+    {
+      "package": "vega-encode",
+      "op": "scale",
+      "instance": 41,
+      "sequence": 0,
+      "params": {
+        "type": "log",
+        "domain": [
+          0,
+          1,
+          2
+        ],
+        "scheme": "blues"
+      },
+      "input": {},
+      "output": {}
+    },
+    {
+      "package": "vega-encode",
+      "op": "scale",
+      "instance": 42,
+      "sequence": 0,
+      "params": {
+        "type": "log",
+        "domain": [
+          0,
+          1,
+          2,
+          3
+        ],
+        "scheme": "blues"
+      },
+      "input": {},
+      "output": {}
+    },
+    {
+      "package": "vega-encode",
+      "op": "scale",
+      "instance": 43,
+      "sequence": 0,
+      "params": {
+        "type": "pow",
+        "domain": [
+          0,
+          1
+        ],
+        "range": [
+          0,
+          1
+        ]
+      },
+      "input": {},
+      "output": {}
+    },
+    {
+      "package": "vega-encode",
+      "op": "scale",
+      "instance": 44,
+      "sequence": 0,
+      "params": {
+        "type": "pow",
+        "domain": [
+          0,
+          1
+        ],
+        "range": [
+          true,
+          false
+        ]
+      },
+      "input": {},
+      "output": {}
+    },
+    {
+      "package": "vega-encode",
+      "op": "scale",
+      "instance": 45,
+      "sequence": 0,
+      "params": {
+        "type": "pow",
+        "domain": [
+          0,
+          1
+        ],
+        "range": [
+          "blue",
+          "red"
+        ]
+      },
+      "input": {},
+      "output": {}
+    },
+    {
+      "package": "vega-encode",
+      "op": "scale",
+      "instance": 46,
+      "sequence": 0,
+      "params": {
+        "type": "pow",
+        "domain": [
+          0,
+          1,
+          2
+        ],
+        "range": [
+          "blue",
+          "red"
+        ]
+      },
+      "input": {},
+      "output": {}
+    },
+    {
+      "package": "vega-encode",
+      "op": "scale",
+      "instance": 47,
+      "sequence": 0,
+      "params": {
+        "type": "pow",
+        "domain": [
+          0,
+          1,
+          2,
+          3
+        ],
+        "range": [
+          "blue",
+          "red"
+        ]
+      },
+      "input": {},
+      "output": {}
+    },
+    {
+      "package": "vega-encode",
+      "op": "scale",
+      "instance": 48,
+      "sequence": 0,
+      "params": {
+        "type": "pow",
+        "domain": [
+          0,
+          1
+        ],
+        "scheme": "blues"
+      },
+      "input": {},
+      "output": {}
+    },
+    {
+      "package": "vega-encode",
+      "op": "scale",
+      "instance": 49,
+      "sequence": 0,
+      "params": {
+        "type": "pow",
+        "domain": [
+          0,
+          1,
+          2
+        ],
+        "scheme": "blues"
+      },
+      "input": {},
+      "output": {}
+    },
+    {
+      "package": "vega-encode",
+      "op": "scale",
+      "instance": 50,
+      "sequence": 0,
+      "params": {
+        "type": "pow",
+        "domain": [
+          0,
+          1,
+          2,
+          3
+        ],
+        "scheme": "blues"
+      },
+      "input": {},
+      "output": {}
+    },
+    {
+      "package": "vega-encode",
+      "op": "scale",
+      "instance": 51,
+      "sequence": 0,
+      "params": {
+        "type": "sqrt",
+        "domain": [
+          0,
+          1
+        ],
+        "range": [
+          0,
+          1
+        ]
+      },
+      "input": {},
+      "output": {}
+    },
+    {
+      "package": "vega-encode",
+      "op": "scale",
+      "instance": 52,
+      "sequence": 0,
+      "params": {
+        "type": "sqrt",
+        "domain": [
+          0,
+          1
+        ],
+        "range": [
+          true,
+          false
+        ]
+      },
+      "input": {},
+      "output": {}
+    },
+    {
+      "package": "vega-encode",
+      "op": "scale",
+      "instance": 53,
+      "sequence": 0,
+      "params": {
+        "type": "sqrt",
+        "domain": [
+          0,
+          1
+        ],
+        "range": [
+          "blue",
+          "red"
+        ]
+      },
+      "input": {},
+      "output": {}
+    },
+    {
+      "package": "vega-encode",
+      "op": "scale",
+      "instance": 54,
+      "sequence": 0,
+      "params": {
+        "type": "sqrt",
+        "domain": [
+          0,
+          1,
+          2
+        ],
+        "range": [
+          "blue",
+          "red"
+        ]
+      },
+      "input": {},
+      "output": {}
+    },
+    {
+      "package": "vega-encode",
+      "op": "scale",
+      "instance": 55,
+      "sequence": 0,
+      "params": {
+        "type": "sqrt",
+        "domain": [
+          0,
+          1,
+          2,
+          3
+        ],
+        "range": [
+          "blue",
+          "red"
+        ]
+      },
+      "input": {},
+      "output": {}
+    },
+    {
+      "package": "vega-encode",
+      "op": "scale",
+      "instance": 56,
+      "sequence": 0,
+      "params": {
+        "type": "sqrt",
+        "domain": [
+          0,
+          1
+        ],
+        "scheme": "blues"
+      },
+      "input": {},
+      "output": {}
+    },
+    {
+      "package": "vega-encode",
+      "op": "scale",
+      "instance": 57,
+      "sequence": 0,
+      "params": {
+        "type": "sqrt",
+        "domain": [
+          0,
+          1,
+          2
+        ],
+        "scheme": "blues"
+      },
+      "input": {},
+      "output": {}
+    },
+    {
+      "package": "vega-encode",
+      "op": "scale",
+      "instance": 58,
+      "sequence": 0,
+      "params": {
+        "type": "sqrt",
+        "domain": [
+          0,
+          1,
+          2,
+          3
+        ],
+        "scheme": "blues"
+      },
+      "input": {},
+      "output": {}
+    },
+    {
+      "package": "vega-encode",
+      "op": "scale",
+      "instance": 59,
+      "sequence": 0,
+      "params": {
+        "type": "symlog",
+        "domain": [
+          0,
+          1
+        ],
+        "range": [
+          0,
+          1
+        ]
+      },
+      "input": {},
+      "output": {}
+    },
+    {
+      "package": "vega-encode",
+      "op": "scale",
+      "instance": 60,
+      "sequence": 0,
+      "params": {
+        "type": "symlog",
+        "domain": [
+          0,
+          1
+        ],
+        "range": [
+          true,
+          false
+        ]
+      },
+      "input": {},
+      "output": {}
+    },
+    {
+      "package": "vega-encode",
+      "op": "scale",
+      "instance": 61,
+      "sequence": 0,
+      "params": {
+        "type": "symlog",
+        "domain": [
+          0,
+          1
+        ],
+        "range": [
+          "blue",
+          "red"
+        ]
+      },
+      "input": {},
+      "output": {}
+    },
+    {
+      "package": "vega-encode",
+      "op": "scale",
+      "instance": 62,
+      "sequence": 0,
+      "params": {
+        "type": "symlog",
+        "domain": [
+          0,
+          1,
+          2
+        ],
+        "range": [
+          "blue",
+          "red"
+        ]
+      },
+      "input": {},
+      "output": {}
+    },
+    {
+      "package": "vega-encode",
+      "op": "scale",
+      "instance": 63,
+      "sequence": 0,
+      "params": {
+        "type": "symlog",
+        "domain": [
+          0,
+          1,
+          2,
+          3
+        ],
+        "range": [
+          "blue",
+          "red"
+        ]
+      },
+      "input": {},
+      "output": {}
+    },
+    {
+      "package": "vega-encode",
+      "op": "scale",
+      "instance": 64,
+      "sequence": 0,
+      "params": {
+        "type": "symlog",
+        "domain": [
+          0,
+          1
+        ],
+        "scheme": "blues"
+      },
+      "input": {},
+      "output": {}
+    },
+    {
+      "package": "vega-encode",
+      "op": "scale",
+      "instance": 65,
+      "sequence": 0,
+      "params": {
+        "type": "symlog",
+        "domain": [
+          0,
+          1,
+          2
+        ],
+        "scheme": "blues"
+      },
+      "input": {},
+      "output": {}
+    },
+    {
+      "package": "vega-encode",
+      "op": "scale",
+      "instance": 66,
+      "sequence": 0,
+      "params": {
+        "type": "symlog",
+        "domain": [
+          0,
+          1,
+          2,
+          3
+        ],
+        "scheme": "blues"
+      },
+      "input": {},
+      "output": {}
+    },
+    {
+      "package": "vega-encode",
+      "op": "scale",
+      "instance": 67,
+      "sequence": 0,
+      "params": {
+        "type": "time",
+        "domain": [
+          {
+            "$": "date",
+            "epochMillis": 1262300400000
+          },
+          {
+            "$": "date",
+            "epochMillis": 1293836400000
+          }
+        ],
+        "range": [
+          0,
+          1
+        ]
+      },
+      "input": {},
+      "output": {}
+    },
+    {
+      "package": "vega-encode",
+      "op": "scale",
+      "instance": 68,
+      "sequence": 0,
+      "params": {
+        "type": "time",
+        "domain": [
+          {
+            "$": "date",
+            "epochMillis": 1262300400000
+          },
+          {
+            "$": "date",
+            "epochMillis": 1293836400000
+          }
+        ],
+        "range": [
+          true,
+          false
+        ]
+      },
+      "input": {},
+      "output": {}
+    },
+    {
+      "package": "vega-encode",
+      "op": "scale",
+      "instance": 69,
+      "sequence": 0,
+      "params": {
+        "type": "time",
+        "domain": [
+          {
+            "$": "date",
+            "epochMillis": 1262300400000
+          },
+          {
+            "$": "date",
+            "epochMillis": 1293836400000
+          }
+        ],
+        "range": [
+          "blue",
+          "red"
+        ]
+      },
+      "input": {},
+      "output": {}
+    },
+    {
+      "package": "vega-encode",
+      "op": "scale",
+      "instance": 70,
+      "sequence": 0,
+      "params": {
+        "type": "time",
+        "domain": [
+          {
+            "$": "date",
+            "epochMillis": 1262300400000
+          },
+          {
+            "$": "date",
+            "epochMillis": 1293836400000
+          },
+          {
+            "$": "date",
+            "epochMillis": 1325372400000
+          }
+        ],
+        "range": [
+          "blue",
+          "red"
+        ]
+      },
+      "input": {},
+      "output": {}
+    },
+    {
+      "package": "vega-encode",
+      "op": "scale",
+      "instance": 71,
+      "sequence": 0,
+      "params": {
+        "type": "time",
+        "domain": [
+          {
+            "$": "date",
+            "epochMillis": 1262300400000
+          },
+          {
+            "$": "date",
+            "epochMillis": 1293836400000
+          },
+          {
+            "$": "date",
+            "epochMillis": 1325372400000
+          },
+          {
+            "$": "date",
+            "epochMillis": 1356994800000
+          }
+        ],
+        "range": [
+          "blue",
+          "red"
+        ]
+      },
+      "input": {},
+      "output": {}
+    },
+    {
+      "package": "vega-encode",
+      "op": "scale",
+      "instance": 72,
+      "sequence": 0,
+      "params": {
+        "type": "time",
+        "domain": [
+          {
+            "$": "date",
+            "epochMillis": 1262300400000
+          },
+          {
+            "$": "date",
+            "epochMillis": 1293836400000
+          }
+        ],
+        "scheme": "blues"
+      },
+      "input": {},
+      "output": {}
+    },
+    {
+      "package": "vega-encode",
+      "op": "scale",
+      "instance": 73,
+      "sequence": 0,
+      "params": {
+        "type": "time",
+        "domain": [
+          {
+            "$": "date",
+            "epochMillis": 1262300400000
+          },
+          {
+            "$": "date",
+            "epochMillis": 1293836400000
+          },
+          {
+            "$": "date",
+            "epochMillis": 1325372400000
+          }
+        ],
+        "scheme": "blues"
+      },
+      "input": {},
+      "output": {}
+    },
+    {
+      "package": "vega-encode",
+      "op": "scale",
+      "instance": 74,
+      "sequence": 0,
+      "params": {
+        "type": "time",
+        "domain": [
+          {
+            "$": "date",
+            "epochMillis": 1262300400000
+          },
+          {
+            "$": "date",
+            "epochMillis": 1293836400000
+          },
+          {
+            "$": "date",
+            "epochMillis": 1325372400000
+          },
+          {
+            "$": "date",
+            "epochMillis": 1356994800000
+          }
+        ],
+        "scheme": "blues"
+      },
+      "input": {},
+      "output": {}
+    },
+    {
+      "package": "vega-encode",
+      "op": "scale",
+      "instance": 75,
+      "sequence": 0,
+      "params": {
+        "type": "utc",
+        "domain": [
+          {
+            "$": "date",
+            "epochMillis": 1262300400000
+          },
+          {
+            "$": "date",
+            "epochMillis": 1293836400000
+          }
+        ],
+        "range": [
+          0,
+          1
+        ]
+      },
+      "input": {},
+      "output": {}
+    },
+    {
+      "package": "vega-encode",
+      "op": "scale",
+      "instance": 76,
+      "sequence": 0,
+      "params": {
+        "type": "utc",
+        "domain": [
+          {
+            "$": "date",
+            "epochMillis": 1262300400000
+          },
+          {
+            "$": "date",
+            "epochMillis": 1293836400000
+          }
+        ],
+        "range": [
+          true,
+          false
+        ]
+      },
+      "input": {},
+      "output": {}
+    },
+    {
+      "package": "vega-encode",
+      "op": "scale",
+      "instance": 77,
+      "sequence": 0,
+      "params": {
+        "type": "utc",
+        "domain": [
+          {
+            "$": "date",
+            "epochMillis": 1262300400000
+          },
+          {
+            "$": "date",
+            "epochMillis": 1293836400000
+          }
+        ],
+        "range": [
+          "blue",
+          "red"
+        ]
+      },
+      "input": {},
+      "output": {}
+    },
+    {
+      "package": "vega-encode",
+      "op": "scale",
+      "instance": 78,
+      "sequence": 0,
+      "params": {
+        "type": "utc",
+        "domain": [
+          {
+            "$": "date",
+            "epochMillis": 1262300400000
+          },
+          {
+            "$": "date",
+            "epochMillis": 1293836400000
+          },
+          {
+            "$": "date",
+            "epochMillis": 1325372400000
+          }
+        ],
+        "range": [
+          "blue",
+          "red"
+        ]
+      },
+      "input": {},
+      "output": {}
+    },
+    {
+      "package": "vega-encode",
+      "op": "scale",
+      "instance": 79,
+      "sequence": 0,
+      "params": {
+        "type": "utc",
+        "domain": [
+          {
+            "$": "date",
+            "epochMillis": 1262300400000
+          },
+          {
+            "$": "date",
+            "epochMillis": 1293836400000
+          },
+          {
+            "$": "date",
+            "epochMillis": 1325372400000
+          },
+          {
+            "$": "date",
+            "epochMillis": 1356994800000
+          }
+        ],
+        "range": [
+          "blue",
+          "red"
+        ]
+      },
+      "input": {},
+      "output": {}
+    },
+    {
+      "package": "vega-encode",
+      "op": "scale",
+      "instance": 80,
+      "sequence": 0,
+      "params": {
+        "type": "utc",
+        "domain": [
+          {
+            "$": "date",
+            "epochMillis": 1262300400000
+          },
+          {
+            "$": "date",
+            "epochMillis": 1293836400000
+          }
+        ],
+        "scheme": "blues"
+      },
+      "input": {},
+      "output": {}
+    },
+    {
+      "package": "vega-encode",
+      "op": "scale",
+      "instance": 81,
+      "sequence": 0,
+      "params": {
+        "type": "utc",
+        "domain": [
+          {
+            "$": "date",
+            "epochMillis": 1262300400000
+          },
+          {
+            "$": "date",
+            "epochMillis": 1293836400000
+          },
+          {
+            "$": "date",
+            "epochMillis": 1325372400000
+          }
+        ],
+        "scheme": "blues"
+      },
+      "input": {},
+      "output": {}
+    },
+    {
+      "package": "vega-encode",
+      "op": "scale",
+      "instance": 82,
+      "sequence": 0,
+      "params": {
+        "type": "utc",
+        "domain": [
+          {
+            "$": "date",
+            "epochMillis": 1262300400000
+          },
+          {
+            "$": "date",
+            "epochMillis": 1293836400000
+          },
+          {
+            "$": "date",
+            "epochMillis": 1325372400000
+          },
+          {
+            "$": "date",
+            "epochMillis": 1356994800000
+          }
+        ],
+        "scheme": "blues"
+      },
+      "input": {},
+      "output": {}
+    },
+    {
+      "package": "vega-encode",
+      "op": "scale",
+      "instance": 83,
+      "sequence": 0,
+      "params": {
+        "type": "sequential",
+        "domain": [
+          0,
+          1
+        ],
+        "range": [
+          "blue",
+          "red"
+        ]
+      },
+      "input": {},
+      "output": {}
+    },
+    {
+      "package": "vega-encode",
+      "op": "scale",
+      "instance": 84,
+      "sequence": 0,
+      "params": {
+        "type": "sequential",
+        "domain": [
+          0,
+          1
+        ],
+        "scheme": "blues"
+      },
+      "input": {},
+      "output": {}
+    },
+    {
+      "package": "vega-encode",
+      "op": "scale",
+      "instance": 85,
+      "sequence": 0,
+      "params": {
+        "type": "linear",
+        "domain": [
+          0,
+          10
+        ],
+        "bins": {
+          "start": 0,
+          "stop": 10,
+          "step": 2
+        }
+      },
+      "input": {},
+      "output": {}
+    },
+    {
+      "package": "vega-encode",
+      "op": "scale",
+      "instance": 86,
+      "sequence": 0,
+      "params": {
+        "type": "linear",
+        "domain": [
+          0,
+          6
+        ],
+        "bins": {
+          "start": 0,
+          "stop": 10,
+          "step": 2
+        }
+      },
+      "input": {},
+      "output": {}
+    },
+    {
+      "package": "vega-encode",
+      "op": "scale",
+      "instance": 87,
+      "sequence": 0,
+      "params": {
+        "type": "linear",
+        "domain": [
+          0,
+          10
+        ],
+        "bins": {
+          "step": 2
+        }
+      },
+      "input": {},
+      "output": {}
+    },
+    {
+      "package": "vega-encode",
+      "op": "scale",
+      "instance": 88,
+      "sequence": 0,
+      "params": {
+        "type": "linear",
+        "domain": [
+          0,
+          10
+        ],
+        "bins": [
+          0,
+          2,
+          4,
+          6
+        ]
+      },
+      "input": {},
+      "output": {}
+    },
+    {
+      "package": "vega-encode",
+      "op": "scale",
+      "instance": 89,
+      "sequence": 0,
+      "params": {
+        "type": "bin-ordinal",
+        "domain": [
+          0,
+          5,
+          10
+        ]
+      },
+      "input": {},
+      "output": {}
+    },
+    {
+      "package": "vega-encode",
+      "op": "scale",
+      "instance": 90,
+      "sequence": 0,
+      "params": {
+        "type": "bin-ordinal",
+        "bins": {
+          "start": 0,
+          "stop": 10,
+          "step": 2
+        }
+      },
+      "input": {},
+      "output": {}
+    },
+    {
+      "package": "vega-encode",
+      "op": "scale",
+      "instance": 91,
+      "sequence": 0,
+      "params": {
+        "type": "bin-ordinal",
+        "bins": [
+          0,
+          2,
+          4,
+          6,
+          8,
+          10
+        ]
+      },
+      "input": {},
+      "output": {}
+    },
+    {
+      "package": "vega-encode",
+      "op": "stack",
+      "instance": 1,
+      "sequence": 0,
+      "params": {
+        "field": {
+          "$": "accessor",
+          "fields": [
+            "value"
+          ]
+        },
+        "groupby": []
+      },
+      "input": {
+        "add": [
+          {
+            "key": "a",
+            "value": 1
+          },
+          {
+            "key": "a",
+            "value": 2
+          },
+          {
+            "key": "b",
+            "value": 3
+          },
+          {
+            "key": "b",
+            "value": 4
+          }
+        ],
+        "source": [
+          {
+            "key": "a",
+            "value": 1
+          },
+          {
+            "key": "a",
+            "value": 2
+          },
+          {
+            "key": "b",
+            "value": 3
+          },
+          {
+            "key": "b",
+            "value": 4
+          }
+        ]
+      },
+      "output": {
+        "add": [
+          {
+            "key": "a",
+            "value": 1,
+            "y0": 0,
+            "y1": 1
+          },
+          {
+            "key": "a",
+            "value": 2,
+            "y0": 1,
+            "y1": 3
+          },
+          {
+            "key": "b",
+            "value": 3,
+            "y0": 3,
+            "y1": 6
+          },
+          {
+            "key": "b",
+            "value": 4,
+            "y0": 6,
+            "y1": 10
+          }
+        ],
+        "source": [
+          {
+            "key": "a",
+            "value": 1,
+            "y0": 0,
+            "y1": 1
+          },
+          {
+            "key": "a",
+            "value": 2,
+            "y0": 1,
+            "y1": 3
+          },
+          {
+            "key": "b",
+            "value": 3,
+            "y0": 3,
+            "y1": 6
+          },
+          {
+            "key": "b",
+            "value": 4,
+            "y0": 6,
+            "y1": 10
+          }
+        ]
+      },
+      "value": null
+    },
+    {
+      "package": "vega-encode",
+      "op": "stack",
+      "instance": 1,
+      "sequence": 1,
+      "params": {
+        "field": {
+          "$": "accessor",
+          "fields": [
+            "value"
+          ]
+        },
+        "groupby": [
+          {
+            "$": "accessor",
+            "fields": [
+              "key"
+            ]
+          }
+        ]
+      },
+      "input": {
+        "source": [
+          {
+            "key": "a",
+            "value": 1,
+            "y0": 0,
+            "y1": 1
+          },
+          {
+            "key": "a",
+            "value": 2,
+            "y0": 1,
+            "y1": 3
+          },
+          {
+            "key": "b",
+            "value": 3,
+            "y0": 3,
+            "y1": 6
+          },
+          {
+            "key": "b",
+            "value": 4,
+            "y0": 6,
+            "y1": 10
+          }
+        ]
+      },
+      "output": {
+        "mod": [
+          {
+            "key": "a",
+            "value": 1,
+            "y0": 0,
+            "y1": 1
+          },
+          {
+            "key": "a",
+            "value": 2,
+            "y0": 1,
+            "y1": 3
+          },
+          {
+            "key": "b",
+            "value": 3,
+            "y0": 0,
+            "y1": 3
+          },
+          {
+            "key": "b",
+            "value": 4,
+            "y0": 3,
+            "y1": 7
+          }
+        ],
+        "source": [
+          {
+            "key": "a",
+            "value": 1,
+            "y0": 0,
+            "y1": 1
+          },
+          {
+            "key": "a",
+            "value": 2,
+            "y0": 1,
+            "y1": 3
+          },
+          {
+            "key": "b",
+            "value": 3,
+            "y0": 0,
+            "y1": 3
+          },
+          {
+            "key": "b",
+            "value": 4,
+            "y0": 3,
+            "y1": 7
+          }
+        ]
+      },
+      "value": null
+    },
+    {
+      "package": "vega-encode",
+      "op": "stack",
+      "instance": 2,
+      "sequence": 0,
+      "params": {
+        "field": {
+          "$": "accessor",
+          "fields": [
+            "value"
+          ]
+        },
+        "groupby": []
+      },
+      "input": {
+        "add": [
+          {
+            "key": "a",
+            "value": -1
+          },
+          {
+            "key": "a",
+            "value": 2
+          },
+          {
+            "key": "b",
+            "value": 3
+          },
+          {
+            "key": "b",
+            "value": -4
+          }
+        ],
+        "source": [
+          {
+            "key": "a",
+            "value": -1
+          },
+          {
+            "key": "a",
+            "value": 2
+          },
+          {
+            "key": "b",
+            "value": 3
+          },
+          {
+            "key": "b",
+            "value": -4
+          }
+        ]
+      },
+      "output": {
+        "add": [
+          {
+            "key": "a",
+            "value": -1,
+            "y0": 0,
+            "y1": -1
+          },
+          {
+            "key": "a",
+            "value": 2,
+            "y0": 0,
+            "y1": 2
+          },
+          {
+            "key": "b",
+            "value": 3,
+            "y0": 2,
+            "y1": 5
+          },
+          {
+            "key": "b",
+            "value": -4,
+            "y0": -1,
+            "y1": -5
+          }
+        ],
+        "source": [
+          {
+            "key": "a",
+            "value": -1,
+            "y0": 0,
+            "y1": -1
+          },
+          {
+            "key": "a",
+            "value": 2,
+            "y0": 0,
+            "y1": 2
+          },
+          {
+            "key": "b",
+            "value": 3,
+            "y0": 2,
+            "y1": 5
+          },
+          {
+            "key": "b",
+            "value": -4,
+            "y0": -1,
+            "y1": -5
+          }
+        ]
+      },
+      "value": null
+    },
+    {
+      "package": "vega-encode",
+      "op": "stack",
+      "instance": 2,
+      "sequence": 1,
+      "params": {
+        "field": {
+          "$": "accessor",
+          "fields": [
+            "value"
+          ]
+        },
+        "groupby": [
+          {
+            "$": "accessor",
+            "fields": [
+              "key"
+            ]
+          }
+        ]
+      },
+      "input": {
+        "source": [
+          {
+            "key": "a",
+            "value": -1,
+            "y0": 0,
+            "y1": -1
+          },
+          {
+            "key": "a",
+            "value": 2,
+            "y0": 0,
+            "y1": 2
+          },
+          {
+            "key": "b",
+            "value": 3,
+            "y0": 2,
+            "y1": 5
+          },
+          {
+            "key": "b",
+            "value": -4,
+            "y0": -1,
+            "y1": -5
+          }
+        ]
+      },
+      "output": {
+        "mod": [
+          {
+            "key": "a",
+            "value": -1,
+            "y0": 0,
+            "y1": -1
+          },
+          {
+            "key": "a",
+            "value": 2,
+            "y0": 0,
+            "y1": 2
+          },
+          {
+            "key": "b",
+            "value": 3,
+            "y0": 0,
+            "y1": 3
+          },
+          {
+            "key": "b",
+            "value": -4,
+            "y0": 0,
+            "y1": -4
+          }
+        ],
+        "source": [
+          {
+            "key": "a",
+            "value": -1,
+            "y0": 0,
+            "y1": -1
+          },
+          {
+            "key": "a",
+            "value": 2,
+            "y0": 0,
+            "y1": 2
+          },
+          {
+            "key": "b",
+            "value": 3,
+            "y0": 0,
+            "y1": 3
+          },
+          {
+            "key": "b",
+            "value": -4,
+            "y0": 0,
+            "y1": -4
+          }
+        ]
+      },
+      "value": null
+    },
+    {
+      "package": "vega-encode",
+      "op": "stack",
+      "instance": 3,
+      "sequence": 0,
+      "params": {
+        "field": {
+          "$": "accessor",
+          "fields": [
+            "value"
+          ]
+        },
+        "groupby": []
+      },
+      "input": {
+        "add": [
+          {
+            "key": "a",
+            "value": "1"
+          },
+          {
+            "key": "a",
+            "value": "2"
+          },
+          {
+            "key": "b",
+            "value": "3"
+          },
+          {
+            "key": "b",
+            "value": "4"
+          }
+        ],
+        "source": [
+          {
+            "key": "a",
+            "value": "1"
+          },
+          {
+            "key": "a",
+            "value": "2"
+          },
+          {
+            "key": "b",
+            "value": "3"
+          },
+          {
+            "key": "b",
+            "value": "4"
+          }
+        ]
+      },
+      "output": {
+        "add": [
+          {
+            "key": "a",
+            "value": "1",
+            "y0": 0,
+            "y1": 1
+          },
+          {
+            "key": "a",
+            "value": "2",
+            "y0": 1,
+            "y1": 3
+          },
+          {
+            "key": "b",
+            "value": "3",
+            "y0": 3,
+            "y1": 6
+          },
+          {
+            "key": "b",
+            "value": "4",
+            "y0": 6,
+            "y1": 10
+          }
+        ],
+        "source": [
+          {
+            "key": "a",
+            "value": "1",
+            "y0": 0,
+            "y1": 1
+          },
+          {
+            "key": "a",
+            "value": "2",
+            "y0": 1,
+            "y1": 3
+          },
+          {
+            "key": "b",
+            "value": "3",
+            "y0": 3,
+            "y1": 6
+          },
+          {
+            "key": "b",
+            "value": "4",
+            "y0": 6,
+            "y1": 10
+          }
+        ]
+      },
+      "value": null
+    },
+    {
+      "package": "vega-encode",
+      "op": "stack",
+      "instance": 3,
+      "sequence": 1,
+      "params": {
+        "field": {
+          "$": "accessor",
+          "fields": [
+            "value"
+          ]
+        },
+        "groupby": [
+          {
+            "$": "accessor",
+            "fields": [
+              "key"
+            ]
+          }
+        ]
+      },
+      "input": {
+        "source": [
+          {
+            "key": "a",
+            "value": "1",
+            "y0": 0,
+            "y1": 1
+          },
+          {
+            "key": "a",
+            "value": "2",
+            "y0": 1,
+            "y1": 3
+          },
+          {
+            "key": "b",
+            "value": "3",
+            "y0": 3,
+            "y1": 6
+          },
+          {
+            "key": "b",
+            "value": "4",
+            "y0": 6,
+            "y1": 10
+          }
+        ]
+      },
+      "output": {
+        "mod": [
+          {
+            "key": "a",
+            "value": "1",
+            "y0": 0,
+            "y1": 1
+          },
+          {
+            "key": "a",
+            "value": "2",
+            "y0": 1,
+            "y1": 3
+          },
+          {
+            "key": "b",
+            "value": "3",
+            "y0": 0,
+            "y1": 3
+          },
+          {
+            "key": "b",
+            "value": "4",
+            "y0": 3,
+            "y1": 7
+          }
+        ],
+        "source": [
+          {
+            "key": "a",
+            "value": "1",
+            "y0": 0,
+            "y1": 1
+          },
+          {
+            "key": "a",
+            "value": "2",
+            "y0": 1,
+            "y1": 3
+          },
+          {
+            "key": "b",
+            "value": "3",
+            "y0": 0,
+            "y1": 3
+          },
+          {
+            "key": "b",
+            "value": "4",
+            "y0": 3,
+            "y1": 7
+          }
+        ]
+      },
+      "value": null
+    },
+    {
+      "package": "vega-encode",
+      "op": "stack",
+      "instance": 4,
+      "sequence": 0,
+      "params": {
+        "groupby": [
+          {
+            "$": "accessor",
+            "fields": [
+              "key"
+            ]
+          }
+        ],
+        "field": {
+          "$": "accessor",
+          "fields": [
+            "value"
+          ]
+        }
+      },
+      "input": {
+        "add": [
+          {
+            "key": null,
+            "value": 1
+          },
+          {
+            "key": null,
+            "value": 2
+          },
+          {
+            "key": "",
+            "value": 3
+          },
+          {
+            "key": "",
+            "value": 4
+          }
+        ],
+        "source": [
+          {
+            "key": null,
+            "value": 1
+          },
+          {
+            "key": null,
+            "value": 2
+          },
+          {
+            "key": "",
+            "value": 3
+          },
+          {
+            "key": "",
+            "value": 4
+          }
+        ]
+      },
+      "output": {
+        "add": [
+          {
+            "key": null,
+            "value": 1,
+            "y0": 0,
+            "y1": 1
+          },
+          {
+            "key": null,
+            "value": 2,
+            "y0": 1,
+            "y1": 3
+          },
+          {
+            "key": "",
+            "value": 3,
+            "y0": 0,
+            "y1": 3
+          },
+          {
+            "key": "",
+            "value": 4,
+            "y0": 3,
+            "y1": 7
+          }
+        ],
+        "source": [
+          {
+            "key": null,
+            "value": 1,
+            "y0": 0,
+            "y1": 1
+          },
+          {
+            "key": null,
+            "value": 2,
+            "y0": 1,
+            "y1": 3
+          },
+          {
+            "key": "",
+            "value": 3,
+            "y0": 0,
+            "y1": 3
+          },
+          {
+            "key": "",
+            "value": 4,
+            "y0": 3,
+            "y1": 7
+          }
+        ]
+      },
+      "value": null
+    },
+    {
+      "package": "vega-encode",
+      "op": "stack",
+      "instance": 5,
+      "sequence": 0,
+      "params": {
+        "groupby": [
+          {
+            "$": "accessor",
+            "fields": [
+              "key"
+            ]
+          }
+        ],
+        "field": {
+          "$": "accessor",
+          "fields": [
+            "value"
+          ]
+        }
+      },
+      "input": {
+        "add": [
+          {
+            "key": 0,
+            "value": 1
+          },
+          {
+            "key": 0,
+            "value": 2
+          },
+          {
+            "key": false,
+            "value": 3
+          },
+          {
+            "key": false,
+            "value": 4
+          }
+        ],
+        "source": [
+          {
+            "key": 0,
+            "value": 1
+          },
+          {
+            "key": 0,
+            "value": 2
+          },
+          {
+            "key": false,
+            "value": 3
+          },
+          {
+            "key": false,
+            "value": 4
+          }
+        ]
+      },
+      "output": {
+        "add": [
+          {
+            "key": 0,
+            "value": 1,
+            "y0": 0,
+            "y1": 1
+          },
+          {
+            "key": 0,
+            "value": 2,
+            "y0": 1,
+            "y1": 3
+          },
+          {
+            "key": false,
+            "value": 3,
+            "y0": 0,
+            "y1": 3
+          },
+          {
+            "key": false,
+            "value": 4,
+            "y0": 3,
+            "y1": 7
+          }
+        ],
+        "source": [
+          {
+            "key": 0,
+            "value": 1,
+            "y0": 0,
+            "y1": 1
+          },
+          {
+            "key": 0,
+            "value": 2,
+            "y0": 1,
+            "y1": 3
+          },
+          {
+            "key": false,
+            "value": 3,
+            "y0": 0,
+            "y1": 3
+          },
+          {
+            "key": false,
+            "value": 4,
+            "y0": 3,
+            "y1": 7
+          }
+        ]
+      },
+      "value": null
+    },
+    {
+      "package": "vega-encode",
+      "op": "stack",
+      "instance": 6,
+      "sequence": 0,
+      "params": {
+        "groupby": [
+          {
+            "$": "accessor",
+            "fields": [
+              "u"
+            ]
+          },
+          {
+            "$": "accessor",
+            "fields": [
+              "v"
+            ]
+          }
+        ],
+        "field": {
+          "$": "accessor",
+          "fields": [
+            "value"
+          ]
+        }
+      },
+      "input": {
+        "add": [
+          {
+            "u": "a,b",
+            "v": "c",
+            "value": 1
+          },
+          {
+            "u": "a,b",
+            "v": "c",
+            "value": 2
+          },
+          {
+            "u": "a",
+            "v": "b,c",
+            "value": 3
+          },
+          {
+            "u": "a",
+            "v": "b,c",
+            "value": 4
+          }
+        ],
+        "source": [
+          {
+            "u": "a,b",
+            "v": "c",
+            "value": 1
+          },
+          {
+            "u": "a,b",
+            "v": "c",
+            "value": 2
+          },
+          {
+            "u": "a",
+            "v": "b,c",
+            "value": 3
+          },
+          {
+            "u": "a",
+            "v": "b,c",
+            "value": 4
+          }
+        ]
+      },
+      "output": {
+        "add": [
+          {
+            "u": "a,b",
+            "v": "c",
+            "value": 1,
+            "y0": 0,
+            "y1": 1
+          },
+          {
+            "u": "a,b",
+            "v": "c",
+            "value": 2,
+            "y0": 1,
+            "y1": 3
+          },
+          {
+            "u": "a",
+            "v": "b,c",
+            "value": 3,
+            "y0": 0,
+            "y1": 3
+          },
+          {
+            "u": "a",
+            "v": "b,c",
+            "value": 4,
+            "y0": 3,
+            "y1": 7
+          }
+        ],
+        "source": [
+          {
+            "u": "a,b",
+            "v": "c",
+            "value": 1,
+            "y0": 0,
+            "y1": 1
+          },
+          {
+            "u": "a,b",
+            "v": "c",
+            "value": 2,
+            "y0": 1,
+            "y1": 3
+          },
+          {
+            "u": "a",
+            "v": "b,c",
+            "value": 3,
+            "y0": 0,
+            "y1": 3
+          },
+          {
+            "u": "a",
+            "v": "b,c",
+            "value": 4,
+            "y0": 3,
+            "y1": 7
+          }
+        ]
+      },
+      "value": null
+    }
+  ]
+}

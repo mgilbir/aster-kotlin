@@ -1,0 +1,4059 @@
+{
+  "package": "vega-crossfilter",
+  "vega": "6.3.1",
+  "files": 1,
+  "skipped": [],
+  "calls": [
+    {
+      "package": "vega-crossfilter",
+      "op": "crossfilter",
+      "instance": 1,
+      "sequence": 0,
+      "params": {
+        "fields": [
+          {
+            "$": "accessor",
+            "fields": [
+              "a"
+            ]
+          },
+          {
+            "$": "accessor",
+            "fields": [
+              "b"
+            ]
+          }
+        ],
+        "query": [
+          [
+            0,
+            5
+          ],
+          [
+            0,
+            5
+          ]
+        ]
+      },
+      "input": {
+        "add": [
+          {
+            "a": 1,
+            "b": 1,
+            "c": 0
+          },
+          {
+            "a": 2,
+            "b": 2,
+            "c": 1
+          },
+          {
+            "a": 4,
+            "b": 4,
+            "c": 2
+          },
+          {
+            "a": 3,
+            "b": 3,
+            "c": 3
+          }
+        ],
+        "source": [
+          {
+            "a": 1,
+            "b": 1,
+            "c": 0
+          },
+          {
+            "a": 2,
+            "b": 2,
+            "c": 1
+          },
+          {
+            "a": 4,
+            "b": 4,
+            "c": 2
+          },
+          {
+            "a": 3,
+            "b": 3,
+            "c": 3
+          }
+        ]
+      },
+      "output": {
+        "add": [
+          0,
+          1,
+          2,
+          3
+        ],
+        "source": [
+          {
+            "a": 1,
+            "b": 1,
+            "c": 0,
+            "_index": 0
+          },
+          {
+            "a": 2,
+            "b": 2,
+            "c": 1,
+            "_index": 1
+          },
+          {
+            "a": 4,
+            "b": 4,
+            "c": 2,
+            "_index": 2
+          },
+          {
+            "a": 3,
+            "b": 3,
+            "c": 3,
+            "_index": 3
+          }
+        ]
+      },
+      "value": {
+        "data": {
+          "$": "function",
+          "name": "data"
+        },
+        "seen": {
+          "$": "function",
+          "name": "seen"
+        },
+        "add": {
+          "$": "function",
+          "name": "add"
+        },
+        "remove": {
+          "$": "function",
+          "name": "remove"
+        },
+        "size": {
+          "$": "function",
+          "name": "size"
+        },
+        "curr": {
+          "$": "function",
+          "name": "curr"
+        },
+        "prev": {
+          "$": "function",
+          "name": "prev"
+        },
+        "reset": {
+          "$": "function",
+          "name": "reset"
+        },
+        "all": {
+          "$": "function",
+          "name": "all"
+        },
+        "set": {
+          "$": "function",
+          "name": "set"
+        },
+        "clear": {
+          "$": "function",
+          "name": "clear"
+        },
+        "resize": {
+          "$": "function",
+          "name": "resize"
+        },
+        "mask": 3
+      }
+    },
+    {
+      "package": "vega-crossfilter",
+      "op": "resolvefilter",
+      "instance": 2,
+      "sequence": 0,
+      "params": {
+        "ignore": 2,
+        "filter": {
+          "data": {
+            "$": "function",
+            "name": "data"
+          },
+          "seen": {
+            "$": "function",
+            "name": "seen"
+          },
+          "add": {
+            "$": "function",
+            "name": "add"
+          },
+          "remove": {
+            "$": "function",
+            "name": "remove"
+          },
+          "size": {
+            "$": "function",
+            "name": "size"
+          },
+          "curr": {
+            "$": "function",
+            "name": "curr"
+          },
+          "prev": {
+            "$": "function",
+            "name": "prev"
+          },
+          "reset": {
+            "$": "function",
+            "name": "reset"
+          },
+          "all": {
+            "$": "function",
+            "name": "all"
+          },
+          "set": {
+            "$": "function",
+            "name": "set"
+          },
+          "clear": {
+            "$": "function",
+            "name": "clear"
+          },
+          "resize": {
+            "$": "function",
+            "name": "resize"
+          },
+          "mask": 3
+        }
+      },
+      "input": {
+        "add": [
+          0,
+          1,
+          2,
+          3
+        ],
+        "source": [
+          {
+            "a": 1,
+            "b": 1,
+            "c": 0,
+            "_index": 0
+          },
+          {
+            "a": 2,
+            "b": 2,
+            "c": 1,
+            "_index": 1
+          },
+          {
+            "a": 4,
+            "b": 4,
+            "c": 2,
+            "_index": 2
+          },
+          {
+            "a": 3,
+            "b": 3,
+            "c": 3,
+            "_index": 3
+          }
+        ]
+      },
+      "output": {
+        "add": [
+          0,
+          1,
+          2,
+          3
+        ],
+        "source": [
+          {
+            "a": 1,
+            "b": 1,
+            "c": 0,
+            "_index": 0
+          },
+          {
+            "a": 2,
+            "b": 2,
+            "c": 1,
+            "_index": 1
+          },
+          {
+            "a": 4,
+            "b": 4,
+            "c": 2,
+            "_index": 2
+          },
+          {
+            "a": 3,
+            "b": 3,
+            "c": 3,
+            "_index": 3
+          }
+        ]
+      },
+      "value": null
+    },
+    {
+      "package": "vega-crossfilter",
+      "op": "resolvefilter",
+      "instance": 3,
+      "sequence": 0,
+      "params": {
+        "ignore": 1,
+        "filter": {
+          "data": {
+            "$": "function",
+            "name": "data"
+          },
+          "seen": {
+            "$": "function",
+            "name": "seen"
+          },
+          "add": {
+            "$": "function",
+            "name": "add"
+          },
+          "remove": {
+            "$": "function",
+            "name": "remove"
+          },
+          "size": {
+            "$": "function",
+            "name": "size"
+          },
+          "curr": {
+            "$": "function",
+            "name": "curr"
+          },
+          "prev": {
+            "$": "function",
+            "name": "prev"
+          },
+          "reset": {
+            "$": "function",
+            "name": "reset"
+          },
+          "all": {
+            "$": "function",
+            "name": "all"
+          },
+          "set": {
+            "$": "function",
+            "name": "set"
+          },
+          "clear": {
+            "$": "function",
+            "name": "clear"
+          },
+          "resize": {
+            "$": "function",
+            "name": "resize"
+          },
+          "mask": 3
+        }
+      },
+      "input": {
+        "add": [
+          0,
+          1,
+          2,
+          3
+        ],
+        "source": [
+          {
+            "a": 1,
+            "b": 1,
+            "c": 0,
+            "_index": 0
+          },
+          {
+            "a": 2,
+            "b": 2,
+            "c": 1,
+            "_index": 1
+          },
+          {
+            "a": 4,
+            "b": 4,
+            "c": 2,
+            "_index": 2
+          },
+          {
+            "a": 3,
+            "b": 3,
+            "c": 3,
+            "_index": 3
+          }
+        ]
+      },
+      "output": {
+        "add": [
+          0,
+          1,
+          2,
+          3
+        ],
+        "source": [
+          {
+            "a": 1,
+            "b": 1,
+            "c": 0,
+            "_index": 0
+          },
+          {
+            "a": 2,
+            "b": 2,
+            "c": 1,
+            "_index": 1
+          },
+          {
+            "a": 4,
+            "b": 4,
+            "c": 2,
+            "_index": 2
+          },
+          {
+            "a": 3,
+            "b": 3,
+            "c": 3,
+            "_index": 3
+          }
+        ]
+      },
+      "value": null
+    },
+    {
+      "package": "vega-crossfilter",
+      "op": "resolvefilter",
+      "instance": 4,
+      "sequence": 0,
+      "params": {
+        "ignore": 0,
+        "filter": {
+          "data": {
+            "$": "function",
+            "name": "data"
+          },
+          "seen": {
+            "$": "function",
+            "name": "seen"
+          },
+          "add": {
+            "$": "function",
+            "name": "add"
+          },
+          "remove": {
+            "$": "function",
+            "name": "remove"
+          },
+          "size": {
+            "$": "function",
+            "name": "size"
+          },
+          "curr": {
+            "$": "function",
+            "name": "curr"
+          },
+          "prev": {
+            "$": "function",
+            "name": "prev"
+          },
+          "reset": {
+            "$": "function",
+            "name": "reset"
+          },
+          "all": {
+            "$": "function",
+            "name": "all"
+          },
+          "set": {
+            "$": "function",
+            "name": "set"
+          },
+          "clear": {
+            "$": "function",
+            "name": "clear"
+          },
+          "resize": {
+            "$": "function",
+            "name": "resize"
+          },
+          "mask": 3
+        }
+      },
+      "input": {
+        "add": [
+          0,
+          1,
+          2,
+          3
+        ],
+        "source": [
+          {
+            "a": 1,
+            "b": 1,
+            "c": 0,
+            "_index": 0
+          },
+          {
+            "a": 2,
+            "b": 2,
+            "c": 1,
+            "_index": 1
+          },
+          {
+            "a": 4,
+            "b": 4,
+            "c": 2,
+            "_index": 2
+          },
+          {
+            "a": 3,
+            "b": 3,
+            "c": 3,
+            "_index": 3
+          }
+        ]
+      },
+      "output": {
+        "add": [
+          0,
+          1,
+          2,
+          3
+        ],
+        "source": [
+          {
+            "a": 1,
+            "b": 1,
+            "c": 0,
+            "_index": 0
+          },
+          {
+            "a": 2,
+            "b": 2,
+            "c": 1,
+            "_index": 1
+          },
+          {
+            "a": 4,
+            "b": 4,
+            "c": 2,
+            "_index": 2
+          },
+          {
+            "a": 3,
+            "b": 3,
+            "c": 3,
+            "_index": 3
+          }
+        ]
+      },
+      "value": null
+    },
+    {
+      "package": "vega-crossfilter",
+      "op": "crossfilter",
+      "instance": 1,
+      "sequence": 1,
+      "params": {
+        "fields": [
+          {
+            "$": "accessor",
+            "fields": [
+              "a"
+            ]
+          },
+          {
+            "$": "accessor",
+            "fields": [
+              "b"
+            ]
+          }
+        ],
+        "query": [
+          [
+            0,
+            5
+          ],
+          [
+            1,
+            3
+          ]
+        ]
+      },
+      "input": {
+        "source": [
+          {
+            "a": 1,
+            "b": 1,
+            "c": 0,
+            "_index": 0
+          },
+          {
+            "a": 2,
+            "b": 2,
+            "c": 1,
+            "_index": 1
+          },
+          {
+            "a": 4,
+            "b": 4,
+            "c": 2,
+            "_index": 2
+          },
+          {
+            "a": 3,
+            "b": 3,
+            "c": 3,
+            "_index": 3
+          }
+        ]
+      },
+      "output": {
+        "rem": [
+          3,
+          2
+        ],
+        "source": [
+          {
+            "a": 1,
+            "b": 1,
+            "c": 0,
+            "_index": 0
+          },
+          {
+            "a": 2,
+            "b": 2,
+            "c": 1,
+            "_index": 1
+          },
+          {
+            "a": 4,
+            "b": 4,
+            "c": 2,
+            "_index": 2
+          },
+          {
+            "a": 3,
+            "b": 3,
+            "c": 3,
+            "_index": 3
+          }
+        ]
+      },
+      "value": {
+        "data": {
+          "$": "function",
+          "name": "data"
+        },
+        "seen": {
+          "$": "function",
+          "name": "seen"
+        },
+        "add": {
+          "$": "function",
+          "name": "add"
+        },
+        "remove": {
+          "$": "function",
+          "name": "remove"
+        },
+        "size": {
+          "$": "function",
+          "name": "size"
+        },
+        "curr": {
+          "$": "function",
+          "name": "curr"
+        },
+        "prev": {
+          "$": "function",
+          "name": "prev"
+        },
+        "reset": {
+          "$": "function",
+          "name": "reset"
+        },
+        "all": {
+          "$": "function",
+          "name": "all"
+        },
+        "set": {
+          "$": "function",
+          "name": "set"
+        },
+        "clear": {
+          "$": "function",
+          "name": "clear"
+        },
+        "resize": {
+          "$": "function",
+          "name": "resize"
+        },
+        "mask": 2
+      }
+    },
+    {
+      "package": "vega-crossfilter",
+      "op": "resolvefilter",
+      "instance": 2,
+      "sequence": 1,
+      "params": {
+        "ignore": 2,
+        "filter": {
+          "data": {
+            "$": "function",
+            "name": "data"
+          },
+          "seen": {
+            "$": "function",
+            "name": "seen"
+          },
+          "add": {
+            "$": "function",
+            "name": "add"
+          },
+          "remove": {
+            "$": "function",
+            "name": "remove"
+          },
+          "size": {
+            "$": "function",
+            "name": "size"
+          },
+          "curr": {
+            "$": "function",
+            "name": "curr"
+          },
+          "prev": {
+            "$": "function",
+            "name": "prev"
+          },
+          "reset": {
+            "$": "function",
+            "name": "reset"
+          },
+          "all": {
+            "$": "function",
+            "name": "all"
+          },
+          "set": {
+            "$": "function",
+            "name": "set"
+          },
+          "clear": {
+            "$": "function",
+            "name": "clear"
+          },
+          "resize": {
+            "$": "function",
+            "name": "resize"
+          },
+          "mask": 2
+        }
+      },
+      "input": {
+        "rem": [
+          3,
+          2
+        ],
+        "source": [
+          {
+            "a": 1,
+            "b": 1,
+            "c": 0,
+            "_index": 0
+          },
+          {
+            "a": 2,
+            "b": 2,
+            "c": 1,
+            "_index": 1
+          },
+          {
+            "a": 4,
+            "b": 4,
+            "c": 2,
+            "_index": 2
+          },
+          {
+            "a": 3,
+            "b": 3,
+            "c": 3,
+            "_index": 3
+          }
+        ]
+      },
+      "output": {
+        "rem": [
+          3,
+          2
+        ],
+        "source": [
+          {
+            "a": 1,
+            "b": 1,
+            "c": 0,
+            "_index": 0
+          },
+          {
+            "a": 2,
+            "b": 2,
+            "c": 1,
+            "_index": 1
+          },
+          {
+            "a": 4,
+            "b": 4,
+            "c": 2,
+            "_index": 2
+          },
+          {
+            "a": 3,
+            "b": 3,
+            "c": 3,
+            "_index": 3
+          }
+        ]
+      },
+      "value": null
+    },
+    {
+      "package": "vega-crossfilter",
+      "op": "resolvefilter",
+      "instance": 3,
+      "sequence": 1,
+      "params": {
+        "ignore": 1,
+        "filter": {
+          "data": {
+            "$": "function",
+            "name": "data"
+          },
+          "seen": {
+            "$": "function",
+            "name": "seen"
+          },
+          "add": {
+            "$": "function",
+            "name": "add"
+          },
+          "remove": {
+            "$": "function",
+            "name": "remove"
+          },
+          "size": {
+            "$": "function",
+            "name": "size"
+          },
+          "curr": {
+            "$": "function",
+            "name": "curr"
+          },
+          "prev": {
+            "$": "function",
+            "name": "prev"
+          },
+          "reset": {
+            "$": "function",
+            "name": "reset"
+          },
+          "all": {
+            "$": "function",
+            "name": "all"
+          },
+          "set": {
+            "$": "function",
+            "name": "set"
+          },
+          "clear": {
+            "$": "function",
+            "name": "clear"
+          },
+          "resize": {
+            "$": "function",
+            "name": "resize"
+          },
+          "mask": 2
+        }
+      },
+      "input": {
+        "rem": [
+          3,
+          2
+        ],
+        "source": [
+          {
+            "a": 1,
+            "b": 1,
+            "c": 0,
+            "_index": 0
+          },
+          {
+            "a": 2,
+            "b": 2,
+            "c": 1,
+            "_index": 1
+          },
+          {
+            "a": 4,
+            "b": 4,
+            "c": 2,
+            "_index": 2
+          },
+          {
+            "a": 3,
+            "b": 3,
+            "c": 3,
+            "_index": 3
+          }
+        ]
+      },
+      "output": {
+        "rem": [
+          3,
+          2
+        ],
+        "source": [
+          {
+            "a": 1,
+            "b": 1,
+            "c": 0,
+            "_index": 0
+          },
+          {
+            "a": 2,
+            "b": 2,
+            "c": 1,
+            "_index": 1
+          },
+          {
+            "a": 4,
+            "b": 4,
+            "c": 2,
+            "_index": 2
+          },
+          {
+            "a": 3,
+            "b": 3,
+            "c": 3,
+            "_index": 3
+          }
+        ]
+      },
+      "value": null
+    },
+    {
+      "package": "vega-crossfilter",
+      "op": "resolvefilter",
+      "instance": 4,
+      "sequence": 1,
+      "params": {
+        "ignore": 0,
+        "filter": {
+          "data": {
+            "$": "function",
+            "name": "data"
+          },
+          "seen": {
+            "$": "function",
+            "name": "seen"
+          },
+          "add": {
+            "$": "function",
+            "name": "add"
+          },
+          "remove": {
+            "$": "function",
+            "name": "remove"
+          },
+          "size": {
+            "$": "function",
+            "name": "size"
+          },
+          "curr": {
+            "$": "function",
+            "name": "curr"
+          },
+          "prev": {
+            "$": "function",
+            "name": "prev"
+          },
+          "reset": {
+            "$": "function",
+            "name": "reset"
+          },
+          "all": {
+            "$": "function",
+            "name": "all"
+          },
+          "set": {
+            "$": "function",
+            "name": "set"
+          },
+          "clear": {
+            "$": "function",
+            "name": "clear"
+          },
+          "resize": {
+            "$": "function",
+            "name": "resize"
+          },
+          "mask": 2
+        }
+      },
+      "input": {
+        "rem": [
+          3,
+          2
+        ],
+        "source": [
+          {
+            "a": 1,
+            "b": 1,
+            "c": 0,
+            "_index": 0
+          },
+          {
+            "a": 2,
+            "b": 2,
+            "c": 1,
+            "_index": 1
+          },
+          {
+            "a": 4,
+            "b": 4,
+            "c": 2,
+            "_index": 2
+          },
+          {
+            "a": 3,
+            "b": 3,
+            "c": 3,
+            "_index": 3
+          }
+        ]
+      },
+      "output": {
+        "rem": [
+          3,
+          2
+        ],
+        "source": [
+          {
+            "a": 1,
+            "b": 1,
+            "c": 0,
+            "_index": 0
+          },
+          {
+            "a": 2,
+            "b": 2,
+            "c": 1,
+            "_index": 1
+          },
+          {
+            "a": 4,
+            "b": 4,
+            "c": 2,
+            "_index": 2
+          },
+          {
+            "a": 3,
+            "b": 3,
+            "c": 3,
+            "_index": 3
+          }
+        ]
+      },
+      "value": null
+    },
+    {
+      "package": "vega-crossfilter",
+      "op": "crossfilter",
+      "instance": 1,
+      "sequence": 2,
+      "params": {
+        "fields": [
+          {
+            "$": "accessor",
+            "fields": [
+              "a"
+            ]
+          },
+          {
+            "$": "accessor",
+            "fields": [
+              "b"
+            ]
+          }
+        ],
+        "query": [
+          [
+            1,
+            4
+          ],
+          [
+            3,
+            5
+          ]
+        ]
+      },
+      "input": {
+        "source": [
+          {
+            "a": 1,
+            "b": 1,
+            "c": 0,
+            "_index": 0
+          },
+          {
+            "a": 2,
+            "b": 2,
+            "c": 1,
+            "_index": 1
+          },
+          {
+            "a": 4,
+            "b": 4,
+            "c": 2,
+            "_index": 2
+          },
+          {
+            "a": 3,
+            "b": 3,
+            "c": 3,
+            "_index": 3
+          }
+        ]
+      },
+      "output": {
+        "add": [
+          2,
+          0,
+          1,
+          3
+        ],
+        "rem": [
+          2,
+          0,
+          1,
+          3
+        ],
+        "source": [
+          {
+            "a": 1,
+            "b": 1,
+            "c": 0,
+            "_index": 0
+          },
+          {
+            "a": 2,
+            "b": 2,
+            "c": 1,
+            "_index": 1
+          },
+          {
+            "a": 4,
+            "b": 4,
+            "c": 2,
+            "_index": 2
+          },
+          {
+            "a": 3,
+            "b": 3,
+            "c": 3,
+            "_index": 3
+          }
+        ]
+      },
+      "value": {
+        "data": {
+          "$": "function",
+          "name": "data"
+        },
+        "seen": {
+          "$": "function",
+          "name": "seen"
+        },
+        "add": {
+          "$": "function",
+          "name": "add"
+        },
+        "remove": {
+          "$": "function",
+          "name": "remove"
+        },
+        "size": {
+          "$": "function",
+          "name": "size"
+        },
+        "curr": {
+          "$": "function",
+          "name": "curr"
+        },
+        "prev": {
+          "$": "function",
+          "name": "prev"
+        },
+        "reset": {
+          "$": "function",
+          "name": "reset"
+        },
+        "all": {
+          "$": "function",
+          "name": "all"
+        },
+        "set": {
+          "$": "function",
+          "name": "set"
+        },
+        "clear": {
+          "$": "function",
+          "name": "clear"
+        },
+        "resize": {
+          "$": "function",
+          "name": "resize"
+        },
+        "mask": 3
+      }
+    },
+    {
+      "package": "vega-crossfilter",
+      "op": "resolvefilter",
+      "instance": 2,
+      "sequence": 2,
+      "params": {
+        "ignore": 2,
+        "filter": {
+          "data": {
+            "$": "function",
+            "name": "data"
+          },
+          "seen": {
+            "$": "function",
+            "name": "seen"
+          },
+          "add": {
+            "$": "function",
+            "name": "add"
+          },
+          "remove": {
+            "$": "function",
+            "name": "remove"
+          },
+          "size": {
+            "$": "function",
+            "name": "size"
+          },
+          "curr": {
+            "$": "function",
+            "name": "curr"
+          },
+          "prev": {
+            "$": "function",
+            "name": "prev"
+          },
+          "reset": {
+            "$": "function",
+            "name": "reset"
+          },
+          "all": {
+            "$": "function",
+            "name": "all"
+          },
+          "set": {
+            "$": "function",
+            "name": "set"
+          },
+          "clear": {
+            "$": "function",
+            "name": "clear"
+          },
+          "resize": {
+            "$": "function",
+            "name": "resize"
+          },
+          "mask": 3
+        }
+      },
+      "input": {
+        "add": [
+          2,
+          0,
+          1,
+          3
+        ],
+        "rem": [
+          2,
+          0,
+          1,
+          3
+        ],
+        "source": [
+          {
+            "a": 1,
+            "b": 1,
+            "c": 0,
+            "_index": 0
+          },
+          {
+            "a": 2,
+            "b": 2,
+            "c": 1,
+            "_index": 1
+          },
+          {
+            "a": 4,
+            "b": 4,
+            "c": 2,
+            "_index": 2
+          },
+          {
+            "a": 3,
+            "b": 3,
+            "c": 3,
+            "_index": 3
+          }
+        ]
+      },
+      "output": {
+        "add": [
+          2,
+          0,
+          1,
+          3
+        ],
+        "rem": [
+          2,
+          0,
+          1,
+          3
+        ],
+        "source": [
+          {
+            "a": 1,
+            "b": 1,
+            "c": 0,
+            "_index": 0
+          },
+          {
+            "a": 2,
+            "b": 2,
+            "c": 1,
+            "_index": 1
+          },
+          {
+            "a": 4,
+            "b": 4,
+            "c": 2,
+            "_index": 2
+          },
+          {
+            "a": 3,
+            "b": 3,
+            "c": 3,
+            "_index": 3
+          }
+        ]
+      },
+      "value": null
+    },
+    {
+      "package": "vega-crossfilter",
+      "op": "resolvefilter",
+      "instance": 3,
+      "sequence": 2,
+      "params": {
+        "ignore": 1,
+        "filter": {
+          "data": {
+            "$": "function",
+            "name": "data"
+          },
+          "seen": {
+            "$": "function",
+            "name": "seen"
+          },
+          "add": {
+            "$": "function",
+            "name": "add"
+          },
+          "remove": {
+            "$": "function",
+            "name": "remove"
+          },
+          "size": {
+            "$": "function",
+            "name": "size"
+          },
+          "curr": {
+            "$": "function",
+            "name": "curr"
+          },
+          "prev": {
+            "$": "function",
+            "name": "prev"
+          },
+          "reset": {
+            "$": "function",
+            "name": "reset"
+          },
+          "all": {
+            "$": "function",
+            "name": "all"
+          },
+          "set": {
+            "$": "function",
+            "name": "set"
+          },
+          "clear": {
+            "$": "function",
+            "name": "clear"
+          },
+          "resize": {
+            "$": "function",
+            "name": "resize"
+          },
+          "mask": 3
+        }
+      },
+      "input": {
+        "add": [
+          2,
+          0,
+          1,
+          3
+        ],
+        "rem": [
+          2,
+          0,
+          1,
+          3
+        ],
+        "source": [
+          {
+            "a": 1,
+            "b": 1,
+            "c": 0,
+            "_index": 0
+          },
+          {
+            "a": 2,
+            "b": 2,
+            "c": 1,
+            "_index": 1
+          },
+          {
+            "a": 4,
+            "b": 4,
+            "c": 2,
+            "_index": 2
+          },
+          {
+            "a": 3,
+            "b": 3,
+            "c": 3,
+            "_index": 3
+          }
+        ]
+      },
+      "output": {
+        "add": [
+          2,
+          0,
+          1,
+          3
+        ],
+        "rem": [
+          2,
+          0,
+          1,
+          3
+        ],
+        "source": [
+          {
+            "a": 1,
+            "b": 1,
+            "c": 0,
+            "_index": 0
+          },
+          {
+            "a": 2,
+            "b": 2,
+            "c": 1,
+            "_index": 1
+          },
+          {
+            "a": 4,
+            "b": 4,
+            "c": 2,
+            "_index": 2
+          },
+          {
+            "a": 3,
+            "b": 3,
+            "c": 3,
+            "_index": 3
+          }
+        ]
+      },
+      "value": null
+    },
+    {
+      "package": "vega-crossfilter",
+      "op": "resolvefilter",
+      "instance": 4,
+      "sequence": 2,
+      "params": {
+        "ignore": 0,
+        "filter": {
+          "data": {
+            "$": "function",
+            "name": "data"
+          },
+          "seen": {
+            "$": "function",
+            "name": "seen"
+          },
+          "add": {
+            "$": "function",
+            "name": "add"
+          },
+          "remove": {
+            "$": "function",
+            "name": "remove"
+          },
+          "size": {
+            "$": "function",
+            "name": "size"
+          },
+          "curr": {
+            "$": "function",
+            "name": "curr"
+          },
+          "prev": {
+            "$": "function",
+            "name": "prev"
+          },
+          "reset": {
+            "$": "function",
+            "name": "reset"
+          },
+          "all": {
+            "$": "function",
+            "name": "all"
+          },
+          "set": {
+            "$": "function",
+            "name": "set"
+          },
+          "clear": {
+            "$": "function",
+            "name": "clear"
+          },
+          "resize": {
+            "$": "function",
+            "name": "resize"
+          },
+          "mask": 3
+        }
+      },
+      "input": {
+        "add": [
+          2,
+          0,
+          1,
+          3
+        ],
+        "rem": [
+          2,
+          0,
+          1,
+          3
+        ],
+        "source": [
+          {
+            "a": 1,
+            "b": 1,
+            "c": 0,
+            "_index": 0
+          },
+          {
+            "a": 2,
+            "b": 2,
+            "c": 1,
+            "_index": 1
+          },
+          {
+            "a": 4,
+            "b": 4,
+            "c": 2,
+            "_index": 2
+          },
+          {
+            "a": 3,
+            "b": 3,
+            "c": 3,
+            "_index": 3
+          }
+        ]
+      },
+      "output": {
+        "add": [
+          2,
+          0,
+          1,
+          3
+        ],
+        "rem": [
+          2,
+          0,
+          1,
+          3
+        ],
+        "source": [
+          {
+            "a": 1,
+            "b": 1,
+            "c": 0,
+            "_index": 0
+          },
+          {
+            "a": 2,
+            "b": 2,
+            "c": 1,
+            "_index": 1
+          },
+          {
+            "a": 4,
+            "b": 4,
+            "c": 2,
+            "_index": 2
+          },
+          {
+            "a": 3,
+            "b": 3,
+            "c": 3,
+            "_index": 3
+          }
+        ]
+      },
+      "value": null
+    },
+    {
+      "package": "vega-crossfilter",
+      "op": "crossfilter",
+      "instance": 1,
+      "sequence": 3,
+      "params": {
+        "fields": [
+          {
+            "$": "accessor",
+            "fields": [
+              "a"
+            ]
+          },
+          {
+            "$": "accessor",
+            "fields": [
+              "b"
+            ]
+          }
+        ],
+        "query": [
+          [
+            1,
+            4
+          ],
+          [
+            3,
+            5
+          ]
+        ]
+      },
+      "input": {
+        "rem": [
+          {
+            "a": 1,
+            "b": 1,
+            "c": 0,
+            "_index": 0
+          },
+          {
+            "a": 2,
+            "b": 2,
+            "c": 1,
+            "_index": 1
+          }
+        ],
+        "source": [
+          {
+            "a": 4,
+            "b": 4,
+            "c": 2,
+            "_index": 2
+          },
+          {
+            "a": 3,
+            "b": 3,
+            "c": 3,
+            "_index": 3
+          }
+        ]
+      },
+      "output": {
+        "rem": [
+          0,
+          1
+        ],
+        "source": [
+          {
+            "a": 4,
+            "b": 4,
+            "c": 2,
+            "_index": 2
+          },
+          {
+            "a": 3,
+            "b": 3,
+            "c": 3,
+            "_index": 3
+          }
+        ]
+      },
+      "value": {
+        "data": {
+          "$": "function",
+          "name": "data"
+        },
+        "seen": {
+          "$": "function",
+          "name": "seen"
+        },
+        "add": {
+          "$": "function",
+          "name": "add"
+        },
+        "remove": {
+          "$": "function",
+          "name": "remove"
+        },
+        "size": {
+          "$": "function",
+          "name": "size"
+        },
+        "curr": {
+          "$": "function",
+          "name": "curr"
+        },
+        "prev": {
+          "$": "function",
+          "name": "prev"
+        },
+        "reset": {
+          "$": "function",
+          "name": "reset"
+        },
+        "all": {
+          "$": "function",
+          "name": "all"
+        },
+        "set": {
+          "$": "function",
+          "name": "set"
+        },
+        "clear": {
+          "$": "function",
+          "name": "clear"
+        },
+        "resize": {
+          "$": "function",
+          "name": "resize"
+        },
+        "mask": 3
+      }
+    },
+    {
+      "package": "vega-crossfilter",
+      "op": "resolvefilter",
+      "instance": 2,
+      "sequence": 3,
+      "params": {
+        "ignore": 2,
+        "filter": {
+          "data": {
+            "$": "function",
+            "name": "data"
+          },
+          "seen": {
+            "$": "function",
+            "name": "seen"
+          },
+          "add": {
+            "$": "function",
+            "name": "add"
+          },
+          "remove": {
+            "$": "function",
+            "name": "remove"
+          },
+          "size": {
+            "$": "function",
+            "name": "size"
+          },
+          "curr": {
+            "$": "function",
+            "name": "curr"
+          },
+          "prev": {
+            "$": "function",
+            "name": "prev"
+          },
+          "reset": {
+            "$": "function",
+            "name": "reset"
+          },
+          "all": {
+            "$": "function",
+            "name": "all"
+          },
+          "set": {
+            "$": "function",
+            "name": "set"
+          },
+          "clear": {
+            "$": "function",
+            "name": "clear"
+          },
+          "resize": {
+            "$": "function",
+            "name": "resize"
+          },
+          "mask": 3
+        }
+      },
+      "input": {
+        "rem": [
+          0,
+          1
+        ],
+        "source": [
+          {
+            "a": 4,
+            "b": 4,
+            "c": 2,
+            "_index": 2
+          },
+          {
+            "a": 3,
+            "b": 3,
+            "c": 3,
+            "_index": 3
+          }
+        ]
+      },
+      "output": {
+        "rem": [
+          0,
+          1
+        ],
+        "source": [
+          {
+            "a": 4,
+            "b": 4,
+            "c": 2,
+            "_index": 2
+          },
+          {
+            "a": 3,
+            "b": 3,
+            "c": 3,
+            "_index": 3
+          }
+        ]
+      },
+      "value": null
+    },
+    {
+      "package": "vega-crossfilter",
+      "op": "resolvefilter",
+      "instance": 3,
+      "sequence": 3,
+      "params": {
+        "ignore": 1,
+        "filter": {
+          "data": {
+            "$": "function",
+            "name": "data"
+          },
+          "seen": {
+            "$": "function",
+            "name": "seen"
+          },
+          "add": {
+            "$": "function",
+            "name": "add"
+          },
+          "remove": {
+            "$": "function",
+            "name": "remove"
+          },
+          "size": {
+            "$": "function",
+            "name": "size"
+          },
+          "curr": {
+            "$": "function",
+            "name": "curr"
+          },
+          "prev": {
+            "$": "function",
+            "name": "prev"
+          },
+          "reset": {
+            "$": "function",
+            "name": "reset"
+          },
+          "all": {
+            "$": "function",
+            "name": "all"
+          },
+          "set": {
+            "$": "function",
+            "name": "set"
+          },
+          "clear": {
+            "$": "function",
+            "name": "clear"
+          },
+          "resize": {
+            "$": "function",
+            "name": "resize"
+          },
+          "mask": 3
+        }
+      },
+      "input": {
+        "rem": [
+          0,
+          1
+        ],
+        "source": [
+          {
+            "a": 4,
+            "b": 4,
+            "c": 2,
+            "_index": 2
+          },
+          {
+            "a": 3,
+            "b": 3,
+            "c": 3,
+            "_index": 3
+          }
+        ]
+      },
+      "output": {
+        "rem": [
+          0,
+          1
+        ],
+        "source": [
+          {
+            "a": 4,
+            "b": 4,
+            "c": 2,
+            "_index": 2
+          },
+          {
+            "a": 3,
+            "b": 3,
+            "c": 3,
+            "_index": 3
+          }
+        ]
+      },
+      "value": null
+    },
+    {
+      "package": "vega-crossfilter",
+      "op": "resolvefilter",
+      "instance": 4,
+      "sequence": 3,
+      "params": {
+        "ignore": 0,
+        "filter": {
+          "data": {
+            "$": "function",
+            "name": "data"
+          },
+          "seen": {
+            "$": "function",
+            "name": "seen"
+          },
+          "add": {
+            "$": "function",
+            "name": "add"
+          },
+          "remove": {
+            "$": "function",
+            "name": "remove"
+          },
+          "size": {
+            "$": "function",
+            "name": "size"
+          },
+          "curr": {
+            "$": "function",
+            "name": "curr"
+          },
+          "prev": {
+            "$": "function",
+            "name": "prev"
+          },
+          "reset": {
+            "$": "function",
+            "name": "reset"
+          },
+          "all": {
+            "$": "function",
+            "name": "all"
+          },
+          "set": {
+            "$": "function",
+            "name": "set"
+          },
+          "clear": {
+            "$": "function",
+            "name": "clear"
+          },
+          "resize": {
+            "$": "function",
+            "name": "resize"
+          },
+          "mask": 3
+        }
+      },
+      "input": {
+        "rem": [
+          0,
+          1
+        ],
+        "source": [
+          {
+            "a": 4,
+            "b": 4,
+            "c": 2,
+            "_index": 2
+          },
+          {
+            "a": 3,
+            "b": 3,
+            "c": 3,
+            "_index": 3
+          }
+        ]
+      },
+      "output": {
+        "rem": [
+          0,
+          1
+        ],
+        "source": [
+          {
+            "a": 4,
+            "b": 4,
+            "c": 2,
+            "_index": 2
+          },
+          {
+            "a": 3,
+            "b": 3,
+            "c": 3,
+            "_index": 3
+          }
+        ]
+      },
+      "value": null
+    },
+    {
+      "package": "vega-crossfilter",
+      "op": "crossfilter",
+      "instance": 1,
+      "sequence": 4,
+      "params": {
+        "fields": [
+          {
+            "$": "accessor",
+            "fields": [
+              "a"
+            ]
+          },
+          {
+            "$": "accessor",
+            "fields": [
+              "b"
+            ]
+          }
+        ],
+        "query": [
+          [
+            1,
+            4
+          ],
+          [
+            3,
+            5
+          ]
+        ]
+      },
+      "input": {
+        "rem": [
+          {
+            "a": 4,
+            "b": 4,
+            "c": 2,
+            "_index": 0
+          },
+          {
+            "a": 3,
+            "b": 3,
+            "c": 3,
+            "_index": 1
+          }
+        ]
+      },
+      "output": {
+        "rem": [
+          0,
+          1
+        ]
+      },
+      "value": {
+        "data": {
+          "$": "function",
+          "name": "data"
+        },
+        "seen": {
+          "$": "function",
+          "name": "seen"
+        },
+        "add": {
+          "$": "function",
+          "name": "add"
+        },
+        "remove": {
+          "$": "function",
+          "name": "remove"
+        },
+        "size": {
+          "$": "function",
+          "name": "size"
+        },
+        "curr": {
+          "$": "function",
+          "name": "curr"
+        },
+        "prev": {
+          "$": "function",
+          "name": "prev"
+        },
+        "reset": {
+          "$": "function",
+          "name": "reset"
+        },
+        "all": {
+          "$": "function",
+          "name": "all"
+        },
+        "set": {
+          "$": "function",
+          "name": "set"
+        },
+        "clear": {
+          "$": "function",
+          "name": "clear"
+        },
+        "resize": {
+          "$": "function",
+          "name": "resize"
+        },
+        "mask": 3
+      }
+    },
+    {
+      "package": "vega-crossfilter",
+      "op": "resolvefilter",
+      "instance": 2,
+      "sequence": 4,
+      "params": {
+        "ignore": 2,
+        "filter": {
+          "data": {
+            "$": "function",
+            "name": "data"
+          },
+          "seen": {
+            "$": "function",
+            "name": "seen"
+          },
+          "add": {
+            "$": "function",
+            "name": "add"
+          },
+          "remove": {
+            "$": "function",
+            "name": "remove"
+          },
+          "size": {
+            "$": "function",
+            "name": "size"
+          },
+          "curr": {
+            "$": "function",
+            "name": "curr"
+          },
+          "prev": {
+            "$": "function",
+            "name": "prev"
+          },
+          "reset": {
+            "$": "function",
+            "name": "reset"
+          },
+          "all": {
+            "$": "function",
+            "name": "all"
+          },
+          "set": {
+            "$": "function",
+            "name": "set"
+          },
+          "clear": {
+            "$": "function",
+            "name": "clear"
+          },
+          "resize": {
+            "$": "function",
+            "name": "resize"
+          },
+          "mask": 3
+        }
+      },
+      "input": {
+        "rem": [
+          0,
+          1
+        ]
+      },
+      "output": {
+        "rem": [
+          0,
+          1
+        ]
+      },
+      "value": null
+    },
+    {
+      "package": "vega-crossfilter",
+      "op": "resolvefilter",
+      "instance": 3,
+      "sequence": 4,
+      "params": {
+        "ignore": 1,
+        "filter": {
+          "data": {
+            "$": "function",
+            "name": "data"
+          },
+          "seen": {
+            "$": "function",
+            "name": "seen"
+          },
+          "add": {
+            "$": "function",
+            "name": "add"
+          },
+          "remove": {
+            "$": "function",
+            "name": "remove"
+          },
+          "size": {
+            "$": "function",
+            "name": "size"
+          },
+          "curr": {
+            "$": "function",
+            "name": "curr"
+          },
+          "prev": {
+            "$": "function",
+            "name": "prev"
+          },
+          "reset": {
+            "$": "function",
+            "name": "reset"
+          },
+          "all": {
+            "$": "function",
+            "name": "all"
+          },
+          "set": {
+            "$": "function",
+            "name": "set"
+          },
+          "clear": {
+            "$": "function",
+            "name": "clear"
+          },
+          "resize": {
+            "$": "function",
+            "name": "resize"
+          },
+          "mask": 3
+        }
+      },
+      "input": {
+        "rem": [
+          0,
+          1
+        ]
+      },
+      "output": {
+        "rem": [
+          0,
+          1
+        ]
+      },
+      "value": null
+    },
+    {
+      "package": "vega-crossfilter",
+      "op": "resolvefilter",
+      "instance": 4,
+      "sequence": 4,
+      "params": {
+        "ignore": 0,
+        "filter": {
+          "data": {
+            "$": "function",
+            "name": "data"
+          },
+          "seen": {
+            "$": "function",
+            "name": "seen"
+          },
+          "add": {
+            "$": "function",
+            "name": "add"
+          },
+          "remove": {
+            "$": "function",
+            "name": "remove"
+          },
+          "size": {
+            "$": "function",
+            "name": "size"
+          },
+          "curr": {
+            "$": "function",
+            "name": "curr"
+          },
+          "prev": {
+            "$": "function",
+            "name": "prev"
+          },
+          "reset": {
+            "$": "function",
+            "name": "reset"
+          },
+          "all": {
+            "$": "function",
+            "name": "all"
+          },
+          "set": {
+            "$": "function",
+            "name": "set"
+          },
+          "clear": {
+            "$": "function",
+            "name": "clear"
+          },
+          "resize": {
+            "$": "function",
+            "name": "resize"
+          },
+          "mask": 3
+        }
+      },
+      "input": {
+        "rem": [
+          0,
+          1
+        ]
+      },
+      "output": {
+        "rem": [
+          0,
+          1
+        ]
+      },
+      "value": null
+    },
+    {
+      "package": "vega-crossfilter",
+      "op": "crossfilter",
+      "instance": 1,
+      "sequence": 5,
+      "params": {
+        "fields": [
+          {
+            "$": "accessor",
+            "fields": [
+              "a"
+            ]
+          },
+          {
+            "$": "accessor",
+            "fields": [
+              "b"
+            ]
+          }
+        ],
+        "query": [
+          [
+            1,
+            4
+          ],
+          [
+            3,
+            5
+          ]
+        ]
+      },
+      "input": {
+        "add": [
+          {
+            "a": 1,
+            "b": 1,
+            "c": 0,
+            "_index": 0
+          },
+          {
+            "a": 2,
+            "b": 2,
+            "c": 1,
+            "_index": 1
+          },
+          {
+            "a": 4,
+            "b": 4,
+            "c": 2,
+            "_index": 0
+          },
+          {
+            "a": 3,
+            "b": 3,
+            "c": 3,
+            "_index": 1
+          }
+        ],
+        "source": [
+          {
+            "a": 1,
+            "b": 1,
+            "c": 0,
+            "_index": 0
+          },
+          {
+            "a": 2,
+            "b": 2,
+            "c": 1,
+            "_index": 1
+          },
+          {
+            "a": 4,
+            "b": 4,
+            "c": 2,
+            "_index": 0
+          },
+          {
+            "a": 3,
+            "b": 3,
+            "c": 3,
+            "_index": 1
+          }
+        ]
+      },
+      "output": {
+        "add": [
+          0,
+          1,
+          2,
+          3
+        ],
+        "source": [
+          {
+            "a": 1,
+            "b": 1,
+            "c": 0,
+            "_index": 0
+          },
+          {
+            "a": 2,
+            "b": 2,
+            "c": 1,
+            "_index": 1
+          },
+          {
+            "a": 4,
+            "b": 4,
+            "c": 2,
+            "_index": 2
+          },
+          {
+            "a": 3,
+            "b": 3,
+            "c": 3,
+            "_index": 3
+          }
+        ]
+      },
+      "value": {
+        "data": {
+          "$": "function",
+          "name": "data"
+        },
+        "seen": {
+          "$": "function",
+          "name": "seen"
+        },
+        "add": {
+          "$": "function",
+          "name": "add"
+        },
+        "remove": {
+          "$": "function",
+          "name": "remove"
+        },
+        "size": {
+          "$": "function",
+          "name": "size"
+        },
+        "curr": {
+          "$": "function",
+          "name": "curr"
+        },
+        "prev": {
+          "$": "function",
+          "name": "prev"
+        },
+        "reset": {
+          "$": "function",
+          "name": "reset"
+        },
+        "all": {
+          "$": "function",
+          "name": "all"
+        },
+        "set": {
+          "$": "function",
+          "name": "set"
+        },
+        "clear": {
+          "$": "function",
+          "name": "clear"
+        },
+        "resize": {
+          "$": "function",
+          "name": "resize"
+        },
+        "mask": 3
+      }
+    },
+    {
+      "package": "vega-crossfilter",
+      "op": "resolvefilter",
+      "instance": 2,
+      "sequence": 5,
+      "params": {
+        "ignore": 2,
+        "filter": {
+          "data": {
+            "$": "function",
+            "name": "data"
+          },
+          "seen": {
+            "$": "function",
+            "name": "seen"
+          },
+          "add": {
+            "$": "function",
+            "name": "add"
+          },
+          "remove": {
+            "$": "function",
+            "name": "remove"
+          },
+          "size": {
+            "$": "function",
+            "name": "size"
+          },
+          "curr": {
+            "$": "function",
+            "name": "curr"
+          },
+          "prev": {
+            "$": "function",
+            "name": "prev"
+          },
+          "reset": {
+            "$": "function",
+            "name": "reset"
+          },
+          "all": {
+            "$": "function",
+            "name": "all"
+          },
+          "set": {
+            "$": "function",
+            "name": "set"
+          },
+          "clear": {
+            "$": "function",
+            "name": "clear"
+          },
+          "resize": {
+            "$": "function",
+            "name": "resize"
+          },
+          "mask": 3
+        }
+      },
+      "input": {
+        "add": [
+          0,
+          1,
+          2,
+          3
+        ],
+        "source": [
+          {
+            "a": 1,
+            "b": 1,
+            "c": 0,
+            "_index": 0
+          },
+          {
+            "a": 2,
+            "b": 2,
+            "c": 1,
+            "_index": 1
+          },
+          {
+            "a": 4,
+            "b": 4,
+            "c": 2,
+            "_index": 2
+          },
+          {
+            "a": 3,
+            "b": 3,
+            "c": 3,
+            "_index": 3
+          }
+        ]
+      },
+      "output": {
+        "add": [
+          0,
+          1,
+          2,
+          3
+        ],
+        "source": [
+          {
+            "a": 1,
+            "b": 1,
+            "c": 0,
+            "_index": 0
+          },
+          {
+            "a": 2,
+            "b": 2,
+            "c": 1,
+            "_index": 1
+          },
+          {
+            "a": 4,
+            "b": 4,
+            "c": 2,
+            "_index": 2
+          },
+          {
+            "a": 3,
+            "b": 3,
+            "c": 3,
+            "_index": 3
+          }
+        ]
+      },
+      "value": null
+    },
+    {
+      "package": "vega-crossfilter",
+      "op": "resolvefilter",
+      "instance": 3,
+      "sequence": 5,
+      "params": {
+        "ignore": 1,
+        "filter": {
+          "data": {
+            "$": "function",
+            "name": "data"
+          },
+          "seen": {
+            "$": "function",
+            "name": "seen"
+          },
+          "add": {
+            "$": "function",
+            "name": "add"
+          },
+          "remove": {
+            "$": "function",
+            "name": "remove"
+          },
+          "size": {
+            "$": "function",
+            "name": "size"
+          },
+          "curr": {
+            "$": "function",
+            "name": "curr"
+          },
+          "prev": {
+            "$": "function",
+            "name": "prev"
+          },
+          "reset": {
+            "$": "function",
+            "name": "reset"
+          },
+          "all": {
+            "$": "function",
+            "name": "all"
+          },
+          "set": {
+            "$": "function",
+            "name": "set"
+          },
+          "clear": {
+            "$": "function",
+            "name": "clear"
+          },
+          "resize": {
+            "$": "function",
+            "name": "resize"
+          },
+          "mask": 3
+        }
+      },
+      "input": {
+        "add": [
+          0,
+          1,
+          2,
+          3
+        ],
+        "source": [
+          {
+            "a": 1,
+            "b": 1,
+            "c": 0,
+            "_index": 0
+          },
+          {
+            "a": 2,
+            "b": 2,
+            "c": 1,
+            "_index": 1
+          },
+          {
+            "a": 4,
+            "b": 4,
+            "c": 2,
+            "_index": 2
+          },
+          {
+            "a": 3,
+            "b": 3,
+            "c": 3,
+            "_index": 3
+          }
+        ]
+      },
+      "output": {
+        "add": [
+          0,
+          1,
+          2,
+          3
+        ],
+        "source": [
+          {
+            "a": 1,
+            "b": 1,
+            "c": 0,
+            "_index": 0
+          },
+          {
+            "a": 2,
+            "b": 2,
+            "c": 1,
+            "_index": 1
+          },
+          {
+            "a": 4,
+            "b": 4,
+            "c": 2,
+            "_index": 2
+          },
+          {
+            "a": 3,
+            "b": 3,
+            "c": 3,
+            "_index": 3
+          }
+        ]
+      },
+      "value": null
+    },
+    {
+      "package": "vega-crossfilter",
+      "op": "resolvefilter",
+      "instance": 4,
+      "sequence": 5,
+      "params": {
+        "ignore": 0,
+        "filter": {
+          "data": {
+            "$": "function",
+            "name": "data"
+          },
+          "seen": {
+            "$": "function",
+            "name": "seen"
+          },
+          "add": {
+            "$": "function",
+            "name": "add"
+          },
+          "remove": {
+            "$": "function",
+            "name": "remove"
+          },
+          "size": {
+            "$": "function",
+            "name": "size"
+          },
+          "curr": {
+            "$": "function",
+            "name": "curr"
+          },
+          "prev": {
+            "$": "function",
+            "name": "prev"
+          },
+          "reset": {
+            "$": "function",
+            "name": "reset"
+          },
+          "all": {
+            "$": "function",
+            "name": "all"
+          },
+          "set": {
+            "$": "function",
+            "name": "set"
+          },
+          "clear": {
+            "$": "function",
+            "name": "clear"
+          },
+          "resize": {
+            "$": "function",
+            "name": "resize"
+          },
+          "mask": 3
+        }
+      },
+      "input": {
+        "add": [
+          0,
+          1,
+          2,
+          3
+        ],
+        "source": [
+          {
+            "a": 1,
+            "b": 1,
+            "c": 0,
+            "_index": 0
+          },
+          {
+            "a": 2,
+            "b": 2,
+            "c": 1,
+            "_index": 1
+          },
+          {
+            "a": 4,
+            "b": 4,
+            "c": 2,
+            "_index": 2
+          },
+          {
+            "a": 3,
+            "b": 3,
+            "c": 3,
+            "_index": 3
+          }
+        ]
+      },
+      "output": {
+        "add": [
+          0,
+          1,
+          2,
+          3
+        ],
+        "source": [
+          {
+            "a": 1,
+            "b": 1,
+            "c": 0,
+            "_index": 0
+          },
+          {
+            "a": 2,
+            "b": 2,
+            "c": 1,
+            "_index": 1
+          },
+          {
+            "a": 4,
+            "b": 4,
+            "c": 2,
+            "_index": 2
+          },
+          {
+            "a": 3,
+            "b": 3,
+            "c": 3,
+            "_index": 3
+          }
+        ]
+      },
+      "value": null
+    },
+    {
+      "package": "vega-crossfilter",
+      "op": "crossfilter",
+      "instance": 1,
+      "sequence": 6,
+      "params": {
+        "fields": [
+          {
+            "$": "accessor",
+            "fields": [
+              "a"
+            ]
+          },
+          {
+            "$": "accessor",
+            "fields": [
+              "b"
+            ]
+          }
+        ],
+        "query": [
+          [
+            1,
+            4
+          ],
+          [
+            3,
+            5
+          ]
+        ]
+      },
+      "input": {
+        "mod": [
+          {
+            "a": 1,
+            "b": 1,
+            "c": 5,
+            "_index": 0
+          },
+          {
+            "a": 3,
+            "b": 3,
+            "c": 5,
+            "_index": 3
+          }
+        ],
+        "source": [
+          {
+            "a": 1,
+            "b": 1,
+            "c": 5,
+            "_index": 0
+          },
+          {
+            "a": 2,
+            "b": 2,
+            "c": 1,
+            "_index": 1
+          },
+          {
+            "a": 4,
+            "b": 4,
+            "c": 2,
+            "_index": 2
+          },
+          {
+            "a": 3,
+            "b": 3,
+            "c": 5,
+            "_index": 3
+          }
+        ]
+      },
+      "output": {
+        "mod": [
+          0,
+          3
+        ],
+        "source": [
+          {
+            "a": 1,
+            "b": 1,
+            "c": 5,
+            "_index": 0
+          },
+          {
+            "a": 2,
+            "b": 2,
+            "c": 1,
+            "_index": 1
+          },
+          {
+            "a": 4,
+            "b": 4,
+            "c": 2,
+            "_index": 2
+          },
+          {
+            "a": 3,
+            "b": 3,
+            "c": 5,
+            "_index": 3
+          }
+        ]
+      },
+      "value": {
+        "data": {
+          "$": "function",
+          "name": "data"
+        },
+        "seen": {
+          "$": "function",
+          "name": "seen"
+        },
+        "add": {
+          "$": "function",
+          "name": "add"
+        },
+        "remove": {
+          "$": "function",
+          "name": "remove"
+        },
+        "size": {
+          "$": "function",
+          "name": "size"
+        },
+        "curr": {
+          "$": "function",
+          "name": "curr"
+        },
+        "prev": {
+          "$": "function",
+          "name": "prev"
+        },
+        "reset": {
+          "$": "function",
+          "name": "reset"
+        },
+        "all": {
+          "$": "function",
+          "name": "all"
+        },
+        "set": {
+          "$": "function",
+          "name": "set"
+        },
+        "clear": {
+          "$": "function",
+          "name": "clear"
+        },
+        "resize": {
+          "$": "function",
+          "name": "resize"
+        },
+        "mask": 3
+      }
+    },
+    {
+      "package": "vega-crossfilter",
+      "op": "resolvefilter",
+      "instance": 2,
+      "sequence": 6,
+      "params": {
+        "ignore": 2,
+        "filter": {
+          "data": {
+            "$": "function",
+            "name": "data"
+          },
+          "seen": {
+            "$": "function",
+            "name": "seen"
+          },
+          "add": {
+            "$": "function",
+            "name": "add"
+          },
+          "remove": {
+            "$": "function",
+            "name": "remove"
+          },
+          "size": {
+            "$": "function",
+            "name": "size"
+          },
+          "curr": {
+            "$": "function",
+            "name": "curr"
+          },
+          "prev": {
+            "$": "function",
+            "name": "prev"
+          },
+          "reset": {
+            "$": "function",
+            "name": "reset"
+          },
+          "all": {
+            "$": "function",
+            "name": "all"
+          },
+          "set": {
+            "$": "function",
+            "name": "set"
+          },
+          "clear": {
+            "$": "function",
+            "name": "clear"
+          },
+          "resize": {
+            "$": "function",
+            "name": "resize"
+          },
+          "mask": 3
+        }
+      },
+      "input": {
+        "mod": [
+          0,
+          3
+        ],
+        "source": [
+          {
+            "a": 1,
+            "b": 1,
+            "c": 5,
+            "_index": 0
+          },
+          {
+            "a": 2,
+            "b": 2,
+            "c": 1,
+            "_index": 1
+          },
+          {
+            "a": 4,
+            "b": 4,
+            "c": 2,
+            "_index": 2
+          },
+          {
+            "a": 3,
+            "b": 3,
+            "c": 5,
+            "_index": 3
+          }
+        ]
+      },
+      "output": {
+        "mod": [
+          0,
+          3
+        ],
+        "source": [
+          {
+            "a": 1,
+            "b": 1,
+            "c": 5,
+            "_index": 0
+          },
+          {
+            "a": 2,
+            "b": 2,
+            "c": 1,
+            "_index": 1
+          },
+          {
+            "a": 4,
+            "b": 4,
+            "c": 2,
+            "_index": 2
+          },
+          {
+            "a": 3,
+            "b": 3,
+            "c": 5,
+            "_index": 3
+          }
+        ]
+      },
+      "value": null
+    },
+    {
+      "package": "vega-crossfilter",
+      "op": "resolvefilter",
+      "instance": 3,
+      "sequence": 6,
+      "params": {
+        "ignore": 1,
+        "filter": {
+          "data": {
+            "$": "function",
+            "name": "data"
+          },
+          "seen": {
+            "$": "function",
+            "name": "seen"
+          },
+          "add": {
+            "$": "function",
+            "name": "add"
+          },
+          "remove": {
+            "$": "function",
+            "name": "remove"
+          },
+          "size": {
+            "$": "function",
+            "name": "size"
+          },
+          "curr": {
+            "$": "function",
+            "name": "curr"
+          },
+          "prev": {
+            "$": "function",
+            "name": "prev"
+          },
+          "reset": {
+            "$": "function",
+            "name": "reset"
+          },
+          "all": {
+            "$": "function",
+            "name": "all"
+          },
+          "set": {
+            "$": "function",
+            "name": "set"
+          },
+          "clear": {
+            "$": "function",
+            "name": "clear"
+          },
+          "resize": {
+            "$": "function",
+            "name": "resize"
+          },
+          "mask": 3
+        }
+      },
+      "input": {
+        "mod": [
+          0,
+          3
+        ],
+        "source": [
+          {
+            "a": 1,
+            "b": 1,
+            "c": 5,
+            "_index": 0
+          },
+          {
+            "a": 2,
+            "b": 2,
+            "c": 1,
+            "_index": 1
+          },
+          {
+            "a": 4,
+            "b": 4,
+            "c": 2,
+            "_index": 2
+          },
+          {
+            "a": 3,
+            "b": 3,
+            "c": 5,
+            "_index": 3
+          }
+        ]
+      },
+      "output": {
+        "mod": [
+          0,
+          3
+        ],
+        "source": [
+          {
+            "a": 1,
+            "b": 1,
+            "c": 5,
+            "_index": 0
+          },
+          {
+            "a": 2,
+            "b": 2,
+            "c": 1,
+            "_index": 1
+          },
+          {
+            "a": 4,
+            "b": 4,
+            "c": 2,
+            "_index": 2
+          },
+          {
+            "a": 3,
+            "b": 3,
+            "c": 5,
+            "_index": 3
+          }
+        ]
+      },
+      "value": null
+    },
+    {
+      "package": "vega-crossfilter",
+      "op": "resolvefilter",
+      "instance": 4,
+      "sequence": 6,
+      "params": {
+        "ignore": 0,
+        "filter": {
+          "data": {
+            "$": "function",
+            "name": "data"
+          },
+          "seen": {
+            "$": "function",
+            "name": "seen"
+          },
+          "add": {
+            "$": "function",
+            "name": "add"
+          },
+          "remove": {
+            "$": "function",
+            "name": "remove"
+          },
+          "size": {
+            "$": "function",
+            "name": "size"
+          },
+          "curr": {
+            "$": "function",
+            "name": "curr"
+          },
+          "prev": {
+            "$": "function",
+            "name": "prev"
+          },
+          "reset": {
+            "$": "function",
+            "name": "reset"
+          },
+          "all": {
+            "$": "function",
+            "name": "all"
+          },
+          "set": {
+            "$": "function",
+            "name": "set"
+          },
+          "clear": {
+            "$": "function",
+            "name": "clear"
+          },
+          "resize": {
+            "$": "function",
+            "name": "resize"
+          },
+          "mask": 3
+        }
+      },
+      "input": {
+        "mod": [
+          0,
+          3
+        ],
+        "source": [
+          {
+            "a": 1,
+            "b": 1,
+            "c": 5,
+            "_index": 0
+          },
+          {
+            "a": 2,
+            "b": 2,
+            "c": 1,
+            "_index": 1
+          },
+          {
+            "a": 4,
+            "b": 4,
+            "c": 2,
+            "_index": 2
+          },
+          {
+            "a": 3,
+            "b": 3,
+            "c": 5,
+            "_index": 3
+          }
+        ]
+      },
+      "output": {
+        "mod": [
+          0,
+          3
+        ],
+        "source": [
+          {
+            "a": 1,
+            "b": 1,
+            "c": 5,
+            "_index": 0
+          },
+          {
+            "a": 2,
+            "b": 2,
+            "c": 1,
+            "_index": 1
+          },
+          {
+            "a": 4,
+            "b": 4,
+            "c": 2,
+            "_index": 2
+          },
+          {
+            "a": 3,
+            "b": 3,
+            "c": 5,
+            "_index": 3
+          }
+        ]
+      },
+      "value": null
+    },
+    {
+      "package": "vega-crossfilter",
+      "op": "crossfilter",
+      "instance": 5,
+      "sequence": 0,
+      "params": {
+        "fields": [
+          {
+            "$": "accessor",
+            "fields": [
+              "x"
+            ]
+          }
+        ],
+        "query": [
+          [
+            2,
+            4
+          ]
+        ]
+      },
+      "input": {
+        "add": [
+          {
+            "x": 1
+          },
+          {
+            "x": 2
+          },
+          {
+            "x": 3
+          },
+          {
+            "x": 4
+          },
+          {
+            "x": 5
+          }
+        ],
+        "source": [
+          {
+            "x": 1
+          },
+          {
+            "x": 2
+          },
+          {
+            "x": 3
+          },
+          {
+            "x": 4
+          },
+          {
+            "x": 5
+          }
+        ]
+      },
+      "output": {
+        "add": [
+          0,
+          1,
+          2,
+          3,
+          4
+        ],
+        "source": [
+          {
+            "x": 1,
+            "_index": 0
+          },
+          {
+            "x": 2,
+            "_index": 1
+          },
+          {
+            "x": 3,
+            "_index": 2
+          },
+          {
+            "x": 4,
+            "_index": 3
+          },
+          {
+            "x": 5,
+            "_index": 4
+          }
+        ]
+      },
+      "value": {
+        "data": {
+          "$": "function",
+          "name": "data"
+        },
+        "seen": {
+          "$": "function",
+          "name": "seen"
+        },
+        "add": {
+          "$": "function",
+          "name": "add"
+        },
+        "remove": {
+          "$": "function",
+          "name": "remove"
+        },
+        "size": {
+          "$": "function",
+          "name": "size"
+        },
+        "curr": {
+          "$": "function",
+          "name": "curr"
+        },
+        "prev": {
+          "$": "function",
+          "name": "prev"
+        },
+        "reset": {
+          "$": "function",
+          "name": "reset"
+        },
+        "all": {
+          "$": "function",
+          "name": "all"
+        },
+        "set": {
+          "$": "function",
+          "name": "set"
+        },
+        "clear": {
+          "$": "function",
+          "name": "clear"
+        },
+        "resize": {
+          "$": "function",
+          "name": "resize"
+        },
+        "mask": 1
+      }
+    },
+    {
+      "package": "vega-crossfilter",
+      "op": "resolvefilter",
+      "instance": 6,
+      "sequence": 0,
+      "params": {
+        "ignore": 0,
+        "filter": {
+          "data": {
+            "$": "function",
+            "name": "data"
+          },
+          "seen": {
+            "$": "function",
+            "name": "seen"
+          },
+          "add": {
+            "$": "function",
+            "name": "add"
+          },
+          "remove": {
+            "$": "function",
+            "name": "remove"
+          },
+          "size": {
+            "$": "function",
+            "name": "size"
+          },
+          "curr": {
+            "$": "function",
+            "name": "curr"
+          },
+          "prev": {
+            "$": "function",
+            "name": "prev"
+          },
+          "reset": {
+            "$": "function",
+            "name": "reset"
+          },
+          "all": {
+            "$": "function",
+            "name": "all"
+          },
+          "set": {
+            "$": "function",
+            "name": "set"
+          },
+          "clear": {
+            "$": "function",
+            "name": "clear"
+          },
+          "resize": {
+            "$": "function",
+            "name": "resize"
+          },
+          "mask": 1
+        }
+      },
+      "input": {
+        "add": [
+          0,
+          1,
+          2,
+          3,
+          4
+        ],
+        "source": [
+          {
+            "x": 1,
+            "_index": 0
+          },
+          {
+            "x": 2,
+            "_index": 1
+          },
+          {
+            "x": 3,
+            "_index": 2
+          },
+          {
+            "x": 4,
+            "_index": 3
+          },
+          {
+            "x": 5,
+            "_index": 4
+          }
+        ]
+      },
+      "output": {
+        "add": [
+          0,
+          1,
+          2,
+          3,
+          4
+        ],
+        "source": [
+          {
+            "x": 1,
+            "_index": 0
+          },
+          {
+            "x": 2,
+            "_index": 1
+          },
+          {
+            "x": 3,
+            "_index": 2
+          },
+          {
+            "x": 4,
+            "_index": 3
+          },
+          {
+            "x": 5,
+            "_index": 4
+          }
+        ]
+      },
+      "value": null
+    },
+    {
+      "package": "vega-crossfilter",
+      "op": "crossfilter",
+      "instance": 7,
+      "sequence": 0,
+      "params": {
+        "fields": [
+          {
+            "$": "accessor",
+            "fields": [
+              "a"
+            ]
+          },
+          {
+            "$": "accessor",
+            "fields": [
+              "b"
+            ]
+          }
+        ],
+        "query": [
+          [
+            0,
+            4
+          ],
+          [
+            0,
+            4
+          ]
+        ]
+      },
+      "input": {
+        "add": [
+          {
+            "a": 1,
+            "b": 1,
+            "c": 0
+          },
+          {
+            "a": 2,
+            "b": 2,
+            "c": 1
+          },
+          {
+            "a": 4,
+            "b": 4,
+            "c": 2
+          },
+          {
+            "a": 3,
+            "b": 3,
+            "c": 3
+          }
+        ],
+        "source": [
+          {
+            "a": 1,
+            "b": 1,
+            "c": 0
+          },
+          {
+            "a": 2,
+            "b": 2,
+            "c": 1
+          },
+          {
+            "a": 4,
+            "b": 4,
+            "c": 2
+          },
+          {
+            "a": 3,
+            "b": 3,
+            "c": 3
+          }
+        ]
+      },
+      "output": {
+        "add": [
+          0,
+          1,
+          2,
+          3
+        ],
+        "source": [
+          {
+            "a": 1,
+            "b": 1,
+            "c": 0,
+            "_index": 0
+          },
+          {
+            "a": 2,
+            "b": 2,
+            "c": 1,
+            "_index": 1
+          },
+          {
+            "a": 4,
+            "b": 4,
+            "c": 2,
+            "_index": 2
+          },
+          {
+            "a": 3,
+            "b": 3,
+            "c": 3,
+            "_index": 3
+          }
+        ]
+      },
+      "value": {
+        "data": {
+          "$": "function",
+          "name": "data"
+        },
+        "seen": {
+          "$": "function",
+          "name": "seen"
+        },
+        "add": {
+          "$": "function",
+          "name": "add"
+        },
+        "remove": {
+          "$": "function",
+          "name": "remove"
+        },
+        "size": {
+          "$": "function",
+          "name": "size"
+        },
+        "curr": {
+          "$": "function",
+          "name": "curr"
+        },
+        "prev": {
+          "$": "function",
+          "name": "prev"
+        },
+        "reset": {
+          "$": "function",
+          "name": "reset"
+        },
+        "all": {
+          "$": "function",
+          "name": "all"
+        },
+        "set": {
+          "$": "function",
+          "name": "set"
+        },
+        "clear": {
+          "$": "function",
+          "name": "clear"
+        },
+        "resize": {
+          "$": "function",
+          "name": "resize"
+        },
+        "mask": 3
+      }
+    },
+    {
+      "package": "vega-crossfilter",
+      "op": "crossfilter",
+      "instance": 7,
+      "sequence": 1,
+      "params": {
+        "fields": [
+          {
+            "$": "accessor",
+            "fields": [
+              "a"
+            ]
+          },
+          {
+            "$": "accessor",
+            "fields": [
+              "b"
+            ]
+          }
+        ],
+        "query": [
+          [
+            0,
+            4
+          ],
+          [
+            0,
+            4
+          ]
+        ]
+      },
+      "input": {
+        "rem": [
+          {
+            "a": 1,
+            "b": 1,
+            "c": 0,
+            "_index": 0
+          },
+          {
+            "a": 2,
+            "b": 2,
+            "c": 1,
+            "_index": 1
+          }
+        ],
+        "source": [
+          {
+            "a": 4,
+            "b": 4,
+            "c": 2,
+            "_index": 2
+          },
+          {
+            "a": 3,
+            "b": 3,
+            "c": 3,
+            "_index": 3
+          }
+        ]
+      },
+      "output": {
+        "rem": [
+          0,
+          1
+        ],
+        "source": [
+          {
+            "a": 4,
+            "b": 4,
+            "c": 2,
+            "_index": 2
+          },
+          {
+            "a": 3,
+            "b": 3,
+            "c": 3,
+            "_index": 3
+          }
+        ]
+      },
+      "value": {
+        "data": {
+          "$": "function",
+          "name": "data"
+        },
+        "seen": {
+          "$": "function",
+          "name": "seen"
+        },
+        "add": {
+          "$": "function",
+          "name": "add"
+        },
+        "remove": {
+          "$": "function",
+          "name": "remove"
+        },
+        "size": {
+          "$": "function",
+          "name": "size"
+        },
+        "curr": {
+          "$": "function",
+          "name": "curr"
+        },
+        "prev": {
+          "$": "function",
+          "name": "prev"
+        },
+        "reset": {
+          "$": "function",
+          "name": "reset"
+        },
+        "all": {
+          "$": "function",
+          "name": "all"
+        },
+        "set": {
+          "$": "function",
+          "name": "set"
+        },
+        "clear": {
+          "$": "function",
+          "name": "clear"
+        },
+        "resize": {
+          "$": "function",
+          "name": "resize"
+        },
+        "mask": 3
+      }
+    }
+  ]
+}

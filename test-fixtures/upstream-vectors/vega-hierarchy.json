@@ -1,0 +1,487 @@
+{
+  "package": "vega-hierarchy",
+  "vega": "6.3.1",
+  "files": 2,
+  "skipped": [
+    {
+      "file": "/private/tmp/claude-502/-Users-m-gilbiraud-Projects-mgilbir-aster-kotlin/1fb5afa9-cf49-4fee-a520-e3a6efa5bae4/scratchpad/vega-src/packages/vega-hierarchy/test/nest-test.js",
+      "case": "Nest tuples",
+      "reason": "case threw: Cannot read properties of undefined (reading 'parent')"
+    }
+  ],
+  "calls": [
+    {
+      "package": "vega-hierarchy",
+      "op": "nest",
+      "instance": 1,
+      "sequence": 0,
+      "params": {
+        "keys": [
+          {
+            "$": "accessor",
+            "fields": [
+              "job"
+            ]
+          }
+        ]
+      },
+      "input": {
+        "add": [
+          {
+            "id": "A",
+            "job": "Doctor"
+          },
+          {
+            "id": "B",
+            "job": "Lawyer"
+          }
+        ],
+        "source": [
+          {
+            "id": "A",
+            "job": "Doctor"
+          },
+          {
+            "id": "B",
+            "job": "Lawyer"
+          }
+        ]
+      },
+      "output": {
+        "add": [
+          {
+            "id": "A",
+            "job": "Doctor"
+          },
+          {
+            "id": "B",
+            "job": "Lawyer"
+          }
+        ],
+        "source": [
+          {
+            "id": "A",
+            "job": "Doctor"
+          },
+          {
+            "id": "B",
+            "job": "Lawyer"
+          }
+        ]
+      },
+      "value": {
+        "data": {
+          "values": [
+            {
+              "key": "Doctor",
+              "values": [
+                {
+                  "id": "A",
+                  "job": "Doctor"
+                }
+              ]
+            },
+            {
+              "key": "Lawyer",
+              "values": [
+                {
+                  "id": "B",
+                  "job": "Lawyer"
+                }
+              ]
+            }
+          ]
+        },
+        "height": 2,
+        "depth": 0,
+        "parent": null,
+        "children": [
+          {
+            "data": {
+              "key": "Doctor",
+              "values": [
+                {
+                  "id": "A",
+                  "job": "Doctor"
+                }
+              ]
+            },
+            "height": 1,
+            "depth": 1,
+            "parent": {
+              "$": "circular"
+            },
+            "children": [
+              {
+                "data": {
+                  "id": "A",
+                  "job": "Doctor"
+                },
+                "height": 0,
+                "depth": 2,
+                "parent": {
+                  "$": "circular"
+                }
+              }
+            ]
+          },
+          {
+            "data": {
+              "key": "Lawyer",
+              "values": [
+                {
+                  "id": "B",
+                  "job": "Lawyer"
+                }
+              ]
+            },
+            "height": 1,
+            "depth": 1,
+            "parent": {
+              "$": "circular"
+            },
+            "children": [
+              {
+                "data": {
+                  "id": "B",
+                  "job": "Lawyer"
+                },
+                "height": 0,
+                "depth": 2,
+                "parent": {
+                  "$": "circular"
+                }
+              }
+            ]
+          }
+        ],
+        "lookup": {
+          "50848": {
+            "data": {
+              "id": "A",
+              "job": "Doctor"
+            },
+            "height": 0,
+            "depth": 2,
+            "parent": {
+              "data": {
+                "key": "Doctor",
+                "values": [
+                  {
+                    "id": "A",
+                    "job": "Doctor"
+                  }
+                ]
+              },
+              "height": 1,
+              "depth": 1,
+              "parent": {
+                "$": "circular"
+              },
+              "children": [
+                {
+                  "$": "circular"
+                }
+              ]
+            }
+          },
+          "50849": {
+            "data": {
+              "id": "B",
+              "job": "Lawyer"
+            },
+            "height": 0,
+            "depth": 2,
+            "parent": {
+              "data": {
+                "key": "Lawyer",
+                "values": [
+                  {
+                    "id": "B",
+                    "job": "Lawyer"
+                  }
+                ]
+              },
+              "height": 1,
+              "depth": 1,
+              "parent": {
+                "$": "circular"
+              },
+              "children": [
+                {
+                  "$": "circular"
+                }
+              ]
+            }
+          }
+        }
+      }
+    },
+    {
+      "package": "vega-hierarchy",
+      "op": "nest",
+      "instance": 2,
+      "sequence": 0,
+      "params": {
+        "keys": [
+          {
+            "$": "accessor",
+            "fields": [
+              "job"
+            ]
+          }
+        ]
+      },
+      "input": {},
+      "output": {},
+      "value": {
+        "data": {
+          "values": []
+        },
+        "height": 0,
+        "depth": 0,
+        "parent": null,
+        "lookup": {}
+      }
+    },
+    {
+      "package": "vega-hierarchy",
+      "op": "stratify",
+      "instance": 1,
+      "sequence": 0,
+      "params": {
+        "key": {
+          "$": "accessor",
+          "fields": [
+            "id"
+          ]
+        },
+        "parentKey": {
+          "$": "accessor",
+          "fields": [
+            "pid"
+          ]
+        }
+      },
+      "input": {
+        "add": [
+          {
+            "id": "a"
+          },
+          {
+            "id": "b",
+            "pid": "a"
+          },
+          {
+            "id": "c",
+            "pid": "a"
+          },
+          {
+            "id": "d",
+            "pid": "c"
+          }
+        ],
+        "source": [
+          {
+            "id": "a"
+          },
+          {
+            "id": "b",
+            "pid": "a"
+          },
+          {
+            "id": "c",
+            "pid": "a"
+          },
+          {
+            "id": "d",
+            "pid": "c"
+          }
+        ]
+      },
+      "output": {
+        "add": [
+          {
+            "id": "a"
+          },
+          {
+            "id": "b",
+            "pid": "a"
+          },
+          {
+            "id": "c",
+            "pid": "a"
+          },
+          {
+            "id": "d",
+            "pid": "c"
+          }
+        ],
+        "source": [
+          {
+            "id": "a"
+          },
+          {
+            "id": "b",
+            "pid": "a"
+          },
+          {
+            "id": "c",
+            "pid": "a"
+          },
+          {
+            "id": "d",
+            "pid": "c"
+          }
+        ]
+      },
+      "value": {
+        "data": {
+          "id": "a"
+        },
+        "height": 2,
+        "depth": 0,
+        "parent": null,
+        "id": "a",
+        "children": [
+          {
+            "data": {
+              "id": "b",
+              "pid": "a"
+            },
+            "height": 0,
+            "depth": 1,
+            "parent": {
+              "$": "circular"
+            },
+            "id": "b"
+          },
+          {
+            "data": {
+              "id": "c",
+              "pid": "a"
+            },
+            "height": 1,
+            "depth": 1,
+            "parent": {
+              "$": "circular"
+            },
+            "id": "c",
+            "children": [
+              {
+                "data": {
+                  "id": "d",
+                  "pid": "c"
+                },
+                "height": 0,
+                "depth": 2,
+                "parent": {
+                  "$": "circular"
+                },
+                "id": "d"
+              }
+            ]
+          }
+        ],
+        "lookup": {
+          "a": {
+            "$": "circular"
+          },
+          "b": {
+            "data": {
+              "id": "b",
+              "pid": "a"
+            },
+            "height": 0,
+            "depth": 1,
+            "parent": {
+              "$": "circular"
+            },
+            "id": "b"
+          },
+          "c": {
+            "data": {
+              "id": "c",
+              "pid": "a"
+            },
+            "height": 1,
+            "depth": 1,
+            "parent": {
+              "$": "circular"
+            },
+            "id": "c",
+            "children": [
+              {
+                "data": {
+                  "id": "d",
+                  "pid": "c"
+                },
+                "height": 0,
+                "depth": 2,
+                "parent": {
+                  "$": "circular"
+                },
+                "id": "d"
+              }
+            ]
+          },
+          "d": {
+            "data": {
+              "id": "d",
+              "pid": "c"
+            },
+            "height": 0,
+            "depth": 2,
+            "parent": {
+              "data": {
+                "id": "c",
+                "pid": "a"
+              },
+              "height": 1,
+              "depth": 1,
+              "parent": {
+                "$": "circular"
+              },
+              "id": "c",
+              "children": [
+                {
+                  "$": "circular"
+                }
+              ]
+            },
+            "id": "d"
+          }
+        }
+      }
+    },
+    {
+      "package": "vega-hierarchy",
+      "op": "stratify",
+      "instance": 2,
+      "sequence": 0,
+      "params": {
+        "key": {
+          "$": "accessor",
+          "fields": [
+            "id"
+          ]
+        },
+        "parentKey": {
+          "$": "accessor",
+          "fields": [
+            "pid"
+          ]
+        }
+      },
+      "input": {},
+      "output": {},
+      "value": {
+        "data": {},
+        "height": 0,
+        "depth": 0,
+        "parent": null,
+        "lookup": {}
+      }
+    }
+  ]
+}
