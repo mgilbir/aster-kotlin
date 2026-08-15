@@ -247,7 +247,11 @@ class UpstreamTransformVectorsTest {
         )
         .jsonObject["divergences"]!!
         .jsonArray
-        .map { it.jsonObject["signature"]!!.jsonPrimitive.content }
+        .map { it.jsonObject }
+        // Only this replay's entries: the same file also records where the colour and path parsers
+        // differ, and three replays each asserting the whole list would fail on each other's work.
+        .filter { it["kind"]?.jsonPrimitive?.content == "transform" }
+        .map { it["signature"]!!.jsonPrimitive.content }
     assertEquals(
       known.sorted(),
       failures.map { it.lines().first() }.sorted(),

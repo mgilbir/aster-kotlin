@@ -536,6 +536,37 @@ What is not replayed is named: `hsl`, `hcl`, `lab`, `lch`, `cubehelix` and `gray
 this engine does not model as objects — it keeps one representation — so there is nothing to compare
 component by component.
 
+## Two more replays: the path parser and the bin algorithm
+
+**`vega-scenegraph`'s `pathParse`** (20 replayed). Every `shape` mark, custom `symbol` and `path` in a
+specification arrives as an SVG path string, and upstream's corpus is the grammar's traps: implicit
+repeats (`M0,0 1,1 2,2` is a move and two lines), a relative run with no separators (`l.5.5.3.3`),
+`H`/`V` shorthands, a `z` mid-path, two `Z`s in a row, numbers glued together by their signs
+(`M-1-1H1V1`). The two representations differ on purpose — upstream keeps the raw letters, this engine
+resolves them to absolute points — so the adapter applies upstream's own resolution rules to its
+segments and compares the *behaviour* rather than the notation. Everything agrees except one, pinned:
+a path that starts with a **drawing command rather than a move**. Upstream's parser emits lines from
+the origin; this one refuses the string, which is what the SVG grammar requires and what a browser
+does — so upstream disagrees with itself between its canvas and SVG renderers, and refusing is the
+answer that matches what a reader sees in the DOM.
+
+**`vega-statistics`' `bin` and `quantiles`** (13 replayed, all agreeing). The interesting part is what
+the first run *looked* like: four disagreements that were all the adapter's fault, and worth writing
+down because the next adapter will meet the same two shapes.
+
+- `binSettings` here is upstream's `bin` **plus** the realignment its `Bin` *transform* applies on top
+  (`start + ceil((stop - start) / step) * step`), because both belong to the settings a histogram is
+  drawn from. The vector records the bare function, so the comparison applies upstream's own
+  realignment to upstream's own result. Without that it looked like this engine was extending the last
+  bin — it is, and so is upstream, one layer up.
+- One `quantiles` vector passes **objects behind an accessor** rather than numbers. Reading numbers
+  out of it with `mapNotNull` produced an empty list and a NaN answer, which looked exactly like a bug
+  in `quantiles`.
+
+`known-divergences.json` now tags each entry with a `kind` and a `subject`, because three replays read
+it and each must assert only its own: a list asserted whole fails as soon as a second replay adds to
+it.
+
 ## Where the remaining packages stand
 
 Replayed: `d3-time` (366), `d3-array` (252), `d3-color` (34), `vega-time` (281), `vega-transforms`

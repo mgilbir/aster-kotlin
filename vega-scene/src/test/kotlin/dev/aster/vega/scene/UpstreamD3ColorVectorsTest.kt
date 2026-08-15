@@ -122,7 +122,7 @@ class UpstreamD3ColorVectorsTest {
         .jsonObject["divergences"]!!
         .jsonArray
         .map { it.jsonObject }
-        .filter { it["transform"]?.jsonPrimitive?.content == "SceneColor.parse" }
+        .filter { it["subject"]?.jsonPrimitive?.content == "SceneColor.parse" }
         .map { it["signature"]!!.jsonPrimitive.content }
     assertEquals(
       known.sorted(),
