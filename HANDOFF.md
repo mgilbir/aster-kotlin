@@ -329,16 +329,28 @@ Three things came with the swap, all of them upstream behaviour this engine had 
 because it builds a fresh `RegExp` per evaluation, while a `Pattern` here is built once and read per
 row. The stateless form is what keeps a filter's answer independent of how many rows preceded it.
 
-**The blocker.** `ktecma262:0.1.2` is not on Maven Central yet — the namespace and signing key are
-still being set up — so `settings.gradle.kts` has a `mavenLocal()` line and the build needs
-`./gradlew publishToMavenLocal` in a checkout of that repository first. That breaks the rule every
-other coordinate follows and breaks a fresh clone. **Do not merge this branch until 0.1.2 is
-published**, then delete the `mavenLocal()` line.
+**The blocker, and it is now precise.** `ktecma262:0.1.2` *is* on Maven Central — it landed on
+2026-08-15 — but it publishes `common`, `jvm` and `js` variants and **no native ones**, which this core
+needs for `macosArm64`, `iosArm64`, `iosSimulatorArm64` and `linuxX64`. So `settings.gradle.kts` still
+carries a `mavenLocal()` line, fed by `./gradlew publishToMavenLocal` in a checkout of that repository
+with the four targets added.
 
-Its published targets are JVM and JS; this core needs the four native ones too. Adding
-`macosArm64() iosArm64() iosSimulatorArm64() linuxX64()` to its `build.gradle.kts` is the whole change —
-verified by doing it and compiling all four, so the README's "other Kotlin targets need only a
-build-file change" holds.
+That line sits **above** `mavenCentral()` deliberately. Gradle takes the first repository holding the
+coordinate, and when Central gained 0.1.2 it began shadowing the locally published one — same version
+string, fewer variants, native compiles failing with "No matching variant". A published version cannot
+be amended, so what unblocks this is a **new version** carrying the native targets, after which the
+whole block goes away.
+
+Adding `macosArm64() iosArm64() iosSimulatorArm64() linuxX64()` to that project's `build.gradle.kts` is
+the entire change — verified by doing exactly that and compiling all four, so the engine's README claim
+that "other Kotlin targets need only a build-file change" holds as written.
+
+Worth knowing about that repository's release workflow, since it caused a false alarm: it publishes to
+Central and **never creates a GitHub Release**, so `gh release list` showing only v0.1.0 says nothing
+about what is published. Its version comes from `build.gradle.kts` and is *guarded* against the tag
+name, so a tag/version mismatch fails the run loudly rather than silently shipping the wrong number.
+The v0.1.2 tag run did fail — 401 from the staging API — and a later manual dispatch is what published
+it, as a `user_managed` deployment needing a click in the portal.
 
 ## Reported and not yet chased: an arc with an inverted radius
 
