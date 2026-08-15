@@ -2,13 +2,7 @@
   "package": "vega-hierarchy",
   "vega": "6.3.1",
   "files": 2,
-  "skipped": [
-    {
-      "file": "/private/tmp/claude-502/-Users-m-gilbiraud-Projects-mgilbir-aster-kotlin/1fb5afa9-cf49-4fee-a520-e3a6efa5bae4/scratchpad/vega-src/packages/vega-hierarchy/test/nest-test.js",
-      "case": "Nest tuples",
-      "reason": "case threw: Cannot read properties of undefined (reading 'parent')"
-    }
-  ],
+  "skipped": [],
   "calls": [
     {
       "package": "vega-hierarchy",
@@ -156,7 +150,7 @@
           }
         ],
         "lookup": {
-          "50848": {
+          "1": {
             "data": {
               "id": "A",
               "job": "Doctor"
@@ -185,7 +179,131 @@
               ]
             }
           },
-          "50849": {
+          "2": {
+            "data": {
+              "id": "B",
+              "job": "Lawyer"
+            },
+            "height": 0,
+            "depth": 2,
+            "parent": {
+              "data": {
+                "key": "Lawyer",
+                "values": [
+                  {
+                    "id": "B",
+                    "job": "Lawyer"
+                  }
+                ]
+              },
+              "height": 1,
+              "depth": 1,
+              "parent": {
+                "$": "circular"
+              },
+              "children": [
+                {
+                  "$": "circular"
+                }
+              ]
+            }
+          }
+        }
+      }
+    },
+    {
+      "package": "vega-hierarchy",
+      "op": "nest",
+      "instance": 1,
+      "sequence": 1,
+      "params": {
+        "keys": [
+          {
+            "$": "accessor",
+            "fields": [
+              "job"
+            ]
+          }
+        ]
+      },
+      "input": {
+        "rem": [
+          {
+            "id": "A",
+            "job": "Doctor"
+          }
+        ],
+        "source": [
+          {
+            "id": "B",
+            "job": "Lawyer"
+          }
+        ]
+      },
+      "output": {
+        "rem": [
+          {
+            "id": "A",
+            "job": "Doctor"
+          }
+        ],
+        "source": [
+          {
+            "id": "B",
+            "job": "Lawyer"
+          }
+        ]
+      },
+      "value": {
+        "data": {
+          "values": [
+            {
+              "key": "Lawyer",
+              "values": [
+                {
+                  "id": "B",
+                  "job": "Lawyer"
+                }
+              ]
+            }
+          ]
+        },
+        "height": 2,
+        "depth": 0,
+        "parent": null,
+        "children": [
+          {
+            "data": {
+              "key": "Lawyer",
+              "values": [
+                {
+                  "id": "B",
+                  "job": "Lawyer"
+                }
+              ]
+            },
+            "height": 1,
+            "depth": 1,
+            "parent": {
+              "$": "circular"
+            },
+            "children": [
+              {
+                "data": {
+                  "id": "B",
+                  "job": "Lawyer"
+                },
+                "height": 0,
+                "depth": 2,
+                "parent": {
+                  "$": "circular"
+                }
+              }
+            ]
+          }
+        ],
+        "lookup": {
+          "2": {
             "data": {
               "id": "B",
               "job": "Lawyer"

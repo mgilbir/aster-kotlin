@@ -439,6 +439,40 @@ Four things had to be right, and each was learned by getting it wrong:
   field it read, so replaying it as the expression `id` computes something else and looks like a bug
   in `formula`.
 
+## Regenerating the vectors: `scripts/record-upstream-vectors.sh`
+
+One command, and the only thing it needs told is nothing:
+
+```
+./scripts/record-upstream-vectors.sh
+```
+
+It reads the pinned version from the **installed** Vega (`oracle-js/node_modules/vega/package.json`),
+clones that exact tag of the monorepo into `build/vega-upstream` — the tests are not published to npm —
+records every package, and drops any file that recorded nothing rather than leaving an empty one that
+looks like coverage.
+
+**Upgrading Vega is therefore: bump `oracle-js/package.json`, `npm ci`, run this, read the diff.** The
+tag is not written down anywhere else.
+
+Getting that diff to mean something took four fixes, because a checked-in artifact that changes on
+every regeneration is worse than no artifact:
+
+- **One package per process.** Vega numbers every tuple from a module-level counter and those ids
+  reach the data — a `lookup` keys its index by them — so recording two packages together made the
+  second depend on the first.
+- **Paths relative to the checkout**, and this machine's paths scrubbed out of recorded error text.
+- **Deterministic scratch file names.** A timestamp in the name reached the recorded text, because
+  Node names the importer in a resolution failure.
+- **`Math.random` and `Date.now` pinned**, with the same seed and instant as `determinism.js`, so a
+  vector and a fixture reference agree on what "random" means. **Order matters**: the constants are
+  inlined rather than imported from `determinism.js`, because importing that imports *vega*, which
+  captures `Math.random` into its own generator as it loads — pinning afterwards fixed the tests' own
+  calls and left the `sample` transform drawing from the real one. That was 8 vectors that changed on
+  every run.
+
+Two consecutive runs are now byte-identical, which is the property that makes the diff readable.
+
 ## What upstream's own tests found: five real transform bugs
 
 151 of the replayable `vega-transforms` vectors match exactly. **13 do not**, in five transforms, and

@@ -4,36 +4,36 @@
   "files": 17,
   "skipped": [
     {
-      "file": "/private/tmp/claude-502/-Users-m-gilbiraud-Projects-mgilbir-aster-kotlin/1fb5afa9-cf49-4fee-a520-e3a6efa5bae4/scratchpad/vega-src/packages/vega-scenegraph/test/canvas-external-context-test.js",
-      "reason": "threw while running: Cannot find package 'd3-path' imported from /private/tmp/claude-502/-Users-m-gilbiraud-Projects-mgilbir-aster-kotlin/1fb5afa9-cf49-4fee-a520-e3a6efa5bae4/scratchpad/vega-src/packages/vega-scenegraph/index.js"
+      "file": "packages/vega-scenegraph/test/canvas-external-context-test.js",
+      "reason": "threw while running: Cannot find package 'd3-path' imported from /Users/m.gilbiraud/Projects/mgilbir/aster-kotlin/build/vega-upstream/packages/vega-scenegraph/index.js"
     },
     {
-      "file": "/private/tmp/claude-502/-Users-m-gilbiraud-Projects-mgilbir-aster-kotlin/1fb5afa9-cf49-4fee-a520-e3a6efa5bae4/scratchpad/vega-src/packages/vega-scenegraph/test/canvas-handler-test.js",
-      "reason": "threw while running: Cannot find package 'jsdom' imported from /Users/m.gilbiraud/Projects/mgilbir/aster-kotlin/oracle-js/.recorder-scratch/1786796158670-canvas-handler-test.js.mjs"
+      "file": "packages/vega-scenegraph/test/canvas-handler-test.js",
+      "reason": "threw while running: Cannot find package 'jsdom' imported from <recorder>/canvas-handler-test.js.mjs"
     },
     {
-      "file": "/private/tmp/claude-502/-Users-m-gilbiraud-Projects-mgilbir-aster-kotlin/1fb5afa9-cf49-4fee-a520-e3a6efa5bae4/scratchpad/vega-src/packages/vega-scenegraph/test/canvas-renderer-test.js",
-      "reason": "threw while running: Cannot find package 'pngjs' imported from /Users/m.gilbiraud/Projects/mgilbir/aster-kotlin/oracle-js/.recorder-scratch/1786796158683-canvas-renderer-test.js.mjs"
+      "file": "packages/vega-scenegraph/test/canvas-renderer-test.js",
+      "reason": "threw while running: Cannot find package 'pngjs' imported from <recorder>/canvas-renderer-test.js.mjs"
     },
     {
-      "file": "/private/tmp/claude-502/-Users-m-gilbiraud-Projects-mgilbir-aster-kotlin/1fb5afa9-cf49-4fee-a520-e3a6efa5bae4/scratchpad/vega-src/packages/vega-scenegraph/test/point-test.js",
-      "reason": "threw while running: Cannot find module '/Users/m.gilbiraud/Projects/mgilbir/aster-kotlin/oracle-js/src/util/point.js' imported from /Users/m.gilbiraud/Projects/mgilbir/aster-kotlin/oracle-js/.recorder-scratch/1786796158706-point-test.js.mjs"
+      "file": "packages/vega-scenegraph/test/point-test.js",
+      "reason": "threw while running: Cannot find module '<oracle-js>/src/util/point.js' imported from <recorder>/point-test.js.mjs"
     },
     {
-      "file": "/private/tmp/claude-502/-Users-m-gilbiraud-Projects-mgilbir-aster-kotlin/1fb5afa9-cf49-4fee-a520-e3a6efa5bae4/scratchpad/vega-src/packages/vega-scenegraph/test/schema-test.js",
-      "reason": "threw while running: Cannot find package 'ajv' imported from /Users/m.gilbiraud/Projects/mgilbir/aster-kotlin/oracle-js/.recorder-scratch/1786796158709-schema-test.js.mjs"
+      "file": "packages/vega-scenegraph/test/schema-test.js",
+      "reason": "threw while running: Cannot find package 'ajv' imported from <recorder>/schema-test.js.mjs"
     },
     {
-      "file": "/private/tmp/claude-502/-Users-m-gilbiraud-Projects-mgilbir-aster-kotlin/1fb5afa9-cf49-4fee-a520-e3a6efa5bae4/scratchpad/vega-src/packages/vega-scenegraph/test/svg-handler-test.js",
-      "reason": "threw while running: Cannot find package 'jsdom' imported from /Users/m.gilbiraud/Projects/mgilbir/aster-kotlin/oracle-js/.recorder-scratch/1786796158712-svg-handler-test.js.mjs"
+      "file": "packages/vega-scenegraph/test/svg-handler-test.js",
+      "reason": "threw while running: Cannot find package 'jsdom' imported from <recorder>/svg-handler-test.js.mjs"
     },
     {
-      "file": "/private/tmp/claude-502/-Users-m-gilbiraud-Projects-mgilbir-aster-kotlin/1fb5afa9-cf49-4fee-a520-e3a6efa5bae4/scratchpad/vega-src/packages/vega-scenegraph/test/svg-renderer-test.js",
-      "reason": "threw while running: Cannot find package 'jsdom' imported from /Users/m.gilbiraud/Projects/mgilbir/aster-kotlin/oracle-js/.recorder-scratch/1786796158715-svg-renderer-test.js.mjs"
+      "file": "packages/vega-scenegraph/test/svg-renderer-test.js",
+      "reason": "threw while running: Cannot find package 'jsdom' imported from <recorder>/svg-renderer-test.js.mjs"
     },
     {
-      "file": "/private/tmp/claude-502/-Users-m-gilbiraud-Projects-mgilbir-aster-kotlin/1fb5afa9-cf49-4fee-a520-e3a6efa5bae4/scratchpad/vega-src/packages/vega-scenegraph/test/svg-string-renderer-test.js",
-      "reason": "threw while running: Cannot find package 'd3-path' imported from /private/tmp/claude-502/-Users-m-gilbiraud-Projects-mgilbir-aster-kotlin/1fb5afa9-cf49-4fee-a520-e3a6efa5bae4/scratchpad/vega-src/packages/vega-scenegraph/index.js"
+      "file": "packages/vega-scenegraph/test/svg-string-renderer-test.js",
+      "reason": "threw while running: Cannot find package 'd3-path' imported from /Users/m.gilbiraud/Projects/mgilbir/aster-kotlin/build/vega-upstream/packages/vega-scenegraph/index.js"
     }
   ],
   "calls": [

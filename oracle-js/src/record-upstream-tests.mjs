@@ -27,6 +27,32 @@ import {parse} from 'acorn';
 // a Kotlin test running under `TEST_TIME_ZONE`.
 process.env.TZ = process.env.TZ || 'Europe/Amsterdam';
 
+/**
+ * The same pinning `scripts/oracle.sh` applies to a reference run, for the same reason.
+ *
+ * A recorded vector is a checked-in artifact, so regenerating it must produce the same bytes or an
+ * upgrade arrives buried in noise. Upstream's own tests build data with `Math.random` — one `sample`
+ * test moved 3,216 lines between two runs — and read `Date.now`.
+ *
+ * **Order matters here and cost an hour.** The constants are inlined rather than imported from
+ * `determinism.js`, because importing that module imports *vega*, and vega captures `Math.random`
+ * into its own module-level generator as it loads. Overriding afterwards pins the tests' own calls
+ * and leaves the `sample` transform drawing from the real one. Nothing may be imported before these
+ * two lines.
+ *
+ * The values match `determinism.js`, so a vector and a fixture reference agree about what "random"
+ * means: `RandomStream.DEFAULT_SEED` and `Clock.PINNED` on the Kotlin side.
+ */
+const SEED = 42;
+const NOW = 1767225600000;
+let seedState = SEED;
+Math.random = () => {
+  // Upstream's own `randomLCG`, inlined for the same reason the constants are.
+  seedState = (seedState * 1664525 + 1013904223) % 4294967296;
+  return seedState / 4294967296;
+};
+Date.now = () => NOW;
+
 const here = dirname(fileURLToPath(import.meta.url));
 const outputDir = resolve(here, '../../test-fixtures/upstream-vectors');
 
@@ -123,19 +149,22 @@ function recordExports(moduleNamespace, packageName, calls) {
  * that reaches for anything else — an internal `../src/...` path, a fixture on disk — is reported
  * and skipped rather than half-run.
  */
-async function runTestFile(file, packageName, calls, skipped) {
+async function runTestFile(file, packageName, calls, skipped, checkout) {
   const source = readFileSync(file, 'utf8');
+  // Recorded relative to the checkout: an absolute path records whose machine ran the recorder, and
+  // makes a regenerated file differ from the committed one for no reason anyone cares about.
+  const where = file.startsWith(checkout) ? file.slice(checkout.length + 1) : file;
   const namespace = await import(packageName);
   const wrapped = recordExports(namespace, packageName, calls);
   const restoreTransforms = recordTransforms(namespace, packageName, calls);
   globalThis.__vegaRecorded = wrapped;
-  globalThis.__vegaTape = tapeShim(file, skipped);
+  globalThis.__vegaTape = tapeShim(where, skipped);
 
   let rewritten;
   try {
     rewritten = rewriteImports(source, file);
   } catch (error) {
-    skipped.push({file, reason: `could not parse: ${error.message.split('\n')[0]}`});
+    skipped.push({file: where, reason: `could not parse: ${error.message.split('\n')[0]}`});
     return;
   }
   // Written to a real file inside `oracle-js` rather than imported from a `data:` URL. A data URL
@@ -144,12 +173,15 @@ async function runTestFile(file, packageName, calls, skipped) {
   // `oracle-js/node_modules`, which is the installed 6.3.1 the whole repository compares against.
   const scratch = join(here, '..', '.recorder-scratch');
   mkdirSync(scratch, {recursive: true});
-  const temporary = join(scratch, `${Date.now()}-${basename(file)}.mjs`);
+  // Named after the test file and nothing else. A timestamp here reached the *recorded* text —
+  // Node names the importer in a resolution failure — so two runs disagreed on a file that had not
+  // changed. One package per process means no collision.
+  const temporary = join(scratch, `${basename(file)}.mjs`);
   writeFileSync(temporary, rewritten);
   try {
     await import(pathToFileURL(temporary).href);
   } catch (error) {
-    skipped.push({file, reason: `threw while running: ${error.message.split('\n')[0]}`});
+    skipped.push({file: where, reason: `threw while running: ${scrub(error.message.split('\n')[0], scratch)}`});
   } finally {
     rmSync(temporary, {force: true});
     restoreTransforms();
@@ -326,6 +358,21 @@ function encodeParams(params) {
   return out;
 }
 
+/**
+ * Replaces this machine's paths in a recorded message.
+ *
+ * A failure message names the importing file, and an absolute path records where somebody's checkout
+ * lives — which makes a regenerated vector file differ from the committed one on another machine, for
+ * no change in behaviour.
+ */
+function scrub(message, scratch) {
+  return message
+    .split(`${scratch}/`)
+    .join('<recorder>/')
+    .split(`${resolve(here, '..')}/`)
+    .join('<oracle-js>/');
+}
+
 /** Enough of `tape` to run a test body: assertions are accepted and ignored. */
 function tapeShim(file, skipped) {
   const noop = () => {};
@@ -346,7 +393,16 @@ function tapeShim(file, skipped) {
   return run;
 }
 
+// One package per process, and the script that drives this enforces it. Vega numbers every tuple it
+// creates from a **module-level counter**, and those ids reach the data — a `lookup` transform keys
+// its index by them. Recording two packages in one process therefore makes the second one's vectors
+// depend on how many tuples the first one built, so a regenerated file differs from the committed one
+// with no change in behaviour. A fresh process starts the counter at zero.
 const [, , checkout, ...packages] = process.argv;
+if (packages.length > 1) {
+  console.error('record one package per process: tuple ids are a module-level counter');
+  process.exit(2);
+}
 if (!checkout || packages.length === 0) {
   console.error('usage: node src/record-upstream-tests.mjs <vega-checkout> <package>...');
   process.exit(2);
@@ -363,7 +419,7 @@ for (const packageName of packages) {
   const skipped = [];
   const files = readdirSync(testDir).filter(f => f.endsWith('-test.js')).sort();
   for (const file of files) {
-    await runTestFile(join(testDir, file), packageName, calls, skipped);
+    await runTestFile(join(testDir, file), packageName, calls, skipped, resolve(checkout));
   }
   // Identical calls are recorded once: a test that calls `bin` with the same parameters in three
   // assertions is one vector, and a duplicate proves nothing the first did not.
