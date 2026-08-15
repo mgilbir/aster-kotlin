@@ -514,6 +514,48 @@ same solution applies: record the chain per object and replay it in order. `d3-f
 at all yet (24 files, all skipped) and is worth a look, because it is what `Decimals` and the
 `format` expression implement.
 
+## Replaying d3-color: the parser is a **superset**, deliberately
+
+`UpstreamD3ColorVectorsTest` replays 34 of d3-color's `color()` vectors against `SceneColor.parse`.
+Nineteen of them expect **null** — a malformed colour is half of d3's corpus and the half a
+hand-written test skips, because rejecting one matters as much as parsing one: the alternative is a
+mark painted an arbitrary colour rather than left alone.
+
+Two things came out of it, neither a bug in the parser:
+
+- **Units.** `SceneColor` keeps channels in 0..1 and d3 keeps them in 0..255, so the comparison scales
+  rather than pretending they agree.
+- **This parser accepts a superset.** d3's regular expressions require integers, so it rejects
+  `rgb(120.5,30,50)`, a trailing `rgb(120.,...)` and an alpha of `1.` — all of which a *browser*
+  accepts. That is the right rule for **rendering**, where a `fill` goes to a renderer rather than to
+  d3, and the wrong one for **`luminance()` and `contrast()`**, which are d3-color calls upstream and
+  would answer NaN for those strings. Thirteen signatures are pinned in `known-divergences.json` so a
+  further loosening has to be a decision rather than an accident.
+
+What is not replayed is named: `hsl`, `hcl`, `lab`, `lch`, `cubehelix` and `gray` are colour *spaces*
+this engine does not model as objects — it keeps one representation — so there is nothing to compare
+component by component.
+
+## Where the remaining packages stand
+
+Replayed: `d3-time` (366), `d3-array` (252), `d3-color` (34), `vega-time` (281), `vega-transforms`
+(151). The rest, with what each would need:
+
+- **`vega-statistics` (112)** — `bin`, `quartiles`, `quantiles`, `dotbin` are plain functions and map
+  directly; the `regression*` family passes an **accessor** and returns a `predict` function, so only
+  its coefficients are comparable.
+- **`vega-scenegraph` (190)** — `pathParse`, `pathRender` and `boundStroke` land on `PathData` and the
+  bounds code. The most valuable of the remainder.
+- **`d3-interpolate` (253)** — the interpolators behind every continuous colour scale.
+- **`vega-expression` (149)** — `parseExpression` returns an **AST**, so replaying it means comparing
+  tree shapes rather than values; the existing `ExpressionReferenceTest` compares *evaluated* results,
+  which is the more useful half.
+- **`vega-scale` (34)** — `validTicks(scale, ticks, count)` takes a **scale function** as its first
+  argument, which a vector cannot hold. Only the identity-scale calls are replayable as written.
+- **`d3-shape` (31), `d3-scale` (55), `d3-hierarchy` (1)** — builder-shaped, so a single call is not a
+  vector; the state is the input. Same fix as the transform seam: record the chain per object with an
+  instance stamp and replay it in order.
+
 ## Replaying d3-array rewrote the tick algorithm, and found three bugs
 
 `UpstreamD3ArrayVectorsTest` replays 252 of d3-array's `ticks`, `tickIncrement`, `tickStep` and `nice`

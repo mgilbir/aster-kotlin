@@ -71,6 +71,71 @@
       "signature": "window params={\"ops\":[\"rank\",\"dense_rank\"],\"type\":\"window\"}",
       "transform": "window",
       "note": "Peer rows \u2014 rows tied on the sort key \u2014 are not handled. `rank`, `dense_rank` and `percent_rank` are computed as if every row were unique, and with `ignorePeers: false` an aggregate must cover the whole peer group."
+    },
+    {
+      "signature": "color(\"rgb(120.5,30,50)\")",
+      "transform": "SceneColor.parse",
+      "note": "This engine's CSS colour parser accepts a **superset** of what d3-color accepts: d3's regular expressions require integers where these strings have `120.5`, a trailing `120.`, or an alpha of `1.`, and a browser accepts all of them. That is the right rule for *rendering* \u2014 a mark's `fill` goes to a renderer, not to d3 \u2014 and the wrong one for `luminance()` and `contrast()`, which are d3-color calls upstream and would answer NaN for these. Narrow, deliberate, and pinned here so a further loosening has to be a decision."
+    },
+    {
+      "signature": "color(\"rgb(120.,30,50)\")",
+      "transform": "SceneColor.parse",
+      "note": "This engine's CSS colour parser accepts a **superset** of what d3-color accepts: d3's regular expressions require integers where these strings have `120.5`, a trailing `120.`, or an alpha of `1.`, and a browser accepts all of them. That is the right rule for *rendering* \u2014 a mark's `fill` goes to a renderer, not to d3 \u2014 and the wrong one for `luminance()` and `contrast()`, which are d3-color calls upstream and would answer NaN for these. Narrow, deliberate, and pinned here so a further loosening has to be a decision."
+    },
+    {
+      "signature": "color(\"rgb(120.%,30%,50%)\")",
+      "transform": "SceneColor.parse",
+      "note": "This engine's CSS colour parser accepts a **superset** of what d3-color accepts: d3's regular expressions require integers where these strings have `120.5`, a trailing `120.`, or an alpha of `1.`, and a browser accepts all of them. That is the right rule for *rendering* \u2014 a mark's `fill` goes to a renderer, not to d3 \u2014 and the wrong one for `luminance()` and `contrast()`, which are d3-color calls upstream and would answer NaN for these. Narrow, deliberate, and pinned here so a further loosening has to be a decision."
+    },
+    {
+      "signature": "color(\"rgba(120,30,50,1.)\")",
+      "transform": "SceneColor.parse",
+      "note": "This engine's CSS colour parser accepts a **superset** of what d3-color accepts: d3's regular expressions require integers where these strings have `120.5`, a trailing `120.`, or an alpha of `1.`, and a browser accepts all of them. That is the right rule for *rendering* \u2014 a mark's `fill` goes to a renderer, not to d3 \u2014 and the wrong one for `luminance()` and `contrast()`, which are d3-color calls upstream and would answer NaN for these. Narrow, deliberate, and pinned here so a further loosening has to be a decision."
+    },
+    {
+      "signature": "color(\"rgba(12%,30%,50%,1.)\")",
+      "transform": "SceneColor.parse",
+      "note": "This engine's CSS colour parser accepts a **superset** of what d3-color accepts: d3's regular expressions require integers where these strings have `120.5`, a trailing `120.`, or an alpha of `1.`, and a browser accepts all of them. That is the right rule for *rendering* \u2014 a mark's `fill` goes to a renderer, not to d3 \u2014 and the wrong one for `luminance()` and `contrast()`, which are d3-color calls upstream and would answer NaN for these. Narrow, deliberate, and pinned here so a further loosening has to be a decision."
+    },
+    {
+      "signature": "color(\"hsla(60,100%,20%,1.)\")",
+      "transform": "SceneColor.parse",
+      "note": "This engine's CSS colour parser accepts a **superset** of what d3-color accepts: d3's regular expressions require integers where these strings have `120.5`, a trailing `120.`, or an alpha of `1.`, and a browser accepts all of them. That is the right rule for *rendering* \u2014 a mark's `fill` goes to a renderer, not to d3 \u2014 and the wrong one for `luminance()` and `contrast()`, which are d3-color calls upstream and would answer NaN for these. Narrow, deliberate, and pinned here so a further loosening has to be a decision."
+    },
+    {
+      "signature": "color(\"rgba(0,0,0,0)\")",
+      "transform": "SceneColor.parse",
+      "note": "This engine's CSS colour parser accepts a **superset** of what d3-color accepts: d3's regular expressions require integers where these strings have `120.5`, a trailing `120.`, or an alpha of `1.`, and a browser accepts all of them. That is the right rule for *rendering* \u2014 a mark's `fill` goes to a renderer, not to d3 \u2014 and the wrong one for `luminance()` and `contrast()`, which are d3-color calls upstream and would answer NaN for these. Narrow, deliberate, and pinned here so a further loosening has to be a decision."
+    },
+    {
+      "signature": "color(\"rgb (120,30,50)\")",
+      "transform": "SceneColor.parse",
+      "note": "This engine's CSS colour parser accepts a **superset** of what d3-color accepts: d3's regular expressions require integers where these strings have `120.5`, a trailing `120.`, or an alpha of `1.`, and a browser accepts all of them. That is the right rule for *rendering* \u2014 a mark's `fill` goes to a renderer, not to d3 \u2014 and the wrong one for `luminance()` and `contrast()`, which are d3-color calls upstream and would answer NaN for these. Narrow, deliberate, and pinned here so a further loosening has to be a decision."
+    },
+    {
+      "signature": "color(\"rgb (12%,30%,50%)\")",
+      "transform": "SceneColor.parse",
+      "note": "This engine's CSS colour parser accepts a **superset** of what d3-color accepts: d3's regular expressions require integers where these strings have `120.5`, a trailing `120.`, or an alpha of `1.`, and a browser accepts all of them. That is the right rule for *rendering* \u2014 a mark's `fill` goes to a renderer, not to d3 \u2014 and the wrong one for `luminance()` and `contrast()`, which are d3-color calls upstream and would answer NaN for these. Narrow, deliberate, and pinned here so a further loosening has to be a decision."
+    },
+    {
+      "signature": "color(\"hsl (120,30%,50%)\")",
+      "transform": "SceneColor.parse",
+      "note": "This engine's CSS colour parser accepts a **superset** of what d3-color accepts: d3's regular expressions require integers where these strings have `120.5`, a trailing `120.`, or an alpha of `1.`, and a browser accepts all of them. That is the right rule for *rendering* \u2014 a mark's `fill` goes to a renderer, not to d3 \u2014 and the wrong one for `luminance()` and `contrast()`, which are d3-color calls upstream and would answer NaN for these. Narrow, deliberate, and pinned here so a further loosening has to be a decision."
+    },
+    {
+      "signature": "color(\"rgba (120,30,50,1)\")",
+      "transform": "SceneColor.parse",
+      "note": "This engine's CSS colour parser accepts a **superset** of what d3-color accepts: d3's regular expressions require integers where these strings have `120.5`, a trailing `120.`, or an alpha of `1.`, and a browser accepts all of them. That is the right rule for *rendering* \u2014 a mark's `fill` goes to a renderer, not to d3 \u2014 and the wrong one for `luminance()` and `contrast()`, which are d3-color calls upstream and would answer NaN for these. Narrow, deliberate, and pinned here so a further loosening has to be a decision."
+    },
+    {
+      "signature": "color(\"rgba (12%,30%,50%,1)\")",
+      "transform": "SceneColor.parse",
+      "note": "This engine's CSS colour parser accepts a **superset** of what d3-color accepts: d3's regular expressions require integers where these strings have `120.5`, a trailing `120.`, or an alpha of `1.`, and a browser accepts all of them. That is the right rule for *rendering* \u2014 a mark's `fill` goes to a renderer, not to d3 \u2014 and the wrong one for `luminance()` and `contrast()`, which are d3-color calls upstream and would answer NaN for these. Narrow, deliberate, and pinned here so a further loosening has to be a decision."
+    },
+    {
+      "signature": "color(\"hsla (120,30%,50%,1)\")",
+      "transform": "SceneColor.parse",
+      "note": "This engine's CSS colour parser accepts a **superset** of what d3-color accepts: d3's regular expressions require integers where these strings have `120.5`, a trailing `120.`, or an alpha of `1.`, and a browser accepts all of them. That is the right rule for *rendering* \u2014 a mark's `fill` goes to a renderer, not to d3 \u2014 and the wrong one for `luminance()` and `contrast()`, which are d3-color calls upstream and would answer NaN for these. Narrow, deliberate, and pinned here so a further loosening has to be a decision."
     }
   ]
 }
