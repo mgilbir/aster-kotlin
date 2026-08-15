@@ -697,7 +697,7 @@ no data is needed to compare two compilers. So every one of them was compiled by
 by this one, and the outputs compared property by property. That is a *measurement*, not a gate: the
 examples are not fixtures here, and nothing about them is checked in.
 
-**124 of 627 matched exactly** at the start, and **595** do now.
+**124 of 627 matched exactly** at the start, and **596** do now.
 
 The value is the *ranking*. The first sweep clustered by root cause, and the three most damaging
 causes were fixed straight away — chosen for what they do to the *picture* rather than for
@@ -712,13 +712,13 @@ frequency:
   where this compiler used `step - 2`, making it nearly four times too wide. `getBandSize` asks the
   scale's kind first and reaches `discreteBandSize` only where the domain is discrete.
 
-The sweep has been the working list ever since, and the 32 that still differ cluster like this:
+The sweep has been the working list ever since, and the 31 that still differ cluster like this:
 
 | Files | Cause |
 | --- | --- |
 | 21 | geographic: projections, `topojson`, `geoshape` — another worker's ground |
 | 5 | the rest of the **facet data flow**: what is left is a chart whose cells are read by a **selection**, where the brush's own datasets have to be cut per cell as well |
-| 3 | one-offs, each its own rule — a facet inside a concatenation, a trellis of selections, a bucketed month's label |
+| 2 | one-offs, each its own rule — a facet inside a concatenation, and a trellis of selections needing a voronoi and an input binding |
 | 2 | `time` channel animations, set aside |
 | 3 | one-offs, each its own rule |
 
@@ -4397,6 +4397,19 @@ A last one, off the same reading: `toFieldDefBase` keeps a field's bucketing, it
 aggregate, and **not its type**. Two layers over one column, one calling it ordinal and the other
 saying nothing, are the same field to a title; keying the title by the type as well titled the axis
 "age, age".
+
+### Only what is drawn between two edges needs to know where they are
+
+A column that arrives **already bucketed** carries its near edge and nothing else, so the far one is
+computed — and the two interpolated edges beside it, where a `bandPosition` moves the rect within
+its bucket. "For binned time unit, only produce end if the mark is a rect-based mark, which needs
+*range*": a label drawn beside such a rect is placed at a single position and needs neither.
+
+Computing them for it as well had a second effect, and it was the visible one. The two layers' steps
+were then identical, so they folded into one node above the fork — which put them in the table the
+*parent* derived rather than in each member's own, and every dataset after that was a dataset the
+chart did not have. The domain followed the same rule: the offsetted columns are named only where
+they are computed, `rectBandPosition` being set for a rect-based mark alone.
 
 ### A bucketing cannot climb above the step that computes its column
 

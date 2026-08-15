@@ -525,6 +525,15 @@ internal class DataPipeline(
     )
   }
 
+  private fun rectBased(): Boolean = view.spec.mark in RECT_BASED_MARKS
+
+  /**
+   * `getBandPosition`, as far as a bucketed column needs it: the definition's, then the theme's.
+   */
+  private fun bandPositionOf(def: ChannelDef): Double? =
+    def.raw.number("bandPosition")
+      ?: view.config.markConfig(view.spec.mark).number("timeUnitBandPosition")
+
   private fun binnedTimeUnitNode(): PassThroughNode? {
     val formulas =
       view.spec.encoding.values.flatMap { def ->
@@ -536,6 +545,14 @@ internal class DataPipeline(
           def.field?.let { Fields.splitAccessPath(it).joinToString(".") }
             ?: return@flatMap emptyList()
         val part = Fields.timeUnitParts(timeUnit).lastOrNull() ?: return@flatMap emptyList()
+        // "For binned time unit, only produce end if the mark is a rect-based mark, which needs
+        // *range*." A column that arrived bucketed already has its near edge; the far one is only
+        // wanted where something is drawn *between* the two — a rect, or a mark placed anywhere in
+        // the bucket but its middle. A label beside such a rect needs neither, and computing them
+        // for it as well folded the two layers' steps into the table above them.
+        if (!rectBased() && bandPositionOf(def).let { it == null || it == 0.0 }) {
+          return@flatMap emptyList()
+        }
         // A **universal** bucket is stepped in universal time: `utcOffset`, not `timeOffset`, or
         // the far edge lands an hour out wherever the viewer keeps daylight saving.
         val offset = if (timeUnit.contains("utc")) "utcOffset" else "timeOffset"

@@ -387,6 +387,10 @@ internal fun UnitView.offsettedRectPosition(def: ChannelDef, channel: String): D
   // runs on both branches of `timeunit.ts`, and a `bandPosition` moves the rect within its bucket
   // whether this compiler cut it or the data came that way.
   if (def.timeUnit == null) return null
+  // `rectBandPosition` is set only for a **rect-based** mark: it is what is drawn *between* two
+  // interpolated edges, and a label beside one is placed at a single position. The columns are not
+  // computed for anything else, so nothing else may name them either.
+  if (spec.mark !in RECT_BASED_MARKS) return null
   if (secondaryChannel(channel)?.let { spec.encoding[it] } != null) return null
   val stated =
     def.raw.number("bandPosition")
@@ -394,6 +398,9 @@ internal fun UnitView.offsettedRectPosition(def: ChannelDef, channel: String): D
       ?: return null
   return stated.takeIf { it != 0.5 }
 }
+
+/** `isRectBasedMark`: the marks drawn *between* two positions rather than at one. */
+internal val RECT_BASED_MARKS = setOf("rect", "bar", "image", "arc", "tick")
 
 /**
  * The aggregates that compare their input rather than accumulating it.
