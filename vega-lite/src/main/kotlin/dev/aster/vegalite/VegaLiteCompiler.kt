@@ -2015,9 +2015,26 @@ private class Compilation(
       facet
         ?.takeIf { views.size > 1 || views.any { view -> DataPipeline.needsRawTable(view) } }
         ?.let { FacetNode(it.named("facet")) }
+    var lookupCount = 0
     val register: (VegaValue) -> String = { table ->
       val existing = order.indexOf(table)
-      "source_${if (existing >= 0) existing else order.size.also { order += table }}"
+      val name = "source_${if (existing >= 0) existing else order.size.also { order += table }}"
+      // `LookupNode.make`: the joined table is given a **named point** of its own on the source it
+      // comes from. That is what makes the source a fork — the table is written out bare and
+      // whatever else reads it derives from it — so a chart that both joins against a table and
+      // draws from it does not join against the drawing's own steps.
+      // Only where the chart **also draws from** that table. Then the source is a fork — the table
+      // written out bare and the drawing's own steps deriving from it — so the join is against the
+      // table rather than against what the drawing made of it. A table read for the join alone is
+      // already bare and needs no point of its own.
+      if (views.none { it.spec.data == table }) name
+      else {
+        val key = "lookup_${lookupCount++}"
+        val output = OutputNode(key)
+        roots.getOrPut(table) { SourceNode(table) }.then(output)
+        lookupOutputs[key] = output
+        key
+      }
     }
     val outputs = views.map { view ->
       val data = view.spec.data!!

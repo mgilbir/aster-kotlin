@@ -405,6 +405,9 @@ internal object Marks {
       if (view.selections.isNotEmpty()) {
         val own =
           view.selections.any { it.owner == null || it.owner === view } ||
+            // A **geoshape** is always reachable: what it draws is a place, and a click on a map is
+            // a click on a country whether or not that layer declared the selection.
+            view.spec.mark == "geoshape" ||
             view.spec.encoding.containsKey("tooltip") ||
             view.markDef.raw.fields.containsKey("tooltip")
         put("interactive", VegaValue.Bool(own))
@@ -533,7 +536,12 @@ internal object Marks {
         }
         "rule" -> {
           val orient = view.markDef.orient
-          if (view.spec.encoding["x"] != null || view.spec.encoding["y"] != null) {
+          // A rule between two **places** has neither `x` nor `y`: the projection wrote both ends,
+          // and the geographic channels are what say there is a line to draw at all.
+          if (
+            view.spec.encoding.keys.any { it in setOf("x", "y") } ||
+              view.spec.encoding.keys.any { it in Channels.GEO_POSITION_CHANNELS }
+          ) {
             putAll(
               pointOrRangePosition(
                 view,
@@ -1383,6 +1391,12 @@ internal object Marks {
     ) {
       return obj {
         put(vgChannel ?: channel, obj { put("field", view.prefixed(channel)) })
+        // The **second** pair is a second place, and a rule between two places spans them: where
+        // `longitude2` or `latitude2` is encoded, the far end is the column the second `geopoint`
+        // wrote — `pointPosition2OrSize`'s geographic branch.
+        if (view.spec.encoding["longitude2"] != null || view.spec.encoding["latitude2"] != null) {
+          put("${channel}2", obj { put("field", view.prefixed("${channel}2")) })
+        }
       }
     }
     val ref = positionRef(view, channel, defaultPos) ?: return VegaValue.EmptyObject
@@ -1655,6 +1669,14 @@ internal object Marks {
     defaultPos2: String,
   ): VegaValue.Obj {
     val channel2 = secondaryChannel(channel)!!
+    // A span between two **places** is both ends at once: `pointPosition` answered with the two
+    // columns the projection wrote, and there is no second position for a scale to add to them.
+    if (
+      view.spec.encoding[channel] == null &&
+        view.spec.encoding.keys.any { it in Channels.GEO_POSITION_CHANNELS }
+    ) {
+      return pointPosition(view, channel, defaultPos, null)
+    }
     val pos2 = position2Ref(view, channel, channel2, defaultPos2)
     // With no second position but a **size** the mark states outright, the extent is that size and
     // the position becomes an *aligned* one: `vgAlignedPositionChannel` centres it by default, so

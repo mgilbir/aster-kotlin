@@ -697,7 +697,7 @@ no data is needed to compare two compilers. So every one of them was compiled by
 by this one, and the outputs compared property by property. That is a *measurement*, not a gate: the
 examples are not fixtures here, and nothing about them is checked in.
 
-**124 of 627 matched exactly** at the start, and **616** do now.
+**124 of 627 matched exactly** at the start, and **619** do now.
 
 The value is the *ranking*. The first sweep clustered by root cause, and the three most damaging
 causes were fixed straight away — chosen for what they do to the *picture* rather than for
@@ -712,11 +712,11 @@ frequency:
   where this compiler used `step - 2`, making it nearly four times too wide. `getBandSize` asks the
   scale's kind first and reaches `discreteBandSize` only where the domain is discrete.
 
-The sweep has been the working list ever since, and the 11 that still differ cluster like this:
+The sweep has been the working list ever since, and the 8 that still differ cluster like this:
 
 | Files | Cause |
 | --- | --- |
-| 8 | geographic: what is left is `topojson`, the second coordinate pair, and a projection inside a repetition or a facet |
+| 5 | geographic: what is left is a projection inside a **repetition** or a **facet**, and the two interactive maps that brush one |
 | 5 | the rest of the **facet data flow**: what is left is a chart whose cells are read by a **selection**, where the brush's own datasets have to be cut per cell as well |
 | 0 | nothing outside the geographic work; the one refusal left of my own is a facet inside a **facet**, described below |
 
@@ -4398,6 +4398,28 @@ aggregate, and **not its type**. Two layers over one column, one calling it ordi
 saying nothing, are the same field to a title; keying the title by the type as well titled the axis
 "age, age".
 
+### A line between two places, and the table it was joined from
+
+Four rules, and the last of the geographic chart shapes that are not compositions.
+
+A **second coordinate pair** is a second place: `longitude2` and `latitude2` are projected exactly
+as the first pair is, into a second `geopoint` and a second pair of columns, and a mark that spans
+them reads both ends from what the projection wrote rather than adding a scaled one. A rule between
+two places has neither `x` nor `y` at all — the geographic channels are what say there is a line to
+draw. A longitude is a **number** whichever end of a line it is, so all four channels default to
+quantitative; read as names, the far end was spoken as text instead of formatted as a coordinate.
+And the two longitudes are named together and then the two latitudes, which is the order a chart's
+spoken description gives its places in.
+
+A table a chart **both joins against and draws from** is given a named point of its own on the
+source — `LookupNode.make` — which makes that source a fork: the table is written out bare and the
+drawing's own steps derive from it, so the join is against the table rather than against what the
+drawing made of it. Only where the chart draws from it: a table read for the join alone is already
+bare and needs no point.
+
+A **geoshape** is always reachable. What it draws is a place, and a click on a map is a click on a
+country whether or not that layer is the one that declared the selection.
+
 ### An outline is drawn by the projection, not placed by two scales
 
 The `geoshape` mark, and the two data sources that make geography out of nothing.
@@ -4449,10 +4471,13 @@ One rule came with them that is not geographic at all: `config.aria: false` take
 out of the accessibility tree, so no mark carries a role description or a spoken summary and every
 guide says `aria: false` on itself.
 
-The compiled specifications match upstream's byte for byte. What this runtime does not yet do is
-**fit a projection** the way d3 does — `albersUsa` is three projections in a coat, and fitting one to
-an extent is arithmetic of its own — so `geo-points` sits in `PROJECTION_PENDING` with its reason
-beside it, checked against upstream's compiler and not yet against upstream's drawing.
+The compiled specifications match upstream's byte for byte. Two things this runtime does not yet do
+keep the geographic fixtures in `PROJECTION_PENDING`, each with its reason beside it. It cannot
+**fit** a projection as d3 does — a projection given an extent to fill has to solve for its own scale
+and translate, and `albersUsa` is three projections in a coat. And a projection **fitted to the
+tables that read it back** through `geopoint` is a cycle to a strict ordering, where Vega re-fits and
+re-pulses. Both are the drawing's business, not the compiling's: `geo-shapes`, whose projection is
+placed by hand and needs neither, is checked end to end and draws correctly.
 
 ### What a facet inside a facet would take
 

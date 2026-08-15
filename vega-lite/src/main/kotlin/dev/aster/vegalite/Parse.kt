@@ -451,7 +451,9 @@ internal class Parse(
     val datum = def.fields["datum"]
     if (field == null && aggregate == null && datum == null) return null
     return when {
-      channel in setOf("latitude", "longitude") -> MeasureType.QUANTITATIVE
+      // The **second** place is a place too: a longitude is a number whichever end of a line it
+      // is, and read as a name it is spoken as text rather than formatted as a coordinate.
+      channel in Channels.GEO_POSITION_CHANNELS -> MeasureType.QUANTITATIVE
       channel in setOf("shape", "row", "column", "facet", "strokeDash") -> MeasureType.NOMINAL
       channel == "order" -> MeasureType.ORDINAL
       def.fields["sort"] is VegaValue.Arr -> MeasureType.ORDINAL

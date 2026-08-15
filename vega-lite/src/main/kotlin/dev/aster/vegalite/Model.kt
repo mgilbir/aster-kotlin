@@ -235,9 +235,11 @@ internal object Channels {
       "theta2",
       "radius",
       "radius2",
+      // `GEO_POSIITON_CHANNEL_INDEX`: the two longitudes together and then the two latitudes,
+      // which is the order a chart's spoken description names its places in.
       "longitude",
-      "latitude",
       "longitude2",
+      "latitude",
       "latitude2",
       "xOffset",
       "yOffset",
