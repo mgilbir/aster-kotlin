@@ -370,13 +370,35 @@ lands, point `Pattern` at it and the divergence closes on every target at once. 
 first four vectors to write. Until then this is a **known**, measured divergence rather than an
 unexamined one — and note that no test in this repository runs on a native target, so Kotlin/Native's
 regex behaviour is unmeasured even for our own internal patterns.
-## Reported and not yet chased: an arc with an inverted radius
-The owner reports that this engine draws **nothing** for an arc whose `outerRadius` is smaller than its
-`innerRadius`, where upstream draws one. Not yet reproduced or fixed — written down here so it is not
-lost. The route is the usual one: a fixture with the two radii swapped, which should fail, then find out
-what upstream's arc path generator does when the radii are the wrong way round (d3-shape swaps them
-rather than refusing) and match it. Worth checking the same question for a **negative** radius while
-there.
+## The inverted-radius arc: it was a guard, not the geometry
+
+Reported as "an arc whose `outerRadius` is smaller than its `innerRadius` draws nothing here and
+something upstream", and true — but not where it looked. `ArcPath` has always carried d3's rule
+(`arc.js:101`, *ensure that the outer radius is always larger than the inner radius*, which **swaps**
+rather than rejects). `MarkEncoder.arc` never let it see the values: it opened with
+
+```kotlin
+if (outerRadius <= 0.0 || startAngle == endAngle) return null
+```
+
+Three of upstream's five items died there, and `arc-radii-inverted` pins all five:
+
+| written | upstream draws |
+| --- | --- |
+| inner 20, outer 55 | the ring |
+| inner 55, outer 20 | **the same ring** — the radii are swapped |
+| inner 40, no outer | a solid **wedge** of radius 40: the defaulted zero outer radius swaps to the inside |
+| inner 0, outer −40 | a point, `M0,0Z` — an item, with nothing drawn |
+| angle of zero | a line from outer to inner, `M0,-45L0,-15Z` |
+
+The third is the one a specification writes by accident, and it is the difference between a donut and
+an empty canvas. The last two matter for a different reason: **upstream still emits the item**. Dropping
+it is not a smaller error than drawing it wrongly — every later item shifts up an index and the mark's
+container disagrees with upstream's, which is exactly what `MarkContainerTest` exists to catch.
+
+The lesson is the one this repository keeps relearning: when a shape is wrong, check whether the
+geometry is even being called. The port was faithful; a validity check written above it was not.
+
 ## A portability seam was hiding a correctness bug
 The core had one JVM-only file, `PlatformDecimals`, and it explained itself well enough that nobody
 questioned it for six milestones: rounding a double at N places must round its **exact** binary value,

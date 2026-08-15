@@ -499,7 +499,16 @@ public class MarkEncoder(
     val endAngle = number(channels["endAngle"], datum) ?: 0.0
     val innerRadius = number(channels["innerRadius"], datum) ?: 0.0
     val outerRadius = number(channels["outerRadius"], datum) ?: 0.0
-    if (outerRadius <= 0.0 || startAngle == endAngle) return null
+    // No guard on the radii or the angle. There used to be one — `outerRadius <= 0 ||
+    // startAngle == endAngle` returned null — and it dropped three arcs upstream draws. d3 refuses
+    // nothing here: it **swaps** the radii so an arc written inside-out is the ring an arc written
+    // the right way round would be, which also means an arc given only an `innerRadius` becomes a
+    // solid wedge of that size once its defaulted zero outer radius is swapped to the inside. Where
+    // the shape really does collapse — a non-positive outer radius, an angle of nothing — upstream
+    // still emits the item, with a path that is a point or a line. Dropping the item instead is not
+    // a smaller difference than drawing it wrongly: every later item shifts up an index, and the
+    // mark's own container disagrees with upstream's. `ArcPath` has always had d3's swap; this
+    // function never let it see the values.
 
     val config = MarkConfig(spec)
     val style = style(channels, datum, spec)

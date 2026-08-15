@@ -144,6 +144,22 @@
   "hidden": false
  },
  {
+  "fixture": "arc-radii-inverted",
+  "kind": "group",
+  "role": "graphics-object",
+  "roleDescription": "group mark container",
+  "label": null,
+  "hidden": false
+ },
+ {
+  "fixture": "arc-radii-inverted",
+  "kind": "arc",
+  "role": "graphics-symbol",
+  "roleDescription": "arc mark container",
+  "label": null,
+  "hidden": false
+ },
+ {
   "fixture": "area-gaps",
   "kind": "group",
   "role": "graphics-object",
