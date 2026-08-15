@@ -100,6 +100,9 @@ public class TimeStepper(
   private fun local(millis: Double): LocalDateTime = instant(millis).toLocalDateTime(zone)
 
   /** The start of the [interval] containing [millis], then snapped down to a multiple of [step]. */
+  /** The millisecond field of a local time, which is the part below a second. */
+  private fun subMillis(at: LocalDateTime): Double = (at.nanosecond / 1_000_000).toDouble()
+
   public fun floor(millis: Double): Double {
     val at = local(millis)
     return when (interval) {
@@ -107,9 +110,25 @@ public class TimeStepper(
         val ms = at.nanosecond / 1_000_000
         millis - (ms - ms / step * step)
       }
-      TimeInterval.SECOND -> atTime(at.date, at.hour, at.minute, snapDown(at.second))
-      TimeInterval.MINUTE -> atTime(at.date, at.hour, snapDown(at.minute), 0)
-      TimeInterval.HOUR -> atTime(at.date, snapDown(at.hour), 0, 0)
+      // The sub-day intervals **subtract** rather than rebuild, which is d3's own arithmetic —
+      // `date.setTime(date - ms - seconds*1e3 - minutes*durationMinute)` — and the difference shows
+      // up exactly once a year. Rebuilding a local time is ambiguous across a daylight-saving
+      // fall-back: 01:30 happens twice in Los Angeles on 6 November 2011, and reconstructing it
+      // resolves to the *first* occurrence, so flooring an instant in the second hour moved it an
+      // hour backwards into the first. Subtracting keeps the instant's own offset, so each of the
+      // two 01:00s floors to itself. d3-time's own vectors are what caught it.
+      //
+      // A step greater than one still snaps the field, which is `every(step)` behaviour and is what
+      // Vega's own tests expect; that path keeps the old reconstruction.
+      TimeInterval.SECOND ->
+        if (step == 1) millis - subMillis(at)
+        else atTime(at.date, at.hour, at.minute, snapDown(at.second))
+      TimeInterval.MINUTE ->
+        if (step == 1) millis - (at.second * 1000.0 + subMillis(at))
+        else atTime(at.date, at.hour, snapDown(at.minute), 0)
+      TimeInterval.HOUR ->
+        if (step == 1) millis - (at.minute * 60_000.0 + at.second * 1000.0 + subMillis(at))
+        else atTime(at.date, snapDown(at.hour), 0, 0)
       TimeInterval.DAY -> millis(at.date.atStartOfDayIn(zone))
       // d3's weeks start on Sunday; kotlinx-datetime numbers Monday as 1, so Sunday is 7.
       TimeInterval.WEEK -> {
@@ -179,6 +198,11 @@ public class TimeStepper(
    */
   public fun range(start: Double, stop: Double): List<Double> {
     if (!start.isFinite() || !stop.isFinite() || stop <= start) return emptyList()
+    // d3 floors the step and gives up on anything that is not positive — `if (!(step > 0)) return
+    // []`
+    // — so a `{"interval": "day", "step": 0}` enumerates nothing rather than one boundary forever.
+    // Found by replaying d3-time's own vectors, where a step of 0, of -1 and of null all expect [].
+    if (step <= 0) return emptyList()
     val result = mutableListOf<Double>()
     var at = floor(start)
     if (at < start) at = offset(at, 1)

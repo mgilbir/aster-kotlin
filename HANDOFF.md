@@ -514,6 +514,33 @@ same solution applies: record the chain per object and replay it in order. `d3-f
 at all yet (24 files, all skipped) and is worth a look, because it is what `Decimals` and the
 `format` expression implement.
 
+## Replaying d3-time found a daylight-saving bug in `TimeStepper`
+
+`UpstreamD3TimeVectorsTest` replays 366 of d3-time's 1,047 recorded calls against `TimeStepper`, in
+**America/Los_Angeles** — d3's own suite zone, read from the vector file rather than assumed, which
+also proves the stepper does not depend on the machine's.
+
+Two real bugs, both now fixed, and zero divergences left in what is replayed:
+
+- **Flooring an hour across a fall-back was an hour early.** The sub-day intervals rebuilt a local
+  time — `atTime(date, hour, 0, 0)` — and 01:30 happens *twice* in Los Angeles on 6 November 2011, so
+  reconstructing resolved to the first occurrence and moved an instant in the second hour backwards.
+  d3 subtracts instead (`date - ms - seconds*1e3 - minutes*durationMinute`), which keeps the instant's
+  own offset, so each of the two 01:00s floors to itself. `second`, `minute` and `hour` now subtract
+  at step 1; a larger step still snaps the field, which is `every(step)` behaviour and what Vega's own
+  vectors expect.
+- **A non-positive step enumerated forever-ish.** d3 gives up — `if (!(step > 0)) return []` — where
+  this returned a boundary. A step of 0, of -1 and of `null` all expect nothing.
+
+**One stated difference, not a bug.** d3's `interval.range(start, stop, step)` steps *from the range
+start*; a `TimeStepper` with a step snaps to a global grid, which is d3's other spelling,
+`every(step).range(...)`, and is the one Vega uses and this engine implements. Those vectors are
+counted as a different function rather than compared.
+
+What is not replayed is named in the ledger: `count` (266), `ceil` (144), `round` (43) and `every` (43)
+are d3 methods this engine does not model, and weekday-anchored weeks — `timeMonday` through
+`timeSaturday` — have no equivalent because Vega's grammar exposes one `week`, starting Sunday.
+
 ## What upstream's own tests found: five real transform bugs
 
 151 of the replayable `vega-transforms` vectors match exactly. **13 do not**, in five transforms, and
