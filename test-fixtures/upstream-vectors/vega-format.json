@@ -1,0 +1,644 @@
+{
+  "package": "vega-format",
+  "vega": "6.3.1",
+  "files": 3,
+  "skipped": [],
+  "calls": [
+    {
+      "package": "vega-format",
+      "fn": "numberFormatDefaultLocale",
+      "args": [],
+      "result": {
+        "format": {
+          "$": "function",
+          "name": "(anonymous)"
+        },
+        "formatPrefix": {
+          "$": "function",
+          "name": "formatPrefix"
+        },
+        "formatFloat": {
+          "$": "function",
+          "name": "formatFloat"
+        },
+        "formatSpan": {
+          "$": "function",
+          "name": "formatSpan"
+        }
+      }
+    },
+    {
+      "package": "vega-format",
+      "fn": "numberFormatLocale",
+      "args": [
+        {
+          "decimal": ",",
+          "thousands": ".",
+          "grouping": [
+            3
+          ],
+          "currency": [
+            "",
+            " €"
+          ]
+        }
+      ],
+      "result": {
+        "format": {
+          "$": "function",
+          "name": "(anonymous)"
+        },
+        "formatPrefix": {
+          "$": "function",
+          "name": "formatPrefix"
+        },
+        "formatFloat": {
+          "$": "function",
+          "name": "formatFloat"
+        },
+        "formatSpan": {
+          "$": "function",
+          "name": "formatSpan"
+        }
+      }
+    },
+    {
+      "package": "vega-format",
+      "fn": "defaultLocale",
+      "args": [],
+      "result": {
+        "format": {
+          "$": "function",
+          "name": "(anonymous)"
+        },
+        "formatPrefix": {
+          "$": "function",
+          "name": "formatPrefix"
+        },
+        "formatFloat": {
+          "$": "function",
+          "name": "formatFloat"
+        },
+        "formatSpan": {
+          "$": "function",
+          "name": "formatSpan"
+        },
+        "timeFormat": {
+          "$": "function",
+          "name": "timeFormat"
+        },
+        "utcFormat": {
+          "$": "function",
+          "name": "utcFormat"
+        },
+        "timeParse": {
+          "$": "function",
+          "name": "(anonymous)"
+        },
+        "utcParse": {
+          "$": "function",
+          "name": "(anonymous)"
+        }
+      }
+    },
+    {
+      "package": "vega-format",
+      "fn": "defaultLocale",
+      "args": [
+        {
+          "decimal": ",",
+          "thousands": ".",
+          "grouping": [
+            3
+          ],
+          "currency": [
+            "",
+            " €"
+          ]
+        },
+        {
+          "dateTime": "%A, der %e. %B %Y, %X",
+          "date": "%d.%m.%Y",
+          "time": "%H:%M:%S",
+          "periods": [
+            "AM",
+            "PM"
+          ],
+          "days": [
+            "Sonntag",
+            "Montag",
+            "Dienstag",
+            "Mittwoch",
+            "Donnerstag",
+            "Freitag",
+            "Samstag"
+          ],
+          "shortDays": [
+            "So",
+            "Mo",
+            "Di",
+            "Mi",
+            "Do",
+            "Fr",
+            "Sa"
+          ],
+          "months": [
+            "Januar",
+            "Februar",
+            "März",
+            "April",
+            "Mai",
+            "Juni",
+            "Juli",
+            "August",
+            "September",
+            "Oktober",
+            "November",
+            "Dezember"
+          ],
+          "shortMonths": [
+            "Jan",
+            "Feb",
+            "Mrz",
+            "Apr",
+            "Mai",
+            "Jun",
+            "Jul",
+            "Aug",
+            "Sep",
+            "Okt",
+            "Nov",
+            "Dez"
+          ]
+        }
+      ],
+      "result": {
+        "format": {
+          "$": "function",
+          "name": "(anonymous)"
+        },
+        "formatPrefix": {
+          "$": "function",
+          "name": "formatPrefix"
+        },
+        "formatFloat": {
+          "$": "function",
+          "name": "formatFloat"
+        },
+        "formatSpan": {
+          "$": "function",
+          "name": "formatSpan"
+        },
+        "timeFormat": {
+          "$": "function",
+          "name": "timeFormat"
+        },
+        "utcFormat": {
+          "$": "function",
+          "name": "utcFormat"
+        },
+        "timeParse": {
+          "$": "function",
+          "name": "(anonymous)"
+        },
+        "utcParse": {
+          "$": "function",
+          "name": "(anonymous)"
+        }
+      }
+    },
+    {
+      "package": "vega-format",
+      "fn": "resetDefaultLocale",
+      "args": [],
+      "result": {
+        "format": {
+          "$": "function",
+          "name": "(anonymous)"
+        },
+        "formatPrefix": {
+          "$": "function",
+          "name": "formatPrefix"
+        },
+        "formatFloat": {
+          "$": "function",
+          "name": "formatFloat"
+        },
+        "formatSpan": {
+          "$": "function",
+          "name": "formatSpan"
+        },
+        "timeFormat": {
+          "$": "function",
+          "name": "timeFormat"
+        },
+        "utcFormat": {
+          "$": "function",
+          "name": "utcFormat"
+        },
+        "timeParse": {
+          "$": "function",
+          "name": "(anonymous)"
+        },
+        "utcParse": {
+          "$": "function",
+          "name": "(anonymous)"
+        }
+      }
+    },
+    {
+      "package": "vega-format",
+      "fn": "locale",
+      "args": [
+        {
+          "decimal": ",",
+          "thousands": ".",
+          "grouping": [
+            3
+          ],
+          "currency": [
+            "",
+            " €"
+          ]
+        },
+        {
+          "dateTime": "%A, der %e. %B %Y, %X",
+          "date": "%d.%m.%Y",
+          "time": "%H:%M:%S",
+          "periods": [
+            "AM",
+            "PM"
+          ],
+          "days": [
+            "Sonntag",
+            "Montag",
+            "Dienstag",
+            "Mittwoch",
+            "Donnerstag",
+            "Freitag",
+            "Samstag"
+          ],
+          "shortDays": [
+            "So",
+            "Mo",
+            "Di",
+            "Mi",
+            "Do",
+            "Fr",
+            "Sa"
+          ],
+          "months": [
+            "Januar",
+            "Februar",
+            "März",
+            "April",
+            "Mai",
+            "Juni",
+            "Juli",
+            "August",
+            "September",
+            "Oktober",
+            "November",
+            "Dezember"
+          ],
+          "shortMonths": [
+            "Jan",
+            "Feb",
+            "Mrz",
+            "Apr",
+            "Mai",
+            "Jun",
+            "Jul",
+            "Aug",
+            "Sep",
+            "Okt",
+            "Nov",
+            "Dez"
+          ]
+        }
+      ],
+      "result": {
+        "format": {
+          "$": "function",
+          "name": "(anonymous)"
+        },
+        "formatPrefix": {
+          "$": "function",
+          "name": "formatPrefix"
+        },
+        "formatFloat": {
+          "$": "function",
+          "name": "formatFloat"
+        },
+        "formatSpan": {
+          "$": "function",
+          "name": "formatSpan"
+        },
+        "timeFormat": {
+          "$": "function",
+          "name": "timeFormat"
+        },
+        "utcFormat": {
+          "$": "function",
+          "name": "utcFormat"
+        },
+        "timeParse": {
+          "$": "function",
+          "name": "(anonymous)"
+        },
+        "utcParse": {
+          "$": "function",
+          "name": "(anonymous)"
+        }
+      }
+    },
+    {
+      "package": "vega-format",
+      "fn": "locale",
+      "args": [
+        {
+          "decimal": ",",
+          "thousands": ".",
+          "grouping": [
+            3
+          ],
+          "currency": [
+            "",
+            " €"
+          ]
+        }
+      ],
+      "result": {
+        "format": {
+          "$": "function",
+          "name": "(anonymous)"
+        },
+        "formatPrefix": {
+          "$": "function",
+          "name": "formatPrefix"
+        },
+        "formatFloat": {
+          "$": "function",
+          "name": "formatFloat"
+        },
+        "formatSpan": {
+          "$": "function",
+          "name": "formatSpan"
+        },
+        "timeFormat": {
+          "$": "function",
+          "name": "timeFormat"
+        },
+        "utcFormat": {
+          "$": "function",
+          "name": "utcFormat"
+        },
+        "timeParse": {
+          "$": "function",
+          "name": "(anonymous)"
+        },
+        "utcParse": {
+          "$": "function",
+          "name": "(anonymous)"
+        }
+      }
+    },
+    {
+      "package": "vega-format",
+      "fn": "locale",
+      "args": [
+        null,
+        {
+          "dateTime": "%A, der %e. %B %Y, %X",
+          "date": "%d.%m.%Y",
+          "time": "%H:%M:%S",
+          "periods": [
+            "AM",
+            "PM"
+          ],
+          "days": [
+            "Sonntag",
+            "Montag",
+            "Dienstag",
+            "Mittwoch",
+            "Donnerstag",
+            "Freitag",
+            "Samstag"
+          ],
+          "shortDays": [
+            "So",
+            "Mo",
+            "Di",
+            "Mi",
+            "Do",
+            "Fr",
+            "Sa"
+          ],
+          "months": [
+            "Januar",
+            "Februar",
+            "März",
+            "April",
+            "Mai",
+            "Juni",
+            "Juli",
+            "August",
+            "September",
+            "Oktober",
+            "November",
+            "Dezember"
+          ],
+          "shortMonths": [
+            "Jan",
+            "Feb",
+            "Mrz",
+            "Apr",
+            "Mai",
+            "Jun",
+            "Jul",
+            "Aug",
+            "Sep",
+            "Okt",
+            "Nov",
+            "Dez"
+          ]
+        }
+      ],
+      "result": {
+        "format": {
+          "$": "function",
+          "name": "(anonymous)"
+        },
+        "formatPrefix": {
+          "$": "function",
+          "name": "formatPrefix"
+        },
+        "formatFloat": {
+          "$": "function",
+          "name": "formatFloat"
+        },
+        "formatSpan": {
+          "$": "function",
+          "name": "formatSpan"
+        },
+        "timeFormat": {
+          "$": "function",
+          "name": "timeFormat"
+        },
+        "utcFormat": {
+          "$": "function",
+          "name": "utcFormat"
+        },
+        "timeParse": {
+          "$": "function",
+          "name": "(anonymous)"
+        },
+        "utcParse": {
+          "$": "function",
+          "name": "(anonymous)"
+        }
+      }
+    },
+    {
+      "package": "vega-format",
+      "fn": "locale",
+      "args": [],
+      "result": {
+        "format": {
+          "$": "function",
+          "name": "(anonymous)"
+        },
+        "formatPrefix": {
+          "$": "function",
+          "name": "formatPrefix"
+        },
+        "formatFloat": {
+          "$": "function",
+          "name": "formatFloat"
+        },
+        "formatSpan": {
+          "$": "function",
+          "name": "formatSpan"
+        },
+        "timeFormat": {
+          "$": "function",
+          "name": "timeFormat"
+        },
+        "utcFormat": {
+          "$": "function",
+          "name": "utcFormat"
+        },
+        "timeParse": {
+          "$": "function",
+          "name": "(anonymous)"
+        },
+        "utcParse": {
+          "$": "function",
+          "name": "(anonymous)"
+        }
+      }
+    },
+    {
+      "package": "vega-format",
+      "fn": "timeFormatDefaultLocale",
+      "args": [],
+      "result": {
+        "timeFormat": {
+          "$": "function",
+          "name": "timeFormat"
+        },
+        "utcFormat": {
+          "$": "function",
+          "name": "utcFormat"
+        },
+        "timeParse": {
+          "$": "function",
+          "name": "(anonymous)"
+        },
+        "utcParse": {
+          "$": "function",
+          "name": "(anonymous)"
+        }
+      }
+    },
+    {
+      "package": "vega-format",
+      "fn": "timeFormatLocale",
+      "args": [
+        {
+          "dateTime": "%A, der %e. %B %Y, %X",
+          "date": "%d.%m.%Y",
+          "time": "%H:%M:%S",
+          "periods": [
+            "AM",
+            "PM"
+          ],
+          "days": [
+            "Sonntag",
+            "Montag",
+            "Dienstag",
+            "Mittwoch",
+            "Donnerstag",
+            "Freitag",
+            "Samstag"
+          ],
+          "shortDays": [
+            "So",
+            "Mo",
+            "Di",
+            "Mi",
+            "Do",
+            "Fr",
+            "Sa"
+          ],
+          "months": [
+            "Januar",
+            "Februar",
+            "März",
+            "April",
+            "Mai",
+            "Juni",
+            "Juli",
+            "August",
+            "September",
+            "Oktober",
+            "November",
+            "Dezember"
+          ],
+          "shortMonths": [
+            "Jan",
+            "Feb",
+            "Mrz",
+            "Apr",
+            "Mai",
+            "Jun",
+            "Jul",
+            "Aug",
+            "Sep",
+            "Okt",
+            "Nov",
+            "Dez"
+          ]
+        }
+      ],
+      "result": {
+        "timeFormat": {
+          "$": "function",
+          "name": "timeFormat"
+        },
+        "utcFormat": {
+          "$": "function",
+          "name": "utcFormat"
+        },
+        "timeParse": {
+          "$": "function",
+          "name": "(anonymous)"
+        },
+        "utcParse": {
+          "$": "function",
+          "name": "(anonymous)"
+        }
+      }
+    }
+  ]
+}

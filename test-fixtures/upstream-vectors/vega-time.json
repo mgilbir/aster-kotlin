@@ -1,0 +1,8396 @@
+{
+  "package": "vega-time",
+  "vega": "6.3.1",
+  "files": 9,
+  "skipped": [],
+  "calls": [
+    {
+      "package": "vega-time",
+      "fn": "timeBin",
+      "args": [
+        {
+          "extent": [
+            {
+              "$": "date",
+              "epochMillis": 946681200000
+            },
+            {
+              "$": "date",
+              "epochMillis": 1262300400000
+            }
+          ],
+          "maxbins": 2
+        }
+      ],
+      "result": {
+        "units": [
+          "year"
+        ],
+        "step": 5
+      }
+    },
+    {
+      "package": "vega-time",
+      "fn": "timeBin",
+      "args": [
+        {
+          "extent": [
+            {
+              "$": "date",
+              "epochMillis": 946681200000
+            },
+            {
+              "$": "date",
+              "epochMillis": 1072911600000
+            }
+          ],
+          "maxbins": 2
+        }
+      ],
+      "result": {
+        "units": [
+          "year"
+        ],
+        "step": 2
+      }
+    },
+    {
+      "package": "vega-time",
+      "fn": "timeBin",
+      "args": [
+        {
+          "extent": [
+            {
+              "$": "date",
+              "epochMillis": 946681200000
+            },
+            {
+              "$": "date",
+              "epochMillis": 978303600000
+            }
+          ],
+          "maxbins": 2
+        }
+      ],
+      "result": {
+        "units": [
+          "year"
+        ],
+        "step": 1
+      }
+    },
+    {
+      "package": "vega-time",
+      "fn": "timeBin",
+      "args": [
+        {
+          "extent": [
+            {
+              "$": "date",
+              "epochMillis": 946681200000
+            },
+            {
+              "$": "date",
+              "epochMillis": 978303600000
+            }
+          ],
+          "maxbins": 5
+        }
+      ],
+      "result": {
+        "units": [
+          "year",
+          "month"
+        ],
+        "step": 3
+      }
+    },
+    {
+      "package": "vega-time",
+      "fn": "timeBin",
+      "args": [
+        {
+          "extent": [
+            {
+              "$": "date",
+              "epochMillis": 946681200000
+            },
+            {
+              "$": "date",
+              "epochMillis": 978303600000
+            }
+          ],
+          "maxbins": 13
+        }
+      ],
+      "result": {
+        "units": [
+          "year",
+          "month"
+        ],
+        "step": 1
+      }
+    },
+    {
+      "package": "vega-time",
+      "fn": "timeBin",
+      "args": [
+        {
+          "extent": [
+            {
+              "$": "date",
+              "epochMillis": 946681200000
+            },
+            {
+              "$": "date",
+              "epochMillis": 978303600000
+            }
+          ],
+          "maxbins": 53
+        }
+      ],
+      "result": {
+        "units": [
+          "year",
+          "week"
+        ],
+        "step": 1
+      }
+    },
+    {
+      "package": "vega-time",
+      "fn": "timeBin",
+      "args": [
+        {
+          "extent": [
+            {
+              "$": "date",
+              "epochMillis": 946681200000
+            },
+            {
+              "$": "date",
+              "epochMillis": 978303600000
+            }
+          ],
+          "maxbins": 366
+        }
+      ],
+      "result": {
+        "units": [
+          "year",
+          "month",
+          "date"
+        ],
+        "step": 1
+      }
+    },
+    {
+      "package": "vega-time",
+      "fn": "timeBin",
+      "args": [
+        {
+          "extent": [
+            {
+              "$": "date",
+              "epochMillis": 946681200000
+            },
+            {
+              "$": "date",
+              "epochMillis": 978303600000
+            }
+          ],
+          "maxbins": 732
+        }
+      ],
+      "result": {
+        "units": [
+          "year",
+          "month",
+          "date",
+          "hours"
+        ],
+        "step": 12
+      }
+    },
+    {
+      "package": "vega-time",
+      "fn": "timeBin",
+      "args": [
+        {
+          "extent": [
+            {
+              "$": "date",
+              "epochMillis": 946681200000
+            },
+            {
+              "$": "date",
+              "epochMillis": 978303600000
+            }
+          ],
+          "maxbins": 1464
+        }
+      ],
+      "result": {
+        "units": [
+          "year",
+          "month",
+          "date",
+          "hours"
+        ],
+        "step": 6
+      }
+    },
+    {
+      "package": "vega-time",
+      "fn": "timeBin",
+      "args": [
+        {
+          "extent": [
+            {
+              "$": "date",
+              "epochMillis": 946681200000
+            },
+            {
+              "$": "date",
+              "epochMillis": 978303600000
+            }
+          ],
+          "maxbins": 2928
+        }
+      ],
+      "result": {
+        "units": [
+          "year",
+          "month",
+          "date",
+          "hours"
+        ],
+        "step": 3
+      }
+    },
+    {
+      "package": "vega-time",
+      "fn": "timeBin",
+      "args": [
+        {
+          "extent": [
+            {
+              "$": "date",
+              "epochMillis": 946681200000
+            },
+            {
+              "$": "date",
+              "epochMillis": 978303600000
+            }
+          ],
+          "maxbins": 8784
+        }
+      ],
+      "result": {
+        "units": [
+          "year",
+          "month",
+          "date",
+          "hours"
+        ],
+        "step": 1
+      }
+    },
+    {
+      "package": "vega-time",
+      "fn": "timeBin",
+      "args": [
+        {
+          "extent": [
+            {
+              "$": "date",
+              "epochMillis": 946681200000
+            },
+            {
+              "$": "date",
+              "epochMillis": 978303600000
+            }
+          ],
+          "maxbins": 17568
+        }
+      ],
+      "result": {
+        "units": [
+          "year",
+          "month",
+          "date",
+          "hours",
+          "minutes"
+        ],
+        "step": 30
+      }
+    },
+    {
+      "package": "vega-time",
+      "fn": "timeBin",
+      "args": [
+        {
+          "extent": [
+            {
+              "$": "date",
+              "epochMillis": 946681200000
+            },
+            {
+              "$": "date",
+              "epochMillis": 978303600000
+            }
+          ],
+          "maxbins": 35136
+        }
+      ],
+      "result": {
+        "units": [
+          "year",
+          "month",
+          "date",
+          "hours",
+          "minutes"
+        ],
+        "step": 15
+      }
+    },
+    {
+      "package": "vega-time",
+      "fn": "timeBin",
+      "args": [
+        {
+          "extent": [
+            {
+              "$": "date",
+              "epochMillis": 946681200000
+            },
+            {
+              "$": "date",
+              "epochMillis": 978303600000
+            }
+          ],
+          "maxbins": 105408
+        }
+      ],
+      "result": {
+        "units": [
+          "year",
+          "month",
+          "date",
+          "hours",
+          "minutes"
+        ],
+        "step": 5
+      }
+    },
+    {
+      "package": "vega-time",
+      "fn": "timeBin",
+      "args": [
+        {
+          "extent": [
+            {
+              "$": "date",
+              "epochMillis": 946681200000
+            },
+            {
+              "$": "date",
+              "epochMillis": 978303600000
+            }
+          ],
+          "maxbins": 527040
+        }
+      ],
+      "result": {
+        "units": [
+          "year",
+          "month",
+          "date",
+          "hours",
+          "minutes"
+        ],
+        "step": 1
+      }
+    },
+    {
+      "package": "vega-time",
+      "fn": "timeBin",
+      "args": [
+        {
+          "extent": [
+            {
+              "$": "date",
+              "epochMillis": 946681200000
+            },
+            {
+              "$": "date",
+              "epochMillis": 978303600000
+            }
+          ],
+          "maxbins": 1054080
+        }
+      ],
+      "result": {
+        "units": [
+          "year",
+          "month",
+          "date",
+          "hours",
+          "minutes",
+          "seconds"
+        ],
+        "step": 30
+      }
+    },
+    {
+      "package": "vega-time",
+      "fn": "timeBin",
+      "args": [
+        {
+          "extent": [
+            {
+              "$": "date",
+              "epochMillis": 946681200000
+            },
+            {
+              "$": "date",
+              "epochMillis": 978303600000
+            }
+          ],
+          "maxbins": 2108160
+        }
+      ],
+      "result": {
+        "units": [
+          "year",
+          "month",
+          "date",
+          "hours",
+          "minutes",
+          "seconds"
+        ],
+        "step": 15
+      }
+    },
+    {
+      "package": "vega-time",
+      "fn": "timeBin",
+      "args": [
+        {
+          "extent": [
+            {
+              "$": "date",
+              "epochMillis": 946681200000
+            },
+            {
+              "$": "date",
+              "epochMillis": 978303600000
+            }
+          ],
+          "maxbins": 6324480
+        }
+      ],
+      "result": {
+        "units": [
+          "year",
+          "month",
+          "date",
+          "hours",
+          "minutes",
+          "seconds"
+        ],
+        "step": 5
+      }
+    },
+    {
+      "package": "vega-time",
+      "fn": "timeBin",
+      "args": [
+        {
+          "extent": [
+            {
+              "$": "date",
+              "epochMillis": 946681200000
+            },
+            {
+              "$": "date",
+              "epochMillis": 978303600000
+            }
+          ],
+          "maxbins": 31622400
+        }
+      ],
+      "result": {
+        "units": [
+          "year",
+          "month",
+          "date",
+          "hours",
+          "minutes",
+          "seconds"
+        ],
+        "step": 1
+      }
+    },
+    {
+      "package": "vega-time",
+      "fn": "timeBin",
+      "args": [
+        {
+          "extent": [
+            {
+              "$": "date",
+              "epochMillis": 946681200000
+            },
+            {
+              "$": "date",
+              "epochMillis": 978303600000
+            }
+          ],
+          "maxbins": 316224000
+        }
+      ],
+      "result": {
+        "units": [
+          "year",
+          "month",
+          "date",
+          "hours",
+          "minutes",
+          "seconds",
+          "milliseconds"
+        ],
+        "step": 100
+      }
+    },
+    {
+      "package": "vega-time",
+      "fn": "timeBin",
+      "args": [
+        {
+          "extent": [
+            {
+              "$": "date",
+              "epochMillis": 946681200000
+            },
+            {
+              "$": "date",
+              "epochMillis": 978303600000
+            }
+          ],
+          "maxbins": 632448000
+        }
+      ],
+      "result": {
+        "units": [
+          "year",
+          "month",
+          "date",
+          "hours",
+          "minutes",
+          "seconds",
+          "milliseconds"
+        ],
+        "step": 50
+      }
+    },
+    {
+      "package": "vega-time",
+      "fn": "timeBin",
+      "args": [
+        {
+          "extent": [
+            {
+              "$": "date",
+              "epochMillis": 946681200000
+            },
+            {
+              "$": "date",
+              "epochMillis": 978303600000
+            }
+          ],
+          "maxbins": 1581120000
+        }
+      ],
+      "result": {
+        "units": [
+          "year",
+          "month",
+          "date",
+          "hours",
+          "minutes",
+          "seconds",
+          "milliseconds"
+        ],
+        "step": 20
+      }
+    },
+    {
+      "package": "vega-time",
+      "fn": "timeBin",
+      "args": [
+        {
+          "extent": [
+            {
+              "$": "date",
+              "epochMillis": 946681200000
+            },
+            {
+              "$": "date",
+              "epochMillis": 978303600000
+            }
+          ],
+          "maxbins": 3162240000
+        }
+      ],
+      "result": {
+        "units": [
+          "year",
+          "month",
+          "date",
+          "hours",
+          "minutes",
+          "seconds",
+          "milliseconds"
+        ],
+        "step": 10
+      }
+    },
+    {
+      "package": "vega-time",
+      "fn": "timeBin",
+      "args": [
+        {
+          "extent": [
+            {
+              "$": "date",
+              "epochMillis": 946681200000
+            },
+            {
+              "$": "date",
+              "epochMillis": 978303600000
+            }
+          ],
+          "maxbins": 31622400000
+        }
+      ],
+      "result": {
+        "units": [
+          "year",
+          "month",
+          "date",
+          "hours",
+          "minutes",
+          "seconds",
+          "milliseconds"
+        ],
+        "step": 1
+      }
+    },
+    {
+      "package": "vega-time",
+      "fn": "detectTimeUnits",
+      "args": [
+        [
+          {
+            "ts": {
+              "$": "date",
+              "epochMillis": 946684800000
+            }
+          },
+          {
+            "ts": {
+              "$": "date",
+              "epochMillis": 1262304000000
+            }
+          }
+        ],
+        {
+          "$": "function",
+          "name": "(anonymous)"
+        },
+        true
+      ],
+      "result": {
+        "units": [
+          "year"
+        ],
+        "step": 10
+      }
+    },
+    {
+      "package": "vega-time",
+      "fn": "detectTimeUnits",
+      "args": [
+        [
+          {
+            "ts": {
+              "$": "date",
+              "epochMillis": 946684800000
+            }
+          },
+          {
+            "ts": {
+              "$": "date",
+              "epochMillis": 978307200000
+            }
+          }
+        ],
+        {
+          "$": "function",
+          "name": "(anonymous)"
+        },
+        true
+      ],
+      "result": {
+        "units": [
+          "year"
+        ],
+        "step": 1
+      }
+    },
+    {
+      "package": "vega-time",
+      "fn": "detectTimeUnits",
+      "args": [
+        [
+          {
+            "ts": {
+              "$": "date",
+              "epochMillis": 946684800000
+            }
+          },
+          {
+            "ts": {
+              "$": "date",
+              "epochMillis": 1009843200000
+            }
+          }
+        ],
+        {
+          "$": "function",
+          "name": "(anonymous)"
+        },
+        true
+      ],
+      "result": {
+        "units": [
+          "year"
+        ],
+        "step": 1
+      }
+    },
+    {
+      "package": "vega-time",
+      "fn": "detectTimeUnits",
+      "args": [
+        [
+          {
+            "ts": {
+              "$": "date",
+              "epochMillis": 946684800000
+            }
+          },
+          {
+            "ts": {
+              "$": "date",
+              "epochMillis": 954547200000
+            }
+          }
+        ],
+        {
+          "$": "function",
+          "name": "(anonymous)"
+        },
+        true
+      ],
+      "result": {
+        "units": [
+          "year",
+          "month"
+        ],
+        "step": 3
+      }
+    },
+    {
+      "package": "vega-time",
+      "fn": "detectTimeUnits",
+      "args": [
+        [
+          {
+            "ts": {
+              "$": "date",
+              "epochMillis": 946684800000
+            }
+          },
+          {
+            "ts": {
+              "$": "date",
+              "epochMillis": 949363200000
+            }
+          }
+        ],
+        {
+          "$": "function",
+          "name": "(anonymous)"
+        },
+        true
+      ],
+      "result": {
+        "units": [
+          "year",
+          "month"
+        ],
+        "step": 1
+      }
+    },
+    {
+      "package": "vega-time",
+      "fn": "detectTimeUnits",
+      "args": [
+        [
+          {
+            "ts": {
+              "$": "date",
+              "epochMillis": 946684800000
+            }
+          },
+          {
+            "ts": {
+              "$": "date",
+              "epochMillis": 947289600000
+            }
+          }
+        ],
+        {
+          "$": "function",
+          "name": "(anonymous)"
+        },
+        true
+      ],
+      "result": {
+        "units": [
+          "year",
+          "week"
+        ],
+        "step": 1
+      }
+    },
+    {
+      "package": "vega-time",
+      "fn": "detectTimeUnits",
+      "args": [
+        [
+          {
+            "ts": {
+              "$": "date",
+              "epochMillis": 946771200000
+            }
+          },
+          {
+            "ts": {
+              "$": "date",
+              "epochMillis": 947376000000
+            }
+          }
+        ],
+        {
+          "$": "function",
+          "name": "(anonymous)"
+        },
+        true
+      ],
+      "result": {
+        "units": [
+          "year",
+          "week"
+        ],
+        "step": 1
+      }
+    },
+    {
+      "package": "vega-time",
+      "fn": "detectTimeUnits",
+      "args": [
+        [
+          {
+            "ts": {
+              "$": "date",
+              "epochMillis": 946684800000
+            }
+          },
+          {
+            "ts": {
+              "$": "date",
+              "epochMillis": 946771200000
+            }
+          }
+        ],
+        {
+          "$": "function",
+          "name": "(anonymous)"
+        },
+        true
+      ],
+      "result": {
+        "units": [
+          "year",
+          "month",
+          "date"
+        ],
+        "step": 1
+      }
+    },
+    {
+      "package": "vega-time",
+      "fn": "detectTimeUnits",
+      "args": [
+        [
+          {
+            "ts": {
+              "$": "date",
+              "epochMillis": 946684800000
+            }
+          },
+          {
+            "ts": {
+              "$": "date",
+              "epochMillis": 946688400000
+            }
+          }
+        ],
+        {
+          "$": "function",
+          "name": "(anonymous)"
+        },
+        true
+      ],
+      "result": {
+        "units": [
+          "year",
+          "month",
+          "date",
+          "hours"
+        ],
+        "step": 1
+      }
+    },
+    {
+      "package": "vega-time",
+      "fn": "detectTimeUnits",
+      "args": [
+        [
+          {
+            "ts": {
+              "$": "date",
+              "epochMillis": 946684800000
+            }
+          },
+          {
+            "ts": {
+              "$": "date",
+              "epochMillis": 946684860000
+            }
+          }
+        ],
+        {
+          "$": "function",
+          "name": "(anonymous)"
+        },
+        true
+      ],
+      "result": {
+        "units": [
+          "year",
+          "month",
+          "date",
+          "hours",
+          "minutes"
+        ],
+        "step": 1
+      }
+    },
+    {
+      "package": "vega-time",
+      "fn": "detectTimeUnits",
+      "args": [
+        [
+          {
+            "ts": {
+              "$": "date",
+              "epochMillis": 946684800000
+            }
+          },
+          {
+            "ts": {
+              "$": "date",
+              "epochMillis": 946685100000
+            }
+          }
+        ],
+        {
+          "$": "function",
+          "name": "(anonymous)"
+        },
+        true
+      ],
+      "result": {
+        "units": [
+          "year",
+          "month",
+          "date",
+          "hours",
+          "minutes"
+        ],
+        "step": 5
+      }
+    },
+    {
+      "package": "vega-time",
+      "fn": "detectTimeUnits",
+      "args": [
+        [
+          {
+            "ts": {
+              "$": "date",
+              "epochMillis": 946684800000
+            }
+          },
+          {
+            "ts": {
+              "$": "date",
+              "epochMillis": 946685400000
+            }
+          }
+        ],
+        {
+          "$": "function",
+          "name": "(anonymous)"
+        },
+        true
+      ],
+      "result": {
+        "units": [
+          "year",
+          "month",
+          "date",
+          "hours",
+          "minutes"
+        ],
+        "step": 10
+      }
+    },
+    {
+      "package": "vega-time",
+      "fn": "detectTimeUnits",
+      "args": [
+        [
+          {
+            "ts": {
+              "$": "date",
+              "epochMillis": 946684800000
+            }
+          },
+          {
+            "ts": {
+              "$": "date",
+              "epochMillis": 946684801000
+            }
+          }
+        ],
+        {
+          "$": "function",
+          "name": "(anonymous)"
+        },
+        true
+      ],
+      "result": {
+        "units": [
+          "year",
+          "month",
+          "date",
+          "hours",
+          "minutes",
+          "seconds"
+        ],
+        "step": 1
+      }
+    },
+    {
+      "package": "vega-time",
+      "fn": "detectTimeUnits",
+      "args": [
+        [
+          {
+            "ts": {
+              "$": "date",
+              "epochMillis": 946684800123
+            }
+          },
+          {
+            "ts": {
+              "$": "date",
+              "epochMillis": 946684800234
+            }
+          }
+        ],
+        {
+          "$": "function",
+          "name": "(anonymous)"
+        },
+        true
+      ],
+      "result": {
+        "units": [
+          "year",
+          "month",
+          "date",
+          "hours",
+          "minutes",
+          "seconds",
+          "milliseconds"
+        ],
+        "step": 1
+      }
+    },
+    {
+      "package": "vega-time",
+      "fn": "detectTimeUnits",
+      "args": [
+        [
+          {
+            "ts": {
+              "$": "date",
+              "epochMillis": 946681200000
+            }
+          },
+          {
+            "ts": {
+              "$": "date",
+              "epochMillis": 1262300400000
+            }
+          }
+        ],
+        {
+          "$": "function",
+          "name": "(anonymous)"
+        },
+        false
+      ],
+      "result": {
+        "units": [
+          "year"
+        ],
+        "step": 10
+      }
+    },
+    {
+      "package": "vega-time",
+      "fn": "detectTimeUnits",
+      "args": [
+        [
+          {
+            "ts": {
+              "$": "date",
+              "epochMillis": 946681200000
+            }
+          },
+          {
+            "ts": {
+              "$": "date",
+              "epochMillis": 978303600000
+            }
+          }
+        ],
+        {
+          "$": "function",
+          "name": "(anonymous)"
+        },
+        false
+      ],
+      "result": {
+        "units": [
+          "year"
+        ],
+        "step": 1
+      }
+    },
+    {
+      "package": "vega-time",
+      "fn": "detectTimeUnits",
+      "args": [
+        [
+          {
+            "ts": {
+              "$": "date",
+              "epochMillis": 946681200000
+            }
+          },
+          {
+            "ts": {
+              "$": "date",
+              "epochMillis": 954540000000
+            }
+          }
+        ],
+        {
+          "$": "function",
+          "name": "(anonymous)"
+        },
+        false
+      ],
+      "result": {
+        "units": [
+          "year",
+          "month"
+        ],
+        "step": 3
+      }
+    },
+    {
+      "package": "vega-time",
+      "fn": "detectTimeUnits",
+      "args": [
+        [
+          {
+            "ts": {
+              "$": "date",
+              "epochMillis": 946681200000
+            }
+          },
+          {
+            "ts": {
+              "$": "date",
+              "epochMillis": 949359600000
+            }
+          }
+        ],
+        {
+          "$": "function",
+          "name": "(anonymous)"
+        },
+        false
+      ],
+      "result": {
+        "units": [
+          "year",
+          "month"
+        ],
+        "step": 1
+      }
+    },
+    {
+      "package": "vega-time",
+      "fn": "detectTimeUnits",
+      "args": [
+        [
+          {
+            "ts": {
+              "$": "date",
+              "epochMillis": 946681200000
+            }
+          },
+          {
+            "ts": {
+              "$": "date",
+              "epochMillis": 947286000000
+            }
+          }
+        ],
+        {
+          "$": "function",
+          "name": "(anonymous)"
+        },
+        false
+      ],
+      "result": {
+        "units": [
+          "year",
+          "week"
+        ],
+        "step": 1
+      }
+    },
+    {
+      "package": "vega-time",
+      "fn": "detectTimeUnits",
+      "args": [
+        [
+          {
+            "ts": {
+              "$": "date",
+              "epochMillis": 946681200000
+            }
+          },
+          {
+            "ts": {
+              "$": "date",
+              "epochMillis": 946767600000
+            }
+          }
+        ],
+        {
+          "$": "function",
+          "name": "(anonymous)"
+        },
+        false
+      ],
+      "result": {
+        "units": [
+          "year",
+          "month",
+          "date"
+        ],
+        "step": 1
+      }
+    },
+    {
+      "package": "vega-time",
+      "fn": "detectTimeUnits",
+      "args": [
+        [
+          {
+            "ts": {
+              "$": "date",
+              "epochMillis": 946681200000
+            }
+          },
+          {
+            "ts": {
+              "$": "date",
+              "epochMillis": 946684800000
+            }
+          }
+        ],
+        {
+          "$": "function",
+          "name": "(anonymous)"
+        },
+        false
+      ],
+      "result": {
+        "units": [
+          "year",
+          "month",
+          "date",
+          "hours"
+        ],
+        "step": 1
+      }
+    },
+    {
+      "package": "vega-time",
+      "fn": "detectTimeUnits",
+      "args": [
+        [
+          {
+            "ts": {
+              "$": "date",
+              "epochMillis": 946681200000
+            }
+          },
+          {
+            "ts": {
+              "$": "date",
+              "epochMillis": 946681260000
+            }
+          }
+        ],
+        {
+          "$": "function",
+          "name": "(anonymous)"
+        },
+        false
+      ],
+      "result": {
+        "units": [
+          "year",
+          "month",
+          "date",
+          "hours",
+          "minutes"
+        ],
+        "step": 1
+      }
+    },
+    {
+      "package": "vega-time",
+      "fn": "detectTimeUnits",
+      "args": [
+        [
+          {
+            "ts": {
+              "$": "date",
+              "epochMillis": 946684800000
+            }
+          },
+          {
+            "ts": {
+              "$": "date",
+              "epochMillis": 962409600000
+            }
+          }
+        ],
+        {
+          "$": "function",
+          "name": "(anonymous)"
+        },
+        true
+      ],
+      "result": {
+        "units": [
+          "year",
+          "month"
+        ],
+        "step": 3
+      }
+    },
+    {
+      "package": "vega-time",
+      "fn": "detectTimeUnits",
+      "args": [
+        [
+          {
+            "ts": {
+              "$": "date",
+              "epochMillis": 946681200000
+            }
+          },
+          {
+            "ts": {
+              "$": "date",
+              "epochMillis": 946767600000
+            }
+          },
+          {
+            "ts": {
+              "$": "date",
+              "epochMillis": 946854000000
+            }
+          }
+        ],
+        {
+          "$": "function",
+          "name": "(anonymous)"
+        },
+        false
+      ],
+      "result": {
+        "units": [
+          "year",
+          "month",
+          "date"
+        ],
+        "step": 1
+      }
+    },
+    {
+      "package": "vega-time",
+      "fn": "detectTimeUnits",
+      "args": [
+        [
+          {
+            "ts": {
+              "$": "date",
+              "epochMillis": 946681200000
+            }
+          },
+          {
+            "ts": {
+              "$": "date",
+              "epochMillis": 946767600000
+            }
+          },
+          {
+            "ts": {
+              "$": "date",
+              "epochMillis": 946854000000
+            }
+          }
+        ],
+        {
+          "$": "function",
+          "name": "(anonymous)"
+        },
+        true
+      ],
+      "result": {
+        "units": [
+          "year",
+          "month",
+          "date",
+          "hours"
+        ],
+        "step": 1
+      }
+    },
+    {
+      "package": "vega-time",
+      "fn": "detectTimeUnits",
+      "args": [
+        [
+          {
+            "ts": {
+              "$": "date",
+              "epochMillis": 946684800000
+            }
+          },
+          {
+            "ts": {
+              "$": "date",
+              "epochMillis": 946771200000
+            }
+          },
+          {
+            "ts": {
+              "$": "date",
+              "epochMillis": 946857600000
+            }
+          }
+        ],
+        {
+          "$": "function",
+          "name": "(anonymous)"
+        },
+        true
+      ],
+      "result": {
+        "units": [
+          "year",
+          "month",
+          "date"
+        ],
+        "step": 1
+      }
+    },
+    {
+      "package": "vega-time",
+      "fn": "detectTimeUnits",
+      "args": [
+        [
+          {
+            "ts": {
+              "$": "date",
+              "epochMillis": 946684800000
+            }
+          },
+          {
+            "ts": {
+              "$": "date",
+              "epochMillis": 946771200000
+            }
+          },
+          {
+            "ts": {
+              "$": "date",
+              "epochMillis": 946857600000
+            }
+          }
+        ],
+        {
+          "$": "function",
+          "name": "(anonymous)"
+        },
+        false
+      ],
+      "result": {
+        "units": [
+          "year",
+          "month",
+          "date",
+          "hours"
+        ],
+        "step": 1
+      }
+    },
+    {
+      "package": "vega-time",
+      "fn": "timeFloor",
+      "args": [
+        [
+          "year"
+        ]
+      ],
+      "result": {
+        "$": "function",
+        "name": "(anonymous)"
+      }
+    },
+    {
+      "package": "vega-time",
+      "fn": "timeFloor",
+      "args": [
+        [
+          "quarter"
+        ]
+      ],
+      "result": {
+        "$": "function",
+        "name": "(anonymous)"
+      }
+    },
+    {
+      "package": "vega-time",
+      "fn": "timeFloor",
+      "args": [
+        [
+          "month"
+        ]
+      ],
+      "result": {
+        "$": "function",
+        "name": "(anonymous)"
+      }
+    },
+    {
+      "package": "vega-time",
+      "fn": "timeFloor",
+      "args": [
+        [
+          "week"
+        ]
+      ],
+      "result": {
+        "$": "function",
+        "name": "(anonymous)"
+      }
+    },
+    {
+      "package": "vega-time",
+      "fn": "timeFloor",
+      "args": [
+        [
+          "date"
+        ]
+      ],
+      "result": {
+        "$": "function",
+        "name": "(anonymous)"
+      }
+    },
+    {
+      "package": "vega-time",
+      "fn": "timeFloor",
+      "args": [
+        [
+          "day"
+        ]
+      ],
+      "result": {
+        "$": "function",
+        "name": "(anonymous)"
+      }
+    },
+    {
+      "package": "vega-time",
+      "fn": "timeFloor",
+      "args": [
+        [
+          "dayofyear"
+        ]
+      ],
+      "result": {
+        "$": "function",
+        "name": "(anonymous)"
+      }
+    },
+    {
+      "package": "vega-time",
+      "fn": "timeFloor",
+      "args": [
+        [
+          "year",
+          "quarter"
+        ]
+      ],
+      "result": {
+        "$": "function",
+        "name": "(anonymous)"
+      }
+    },
+    {
+      "package": "vega-time",
+      "fn": "timeFloor",
+      "args": [
+        [
+          "year",
+          "month"
+        ]
+      ],
+      "result": {
+        "$": "function",
+        "name": "(anonymous)"
+      }
+    },
+    {
+      "package": "vega-time",
+      "fn": "timeFloor",
+      "args": [
+        [
+          "year",
+          "month",
+          "date"
+        ]
+      ],
+      "result": {
+        "$": "function",
+        "name": "(anonymous)"
+      }
+    },
+    {
+      "package": "vega-time",
+      "fn": "timeFloor",
+      "args": [
+        [
+          "year",
+          "week"
+        ]
+      ],
+      "result": {
+        "$": "function",
+        "name": "(anonymous)"
+      }
+    },
+    {
+      "package": "vega-time",
+      "fn": "timeFloor",
+      "args": [
+        [
+          "year",
+          "week",
+          "day"
+        ]
+      ],
+      "result": {
+        "$": "function",
+        "name": "(anonymous)"
+      }
+    },
+    {
+      "package": "vega-time",
+      "fn": "timeFloor",
+      "args": [
+        [
+          "year",
+          "dayofyear"
+        ]
+      ],
+      "result": {
+        "$": "function",
+        "name": "(anonymous)"
+      }
+    },
+    {
+      "package": "vega-time",
+      "fn": "timeFloor",
+      "args": [
+        [
+          "month",
+          "date"
+        ]
+      ],
+      "result": {
+        "$": "function",
+        "name": "(anonymous)"
+      }
+    },
+    {
+      "package": "vega-time",
+      "fn": "timeFloor",
+      "args": [
+        [
+          "week",
+          "day"
+        ]
+      ],
+      "result": {
+        "$": "function",
+        "name": "(anonymous)"
+      }
+    },
+    {
+      "package": "vega-time",
+      "fn": "utcFloor",
+      "args": [
+        [
+          "year"
+        ]
+      ],
+      "result": {
+        "$": "function",
+        "name": "(anonymous)"
+      }
+    },
+    {
+      "package": "vega-time",
+      "fn": "utcFloor",
+      "args": [
+        [
+          "quarter"
+        ]
+      ],
+      "result": {
+        "$": "function",
+        "name": "(anonymous)"
+      }
+    },
+    {
+      "package": "vega-time",
+      "fn": "utcFloor",
+      "args": [
+        [
+          "month"
+        ]
+      ],
+      "result": {
+        "$": "function",
+        "name": "(anonymous)"
+      }
+    },
+    {
+      "package": "vega-time",
+      "fn": "utcFloor",
+      "args": [
+        [
+          "week"
+        ]
+      ],
+      "result": {
+        "$": "function",
+        "name": "(anonymous)"
+      }
+    },
+    {
+      "package": "vega-time",
+      "fn": "utcFloor",
+      "args": [
+        [
+          "date"
+        ]
+      ],
+      "result": {
+        "$": "function",
+        "name": "(anonymous)"
+      }
+    },
+    {
+      "package": "vega-time",
+      "fn": "utcFloor",
+      "args": [
+        [
+          "day"
+        ]
+      ],
+      "result": {
+        "$": "function",
+        "name": "(anonymous)"
+      }
+    },
+    {
+      "package": "vega-time",
+      "fn": "utcFloor",
+      "args": [
+        [
+          "dayofyear"
+        ]
+      ],
+      "result": {
+        "$": "function",
+        "name": "(anonymous)"
+      }
+    },
+    {
+      "package": "vega-time",
+      "fn": "utcFloor",
+      "args": [
+        [
+          "year",
+          "quarter"
+        ]
+      ],
+      "result": {
+        "$": "function",
+        "name": "(anonymous)"
+      }
+    },
+    {
+      "package": "vega-time",
+      "fn": "utcFloor",
+      "args": [
+        [
+          "year",
+          "month"
+        ]
+      ],
+      "result": {
+        "$": "function",
+        "name": "(anonymous)"
+      }
+    },
+    {
+      "package": "vega-time",
+      "fn": "utcFloor",
+      "args": [
+        [
+          "year",
+          "month",
+          "date"
+        ]
+      ],
+      "result": {
+        "$": "function",
+        "name": "(anonymous)"
+      }
+    },
+    {
+      "package": "vega-time",
+      "fn": "utcFloor",
+      "args": [
+        [
+          "year",
+          "week"
+        ]
+      ],
+      "result": {
+        "$": "function",
+        "name": "(anonymous)"
+      }
+    },
+    {
+      "package": "vega-time",
+      "fn": "utcFloor",
+      "args": [
+        [
+          "year",
+          "week",
+          "day"
+        ]
+      ],
+      "result": {
+        "$": "function",
+        "name": "(anonymous)"
+      }
+    },
+    {
+      "package": "vega-time",
+      "fn": "utcFloor",
+      "args": [
+        [
+          "year",
+          "dayofyear"
+        ]
+      ],
+      "result": {
+        "$": "function",
+        "name": "(anonymous)"
+      }
+    },
+    {
+      "package": "vega-time",
+      "fn": "utcFloor",
+      "args": [
+        [
+          "month",
+          "date"
+        ]
+      ],
+      "result": {
+        "$": "function",
+        "name": "(anonymous)"
+      }
+    },
+    {
+      "package": "vega-time",
+      "fn": "utcFloor",
+      "args": [
+        [
+          "week",
+          "day"
+        ]
+      ],
+      "result": {
+        "$": "function",
+        "name": "(anonymous)"
+      }
+    },
+    {
+      "package": "vega-time",
+      "fn": "timeFloor",
+      "args": [
+        [
+          "year",
+          "quarter"
+        ],
+        1
+      ],
+      "result": {
+        "$": "function",
+        "name": "(anonymous)"
+      }
+    },
+    {
+      "package": "vega-time",
+      "fn": "timeFloor",
+      "args": [
+        [
+          "year",
+          "quarter"
+        ],
+        2
+      ],
+      "result": {
+        "$": "function",
+        "name": "(anonymous)"
+      }
+    },
+    {
+      "package": "vega-time",
+      "fn": "timeFloor",
+      "args": [
+        [
+          "year",
+          "week"
+        ],
+        1
+      ],
+      "result": {
+        "$": "function",
+        "name": "(anonymous)"
+      }
+    },
+    {
+      "package": "vega-time",
+      "fn": "timeFloor",
+      "args": [
+        [
+          "year",
+          "week"
+        ],
+        2
+      ],
+      "result": {
+        "$": "function",
+        "name": "(anonymous)"
+      }
+    },
+    {
+      "package": "vega-time",
+      "fn": "timeFloor",
+      "args": [
+        [
+          "year",
+          "week"
+        ],
+        3
+      ],
+      "result": {
+        "$": "function",
+        "name": "(anonymous)"
+      }
+    },
+    {
+      "package": "vega-time",
+      "fn": "timeFloor",
+      "args": [
+        [
+          "year",
+          "week"
+        ],
+        4
+      ],
+      "result": {
+        "$": "function",
+        "name": "(anonymous)"
+      }
+    },
+    {
+      "package": "vega-time",
+      "fn": "utcFloor",
+      "args": [
+        [
+          "year",
+          "quarter"
+        ],
+        1
+      ],
+      "result": {
+        "$": "function",
+        "name": "(anonymous)"
+      }
+    },
+    {
+      "package": "vega-time",
+      "fn": "utcFloor",
+      "args": [
+        [
+          "year",
+          "quarter"
+        ],
+        2
+      ],
+      "result": {
+        "$": "function",
+        "name": "(anonymous)"
+      }
+    },
+    {
+      "package": "vega-time",
+      "fn": "utcFloor",
+      "args": [
+        [
+          "year",
+          "week"
+        ],
+        1
+      ],
+      "result": {
+        "$": "function",
+        "name": "(anonymous)"
+      }
+    },
+    {
+      "package": "vega-time",
+      "fn": "utcFloor",
+      "args": [
+        [
+          "year",
+          "week"
+        ],
+        2
+      ],
+      "result": {
+        "$": "function",
+        "name": "(anonymous)"
+      }
+    },
+    {
+      "package": "vega-time",
+      "fn": "utcFloor",
+      "args": [
+        [
+          "year",
+          "week"
+        ],
+        3
+      ],
+      "result": {
+        "$": "function",
+        "name": "(anonymous)"
+      }
+    },
+    {
+      "package": "vega-time",
+      "fn": "utcFloor",
+      "args": [
+        [
+          "year",
+          "week"
+        ],
+        4
+      ],
+      "result": {
+        "$": "function",
+        "name": "(anonymous)"
+      }
+    },
+    {
+      "package": "vega-time",
+      "fn": "timeInterval",
+      "args": [
+        "year"
+      ],
+      "result": {
+        "$": "function",
+        "name": "interval"
+      }
+    },
+    {
+      "package": "vega-time",
+      "fn": "timeInterval",
+      "args": [
+        "quarter"
+      ],
+      "result": {
+        "$": "function",
+        "name": "interval"
+      }
+    },
+    {
+      "package": "vega-time",
+      "fn": "timeInterval",
+      "args": [
+        "month"
+      ],
+      "result": {
+        "$": "function",
+        "name": "interval"
+      }
+    },
+    {
+      "package": "vega-time",
+      "fn": "timeInterval",
+      "args": [
+        "week"
+      ],
+      "result": {
+        "$": "function",
+        "name": "interval"
+      }
+    },
+    {
+      "package": "vega-time",
+      "fn": "timeInterval",
+      "args": [
+        "date"
+      ],
+      "result": {
+        "$": "function",
+        "name": "interval"
+      }
+    },
+    {
+      "package": "vega-time",
+      "fn": "timeInterval",
+      "args": [
+        "day"
+      ],
+      "result": {
+        "$": "function",
+        "name": "interval"
+      }
+    },
+    {
+      "package": "vega-time",
+      "fn": "timeInterval",
+      "args": [
+        "dayofyear"
+      ],
+      "result": {
+        "$": "function",
+        "name": "interval"
+      }
+    },
+    {
+      "package": "vega-time",
+      "fn": "timeInterval",
+      "args": [
+        "hours"
+      ],
+      "result": {
+        "$": "function",
+        "name": "interval"
+      }
+    },
+    {
+      "package": "vega-time",
+      "fn": "timeInterval",
+      "args": [
+        "minutes"
+      ],
+      "result": {
+        "$": "function",
+        "name": "interval"
+      }
+    },
+    {
+      "package": "vega-time",
+      "fn": "timeInterval",
+      "args": [
+        "seconds"
+      ],
+      "result": {
+        "$": "function",
+        "name": "interval"
+      }
+    },
+    {
+      "package": "vega-time",
+      "fn": "timeInterval",
+      "args": [
+        "milliseconds"
+      ],
+      "result": {
+        "$": "function",
+        "name": "interval"
+      }
+    },
+    {
+      "package": "vega-time",
+      "fn": "utcInterval",
+      "args": [
+        "year"
+      ],
+      "result": {
+        "$": "function",
+        "name": "interval"
+      }
+    },
+    {
+      "package": "vega-time",
+      "fn": "utcInterval",
+      "args": [
+        "quarter"
+      ],
+      "result": {
+        "$": "function",
+        "name": "interval"
+      }
+    },
+    {
+      "package": "vega-time",
+      "fn": "utcInterval",
+      "args": [
+        "month"
+      ],
+      "result": {
+        "$": "function",
+        "name": "interval"
+      }
+    },
+    {
+      "package": "vega-time",
+      "fn": "utcInterval",
+      "args": [
+        "week"
+      ],
+      "result": {
+        "$": "function",
+        "name": "interval"
+      }
+    },
+    {
+      "package": "vega-time",
+      "fn": "utcInterval",
+      "args": [
+        "date"
+      ],
+      "result": {
+        "$": "function",
+        "name": "interval"
+      }
+    },
+    {
+      "package": "vega-time",
+      "fn": "utcInterval",
+      "args": [
+        "day"
+      ],
+      "result": {
+        "$": "function",
+        "name": "interval"
+      }
+    },
+    {
+      "package": "vega-time",
+      "fn": "utcInterval",
+      "args": [
+        "dayofyear"
+      ],
+      "result": {
+        "$": "function",
+        "name": "interval"
+      }
+    },
+    {
+      "package": "vega-time",
+      "fn": "utcInterval",
+      "args": [
+        "hours"
+      ],
+      "result": {
+        "$": "function",
+        "name": "interval"
+      }
+    },
+    {
+      "package": "vega-time",
+      "fn": "utcInterval",
+      "args": [
+        "minutes"
+      ],
+      "result": {
+        "$": "function",
+        "name": "interval"
+      }
+    },
+    {
+      "package": "vega-time",
+      "fn": "utcInterval",
+      "args": [
+        "seconds"
+      ],
+      "result": {
+        "$": "function",
+        "name": "interval"
+      }
+    },
+    {
+      "package": "vega-time",
+      "fn": "utcInterval",
+      "args": [
+        "milliseconds"
+      ],
+      "result": {
+        "$": "function",
+        "name": "interval"
+      }
+    },
+    {
+      "package": "vega-time",
+      "fn": "timeOffset",
+      "args": [
+        "year",
+        {
+          "$": "date",
+          "epochMillis": 1325372400000
+        }
+      ],
+      "result": {
+        "$": "date",
+        "epochMillis": 1356994800000
+      }
+    },
+    {
+      "package": "vega-time",
+      "fn": "timeOffset",
+      "args": [
+        "year",
+        {
+          "$": "date",
+          "epochMillis": 1325372400000
+        },
+        2
+      ],
+      "result": {
+        "$": "date",
+        "epochMillis": 1388530800000
+      }
+    },
+    {
+      "package": "vega-time",
+      "fn": "timeOffset",
+      "args": [
+        "quarter",
+        {
+          "$": "date",
+          "epochMillis": 1325372400000
+        }
+      ],
+      "result": {
+        "$": "date",
+        "epochMillis": 1333231200000
+      }
+    },
+    {
+      "package": "vega-time",
+      "fn": "timeOffset",
+      "args": [
+        "quarter",
+        {
+          "$": "date",
+          "epochMillis": 1325372400000
+        },
+        2
+      ],
+      "result": {
+        "$": "date",
+        "epochMillis": 1341093600000
+      }
+    },
+    {
+      "package": "vega-time",
+      "fn": "timeOffset",
+      "args": [
+        "month",
+        {
+          "$": "date",
+          "epochMillis": 1325372400000
+        }
+      ],
+      "result": {
+        "$": "date",
+        "epochMillis": 1328050800000
+      }
+    },
+    {
+      "package": "vega-time",
+      "fn": "timeOffset",
+      "args": [
+        "month",
+        {
+          "$": "date",
+          "epochMillis": 1325372400000
+        },
+        2
+      ],
+      "result": {
+        "$": "date",
+        "epochMillis": 1330556400000
+      }
+    },
+    {
+      "package": "vega-time",
+      "fn": "timeOffset",
+      "args": [
+        "week",
+        {
+          "$": "date",
+          "epochMillis": 1325372400000
+        }
+      ],
+      "result": {
+        "$": "date",
+        "epochMillis": 1325977200000
+      }
+    },
+    {
+      "package": "vega-time",
+      "fn": "timeOffset",
+      "args": [
+        "week",
+        {
+          "$": "date",
+          "epochMillis": 1325372400000
+        },
+        2
+      ],
+      "result": {
+        "$": "date",
+        "epochMillis": 1326582000000
+      }
+    },
+    {
+      "package": "vega-time",
+      "fn": "timeOffset",
+      "args": [
+        "date",
+        {
+          "$": "date",
+          "epochMillis": 1325372400000
+        }
+      ],
+      "result": {
+        "$": "date",
+        "epochMillis": 1325458800000
+      }
+    },
+    {
+      "package": "vega-time",
+      "fn": "timeOffset",
+      "args": [
+        "date",
+        {
+          "$": "date",
+          "epochMillis": 1325372400000
+        },
+        2
+      ],
+      "result": {
+        "$": "date",
+        "epochMillis": 1325545200000
+      }
+    },
+    {
+      "package": "vega-time",
+      "fn": "timeOffset",
+      "args": [
+        "day",
+        {
+          "$": "date",
+          "epochMillis": 1325372400000
+        }
+      ],
+      "result": {
+        "$": "date",
+        "epochMillis": 1325458800000
+      }
+    },
+    {
+      "package": "vega-time",
+      "fn": "timeOffset",
+      "args": [
+        "day",
+        {
+          "$": "date",
+          "epochMillis": 1325372400000
+        },
+        2
+      ],
+      "result": {
+        "$": "date",
+        "epochMillis": 1325545200000
+      }
+    },
+    {
+      "package": "vega-time",
+      "fn": "timeOffset",
+      "args": [
+        "dayofyear",
+        {
+          "$": "date",
+          "epochMillis": 1325372400000
+        }
+      ],
+      "result": {
+        "$": "date",
+        "epochMillis": 1325458800000
+      }
+    },
+    {
+      "package": "vega-time",
+      "fn": "timeOffset",
+      "args": [
+        "dayofyear",
+        {
+          "$": "date",
+          "epochMillis": 1325372400000
+        },
+        2
+      ],
+      "result": {
+        "$": "date",
+        "epochMillis": 1325545200000
+      }
+    },
+    {
+      "package": "vega-time",
+      "fn": "timeOffset",
+      "args": [
+        "hours",
+        {
+          "$": "date",
+          "epochMillis": 1325372400000
+        }
+      ],
+      "result": {
+        "$": "date",
+        "epochMillis": 1325376000000
+      }
+    },
+    {
+      "package": "vega-time",
+      "fn": "timeOffset",
+      "args": [
+        "hours",
+        {
+          "$": "date",
+          "epochMillis": 1325372400000
+        },
+        2
+      ],
+      "result": {
+        "$": "date",
+        "epochMillis": 1325379600000
+      }
+    },
+    {
+      "package": "vega-time",
+      "fn": "timeOffset",
+      "args": [
+        "minutes",
+        {
+          "$": "date",
+          "epochMillis": 1325372400000
+        }
+      ],
+      "result": {
+        "$": "date",
+        "epochMillis": 1325372460000
+      }
+    },
+    {
+      "package": "vega-time",
+      "fn": "timeOffset",
+      "args": [
+        "minutes",
+        {
+          "$": "date",
+          "epochMillis": 1325372400000
+        },
+        2
+      ],
+      "result": {
+        "$": "date",
+        "epochMillis": 1325372520000
+      }
+    },
+    {
+      "package": "vega-time",
+      "fn": "timeOffset",
+      "args": [
+        "seconds",
+        {
+          "$": "date",
+          "epochMillis": 1325372400000
+        }
+      ],
+      "result": {
+        "$": "date",
+        "epochMillis": 1325372401000
+      }
+    },
+    {
+      "package": "vega-time",
+      "fn": "timeOffset",
+      "args": [
+        "seconds",
+        {
+          "$": "date",
+          "epochMillis": 1325372400000
+        },
+        2
+      ],
+      "result": {
+        "$": "date",
+        "epochMillis": 1325372402000
+      }
+    },
+    {
+      "package": "vega-time",
+      "fn": "timeOffset",
+      "args": [
+        "milliseconds",
+        {
+          "$": "date",
+          "epochMillis": 1325372400000
+        }
+      ],
+      "result": {
+        "$": "date",
+        "epochMillis": 1325372400001
+      }
+    },
+    {
+      "package": "vega-time",
+      "fn": "timeOffset",
+      "args": [
+        "milliseconds",
+        {
+          "$": "date",
+          "epochMillis": 1325372400000
+        },
+        2
+      ],
+      "result": {
+        "$": "date",
+        "epochMillis": 1325372400002
+      }
+    },
+    {
+      "package": "vega-time",
+      "fn": "utcOffset",
+      "args": [
+        "year",
+        {
+          "$": "date",
+          "epochMillis": 1325376000000
+        }
+      ],
+      "result": {
+        "$": "date",
+        "epochMillis": 1356998400000
+      }
+    },
+    {
+      "package": "vega-time",
+      "fn": "utcOffset",
+      "args": [
+        "year",
+        {
+          "$": "date",
+          "epochMillis": 1325376000000
+        },
+        2
+      ],
+      "result": {
+        "$": "date",
+        "epochMillis": 1388534400000
+      }
+    },
+    {
+      "package": "vega-time",
+      "fn": "utcOffset",
+      "args": [
+        "quarter",
+        {
+          "$": "date",
+          "epochMillis": 1325376000000
+        }
+      ],
+      "result": {
+        "$": "date",
+        "epochMillis": 1333238400000
+      }
+    },
+    {
+      "package": "vega-time",
+      "fn": "utcOffset",
+      "args": [
+        "quarter",
+        {
+          "$": "date",
+          "epochMillis": 1325376000000
+        },
+        2
+      ],
+      "result": {
+        "$": "date",
+        "epochMillis": 1341100800000
+      }
+    },
+    {
+      "package": "vega-time",
+      "fn": "utcOffset",
+      "args": [
+        "month",
+        {
+          "$": "date",
+          "epochMillis": 1325376000000
+        }
+      ],
+      "result": {
+        "$": "date",
+        "epochMillis": 1328054400000
+      }
+    },
+    {
+      "package": "vega-time",
+      "fn": "utcOffset",
+      "args": [
+        "month",
+        {
+          "$": "date",
+          "epochMillis": 1325376000000
+        },
+        2
+      ],
+      "result": {
+        "$": "date",
+        "epochMillis": 1330560000000
+      }
+    },
+    {
+      "package": "vega-time",
+      "fn": "utcOffset",
+      "args": [
+        "week",
+        {
+          "$": "date",
+          "epochMillis": 1325376000000
+        }
+      ],
+      "result": {
+        "$": "date",
+        "epochMillis": 1325980800000
+      }
+    },
+    {
+      "package": "vega-time",
+      "fn": "utcOffset",
+      "args": [
+        "week",
+        {
+          "$": "date",
+          "epochMillis": 1325376000000
+        },
+        2
+      ],
+      "result": {
+        "$": "date",
+        "epochMillis": 1326585600000
+      }
+    },
+    {
+      "package": "vega-time",
+      "fn": "utcOffset",
+      "args": [
+        "date",
+        {
+          "$": "date",
+          "epochMillis": 1325376000000
+        }
+      ],
+      "result": {
+        "$": "date",
+        "epochMillis": 1325462400000
+      }
+    },
+    {
+      "package": "vega-time",
+      "fn": "utcOffset",
+      "args": [
+        "date",
+        {
+          "$": "date",
+          "epochMillis": 1325376000000
+        },
+        2
+      ],
+      "result": {
+        "$": "date",
+        "epochMillis": 1325548800000
+      }
+    },
+    {
+      "package": "vega-time",
+      "fn": "utcOffset",
+      "args": [
+        "day",
+        {
+          "$": "date",
+          "epochMillis": 1325376000000
+        }
+      ],
+      "result": {
+        "$": "date",
+        "epochMillis": 1325462400000
+      }
+    },
+    {
+      "package": "vega-time",
+      "fn": "utcOffset",
+      "args": [
+        "day",
+        {
+          "$": "date",
+          "epochMillis": 1325376000000
+        },
+        2
+      ],
+      "result": {
+        "$": "date",
+        "epochMillis": 1325548800000
+      }
+    },
+    {
+      "package": "vega-time",
+      "fn": "utcOffset",
+      "args": [
+        "dayofyear",
+        {
+          "$": "date",
+          "epochMillis": 1325376000000
+        }
+      ],
+      "result": {
+        "$": "date",
+        "epochMillis": 1325462400000
+      }
+    },
+    {
+      "package": "vega-time",
+      "fn": "utcOffset",
+      "args": [
+        "dayofyear",
+        {
+          "$": "date",
+          "epochMillis": 1325376000000
+        },
+        2
+      ],
+      "result": {
+        "$": "date",
+        "epochMillis": 1325548800000
+      }
+    },
+    {
+      "package": "vega-time",
+      "fn": "utcOffset",
+      "args": [
+        "hours",
+        {
+          "$": "date",
+          "epochMillis": 1325376000000
+        }
+      ],
+      "result": {
+        "$": "date",
+        "epochMillis": 1325379600000
+      }
+    },
+    {
+      "package": "vega-time",
+      "fn": "utcOffset",
+      "args": [
+        "hours",
+        {
+          "$": "date",
+          "epochMillis": 1325376000000
+        },
+        2
+      ],
+      "result": {
+        "$": "date",
+        "epochMillis": 1325383200000
+      }
+    },
+    {
+      "package": "vega-time",
+      "fn": "utcOffset",
+      "args": [
+        "minutes",
+        {
+          "$": "date",
+          "epochMillis": 1325376000000
+        }
+      ],
+      "result": {
+        "$": "date",
+        "epochMillis": 1325376060000
+      }
+    },
+    {
+      "package": "vega-time",
+      "fn": "utcOffset",
+      "args": [
+        "minutes",
+        {
+          "$": "date",
+          "epochMillis": 1325376000000
+        },
+        2
+      ],
+      "result": {
+        "$": "date",
+        "epochMillis": 1325376120000
+      }
+    },
+    {
+      "package": "vega-time",
+      "fn": "utcOffset",
+      "args": [
+        "seconds",
+        {
+          "$": "date",
+          "epochMillis": 1325376000000
+        }
+      ],
+      "result": {
+        "$": "date",
+        "epochMillis": 1325376001000
+      }
+    },
+    {
+      "package": "vega-time",
+      "fn": "utcOffset",
+      "args": [
+        "seconds",
+        {
+          "$": "date",
+          "epochMillis": 1325376000000
+        },
+        2
+      ],
+      "result": {
+        "$": "date",
+        "epochMillis": 1325376002000
+      }
+    },
+    {
+      "package": "vega-time",
+      "fn": "utcOffset",
+      "args": [
+        "milliseconds",
+        {
+          "$": "date",
+          "epochMillis": 1325376000000
+        }
+      ],
+      "result": {
+        "$": "date",
+        "epochMillis": 1325376000001
+      }
+    },
+    {
+      "package": "vega-time",
+      "fn": "utcOffset",
+      "args": [
+        "milliseconds",
+        {
+          "$": "date",
+          "epochMillis": 1325376000000
+        },
+        2
+      ],
+      "result": {
+        "$": "date",
+        "epochMillis": 1325376000002
+      }
+    },
+    {
+      "package": "vega-time",
+      "fn": "timeOffset",
+      "args": [
+        "year",
+        {
+          "$": "date",
+          "epochMillis": 1325372400000
+        },
+        0
+      ],
+      "result": {
+        "$": "date",
+        "epochMillis": 1325372400000
+      }
+    },
+    {
+      "package": "vega-time",
+      "fn": "timeOffset",
+      "args": [
+        "year",
+        {
+          "$": "date",
+          "epochMillis": 1325372400000
+        },
+        1
+      ],
+      "result": {
+        "$": "date",
+        "epochMillis": 1356994800000
+      }
+    },
+    {
+      "package": "vega-time",
+      "fn": "timeOffset",
+      "args": [
+        "year",
+        {
+          "$": "date",
+          "epochMillis": 1325372400000
+        },
+        3
+      ],
+      "result": {
+        "$": "date",
+        "epochMillis": 1420066800000
+      }
+    },
+    {
+      "package": "vega-time",
+      "fn": "timeOffset",
+      "args": [
+        "year",
+        {
+          "$": "date",
+          "epochMillis": 1325372400000
+        },
+        4
+      ],
+      "result": {
+        "$": "date",
+        "epochMillis": 1451602800000
+      }
+    },
+    {
+      "package": "vega-time",
+      "fn": "timeOffset",
+      "args": [
+        "year",
+        {
+          "$": "date",
+          "epochMillis": 1325372400000
+        },
+        5
+      ],
+      "result": {
+        "$": "date",
+        "epochMillis": 1483225200000
+      }
+    },
+    {
+      "package": "vega-time",
+      "fn": "timeOffset",
+      "args": [
+        "year",
+        {
+          "$": "date",
+          "epochMillis": 1325372400000
+        },
+        6
+      ],
+      "result": {
+        "$": "date",
+        "epochMillis": 1514761200000
+      }
+    },
+    {
+      "package": "vega-time",
+      "fn": "timeOffset",
+      "args": [
+        "year",
+        {
+          "$": "date",
+          "epochMillis": 1325372400000
+        },
+        7
+      ],
+      "result": {
+        "$": "date",
+        "epochMillis": 1546297200000
+      }
+    },
+    {
+      "package": "vega-time",
+      "fn": "timeOffset",
+      "args": [
+        "year",
+        {
+          "$": "date",
+          "epochMillis": 1325372400000
+        },
+        8
+      ],
+      "result": {
+        "$": "date",
+        "epochMillis": 1577833200000
+      }
+    },
+    {
+      "package": "vega-time",
+      "fn": "timeOffset",
+      "args": [
+        "year",
+        {
+          "$": "date",
+          "epochMillis": 1325372400000
+        },
+        9
+      ],
+      "result": {
+        "$": "date",
+        "epochMillis": 1609455600000
+      }
+    },
+    {
+      "package": "vega-time",
+      "fn": "timeSequence",
+      "args": [
+        "year",
+        {
+          "$": "date",
+          "epochMillis": 1325372400000
+        },
+        1609455600001
+      ],
+      "result": [
+        {
+          "$": "date",
+          "epochMillis": 1325372400000
+        },
+        {
+          "$": "date",
+          "epochMillis": 1356994800000
+        },
+        {
+          "$": "date",
+          "epochMillis": 1388530800000
+        },
+        {
+          "$": "date",
+          "epochMillis": 1420066800000
+        },
+        {
+          "$": "date",
+          "epochMillis": 1451602800000
+        },
+        {
+          "$": "date",
+          "epochMillis": 1483225200000
+        },
+        {
+          "$": "date",
+          "epochMillis": 1514761200000
+        },
+        {
+          "$": "date",
+          "epochMillis": 1546297200000
+        },
+        {
+          "$": "date",
+          "epochMillis": 1577833200000
+        },
+        {
+          "$": "date",
+          "epochMillis": 1609455600000
+        }
+      ]
+    },
+    {
+      "package": "vega-time",
+      "fn": "timeOffset",
+      "args": [
+        "quarter",
+        {
+          "$": "date",
+          "epochMillis": 1325372400000
+        },
+        0
+      ],
+      "result": {
+        "$": "date",
+        "epochMillis": 1325372400000
+      }
+    },
+    {
+      "package": "vega-time",
+      "fn": "timeOffset",
+      "args": [
+        "quarter",
+        {
+          "$": "date",
+          "epochMillis": 1325372400000
+        },
+        1
+      ],
+      "result": {
+        "$": "date",
+        "epochMillis": 1333231200000
+      }
+    },
+    {
+      "package": "vega-time",
+      "fn": "timeOffset",
+      "args": [
+        "quarter",
+        {
+          "$": "date",
+          "epochMillis": 1325372400000
+        },
+        3
+      ],
+      "result": {
+        "$": "date",
+        "epochMillis": 1349042400000
+      }
+    },
+    {
+      "package": "vega-time",
+      "fn": "timeOffset",
+      "args": [
+        "quarter",
+        {
+          "$": "date",
+          "epochMillis": 1325372400000
+        },
+        4
+      ],
+      "result": {
+        "$": "date",
+        "epochMillis": 1356994800000
+      }
+    },
+    {
+      "package": "vega-time",
+      "fn": "timeOffset",
+      "args": [
+        "quarter",
+        {
+          "$": "date",
+          "epochMillis": 1325372400000
+        },
+        5
+      ],
+      "result": {
+        "$": "date",
+        "epochMillis": 1364767200000
+      }
+    },
+    {
+      "package": "vega-time",
+      "fn": "timeOffset",
+      "args": [
+        "quarter",
+        {
+          "$": "date",
+          "epochMillis": 1325372400000
+        },
+        6
+      ],
+      "result": {
+        "$": "date",
+        "epochMillis": 1372629600000
+      }
+    },
+    {
+      "package": "vega-time",
+      "fn": "timeOffset",
+      "args": [
+        "quarter",
+        {
+          "$": "date",
+          "epochMillis": 1325372400000
+        },
+        7
+      ],
+      "result": {
+        "$": "date",
+        "epochMillis": 1380578400000
+      }
+    },
+    {
+      "package": "vega-time",
+      "fn": "timeOffset",
+      "args": [
+        "quarter",
+        {
+          "$": "date",
+          "epochMillis": 1325372400000
+        },
+        8
+      ],
+      "result": {
+        "$": "date",
+        "epochMillis": 1388530800000
+      }
+    },
+    {
+      "package": "vega-time",
+      "fn": "timeOffset",
+      "args": [
+        "quarter",
+        {
+          "$": "date",
+          "epochMillis": 1325372400000
+        },
+        9
+      ],
+      "result": {
+        "$": "date",
+        "epochMillis": 1396303200000
+      }
+    },
+    {
+      "package": "vega-time",
+      "fn": "timeSequence",
+      "args": [
+        "quarter",
+        {
+          "$": "date",
+          "epochMillis": 1325372400000
+        },
+        1396303200001
+      ],
+      "result": [
+        {
+          "$": "date",
+          "epochMillis": 1325372400000
+        },
+        {
+          "$": "date",
+          "epochMillis": 1333231200000
+        },
+        {
+          "$": "date",
+          "epochMillis": 1341093600000
+        },
+        {
+          "$": "date",
+          "epochMillis": 1349042400000
+        },
+        {
+          "$": "date",
+          "epochMillis": 1356994800000
+        },
+        {
+          "$": "date",
+          "epochMillis": 1364767200000
+        },
+        {
+          "$": "date",
+          "epochMillis": 1372629600000
+        },
+        {
+          "$": "date",
+          "epochMillis": 1380578400000
+        },
+        {
+          "$": "date",
+          "epochMillis": 1388530800000
+        },
+        {
+          "$": "date",
+          "epochMillis": 1396303200000
+        }
+      ]
+    },
+    {
+      "package": "vega-time",
+      "fn": "timeOffset",
+      "args": [
+        "month",
+        {
+          "$": "date",
+          "epochMillis": 1325372400000
+        },
+        0
+      ],
+      "result": {
+        "$": "date",
+        "epochMillis": 1325372400000
+      }
+    },
+    {
+      "package": "vega-time",
+      "fn": "timeOffset",
+      "args": [
+        "month",
+        {
+          "$": "date",
+          "epochMillis": 1325372400000
+        },
+        1
+      ],
+      "result": {
+        "$": "date",
+        "epochMillis": 1328050800000
+      }
+    },
+    {
+      "package": "vega-time",
+      "fn": "timeOffset",
+      "args": [
+        "month",
+        {
+          "$": "date",
+          "epochMillis": 1325372400000
+        },
+        3
+      ],
+      "result": {
+        "$": "date",
+        "epochMillis": 1333231200000
+      }
+    },
+    {
+      "package": "vega-time",
+      "fn": "timeOffset",
+      "args": [
+        "month",
+        {
+          "$": "date",
+          "epochMillis": 1325372400000
+        },
+        4
+      ],
+      "result": {
+        "$": "date",
+        "epochMillis": 1335823200000
+      }
+    },
+    {
+      "package": "vega-time",
+      "fn": "timeOffset",
+      "args": [
+        "month",
+        {
+          "$": "date",
+          "epochMillis": 1325372400000
+        },
+        5
+      ],
+      "result": {
+        "$": "date",
+        "epochMillis": 1338501600000
+      }
+    },
+    {
+      "package": "vega-time",
+      "fn": "timeOffset",
+      "args": [
+        "month",
+        {
+          "$": "date",
+          "epochMillis": 1325372400000
+        },
+        6
+      ],
+      "result": {
+        "$": "date",
+        "epochMillis": 1341093600000
+      }
+    },
+    {
+      "package": "vega-time",
+      "fn": "timeOffset",
+      "args": [
+        "month",
+        {
+          "$": "date",
+          "epochMillis": 1325372400000
+        },
+        7
+      ],
+      "result": {
+        "$": "date",
+        "epochMillis": 1343772000000
+      }
+    },
+    {
+      "package": "vega-time",
+      "fn": "timeOffset",
+      "args": [
+        "month",
+        {
+          "$": "date",
+          "epochMillis": 1325372400000
+        },
+        8
+      ],
+      "result": {
+        "$": "date",
+        "epochMillis": 1346450400000
+      }
+    },
+    {
+      "package": "vega-time",
+      "fn": "timeOffset",
+      "args": [
+        "month",
+        {
+          "$": "date",
+          "epochMillis": 1325372400000
+        },
+        9
+      ],
+      "result": {
+        "$": "date",
+        "epochMillis": 1349042400000
+      }
+    },
+    {
+      "package": "vega-time",
+      "fn": "timeSequence",
+      "args": [
+        "month",
+        {
+          "$": "date",
+          "epochMillis": 1325372400000
+        },
+        1349042400001
+      ],
+      "result": [
+        {
+          "$": "date",
+          "epochMillis": 1325372400000
+        },
+        {
+          "$": "date",
+          "epochMillis": 1328050800000
+        },
+        {
+          "$": "date",
+          "epochMillis": 1330556400000
+        },
+        {
+          "$": "date",
+          "epochMillis": 1333231200000
+        },
+        {
+          "$": "date",
+          "epochMillis": 1335823200000
+        },
+        {
+          "$": "date",
+          "epochMillis": 1338501600000
+        },
+        {
+          "$": "date",
+          "epochMillis": 1341093600000
+        },
+        {
+          "$": "date",
+          "epochMillis": 1343772000000
+        },
+        {
+          "$": "date",
+          "epochMillis": 1346450400000
+        },
+        {
+          "$": "date",
+          "epochMillis": 1349042400000
+        }
+      ]
+    },
+    {
+      "package": "vega-time",
+      "fn": "timeOffset",
+      "args": [
+        "week",
+        {
+          "$": "date",
+          "epochMillis": 1325372400000
+        },
+        0
+      ],
+      "result": {
+        "$": "date",
+        "epochMillis": 1325372400000
+      }
+    },
+    {
+      "package": "vega-time",
+      "fn": "timeOffset",
+      "args": [
+        "week",
+        {
+          "$": "date",
+          "epochMillis": 1325372400000
+        },
+        1
+      ],
+      "result": {
+        "$": "date",
+        "epochMillis": 1325977200000
+      }
+    },
+    {
+      "package": "vega-time",
+      "fn": "timeOffset",
+      "args": [
+        "week",
+        {
+          "$": "date",
+          "epochMillis": 1325372400000
+        },
+        3
+      ],
+      "result": {
+        "$": "date",
+        "epochMillis": 1327186800000
+      }
+    },
+    {
+      "package": "vega-time",
+      "fn": "timeOffset",
+      "args": [
+        "week",
+        {
+          "$": "date",
+          "epochMillis": 1325372400000
+        },
+        4
+      ],
+      "result": {
+        "$": "date",
+        "epochMillis": 1327791600000
+      }
+    },
+    {
+      "package": "vega-time",
+      "fn": "timeOffset",
+      "args": [
+        "week",
+        {
+          "$": "date",
+          "epochMillis": 1325372400000
+        },
+        5
+      ],
+      "result": {
+        "$": "date",
+        "epochMillis": 1328396400000
+      }
+    },
+    {
+      "package": "vega-time",
+      "fn": "timeOffset",
+      "args": [
+        "week",
+        {
+          "$": "date",
+          "epochMillis": 1325372400000
+        },
+        6
+      ],
+      "result": {
+        "$": "date",
+        "epochMillis": 1329001200000
+      }
+    },
+    {
+      "package": "vega-time",
+      "fn": "timeOffset",
+      "args": [
+        "week",
+        {
+          "$": "date",
+          "epochMillis": 1325372400000
+        },
+        7
+      ],
+      "result": {
+        "$": "date",
+        "epochMillis": 1329606000000
+      }
+    },
+    {
+      "package": "vega-time",
+      "fn": "timeOffset",
+      "args": [
+        "week",
+        {
+          "$": "date",
+          "epochMillis": 1325372400000
+        },
+        8
+      ],
+      "result": {
+        "$": "date",
+        "epochMillis": 1330210800000
+      }
+    },
+    {
+      "package": "vega-time",
+      "fn": "timeOffset",
+      "args": [
+        "week",
+        {
+          "$": "date",
+          "epochMillis": 1325372400000
+        },
+        9
+      ],
+      "result": {
+        "$": "date",
+        "epochMillis": 1330815600000
+      }
+    },
+    {
+      "package": "vega-time",
+      "fn": "timeSequence",
+      "args": [
+        "week",
+        {
+          "$": "date",
+          "epochMillis": 1325372400000
+        },
+        1330815600001
+      ],
+      "result": [
+        {
+          "$": "date",
+          "epochMillis": 1325372400000
+        },
+        {
+          "$": "date",
+          "epochMillis": 1325977200000
+        },
+        {
+          "$": "date",
+          "epochMillis": 1326582000000
+        },
+        {
+          "$": "date",
+          "epochMillis": 1327186800000
+        },
+        {
+          "$": "date",
+          "epochMillis": 1327791600000
+        },
+        {
+          "$": "date",
+          "epochMillis": 1328396400000
+        },
+        {
+          "$": "date",
+          "epochMillis": 1329001200000
+        },
+        {
+          "$": "date",
+          "epochMillis": 1329606000000
+        },
+        {
+          "$": "date",
+          "epochMillis": 1330210800000
+        },
+        {
+          "$": "date",
+          "epochMillis": 1330815600000
+        }
+      ]
+    },
+    {
+      "package": "vega-time",
+      "fn": "timeOffset",
+      "args": [
+        "date",
+        {
+          "$": "date",
+          "epochMillis": 1325372400000
+        },
+        0
+      ],
+      "result": {
+        "$": "date",
+        "epochMillis": 1325372400000
+      }
+    },
+    {
+      "package": "vega-time",
+      "fn": "timeOffset",
+      "args": [
+        "date",
+        {
+          "$": "date",
+          "epochMillis": 1325372400000
+        },
+        1
+      ],
+      "result": {
+        "$": "date",
+        "epochMillis": 1325458800000
+      }
+    },
+    {
+      "package": "vega-time",
+      "fn": "timeOffset",
+      "args": [
+        "date",
+        {
+          "$": "date",
+          "epochMillis": 1325372400000
+        },
+        3
+      ],
+      "result": {
+        "$": "date",
+        "epochMillis": 1325631600000
+      }
+    },
+    {
+      "package": "vega-time",
+      "fn": "timeOffset",
+      "args": [
+        "date",
+        {
+          "$": "date",
+          "epochMillis": 1325372400000
+        },
+        4
+      ],
+      "result": {
+        "$": "date",
+        "epochMillis": 1325718000000
+      }
+    },
+    {
+      "package": "vega-time",
+      "fn": "timeOffset",
+      "args": [
+        "date",
+        {
+          "$": "date",
+          "epochMillis": 1325372400000
+        },
+        5
+      ],
+      "result": {
+        "$": "date",
+        "epochMillis": 1325804400000
+      }
+    },
+    {
+      "package": "vega-time",
+      "fn": "timeOffset",
+      "args": [
+        "date",
+        {
+          "$": "date",
+          "epochMillis": 1325372400000
+        },
+        6
+      ],
+      "result": {
+        "$": "date",
+        "epochMillis": 1325890800000
+      }
+    },
+    {
+      "package": "vega-time",
+      "fn": "timeOffset",
+      "args": [
+        "date",
+        {
+          "$": "date",
+          "epochMillis": 1325372400000
+        },
+        7
+      ],
+      "result": {
+        "$": "date",
+        "epochMillis": 1325977200000
+      }
+    },
+    {
+      "package": "vega-time",
+      "fn": "timeOffset",
+      "args": [
+        "date",
+        {
+          "$": "date",
+          "epochMillis": 1325372400000
+        },
+        8
+      ],
+      "result": {
+        "$": "date",
+        "epochMillis": 1326063600000
+      }
+    },
+    {
+      "package": "vega-time",
+      "fn": "timeOffset",
+      "args": [
+        "date",
+        {
+          "$": "date",
+          "epochMillis": 1325372400000
+        },
+        9
+      ],
+      "result": {
+        "$": "date",
+        "epochMillis": 1326150000000
+      }
+    },
+    {
+      "package": "vega-time",
+      "fn": "timeSequence",
+      "args": [
+        "date",
+        {
+          "$": "date",
+          "epochMillis": 1325372400000
+        },
+        1326150000001
+      ],
+      "result": [
+        {
+          "$": "date",
+          "epochMillis": 1325372400000
+        },
+        {
+          "$": "date",
+          "epochMillis": 1325458800000
+        },
+        {
+          "$": "date",
+          "epochMillis": 1325545200000
+        },
+        {
+          "$": "date",
+          "epochMillis": 1325631600000
+        },
+        {
+          "$": "date",
+          "epochMillis": 1325718000000
+        },
+        {
+          "$": "date",
+          "epochMillis": 1325804400000
+        },
+        {
+          "$": "date",
+          "epochMillis": 1325890800000
+        },
+        {
+          "$": "date",
+          "epochMillis": 1325977200000
+        },
+        {
+          "$": "date",
+          "epochMillis": 1326063600000
+        },
+        {
+          "$": "date",
+          "epochMillis": 1326150000000
+        }
+      ]
+    },
+    {
+      "package": "vega-time",
+      "fn": "timeOffset",
+      "args": [
+        "day",
+        {
+          "$": "date",
+          "epochMillis": 1325372400000
+        },
+        0
+      ],
+      "result": {
+        "$": "date",
+        "epochMillis": 1325372400000
+      }
+    },
+    {
+      "package": "vega-time",
+      "fn": "timeOffset",
+      "args": [
+        "day",
+        {
+          "$": "date",
+          "epochMillis": 1325372400000
+        },
+        1
+      ],
+      "result": {
+        "$": "date",
+        "epochMillis": 1325458800000
+      }
+    },
+    {
+      "package": "vega-time",
+      "fn": "timeOffset",
+      "args": [
+        "day",
+        {
+          "$": "date",
+          "epochMillis": 1325372400000
+        },
+        3
+      ],
+      "result": {
+        "$": "date",
+        "epochMillis": 1325631600000
+      }
+    },
+    {
+      "package": "vega-time",
+      "fn": "timeOffset",
+      "args": [
+        "day",
+        {
+          "$": "date",
+          "epochMillis": 1325372400000
+        },
+        4
+      ],
+      "result": {
+        "$": "date",
+        "epochMillis": 1325718000000
+      }
+    },
+    {
+      "package": "vega-time",
+      "fn": "timeOffset",
+      "args": [
+        "day",
+        {
+          "$": "date",
+          "epochMillis": 1325372400000
+        },
+        5
+      ],
+      "result": {
+        "$": "date",
+        "epochMillis": 1325804400000
+      }
+    },
+    {
+      "package": "vega-time",
+      "fn": "timeOffset",
+      "args": [
+        "day",
+        {
+          "$": "date",
+          "epochMillis": 1325372400000
+        },
+        6
+      ],
+      "result": {
+        "$": "date",
+        "epochMillis": 1325890800000
+      }
+    },
+    {
+      "package": "vega-time",
+      "fn": "timeOffset",
+      "args": [
+        "day",
+        {
+          "$": "date",
+          "epochMillis": 1325372400000
+        },
+        7
+      ],
+      "result": {
+        "$": "date",
+        "epochMillis": 1325977200000
+      }
+    },
+    {
+      "package": "vega-time",
+      "fn": "timeOffset",
+      "args": [
+        "day",
+        {
+          "$": "date",
+          "epochMillis": 1325372400000
+        },
+        8
+      ],
+      "result": {
+        "$": "date",
+        "epochMillis": 1326063600000
+      }
+    },
+    {
+      "package": "vega-time",
+      "fn": "timeOffset",
+      "args": [
+        "day",
+        {
+          "$": "date",
+          "epochMillis": 1325372400000
+        },
+        9
+      ],
+      "result": {
+        "$": "date",
+        "epochMillis": 1326150000000
+      }
+    },
+    {
+      "package": "vega-time",
+      "fn": "timeSequence",
+      "args": [
+        "day",
+        {
+          "$": "date",
+          "epochMillis": 1325372400000
+        },
+        1326150000001
+      ],
+      "result": [
+        {
+          "$": "date",
+          "epochMillis": 1325372400000
+        },
+        {
+          "$": "date",
+          "epochMillis": 1325458800000
+        },
+        {
+          "$": "date",
+          "epochMillis": 1325545200000
+        },
+        {
+          "$": "date",
+          "epochMillis": 1325631600000
+        },
+        {
+          "$": "date",
+          "epochMillis": 1325718000000
+        },
+        {
+          "$": "date",
+          "epochMillis": 1325804400000
+        },
+        {
+          "$": "date",
+          "epochMillis": 1325890800000
+        },
+        {
+          "$": "date",
+          "epochMillis": 1325977200000
+        },
+        {
+          "$": "date",
+          "epochMillis": 1326063600000
+        },
+        {
+          "$": "date",
+          "epochMillis": 1326150000000
+        }
+      ]
+    },
+    {
+      "package": "vega-time",
+      "fn": "timeOffset",
+      "args": [
+        "dayofyear",
+        {
+          "$": "date",
+          "epochMillis": 1325372400000
+        },
+        0
+      ],
+      "result": {
+        "$": "date",
+        "epochMillis": 1325372400000
+      }
+    },
+    {
+      "package": "vega-time",
+      "fn": "timeOffset",
+      "args": [
+        "dayofyear",
+        {
+          "$": "date",
+          "epochMillis": 1325372400000
+        },
+        1
+      ],
+      "result": {
+        "$": "date",
+        "epochMillis": 1325458800000
+      }
+    },
+    {
+      "package": "vega-time",
+      "fn": "timeOffset",
+      "args": [
+        "dayofyear",
+        {
+          "$": "date",
+          "epochMillis": 1325372400000
+        },
+        3
+      ],
+      "result": {
+        "$": "date",
+        "epochMillis": 1325631600000
+      }
+    },
+    {
+      "package": "vega-time",
+      "fn": "timeOffset",
+      "args": [
+        "dayofyear",
+        {
+          "$": "date",
+          "epochMillis": 1325372400000
+        },
+        4
+      ],
+      "result": {
+        "$": "date",
+        "epochMillis": 1325718000000
+      }
+    },
+    {
+      "package": "vega-time",
+      "fn": "timeOffset",
+      "args": [
+        "dayofyear",
+        {
+          "$": "date",
+          "epochMillis": 1325372400000
+        },
+        5
+      ],
+      "result": {
+        "$": "date",
+        "epochMillis": 1325804400000
+      }
+    },
+    {
+      "package": "vega-time",
+      "fn": "timeOffset",
+      "args": [
+        "dayofyear",
+        {
+          "$": "date",
+          "epochMillis": 1325372400000
+        },
+        6
+      ],
+      "result": {
+        "$": "date",
+        "epochMillis": 1325890800000
+      }
+    },
+    {
+      "package": "vega-time",
+      "fn": "timeOffset",
+      "args": [
+        "dayofyear",
+        {
+          "$": "date",
+          "epochMillis": 1325372400000
+        },
+        7
+      ],
+      "result": {
+        "$": "date",
+        "epochMillis": 1325977200000
+      }
+    },
+    {
+      "package": "vega-time",
+      "fn": "timeOffset",
+      "args": [
+        "dayofyear",
+        {
+          "$": "date",
+          "epochMillis": 1325372400000
+        },
+        8
+      ],
+      "result": {
+        "$": "date",
+        "epochMillis": 1326063600000
+      }
+    },
+    {
+      "package": "vega-time",
+      "fn": "timeOffset",
+      "args": [
+        "dayofyear",
+        {
+          "$": "date",
+          "epochMillis": 1325372400000
+        },
+        9
+      ],
+      "result": {
+        "$": "date",
+        "epochMillis": 1326150000000
+      }
+    },
+    {
+      "package": "vega-time",
+      "fn": "timeSequence",
+      "args": [
+        "dayofyear",
+        {
+          "$": "date",
+          "epochMillis": 1325372400000
+        },
+        1326150000001
+      ],
+      "result": [
+        {
+          "$": "date",
+          "epochMillis": 1325372400000
+        },
+        {
+          "$": "date",
+          "epochMillis": 1325458800000
+        },
+        {
+          "$": "date",
+          "epochMillis": 1325545200000
+        },
+        {
+          "$": "date",
+          "epochMillis": 1325631600000
+        },
+        {
+          "$": "date",
+          "epochMillis": 1325718000000
+        },
+        {
+          "$": "date",
+          "epochMillis": 1325804400000
+        },
+        {
+          "$": "date",
+          "epochMillis": 1325890800000
+        },
+        {
+          "$": "date",
+          "epochMillis": 1325977200000
+        },
+        {
+          "$": "date",
+          "epochMillis": 1326063600000
+        },
+        {
+          "$": "date",
+          "epochMillis": 1326150000000
+        }
+      ]
+    },
+    {
+      "package": "vega-time",
+      "fn": "timeOffset",
+      "args": [
+        "hours",
+        {
+          "$": "date",
+          "epochMillis": 1325372400000
+        },
+        0
+      ],
+      "result": {
+        "$": "date",
+        "epochMillis": 1325372400000
+      }
+    },
+    {
+      "package": "vega-time",
+      "fn": "timeOffset",
+      "args": [
+        "hours",
+        {
+          "$": "date",
+          "epochMillis": 1325372400000
+        },
+        1
+      ],
+      "result": {
+        "$": "date",
+        "epochMillis": 1325376000000
+      }
+    },
+    {
+      "package": "vega-time",
+      "fn": "timeOffset",
+      "args": [
+        "hours",
+        {
+          "$": "date",
+          "epochMillis": 1325372400000
+        },
+        3
+      ],
+      "result": {
+        "$": "date",
+        "epochMillis": 1325383200000
+      }
+    },
+    {
+      "package": "vega-time",
+      "fn": "timeOffset",
+      "args": [
+        "hours",
+        {
+          "$": "date",
+          "epochMillis": 1325372400000
+        },
+        4
+      ],
+      "result": {
+        "$": "date",
+        "epochMillis": 1325386800000
+      }
+    },
+    {
+      "package": "vega-time",
+      "fn": "timeOffset",
+      "args": [
+        "hours",
+        {
+          "$": "date",
+          "epochMillis": 1325372400000
+        },
+        5
+      ],
+      "result": {
+        "$": "date",
+        "epochMillis": 1325390400000
+      }
+    },
+    {
+      "package": "vega-time",
+      "fn": "timeOffset",
+      "args": [
+        "hours",
+        {
+          "$": "date",
+          "epochMillis": 1325372400000
+        },
+        6
+      ],
+      "result": {
+        "$": "date",
+        "epochMillis": 1325394000000
+      }
+    },
+    {
+      "package": "vega-time",
+      "fn": "timeOffset",
+      "args": [
+        "hours",
+        {
+          "$": "date",
+          "epochMillis": 1325372400000
+        },
+        7
+      ],
+      "result": {
+        "$": "date",
+        "epochMillis": 1325397600000
+      }
+    },
+    {
+      "package": "vega-time",
+      "fn": "timeOffset",
+      "args": [
+        "hours",
+        {
+          "$": "date",
+          "epochMillis": 1325372400000
+        },
+        8
+      ],
+      "result": {
+        "$": "date",
+        "epochMillis": 1325401200000
+      }
+    },
+    {
+      "package": "vega-time",
+      "fn": "timeOffset",
+      "args": [
+        "hours",
+        {
+          "$": "date",
+          "epochMillis": 1325372400000
+        },
+        9
+      ],
+      "result": {
+        "$": "date",
+        "epochMillis": 1325404800000
+      }
+    },
+    {
+      "package": "vega-time",
+      "fn": "timeSequence",
+      "args": [
+        "hours",
+        {
+          "$": "date",
+          "epochMillis": 1325372400000
+        },
+        1325404800001
+      ],
+      "result": [
+        {
+          "$": "date",
+          "epochMillis": 1325372400000
+        },
+        {
+          "$": "date",
+          "epochMillis": 1325376000000
+        },
+        {
+          "$": "date",
+          "epochMillis": 1325379600000
+        },
+        {
+          "$": "date",
+          "epochMillis": 1325383200000
+        },
+        {
+          "$": "date",
+          "epochMillis": 1325386800000
+        },
+        {
+          "$": "date",
+          "epochMillis": 1325390400000
+        },
+        {
+          "$": "date",
+          "epochMillis": 1325394000000
+        },
+        {
+          "$": "date",
+          "epochMillis": 1325397600000
+        },
+        {
+          "$": "date",
+          "epochMillis": 1325401200000
+        },
+        {
+          "$": "date",
+          "epochMillis": 1325404800000
+        }
+      ]
+    },
+    {
+      "package": "vega-time",
+      "fn": "timeOffset",
+      "args": [
+        "minutes",
+        {
+          "$": "date",
+          "epochMillis": 1325372400000
+        },
+        0
+      ],
+      "result": {
+        "$": "date",
+        "epochMillis": 1325372400000
+      }
+    },
+    {
+      "package": "vega-time",
+      "fn": "timeOffset",
+      "args": [
+        "minutes",
+        {
+          "$": "date",
+          "epochMillis": 1325372400000
+        },
+        1
+      ],
+      "result": {
+        "$": "date",
+        "epochMillis": 1325372460000
+      }
+    },
+    {
+      "package": "vega-time",
+      "fn": "timeOffset",
+      "args": [
+        "minutes",
+        {
+          "$": "date",
+          "epochMillis": 1325372400000
+        },
+        3
+      ],
+      "result": {
+        "$": "date",
+        "epochMillis": 1325372580000
+      }
+    },
+    {
+      "package": "vega-time",
+      "fn": "timeOffset",
+      "args": [
+        "minutes",
+        {
+          "$": "date",
+          "epochMillis": 1325372400000
+        },
+        4
+      ],
+      "result": {
+        "$": "date",
+        "epochMillis": 1325372640000
+      }
+    },
+    {
+      "package": "vega-time",
+      "fn": "timeOffset",
+      "args": [
+        "minutes",
+        {
+          "$": "date",
+          "epochMillis": 1325372400000
+        },
+        5
+      ],
+      "result": {
+        "$": "date",
+        "epochMillis": 1325372700000
+      }
+    },
+    {
+      "package": "vega-time",
+      "fn": "timeOffset",
+      "args": [
+        "minutes",
+        {
+          "$": "date",
+          "epochMillis": 1325372400000
+        },
+        6
+      ],
+      "result": {
+        "$": "date",
+        "epochMillis": 1325372760000
+      }
+    },
+    {
+      "package": "vega-time",
+      "fn": "timeOffset",
+      "args": [
+        "minutes",
+        {
+          "$": "date",
+          "epochMillis": 1325372400000
+        },
+        7
+      ],
+      "result": {
+        "$": "date",
+        "epochMillis": 1325372820000
+      }
+    },
+    {
+      "package": "vega-time",
+      "fn": "timeOffset",
+      "args": [
+        "minutes",
+        {
+          "$": "date",
+          "epochMillis": 1325372400000
+        },
+        8
+      ],
+      "result": {
+        "$": "date",
+        "epochMillis": 1325372880000
+      }
+    },
+    {
+      "package": "vega-time",
+      "fn": "timeOffset",
+      "args": [
+        "minutes",
+        {
+          "$": "date",
+          "epochMillis": 1325372400000
+        },
+        9
+      ],
+      "result": {
+        "$": "date",
+        "epochMillis": 1325372940000
+      }
+    },
+    {
+      "package": "vega-time",
+      "fn": "timeSequence",
+      "args": [
+        "minutes",
+        {
+          "$": "date",
+          "epochMillis": 1325372400000
+        },
+        1325372940001
+      ],
+      "result": [
+        {
+          "$": "date",
+          "epochMillis": 1325372400000
+        },
+        {
+          "$": "date",
+          "epochMillis": 1325372460000
+        },
+        {
+          "$": "date",
+          "epochMillis": 1325372520000
+        },
+        {
+          "$": "date",
+          "epochMillis": 1325372580000
+        },
+        {
+          "$": "date",
+          "epochMillis": 1325372640000
+        },
+        {
+          "$": "date",
+          "epochMillis": 1325372700000
+        },
+        {
+          "$": "date",
+          "epochMillis": 1325372760000
+        },
+        {
+          "$": "date",
+          "epochMillis": 1325372820000
+        },
+        {
+          "$": "date",
+          "epochMillis": 1325372880000
+        },
+        {
+          "$": "date",
+          "epochMillis": 1325372940000
+        }
+      ]
+    },
+    {
+      "package": "vega-time",
+      "fn": "timeOffset",
+      "args": [
+        "seconds",
+        {
+          "$": "date",
+          "epochMillis": 1325372400000
+        },
+        0
+      ],
+      "result": {
+        "$": "date",
+        "epochMillis": 1325372400000
+      }
+    },
+    {
+      "package": "vega-time",
+      "fn": "timeOffset",
+      "args": [
+        "seconds",
+        {
+          "$": "date",
+          "epochMillis": 1325372400000
+        },
+        1
+      ],
+      "result": {
+        "$": "date",
+        "epochMillis": 1325372401000
+      }
+    },
+    {
+      "package": "vega-time",
+      "fn": "timeOffset",
+      "args": [
+        "seconds",
+        {
+          "$": "date",
+          "epochMillis": 1325372400000
+        },
+        3
+      ],
+      "result": {
+        "$": "date",
+        "epochMillis": 1325372403000
+      }
+    },
+    {
+      "package": "vega-time",
+      "fn": "timeOffset",
+      "args": [
+        "seconds",
+        {
+          "$": "date",
+          "epochMillis": 1325372400000
+        },
+        4
+      ],
+      "result": {
+        "$": "date",
+        "epochMillis": 1325372404000
+      }
+    },
+    {
+      "package": "vega-time",
+      "fn": "timeOffset",
+      "args": [
+        "seconds",
+        {
+          "$": "date",
+          "epochMillis": 1325372400000
+        },
+        5
+      ],
+      "result": {
+        "$": "date",
+        "epochMillis": 1325372405000
+      }
+    },
+    {
+      "package": "vega-time",
+      "fn": "timeOffset",
+      "args": [
+        "seconds",
+        {
+          "$": "date",
+          "epochMillis": 1325372400000
+        },
+        6
+      ],
+      "result": {
+        "$": "date",
+        "epochMillis": 1325372406000
+      }
+    },
+    {
+      "package": "vega-time",
+      "fn": "timeOffset",
+      "args": [
+        "seconds",
+        {
+          "$": "date",
+          "epochMillis": 1325372400000
+        },
+        7
+      ],
+      "result": {
+        "$": "date",
+        "epochMillis": 1325372407000
+      }
+    },
+    {
+      "package": "vega-time",
+      "fn": "timeOffset",
+      "args": [
+        "seconds",
+        {
+          "$": "date",
+          "epochMillis": 1325372400000
+        },
+        8
+      ],
+      "result": {
+        "$": "date",
+        "epochMillis": 1325372408000
+      }
+    },
+    {
+      "package": "vega-time",
+      "fn": "timeOffset",
+      "args": [
+        "seconds",
+        {
+          "$": "date",
+          "epochMillis": 1325372400000
+        },
+        9
+      ],
+      "result": {
+        "$": "date",
+        "epochMillis": 1325372409000
+      }
+    },
+    {
+      "package": "vega-time",
+      "fn": "timeSequence",
+      "args": [
+        "seconds",
+        {
+          "$": "date",
+          "epochMillis": 1325372400000
+        },
+        1325372409001
+      ],
+      "result": [
+        {
+          "$": "date",
+          "epochMillis": 1325372400000
+        },
+        {
+          "$": "date",
+          "epochMillis": 1325372401000
+        },
+        {
+          "$": "date",
+          "epochMillis": 1325372402000
+        },
+        {
+          "$": "date",
+          "epochMillis": 1325372403000
+        },
+        {
+          "$": "date",
+          "epochMillis": 1325372404000
+        },
+        {
+          "$": "date",
+          "epochMillis": 1325372405000
+        },
+        {
+          "$": "date",
+          "epochMillis": 1325372406000
+        },
+        {
+          "$": "date",
+          "epochMillis": 1325372407000
+        },
+        {
+          "$": "date",
+          "epochMillis": 1325372408000
+        },
+        {
+          "$": "date",
+          "epochMillis": 1325372409000
+        }
+      ]
+    },
+    {
+      "package": "vega-time",
+      "fn": "timeOffset",
+      "args": [
+        "milliseconds",
+        {
+          "$": "date",
+          "epochMillis": 1325372400000
+        },
+        0
+      ],
+      "result": {
+        "$": "date",
+        "epochMillis": 1325372400000
+      }
+    },
+    {
+      "package": "vega-time",
+      "fn": "timeOffset",
+      "args": [
+        "milliseconds",
+        {
+          "$": "date",
+          "epochMillis": 1325372400000
+        },
+        1
+      ],
+      "result": {
+        "$": "date",
+        "epochMillis": 1325372400001
+      }
+    },
+    {
+      "package": "vega-time",
+      "fn": "timeOffset",
+      "args": [
+        "milliseconds",
+        {
+          "$": "date",
+          "epochMillis": 1325372400000
+        },
+        3
+      ],
+      "result": {
+        "$": "date",
+        "epochMillis": 1325372400003
+      }
+    },
+    {
+      "package": "vega-time",
+      "fn": "timeOffset",
+      "args": [
+        "milliseconds",
+        {
+          "$": "date",
+          "epochMillis": 1325372400000
+        },
+        4
+      ],
+      "result": {
+        "$": "date",
+        "epochMillis": 1325372400004
+      }
+    },
+    {
+      "package": "vega-time",
+      "fn": "timeOffset",
+      "args": [
+        "milliseconds",
+        {
+          "$": "date",
+          "epochMillis": 1325372400000
+        },
+        5
+      ],
+      "result": {
+        "$": "date",
+        "epochMillis": 1325372400005
+      }
+    },
+    {
+      "package": "vega-time",
+      "fn": "timeOffset",
+      "args": [
+        "milliseconds",
+        {
+          "$": "date",
+          "epochMillis": 1325372400000
+        },
+        6
+      ],
+      "result": {
+        "$": "date",
+        "epochMillis": 1325372400006
+      }
+    },
+    {
+      "package": "vega-time",
+      "fn": "timeOffset",
+      "args": [
+        "milliseconds",
+        {
+          "$": "date",
+          "epochMillis": 1325372400000
+        },
+        7
+      ],
+      "result": {
+        "$": "date",
+        "epochMillis": 1325372400007
+      }
+    },
+    {
+      "package": "vega-time",
+      "fn": "timeOffset",
+      "args": [
+        "milliseconds",
+        {
+          "$": "date",
+          "epochMillis": 1325372400000
+        },
+        8
+      ],
+      "result": {
+        "$": "date",
+        "epochMillis": 1325372400008
+      }
+    },
+    {
+      "package": "vega-time",
+      "fn": "timeOffset",
+      "args": [
+        "milliseconds",
+        {
+          "$": "date",
+          "epochMillis": 1325372400000
+        },
+        9
+      ],
+      "result": {
+        "$": "date",
+        "epochMillis": 1325372400009
+      }
+    },
+    {
+      "package": "vega-time",
+      "fn": "timeSequence",
+      "args": [
+        "milliseconds",
+        {
+          "$": "date",
+          "epochMillis": 1325372400000
+        },
+        1325372400010
+      ],
+      "result": [
+        {
+          "$": "date",
+          "epochMillis": 1325372400000
+        },
+        {
+          "$": "date",
+          "epochMillis": 1325372400001
+        },
+        {
+          "$": "date",
+          "epochMillis": 1325372400002
+        },
+        {
+          "$": "date",
+          "epochMillis": 1325372400003
+        },
+        {
+          "$": "date",
+          "epochMillis": 1325372400004
+        },
+        {
+          "$": "date",
+          "epochMillis": 1325372400005
+        },
+        {
+          "$": "date",
+          "epochMillis": 1325372400006
+        },
+        {
+          "$": "date",
+          "epochMillis": 1325372400007
+        },
+        {
+          "$": "date",
+          "epochMillis": 1325372400008
+        },
+        {
+          "$": "date",
+          "epochMillis": 1325372400009
+        }
+      ]
+    },
+    {
+      "package": "vega-time",
+      "fn": "utcOffset",
+      "args": [
+        "year",
+        {
+          "$": "date",
+          "epochMillis": 1325376000000
+        },
+        0
+      ],
+      "result": {
+        "$": "date",
+        "epochMillis": 1325376000000
+      }
+    },
+    {
+      "package": "vega-time",
+      "fn": "utcOffset",
+      "args": [
+        "year",
+        {
+          "$": "date",
+          "epochMillis": 1325376000000
+        },
+        1
+      ],
+      "result": {
+        "$": "date",
+        "epochMillis": 1356998400000
+      }
+    },
+    {
+      "package": "vega-time",
+      "fn": "utcOffset",
+      "args": [
+        "year",
+        {
+          "$": "date",
+          "epochMillis": 1325376000000
+        },
+        3
+      ],
+      "result": {
+        "$": "date",
+        "epochMillis": 1420070400000
+      }
+    },
+    {
+      "package": "vega-time",
+      "fn": "utcOffset",
+      "args": [
+        "year",
+        {
+          "$": "date",
+          "epochMillis": 1325376000000
+        },
+        4
+      ],
+      "result": {
+        "$": "date",
+        "epochMillis": 1451606400000
+      }
+    },
+    {
+      "package": "vega-time",
+      "fn": "utcOffset",
+      "args": [
+        "year",
+        {
+          "$": "date",
+          "epochMillis": 1325376000000
+        },
+        5
+      ],
+      "result": {
+        "$": "date",
+        "epochMillis": 1483228800000
+      }
+    },
+    {
+      "package": "vega-time",
+      "fn": "utcOffset",
+      "args": [
+        "year",
+        {
+          "$": "date",
+          "epochMillis": 1325376000000
+        },
+        6
+      ],
+      "result": {
+        "$": "date",
+        "epochMillis": 1514764800000
+      }
+    },
+    {
+      "package": "vega-time",
+      "fn": "utcOffset",
+      "args": [
+        "year",
+        {
+          "$": "date",
+          "epochMillis": 1325376000000
+        },
+        7
+      ],
+      "result": {
+        "$": "date",
+        "epochMillis": 1546300800000
+      }
+    },
+    {
+      "package": "vega-time",
+      "fn": "utcOffset",
+      "args": [
+        "year",
+        {
+          "$": "date",
+          "epochMillis": 1325376000000
+        },
+        8
+      ],
+      "result": {
+        "$": "date",
+        "epochMillis": 1577836800000
+      }
+    },
+    {
+      "package": "vega-time",
+      "fn": "utcOffset",
+      "args": [
+        "year",
+        {
+          "$": "date",
+          "epochMillis": 1325376000000
+        },
+        9
+      ],
+      "result": {
+        "$": "date",
+        "epochMillis": 1609459200000
+      }
+    },
+    {
+      "package": "vega-time",
+      "fn": "utcSequence",
+      "args": [
+        "year",
+        {
+          "$": "date",
+          "epochMillis": 1325376000000
+        },
+        1609459200001
+      ],
+      "result": [
+        {
+          "$": "date",
+          "epochMillis": 1325376000000
+        },
+        {
+          "$": "date",
+          "epochMillis": 1356998400000
+        },
+        {
+          "$": "date",
+          "epochMillis": 1388534400000
+        },
+        {
+          "$": "date",
+          "epochMillis": 1420070400000
+        },
+        {
+          "$": "date",
+          "epochMillis": 1451606400000
+        },
+        {
+          "$": "date",
+          "epochMillis": 1483228800000
+        },
+        {
+          "$": "date",
+          "epochMillis": 1514764800000
+        },
+        {
+          "$": "date",
+          "epochMillis": 1546300800000
+        },
+        {
+          "$": "date",
+          "epochMillis": 1577836800000
+        },
+        {
+          "$": "date",
+          "epochMillis": 1609459200000
+        }
+      ]
+    },
+    {
+      "package": "vega-time",
+      "fn": "utcOffset",
+      "args": [
+        "quarter",
+        {
+          "$": "date",
+          "epochMillis": 1325376000000
+        },
+        0
+      ],
+      "result": {
+        "$": "date",
+        "epochMillis": 1325376000000
+      }
+    },
+    {
+      "package": "vega-time",
+      "fn": "utcOffset",
+      "args": [
+        "quarter",
+        {
+          "$": "date",
+          "epochMillis": 1325376000000
+        },
+        1
+      ],
+      "result": {
+        "$": "date",
+        "epochMillis": 1333238400000
+      }
+    },
+    {
+      "package": "vega-time",
+      "fn": "utcOffset",
+      "args": [
+        "quarter",
+        {
+          "$": "date",
+          "epochMillis": 1325376000000
+        },
+        3
+      ],
+      "result": {
+        "$": "date",
+        "epochMillis": 1349049600000
+      }
+    },
+    {
+      "package": "vega-time",
+      "fn": "utcOffset",
+      "args": [
+        "quarter",
+        {
+          "$": "date",
+          "epochMillis": 1325376000000
+        },
+        4
+      ],
+      "result": {
+        "$": "date",
+        "epochMillis": 1356998400000
+      }
+    },
+    {
+      "package": "vega-time",
+      "fn": "utcOffset",
+      "args": [
+        "quarter",
+        {
+          "$": "date",
+          "epochMillis": 1325376000000
+        },
+        5
+      ],
+      "result": {
+        "$": "date",
+        "epochMillis": 1364774400000
+      }
+    },
+    {
+      "package": "vega-time",
+      "fn": "utcOffset",
+      "args": [
+        "quarter",
+        {
+          "$": "date",
+          "epochMillis": 1325376000000
+        },
+        6
+      ],
+      "result": {
+        "$": "date",
+        "epochMillis": 1372636800000
+      }
+    },
+    {
+      "package": "vega-time",
+      "fn": "utcOffset",
+      "args": [
+        "quarter",
+        {
+          "$": "date",
+          "epochMillis": 1325376000000
+        },
+        7
+      ],
+      "result": {
+        "$": "date",
+        "epochMillis": 1380585600000
+      }
+    },
+    {
+      "package": "vega-time",
+      "fn": "utcOffset",
+      "args": [
+        "quarter",
+        {
+          "$": "date",
+          "epochMillis": 1325376000000
+        },
+        8
+      ],
+      "result": {
+        "$": "date",
+        "epochMillis": 1388534400000
+      }
+    },
+    {
+      "package": "vega-time",
+      "fn": "utcOffset",
+      "args": [
+        "quarter",
+        {
+          "$": "date",
+          "epochMillis": 1325376000000
+        },
+        9
+      ],
+      "result": {
+        "$": "date",
+        "epochMillis": 1396310400000
+      }
+    },
+    {
+      "package": "vega-time",
+      "fn": "utcSequence",
+      "args": [
+        "quarter",
+        {
+          "$": "date",
+          "epochMillis": 1325376000000
+        },
+        1396310400001
+      ],
+      "result": [
+        {
+          "$": "date",
+          "epochMillis": 1325376000000
+        },
+        {
+          "$": "date",
+          "epochMillis": 1333238400000
+        },
+        {
+          "$": "date",
+          "epochMillis": 1341100800000
+        },
+        {
+          "$": "date",
+          "epochMillis": 1349049600000
+        },
+        {
+          "$": "date",
+          "epochMillis": 1356998400000
+        },
+        {
+          "$": "date",
+          "epochMillis": 1364774400000
+        },
+        {
+          "$": "date",
+          "epochMillis": 1372636800000
+        },
+        {
+          "$": "date",
+          "epochMillis": 1380585600000
+        },
+        {
+          "$": "date",
+          "epochMillis": 1388534400000
+        },
+        {
+          "$": "date",
+          "epochMillis": 1396310400000
+        }
+      ]
+    },
+    {
+      "package": "vega-time",
+      "fn": "utcOffset",
+      "args": [
+        "month",
+        {
+          "$": "date",
+          "epochMillis": 1325376000000
+        },
+        0
+      ],
+      "result": {
+        "$": "date",
+        "epochMillis": 1325376000000
+      }
+    },
+    {
+      "package": "vega-time",
+      "fn": "utcOffset",
+      "args": [
+        "month",
+        {
+          "$": "date",
+          "epochMillis": 1325376000000
+        },
+        1
+      ],
+      "result": {
+        "$": "date",
+        "epochMillis": 1328054400000
+      }
+    },
+    {
+      "package": "vega-time",
+      "fn": "utcOffset",
+      "args": [
+        "month",
+        {
+          "$": "date",
+          "epochMillis": 1325376000000
+        },
+        3
+      ],
+      "result": {
+        "$": "date",
+        "epochMillis": 1333238400000
+      }
+    },
+    {
+      "package": "vega-time",
+      "fn": "utcOffset",
+      "args": [
+        "month",
+        {
+          "$": "date",
+          "epochMillis": 1325376000000
+        },
+        4
+      ],
+      "result": {
+        "$": "date",
+        "epochMillis": 1335830400000
+      }
+    },
+    {
+      "package": "vega-time",
+      "fn": "utcOffset",
+      "args": [
+        "month",
+        {
+          "$": "date",
+          "epochMillis": 1325376000000
+        },
+        5
+      ],
+      "result": {
+        "$": "date",
+        "epochMillis": 1338508800000
+      }
+    },
+    {
+      "package": "vega-time",
+      "fn": "utcOffset",
+      "args": [
+        "month",
+        {
+          "$": "date",
+          "epochMillis": 1325376000000
+        },
+        6
+      ],
+      "result": {
+        "$": "date",
+        "epochMillis": 1341100800000
+      }
+    },
+    {
+      "package": "vega-time",
+      "fn": "utcOffset",
+      "args": [
+        "month",
+        {
+          "$": "date",
+          "epochMillis": 1325376000000
+        },
+        7
+      ],
+      "result": {
+        "$": "date",
+        "epochMillis": 1343779200000
+      }
+    },
+    {
+      "package": "vega-time",
+      "fn": "utcOffset",
+      "args": [
+        "month",
+        {
+          "$": "date",
+          "epochMillis": 1325376000000
+        },
+        8
+      ],
+      "result": {
+        "$": "date",
+        "epochMillis": 1346457600000
+      }
+    },
+    {
+      "package": "vega-time",
+      "fn": "utcOffset",
+      "args": [
+        "month",
+        {
+          "$": "date",
+          "epochMillis": 1325376000000
+        },
+        9
+      ],
+      "result": {
+        "$": "date",
+        "epochMillis": 1349049600000
+      }
+    },
+    {
+      "package": "vega-time",
+      "fn": "utcSequence",
+      "args": [
+        "month",
+        {
+          "$": "date",
+          "epochMillis": 1325376000000
+        },
+        1349049600001
+      ],
+      "result": [
+        {
+          "$": "date",
+          "epochMillis": 1325376000000
+        },
+        {
+          "$": "date",
+          "epochMillis": 1328054400000
+        },
+        {
+          "$": "date",
+          "epochMillis": 1330560000000
+        },
+        {
+          "$": "date",
+          "epochMillis": 1333238400000
+        },
+        {
+          "$": "date",
+          "epochMillis": 1335830400000
+        },
+        {
+          "$": "date",
+          "epochMillis": 1338508800000
+        },
+        {
+          "$": "date",
+          "epochMillis": 1341100800000
+        },
+        {
+          "$": "date",
+          "epochMillis": 1343779200000
+        },
+        {
+          "$": "date",
+          "epochMillis": 1346457600000
+        },
+        {
+          "$": "date",
+          "epochMillis": 1349049600000
+        }
+      ]
+    },
+    {
+      "package": "vega-time",
+      "fn": "utcOffset",
+      "args": [
+        "week",
+        {
+          "$": "date",
+          "epochMillis": 1325376000000
+        },
+        0
+      ],
+      "result": {
+        "$": "date",
+        "epochMillis": 1325376000000
+      }
+    },
+    {
+      "package": "vega-time",
+      "fn": "utcOffset",
+      "args": [
+        "week",
+        {
+          "$": "date",
+          "epochMillis": 1325376000000
+        },
+        1
+      ],
+      "result": {
+        "$": "date",
+        "epochMillis": 1325980800000
+      }
+    },
+    {
+      "package": "vega-time",
+      "fn": "utcOffset",
+      "args": [
+        "week",
+        {
+          "$": "date",
+          "epochMillis": 1325376000000
+        },
+        3
+      ],
+      "result": {
+        "$": "date",
+        "epochMillis": 1327190400000
+      }
+    },
+    {
+      "package": "vega-time",
+      "fn": "utcOffset",
+      "args": [
+        "week",
+        {
+          "$": "date",
+          "epochMillis": 1325376000000
+        },
+        4
+      ],
+      "result": {
+        "$": "date",
+        "epochMillis": 1327795200000
+      }
+    },
+    {
+      "package": "vega-time",
+      "fn": "utcOffset",
+      "args": [
+        "week",
+        {
+          "$": "date",
+          "epochMillis": 1325376000000
+        },
+        5
+      ],
+      "result": {
+        "$": "date",
+        "epochMillis": 1328400000000
+      }
+    },
+    {
+      "package": "vega-time",
+      "fn": "utcOffset",
+      "args": [
+        "week",
+        {
+          "$": "date",
+          "epochMillis": 1325376000000
+        },
+        6
+      ],
+      "result": {
+        "$": "date",
+        "epochMillis": 1329004800000
+      }
+    },
+    {
+      "package": "vega-time",
+      "fn": "utcOffset",
+      "args": [
+        "week",
+        {
+          "$": "date",
+          "epochMillis": 1325376000000
+        },
+        7
+      ],
+      "result": {
+        "$": "date",
+        "epochMillis": 1329609600000
+      }
+    },
+    {
+      "package": "vega-time",
+      "fn": "utcOffset",
+      "args": [
+        "week",
+        {
+          "$": "date",
+          "epochMillis": 1325376000000
+        },
+        8
+      ],
+      "result": {
+        "$": "date",
+        "epochMillis": 1330214400000
+      }
+    },
+    {
+      "package": "vega-time",
+      "fn": "utcOffset",
+      "args": [
+        "week",
+        {
+          "$": "date",
+          "epochMillis": 1325376000000
+        },
+        9
+      ],
+      "result": {
+        "$": "date",
+        "epochMillis": 1330819200000
+      }
+    },
+    {
+      "package": "vega-time",
+      "fn": "utcSequence",
+      "args": [
+        "week",
+        {
+          "$": "date",
+          "epochMillis": 1325376000000
+        },
+        1330819200001
+      ],
+      "result": [
+        {
+          "$": "date",
+          "epochMillis": 1325376000000
+        },
+        {
+          "$": "date",
+          "epochMillis": 1325980800000
+        },
+        {
+          "$": "date",
+          "epochMillis": 1326585600000
+        },
+        {
+          "$": "date",
+          "epochMillis": 1327190400000
+        },
+        {
+          "$": "date",
+          "epochMillis": 1327795200000
+        },
+        {
+          "$": "date",
+          "epochMillis": 1328400000000
+        },
+        {
+          "$": "date",
+          "epochMillis": 1329004800000
+        },
+        {
+          "$": "date",
+          "epochMillis": 1329609600000
+        },
+        {
+          "$": "date",
+          "epochMillis": 1330214400000
+        },
+        {
+          "$": "date",
+          "epochMillis": 1330819200000
+        }
+      ]
+    },
+    {
+      "package": "vega-time",
+      "fn": "utcOffset",
+      "args": [
+        "date",
+        {
+          "$": "date",
+          "epochMillis": 1325376000000
+        },
+        0
+      ],
+      "result": {
+        "$": "date",
+        "epochMillis": 1325376000000
+      }
+    },
+    {
+      "package": "vega-time",
+      "fn": "utcOffset",
+      "args": [
+        "date",
+        {
+          "$": "date",
+          "epochMillis": 1325376000000
+        },
+        1
+      ],
+      "result": {
+        "$": "date",
+        "epochMillis": 1325462400000
+      }
+    },
+    {
+      "package": "vega-time",
+      "fn": "utcOffset",
+      "args": [
+        "date",
+        {
+          "$": "date",
+          "epochMillis": 1325376000000
+        },
+        3
+      ],
+      "result": {
+        "$": "date",
+        "epochMillis": 1325635200000
+      }
+    },
+    {
+      "package": "vega-time",
+      "fn": "utcOffset",
+      "args": [
+        "date",
+        {
+          "$": "date",
+          "epochMillis": 1325376000000
+        },
+        4
+      ],
+      "result": {
+        "$": "date",
+        "epochMillis": 1325721600000
+      }
+    },
+    {
+      "package": "vega-time",
+      "fn": "utcOffset",
+      "args": [
+        "date",
+        {
+          "$": "date",
+          "epochMillis": 1325376000000
+        },
+        5
+      ],
+      "result": {
+        "$": "date",
+        "epochMillis": 1325808000000
+      }
+    },
+    {
+      "package": "vega-time",
+      "fn": "utcOffset",
+      "args": [
+        "date",
+        {
+          "$": "date",
+          "epochMillis": 1325376000000
+        },
+        6
+      ],
+      "result": {
+        "$": "date",
+        "epochMillis": 1325894400000
+      }
+    },
+    {
+      "package": "vega-time",
+      "fn": "utcOffset",
+      "args": [
+        "date",
+        {
+          "$": "date",
+          "epochMillis": 1325376000000
+        },
+        7
+      ],
+      "result": {
+        "$": "date",
+        "epochMillis": 1325980800000
+      }
+    },
+    {
+      "package": "vega-time",
+      "fn": "utcOffset",
+      "args": [
+        "date",
+        {
+          "$": "date",
+          "epochMillis": 1325376000000
+        },
+        8
+      ],
+      "result": {
+        "$": "date",
+        "epochMillis": 1326067200000
+      }
+    },
+    {
+      "package": "vega-time",
+      "fn": "utcOffset",
+      "args": [
+        "date",
+        {
+          "$": "date",
+          "epochMillis": 1325376000000
+        },
+        9
+      ],
+      "result": {
+        "$": "date",
+        "epochMillis": 1326153600000
+      }
+    },
+    {
+      "package": "vega-time",
+      "fn": "utcSequence",
+      "args": [
+        "date",
+        {
+          "$": "date",
+          "epochMillis": 1325376000000
+        },
+        1326153600001
+      ],
+      "result": [
+        {
+          "$": "date",
+          "epochMillis": 1325376000000
+        },
+        {
+          "$": "date",
+          "epochMillis": 1325462400000
+        },
+        {
+          "$": "date",
+          "epochMillis": 1325548800000
+        },
+        {
+          "$": "date",
+          "epochMillis": 1325635200000
+        },
+        {
+          "$": "date",
+          "epochMillis": 1325721600000
+        },
+        {
+          "$": "date",
+          "epochMillis": 1325808000000
+        },
+        {
+          "$": "date",
+          "epochMillis": 1325894400000
+        },
+        {
+          "$": "date",
+          "epochMillis": 1325980800000
+        },
+        {
+          "$": "date",
+          "epochMillis": 1326067200000
+        },
+        {
+          "$": "date",
+          "epochMillis": 1326153600000
+        }
+      ]
+    },
+    {
+      "package": "vega-time",
+      "fn": "utcOffset",
+      "args": [
+        "day",
+        {
+          "$": "date",
+          "epochMillis": 1325376000000
+        },
+        0
+      ],
+      "result": {
+        "$": "date",
+        "epochMillis": 1325376000000
+      }
+    },
+    {
+      "package": "vega-time",
+      "fn": "utcOffset",
+      "args": [
+        "day",
+        {
+          "$": "date",
+          "epochMillis": 1325376000000
+        },
+        1
+      ],
+      "result": {
+        "$": "date",
+        "epochMillis": 1325462400000
+      }
+    },
+    {
+      "package": "vega-time",
+      "fn": "utcOffset",
+      "args": [
+        "day",
+        {
+          "$": "date",
+          "epochMillis": 1325376000000
+        },
+        3
+      ],
+      "result": {
+        "$": "date",
+        "epochMillis": 1325635200000
+      }
+    },
+    {
+      "package": "vega-time",
+      "fn": "utcOffset",
+      "args": [
+        "day",
+        {
+          "$": "date",
+          "epochMillis": 1325376000000
+        },
+        4
+      ],
+      "result": {
+        "$": "date",
+        "epochMillis": 1325721600000
+      }
+    },
+    {
+      "package": "vega-time",
+      "fn": "utcOffset",
+      "args": [
+        "day",
+        {
+          "$": "date",
+          "epochMillis": 1325376000000
+        },
+        5
+      ],
+      "result": {
+        "$": "date",
+        "epochMillis": 1325808000000
+      }
+    },
+    {
+      "package": "vega-time",
+      "fn": "utcOffset",
+      "args": [
+        "day",
+        {
+          "$": "date",
+          "epochMillis": 1325376000000
+        },
+        6
+      ],
+      "result": {
+        "$": "date",
+        "epochMillis": 1325894400000
+      }
+    },
+    {
+      "package": "vega-time",
+      "fn": "utcOffset",
+      "args": [
+        "day",
+        {
+          "$": "date",
+          "epochMillis": 1325376000000
+        },
+        7
+      ],
+      "result": {
+        "$": "date",
+        "epochMillis": 1325980800000
+      }
+    },
+    {
+      "package": "vega-time",
+      "fn": "utcOffset",
+      "args": [
+        "day",
+        {
+          "$": "date",
+          "epochMillis": 1325376000000
+        },
+        8
+      ],
+      "result": {
+        "$": "date",
+        "epochMillis": 1326067200000
+      }
+    },
+    {
+      "package": "vega-time",
+      "fn": "utcOffset",
+      "args": [
+        "day",
+        {
+          "$": "date",
+          "epochMillis": 1325376000000
+        },
+        9
+      ],
+      "result": {
+        "$": "date",
+        "epochMillis": 1326153600000
+      }
+    },
+    {
+      "package": "vega-time",
+      "fn": "utcSequence",
+      "args": [
+        "day",
+        {
+          "$": "date",
+          "epochMillis": 1325376000000
+        },
+        1326153600001
+      ],
+      "result": [
+        {
+          "$": "date",
+          "epochMillis": 1325376000000
+        },
+        {
+          "$": "date",
+          "epochMillis": 1325462400000
+        },
+        {
+          "$": "date",
+          "epochMillis": 1325548800000
+        },
+        {
+          "$": "date",
+          "epochMillis": 1325635200000
+        },
+        {
+          "$": "date",
+          "epochMillis": 1325721600000
+        },
+        {
+          "$": "date",
+          "epochMillis": 1325808000000
+        },
+        {
+          "$": "date",
+          "epochMillis": 1325894400000
+        },
+        {
+          "$": "date",
+          "epochMillis": 1325980800000
+        },
+        {
+          "$": "date",
+          "epochMillis": 1326067200000
+        },
+        {
+          "$": "date",
+          "epochMillis": 1326153600000
+        }
+      ]
+    },
+    {
+      "package": "vega-time",
+      "fn": "utcOffset",
+      "args": [
+        "dayofyear",
+        {
+          "$": "date",
+          "epochMillis": 1325376000000
+        },
+        0
+      ],
+      "result": {
+        "$": "date",
+        "epochMillis": 1325376000000
+      }
+    },
+    {
+      "package": "vega-time",
+      "fn": "utcOffset",
+      "args": [
+        "dayofyear",
+        {
+          "$": "date",
+          "epochMillis": 1325376000000
+        },
+        1
+      ],
+      "result": {
+        "$": "date",
+        "epochMillis": 1325462400000
+      }
+    },
+    {
+      "package": "vega-time",
+      "fn": "utcOffset",
+      "args": [
+        "dayofyear",
+        {
+          "$": "date",
+          "epochMillis": 1325376000000
+        },
+        3
+      ],
+      "result": {
+        "$": "date",
+        "epochMillis": 1325635200000
+      }
+    },
+    {
+      "package": "vega-time",
+      "fn": "utcOffset",
+      "args": [
+        "dayofyear",
+        {
+          "$": "date",
+          "epochMillis": 1325376000000
+        },
+        4
+      ],
+      "result": {
+        "$": "date",
+        "epochMillis": 1325721600000
+      }
+    },
+    {
+      "package": "vega-time",
+      "fn": "utcOffset",
+      "args": [
+        "dayofyear",
+        {
+          "$": "date",
+          "epochMillis": 1325376000000
+        },
+        5
+      ],
+      "result": {
+        "$": "date",
+        "epochMillis": 1325808000000
+      }
+    },
+    {
+      "package": "vega-time",
+      "fn": "utcOffset",
+      "args": [
+        "dayofyear",
+        {
+          "$": "date",
+          "epochMillis": 1325376000000
+        },
+        6
+      ],
+      "result": {
+        "$": "date",
+        "epochMillis": 1325894400000
+      }
+    },
+    {
+      "package": "vega-time",
+      "fn": "utcOffset",
+      "args": [
+        "dayofyear",
+        {
+          "$": "date",
+          "epochMillis": 1325376000000
+        },
+        7
+      ],
+      "result": {
+        "$": "date",
+        "epochMillis": 1325980800000
+      }
+    },
+    {
+      "package": "vega-time",
+      "fn": "utcOffset",
+      "args": [
+        "dayofyear",
+        {
+          "$": "date",
+          "epochMillis": 1325376000000
+        },
+        8
+      ],
+      "result": {
+        "$": "date",
+        "epochMillis": 1326067200000
+      }
+    },
+    {
+      "package": "vega-time",
+      "fn": "utcOffset",
+      "args": [
+        "dayofyear",
+        {
+          "$": "date",
+          "epochMillis": 1325376000000
+        },
+        9
+      ],
+      "result": {
+        "$": "date",
+        "epochMillis": 1326153600000
+      }
+    },
+    {
+      "package": "vega-time",
+      "fn": "utcSequence",
+      "args": [
+        "dayofyear",
+        {
+          "$": "date",
+          "epochMillis": 1325376000000
+        },
+        1326153600001
+      ],
+      "result": [
+        {
+          "$": "date",
+          "epochMillis": 1325376000000
+        },
+        {
+          "$": "date",
+          "epochMillis": 1325462400000
+        },
+        {
+          "$": "date",
+          "epochMillis": 1325548800000
+        },
+        {
+          "$": "date",
+          "epochMillis": 1325635200000
+        },
+        {
+          "$": "date",
+          "epochMillis": 1325721600000
+        },
+        {
+          "$": "date",
+          "epochMillis": 1325808000000
+        },
+        {
+          "$": "date",
+          "epochMillis": 1325894400000
+        },
+        {
+          "$": "date",
+          "epochMillis": 1325980800000
+        },
+        {
+          "$": "date",
+          "epochMillis": 1326067200000
+        },
+        {
+          "$": "date",
+          "epochMillis": 1326153600000
+        }
+      ]
+    },
+    {
+      "package": "vega-time",
+      "fn": "utcOffset",
+      "args": [
+        "hours",
+        {
+          "$": "date",
+          "epochMillis": 1325376000000
+        },
+        0
+      ],
+      "result": {
+        "$": "date",
+        "epochMillis": 1325376000000
+      }
+    },
+    {
+      "package": "vega-time",
+      "fn": "utcOffset",
+      "args": [
+        "hours",
+        {
+          "$": "date",
+          "epochMillis": 1325376000000
+        },
+        1
+      ],
+      "result": {
+        "$": "date",
+        "epochMillis": 1325379600000
+      }
+    },
+    {
+      "package": "vega-time",
+      "fn": "utcOffset",
+      "args": [
+        "hours",
+        {
+          "$": "date",
+          "epochMillis": 1325376000000
+        },
+        3
+      ],
+      "result": {
+        "$": "date",
+        "epochMillis": 1325386800000
+      }
+    },
+    {
+      "package": "vega-time",
+      "fn": "utcOffset",
+      "args": [
+        "hours",
+        {
+          "$": "date",
+          "epochMillis": 1325376000000
+        },
+        4
+      ],
+      "result": {
+        "$": "date",
+        "epochMillis": 1325390400000
+      }
+    },
+    {
+      "package": "vega-time",
+      "fn": "utcOffset",
+      "args": [
+        "hours",
+        {
+          "$": "date",
+          "epochMillis": 1325376000000
+        },
+        5
+      ],
+      "result": {
+        "$": "date",
+        "epochMillis": 1325394000000
+      }
+    },
+    {
+      "package": "vega-time",
+      "fn": "utcOffset",
+      "args": [
+        "hours",
+        {
+          "$": "date",
+          "epochMillis": 1325376000000
+        },
+        6
+      ],
+      "result": {
+        "$": "date",
+        "epochMillis": 1325397600000
+      }
+    },
+    {
+      "package": "vega-time",
+      "fn": "utcOffset",
+      "args": [
+        "hours",
+        {
+          "$": "date",
+          "epochMillis": 1325376000000
+        },
+        7
+      ],
+      "result": {
+        "$": "date",
+        "epochMillis": 1325401200000
+      }
+    },
+    {
+      "package": "vega-time",
+      "fn": "utcOffset",
+      "args": [
+        "hours",
+        {
+          "$": "date",
+          "epochMillis": 1325376000000
+        },
+        8
+      ],
+      "result": {
+        "$": "date",
+        "epochMillis": 1325404800000
+      }
+    },
+    {
+      "package": "vega-time",
+      "fn": "utcOffset",
+      "args": [
+        "hours",
+        {
+          "$": "date",
+          "epochMillis": 1325376000000
+        },
+        9
+      ],
+      "result": {
+        "$": "date",
+        "epochMillis": 1325408400000
+      }
+    },
+    {
+      "package": "vega-time",
+      "fn": "utcSequence",
+      "args": [
+        "hours",
+        {
+          "$": "date",
+          "epochMillis": 1325376000000
+        },
+        1325408400001
+      ],
+      "result": [
+        {
+          "$": "date",
+          "epochMillis": 1325376000000
+        },
+        {
+          "$": "date",
+          "epochMillis": 1325379600000
+        },
+        {
+          "$": "date",
+          "epochMillis": 1325383200000
+        },
+        {
+          "$": "date",
+          "epochMillis": 1325386800000
+        },
+        {
+          "$": "date",
+          "epochMillis": 1325390400000
+        },
+        {
+          "$": "date",
+          "epochMillis": 1325394000000
+        },
+        {
+          "$": "date",
+          "epochMillis": 1325397600000
+        },
+        {
+          "$": "date",
+          "epochMillis": 1325401200000
+        },
+        {
+          "$": "date",
+          "epochMillis": 1325404800000
+        },
+        {
+          "$": "date",
+          "epochMillis": 1325408400000
+        }
+      ]
+    },
+    {
+      "package": "vega-time",
+      "fn": "utcOffset",
+      "args": [
+        "minutes",
+        {
+          "$": "date",
+          "epochMillis": 1325376000000
+        },
+        0
+      ],
+      "result": {
+        "$": "date",
+        "epochMillis": 1325376000000
+      }
+    },
+    {
+      "package": "vega-time",
+      "fn": "utcOffset",
+      "args": [
+        "minutes",
+        {
+          "$": "date",
+          "epochMillis": 1325376000000
+        },
+        1
+      ],
+      "result": {
+        "$": "date",
+        "epochMillis": 1325376060000
+      }
+    },
+    {
+      "package": "vega-time",
+      "fn": "utcOffset",
+      "args": [
+        "minutes",
+        {
+          "$": "date",
+          "epochMillis": 1325376000000
+        },
+        3
+      ],
+      "result": {
+        "$": "date",
+        "epochMillis": 1325376180000
+      }
+    },
+    {
+      "package": "vega-time",
+      "fn": "utcOffset",
+      "args": [
+        "minutes",
+        {
+          "$": "date",
+          "epochMillis": 1325376000000
+        },
+        4
+      ],
+      "result": {
+        "$": "date",
+        "epochMillis": 1325376240000
+      }
+    },
+    {
+      "package": "vega-time",
+      "fn": "utcOffset",
+      "args": [
+        "minutes",
+        {
+          "$": "date",
+          "epochMillis": 1325376000000
+        },
+        5
+      ],
+      "result": {
+        "$": "date",
+        "epochMillis": 1325376300000
+      }
+    },
+    {
+      "package": "vega-time",
+      "fn": "utcOffset",
+      "args": [
+        "minutes",
+        {
+          "$": "date",
+          "epochMillis": 1325376000000
+        },
+        6
+      ],
+      "result": {
+        "$": "date",
+        "epochMillis": 1325376360000
+      }
+    },
+    {
+      "package": "vega-time",
+      "fn": "utcOffset",
+      "args": [
+        "minutes",
+        {
+          "$": "date",
+          "epochMillis": 1325376000000
+        },
+        7
+      ],
+      "result": {
+        "$": "date",
+        "epochMillis": 1325376420000
+      }
+    },
+    {
+      "package": "vega-time",
+      "fn": "utcOffset",
+      "args": [
+        "minutes",
+        {
+          "$": "date",
+          "epochMillis": 1325376000000
+        },
+        8
+      ],
+      "result": {
+        "$": "date",
+        "epochMillis": 1325376480000
+      }
+    },
+    {
+      "package": "vega-time",
+      "fn": "utcOffset",
+      "args": [
+        "minutes",
+        {
+          "$": "date",
+          "epochMillis": 1325376000000
+        },
+        9
+      ],
+      "result": {
+        "$": "date",
+        "epochMillis": 1325376540000
+      }
+    },
+    {
+      "package": "vega-time",
+      "fn": "utcSequence",
+      "args": [
+        "minutes",
+        {
+          "$": "date",
+          "epochMillis": 1325376000000
+        },
+        1325376540001
+      ],
+      "result": [
+        {
+          "$": "date",
+          "epochMillis": 1325376000000
+        },
+        {
+          "$": "date",
+          "epochMillis": 1325376060000
+        },
+        {
+          "$": "date",
+          "epochMillis": 1325376120000
+        },
+        {
+          "$": "date",
+          "epochMillis": 1325376180000
+        },
+        {
+          "$": "date",
+          "epochMillis": 1325376240000
+        },
+        {
+          "$": "date",
+          "epochMillis": 1325376300000
+        },
+        {
+          "$": "date",
+          "epochMillis": 1325376360000
+        },
+        {
+          "$": "date",
+          "epochMillis": 1325376420000
+        },
+        {
+          "$": "date",
+          "epochMillis": 1325376480000
+        },
+        {
+          "$": "date",
+          "epochMillis": 1325376540000
+        }
+      ]
+    },
+    {
+      "package": "vega-time",
+      "fn": "utcOffset",
+      "args": [
+        "seconds",
+        {
+          "$": "date",
+          "epochMillis": 1325376000000
+        },
+        0
+      ],
+      "result": {
+        "$": "date",
+        "epochMillis": 1325376000000
+      }
+    },
+    {
+      "package": "vega-time",
+      "fn": "utcOffset",
+      "args": [
+        "seconds",
+        {
+          "$": "date",
+          "epochMillis": 1325376000000
+        },
+        1
+      ],
+      "result": {
+        "$": "date",
+        "epochMillis": 1325376001000
+      }
+    },
+    {
+      "package": "vega-time",
+      "fn": "utcOffset",
+      "args": [
+        "seconds",
+        {
+          "$": "date",
+          "epochMillis": 1325376000000
+        },
+        3
+      ],
+      "result": {
+        "$": "date",
+        "epochMillis": 1325376003000
+      }
+    },
+    {
+      "package": "vega-time",
+      "fn": "utcOffset",
+      "args": [
+        "seconds",
+        {
+          "$": "date",
+          "epochMillis": 1325376000000
+        },
+        4
+      ],
+      "result": {
+        "$": "date",
+        "epochMillis": 1325376004000
+      }
+    },
+    {
+      "package": "vega-time",
+      "fn": "utcOffset",
+      "args": [
+        "seconds",
+        {
+          "$": "date",
+          "epochMillis": 1325376000000
+        },
+        5
+      ],
+      "result": {
+        "$": "date",
+        "epochMillis": 1325376005000
+      }
+    },
+    {
+      "package": "vega-time",
+      "fn": "utcOffset",
+      "args": [
+        "seconds",
+        {
+          "$": "date",
+          "epochMillis": 1325376000000
+        },
+        6
+      ],
+      "result": {
+        "$": "date",
+        "epochMillis": 1325376006000
+      }
+    },
+    {
+      "package": "vega-time",
+      "fn": "utcOffset",
+      "args": [
+        "seconds",
+        {
+          "$": "date",
+          "epochMillis": 1325376000000
+        },
+        7
+      ],
+      "result": {
+        "$": "date",
+        "epochMillis": 1325376007000
+      }
+    },
+    {
+      "package": "vega-time",
+      "fn": "utcOffset",
+      "args": [
+        "seconds",
+        {
+          "$": "date",
+          "epochMillis": 1325376000000
+        },
+        8
+      ],
+      "result": {
+        "$": "date",
+        "epochMillis": 1325376008000
+      }
+    },
+    {
+      "package": "vega-time",
+      "fn": "utcOffset",
+      "args": [
+        "seconds",
+        {
+          "$": "date",
+          "epochMillis": 1325376000000
+        },
+        9
+      ],
+      "result": {
+        "$": "date",
+        "epochMillis": 1325376009000
+      }
+    },
+    {
+      "package": "vega-time",
+      "fn": "utcSequence",
+      "args": [
+        "seconds",
+        {
+          "$": "date",
+          "epochMillis": 1325376000000
+        },
+        1325376009001
+      ],
+      "result": [
+        {
+          "$": "date",
+          "epochMillis": 1325376000000
+        },
+        {
+          "$": "date",
+          "epochMillis": 1325376001000
+        },
+        {
+          "$": "date",
+          "epochMillis": 1325376002000
+        },
+        {
+          "$": "date",
+          "epochMillis": 1325376003000
+        },
+        {
+          "$": "date",
+          "epochMillis": 1325376004000
+        },
+        {
+          "$": "date",
+          "epochMillis": 1325376005000
+        },
+        {
+          "$": "date",
+          "epochMillis": 1325376006000
+        },
+        {
+          "$": "date",
+          "epochMillis": 1325376007000
+        },
+        {
+          "$": "date",
+          "epochMillis": 1325376008000
+        },
+        {
+          "$": "date",
+          "epochMillis": 1325376009000
+        }
+      ]
+    },
+    {
+      "package": "vega-time",
+      "fn": "utcOffset",
+      "args": [
+        "milliseconds",
+        {
+          "$": "date",
+          "epochMillis": 1325376000000
+        },
+        0
+      ],
+      "result": {
+        "$": "date",
+        "epochMillis": 1325376000000
+      }
+    },
+    {
+      "package": "vega-time",
+      "fn": "utcOffset",
+      "args": [
+        "milliseconds",
+        {
+          "$": "date",
+          "epochMillis": 1325376000000
+        },
+        1
+      ],
+      "result": {
+        "$": "date",
+        "epochMillis": 1325376000001
+      }
+    },
+    {
+      "package": "vega-time",
+      "fn": "utcOffset",
+      "args": [
+        "milliseconds",
+        {
+          "$": "date",
+          "epochMillis": 1325376000000
+        },
+        3
+      ],
+      "result": {
+        "$": "date",
+        "epochMillis": 1325376000003
+      }
+    },
+    {
+      "package": "vega-time",
+      "fn": "utcOffset",
+      "args": [
+        "milliseconds",
+        {
+          "$": "date",
+          "epochMillis": 1325376000000
+        },
+        4
+      ],
+      "result": {
+        "$": "date",
+        "epochMillis": 1325376000004
+      }
+    },
+    {
+      "package": "vega-time",
+      "fn": "utcOffset",
+      "args": [
+        "milliseconds",
+        {
+          "$": "date",
+          "epochMillis": 1325376000000
+        },
+        5
+      ],
+      "result": {
+        "$": "date",
+        "epochMillis": 1325376000005
+      }
+    },
+    {
+      "package": "vega-time",
+      "fn": "utcOffset",
+      "args": [
+        "milliseconds",
+        {
+          "$": "date",
+          "epochMillis": 1325376000000
+        },
+        6
+      ],
+      "result": {
+        "$": "date",
+        "epochMillis": 1325376000006
+      }
+    },
+    {
+      "package": "vega-time",
+      "fn": "utcOffset",
+      "args": [
+        "milliseconds",
+        {
+          "$": "date",
+          "epochMillis": 1325376000000
+        },
+        7
+      ],
+      "result": {
+        "$": "date",
+        "epochMillis": 1325376000007
+      }
+    },
+    {
+      "package": "vega-time",
+      "fn": "utcOffset",
+      "args": [
+        "milliseconds",
+        {
+          "$": "date",
+          "epochMillis": 1325376000000
+        },
+        8
+      ],
+      "result": {
+        "$": "date",
+        "epochMillis": 1325376000008
+      }
+    },
+    {
+      "package": "vega-time",
+      "fn": "utcOffset",
+      "args": [
+        "milliseconds",
+        {
+          "$": "date",
+          "epochMillis": 1325376000000
+        },
+        9
+      ],
+      "result": {
+        "$": "date",
+        "epochMillis": 1325376000009
+      }
+    },
+    {
+      "package": "vega-time",
+      "fn": "utcSequence",
+      "args": [
+        "milliseconds",
+        {
+          "$": "date",
+          "epochMillis": 1325376000000
+        },
+        1325376000010
+      ],
+      "result": [
+        {
+          "$": "date",
+          "epochMillis": 1325376000000
+        },
+        {
+          "$": "date",
+          "epochMillis": 1325376000001
+        },
+        {
+          "$": "date",
+          "epochMillis": 1325376000002
+        },
+        {
+          "$": "date",
+          "epochMillis": 1325376000003
+        },
+        {
+          "$": "date",
+          "epochMillis": 1325376000004
+        },
+        {
+          "$": "date",
+          "epochMillis": 1325376000005
+        },
+        {
+          "$": "date",
+          "epochMillis": 1325376000006
+        },
+        {
+          "$": "date",
+          "epochMillis": 1325376000007
+        },
+        {
+          "$": "date",
+          "epochMillis": 1325376000008
+        },
+        {
+          "$": "date",
+          "epochMillis": 1325376000009
+        }
+      ]
+    },
+    {
+      "package": "vega-time",
+      "fn": "timeUnitSpecifier",
+      "args": [
+        "year"
+      ],
+      "result": "%Y"
+    },
+    {
+      "package": "vega-time",
+      "fn": "timeUnitSpecifier",
+      "args": [
+        "quarter"
+      ],
+      "result": "Q%q"
+    },
+    {
+      "package": "vega-time",
+      "fn": "timeUnitSpecifier",
+      "args": [
+        "month"
+      ],
+      "result": "%b"
+    },
+    {
+      "package": "vega-time",
+      "fn": "timeUnitSpecifier",
+      "args": [
+        "week"
+      ],
+      "result": "W%U"
+    },
+    {
+      "package": "vega-time",
+      "fn": "timeUnitSpecifier",
+      "args": [
+        "day"
+      ],
+      "result": "%a"
+    },
+    {
+      "package": "vega-time",
+      "fn": "timeUnitSpecifier",
+      "args": [
+        "date"
+      ],
+      "result": "%d"
+    },
+    {
+      "package": "vega-time",
+      "fn": "timeUnitSpecifier",
+      "args": [
+        "dayofyear"
+      ],
+      "result": "%j"
+    },
+    {
+      "package": "vega-time",
+      "fn": "timeUnitSpecifier",
+      "args": [
+        "hours"
+      ],
+      "result": "%H:00"
+    },
+    {
+      "package": "vega-time",
+      "fn": "timeUnitSpecifier",
+      "args": [
+        "minutes"
+      ],
+      "result": "00:%M"
+    },
+    {
+      "package": "vega-time",
+      "fn": "timeUnitSpecifier",
+      "args": [
+        "seconds"
+      ],
+      "result": ":%S"
+    },
+    {
+      "package": "vega-time",
+      "fn": "timeUnitSpecifier",
+      "args": [
+        "milliseconds"
+      ],
+      "result": ".%L"
+    },
+    {
+      "package": "vega-time",
+      "fn": "timeUnitSpecifier",
+      "args": [
+        [
+          "year",
+          "quarter"
+        ]
+      ],
+      "result": "%Y Q%q"
+    },
+    {
+      "package": "vega-time",
+      "fn": "timeUnitSpecifier",
+      "args": [
+        [
+          "year",
+          "month"
+        ]
+      ],
+      "result": "%Y-%m"
+    },
+    {
+      "package": "vega-time",
+      "fn": "timeUnitSpecifier",
+      "args": [
+        [
+          "year",
+          "month",
+          "date"
+        ]
+      ],
+      "result": "%Y-%m-%d"
+    },
+    {
+      "package": "vega-time",
+      "fn": "timeUnitSpecifier",
+      "args": [
+        [
+          "year",
+          "week"
+        ]
+      ],
+      "result": "%Y W%U"
+    },
+    {
+      "package": "vega-time",
+      "fn": "timeUnitSpecifier",
+      "args": [
+        [
+          "year",
+          "week",
+          "day"
+        ]
+      ],
+      "result": "%Y W%U %a"
+    },
+    {
+      "package": "vega-time",
+      "fn": "timeUnitSpecifier",
+      "args": [
+        [
+          "year",
+          "dayofyear"
+        ]
+      ],
+      "result": "%Y %j"
+    },
+    {
+      "package": "vega-time",
+      "fn": "timeUnitSpecifier",
+      "args": [
+        [
+          "day",
+          "hours",
+          "minutes"
+        ]
+      ],
+      "result": "%a %H:%M"
+    },
+    {
+      "package": "vega-time",
+      "fn": "timeUnitSpecifier",
+      "args": [
+        [
+          "year",
+          "month",
+          "date",
+          "hours"
+        ]
+      ],
+      "result": "%Y-%m-%d %H:00"
+    },
+    {
+      "package": "vega-time",
+      "fn": "timeUnitSpecifier",
+      "args": [
+        [
+          "year",
+          "month",
+          "date",
+          "minutes"
+        ]
+      ],
+      "result": "%Y-%m-%d 00:%M"
+    },
+    {
+      "package": "vega-time",
+      "fn": "timeUnitSpecifier",
+      "args": [
+        [
+          "year",
+          "month",
+          "date",
+          "hours",
+          "minutes"
+        ]
+      ],
+      "result": "%Y-%m-%d %H:%M"
+    },
+    {
+      "package": "vega-time",
+      "fn": "timeUnitSpecifier",
+      "args": [
+        [
+          "hours",
+          "minutes",
+          "seconds",
+          "milliseconds"
+        ]
+      ],
+      "result": "%H:%M:%S.%L"
+    },
+    {
+      "package": "vega-time",
+      "fn": "timeUnitSpecifier",
+      "args": [
+        [
+          "year"
+        ],
+        {
+          "year": "%y",
+          "month": "M%m",
+          "year-month": "%y-%b",
+          "year-month-date": "%y-%b-%d",
+          "dayofyear": "D%j",
+          "hours": "%H ",
+          "minutes": "%Mmin ",
+          "hours-minutes": null
+        }
+      ],
+      "result": "%y"
+    },
+    {
+      "package": "vega-time",
+      "fn": "timeUnitSpecifier",
+      "args": [
+        [
+          "month"
+        ],
+        {
+          "year": "%y",
+          "month": "M%m",
+          "year-month": "%y-%b",
+          "year-month-date": "%y-%b-%d",
+          "dayofyear": "D%j",
+          "hours": "%H ",
+          "minutes": "%Mmin ",
+          "hours-minutes": null
+        }
+      ],
+      "result": "M%m"
+    },
+    {
+      "package": "vega-time",
+      "fn": "timeUnitSpecifier",
+      "args": [
+        [
+          "year",
+          "month"
+        ],
+        {
+          "year": "%y",
+          "month": "M%m",
+          "year-month": "%y-%b",
+          "year-month-date": "%y-%b-%d",
+          "dayofyear": "D%j",
+          "hours": "%H ",
+          "minutes": "%Mmin ",
+          "hours-minutes": null
+        }
+      ],
+      "result": "%y-%b"
+    },
+    {
+      "package": "vega-time",
+      "fn": "timeUnitSpecifier",
+      "args": [
+        [
+          "year",
+          "month",
+          "date"
+        ],
+        {
+          "year": "%y",
+          "month": "M%m",
+          "year-month": "%y-%b",
+          "year-month-date": "%y-%b-%d",
+          "dayofyear": "D%j",
+          "hours": "%H ",
+          "minutes": "%Mmin ",
+          "hours-minutes": null
+        }
+      ],
+      "result": "%y-%b-%d"
+    },
+    {
+      "package": "vega-time",
+      "fn": "timeUnitSpecifier",
+      "args": [
+        [
+          "dayofyear"
+        ],
+        {
+          "year": "%y",
+          "month": "M%m",
+          "year-month": "%y-%b",
+          "year-month-date": "%y-%b-%d",
+          "dayofyear": "D%j",
+          "hours": "%H ",
+          "minutes": "%Mmin ",
+          "hours-minutes": null
+        }
+      ],
+      "result": "D%j"
+    },
+    {
+      "package": "vega-time",
+      "fn": "timeUnitSpecifier",
+      "args": [
+        [
+          "hours",
+          "minutes"
+        ],
+        {
+          "year": "%y",
+          "month": "M%m",
+          "year-month": "%y-%b",
+          "year-month-date": "%y-%b-%d",
+          "dayofyear": "D%j",
+          "hours": "%H ",
+          "minutes": "%Mmin ",
+          "hours-minutes": null
+        }
+      ],
+      "result": "%H %Mmin"
+    },
+    {
+      "package": "vega-time",
+      "fn": "timeUnits",
+      "args": [
+        "year"
+      ],
+      "result": [
+        "year"
+      ]
+    },
+    {
+      "package": "vega-time",
+      "fn": "timeUnits",
+      "args": [
+        [
+          "year"
+        ]
+      ],
+      "result": [
+        "year"
+      ]
+    },
+    {
+      "package": "vega-time",
+      "fn": "timeUnits",
+      "args": [
+        [
+          "year",
+          "month",
+          "date"
+        ]
+      ],
+      "result": [
+        "year",
+        "month",
+        "date"
+      ]
+    },
+    {
+      "package": "vega-time",
+      "fn": "timeUnits",
+      "args": [
+        [
+          "year",
+          "date",
+          "month"
+        ]
+      ],
+      "result": [
+        "year",
+        "month",
+        "date"
+      ]
+    },
+    {
+      "package": "vega-time",
+      "fn": "timeUnits",
+      "args": [
+        [
+          "date",
+          "month",
+          "year"
+        ]
+      ],
+      "result": [
+        "year",
+        "month",
+        "date"
+      ]
+    },
+    {
+      "package": "vega-time",
+      "fn": "timeUnits",
+      "args": [
+        [
+          "year",
+          "week",
+          "day"
+        ]
+      ],
+      "result": [
+        "year",
+        "week",
+        "day"
+      ]
+    },
+    {
+      "package": "vega-time",
+      "fn": "timeUnits",
+      "args": [
+        [
+          "year",
+          "day",
+          "week"
+        ]
+      ],
+      "result": [
+        "year",
+        "week",
+        "day"
+      ]
+    },
+    {
+      "package": "vega-time",
+      "fn": "timeUnits",
+      "args": [
+        [
+          "day",
+          "week",
+          "year"
+        ]
+      ],
+      "result": [
+        "year",
+        "week",
+        "day"
+      ]
+    },
+    {
+      "package": "vega-time",
+      "fn": "timeUnits",
+      "args": [
+        [
+          "year",
+          "dayofyear"
+        ]
+      ],
+      "result": [
+        "year",
+        "dayofyear"
+      ]
+    },
+    {
+      "package": "vega-time",
+      "fn": "timeUnits",
+      "args": [
+        [
+          "dayofyear",
+          "year"
+        ]
+      ],
+      "result": [
+        "year",
+        "dayofyear"
+      ]
+    },
+    {
+      "package": "vega-time",
+      "fn": "timeUnits",
+      "args": [
+        [
+          "hours",
+          "minutes",
+          "seconds"
+        ]
+      ],
+      "result": [
+        "hours",
+        "minutes",
+        "seconds"
+      ]
+    },
+    {
+      "package": "vega-time",
+      "fn": "timeUnits",
+      "args": [
+        [
+          "hours",
+          "seconds",
+          "minutes"
+        ]
+      ],
+      "result": [
+        "hours",
+        "minutes",
+        "seconds"
+      ]
+    },
+    {
+      "package": "vega-time",
+      "fn": "timeUnits",
+      "args": [
+        [
+          "seconds",
+          "minutes",
+          "hours"
+        ]
+      ],
+      "result": [
+        "hours",
+        "minutes",
+        "seconds"
+      ]
+    },
+    {
+      "package": "vega-time",
+      "fn": "dayofyear",
+      "args": [
+        {
+          "$": "date",
+          "epochMillis": 1325372400000
+        }
+      ],
+      "result": 1
+    },
+    {
+      "package": "vega-time",
+      "fn": "dayofyear",
+      "args": [
+        {
+          "$": "date",
+          "epochMillis": 1356908400000
+        }
+      ],
+      "result": 366
+    },
+    {
+      "package": "vega-time",
+      "fn": "dayofyear",
+      "args": [
+        {
+          "$": "date",
+          "epochMillis": 1293836400000
+        }
+      ],
+      "result": 1
+    },
+    {
+      "package": "vega-time",
+      "fn": "dayofyear",
+      "args": [
+        {
+          "$": "date",
+          "epochMillis": 1325286000000
+        }
+      ],
+      "result": 365
+    },
+    {
+      "package": "vega-time",
+      "fn": "dayofyear",
+      "args": [
+        1325372400000
+      ],
+      "result": 1
+    },
+    {
+      "package": "vega-time",
+      "fn": "dayofyear",
+      "args": [
+        1356908400000
+      ],
+      "result": 366
+    },
+    {
+      "package": "vega-time",
+      "fn": "dayofyear",
+      "args": [
+        1293836400000
+      ],
+      "result": 1
+    },
+    {
+      "package": "vega-time",
+      "fn": "dayofyear",
+      "args": [
+        1325286000000
+      ],
+      "result": 365
+    },
+    {
+      "package": "vega-time",
+      "fn": "week",
+      "args": [
+        {
+          "$": "date",
+          "epochMillis": 1325372400000
+        }
+      ],
+      "result": 1
+    },
+    {
+      "package": "vega-time",
+      "fn": "week",
+      "args": [
+        {
+          "$": "date",
+          "epochMillis": 1325977200000
+        }
+      ],
+      "result": 2
+    },
+    {
+      "package": "vega-time",
+      "fn": "week",
+      "args": [
+        {
+          "$": "date",
+          "epochMillis": 1356908400000
+        }
+      ],
+      "result": 53
+    },
+    {
+      "package": "vega-time",
+      "fn": "week",
+      "args": [
+        {
+          "$": "date",
+          "epochMillis": 1293836400000
+        }
+      ],
+      "result": 0
+    },
+    {
+      "package": "vega-time",
+      "fn": "week",
+      "args": [
+        {
+          "$": "date",
+          "epochMillis": 1294441200000
+        }
+      ],
+      "result": 1
+    },
+    {
+      "package": "vega-time",
+      "fn": "week",
+      "args": [
+        {
+          "$": "date",
+          "epochMillis": 1325286000000
+        }
+      ],
+      "result": 52
+    },
+    {
+      "package": "vega-time",
+      "fn": "week",
+      "args": [
+        1325372400000
+      ],
+      "result": 1
+    },
+    {
+      "package": "vega-time",
+      "fn": "week",
+      "args": [
+        1325977200000
+      ],
+      "result": 2
+    },
+    {
+      "package": "vega-time",
+      "fn": "week",
+      "args": [
+        1356908400000
+      ],
+      "result": 53
+    },
+    {
+      "package": "vega-time",
+      "fn": "week",
+      "args": [
+        1293836400000
+      ],
+      "result": 0
+    },
+    {
+      "package": "vega-time",
+      "fn": "week",
+      "args": [
+        1294441200000
+      ],
+      "result": 1
+    },
+    {
+      "package": "vega-time",
+      "fn": "week",
+      "args": [
+        1325286000000
+      ],
+      "result": 52
+    },
+    {
+      "package": "vega-time",
+      "fn": "utcdayofyear",
+      "args": [
+        {
+          "$": "date",
+          "epochMillis": 1325376000000
+        }
+      ],
+      "result": 1
+    },
+    {
+      "package": "vega-time",
+      "fn": "utcdayofyear",
+      "args": [
+        {
+          "$": "date",
+          "epochMillis": 1356912000000
+        }
+      ],
+      "result": 366
+    },
+    {
+      "package": "vega-time",
+      "fn": "utcdayofyear",
+      "args": [
+        {
+          "$": "date",
+          "epochMillis": 1293840000000
+        }
+      ],
+      "result": 1
+    },
+    {
+      "package": "vega-time",
+      "fn": "utcdayofyear",
+      "args": [
+        {
+          "$": "date",
+          "epochMillis": 1325289600000
+        }
+      ],
+      "result": 365
+    },
+    {
+      "package": "vega-time",
+      "fn": "utcdayofyear",
+      "args": [
+        1325376000000
+      ],
+      "result": 1
+    },
+    {
+      "package": "vega-time",
+      "fn": "utcdayofyear",
+      "args": [
+        1356912000000
+      ],
+      "result": 366
+    },
+    {
+      "package": "vega-time",
+      "fn": "utcdayofyear",
+      "args": [
+        1293840000000
+      ],
+      "result": 1
+    },
+    {
+      "package": "vega-time",
+      "fn": "utcdayofyear",
+      "args": [
+        1325289600000
+      ],
+      "result": 365
+    },
+    {
+      "package": "vega-time",
+      "fn": "utcweek",
+      "args": [
+        {
+          "$": "date",
+          "epochMillis": 1325376000000
+        }
+      ],
+      "result": 1
+    },
+    {
+      "package": "vega-time",
+      "fn": "utcweek",
+      "args": [
+        {
+          "$": "date",
+          "epochMillis": 1325980800000
+        }
+      ],
+      "result": 2
+    },
+    {
+      "package": "vega-time",
+      "fn": "utcweek",
+      "args": [
+        {
+          "$": "date",
+          "epochMillis": 1356912000000
+        }
+      ],
+      "result": 53
+    },
+    {
+      "package": "vega-time",
+      "fn": "utcweek",
+      "args": [
+        {
+          "$": "date",
+          "epochMillis": 1293840000000
+        }
+      ],
+      "result": 0
+    },
+    {
+      "package": "vega-time",
+      "fn": "utcweek",
+      "args": [
+        {
+          "$": "date",
+          "epochMillis": 1294444800000
+        }
+      ],
+      "result": 1
+    },
+    {
+      "package": "vega-time",
+      "fn": "utcweek",
+      "args": [
+        {
+          "$": "date",
+          "epochMillis": 1325289600000
+        }
+      ],
+      "result": 52
+    },
+    {
+      "package": "vega-time",
+      "fn": "utcweek",
+      "args": [
+        1325376000000
+      ],
+      "result": 1
+    },
+    {
+      "package": "vega-time",
+      "fn": "utcweek",
+      "args": [
+        1325980800000
+      ],
+      "result": 2
+    },
+    {
+      "package": "vega-time",
+      "fn": "utcweek",
+      "args": [
+        1356912000000
+      ],
+      "result": 53
+    },
+    {
+      "package": "vega-time",
+      "fn": "utcweek",
+      "args": [
+        1293840000000
+      ],
+      "result": 0
+    },
+    {
+      "package": "vega-time",
+      "fn": "utcweek",
+      "args": [
+        1294444800000
+      ],
+      "result": 1
+    },
+    {
+      "package": "vega-time",
+      "fn": "utcweek",
+      "args": [
+        1325289600000
+      ],
+      "result": 52
+    }
+  ]
+}

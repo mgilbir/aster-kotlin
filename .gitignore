@@ -22,3 +22,5 @@ node_modules/
 
 # Worktrees for parallel agents; each is its own checkout, not content of this one.
 .claude/worktrees/
+# Scratch directory the upstream-test recorder writes rewritten test files into.
+oracle-js/.recorder-scratch/

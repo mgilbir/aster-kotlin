@@ -1,0 +1,331 @@
+{
+  "package": "vega-event-selector",
+  "vega": "6.3.1",
+  "files": 1,
+  "skipped": [],
+  "calls": [
+    {
+      "package": "vega-event-selector",
+      "fn": "parseSelector",
+      "args": [
+        "rect:mousedown"
+      ],
+      "result": [
+        {
+          "source": "view",
+          "type": "mousedown",
+          "marktype": "rect"
+        }
+      ]
+    },
+    {
+      "package": "vega-event-selector",
+      "fn": "parseSelector",
+      "args": [
+        "rect:mousedown, rect:touchstart"
+      ],
+      "result": [
+        {
+          "source": "view",
+          "type": "mousedown",
+          "marktype": "rect"
+        },
+        {
+          "source": "view",
+          "type": "touchstart",
+          "marktype": "rect"
+        }
+      ]
+    },
+    {
+      "package": "vega-event-selector",
+      "fn": "parseSelector",
+      "args": [
+        "rect:mousedown!"
+      ],
+      "result": [
+        {
+          "source": "view",
+          "type": "mousedown",
+          "marktype": "rect",
+          "consume": true
+        }
+      ]
+    },
+    {
+      "package": "vega-event-selector",
+      "fn": "parseSelector",
+      "args": [
+        "@foo:mouseup"
+      ],
+      "result": [
+        {
+          "source": "view",
+          "type": "mouseup",
+          "markname": "foo"
+        }
+      ]
+    },
+    {
+      "package": "vega-event-selector",
+      "fn": "parseSelector",
+      "args": [
+        "rect:mousedown{1000}"
+      ],
+      "result": [
+        {
+          "source": "view",
+          "type": "mousedown",
+          "marktype": "rect",
+          "throttle": 1000
+        }
+      ]
+    },
+    {
+      "package": "vega-event-selector",
+      "fn": "parseSelector",
+      "args": [
+        "rect:mousedown{100,200}"
+      ],
+      "result": [
+        {
+          "source": "view",
+          "type": "mousedown",
+          "marktype": "rect",
+          "throttle": 100,
+          "debounce": 200
+        }
+      ]
+    },
+    {
+      "package": "vega-event-selector",
+      "fn": "parseSelector",
+      "args": [
+        "rect:mousedown{0,200}"
+      ],
+      "result": [
+        {
+          "source": "view",
+          "type": "mousedown",
+          "marktype": "rect",
+          "debounce": 200
+        }
+      ]
+    },
+    {
+      "package": "vega-event-selector",
+      "fn": "parseSelector",
+      "args": [
+        "rect:mousedown{,200}"
+      ],
+      "result": [
+        {
+          "source": "view",
+          "type": "mousedown",
+          "marktype": "rect",
+          "debounce": 200
+        }
+      ]
+    },
+    {
+      "package": "vega-event-selector",
+      "fn": "parseSelector",
+      "args": [
+        "rect:mousedown{200,0}"
+      ],
+      "result": [
+        {
+          "source": "view",
+          "type": "mousedown",
+          "marktype": "rect",
+          "throttle": 200
+        }
+      ]
+    },
+    {
+      "package": "vega-event-selector",
+      "fn": "parseSelector",
+      "args": [
+        "rect:mousedown{200,}"
+      ],
+      "result": [
+        {
+          "source": "view",
+          "type": "mousedown",
+          "marktype": "rect",
+          "throttle": 200
+        }
+      ]
+    },
+    {
+      "package": "vega-event-selector",
+      "fn": "parseSelector",
+      "args": [
+        "mousedown[event.x>10][event.metaKey]"
+      ],
+      "result": [
+        {
+          "source": "view",
+          "type": "mousedown",
+          "filter": [
+            "event.x>10",
+            "event.metaKey"
+          ]
+        }
+      ]
+    },
+    {
+      "package": "vega-event-selector",
+      "fn": "parseSelector",
+      "args": [
+        "wheel![event.shiftKey]"
+      ],
+      "result": [
+        {
+          "source": "view",
+          "type": "wheel",
+          "consume": true,
+          "filter": [
+            "event.shiftKey"
+          ]
+        }
+      ]
+    },
+    {
+      "package": "vega-event-selector",
+      "fn": "parseSelector",
+      "args": [
+        "wheel![event.shiftKey]{200}"
+      ],
+      "result": [
+        {
+          "source": "view",
+          "type": "wheel",
+          "consume": true,
+          "filter": [
+            "event.shiftKey"
+          ],
+          "throttle": 200
+        }
+      ]
+    },
+    {
+      "package": "vega-event-selector",
+      "fn": "parseSelector",
+      "args": [
+        "path:wheel![event.shiftKey]{200}"
+      ],
+      "result": [
+        {
+          "source": "view",
+          "type": "wheel",
+          "marktype": "path",
+          "consume": true,
+          "filter": [
+            "event.shiftKey"
+          ],
+          "throttle": 200
+        }
+      ]
+    },
+    {
+      "package": "vega-event-selector",
+      "fn": "parseSelector",
+      "args": [
+        "[mousedown, mouseup] > window:mousemove"
+      ],
+      "result": [
+        {
+          "source": "window",
+          "type": "mousemove",
+          "between": [
+            {
+              "source": "view",
+              "type": "mousedown"
+            },
+            {
+              "source": "view",
+              "type": "mouseup"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "package": "vega-event-selector",
+      "fn": "parseSelector",
+      "args": [
+        "[touchstart, touchend] > [mousedown, mouseup] > window:mousemove"
+      ],
+      "result": [
+        {
+          "between": [
+            {
+              "source": "view",
+              "type": "touchstart"
+            },
+            {
+              "source": "view",
+              "type": "touchend"
+            }
+          ],
+          "stream": {
+            "source": "window",
+            "type": "mousemove",
+            "between": [
+              {
+                "source": "view",
+                "type": "mousedown"
+              },
+              {
+                "source": "view",
+                "type": "mouseup"
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "package": "vega-event-selector",
+      "fn": "parseSelector",
+      "args": [
+        "[mousedown[!event.item], window:mouseup] > window:mousemove"
+      ],
+      "result": [
+        {
+          "source": "window",
+          "type": "mousemove",
+          "between": [
+            {
+              "source": "view",
+              "type": "mousedown",
+              "filter": [
+                "!event.item"
+              ]
+            },
+            {
+              "source": "window",
+              "type": "mouseup"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "package": "vega-event-selector",
+      "fn": "parseSelector",
+      "args": [
+        "rect:mousedown",
+        "scope"
+      ],
+      "result": [
+        {
+          "source": "scope",
+          "type": "mousedown",
+          "marktype": "rect"
+        }
+      ]
+    }
+  ]
+}

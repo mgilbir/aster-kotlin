@@ -387,6 +387,55 @@ lands, point `Pattern` at it and the divergence closes on every target at once. 
 first four vectors to write. Until then this is a **known**, measured divergence rather than an
 unexamined one — and note that no test in this repository runs on a native target, so Kotlin/Native's
 regex behaviour is unmeasured even for our own internal patterns.
+## Vega's own tests, recorded rather than transcribed
+
+Upstream has ~3,700 assertions across ~30 packages, and they are the best-chosen inputs anyone has
+produced for this grammar. `oracle-js/src/record-upstream-tests.mjs` turns them into differential
+vectors **without reading their assertions**: it runs each of their test files against the installed
+Vega 6.3.1 with the package's exports wrapped in a recording proxy, and writes every call — arguments,
+and what upstream actually returned — to `test-fixtures/upstream-vectors/<package>.json`.
+
+Recording beats transcribing for two reasons. Their assertions are sometimes deliberately loose
+(`t.ok(x > 0)`) where a port needs the exact value; and on a **version upgrade** the diff is data
+rather than a hand-edit spread across Kotlin. Re-run the recorder against a newer checkout and read
+the JSON diff.
+
+The imports are rewritten by **AST** (`acorn`), which is the part that has to survive that upgrade. The
+regex version it replaced did not survive the *current* version: it handled `import {a, b}` and missed
+`import * as vega`, the form 55 of these files use. Recorded today:
+
+| package | vectors | files run |
+| --- | --- | --- |
+| `vega-time` | 460 | 9/9 |
+| `vega-scenegraph` | 190 | 9/17 |
+| `vega-expression` | 149 | 2/2 |
+| `vega-statistics` | 112 | 13/13 |
+| `vega-scale` | 34 | 3/3 |
+| `vega-functions` | 33 | 5/5 |
+| `vega-event-selector` | 18 | 1/1 |
+| `vega-format` | 11 | 3/3 |
+
+**Where it stops, and why that is not a dead end.** `vega-crossfilter`, `vega-encode`, `vega-force`, `vega-geo`, `vega-hierarchy`, `vega-label`, `vega-regression`, `vega-transforms`, `vega-util`, `vega-voronoi` record *nothing*, because those packages
+export operator **classes** driven through a `Dataflow` — nothing crosses the export boundary with
+plain arguments. Their tests do run to completion (30/30 for `vega-transforms`), so the machinery is
+sound; the seam is one level in, at `prototype.transform(_, pulse)`, where params and the input and
+output pulses are all capturable. Two details to solve there: a params object holds **accessor
+functions** (encode them by their `fields`, not as `{$:'function'}`), and a pulse needs its tuples
+serialised. That is the highest-value extension by far — `vega-transforms` alone is 938 assertions.
+
+**The Kotlin side is an adapter per package**, not generated code: `UpstreamTimeVectorsTest` maps
+upstream function names onto ours, prints a coverage ledger, and asserts a **floor** on how many
+vectors replay so the harness cannot shrink into a pass. 281 of 460 `vega-time` vectors replay today;
+the rest are named in the output.
+
+It found a real gap on its first run, which is the argument for doing the other packages.
+`timeUnitSpecifier(units, overrides)` builds its table with `extend({}, defaults, specifiers)` and then
+tests `s[key] != null`, so an override set to **null** *removes* an entry instead of falling back to
+the default — the only way to say "do not combine these two units".
+`timeUnitSpecifier(['hours','minutes'], {'hours-minutes': null})` is `%H %Mmin` upstream where taking
+the built-in combination gives `%H:%M`. Our signature was `Map<String, String>`, which cannot express
+it at all. It is `Map<String, String?>` now.
+
 ## The inverted-radius arc: it was a guard, not the geometry
 
 Reported as "an arc whose `outerRadius` is smaller than its `innerRadius` draws nothing here and

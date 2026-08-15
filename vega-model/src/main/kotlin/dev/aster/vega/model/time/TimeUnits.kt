@@ -66,8 +66,16 @@ public object TimeUnits {
    * Unrecognised units are dropped rather than rejected, so a specification naming one gets a
    * shorter label rather than no chart.
    */
-  public fun specifier(units: List<String>, overrides: Map<String, String> = emptyMap()): String {
-    val table = SPECIFIERS + overrides
+  public fun specifier(units: List<String>, overrides: Map<String, String?> = emptyMap()): String {
+    // Nullable on purpose. Upstream builds the table with `extend({}, defaults, specifiers)` and
+    // then
+    // tests `s[key] != null`, so an override set to **null** does not fall back to the default — it
+    // *removes* the entry, and the search drops to a shorter run of units. That is the only way to
+    // say "do not combine these two", and `timeUnitSpecifier(['hours','minutes'], {'hours-minutes':
+    // null})` is `%H %Mmin` upstream where taking the built-in combination gives `%H:%M`. The
+    // signature used to be `Map<String, String>`, which cannot express it at all; upstream's own
+    // test vectors are what caught it.
+    val table: Map<String, String?> = SPECIFIERS + overrides
     val ordered = ALL.filter { it in units }
     val out = StringBuilder()
     var start = 0

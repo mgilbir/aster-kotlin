@@ -1,0 +1,3904 @@
+{
+  "package": "vega-expression",
+  "vega": "6.3.1",
+  "files": 2,
+  "skipped": [],
+  "calls": [
+    {
+      "package": "vega-expression",
+      "fn": "codegenExpression",
+      "args": [
+        {
+          "globalvar": "global"
+        }
+      ],
+      "result": {
+        "$": "function",
+        "name": "codegen"
+      }
+    },
+    {
+      "package": "vega-expression",
+      "fn": "parseExpression",
+      "args": [
+        "global._val_+1"
+      ],
+      "result": {
+        "type": "BinaryExpression",
+        "operator": "+",
+        "left": {
+          "type": "MemberExpression",
+          "computed": false,
+          "object": {
+            "type": "Identifier",
+            "name": "global"
+          },
+          "property": {
+            "type": "Identifier",
+            "name": "_val_",
+            "member": true
+          }
+        },
+        "right": {
+          "type": "Literal",
+          "value": 1,
+          "raw": "1"
+        }
+      }
+    },
+    {
+      "package": "vega-expression",
+      "fn": "parseExpression",
+      "args": [
+        "global[\"d©\"]"
+      ],
+      "result": {
+        "type": "MemberExpression",
+        "computed": true,
+        "object": {
+          "type": "Identifier",
+          "name": "global"
+        },
+        "property": {
+          "type": "Literal",
+          "value": "d©",
+          "raw": "\"d©\""
+        }
+      }
+    },
+    {
+      "package": "vega-expression",
+      "fn": "codegenExpression",
+      "args": [
+        {
+          "forbidden": [
+            "a",
+            "b",
+            "c"
+          ],
+          "globalvar": "global",
+          "fieldvar": "d"
+        }
+      ],
+      "result": {
+        "$": "function",
+        "name": "codegen"
+      }
+    },
+    {
+      "package": "vega-expression",
+      "fn": "codegenExpression",
+      "args": [
+        {
+          "allowed": [
+            "datum",
+            "event",
+            "signals"
+          ],
+          "globalvar": "global"
+        }
+      ],
+      "result": {
+        "$": "function",
+        "name": "codegen"
+      }
+    },
+    {
+      "package": "vega-expression",
+      "fn": "parseExpression",
+      "args": [
+        "1"
+      ],
+      "result": {
+        "type": "Literal",
+        "value": 1,
+        "raw": "1"
+      }
+    },
+    {
+      "package": "vega-expression",
+      "fn": "parseExpression",
+      "args": [
+        "0xFF"
+      ],
+      "result": {
+        "type": "Literal",
+        "value": 255,
+        "raw": "0xFF"
+      }
+    },
+    {
+      "package": "vega-expression",
+      "fn": "parseExpression",
+      "args": [
+        "1+1"
+      ],
+      "result": {
+        "type": "BinaryExpression",
+        "operator": "+",
+        "left": {
+          "type": "Literal",
+          "value": 1,
+          "raw": "1"
+        },
+        "right": {
+          "type": "Literal",
+          "value": 1,
+          "raw": "1"
+        }
+      }
+    },
+    {
+      "package": "vega-expression",
+      "fn": "parseExpression",
+      "args": [
+        "1 + 1"
+      ],
+      "result": {
+        "type": "BinaryExpression",
+        "operator": "+",
+        "left": {
+          "type": "Literal",
+          "value": 1,
+          "raw": "1"
+        },
+        "right": {
+          "type": "Literal",
+          "value": 1,
+          "raw": "1"
+        }
+      }
+    },
+    {
+      "package": "vega-expression",
+      "fn": "parseExpression",
+      "args": [
+        "1+(2+3)"
+      ],
+      "result": {
+        "type": "BinaryExpression",
+        "operator": "+",
+        "left": {
+          "type": "Literal",
+          "value": 1,
+          "raw": "1"
+        },
+        "right": {
+          "type": "BinaryExpression",
+          "operator": "+",
+          "left": {
+            "type": "Literal",
+            "value": 2,
+            "raw": "2"
+          },
+          "right": {
+            "type": "Literal",
+            "value": 3,
+            "raw": "3"
+          }
+        }
+      }
+    },
+    {
+      "package": "vega-expression",
+      "fn": "parseExpression",
+      "args": [
+        "3 * (2+1)"
+      ],
+      "result": {
+        "type": "BinaryExpression",
+        "operator": "*",
+        "left": {
+          "type": "Literal",
+          "value": 3,
+          "raw": "3"
+        },
+        "right": {
+          "type": "BinaryExpression",
+          "operator": "+",
+          "left": {
+            "type": "Literal",
+            "value": 2,
+            "raw": "2"
+          },
+          "right": {
+            "type": "Literal",
+            "value": 1,
+            "raw": "1"
+          }
+        }
+      }
+    },
+    {
+      "package": "vega-expression",
+      "fn": "parseExpression",
+      "args": [
+        "\"a\""
+      ],
+      "result": {
+        "type": "Literal",
+        "value": "a",
+        "raw": "\"a\""
+      }
+    },
+    {
+      "package": "vega-expression",
+      "fn": "parseExpression",
+      "args": [
+        "\"\t\""
+      ],
+      "result": {
+        "type": "Literal",
+        "value": "\t",
+        "raw": "\"\t\""
+      }
+    },
+    {
+      "package": "vega-expression",
+      "fn": "parseExpression",
+      "args": [
+        "\"©\""
+      ],
+      "result": {
+        "type": "Literal",
+        "value": "©",
+        "raw": "\"©\""
+      }
+    },
+    {
+      "package": "vega-expression",
+      "fn": "parseExpression",
+      "args": [
+        "\"a\" + \"b\""
+      ],
+      "result": {
+        "type": "BinaryExpression",
+        "operator": "+",
+        "left": {
+          "type": "Literal",
+          "value": "a",
+          "raw": "\"a\""
+        },
+        "right": {
+          "type": "Literal",
+          "value": "b",
+          "raw": "\"b\""
+        }
+      }
+    },
+    {
+      "package": "vega-expression",
+      "fn": "parseExpression",
+      "args": [
+        "true"
+      ],
+      "result": {
+        "type": "Literal",
+        "value": true,
+        "raw": "true"
+      }
+    },
+    {
+      "package": "vega-expression",
+      "fn": "parseExpression",
+      "args": [
+        "true && false"
+      ],
+      "result": {
+        "type": "LogicalExpression",
+        "operator": "&&",
+        "left": {
+          "type": "Literal",
+          "value": true,
+          "raw": "true"
+        },
+        "right": {
+          "type": "Literal",
+          "value": false,
+          "raw": "false"
+        }
+      }
+    },
+    {
+      "package": "vega-expression",
+      "fn": "parseExpression",
+      "args": [
+        "true || false"
+      ],
+      "result": {
+        "type": "LogicalExpression",
+        "operator": "||",
+        "left": {
+          "type": "Literal",
+          "value": true,
+          "raw": "true"
+        },
+        "right": {
+          "type": "Literal",
+          "value": false,
+          "raw": "false"
+        }
+      }
+    },
+    {
+      "package": "vega-expression",
+      "fn": "parseExpression",
+      "args": [
+        "(2>3) ? 1 : 2"
+      ],
+      "result": {
+        "type": "ConditionalExpression",
+        "test": {
+          "type": "BinaryExpression",
+          "operator": ">",
+          "left": {
+            "type": "Literal",
+            "value": 2,
+            "raw": "2"
+          },
+          "right": {
+            "type": "Literal",
+            "value": 3,
+            "raw": "3"
+          }
+        },
+        "consequent": {
+          "type": "Literal",
+          "value": 1,
+          "raw": "1"
+        },
+        "alternate": {
+          "type": "Literal",
+          "value": 2,
+          "raw": "2"
+        }
+      }
+    },
+    {
+      "package": "vega-expression",
+      "fn": "parseExpression",
+      "args": [
+        "1 + \"ab\".length"
+      ],
+      "result": {
+        "type": "BinaryExpression",
+        "operator": "+",
+        "left": {
+          "type": "Literal",
+          "value": 1,
+          "raw": "1"
+        },
+        "right": {
+          "type": "MemberExpression",
+          "computed": false,
+          "object": {
+            "type": "Literal",
+            "value": "ab",
+            "raw": "\"ab\""
+          },
+          "property": {
+            "type": "Identifier",
+            "name": "length",
+            "member": true
+          }
+        }
+      }
+    },
+    {
+      "package": "vega-expression",
+      "fn": "parseExpression",
+      "args": [
+        "/pattern/"
+      ],
+      "result": {
+        "type": "Literal",
+        "value": {
+          "$": "regexp",
+          "source": "pattern",
+          "flags": ""
+        },
+        "raw": "/pattern/",
+        "regex": {
+          "pattern": "pattern",
+          "flags": ""
+        }
+      }
+    },
+    {
+      "package": "vega-expression",
+      "fn": "parseExpression",
+      "args": [
+        "/[0-9]+/"
+      ],
+      "result": {
+        "type": "Literal",
+        "value": {
+          "$": "regexp",
+          "source": "[0-9]+",
+          "flags": ""
+        },
+        "raw": "/[0-9]+/",
+        "regex": {
+          "pattern": "[0-9]+",
+          "flags": ""
+        }
+      }
+    },
+    {
+      "package": "vega-expression",
+      "fn": "parseExpression",
+      "args": [
+        "/[1-9]+/"
+      ],
+      "result": {
+        "type": "Literal",
+        "value": {
+          "$": "regexp",
+          "source": "[1-9]+",
+          "flags": ""
+        },
+        "raw": "/[1-9]+/",
+        "regex": {
+          "pattern": "[1-9]+",
+          "flags": ""
+        }
+      }
+    },
+    {
+      "package": "vega-expression",
+      "fn": "parseExpression",
+      "args": [
+        "/[a-z]/gi"
+      ],
+      "result": {
+        "type": "Literal",
+        "value": {
+          "$": "regexp",
+          "source": "[a-z]",
+          "flags": "gi"
+        },
+        "raw": "/[a-z]/gi",
+        "regex": {
+          "pattern": "[a-z]",
+          "flags": "gi"
+        }
+      }
+    },
+    {
+      "package": "vega-expression",
+      "fn": "parseExpression",
+      "args": [
+        "regexp(\"pattern\")"
+      ],
+      "result": {
+        "type": "CallExpression",
+        "callee": {
+          "type": "Identifier",
+          "name": "regexp"
+        },
+        "arguments": [
+          {
+            "type": "Literal",
+            "value": "pattern",
+            "raw": "\"pattern\""
+          }
+        ]
+      }
+    },
+    {
+      "package": "vega-expression",
+      "fn": "parseExpression",
+      "args": [
+        "regexp(\"[0-9]+\")"
+      ],
+      "result": {
+        "type": "CallExpression",
+        "callee": {
+          "type": "Identifier",
+          "name": "regexp"
+        },
+        "arguments": [
+          {
+            "type": "Literal",
+            "value": "[0-9]+",
+            "raw": "\"[0-9]+\""
+          }
+        ]
+      }
+    },
+    {
+      "package": "vega-expression",
+      "fn": "parseExpression",
+      "args": [
+        "regexp(\"[1-9]+\")"
+      ],
+      "result": {
+        "type": "CallExpression",
+        "callee": {
+          "type": "Identifier",
+          "name": "regexp"
+        },
+        "arguments": [
+          {
+            "type": "Literal",
+            "value": "[1-9]+",
+            "raw": "\"[1-9]+\""
+          }
+        ]
+      }
+    },
+    {
+      "package": "vega-expression",
+      "fn": "parseExpression",
+      "args": [
+        "regexp(\"[a-z]\", \"gi\")"
+      ],
+      "result": {
+        "type": "CallExpression",
+        "callee": {
+          "type": "Identifier",
+          "name": "regexp"
+        },
+        "arguments": [
+          {
+            "type": "Literal",
+            "value": "[a-z]",
+            "raw": "\"[a-z]\""
+          },
+          {
+            "type": "Literal",
+            "value": "gi",
+            "raw": "\"gi\""
+          }
+        ]
+      }
+    },
+    {
+      "package": "vega-expression",
+      "fn": "parseExpression",
+      "args": [
+        "[]"
+      ],
+      "result": {
+        "type": "ArrayExpression",
+        "elements": []
+      }
+    },
+    {
+      "package": "vega-expression",
+      "fn": "parseExpression",
+      "args": [
+        "[1,2,3]"
+      ],
+      "result": {
+        "type": "ArrayExpression",
+        "elements": [
+          {
+            "type": "Literal",
+            "value": 1,
+            "raw": "1"
+          },
+          {
+            "type": "Literal",
+            "value": 2,
+            "raw": "2"
+          },
+          {
+            "type": "Literal",
+            "value": 3,
+            "raw": "3"
+          }
+        ]
+      }
+    },
+    {
+      "package": "vega-expression",
+      "fn": "parseExpression",
+      "args": [
+        "[\"a\",\"b\"]"
+      ],
+      "result": {
+        "type": "ArrayExpression",
+        "elements": [
+          {
+            "type": "Literal",
+            "value": "a",
+            "raw": "\"a\""
+          },
+          {
+            "type": "Literal",
+            "value": "b",
+            "raw": "\"b\""
+          }
+        ]
+      }
+    },
+    {
+      "package": "vega-expression",
+      "fn": "parseExpression",
+      "args": [
+        "-3"
+      ],
+      "result": {
+        "type": "UnaryExpression",
+        "operator": "-",
+        "argument": {
+          "type": "Literal",
+          "value": 3,
+          "raw": "3"
+        },
+        "prefix": true
+      }
+    },
+    {
+      "package": "vega-expression",
+      "fn": "parseExpression",
+      "args": [
+        "+\"4\""
+      ],
+      "result": {
+        "type": "UnaryExpression",
+        "operator": "+",
+        "argument": {
+          "type": "Literal",
+          "value": "4",
+          "raw": "\"4\""
+        },
+        "prefix": true
+      }
+    },
+    {
+      "package": "vega-expression",
+      "fn": "parseExpression",
+      "args": [
+        "~~5.2"
+      ],
+      "result": {
+        "type": "UnaryExpression",
+        "operator": "~",
+        "argument": {
+          "type": "UnaryExpression",
+          "operator": "~",
+          "argument": {
+            "type": "Literal",
+            "value": 5.2,
+            "raw": "5.2"
+          },
+          "prefix": true
+        },
+        "prefix": true
+      }
+    },
+    {
+      "package": "vega-expression",
+      "fn": "parseExpression",
+      "args": [
+        "!1"
+      ],
+      "result": {
+        "type": "UnaryExpression",
+        "operator": "!",
+        "argument": {
+          "type": "Literal",
+          "value": 1,
+          "raw": "1"
+        },
+        "prefix": true
+      }
+    },
+    {
+      "package": "vega-expression",
+      "fn": "parseExpression",
+      "args": [
+        "null"
+      ],
+      "result": {
+        "type": "Literal",
+        "value": null,
+        "raw": "null"
+      }
+    },
+    {
+      "package": "vega-expression",
+      "fn": "parseExpression",
+      "args": [
+        "E"
+      ],
+      "result": {
+        "type": "Identifier",
+        "name": "E"
+      }
+    },
+    {
+      "package": "vega-expression",
+      "fn": "parseExpression",
+      "args": [
+        "PI"
+      ],
+      "result": {
+        "type": "Identifier",
+        "name": "PI"
+      }
+    },
+    {
+      "package": "vega-expression",
+      "fn": "parseExpression",
+      "args": [
+        "SQRT2"
+      ],
+      "result": {
+        "type": "Identifier",
+        "name": "SQRT2"
+      }
+    },
+    {
+      "package": "vega-expression",
+      "fn": "parseExpression",
+      "args": [
+        "datum.a"
+      ],
+      "result": {
+        "type": "MemberExpression",
+        "computed": false,
+        "object": {
+          "type": "Identifier",
+          "name": "datum"
+        },
+        "property": {
+          "type": "Identifier",
+          "name": "a",
+          "member": true
+        }
+      }
+    },
+    {
+      "package": "vega-expression",
+      "fn": "parseExpression",
+      "args": [
+        "datum[\"a\"]"
+      ],
+      "result": {
+        "type": "MemberExpression",
+        "computed": true,
+        "object": {
+          "type": "Identifier",
+          "name": "datum"
+        },
+        "property": {
+          "type": "Literal",
+          "value": "a",
+          "raw": "\"a\""
+        }
+      }
+    },
+    {
+      "package": "vega-expression",
+      "fn": "parseExpression",
+      "args": [
+        "event.type"
+      ],
+      "result": {
+        "type": "MemberExpression",
+        "computed": false,
+        "object": {
+          "type": "Identifier",
+          "name": "event"
+        },
+        "property": {
+          "type": "Identifier",
+          "name": "type",
+          "member": true
+        }
+      }
+    },
+    {
+      "package": "vega-expression",
+      "fn": "parseExpression",
+      "args": [
+        "datum.föö"
+      ],
+      "result": {
+        "type": "MemberExpression",
+        "computed": false,
+        "object": {
+          "type": "Identifier",
+          "name": "datum"
+        },
+        "property": {
+          "type": "Identifier",
+          "name": "föö",
+          "member": true
+        }
+      }
+    },
+    {
+      "package": "vega-expression",
+      "fn": "parseExpression",
+      "args": [
+        "isNaN(1/0)"
+      ],
+      "result": {
+        "type": "CallExpression",
+        "callee": {
+          "type": "Identifier",
+          "name": "isNaN"
+        },
+        "arguments": [
+          {
+            "type": "BinaryExpression",
+            "operator": "/",
+            "left": {
+              "type": "Literal",
+              "value": 1,
+              "raw": "1"
+            },
+            "right": {
+              "type": "Literal",
+              "value": 0,
+              "raw": "0"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "package": "vega-expression",
+      "fn": "parseExpression",
+      "args": [
+        "isNaN(\"1\")"
+      ],
+      "result": {
+        "type": "CallExpression",
+        "callee": {
+          "type": "Identifier",
+          "name": "isNaN"
+        },
+        "arguments": [
+          {
+            "type": "Literal",
+            "value": "1",
+            "raw": "\"1\""
+          }
+        ]
+      }
+    },
+    {
+      "package": "vega-expression",
+      "fn": "parseExpression",
+      "args": [
+        "isFinite(1)"
+      ],
+      "result": {
+        "type": "CallExpression",
+        "callee": {
+          "type": "Identifier",
+          "name": "isFinite"
+        },
+        "arguments": [
+          {
+            "type": "Literal",
+            "value": 1,
+            "raw": "1"
+          }
+        ]
+      }
+    },
+    {
+      "package": "vega-expression",
+      "fn": "parseExpression",
+      "args": [
+        "isFinite(1/0)"
+      ],
+      "result": {
+        "type": "CallExpression",
+        "callee": {
+          "type": "Identifier",
+          "name": "isFinite"
+        },
+        "arguments": [
+          {
+            "type": "BinaryExpression",
+            "operator": "/",
+            "left": {
+              "type": "Literal",
+              "value": 1,
+              "raw": "1"
+            },
+            "right": {
+              "type": "Literal",
+              "value": 0,
+              "raw": "0"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "package": "vega-expression",
+      "fn": "parseExpression",
+      "args": [
+        "isFinite(null)"
+      ],
+      "result": {
+        "type": "CallExpression",
+        "callee": {
+          "type": "Identifier",
+          "name": "isFinite"
+        },
+        "arguments": [
+          {
+            "type": "Literal",
+            "value": null,
+            "raw": "null"
+          }
+        ]
+      }
+    },
+    {
+      "package": "vega-expression",
+      "fn": "parseExpression",
+      "args": [
+        "isFinite(\"0\")"
+      ],
+      "result": {
+        "type": "CallExpression",
+        "callee": {
+          "type": "Identifier",
+          "name": "isFinite"
+        },
+        "arguments": [
+          {
+            "type": "Literal",
+            "value": "0",
+            "raw": "\"0\""
+          }
+        ]
+      }
+    },
+    {
+      "package": "vega-expression",
+      "fn": "parseExpression",
+      "args": [
+        "abs(-3)"
+      ],
+      "result": {
+        "type": "CallExpression",
+        "callee": {
+          "type": "Identifier",
+          "name": "abs"
+        },
+        "arguments": [
+          {
+            "type": "UnaryExpression",
+            "operator": "-",
+            "argument": {
+              "type": "Literal",
+              "value": 3,
+              "raw": "3"
+            },
+            "prefix": true
+          }
+        ]
+      }
+    },
+    {
+      "package": "vega-expression",
+      "fn": "parseExpression",
+      "args": [
+        "acos(1)"
+      ],
+      "result": {
+        "type": "CallExpression",
+        "callee": {
+          "type": "Identifier",
+          "name": "acos"
+        },
+        "arguments": [
+          {
+            "type": "Literal",
+            "value": 1,
+            "raw": "1"
+          }
+        ]
+      }
+    },
+    {
+      "package": "vega-expression",
+      "fn": "parseExpression",
+      "args": [
+        "asin(1)"
+      ],
+      "result": {
+        "type": "CallExpression",
+        "callee": {
+          "type": "Identifier",
+          "name": "asin"
+        },
+        "arguments": [
+          {
+            "type": "Literal",
+            "value": 1,
+            "raw": "1"
+          }
+        ]
+      }
+    },
+    {
+      "package": "vega-expression",
+      "fn": "parseExpression",
+      "args": [
+        "atan(1)"
+      ],
+      "result": {
+        "type": "CallExpression",
+        "callee": {
+          "type": "Identifier",
+          "name": "atan"
+        },
+        "arguments": [
+          {
+            "type": "Literal",
+            "value": 1,
+            "raw": "1"
+          }
+        ]
+      }
+    },
+    {
+      "package": "vega-expression",
+      "fn": "parseExpression",
+      "args": [
+        "atan2(1,2)"
+      ],
+      "result": {
+        "type": "CallExpression",
+        "callee": {
+          "type": "Identifier",
+          "name": "atan2"
+        },
+        "arguments": [
+          {
+            "type": "Literal",
+            "value": 1,
+            "raw": "1"
+          },
+          {
+            "type": "Literal",
+            "value": 2,
+            "raw": "2"
+          }
+        ]
+      }
+    },
+    {
+      "package": "vega-expression",
+      "fn": "parseExpression",
+      "args": [
+        "ceil(0.5)"
+      ],
+      "result": {
+        "type": "CallExpression",
+        "callee": {
+          "type": "Identifier",
+          "name": "ceil"
+        },
+        "arguments": [
+          {
+            "type": "Literal",
+            "value": 0.5,
+            "raw": "0.5"
+          }
+        ]
+      }
+    },
+    {
+      "package": "vega-expression",
+      "fn": "parseExpression",
+      "args": [
+        "cos(1)"
+      ],
+      "result": {
+        "type": "CallExpression",
+        "callee": {
+          "type": "Identifier",
+          "name": "cos"
+        },
+        "arguments": [
+          {
+            "type": "Literal",
+            "value": 1,
+            "raw": "1"
+          }
+        ]
+      }
+    },
+    {
+      "package": "vega-expression",
+      "fn": "parseExpression",
+      "args": [
+        "exp(1)"
+      ],
+      "result": {
+        "type": "CallExpression",
+        "callee": {
+          "type": "Identifier",
+          "name": "exp"
+        },
+        "arguments": [
+          {
+            "type": "Literal",
+            "value": 1,
+            "raw": "1"
+          }
+        ]
+      }
+    },
+    {
+      "package": "vega-expression",
+      "fn": "parseExpression",
+      "args": [
+        "floor(0.5)"
+      ],
+      "result": {
+        "type": "CallExpression",
+        "callee": {
+          "type": "Identifier",
+          "name": "floor"
+        },
+        "arguments": [
+          {
+            "type": "Literal",
+            "value": 0.5,
+            "raw": "0.5"
+          }
+        ]
+      }
+    },
+    {
+      "package": "vega-expression",
+      "fn": "parseExpression",
+      "args": [
+        "log(2)"
+      ],
+      "result": {
+        "type": "CallExpression",
+        "callee": {
+          "type": "Identifier",
+          "name": "log"
+        },
+        "arguments": [
+          {
+            "type": "Literal",
+            "value": 2,
+            "raw": "2"
+          }
+        ]
+      }
+    },
+    {
+      "package": "vega-expression",
+      "fn": "parseExpression",
+      "args": [
+        "max(0,1)"
+      ],
+      "result": {
+        "type": "CallExpression",
+        "callee": {
+          "type": "Identifier",
+          "name": "max"
+        },
+        "arguments": [
+          {
+            "type": "Literal",
+            "value": 0,
+            "raw": "0"
+          },
+          {
+            "type": "Literal",
+            "value": 1,
+            "raw": "1"
+          }
+        ]
+      }
+    },
+    {
+      "package": "vega-expression",
+      "fn": "parseExpression",
+      "args": [
+        "min(0,1)"
+      ],
+      "result": {
+        "type": "CallExpression",
+        "callee": {
+          "type": "Identifier",
+          "name": "min"
+        },
+        "arguments": [
+          {
+            "type": "Literal",
+            "value": 0,
+            "raw": "0"
+          },
+          {
+            "type": "Literal",
+            "value": 1,
+            "raw": "1"
+          }
+        ]
+      }
+    },
+    {
+      "package": "vega-expression",
+      "fn": "parseExpression",
+      "args": [
+        "pow(2,3)"
+      ],
+      "result": {
+        "type": "CallExpression",
+        "callee": {
+          "type": "Identifier",
+          "name": "pow"
+        },
+        "arguments": [
+          {
+            "type": "Literal",
+            "value": 2,
+            "raw": "2"
+          },
+          {
+            "type": "Literal",
+            "value": 3,
+            "raw": "3"
+          }
+        ]
+      }
+    },
+    {
+      "package": "vega-expression",
+      "fn": "parseExpression",
+      "args": [
+        "round(0.5)"
+      ],
+      "result": {
+        "type": "CallExpression",
+        "callee": {
+          "type": "Identifier",
+          "name": "round"
+        },
+        "arguments": [
+          {
+            "type": "Literal",
+            "value": 0.5,
+            "raw": "0.5"
+          }
+        ]
+      }
+    },
+    {
+      "package": "vega-expression",
+      "fn": "parseExpression",
+      "args": [
+        "sin(1)"
+      ],
+      "result": {
+        "type": "CallExpression",
+        "callee": {
+          "type": "Identifier",
+          "name": "sin"
+        },
+        "arguments": [
+          {
+            "type": "Literal",
+            "value": 1,
+            "raw": "1"
+          }
+        ]
+      }
+    },
+    {
+      "package": "vega-expression",
+      "fn": "parseExpression",
+      "args": [
+        "sqrt(2)"
+      ],
+      "result": {
+        "type": "CallExpression",
+        "callee": {
+          "type": "Identifier",
+          "name": "sqrt"
+        },
+        "arguments": [
+          {
+            "type": "Literal",
+            "value": 2,
+            "raw": "2"
+          }
+        ]
+      }
+    },
+    {
+      "package": "vega-expression",
+      "fn": "parseExpression",
+      "args": [
+        "tan(1)"
+      ],
+      "result": {
+        "type": "CallExpression",
+        "callee": {
+          "type": "Identifier",
+          "name": "tan"
+        },
+        "arguments": [
+          {
+            "type": "Literal",
+            "value": 1,
+            "raw": "1"
+          }
+        ]
+      }
+    },
+    {
+      "package": "vega-expression",
+      "fn": "parseExpression",
+      "args": [
+        "random()"
+      ],
+      "result": {
+        "type": "CallExpression",
+        "callee": {
+          "type": "Identifier",
+          "name": "random"
+        },
+        "arguments": []
+      }
+    },
+    {
+      "package": "vega-expression",
+      "fn": "parseExpression",
+      "args": [
+        "clamp(5, 0, 10)"
+      ],
+      "result": {
+        "type": "CallExpression",
+        "callee": {
+          "type": "Identifier",
+          "name": "clamp"
+        },
+        "arguments": [
+          {
+            "type": "Literal",
+            "value": 5,
+            "raw": "5"
+          },
+          {
+            "type": "Literal",
+            "value": 0,
+            "raw": "0"
+          },
+          {
+            "type": "Literal",
+            "value": 10,
+            "raw": "10"
+          }
+        ]
+      }
+    },
+    {
+      "package": "vega-expression",
+      "fn": "parseExpression",
+      "args": [
+        "clamp(-1, 0, 10)"
+      ],
+      "result": {
+        "type": "CallExpression",
+        "callee": {
+          "type": "Identifier",
+          "name": "clamp"
+        },
+        "arguments": [
+          {
+            "type": "UnaryExpression",
+            "operator": "-",
+            "argument": {
+              "type": "Literal",
+              "value": 1,
+              "raw": "1"
+            },
+            "prefix": true
+          },
+          {
+            "type": "Literal",
+            "value": 0,
+            "raw": "0"
+          },
+          {
+            "type": "Literal",
+            "value": 10,
+            "raw": "10"
+          }
+        ]
+      }
+    },
+    {
+      "package": "vega-expression",
+      "fn": "parseExpression",
+      "args": [
+        "clamp(11, 0, 10)"
+      ],
+      "result": {
+        "type": "CallExpression",
+        "callee": {
+          "type": "Identifier",
+          "name": "clamp"
+        },
+        "arguments": [
+          {
+            "type": "Literal",
+            "value": 11,
+            "raw": "11"
+          },
+          {
+            "type": "Literal",
+            "value": 0,
+            "raw": "0"
+          },
+          {
+            "type": "Literal",
+            "value": 10,
+            "raw": "10"
+          }
+        ]
+      }
+    },
+    {
+      "package": "vega-expression",
+      "fn": "parseExpression",
+      "args": [
+        "length([1, 2, 3])"
+      ],
+      "result": {
+        "type": "CallExpression",
+        "callee": {
+          "type": "Identifier",
+          "name": "length"
+        },
+        "arguments": [
+          {
+            "type": "ArrayExpression",
+            "elements": [
+              {
+                "type": "Literal",
+                "value": 1,
+                "raw": "1"
+              },
+              {
+                "type": "Literal",
+                "value": 2,
+                "raw": "2"
+              },
+              {
+                "type": "Literal",
+                "value": 3,
+                "raw": "3"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "package": "vega-expression",
+      "fn": "parseExpression",
+      "args": [
+        "length(\"123\")"
+      ],
+      "result": {
+        "type": "CallExpression",
+        "callee": {
+          "type": "Identifier",
+          "name": "length"
+        },
+        "arguments": [
+          {
+            "type": "Literal",
+            "value": "123",
+            "raw": "\"123\""
+          }
+        ]
+      }
+    },
+    {
+      "package": "vega-expression",
+      "fn": "parseExpression",
+      "args": [
+        "upper(\"abc\")"
+      ],
+      "result": {
+        "type": "CallExpression",
+        "callee": {
+          "type": "Identifier",
+          "name": "upper"
+        },
+        "arguments": [
+          {
+            "type": "Literal",
+            "value": "abc",
+            "raw": "\"abc\""
+          }
+        ]
+      }
+    },
+    {
+      "package": "vega-expression",
+      "fn": "parseExpression",
+      "args": [
+        "lower(\"abc\")"
+      ],
+      "result": {
+        "type": "CallExpression",
+        "callee": {
+          "type": "Identifier",
+          "name": "lower"
+        },
+        "arguments": [
+          {
+            "type": "Literal",
+            "value": "abc",
+            "raw": "\"abc\""
+          }
+        ]
+      }
+    },
+    {
+      "package": "vega-expression",
+      "fn": "parseExpression",
+      "args": [
+        "split(\"1 2 3\",\" \")"
+      ],
+      "result": {
+        "type": "CallExpression",
+        "callee": {
+          "type": "Identifier",
+          "name": "split"
+        },
+        "arguments": [
+          {
+            "type": "Literal",
+            "value": "1 2 3",
+            "raw": "\"1 2 3\""
+          },
+          {
+            "type": "Literal",
+            "value": " ",
+            "raw": "\" \""
+          }
+        ]
+      }
+    },
+    {
+      "package": "vega-expression",
+      "fn": "parseExpression",
+      "args": [
+        "substring(\"123\",0,1)"
+      ],
+      "result": {
+        "type": "CallExpression",
+        "callee": {
+          "type": "Identifier",
+          "name": "substring"
+        },
+        "arguments": [
+          {
+            "type": "Literal",
+            "value": "123",
+            "raw": "\"123\""
+          },
+          {
+            "type": "Literal",
+            "value": 0,
+            "raw": "0"
+          },
+          {
+            "type": "Literal",
+            "value": 1,
+            "raw": "1"
+          }
+        ]
+      }
+    },
+    {
+      "package": "vega-expression",
+      "fn": "parseExpression",
+      "args": [
+        "trim(\" 123 \")"
+      ],
+      "result": {
+        "type": "CallExpression",
+        "callee": {
+          "type": "Identifier",
+          "name": "trim"
+        },
+        "arguments": [
+          {
+            "type": "Literal",
+            "value": " 123 ",
+            "raw": "\" 123 \""
+          }
+        ]
+      }
+    },
+    {
+      "package": "vega-expression",
+      "fn": "parseExpression",
+      "args": [
+        "parseFloat(\"3.14\")"
+      ],
+      "result": {
+        "type": "CallExpression",
+        "callee": {
+          "type": "Identifier",
+          "name": "parseFloat"
+        },
+        "arguments": [
+          {
+            "type": "Literal",
+            "value": "3.14",
+            "raw": "\"3.14\""
+          }
+        ]
+      }
+    },
+    {
+      "package": "vega-expression",
+      "fn": "parseExpression",
+      "args": [
+        "parseInt(\"42\")"
+      ],
+      "result": {
+        "type": "CallExpression",
+        "callee": {
+          "type": "Identifier",
+          "name": "parseInt"
+        },
+        "arguments": [
+          {
+            "type": "Literal",
+            "value": "42",
+            "raw": "\"42\""
+          }
+        ]
+      }
+    },
+    {
+      "package": "vega-expression",
+      "fn": "parseExpression",
+      "args": [
+        "btoa(\"a\")"
+      ],
+      "result": {
+        "type": "CallExpression",
+        "callee": {
+          "type": "Identifier",
+          "name": "btoa"
+        },
+        "arguments": [
+          {
+            "type": "Literal",
+            "value": "a",
+            "raw": "\"a\""
+          }
+        ]
+      }
+    },
+    {
+      "package": "vega-expression",
+      "fn": "parseExpression",
+      "args": [
+        "atob(\"YQ==\")"
+      ],
+      "result": {
+        "type": "CallExpression",
+        "callee": {
+          "type": "Identifier",
+          "name": "atob"
+        },
+        "arguments": [
+          {
+            "type": "Literal",
+            "value": "YQ==",
+            "raw": "\"YQ==\""
+          }
+        ]
+      }
+    },
+    {
+      "package": "vega-expression",
+      "fn": "parseExpression",
+      "args": [
+        "encodeURIComponent(\"hello world\")"
+      ],
+      "result": {
+        "type": "CallExpression",
+        "callee": {
+          "type": "Identifier",
+          "name": "encodeURIComponent"
+        },
+        "arguments": [
+          {
+            "type": "Literal",
+            "value": "hello world",
+            "raw": "\"hello world\""
+          }
+        ]
+      }
+    },
+    {
+      "package": "vega-expression",
+      "fn": "parseExpression",
+      "args": [
+        "encodeURIComponent(\"a=b&c=d\")"
+      ],
+      "result": {
+        "type": "CallExpression",
+        "callee": {
+          "type": "Identifier",
+          "name": "encodeURIComponent"
+        },
+        "arguments": [
+          {
+            "type": "Literal",
+            "value": "a=b&c=d",
+            "raw": "\"a=b&c=d\""
+          }
+        ]
+      }
+    },
+    {
+      "package": "vega-expression",
+      "fn": "parseExpression",
+      "args": [
+        "test(/ain/, \"spain\")"
+      ],
+      "result": {
+        "type": "CallExpression",
+        "callee": {
+          "type": "Identifier",
+          "name": "test"
+        },
+        "arguments": [
+          {
+            "type": "Literal",
+            "value": {
+              "$": "regexp",
+              "source": "ain",
+              "flags": ""
+            },
+            "raw": "/ain/",
+            "regex": {
+              "pattern": "ain",
+              "flags": ""
+            }
+          },
+          {
+            "type": "Literal",
+            "value": "spain",
+            "raw": "\"spain\""
+          }
+        ]
+      }
+    },
+    {
+      "package": "vega-expression",
+      "fn": "parseExpression",
+      "args": [
+        "test(/ain/, \"france\")"
+      ],
+      "result": {
+        "type": "CallExpression",
+        "callee": {
+          "type": "Identifier",
+          "name": "test"
+        },
+        "arguments": [
+          {
+            "type": "Literal",
+            "value": {
+              "$": "regexp",
+              "source": "ain",
+              "flags": ""
+            },
+            "raw": "/ain/",
+            "regex": {
+              "pattern": "ain",
+              "flags": ""
+            }
+          },
+          {
+            "type": "Literal",
+            "value": "france",
+            "raw": "\"france\""
+          }
+        ]
+      }
+    },
+    {
+      "package": "vega-expression",
+      "fn": "parseExpression",
+      "args": [
+        "now()"
+      ],
+      "result": {
+        "type": "CallExpression",
+        "callee": {
+          "type": "Identifier",
+          "name": "now"
+        },
+        "arguments": []
+      }
+    },
+    {
+      "package": "vega-expression",
+      "fn": "parseExpression",
+      "args": [
+        "+datetime(2001,1,1)"
+      ],
+      "result": {
+        "type": "UnaryExpression",
+        "operator": "+",
+        "argument": {
+          "type": "CallExpression",
+          "callee": {
+            "type": "Identifier",
+            "name": "datetime"
+          },
+          "arguments": [
+            {
+              "type": "Literal",
+              "value": 2001,
+              "raw": "2001"
+            },
+            {
+              "type": "Literal",
+              "value": 1,
+              "raw": "1"
+            },
+            {
+              "type": "Literal",
+              "value": 1,
+              "raw": "1"
+            }
+          ]
+        },
+        "prefix": true
+      }
+    },
+    {
+      "package": "vega-expression",
+      "fn": "parseExpression",
+      "args": [
+        "time(datetime(2001,1,1))"
+      ],
+      "result": {
+        "type": "CallExpression",
+        "callee": {
+          "type": "Identifier",
+          "name": "time"
+        },
+        "arguments": [
+          {
+            "type": "CallExpression",
+            "callee": {
+              "type": "Identifier",
+              "name": "datetime"
+            },
+            "arguments": [
+              {
+                "type": "Literal",
+                "value": 2001,
+                "raw": "2001"
+              },
+              {
+                "type": "Literal",
+                "value": 1,
+                "raw": "1"
+              },
+              {
+                "type": "Literal",
+                "value": 1,
+                "raw": "1"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "package": "vega-expression",
+      "fn": "parseExpression",
+      "args": [
+        "timezoneoffset(datetime(2001,1,1))"
+      ],
+      "result": {
+        "type": "CallExpression",
+        "callee": {
+          "type": "Identifier",
+          "name": "timezoneoffset"
+        },
+        "arguments": [
+          {
+            "type": "CallExpression",
+            "callee": {
+              "type": "Identifier",
+              "name": "datetime"
+            },
+            "arguments": [
+              {
+                "type": "Literal",
+                "value": 2001,
+                "raw": "2001"
+              },
+              {
+                "type": "Literal",
+                "value": 1,
+                "raw": "1"
+              },
+              {
+                "type": "Literal",
+                "value": 1,
+                "raw": "1"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "package": "vega-expression",
+      "fn": "parseExpression",
+      "args": [
+        "day(datetime(2001,1,1))"
+      ],
+      "result": {
+        "type": "CallExpression",
+        "callee": {
+          "type": "Identifier",
+          "name": "day"
+        },
+        "arguments": [
+          {
+            "type": "CallExpression",
+            "callee": {
+              "type": "Identifier",
+              "name": "datetime"
+            },
+            "arguments": [
+              {
+                "type": "Literal",
+                "value": 2001,
+                "raw": "2001"
+              },
+              {
+                "type": "Literal",
+                "value": 1,
+                "raw": "1"
+              },
+              {
+                "type": "Literal",
+                "value": 1,
+                "raw": "1"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "package": "vega-expression",
+      "fn": "parseExpression",
+      "args": [
+        "year(datetime(2001,1,1))"
+      ],
+      "result": {
+        "type": "CallExpression",
+        "callee": {
+          "type": "Identifier",
+          "name": "year"
+        },
+        "arguments": [
+          {
+            "type": "CallExpression",
+            "callee": {
+              "type": "Identifier",
+              "name": "datetime"
+            },
+            "arguments": [
+              {
+                "type": "Literal",
+                "value": 2001,
+                "raw": "2001"
+              },
+              {
+                "type": "Literal",
+                "value": 1,
+                "raw": "1"
+              },
+              {
+                "type": "Literal",
+                "value": 1,
+                "raw": "1"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "package": "vega-expression",
+      "fn": "parseExpression",
+      "args": [
+        "month(datetime(2001,1,1))"
+      ],
+      "result": {
+        "type": "CallExpression",
+        "callee": {
+          "type": "Identifier",
+          "name": "month"
+        },
+        "arguments": [
+          {
+            "type": "CallExpression",
+            "callee": {
+              "type": "Identifier",
+              "name": "datetime"
+            },
+            "arguments": [
+              {
+                "type": "Literal",
+                "value": 2001,
+                "raw": "2001"
+              },
+              {
+                "type": "Literal",
+                "value": 1,
+                "raw": "1"
+              },
+              {
+                "type": "Literal",
+                "value": 1,
+                "raw": "1"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "package": "vega-expression",
+      "fn": "parseExpression",
+      "args": [
+        "hours(datetime(2001,1,1))"
+      ],
+      "result": {
+        "type": "CallExpression",
+        "callee": {
+          "type": "Identifier",
+          "name": "hours"
+        },
+        "arguments": [
+          {
+            "type": "CallExpression",
+            "callee": {
+              "type": "Identifier",
+              "name": "datetime"
+            },
+            "arguments": [
+              {
+                "type": "Literal",
+                "value": 2001,
+                "raw": "2001"
+              },
+              {
+                "type": "Literal",
+                "value": 1,
+                "raw": "1"
+              },
+              {
+                "type": "Literal",
+                "value": 1,
+                "raw": "1"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "package": "vega-expression",
+      "fn": "parseExpression",
+      "args": [
+        "minutes(datetime(2001,1,1))"
+      ],
+      "result": {
+        "type": "CallExpression",
+        "callee": {
+          "type": "Identifier",
+          "name": "minutes"
+        },
+        "arguments": [
+          {
+            "type": "CallExpression",
+            "callee": {
+              "type": "Identifier",
+              "name": "datetime"
+            },
+            "arguments": [
+              {
+                "type": "Literal",
+                "value": 2001,
+                "raw": "2001"
+              },
+              {
+                "type": "Literal",
+                "value": 1,
+                "raw": "1"
+              },
+              {
+                "type": "Literal",
+                "value": 1,
+                "raw": "1"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "package": "vega-expression",
+      "fn": "parseExpression",
+      "args": [
+        "seconds(datetime(2001,1,1))"
+      ],
+      "result": {
+        "type": "CallExpression",
+        "callee": {
+          "type": "Identifier",
+          "name": "seconds"
+        },
+        "arguments": [
+          {
+            "type": "CallExpression",
+            "callee": {
+              "type": "Identifier",
+              "name": "datetime"
+            },
+            "arguments": [
+              {
+                "type": "Literal",
+                "value": 2001,
+                "raw": "2001"
+              },
+              {
+                "type": "Literal",
+                "value": 1,
+                "raw": "1"
+              },
+              {
+                "type": "Literal",
+                "value": 1,
+                "raw": "1"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "package": "vega-expression",
+      "fn": "parseExpression",
+      "args": [
+        "milliseconds(datetime(2001,1,1))"
+      ],
+      "result": {
+        "type": "CallExpression",
+        "callee": {
+          "type": "Identifier",
+          "name": "milliseconds"
+        },
+        "arguments": [
+          {
+            "type": "CallExpression",
+            "callee": {
+              "type": "Identifier",
+              "name": "datetime"
+            },
+            "arguments": [
+              {
+                "type": "Literal",
+                "value": 2001,
+                "raw": "2001"
+              },
+              {
+                "type": "Literal",
+                "value": 1,
+                "raw": "1"
+              },
+              {
+                "type": "Literal",
+                "value": 1,
+                "raw": "1"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "package": "vega-expression",
+      "fn": "parseExpression",
+      "args": [
+        "utcday(datetime(2001,1,1))"
+      ],
+      "result": {
+        "type": "CallExpression",
+        "callee": {
+          "type": "Identifier",
+          "name": "utcday"
+        },
+        "arguments": [
+          {
+            "type": "CallExpression",
+            "callee": {
+              "type": "Identifier",
+              "name": "datetime"
+            },
+            "arguments": [
+              {
+                "type": "Literal",
+                "value": 2001,
+                "raw": "2001"
+              },
+              {
+                "type": "Literal",
+                "value": 1,
+                "raw": "1"
+              },
+              {
+                "type": "Literal",
+                "value": 1,
+                "raw": "1"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "package": "vega-expression",
+      "fn": "parseExpression",
+      "args": [
+        "utcyear(datetime(2001,1,1))"
+      ],
+      "result": {
+        "type": "CallExpression",
+        "callee": {
+          "type": "Identifier",
+          "name": "utcyear"
+        },
+        "arguments": [
+          {
+            "type": "CallExpression",
+            "callee": {
+              "type": "Identifier",
+              "name": "datetime"
+            },
+            "arguments": [
+              {
+                "type": "Literal",
+                "value": 2001,
+                "raw": "2001"
+              },
+              {
+                "type": "Literal",
+                "value": 1,
+                "raw": "1"
+              },
+              {
+                "type": "Literal",
+                "value": 1,
+                "raw": "1"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "package": "vega-expression",
+      "fn": "parseExpression",
+      "args": [
+        "utcmonth(datetime(2001,1,1))"
+      ],
+      "result": {
+        "type": "CallExpression",
+        "callee": {
+          "type": "Identifier",
+          "name": "utcmonth"
+        },
+        "arguments": [
+          {
+            "type": "CallExpression",
+            "callee": {
+              "type": "Identifier",
+              "name": "datetime"
+            },
+            "arguments": [
+              {
+                "type": "Literal",
+                "value": 2001,
+                "raw": "2001"
+              },
+              {
+                "type": "Literal",
+                "value": 1,
+                "raw": "1"
+              },
+              {
+                "type": "Literal",
+                "value": 1,
+                "raw": "1"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "package": "vega-expression",
+      "fn": "parseExpression",
+      "args": [
+        "utchours(datetime(2001,1,1))"
+      ],
+      "result": {
+        "type": "CallExpression",
+        "callee": {
+          "type": "Identifier",
+          "name": "utchours"
+        },
+        "arguments": [
+          {
+            "type": "CallExpression",
+            "callee": {
+              "type": "Identifier",
+              "name": "datetime"
+            },
+            "arguments": [
+              {
+                "type": "Literal",
+                "value": 2001,
+                "raw": "2001"
+              },
+              {
+                "type": "Literal",
+                "value": 1,
+                "raw": "1"
+              },
+              {
+                "type": "Literal",
+                "value": 1,
+                "raw": "1"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "package": "vega-expression",
+      "fn": "parseExpression",
+      "args": [
+        "utcminutes(datetime(2001,1,1))"
+      ],
+      "result": {
+        "type": "CallExpression",
+        "callee": {
+          "type": "Identifier",
+          "name": "utcminutes"
+        },
+        "arguments": [
+          {
+            "type": "CallExpression",
+            "callee": {
+              "type": "Identifier",
+              "name": "datetime"
+            },
+            "arguments": [
+              {
+                "type": "Literal",
+                "value": 2001,
+                "raw": "2001"
+              },
+              {
+                "type": "Literal",
+                "value": 1,
+                "raw": "1"
+              },
+              {
+                "type": "Literal",
+                "value": 1,
+                "raw": "1"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "package": "vega-expression",
+      "fn": "parseExpression",
+      "args": [
+        "utcseconds(datetime(2001,1,1))"
+      ],
+      "result": {
+        "type": "CallExpression",
+        "callee": {
+          "type": "Identifier",
+          "name": "utcseconds"
+        },
+        "arguments": [
+          {
+            "type": "CallExpression",
+            "callee": {
+              "type": "Identifier",
+              "name": "datetime"
+            },
+            "arguments": [
+              {
+                "type": "Literal",
+                "value": 2001,
+                "raw": "2001"
+              },
+              {
+                "type": "Literal",
+                "value": 1,
+                "raw": "1"
+              },
+              {
+                "type": "Literal",
+                "value": 1,
+                "raw": "1"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "package": "vega-expression",
+      "fn": "parseExpression",
+      "args": [
+        "utcmilliseconds(datetime(2001,1,1))"
+      ],
+      "result": {
+        "type": "CallExpression",
+        "callee": {
+          "type": "Identifier",
+          "name": "utcmilliseconds"
+        },
+        "arguments": [
+          {
+            "type": "CallExpression",
+            "callee": {
+              "type": "Identifier",
+              "name": "datetime"
+            },
+            "arguments": [
+              {
+                "type": "Literal",
+                "value": 2001,
+                "raw": "2001"
+              },
+              {
+                "type": "Literal",
+                "value": 1,
+                "raw": "1"
+              },
+              {
+                "type": "Literal",
+                "value": 1,
+                "raw": "1"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "package": "vega-expression",
+      "fn": "parseExpression",
+      "args": [
+        "date(datetime(2001,1,1))"
+      ],
+      "result": {
+        "type": "CallExpression",
+        "callee": {
+          "type": "Identifier",
+          "name": "date"
+        },
+        "arguments": [
+          {
+            "type": "CallExpression",
+            "callee": {
+              "type": "Identifier",
+              "name": "datetime"
+            },
+            "arguments": [
+              {
+                "type": "Literal",
+                "value": 2001,
+                "raw": "2001"
+              },
+              {
+                "type": "Literal",
+                "value": 1,
+                "raw": "1"
+              },
+              {
+                "type": "Literal",
+                "value": 1,
+                "raw": "1"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "package": "vega-expression",
+      "fn": "parseExpression",
+      "args": [
+        "utcdate(datetime(2001,1,1))"
+      ],
+      "result": {
+        "type": "CallExpression",
+        "callee": {
+          "type": "Identifier",
+          "name": "utcdate"
+        },
+        "arguments": [
+          {
+            "type": "CallExpression",
+            "callee": {
+              "type": "Identifier",
+              "name": "datetime"
+            },
+            "arguments": [
+              {
+                "type": "Literal",
+                "value": 2001,
+                "raw": "2001"
+              },
+              {
+                "type": "Literal",
+                "value": 1,
+                "raw": "1"
+              },
+              {
+                "type": "Literal",
+                "value": 1,
+                "raw": "1"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "package": "vega-expression",
+      "fn": "parseExpression",
+      "args": [
+        "date(datetime(2001,1,2))"
+      ],
+      "result": {
+        "type": "CallExpression",
+        "callee": {
+          "type": "Identifier",
+          "name": "date"
+        },
+        "arguments": [
+          {
+            "type": "CallExpression",
+            "callee": {
+              "type": "Identifier",
+              "name": "datetime"
+            },
+            "arguments": [
+              {
+                "type": "Literal",
+                "value": 2001,
+                "raw": "2001"
+              },
+              {
+                "type": "Literal",
+                "value": 1,
+                "raw": "1"
+              },
+              {
+                "type": "Literal",
+                "value": 2,
+                "raw": "2"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "package": "vega-expression",
+      "fn": "parseExpression",
+      "args": [
+        "utcdate(datetime(2001,1,2))"
+      ],
+      "result": {
+        "type": "CallExpression",
+        "callee": {
+          "type": "Identifier",
+          "name": "utcdate"
+        },
+        "arguments": [
+          {
+            "type": "CallExpression",
+            "callee": {
+              "type": "Identifier",
+              "name": "datetime"
+            },
+            "arguments": [
+              {
+                "type": "Literal",
+                "value": 2001,
+                "raw": "2001"
+              },
+              {
+                "type": "Literal",
+                "value": 1,
+                "raw": "1"
+              },
+              {
+                "type": "Literal",
+                "value": 2,
+                "raw": "2"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "package": "vega-expression",
+      "fn": "parseExpression",
+      "args": [
+        "date(datetime(2001,1,3))"
+      ],
+      "result": {
+        "type": "CallExpression",
+        "callee": {
+          "type": "Identifier",
+          "name": "date"
+        },
+        "arguments": [
+          {
+            "type": "CallExpression",
+            "callee": {
+              "type": "Identifier",
+              "name": "datetime"
+            },
+            "arguments": [
+              {
+                "type": "Literal",
+                "value": 2001,
+                "raw": "2001"
+              },
+              {
+                "type": "Literal",
+                "value": 1,
+                "raw": "1"
+              },
+              {
+                "type": "Literal",
+                "value": 3,
+                "raw": "3"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "package": "vega-expression",
+      "fn": "parseExpression",
+      "args": [
+        "utcdate(datetime(2001,1,3))"
+      ],
+      "result": {
+        "type": "CallExpression",
+        "callee": {
+          "type": "Identifier",
+          "name": "utcdate"
+        },
+        "arguments": [
+          {
+            "type": "CallExpression",
+            "callee": {
+              "type": "Identifier",
+              "name": "datetime"
+            },
+            "arguments": [
+              {
+                "type": "Literal",
+                "value": 2001,
+                "raw": "2001"
+              },
+              {
+                "type": "Literal",
+                "value": 1,
+                "raw": "1"
+              },
+              {
+                "type": "Literal",
+                "value": 3,
+                "raw": "3"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "package": "vega-expression",
+      "fn": "parseExpression",
+      "args": [
+        "date(datetime(2001,1,4))"
+      ],
+      "result": {
+        "type": "CallExpression",
+        "callee": {
+          "type": "Identifier",
+          "name": "date"
+        },
+        "arguments": [
+          {
+            "type": "CallExpression",
+            "callee": {
+              "type": "Identifier",
+              "name": "datetime"
+            },
+            "arguments": [
+              {
+                "type": "Literal",
+                "value": 2001,
+                "raw": "2001"
+              },
+              {
+                "type": "Literal",
+                "value": 1,
+                "raw": "1"
+              },
+              {
+                "type": "Literal",
+                "value": 4,
+                "raw": "4"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "package": "vega-expression",
+      "fn": "parseExpression",
+      "args": [
+        "utcdate(datetime(2001,1,4))"
+      ],
+      "result": {
+        "type": "CallExpression",
+        "callee": {
+          "type": "Identifier",
+          "name": "utcdate"
+        },
+        "arguments": [
+          {
+            "type": "CallExpression",
+            "callee": {
+              "type": "Identifier",
+              "name": "datetime"
+            },
+            "arguments": [
+              {
+                "type": "Literal",
+                "value": 2001,
+                "raw": "2001"
+              },
+              {
+                "type": "Literal",
+                "value": 1,
+                "raw": "1"
+              },
+              {
+                "type": "Literal",
+                "value": 4,
+                "raw": "4"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "package": "vega-expression",
+      "fn": "parseExpression",
+      "args": [
+        "date(datetime(2001,1,5))"
+      ],
+      "result": {
+        "type": "CallExpression",
+        "callee": {
+          "type": "Identifier",
+          "name": "date"
+        },
+        "arguments": [
+          {
+            "type": "CallExpression",
+            "callee": {
+              "type": "Identifier",
+              "name": "datetime"
+            },
+            "arguments": [
+              {
+                "type": "Literal",
+                "value": 2001,
+                "raw": "2001"
+              },
+              {
+                "type": "Literal",
+                "value": 1,
+                "raw": "1"
+              },
+              {
+                "type": "Literal",
+                "value": 5,
+                "raw": "5"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "package": "vega-expression",
+      "fn": "parseExpression",
+      "args": [
+        "utcdate(datetime(2001,1,5))"
+      ],
+      "result": {
+        "type": "CallExpression",
+        "callee": {
+          "type": "Identifier",
+          "name": "utcdate"
+        },
+        "arguments": [
+          {
+            "type": "CallExpression",
+            "callee": {
+              "type": "Identifier",
+              "name": "datetime"
+            },
+            "arguments": [
+              {
+                "type": "Literal",
+                "value": 2001,
+                "raw": "2001"
+              },
+              {
+                "type": "Literal",
+                "value": 1,
+                "raw": "1"
+              },
+              {
+                "type": "Literal",
+                "value": 5,
+                "raw": "5"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "package": "vega-expression",
+      "fn": "parseExpression",
+      "args": [
+        "date(datetime(2001,1,6))"
+      ],
+      "result": {
+        "type": "CallExpression",
+        "callee": {
+          "type": "Identifier",
+          "name": "date"
+        },
+        "arguments": [
+          {
+            "type": "CallExpression",
+            "callee": {
+              "type": "Identifier",
+              "name": "datetime"
+            },
+            "arguments": [
+              {
+                "type": "Literal",
+                "value": 2001,
+                "raw": "2001"
+              },
+              {
+                "type": "Literal",
+                "value": 1,
+                "raw": "1"
+              },
+              {
+                "type": "Literal",
+                "value": 6,
+                "raw": "6"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "package": "vega-expression",
+      "fn": "parseExpression",
+      "args": [
+        "utcdate(datetime(2001,1,6))"
+      ],
+      "result": {
+        "type": "CallExpression",
+        "callee": {
+          "type": "Identifier",
+          "name": "utcdate"
+        },
+        "arguments": [
+          {
+            "type": "CallExpression",
+            "callee": {
+              "type": "Identifier",
+              "name": "datetime"
+            },
+            "arguments": [
+              {
+                "type": "Literal",
+                "value": 2001,
+                "raw": "2001"
+              },
+              {
+                "type": "Literal",
+                "value": 1,
+                "raw": "1"
+              },
+              {
+                "type": "Literal",
+                "value": 6,
+                "raw": "6"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "package": "vega-expression",
+      "fn": "parseExpression",
+      "args": [
+        "date(datetime(2001,1,7))"
+      ],
+      "result": {
+        "type": "CallExpression",
+        "callee": {
+          "type": "Identifier",
+          "name": "date"
+        },
+        "arguments": [
+          {
+            "type": "CallExpression",
+            "callee": {
+              "type": "Identifier",
+              "name": "datetime"
+            },
+            "arguments": [
+              {
+                "type": "Literal",
+                "value": 2001,
+                "raw": "2001"
+              },
+              {
+                "type": "Literal",
+                "value": 1,
+                "raw": "1"
+              },
+              {
+                "type": "Literal",
+                "value": 7,
+                "raw": "7"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "package": "vega-expression",
+      "fn": "parseExpression",
+      "args": [
+        "utcdate(datetime(2001,1,7))"
+      ],
+      "result": {
+        "type": "CallExpression",
+        "callee": {
+          "type": "Identifier",
+          "name": "utcdate"
+        },
+        "arguments": [
+          {
+            "type": "CallExpression",
+            "callee": {
+              "type": "Identifier",
+              "name": "datetime"
+            },
+            "arguments": [
+              {
+                "type": "Literal",
+                "value": 2001,
+                "raw": "2001"
+              },
+              {
+                "type": "Literal",
+                "value": 1,
+                "raw": "1"
+              },
+              {
+                "type": "Literal",
+                "value": 7,
+                "raw": "7"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "package": "vega-expression",
+      "fn": "parseExpression",
+      "args": [
+        "utc(2009,9,1,10)"
+      ],
+      "result": {
+        "type": "CallExpression",
+        "callee": {
+          "type": "Identifier",
+          "name": "utc"
+        },
+        "arguments": [
+          {
+            "type": "Literal",
+            "value": 2009,
+            "raw": "2009"
+          },
+          {
+            "type": "Literal",
+            "value": 9,
+            "raw": "9"
+          },
+          {
+            "type": "Literal",
+            "value": 1,
+            "raw": "1"
+          },
+          {
+            "type": "Literal",
+            "value": 10,
+            "raw": "10"
+          }
+        ]
+      }
+    },
+    {
+      "package": "vega-expression",
+      "fn": "parseExpression",
+      "args": [
+        "utchours(utc(2009,9,1,10))"
+      ],
+      "result": {
+        "type": "CallExpression",
+        "callee": {
+          "type": "Identifier",
+          "name": "utchours"
+        },
+        "arguments": [
+          {
+            "type": "CallExpression",
+            "callee": {
+              "type": "Identifier",
+              "name": "utc"
+            },
+            "arguments": [
+              {
+                "type": "Literal",
+                "value": 2009,
+                "raw": "2009"
+              },
+              {
+                "type": "Literal",
+                "value": 9,
+                "raw": "9"
+              },
+              {
+                "type": "Literal",
+                "value": 1,
+                "raw": "1"
+              },
+              {
+                "type": "Literal",
+                "value": 10,
+                "raw": "10"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "package": "vega-expression",
+      "fn": "parseExpression",
+      "args": [
+        "if(datum.a > 1, 1, 2)"
+      ],
+      "result": {
+        "type": "CallExpression",
+        "callee": {
+          "type": "Identifier",
+          "name": "if"
+        },
+        "arguments": [
+          {
+            "type": "BinaryExpression",
+            "operator": ">",
+            "left": {
+              "type": "MemberExpression",
+              "computed": false,
+              "object": {
+                "type": "Identifier",
+                "name": "datum"
+              },
+              "property": {
+                "type": "Identifier",
+                "name": "a",
+                "member": true
+              }
+            },
+            "right": {
+              "type": "Literal",
+              "value": 1,
+              "raw": "1"
+            }
+          },
+          {
+            "type": "Literal",
+            "value": 1,
+            "raw": "1"
+          },
+          {
+            "type": "Literal",
+            "value": 2,
+            "raw": "2"
+          }
+        ]
+      }
+    },
+    {
+      "package": "vega-expression",
+      "fn": "parseExpression",
+      "args": [
+        "if(event.type === \"mousedown\", 1, 2)"
+      ],
+      "result": {
+        "type": "CallExpression",
+        "callee": {
+          "type": "Identifier",
+          "name": "if"
+        },
+        "arguments": [
+          {
+            "type": "BinaryExpression",
+            "operator": "===",
+            "left": {
+              "type": "MemberExpression",
+              "computed": false,
+              "object": {
+                "type": "Identifier",
+                "name": "event"
+              },
+              "property": {
+                "type": "Identifier",
+                "name": "type",
+                "member": true
+              }
+            },
+            "right": {
+              "type": "Literal",
+              "value": "mousedown",
+              "raw": "\"mousedown\""
+            }
+          },
+          {
+            "type": "Literal",
+            "value": 1,
+            "raw": "1"
+          },
+          {
+            "type": "Literal",
+            "value": 2,
+            "raw": "2"
+          }
+        ]
+      }
+    },
+    {
+      "package": "vega-expression",
+      "fn": "parseExpression",
+      "args": [
+        "if(datum.a > 1, if(event.type === \"mousedown\", 3, 4), 2)"
+      ],
+      "result": {
+        "type": "CallExpression",
+        "callee": {
+          "type": "Identifier",
+          "name": "if"
+        },
+        "arguments": [
+          {
+            "type": "BinaryExpression",
+            "operator": ">",
+            "left": {
+              "type": "MemberExpression",
+              "computed": false,
+              "object": {
+                "type": "Identifier",
+                "name": "datum"
+              },
+              "property": {
+                "type": "Identifier",
+                "name": "a",
+                "member": true
+              }
+            },
+            "right": {
+              "type": "Literal",
+              "value": 1,
+              "raw": "1"
+            }
+          },
+          {
+            "type": "CallExpression",
+            "callee": {
+              "type": "Identifier",
+              "name": "if"
+            },
+            "arguments": [
+              {
+                "type": "BinaryExpression",
+                "operator": "===",
+                "left": {
+                  "type": "MemberExpression",
+                  "computed": false,
+                  "object": {
+                    "type": "Identifier",
+                    "name": "event"
+                  },
+                  "property": {
+                    "type": "Identifier",
+                    "name": "type",
+                    "member": true
+                  }
+                },
+                "right": {
+                  "type": "Literal",
+                  "value": "mousedown",
+                  "raw": "\"mousedown\""
+                }
+              },
+              {
+                "type": "Literal",
+                "value": 3,
+                "raw": "3"
+              },
+              {
+                "type": "Literal",
+                "value": 4,
+                "raw": "4"
+              }
+            ]
+          },
+          {
+            "type": "Literal",
+            "value": 2,
+            "raw": "2"
+          }
+        ]
+      }
+    },
+    {
+      "package": "vega-expression",
+      "fn": "parseExpression",
+      "args": [
+        "0 * if(datum.a > 1, 1, 2)"
+      ],
+      "result": {
+        "type": "BinaryExpression",
+        "operator": "*",
+        "left": {
+          "type": "Literal",
+          "value": 0,
+          "raw": "0"
+        },
+        "right": {
+          "type": "CallExpression",
+          "callee": {
+            "type": "Identifier",
+            "name": "if"
+          },
+          "arguments": [
+            {
+              "type": "BinaryExpression",
+              "operator": ">",
+              "left": {
+                "type": "MemberExpression",
+                "computed": false,
+                "object": {
+                  "type": "Identifier",
+                  "name": "datum"
+                },
+                "property": {
+                  "type": "Identifier",
+                  "name": "a",
+                  "member": true
+                }
+              },
+              "right": {
+                "type": "Literal",
+                "value": 1,
+                "raw": "1"
+              }
+            },
+            {
+              "type": "Literal",
+              "value": 1,
+              "raw": "1"
+            },
+            {
+              "type": "Literal",
+              "value": 2,
+              "raw": "2"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "package": "vega-expression",
+      "fn": "parseExpression",
+      "args": [
+        "3"
+      ],
+      "result": {
+        "type": "Literal",
+        "value": 3,
+        "raw": "3"
+      }
+    },
+    {
+      "package": "vega-expression",
+      "fn": "parseExpression",
+      "args": [
+        "'a'"
+      ],
+      "result": {
+        "type": "Literal",
+        "value": "a",
+        "raw": "'a'"
+      }
+    },
+    {
+      "package": "vega-expression",
+      "fn": "parseExpression",
+      "args": [
+        "/a/"
+      ],
+      "result": {
+        "type": "Literal",
+        "value": {
+          "$": "regexp",
+          "source": "a",
+          "flags": ""
+        },
+        "raw": "/a/",
+        "regex": {
+          "pattern": "a",
+          "flags": ""
+        }
+      }
+    },
+    {
+      "package": "vega-expression",
+      "fn": "parseExpression",
+      "args": [
+        "[0,,]"
+      ],
+      "result": {
+        "type": "ArrayExpression",
+        "elements": [
+          {
+            "type": "Literal",
+            "value": 0,
+            "raw": "0"
+          },
+          null
+        ]
+      }
+    },
+    {
+      "package": "vega-expression",
+      "fn": "parseExpression",
+      "args": [
+        "{}"
+      ],
+      "result": {
+        "type": "ObjectExpression",
+        "properties": []
+      }
+    },
+    {
+      "package": "vega-expression",
+      "fn": "parseExpression",
+      "args": [
+        "{a:1, b:\"c\"}"
+      ],
+      "result": {
+        "type": "ObjectExpression",
+        "properties": [
+          {
+            "type": "Property",
+            "key": {
+              "type": "Identifier",
+              "name": "a"
+            },
+            "value": {
+              "type": "Literal",
+              "value": 1,
+              "raw": "1"
+            },
+            "kind": "init"
+          },
+          {
+            "type": "Property",
+            "key": {
+              "type": "Identifier",
+              "name": "b"
+            },
+            "value": {
+              "type": "Literal",
+              "value": "c",
+              "raw": "\"c\""
+            },
+            "kind": "init"
+          }
+        ]
+      }
+    },
+    {
+      "package": "vega-expression",
+      "fn": "parseExpression",
+      "args": [
+        "+\"1\""
+      ],
+      "result": {
+        "type": "UnaryExpression",
+        "operator": "+",
+        "argument": {
+          "type": "Literal",
+          "value": "1",
+          "raw": "\"1\""
+        },
+        "prefix": true
+      }
+    },
+    {
+      "package": "vega-expression",
+      "fn": "parseExpression",
+      "args": [
+        "1+2"
+      ],
+      "result": {
+        "type": "BinaryExpression",
+        "operator": "+",
+        "left": {
+          "type": "Literal",
+          "value": 1,
+          "raw": "1"
+        },
+        "right": {
+          "type": "Literal",
+          "value": 2,
+          "raw": "2"
+        }
+      }
+    },
+    {
+      "package": "vega-expression",
+      "fn": "parseExpression",
+      "args": [
+        "1 && 2"
+      ],
+      "result": {
+        "type": "LogicalExpression",
+        "operator": "&&",
+        "left": {
+          "type": "Literal",
+          "value": 1,
+          "raw": "1"
+        },
+        "right": {
+          "type": "Literal",
+          "value": 2,
+          "raw": "2"
+        }
+      }
+    },
+    {
+      "package": "vega-expression",
+      "fn": "parseExpression",
+      "args": [
+        "1 < 2"
+      ],
+      "result": {
+        "type": "BinaryExpression",
+        "operator": "<",
+        "left": {
+          "type": "Literal",
+          "value": 1,
+          "raw": "1"
+        },
+        "right": {
+          "type": "Literal",
+          "value": 2,
+          "raw": "2"
+        }
+      }
+    },
+    {
+      "package": "vega-expression",
+      "fn": "parseExpression",
+      "args": [
+        "a ? b : c"
+      ],
+      "result": {
+        "type": "ConditionalExpression",
+        "test": {
+          "type": "Identifier",
+          "name": "a"
+        },
+        "consequent": {
+          "type": "Identifier",
+          "name": "b"
+        },
+        "alternate": {
+          "type": "Identifier",
+          "name": "c"
+        }
+      }
+    },
+    {
+      "package": "vega-expression",
+      "fn": "parseExpression",
+      "args": [
+        "a"
+      ],
+      "result": {
+        "type": "Identifier",
+        "name": "a"
+      }
+    },
+    {
+      "package": "vega-expression",
+      "fn": "parseExpression",
+      "args": [
+        "\\u0041"
+      ],
+      "result": {
+        "type": "Identifier",
+        "name": "A"
+      }
+    },
+    {
+      "package": "vega-expression",
+      "fn": "parseExpression",
+      "args": [
+        "A\\u0041"
+      ],
+      "result": {
+        "type": "Identifier",
+        "name": "AA"
+      }
+    },
+    {
+      "package": "vega-expression",
+      "fn": "parseExpression",
+      "args": [
+        "a[0]"
+      ],
+      "result": {
+        "type": "MemberExpression",
+        "computed": true,
+        "object": {
+          "type": "Identifier",
+          "name": "a"
+        },
+        "property": {
+          "type": "Literal",
+          "value": 0,
+          "raw": "0"
+        }
+      }
+    },
+    {
+      "package": "vega-expression",
+      "fn": "parseExpression",
+      "args": [
+        "a.b"
+      ],
+      "result": {
+        "type": "MemberExpression",
+        "computed": false,
+        "object": {
+          "type": "Identifier",
+          "name": "a"
+        },
+        "property": {
+          "type": "Identifier",
+          "name": "b",
+          "member": true
+        }
+      }
+    },
+    {
+      "package": "vega-expression",
+      "fn": "parseExpression",
+      "args": [
+        "a.true"
+      ],
+      "result": {
+        "type": "MemberExpression",
+        "computed": false,
+        "object": {
+          "type": "Identifier",
+          "name": "a"
+        },
+        "property": {
+          "type": "Identifier",
+          "name": "true",
+          "member": true
+        }
+      }
+    },
+    {
+      "package": "vega-expression",
+      "fn": "parseExpression",
+      "args": [
+        "a()"
+      ],
+      "result": {
+        "type": "CallExpression",
+        "callee": {
+          "type": "Identifier",
+          "name": "a"
+        },
+        "arguments": []
+      }
+    },
+    {
+      "package": "vega-expression",
+      "fn": "parseExpression",
+      "args": [
+        "a(0,1,2)"
+      ],
+      "result": {
+        "type": "CallExpression",
+        "callee": {
+          "type": "Identifier",
+          "name": "a"
+        },
+        "arguments": [
+          {
+            "type": "Literal",
+            "value": 0,
+            "raw": "0"
+          },
+          {
+            "type": "Literal",
+            "value": 1,
+            "raw": "1"
+          },
+          {
+            "type": "Literal",
+            "value": 2,
+            "raw": "2"
+          }
+        ]
+      }
+    },
+    {
+      "package": "vega-expression",
+      "fn": "parseExpression",
+      "args": [
+        "\"\\\n\\b\\f\\n\\r\\t\\v\\z\\u0023\\u{41}\\u{2F804}\""
+      ],
+      "result": {
+        "type": "Literal",
+        "value": "\b\f\n\r\t\u000bz#A你",
+        "raw": "\"\\\n\\b\\f\\n\\r\\t\\v\\z\\u0023\\u{41}\\u{2F804}\""
+      }
+    },
+    {
+      "package": "vega-expression",
+      "fn": "parseExpression",
+      "args": [
+        "1+ 2"
+      ],
+      "result": {
+        "type": "BinaryExpression",
+        "operator": "+",
+        "left": {
+          "type": "Literal",
+          "value": 1,
+          "raw": "1"
+        },
+        "right": {
+          "type": "Literal",
+          "value": 2,
+          "raw": "2"
+        }
+      }
+    },
+    {
+      "package": "vega-expression",
+      "fn": "parseExpression",
+      "args": [
+        "1+\n2"
+      ],
+      "result": {
+        "type": "BinaryExpression",
+        "operator": "+",
+        "left": {
+          "type": "Literal",
+          "value": 1,
+          "raw": "1"
+        },
+        "right": {
+          "type": "Literal",
+          "value": 2,
+          "raw": "2"
+        }
+      }
+    },
+    {
+      "package": "vega-expression",
+      "fn": "parseExpression",
+      "args": [
+        "1+\t2"
+      ],
+      "result": {
+        "type": "BinaryExpression",
+        "operator": "+",
+        "left": {
+          "type": "Literal",
+          "value": 1,
+          "raw": "1"
+        },
+        "right": {
+          "type": "Literal",
+          "value": 2,
+          "raw": "2"
+        }
+      }
+    },
+    {
+      "package": "vega-expression",
+      "fn": "parseExpression",
+      "args": [
+        "1+\u000b2"
+      ],
+      "result": {
+        "type": "BinaryExpression",
+        "operator": "+",
+        "left": {
+          "type": "Literal",
+          "value": 1,
+          "raw": "1"
+        },
+        "right": {
+          "type": "Literal",
+          "value": 2,
+          "raw": "2"
+        }
+      }
+    },
+    {
+      "package": "vega-expression",
+      "fn": "parseExpression",
+      "args": [
+        "1+﻿2"
+      ],
+      "result": {
+        "type": "BinaryExpression",
+        "operator": "+",
+        "left": {
+          "type": "Literal",
+          "value": 1,
+          "raw": "1"
+        },
+        "right": {
+          "type": "Literal",
+          "value": 2,
+          "raw": "2"
+        }
+      }
+    },
+    {
+      "package": "vega-expression",
+      "fn": "parseExpression",
+      "args": [
+        "1+\r\n2"
+      ],
+      "result": {
+        "type": "BinaryExpression",
+        "operator": "+",
+        "left": {
+          "type": "Literal",
+          "value": 1,
+          "raw": "1"
+        },
+        "right": {
+          "type": "Literal",
+          "value": 2,
+          "raw": "2"
+        }
+      }
+    }
+  ]
+}
