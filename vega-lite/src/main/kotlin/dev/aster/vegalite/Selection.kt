@@ -302,7 +302,11 @@ internal class Selection(
     val projected = view?.let { intervalChannels(it) }.orEmpty()
     // A **point** selection's stated value is a list of rows, each written as a field-to-value
     // object: the chart opens with those rows already picked, which is a store with them in it.
-    if (type != "interval" && initial != null && fields.isNotEmpty()) {
+    // The projection this selection remembers by, which is the same list `_tuple_fields` publishes
+    // — a channel projection where the specification named encodings, a bare field where it named
+    // fields.
+    val pointProjection = view?.let { projections(it) } ?: fields.map { null to it }
+    if (type != "interval" && initial != null && pointProjection.isNotEmpty()) {
       val picked = (initial as? VegaValue.Arr)?.values ?: listOf(initial)
       put(
         "values",
@@ -313,17 +317,35 @@ internal class Selection(
               put(
                 "fields",
                 arr(
-                  fields.map {
+                  pointProjection.map { (channel, field) ->
                     obj {
-                      put("type", "E")
-                      put("field", it)
+                      put("field", field)
+                      channel?.let { put("channel", it) }
+                      put("type", if (view != null) projectionType(view, channel) else "E")
                     }
                   }
                 ),
               )
+              // Keyed by the **channel** first and the field second — `v[p.channel] ?? v[p.field]`.
+              // A selection projected through `x` is initialised as `{"x": …}`, which is the
+              // channel's name and not the column's, and a stated instant is the *timestamp* it
+              // names rather than the parts it was written in: a store is data, not an expression.
               put(
                 "values",
-                arr(fields.map { (row as? VegaValue.Obj)?.fields?.get(it) ?: VegaValue.Null }),
+                arr(
+                  pointProjection.map { (channel, field) ->
+                    val stated =
+                      (row as? VegaValue.Obj)?.let { own ->
+                        channel?.let { own.fields[it] } ?: own.fields[field]
+                      } ?: (row as? VegaValue.Obj)?.fields?.get(field)
+                    when (stated) {
+                      null -> VegaValue.Null
+                      is VegaValue.Obj ->
+                        VegaValue.Num(Transforms(DiagnosticCollector()).dateTimeTimestamp(stated))
+                      else -> stated
+                    }
+                  }
+                ),
               )
             }
           }

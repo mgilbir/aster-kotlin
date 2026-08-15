@@ -697,7 +697,7 @@ no data is needed to compare two compilers. So every one of them was compiled by
 by this one, and the outputs compared property by property. That is a *measurement*, not a gate: the
 examples are not fixtures here, and nothing about them is checked in.
 
-**124 of 627 matched exactly** at the start, and **586** do now.
+**124 of 627 matched exactly** at the start, and **587** do now.
 
 The value is the *ranking*. The first sweep clustered by root cause, and the three most damaging
 causes were fixed straight away — chosen for what they do to the *picture* rather than for
@@ -712,7 +712,7 @@ frequency:
   where this compiler used `step - 2`, making it nearly four times too wide. `getBandSize` asks the
   scale's kind first and reaches `discreteBandSize` only where the domain is discrete.
 
-The sweep has been the working list ever since, and the 41 that still differ cluster like this:
+The sweep has been the working list ever since, and the 40 that still differ cluster like this:
 
 | Files | Cause |
 | --- | --- |
@@ -720,7 +720,7 @@ The sweep has been the working list ever since, and the 41 that still differ clu
 | 5 | the rest of the **facet data flow**: what is left is a chart whose cells are read by a **selection**, where the brush's own datasets have to be cut per cell as well |
 | 9 | crossfilter charts and scatter-plot matrices: several selections over one table, whose datasets fork differently and whose diagonal cells are not the cells upstream builds |
 | 2 | `time` channel animations, set aside |
-| 4 | one-offs, each its own rule |
+| 3 | one-offs, each its own rule |
 
 Fourteen are still refused by name: eight geographic, three a facet inside a facet, two a repeat
 inside a concatenation, and one the `url` channel.
@@ -4397,6 +4397,28 @@ A last one, off the same reading: `toFieldDefBase` keeps a field's bucketing, it
 aggregate, and **not its type**. Two layers over one column, one calling it ordinal and the other
 saying nothing, are the same field to a title; keying the title by the type as well titled the axis
 "age, age".
+
+### A selection read as a table
+
+A `lookup` may name a **parameter** instead of a dataset: `{"lookup": "symbol", "from": {"param":
+"index", "key": "symbol"}}` joins each row against the rows that selection has picked. That needs
+the selection to *be* a table, which is `materializeSelections` — a filter on the selection hung off
+the view's own main output, ending in an output node the join names. Upstream builds one for every
+selection and lets its reference counting drop the unread ones; the same answer is reached here by
+asking first which selections a `lookup` names, since an output nobody reads still costs a dataset
+name and every dataset after it would be numbered one too high.
+
+The join's `from` cannot be filled in when the transform is translated — the dataset that output
+node turns out to be is not known until the tree has been walked and named — so it carries the
+node's name and is corrected at the end, which is upstream's own last pass over the assembled data
+("now fix the from references in lookup transforms").
+
+Beside it, a **stated starting value** written as a date. A selection opens with rows already in its
+store, and a store is data rather than an expression: `{"x": {"year": 2005, "month": 1, "date": 1}}`
+becomes the millisecond it names, not a `datetime(…)` call. Two smaller rules came with it — the
+initial row is keyed by the **channel** first and the field second (`v[p.channel] ?? v[p.field]`,
+and a selection projected through `x` is initialised as `{"x": …}`), and the projection it records
+is the same one `_tuple_fields` publishes, channel and all.
 
 ### A theme speaks in blocks, and the most specific one wins
 

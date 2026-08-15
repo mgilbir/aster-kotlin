@@ -1704,6 +1704,16 @@ private class Compilation(
     // chart's table `source_0`. It is left out where nothing hangs off it, as an unused subtree is.
     spec.fields["data"]?.let { own -> if (views.any { it.spec.data == own }) order += own }
     val roots = LinkedHashMap<VegaValue, SourceNode>()
+    // Which selections are read as a **table** rather than as a test. `materializeSelections`
+    // builds one for every selection upstream and lets its ref counting drop the unread ones; the
+    // same answer is reached here by asking first, since an output nobody reads still costs a
+    // dataset name.
+    val materialized =
+      views
+        .flatMap { it.spec.transforms }
+        .mapNotNull { it.obj("from")?.string("param")?.takeIf { _ -> it.has("lookup") } }
+        .toSet()
+    val lookupOutputs = mutableMapOf<String, OutputNode>()
     // One facet, however many layers are drawn in each of its cells: `facetRoot` is a single node
     // with every child's chain hanging under it, so the layers share the partition rather than
     // each cutting one of their own.
@@ -1738,6 +1748,8 @@ private class Compilation(
           // where there is one the chain stays below the facet and a copy of it — with the facet's
           // own fields added to every grouping — is hung beside it for the scales to measure.
           facetSplit = split,
+          materialized = materialized,
+          lookupOutputs = lookupOutputs,
         )
         .build(roots.getOrPut(data) { SourceNode(data) })
     }
@@ -1778,6 +1790,41 @@ private class Compilation(
       facetReads = split.data
       facetDomainsAt = split.at
     }
+    // "now fix the from references in lookup transforms": a join names the *output node* while the
+    // flow is being built, because the dataset that node ends up being is not known until the tree
+    // has been walked and named.
+    val joined =
+      if (lookupOutputs.isEmpty()) datasets
+      else
+        datasets.map { dataset ->
+          val steps = dataset.array("transform") ?: return@map dataset
+          if (steps.none { lookupOutputs.containsKey(it.string("from").orEmpty()) })
+            return@map dataset
+          obj {
+            (dataset as VegaValue.Obj).fields.forEach { (key, value) ->
+              if (key != "transform") put(key, value)
+              else
+                put(
+                  "transform",
+                  arr(
+                    steps.map { step ->
+                      val output =
+                        step
+                          .takeIf { it.string("type") == "lookup" }
+                          ?.let { lookupOutputs[it.string("from")] }
+                      if (output == null) step
+                      else
+                        obj {
+                          (step as VegaValue.Obj).fields.forEach { (key, own) ->
+                            put(key, if (key == "from") VegaValue.Str(output.source ?: "") else own)
+                          }
+                        }
+                    }
+                  ),
+                )
+            }
+          }
+        }
     views.forEachIndexed { index, view ->
       // The **scales** read one named point and the marks another, where the specification asked
       // for a path that breaks at a gap the domain does not want. They are the same node
@@ -1795,7 +1842,7 @@ private class Compilation(
       }
       view.rawData = outputs[index].raw?.source ?: view.mainData
     }
-    return datasets
+    return joined
   }
 
   // -----------------------------------------------------------------------------------------

@@ -3,6 +3,9 @@ package dev.aster.vegalite
 import dev.aster.vega.model.DiagnosticCollector
 import dev.aster.vega.model.VegaValue
 import dev.aster.vega.model.canonicalNumberString
+import kotlinx.datetime.LocalDateTime
+import kotlinx.datetime.TimeZone
+import kotlinx.datetime.toInstant
 
 /**
  * The `transform` block, one entry at a time.
@@ -30,6 +33,8 @@ internal class Transforms(
    * `lookup` is reported instead.
    */
   private val registerLookup: ((VegaValue) -> String)? = null,
+  /** Answers with the name of the table a selection's picked rows are assembled into. */
+  private val registerParamLookup: ((String) -> String)? = null,
   /** How a signal is named through the view it belongs to, a bin publishing two of them. */
   private val prefix: (String) -> String = { it },
   /** The chart's selections, which a `{"param": …}` predicate is tested against. */
@@ -494,6 +499,39 @@ internal class Transforms(
     val register = registerLookup
     val from = transform.obj("from")
     val data = from?.get("data")
+    // A join against a **parameter** reads the rows that selection has picked, assembled as a
+    // table of their own — `materializeSelections`. With no `from.fields` the whole row is nested
+    // under a name, and the name a parameter lookup falls back to is the parameter's own.
+    val param = from?.string("param")
+    if (param != null && registerParamLookup != null) {
+      val local = transform.string("lookup")
+      val key = from.string("key")
+      if (local == null || key == null) {
+        diagnostics.error(
+          VegaLiteDiagnostics.UNSUPPORTED_TRANSFORM,
+          "A `lookup` names the *local* column to match with and a `from.key` to match it " +
+            "against; this one names ${if (local == null) "no column" else "no key"}.",
+          jsonPath = path,
+        )
+        return emptyList()
+      }
+      val values = from.array("fields")
+      return listOf(
+        obj {
+          put("type", "lookup")
+          put("from", registerParamLookup.invoke(param))
+          put("key", key)
+          put("fields", strings(listOf(local)))
+          if (values != null) {
+            put("values", strings(values.mapNotNull { (it as? VegaValue.Str)?.value }))
+            transform["as"]?.let { put("as", it) }
+          } else {
+            put("as", strings(listOf((transform.string("as") ?: param))))
+          }
+          transform["default"]?.let { put("default", it) }
+        }
+      )
+    }
     if (register == null || from == null || data == null) {
       diagnostics.error(
         VegaLiteDiagnostics.UNSUPPORTED_TRANSFORM,
@@ -913,6 +951,41 @@ internal class Transforms(
   /**
    * `jan` is month zero and `mon` is day one: upstream normalises the names before writing them.
    */
+  /**
+   * `dateTimeToTimestamp`: the same instant as a **number**, which is what a store holds.
+   *
+   * A signal reads an expression and a dataset does not, so a selection initialised with a written
+   * date carries the millisecond it names. Local time unless the object says `utc`, exactly as `new
+   * Date(year, month, …)` reads it — the two sides of the comparison agree because both ask the
+   * same machine what its zone is.
+   */
+  fun dateTimeTimestamp(value: VegaValue.Obj): Double {
+    fun part(key: String): Int? =
+      when (val own = value.fields[key]) {
+        is VegaValue.Num -> own.value.toInt()
+        is VegaValue.Str -> monthOrDay(key, own.value).toIntOrNull()
+        else -> null
+      }
+    val year = part("year") ?: 2012
+    val month = part("month")?.minus(1) ?: part("quarter")?.let { (it - 1) * 3 } ?: 0
+    val date = part("date") ?: part("day")?.plus(1) ?: 1
+    val zone =
+      if (value.fields["utc"] == VegaValue.Bool(true)) TimeZone.UTC
+      else TimeZone.currentSystemDefault()
+    val clock =
+      LocalDateTime(
+        year = year,
+        // `datetime()` counts months from zero and a calendar counts them from one.
+        month = month + 1,
+        day = date,
+        hour = part("hours") ?: 0,
+        minute = part("minutes") ?: 0,
+        second = part("seconds") ?: 0,
+        nanosecond = (part("milliseconds") ?: 0) * 1_000_000,
+      )
+    return clock.toInstant(zone).toEpochMilliseconds().toDouble()
+  }
+
   private fun monthOrDay(key: String, name: String): String {
     val lower = name.lowercase().take(3)
     val index =

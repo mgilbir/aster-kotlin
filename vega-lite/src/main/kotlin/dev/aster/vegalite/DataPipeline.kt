@@ -43,6 +43,10 @@ internal class DataPipeline(
    * domain asks for is such a point.
    */
   private val facetSplit: FacetNode? = null,
+  /** The selections some `lookup` reads as a table, which are the ones worth materialising. */
+  private val materialized: Set<String> = emptySet(),
+  /** Where each materialised selection's output node is recorded, for the join to be named from. */
+  private val lookupOutputs: MutableMap<String, OutputNode> = mutableMapOf(),
 ) {
 
   /** The facet fields the chain being built groups by, which the cell's own chain does not. */
@@ -182,6 +186,26 @@ internal class DataPipeline(
     val main = OutputNode(view.prefixed("main"))
     head.then(main)
     head = main
+
+    // `materializeSelections`: every selection this view declares can be **read as a table** — the
+    // rows it has picked — which is what a `lookup` naming a parameter joins against. It hangs off
+    // the view's main output as a filter of its own, and is built only where something asks for it,
+    // an output nobody reads being an output upstream never assembles.
+    for (selection in view.selections.filter { it.owner === view && it.name in materialized }) {
+      val picked =
+        PassThroughNode(
+          listOf(
+            obj {
+              put("type", "filter")
+              put("expr", selection.test())
+            }
+          )
+        )
+      main.then(picked)
+      val output = OutputNode(view.prefixed("lookup_${selection.name}"))
+      picked.then(output)
+      lookupOutputs["lookup_${selection.name}"] = output
+    }
 
     // And *below* the filter where the marks want the invalid rows and the scales do not: a path
     // drawn with a break at the gap, over a domain measured without it — `postFilterInvalid`.
@@ -938,6 +962,7 @@ internal class DataPipeline(
         Transforms(
           diagnostics,
           registerLookup,
+          { param -> "lookup_$param" },
           { suffix -> view.prefixedForTransform(index, suffix) },
           view.selections,
         )
