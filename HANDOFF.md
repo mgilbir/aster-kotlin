@@ -298,36 +298,47 @@ nothing yet *runs* on a native target — `commonTest` with a multiplatform asse
 the honest next step, and the differential fixtures cannot move there because they read files off
 disk. And `Regex` is the platform's, not ECMA-262: see the note below.
 
-## `Regex` is the platform's, and upstream's is ECMA-262
+## Regular expressions are ECMA-262 now, and one merge blocker remains
 
-Vega's `regexp`, `test` and `replace` take a pattern **from the specification**, and upstream runs it
-through JavaScript's own engine. Kotlin's `Regex` delegates to whatever the target has — `java.util.regex`
-on the JVM and Android, Kotlin/Native's own engine on the native targets, the real thing on JS — so the
-same specification can behave three ways, none of them guaranteed to be upstream's. Measured, not
-assumed:
+`VegaValue.Pattern` compiles with **`io.github.mgilbir:ktecma262`**, an ECMA-262 engine in common
+Kotlin, instead of Kotlin's `Regex`. A pattern in a specification is JavaScript's; Kotlin's `Regex` is
+whatever the platform has — `java.util.regex` on Android, a different engine on each native target.
+The four divergences that had been measured are now vectors, and they pass:
 
-| pattern, subject | ECMA-262 (upstream) | JVM (what Android runs) |
-| --- | --- | --- |
-| `a$` on `"a\n"` | no match | **matches** — Java's `$` sits before a final line terminator |
-| `x{` on `"x{"` | matches, `{` is literal | **throws** `Illegal repetition` |
-| `\a` on `"a"` | matches, identity escape (Annex B) | no match |
-| `[]` on `"a"` | never matches, by definition | **throws** `Unclosed character class` |
+| pattern, subject | upstream | before | now |
+| --- | --- | --- | --- |
+| `a$` on `"a\n"` | no match | matched | no match |
+| `x{` on `"x{"` | matches | **threw** | matches |
+| `\a` on `"a"` | matches | no match | matches |
+| `[]` on `"a"` | never matches | **threw** | never matches |
 
-The two throws are the serious half: `test(regexp('x{'), 'x{')` is `true` upstream and an exception
-here, and a specification is data — often *pasted* data — so that is a chart taken down by a string
-someone typed.
+Three things came with the swap, all of them upstream behaviour this engine had approximated:
 
-**The swap surface is one line.** `VegaValue.Pattern.regex` is the only place a specification's own
-pattern becomes a `Regex`, and it has exactly three readers: `test` (`Functions.kt:375`) and the two
-branches of `replace` (`386`, `388`). Everything else that uses `Regex` in the core — twelve sites —
-is a fixed pattern this repository wrote, where the only requirement is that the platforms agree with
-each other.
+- **Flags are honoured, not translated.** `g`, `y`, `u`, `v` and `d` used to be accepted and dropped
+  because Kotlin had no equivalent. `g` in particular decides whether `replace` replaces once or
+  throughout, and the engine applies that itself — so `Functions.replace` no longer branches on flag
+  text.
+- **`$` substitution in a replacement is JavaScript's**: `$&`, `` $` ``, `$'`, `$1`, `$<name>`, with an
+  invalid reference emitted literally. Kotlin's `Regex` spells that differently.
+- **`split` takes a pattern.** It had been stringifying one to `/\d+/` and splitting on that literal,
+  so it silently returned the whole string. Capture groups now appear in the result and a
+  non-participating group is a hole (`null`), which is what JavaScript does.
 
-The owner is porting an ECMA-262 engine to Kotlin in a separate effort and will supply the URL; when it
-lands, point `Pattern` at it and the divergence closes on every target at once. The table above is the
-first four vectors to write. Until then this is a **known**, measured divergence rather than an
-unexamined one — and note that no test in this repository runs on a native target, so Kotlin/Native's
-regex behaviour is unmeasured even for our own internal patterns.
+`test` deliberately calls `findAll(...).isNotEmpty()` rather than the engine's `test`. JavaScript's
+`RegExp.test` advances `lastIndex` under `g`, so consecutive calls alternate; upstream gets away with it
+because it builds a fresh `RegExp` per evaluation, while a `Pattern` here is built once and read per
+row. The stateless form is what keeps a filter's answer independent of how many rows preceded it.
+
+**The blocker.** `ktecma262:0.1.2` is not on Maven Central yet — the namespace and signing key are
+still being set up — so `settings.gradle.kts` has a `mavenLocal()` line and the build needs
+`./gradlew publishToMavenLocal` in a checkout of that repository first. That breaks the rule every
+other coordinate follows and breaks a fresh clone. **Do not merge this branch until 0.1.2 is
+published**, then delete the `mavenLocal()` line.
+
+Its published targets are JVM and JS; this core needs the four native ones too. Adding
+`macosArm64() iosArm64() iosSimulatorArm64() linuxX64()` to its `build.gradle.kts` is the whole change —
+verified by doing it and compiling all four, so the README's "other Kotlin targets need only a
+build-file change" holds.
 
 ## Reported and not yet chased: an arc with an inverted radius
 
