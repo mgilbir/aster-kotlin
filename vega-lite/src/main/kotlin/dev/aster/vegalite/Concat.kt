@@ -69,9 +69,14 @@ private constructor(
         // A **repetition** inside a concatenation is a concatenation of its copies, exactly as one
         // at the top of a chart is: normalising it here rather than refusing it lets the ordinary
         // nesting take it, a concatenation's plot being allowed to be a concatenation.
-        val child =
+        val repeated =
           if (!declared.has("repeat")) declared
           else Repeat.normalize(declared, diagnostics) ?: return null
+        // A **facet** operator is the same chart as its two channels written in the encoding, here
+        // as much as at the top: the grid it lays out is then this plot's rather than the chart's.
+        val child =
+          if (!repeated.has("facet")) repeated
+          else FacetOperator.normalize(repeated, diagnostics) ?: return null
         for (nested in listOf("repeat", "facet")) {
           if (child.has(nested)) {
             diagnostics.fatal(

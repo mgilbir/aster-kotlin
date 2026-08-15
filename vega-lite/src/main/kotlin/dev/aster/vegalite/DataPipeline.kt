@@ -43,6 +43,14 @@ internal class DataPipeline(
    * domain asks for is such a point.
    */
   private val facetSplit: FacetNode? = null,
+  /**
+   * The partition a faceted view's cells are cut from, where the flow does **not** split at it.
+   *
+   * A facet is a node in the flow whether or not anything hangs below it, and a node in the flow
+   * takes a name: the dataset it reads is named when the walk reaches it, so a chart with a grid in
+   * it numbers the tables after that grid one higher than a chart without.
+   */
+  private val facetTail: FacetNode? = null,
   /** The selections some `lookup` reads as a table, which are the ones worth materialising. */
   private val materialized: Set<String> = emptySet(),
   /** Where each materialised selection's output node is recorded, for the join to be named from. */
@@ -110,7 +118,9 @@ internal class DataPipeline(
       return Outputs(outside.raw, outside.main, outside.scales, inside.main, facetNode)
     }
 
-    return cellChain(head, view.facetFields)
+    val chain = cellChain(head, view.facetFields)
+    facetTail?.let { chain.main.then(it) }
+    return chain
   }
 
   /** Everything a view does **before** it aggregates: its transforms, its buckets, its instants. */

@@ -175,13 +175,29 @@ private class Compilation(
     if (spec.has("facet")) spec = FacetOperator.normalize(spec, diagnostics) ?: return failed()
     selections = Selection.of(spec)
     val plots = plots() ?: return failed()
+    allPlots = plots
     concat = (plotTree as? Node.Nest)?.concat
     if (plots.any { it.views.isEmpty() }) return failed()
 
     // A facet channel does not encode anything *within* a cell, so it is lifted out of the encoding
     // before the scales are built — and everything inside then measures a cell rather than the
     // surface.
-    if (concat == null) plots.single().views = liftFacet(plots.single().views)
+    // Each plot's own grid, where it has one: a concatenation may hold a faceted plot beside a
+    // plain one, and the cells then belong inside that plot's group rather than to the chart.
+    for (plot in plots) {
+      val lifted = liftFacet(plot.views, plot.name)
+      plot.views = lifted.first
+      plot.facet = lifted.second
+      // Lifting a facet builds the cell's views anew, so the plot each belongs to has to be
+      // recorded again: a scale resolved per plot is named for the plot that owns it, and a view
+      // nothing knows the plot of is named as though it stood alone.
+      plot.views.forEach { plotNames[it] = plot.name }
+      // The **chart's** grid is the one it lays out itself. A faceted plot inside a concatenation
+      // lays out its own cells within its group, and everything the chart does about a facet —
+      // the split in the data flow, the cell's scales, the machinery in its signals — belongs to
+      // that plot rather than to the chart.
+      if (concat == null) facet = lifted.second
+    }
 
     val views = plots.flatMap { it.views }
     views.forEach { it.selections = selections }
@@ -455,6 +471,27 @@ private class Compilation(
     val root = plots.first().size!!
     // The facets' own values, which the layout counts and the headers title themselves from — and,
     // for a wrapped facet, only along the directions a shared axis was actually drawn in.
+    // A faceted plot inside a **concatenation** names its own values the same way; there is no
+    // split below it and no cell scale to place them among, so they simply follow the tables the
+    // chart derived.
+    for (plot in plots.filter { it.facet != null && concat != null }) {
+      val current = plot.facet!!
+      val bands =
+        plot.axes.filter { (it["grid"] as? VegaValue.Bool)?.value != true && !cellOwnsAxis(it) }
+      val across = bands.filter { it.string("orient") == "bottom" || it.string("orient") == "top" }
+      val reads = plot.views.first().mainData
+      val domains =
+        current.domainDatasets(
+          counted = emptyMap(),
+          source = reads,
+          vertical = (bands - across.toSet()).isNotEmpty(),
+          horizontal = across.isNotEmpty(),
+        )
+      // Beside the table it reads, not at the end of the chart's: a plot's own data is assembled
+      // when that plot is, so a grid's values stand between its table and the next plot's.
+      val at = data.indexOfFirst { it.string("name") == reads }
+      if (at >= 0) data.addAll(at + 1, domains) else data += domains
+    }
     facet?.let { current ->
       val main =
         plots.single().axes.filter {
@@ -523,15 +560,7 @@ private class Compilation(
         // `spacing` is a number or a `{row, column}` pair, and a pair states only the side it
         // means: a trellis of rows an inch apart still wants the configured gap between its
         // columns, so the side left out is filled in rather than dropped.
-        val stated = spec.fields["spacing"] ?: config.raw.obj("facet")?.fields?.get("spacing")
-        val configured = config.raw.obj("facet")?.number("spacing") ?: FACET_SPACING
-        val spacing =
-          if (stated is VegaValue.Obj)
-            obj {
-              put("row", stated.number("row") ?: configured)
-              put("column", stated.number("column") ?: configured)
-            }
-          else num((stated as? VegaValue.Num)?.value ?: configured)
+        val spacing = facetSpacing(spec)
         val independent =
           setOf("x", "y").filter { channel ->
             resolve.scaleIsIndependent(channel, defaultIndependent = false)
@@ -772,6 +801,10 @@ private class Compilation(
     }
   }
 
+  /** The plot a view belongs to, where the compiler has been told about it. */
+  private fun plotOfView(view: UnitView): Plot? =
+    plotNames[view]?.let { name -> allPlots.firstOrNull { it.name == name } }
+
   /** Signals that changed their name when two nodes were folded together. */
   private val signalRenames = mutableMapOf<String, String>()
 
@@ -810,6 +843,9 @@ private class Compilation(
 
   private val plotNames = mutableMapOf<UnitView, String>()
 
+  /** Every plot the chart was built from, so a view can be asked which grid it belongs to. */
+  private var allPlots: List<Plot> = emptyList()
+
   private fun failed() = VegaLiteCompilation(null, diagnostics.diagnostics)
 
   /**
@@ -847,6 +883,9 @@ private class Compilation(
   private class Plot(val name: String, val spec: VegaValue.Obj) {
     val prefix: String = if (name.isEmpty()) "" else "${name}_"
     var views: List<UnitView> = emptyList()
+
+    /** The grid this plot's cells are laid out in, where the plot is faceted at all. */
+    var facet: FacetLayout? = null
     var scales: LinkedHashMap<String, ScaleComponent> = LinkedHashMap()
     var axes: List<VegaValue> = emptyList()
 
@@ -1050,7 +1089,11 @@ private class Compilation(
       // `concat_1_height` where two plots in a column are different heights.
       for (child in nest.children) {
         if (name == null && child is Node.Nest) continue
-        val own = name ?: "${nameOf(child)}_$plain"
+        // A **faceted** plot's size is its *cell's*: the grid itself is a place its cells are
+        // arranged in and has no extent of its own to name, so the signal is `child_width` under
+        // the plot's name and no level above may rename it into a size the plot does not have.
+        val cell = (child as? Node.Leaf)?.plot?.facet != null
+        val own = if (cell) "${nameOf(child)}_child_$plain" else name ?: "${nameOf(child)}_$plain"
         when (child) {
           is Node.Leaf -> {
             child.plot.sizeNames = child.plot.sizeNames + (channel to own)
@@ -1087,6 +1130,7 @@ private class Compilation(
   /** A level above renamed what this one merged, so everything under it follows. */
   private fun renameSize(nest: Node.Nest, channel: String, name: String) {
     for (plot in leavesOf(nest)) {
+      if (plot.facet != null) continue
       if (plot.sizeNames[channel]?.endsWith(if (channel == "x") "width" else "height") != true)
         continue
       plot.sizeNames = plot.sizeNames + (channel to name)
@@ -1165,31 +1209,58 @@ private class Compilation(
       is Node.Leaf -> listOf(leafGroup(node.plot))
     }
 
+  /**
+   * The gap between a grid's cells: what the specification stated, then what the theme did.
+   *
+   * `spacing` is a number or a `{row, column}` pair, and a pair states only the side it means: a
+   * trellis of rows an inch apart still wants the configured gap between its columns, so the side
+   * left out is filled in rather than dropped.
+   */
+  private fun facetSpacing(owner: VegaValue.Obj): VegaValue {
+    val stated = owner.fields["spacing"] ?: config.raw.obj("facet")?.fields?.get("spacing")
+    val configured = config.raw.obj("facet")?.number("spacing") ?: FACET_SPACING
+    return if (stated is VegaValue.Obj)
+      obj {
+        put("row", stated.number("row") ?: configured)
+        put("column", stated.number("column") ?: configured)
+      }
+    else num((stated as? VegaValue.Num)?.value ?: configured)
+  }
+
   private fun leafGroup(plot: Plot): VegaValue = run {
     obj {
       put("type", "group")
       put("name", "${plot.name}_group")
-      // A plot inside a composition is still a unit or a layer, so its own title frames the group.
-      plot.spec.fields["title"]?.let { put("title", titleFor(it, composed = false)) }
-      put("style", style(plot.views))
-      put(
-        "encode",
-        obj {
-          put(
-            "update",
-            obj {
-              put("width", signalRef(plot.sizeNames.getValue("x")))
-              put("height", signalRef(plot.sizeNames.getValue("y")))
-              // A plot's own `view` block paints its plotting area, the same as the chart's does:
-              // a middle column drawn without a border says so on itself rather than on the chart.
-              (viewEncode(plot.spec) as? VegaValue.Obj)?.obj("update")?.fields?.forEach {
-                (key, value) ->
-                put(key, value)
-              }
-            },
-          )
-        },
-      )
+      // A plot inside a composition is still a unit or a layer, so its own title frames the group
+      // — unless it is a **grid**, which is a composition itself and anchors its title to the
+      // start rather than framing a plotting area it does not have.
+      plot.spec.fields["title"]?.let {
+        put("title", titleFor(it, composed = plot.facet != null))
+      }
+      if (plot.facet == null) put("style", style(plot.views))
+      // A **grid** has no plotting area to size: its layout places the cells, and the size the
+      // plot's name carries is one cell's.
+      if (plot.facet == null) {
+        put(
+          "encode",
+          obj {
+            put(
+              "update",
+              obj {
+                put("width", signalRef(plot.sizeNames.getValue("x")))
+                put("height", signalRef(plot.sizeNames.getValue("y")))
+                // A plot's own `view` block paints its plotting area, the same as the chart's
+                // does: a middle column drawn without a border says so on itself rather than on
+                // the chart.
+                (viewEncode(plot.spec) as? VegaValue.Obj)?.obj("update")?.fields?.forEach {
+                  (key, value) ->
+                  put(key, value)
+                }
+              },
+            )
+          },
+        )
+      }
       val local =
         localSizeSignals(plot) +
           selections
@@ -1209,8 +1280,26 @@ private class Compilation(
               }
             }
       if (local.isNotEmpty()) put("signals", arr(local))
-      put("marks", arr(brushed(plot.views, plot.views.flatMap { Marks.marks(it) })))
-      if (plot.axes.isNotEmpty()) put("axes", arr(plot.axes))
+      // A **faceted** plot lays its own cells out inside its group: the grid is this plot's, not
+      // the chart's, so its headers and its cell stand here and the axes are already inside them.
+      val grid = plot.facet
+      if (grid != null) {
+        put(
+          "layout",
+          grid.layout(
+            facetSpacing(plot.spec),
+            HEADER_OFFSET,
+            config,
+            setOf("x", "y")
+              .filter { resolve.scaleIsIndependent(it, defaultIndependent = false) }
+              .toSet(),
+          ),
+        )
+        put("marks", arr(marks(plot.views, plot.axes, grid)))
+      } else {
+        put("marks", arr(brushed(plot.views, plot.views.flatMap { Marks.marks(it) })))
+      }
+      if (grid == null && plot.axes.isNotEmpty()) put("axes", arr(plot.axes))
       if (plot.legends.isNotEmpty()) put("legends", arr(plot.legends))
     }
   }
@@ -1447,20 +1536,22 @@ private class Compilation(
    * Their marks are then named `child_marks` and their sizes `child_width`/`child_height`, which is
    * upstream's naming and is load-bearing: `width` still exists and means the whole grid.
    */
-  private fun liftFacet(views: List<UnitView>): List<UnitView> {
+  private fun liftFacet(views: List<UnitView>, owner: String): Pair<List<UnitView>, FacetLayout?> {
+    // The model the grid belongs to: the chart itself, or — inside a concatenation — the plot that
+    // holds it. Everything the grid names runs through it, so a faceted plot beside a plain one
+    // reads `concat_0_cell` rather than `cell`.
+    val named = if (owner.isEmpty()) spec.string("name").orEmpty() else owner
+    fun through(suffix: String) =
+      Fields.varName(if (named.isEmpty()) suffix else "${named}_$suffix")
     fun channel(name: String) = views.firstNotNullOfOrNull { view ->
-      view.spec.encoding[name]
-        ?.takeIf { it.isFieldDef }
-        ?.let {
-          Facet(name, it, spec.string("name").orEmpty())
-        }
+      view.spec.encoding[name]?.takeIf { it.isFieldDef }?.let { Facet(name, it, named) }
     }
     val row = channel("row")
     val column = channel("column")
     val wrapped = views.firstNotNullOfOrNull { view ->
       view.spec.encoding["facet"]?.takeIf { it.isFieldDef }
     }
-    if (row == null && column == null && wrapped == null) return views
+    if (row == null && column == null && wrapped == null) return views to null
     val crossed = row != null && column != null
     listOfNotNull(row, column).forEach { it.reportUnsupportedSort(diagnostics, crossed) }
     val found: FacetLayout =
@@ -1471,11 +1562,10 @@ private class Compilation(
         FacetWrap(
           wrapped,
           (spec.number("columns") ?: wrapped.raw.number("columns"))?.toInt(),
-          spec.string("name").orEmpty(),
+          named,
           config,
         )
-      else FacetGrid(row, column, spec.string("name").orEmpty())
-    facet = found
+      else FacetGrid(row, column, named)
 
     return views.map { view ->
       val withoutFacet = view.spec.encoding.filterKeys { it !in Channels.FACET_CHANNELS }
@@ -1492,11 +1582,7 @@ private class Compilation(
           // `child` under the chart's own name and above the layer's: a named trellis of layers
           // reads `trellis_child_layer_0`, because the name belongs to the model the cell hangs
           // from and the layer's index to the view inside it.
-          listOf(
-              spec.string("name").orEmpty(),
-              "child",
-              view.name.removePrefix(prefixed("")).trimStart('_'),
-            )
+          listOf(named, "child", view.name.removePrefix(named).trimStart('_'))
             .filter { it.isNotEmpty() }
             .joinToString("_"),
           parentIsLayer = view.parentIsLayer,
@@ -1506,8 +1592,8 @@ private class Compilation(
           // *facet model's*, whatever the cell is called, and that is what says they stand above
           // the partition rather than being rebuilt inside every cell.
           it.transformOwners = view.transformOwners
-          it.widthSignal = prefixed("child_width")
-          it.heightSignal = prefixed("child_height")
+          it.widthSignal = through("child_width")
+          it.heightSignal = through("child_height")
           it.facetFields = found.fields
           it.facetDefs = found.defs
           it.facetDeclared =
@@ -1518,7 +1604,7 @@ private class Compilation(
           // scales still read the whole table, so every cell is scaled alike.
           it.markData = found.named("facet")
         }
-    }
+    } to found
   }
 
   /**
@@ -1608,9 +1694,13 @@ private class Compilation(
     }
   }
 
-  private fun marks(views: List<UnitView>, axes: List<VegaValue>): List<VegaValue> {
+  private fun marks(
+    views: List<UnitView>,
+    axes: List<VegaValue>,
+    grid: FacetLayout? = facet,
+  ): List<VegaValue> {
     val drawn = views.flatMap { Marks.marks(it) }
-    val current = facet ?: return drawn
+    val current = grid ?: return drawn
     // A brush is drawn **in the cell**, where the marks it reacts to are. The rectangle belongs to
     // one cell's plotting area — it is dragged across those rows and no others — and the signals
     // that follow the pointer read that cell's own scales, so both go inside the group.
@@ -1623,7 +1713,7 @@ private class Compilation(
       setOf("x", "y").filter { channel ->
         resolve.scaleIsIndependent(channel, defaultIndependent = false)
       }
-    fun cellsOwn(axis: VegaValue): Boolean = cellOwnsAxis(axis)
+    fun cellsOwn(axis: VegaValue): Boolean = cellOwnsAxis(axis, ofFacet = true)
     val gridAxes = axes.filter { (it["grid"] as? VegaValue.Bool)?.value == true || cellsOwn(it) }
     val mainAxes = axes.filter { (it["grid"] as? VegaValue.Bool)?.value != true && !cellsOwn(it) }
     val horizontal = mainAxes.filter {
@@ -1859,6 +1949,10 @@ private class Compilation(
           // where there is one the chain stays below the facet and a copy of it — with the facet's
           // own fields added to every grouping — is hung beside it for the scales to measure.
           facetSplit = split,
+          // Where the flow does not split, the grid is still a node in it, and a node takes a name.
+          facetTail =
+            if (split != null) null
+            else plotOfView(view)?.facet?.let { FacetNode(it.named("facet")) },
           materialized = materialized,
           lookupOutputs = lookupOutputs,
         )
@@ -2235,19 +2329,23 @@ private class Compilation(
    * axis in the cell — and `parseGuideResolve` settles that for the *guide*, which an independent
    * scale forces but an `axis: "independent"` asks for on its own.
    */
-  private fun cellOwnsAxis(axis: VegaValue): Boolean =
+  private fun cellOwnsAxis(axis: VegaValue, ofFacet: Boolean = concat == null): Boolean =
     setOf("x", "y").any { channel ->
-      guideIsIndependent(channel) && axis.string("scale")?.endsWith(channel) == true
+      guideIsIndependent(channel, ofFacet) && axis.string("scale")?.endsWith(channel) == true
     }
 
-  private fun guideIsIndependent(channel: String): Boolean =
+  private fun guideIsIndependent(channel: String, ofFacet: Boolean = concat == null): Boolean =
     resolve.guideIsIndependent(
       channel,
       resolve.scaleIsIndependent(
         channel,
+        // `defaultScaleResolve` answers for the composition being asked about. A facet **inside** a
+        // concatenation is asked about its own cells, which share everything but `theta`; the
+        // concatenation's plots are what measure their positions separately.
         defaultIndependent =
-          if (concat != null) channel in Channels.POSITION_SCALE_CHANNELS || channel == "theta"
-          else facet != null && channel == "theta",
+          if (!ofFacet && concat != null)
+            channel in Channels.POSITION_SCALE_CHANNELS || channel == "theta"
+          else channel == "theta",
       ),
     )
 

@@ -697,7 +697,7 @@ no data is needed to compare two compilers. So every one of them was compiled by
 by this one, and the outputs compared property by property. That is a *measurement*, not a gate: the
 examples are not fixtures here, and nothing about them is checked in.
 
-**124 of 627 matched exactly** at the start, and **601** do now.
+**124 of 627 matched exactly** at the start, and **602** do now.
 
 The value is the *ranking*. The first sweep clustered by root cause, and the three most damaging
 causes were fixed straight away — chosen for what they do to the *picture* rather than for
@@ -712,13 +712,13 @@ frequency:
   where this compiler used `step - 2`, making it nearly four times too wide. `getBandSize` asks the
   scale's kind first and reaches `discreteBandSize` only where the domain is discrete.
 
-The sweep has been the working list ever since, and the 26 that still differ cluster like this:
+The sweep has been the working list ever since, and the 25 that still differ cluster like this:
 
 | Files | Cause |
 | --- | --- |
 | 21 | geographic: projections, `topojson`, `geoshape` — another worker's ground |
 | 5 | the rest of the **facet data flow**: what is left is a chart whose cells are read by a **selection**, where the brush's own datasets have to be cut per cell as well |
-| 1 | a facet inside a **concatenation**, which this compiler has as one grid per chart rather than one per plot — the same generalisation the three remaining refusals want, a facet inside a facet |
+| 0 | nothing outside the geographic work: what is left of the refusals is a facet inside a **facet**, a grid whose every cell is itself a grid, which needs a second level of cell groups |
 
 | 3 | one-offs, each its own rule |
 
@@ -4397,6 +4397,33 @@ A last one, off the same reading: `toFieldDefBase` keeps a field's bucketing, it
 aggregate, and **not its type**. Two layers over one column, one calling it ordinal and the other
 saying nothing, are the same field to a title; keying the title by the type as well titled the axis
 "age, age".
+
+### A grid belongs to the plot that holds it
+
+A facet inside a concatenation was refused because this compiler had one grid per *chart*. It now
+has one per plot: the operator is normalised where the child stands, `liftFacet` runs per plot, and
+the names the grid publishes run through the plot that owns it — `concat_0_cell` beside
+`concat_1_marks`.
+
+Four things follow from a grid being a plot rather than being in one:
+
+- Its group has **no plotting area**: no style, no `encode`, and a title anchored to the start
+  rather than framing a rectangle it does not have. Its layout places the cells instead.
+- The size its name carries is one **cell's**, `concat_0_child_width`, and no level above may
+  rename it into a size the plot does not have.
+- `defaultScaleResolve` answers for the composition being asked about. A facet *inside* a
+  concatenation is asked about its own cells, which share everything but `theta`; taking the
+  concatenation's answer — its plots measure their positions separately — put every axis inside the
+  cell and left the header bands empty.
+- Its values stand beside the table they are drawn from rather than at the end of the chart's data,
+  because a plot's own data is assembled when that plot is.
+
+And a fifth, which is not about concatenation at all: **a facet is a node in the flow whether or not
+anything hangs below it**, and a node in the flow takes a name. The dataset it reads is named when
+the walk reaches it, so a chart with a grid in it numbers the tables after that grid one higher than
+a chart without. Where the whole chain is hoisted above the facet that costs nothing — the dataset
+already had a name — which is why it went unnoticed until a grid stood beside a plot that had
+datasets of its own.
 
 ### A repetition inside a concatenation is a concatenation
 

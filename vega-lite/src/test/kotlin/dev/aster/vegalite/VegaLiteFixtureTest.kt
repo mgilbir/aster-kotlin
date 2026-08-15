@@ -75,18 +75,20 @@ class VegaLiteFixtureTest {
 
   @Test
   fun `an unimplemented composition is refused by name rather than approximated`() {
-    // A facet inside a concatenation: a concatenation's plots are single views, layers of them,
-    // or further concatenations.
+    // A facet inside a **facet**: a grid whose every cell is itself a grid needs a second level of
+    // cell groups, which is a layout this compiler does not have. A facet inside a concatenation
+    // does compile — the grid belongs to the plot that holds it.
     val compiled =
       VegaLiteCompiler()
         .compileJson(
           """
           {
-            "data": {"values": [{"a": 1}]},
-            "hconcat": [
-              {"mark": "bar", "encoding": {"x": {"field": "a", "type": "quantitative"}}},
-              {"facet": {"column": {"field": "a"}}, "spec": {"mark": "bar"}}
-            ]
+            "data": {"values": [{"a": 1, "b": 2}]},
+            "facet": {"column": {"field": "a"}},
+            "spec": {
+              "facet": {"row": {"field": "b"}},
+              "spec": {"mark": "bar", "encoding": {"x": {"field": "a", "type": "quantitative"}}}
+            }
           }
           """
             .trimIndent()

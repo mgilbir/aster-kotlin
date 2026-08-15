@@ -94,11 +94,12 @@ class VegaLiteInputTest {
       """
       {
         "${'$'}schema": "https://vega.github.io/schema/vega-lite/v6.json",
-        "data": {"values": [{"a": 1}]},
-        "hconcat": [
-          {"mark": "bar", "encoding": {"x": {"field": "a", "type": "quantitative"}}},
-          {"facet": {"column": {"field": "a"}}, "spec": {"mark": "bar"}}
-        ]
+        "data": {"values": [{"a": 1, "b": 2}]},
+        "facet": {"column": {"field": "a"}},
+        "spec": {
+          "facet": {"row": {"field": "b"}},
+          "spec": {"mark": "bar", "encoding": {"x": {"field": "a", "type": "quantitative"}}}
+        }
       }
       """
         .trimIndent()
@@ -106,7 +107,7 @@ class VegaLiteInputTest {
     assertTrue(converted.wasVegaLite)
     assertTrue(
       converted.diagnostics.any { it.code == VegaLiteDiagnostics.UNSUPPORTED_COMPOSITION },
-      "a facet inside a concatenation should be reported: ${converted.diagnostics}",
+      "a facet inside a facet should be reported: ${converted.diagnostics}",
     )
   }
 }
