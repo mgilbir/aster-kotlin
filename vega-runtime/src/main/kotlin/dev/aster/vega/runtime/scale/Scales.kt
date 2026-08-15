@@ -189,7 +189,12 @@ public class LinearScale(
     val r0 = range[0]
     val r1 = range[1]
     if (r0 == r1) return Double.NaN
-    val t = (position - r0) / (r1 - r0)
+    // `clamp` works **both ways** in d3, and this only clamped one of them. Inverting a position
+    // outside the range — which is every pointer event past the end of an axis — returned a value
+    // outside the domain: with domain [0, 1] and range [10, 20], `invert(30)` read 2 where upstream
+    // reads 1. A brush or a tooltip built on that selects data the scale says is not there.
+    val clamped = if (clamp) position.coerceIn(minOf(r0, r1), maxOf(r0, r1)) else position
+    val t = (clamped - r0) / (r1 - r0)
     return domain[0] + t * (domain[1] - domain[0])
   }
 

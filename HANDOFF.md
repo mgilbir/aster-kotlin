@@ -601,6 +601,34 @@ It also learned a distinction worth keeping: some operators publish something th
 rather than rows — so comparing it against rows compares two different contracts. Detected by shape
 rather than by name, and counted rather than called a divergence.
 
+## Builder chains: the last recording shape, and what it found
+
+`d3-scale` and `d3-shape` are written as builders — `scaleLinear().domain([0, 1]).range([0, 100])`
+configures an object and only then answers a question — so a single call is not a vector: *the state
+is the input*. The recorder follows the chain now. Every chainable call (one that returns the object)
+is remembered, and a call that answers something records the configuration that produced it:
+
+```json
+{"fn": "scaleLinear()", "chain": [["domain", [[1, 2]]], ["range", [[10, 20]]]],
+ "method": "invert", "args": [30], "result": 1}
+```
+
+**`d3-scale` went from 55 vectors to 1,129.** Two details were needed to make it true rather than
+plausible, and both were found by a wrong answer:
+
+- **The chain belongs to the object, not the wrapper.** A test does not have to chain — `const s =
+  scaleLinear(); s.domain([1, 2]); s(0.5)` throws the return value away — so holding the chain in the
+  wrapper loses it, and the vector then claims `scaleLinear()(0.5)` is 1.5, which is true of the
+  configured scale and nonsense on its own. It lives in a `WeakMap` keyed by the object.
+- **d3 takes configuration as constructor arguments too**: `scaleLinear([1, 2])` sets the range, and
+  ignoring that made a configured scale look like the default one.
+
+`UpstreamD3ScaleVectorsTest` replays 73 linear-scale vectors — evaluating, inverting, ticks — and
+found a real bug: **`clamp` works both ways in d3 and only one way here.** Inverting a position past
+the end of the range, which is every pointer event past the end of an axis, returned a value outside
+the domain: with domain [0, 1] and range [10, 20], `invert(30)` read **2** where upstream reads 1. A
+brush or a tooltip built on that selects data the scale says is not there.
+
 ## Where the remaining packages stand
 
 Replayed: `d3-time` (366), `d3-array` (252), `d3-color` (34), `vega-time` (281), `vega-transforms`

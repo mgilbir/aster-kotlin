@@ -330,7 +330,37 @@ function rewriteImports(source, file) {
  * hundred rows do not. Anything larger is recorded as a count, so the skip is visible rather than a
  * silently short array.
  */
-/** Wraps a returned function so calling it records what it was built with and what it answered. */
+/**
+ * Wraps a returned function so calling it records what it was built with and what it answered.
+ *
+ * It also follows a **builder chain**, which is the shape `d3-scale` and `d3-shape` are written in:
+ * `scaleLinear().domain([0, 1]).range([0, 100])` configures an object by chained calls and only then
+ * asks it something. A single call is not a vector there — *the state is the input* — so every
+ * chainable call (one that returns the object itself) is appended to a chain, and a call that
+ * answers with anything else records the chain that produced it:
+ *
+ *     {"fn": "scaleLinear", "chain": [["domain", [0, 1]], ["range", [0, 100]]],
+ *      "method": "invert", "args": [50], "result": 0.5}
+ *
+ * A replay rebuilds the object from the chain and asks the same question. Configuration order is
+ * kept because it matters: a `nice()` before a `domain()` nices a different domain.
+ */
+const chains = new WeakMap();
+
+/**
+ * The configuration a builder has accumulated, kept **on the object** rather than on a wrapper.
+ *
+ * A test does not have to chain: `const s = scaleLinear(); s.domain([1, 2]); s(0.5)` configures the
+ * same object through a call whose return value it throws away. Holding the chain in the wrapper
+ * loses that — the next question is asked through the original wrapper, whose chain is still empty —
+ * and the recorded vector then says `scaleLinear()(0.5)` is 1.5, which is true of the configured
+ * scale and nonsense on its own.
+ */
+function chainOf(target) {
+  if (!chains.has(target)) chains.set(target, []);
+  return chains.get(target);
+}
+
 function applied(fn, packageName, name, constructedWith, calls) {
   return new Proxy(fn, {
     apply(target, thisArg, args) {
@@ -344,11 +374,61 @@ function applied(fn, packageName, name, constructedWith, calls) {
         package: packageName,
         fn: `${name}()`,
         constructedWith: constructedWith.map(a => encode(a)),
+...(chainOf(target).length
+          ? {chain: chainOf(target).map(([m, a]) => [m, a.map(v => encode(v))])}
+          : {}),
         args: args.map(a => encode(a)),
         ...(threw ? {threw: threw.message.split('\n')[0]} : {result: encode(result)}),
       });
       if (threw) throw threw;
       return result;
+    },
+    get(target, key, receiver) {
+      const property = Reflect.get(target, key, receiver);
+      if (typeof property !== 'function' || typeof key !== 'string') return property;
+      if (key === 'constructor' || key.startsWith('_') || key in Function.prototype) return property;
+      return function (...args) {
+        let result, threw = null;
+        try {
+          result = property.apply(target, args);
+        } catch (error) {
+          threw = error;
+        }
+        if (threw) {
+          pushCall(calls, {
+            package: packageName,
+            fn: `${name}()`,
+            constructedWith: constructedWith.map(a => encode(a)),
+    ...(chainOf(target).length
+          ? {chain: chainOf(target).map(([m, a]) => [m, a.map(v => encode(v))])}
+          : {}),
+            method: key,
+            args: args.map(a => encode(a)),
+            threw: threw.message.split('\n')[0],
+          });
+          throw threw;
+        }
+        // Chainable: the call configured the object and handed it back. Remember it and keep
+        // wrapping, so the next question carries the whole configuration with it.
+        if (result === target || result === receiver) {
+          // Configured, not asked: remembered against the object itself, so a later question sees it
+          // whether or not the test kept the returned value.
+          chainOf(target).push([key, args]);
+          return receiver;
+        }
+        pushCall(calls, {
+          package: packageName,
+          fn: `${name}()`,
+          constructedWith: constructedWith.map(a => encode(a)),
+  ...(chainOf(target).length
+          ? {chain: chainOf(target).map(([m, a]) => [m, a.map(v => encode(v))])}
+          : {}),
+          method: key,
+          args: args.map(a => encode(a)),
+          result: encode(result),
+        });
+        return result;
+      };
     },
   });
 }
