@@ -2,6 +2,7 @@ package dev.aster.vega.expression
 
 import dev.aster.vega.model.Decimals
 import dev.aster.vega.model.VegaValue
+import io.github.mgilbir.ecma262.number.toEcmaDouble
 import kotlin.math.truncate
 
 /**
@@ -61,23 +62,16 @@ public object JsSemantics {
     }
 
   /** `Number(string)`: trims, accepts hex and binary, and treats the empty string as 0. */
-  private fun stringToNumber(text: String): Double {
-    val trimmed = text.trim()
-    if (trimmed.isEmpty()) return 0.0
-    if (trimmed == "Infinity" || trimmed == "+Infinity") return Double.POSITIVE_INFINITY
-    if (trimmed == "-Infinity") return Double.NEGATIVE_INFINITY
-    if (trimmed.length > 2 && (trimmed.startsWith("0x") || trimmed.startsWith("0X"))) {
-      return trimmed.substring(2).toLongOrNull(16)?.toDouble() ?: Double.NaN
-    }
-    if (trimmed.length > 2 && (trimmed.startsWith("0b") || trimmed.startsWith("0B"))) {
-      return trimmed.substring(2).toLongOrNull(2)?.toDouble() ?: Double.NaN
-    }
-    // Kotlin accepts trailing 'd'/'f' suffixes and leading/trailing whitespace forms that
-    // JavaScript
-    // rejects, so screen the text before converting.
-    if (!NUMERIC.matches(trimmed)) return Double.NaN
-    return trimmed.toDoubleOrNull() ?: Double.NaN
-  }
+  /**
+   * `Number(string)`, from **ktecma262**.
+   *
+   * This used to be a hand-rolled screen: trim, special-case `Infinity`, read `0x` and `0b` through
+   * `toLongOrNull`, then a regular expression to keep Kotlin from accepting the `1.0f` and `1.0d`
+   * suffixes JavaScript rejects. It got the common cases right and missed **octal** —
+   * `Number("0o17")` is 15 and this answered NaN — which is the kind of gap a screen written from
+   * memory has and a specification does not.
+   */
+  private fun stringToNumber(text: String): Double = text.toEcmaDouble()
 
   // ---- string coercion ------------------------------------------------------
 

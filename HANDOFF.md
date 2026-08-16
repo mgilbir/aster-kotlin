@@ -1318,6 +1318,46 @@ While there, the claim made in the previous commit — that an HCL interpolator 
 endpoint's hue — was checked rather than left as an assertion. `hue()` and `channel()` both carry
 d3's rule already, so making `toHcl` answer NaN for a grey was safe. 185 fixtures.
 
+## ktecma262 0.2.0: deleting the arithmetic this engine had written twice
+
+0.2.0 adds an `ecma262.number` package — `toEcmaString`, `toEcmaFixed`, `toEcmaExponential`,
+`toEcmaPrecision`, `toEcmaDouble`, radix `toEcmaString` — which is, almost exactly, the work done
+here earlier in this session. Two implementations of one specification is one too many, and the
+library's is the one with the specification's own suite behind it. **`Decimals` went from 458 lines
+to 124**, taking the `Natural` big-integer with it, and the reasoning that justified writing it
+stays in the file's header, because it is still why the answers are what they are.
+
+Swapping it was quick for one reason: **the oracle was never the implementation.** `DecimalsTest`
+checks against `java.math.BigDecimal` over a hundred thousand random doubles and `DecimalsCommonTest`
+against pinned vectors generated from it. The implementation could be replaced wholesale and the
+authority stayed put.
+
+What the swap found is that the oracle had been encoding *this engine's* choices in three places
+where the language says otherwise, and each is a real behaviour change:
+
+- **`toFixed` gives up at 10^21.** The specification says to return `ToString(x)` there, so
+  `(4.8e260).toFixed(6)` is `4.8371574695849096e+260` and not 261 digits — and `d3.format('.6f')`
+  answers the same, because d3 calls `toFixed`. This engine expanded. Fourteen pinned vectors were
+  wrong with it.
+- **`toPrecision` has no such rule**, so `(1e21).toPrecision(26)` *does* write the digits out. The
+  oracle had been routing one through the other and conflating them.
+- **A negative zero keeps no sign in `toExponential`.** `(-0).toExponential(0)` is `0e+0`, and d3
+  re-adds a sign itself when a specifier asks for one.
+
+`toFixed` also refuses beyond 100 places, as JavaScript does, so the test that expanded
+`Double.MIN_VALUE` to 1074 now asserts what a caller can actually ask for. And
+`canonicalNumberString` keeps its own rule — the exponent form is never emitted, per PROJECT_BRIEF
+4.4 — by writing large magnitudes out from their shortest digits rather than inheriting `toFixed`'s
+cutoff.
+
+Two smaller deletions came with it. `Number(string)` is `toEcmaDouble` now; the hand-rolled screen
+it replaced missed **octal**, answering NaN where `Number("0o17")` is 15. And `toString(radix)` is
+the library's, which does not saturate at `Long`'s range the way the old one did — the same trap
+that broke `String(x)` earlier today.
+
+Verified by 7,957 number-string vectors, 548 d3-format vectors, the `BigDecimal` oracle, and 185
+fixtures, all unchanged.
+
 ## Where the remaining packages stand
 
 Replayed: `d3-time` (366), `d3-array` (252), `d3-color` (34), `vega-time` (281), `vega-transforms`

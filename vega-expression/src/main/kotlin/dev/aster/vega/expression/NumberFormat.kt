@@ -2,6 +2,7 @@ package dev.aster.vega.expression
 
 import dev.aster.vega.model.Decimals
 import dev.aster.vega.model.roundHalfUp
+import io.github.mgilbir.ecma262.number.toEcmaString
 import kotlin.math.abs
 import kotlin.math.floor
 import kotlin.math.max
@@ -388,7 +389,10 @@ public object NumberFormat {
   private fun wholeInRadix(value: Double, radix: Int): String {
     val rounded = roundHalfUp(value)
     if (!rounded.isFinite()) return JsSemantics.numberToString(rounded)
-    return rounded.toLong().toString(radix)
+    // `Number.prototype.toString(radix)`, from the library: `toLong().toString(radix)` agreed for
+    // every value a format string reaches but is not the same function — it saturates at `Long`'s
+    // range where the specification keeps going, the same way `toLong()` once broke `String(x)`.
+    return rounded.toEcmaString(radix)
   }
 
   /**
