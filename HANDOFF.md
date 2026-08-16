@@ -862,6 +862,35 @@ stringifies to, which matches no operator and contributes nothing.
 a spherical polygon has no outside, so the box wound one way is `0.000305 sr` and wound the other is
 `12.566066 sr` — 4π, everything else on Earth. 180 fixtures.
 
+## The rest of d3-geo, and one adapter reading the wrong column
+
+Rotation and the stream walk are replayed too, taking d3-geo to **144 of 236**. Both were clean
+first time, which is worth recording as much as a fix would be: the rotation composition and the
+`geoStream` walk were already right.
+
+`geoStream`'s corpus is shapes rather than answers — an unknown geometry type, a **null geometry**,
+empty coordinate arrays, points carrying an elevation — and upstream walks every one of them and
+reports nothing. The sink it was handed is recorded as an empty object, so what is replayable is the
+part that matters: that none of them is an error. All 22 walk.
+
+The 32 `geoGraticule()` and `geoCircle()` vectors cannot be replayed **as recorded**, and the reason
+is worth writing down rather than filing under "unmapped": the recorder captures a builder's
+constructor arguments and its chain, but these are configured by calls the chain did not catch, so
+sixteen graticules that differ only by `.step()` and `.extent()` all arrive as `geoGraticule()` with
+no arguments. Two vectors that differ only by configuration are indistinguishable, and replaying
+them would mean guessing which is which from the answer.
+
+**And an adapter bug that looked exactly like an engine bug.** One rotation vector disagreed, and
+not subtly — upstream mapped the point to the origin where this engine turned it a hundred degrees.
+The engine was right: the vector was `rotation.invert(p)`, which the recorder files under the same
+`fn` as `rotation(p)` and distinguishes with a `method` field the adapter was ignoring. Comparing an
+inverse against a forward looks precisely like a rotation applied backwards.
+
+That is a mistake with reach, so the other adapters were audited for it. Only this one had it:
+`UpstreamD3ScaleVectorsTest` reads the field, and the two remaining packages with `method` vectors
+— `d3-array`'s `bin()` and `d3-time`'s `timeInterval()`, both built from anonymous functions a
+vector cannot record — are already counted as unmapped rather than replayed.
+
 ## Where the remaining packages stand
 
 Replayed: `d3-time` (366), `d3-array` (252), `d3-color` (34), `vega-time` (281), `vega-transforms`

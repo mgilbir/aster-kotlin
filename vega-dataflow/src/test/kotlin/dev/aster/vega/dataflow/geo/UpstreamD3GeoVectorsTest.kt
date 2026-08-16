@@ -81,13 +81,80 @@ class UpstreamD3GeoVectorsTest {
       val fn = vector["fn"]?.jsonPrimitive?.content ?: continue
       if (fn !in REPLAYED) {
         unmapped.merge(
-          if (fn in NOT_VEGA_S) "$fn (Vega does not call it)" else fn,
+          when (fn) {
+            in NOT_VEGA_S -> "$fn (Vega does not call it)"
+            // The recorder captures a builder's *constructor* arguments, not the chain of `.step()`
+            // and `.extent()` calls that configure it, so two vectors that differ only by
+            // configuration are indistinguishable here. Replaying them would mean guessing.
+            in BUILDERS -> "$fn (the builder's configuration is not recorded)"
+            else -> fn
+          },
           1,
           Int::plus,
         )
         continue
       }
+      // A rotation compares numbers rather than measuring a geometry, so it is answered first.
+      if (fn == "geoRotation()") {
+        val angles =
+          (vector["constructedWith"] as? JsonArray)
+            ?.getOrNull(0)
+            ?.let { it as? JsonArray }
+            ?.mapNotNull {
+              number(it)
+            }
+        val point =
+          ((vector["args"] as? JsonArray)?.getOrNull(0) as? JsonArray)?.mapNotNull { number(it) }
+        val expected = (vector["result"] as? JsonArray)?.mapNotNull { number(it) }
+        if (angles == null || angles.size < 2 || point?.size != 2 || expected?.size != 2) {
+          unmapped.merge("$fn (not a rotation of a point)", 1, Int::plus)
+          continue
+        }
+        val rotation =
+          Rotation(
+            angles[0] * GeoMath.RADIANS,
+            angles[1] * GeoMath.RADIANS,
+            (angles.getOrNull(2) ?: 0.0) * GeoMath.RADIANS,
+          )
+        // `rotation.invert(p)` is recorded under the same `fn` as `rotation(p)`, distinguished
+        // only by the `method` field. Ignoring it compares an inverse against a forward, which
+        // looks exactly like an engine that has its rotation backwards.
+        val method = vector["method"]?.jsonPrimitive?.content
+        if (method != null && method != "invert") {
+          unmapped.merge("geoRotation().$method", 1, Int::plus)
+          continue
+        }
+        val turned =
+          if (method == "invert")
+            rotation.invert(point[0] * GeoMath.RADIANS, point[1] * GeoMath.RADIANS)
+          else rotation.forward(point[0] * GeoMath.RADIANS, point[1] * GeoMath.RADIANS)
+        val ours = listOf(turned[0] * GeoMath.DEGREES, turned[1] * GeoMath.DEGREES)
+        replayed++
+        if (expected.indices.any { !near(ours[it], expected[it]) })
+          failures.add("$fn$angles($point): upstream $expected, ours $ours")
+        continue
+      }
+
       val argument = (vector["args"] as? JsonArray)?.getOrNull(0)
+
+      // `geoStream` is a corpus of *shapes rather than answers*: an unknown geometry type, a null
+      // geometry, empty coordinate arrays, and points carrying an elevation. Upstream walks all of
+      // them and reports nothing, and the sink it was given is recorded as an empty object — so
+      // what is replayable is the part that matters, that none of them is an error.
+      if (fn == "geoStream") {
+        val walked = runCatching {
+          val counting = CountingSink()
+          GeoJsonStream.stream(
+            argument?.toVegaValue() ?: dev.aster.vega.model.VegaValue.Null,
+            counting,
+          )
+        }
+          .exceptionOrNull()
+        replayed++
+        if (walked != null) failures.add("$fn on $argument threw ${walked::class.simpleName}")
+        continue
+      }
+
       if (argument !is JsonObject) {
         unmapped.merge("$fn (the argument is not a geometry)", 1, Int::plus)
         continue
@@ -151,13 +218,25 @@ class UpstreamD3GeoVectorsTest {
       }
 
     assertEquals(emptyList<String>(), failures.take(12), "d3-geo disagrees with this engine")
-    assertTrue(replayed >= 110, "only $replayed vectors replayed; the harness must not shrink")
+    assertTrue(replayed >= 140, "only $replayed vectors replayed; the harness must not shrink")
   }
 
   private companion object {
-    val REPLAYED = setOf("geoArea", "geoBounds", "geoCentroid", "geoLength")
+    val REPLAYED =
+      setOf("geoArea", "geoBounds", "geoCentroid", "geoLength", "geoRotation()", "geoStream")
+
+    /** Counts what a sink is asked to draw, so a walk can be checked for having happened. */
+    private class CountingSink : GeoStream() {
+      var points = 0
+
+      override fun point(x: Double, y: Double) {
+        points++
+      }
+    }
 
     /** Recorded because they are in the package, but nothing in Vega reaches them. */
     val NOT_VEGA_S = setOf("geoContains", "geoDistance", "geoInterpolate", "geoInterpolate()")
+
+    val BUILDERS = setOf("geoGraticule()", "geoCircle()", "geoGraticule", "geoCircle")
   }
 }
