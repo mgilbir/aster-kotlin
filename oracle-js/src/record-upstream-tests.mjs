@@ -212,6 +212,7 @@ async function runTestFile(file, packageName, calls, skipped, checkout) {
   const restoreTransforms = recordTransforms(namespace, packageName, calls);
   globalThis.__vegaRecorded = wrapped;
   globalThis.__vegaTape = tapeShim(where, skipped);
+  globalThis.__vegaVitest = vitestShim(where, skipped);
   installMochaShim(where, skipped);
 
   let rewritten;
@@ -269,7 +270,7 @@ function rewriteImports(source, file) {
     // and vector in this repository is generated from.
     const isPackage =
       from === '../index.js' || from === '../index' || from === '../src/index.js';
-    if (!isPackage && from !== 'tape' && !from.startsWith('./')) continue;
+    if (!isPackage && from !== 'tape' && from !== 'vitest' && !from.startsWith('./')) continue;
 
     if (from.startsWith('./')) {
       // Rebuilt from the AST rather than patched in the text. The first version swapped `'${from}'`
@@ -292,9 +293,22 @@ function rewriteImports(source, file) {
       ]);
       continue;
     }
-    const binding = isPackage ? 'globalThis.__vegaRecorded' : 'globalThis.__vegaTape';
+    const binding = isPackage
+      ? 'globalThis.__vegaRecorded'
+      : from === 'vitest'
+        ? 'globalThis.__vegaVitest'
+        : 'globalThis.__vegaTape';
     const parts = [];
     for (const specifier of node.specifiers) {
+      // `vitest` is imported by name — `import {it, expect} from "vitest"` — so each specifier is
+      // taken off the shim object rather than bound to the whole of it.
+      if (
+        from === 'vitest' &&
+        (specifier.type === 'ImportDefaultSpecifier' || specifier.type === 'ImportNamespaceSpecifier')
+      ) {
+        parts.push(`const ${specifier.local.name} = ${binding};`);
+        continue;
+      }
       if (specifier.type === 'ImportDefaultSpecifier' || specifier.type === 'ImportNamespaceSpecifier') {
         // `import tape from 'tape'` and `import * as vega from '../index.js'` both bind the whole
         // thing; for the package that is exactly the wrapper object.
@@ -580,6 +594,43 @@ function installMochaShim(where, skipped) {
   globalThis.it = run;
   globalThis.describe = (_name, body) => body?.();
   globalThis.before = globalThis.after = globalThis.beforeEach = globalThis.afterEach = () => {};
+}
+
+/**
+ * Enough of **vitest** to run a test body, which is what the newer d3 packages use.
+ *
+ * Three runners now — `tape` in Vega, `mocha` in most of d3, `vitest` in the packages d3 has
+ * migrated — and the recorder cares about none of their assertions: `expect(x).toBe(y)` is accepted
+ * and dropped like the rest, because the vector is what the library *returned*, not what the test
+ * believed about it. `expect` therefore answers any method with itself, so a chain of them runs.
+ */
+function vitestShim(where, skipped) {
+  const chainable = new Proxy(() => chainable, {
+    get: (target, key) => (key === 'not' || key === 'resolves' || key === 'rejects' ? chainable : () => chainable),
+    apply: () => chainable,
+  });
+  const run = (name, body) => {
+    try {
+      const done = body?.();
+      if (done && typeof done.then === 'function') done.catch(() => {});
+    } catch (error) {
+      skipped.push({file: where, case: name, reason: `case threw: ${error.message.split('\n')[0]}`});
+    }
+  };
+  run.skip = () => {};
+  run.only = run;
+  run.each = () => run;
+  return {
+    it: run,
+    test: run,
+    describe: (_name, body) => body?.(),
+    expect: () => chainable,
+    assert: new Proxy({}, {get: () => () => {}}),
+    beforeEach: () => {},
+    afterEach: () => {},
+    beforeAll: () => {},
+    afterAll: () => {},
+  };
 }
 
 /** Enough of `tape` to run a test body: assertions are accepted and ignored. */

@@ -1601,23 +1601,27 @@ public object NumberFormatSubset {
     // d3-format spells these the way JavaScript does, then signs them like any other number.
     if (value.isInfinite()) return if (value > 0) "Infinity" else MINUS_SIGN + "Infinity"
 
+    // d3 clamps a requested precision to **20** — `Math.max(0, Math.min(20, precision))` — because
+    // that is as far as JavaScript's own `toFixed` goes. `.30f` therefore writes twenty decimals
+    // upstream and wrote thirty here, which is a wider column and a number that claims more than a
+    // double holds.
+    val precision = spec.precision?.coerceIn(0, MAX_PRECISION)
     val raw =
       when (spec.type) {
-        'd' -> roundHalfUp(value).toLong().toString()
-        'e' -> Decimals.exponential(value, spec.precision ?: 6)
+        'd' -> wholeNumber(roundHalfUp(value))
+        'e' -> Decimals.exponential(value, precision ?: 6)
         'g' ->
-          Decimals.significant(
-            value,
-            (spec.precision ?: DEFAULT_SIGNIFICANT_DIGITS).coerceAtLeast(1),
-          )
-        '%' -> {
-          val scaled = value * 100.0
-          Decimals.fixed(scaled, spec.precision ?: 0) + "%"
-        }
-        else -> Decimals.fixed(value, spec.precision ?: 6)
+          Decimals.significant(value, (precision ?: DEFAULT_SIGNIFICANT_DIGITS).coerceAtLeast(1))
+        // The `%` sign is a **suffix**, appended after trimming and grouping rather than baked into
+        // the number: with it attached, `~%` could not see the trailing zeros it was asked to trim
+        // and `10.000000%` came back where upstream writes `10%`. Six, not zero, is d3's default
+        // precision for it, as for every type that takes one.
+        '%' -> Decimals.fixed(value * 100.0, precision ?: 6)
+        else -> Decimals.fixed(value, precision ?: 6)
       }
     val text = if (spec.trim) trimInsignificantZeros(raw) else raw
-    val grouped = if (spec.group) groupThousands(text) else text
+    val grouped =
+      (if (spec.group) groupThousands(text) else text) + if (spec.type == '%') "%" else ""
     // The currency symbol goes *inside* the sign, between it and the digits, so -1.5 reads `−$1.50`
     // rather than `$−1.50`. Applied before the minus substitution because it has to find the sign.
     val signed = if (spec.currency) prefixCurrency(grouped) else grouped
@@ -1639,6 +1643,34 @@ public object NumberFormatSubset {
     val trimmed = body.trimEnd('0').trimEnd('.')
     return trimmed + suffix
   }
+
+  /**
+   * A whole number written out, the way d3's `formatDecimal` writes one.
+   *
+   * Two traps, both found by replaying d3-format's own vectors. Going through a `Long` saturates:
+   * `format(",d")` of 1e21 printed **9,223,372,036,854,775,807**. And expanding the double
+   * *exactly* is not right either — d3 hands anything from 1e21 up to `toLocaleString`, which
+   * writes the **shortest** representation, so 1.3e27 is `1300000000000000000000000000` where the
+   * exact value of that double is `1300000000000000044761612288`. Below 1e21 the two agree and
+   * `toString` is used.
+   */
+  private fun wholeNumber(value: Double): String {
+    if (!value.isFinite()) return Decimals.fixed(value, 0)
+    if (abs(value) < 1e21) return Decimals.fixed(value, 0)
+    val shortest = JsSemantics.numberToString(value)
+    val marker = shortest.indexOf('e')
+    if (marker < 0) return shortest
+    val exponent = shortest.substring(marker + 1).removePrefix("+").toIntOrNull() ?: return shortest
+    val mantissa = shortest.substring(0, marker)
+    val negative = mantissa.startsWith("-")
+    val digits = mantissa.removePrefix("-").replace(".", "")
+    val pointAt = mantissa.removePrefix("-").indexOf('.').let { if (it < 0) 1 else it }
+    val zeros = exponent - (digits.length - pointAt)
+    return (if (negative) "-" else "") + digits + "0".repeat(zeros.coerceAtLeast(0))
+  }
+
+  /** d3 clamps a precision to this, because it is as far as JavaScript's `toFixed` goes. */
+  private const val MAX_PRECISION = 20
 
   /** d3's default currency symbol, placed between the sign and the digits. */
   private fun prefixCurrency(text: String): String =

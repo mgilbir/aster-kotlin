@@ -653,6 +653,31 @@ compares them with JavaScript's `<`, which is lexicographic (`"12" < "2"`), wher
 them to numbers. Supporting it means carrying `VegaValue` thresholds and JS comparison through the
 scale, for a specification that writes a numeric cut point in quotes.
 
+## A third test runner, and three bugs in number formatting
+
+`d3-format` recorded **nothing** — 24 of 24 files skipped — because it uses **vitest**. Vega uses
+`tape`, most of d3 uses `mocha`, and the packages d3 has migrated use vitest, so the recorder now
+shims all three. It cares about none of their assertions: the vector is what the library *returned*,
+not what the test believed about it, so `expect(x).toBe(y)` is accepted and dropped like the rest.
+
+0 → **774 vectors**, and 106 of them replay against the `format` expression function. Three real bugs,
+all on the path every axis label takes:
+
+- **`format(",d")` of 1e21 printed `9,223,372,036,854,775,807`.** It went through a `Long`, which
+  saturates. Expanding the double exactly is not right either: d3 hands anything from 1e21 up to
+  `toLocaleString`, which writes the **shortest** representation — 1.3e27 is
+  `1300000000000000000000000000` where that double's exact value is `1300000000000000044761612288`.
+- **Precision was not clamped.** d3 caps it at 20, because that is as far as JavaScript's `toFixed`
+  goes, so `.30f` writes twenty decimals upstream and wrote thirty here: a wider column, and a number
+  claiming more than a double holds.
+- **`%` defaulted to no decimals** where d3 defaults to six, so `format('%')` of 0.001 read `0%`
+  instead of `0.100000%`. The `%` sign also has to be appended **after** trimming — with it attached,
+  `~%` could not see the trailing zeros it was asked to trim.
+
+What is not replayed is named: 122 vectors ask for `s` (SI prefixes) and 71 for the `d` variants this
+grammar does not accept, which is the honest size of the gap between this subset and d3's full
+specifier language.
+
 ## Where the remaining packages stand
 
 Replayed: `d3-time` (366), `d3-array` (252), `d3-color` (34), `vega-time` (281), `vega-transforms`
