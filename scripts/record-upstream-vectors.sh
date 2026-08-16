@@ -73,7 +73,11 @@ done
 cd "$ROOT"
 
 # An empty file would claim a package was covered when nothing was recorded from it.
-find test-fixtures/upstream-vectors -name '*.json' ! -name 'known-divergences.json' -print0 |
+# `js-number-strings.json` is not a recording of a package's tests and holds `numbers` rather than
+# `calls`; reading `.calls.length` off it threw, and under `set -e` that killed the run *before the
+# whole d3 section*. Excluded here as it is in the total below.
+find test-fixtures/upstream-vectors -name '*.json' \
+  ! -name 'known-divergences.json' ! -name 'js-number-strings.json' -print0 |
   while IFS= read -r -d '' file; do
     count="$(node -p "JSON.parse(require('fs').readFileSync('$file','utf8')).calls.length")"
     # An `if`, not `[ ... ] && rm`: the and-list returns 1 for every file that *does* have vectors,

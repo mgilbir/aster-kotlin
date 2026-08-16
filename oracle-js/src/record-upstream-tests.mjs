@@ -178,6 +178,7 @@ function recordExports(moduleNamespace, packageName, calls) {
         // library; recording them produced vectors named `monthAbbrevFormat.bind`.
         if (key === 'constructor' || key.startsWith('_') || key in Function.prototype) return property;
         return function (...args) {
+          const encodedArgs = args.map(a => encode(a));
           let result, threw = null;
           try {
             result = property.apply(target, args);
@@ -385,7 +386,9 @@ function applied(fn, packageName, name, constructedWith, calls) {
     apply(target, thisArg, args) {
       // Encoded **before** the call, because a function may mutate what it was handed and some
       // do: `boundStroke(bounds, item)` expands `bounds` in place and returns it, so encoding
-      // afterwards recorded the answer as the question and lost the input entirely.
+      // afterwards recorded the answer as the question and lost the input entirely. Each closure
+      // takes its own snapshot — reading one from an enclosing scope silently recorded nothing for
+      // every method call in d3-time.
       const encodedArgs = args.map(a => encode(a));
       let result, threw = null;
       try {
