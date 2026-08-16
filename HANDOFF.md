@@ -954,6 +954,40 @@ record.
 family lands exactly on the middle range stop, which is the property the old code could not have.
 181 fixtures.
 
+## Two ways to step a day, and this engine knew neither
+
+d3-time was at 366 of 1051 replayed because `TimeStepper` had `floor`, `offset` and `range` and
+nothing else. Adding **`ceil`**, **`round`** and **`count`** — and noticing that calling an interval
+*is* flooring it, and that `unixDay` is `utcDay` for every method here — took it to **688**, all
+clean first time. The one piece of arithmetic worth keeping in view is `count`'s daylight-saving
+correction: a local day is not always 86,400,000 milliseconds, so the day a clock springs forward
+would otherwise report 30 days in a 31-day March.
+
+`timeTicks` and `utcTicks` needed a second adapter, because `TimeTicks` lives in the runtime while
+`TimeStepper` lives in the model. 47 vectors, and they found three real faults — all of them in the
+part that decides what a time axis is labelled in.
+
+- **A stepped day ignored its step when flooring.** `TimeInterval.DAY` floored to the start of
+  whatever day it was given, so `range` anchored a two-day grid to wherever the domain happened to
+  begin. d3 selects the 1st, 3rd, 5th … of each month, so every label on such an axis was a day out.
+- **And there are two day intervals, not one.** d3 builds its local tick table on `timeDay`, whose
+  `every(n)` tests the day of the month, and its **UTC** table on `unixDay`, which tests days since
+  1970. The same two-day step therefore lands on odd days of the month locally and on even *epoch*
+  days in UTC. Getting the local case right left the UTC case wrong in a different way.
+- **A zero-width domain drew no ticks.** The tick increment of `[t, t]` is `NaN`, and
+  `coerceAtLeast(1.0)` does not rescue a `NaN` — so the stepper was built with a step of zero and
+  enumerated nothing. Upstream puts one tick on a single-valued domain, which is what an axis over
+  one datum should show.
+
+Offsetting a stepped day now walks day by day rather than adding `step` days, which is d3's filtered
+interval and matters at the end of a month: after the 31st comes the 1st, two selected days in a
+row. That is upstream's own quirk, reproduced rather than smoothed.
+
+What is left in d3-time is honest: 43 `every` calls that return a function a vector cannot record,
+about 270 weekday-anchored intervals (`timeMonday` and its six siblings, which Vega never asks for —
+its `week` is Sunday), and 19 `range` calls with a step, which is d3's *other* stepping rule and a
+different function from the one Vega uses.
+
 ## Where the remaining packages stand
 
 Replayed: `d3-time` (366), `d3-array` (252), `d3-color` (34), `vega-time` (281), `vega-transforms`

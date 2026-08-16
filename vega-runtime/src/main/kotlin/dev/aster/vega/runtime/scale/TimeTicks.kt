@@ -66,19 +66,32 @@ public object TimeTicks {
             count,
           )
         )
-      return TimeStepper(TimeInterval.YEAR, years.coerceAtLeast(1.0).toInt(), zone)
+      return TimeStepper(TimeInterval.YEAR, atLeastOne(years), zone)
     }
     if (index == 0) {
       // Finer than a second: step in raw milliseconds.
       val step = Ticks.stepFrom(Ticks.tickIncrement(start, stop, count))
-      return TimeStepper(TimeInterval.MILLISECOND, step.coerceAtLeast(1.0).toInt(), zone)
+      return TimeStepper(TimeInterval.MILLISECOND, atLeastOne(step), zone)
     }
 
     val finer = INTERVALS[index - 1]
     val coarser = INTERVALS[index]
     val entry = if (target / span(finer) < span(coarser) / target) finer else coarser
-    return TimeStepper(entry.first, entry.second, zone)
+    // d3 builds its UTC tick table on `unixDay` and its local one on `timeDay`, which choose
+    // different days for the same step — see `TimeStepper`'s `epochDays`.
+    return TimeStepper(entry.first, entry.second, zone, epochDays = zone == TimeZone.UTC)
   }
+
+  /**
+   * A step of at least one, treating a step that is not a number as one.
+   *
+   * `coerceAtLeast(1.0)` does not rescue a **NaN**, and a domain of zero width produces exactly
+   * that: the tick increment of `[t, t]` is not a number, so the stepper was built with a step of
+   * zero and enumerated nothing. Upstream puts a single tick on a single-valued time domain, which
+   * is what an axis over one datum should show.
+   */
+  private fun atLeastOne(step: Double): Int =
+    if (step.isFinite() && step >= 1.0) step.toInt() else 1
 
   /** Tick instants across `[start, stop]`, inclusive of a boundary that lands exactly on [stop]. */
   public fun ticks(start: Double, stop: Double, count: Int, zone: TimeZone): List<Double> {

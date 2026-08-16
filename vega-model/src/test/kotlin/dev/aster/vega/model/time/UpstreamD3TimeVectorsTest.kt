@@ -54,9 +54,18 @@ class UpstreamD3TimeVectorsTest {
    * counted from the epoch rather than from local midnight, which is a different thing again.
    */
   private fun stepper(name: String, step: Int): TimeStepper? {
-    val utc = name.startsWith("utc")
+    // `unixDay` is `utcDay` for every method here: it floors with `setUTCHours(0,0,0,0)`, offsets
+    // with `setUTCDate`, and counts elapsed milliseconds over a day. The two part company only in
+    // the `field` function `every()` filters on, which is not replayable anyway.
+    val utc = name.startsWith("utc") || name.startsWith("unix")
     val zone = if (utc) TimeZone.UTC else TimeZone.of(document["timeZone"]!!.jsonPrimitive.content)
-    val unit = name.removePrefix("utc").removePrefix("time").lowercase()
+    val unit =
+      name
+        .removePrefix("utc")
+        .removePrefix("unix")
+        .removePrefix("time")
+        .lowercase()
+        .removeSuffix("s")
     val interval =
       when (unit) {
         "millisecond" -> TimeInterval.MILLISECOND
@@ -115,10 +124,30 @@ class UpstreamD3TimeVectorsTest {
       val expected: String
       val actual: String
       when (method) {
+        // Calling an interval *is* flooring it: `timeDay(date)` and `timeDay.floor(date)` are the
+        // same function in d3, and the shorter spelling is the one its tests mostly use.
+        "(call)",
         "floor" -> {
           val at = date(args.getOrNull(0)) ?: continue
           expected = describe(date(result))
           actual = describe(stepper.floor(at))
+        }
+        "ceil" -> {
+          val at = date(args.getOrNull(0)) ?: continue
+          expected = describe(date(result))
+          actual = describe(stepper.ceil(at))
+        }
+        "round" -> {
+          val at = date(args.getOrNull(0)) ?: continue
+          expected = describe(date(result))
+          actual = describe(stepper.round(at))
+        }
+        "count" -> {
+          val from = date(args.getOrNull(0)) ?: continue
+          val to = date(args.getOrNull(1)) ?: continue
+          val answer = number(result) ?: continue
+          expected = answer.toString()
+          actual = stepper.count(from, to).toString()
         }
         "offset" -> {
           val at = date(args.getOrNull(0)) ?: continue
@@ -183,7 +212,7 @@ class UpstreamD3TimeVectorsTest {
       }
 
     assertEquals(emptyList<String>(), failures.take(10), "d3 disagrees with TimeStepper")
-    assertTrue(replayed >= 366, "only $replayed vectors replayed; the harness must not shrink")
+    assertTrue(replayed >= 685, "only $replayed vectors replayed; the harness must not shrink")
   }
 
   private fun describe(value: Double?): String =
@@ -199,6 +228,6 @@ class UpstreamD3TimeVectorsTest {
      * modelled here — Vega reaches them only through its own scale and axis code, which this engine
      * implements a different way — so they are counted rather than pretended about.
      */
-    val REPLAYED_METHODS = setOf("floor", "offset", "range")
+    val REPLAYED_METHODS = setOf("(call)", "ceil", "count", "floor", "offset", "range", "round")
   }
 }
