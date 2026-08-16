@@ -171,21 +171,21 @@ public object ColorSpaces {
     //
     // Matching the effect rather than importing NaN channels: the alpha still interpolates, so the
     // colour disappears exactly as it should, and nothing downstream has to defend against a NaN.
-    if (from.alpha == 0.0 && to.alpha != 0.0) {
-      return interpolate(to.withAlpha(from.alpha), to, t, space, gamma)
-    }
-    if (to.alpha == 0.0 && from.alpha != 0.0) {
-      return interpolate(from, from.withAlpha(to.alpha), t, space, gamma)
-    }
+    // Substituted rather than recursed into: handing the same pair back to this function meant the
+    // replacement still had a zero alpha, so the branch fired again and the stack ran out. A
+    // fixture with a `range: ["red", "transparent"]` is what found that, which is the argument for
+    // having one.
+    val start = if (from.alpha == 0.0 && to.alpha != 0.0) to.withAlpha(from.alpha) else from
+    val end = if (to.alpha == 0.0 && from.alpha != 0.0) from.withAlpha(to.alpha) else to
     return when (space) {
-      Interpolation.RGB -> interpolateRgb(from, to, t, gamma)
-      Interpolation.LAB -> interpolateLab(from, to, t)
+      Interpolation.RGB -> interpolateRgb(start, end, t, gamma)
+      Interpolation.LAB -> interpolateLab(start, end, t)
       Interpolation.HCL,
-      Interpolation.HCL_LONG -> interpolateHcl(from, to, t, space.isLong)
+      Interpolation.HCL_LONG -> interpolateHcl(start, end, t, space.isLong)
       Interpolation.HSL,
-      Interpolation.HSL_LONG -> interpolateHsl(from, to, t, space.isLong)
+      Interpolation.HSL_LONG -> interpolateHsl(start, end, t, space.isLong)
       Interpolation.CUBEHELIX,
-      Interpolation.CUBEHELIX_LONG -> interpolateCubehelix(from, to, t, space.isLong)
+      Interpolation.CUBEHELIX_LONG -> interpolateCubehelix(start, end, t, space.isLong)
     }
   }
 
@@ -407,7 +407,18 @@ public object ColorSpaces {
     val position = amount * (colors.size - 1)
     val lower = kotlin.math.floor(position).toInt().coerceIn(0, colors.size - 1)
     val upper = (lower + 1).coerceAtMost(colors.size - 1)
-    if (lower == upper) return colors[lower]
+    // **An endpoint still goes through the interpolator**, which is what d3 does: its ramp is a
+    // function evaluated at `t`, not a lookup, so at `t = 1` the substitution above still applies.
+    // For an ordinary colour this is exact — interpolating to a stop at 1 returns that stop — and
+    // for one carrying no colour of its own it is the difference between `range: ["red",
+    // "transparent"]` ending at transparent *red* and ending at transparent *black*.
+    if (lower == upper) {
+      return when {
+        colors.size == 1 -> colors[0]
+        lower == 0 -> interpolate(colors[0], colors[1], 0.0, space, gamma)
+        else -> interpolate(colors[lower - 1], colors[lower], 1.0, space, gamma)
+      }
+    }
     return interpolate(colors[lower], colors[upper], position - lower, space, gamma)
   }
 

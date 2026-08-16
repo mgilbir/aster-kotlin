@@ -1295,6 +1295,29 @@ The two remaining colour mismatches are one cause: a fully transparent colour's 
 pinned. The `hsl()` form is listed as its own entry, because it is a second **entry point** rather
 than a second reason, and the note says so.
 
+## The transparent-endpoint fix was untested, and wrong twice
+
+The fade-to-transparent fix went in with both gates green and **no fixture that faded to
+transparent**. Writing one — `ramp-through-grey.vg.json`, which also pins the grey-hue rule in HCL,
+HSL and Lab — found two faults in it immediately.
+
+- **A stack overflow.** The substitution recursed into `interpolate` with a colour that still had a
+  zero alpha, so the same branch fired again, forever. Substituting the endpoints and falling
+  through fixes it. A green build had been reporting on code no chart executed.
+- **An endpoint bypassed the substitution entirely.** `sample` short-circuits when a position lands
+  exactly on a stop and returns that colour raw, where d3's ramp is a *function evaluated at t* and
+  applies the rule at `t = 1` as much as at `0.5`. So `range: ["red", "transparent"]` ended at
+  transparent **black** rather than transparent red. Endpoints go through the interpolator now,
+  which is exact for an ordinary colour — interpolating to a stop at 1 returns that stop.
+
+The lesson is the one this session keeps relearning from the other side: a fix verified only by the
+tests that already existed is verified against the absence of a case, not against the case. The
+vectors had said the *conversion* was right; nothing had asked what a chart did with it.
+
+While there, the claim made in the previous commit — that an HCL interpolator holds the other
+endpoint's hue — was checked rather than left as an assertion. `hue()` and `channel()` both carry
+d3's rule already, so making `toHcl` answer NaN for a grey was safe. 185 fixtures.
+
 ## Where the remaining packages stand
 
 Replayed: `d3-time` (366), `d3-array` (252), `d3-color` (34), `vega-time` (281), `vega-transforms`
