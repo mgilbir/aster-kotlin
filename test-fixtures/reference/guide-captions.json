@@ -1765,6 +1765,11 @@
   "caption": "Symbol legend titled 'Tier' for fill color with 4 values: 3, 9, 20, 100"
  },
  {
+  "fixture": "spherical-measures",
+  "kind": "axis",
+  "caption": "Y-axis for a discrete scale with 6 values: box, wound clockwise, box, wound the other way, wide, across the antimeridian, a line, two points"
+ },
+ {
   "fixture": "stack-diverging",
   "kind": "axis",
   "caption": "X-axis for a discrete scale with 4 values: Q1, Q2, Q3, Q4"

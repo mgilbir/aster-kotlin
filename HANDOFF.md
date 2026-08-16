@@ -825,6 +825,43 @@ thoroughly that upstream yields **no columns at all**. Verified end to end and m
 that the `\u2028` replacement only rewrites the first occurrence, because JavaScript's `replace`
 with a string pattern does.
 
+## `geoArea(null, f)` was measured on a page that was never drawn
+
+Upstream's `geoMethod` branches on the projection: with one it measures through the path generator,
+and with **none** it calls d3's *spherical* function. This engine did not make that distinction — it
+ran the planar path sinks over raw longitude and latitude — so a measurement on the globe came back
+in the wrong units entirely. A one-degree box is `1` square degree that way and `0.000305`
+steradians the right way, a factor of about three thousand, and the centroid of anything larger than
+a city was in the wrong place.
+
+`SphericalMeasure` ports d3's three stream sinks: **area** as the spherical excess from the south
+pole by Cagnoli's theorem, **centroid** as three accumulators reporting the highest dimension
+present, and **bounds** — much the hardest, because longitude wraps. Two islands at ±179° are two
+degrees apart across the antimeridian, not 358° the other way, so d3 collects a range per line,
+merges the overlaps, and takes the inverse of the **largest gap**: the widest stretch of longitude
+the geometry does not occupy is the part to leave out. 113 of 236 vectors replay.
+
+One thing had to be copied rather than reasoned about. d3 accumulates its winding sum with
+`delta + (delta > 0 ? 360 : -360)`, which is *not* the correction that normalises a wrap — it pushes
+a step across the antimeridian further the way it went, so the sum counts turns instead of measuring
+displacement. Writing the sensible version instead put the poles on the wrong side, which is how the
+two polar-polygon vectors failed.
+
+The rest of the corpus is counted with reasons: `geoContains` (42), `geoInterpolate` (10) and
+`geoDistance` (3) are recorded because they are in the package, but nothing in Vega calls them.
+`geoStream`, `geoCircle` and `geoRotation` are the remaining reachable ones.
+
+**And a false cycle that would have blocked all of this.** `geoArea(null, feature)` failed to
+compile at all: the visitor that collects scale references treated only a *string* literal as a
+name, so a `null` first argument read as "some scale, we cannot tell which" and made **every** scale
+a dependency of the dataset — a cycle reported for a chart upstream compiles. Upstream's visitor
+branches on the node being a `Literal`, not on its type. Any literal now names whatever it
+stringifies to, which matches no operator and contributes nothing.
+
+`test-fixtures/specs/spherical-measures.vg.json` pins it, both windings of the same ring included:
+a spherical polygon has no outside, so the box wound one way is `0.000305 sr` and wound the other is
+`12.566066 sr` — 4π, everything else on Earth. 180 fixtures.
+
 ## Where the remaining packages stand
 
 Replayed: `d3-time` (366), `d3-array` (252), `d3-color` (34), `vega-time` (281), `vega-transforms`
