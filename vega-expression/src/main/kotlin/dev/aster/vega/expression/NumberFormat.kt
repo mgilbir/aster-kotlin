@@ -6,6 +6,7 @@ import kotlin.math.abs
 import kotlin.math.floor
 import kotlin.math.max
 import kotlin.math.min
+import kotlin.math.pow
 
 /**
  * d3-format's specifier language, whole.
@@ -88,7 +89,20 @@ public object NumberFormat {
   /** Formats [value] with [specifier], as `d3.format` does. */
   public fun format(value: Double, specifier: String): String {
     val parsed = parse(specifier) ?: return withTypographicMinus(JsSemantics.numberToString(value))
-    var spec = parsed
+    return format(value, parsed)
+  }
+
+  /**
+   * Formats [value] with an already-parsed specifier, and an [extra] suffix that participates in
+   * padding.
+   *
+   * The suffix is a parameter rather than something the caller appends because d3 passes it *into*
+   * the formatter: `formatPrefix(" $12,.1s", 1e6)(-4.2e7)` is twelve characters wide **including**
+   * the `M`, and `formatPrefix("($~s", 1000)(-1000)` writes `($1k)` with the prefix inside the
+   * parentheses. Appending afterwards gets both wrong.
+   */
+  public fun format(value: Double, requested: Spec, extra: String = ""): String {
+    var spec = requested
     var type = spec.type
     var comma = spec.comma
     var trim = spec.trim
@@ -133,7 +147,7 @@ public object NumberFormat {
         spec.symbol == '#' && type in "boxX" -> "0" + type.lowercaseChar()
         else -> ""
       }
-    var suffix = if (type == '%' || type == 'p') "%" else ""
+    var suffix = (if (type == '%' || type == 'p') "%" else "") + extra
 
     var body: String
     if (type == 'c') {
@@ -222,6 +236,70 @@ public object NumberFormat {
       }
       else -> padding + prefix + body + suffix
     }
+  }
+
+  /**
+   * The decimal exponent of [value] — the `n` in `d.ddd × 10^n` — exactly.
+   *
+   * `floor(log10(x))` is the obvious way to get this and is wrong at the decade boundaries, which
+   * are precisely the values a tick step lands on: `log10(1e-7)` is not `-7` in binary floating
+   * point. d3 reads the exponent off `toExponential()` instead, and [Decimals.shortest] is that
+   * same question already answered.
+   */
+  private fun decimalExponent(value: Double): Int = Decimals.shortest(value).exponent - 1
+
+  /** d3's `precisionFixed`: decimals enough to tell values [step] apart, for `f` and `%`. */
+  public fun precisionFixed(step: Double): Int {
+    if (step == 0.0 || !step.isFinite()) return 0
+    return max(0, -decimalExponent(abs(step)))
+  }
+
+  /**
+   * d3's `precisionRound`: **significant** digits enough to tell values [step] apart at
+   * [magnitude].
+   *
+   * The `+ 1` is not a fudge: telling `1.02` from `1.03` at a step of `0.01` needs three digits,
+   * one more than the two decades between them.
+   */
+  public fun precisionRound(step: Double, magnitude: Double): Int {
+    if (step == 0.0 || !step.isFinite() || !magnitude.isFinite()) return 0
+    // `abs(max) - step`, and the subtraction is the whole subtlety: the largest value an axis
+    // actually *labels* is a step below its bound, so `precisionRound(0.01, 1)` is 2 rather than 3
+    // — the digits needed for 0.99, not for 1.00. Dropping it puts an extra decimal on every `g`,
+    // `p`, `r` and `e` axis.
+    val reach = abs(abs(magnitude) - abs(step))
+    val distance = decimalExponent(reach) - decimalExponent(abs(step))
+    return max(0, distance) + 1
+  }
+
+  /**
+   * d3's `precisionPrefix`: decimals enough to tell values [step] apart *once an SI prefix has been
+   * applied*, which is what makes an axis over two million read `0.5M` rather than `0M`.
+   */
+  public fun precisionPrefix(step: Double, reference: Double): Int {
+    if (step == 0.0 || !step.isFinite() || !reference.isFinite()) return 0
+    return max(0, prefixExponentFor(reference) - decimalExponent(abs(step)))
+  }
+
+  /** The SI prefix's exponent for a magnitude: a multiple of three, clamped to yocto…yotta. */
+  private fun prefixExponentFor(reference: Double): Int =
+    max(-8, min(8, floor(decimalExponent(abs(reference)) / 3.0).toInt())) * 3
+
+  /**
+   * d3's `formatPrefix`: a formatter whose SI prefix is fixed by [reference] rather than chosen per
+   * value.
+   *
+   * This is the difference between an axis that reads `0.5M | 1.0M | 1.5M | 2.0M` and one that
+   * reads `500k | 1M | 1.5M | 2M`, and it cannot be expressed as a specifier string — the prefix is
+   * a property of the *span*, not of the number. d3 achieves it by rewriting the type to `f`,
+   * scaling every value by the prefix's power of ten, and appending the prefix itself.
+   */
+  public fun prefixed(spec: Spec, reference: Double): (Double) -> String {
+    val exponent = prefixExponentFor(reference)
+    val scale = 10.0.pow(-exponent)
+    val prefix = PREFIXES[8 + exponent / 3]
+    val fixed = spec.copy(type = 'f')
+    return { value -> format(scale * value, fixed, prefix) }
   }
 
   /**

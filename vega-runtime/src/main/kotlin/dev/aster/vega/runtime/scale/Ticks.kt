@@ -1,5 +1,6 @@
 package dev.aster.vega.runtime.scale
 
+import dev.aster.vega.expression.NumberFormat
 import dev.aster.vega.model.roundHalfUp
 import kotlin.math.abs
 import kotlin.math.ceil
@@ -197,11 +198,8 @@ public object Ticks {
    *
    * Takes an actual step, not a [tickIncrement] result; pass the latter through [stepFrom] first.
    */
-  public fun precisionForStep(step: Double): Int {
-    if (step <= 0.0 || !step.isFinite()) return 0
-    val exponent = floor(log10(abs(step)))
-    return if (exponent >= 0) 0 else (-exponent).toInt()
-  }
+  public fun precisionForStep(step: Double): Int =
+    if (step <= 0.0) 0 else NumberFormat.precisionFixed(step)
 
   /**
    * A format specifier with the precision the span implies, when the specification left it out.
@@ -211,8 +209,9 @@ public object Ticks {
    * "as many as the tick step needs", and the number of them depends on the domain being labelled.
    * A percent format takes **two fewer**, because the value is multiplied by a hundred first.
    *
-   * A specifier that already names a precision is left exactly as written, and so is `s`, whose
-   * precision is decided by an SI prefix this engine does not implement.
+   * A specifier that already names a precision is left exactly as written, and so is `d`, which has
+   * no case in upstream's switch. `s` is not resolvable to a specifier string at all — see
+   * [spanFormatter].
    */
   public fun spanSpecifier(specifier: String, start: Double, stop: Double, count: Int): String {
     if (specifier.contains('.')) return specifier
@@ -238,12 +237,35 @@ public object Ticks {
     return if (type == null) "$specifier.$clamped" else specifier.dropLast(1) + ".$clamped" + type
   }
 
+  private fun precisionForRound(step: Double, magnitude: Double): Int =
+    if (step <= 0.0 || magnitude <= 0.0) 0 else NumberFormat.precisionRound(step, magnitude)
+
   /**
-   * d3's `precisionRound`: significant digits enough to tell values [step] apart at [magnitude].
+   * The label formatter a span implies — [spanSpecifier], plus the one case a specifier cannot say.
+   *
+   * `s` is that case. Upstream resolves it with `formatPrefix`, which fixes **one** SI prefix for
+   * the whole span from its largest magnitude, so an axis over two million reads `0.5M | 1.0M |
+   * 1.5M | 2.0M`. Formatting each label on its own instead gives `500k | 1M | 1.5M | 2M` — mixed
+   * units down one axis, which is the kind of wrong that looks like a data error.
    */
-  private fun precisionForRound(step: Double, magnitude: Double): Int {
-    if (step <= 0.0 || !step.isFinite() || magnitude <= 0.0 || !magnitude.isFinite()) return 0
-    return maxOf(0.0, floor(log10(magnitude)) - floor(log10(abs(step)))).toInt() + 1
+  public fun spanFormatter(
+    specifier: String,
+    start: Double,
+    stop: Double,
+    count: Int,
+  ): (Double) -> String {
+    val parsed = NumberFormat.parse(specifier)
+    if (parsed != null && parsed.type == 's' && parsed.precision == null) {
+      val step = stepFrom(tickIncrement(start, stop, count))
+      val magnitude = maxOf(abs(start), abs(stop))
+      if (step.isFinite() && step > 0.0) {
+        val precision = NumberFormat.precisionPrefix(step, magnitude).coerceIn(0, 20)
+        val prefixed = NumberFormat.prefixed(parsed.copy(precision = precision), magnitude)
+        return { value -> prefixed(value) }
+      }
+    }
+    val resolved = spanSpecifier(specifier, start, stop, count)
+    return { value -> NumberFormat.format(value, resolved) }
   }
 
   /**

@@ -15472,6 +15472,22 @@
   "hidden": false
  },
  {
+  "fixture": "si-prefix-axis",
+  "kind": "group",
+  "role": "graphics-object",
+  "roleDescription": "group mark container",
+  "label": null,
+  "hidden": false
+ },
+ {
+  "fixture": "si-prefix-axis",
+  "kind": "rect",
+  "role": "graphics-symbol",
+  "roleDescription": "rect mark container",
+  "label": null,
+  "hidden": false
+ },
+ {
   "fixture": "signal-transform-params",
   "kind": "group",
   "role": "graphics-object",

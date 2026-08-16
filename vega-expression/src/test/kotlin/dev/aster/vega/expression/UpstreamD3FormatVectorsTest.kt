@@ -68,8 +68,21 @@ class UpstreamD3FormatVectorsTest {
     val failures = mutableListOf<String>()
 
     for (vector in vectors) {
-      if (vector["fn"]?.jsonPrimitive?.content != "format()") {
-        unmapped.merge(vector["fn"]?.jsonPrimitive?.content ?: "?", 1, Int::plus)
+      val fn = vector["fn"]?.jsonPrimitive?.content
+      // The precision helpers and `formatPrefix` are what `vega-format`'s `formatSpan` calls to
+      // decide how many decimals an axis label needs, so they are replayed here rather than
+      // counted as unmapped.
+      if (fn in PRECISION || fn == "formatPrefix()") {
+        val outcome = replayHelper(fn!!, vector)
+        if (outcome == null) unmapped.merge("$fn (not comparable)", 1, Int::plus)
+        else {
+          replayed++
+          if (outcome.isNotEmpty()) failures.add(outcome)
+        }
+        continue
+      }
+      if (fn != "format()") {
+        unmapped.merge(fn ?: "?", 1, Int::plus)
         continue
       }
       val specifier =
@@ -132,6 +145,42 @@ class UpstreamD3FormatVectorsTest {
       failures.map { it.substringBefore(": upstream") }.sorted(),
       "the set of format divergences changed; update known-divergences.json",
     )
-    assertTrue(replayed >= 400, "only $replayed vectors replayed; the harness must not shrink")
+    assertTrue(replayed >= 548, "only $replayed vectors replayed; the harness must not shrink")
+  }
+
+  /**
+   * One `precisionFixed`/`precisionRound`/`precisionPrefix`/`formatPrefix()` vector: the empty
+   * string when it agrees, a description when it does not, and null when it is not comparable.
+   */
+  private fun replayHelper(fn: String, vector: JsonObject): String? {
+    if (fn == "formatPrefix()") {
+      val built = vector["constructedWith"] as? JsonArray ?: return null
+      val specifier =
+        (built.getOrNull(0) as? JsonPrimitive)?.takeIf { it.isString }?.content ?: return null
+      val reference = number(built.getOrNull(1)) ?: return null
+      val spec = NumberFormat.parse(specifier) ?: return null
+      val value = number((vector["args"] as? JsonArray)?.getOrNull(0)) ?: return null
+      val expected =
+        (vector["result"] as? JsonPrimitive)?.takeIf { it.isString }?.content ?: return null
+      val actual = NumberFormat.prefixed(spec, reference)(value)
+      return if (expected == actual) ""
+      else "formatPrefix(\"$specifier\", $reference)($value): upstream $expected, ours $actual"
+    }
+    val args = vector["args"] as? JsonArray ?: return null
+    val step = number(args.getOrNull(0)) ?: return null
+    val expected = (vector["result"] as? JsonPrimitive)?.doubleOrNull?.toInt() ?: return null
+    val actual =
+      when (fn) {
+        "precisionFixed" -> NumberFormat.precisionFixed(step)
+        "precisionRound" ->
+          NumberFormat.precisionRound(step, number(args.getOrNull(1)) ?: return null)
+        else -> NumberFormat.precisionPrefix(step, number(args.getOrNull(1)) ?: return null)
+      }
+    return if (expected == actual) ""
+    else "$fn(${args.joinToString(", ")}): upstream $expected, ours $actual"
+  }
+
+  private companion object {
+    val PRECISION = setOf("precisionFixed", "precisionRound", "precisionPrefix")
   }
 }

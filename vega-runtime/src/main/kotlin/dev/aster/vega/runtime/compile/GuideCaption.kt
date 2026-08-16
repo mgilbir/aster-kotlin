@@ -1,6 +1,5 @@
 package dev.aster.vega.runtime.compile
 
-import dev.aster.vega.expression.NumberFormat
 import dev.aster.vega.model.spec.ScaleType
 import dev.aster.vega.model.time.TimeFormat
 import dev.aster.vega.runtime.scale.BandScale
@@ -243,8 +242,7 @@ internal object GuideCaption {
       val decimals = if (increment.isFinite()) Ticks.precisionForStep(increment) else 0
       return { value -> formatTickLabel(value, decimals) }
     }
-    val resolved = Ticks.spanSpecifier(format, 0.0, step, THRESHOLD_FORMAT_COUNT)
-    return { value -> NumberFormat.format(value, resolved) }
+    return Ticks.spanFormatter(format, 0.0, step, THRESHOLD_FORMAT_COUNT)
   }
 
   /** Upstream's `3 * 10`: three ticks at ten times the resolution. */
@@ -259,8 +257,7 @@ internal object GuideCaption {
    */
   private fun spelled(format: String?, domain: List<Double>): ((Double) -> String)? {
     if (format == null) return null
-    val resolved = Ticks.spanSpecifier(format, domain.first(), domain.last(), CAPTION_TICK_COUNT)
-    return { value -> NumberFormat.format(value, resolved) }
+    return Ticks.spanFormatter(format, domain.first(), domain.last(), CAPTION_TICK_COUNT)
   }
 
   /**

@@ -766,6 +766,35 @@ The sweep is now `oracle-js/src/record-number-strings.mjs`, run by
 `scripts/record-upstream-vectors.sh` and replayed by `UpstreamNumberStringVectorsTest`, comparing by
 **bits** so a parse disagreement cannot hide as a print agreement.
 
+## An `s` axis was labelled in mixed units
+
+`vega-format`'s `formatSpan` is what turns `"format": "s"` on an axis into labels, and it does not
+call `format` — it calls **`formatPrefix`**, which fixes one SI prefix for the whole span from its
+largest magnitude. This engine resolved every label on its own instead, so an axis over two million
+read `500k | 1M | 1.5M | 2M`: three different units down one axis, which reads like a data error
+rather than a formatting one. Upstream reads `0.5M | 1.0M | 1.5M | 2.0M`.
+
+The four d3 functions behind that were never ported, and the vectors were sitting unreplayed:
+`precisionFixed` (10), `precisionRound` (8), `precisionPrefix` (129) and `formatPrefix` (17). They
+are in `NumberFormat` now and the corpus went from 403 replayed to **548**. Three things came out of
+making them pass:
+
+- **`precisionRound` subtracts the step from the bound first.** `precisionRound(0.01, 1)` is 2, not
+  3 — the digits needed for 0.99, because the largest value an axis labels is a step below its
+  bound. The copy in `Ticks` had the same omission, and it put an extra decimal on every `g`, `p`,
+  `r` and `e` axis.
+- **The prefix is a suffix, not an append.** This d3 passes it *into* the formatter, so it sits
+  inside the width and inside the accountant's parentheses: `formatPrefix(" $12,.1s", 1e6)(-4.2e7)`
+  is twelve characters wide *including* the `M`, and `formatPrefix("($~s", 1000)(-1000)` is `($1k)`,
+  not `($1)k`.
+- **`floor(log10(x))` is not the decimal exponent.** It is wrong exactly at the decade boundaries,
+  which is where every tick step lands. `Decimals.shortest` answers it exactly, so the three
+  precision helpers use that.
+
+`spanSpecifier` could not express any of this — one SI prefix for a span is a property of the span,
+not of a specifier string — so the six call sites now take a `spanFormatter` instead. `test-fixtures/
+specs/si-prefix-axis.vg.json` pins it differentially: 179 fixtures.
+
 ## Where the remaining packages stand
 
 Replayed: `d3-time` (366), `d3-array` (252), `d3-color` (34), `vega-time` (281), `vega-transforms`

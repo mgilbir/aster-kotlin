@@ -1690,6 +1690,36 @@
   "caption": "Y-axis for a linear scale with values from 0.0 to 0.5"
  },
  {
+  "fixture": "si-prefix-axis",
+  "kind": "axis",
+  "caption": "X-axis for a discrete scale with 4 values: a, b, c, d"
+ },
+ {
+  "fixture": "si-prefix-axis",
+  "kind": "axis",
+  "caption": "Y-axis for a linear scale with values from 0.0M to 2.0M"
+ },
+ {
+  "fixture": "si-prefix-axis",
+  "kind": "axis",
+  "caption": "Y-axis for a linear scale with values from $0.0M to $2.0M"
+ },
+ {
+  "fixture": "si-prefix-axis",
+  "kind": "axis",
+  "caption": "Y-axis for a linear scale with values from 0 to 0.05"
+ },
+ {
+  "fixture": "si-prefix-axis",
+  "kind": "axis",
+  "caption": "X-axis for a linear scale with values from 0.0e+0 to 2.0e+6"
+ },
+ {
+  "fixture": "si-prefix-axis",
+  "kind": "legend",
+  "caption": "Gradient legend titled 'amount' for fill color with values from 0.1M to 2.0M"
+ },
+ {
   "fixture": "signal-transform-params",
   "kind": "axis",
   "caption": "Y-axis for a discrete scale with 3 values: alpha, gamma, epsilon"
