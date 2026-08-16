@@ -1188,6 +1188,29 @@ correct implementation that nothing verifies is one refactor away from being an 
 
 The ledger entry now says which fixture covers it rather than implying nobody has looked.
 
+## Two more scale families the adapter had written off, and a constant column
+
+`scaleIdentity` (53 vectors) and `scaleSequential` (37) were both filed as **"no equivalent scale
+here"**, and both were wrong the same way as the last three: this engine has had an `IdentityScale`
+and a `SequentialColorScale` all along. The adapter simply never listed them. `scaleDiverging` came
+with them, now that there is something to compare against.
+
+The sequential and diverging vectors turn out to be the best possible check on the diverging work
+above: with d3's **default interpolator** — the identity — a sequential scale *is* its own
+normaliser, so those vectors compare the exact arithmetic every colour ramp runs on, positions and
+clamping and all, without a colour in sight. d3-scale went from 356 replayed to **397**.
+
+They found one real fault, and it is the sort that only shows on a bad day: **a zero-width domain
+sits in the middle of the ramp, not at its start.** d3's `normalize` answers `constant(0.5)` when
+the ends coincide, so a colour scale over a column that turns out to be constant paints the middle
+colour — the one that reads as "nothing to compare" — rather than an extreme. This engine gave three
+different answers between its own methods: `position` said 0, `fraction` said 0, and `colorAt` had a
+special case returning the **last** colour. None of them was upstream's.
+
+`ColorScaleTest` had that last-colour behaviour written down as an expectation, in a test named for
+it. Corrected against upstream rather than deleted — `scale('c', 5)` on a `domain: [5, 5]` colour
+scale gives the middle of the scheme, verified end to end before touching the test.
+
 ## Where the remaining packages stand
 
 Replayed: `d3-time` (366), `d3-array` (252), `d3-color` (34), `vega-time` (281), `vega-transforms`

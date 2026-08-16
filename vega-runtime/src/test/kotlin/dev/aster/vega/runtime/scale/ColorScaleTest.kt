@@ -90,9 +90,15 @@ class ColorScaleTest {
   }
 
   @Test
-  fun `a zero-extent domain yields the ramp's last colour`() {
+  fun `a zero-extent domain yields the ramp's middle colour`() {
+    // Upstream's `normalize` answers `constant(0.5)` when a domain's ends coincide, so a column
+    // that turns out to be constant is painted the colour that says "nothing to compare" rather
+    // than an extreme. Verified against `scale('c', 5)` on a `domain: [5, 5]` colour scale, which
+    // gives the middle of the scheme; this expected the *last* colour and was wrong for every
+    // input, not only this one.
     val scale = SequentialColorScale("s", listOf(5.0, 5.0), listOf(hex("red"), hex("blue")))
-    assertEquals("#0000ff", scale.colorAt(5.0)?.toCssHex())
+    assertEquals("#800080", scale.colorAt(5.0)?.toCssHex())
+    assertEquals("#800080", scale.colorAt(0.0)?.toCssHex())
   }
 
   @Test

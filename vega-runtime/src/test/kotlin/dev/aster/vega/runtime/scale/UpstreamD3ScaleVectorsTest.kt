@@ -2,6 +2,7 @@ package dev.aster.vega.runtime.scale
 
 import dev.aster.vega.model.VegaValue
 import dev.aster.vega.model.asDouble
+import dev.aster.vega.scene.SceneColor
 import java.io.File
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
@@ -284,6 +285,36 @@ class UpstreamD3ScaleVectorsTest {
         val answered = OrdinalScale("replay", values, outputs).scale(VegaValue.Str(at))
         if (answered is VegaValue.Str) answered.value else show(answered.asDouble())
       }
+      // d3's identity scale ignores its domain and answers what it was given; the domain exists
+      // only to be read back. This engine has had one all along — the adapter simply never listed
+      // it, and 53 vectors sat under "no equivalent scale here" as a result.
+      "scaleIdentity" -> {
+        if (method != "(call)") return null
+        val at = number(args.getOrNull(0)) ?: return null
+        show(IdentityScale("replay").scale(VegaValue.Num(at)).asDouble())
+      }
+      // A sequential or diverging scale with the **default interpolator** is its own normaliser:
+      // d3's identity interpolator hands back the position, so these vectors compare the very
+      // arithmetic a colour ramp runs on — including the diverging split this engine only just
+      // learnt.
+      "scaleSequential",
+      "scaleDiverging" -> {
+        if (method != "(call)") return null
+        val at = number(args.getOrNull(0)) ?: return null
+        val domain =
+          config.domainNumbers
+            ?: if (kind == "scaleDiverging") listOf(0.0, 0.5, 1.0) else listOf(0.0, 1.0)
+        // Two colours stand in for the interpolator: the ramp is never sampled, only positioned.
+        val ramp =
+          SequentialColorScale(
+            "replay",
+            domain,
+            listOf(SceneColor.parse("black")!!, SceneColor.parse("white")!!),
+            clamp = config.clamp,
+          )
+        val placed = ramp.position(at)
+        show(if (config.clamp) placed.coerceIn(0.0, 1.0) else placed)
+      }
       "scaleQuantile",
       "scaleQuantize",
       "scaleThreshold" -> {
@@ -449,7 +480,7 @@ class UpstreamD3ScaleVectorsTest {
       failures.map { it.substringBefore(": upstream") }.sorted(),
       "the set of scale divergences changed; update known-divergences.json",
     )
-    assertTrue(replayed >= 330, "only $replayed vectors replayed; the harness must not shrink")
+    assertTrue(replayed >= 395, "only $replayed vectors replayed; the harness must not shrink")
   }
 
   private fun describe(chain: JsonArray?): String =
@@ -481,6 +512,9 @@ class UpstreamD3ScaleVectorsTest {
     /** The families this engine models the same way d3 does. */
     val REPLAYED_SCALES =
       setOf(
+        "scaleIdentity",
+        "scaleSequential",
+        "scaleDiverging",
         "scaleLinear",
         "scalePow",
         "scaleSqrt",

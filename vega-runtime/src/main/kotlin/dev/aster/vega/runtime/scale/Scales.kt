@@ -1100,11 +1100,19 @@ public class SequentialColorScale(
    * The two halves are scaled independently, `0.5 / (mid - low)` below and `0.5 / (high - mid)`
    * above, which is d3's `scaleDiverging`.
    */
-  private fun position(x: Double): Double {
+  internal fun position(x: Double): Double {
     if (domain.size < 3) {
       val lo = domain.first()
       val hi = domain.last()
-      return if (lo == hi) 0.0 else (x - lo) / (hi - lo)
+      // A **zero-width domain sits in the middle of the ramp**, not at its start. d3's `normalize`
+      // answers `constant(0.5)` when the ends coincide, so a colour scale over a column that turns
+      // out to be constant paints the middle colour — the one that says "nothing to compare" —
+      // rather than the extreme. This returned 0 here and the *last* colour in `colorAt`, three
+      // answers between them and none of upstream's.
+      val delta = hi - lo
+      if (delta == 0.0) return 0.5
+      if (delta.isNaN()) return Double.NaN
+      return (x - lo) / delta
     }
     val low = domain[0]
     val mid = domain[1]
@@ -1120,7 +1128,6 @@ public class SequentialColorScale(
   /** The colour at [x], or `null` when the input cannot be placed on the ramp. */
   public fun colorAt(x: Double): SceneColor? {
     if (x.isNaN()) return null
-    if (domain.size < 3 && domain.first() == domain.last()) return colors.last()
     val raw = position(x)
     // Sequential scales clamp by default, since a colour past the end of a ramp has no meaning.
     if (!clamp && (raw < 0.0 || raw > 1.0)) return null
