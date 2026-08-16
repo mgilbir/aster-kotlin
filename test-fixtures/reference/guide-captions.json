@@ -1120,6 +1120,11 @@
   "caption": "Symbol legend titled 'Origin' for stroke color with 3 values: USA, Japan, Europe"
  },
  {
+  "fixture": "invert-buckets",
+  "kind": "axis",
+  "caption": "Y-axis for a discrete scale with 6 values: quantize red, quantize blue, quantile b, threshold low, threshold high, not in range"
+ },
+ {
   "fixture": "label-limit",
   "kind": "axis",
   "caption": "Y-axis for a discrete scale with 3 values: a-really-quite-long-category-name-here, another-long-one-that-runs-on-and-on, short"

@@ -719,6 +719,29 @@ public sealed interface BinnedScale : VegaScale {
   public val rangeValues: List<VegaValue>
 
   /**
+   * The stretch of domain that maps to [value] — d3's `invertExtent`, and what `invert()` means for
+   * a scale that has buckets rather than a gradient.
+   *
+   * This is how a chart turns a *clicked legend swatch* back into a range of data: a quantize scale
+   * says which values are coloured red, and a selection built on it filters to exactly those.
+   * `invert()` used to report an error for any scale it could not run backwards continuously, which
+   * refused a question upstream answers.
+   *
+   * Null when the value is not one of the range's, which upstream writes as `[NaN, NaN]`. The ends
+   * may be null in their own right: a **threshold** scale's outermost buckets are unbounded,
+   * because a cut point at 10 says nothing about how far below it the first bucket reaches.
+   */
+  public fun invertExtent(value: VegaValue): Pair<Double?, Double?>?
+
+  /**
+   * The shared middle of [invertExtent]: the bucket's own cut points, with the ends left to the
+   * scale, since only it knows whether they are bounded and by what.
+   */
+  public fun extentAt(index: Int, low: Double?, high: Double?): Pair<Double?, Double?> =
+    (if (index > 0) thresholds[index - 1] else low) to
+      (if (index < thresholds.size) thresholds[index] else high)
+
+  /**
    * One input value per bucket, for a legend to colour its swatches with.
    *
    * Taken through [scale] rather than indexing the range directly, so the legend cannot drift out
@@ -843,6 +866,13 @@ public class QuantizeScale(
   override val legendExtent: Pair<Double, Double>
     get() = (domain.firstOrNull() ?: 0.0) to (domain.lastOrNull() ?: 1.0)
 
+  /** Bounded at both ends by the declared domain, which is what makes `quantize` quantize. */
+  override fun invertExtent(value: VegaValue): Pair<Double?, Double?>? {
+    val index = rangeValues.indexOf(value)
+    if (index < 0) return null
+    return extentAt(index, domain.firstOrNull() ?: 0.0, domain.lastOrNull() ?: 1.0)
+  }
+
   override fun scale(value: VegaValue): VegaValue {
     if (rangeValues.isEmpty()) return VegaValue.Null
     val x = value.asDouble()
@@ -883,6 +913,13 @@ public class QuantileScale(
   /** The sample's own extent: a quantile scale's domain is the whole column, sorted. */
   override val legendExtent: Pair<Double, Double>
     get() = (sorted.firstOrNull() ?: 0.0) to (sorted.lastOrNull() ?: 1.0)
+
+  /** Bounded by the **samples**, since a quantile scale's domain is the column itself. */
+  override fun invertExtent(value: VegaValue): Pair<Double?, Double?>? {
+    val index = rangeValues.indexOf(value)
+    if (index < 0) return null
+    return extentAt(index, sorted.firstOrNull(), sorted.lastOrNull())
+  }
 
   override fun scale(value: VegaValue): VegaValue {
     if (rangeValues.isEmpty()) return VegaValue.Null
@@ -927,6 +964,16 @@ public class ThresholdScale(
    * first and last bands no width at all. Upstream pads by one average band; with a single cut
    * point and no average to take, it pads by a tenth.
    */
+  /**
+   * Unbounded at both ends, and deliberately so: a cut point at 10 says the first bucket holds
+   * everything below 10 and nothing about how far below. Upstream answers `undefined` there.
+   */
+  override fun invertExtent(value: VegaValue): Pair<Double?, Double?>? {
+    val index = rangeValues.indexOf(value)
+    if (index < 0) return null
+    return extentAt(index, null, null)
+  }
+
   override val legendExtent: Pair<Double, Double>
     get() {
       val lo = thresholds.firstOrNull() ?: 0.0
@@ -974,6 +1021,16 @@ public class BinOrdinalScale(
   /** The interior edges: the first and last bound the outermost buckets and label nothing. */
   override val thresholds: List<Double>
     get() = domain.drop(1).dropLast(1)
+
+  /**
+   * Bounded by the outermost bin edges, which a `bin-ordinal` scale has and a threshold scale does
+   * not: the domain *is* the edges, so the first and last are real bounds rather than absences.
+   */
+  override fun invertExtent(value: VegaValue): Pair<Double?, Double?>? {
+    val index = rangeValues.indexOf(value)
+    if (index < 0) return null
+    return extentAt(index, domain.firstOrNull(), domain.lastOrNull())
+  }
 
   /** The bin edges are the labels, and the last one bounds rather than opens a bucket. */
   override val legendValues: List<Double>

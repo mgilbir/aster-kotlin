@@ -27,8 +27,10 @@ import org.junit.jupiter.api.Test
  * produced it. `d3-scale` went from 55 recorded vectors to **1,123** with that one change.
  *
  * What is replayed is the part this engine models the same way: evaluating the scale, inverting it,
- * and its ticks. A getter (`domain()` with no arguments) is upstream's own reflection API and has
- * no equivalent here, so it is counted rather than compared.
+ * and its ticks — and `invertExtent`, which is what `invert()` means for a scale with buckets, and
+ * which sat in the unmapped column as "reflection API" until someone read the entry again. A getter
+ * (`domain()` with no arguments) is upstream's own reflection API and has no equivalent here, so it
+ * is counted rather than compared.
  */
 class UpstreamD3ScaleVectorsTest {
 
@@ -286,7 +288,27 @@ class UpstreamD3ScaleVectorsTest {
       "scaleQuantize",
       "scaleThreshold" -> {
         val values = config.rangeValues ?: return null
-        if (method != "(call)") return null
+        if (method != "(call)" && method != "invertExtent") return null
+        val scale0 =
+          when (kind) {
+            "scaleQuantize" ->
+              QuantizeScale("replay", config.domainNumbers ?: listOf(0.0, 1.0), values)
+            "scaleQuantile" -> QuantileScale("replay", config.domainNumbers ?: return null, values)
+            else -> ThresholdScale("replay", config.domainNumbers ?: emptyList(), values)
+          }
+        // `invertExtent` runs a bucketed scale backwards to the stretch of domain that maps to a
+        // range value — what `invert()` means for a scale that has buckets rather than a gradient.
+        if (method == "invertExtent") {
+          val asked =
+            (args.getOrNull(0) as? JsonPrimitive)?.let { p ->
+              if (p.isString) VegaValue.Str(p.content)
+              else p.doubleOrNull?.let { VegaValue.Num(it) }
+            } ?: return null
+          val extent = scale0.invertExtent(asked)
+          return if (extent == null) "NaN,NaN"
+          else
+            "${extent.first?.let { show(it) } ?: "null"},${extent.second?.let { show(it) } ?: "null"}"
+        }
         val at = number(args.getOrNull(0)) ?: return null
         val scale =
           when (kind) {
@@ -340,6 +362,19 @@ class UpstreamD3ScaleVectorsTest {
       val expected =
         when (method) {
           "ticks" -> numbers(vector["result"])?.joinToString(",") { show(it) }
+          // Two values, either of which may be absent: a threshold scale's outermost buckets are
+          // unbounded, and upstream writes an unmatched range value as `[NaN, NaN]`.
+          "invertExtent" ->
+            (vector["result"] as? JsonArray)
+              ?.take(2)
+              ?.joinToString(",") { end ->
+                when {
+                  end is JsonObject && end["\$"]?.jsonPrimitive?.content == "NaN" -> "NaN"
+                  end is JsonObject && end["\$"]?.jsonPrimitive?.content == "undefined" -> "null"
+                  else -> number(end)?.let { show(it) } ?: "null"
+                }
+              }
+              ?.takeIf { it.contains(',') }
           else ->
             number(vector["result"])?.let { show(it) }
               ?: (vector["result"] as? JsonPrimitive)?.takeIf { it.isString }?.content
@@ -429,7 +464,7 @@ class UpstreamD3ScaleVectorsTest {
     /** The families this adapter builds as one continuous scale. */
     val CONTINUOUS = setOf("scaleLinear", "scalePow", "scaleSqrt", "scaleLog", "scaleSymlog")
 
-    val REPLAYED_METHODS = setOf("(call)", "invert", "ticks")
+    val REPLAYED_METHODS = setOf("(call)", "invert", "invertExtent", "ticks")
 
     /** The families this engine models the same way d3 does. */
     val REPLAYED_SCALES =

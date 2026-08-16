@@ -1142,6 +1142,33 @@ exactly what I did first, and the legend labels moved; the differential said so 
 `test-fixtures/specs/diverging-colour.vg.json` pins it with the sequential case beside it. 182
 fixtures.
 
+## `invert()` refused a question upstream answers
+
+The lesson from the diverging scale — that my own dismissals in the ledger were worth re-reading —
+paid again immediately. `invertExtent` sat under **"upstream's reflection API, not modelled here"**,
+34 vectors, filed beside the getters. It is not a getter. It is what `invert()` *means* for a scale
+that has buckets rather than a gradient: upstream's `invert()` falls through to `invertExtent` when
+there is no continuous inverse, and answers the stretch of domain a range value covers.
+
+That is how a chart turns a **clicked legend swatch** back into a range of data. This engine
+reported an error instead — "invert() needs a continuous scale" — refusing the question outright.
+
+`BinnedScale.invertExtent` is the shared middle, and the four scales differ only in what bounds
+their outermost buckets, which is the part worth knowing:
+
+- **quantize** is bounded by its declared domain, which is what makes it quantize;
+- **quantile** by the samples, because its domain *is* the column;
+- **bin-ordinal** by the outermost bin edges, which it has;
+- **threshold** by nothing at all, deliberately — a cut point at 10 says the first bucket holds
+  everything below 10 and nothing about how far below. Upstream answers `undefined` there, and the
+  fixture pins it as `,10` and `20,`.
+
+A range value the scale never produces answers `[NaN, NaN]` rather than nothing, so an expression
+reading `[0]` off the result gets NaN instead of failing. That was the one case of six the fixture
+caught.
+
+`test-fixtures/specs/invert-buckets.vg.json`, and 356 d3-scale vectors replayed. 183 fixtures.
+
 ## Where the remaining packages stand
 
 Replayed: `d3-time` (366), `d3-array` (252), `d3-color` (34), `vega-time` (281), `vega-transforms`

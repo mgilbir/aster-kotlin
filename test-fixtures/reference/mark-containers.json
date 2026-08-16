@@ -9704,6 +9704,22 @@
   "hidden": false
  },
  {
+  "fixture": "invert-buckets",
+  "kind": "group",
+  "role": "graphics-object",
+  "roleDescription": "group mark container",
+  "label": null,
+  "hidden": false
+ },
+ {
+  "fixture": "invert-buckets",
+  "kind": "text",
+  "role": "graphics-object",
+  "roleDescription": "text mark container",
+  "label": null,
+  "hidden": false
+ },
+ {
   "fixture": "label-limit",
   "kind": "group",
   "role": "graphics-object",
