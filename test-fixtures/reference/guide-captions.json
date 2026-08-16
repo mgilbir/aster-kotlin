@@ -870,6 +870,11 @@
   "caption": "Y-axis for a linear scale with values from 0 to 40"
  },
  {
+  "fixture": "ecma-trim",
+  "kind": "axis",
+  "caption": "Y-axis for a discrete scale with 6 values: bom, nbsp, nel, unit separator, zero width space, ideographic space"
+ },
+ {
   "fixture": "edge-bundling",
   "kind": "legend",
   "caption": "Symbol legend titled 'Dependencies' for stroke color with 2 values: depends on, imported by"

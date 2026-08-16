@@ -12,6 +12,7 @@ import dev.aster.vega.model.time.TimeStepper
 import dev.aster.vega.model.time.TimeUnits
 import dev.aster.vega.scene.ColorSpaces
 import dev.aster.vega.scene.SceneColor
+import io.github.mgilbir.ecma262.text.ecmaTrim
 import kotlin.math.abs
 import kotlin.math.acos
 import kotlin.math.asin
@@ -342,7 +343,15 @@ public object Functions {
     // ---- strings ------------------------------------------------------------
     map["upper"] = ExpressionFunction { args -> VegaValue.Str(args.string(0).uppercase()) }
     map["lower"] = ExpressionFunction { args -> VegaValue.Str(args.string(0).lowercase()) }
-    map["trim"] = ExpressionFunction { args -> VegaValue.Str(args.string(0).trim()) }
+    /**
+     * `trim(string)` — JavaScript's, which is **not** Kotlin's.
+     *
+     * The two whitespace sets differ at both ends. ECMA trims U+FEFF, the byte-order mark, and
+     * Kotlin does not — so a label read from a file that begins with one kept it. Kotlin trims
+     * U+0085 and the four information separators U+001C–U+001F, and ECMA does not. `ecmaTrim` is
+     * the specification's set.
+     */
+    map["trim"] = ExpressionFunction { args -> VegaValue.Str(args.string(0).ecmaTrim()) }
     map["substring"] = ExpressionFunction { args ->
       val text = args.string(0)
       val from = if (args.size > 1) clampIndex(args.number(1), text.length) else 0
@@ -1474,7 +1483,8 @@ public object Functions {
   }
 
   private fun parseLeadingNumber(text: String, allowDecimal: Boolean): Double {
-    val trimmed = text.trim()
+    // `parseFloat` skips *StrWhiteSpace*, the same set `trim` uses.
+    val trimmed = text.ecmaTrim()
     val pattern = if (allowDecimal) LEADING_FLOAT else LEADING_INT
     val match = pattern.find(trimmed) ?: return Double.NaN
     return match.value.toDoubleOrNull() ?: Double.NaN
@@ -1496,7 +1506,7 @@ public object Functions {
     }
 
   private fun parseInteger(text: String, radix: Int): Double {
-    val trimmed = text.trim()
+    val trimmed = text.ecmaTrim()
     if (radix == 10) return parseLeadingNumber(trimmed, allowDecimal = false)
     val effective = radix.takeIf { it in 2..36 } ?: return Double.NaN
     val body = if (effective == 16) trimmed.removePrefix("0x").removePrefix("0X") else trimmed

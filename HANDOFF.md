@@ -1358,6 +1358,26 @@ that broke `String(x)` earlier today.
 Verified by 7,957 number-string vectors, 548 d3-format vectors, the `BigDecimal` oracle, and 185
 fixtures, all unchanged.
 
+## `trim` was the platform's, not the language's
+
+The other two packages 0.2.0 adds were checked as well. **`ecma262.uri` is not reachable**: Vega's
+expression registry has 119 functions and none of them encodes or decodes a URI, so there is nothing
+here to replace. `ecma262.text`'s normalization and identifier helpers are unused so far — the
+parser's own identifier rules are the obvious candidate and have not been looked at yet.
+
+`ecmaTrim` was reachable, though. `trim` **is** a Vega function — not from `functionContext`, which
+is why grepping for it finds nothing, but from `vega-expression`'s codegen whitelist, so it is
+JavaScript's `String.prototype.trim` and carries ECMA's whitespace set. This engine used Kotlin's,
+and the two disagree at both ends: ECMA trims **U+FEFF**, a byte-order mark, and Kotlin does not;
+Kotlin trims the information separators U+001C–U+001F, and ECMA does not.
+
+`ecma-trim.vg.json` puts six codepoints in front of upstream and reports the trimmed length, which
+says which set was used. Two of the six were wrong before — the byte-order mark and the unit
+separator. I had expected three and checked: `Character.isWhitespace(U+0085)` is false in Java, so
+the next-line character agreed by accident.
+
+`parseFloat` and `parseInt` skip *StrWhiteSpace*, which is the same set, so they went with it.
+
 ## Where the remaining packages stand
 
 Replayed: `d3-time` (366), `d3-array` (252), `d3-color` (34), `vega-time` (281), `vega-transforms`
