@@ -2,8 +2,10 @@ package dev.aster.vega.scene
 
 import java.io.File
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.doubleOrNull
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
@@ -48,6 +50,50 @@ class UpstreamD3ColorVectorsTest {
       else -> null
     }
 
+  /**
+   * One `hsl`/`lab`/`hcl` vector: the empty string when it agrees, a description when it does not,
+   * and null when it is not a conversion of a single colour.
+   *
+   * Only the **one-argument** form is a conversion — `hcl("#abc")`. Given three numbers, d3 is
+   * building a colour in that space rather than reading one, which this engine spells as `fromHcl`
+   * and answers in RGB, so there is nothing component-wise to compare.
+   *
+   * An achromatic colour has **no hue**: d3 answers NaN for the hue of black or grey, because the
+   * angle is undefined when the chroma is zero, and a ramp through it has to hold the other
+   * endpoint's hue rather than swing through red.
+   */
+  private fun replayConversion(fn: String, vector: JsonObject): String? {
+    val args = vector["args"] as? JsonArray ?: return null
+    if (args.size != 1) return null
+    val text = (args[0] as? JsonPrimitive)?.takeIf { it.isString }?.content ?: return null
+    val result = vector["result"] as? JsonObject ?: return null
+    val colour = SceneColor.parse(text) ?: return null
+
+    val keys =
+      if (fn == "hsl") listOf("h", "s", "l")
+      else if (fn == "lab") listOf("l", "a", "b") else listOf("h", "c", "l")
+    val ours =
+      when (fn) {
+        "hsl" -> ColorSpaces.toHsl(colour).let { listOf(it.hue, it.saturation, it.lightness) }
+        "lab" -> ColorSpaces.toLab(colour).let { listOf(it.lightness, it.a, it.b) }
+        else -> ColorSpaces.toHcl(colour).let { listOf(it.hue, it.chroma, it.lightness) }
+      }
+    // A component the recording could not render is not comparable; a recorded **NaN** is, and is
+    // the interesting case — `number` decodes that marker.
+    val expected = keys.map { number(result[it]) ?: return null }
+    val near =
+      expected.indices.all {
+        val e = expected[it]
+        val a = ours[it]
+        (e.isNaN() && a.isNaN()) ||
+          kotlin.math.abs(e - a) <= 1e-9 * kotlin.math.max(1.0, kotlin.math.abs(e))
+      }
+    return if (near) ""
+    else
+      "$fn(\"$text\"): upstream ${expected.joinToString(",") { show(it) }}, " +
+        "ours ${ours.joinToString(",") { show(it) }}"
+  }
+
   @Test
   fun `d3-color's own parse vectors replay against SceneColor`() {
     var replayed = 0
@@ -56,8 +102,21 @@ class UpstreamD3ColorVectorsTest {
 
     for (vector in vectors) {
       val fn = vector["fn"]?.jsonPrimitive?.content ?: continue
+      // `hsl`, `lab` and `hcl` convert a colour *into* another space, which this engine has had all
+      // along in `ColorSpaces` — it is the arithmetic under every non-RGB ramp, and it was reaching
+      // the corpus only indirectly, through the interpolators. The label here said the spaces were
+      // not modelled; what was not modelled was the adapter.
+      if (fn == "hsl" || fn == "lab" || fn == "hcl") {
+        val outcome = replayConversion(fn, vector)
+        if (outcome == null) unmapped.merge("$fn (not a conversion of one colour)", 1, Int::plus)
+        else {
+          replayed++
+          if (outcome.isNotEmpty()) failures.add(outcome)
+        }
+        continue
+      }
       if (fn != "color") {
-        unmapped.merge("$fn (a colour space this engine does not model)", 1, Int::plus)
+        unmapped.merge("$fn (not a colour this engine keeps)", 1, Int::plus)
         continue
       }
       val argument = vector["args"]?.jsonArray?.getOrNull(0)
@@ -126,7 +185,11 @@ class UpstreamD3ColorVectorsTest {
         .jsonObject["divergences"]!!
         .jsonArray
         .map { it.jsonObject }
-        .filter { it["subject"]?.jsonPrimitive?.content == "SceneColor.parse" }
+        // Both subjects are this file's: the parser and the conversions read the same channels,
+        // and a transparent colour differs in both for one reason.
+        .filter {
+          it["subject"]?.jsonPrimitive?.content in setOf("SceneColor.parse", "ColorSpaces.toHsl")
+        }
         .map { it["signature"]!!.jsonPrimitive.content }
     assertEquals(
       known.sorted(),

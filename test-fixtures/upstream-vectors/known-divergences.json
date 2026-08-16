@@ -26,6 +26,12 @@
       "kind": "scale",
       "subject": "ThresholdScale",
       "note": "A threshold scale whose cut points are **strings**. d3 bisects them with JavaScript's `<`, which is lexicographic — `\"12\" < \"2\"` — so `\"12\"` lands in the first bucket; this engine's `ThresholdScale` holds `Double` cut points and puts 12 above both. Reviewed again: supporting it means carrying `VegaValue` thresholds and JavaScript comparison through the scale and its legend, for a specification that writes a numeric cut point as a quoted string. Still not worth it, and still pinned so the day one appears there is a note explaining why the answer is odd."
+    },
+    {
+      "signature": "hsl(\"hsla(120,20%,10%,0)\")",
+      "kind": "parser",
+      "subject": "ColorSpaces.toHsl",
+      "note": "The same transparent-channel difference as `color(\"rgba(0,0,0,0)\")` above, seen through a conversion: d3 blanks a fully transparent colour's channels to NaN, so reading it back as HSL gives NaN for all three, where this engine converts the zeros it parsed. Listed separately because it is a second entry point rather than a second cause — the interpolators, which are what actually reach these channels, already match upstream by treating a transparent endpoint as contributing only its opacity."
     }
   ]
 }

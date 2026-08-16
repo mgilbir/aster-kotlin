@@ -430,8 +430,15 @@ public object ColorSpaces {
     val g = linearize(color.green)
     val b = linearize(color.blue)
     val x = xyz((0.2225045 * r + 0.7168786 * g + 0.0606169 * b) / YN)
-    val y = xyz((0.4360747 * r + 0.3850649 * g + 0.1430804 * b) / XN)
-    val z = xyz((0.0139322 * r + 0.0971045 * g + 0.7141733 * b) / ZN)
+    // **A grey is exactly neutral**, and d3 makes sure of it by reusing the luminance for the
+    // other two axes instead of computing them. Without that, the three sums differ in their last
+    // bits and `a` and `b` come out as floating-point dust rather than zero — which matters one
+    // step later: `toHcl` reads a hue of *undefined* only when both are exactly zero, so `#ccc`
+    // was given a hue of 158 degrees and an HCL ramp from red to grey swung through green instead
+    // of quietly desaturating.
+    val neutral = color.red == color.green && color.green == color.blue
+    val y = if (neutral) x else xyz((0.4360747 * r + 0.3850649 * g + 0.1430804 * b) / XN)
+    val z = if (neutral) x else xyz((0.0139322 * r + 0.0971045 * g + 0.7141733 * b) / ZN)
     return Lab(
       lightness = 116.0 * x - 16.0,
       a = 500.0 * (y - x),

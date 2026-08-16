@@ -1272,6 +1272,29 @@ The tolerances were reviewed at the same time and left alone: geometry compares 
 one loose figure — `1e-2` for the extent of a curve approximating a true arc — is documented,
 justified, and applied only to `arc`, `trail` and `path`.
 
+## A grey has no hue, and floating-point dust gave it one
+
+Sweeping every ledger for the phrase that had been wrong five times — "no equivalent", "does not
+model", "not implemented here" — turned up the largest remaining block: **174 d3-color vectors**
+filed under "a colour space this engine does not model". `ColorSpaces` has had Lab, HCL and HSL all
+along. What was not modelled was the adapter. Replaying them took d3-color from 34 to **77**.
+
+They found this. `toHcl` already carried d3's rule exactly — a hue is *undefined* when both Lab
+opponents are zero — but it never fired, because `toLab` never produced exactly zero for a grey. d3
+does, and on purpose: `if (r === g && g === b) x = z = y` reuses the luminance for the other two
+axes rather than computing them, so `a` and `b` come out as literal zeros instead of last-bit dust.
+
+Without it `#ccc` had a hue of **158 degrees**, and that is not cosmetic: an HCL interpolator holds
+the other endpoint's hue when one is undefined, so `red -> grey` should quietly desaturate. Ours
+would have swung the hue two thirds of the way round the wheel and gone **through green**. The same
+shape of bug as the transparent-endpoint fade found an hour earlier, in a different colour space —
+both are cases where d3 encodes "no information here" as a NaN and builds its interpolators around
+it.
+
+The two remaining colour mismatches are one cause: a fully transparent colour's channels, already
+pinned. The `hsl()` form is listed as its own entry, because it is a second **entry point** rather
+than a second reason, and the note says so.
+
 ## Where the remaining packages stand
 
 Replayed: `d3-time` (366), `d3-array` (252), `d3-color` (34), `vega-time` (281), `vega-transforms`
