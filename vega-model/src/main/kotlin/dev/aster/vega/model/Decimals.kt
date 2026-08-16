@@ -107,6 +107,53 @@ public object Decimals {
   }
 
   /**
+   * The **fewest** digits that read back as this double, and where the point goes.
+   *
+   * This is the other half of printing a number, and the half that is not obvious. [fixed] and
+   * [exponential] are told how many digits to write; `String(x)` is not, and JavaScript's answer is
+   * *the shortest decimal that no other double is nearer to* — which is why `0.1 + 0.2` prints as
+   * `0.30000000000000004` (seventeen digits are genuinely needed) while `0.3` prints as `0.3`.
+   *
+   * The platform's own `toString` is not a substitute, on two counts. It writes at least two
+   * significant digits, so `Double.MIN_VALUE` comes out as `4.9E-324` where `5e-324` reads back to
+   * the same bits and is what JavaScript prints. And it switches to exponential notation at 10^7,
+   * where JavaScript switches at 10^21 — a difference that shows up on any axis label past ten
+   * million.
+   *
+   * Finding the count is a search rather than an algorithm here, and it is cheap because the
+   * expansion is already exact: rounding it to *k* digits and asking whether that reads back is a
+   * string round-trip, and round-tripping is **monotone** in *k* — a longer decimal is never
+   * further from the double than a shorter one — so the fewest that work can be halved out in five
+   * tries. Seventeen always work, which is what makes the search terminate.
+   */
+  public fun shortest(value: Double): Shortest {
+    val magnitude = kotlin.math.abs(value)
+    val expansion = expansion(magnitude)
+    var low = 1
+    var high = 17
+    while (low < high) {
+      val mid = (low + high) / 2
+      if (readsBack(expansion, mid, magnitude)) high = mid else low = mid + 1
+    }
+    val rounded = round(expansion.digits, low, tieToEven = true)
+    val exponent = expansion.exponent + if (rounded.carried) 1 else 0
+    val digits = rounded.digits.trimEnd('0').ifEmpty { "0" }
+    return Shortest(digits, exponent + 1)
+  }
+
+  /** The value is `0.digits × 10^exponent`, with [digits] carrying no leading or trailing zero. */
+  public class Shortest internal constructor(public val digits: String, public val exponent: Int)
+
+  /** Whether [expansion] rounded to [keep] digits still names the same double. */
+  private fun readsBack(expansion: Expansion, keep: Int, magnitude: Double): Boolean {
+    val rounded = round(expansion.digits, keep, tieToEven = true)
+    val exponent = expansion.exponent + if (rounded.carried) 1 else 0
+    // Written with the point after every digit rather than after the first, so the text stays a
+    // plain integer-and-exponent that every platform's parser reads the same way.
+    return "${rounded.digits}e${exponent - keep + 1}".toDouble() == magnitude
+  }
+
+  /**
    * The digits of `round(|value| × 10^decimals)`, half-up on the exact binary value.
    *
    * `|value| = m × 2^-k` for a negative binary exponent, so `|value| × 10^decimals` is `(m ×
@@ -169,12 +216,27 @@ public object Decimals {
   /** An exact expansion: `digits[0].digits[1..] × 10^exponent`, with no leading zero. */
   private class Expansion(val digits: String, val exponent: Int)
 
-  /** [digits] rounded half-up to [keep] of them, and whether that carried into a new decade. */
-  private fun round(digits: String, keep: Int): Rounded {
+  /**
+   * [digits] rounded to [keep] of them, and whether that carried into a new decade.
+   *
+   * Half-up, except when [tieToEven] — which only [shortest] asks for, because that is the one
+   * place the language rounds differently. `toFixed` and `toExponential` round a tie away from
+   * zero; `String(x)` breaks it towards the **even** digit, so `170255292857.578125` prints as
+   * `170255292857.57812` rather than `…13`, both of which read back to the same double.
+   */
+  private fun round(digits: String, keep: Int, tieToEven: Boolean = false): Rounded {
     if (digits.length <= keep) return Rounded(digits.padEnd(keep, '0'), carried = false)
     // The expansion is exact, so the first discarded digit decides it: five or more rounds up, and
     // a tie — five followed by nothing — rounds up too, which is what half-up means.
     if (digits[keep] < '5') return Rounded(digits.substring(0, keep), carried = false)
+    if (
+      tieToEven &&
+        digits[keep] == '5' &&
+        digits.asSequence().drop(keep + 1).all { it == '0' } &&
+        (digits[keep - 1] - '0') % 2 == 0
+    ) {
+      return Rounded(digits.substring(0, keep), carried = false)
+    }
     val kept = digits.substring(0, keep).toCharArray()
     var index = keep - 1
     while (index >= 0) {

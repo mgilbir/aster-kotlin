@@ -129,13 +129,17 @@ for package in "${D3_PACKAGES[@]}"; do
   (cd oracle-js && TZ="$zone" node src/record-upstream-tests.mjs "$clone" "$package")
 done
 
+# Not an upstream test: `String(x)` is a language primitive, and only the language can say what it
+# prints. Every number a chart writes as text goes through it.
+node oracle-js/src/record-number-strings.mjs
+
 total="$(node -e '
   const fs = require("fs");
   const dir = "test-fixtures/upstream-vectors";
   let n = 0;
   for (const f of fs.readdirSync(dir)) {
-    if (f === "known-divergences.json") continue;
-    n += JSON.parse(fs.readFileSync(`${dir}/${f}`, "utf8")).calls.length;
+    const doc = JSON.parse(fs.readFileSync(`${dir}/${f}`, "utf8"));
+    n += (doc.calls || doc.numbers || []).length;
   }
   console.log(n);
 ')"

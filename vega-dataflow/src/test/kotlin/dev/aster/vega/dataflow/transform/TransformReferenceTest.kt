@@ -1624,7 +1624,7 @@ class TransformReferenceTest {
         """{"density":0.11968268412043688,"value":0},""" +
         """{"density":0.016384652270027257,"value":2},""" +
         """{"density":0.5585593416297352,"value":4},""" +
-        """{"density":1.8736413883569446e-4,"value":6}]"""
+        """{"density":0.00018736413883569446,"value":6}]"""
     assertEquals(
       expected,
       run(

@@ -730,6 +730,42 @@ And a real crash: **`%Q` could not parse any real timestamp.** The parser read t
 delimiter parsers land on the loader, `geoCentroid`, `geoBounds`, `geoArea` and `geoContains` on the
 projection code.
 
+## `String(x)` was wrong for one double in sixty, and nothing was checking it
+
+Chasing the last d3-format mismatch — `format("s")` on the smallest subnormal — led somewhere much
+larger than the mismatch. The digits for that case come from JavaScript's `toExponential()` with no
+argument, which is the *shortest decimal no other double is nearer to*, and this engine was getting
+that from Kotlin's `Double.toString`. It is not the same function. A sweep of 7,957 doubles against
+Node found **91 disagreements**, in three kinds:
+
+- **Notation.** Kotlin goes exponential at 10^7, JavaScript at 10^21. So `1777860673.6878662`
+  printed as `1.7778606736878662e+9` — on a tooltip, on an axis label, anywhere a number over ten
+  million was not a whole one. 57 of the 91, and the everyday one.
+- **`toLong()` saturates.** The integer fast path was guarded by `< 1e21`, but `toLong` stops at
+  9.2×10^18, so every integral double above that printed as **`-9223372036854775808`**.
+- **Shortest is not exact.** Past 2^53 an integral double is not the integer it looks like:
+  `319615008869810176` prints as `319615008869810200`, because that is the shorter decimal that
+  still names those bits.
+
+The fix is one algorithm rather than three patches. `Decimals.shortest` finds the fewest digits that
+read back, and it is cheap because the expansion is already exact: round it to *k* digits, ask
+whether the text reads back as the same double, and binary-search *k* — round-tripping is monotone,
+so five tries settle it and seventeen always work. `JsSemantics.numberToString` then just places the
+point per ECMA-262, and `NumberFormat` asks the same question instead of taking the printed form
+back apart.
+
+One rule was only visible because the corpus was large: `String(x)` breaks a tie towards the **even**
+digit where `toFixed` rounds away from zero, so `170255292857.578125` prints as `…57812`. One double
+in 7,957 turned on it.
+
+`TransformReferenceTest`'s mixture expectation had `1.8736413883569446e-4` written into it — a form
+JavaScript never prints. It was captured from this engine's own output rather than from upstream, so
+it had been asserting the bug. Corrected against upstream, not deleted.
+
+The sweep is now `oracle-js/src/record-number-strings.mjs`, run by
+`scripts/record-upstream-vectors.sh` and replayed by `UpstreamNumberStringVectorsTest`, comparing by
+**bits** so a parse disagreement cannot hide as a print agreement.
+
 ## Where the remaining packages stand
 
 Replayed: `d3-time` (366), `d3-array` (252), `d3-color` (34), `vega-time` (281), `vega-transforms`

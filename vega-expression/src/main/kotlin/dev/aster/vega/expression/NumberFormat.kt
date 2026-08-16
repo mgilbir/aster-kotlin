@@ -252,19 +252,15 @@ public object NumberFormat {
    * JavaScript's `toExponential()` with no argument: the fewest digits that identify the double.
    */
   private fun shortestExponential(value: Double): String {
-    val shortest = JsSemantics.numberToString(value)
-    if ('e' in shortest) return shortest
-    val negative = shortest.startsWith("-")
-    val body = shortest.removePrefix("-")
-    val point = body.indexOf('.')
-    val digits = body.replace(".", "").trimStart('0')
-    if (digits.isEmpty()) return (if (negative) "-" else "") + "0e+0"
-    val integerLength = if (point < 0) body.length else point
-    val leadingZeros = body.replace(".", "").length - body.replace(".", "").trimStart('0').length
-    val exponent = integerLength - 1 - leadingZeros
-    val trimmed = digits.trimEnd('0').ifEmpty { "0" }
-    val mantissa = if (trimmed.length > 1) "${trimmed[0]}.${trimmed.substring(1)}" else trimmed
-    return (if (negative) "-" else "") +
+    if (value == 0.0) return "0e+0"
+    // Asked of `Decimals` rather than re-derived from the printed form: this used to read
+    // `numberToString` back apart, which meant it inherited that function's notation threshold and
+    // could not see a digit the printer had already rounded away.
+    val shortest = Decimals.shortest(value)
+    val digits = shortest.digits
+    val exponent = shortest.exponent - 1
+    val mantissa = if (digits.length > 1) "${digits[0]}.${digits.substring(1)}" else digits
+    return (if (value < 0) "-" else "") +
       mantissa +
       "e" +
       (if (exponent < 0) "-" else "+") +
