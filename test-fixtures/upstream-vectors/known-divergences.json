@@ -11,13 +11,13 @@
   "divergences": [
     {
       "signature": "color(\"rgba(0,0,0,0)\")",
-      "note": "A fully transparent colour. d3 **blanks the channels** when the opacity is zero — `rgba(r, g, b, a)` sets `r = g = b = NaN` for `a <= 0` — so its answer carries no colour at all, where this engine keeps the zeros it was given. Nothing downstream reads them: a renderer draws nothing at zero opacity, and `luminance()` already answers NaN for a transparent colour by checking the alpha. Kept as a representational difference rather than propagated, because NaN channels would have to be defended everywhere they could reach.",
+      "note": "A fully transparent colour. d3 **blanks the channels** — `rgba(r, g, b, a)` sets `r = g = b = NaN` for `a <= 0` — where this engine keeps the zeros it parsed. The note here used to say nothing downstream reads them, and that was **wrong**: d3's interpolators are built around those NaNs, holding the other endpoint's channel constant, so `red -> transparent` stays red and fades. Reading zeros faded it through black instead. That is fixed at the interpolator — a transparent endpoint now contributes only its opacity — so what remains is genuinely representational: the parsed value carries 0,0,0 rather than NaN,NaN,NaN, and nothing now reaches it. Kept rather than propagated, because NaN channels would have to be defended everywhere they could travel.",
       "kind": "parser",
       "subject": "SceneColor.parse"
     },
     {
       "signature": "pathParse(\"l.5.5.3.3\")",
-      "note": "A path that starts with a **drawing** command rather than a move. Upstream's parser emits two lines from the origin; this one refuses the string, which is what the SVG grammar requires and what a browser does with it — so the same specification draws nothing in a browser and two lines through Vega's canvas renderer. Upstream disagrees with itself here, so neither answer is simply right; refusing is the one that matches what a reader sees in the DOM. Pinned so a change of mind is a decision.",
+      "note": "A path that begins with a **drawing** command rather than a move. Upstream's parser emits two lines from the origin; this one refuses the string, which is what the SVG grammar requires and what a browser does with it — so upstream's canvas renderer draws two lines where its own SVG renderer draws nothing. Reviewed again rather than inherited: the choice is between matching upstream's canvas and matching every browser, the two disagree, and no specification a chart is built from starts a path this way. Pinned so that changing sides stays a decision.",
       "kind": "parser",
       "subject": "SvgPath.parse"
     },
@@ -25,7 +25,7 @@
       "signature": "scaleThreshold.domain([\"10\",\"2\"]).range([0,1,2]).(call)([\"12\"])",
       "kind": "scale",
       "subject": "ThresholdScale",
-      "note": "A threshold scale whose cut points are **strings**. d3 compares them with JavaScript's `<`, which is lexicographic — `\"12\" < \"2\"` — so `\"12\"` lands in the first bucket; this engine's `ThresholdScale` holds `Double` cut points, parses them, and puts 12 above both. Supporting it would mean carrying `VegaValue` thresholds and JS comparison through the scale, for a specification that writes a numeric cut point as a quoted string. Pinned rather than fixed, and worth revisiting if a real specification ever does it."
+      "note": "A threshold scale whose cut points are **strings**. d3 bisects them with JavaScript's `<`, which is lexicographic — `\"12\" < \"2\"` — so `\"12\"` lands in the first bucket; this engine's `ThresholdScale` holds `Double` cut points and puts 12 above both. Reviewed again: supporting it means carrying `VegaValue` thresholds and JavaScript comparison through the scale and its legend, for a specification that writes a numeric cut point as a quoted string. Still not worth it, and still pinned so the day one appears there is a note explaining why the answer is odd."
     }
   ]
 }

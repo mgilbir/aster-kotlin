@@ -1211,6 +1211,45 @@ special case returning the **last** colour. None of them was upstream's.
 it. Corrected against upstream rather than deleted — `scale('c', 5)` on a `domain: [5, 5]` colour
 scale gives the middle of the scheme, verified end to end before touching the test.
 
+## Reviewing what the harness had been told to ignore
+
+Two suppression mechanisms, reviewed rather than trusted.
+
+**The ignored-channels list.** `Differential.kt` excluded `font` and `fontWeight` from every
+comparison, under the documented text-metrics exception. That exception is real and this was not it:
+it is about *measurement* — a browser and Android size glyphs differently, so a label's width is not
+comparable — and these two are neither measured nor derived. They are the family and weight the
+specification asked for. Comparing them found:
+
+- a `style` block's **`font` leaking from a title into its subtitle**. Upstream never lets a
+  subtitle inherit the title's family — not from `title.font`, not from `config.title.font`, not
+  from a style block, all three checked — and the `?: spec.font` fallback put a serif heading's face
+  on a sans-serif subtitle;
+- and that **`fontWeight` was never mapped into the comparison at all.** It was excluded *and*
+  absent, so removing it from the ignore list changed nothing until the channel was published. It
+  now compares canonically, `bold` against 700, on both the string and number paths, because
+  upstream carries whichever the specification wrote.
+
+The list is empty now, and the comment says why rather than repeating the exception it was misusing.
+
+**The three known divergences**, each re-examined against upstream rather than re-read:
+
+1. **A transparent colour's channels.** The note claimed nothing downstream reads them. That was
+   **wrong.** d3 blanks them to NaN and its interpolators are *built around it*: a NaN endpoint
+   holds the other end's channel constant, so `red -> transparent` stays red and fades. This engine
+   read the zeros and faded through **black** — reachable from `range: ["red", "transparent"]` and
+   plainly visible. Fixed at the interpolator: a transparent endpoint now contributes only its
+   opacity. What is left is genuinely representational, and the note says so.
+2. **A path beginning with a drawing command.** Upstream's canvas draws two lines from the origin;
+   every browser draws nothing, which is what this engine does. Upstream disagrees with itself here,
+   and no specification starts a path this way. Kept, with the trade-off written down.
+3. **Threshold cut points written as strings.** Lexicographic upstream, numeric here. Supporting it
+   means carrying `VegaValue` thresholds and JavaScript comparison through the scale and its legend.
+   Kept, and still not worth it.
+
+One of three was hiding a real bug, which is about the rate this session has found for anything
+labelled "known".
+
 ## Where the remaining packages stand
 
 Replayed: `d3-time` (366), `d3-array` (252), `d3-color` (34), `vega-time` (281), `vega-transforms`

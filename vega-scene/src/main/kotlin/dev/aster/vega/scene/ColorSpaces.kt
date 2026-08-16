@@ -162,8 +162,22 @@ public object ColorSpaces {
     space: Interpolation,
     /** Only `rgb` has one; every other space ignores it, as d3 does. */
     gamma: Double = 1.0,
-  ): SceneColor =
-    when (space) {
+  ): SceneColor {
+    // **A fully transparent endpoint contributes no colour, only its opacity.** d3 blanks a
+    // transparent colour's channels to NaN, and its interpolators are built to notice: a NaN
+    // endpoint holds the *other* end's channel constant, so `red -> transparent` stays red and
+    // fades away. This engine keeps the zeros it parsed, so the same ramp faded through black —
+    // visibly wrong, and reachable from `range: ["red", "transparent"]`.
+    //
+    // Matching the effect rather than importing NaN channels: the alpha still interpolates, so the
+    // colour disappears exactly as it should, and nothing downstream has to defend against a NaN.
+    if (from.alpha == 0.0 && to.alpha != 0.0) {
+      return interpolate(to.withAlpha(from.alpha), to, t, space, gamma)
+    }
+    if (to.alpha == 0.0 && from.alpha != 0.0) {
+      return interpolate(from, from.withAlpha(to.alpha), t, space, gamma)
+    }
+    return when (space) {
       Interpolation.RGB -> interpolateRgb(from, to, t, gamma)
       Interpolation.LAB -> interpolateLab(from, to, t)
       Interpolation.HCL,
@@ -173,6 +187,7 @@ public object ColorSpaces {
       Interpolation.CUBEHELIX,
       Interpolation.CUBEHELIX_LONG -> interpolateCubehelix(from, to, t, space.isLong)
     }
+  }
 
   // ---- HCL --------------------------------------------------------------------
 
