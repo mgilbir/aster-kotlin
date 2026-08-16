@@ -988,6 +988,33 @@ about 270 weekday-anchored intervals (`timeMonday` and its six siblings, which V
 its `week` is Sunday), and 19 `range` calls with a step, which is d3's *other* stepping rule and a
 different function from the one Vega uses.
 
+## The d3-array gap was about 300 vectors smaller than the ledger said
+
+Two adapters read `d3-array.json`, and only one of them said so. `UpstreamD3ArrayVectorsTest`
+listed `median`, `max`, `sum`, `variance` and their siblings as plain **"not mapped"** when
+`UpstreamD3StatisticsVectorsTest` replays every one of them against the aggregate operations. The
+ledger now names the adapter that covers them, because a gap that is not real is as misleading as a
+crash that is not reported.
+
+What was genuinely missing is `bisectLeft` and `bisectRight`, and they are not helpers: a band scale
+inverts a brush with `bisectRight(bandStarts, position) - 1`, and a crossfilter narrows a range with
+`bisectLeft` at both ends. 53 vectors, and they found one real fault — **a `NaN` needle**. Every
+comparison against a NaN is false, so the search converges on `low` and reports that the value
+belongs at the front; d3 checks for it up front and answers `high` instead. For a band scale
+inverting a pointer position that is not a number, the difference is selecting the first band rather
+than none.
+
+Fixing it broke four tests, and the break was mine rather than the engine's: giving `bisectRight` a
+`low` parameter put it *before* the existing `high`, so the one call site that passed a limit
+positionally silently started passing it as a lower bound — and every value landed in the last
+bucket. The gates caught it in one run. Named argument, and the lesson is the ordinary one about
+adding a parameter in front of an existing positional.
+
+d3-array stands at 303 replayed. Most of the remainder is genuinely not this engine's to match:
+`ascending` and `descending` are d3's comparator, where Vega sorts with `vega-util`'s own, which
+orders nulls rather than answering NaN; `range`, `mode`, `greatest` and the index variants have no
+counterpart here because Vega does not route through them.
+
 ## Where the remaining packages stand
 
 Replayed: `d3-time` (366), `d3-array` (252), `d3-color` (34), `vega-time` (281), `vega-transforms`

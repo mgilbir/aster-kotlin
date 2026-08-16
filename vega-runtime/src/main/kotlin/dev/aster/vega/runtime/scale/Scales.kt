@@ -769,14 +769,52 @@ public sealed interface BinnedScale : VegaScale {
   public val legendExtent: Pair<Double, Double>
 }
 
-private fun bisectRight(values: List<Double>, x: Double, high: Int = values.size): Int {
-  var low = 0
+/**
+ * d3's `bisectRight`: the index after the last value not greater than [x].
+ *
+ * A band scale inverts a brush with this — `bisectRight(bandStarts, position) - 1` is the band the
+ * pointer is over — and a crossfilter narrows a range with its sibling below, so both are load
+ * bearing rather than helpers.
+ */
+internal fun bisectRight(
+  values: List<Double>,
+  x: Double,
+  low: Int = 0,
+  high: Int = values.size,
+): Int {
+  if (x.isNaN()) return high
+  var lo = low
   var hi = high
-  while (low < hi) {
-    val mid = (low + hi) ushr 1
-    if (x < values[mid]) hi = mid else low = mid + 1
+  while (lo < hi) {
+    val mid = (lo + hi) ushr 1
+    if (x < values[mid]) hi = mid else lo = mid + 1
   }
-  return low
+  return lo
+}
+
+/**
+ * d3's `bisectLeft`: the index of the first value not less than [x].
+ *
+ * A **NaN** needle answers `high` rather than a position, and d3 checks for it up front rather than
+ * leaving it to the comparisons: every comparison against a NaN is false, so the search would
+ * otherwise converge on `low` and claim the value belongs at the front. For a band scale inverting
+ * a pointer position that is not a number, the difference is selecting the first band instead of
+ * none.
+ */
+internal fun bisectLeft(
+  values: List<Double>,
+  x: Double,
+  low: Int = 0,
+  high: Int = values.size,
+): Int {
+  if (x.isNaN()) return high
+  var lo = low
+  var hi = high
+  while (lo < hi) {
+    val mid = (lo + hi) ushr 1
+    if (values[mid] < x) lo = mid + 1 else hi = mid
+  }
+  return lo
 }
 
 /**
@@ -905,7 +943,7 @@ public class ThresholdScale(
     // d3 clamps the search to one fewer than the range length, so extra domain values past the end
     // of the range are ignored rather than indexing off it.
     val limit = minOf(thresholds.size, rangeValues.size - 1)
-    return rangeValues[bisectRight(thresholds, x, limit)]
+    return rangeValues[bisectRight(thresholds, x, high = limit)]
   }
 }
 

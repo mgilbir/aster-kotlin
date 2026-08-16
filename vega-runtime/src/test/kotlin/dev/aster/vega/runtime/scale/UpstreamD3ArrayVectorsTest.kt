@@ -66,9 +66,42 @@ class UpstreamD3ArrayVectorsTest {
     for (vector in vectors) {
       val fn = vector["fn"]?.jsonPrimitive?.content ?: continue
       if (fn !in REPLAYED) {
-        unmapped.merge(fn, 1, Int::plus)
+        // Two adapters read this one file, and saying so matters: the summary statistics are
+        // replayed by `UpstreamD3StatisticsVectorsTest` against the aggregate operations, which is
+        // where they belong. Listing them here as plain "not mapped" made the gap look about 300
+        // vectors larger than it is.
+        unmapped.merge(
+          if (fn in ELSEWHERE) "$fn (replayed by UpstreamD3StatisticsVectorsTest)" else fn,
+          1,
+          Int::plus,
+        )
         continue
       }
+      // `bisectLeft` and `bisectRight` take an **array** first, so they are answered before the
+      // three-numbers shape below. They are not helpers: a band scale inverts a brush with
+      // `bisectRight(bandStarts, position) - 1`, and a crossfilter narrows a range with
+      // `bisectLeft` at both ends.
+      if (fn == "bisectLeft" || fn == "bisectRight") {
+        val args = vector["args"] as? JsonArray
+        val values = (args?.getOrNull(0) as? JsonArray)?.map { number(it) }
+        val x = number(args?.getOrNull(1))
+        if (values == null || values.any { it == null } || x == null) {
+          unmapped.merge("$fn (not a numeric array and a value)", 1, Int::plus)
+          continue
+        }
+        val sorted = values.filterNotNull()
+        val low = number(args.getOrNull(2))?.toInt() ?: 0
+        val high = number(args.getOrNull(3))?.toInt() ?: sorted.size
+        val answer = number(vector["result"])?.toInt() ?: continue
+        replayed++
+        val ours =
+          if (fn == "bisectLeft") bisectLeft(sorted, x, low, high)
+          else bisectRight(sorted, x, low, high)
+        if (answer != ours)
+          failures.add("$fn(${sorted.size} values, $x, $low, $high): upstream $answer, ours $ours")
+        continue
+      }
+
       // A vector too large to record keeps its name and a byte count instead of its arguments —
       // `d3-array` operates on million-element arrays in places. Counted, not dereferenced.
       val args = (vector["args"] as? JsonArray)
@@ -128,7 +161,7 @@ class UpstreamD3ArrayVectorsTest {
       }
 
     assertEquals(emptyList<String>(), failures.take(10), "d3-array disagrees with Ticks")
-    assertTrue(replayed >= 240, "only $replayed vectors replayed; the harness must not shrink")
+    assertTrue(replayed >= 300, "only $replayed vectors replayed; the harness must not shrink")
   }
 
   /** NaN and the infinities compare as text, so a mismatch reads as itself rather than as false. */
@@ -148,6 +181,20 @@ class UpstreamD3ArrayVectorsTest {
      * rather than as functions over an array, so it wants an adapter of its own rather than a
      * pretence that the shapes match.
      */
-    val REPLAYED = setOf("ticks", "tickIncrement", "tickStep", "nice")
+    /** Replayed by the sibling adapter against this engine's aggregates, not unreplayed. */
+    val ELSEWHERE =
+      setOf(
+        "sum",
+        "mean",
+        "median",
+        "variance",
+        "deviation",
+        "min",
+        "max",
+        "extent",
+        "quantile",
+      )
+
+    val REPLAYED = setOf("ticks", "tickIncrement", "tickStep", "nice", "bisectLeft", "bisectRight")
   }
 }
