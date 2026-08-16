@@ -1405,23 +1405,42 @@ expression registry has no URI function among its 119.
 
 ## Where the remaining packages stand
 
-Replayed: `d3-time` (366), `d3-array` (252), `d3-color` (34), `vega-time` (281), `vega-transforms`
-(151). The rest, with what each would need:
+**Rewritten from the ledgers, which the previous version of this section had drifted a long way
+from** — it still read `d3-time` 366 and `vega-statistics` unreplayed, and would have sent the next
+person to redo finished work. The numbers below come from `build/upstream-*-ledger.txt` after a full
+re-record; regenerate with `scripts/record-upstream-vectors.sh` and they will reproduce.
 
-- **`vega-statistics` (112)** — `bin`, `quartiles`, `quantiles`, `dotbin` are plain functions and map
-  directly; the `regression*` family passes an **accessor** and returns a `predict` function, so only
-  its coefficients are comparable.
-- **`vega-scenegraph` (190)** — `pathParse`, `pathRender` and `boundStroke` land on `PathData` and the
-  bounds code. The most valuable of the remainder.
-- **`d3-interpolate` (253)** — the interpolators behind every continuous colour scale.
-- **`vega-expression` (149)** — `parseExpression` returns an **AST**, so replaying it means comparing
-  tree shapes rather than values; the existing `ExpressionReferenceTest` compares *evaluated* results,
-  which is the more useful half.
-- **`vega-scale` (34)** — `validTicks(scale, ticks, count)` takes a **scale function** as its first
-  argument, which a vector cannot hold. Only the identity-scale calls are replayable as written.
-- **`d3-shape` (31), `d3-scale` (55), `d3-hierarchy` (1)** — builder-shaped, so a single call is not a
-  vector; the state is the input. Same fix as the transform seam: record the chain per object with an
-  instance stamp and replay it in order.
+25,919 vectors recorded, 187 differential fixtures, 4 pinned divergences.
+
+| package | replayed | of | what the rest is |
+| --- | --- | --- | --- |
+| `vega-statistics` | 9,763 | 9,820 | the sampling side returns objects of functions |
+| `d3-time` | 688 | 1,051 | ~270 weekday-anchored intervals Vega never asks for; `every` returns a function |
+| `d3-format` | 548 | 776 | 180 constructor calls, and the locale API |
+| `d3-scale` | 397 | 1,134 | getters (`domain()`, `range()`), `tickFormat` returning a formatter, `scaleRadial` — which Vega's registry does not have |
+| `d3-time-format` | 312 | 422 | locale construction |
+| `d3-array` | 303 | 1,571 | ~300 replayed by `UpstreamD3StatisticsVectorsTest` instead; the rest are utilities Vega does not route through |
+| `d3-geo` | 160 | 236 | 55 functions Vega never calls; 16 `geoCircle`, which it does not call either |
+| `d3-array` (statistics) | 106 | 1,571 | the same file read by a second adapter |
+| `d3-color` | 77 | 216 | constructor forms; a conversion *from* components is not a conversion of a colour |
+| `d3-interpolate` | 68 | 533 | **the largest genuine gap left** — see below |
+| `d3-time` ticks | 47 | 51 | 4 pass an interval rather than a count |
+| `d3-dsv` | 40 | 93 | 46 `autoType`, which `vega-loader` does not use |
+| `vega-scenegraph` | 36 | 204 | `pathRender` takes a context of functions; `pathEqual` is a test helper |
+| transforms | 167 | — | across every recorded package |
+| `String(x)` | 7,957 | 7,957 | — |
+
+### What is actually left
+
+- **`d3-interpolate`, 68 of 533.** The one place a real gap remains rather than a classification. Most
+  of the unreplayed are *constructions* returning a function, but `interpolateString` (16 samples) is
+  a feature this engine does not have — upstream interpolates the numbers embedded in a string, so
+  `range: ["0px", "2px"]` animates, and here it does not. Worth deciding on rather than leaving.
+- **`vega-scenegraph`'s `intersect*` family** (44) — hit-testing, which this engine has no equivalent
+  of because it does not handle events. A deliberate absence, not a gap.
+- Everything else above is counted with a reason, and the reasons were re-read in this session —
+  five of six that said "no equivalent here" turned out to be the *adapter's* gap, not the engine's,
+  so treat the remaining ones with suspicion rather than trust.
 
 ## Replaying d3-array rewrote the tick algorithm, and found three bugs
 
