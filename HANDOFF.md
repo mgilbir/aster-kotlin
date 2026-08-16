@@ -1378,6 +1378,31 @@ the next-line character agreed by accident.
 
 `parseFloat` and `parseInt` skip *StrWhiteSpace*, which is the same set, so they went with it.
 
+## Which characters may spell a field name
+
+The last of 0.2.0's packages. A field is reached through `datum.name`, so the identifier grammar
+decides which columns an expression can see at all — and this engine tested for a letter or a digit,
+where ECMA-262 uses `UnicodeIDStart` and `UnicodeIDContinue`. Upstream parses `datum.café` written
+with a decomposed acute, a name beginning with a letter number like `Ⅷ`, and one carrying a
+zero-width non-joiner; this engine parsed none of them, and a field it cannot name is a field it
+cannot read.
+
+Reading the Unicode categories directly gets closer and does not arrive. `ID_Start` and
+`ID_Continue` carry **`Other_ID_Start`** and **`Other_ID_Continue`** on top of the categories — the
+middle dot, the Ethiopic digits, two Mongolian letters — and they move with whichever Unicode
+version the platform ships. That was not a guess: the category version was written, tested against
+the library over the whole Basic Multilingual Plane, and **86 characters disagreed**. The right
+answer was to stop approximating and ask.
+
+So the lexer asks, once per character, and remembers: two arrays of the plane, filled only where a
+specification actually reaches. `IdentifierGrammarTest` compares every character of the plane, as a
+start and as a continuation, against `isEcmaIdentifierName` — the specification's own answer rather
+than a second reading of it — and `unicode-identifiers.vg.json` pins the four cases end to end.
+
+That completes the 0.2.0 review: **number** replaced a whole file, **text** gave `trim` its
+whitespace set and the lexer its grammar, and **uri** turned out to be unreachable, since Vega's
+expression registry has no URI function among its 119.
+
 ## Where the remaining packages stand
 
 Replayed: `d3-time` (366), `d3-array` (252), `d3-color` (34), `vega-time` (281), `vega-transforms`

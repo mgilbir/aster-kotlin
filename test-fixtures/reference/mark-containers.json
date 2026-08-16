@@ -17368,6 +17368,22 @@
   "hidden": false
  },
  {
+  "fixture": "unicode-identifiers",
+  "kind": "group",
+  "role": "graphics-object",
+  "roleDescription": "group mark container",
+  "label": null,
+  "hidden": false
+ },
+ {
+  "fixture": "unicode-identifiers",
+  "kind": "text",
+  "role": "graphics-object",
+  "roleDescription": "text mark container",
+  "label": null,
+  "hidden": false
+ },
+ {
   "fixture": "volcano-contours",
   "kind": "group",
   "role": "graphics-object",
