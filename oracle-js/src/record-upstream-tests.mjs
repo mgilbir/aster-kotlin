@@ -79,6 +79,10 @@ function encode(value, seen = new Set()) {
   if (value === null) return null;
   if (typeof value === 'number') {
     if (Number.isNaN(value)) return {$: 'NaN'};
+    // **Negative zero.** `JSON.stringify(-0)` is `"0"`, and the difference is not academic here: d3
+    // decides a value's sign with `1 / value < 0`, so `format("+f")(-0)` writes `−0.000000` where
+    // `+0` writes `+0.000000`. Recorded as itself rather than lost.
+    if (value === 0 && 1 / value < 0) return {$: '-0'};
     if (value === Infinity) return {$: 'Infinity'};
     if (value === -Infinity) return {$: '-Infinity'};
     return value;

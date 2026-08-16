@@ -1,19 +1,15 @@
 package dev.aster.vega.expression
 
-import dev.aster.vega.model.Decimals
-import dev.aster.vega.model.MINUS_SIGN
 import dev.aster.vega.model.VegaValue
 import dev.aster.vega.model.asNumberOrNull
 import dev.aster.vega.model.asString
 import dev.aster.vega.model.field
-import dev.aster.vega.model.roundHalfUp
 import dev.aster.vega.model.time.DateValues
 import dev.aster.vega.model.time.TimeFormat
 import dev.aster.vega.model.time.TimeInterval
 import dev.aster.vega.model.time.TimeParse
 import dev.aster.vega.model.time.TimeStepper
 import dev.aster.vega.model.time.TimeUnits
-import dev.aster.vega.model.withTypographicMinus
 import dev.aster.vega.scene.ColorSpaces
 import dev.aster.vega.scene.SceneColor
 import kotlin.math.abs
@@ -430,7 +426,7 @@ public object Functions {
       VegaValue.Str(padText(text, length, character, align))
     }
     map["format"] = ExpressionFunction { args ->
-      VegaValue.Str(NumberFormatSubset.format(args.number(0), args.string(1)))
+      VegaValue.Str(NumberFormat.format(args.number(0), args.string(1)))
     }
 
     // ---- strings and arrays -------------------------------------------------
@@ -1546,180 +1542,4 @@ public object Functions {
         JsSemantics.toStringValue(a).compareTo(JsSemantics.toStringValue(b))
       }
     }
-}
-
-/**
- * The slice of d3-format that default and common Vega format strings need.
- *
- * Supports `.Nf`, `.Ne`, `.N%`, `d`, `,d`, `,.Nf` and a bare `%`. Anything else falls back to plain
- * number formatting and is reported by the caller, rather than silently producing a differently
- * formatted label.
- */
-public object NumberFormatSubset {
-
-  /** Returns `null` from [parse] for a specifier this subset cannot honour. */
-  public data class Spec(
-    val group: Boolean,
-    val precision: Int?,
-    val type: Char,
-    /** Strips insignificant trailing zeros, which is d3's `~` and is implied by a missing type. */
-    val trim: Boolean = false,
-    /**
-     * d3's currency *symbol* flag, `$`, which is a slot of its own in the grammar and not a type.
-     *
-     * It sits before the zero-pad flag and the width, so `$,.2f` and `$0.2f` both mean "currency,
-     * two decimals" — which is how every price axis in the gallery is written. The symbol itself
-     * comes from the locale; this uses d3's default, `$` before the magnitude and inside the sign,
-     * so a negative price reads `−$1.50`.
-     */
-    val currency: Boolean = false,
-  )
-
-  /**
-   * A specifier naming **no type** is not "plain formatting": d3 aliases it to `.12~g` — twelve
-   * significant digits, trailing zeros trimmed. That is why `format(x, "")` prints `5` rather than
-   * `5.000000`, and why it switches to `1.23456789012e+14` once a number outgrows twelve digits.
-   */
-  public fun parse(specifier: String): Spec? {
-    val match = PATTERN.matchEntire(specifier) ?: return null
-    val currency = match.groupValues[1] == "$"
-    val group = match.groupValues[3] == ","
-    val precision =
-      match.groupValues[4].takeIf { it.isNotEmpty() }?.removePrefix(".")?.toIntOrNull()
-    val trim = match.groupValues[5] == "~"
-    val type = match.groupValues[6].firstOrNull()
-    return if (type == null) {
-      Spec(group, precision ?: DEFAULT_SIGNIFICANT_DIGITS, 'g', trim = true, currency = currency)
-    } else {
-      Spec(group, precision, type, trim = trim, currency = currency)
-    }
-  }
-
-  public fun format(value: Double, specifier: String): String {
-    val spec = parse(specifier) ?: return withTypographicMinus(JsSemantics.numberToString(value))
-    if (value.isNaN()) return "NaN"
-    // d3-format spells these the way JavaScript does, then signs them like any other number.
-    if (value.isInfinite()) return if (value > 0) "Infinity" else MINUS_SIGN + "Infinity"
-
-    // d3 clamps a requested precision to **20** — `Math.max(0, Math.min(20, precision))` — because
-    // that is as far as JavaScript's own `toFixed` goes. `.30f` therefore writes twenty decimals
-    // upstream and wrote thirty here, which is a wider column and a number that claims more than a
-    // double holds.
-    val precision = spec.precision?.coerceIn(0, MAX_PRECISION)
-    val raw =
-      when (spec.type) {
-        'd' -> wholeNumber(roundHalfUp(value))
-        'e' -> Decimals.exponential(value, precision ?: 6)
-        'g' ->
-          Decimals.significant(value, (precision ?: DEFAULT_SIGNIFICANT_DIGITS).coerceAtLeast(1))
-        // The `%` sign is a **suffix**, appended after trimming and grouping rather than baked into
-        // the number: with it attached, `~%` could not see the trailing zeros it was asked to trim
-        // and `10.000000%` came back where upstream writes `10%`. Six, not zero, is d3's default
-        // precision for it, as for every type that takes one.
-        '%' -> Decimals.fixed(value * 100.0, precision ?: 6)
-        else -> Decimals.fixed(value, precision ?: 6)
-      }
-    val text = if (spec.trim) trimInsignificantZeros(raw) else raw
-    val grouped =
-      (if (spec.group) groupThousands(text) else text) + if (spec.type == '%') "%" else ""
-    // The currency symbol goes *inside* the sign, between it and the digits, so -1.5 reads `−$1.50`
-    // rather than `$−1.50`. Applied before the minus substitution because it has to find the sign.
-    val signed = if (spec.currency) prefixCurrency(grouped) else grouped
-    // d3 formats the magnitude and prefixes the sign, so the substitution comes last and leaves an
-    // exponent's own hyphen alone: `.2e` of -0.005 is `−5.00e-3`, with two different characters.
-    return withTypographicMinus(signed)
-  }
-
-  /**
-   * d3's `~`: drops trailing zeros from the fraction, and the point with them, leaving any exponent
-   * suffix in place. `5.00000000000` becomes `5`; `1.00000000000e+21` becomes `1e+21`.
-   */
-  private fun trimInsignificantZeros(text: String): String {
-    val dot = text.indexOf('.')
-    if (dot < 0) return text
-    val exponent = text.indexOf('e', dot)
-    val suffix = if (exponent < 0) "" else text.substring(exponent)
-    val body = if (exponent < 0) text else text.substring(0, exponent)
-    val trimmed = body.trimEnd('0').trimEnd('.')
-    return trimmed + suffix
-  }
-
-  /**
-   * A whole number written out, the way d3's `formatDecimal` writes one.
-   *
-   * Two traps, both found by replaying d3-format's own vectors. Going through a `Long` saturates:
-   * `format(",d")` of 1e21 printed **9,223,372,036,854,775,807**. And expanding the double
-   * *exactly* is not right either — d3 hands anything from 1e21 up to `toLocaleString`, which
-   * writes the **shortest** representation, so 1.3e27 is `1300000000000000000000000000` where the
-   * exact value of that double is `1300000000000000044761612288`. Below 1e21 the two agree and
-   * `toString` is used.
-   */
-  private fun wholeNumber(value: Double): String {
-    if (!value.isFinite()) return Decimals.fixed(value, 0)
-    if (abs(value) < 1e21) return Decimals.fixed(value, 0)
-    val shortest = JsSemantics.numberToString(value)
-    val marker = shortest.indexOf('e')
-    if (marker < 0) return shortest
-    val exponent = shortest.substring(marker + 1).removePrefix("+").toIntOrNull() ?: return shortest
-    val mantissa = shortest.substring(0, marker)
-    val negative = mantissa.startsWith("-")
-    val digits = mantissa.removePrefix("-").replace(".", "")
-    val pointAt = mantissa.removePrefix("-").indexOf('.').let { if (it < 0) 1 else it }
-    val zeros = exponent - (digits.length - pointAt)
-    return (if (negative) "-" else "") + digits + "0".repeat(zeros.coerceAtLeast(0))
-  }
-
-  /** d3 clamps a precision to this, because it is as far as JavaScript's `toFixed` goes. */
-  private const val MAX_PRECISION = 20
-
-  /** d3's default currency symbol, placed between the sign and the digits. */
-  private fun prefixCurrency(text: String): String =
-    if (text.startsWith("-")) "-$" + text.substring(1) else "$$text"
-
-  /**
-   * Thousands separators, over the **leading run of digits only**.
-   *
-   * d3 splits the formatted value at the first character that is not a digit and groups what is
-   * before it, which matters because a formatted number is not always plain digits and a point: an
-   * axis whose specifier resolves to one significant figure over a million produces `2e+5`, and
-   * splitting on the decimal point alone grouped the exponent into it as `2,e+5`. A percentage's
-   * `%` is the same case.
-   */
-  private fun groupThousands(text: String): String {
-    val negative = text.startsWith("-")
-    val body = if (negative) text.substring(1) else text
-    val end = body.indexOfFirst { !it.isDigit() }.let { if (it < 0) body.length else it }
-    val digits = body.substring(0, end)
-    val rest = body.substring(end)
-    val grouped = digits.reversed().chunked(3).joinToString(",").reversed()
-    return (if (negative) "-" else "") + grouped + rest
-  }
-
-  /** d3's default precision for a specifier with no type: `.12~g`. */
-  private const val DEFAULT_SIGNIFICANT_DIGITS = 12
-
-  /**
-   * The slice of d3's format grammar this subset reads.
-   *
-   * `[$][0][,][.precision][type]`, in that order, which is d3's own order and not negotiable — `$,`
-   * parses and `,$` does not. The zero-pad flag is accepted and ignored: it only matters alongside
-   * a width, which this subset does not implement, and refusing the whole specifier over it would
-   * turn `$0.2f` into unformatted output.
-   */
-  /**
-   * d3's specifier grammar, as much of it as this subset honours: `[$][0][,][.precision][~][type]`.
-   *
-   * `~` and `g` were missing, and their absence was invisible rather than reported — an unparsed
-   * specifier falls back to plain number text, so `format(x, ".3g")` answered `2.675` where
-   * upstream answers `2.67`. `g` had been implemented all along and was only unreachable: a
-   * specifier naming *no* type is aliased to `.12~g`, which is the path every bare `format(x, "")`
-   * already took.
-   *
-   * Still outside it, and still silent, which is the honest statement: `s` and its SI prefixes,
-   * `r`, the radix types `b`/`o`/`x`/`X`/`c`, `n` (which is `,g`), and the leading
-   * `[[fill]align][sign]` and `width` slots. Upstream throws "invalid format" on a specifier it
-   * cannot read; this returns the number as JavaScript would write it, which is a wrong label
-   * rather than a broken chart.
-   */
-  private val PATTERN = Regex("^(\\$?)(0?)(,?)(\\.\\d+)?(~?)([dfeg%]?)$")
 }

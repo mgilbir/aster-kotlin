@@ -50,6 +50,9 @@ class UpstreamD3FormatVectorsTest {
       is JsonPrimitive -> element.doubleOrNull
       is JsonObject ->
         when (element["\$"]?.jsonPrimitive?.content) {
+          // `JSON.stringify(-0)` is "0", so the recorder tags a negative zero; d3 signs by
+          // `1 / value < 0`, and the two zeros format differently under `+f`.
+          "-0" -> -0.0
           "NaN" -> Double.NaN
           "Infinity" -> Double.POSITIVE_INFINITY
           "-Infinity" -> Double.NEGATIVE_INFINITY
@@ -81,7 +84,7 @@ class UpstreamD3FormatVectorsTest {
       // approximated — `s`, `r`, the radix types, the fill/align/width slots — so it is counted
       // here
       // by the type it asked for rather than compared against a fallback.
-      val parsed = NumberFormatSubset.parse(specifier)
+      val parsed = NumberFormat.parse(specifier)
       if (parsed == null) {
         val type = specifier.lastOrNull()?.takeIf { !it.isDigit() }?.toString() ?: "(no type)"
         unmapped.merge("a specifier this grammar does not accept: '$type'", 1, Int::plus)
@@ -94,7 +97,7 @@ class UpstreamD3FormatVectorsTest {
         continue
       }
       replayed++
-      val actual = NumberFormatSubset.format(value, specifier)
+      val actual = NumberFormat.format(value, specifier)
       if (expected != actual)
         failures.add("format(\"$specifier\")($value): upstream $expected, ours $actual")
     }
@@ -110,7 +113,25 @@ class UpstreamD3FormatVectorsTest {
         writeText(ledger.toString())
       }
 
-    assertEquals(emptyList<String>(), failures.take(12), "d3-format disagrees with this engine")
-    assertTrue(replayed >= 100, "only $replayed vectors replayed; the harness must not shrink")
+    val known =
+      json
+        .parseToJsonElement(
+          File(
+              File(System.getProperty("user.dir")).parentFile,
+              "test-fixtures/upstream-vectors/known-divergences.json",
+            )
+            .readText()
+        )
+        .jsonObject["divergences"]!!
+        .jsonArray
+        .map { it.jsonObject }
+        .filter { it["kind"]?.jsonPrimitive?.content == "format" }
+        .map { it["signature"]!!.jsonPrimitive.content }
+    assertEquals(
+      known.sorted(),
+      failures.map { it.substringBefore(": upstream") }.sorted(),
+      "the set of format divergences changed; update known-divergences.json",
+    )
+    assertTrue(replayed >= 400, "only $replayed vectors replayed; the harness must not shrink")
   }
 }

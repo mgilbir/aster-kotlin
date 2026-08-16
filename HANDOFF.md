@@ -674,9 +674,35 @@ all on the path every axis label takes:
   instead of `0.100000%`. The `%` sign also has to be appended **after** trimming — with it attached,
   `~%` could not see the trailing zeros it was asked to trim.
 
-What is not replayed is named: 122 vectors ask for `s` (SI prefixes) and 71 for the `d` variants this
-grammar does not accept, which is the honest size of the gap between this subset and d3's full
-specifier language.
+**And then the gap was closed.** Counting it was not the point of counting it: `NumberFormat` is now
+the whole grammar — `[[fill]align][sign][symbol][0][width][,][.precision][~][type]` with every type d3
+has, `e f g r s % p b o d x X c n` and the typeless `.12~g`. Replayed vectors went from 106 to **403**.
+
+The pieces that look decorative are the ones that carry meaning, and each was transcribed rather than
+guessed:
+
+- **`s`** picks an SI prefix from the value's own magnitude, and the prefix belongs to the *suffix* —
+  so it survives trimming and stays outside the grouped digits. This is what turns 1,200,000 into
+  `1.2M` on an axis.
+- **`align`** decides where padding goes, and `=` puts it between the sign and the digits, which is
+  what lines up a column of signed numbers.
+- **`sign`** has four forms; `(` writes a negative in parentheses, as an accountant does.
+- **Grouping happens before padding unless the fill is `0`**, in which case it happens after, so
+  `08,d` of 1234 is `0,001,234` and not `0001,234`.
+
+Two traps, both found by a crash or a wrong answer rather than by reading:
+
+- **A precision of zero is falsy in JavaScript.** `formatDecimalParts(x, p)` asks for the *shortest*
+  form when `p` is 0, and passing the zero through asked for minus-one digits and threw. `siPrefixed`
+  reaches it, because its fallback asks for `max(0, precision + index - 1)` digits.
+- **`JSON.stringify(-0)` is `"0"`.** The recorder lost the sign of negative zero, and d3 decides a
+  sign with `1 / value < 0`: `format("+f")(-0)` is `−0.000000` where `+0` is `+0.000000`. The recorder
+  tags it now, which is a fidelity fix for every future vector as well.
+
+One divergence pinned: `format("s")` of the smallest subnormal. d3 falls back to JavaScript's shortest
+representation for the digits — `(4.9e-324).toExponential()` is `5e-324` — where this engine's
+shortest-form routine writes `4.9e-324`. A shortest-round-trip printer would close it; nothing about
+formatting would.
 
 ## Where the remaining packages stand
 

@@ -98,6 +98,12 @@
       "kind": "scale",
       "subject": "ThresholdScale",
       "note": "A threshold scale whose cut points are **strings**. d3 compares them with JavaScript's `<`, which is lexicographic \u2014 `\"12\" < \"2\"` \u2014 so `\"12\"` lands in the first bucket; this engine's `ThresholdScale` holds `Double` cut points, parses them, and puts 12 above both. Supporting it would mean carrying `VegaValue` thresholds and JS comparison through the scale, for a specification that writes a numeric cut point as a quoted string. Pinned rather than fixed, and worth revisiting if a real specification ever does it."
+    },
+    {
+      "signature": "format(\"s\")(4.9E-324)",
+      "kind": "format",
+      "subject": "NumberFormat",
+      "note": "The smallest subnormal double, formatted with an SI prefix. d3 falls back to JavaScript's shortest representation for the digits \u2014 `(4.9e-324).toExponential()` is `5e-324`, one digit \u2014 and this engine's shortest-form routine writes `4.9e-324`, so the tail reads `\u20260049y` where upstream reads `\u2026005y`. One value at the very bottom of the double range, and the fix is a shortest-round-trip printer rather than anything about formatting. Pinned so it is a known quantity rather than a surprise."
     }
   ]
 }

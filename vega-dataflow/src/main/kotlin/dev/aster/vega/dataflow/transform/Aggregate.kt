@@ -341,7 +341,11 @@ internal class Measure(
         )
       }
       AggregateOp.MEAN,
-      AggregateOp.AVERAGE -> VegaValue.Num(numbers.average())
+      // The **running** mean, not `sum / n`: upstream accumulates it incrementally, and the two
+      // part
+      // company where the sum overflows — the mean of `[MAX_VALUE, MAX_VALUE]` is `MAX_VALUE`
+      // upstream and `Infinity` from a sum that overflowed before it divided.
+      AggregateOp.AVERAGE -> VegaValue.Num(welford(numbers).mean)
       AggregateOp.MIN -> VegaValue.Num(numbers.min())
       AggregateOp.MAX -> VegaValue.Num(numbers.max())
       AggregateOp.MEDIAN -> VegaValue.Num(quantile(numbers.sorted(), 0.5))
@@ -372,13 +376,32 @@ internal class Measure(
   /** Sample variance divides by `n - 1`; the population form divides by `n`. */
   private fun variance(values: List<Double>, sample: Boolean): Double {
     if (values.size < 2) return if (sample) Double.NaN else 0.0
-    val mean = values.average()
-    val sumSquares = values.sumOf {
-      val d = it - mean
-      d * d
-    }
-    return sumSquares / (if (sample) values.size - 1 else values.size)
+    return maxOf(0.0, welford(values).dev) / (if (sample) values.size - 1 else values.size)
   }
+
+  /**
+   * The running mean and squared deviation, which is how **both** upstream engines compute them.
+   *
+   * `dev += (v - oldMean) * (v - newMean)` — Welford's — rather than a mean followed by a sum of
+   * squares. The two agree to the last bit on ordinary data and part company at the extremes: the
+   * variance of `[MAX_VALUE, MAX_VALUE]` is **0** upstream and was `Infinity` here, because taking
+   * the average first overflows the sum before it divides. Found by replaying d3-array's own
+   * vectors, which pass exactly that array.
+   */
+  private fun welford(values: List<Double>): Running {
+    var mean = 0.0
+    var dev = 0.0
+    var seen = 0
+    for (value in values) {
+      seen++
+      val delta = value - mean
+      mean += delta / seen
+      dev += delta * (value - mean)
+    }
+    return Running(mean, dev)
+  }
+
+  private class Running(val mean: Double, val dev: Double)
 
   /** d3's `quantile`: linear interpolation between the two straddling values. */
   private fun quantile(sorted: List<Double>, p: Double): Double {

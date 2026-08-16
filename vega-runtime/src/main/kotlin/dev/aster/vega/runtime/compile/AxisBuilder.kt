@@ -1,6 +1,6 @@
 package dev.aster.vega.runtime.compile
 
-import dev.aster.vega.expression.NumberFormatSubset
+import dev.aster.vega.expression.NumberFormat
 import dev.aster.vega.model.DiagnosticCodes
 import dev.aster.vega.model.DiagnosticCollector
 import dev.aster.vega.model.VegaValue
@@ -1175,7 +1175,7 @@ public class AxisBuilder(
       val resolved = Ticks.spanSpecifier(format, numeric.first(), numeric.last(), count)
       return { value ->
         val number = value.asDouble()
-        if (number.isNaN()) value.asString() else NumberFormatSubset.format(number, resolved)
+        if (number.isNaN()) value.asString() else NumberFormat.format(number, resolved)
       }
     }
     return when (scale) {
@@ -1377,7 +1377,7 @@ public class AxisBuilder(
       val high = scale.domain.lastOrNull() ?: 1.0
       if (specifier != null) {
         val resolved = Ticks.spanSpecifier(specifier, low, high, count)
-        return { value -> NumberFormatSubset.format(value.asDouble(), resolved) }
+        return { value -> NumberFormat.format(value.asDouble(), resolved) }
       }
       val step = Ticks.stepFrom(Ticks.tickIncrement(low, high, count))
       val precision = if (step.isFinite()) Ticks.precisionForStep(step) else 0
