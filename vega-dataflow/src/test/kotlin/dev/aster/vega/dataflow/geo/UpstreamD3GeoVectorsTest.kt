@@ -1,5 +1,6 @@
 package dev.aster.vega.dataflow.geo
 
+import dev.aster.vega.model.VegaValue
 import dev.aster.vega.model.toVegaValue
 import java.io.File
 import kotlin.math.abs
@@ -86,7 +87,7 @@ class UpstreamD3GeoVectorsTest {
             // The recorder captures a builder's *constructor* arguments, not the chain of `.step()`
             // and `.extent()` calls that configure it, so two vectors that differ only by
             // configuration are indistinguishable here. Replaying them would mean guessing.
-            in BUILDERS -> "$fn (the builder's configuration is not recorded)"
+            in BUILDERS -> "$fn (no circle generator here; Vega does not call one)"
             else -> fn
           },
           1,
@@ -94,6 +95,72 @@ class UpstreamD3GeoVectorsTest {
         )
         continue
       }
+      // A graticule is *configured before it is asked*, and the configuration is the recorded
+      // `chain` — `[["extent", [[[-90,-45],[90,45]]]], ["step", [[45,45]]]]`. Replaying it means
+      // replaying those calls in order and only then asking the question in `method`.
+      if (fn == "geoGraticule()") {
+        val graticule = Graticule()
+        var understood = true
+        for (step in (vector["chain"] as? JsonArray).orEmpty()) {
+          val parts = step as? JsonArray ?: continue
+          val call = (parts.firstOrNull() as? JsonPrimitive)?.content
+          val given = (parts.getOrNull(1) as? JsonArray)?.getOrNull(0)
+          val box = corners(given)
+          val pair = (given as? JsonArray)?.mapNotNull { number(it) }?.takeIf { it.size == 2 }
+          when (call) {
+            "extent" ->
+              box?.let {
+                graticule.extentMajor(it[0], it[1], it[2], it[3])
+                graticule.extentMinor(it[0], it[1], it[2], it[3])
+              } ?: run { understood = false }
+            "extentMajor" ->
+              box?.let { graticule.extentMajor(it[0], it[1], it[2], it[3]) }
+                ?: run { understood = false }
+            "extentMinor" ->
+              box?.let { graticule.extentMinor(it[0], it[1], it[2], it[3]) }
+                ?: run { understood = false }
+            "step" ->
+              pair?.let {
+                graticule.stepMajor(it[0], it[1])
+                graticule.stepMinor(it[0], it[1])
+              } ?: run { understood = false }
+            "stepMajor" ->
+              pair?.let { graticule.stepMajor(it[0], it[1]) } ?: run { understood = false }
+            "stepMinor" ->
+              pair?.let { graticule.stepMinor(it[0], it[1]) } ?: run { understood = false }
+            "precision" ->
+              number(given)?.let { graticule.precision(it) } ?: run { understood = false }
+            else -> understood = false
+          }
+        }
+        if (!understood) {
+          unmapped.merge("$fn (a configuring call this adapter does not know)", 1, Int::plus)
+          continue
+        }
+        val asked = vector["method"]?.jsonPrimitive?.content
+        val ours =
+          when (asked) {
+            null -> graticule.multiLineString()
+            "lines" -> graticule.lineStrings()
+            "outline" -> graticule.outline()
+            "precision" -> VegaValue.Num(graticule.precisionValue())
+            "extentMajor" -> box(graticule.extentMajorValue())
+            "extentMinor" -> box(graticule.extentMinorValue())
+            "stepMajor" -> pair(graticule.stepMajorValue())
+            "stepMinor" -> pair(graticule.stepMinorValue())
+            else -> null
+          }
+        if (ours == null) {
+          unmapped.merge("$fn.$asked", 1, Int::plus)
+          continue
+        }
+        replayed++
+        val expected = vector["result"]?.toVegaValue() ?: VegaValue.Null
+        if (!alike(expected, ours))
+          failures.add("$fn.${asked ?: "(call)"}: upstream $expected, ours $ours")
+        continue
+      }
+
       // A rotation compares numbers rather than measuring a geometry, so it is answered first.
       if (fn == "geoRotation()") {
         val angles =
@@ -218,12 +285,59 @@ class UpstreamD3GeoVectorsTest {
       }
 
     assertEquals(emptyList<String>(), failures.take(12), "d3-geo disagrees with this engine")
-    assertTrue(replayed >= 140, "only $replayed vectors replayed; the harness must not shrink")
+    assertTrue(replayed >= 155, "only $replayed vectors replayed; the harness must not shrink")
   }
+
+  /** `[[x0, y0], [x1, y1]]` as a flat box, which is how this engine passes an extent. */
+  private fun corners(element: kotlinx.serialization.json.JsonElement?): DoubleArray? {
+    val outer = element as? JsonArray ?: return null
+    val low = (outer.getOrNull(0) as? JsonArray)?.mapNotNull { number(it) } ?: return null
+    val high = (outer.getOrNull(1) as? JsonArray)?.mapNotNull { number(it) } ?: return null
+    if (low.size != 2 || high.size != 2) return null
+    return doubleArrayOf(low[0], low[1], high[0], high[1])
+  }
+
+  private fun box(values: DoubleArray): VegaValue =
+    VegaValue.Arr(
+      listOf(
+        VegaValue.Arr(listOf(VegaValue.Num(values[0]), VegaValue.Num(values[1]))),
+        VegaValue.Arr(listOf(VegaValue.Num(values[2]), VegaValue.Num(values[3]))),
+      )
+    )
+
+  private fun pair(values: DoubleArray): VegaValue =
+    VegaValue.Arr(listOf(VegaValue.Num(values[0]), VegaValue.Num(values[1])))
+
+  /**
+   * Two values equal to within the same tolerance the scalars use, structure included.
+   *
+   * A graticule answer is thousands of coordinates deep, so comparing the rendered text would fail
+   * on the last digit of one point in a grid that is otherwise identical.
+   */
+  private fun alike(expected: VegaValue, ours: VegaValue): Boolean =
+    when {
+      expected is VegaValue.Num && ours is VegaValue.Num -> near(ours.value, expected.value)
+      expected is VegaValue.Str && ours is VegaValue.Str -> expected.value == ours.value
+      expected is VegaValue.Arr && ours is VegaValue.Arr ->
+        expected.values.size == ours.values.size &&
+          expected.values.indices.all { alike(expected.values[it], ours.values[it]) }
+      expected is VegaValue.Obj && ours is VegaValue.Obj ->
+        expected.fields.keys == ours.fields.keys &&
+          expected.fields.all { (key, value) -> alike(value, ours.fields.getValue(key)) }
+      else -> expected == ours
+    }
 
   private companion object {
     val REPLAYED =
-      setOf("geoArea", "geoBounds", "geoCentroid", "geoLength", "geoRotation()", "geoStream")
+      setOf(
+        "geoArea",
+        "geoBounds",
+        "geoCentroid",
+        "geoGraticule()",
+        "geoLength",
+        "geoRotation()",
+        "geoStream",
+      )
 
     /** Counts what a sink is asked to draw, so a walk can be checked for having happened. */
     private class CountingSink : GeoStream() {
@@ -237,6 +351,6 @@ class UpstreamD3GeoVectorsTest {
     /** Recorded because they are in the package, but nothing in Vega reaches them. */
     val NOT_VEGA_S = setOf("geoContains", "geoDistance", "geoInterpolate", "geoInterpolate()")
 
-    val BUILDERS = setOf("geoGraticule()", "geoCircle()", "geoGraticule", "geoCircle")
+    val BUILDERS = setOf("geoCircle()", "geoCircle")
   }
 }

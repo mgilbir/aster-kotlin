@@ -873,12 +873,8 @@ empty coordinate arrays, points carrying an elevation — and upstream walks eve
 reports nothing. The sink it was handed is recorded as an empty object, so what is replayable is the
 part that matters: that none of them is an error. All 22 walk.
 
-The 32 `geoGraticule()` and `geoCircle()` vectors cannot be replayed **as recorded**, and the reason
-is worth writing down rather than filing under "unmapped": the recorder captures a builder's
-constructor arguments and its chain, but these are configured by calls the chain did not catch, so
-sixteen graticules that differ only by `.step()` and `.extent()` all arrive as `geoGraticule()` with
-no arguments. Two vectors that differ only by configuration are indistinguishable, and replaying
-them would mean guessing which is which from the answer.
+The 32 `geoGraticule()` and `geoCircle()` vectors looked unreplayable here, and that claim was
+**wrong** — see the section below. The recorder had captured their configuration all along.
 
 **And an adapter bug that looked exactly like an engine bug.** One rotation vector disagreed, and
 not subtly — upstream mapped the point to the origin where this engine turned it a hundred degrees.
@@ -890,6 +886,34 @@ That is a mistake with reach, so the other adapters were audited for it. Only th
 `UpstreamD3ScaleVectorsTest` reads the field, and the two remaining packages with `method` vectors
 — `d3-array`'s `bin()` and `d3-time`'s `timeInterval()`, both built from anonymous functions a
 vector cannot record — are already counted as unmapped rather than replayed.
+
+## The chain was in the file the whole time
+
+The previous section claimed the recorder could not capture how a builder is configured, so the
+graticule and circle vectors were unreplayable. That was wrong, and wrong in the same way as the
+rotation bug two paragraphs above it: a recorded vector carries a **`chain`** field —
+`[["extent", [[[-90,-45],[90,45]]]], ["step", [[45,45]]], ["precision", [3]]]` — and the claim came
+from printing `constructedWith` and not looking further. No recorder work was needed. The work was
+an adapter that reads the field.
+
+With that, all 16 graticule vectors replay and d3-geo reaches **160 of 236**, clean. Three things
+had to be added to `Graticule` for the corpus to reach them: `outline()`, `lineStrings()`, and the
+getters d3 answers when a setter is called with no argument. The outline is the one worth a note —
+down the western meridian, east along the northern parallel, back up the eastern one and west along
+the southern, each leg dropping its first point because the previous leg already ended there.
+
+The remaining 76 are now fully accounted for rather than merely counted: 55 are functions nothing in
+Vega calls (`geoContains` 42, `geoInterpolate` 10, `geoDistance` 3), 16 are `geoCircle`, which has no
+generator here because Vega does not call one either, and 5 are constructors and one non-geometry
+argument.
+
+**The lesson is diagnostic, and it is now a test.** `UpstreamVectorShapeTest` asserts the recorder
+emits only fields someone has considered, so a *new* one fails the build rather than being silently
+dropped by fifteen adapters. What it cannot catch is an adapter ignoring a field that already
+exists — for that the rule is the one the rotation vector taught, and it is written where the next
+person will read it: **a structural disagreement is an adapter bug until proven otherwise.** A
+hundred degrees of rotation is not a rounding error, and no engine gets a formula that wrong while
+getting the other eight vectors exactly right.
 
 ## Where the remaining packages stand
 
