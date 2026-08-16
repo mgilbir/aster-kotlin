@@ -1015,6 +1015,27 @@ d3-array stands at 303 replayed. Most of the remainder is genuinely not this eng
 orders nulls rather than answering NaN; `range`, `mode`, `greatest` and the index variants have no
 counterpart here because Vega does not route through them.
 
+## The seeded generator, verified draw by draw
+
+`vega-statistics` read **13 of 9,820** replayed, which looked like the worst-covered package by a
+wide margin. 9,708 of those vectors are one thing: `randomLCG()` called in a loop from a single
+seed. They are now replayed as **one sequence** — the file holds them in call order, so the nth
+vector is the nth draw — and all 9,708 reproduce exactly.
+
+That is worth more than the count suggests. The generator's arithmetic is the whole point:
+`1103515245 * seed` reaches past 2^53, so JavaScript loses low bits, and every value after the first
+is a property of that loss. Computing it exactly — in a `Long`, say — gives a better generator and
+the wrong one, and a `sample` transform that draws a different subset draws a different chart. The
+engine already had this right, deliberately and with a comment saying why; it had simply never been
+checked against upstream's own output. Now it is, to the last bit, nine thousand times.
+
+The distribution functions came with it: `densityNormal`, `cumulativeNormal`, `quantileNormal` and
+the log-normal and uniform families, which are what a `density` transform draws a violin plot from.
+**9,763 of 9,820**, clean.
+
+What is left is the sampling side — `randomNormal`, `randomKDE`, `sampleCurve`, `dotbin` — whose
+vectors record a returned *object of functions* rather than an answer.
+
 ## Where the remaining packages stand
 
 Replayed: `d3-time` (366), `d3-array` (252), `d3-color` (34), `vega-time` (281), `vega-transforms`

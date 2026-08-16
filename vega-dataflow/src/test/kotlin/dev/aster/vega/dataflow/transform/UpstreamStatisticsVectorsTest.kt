@@ -1,5 +1,7 @@
 package dev.aster.vega.dataflow.transform
 
+import dev.aster.vega.expression.RandomStream
+import dev.aster.vega.expression.Statistics
 import java.io.File
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
@@ -59,6 +61,8 @@ class UpstreamStatisticsVectorsTest {
   @Test
   fun `vega-statistics' own bin and quantile vectors replay against this engine`() {
     var replayed = 0
+    // One generator per seed, so a sequence of draws is replayed as a sequence.
+    val lcgStreams = mutableMapOf<Double, RandomStream>()
     val unmapped = mutableMapOf<String, Int>()
     val failures = mutableListOf<String>()
 
@@ -70,6 +74,60 @@ class UpstreamStatisticsVectorsTest {
         continue
       }
       when (fn) {
+        // The seeded generator, replayed as **one sequence**: all 9,708 draws share the seed
+        // 123456789 and the file holds them in call order, so the nth vector is the nth draw. The
+        // arithmetic is the point — `1103515245 * seed` reaches past 2^53, so JavaScript loses low
+        // bits and the whole sequence is a property of that loss. Computing it exactly would give a
+        // better generator and the wrong one, and this is what makes a `sample` transform
+        // reproduce.
+        "randomLCG()" -> {
+          val seed = (vector["constructedWith"] as? JsonArray)?.getOrNull(0)?.let { number(it) }
+          if (seed == null) {
+            unmapped.merge("randomLCG() (no seed recorded)", 1, Int::plus)
+            continue
+          }
+          val stream = lcgStreams.getOrPut(seed) { RandomStream(seed.toLong()) }
+          val drawn = stream.next()
+          val answer = number(vector["result"]) ?: continue
+          replayed++
+          if (show(drawn) != show(answer))
+            failures.add("randomLCG($seed) draw ${replayed}: upstream $answer, ours $drawn")
+        }
+        "densityNormal",
+        "cumulativeNormal",
+        "quantileNormal",
+        "densityLogNormal",
+        "cumulativeLogNormal",
+        "quantileLogNormal",
+        "densityUniform",
+        "cumulativeUniform",
+        "quantileUniform" -> {
+          val x = number(args.getOrNull(0))
+          if (x == null) {
+            unmapped.merge("$fn (the argument is not a number)", 1, Int::plus)
+            continue
+          }
+          // Upstream's defaults are 0 and 1 for the two normals and 0 and 1 for the uniform's
+          // bounds, and the tests mostly leave them alone.
+          val a = number(args.getOrNull(1))
+          val b = number(args.getOrNull(2))
+          val answer = number(vector["result"]) ?: continue
+          val ours =
+            when (fn) {
+              "densityNormal" -> Statistics.densityNormal(x, a ?: 0.0, b ?: 1.0)
+              "cumulativeNormal" -> Statistics.cumulativeNormal(x, a ?: 0.0, b ?: 1.0)
+              "quantileNormal" -> Statistics.quantileNormal(x, a ?: 0.0, b ?: 1.0)
+              "densityLogNormal" -> Statistics.densityLogNormal(x, a ?: 0.0, b ?: 1.0)
+              "cumulativeLogNormal" -> Statistics.cumulativeLogNormal(x, a ?: 0.0, b ?: 1.0)
+              "quantileLogNormal" -> Statistics.quantileLogNormal(x, a ?: 0.0, b ?: 1.0)
+              "densityUniform" -> Statistics.densityUniform(x, a ?: 0.0, b ?: 1.0)
+              "cumulativeUniform" -> Statistics.cumulativeUniform(x, a ?: 0.0, b ?: 1.0)
+              else -> Statistics.quantileUniform(x, a ?: 0.0, b ?: 1.0)
+            }
+          replayed++
+          if (show(answer) != show(ours))
+            failures.add("$fn($x, $a, $b): upstream $answer, ours $ours")
+        }
         "bin" -> {
           val params = args.getOrNull(0) as? JsonObject ?: continue
           val extent = params["extent"] as? JsonArray
@@ -157,7 +215,7 @@ class UpstreamStatisticsVectorsTest {
       }
 
     assertEquals(emptyList<String>(), failures.take(10), "vega-statistics disagrees")
-    assertTrue(replayed >= 12, "only $replayed vectors replayed; the harness must not shrink")
+    assertTrue(replayed >= 9750, "only $replayed vectors replayed; the harness must not shrink")
   }
 
   private fun show(value: Double?): String =
