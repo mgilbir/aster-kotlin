@@ -60,6 +60,14 @@ class UpstreamD3ScaleVectorsTest {
       else -> null
     }
 
+  /** A recorded `Date` as epoch milliseconds. */
+  private fun instant(element: kotlinx.serialization.json.JsonElement?): Double? =
+    (element as? JsonObject)
+      ?.takeIf { it["\$"]?.jsonPrimitive?.content == "date" }
+      ?.get("epochMillis")
+      ?.jsonPrimitive
+      ?.doubleOrNull
+
   private fun numbers(element: kotlinx.serialization.json.JsonElement?): List<Double>? =
     (element as? JsonArray)?.map { number(it) ?: return null }
 
@@ -91,6 +99,11 @@ class UpstreamD3ScaleVectorsTest {
     val config = Config()
     fun setDomain(element: kotlinx.serialization.json.JsonElement?): Boolean {
       val array = element as? JsonArray ?: return false
+      // A time scale's domain is `Date`s, recorded as `{"$": "date", "epochMillis": …}`; this
+      // engine
+      // holds instants as milliseconds, which is the same number.
+      val dates = array.map { instant(it) }
+      if (dates.all { it != null }) config.domainNumbers = dates.filterNotNull()
       numbers(array)?.let { config.domainNumbers = it }
       config.domainStrings = array.map { (it as? JsonPrimitive)?.content ?: return false }
       return true
@@ -220,16 +233,50 @@ class UpstreamD3ScaleVectorsTest {
           }
         show(scale.scale(VegaValue.Str(at)).asDouble())
       }
+      "scaleTime",
+      "scaleUtc" -> {
+        // A time scale is a linear scale over instants; the zone is the whole difference between
+        // the
+        // two names, and it decides where a tick lands rather than where a value does.
+        if (range.size != 2 || (config.domainNumbers?.size ?: 0) != 2) return null
+        val zone =
+          if (kind == "scaleUtc") kotlinx.datetime.TimeZone.UTC
+          else kotlinx.datetime.TimeZone.currentSystemDefault()
+        val scale =
+          TimeScale("replay", config.domainNumbers!!, range, zone = zone, clamp = config.clamp)
+        when (method) {
+          "(call)" ->
+            (instant(args.getOrNull(0)) ?: number(args.getOrNull(0)))?.let {
+              show(scale.scale(VegaValue.Num(it)).asDouble())
+            }
+          "invert" -> number(args.getOrNull(0))?.let { show(scale.invert(it)) }
+          else -> null
+        }
+      }
+      "scaleOrdinal" -> {
+        val values = config.domainStrings ?: return null
+        val outputs = config.rangeValues ?: return null
+        if (method != "(call)") return null
+        val at = (args.getOrNull(0) as? JsonPrimitive)?.content ?: return null
+        val answered = OrdinalScale("replay", values, outputs).scale(VegaValue.Str(at))
+        if (answered is VegaValue.Str) answered.value else show(answered.asDouble())
+      }
+      "scaleQuantile",
       "scaleQuantize",
       "scaleThreshold" -> {
         val values = config.rangeValues ?: return null
         if (method != "(call)") return null
         val at = number(args.getOrNull(0)) ?: return null
         val scale =
-          if (kind == "scaleQuantize") {
-            QuantizeScale("replay", config.domainNumbers ?: listOf(0.0, 1.0), values)
-          } else {
-            ThresholdScale("replay", config.domainNumbers ?: emptyList(), values)
+          when (kind) {
+            "scaleQuantize" ->
+              QuantizeScale("replay", config.domainNumbers ?: listOf(0.0, 1.0), values)
+            // A quantile scale's domain is the **samples themselves**, not an extent: the cut
+            // points
+            // are its quantiles, which is why a skewed column gets narrow buckets where it is
+            // dense.
+            "scaleQuantile" -> QuantileScale("replay", config.domainNumbers ?: return null, values)
+            else -> ThresholdScale("replay", config.domainNumbers ?: emptyList(), values)
           }
         val answered = scale.scale(VegaValue.Num(at))
         if (answered is VegaValue.Str) answered.value else show(answered.asDouble())
@@ -330,7 +377,7 @@ class UpstreamD3ScaleVectorsTest {
       failures.map { it.substringBefore(": upstream") }.sorted(),
       "the set of scale divergences changed; update known-divergences.json",
     )
-    assertTrue(replayed >= 109, "only $replayed vectors replayed; the harness must not shrink")
+    assertTrue(replayed >= 130, "only $replayed vectors replayed; the harness must not shrink")
   }
 
   private fun describe(chain: JsonArray?): String =
@@ -368,6 +415,10 @@ class UpstreamD3ScaleVectorsTest {
         "scalePoint",
         "scaleQuantize",
         "scaleThreshold",
+        "scaleQuantile",
+        "scaleOrdinal",
+        "scaleTime",
+        "scaleUtc",
       )
     const val DEFAULT_TICKS = 10
     const val DEFAULT_NICE = 10
