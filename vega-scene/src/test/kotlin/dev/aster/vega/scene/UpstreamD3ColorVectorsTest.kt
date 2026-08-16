@@ -84,7 +84,11 @@ class UpstreamD3ColorVectorsTest {
       // comparison scales rather than pretending the two agree. Rounded to six decimals because a
       // percentage colour is fractional on both sides — `rgb(12%,...)` is 30.6, and 0.12 * 255 is
       // 30.599999999999998.
-      val parsed = SceneColor.parse(text)
+      // Compared against the **strict** acceptance, because this corpus is d3's parser and that is
+      // this engine's equivalent of it. [SceneColor.parse] deliberately takes a superset for the
+      // renderer's sake, and testing it here was comparing two functions that were never meant to
+      // agree — thirteen pinned "divergences" that were really a mismatched comparison.
+      val parsed = if (SceneColor.acceptedByD3(text)) SceneColor.parse(text) else null
       val actual =
         parsed?.let {
           listOf(it.red * 255.0, it.green * 255.0, it.blue * 255.0, it.alpha).joinToString(",") { c

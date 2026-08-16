@@ -1036,6 +1036,28 @@ the log-normal and uniform families, which are what a `density` transform draws 
 What is left is the sampling side — `randomNormal`, `randomKDE`, `sampleCurve`, `dotbin` — whose
 vectors record a returned *object of functions* rather than an answer.
 
+## Twelve divergences that were a mismatched comparison
+
+The colour ledger carried thirteen pinned divergences with a careful note explaining that this
+engine's CSS parser accepts a **superset** of what d3-color accepts — `rgb(120.5,30,50)` draws in a
+browser, so refusing it would lose a mark over a decimal point. The note was right about the parser
+and wrong about what to do with it: the d3-color corpus is *d3's parser*, and comparing it against
+this engine's deliberately-permissive **renderer** parser was comparing two functions that were
+never meant to agree. Twelve of the thirteen were that, and they are gone.
+
+The note also conceded a real consequence and left it: `luminance()` and `contrast()` are d3-color
+calls upstream, so for a string d3 refuses they answer **NaN**, where this engine answered a
+plausible number computed from a string upstream never read. `SceneColor.acceptedByD3` is d3's
+grammar transcribed — its integer form takes no fraction, its number form needs a digit after the
+point, and neither tolerates a space before the bracket — and those two functions now go through it
+while the renderer keeps taking what a browser takes. Two acceptances, each right where it is used.
+A validator rather than a second parser, because wherever d3 *does* accept a string the two already
+agree on the channels; only the boundary differed.
+
+One divergence survives, and it is a different kind: `rgba(0,0,0,0)`. d3 blanks the channels when
+the opacity is zero — `r = g = b = NaN` for `a <= 0` — where this engine keeps the zeros. Nothing
+downstream reads them, and its note now says that rather than the superset story it inherited.
+
 ## Where the remaining packages stand
 
 Replayed: `d3-time` (366), `d3-array` (252), `d3-color` (34), `vega-time` (281), `vega-transforms`

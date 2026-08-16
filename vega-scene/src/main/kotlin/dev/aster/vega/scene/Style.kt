@@ -108,6 +108,50 @@ public data class SceneColor(
       return NAMED_COLORS[value.lowercase()]?.let { fromArgb(it or ALPHA_OPAQUE) }
     }
 
+    /**
+     * Whether **d3-color** would accept this string, which is narrower than [parse] accepts.
+     *
+     * [parse] feeds a renderer, and a renderer should take what a browser takes: `rgb(120.5,30,50)`
+     * draws, so refusing it would lose a mark over a decimal point. d3's grammar is stricter — its
+     * integer form is `[+-]?\d+` with no fraction, its number form needs a digit after the point,
+     * and neither tolerates a space before the bracket — and `luminance()` and `contrast()` are
+     * *d3-color calls* upstream, so for those two the strict answer is the correct one: NaN, not a
+     * plausible number computed from a string upstream never read.
+     *
+     * A validator rather than a second parser, because wherever d3 does accept a string the two
+     * agree on the channels; only the accept/reject boundary differs.
+     */
+    public fun acceptedByD3(text: String): Boolean {
+      val value = text.trim().lowercase()
+      if (value == "transparent") return true
+      if (value.startsWith("#")) {
+        // Three, four, six or eight hex digits; the regex admits three to eight and the lengths
+        // between are answered null.
+        val digits = value.substring(1)
+        return digits.length in setOf(3, 4, 6, 8) && digits.all { it.digitToIntOrNull(16) != null }
+      }
+      if (D3_FUNCTIONAL.any { it.matches(value) }) return true
+      return NAMED_COLORS.containsKey(value)
+    }
+
+    /**
+     * d3-color's own grammar, transcribed: `reI` for integers, `reN` for numbers, `reP` for
+     * percentages, and no space between the name and its bracket.
+     */
+    private val D3_FUNCTIONAL: List<Regex> = run {
+      val i = """\s*([+-]?\d+)\s*"""
+      val n = """\s*([+-]?(?:\d*\.)?\d+(?:[eE][+-]?\d+)?)\s*"""
+      val p = """\s*([+-]?(?:\d*\.)?\d+(?:[eE][+-]?\d+)?)%\s*"""
+      listOf(
+        Regex("""^rgb\($i,$i,$i\)$"""),
+        Regex("""^rgb\($p,$p,$p\)$"""),
+        Regex("""^rgba\($i,$i,$i,$n\)$"""),
+        Regex("""^rgba\($p,$p,$p,$n\)$"""),
+        Regex("""^hsl\($n,$p,$p\)$"""),
+        Regex("""^hsla\($n,$p,$p,$n\)$"""),
+      )
+    }
+
     private fun parseHex(hex: String): SceneColor? {
       fun nibble(c: Char): Int? = c.digitToIntOrNull(16)
       return when (hex.length) {

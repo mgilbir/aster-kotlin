@@ -1080,6 +1080,12 @@ public object Functions {
 
   /** The WCAG relative luminance of a colour name, shared by `luminance` and `contrast`. */
   private fun relativeLuminance(text: String): Double {
+    // Strictly, because upstream's `luminance` is a **d3-color call**. This engine's renderer
+    // parser takes a superset — `rgb(120.5,30,50)` draws in a browser, so refusing it would lose a
+    // mark over a decimal point — but d3 reads that string as nothing, and answering a plausible
+    // number where upstream answers NaN is worse than answering nothing. Two acceptances, each
+    // right where it is used.
+    if (!SceneColor.acceptedByD3(text)) return Double.NaN
     val color = SceneColor.parse(text)
     if (color == null || color.alpha <= 0.0) return Double.NaN
     return 0.2126 * expandGamma(color.red) +
