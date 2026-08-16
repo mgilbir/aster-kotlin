@@ -140,6 +140,7 @@ function recordExports(moduleNamespace, packageName, calls) {
     // is noted and not pretended about.
     wrapped[name] = new Proxy(value, {
       apply(target, thisArg, args) {
+        const encodedArgs = args.map(a => encode(a));
         let result, threw = null;
         try {
           result = Reflect.apply(target, thisArg, args);
@@ -149,7 +150,7 @@ function recordExports(moduleNamespace, packageName, calls) {
         pushCall(calls, {
           package: packageName,
           fn: name,
-          args: args.map(a => encode(a)),
+          args: encodedArgs,
           ...(threw ? {threw: threw.message.split('\n')[0]} : {result: encode(result)}),
         });
         if (threw) throw threw;
@@ -186,7 +187,7 @@ function recordExports(moduleNamespace, packageName, calls) {
           pushCall(calls, {
             package: packageName,
             fn: `${name}.${key}`,
-            args: args.map(a => encode(a)),
+            args: encodedArgs,
             ...(threw ? {threw: threw.message.split('\n')[0]} : {result: encode(result)}),
           });
           if (threw) throw threw;
@@ -382,6 +383,10 @@ function chainOf(target) {
 function applied(fn, packageName, name, constructedWith, calls) {
   return new Proxy(fn, {
     apply(target, thisArg, args) {
+      // Encoded **before** the call, because a function may mutate what it was handed and some
+      // do: `boundStroke(bounds, item)` expands `bounds` in place and returns it, so encoding
+      // afterwards recorded the answer as the question and lost the input entirely.
+      const encodedArgs = args.map(a => encode(a));
       let result, threw = null;
       try {
         result = Reflect.apply(target, thisArg, args);
@@ -395,7 +400,7 @@ function applied(fn, packageName, name, constructedWith, calls) {
 ...(chainOf(target).length
           ? {chain: chainOf(target).map(([m, a]) => [m, a.map(v => encode(v))])}
           : {}),
-        args: args.map(a => encode(a)),
+        args: encodedArgs,
         ...(threw ? {threw: threw.message.split('\n')[0]} : {result: encode(result)}),
       });
       if (threw) throw threw;
@@ -406,6 +411,7 @@ function applied(fn, packageName, name, constructedWith, calls) {
       if (typeof property !== 'function' || typeof key !== 'string') return property;
       if (key === 'constructor' || key.startsWith('_') || key in Function.prototype) return property;
       return function (...args) {
+        const encodedArgs = args.map(a => encode(a));
         let result, threw = null;
         try {
           result = property.apply(target, args);
@@ -421,7 +427,7 @@ function applied(fn, packageName, name, constructedWith, calls) {
           ? {chain: chainOf(target).map(([m, a]) => [m, a.map(v => encode(v))])}
           : {}),
             method: key,
-            args: args.map(a => encode(a)),
+            args: encodedArgs,
             threw: threw.message.split('\n')[0],
           });
           throw threw;
@@ -442,7 +448,7 @@ function applied(fn, packageName, name, constructedWith, calls) {
           ? {chain: chainOf(target).map(([m, a]) => [m, a.map(v => encode(v))])}
           : {}),
           method: key,
-          args: args.map(a => encode(a)),
+          args: encodedArgs,
           result: encode(result),
         });
         return result;

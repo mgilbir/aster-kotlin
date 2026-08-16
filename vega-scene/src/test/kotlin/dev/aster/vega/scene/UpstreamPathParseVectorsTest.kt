@@ -116,6 +116,62 @@ class UpstreamPathParseVectorsTest {
     val failures = mutableListOf<String>()
 
     for (vector in vectors) {
+      // `boundStroke` decides how far a stroke reaches past its geometry, which is what a mark's
+      // bounds are made of — and bounds drive layout, autosize and clipping, so being short here
+      // crops a chart rather than merely mismeasuring one.
+      if (vector["fn"]?.jsonPrimitive?.content == "boundStroke") {
+        val args = vector["args"] as? JsonArray
+        val box = args?.getOrNull(0) as? JsonObject
+        val item = args?.getOrNull(1) as? JsonObject
+        val answer = vector["result"] as? JsonObject
+        if (box == null || item == null || answer == null) {
+          unmapped.merge("boundStroke (not a box and an item)", 1, Int::plus)
+          continue
+        }
+        fun side(of: JsonObject, key: String) = (of[key] as? JsonPrimitive)?.doubleOrNull
+        val x1 = side(box, "x1")
+        val y1 = side(box, "y1")
+        val x2 = side(box, "x2")
+        val y2 = side(box, "y2")
+        if (x1 == null || y1 == null || x2 == null || y2 == null) continue
+        val stroke =
+          (item["stroke"] as? JsonPrimitive)?.let {
+            Stroke(
+              paint = ScenePaint.Solid(SceneColor.parse("red")!!),
+              width = side(item, "strokeWidth") ?: 1.0,
+              cap =
+                when ((item["strokeCap"] as? JsonPrimitive)?.content) {
+                  "square" -> StrokeCap.SQUARE
+                  "round" -> StrokeCap.ROUND
+                  else -> StrokeCap.BUTT
+                },
+              join =
+                when ((item["strokeJoin"] as? JsonPrimitive)?.content) {
+                  "round" -> StrokeJoin.ROUND
+                  "bevel" -> StrokeJoin.BEVEL
+                  else -> StrokeJoin.MITER
+                },
+              miterLimit = side(item, "strokeMiterLimit") ?: 4.0,
+              opacity = side(item, "strokeOpacity") ?: 1.0,
+            )
+          }
+        // Upstream bounds a group, a rect and a rule *without* the join allowance and the
+        // path-like marks with it, and the vector does not record which of the two callers it came
+        // from. The recorded growth says which: anything wider than the cap allowance alone had the
+        // join allowance applied.
+        val opacity = side(item, "opacity") ?: 1.0
+        val widened = stroke.wideningAt(opacity)
+        val expected =
+          listOf(side(answer, "x1"), side(answer, "y1"), side(answer, "x2"), side(answer, "y2"))
+        val grew = x1 - (expected[0] ?: x1)
+        val miter = widened != null && grew > widened.boundsExpansion() + 1e-9
+        val e = widened?.boundsExpansion(miter) ?: 0.0
+        replayed++
+        val ours = listOf(x1 - e, y1 - e, x2 + e, y2 + e)
+        if (expected.indices.any { kotlin.math.abs((expected[it] ?: 0.0) - ours[it]) > 1e-9 })
+          failures.add("boundStroke($item): upstream $expected, ours $ours")
+        continue
+      }
       if (vector["fn"]?.jsonPrimitive?.content != "pathParse") {
         unmapped.merge(vector["fn"]?.jsonPrimitive?.content ?: "?", 1, Int::plus)
         continue

@@ -2,6 +2,7 @@ package dev.aster.vega.scene
 
 import kotlin.jvm.JvmInline
 import kotlin.math.roundToInt
+import kotlin.math.sqrt
 
 /** Non-premultiplied sRGB colour with components in `0..1`. */
 public data class SceneColor(
@@ -464,6 +465,9 @@ public sealed interface ScenePaint {
   }
 }
 
+/** `√2`, the reach of a square cap on a diagonal, as a fraction of the stroke width. */
+private val SQRT2: Double = sqrt(2.0)
+
 public enum class StrokeCap {
   BUTT,
   ROUND,
@@ -505,6 +509,25 @@ public data class Stroke(
   /** Half the stroke width, i.e. how far a stroke extends beyond the geometry it outlines. */
   public val halfWidth: Double
     get() = width / 2.0
+
+  /**
+   * How far this stroke reaches past its geometry — upstream's `boundStroke`, whole.
+   *
+   * Two allowances beyond half the width, and both are geometry rather than fudge. A **square cap**
+   * on a diagonal segment projects from the corner of the cap, so it reaches `√2/2` of the width
+   * rather than a half — this engine had that nowhere, which under-measured every square-capped
+   * rule and line. A **miter join** runs the tips of two segments together and can reach
+   * `miterLimit/2` widths past the vertex, which is why a triangle's point stays inside its own
+   * bounds; that one was already applied to paths and symbols, but as a bare product rather than
+   * upstream's `max`, so a miter limit below one would have pulled the bounds *inside* the stroke.
+   *
+   * [miter] is false for the marks upstream bounds without the join allowance — a group, a rect, a
+   * rule — and true for the path-like ones, where a join can actually occur.
+   */
+  public fun boundsExpansion(miter: Boolean = false): Double {
+    val capped = (if (cap == StrokeCap.SQUARE) SQRT2 else 1.0) * halfWidth
+    return if (miter && join == StrokeJoin.MITER) maxOf(capped, miterLimit * halfWidth) else capped
+  }
 
   public companion object {
     /**
