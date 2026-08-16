@@ -75,6 +75,7 @@ class UpstreamD3ScaleVectorsTest {
   private class Config {
     var domainNumbers: List<Double>? = null
     var domainStrings: List<String>? = null
+    var domainQuoted = false
     var rangeNumbers: List<Double>? = null
     var rangeValues: List<VegaValue>? = null
     var clamp = false
@@ -106,6 +107,8 @@ class UpstreamD3ScaleVectorsTest {
       if (dates.all { it != null }) config.domainNumbers = dates.filterNotNull()
       numbers(array)?.let { config.domainNumbers = it }
       config.domainStrings = array.map { (it as? JsonPrimitive)?.content ?: return false }
+      // Whether the *JSON* held strings, which `"10"` parsing as a number would otherwise hide.
+      config.domainQuoted = array.all { (it as? JsonPrimitive)?.isString == true }
       return true
     }
     fun setRange(element: kotlinx.serialization.json.JsonElement?): Boolean {
@@ -165,8 +168,24 @@ class UpstreamD3ScaleVectorsTest {
     // usual default made every unconfigured log scale answer NaN.
     val domain =
       config.domainNumbers ?: if (kind == "scaleLog") listOf(1.0, 10.0) else listOf(0.0, 1.0)
-    val range = config.rangeNumbers ?: emptyList()
-    val niced = config.nice?.let { Ticks.nice(domain, it) } ?: domain
+    // d3's own default range is `[0, 1]`, and `ticks` never consults the range at all — so
+    // `scaleLinear().ticks(10)` is a perfectly ordinary question that this adapter was answering by
+    // building a scale with **no** range and letting the constructor throw. 135 vectors were lost
+    // that way, and lost quietly, because a throw was filed as "unmapped". A range that *was* given
+    // but is not numeric — a colour ramp — is a different case, and `rangeValues` tells them apart.
+    val range =
+      config.rangeNumbers ?: if (config.rangeValues == null) listOf(0.0, 1.0) else emptyList()
+    // `nice()` is **not one operation**: a log scale rounds outwards to powers of its base, where
+    // a linear one rounds to a tick step. Nicing a log domain linearly took `[1.5, 50]` to
+    // `[0, 50]`, and zero has no logarithm — so the scale answered NaN for every value.
+    val niced =
+      config.nice?.let {
+        if (kind == "scaleLog") Ticks.niceLog(domain, config.base) else Ticks.nice(domain, it)
+      } ?: domain
+    // Checked **before** building, not after. A range of colours or strings — `range(["red",
+    // "blue"])` — is a different scale here, and asking the continuous one for it threw out of the
+    // constructor rather than reaching the guard that meant to skip it.
+    if (kind in CONTINUOUS && (domain.size < 2 || range.size < 2)) return null
     val continuous: InvertibleScale? =
       when (kind) {
         "scaleLinear" ->
@@ -186,7 +205,9 @@ class UpstreamD3ScaleVectorsTest {
       // modelled apart as well. Both are counted rather than called divergences — and both apply
       // only to the *continuous* families, which is why the check sits here rather than above:
       // `quantize` and `threshold` are supposed to have value ranges.
-      if (domain.size != 2 || range.size != 2) return null
+      // A polylinear domain is no longer set aside: this engine interpolates piece by piece as
+      // upstream does, and takes `min(domain, range)` stops when the two differ in length.
+      if (domain.size < 2 || range.size < 2) return null
       return when (method) {
         "(call)" ->
           number(args.getOrNull(0))?.let { show(continuous.scale(VegaValue.Num(it)).asDouble()) }
@@ -327,11 +348,15 @@ class UpstreamD3ScaleVectorsTest {
         unmapped.merge("$kind.$method (an answer this comparison cannot render)", 1, Int::plus)
         continue
       }
+      // A throw is a **failure**, not a gap. Counting it as unmapped is the harness quietly
+      // excusing the engine, which is the one thing this comparison must never do: 135 crashes sat
+      // in the unmapped column looking like features nobody had ported.
       val actual = runCatching {
         answer(kind, method, config, args)
       }
         .getOrElse {
-          unmapped.merge("$kind.$method (threw: ${it::class.simpleName})", 1, Int::plus)
+          replayed++
+          failures.add("$kind.$method$args threw ${it::class.simpleName}: ${it.message}")
           continue
         }
       if (actual == null) {
@@ -377,7 +402,7 @@ class UpstreamD3ScaleVectorsTest {
       failures.map { it.substringBefore(": upstream") }.sorted(),
       "the set of scale divergences changed; update known-divergences.json",
     )
-    assertTrue(replayed >= 130, "only $replayed vectors replayed; the harness must not shrink")
+    assertTrue(replayed >= 330, "only $replayed vectors replayed; the harness must not shrink")
   }
 
   private fun describe(chain: JsonArray?): String =
@@ -401,6 +426,9 @@ class UpstreamD3ScaleVectorsTest {
     }
 
   private companion object {
+    /** The families this adapter builds as one continuous scale. */
+    val CONTINUOUS = setOf("scaleLinear", "scalePow", "scaleSqrt", "scaleLog", "scaleSymlog")
+
     val REPLAYED_METHODS = setOf("(call)", "invert", "ticks")
 
     /** The families this engine models the same way d3 does. */

@@ -915,6 +915,45 @@ person will read it: **a structural disagreement is an adapter bug until proven 
 hundred degrees of rotation is not a rounding error, and no engine gets a formula that wrong while
 getting the other eight vectors exactly right.
 
+## 135 crashes were sitting in the "unmapped" column
+
+`UpstreamD3ScaleVectorsTest` wrapped each replay in `runCatching` and filed a thrown exception as
+**unmapped** — the same column as "no equivalent scale here". So `scaleLinear.ticks (threw:
+IllegalArgumentException): 52` read like a feature nobody had ported, when it meant this engine
+crashed on `scaleLinear().ticks(10)`. A throw is a failure, not a gap, and counting it otherwise is
+the harness excusing the engine, which is the one thing this comparison must never do.
+
+With that changed, coverage went from **130 to 338** replayed and three real faults came out:
+
+- **A range longer than its domain threw.** d3 uses `min(domain.length, range.length)` stops, so
+  `domain([-10, 0]).range([0, 1, 2])` maps -5 to 0.5 and ignores the spare stop. This refused it
+  outright, which takes a whole chart down for a specification upstream draws — and a range with a
+  stop left over is an ordinary thing to have while editing one.
+- **No transformed scale was piecewise.** Log, power and symlog are upstream's `continuous()`
+  wearing a transform, so they take a domain of more than two stops exactly as a linear one does.
+  `TransformedScale` read only the first and last, so a three-stop power scale over `[4, 2, 1] ->
+  [1, 2, 4]` answered 3.5 for 1.5 where upstream answers 3 — interpolating straight across both
+  segments and ignoring the middle stop entirely.
+- **And it interpolated in the wrong arithmetic**, `r0 + u * (r1 - r0)` rather than d3's
+  `r0 * (1 - u) + r1 * u`. `LinearScale` already carries a comment about why that matters — the two
+  differ in the last bits, and an axis rounds ticks to whole pixels — but the transformed families
+  had never been given the same treatment.
+
+Two of the remaining differences were the *adapter* rather than the engine, and both were the kind
+that looks like a bug. It defaulted an unconfigured range to **empty** instead of d3's `[0, 1]` and
+built the scale before the guard meant to skip colour ranges; and it applied a **linear** `nice` to
+a log domain, which took `[1.5, 50]` to `[0, 50]`, and zero has no logarithm — so the scale answered
+NaN for everything.
+
+One divergence stands, pinned as it was: a threshold scale whose cut points are quoted strings, which
+d3 bisects lexicographically. That was already a deliberate entry in `known-divergences.json`, and
+reclassifying it as "not comparable" would have quietly downgraded a difference someone chose to
+record.
+
+`test-fixtures/specs/polylinear-scales.vg.json` pins the rest: at the middle domain stop every
+family lands exactly on the middle range stop, which is the property the old code could not have.
+181 fixtures.
+
 ## Where the remaining packages stand
 
 Replayed: `d3-time` (366), `d3-array` (252), `d3-color` (34), `vega-time` (281), `vega-transforms`

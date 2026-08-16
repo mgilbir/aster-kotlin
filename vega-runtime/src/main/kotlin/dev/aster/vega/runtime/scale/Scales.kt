@@ -121,10 +121,17 @@ public class LinearScale(
   init {
     require(domain.size >= 2) { "A linear scale needs at least two domain values, got $domain" }
     require(range.size >= 2) { "A linear scale needs at least two range values, got $range" }
-    require(domain.size == range.size || (domain.size == 2 && range.size == 2)) {
-      "Piecewise domain and range must have equal length: $domain vs $range"
-    }
   }
+
+  /**
+   * How many stops actually take part: `min(domain, range)`, which is d3's rule.
+   *
+   * A domain and a range of different lengths used to **throw** here, and upstream simply uses the
+   * shorter — `domain([-10, 0]).range([0, 1, 2])` maps -5 to 0.5, ignoring the third stop. Refusing
+   * it took the whole chart down for a specification upstream draws, and a range with a spare stop
+   * is an ordinary thing to write while editing one.
+   */
+  private val stops: Int = minOf(domain.size, range.size)
 
   override val bandwidth: Double
     get() = 0.0
@@ -142,17 +149,17 @@ public class LinearScale(
     if (x.isNaN()) return Double.NaN
     // A zero-extent domain has no gradient; d3 returns the range midpoint rather than dividing by
     // 0.
-    val d0 = domain.first()
-    val d1 = domain.last()
-    if (d0 == d1) return (range.first() + range.last()) / 2.0
+    val d0 = domain[0]
+    val d1 = domain[stops - 1]
+    if (d0 == d1) return (range[0] + range[stops - 1]) / 2.0
 
     val input = if (clamp) x.coerceIn(minOf(d0, d1), maxOf(d0, d1)) else x
-    if (domain.size == 2) return interpolate(d0, d1, range.first(), range.last(), input)
+    if (stops == 2) return interpolate(d0, d1, range[0], range[stops - 1], input)
 
     // Piecewise: find the segment containing the input, then interpolate within it.
-    val ascending = domain.last() > domain.first()
+    val ascending = d1 > d0
     var segment = 0
-    while (segment < domain.size - 2) {
+    while (segment < stops - 2) {
       val upper = domain[segment + 1]
       val past = if (ascending) input > upper else input < upper
       if (!past) break
@@ -185,7 +192,7 @@ public class LinearScale(
 
   /** The data value that maps to range position [y]. Only defined for a two-point domain. */
   override fun invert(position: Double): Double {
-    if (domain.size != 2 || range.size != 2) return Double.NaN
+    if (stops != 2) return Double.NaN
     val r0 = range[0]
     val r1 = range[1]
     if (r0 == r1) return Double.NaN
@@ -378,6 +385,9 @@ public abstract class TransformedScale(
     require(range.size >= 2) { "$name needs at least two range values, got $range" }
   }
 
+  /** How many stops take part: `min(domain, range)`, as in [LinearScale]. */
+  private val stops: Int = minOf(domain.size, range.size)
+
   /** The monotonic transform this scale interpolates in. */
   protected abstract fun forward(value: Double): Double
 
@@ -398,17 +408,45 @@ public abstract class TransformedScale(
 
   private fun unrounded(x: Double): Double {
     if (x.isNaN()) return Double.NaN
-    val d0 = forward(domain.first())
-    val d1 = forward(domain.last())
-    if (!d0.isFinite() || !d1.isFinite()) return Double.NaN
-    if (d0 == d1) return (range.first() + range.last()) / 2.0
+    val d0 = forward(domain[0])
+    val dn = forward(domain[stops - 1])
+    if (!d0.isFinite() || !dn.isFinite()) return Double.NaN
+    if (d0 == dn) return (range[0] + range[stops - 1]) / 2.0
 
-    val low = minOf(domain.first(), domain.last())
-    val high = maxOf(domain.first(), domain.last())
+    val low = minOf(domain[0], domain[stops - 1])
+    val high = maxOf(domain[0], domain[stops - 1])
     val input = if (clamp) x.coerceIn(low, high) else x
     val t = forward(input)
     if (!t.isFinite()) return Double.NaN
-    return range.first() + ((t - d0) / (d1 - d0)) * (range.last() - range.first())
+    if (stops == 2) return mix(d0, dn, range[0], range[stops - 1], t)
+
+    // **Piecewise, in the transformed space.** A log, power or symlog scale is upstream's
+    // `continuous()` wearing a transform, so it takes a domain of more than two stops exactly as a
+    // linear one does. This read only the first and last, which is not a rounding difference: a
+    // three-stop power scale over `[4, 2, 1] -> [1, 2, 4]` answered 3.5 for 1.5 where upstream
+    // answers 3, because it interpolated straight across both segments.
+    val ascending = dn > d0
+    var segment = 0
+    while (segment < stops - 2) {
+      val upper = forward(domain[segment + 1])
+      val past = if (ascending) t > upper else t < upper
+      if (!past) break
+      segment++
+    }
+    return mix(
+      forward(domain[segment]),
+      forward(domain[segment + 1]),
+      range[segment],
+      range[segment + 1],
+      t,
+    )
+  }
+
+  /** d3's `interpolateNumber`, in d3's arithmetic — see `LinearScale`. */
+  private fun mix(d0: Double, d1: Double, r0: Double, r1: Double, t: Double): Double {
+    if (d0 == d1) return (r0 + r1) / 2.0
+    val u = (t - d0) / (d1 - d0)
+    return r0 * (1.0 - u) + r1 * u
   }
 
   override fun invert(position: Double): Double {
