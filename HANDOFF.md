@@ -1116,6 +1116,32 @@ Both fixed, everything re-recorded, every ledger back to its previous figure or 
 `d3-dsv` gained 14 vectors the old recorder had been losing to the same mutation problem
 `boundStroke` exposed. 25,919 vectors.
 
+## A diverging colour scale nobody had to ask for
+
+`scaleDiverging` sat in the d3-scale ledger as "no equivalent scale here", 49 vectors, and that
+reading was wrong in an interesting way: **no specification ever names a diverging scale.** Vega
+composes the type itself. `scaleKey` in `vega-encode` looks at a continuous colour scale and
+prefixes `sequential-` for a two-point domain or `diverging-` for a three-point one, so
+`{"type": "linear", "domain": [-10, 0, 20], "range": {"scheme": "blueorange"}}` — the ordinary
+blue-white-red chart — *is* a diverging scale, and the specification says `linear`.
+
+This engine read the first and last domain values and interpolated between them, so the middle value
+landed wherever it fell arithmetically. For `[-10, 0, 20]`, zero came out a third of the way along
+the ramp and still blue, where upstream gives the near-white midpoint. The whole point of that chart
+is that the neutral colour sits at zero.
+
+The two halves scale independently, `0.5 / (mid - low)` below and `0.5 / (high - mid)` above, which
+is d3's `scaleDiverging`.
+
+One thing that had to be read rather than assumed: the gradient **legend** does not use the
+diverging position. Upstream's `scaleFraction` strips the `diverging-` prefix and places labels with
+a plain scale of the base type over the extent — the gradient carries the asymmetry in its colour
+stops, so bending the labels too would bend them twice. Applying the diverging position to both is
+exactly what I did first, and the legend labels moved; the differential said so immediately.
+
+`test-fixtures/specs/diverging-colour.vg.json` pins it with the sequential case beside it. 182
+fixtures.
+
 ## Where the remaining packages stand
 
 Replayed: `d3-time` (366), `d3-array` (252), `d3-color` (34), `vega-time` (281), `vega-transforms`

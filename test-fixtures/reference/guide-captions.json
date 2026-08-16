@@ -810,6 +810,16 @@
   "caption": "Y-axis for a linear scale with values from 0.00 to 0.16"
  },
  {
+  "fixture": "diverging-colour",
+  "kind": "axis",
+  "caption": "Y-axis for a discrete scale with 6 values: -10, -5, 0, 5, 10, 20"
+ },
+ {
+  "fixture": "diverging-colour",
+  "kind": "legend",
+  "caption": "Gradient legend titled 'diverging' for fill color with values from −10 to 20"
+ },
+ {
   "fixture": "domain-limits",
   "kind": "axis",
   "caption": "X-axis for a discrete scale with 4 values: a, b, c, d"

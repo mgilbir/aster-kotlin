@@ -1029,13 +1029,42 @@ public class SequentialColorScale(
     require(colors.isNotEmpty()) { "$name needs at least one colour" }
   }
 
+  /**
+   * Where [x] sits along the ramp before clamping, in `0..1` for a value inside the domain.
+   *
+   * A **three-point domain makes this a diverging scale**, and Vega composes that itself: a
+   * continuous colour scale with three domain values becomes `diverging-linear` in its registry,
+   * without the specification ever naming it. The middle value then takes the ramp's midpoint
+   * whatever its arithmetic position — the point of a blue-white-red chart is that white sits at
+   * zero, not halfway between the extremes. Reading only the first and last put the neutral colour
+   * wherever the domain's midpoint happened to fall: for `[-10, 0, 20]`, zero came out a third of
+   * the way along and still blue.
+   *
+   * The two halves are scaled independently, `0.5 / (mid - low)` below and `0.5 / (high - mid)`
+   * above, which is d3's `scaleDiverging`.
+   */
+  private fun position(x: Double): Double {
+    if (domain.size < 3) {
+      val lo = domain.first()
+      val hi = domain.last()
+      return if (lo == hi) 0.0 else (x - lo) / (hi - lo)
+    }
+    val low = domain[0]
+    val mid = domain[1]
+    val high = domain[2]
+    val below = if (low == mid) 0.0 else 0.5 / (mid - low)
+    val above = if (mid == high) 0.0 else 0.5 / (high - mid)
+    // Which half a value belongs to is decided in the domain's own direction, so a descending
+    // domain still puts its middle value at the middle of the ramp.
+    val sign = if (mid < low) -1.0 else 1.0
+    return 0.5 + (x - mid) * (if (sign * x < sign * mid) below else above)
+  }
+
   /** The colour at [x], or `null` when the input cannot be placed on the ramp. */
   public fun colorAt(x: Double): SceneColor? {
     if (x.isNaN()) return null
-    val lo = domain.first()
-    val hi = domain.last()
-    if (lo == hi) return colors.last()
-    val raw = (x - lo) / (hi - lo)
+    if (domain.size < 3 && domain.first() == domain.last()) return colors.last()
+    val raw = position(x)
     // Sequential scales clamp by default, since a colour past the end of a ramp has no meaning.
     if (!clamp && (raw < 0.0 || raw > 1.0)) return null
     return ColorSpaces.sample(colors, raw.coerceIn(0.0, 1.0), space, gamma)
@@ -1053,6 +1082,10 @@ public class SequentialColorScale(
    * label against the swatch.
    */
   public fun fraction(x: Double): Double {
+    // **Linear over the extent, even when the ramp is diverging.** Upstream's `scaleFraction`
+    // strips the `diverging-` prefix and places labels with a plain scale of the base type over
+    // `[first, last]`: the gradient itself carries the asymmetry in its colour stops, so placing
+    // the labels by the diverging position too would bend them a second time.
     val lo = domain.first()
     val hi = domain.last()
     if (lo == hi) return 0.0
