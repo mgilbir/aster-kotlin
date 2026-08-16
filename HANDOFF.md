@@ -1250,6 +1250,28 @@ The list is empty now, and the comment says why rather than repeating the except
 One of three was hiding a real bug, which is about the rate this session has found for anything
 labelled "known".
 
+## A green build that verified nothing, made impossible
+
+The replays each begin with an `assumeTrue` on their own vector file, because the corpus is
+regenerated rather than committed and a fresh clone legitimately has none. That is right for an
+**empty** directory and dangerous for a **half-full** one: a recording run that dies partway leaves
+some packages behind, every adapter whose file is missing skips in silence, and the build stays
+green.
+
+That is not hypothetical — it happened in this session. A `set -e` fault killed the recording script
+before the entire d3 section, and what noticed was a person reading the ledgers. `UpstreamVectorShapeTest`
+now notices instead: if any package is recorded, **every** package an adapter reads must be. Verified
+by removing `d3-time.json` and watching it fail, then putting it back.
+
+That completes the sweep the divergence review started. The failure mode it guards is the one this
+session kept meeting under different names — a crash filed as unmapped, a corpus that shrank to
+sixty vectors, a channel excluded *and* unmapped. Each time the build was green and the thing it was
+supposed to be checking was not being checked.
+
+The tolerances were reviewed at the same time and left alone: geometry compares at `1e-6`, and the
+one loose figure — `1e-2` for the extent of a curve approximating a true arc — is documented,
+justified, and applied only to `arc`, `trail` and `path`.
+
 ## Where the remaining packages stand
 
 Replayed: `d3-time` (366), `d3-array` (252), `d3-color` (34), `vega-time` (281), `vega-transforms`
