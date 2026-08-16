@@ -704,6 +704,32 @@ representation for the digits — `(4.9e-324).toExponential()` is `5e-324` — w
 shortest-form routine writes `4.9e-324`. A shortest-round-trip printer would close it; nothing about
 formatting would.
 
+## d3-time-format was never recorded, and it hid nine missing directives
+
+`d3-time-format` was simply **absent from the package list** — the one that formats every label on
+every time axis. Adding it gave 422 vectors, 312 of which replay, and they found that this engine's
+directive table was missing nine entries and all three padding modifiers:
+
+- **`%-S`, `%_S`, `%0S`** — no padding, space padding, zero padding. A specification writes `%-I` to
+  get "9am" rather than "09am", and this emitted the directive back **unchanged**, so the label read
+  `%-I`.
+- **`%c`, `%x`, `%X`** — the locale's date, time and both, which d3's en-US locale spells `%-m/%-d/%Y`
+  and `%-I:%M:%S %p`.
+- **`%G`, `%g`, `%V`** — the ISO week trio, where a week belongs to the year holding its Thursday.
+- **`%u`** (Monday-based weekday), **`%Q`** and **`%s`** (the instant itself), **`%Z`** (the offset).
+
+Two arithmetic details came from reading d3's `pad` rather than assuming: the **sign goes outside the
+width** — the year -2 is `-0002`, four digits *plus* a minus — and `%Y` is `year % 10000`, so the year
+10002 formats as `0002` rather than as something six digits wide.
+
+And a real crash: **`%Q` could not parse any real timestamp.** The parser read the digits into an
+`Int`, and an epoch in milliseconds is thirteen of them, so `toInt()` threw — for every date since
+1970. It reads a `Double` now, which also covers `%s` past 2038.
+
+`d3-dsv` (79 vectors) and `d3-geo` (236) are recorded too, and want adapters: `autoType` and the
+delimiter parsers land on the loader, `geoCentroid`, `geoBounds`, `geoArea` and `geoContains` on the
+projection code.
+
 ## Where the remaining packages stand
 
 Replayed: `d3-time` (366), `d3-array` (252), `d3-color` (34), `vega-time` (281), `vega-transforms`

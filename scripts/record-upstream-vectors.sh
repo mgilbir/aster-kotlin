@@ -97,7 +97,10 @@ find test-fixtures/upstream-vectors -name '*.json' ! -name 'known-divergences.js
 D3_PACKAGES=(
   d3-array
   d3-time
+  d3-time-format
   d3-format
+  d3-dsv
+  d3-geo
   d3-color
   d3-shape
   d3-scale
