@@ -2,7 +2,6 @@ package dev.aster.vega.expression
 
 import dev.aster.vega.model.Decimals
 import dev.aster.vega.model.VegaValue
-import kotlin.math.floor
 import kotlin.math.truncate
 
 /**
@@ -107,45 +106,7 @@ public object JsSemantics {
    * Whole numbers lose their decimal point (`1` not `1.0`), which matters because string
    * concatenation of a scaled value is common in labels and tooltips.
    */
-  public fun numberToString(value: Double): String =
-    when {
-      value.isNaN() -> "NaN"
-      value == Double.POSITIVE_INFINITY -> "Infinity"
-      value == Double.NEGATIVE_INFINITY -> "-Infinity"
-      value == 0.0 -> "0"
-      // Up to 2^53 an integral double *is* one integer and prints as itself, which is the common
-      // case and costs a single conversion. Past that it is not: 2^53 + 2 is stored exactly and
-      // JavaScript still writes the shortest decimal that names it, so the general path takes over.
-      // The bound used to be 1e21 and was wrong twice — `toLong` saturates at 9.2e18, so every
-      // integral double above that printed as `-9223372036854775808`.
-      value == floor(value) && kotlin.math.abs(value) <= 9007199254740992.0 ->
-        value.toLong().toString()
-      else -> {
-        val shortest = Decimals.shortest(value)
-        (if (value < 0) "-" else "") + place(shortest.digits, shortest.exponent)
-      }
-    }
-
-  /**
-   * Where ECMA-262 puts the point, once [Decimals.shortest] has settled what the digits are.
-   *
-   * The thresholds are the whole content of this: plain decimal notation holds from 10^-6 up to
-   * 10^21 and exponential takes over outside it. Kotlin's own `toString` goes exponential at 10^7
-   * instead, so before this existed `1777860673.6878662` printed as `1.7778606736878662e+9` — on a
-   * tooltip, on an axis label, anywhere a number over ten million was not a whole one.
-   */
-  private fun place(digits: String, exponent: Int): String {
-    val count = digits.length
-    return when {
-      exponent in count..21 -> digits + "0".repeat(exponent - count)
-      exponent in 1..21 -> digits.substring(0, exponent) + "." + digits.substring(exponent)
-      exponent in -5..0 -> "0." + "0".repeat(-exponent) + digits
-      else -> {
-        val mantissa = if (count == 1) digits else "${digits[0]}.${digits.substring(1)}"
-        mantissa + "e" + (if (exponent > 21) "+" else "-") + kotlin.math.abs(exponent - 1)
-      }
-    }
-  }
+  public fun numberToString(value: Double): String = Decimals.jsString(value)
 
   // ---- arithmetic -----------------------------------------------------------
 

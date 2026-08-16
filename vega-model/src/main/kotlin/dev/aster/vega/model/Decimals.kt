@@ -141,6 +141,45 @@ public object Decimals {
     return Shortest(digits, exponent + 1)
   }
 
+  /**
+   * `String(x)`: [shortest]'s digits with ECMA-262's point placement.
+   *
+   * Plain decimal notation holds from 10^-6 up to 10^21 and exponential takes over outside it,
+   * which is not where Kotlin's own `toString` switches.
+   */
+  public fun jsString(value: Double): String =
+    when {
+      value.isNaN() -> "NaN"
+      value == Double.POSITIVE_INFINITY -> "Infinity"
+      value == Double.NEGATIVE_INFINITY -> "-Infinity"
+      value == 0.0 -> "0"
+      // Up to 2^53 an integral double *is* one integer and prints as itself, which is the common
+      // case and costs a single conversion. Past that it is not: 2^53 + 2 is stored exactly and
+      // JavaScript still writes the shortest decimal that names it, so the general path takes over.
+      // The bound was 1e21 once and was wrong twice — `toLong` saturates at 9.2e18, so every
+      // integral double above that printed as `-9223372036854775808`.
+      value == kotlin.math.floor(value) && kotlin.math.abs(value) <= 9007199254740992.0 ->
+        value.toLong().toString()
+      else -> {
+        val shortest = shortest(value)
+        (if (value < 0) "-" else "") + place(shortest.digits, shortest.exponent)
+      }
+    }
+
+  /** Where ECMA-262 puts the point, once [shortest] has settled what the digits are. */
+  private fun place(digits: String, exponent: Int): String {
+    val count = digits.length
+    return when {
+      exponent in count..21 -> digits + "0".repeat(exponent - count)
+      exponent in 1..21 -> digits.substring(0, exponent) + "." + digits.substring(exponent)
+      exponent in -5..0 -> "0." + "0".repeat(-exponent) + digits
+      else -> {
+        val mantissa = if (count == 1) digits else "${digits[0]}.${digits.substring(1)}"
+        mantissa + "e" + (if (exponent > 21) "+" else "-") + kotlin.math.abs(exponent - 1)
+      }
+    }
+  }
+
   /** The value is `0.digits × 10^exponent`, with [digits] carrying no leading or trailing zero. */
   public class Shortest internal constructor(public val digits: String, public val exponent: Int)
 

@@ -795,6 +795,36 @@ making them pass:
 not of a specifier string — so the six call sites now take a `spanFormatter` instead. `test-fixtures/
 specs/si-prefix-axis.vg.json` pins it differentially: 179 fixtures.
 
+## The CSV reader lost blank lines and joined classic-Mac files into one row
+
+`vega-loader` reads every CSV and TSV through `dsvFormat(delimiter).parse`, so `DelimitedText` is
+the code between a `"url"` and the first datum. Replaying d3-dsv's own corpus against it found two
+real faults, both of the quiet kind:
+
+- **A lone `\r` was treated as nothing.** It is a row terminator — d3 ends a row on `\r`, `\n` or
+  `\r\n` — so a file with classic-Mac line endings came back as **one row**, every field belonging
+  to no header.
+- **A blank line was dropped.** Upstream reads it as a record of empty fields; this skipped any row
+  that was a single empty cell, which loses a datum from the middle of a file. The comment said it
+  was tidying a trailing newline, but the row splitter already handles that — a trailing terminator
+  closes its row and starts no new one.
+
+`parseRows` and the formatting side (`formatValue`, `formatRow`, `formatRows`, `format`) were
+missing and are now there, which is what let the corpus reach them: 40 of 79 vectors replay.
+
+The other 39 are counted with reasons rather than skipped. **32 are `autoType`, which `vega-loader`
+does not use** — Vega infers types with its own `inferTypes` driven by `format.parse`, so d3's rules
+are not this engine's to match. Six pass a row-conversion function, whose body a vector cannot
+record. One is the `dsvFormat` constructor.
+
+`DataResolver` also had `format.header` wrong, and the comment explained the wrong thing: upstream
+quotes those names with **`JSON.stringify`** (`vega-util`'s `stringValue`), not with the delimited
+format's own quoting. The two differ for every name that is not plain — `a\b` comes back as `a\\b`,
+a tab comes back as the two characters `\t`, and a name containing a quote breaks the row so
+thoroughly that upstream yields **no columns at all**. Verified end to end and matched, including
+that the `\u2028` replacement only rewrites the first occurrence, because JavaScript's `replace`
+with a string pattern does.
+
 ## Where the remaining packages stand
 
 Replayed: `d3-time` (366), `d3-array` (252), `d3-color` (34), `vega-time` (281), `vega-transforms`
