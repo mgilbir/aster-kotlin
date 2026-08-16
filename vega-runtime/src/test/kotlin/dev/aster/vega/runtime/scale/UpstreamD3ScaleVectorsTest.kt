@@ -346,7 +346,19 @@ class UpstreamD3ScaleVectorsTest {
       }
       val method = vector["method"]?.jsonPrimitive?.content ?: "(call)"
       if (method !in REPLAYED_METHODS) {
-        unmapped.merge("$method (upstream's reflection API, not modelled here)", 1, Int::plus)
+        unmapped.merge(
+          when (method) {
+            // Not reflection, and worth saying so: `tickFormat` returns a **formatter**, which a
+            // vector records as `{$: function}` and cannot replay. The behaviour behind it — a log
+            // axis labelling only the ticks whose mantissa is within `base * count / ticks`, so a
+            // four-decade axis shows the powers of ten alone — is pinned by
+            // `log-axis-labels.vg.json` instead, and this engine already had it right.
+            "tickFormat" -> "tickFormat (returns a formatter; see log-axis-labels.vg.json)"
+            else -> "$method (upstream's reflection API, not modelled here)"
+          },
+          1,
+          Int::plus,
+        )
         continue
       }
       val config = configure(vector)

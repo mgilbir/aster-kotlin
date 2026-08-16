@@ -1169,6 +1169,25 @@ caught.
 
 `test-fixtures/specs/invert-buckets.vg.json`, and 356 d3-scale vectors replayed. 183 fixtures.
 
+## `tickFormat`, checked and found already right
+
+Three ledger entries I had written off turned out to be real gaps, so the fourth got the same
+treatment: `tickFormat`, 51 vectors, filed as "upstream's reflection API". This time the dismissal
+was half right and the label was wrong.
+
+It is not reflection. `tickFormat` returns a **formatter**, which a vector records as
+`{$: function}` and genuinely cannot replay — the reason it cannot be replayed is the recorder, not
+the engine. And the behaviour behind it is not a detail: d3's log `tickFormat` labels a tick only
+when its mantissa is within `base × count / ticks.length`, so a four-decade axis shows the powers of
+ten and nothing else, while a single-decade one labels all nine.
+
+`log-axis-labels.vg.json` puts four log axes at different densities in front of upstream, and **this
+engine already agreed** — the wide axis labels 1 and 2 per decade, the middling one 1 to 5, the
+narrow one everything, base 2 everything. No bug. The behaviour was simply never checked, and a
+correct implementation that nothing verifies is one refactor away from being an incorrect one.
+
+The ledger entry now says which fixture covers it rather than implying nobody has looked.
+
 ## Where the remaining packages stand
 
 Replayed: `d3-time` (366), `d3-array` (252), `d3-color` (34), `vega-time` (281), `vega-transforms`

@@ -1375,6 +1375,26 @@
   "caption": "Y-axis for a linear scale with values from 0 to 26"
  },
  {
+  "fixture": "log-axis-labels",
+  "kind": "axis",
+  "caption": "Y-axis for a log scale with values from 1 to 10,000"
+ },
+ {
+  "fixture": "log-axis-labels",
+  "kind": "axis",
+  "caption": "Y-axis for a log scale with values from 1 to 10"
+ },
+ {
+  "fixture": "log-axis-labels",
+  "kind": "axis",
+  "caption": "Y-axis for a log scale with values from 1 to 100"
+ },
+ {
+  "fixture": "log-axis-labels",
+  "kind": "axis",
+  "caption": "X-axis for a log scale with values from 1 to 256"
+ },
+ {
   "fixture": "log-scale",
   "kind": "axis",
   "caption": "X-axis for a log scale with values from 1 to 1,000"
