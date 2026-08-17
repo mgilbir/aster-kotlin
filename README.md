@@ -70,8 +70,10 @@ includeBuild("../aster-kotlin")
 ```kotlin
 // build.gradle.kts
 dependencies {
-  implementation("dev.aster.vega:vega-compose")      // Compose API
+  implementation("dev.aster.vega:vega-compose")      // Compose API, Android
   implementation("dev.aster.vega:vega-android-canvas") // View API
+  // Compose Multiplatform: the same renderer on Android, iOS and the desktop.
+  implementation("dev.aster.vega:vega-compose-multiplatform")
 }
 ```
 
@@ -275,11 +277,12 @@ Dataflow graph                vega-dataflow, vega-expression
         ↓
 Immutable scene snapshot      vega-scene
         ↓
-┌─────────────────┬─────────────────┬─────────────────┐
-│ Android Canvas  │ SVG serializer  │ Bitmap/PNG/PDF  │
-│ vega-android-   │ vega-svg        │ vega-android-   │
-│ canvas          │                 │ canvas          │
-└─────────────────┴─────────────────┴─────────────────┘
+┌────────────────┬────────────────┬────────────────┬────────────────┬────────────────┐
+│ Android Canvas │ SVG serializer │ Bitmap/PNG/PDF │ Compose        │ CoreGraphics   │
+│ vega-android-  │ vega-svg       │ vega-android-  │ Multiplatform  │ swift/AsterVe- │
+│ canvas         │                │ canvas         │ vega-compose-  │ gaRender       │
+│                │                │                │ multiplatform  │                │
+└────────────────┴────────────────┴────────────────┴────────────────┴────────────────┘
         ↓
 Interaction and semantic accessibility trees
 ```
