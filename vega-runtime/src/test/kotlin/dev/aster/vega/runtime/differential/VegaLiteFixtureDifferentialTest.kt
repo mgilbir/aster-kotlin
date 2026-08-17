@@ -204,15 +204,23 @@ class VegaLiteFixtureDifferentialTest {
     val GRID_LAYOUT_PENDING = setOf("facet-footer")
 
     /**
-     * Fixtures pending on the runtime's projections, and the two things it does not yet do.
+     * Fixtures pending on one thing the runtime's projections do not yet do.
      *
-     * **Fitting**: a projection given an extent to fill has to solve for its own scale and
-     * translate, and `albersUsa` is three projections in a coat. **Cycles**: a projection fitted to
-     * the tables that read it back through `geopoint` is a cycle to a strict ordering, where Vega
-     * re-fits and re-pulses. Both are the drawing's business; the compiled specifications match
-     * upstream's byte for byte.
+     * Both halves of what this used to say were wrong, and the record is worth keeping. **Fitting**
+     * to an extent works, including for a composite — `albersUsa` is three projections in a coat,
+     * and `fitExtent` reaching only the concrete projection is what made a fitted composite draw at
+     * its family's unfitted default. And a projection fitted to the table that reads it back is not
+     * a cycle: upstream refuses that construction too, and what Vega-Lite emits instead is a
+     * `geojson` transform publishing a signal, the projection fitting to *that*, and `geopoint`
+     * following — which this engine handles by marking projections stale on `setSignal`.
+     *
+     * What is left is narrower and real: a projection fitted to collections published by **two**
+     * datasets, each of which reads it back. Neither can be resolved before the projection, and the
+     * projection needs both — a cycle to an ordering that resolves each dataset once, where Vega
+     * re-fits and re-pulses until it settles. `geo-rules` is that chart: one layer of airports and
+     * one of routes between them, fitted together so the map frames both.
      */
-    val PROJECTION_PENDING = setOf("geo-points", "geo-rules", "geo-trellis")
+    val PROJECTION_PENDING = setOf("geo-rules")
 
     val repositoryRoot: File = File(System.getProperty("user.dir")).parentFile
 

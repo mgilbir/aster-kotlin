@@ -221,7 +221,7 @@ substantive compatibility items:
 | 6. View and Compose APIs | Yes |
 | 7. SVG, PNG, PDF export | Yes |
 | 8. TalkBack can describe and navigate | Partial — virtual nodes are tested by instrumentation, not with TalkBack itself |
-| 9. At least 100 compatibility fixtures pass | **Yes** — 187 |
+| 9. At least 100 compatibility fixtures pass | **Yes** — 188 |
 | 10. Core runtime has no Android dependency | Yes |
 | 11. Renders without WebView | Yes |
 | 12. Build and test loop runs from the terminal | Yes |
@@ -4520,13 +4520,33 @@ One rule came with them that is not geographic at all: `config.aria: false` take
 out of the accessibility tree, so no mark carries a role description or a spoken summary and every
 guide says `aria: false` on itself.
 
-The compiled specifications match upstream's byte for byte. Two things this runtime does not yet do
-keep the geographic fixtures in `PROJECTION_PENDING`, each with its reason beside it. It cannot
-**fit** a projection as d3 does — a projection given an extent to fill has to solve for its own scale
-and translate, and `albersUsa` is three projections in a coat. And a projection **fitted to the
-tables that read it back** through `geopoint` is a cycle to a strict ordering, where Vega re-fits and
-re-pulses. Both are the drawing's business, not the compiling's: `geo-shapes`, whose projection is
-placed by hand and needs neither, is checked end to end and draws correctly.
+The compiled specifications match upstream's byte for byte, and the drawings agree too — with one
+exception, arrived at after both of my first guesses turned out to be wrong. The record of that is
+worth more than the conclusion.
+
+I reported two gaps. Neither was real. **Fitting** to an extent worked all along; two fixtures had
+been doing it. And a projection **fitted to the table that reads it back** is not a cycle — upstream
+refuses that construction too, and what Vega-Lite actually emits is a `geojson` transform publishing
+a signal, the projection fitting to *that*, and `geopoint` following, which this engine already
+handles by marking projections stale when a signal changes. The real blocker under both symptoms was
+that `fitExtent` reached only a concrete projection and not the interface a **composite** implements,
+so a fitted `albersUsa` — the projection Vega-Lite reaches for on any chart of the United States —
+drew silently at its family's unfitted default. Fixed on main, and `geo-points` and `geo-trellis`
+draw correctly now.
+
+What is left is narrower and does exist: a projection fitted to collections published by **two**
+datasets, each of which reads it back. Neither can be resolved before the projection and the
+projection needs both, which is a cycle to an ordering that resolves each dataset once, where Vega
+re-fits and re-pulses until it settles. `geo-rules` is that chart, and it is the only fixture on the
+shelf.
+
+One thing found on the way, and it is the loader's rather than the projections': **delimited text is
+never typed**. `DelimitedText.parse` reads every cell as a string and nothing applies `format.parse`
+or infers a type afterwards, where upstream's loader infers by default. It stays invisible while
+every column a chart reads is one the compiler wrote a parse for, and it shows the moment a column is
+used untyped — a `lookup` key joining a numeric id against text, which matches nothing and draws an
+empty chart. The first `geo-trellis` fixture had exactly that shape and was rewritten to state its
+figures inline, so that it tests the grid of maps it was written for rather than the loader.
 
 ### What a facet inside a facet would take
 
