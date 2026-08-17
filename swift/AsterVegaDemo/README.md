@@ -136,6 +136,22 @@ could reach. Android now reads the same tree, so the two cannot describe the sam
 tested as readable from Swift; the SwiftUI wiring that turns them into accessibility elements is not
 covered by an automated test. Closing that means an XCUITest target, which this project does not have yet.
 
+## Export
+
+SVG, PNG and PDF, from the chart on screen, through the system share sheet.
+
+The three come from two places and the split is deliberate. **SVG is the engine's** — `vega-svg`'s `toSvg`,
+the serializer the differential harness compares against upstream — so an exported file is markup this
+project has verified rather than a second opinion written in Swift. **PNG and PDF are the platform's**, drawn
+through the same walk and target that put the chart on screen, which is what makes an export look like what
+the reader saw. The PDF is drawn rather than rasterised, so its text stays text at any zoom.
+
+Exporting happens off the main thread: a PNG at scale 3 is the renderer drawing the whole scene again.
+
+The only thing that had ever stopped this on iOS was one line of build configuration — `vega-svg` was not on
+the framework's export list, so a serializer that already compiled for `iosArm64` was unreachable from
+Swift.
+
 ## Diagnostics
 
 Listing what the engine could not honour is the point rather than decoration. This engine's discipline is

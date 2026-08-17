@@ -37,6 +37,11 @@ kotlin {
       export(project(":vega-scene"))
       export(project(":vega-expression"))
       export(project(":vega-dataflow"))
+      // The SVG serializer, so a foreign host can export a chart rather than only draw it. It is
+      // multiplatform already and was simply not on this list, which is the only reason an iOS host
+      // had
+      // no export at all while Android had three formats.
+      export(project(":vega-svg"))
       if (target.name != "macosArm64") xcframework.add(this)
     }
   }
@@ -49,6 +54,7 @@ kotlin {
         api(project(":vega-expression"))
         api(project(":vega-dataflow"))
         api(project(":vega-scene"))
+        api(project(":vega-svg"))
         api(libs.kotlinx.coroutines.core)
       }
     }
@@ -59,9 +65,6 @@ kotlin {
         // why they are the one pair of dependencies that does not follow the core off the JVM.
         implementation(project(":vega-loader"))
         implementation(project(":test-fixtures"))
-        // Only so FixtureSvgTest can write a lookable-at rendering of each fixture beside the
-        // oracle's.
-        implementation(project(":vega-svg"))
         implementation(libs.kotlinx.coroutines.test)
       }
     }
