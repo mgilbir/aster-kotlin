@@ -22,16 +22,16 @@ public protocol DrawTarget {
   mutating func endGroup()
 
   /// An axis-aligned rectangle, with per-corner radii already resolved.
-  mutating func rect(_ rect: Rect, corners: Corners, fill: Paint?, stroke: StrokePaint?)
+  mutating func rect(_ rect: Rect, corners: Corners, fill: Brush?, stroke: StrokePaint?)
 
   /// A straight segment. A rule is a line, not a thin rectangle, so its caps matter.
   mutating func line(from: Point, to: Point, stroke: StrokePaint?)
 
   /// An arbitrary path, already reduced to move/line/cubic/close by the engine.
-  mutating func path(_ commands: [PathCommand], fill: Paint?, stroke: StrokePaint?)
+  mutating func path(_ commands: [PathCommand], fill: Brush?, stroke: StrokePaint?)
 
   /// One line of text, positioned at its anchor with alignment already resolved by the engine.
-  mutating func text(_ run: TextRun, fill: Paint?, stroke: StrokePaint?)
+  mutating func text(_ run: DrawTextRun, fill: Brush?, stroke: StrokePaint?)
 
   /// A bitmap, by the URL the specification gave; a target resolves it however it can.
   mutating func image(url: String, in rect: Rect, opacity: Double)
@@ -94,6 +94,41 @@ public struct Paint: Equatable, Sendable {
     self.blue = blue
     self.alpha = alpha
   }
+
+  /// A scene colour, as it stands. Used for a gradient's stops, which carry their own alpha.
+  public static func of(_ colour: SceneColor) -> Paint {
+    Paint(red: colour.red, green: colour.green, blue: colour.blue, alpha: colour.alpha)
+  }
+}
+
+/// What a shape is painted with: a colour, or a gradient already resolved to surface coordinates.
+///
+/// A specification writes a gradient in fractions of the item it fills — `x1: 0, x2: 1` is left edge to
+/// right edge whatever the mark's size — so the walk multiplies those fractions through the item's
+/// bounds and a target receives absolute points. That keeps "what does x1 mean" in one place rather
+/// than in every renderer, and it is the same split the Compose renderer uses.
+public enum Brush: Equatable, Sendable {
+  case solid(Paint)
+  case linear(from: Point, to: Point, stops: [GradientStop], alpha: Double)
+  case radial(centre: Point, radius: Double, stops: [GradientStop], alpha: Double)
+
+  /// The opacity to draw the whole brush at, from the item's own `opacity` channel.
+  public var alpha: Double {
+    switch self {
+    case .solid(let paint): return paint.alpha
+    case .linear(_, _, _, let alpha): return alpha
+    case .radial(_, _, _, let alpha): return alpha
+    }
+  }
+}
+
+public struct GradientStop: Equatable, Sendable {
+  public let offset: Double
+  public let paint: Paint
+  public init(offset: Double, paint: Paint) {
+    self.offset = offset
+    self.paint = paint
+  }
 }
 
 public enum LineCap: String, Sendable { case butt, round, square }
@@ -101,7 +136,7 @@ public enum LineCap: String, Sendable { case butt, round, square }
 public enum LineJoin: String, Sendable { case miter, round, bevel }
 
 public struct StrokePaint: Equatable, Sendable {
-  public let paint: Paint
+  public let brush: Brush
   public let width: Double
   public let cap: LineCap
   public let join: LineJoin
@@ -110,7 +145,7 @@ public struct StrokePaint: Equatable, Sendable {
   public let dashOffset: Double
 
   public init(
-    paint: Paint,
+    brush: Brush,
     width: Double,
     cap: LineCap,
     join: LineJoin,
@@ -118,7 +153,7 @@ public struct StrokePaint: Equatable, Sendable {
     dash: [Double],
     dashOffset: Double
   ) {
-    self.paint = paint
+    self.brush = brush
     self.width = width
     self.cap = cap
     self.join = join
@@ -140,7 +175,12 @@ public enum PathCommand: Equatable, Sendable {
   case close
 }
 
-public struct TextRun: Equatable, Sendable {
+/// One line of text to draw.
+///
+/// Named `DrawTextRun` rather than `TextRun` because the engine exports a `TextRun` of its own — the
+/// one a scene holds, with a full style attached — and a file importing both modules could not then say
+/// which it meant. The Compose renderer's equivalent has the same name for the same reason.
+public struct DrawTextRun: Equatable, Sendable {
   public let text: String
   public let origin: Point
   public let fontFamily: String

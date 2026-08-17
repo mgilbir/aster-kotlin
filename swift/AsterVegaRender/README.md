@@ -54,8 +54,37 @@ The pixel tests earned their place immediately. They found two bugs the recordin
   RGB, not sRGB, and the context converted it on the way in — `steelblue` landed as rgb(86,149,193)
   instead of rgb(70,130,180). Too small to notice by eye, and a different colour.
 
+## Gradients
+
+`CoreGraphics` has no gradient *fill*: a gradient is drawn across a region, so the region has to be the
+clip. `CoreGraphicsTarget` clips to the mark's path and draws the gradient through it — and for a
+gradient-stroked mark, clips to `replacePathWithStrokedPath` instead, which turns the pen into a region.
+
+`drawsBeforeStartLocation`/`drawsAfterEndLocation` are what make this agree with every other renderer: a
+gradient's stops describe the span between its two points, and the area outside that span takes the
+nearest stop's colour rather than nothing.
+
+The *coordinates* are resolved in the walk, not here. A specification writes a gradient in fractions of
+the item it fills — `x1: 0, x2: 1` is left edge to right edge whatever the mark's size — so the walk
+multiplies them through the item's bounds and a target receives absolute points. The Compose renderer
+splits it the same way.
+
 ## Text
 
 `CoreGraphicsTarget` takes an injectable `drawText` closure and draws no glyphs itself. The engine
-positions a run and resolves its alignment; shaping it is the platform's job, and a caller with
-CoreText wires it in. One without gets no text rather than wrong text.
+positions a run and resolves its alignment; shaping it is the platform's job, and a caller without a way
+to draw text gets no text rather than wrong text.
+
+`CoreTextDrawing.draw` is that closure for Apple platforms, so a caller writes:
+
+```swift
+var target = CoreGraphicsTarget(context: context, drawText: CoreTextDrawing.draw)
+```
+
+It imports neither UIKit nor AppKit — CoreText attribute names throughout — so it is the same code on
+iOS and macOS. It flips y locally around the run's anchor, because CoreText draws up from a baseline
+while every coordinate this renderer produces is in a y-down space; without that the glyphs come out
+mirrored, which is the classic symptom and worth naming.
+
+`DrawTextRun` is named that way, rather than `TextRun`, because the engine exports a `TextRun` of its own
+— the one a scene holds — and a file importing both modules could not otherwise say which it meant.

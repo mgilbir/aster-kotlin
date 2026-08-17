@@ -21,7 +21,10 @@ final class CoreGraphicsTargetTests: XCTestCase {
   private let height = 50
 
   /// Renders a specification and returns a reader of the resulting pixels.
-  private func raster(_ json: String) throws -> Raster {
+  private func raster(
+    _ json: String,
+    drawText: ((DrawTextRun, Brush?, CGContext) -> Void)? = nil
+  ) throws -> Raster {
     let compiler = SpecCompiler(
       textEngine: MetricTextEngine(advanceRatio: 0.6, ascentRatio: 0.8, descentRatio: 0.2),
       loader: DenyLoader(),
@@ -48,7 +51,7 @@ final class CoreGraphicsTargetTests: XCTestCase {
     context.translateBy(x: 0, y: CGFloat(height))
     context.scaleBy(x: 1, y: -1)
 
-    var target = CoreGraphicsTarget(context: context)
+    var target = CoreGraphicsTarget(context: context, drawText: drawText)
     SceneWalk().draw(scene: scene, into: &target)
 
     // Copied out rather than held as a pointer: `context.data` belongs to the context, and the
@@ -88,6 +91,18 @@ final class CoreGraphicsTargetTests: XCTestCase {
       return abs(Int(got.r) - Int(r)) <= tolerance
         && abs(Int(got.g) - Int(g)) <= tolerance
         && abs(Int(got.b) - Int(b)) <= tolerance
+    }
+
+    /// How many pixels are dark, which is how a test asks "is there ink here" without asserting on
+    /// glyph shapes — those belong to the platform's font and would change with it.
+    var darkPixels: Int {
+      var count = 0
+      for y in 0..<height {
+        for x in 0..<width where at(x, y).r < 128 {
+          count += 1
+        }
+      }
+      return count
     }
 
     func describe(_ x: Int, _ y: Int) -> String {
@@ -152,6 +167,64 @@ final class CoreGraphicsTargetTests: XCTestCase {
   /// descent, while its SVG renderer emits `opacity` on the group's background `path` and leaves the
   /// child element bare. So a half-opaque group containing an opaque mark draws a solid mark on a
   /// washed-out panel — which is what this asserts, in pixels.
+  /// A gradient runs across the mark it fills, in absolute coordinates the target never re-derives.
+  ///
+  /// CoreGraphics has no gradient *fill*: a gradient is drawn over a region, so the region has to be
+  /// the clip. This is the test that the clip is the mark's path and not the whole surface — and that
+  /// the stops land on the mark's own edges, since a specification writes them as fractions of it.
+  func testAGradientRunsAcrossTheMarkItFills() throws {
+    let image = try raster(
+      """
+      {"$schema": "https://vega.github.io/schema/vega/v6.json",
+       "width": 100, "height": 50, "padding": 0,
+       "background": "white",
+       "marks": [{"type": "rect", "encode": {"enter": {
+         "x": {"value": 20}, "y": {"value": 10},
+         "width": {"value": 60}, "height": {"value": 30},
+         "fill": {"value": {"gradient": "linear", "stops": [
+           {"offset": 0, "color": "red"}, {"offset": 1, "color": "blue"}]}}}}}]}
+      """
+    )
+    // Red at the mark's left edge, blue at its right — x=20 and x=80, not the chart's 0 and 100.
+    let left = image.at(22, 25)
+    let right = image.at(78, 25)
+    XCTAssertTrue(left.r > 200 && left.b < 60, "red end: \(image.describe(22, 25))")
+    XCTAssertTrue(right.b > 200 && right.r < 60, "blue end: \(image.describe(78, 25))")
+    // A gradient, not two halves: the middle is a mixture of the two.
+    let middle = image.at(50, 25)
+    XCTAssertTrue(
+      middle.r > 60 && middle.r < 220 && middle.b > 60 && middle.b < 220,
+      "the middle is mixed: \(image.describe(50, 25))"
+    )
+    // And it is clipped to the mark. Outside it the background survives, which is the assertion that
+    // says the gradient was drawn through a clip rather than across the surface.
+    XCTAssertTrue(image.isNear(5, 25, 255, 255, 255), "outside the mark: \(image.describe(5, 25))")
+    XCTAssertTrue(image.isNear(50, 3, 255, 255, 255), "above the mark: \(image.describe(50, 3)))")
+  }
+
+  /// Text reaches the surface when a caller lends the renderer CoreText, and not before.
+  ///
+  /// The renderer draws no glyphs of its own — shaping is the platform's job — so this checks the seam
+  /// in both positions: with `CoreTextDrawing.draw` there are dark pixels where the label is, and
+  /// without it the same chart draws everything else and leaves the text out. A renderer that silently
+  /// dropped text would otherwise look identical to one that was never given a way to draw it.
+  func testTextIsDrawnWhenCoreTextIsLentAndOmittedWhenItIsNot() throws {
+    let spec = """
+      {"$schema": "https://vega.github.io/schema/vega/v6.json",
+       "width": 100, "height": 50, "padding": 0,
+       "background": "white",
+       "marks": [{"type": "text", "encode": {"enter": {
+         "x": {"value": 10}, "y": {"value": 30},
+         "text": {"value": "IIIIIIII"}, "fontSize": {"value": 28},
+         "fill": {"value": "black"}}}}]}
+      """
+    let withText = try raster(spec, drawText: CoreTextDrawing.draw)
+    let withoutText = try raster(spec)
+
+    XCTAssertTrue(withText.darkPixels > 40, "glyphs were drawn: \(withText.darkPixels) dark pixels")
+    XCTAssertEqual(withoutText.darkPixels, 0, "no glyphs without a text engine")
+  }
+
   func testAGroupOpacityPaintsItsPanelAndNotItsChildren() throws {
     let image = try raster(
       """
