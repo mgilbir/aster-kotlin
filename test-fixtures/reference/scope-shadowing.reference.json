@@ -1,0 +1,165 @@
+{
+  "marks": [
+    {
+      "fill": "#f58518",
+      "height": 8,
+      "role": "mark",
+      "type": "rect",
+      "width": 80,
+      "x": 0,
+      "y": 2
+    },
+    {
+      "fill": "#54a24b",
+      "height": 6,
+      "role": "mark",
+      "type": "rect",
+      "x": 0,
+      "y": 16
+    },
+    {
+      "align": "right",
+      "baseline": "middle",
+      "fill": "#333333",
+      "font": "sans-serif",
+      "fontSize": 9,
+      "role": "mark",
+      "text": "inner bar 6",
+      "type": "text",
+      "x": 258,
+      "y": 24
+    },
+    {
+      "fill": "#f58518",
+      "height": 12,
+      "role": "mark",
+      "type": "rect",
+      "width": 140,
+      "x": 0,
+      "y": 36
+    },
+    {
+      "fill": "#54a24b",
+      "height": 6,
+      "role": "mark",
+      "type": "rect",
+      "x": 0,
+      "y": 50
+    },
+    {
+      "align": "right",
+      "baseline": "middle",
+      "fill": "#333333",
+      "font": "sans-serif",
+      "fontSize": 9,
+      "role": "mark",
+      "text": "inner bar 6",
+      "type": "text",
+      "x": 258,
+      "y": 58
+    },
+    {
+      "fill": "#f58518",
+      "height": 16,
+      "role": "mark",
+      "type": "rect",
+      "width": 200,
+      "x": 0,
+      "y": 70
+    },
+    {
+      "fill": "#54a24b",
+      "height": 6,
+      "role": "mark",
+      "type": "rect",
+      "x": 0,
+      "y": 84
+    },
+    {
+      "align": "right",
+      "baseline": "middle",
+      "fill": "#333333",
+      "font": "sans-serif",
+      "fontSize": 9,
+      "role": "mark",
+      "text": "inner bar 6",
+      "type": "text",
+      "x": 258,
+      "y": 92
+    },
+    {
+      "role": "mark",
+      "stroke": "#4c78a8",
+      "strokeWidth": 3,
+      "type": "rule",
+      "x": 0,
+      "x2": 120,
+      "y": 108,
+      "y2": 108
+    },
+    {
+      "fill": "#333333",
+      "font": "sans-serif",
+      "fontSize": 10,
+      "role": "mark",
+      "text": "outer bar 12, s(10) = 60",
+      "type": "text",
+      "x": 0,
+      "y": 122
+    }
+  ],
+  "scales": {
+    "outer": {
+      "domain": [
+        0,
+        10
+      ],
+      "range": [
+        0,
+        120
+      ],
+      "ticks": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10
+      ]
+    },
+    "s": {
+      "domain": [
+        0,
+        10
+      ],
+      "range": [
+        0,
+        60
+      ],
+      "ticks": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10
+      ]
+    }
+  },
+  "size": {
+    "height": 150,
+    "width": 271.5
+  },
+  "spec": "scope-shadowing.vg.json",
+  "vegaVersion": "6.3.1"
+}

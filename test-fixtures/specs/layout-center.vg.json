@@ -1,0 +1,137 @@
+{
+  "$schema": "https://vega.github.io/schema/vega/v6.json",
+  "description": "layout center puts a cell narrower than its column in the middle of it rather than at its start. Six cells of six different widths in a three-column grid: every cell but the widest of each column is nudged by half its column's slack.",
+  "width": 380,
+  "height": 120,
+  "padding": 5,
+  "background": "white",
+  "data": [
+    {
+      "name": "t",
+      "values": [
+        {
+          "c": "a",
+          "w": 20
+        },
+        {
+          "c": "b",
+          "w": 60
+        },
+        {
+          "c": "c",
+          "w": 100
+        },
+        {
+          "c": "d",
+          "w": 34
+        },
+        {
+          "c": "e",
+          "w": 74
+        },
+        {
+          "c": "f",
+          "w": 114
+        }
+      ]
+    }
+  ],
+  "scales": [
+    {
+      "name": "colour",
+      "type": "ordinal",
+      "domain": {
+        "data": "t",
+        "field": "c"
+      },
+      "range": "category"
+    }
+  ],
+  "marks": [
+    {
+      "type": "group",
+      "layout": {
+        "columns": 3,
+        "padding": {
+          "row": 12,
+          "column": 12
+        },
+        "align": "each",
+        "center": true,
+        "bounds": "full"
+      },
+      "marks": [
+        {
+          "type": "group",
+          "from": {
+            "facet": {
+              "data": "t",
+              "name": "cell",
+              "groupby": "c"
+            }
+          },
+          "encode": {
+            "enter": {
+              "height": {
+                "value": 40
+              }
+            }
+          },
+          "marks": [
+            {
+              "type": "rect",
+              "from": {
+                "data": "cell"
+              },
+              "encode": {
+                "enter": {
+                  "x": {
+                    "value": 0
+                  },
+                  "width": {
+                    "field": "w"
+                  },
+                  "y": {
+                    "value": 0
+                  },
+                  "height": {
+                    "value": 30
+                  },
+                  "fill": {
+                    "scale": "colour",
+                    "field": "c"
+                  }
+                }
+              }
+            },
+            {
+              "type": "text",
+              "from": {
+                "data": "cell"
+              },
+              "encode": {
+                "enter": {
+                  "x": {
+                    "value": 2
+                  },
+                  "y": {
+                    "value": 20
+                  },
+                  "text": {
+                    "field": "c"
+                  },
+                  "fontSize": {
+                    "value": 9
+                  },
+                  "fill": {
+                    "value": "#ffffff"
+                  }
+                }
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

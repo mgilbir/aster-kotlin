@@ -1,0 +1,30 @@
+{
+  "marks": [
+    {
+      "fill": "#eef2f7",
+      "height": 110,
+      "role": "frame",
+      "type": "group",
+      "width": 200,
+      "x": 0,
+      "y": 0
+    },
+    {
+      "fill": "#4c78a8",
+      "opacity": 0.6,
+      "role": "mark",
+      "shapeHeight": 0,
+      "shapeLeft": 4,
+      "shapeTop": 4,
+      "shapeWidth": 0,
+      "type": "path"
+    }
+  ],
+  "scales": {},
+  "size": {
+    "height": 122,
+    "width": 212
+  },
+  "spec": "config-group-projection.vg.json",
+  "vegaVersion": "6.3.1"
+}

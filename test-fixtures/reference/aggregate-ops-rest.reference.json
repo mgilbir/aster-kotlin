@@ -1,0 +1,213 @@
+{
+  "marks": [
+    {
+      "opacity": 1,
+      "role": "axis-tick",
+      "stroke": "#888",
+      "strokeWidth": 1,
+      "type": "rule",
+      "x": 0.5,
+      "x2": 0.5,
+      "y": 216.5,
+      "y2": 221.5
+    },
+    {
+      "opacity": 1,
+      "role": "axis-tick",
+      "stroke": "#888",
+      "strokeWidth": 1,
+      "type": "rule",
+      "x": 86.5,
+      "x2": 86.5,
+      "y": 216.5,
+      "y2": 221.5
+    },
+    {
+      "opacity": 1,
+      "role": "axis-tick",
+      "stroke": "#888",
+      "strokeWidth": 1,
+      "type": "rule",
+      "x": 171.5,
+      "x2": 171.5,
+      "y": 216.5,
+      "y2": 221.5
+    },
+    {
+      "align": "center",
+      "angle": 0,
+      "baseline": "top",
+      "fill": "#000",
+      "font": "sans-serif",
+      "fontSize": 10,
+      "limit": 180,
+      "opacity": 1,
+      "role": "axis-label",
+      "text": "0",
+      "type": "text",
+      "x": 0.5,
+      "y": 223.5
+    },
+    {
+      "align": "center",
+      "angle": 0,
+      "baseline": "top",
+      "fill": "#000",
+      "font": "sans-serif",
+      "fontSize": 10,
+      "limit": 180,
+      "opacity": 1,
+      "role": "axis-label",
+      "text": "5",
+      "type": "text",
+      "x": 86.214286,
+      "y": 223.5
+    },
+    {
+      "align": "center",
+      "angle": 0,
+      "baseline": "top",
+      "fill": "#000",
+      "font": "sans-serif",
+      "fontSize": 10,
+      "limit": 180,
+      "opacity": 1,
+      "role": "axis-label",
+      "text": "10",
+      "type": "text",
+      "x": 171.928571,
+      "y": 223.5
+    },
+    {
+      "opacity": 1,
+      "role": "axis-domain",
+      "stroke": "#888",
+      "strokeWidth": 1,
+      "type": "rule",
+      "x": 0.5,
+      "x2": 240.5,
+      "y": 216.5,
+      "y2": 216.5
+    },
+    {
+      "align": "center",
+      "angle": 0,
+      "baseline": "top",
+      "fill": "#000",
+      "font": "sans-serif",
+      "fontSize": 11,
+      "fontWeight": "bold",
+      "opacity": 1,
+      "role": "axis-title",
+      "text": "variance",
+      "type": "text",
+      "x": 120.5,
+      "y": 237.5
+    },
+    {
+      "fill": "#4c78a8",
+      "height": 18.26087,
+      "role": "mark",
+      "type": "rect",
+      "width": 142.857143,
+      "x": 0,
+      "y": 7.826087
+    },
+    {
+      "fill": "#4c78a8",
+      "height": 18.26087,
+      "role": "mark",
+      "type": "rect",
+      "width": 232.857143,
+      "x": 0,
+      "y": 33.913043
+    },
+    {
+      "fill": "#333333",
+      "font": "sans-serif",
+      "fontSize": 10,
+      "role": "mark",
+      "text": "left: 4 kinds, 2 gaps, 3 good of 5",
+      "type": "text",
+      "x": 0,
+      "y": 110
+    },
+    {
+      "fill": "#333333",
+      "font": "sans-serif",
+      "fontSize": 10,
+      "role": "mark",
+      "text": "right: 3 kinds, 0 gaps, 4 good of 4",
+      "type": "text",
+      "x": 0,
+      "y": 140
+    },
+    {
+      "fill": "#666666",
+      "font": "sans-serif",
+      "fontSize": 10,
+      "role": "mark",
+      "text": "var 8.3333 / pop 5.5556 / sd 2.3570 / top bo",
+      "type": "text",
+      "x": 0,
+      "y": 124
+    },
+    {
+      "fill": "#666666",
+      "font": "sans-serif",
+      "fontSize": 10,
+      "role": "mark",
+      "text": "var 13.5833 / pop 10.1875 / sd 3.1918 / top fay",
+      "type": "text",
+      "x": 0,
+      "y": 154
+    }
+  ],
+  "scales": {
+    "x": {
+      "domain": [
+        0,
+        14
+      ],
+      "range": [
+        0,
+        240
+      ],
+      "ticks": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13,
+        14
+      ]
+    },
+    "y": {
+      "bandwidth": 18.26087,
+      "domain": [
+        "left",
+        "right"
+      ],
+      "range": [
+        0,
+        60
+      ],
+      "step": 26.086957
+    }
+  },
+  "size": {
+    "height": 258,
+    "width": 390
+  },
+  "spec": "aggregate-ops-rest.vg.json",
+  "vegaVersion": "6.3.1"
+}

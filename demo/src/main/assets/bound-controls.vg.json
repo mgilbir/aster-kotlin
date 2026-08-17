@@ -1,0 +1,252 @@
+{
+  "$schema": "https://vega.github.io/schema/vega/v6.json",
+  "description": "A bar chart a reader can change. Every control below the chart was asked for by the specification itself, through the bind blocks on its signals: a slider for the bars' width, a checkbox for the labels, a choice of palette and of what to sort by, and a field for the heading — which carries a placeholder, an attribute upstream hands straight to the browser and this host shows as the hint in an empty field. Nothing about the controls is in the app \u2014 the specification names them, the engine describes them, and the host draws whatever it has.",
+  "width": 300,
+  "height": 200,
+  "padding": 5,
+  "autosize": {
+    "type": "fit",
+    "contains": "padding"
+  },
+  "signals": [
+    {
+      "name": "barWidth",
+      "value": 0.7,
+      "bind": {
+        "input": "range",
+        "min": 0.2,
+        "max": 0.95,
+        "step": 0.05,
+        "name": "bar width"
+      }
+    },
+    {
+      "name": "labels",
+      "value": true,
+      "bind": {
+        "input": "checkbox",
+        "name": "value labels"
+      }
+    },
+    {
+      "name": "palette",
+      "value": "blues",
+      "bind": {
+        "input": "select",
+        "options": [
+          "blues",
+          "oranges",
+          "greens"
+        ],
+        "labels": [
+          "blue",
+          "orange",
+          "green"
+        ],
+        "name": "palette"
+      }
+    },
+    {
+      "name": "order",
+      "value": "descending",
+      "bind": {
+        "input": "radio",
+        "options": [
+          "descending",
+          "ascending"
+        ],
+        "labels": [
+          "tallest first",
+          "smallest first"
+        ],
+        "name": "sort"
+      }
+    },
+    {
+      "name": "heading",
+      "value": "Regional totals",
+      "bind": {
+        "input": "text",
+        "name": "heading",
+        "placeholder": "e.g. Regional totals"
+      }
+    },
+    {
+      "name": "tint",
+      "update": "palette === 'blues' ? '#4c78a8' : palette === 'oranges' ? '#f58518' : '#54a24b'"
+    },
+    {
+      "name": "faded",
+      "update": "palette === 'blues' ? '#9ecae1' : palette === 'oranges' ? '#ffbf79' : '#a1d99b'"
+    }
+  ],
+  "data": [
+    {
+      "name": "table",
+      "values": [
+        {
+          "c": "north",
+          "v": 42
+        },
+        {
+          "c": "south",
+          "v": 27
+        },
+        {
+          "c": "east",
+          "v": 58
+        },
+        {
+          "c": "west",
+          "v": 35
+        },
+        {
+          "c": "central",
+          "v": 19
+        }
+      ]
+    }
+  ],
+  "scales": [
+    {
+      "name": "x",
+      "type": "band",
+      "domain": {
+        "data": "table",
+        "field": "c",
+        "sort": {
+          "op": "min",
+          "field": "v",
+          "order": {
+            "signal": "order"
+          }
+        }
+      },
+      "range": "width",
+      "paddingInner": {
+        "signal": "1 - barWidth"
+      },
+      "paddingOuter": 0.1
+    },
+    {
+      "name": "y",
+      "type": "linear",
+      "domain": {
+        "data": "table",
+        "field": "v"
+      },
+      "range": "height",
+      "nice": true,
+      "zero": true
+    },
+    {
+      "name": "shade",
+      "type": "linear",
+      "domain": {
+        "data": "table",
+        "field": "v"
+      },
+      "range": [
+        {
+          "signal": "faded"
+        },
+        {
+          "signal": "tint"
+        }
+      ]
+    }
+  ],
+  "axes": [
+    {
+      "orient": "bottom",
+      "scale": "x"
+    },
+    {
+      "orient": "left",
+      "scale": "y",
+      "tickCount": 5,
+      "grid": true,
+      "gridColor": "#eeeeee"
+    }
+  ],
+  "title": {
+    "text": {
+      "signal": "heading"
+    },
+    "anchor": "start",
+    "fontSize": 14
+  },
+  "marks": [
+    {
+      "type": "rect",
+      "from": {
+        "data": "table"
+      },
+      "encode": {
+        "enter": {
+          "x": {
+            "scale": "x",
+            "field": "c"
+          },
+          "width": {
+            "scale": "x",
+            "band": 1
+          },
+          "y": {
+            "scale": "y",
+            "field": "v"
+          },
+          "y2": {
+            "scale": "y",
+            "value": 0
+          },
+          "fill": {
+            "scale": "shade",
+            "field": "v"
+          },
+          "tooltip": {
+            "signal": "datum.c + ': ' + datum.v"
+          }
+        }
+      }
+    },
+    {
+      "type": "text",
+      "from": {
+        "data": "table"
+      },
+      "encode": {
+        "enter": {
+          "x": {
+            "scale": "x",
+            "field": "c",
+            "band": 0.5
+          },
+          "y": {
+            "scale": "y",
+            "field": "v",
+            "offset": -4
+          },
+          "text": {
+            "field": "v"
+          },
+          "align": {
+            "value": "center"
+          },
+          "baseline": {
+            "value": "bottom"
+          },
+          "fontSize": {
+            "value": 10
+          },
+          "fill": {
+            "value": "#333333"
+          },
+          "opacity": {
+            "signal": "labels ? 1 : 0"
+          }
+        }
+      }
+    }
+  ]
+}

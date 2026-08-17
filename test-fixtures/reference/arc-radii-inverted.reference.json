@@ -1,0 +1,83 @@
+{
+  "marks": [
+    {
+      "fill": "#4c78a8",
+      "role": "mark",
+      "shapeHeight": 86.766536,
+      "shapeLeft": 58,
+      "shapeTop": 13,
+      "shapeWidth": 59,
+      "stroke": "#333333",
+      "strokeWidth": 1,
+      "type": "arc"
+    },
+    {
+      "fill": "#f58518",
+      "role": "mark",
+      "shapeHeight": 86.766536,
+      "shapeLeft": 168,
+      "shapeTop": 13,
+      "shapeWidth": 59,
+      "stroke": "#333333",
+      "strokeWidth": 1,
+      "type": "arc"
+    },
+    {
+      "fill": "#54a24b",
+      "role": "mark",
+      "shapeHeight": 64.193844,
+      "shapeLeft": 278,
+      "shapeTop": 28,
+      "shapeWidth": 44,
+      "stroke": "#333333",
+      "strokeWidth": 1,
+      "type": "arc"
+    },
+    {
+      "fill": "#e45756",
+      "role": "mark",
+      "shapeHeight": 4,
+      "shapeLeft": 368,
+      "shapeTop": 68,
+      "shapeWidth": 4,
+      "stroke": "#333333",
+      "strokeWidth": 1,
+      "type": "arc"
+    },
+    {
+      "fill": "#72b7b2",
+      "role": "mark",
+      "shapeHeight": 34,
+      "shapeLeft": 428,
+      "shapeTop": 23,
+      "shapeWidth": 4,
+      "stroke": "#333333",
+      "strokeWidth": 1,
+      "type": "arc"
+    }
+  ],
+  "scales": {
+    "colour": {
+      "domain": [
+        "ring",
+        "inverted",
+        "inner only",
+        "negative outer",
+        "no angle"
+      ],
+      "range": [
+        "#4c78a8",
+        "#f58518",
+        "#54a24b",
+        "#e45756",
+        "#72b7b2"
+      ]
+    }
+  },
+  "size": {
+    "height": 150,
+    "width": 470
+  },
+  "spec": "arc-radii-inverted.vg.json",
+  "vegaVersion": "6.3.1"
+}

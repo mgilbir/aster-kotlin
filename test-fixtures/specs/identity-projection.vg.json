@@ -1,0 +1,243 @@
+{
+  "$schema": "https://vega.github.io/schema/vega/v6.json",
+  "description": "The identity projection: no globe at all. Coordinates are already on the page and only the scale, the translation and a reflection touch them, which is what a chart whose geometry is a floor plan rather than a map wants. Its defaults are its own \u2014 scale 1 and translate [0, 0], where every spherical projection starts at 150 and the middle of a 960 by 500 page \u2014 and clipExtent, fitExtent and reflectY all work on it as they do on the rest.",
+  "width": 240,
+  "height": 120,
+  "padding": 5,
+  "background": "white",
+  "data": [
+    {
+      "name": "shape",
+      "values": {
+        "type": "FeatureCollection",
+        "features": [
+          {
+            "type": "Feature",
+            "properties": {},
+            "geometry": {
+              "type": "Polygon",
+              "coordinates": [
+                [
+                  [
+                    0,
+                    0
+                  ],
+                  [
+                    40,
+                    0
+                  ],
+                  [
+                    40,
+                    20
+                  ],
+                  [
+                    20,
+                    30
+                  ],
+                  [
+                    0,
+                    20
+                  ],
+                  [
+                    0,
+                    0
+                  ]
+                ]
+              ]
+            }
+          }
+        ]
+      },
+      "format": {
+        "type": "json",
+        "property": "features"
+      }
+    },
+    {
+      "name": "pts",
+      "values": [
+        {
+          "x": 5,
+          "y": 5
+        },
+        {
+          "x": 30,
+          "y": 15
+        },
+        {
+          "x": 20,
+          "y": 25
+        }
+      ]
+    }
+  ],
+  "projections": [
+    {
+      "name": "plain",
+      "type": "identity",
+      "scale": 2,
+      "translate": [
+        4,
+        4
+      ]
+    },
+    {
+      "name": "flipped",
+      "type": "identity",
+      "scale": 2,
+      "translate": [
+        130,
+        64
+      ],
+      "reflectY": true
+    },
+    {
+      "name": "fitted",
+      "type": "identity",
+      "fit": {
+        "signal": "data('shape')"
+      },
+      "extent": [
+        [
+          100,
+          6
+        ],
+        [
+          124,
+          114
+        ]
+      ]
+    }
+  ],
+  "signals": [
+    {
+      "name": "howBig",
+      "update": "geoScale('plain') + ',' + geoScale('fitted')"
+    }
+  ],
+  "marks": [
+    {
+      "type": "path",
+      "from": {
+        "data": "shape"
+      },
+      "transform": [
+        {
+          "type": "geoshape",
+          "projection": "plain"
+        }
+      ],
+      "encode": {
+        "enter": {
+          "fill": {
+            "value": "#dbe9f6"
+          },
+          "stroke": {
+            "value": "#4c78a8"
+          }
+        }
+      }
+    },
+    {
+      "type": "path",
+      "from": {
+        "data": "shape"
+      },
+      "transform": [
+        {
+          "type": "geoshape",
+          "projection": "flipped"
+        }
+      ],
+      "encode": {
+        "enter": {
+          "fill": {
+            "value": "#fde0dd"
+          },
+          "stroke": {
+            "value": "#e45756"
+          }
+        }
+      }
+    },
+    {
+      "type": "path",
+      "from": {
+        "data": "shape"
+      },
+      "transform": [
+        {
+          "type": "geoshape",
+          "projection": "fitted"
+        }
+      ],
+      "encode": {
+        "enter": {
+          "fill": {
+            "value": "#e6f0d9"
+          },
+          "stroke": {
+            "value": "#4a7c1f"
+          }
+        }
+      }
+    },
+    {
+      "type": "symbol",
+      "from": {
+        "data": "pts"
+      },
+      "transform": [
+        {
+          "type": "geopoint",
+          "projection": "plain",
+          "fields": [
+            "x",
+            "y"
+          ],
+          "as": [
+            "px",
+            "py"
+          ]
+        }
+      ],
+      "encode": {
+        "enter": {
+          "x": {
+            "field": "px"
+          },
+          "y": {
+            "field": "py"
+          },
+          "size": {
+            "value": 40
+          },
+          "fill": {
+            "value": "#333"
+          }
+        }
+      }
+    },
+    {
+      "type": "text",
+      "encode": {
+        "enter": {
+          "x": {
+            "value": 4
+          },
+          "y": {
+            "value": 116
+          },
+          "fontSize": {
+            "value": 9
+          }
+        },
+        "update": {
+          "text": {
+            "signal": "howBig"
+          }
+        }
+      }
+    }
+  ]
+}

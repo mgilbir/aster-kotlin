@@ -1,0 +1,123 @@
+{
+  "$schema": "https://vega.github.io/schema/vega/v6.json",
+  "description": "The same skewed column through all four discretizing scales, so the difference between equal widths and equal counts is visible as a row of squares.",
+  "width": 250,
+  "height": 130,
+  "padding": 5,
+  "data": [
+    {
+      "name": "table",
+      "values": [
+        {"v": 1},
+        {"v": 2},
+        {"v": 2},
+        {"v": 3},
+        {"v": 4},
+        {"v": 5},
+        {"v": 7},
+        {"v": 9},
+        {"v": 12},
+        {"v": 18},
+        {"v": 27},
+        {"v": 44},
+        {"v": 70},
+        {"v": 100}
+      ]
+    }
+  ],
+  "scales": [
+    {
+      "name": "x",
+      "type": "linear",
+      "domain": [0, 100],
+      "range": [0, 240]
+    },
+    {
+      "name": "byWidth",
+      "type": "quantize",
+      "domain": [0, 100],
+      "range": ["#eff3ff", "#bdd7e7", "#6baed6", "#2171b5"]
+    },
+    {
+      "name": "byCount",
+      "type": "quantile",
+      "domain": {"data": "table", "field": "v"},
+      "range": ["#feedde", "#fdbe85", "#fd8d3c", "#d94701"]
+    },
+    {
+      "name": "byLimit",
+      "type": "threshold",
+      "domain": [10, 50],
+      "range": ["#edf8e9", "#74c476", "#006d2c"]
+    },
+    {
+      "name": "byEdge",
+      "type": "bin-ordinal",
+      "domain": [0, 25, 50, 75, 100],
+      "range": ["#f2f0f7", "#cbc9e2", "#9e9ac8", "#6a51a3"]
+    }
+  ],
+  "axes": [{"orient": "bottom", "scale": "x", "tickCount": 5, "offset": 8}],
+  "marks": [
+    {
+      "type": "rect",
+      "from": {"data": "table"},
+      "encode": {
+        "enter": {
+          "x": {"scale": "x", "field": "v"},
+          "width": {"value": 9},
+          "y": {"value": 0},
+          "height": {"value": 22},
+          "fill": {"scale": "byWidth", "field": "v"},
+          "stroke": {"value": "#666666"},
+          "strokeWidth": {"value": 0.5}
+        }
+      }
+    },
+    {
+      "type": "rect",
+      "from": {"data": "table"},
+      "encode": {
+        "enter": {
+          "x": {"scale": "x", "field": "v"},
+          "width": {"value": 9},
+          "y": {"value": 25},
+          "height": {"value": 22},
+          "fill": {"scale": "byCount", "field": "v"},
+          "stroke": {"value": "#666666"},
+          "strokeWidth": {"value": 0.5}
+        }
+      }
+    },
+    {
+      "type": "rect",
+      "from": {"data": "table"},
+      "encode": {
+        "enter": {
+          "x": {"scale": "x", "field": "v"},
+          "width": {"value": 9},
+          "y": {"value": 50},
+          "height": {"value": 22},
+          "fill": {"scale": "byLimit", "field": "v"},
+          "stroke": {"value": "#666666"},
+          "strokeWidth": {"value": 0.5}
+        }
+      }
+    },
+    {
+      "type": "rect",
+      "from": {"data": "table"},
+      "encode": {
+        "enter": {
+          "x": {"scale": "x", "field": "v"},
+          "width": {"value": 9},
+          "y": {"value": 75},
+          "height": {"value": 22},
+          "fill": {"scale": "byEdge", "field": "v"},
+          "stroke": {"value": "#666666"},
+          "strokeWidth": {"value": 0.5}
+        }
+      }
+    }
+  ]
+}
