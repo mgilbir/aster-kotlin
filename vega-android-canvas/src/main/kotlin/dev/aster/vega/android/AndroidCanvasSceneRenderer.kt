@@ -85,22 +85,34 @@ public class AndroidCanvasSceneRenderer(
         if (!background.isTransparent) canvas.drawColor(background.toArgb())
       }
 
-      drawNode(scene.root, canvas, 1.0, diagnostics)
+      drawNode(scene.root, canvas, diagnostics)
     } finally {
       canvas.restoreToCount(saveCount)
       lastDiagnostics = diagnostics.diagnostics
     }
   }
 
-  private fun drawNode(
-    node: SceneNode,
-    canvas: Canvas,
-    inheritedOpacity: Double,
-    diagnostics: DiagnosticCollector,
-  ) {
+  /**
+   * Draws one node, with its **own** opacity and no inheritance.
+   *
+   * Opacity does not descend. That reads like an omission, so it is worth saying why: upstream's
+   * canvas renderer saves the graphics state, translates and clips on the way into a group and
+   * never touches `globalAlpha`, and its SVG renderer emits `opacity` on the group's background
+   * `path` while leaving the child element bare. A group's opacity paints its own panel and nothing
+   * else.
+   *
+   * This renderer used to multiply an inherited opacity into every descendant, which drew a
+   * half-opaque group's opaque child at half. Nothing caught it: the differential fixtures compare
+   * scene trees, and a scene tree is the same either way. The Swift renderer's pixel tests found
+   * it, having made the identical mistake.
+   */
+  private fun drawNode(node: SceneNode, canvas: Canvas, diagnostics: DiagnosticCollector) {
     if (!node.visible) return
-    val opacity = inheritedOpacity * node.opacity
-    if (opacity <= 0.0) return
+    // A fully transparent *group* still draws its children — upstream renders them and only its own
+    // background disappears. For everything else nothing would be painted anyway, so leaving early
+    // is the same picture drawn faster.
+    if (node.opacity <= 0.0 && node !is GroupNode) return
+    val opacity = node.opacity
 
     val saveCount = canvas.save()
     try {
@@ -141,8 +153,9 @@ public class AndroidCanvasSceneRenderer(
     }
 
     // A group with its own paint draws a rectangle of its declared size, as Vega group marks do.
+    // This is the only thing the group's own opacity applies to.
     val paintRect = node.paintRect
-    if (paintRect != null) {
+    if (paintRect != null && opacity > 0.0) {
       drawGroupPaint(
         node,
         paintRect,
@@ -154,12 +167,12 @@ public class AndroidCanvasSceneRenderer(
       )
     }
 
-    for (child in node.children) drawNode(child, canvas, opacity, diagnostics)
+    for (child in node.children) drawNode(child, canvas, diagnostics)
 
     // `strokeForeground` puts the group's outline over its children rather than under them, which
     // is
     // the whole channel: a cell whose bars run to its own border either covers it or is covered.
-    if (paintRect != null && node.strokeForeground) {
+    if (paintRect != null && node.strokeForeground && opacity > 0.0) {
       drawGroupPaint(node, paintRect, canvas, opacity, diagnostics, filled = false, stroked = true)
     }
   }
