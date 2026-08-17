@@ -138,8 +138,12 @@ public object WindowTransform : Transform {
       var currentRank = 1
       var currentDense = 1
       for (index in data.indices) {
+        // With **no** comparator every row is its own peer group, which is what the `peerEnd` scan
+        // below already assumes and what upstream's `constant(-1)` peer boundary means. This tested
+        // `comparator != null` first, so an unsorted window never advanced: `rank` and `dense_rank`
+        // came back as 1 for every row of the table. Upstream answers 1, 2, 3, …
         val changed =
-          index > 0 && comparator != null && comparator.compare(data[index - 1], data[index]) != 0
+          index > 0 && (comparator == null || comparator.compare(data[index - 1], data[index]) != 0)
         if (changed) {
           currentRank = index + 1
           currentDense++

@@ -1,5 +1,6 @@
 package dev.aster.vega.runtime.scale
 
+import dev.aster.vega.expression.NumberFormat
 import dev.aster.vega.model.roundHalfUp
 import kotlin.math.abs
 import kotlin.math.ceil
@@ -32,9 +33,21 @@ public object Ticks {
    * A positive result is a multiplier; a negative result `-k` means the step is `1/k`.
    * `Double.NEGATIVE_INFINITY` means the range is degenerate.
    */
-  public fun tickIncrement(start: Double, stop: Double, count: Int): Double {
-    val step = (stop - start) / count.coerceAtLeast(0)
-    if (!step.isFinite() || step <= 0.0) return Double.NEGATIVE_INFINITY
+  /**
+   * d3's `tickSpec`: the first and last tick **indices** and the increment between them.
+   *
+   * Transcribed from d3-array 3.2.4, which rewrote this — the older algorithm computed the
+   * increment and let each caller rediscover the indices. Two things only exist in the new one:
+   *
+   * - the **retry**. When the interval is empty and the count is between a half and two, d3 asks
+   *   again with twice the count, so `ticks(1, 364, 1)` is `[200]` rather than nothing. A count of
+   *   one is something a specification writes, and this engine answered with an axis that had no
+   *   ticks at all.
+   * - a **fractional count**, which is why this takes a `Double`. The retry passes `count * 2` and
+   *   the condition itself is fractional, so an `Int` cannot express the algorithm.
+   */
+  private fun tickSpec(start: Double, stop: Double, count: Double): TickSpec {
+    val step = (stop - start) / maxOf(0.0, count)
     val power = floor(log10(step))
     val error = step / 10.0.pow(power)
     val factor =
@@ -44,40 +57,73 @@ public object Ticks {
         error >= E2 -> 2.0
         else -> 1.0
       }
-    return if (power >= 0) factor * 10.0.pow(power) else -(10.0.pow(-power)) / factor
+    var i1: Double
+    var i2: Double
+    var inc: Double
+    // `power < 0` is false for a NaN power, which is how a NaN bound reaches the else branch here
+    // and comes back out as NaN rather than as an infinity — JavaScript's comparison, kept.
+    if (power < 0) {
+      inc = 10.0.pow(-power) / factor
+      i1 = roundHalfUp(start * inc)
+      i2 = roundHalfUp(stop * inc)
+      if (i1 / inc < start) i1 += 1
+      if (i2 / inc > stop) i2 -= 1
+      inc = -inc
+    } else {
+      inc = 10.0.pow(power) * factor
+      i1 = roundHalfUp(start / inc)
+      i2 = roundHalfUp(stop / inc)
+      if (i1 * inc < start) i1 += 1
+      if (i2 * inc > stop) i2 -= 1
+    }
+    if (i2 < i1 && 0.5 <= count && count < 2) return tickSpec(start, stop, count * 2)
+    return TickSpec(i1, i2, inc)
+  }
+
+  private class TickSpec(val i1: Double, val i2: Double, val inc: Double)
+
+  /**
+   * The increment between ticks: a step, or **`-k` meaning a step of `1/k`**.
+   *
+   * The negative form is d3's way of keeping a fractional step exact — a tenth is `-10`, not `0.1`
+   * — so `0.1 + 0.2` never enters an axis.
+   */
+  public fun tickIncrement(start: Double, stop: Double, count: Int): Double =
+    tickIncrement(start, stop, count.toDouble())
+
+  public fun tickIncrement(start: Double, stop: Double, count: Double): Double =
+    tickSpec(start, stop, count).inc
+
+  /**
+   * d3's `tickStep`: the increment as a **signed magnitude**, negative for a reversed span.
+   *
+   * Not `stepFrom(tickIncrement(...))`, which is what this engine used to compute for it: that
+   * loses the sign of a reversed span, and answers NaN where d3 answers 0 for a span of nothing.
+   */
+  public fun step(start: Double, stop: Double, count: Double): Double {
+    val reverse = stop < start
+    val inc = if (reverse) tickIncrement(stop, start, count) else tickIncrement(start, stop, count)
+    return (if (reverse) -1.0 else 1.0) * (if (inc < 0) 1.0 / -inc else inc)
   }
 
   /** Tick values between [start] and [stop], approximately [count] of them, ascending. */
-  public fun ticks(start: Double, stop: Double, count: Int): List<Double> {
-    if (count <= 0) return emptyList()
-    if (start == stop) return if (start.isFinite()) listOf(start) else emptyList()
+  public fun ticks(start: Double, stop: Double, count: Int): List<Double> =
+    ticks(start, stop, count.toDouble())
 
+  public fun ticks(start: Double, stop: Double, count: Double): List<Double> {
+    if (!(count > 0)) return emptyList()
+    if (start == stop) return listOf(start)
     val reverse = stop < start
-    val lo = if (reverse) stop else start
-    val hi = if (reverse) start else stop
-    val step = tickIncrement(lo, hi, count)
-    if (!step.isFinite()) return emptyList()
-
-    val values =
-      if (step > 0) {
-        // Nudge the bounds by one part in 1e12 so a bound that should be a tick is not lost to
-        // floating-point representation, matching d3's `Math.round` on the scaled bounds.
-        var i1 = roundHalfUp(lo / step)
-        var i2 = roundHalfUp(hi / step)
-        if (i1 * step < lo) i1 += 1
-        if (i2 * step > hi) i2 -= 1
-        val n = (i2 - i1 + 1).toInt()
-        if (n <= 0) emptyList() else List(n) { (i1 + it) * step }
-      } else {
-        val inverse = -step
-        var i1 = roundHalfUp(lo * inverse)
-        var i2 = roundHalfUp(hi * inverse)
-        if (i1 / inverse < lo) i1 += 1
-        if (i2 / inverse > hi) i2 -= 1
-        val n = (i2 - i1 + 1).toInt()
-        if (n <= 0) emptyList() else List(n) { (i1 + it) / inverse }
-      }
-    return if (reverse) values.reversed() else values
+    val spec = if (reverse) tickSpec(stop, start, count) else tickSpec(start, stop, count)
+    if (!(spec.i2 >= spec.i1)) return emptyList()
+    val n = (spec.i2 - spec.i1 + 1).toInt()
+    if (n <= 0) return emptyList()
+    val inc = spec.inc
+    return if (reverse) {
+      if (inc < 0) List(n) { (spec.i2 - it) / -inc } else List(n) { (spec.i2 - it) * inc }
+    } else {
+      if (inc < 0) List(n) { (spec.i1 + it) / -inc } else List(n) { (spec.i1 + it) * inc }
+    }
   }
 
   /**
@@ -110,7 +156,9 @@ public object Ticks {
     var iterations = MAX_NICE_PASSES
     while (iterations-- > 0) {
       val step = tickIncrement(start, stop, count)
-      if (step == previousStep) break
+      // d3 stops on any step it cannot widen with: unchanged, zero, or not finite. Without the last
+      // two, a count of zero or a NaN bound walked into the arithmetic below and returned NaN.
+      if (step == previousStep || step == 0.0 || !step.isFinite()) break
       when {
         step > 0 -> {
           start = floor(start / step) * step
@@ -150,11 +198,8 @@ public object Ticks {
    *
    * Takes an actual step, not a [tickIncrement] result; pass the latter through [stepFrom] first.
    */
-  public fun precisionForStep(step: Double): Int {
-    if (step <= 0.0 || !step.isFinite()) return 0
-    val exponent = floor(log10(abs(step)))
-    return if (exponent >= 0) 0 else (-exponent).toInt()
-  }
+  public fun precisionForStep(step: Double): Int =
+    if (step <= 0.0) 0 else NumberFormat.precisionFixed(step)
 
   /**
    * A format specifier with the precision the span implies, when the specification left it out.
@@ -164,13 +209,16 @@ public object Ticks {
    * "as many as the tick step needs", and the number of them depends on the domain being labelled.
    * A percent format takes **two fewer**, because the value is multiplied by a hundred first.
    *
-   * A specifier that already names a precision is left exactly as written, and so is `s`, whose
-   * precision is decided by an SI prefix this engine does not implement.
+   * A specifier that already names a precision is left exactly as written, and so is `d`, which has
+   * no case in upstream's switch. `s` is not resolvable to a specifier string at all — see
+   * [spanFormatter].
    */
   public fun spanSpecifier(specifier: String, start: Double, stop: Double, count: Int): String {
     if (specifier.contains('.')) return specifier
     val type = specifier.lastOrNull()?.takeIf { it.isLetter() || it == '%' }
-    if (type == 'd') return specifier
+    // `s` is resolved by [spanFormatter] instead: one SI prefix is fixed for the whole span, which
+    // no specifier string can say. `d` has no case in upstream's switch.
+    if (type == 's' || type == 'd') return specifier
     val step = stepFrom(tickIncrement(start, stop, count))
     if (!step.isFinite() || step <= 0.0) return specifier
     val magnitude = maxOf(abs(start), abs(stop))
@@ -179,10 +227,6 @@ public object Ticks {
         'f',
         '%' -> precisionForStep(step) - (if (type == '%') 2 else 0)
         'e' -> precisionForRound(step, magnitude) - 1
-        // d3's `precisionPrefix`: how many decimals are needed once the value has been divided by
-        // the SI prefix the *whole axis* shares. A step of 500 under a 1,000 magnitude leaves one,
-        // which is what makes the labels read `−1.0k` rather than `−1k`.
-        's' -> precisionPrefix(step, magnitude)
         null,
         'g',
         'p',
@@ -195,29 +239,35 @@ public object Ticks {
     return if (type == null) "$specifier.$clamped" else specifier.dropLast(1) + ".$clamped" + type
   }
 
-  /**
-   * d3's `precisionPrefix`: decimals needed after dividing by the SI prefix chosen for [magnitude].
-   */
-  private fun precisionPrefix(step: Double, magnitude: Double): Int {
-    if (magnitude <= 0.0 || !magnitude.isFinite() || step <= 0.0 || !step.isFinite()) return 0
-    val prefixExponent = siExponent(magnitude)
-    return maxOf(0, prefixExponent - floor(log10(abs(step))).toInt())
-  }
+  private fun precisionForRound(step: Double, magnitude: Double): Int =
+    if (step <= 0.0 || magnitude <= 0.0) 0 else NumberFormat.precisionRound(step, magnitude)
 
   /**
-   * The exponent of the SI prefix d3 picks for a magnitude: a multiple of three, clamped to ±24.
+   * The label formatter a span implies — [spanSpecifier], plus the one case a specifier cannot say.
+   *
+   * `s` is that case. Upstream resolves it with `formatPrefix`, which fixes **one** SI prefix for
+   * the whole span from its largest magnitude, so an axis over two million reads `0.5M | 1.0M |
+   * 1.5M | 2.0M`. Formatting each label on its own instead gives `500k | 1M | 1.5M | 2M` — mixed
+   * units down one axis, which is the kind of wrong that looks like a data error.
    */
-  public fun siExponent(magnitude: Double): Int {
-    if (magnitude <= 0.0 || !magnitude.isFinite()) return 0
-    return floor(log10(magnitude)).toInt().floorDiv(3).coerceIn(-8, 8) * 3
-  }
-
-  /**
-   * d3's `precisionRound`: significant digits enough to tell values [step] apart at [magnitude].
-   */
-  private fun precisionForRound(step: Double, magnitude: Double): Int {
-    if (step <= 0.0 || !step.isFinite() || magnitude <= 0.0 || !magnitude.isFinite()) return 0
-    return maxOf(0.0, floor(log10(magnitude)) - floor(log10(abs(step)))).toInt() + 1
+  public fun spanFormatter(
+    specifier: String,
+    start: Double,
+    stop: Double,
+    count: Int,
+  ): (Double) -> String {
+    val parsed = NumberFormat.parse(specifier)
+    if (parsed != null && parsed.type == 's' && parsed.precision == null) {
+      val step = stepFrom(tickIncrement(start, stop, count))
+      val magnitude = maxOf(abs(start), abs(stop))
+      if (step.isFinite() && step > 0.0) {
+        val precision = NumberFormat.precisionPrefix(step, magnitude).coerceIn(0, 20)
+        val prefixed = NumberFormat.prefixed(parsed.copy(precision = precision), magnitude)
+        return { value -> prefixed(value) }
+      }
+    }
+    val resolved = spanSpecifier(specifier, start, stop, count)
+    return { value -> NumberFormat.format(value, resolved) }
   }
 
   /**

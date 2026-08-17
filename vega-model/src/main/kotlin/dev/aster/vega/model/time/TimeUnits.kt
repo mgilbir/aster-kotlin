@@ -1,5 +1,12 @@
 package dev.aster.vega.model.time
 
+import kotlin.time.Instant
+import kotlinx.datetime.LocalDateTime
+import kotlinx.datetime.TimeZone
+import kotlinx.datetime.isoDayNumber
+import kotlinx.datetime.number
+import kotlinx.datetime.toLocalDateTime
+
 /**
  * The calendar units a specification can bucket dates into, and the format each one is read with.
  *
@@ -66,8 +73,84 @@ public object TimeUnits {
    * Unrecognised units are dropped rather than rejected, so a specification naming one gets a
    * shorter label rather than no chart.
    */
-  public fun specifier(units: List<String>, overrides: Map<String, String> = emptyMap()): String {
-    val table = SPECIFIERS + overrides
+  /**
+   * `inferUnits`: the finest granularity every instant in the data is **aligned to**.
+   *
+   * A transcription of upstream's `detectTimeUnits`, table and all, because the answer is a *label
+   * format* — infer `date` for a series of month starts and every tick reads "Jan 1, Feb 1" where
+   * upstream reads "January, February". This engine had no inference at all: it fell through to the
+   * extent-binning path, which chooses by span rather than by alignment and answered `date` for
+   * monthly data.
+   *
+   * The table is read in order and the *last aligned* grain wins, with one wrinkle worth keeping:
+   * the weekly grain is **skippable**, so a run of dates that is not weekly does not stop the
+   * search — `required > mismatch + 1` lets the scan step over it and still reach the monthly grain
+   * below.
+   */
+  public fun detect(instants: List<Double>, zone: TimeZone): Pair<List<String>, Int> {
+    if (instants.isEmpty()) return listOf("year") to 1
+    val dates = instants.map { Instant.fromEpochMilliseconds(it.toLong()).toLocalDateTime(zone) }
+    // JavaScript's `getDay` is 0 for Sunday; `isoDayNumber` is 7 for it.
+    fun weekday(at: LocalDateTime) = at.date.dayOfWeek.isoDayNumber % 7
+    fun millisecond(at: LocalDateTime) = at.nanosecond / 1_000_000
+
+    val grains: List<Grain> =
+      listOf(
+        Grain(listOf("year", "month", "date", "hours", "minutes", "seconds", "milliseconds"), 1) {
+          true
+        },
+        Grain(listOf("year", "month", "date", "hours", "minutes", "seconds"), 1) { all ->
+          all.all { millisecond(it) == 0 }
+        },
+        Grain(listOf("year", "month", "date", "hours", "minutes"), 1) { all ->
+          all.all { it.second == 0 }
+        },
+        Grain(listOf("year", "month", "date", "hours", "minutes"), 5) { all ->
+          all.all { it.minute % 5 == 0 }
+        },
+        Grain(listOf("year", "month", "date", "hours", "minutes"), 10) { all ->
+          all.all { it.minute % 10 == 0 }
+        },
+        Grain(listOf("year", "month", "date", "hours"), 1) { all -> all.all { it.minute == 0 } },
+        Grain(listOf("year", "month", "date"), 1) { all -> all.all { it.hour == 0 } },
+        Grain(listOf("year", "week"), 1, skippable = true) { all ->
+          all.map { weekday(it) }.distinct().size == 1
+        },
+        Grain(listOf("year", "month"), 1) { all -> all.all { it.date.day == 1 } },
+        Grain(listOf("year", "month"), 3) { all ->
+          all.all { (it.date.month.number - 1) % 3 == 0 }
+        },
+        Grain(listOf("year"), 1) { all -> all.all { it.date.month.number == 1 } },
+        Grain(listOf("year"), 10) { all -> all.all { it.date.year % 10 == 0 } },
+        Grain(emptyList(), 1) { false },
+      )
+
+    val mismatch = grains.indexOfFirst { !it.aligned(dates) }
+    val required = grains.indexOfFirst { !it.skippable && !it.aligned(dates) }
+    val index = if (required > mismatch + 1) required else mismatch
+    val chosen = grains[(index - 1).coerceAtLeast(0)]
+    return chosen.units to chosen.step
+  }
+
+  private class Grain(
+    val units: List<String>,
+    val step: Int,
+    val skippable: Boolean = false,
+    private val test: (List<LocalDateTime>) -> Boolean,
+  ) {
+    fun aligned(dates: List<LocalDateTime>): Boolean = test(dates)
+  }
+
+  public fun specifier(units: List<String>, overrides: Map<String, String?> = emptyMap()): String {
+    // Nullable on purpose. Upstream builds the table with `extend({}, defaults, specifiers)` and
+    // then
+    // tests `s[key] != null`, so an override set to **null** does not fall back to the default — it
+    // *removes* the entry, and the search drops to a shorter run of units. That is the only way to
+    // say "do not combine these two", and `timeUnitSpecifier(['hours','minutes'], {'hours-minutes':
+    // null})` is `%H %Mmin` upstream where taking the built-in combination gives `%H:%M`. The
+    // signature used to be `Map<String, String>`, which cannot express it at all; upstream's own
+    // test vectors are what caught it.
+    val table: Map<String, String?> = SPECIFIERS + overrides
     val ordered = ALL.filter { it in units }
     val out = StringBuilder()
     var start = 0

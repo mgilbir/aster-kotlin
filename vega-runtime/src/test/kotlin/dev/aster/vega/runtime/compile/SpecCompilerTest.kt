@@ -227,8 +227,18 @@ class SpecCompilerTest {
     }
   }
 
+  /**
+   * This test used to assert the opposite, and the opposite was wrong.
+   *
+   * It read "an arc without a radius or a sweep draws nothing rather than a degenerate shape",
+   * which sounds like tidiness and was a divergence: upstream **emits the item** and gives it a
+   * degenerate path — a line from the outer radius to the inner one for a sweep of zero, a point
+   * for a non-positive radius. Dropping the item is the wider error, because every later item
+   * shifts up an index and the mark's container stops agreeing with upstream's.
+   * `arc-radii-inverted` is the evidence; this pins the same rule where a unit test can see it.
+   */
   @Test
-  fun `an arc without a radius or a sweep draws nothing rather than a degenerate shape`() {
+  fun `an arc with no sweep still produces an item, as upstream does`() {
     val compiled =
       compile(
         """
@@ -243,7 +253,9 @@ class SpecCompilerTest {
         """
           .trimIndent()
       )
-    assertTrue(requireNotNull(compiled.scene).flatten().none { it.node is PathNode })
+    val paths =
+      requireNotNull(compiled.scene).flatten().map { it.node }.filterIsInstance<PathNode>()
+    assertEquals(1, paths.size, "upstream draws one arc item here, degenerate or not")
   }
 
   /**

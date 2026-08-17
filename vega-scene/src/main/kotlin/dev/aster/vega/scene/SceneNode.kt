@@ -360,7 +360,8 @@ public data class GroupNode(
       }
       if (clip != null) result = intersect(result, clip)
       if (boundsFromChildren) return@lazy result.normalized()
-      (stroke.wideningAt(opacity)?.let { result.expand(it.halfWidth) } ?: result).normalized()
+      (stroke.wideningAt(opacity)?.let { result.expand(it.boundsExpansion()) } ?: result)
+        .normalized()
     }
 }
 
@@ -448,7 +449,7 @@ public data class RectNode(
   override val bounds: RectD by
     lazy(LazyThreadSafetyMode.NONE) {
       val base = rect
-      (stroke.wideningAt(opacity)?.let { base.expand(it.halfWidth) } ?: base).normalized()
+      (stroke.wideningAt(opacity)?.let { base.expand(it.boundsExpansion()) } ?: base).normalized()
     }
 }
 
@@ -470,7 +471,7 @@ public data class RuleNode(
   override val bounds: RectD by
     lazy(LazyThreadSafetyMode.NONE) {
       RectD(minOf(x1, x2), minOf(y1, y2), maxOf(x1, x2), maxOf(y1, y2))
-        .expand(stroke.wideningAt(opacity)?.halfWidth ?: 0.0)
+        .expand(stroke.wideningAt(opacity)?.boundsExpansion() ?: 0.0)
         .normalized()
     }
 }
@@ -502,12 +503,9 @@ public data class PathNode(
     lazy(LazyThreadSafetyMode.NONE) {
       if (absent) return@lazy RectD(0.0, 0.0, 0.0, 0.0)
       val base = path.bounds
-      // A miter join can extend past halfWidth; the miter limit bounds how far.
-      val expansion =
-        stroke.wideningAt(opacity)?.let {
-          if (it.join == StrokeJoin.MITER) it.halfWidth * it.miterLimit.coerceAtLeast(1.0)
-          else it.halfWidth
-        } ?: 0.0
+      // A miter join can extend past halfWidth, and a square cap past it too; see
+      // `Stroke.boundsExpansion`.
+      val expansion = stroke.wideningAt(opacity)?.boundsExpansion(miter = true) ?: 0.0
       (if (expansion > 0.0) base.expand(expansion) else base).normalized()
     }
 }
@@ -573,10 +571,7 @@ public data class SymbolNode(
       // triangle's tip really does reach that far past the vertex. It applies the same allowance to
       // a
       // circle, which is over-generous; reproducing it keeps our bounds comparable with upstream's.
-      val expansion =
-        stroke.wideningAt(opacity)?.let {
-          maxOf(it.halfWidth, it.miterLimit.coerceAtLeast(1.0) * it.halfWidth)
-        } ?: 0.0
+      val expansion = stroke.wideningAt(opacity)?.boundsExpansion(miter = true) ?: 0.0
       (if (expansion > 0.0) base.expand(expansion) else base).normalized()
     }
 }

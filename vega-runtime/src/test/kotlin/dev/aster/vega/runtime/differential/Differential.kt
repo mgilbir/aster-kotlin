@@ -322,6 +322,10 @@ public object Differential {
         "x" to anchor.x,
         "y" to anchor.y,
         "fontSize" to run.style.fontSize,
+        // Published to **both** maps, because upstream carries whatever the specification wrote:
+        // `"bold"` arrives as a string and `800` as a number, and the comparison walks upstream's
+        // channels. The string side canonicalises the keywords; this side needs no conversion.
+        "fontWeight" to run.style.fontWeight.toDouble(),
         // Rotation is geometry, not styling: a quarter-turned axis title reads down the page.
         "angle" to node.angleDegrees,
       )
@@ -330,6 +334,11 @@ public object Differential {
         "align" to run.align.name.lowercase(),
         "baseline" to vegaBaseline(run.baseline),
         "font" to run.style.fontFamily,
+        // Compared as a **number**, because the two sides spell it differently: upstream carries
+        // whatever the specification wrote — `bold`, `normal`, `800` — while this engine resolves
+        // it to a weight at encode time. Canonicalising both is the comparison; excluding the
+        // channel, as this harness used to, hid the fact that it was never mapped here either.
+        "fontWeight" to run.style.fontWeight.toString(),
       )
     // An item with no text at all contributes no `text` property, exactly as upstream's does — its
     // formatter returned nothing. An item with an *empty* text still contributes one, so the two
@@ -808,6 +817,8 @@ public object Differential {
       }
       val equal =
         when {
+          // `bold` is 700 and `normal` is 400, which is what a renderer does with them.
+          channel == "fontWeight" -> cssWeight(wanted) == cssWeight(got)
           // Colours compare by value, not by spelling: "steelblue" and "#4682b4" are one colour.
           channel in COLOUR_CHANNELS -> {
             val a = SceneColor.parse(wanted)
@@ -962,17 +973,36 @@ public object Differential {
     }
   }
 
+  /** A CSS font weight as the number a renderer resolves it to. */
+  private fun cssWeight(value: String): Int? =
+    when (value.trim().lowercase()) {
+      "normal" -> 400
+      "bold" -> 700
+      // `lighter` and `bolder` are relative to the parent and cannot be resolved from one item.
+      "lighter",
+      "bolder" -> null
+      else -> value.trim().toDoubleOrNull()?.toInt()
+    }
+
   private fun fmt(value: Double): String =
     if (value == value.toLong().toDouble()) value.toLong().toString() else value.toString()
 
   /**
-   * Channels excluded from comparison.
+   * Channels excluded from comparison: **none**.
    *
-   * Text glyph metrics are the documented exception (PROJECT_BRIEF.md 18.4, docs/adr/0006): a
-   * browser and Android measure fonts differently, so comparing them would fail for reasons
-   * unrelated to this engine's behaviour. Everything else is compared.
+   * This used to hold `font` and `fontWeight`, under the documented text-metrics exception
+   * (PROJECT_BRIEF.md 18.4, docs/adr/0006). That exception is real but it is about *measurement* —
+   * a browser and Android size glyphs differently, so the width of a label is not comparable — and
+   * these two channels are neither measured nor derived. They are the family and weight the
+   * specification asked for, and this engine either resolves them the way upstream does or it does
+   * not.
+   *
+   * It did not. Comparing them found a `style` block's `font` leaking from a title into its
+   * subtitle, and found that `fontWeight` had never been mapped into the comparison at all — it was
+   * excluded *and* absent, so removing it from this set changed nothing until the channel was
+   * published. Text bounds remain excluded, which is what the exception was for.
    */
-  public val DEFAULT_IGNORED_CHANNELS: Set<String> = setOf("font", "fontWeight")
+  public val DEFAULT_IGNORED_CHANNELS: Set<String> = emptySet()
 
   /** Mark types whose drawn extent comes from a curve approximating a true circular arc. */
   private val CURVE_EXTENT_TYPES = setOf("arc", "trail", "path")

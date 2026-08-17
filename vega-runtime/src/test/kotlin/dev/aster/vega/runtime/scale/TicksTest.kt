@@ -34,8 +34,14 @@ class TicksTest {
 
   @Test
   fun `tickIncrement reports a degenerate range`() {
+    // A span of nothing is -Infinity, which is d3's answer and reads as "no ticks".
     assertEquals(Double.NEGATIVE_INFINITY, Ticks.tickIncrement(1.0, 1.0, 10))
-    assertEquals(Double.NEGATIVE_INFINITY, Ticks.tickIncrement(0.0, Double.NaN, 10))
+    // A **NaN** bound is NaN, not -Infinity. This asserted -Infinity — the answer an early guard in
+    // `tickIncrement` produced — until d3-array's own vectors were replayed and disagreed. It is
+    // not
+    // a nicety: `nice` multiplied that infinity out and returned a domain of `[NaN, NaN]`, which is
+    // a chart that does not draw.
+    assertTrue(Ticks.tickIncrement(0.0, Double.NaN, 10).isNaN())
   }
 
   @ParameterizedTest

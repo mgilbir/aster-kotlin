@@ -810,6 +810,16 @@
   "caption": "Y-axis for a linear scale with values from 0.00 to 0.16"
  },
  {
+  "fixture": "diverging-colour",
+  "kind": "axis",
+  "caption": "Y-axis for a discrete scale with 6 values: -10, -5, 0, 5, 10, 20"
+ },
+ {
+  "fixture": "diverging-colour",
+  "kind": "legend",
+  "caption": "Gradient legend titled 'diverging' for fill color with values from −10 to 20"
+ },
+ {
   "fixture": "domain-limits",
   "kind": "axis",
   "caption": "X-axis for a discrete scale with 4 values: a, b, c, d"
@@ -858,6 +868,11 @@
   "fixture": "dot-plot",
   "kind": "axis",
   "caption": "Y-axis for a linear scale with values from 0 to 40"
+ },
+ {
+  "fixture": "ecma-trim",
+  "kind": "axis",
+  "caption": "Y-axis for a discrete scale with 6 values: bom, nbsp, nel, unit separator, zero width space, ideographic space"
  },
  {
   "fixture": "edge-bundling",
@@ -1110,6 +1125,11 @@
   "caption": "Symbol legend titled 'Origin' for stroke color with 3 values: USA, Japan, Europe"
  },
  {
+  "fixture": "invert-buckets",
+  "kind": "axis",
+  "caption": "Y-axis for a discrete scale with 6 values: quantize red, quantize blue, quantile b, threshold low, threshold high, not in range"
+ },
+ {
   "fixture": "label-limit",
   "kind": "axis",
   "caption": "Y-axis for a discrete scale with 3 values: a-really-quite-long-category-name-here, another-long-one-that-runs-on-and-on, short"
@@ -1358,6 +1378,26 @@
   "fixture": "local-time-dst",
   "kind": "axis",
   "caption": "Y-axis for a linear scale with values from 0 to 26"
+ },
+ {
+  "fixture": "log-axis-labels",
+  "kind": "axis",
+  "caption": "Y-axis for a log scale with values from 1 to 10,000"
+ },
+ {
+  "fixture": "log-axis-labels",
+  "kind": "axis",
+  "caption": "Y-axis for a log scale with values from 1 to 10"
+ },
+ {
+  "fixture": "log-axis-labels",
+  "kind": "axis",
+  "caption": "Y-axis for a log scale with values from 1 to 100"
+ },
+ {
+  "fixture": "log-axis-labels",
+  "kind": "axis",
+  "caption": "X-axis for a log scale with values from 1 to 256"
  },
  {
   "fixture": "log-scale",
@@ -1690,6 +1730,36 @@
   "caption": "Y-axis for a linear scale with values from 0.0 to 0.5"
  },
  {
+  "fixture": "si-prefix-axis",
+  "kind": "axis",
+  "caption": "X-axis for a discrete scale with 4 values: a, b, c, d"
+ },
+ {
+  "fixture": "si-prefix-axis",
+  "kind": "axis",
+  "caption": "Y-axis for a linear scale with values from 0.0M to 2.0M"
+ },
+ {
+  "fixture": "si-prefix-axis",
+  "kind": "axis",
+  "caption": "Y-axis for a linear scale with values from $0.0M to $2.0M"
+ },
+ {
+  "fixture": "si-prefix-axis",
+  "kind": "axis",
+  "caption": "Y-axis for a linear scale with values from 0 to 0.05"
+ },
+ {
+  "fixture": "si-prefix-axis",
+  "kind": "axis",
+  "caption": "X-axis for a linear scale with values from 0.0e+0 to 2.0e+6"
+ },
+ {
+  "fixture": "si-prefix-axis",
+  "kind": "legend",
+  "caption": "Gradient legend titled 'amount' for fill color with values from 0.1M to 2.0M"
+ },
+ {
   "fixture": "signal-transform-params",
   "kind": "axis",
   "caption": "Y-axis for a discrete scale with 3 values: alpha, gamma, epsilon"
@@ -1733,6 +1803,11 @@
   "fixture": "sorted-domain",
   "kind": "legend",
   "caption": "Symbol legend titled 'Tier' for fill color with 4 values: 3, 9, 20, 100"
+ },
+ {
+  "fixture": "spherical-measures",
+  "kind": "axis",
+  "caption": "Y-axis for a discrete scale with 6 values: box, wound clockwise, box, wound the other way, wide, across the antimeridian, a line, two points"
  },
  {
   "fixture": "stack-diverging",
