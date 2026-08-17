@@ -32,8 +32,8 @@ if [ "$MODE" = "--check" ]; then
   # most a machine without the iOS platform installed can verify, and it does catch real errors — the
   # first run of it found a SwiftUI overload resolving to `List`'s editable form.
   echo "==> Type-checking for the simulator and for a device"
-  for pair in "iphonesimulator arm64-apple-ios16.0-simulator ios-arm64-simulator" \
-              "iphoneos arm64-apple-ios16.0 ios-arm64"; do
+  for pair in "iphonesimulator arm64-apple-ios17.0-simulator ios-arm64-simulator" \
+              "iphoneos arm64-apple-ios17.0 ios-arm64"; do
     set -- $pair
     sdk_name="$1"; triple="$2"; slice="$3"
     sdk_path="$(xcrun --sdk "$sdk_name" --show-sdk-path)"

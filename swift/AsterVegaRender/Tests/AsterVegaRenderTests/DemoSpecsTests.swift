@@ -24,10 +24,24 @@ final class DemoSpecsTests: XCTestCase {
       .appendingPathComponent("AsterVegaDemo/Resources/Specs")
   }
 
+  /// The loader the app uses, pointed at the repository's data rather than a bundle.
+  ///
+  /// Two of the bundled specifications read their data from a `url`, so `DenyLoader` would fail them
+  /// here for a reason that has nothing to do with the demo. Sharing one loader across the whole run
+  /// also shares its cache, which is what keeps this test from reading `cars.json` twice.
+  private static let loader = VegaDataLoader(
+    localDirectory: URL(fileURLWithPath: #filePath)
+      .deletingLastPathComponent()
+      .deletingLastPathComponent()
+      .deletingLastPathComponent()
+      .deletingLastPathComponent()
+      .appendingPathComponent("test-fixtures")
+  )
+
   private func compiler() -> SpecCompiler {
     SpecCompiler(
       textEngine: MetricTextEngine(advanceRatio: 0.6, ascentRatio: 0.8, descentRatio: 0.2),
-      loader: DenyLoader(),
+      loader: Self.loader,
       randomSeed: 42,
       clock: ClockCompanion.shared.Fixed
     )
