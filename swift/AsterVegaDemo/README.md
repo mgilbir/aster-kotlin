@@ -132,9 +132,17 @@ statements about screen readers rather than about a platform. Those rules used t
 `ExploreByTouchHelper` subclass, which is precisely why iOS had none: they were in a class no other host
 could reach. Android now reads the same tree, so the two cannot describe the same chart differently.
 
-**Verified to the boundary, not through VoiceOver.** The rules are tested in Kotlin and the elements are
-tested as readable from Swift; the SwiftUI wiring that turns them into accessibility elements is not
-covered by an automated test. Closing that means an XCUITest target, which this project does not have yet.
+**Verified through the system**, by UI tests: `scripts/ios-demo.sh --test`. Each bar is asserted to be its
+own element labelled with its datum ("Apr: 91"), the axes to describe themselves, and activating an element
+to select the mark it stands for.
+
+Those tests earned their place twice over. The first version of them passed with the whole accessibility
+block deleted, because they asserted on labels a navigation bar also provides — so they now assert on labels
+only the engine produces. And with real assertions they found two defects: an activation that applied the fit
+scale twice and therefore selected nothing, and — more interesting — that `accessibilityChildren` produces
+elements whose frame is `(inf, inf, 0, 0)`. A reader could have swiped through the chart but never touched it,
+which is most of what makes a chart explorable. The elements are positioned overlay views now, with hit
+testing off so they cannot intercept a finger.
 
 ## Export
 

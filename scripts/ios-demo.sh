@@ -9,6 +9,7 @@
 #   scripts/ios-demo.sh                 build for the simulator, then install and launch
 #   scripts/ios-demo.sh --device        build, install and launch on a connected iPhone
 #   scripts/ios-demo.sh --device-build  build the real device app, unsigned — no Apple ID needed
+#   scripts/ios-demo.sh --test          run the UI tests on a simulator
 #   scripts/ios-demo.sh --check         compile only, no simulator needed
 #
 # `SIMULATOR_DEVICE_TYPE` picks the simulated hardware, so a screenshot can match a real phone:
@@ -52,6 +53,37 @@ if [ "$MODE" = "--check" ]; then
       swift/AsterVegaRender/Sources/AsterVegaRender/*.swift
   done
   echo "==> Both slices type-check"
+  exit 0
+fi
+
+if [ "$MODE" = "--test" ]; then
+  # The UI tests, which are the only place the accessibility wiring is checked end to end: the rules live
+  # in the core and are tested there, but whether SwiftUI actually exposes them to VoiceOver can only be
+  # asked of a running app. They caught two real defects on the way in — an activation that applied the fit
+  # scale twice, and elements with no frame at all.
+  echo "==> Building the framework Kotlin exports"
+  ./gradlew :vega-runtime:assembleAsterVegaDebugXCFramework
+
+  RUNTIMES="$(xcrun simctl list runtimes 2>/dev/null | grep -c "iOS" || true)"
+  if [ "$RUNTIMES" -eq 0 ]; then
+    echo "No iOS simulator runtime installed; see --check, or install with:" >&2
+    echo "    xcodebuild -downloadPlatform iOS" >&2
+    exit 1
+  fi
+
+  WANTED_TYPE="${SIMULATOR_DEVICE_TYPE:-iPhone 15 Pro Max}"
+  DEVICE_NAME="AsterVega-${WANTED_TYPE// /-}"
+  if ! xcrun simctl list devices | grep -q "$DEVICE_NAME"; then
+    RUNTIME="$(xcrun simctl list runtimes | grep "iOS" | tail -1 | sed -E 's/.*(com\.apple\.CoreSimulator\.SimRuntime\.[^ ]*).*/\1/')"
+    DEVICE_TYPE="$(xcrun simctl list devicetypes | grep -F "$WANTED_TYPE (" | head -1 | sed -E 's/.*\((com\.apple[^)]*)\).*/\1/')"
+    xcrun simctl create "$DEVICE_NAME" "$DEVICE_TYPE" "$RUNTIME"
+  fi
+
+  echo "==> Running the UI tests on $DEVICE_NAME"
+  xcodebuild -project "$PROJECT" -scheme AsterVegaDemo \
+    -destination "platform=iOS Simulator,name=$DEVICE_NAME" \
+    -derivedDataPath build/ios-demo \
+    test
   exit 0
 fi
 

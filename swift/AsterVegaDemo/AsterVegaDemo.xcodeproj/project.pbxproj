@@ -27,6 +27,7 @@
 		A50000000000000000000036 /* CoreTextTextEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = A50000000000000000000035 /* CoreTextTextEngine.swift */; };
 		A50000000000000000000038 /* ExportButton.swift in Sources */ = {isa = PBXBuildFile; fileRef = A50000000000000000000037 /* ExportButton.swift */; };
 		A5000000000000000000003A /* SceneExport.swift in Sources */ = {isa = PBXBuildFile; fileRef = A50000000000000000000039 /* SceneExport.swift */; };
+		A5000000000000000000003C /* AccessibilityUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A5000000000000000000003B /* AccessibilityUITests.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -51,6 +52,8 @@
 		A50000000000000000000035 /* CoreTextTextEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = CoreTextTextEngine.swift; path = ../AsterVegaRender/Sources/AsterVegaRender/CoreTextTextEngine.swift; sourceTree = "<group>"; };
 		A50000000000000000000037 /* ExportButton.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExportButton.swift; sourceTree = "<group>"; };
 		A50000000000000000000039 /* SceneExport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = SceneExport.swift; path = ../AsterVegaRender/Sources/AsterVegaRender/SceneExport.swift; sourceTree = "<group>"; };
+		A5000000000000000000003B /* AccessibilityUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AccessibilityUITests.swift; sourceTree = "<group>"; };
+		A5000000000000000000003D /* AsterVegaDemoUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = AsterVegaDemoUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -59,6 +62,13 @@
 			buildActionMask = 2147483647;
 			files = (
 				A50000000000000000000016 /* AsterVega.xcframework in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		A50000000000000000000041 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -72,6 +82,7 @@
 				A5000000000000000000001A /* AsterVegaRender */,
 				A5000000000000000000001B /* Resources */,
 				A5000000000000000000001C /* Frameworks */,
+				A5000000000000000000003F /* UITests */,
 				A5000000000000000000001D /* Products */,
 			);
 			sourceTree = "<group>";
@@ -128,8 +139,17 @@
 			isa = PBXGroup;
 			children = (
 				A50000000000000000000017 /* AsterVegaDemo.app */,
+				A5000000000000000000003D /* AsterVegaDemoUITests.xctest */,
 			);
 			name = Products;
+			sourceTree = "<group>";
+		};
+		A5000000000000000000003F /* UITests */ = {
+			isa = PBXGroup;
+			children = (
+				A5000000000000000000003B /* AccessibilityUITests.swift */,
+			);
+			path = UITests;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -151,6 +171,24 @@
 			productName = AsterVegaDemo;
 			productReference = A50000000000000000000017 /* AsterVegaDemo.app */;
 			productType = "com.apple.product-type.application";
+		};
+		A5000000000000000000003E /* AsterVegaDemoUITests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = A50000000000000000000043 /* Build configuration list for PBXNativeTarget "AsterVegaDemoUITests" */;
+			buildPhases = (
+				A50000000000000000000040 /* Sources */,
+				A50000000000000000000041 /* Frameworks */,
+				A50000000000000000000042 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				A50000000000000000000046 /* PBXTargetDependency */,
+			);
+			name = AsterVegaDemoUITests;
+			productName = AsterVegaDemoUITests;
+			productReference = A5000000000000000000003D /* AsterVegaDemoUITests.xctest */;
+			productType = "com.apple.product-type.bundle.ui-testing";
 		};
 /* End PBXNativeTarget section */
 
@@ -176,9 +214,28 @@
 			projectRoot = "";
 			targets = (
 				A5000000000000000000001E /* AsterVegaDemo */,
+				A5000000000000000000003E /* AsterVegaDemoUITests */,
 			);
 		};
 /* End PBXProject section */
+
+/* Begin PBXTargetDependency section */
+		A50000000000000000000046 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = A5000000000000000000001E /* AsterVegaDemo */;
+			targetProxy = A50000000000000000000047 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
+
+/* Begin PBXContainerItemProxy section */
+		A50000000000000000000047 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = A5000000000000000000001F /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = A5000000000000000000001E;
+			remoteInfo = AsterVegaDemo;
+		};
+/* End PBXContainerItemProxy section */
 
 /* Begin PBXResourcesBuildPhase section */
 		A50000000000000000000028 /* Resources */ = {
@@ -187,6 +244,13 @@
 			files = (
 				A50000000000000000000014 /* Specs in Resources */,
 				A50000000000000000000030 /* data in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		A50000000000000000000042 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -214,6 +278,14 @@
 				A5000000000000000000000E /* CoreGraphicsTarget.swift in Sources */,
 				A50000000000000000000010 /* RecordingTarget.swift in Sources */,
 				A50000000000000000000012 /* CoreTextDrawing.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		A50000000000000000000040 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				A5000000000000000000003C /* AccessibilityUITests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -298,6 +370,32 @@
 			};
 			name = Release;
 		};
+		A50000000000000000000044 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				GENERATE_INFOPLIST_FILE = YES;
+				PRODUCT_BUNDLE_IDENTIFIER = dev.aster.vega.demo.uitests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_TARGET_NAME = AsterVegaDemo;
+			};
+			name = Debug;
+		};
+		A50000000000000000000045 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				GENERATE_INFOPLIST_FILE = YES;
+				PRODUCT_BUNDLE_IDENTIFIER = dev.aster.vega.demo.uitests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_TARGET_NAME = AsterVegaDemo;
+			};
+			name = Release;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -315,6 +413,15 @@
 			buildConfigurations = (
 				A50000000000000000000024 /* Debug */,
 				A50000000000000000000025 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		A50000000000000000000043 /* Build configuration list for PBXNativeTarget "AsterVegaDemoUITests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				A50000000000000000000044 /* Debug */,
+				A50000000000000000000045 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;

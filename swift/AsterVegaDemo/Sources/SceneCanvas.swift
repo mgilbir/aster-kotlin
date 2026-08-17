@@ -27,6 +27,23 @@ struct SceneCanvas: View {
   @State private var lastDown: CGPoint = .zero
 
   var body: some View {
+    ZStack {
+      canvas
+      // VoiceOver, as real positioned views rather than `accessibilityChildren`.
+      //
+      // That distinction is the whole of this: `accessibilityChildren` produces elements with labels and a
+      // frame of `(inf, inf, 0, 0)`, so a reader can swipe through a chart but cannot *touch* it — and
+      // touch exploration is most of what makes a chart explorable at all. Android's
+      // `ExploreByTouchHelper` gives every virtual node a rectangle; this is the same thing in SwiftUI.
+      //
+      // Hit testing is off, so the overlay cannot intercept a finger. VoiceOver activation goes through
+      // the accessibility action, which does not need it.
+      accessibilityOverlay
+        .allowsHitTesting(false)
+    }
+  }
+
+  private var canvas: some View {
     Canvas { graphics, size in
       graphics.withCGContext { context in
         draw(into: context, size: size)
@@ -45,46 +62,6 @@ struct SceneCanvas: View {
           .onChange(of: proxy.size) { _, new in report(new) }
       }
     )
-    // VoiceOver. Each mark the engine marked focusable becomes an element with its own label, its own
-    // frame and its own activation, which is what lets a reader explore a chart by swiping through it
-    // rather than being told "image".
-    //
-    // The elements come from `AccessibilityTree` in the core — the same policy Android's
-    // `ExploreByTouchHelper` uses, including the rule that a chart denser than 120 focusable marks
-    // becomes one summary instead of an unusable list. That policy is a statement about screen readers
-    // rather than about a platform, so it is not written twice.
-    .accessibilityElement(children: .ignore)
-    .accessibilityChildren {
-      ForEach(accessibleElements, id: \.offset) { entry in
-        let placement = placement(in: canvasSize)
-        Rectangle()
-          .fill(Color.clear)
-          .frame(
-            width: max(entry.element.bounds.width, 1) * (placement?.scale ?? 1),
-            height: max(entry.element.bounds.height, 1) * (placement?.scale ?? 1)
-          )
-          .position(
-            x: (entry.element.bounds.left + entry.element.bounds.width / 2)
-              * (placement?.scale ?? 1) + Double(placement?.left ?? 0),
-            y: (entry.element.bounds.top + entry.element.bounds.height / 2)
-              * (placement?.scale ?? 1) + Double(placement?.top ?? 0)
-          )
-          .accessibilityLabel(entry.element.label)
-          .accessibilityAddTraits(entry.element.selected ? [.isButton, .isSelected] : .isButton)
-          .accessibilityAction {
-            // Activating an element selects the mark, so a reader can drive the same handlers a finger
-            // does rather than only hear about them.
-            guard let session, let placement, entry.element.nodeId != nil else { return }
-            session.tap(
-              at: Point(
-                x: entry.element.bounds.left + entry.element.bounds.width / 2,
-                y: entry.element.bounds.top + entry.element.bounds.height / 2
-              )
-            )
-            _ = placement
-          }
-      }
-    }
     .gesture(touch)
     .simultaneousGesture(pinch)
     .simultaneousGesture(
@@ -201,6 +178,48 @@ struct SceneCanvas: View {
         pinched = 1
         session?.zoom(by: 1, at: Point(x: 0, y: 0), phase: GesturePhase.ended)
       }
+  }
+
+  /// The accessibility elements, positioned over the chart they describe.
+  private var accessibilityOverlay: some View {
+    GeometryReader { proxy in
+      let placement = placement(in: proxy.size)
+      ZStack(alignment: .topLeading) {
+        ForEach(accessibleElements, id: \.offset) { entry in
+          let scale = placement?.scale ?? 1
+          Rectangle()
+            .fill(Color.clear)
+            // At least a point in each direction: a rule or a zero-height mark would otherwise have a
+            // frame a reader cannot land on.
+            .frame(
+              width: max(entry.element.bounds.width * scale, 1),
+              height: max(entry.element.bounds.height * scale, 1)
+            )
+            .offset(
+              x: entry.element.bounds.left * scale + Double(placement?.left ?? 0),
+              y: entry.element.bounds.top * scale + Double(placement?.top ?? 0)
+            )
+            .accessibilityElement()
+            .accessibilityLabel(entry.element.label)
+            .accessibilityAddTraits(entry.element.selected ? [.isButton, .isSelected] : .isButton)
+            // `.default` rather than an unnamed action: without the kind this registers a *custom* action,
+            // which a reader has to go looking for and which an activation does not invoke.
+            .accessibilityAction(.default) {
+              // Scaled, because `tap` takes surface coordinates and the controller divides by
+              // `contentScale` to reach the scene. Handing it the element's scene-space centre applied the
+              // fit factor twice — the same trap `contentScale` has set twice before on this project.
+              guard let session, entry.element.nodeId != nil else { return }
+              session.tap(
+                at: Point(
+                  x: (entry.element.bounds.left + entry.element.bounds.width / 2) * scale,
+                  y: (entry.element.bounds.top + entry.element.bounds.height / 2) * scale
+                )
+              )
+            }
+        }
+      }
+      .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+    }
   }
 
   /// The chart's accessible elements, paired with an index so `ForEach` has something stable to key on.
