@@ -66,6 +66,16 @@ internal fun ProjectionDefinition.build(): GeoProjector? {
       scale?.let { composite.scale(it) }
       if (translate.size >= 2) composite.translate(translate[0], translate[1])
       precision?.let { composite.precision(it) }
+      // A composite is fitted the same way anything else is, and it was the one projection this
+      // never tried it on.
+      fit?.let { features ->
+        when {
+          fitExtent.size >= 4 ->
+            composite.fitExtent(fitExtent[0], fitExtent[1], fitExtent[2], fitExtent[3], features)
+          fitSize.size >= 2 -> composite.fitExtent(0.0, 0.0, fitSize[0], fitSize[1], features)
+          else -> Unit
+        }
+      }
     }
     return composite
   }
