@@ -15,6 +15,7 @@ import dev.aster.vega.scene.Scene
 import dev.aster.vega.scene.SceneColor
 import dev.aster.vega.scene.SceneNode
 import dev.aster.vega.scene.SceneNodeIdAllocator
+import dev.aster.vega.scene.SizeD
 import dev.aster.vega.scene.Transform2D
 import dev.aster.vega.scene.toCanonicalJson
 import org.junit.Assert.assertEquals
@@ -48,6 +49,117 @@ class AndroidCanvasSceneRendererTest {
     val bitmap = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888)
     renderer.render(scene, Canvas(bitmap), RectF(0f, 0f, size.toFloat(), size.toFloat()), 1f)
     return bitmap
+  }
+
+  /**
+   * A group's opacity paints its own panel and is **not** inherited by its children.
+   *
+   * This renderer used to multiply an inherited opacity into every descendant, so a half-opaque
+   * group drew its opaque child at half. Upstream does not: `vega-scenegraph`'s canvas group saves
+   * the graphics state, translates and clips on the way in and never touches `globalAlpha`, and its
+   * SVG renderer emits `opacity` on the group's background path while leaving the child element
+   * bare.
+   *
+   * The differential fixtures could never have caught this, because they compare scene trees and a
+   * scene tree is identical either way. It took pixels — the Swift renderer's, which had made the
+   * same mistake.
+   */
+  @Test
+  fun groupOpacityPaintsItsPanelAndIsNotInherited() {
+    val child =
+      RectNode(
+        id = ids.allocate(),
+        x = 10.0,
+        y = 10.0,
+        width = 30.0,
+        height = 30.0,
+        fill = Fill.of(SceneColor.parse("#ff0000")!!),
+      )
+    val faded =
+      GroupNode(
+        id = ids.allocate(),
+        opacity = 0.5,
+        size = SizeD(100.0, 100.0),
+        fill = Fill.of(SceneColor.parse("#000000")!!),
+        children = listOf(child),
+      )
+    val bitmap = renderToBitmap(sceneOf(faded))
+
+    // The panel: black at half opacity over white is mid grey.
+    val panel = bitmap.getPixel(80, 80)
+    assertTrue(
+      "the group's own background is half-opaque, was ${Integer.toHexString(panel)}",
+      Math.abs(Color.red(panel) - 128) <= 3 && Math.abs(Color.green(panel) - 128) <= 3,
+    )
+    // The child: fully red, not blended toward the panel.
+    assertEquals(Color.RED, bitmap.getPixel(25, 25))
+  }
+
+  /** A group at zero opacity loses its own panel and keeps its children, as upstream does. */
+  @Test
+  fun aFullyTransparentGroupStillDrawsItsChildren() {
+    val child =
+      RectNode(
+        id = ids.allocate(),
+        x = 10.0,
+        y = 10.0,
+        width = 30.0,
+        height = 30.0,
+        fill = Fill.of(SceneColor.parse("#ff0000")!!),
+      )
+    val invisible =
+      GroupNode(
+        id = ids.allocate(),
+        opacity = 0.0,
+        size = SizeD(100.0, 100.0),
+        fill = Fill.of(SceneColor.parse("#000000")!!),
+        children = listOf(child),
+      )
+    val bitmap = renderToBitmap(sceneOf(invisible))
+
+    assertEquals(Color.RED, bitmap.getPixel(25, 25))
+    // Its own panel is gone: the background shows through where the child is not.
+    assertEquals(Color.WHITE, bitmap.getPixel(80, 80))
+  }
+
+  /**
+   * An image the **engine** produced draws without any resolver.
+   *
+   * A `heatmap` or an `isocontour` builds its image during the compile and carries the pixels on
+   * the node; there is no URL to resolve. This renderer only ever asked the resolver, so every one
+   * of those marks was dropped — and reported as an unresolved image, which pointed at the wrong
+   * problem. The SVG renderer encoded them as data URLs and drew them all along, so the two
+   * disagreed about a whole mark type.
+   */
+  @Test
+  fun anEngineProducedRasterIsDrawnWithoutAResolver() {
+    // Four pixels: red, green / blue, white. `0xAARRGGBB`, which is what ARGB_8888 wants.
+    val pixels =
+      intArrayOf(
+        0xFFFF0000.toInt(),
+        0xFF00FF00.toInt(),
+        0xFF0000FF.toInt(),
+        0xFFFFFFFF.toInt(),
+      )
+    val node =
+      ImageNode(
+        id = ids.allocate(),
+        url = "",
+        raster = dev.aster.vega.scene.RasterImage(width = 2, height = 2, pixels = pixels),
+        x = 0.0,
+        y = 0.0,
+        width = 100.0,
+        height = 100.0,
+        smooth = false,
+      )
+    // `AndroidImageResolver.None` on purpose: if the raster needed the resolver this would draw
+    // nothing.
+    val bitmap = renderToBitmap(sceneOf(node))
+
+    // The raster is stretched over the whole 100×100 box, so each quadrant is one source pixel.
+    assertEquals(Color.RED, bitmap.getPixel(25, 25))
+    assertEquals(Color.GREEN, bitmap.getPixel(75, 25))
+    assertEquals(Color.BLUE, bitmap.getPixel(25, 75))
   }
 
   @Test

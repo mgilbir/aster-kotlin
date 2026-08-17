@@ -85,22 +85,34 @@ public class AndroidCanvasSceneRenderer(
         if (!background.isTransparent) canvas.drawColor(background.toArgb())
       }
 
-      drawNode(scene.root, canvas, 1.0, diagnostics)
+      drawNode(scene.root, canvas, diagnostics)
     } finally {
       canvas.restoreToCount(saveCount)
       lastDiagnostics = diagnostics.diagnostics
     }
   }
 
-  private fun drawNode(
-    node: SceneNode,
-    canvas: Canvas,
-    inheritedOpacity: Double,
-    diagnostics: DiagnosticCollector,
-  ) {
+  /**
+   * Draws one node, with its **own** opacity and no inheritance.
+   *
+   * Opacity does not descend. That reads like an omission, so it is worth saying why: upstream's
+   * canvas renderer saves the graphics state, translates and clips on the way into a group and
+   * never touches `globalAlpha`, and its SVG renderer emits `opacity` on the group's background
+   * `path` while leaving the child element bare. A group's opacity paints its own panel and nothing
+   * else.
+   *
+   * This renderer used to multiply an inherited opacity into every descendant, which drew a
+   * half-opaque group's opaque child at half. Nothing caught it: the differential fixtures compare
+   * scene trees, and a scene tree is the same either way. The Swift renderer's pixel tests found
+   * it, having made the identical mistake.
+   */
+  private fun drawNode(node: SceneNode, canvas: Canvas, diagnostics: DiagnosticCollector) {
     if (!node.visible) return
-    val opacity = inheritedOpacity * node.opacity
-    if (opacity <= 0.0) return
+    // A fully transparent *group* still draws its children — upstream renders them and only its own
+    // background disappears. For everything else nothing would be painted anyway, so leaving early
+    // is the same picture drawn faster.
+    if (node.opacity <= 0.0 && node !is GroupNode) return
+    val opacity = node.opacity
 
     val saveCount = canvas.save()
     try {
@@ -141,8 +153,9 @@ public class AndroidCanvasSceneRenderer(
     }
 
     // A group with its own paint draws a rectangle of its declared size, as Vega group marks do.
+    // This is the only thing the group's own opacity applies to.
     val paintRect = node.paintRect
-    if (paintRect != null) {
+    if (paintRect != null && opacity > 0.0) {
       drawGroupPaint(
         node,
         paintRect,
@@ -154,12 +167,12 @@ public class AndroidCanvasSceneRenderer(
       )
     }
 
-    for (child in node.children) drawNode(child, canvas, opacity, diagnostics)
+    for (child in node.children) drawNode(child, canvas, diagnostics)
 
     // `strokeForeground` puts the group's outline over its children rather than under them, which
     // is
     // the whole channel: a cell whose bars run to its own border either covers it or is covered.
-    if (paintRect != null && node.strokeForeground) {
+    if (paintRect != null && node.strokeForeground && opacity > 0.0) {
       drawGroupPaint(node, paintRect, canvas, opacity, diagnostics, filled = false, stroked = true)
     }
   }
@@ -365,13 +378,44 @@ public class AndroidCanvasSceneRenderer(
     }
   }
 
+  /**
+   * A [RasterImage] as a [Bitmap], cached by the raster's own digest.
+   *
+   * The digest is stable for identical pixels, so a chart redrawn per frame builds each raster
+   * once. The pixels are already `0xAARRGGBB`, which is exactly `ARGB_8888`, so this is a copy
+   * rather than a conversion.
+   */
+  private fun rasterBitmap(raster: dev.aster.vega.scene.RasterImage): Bitmap? {
+    if (raster.width <= 0 || raster.height <= 0) return null
+    rasterCache[raster.digest]?.let {
+      return it
+    }
+    val bitmap =
+      Bitmap.createBitmap(raster.pixels, raster.width, raster.height, Bitmap.Config.ARGB_8888)
+    // A small bound rather than none: a scene holds its own rasters, and this only exists to
+    // survive
+    // between frames.
+    if (rasterCache.size > RASTER_CACHE_LIMIT) rasterCache.clear()
+    rasterCache[raster.digest] = bitmap
+    return bitmap
+  }
+
+  private val rasterCache = HashMap<Long, Bitmap>()
+
   private fun drawImage(
     node: ImageNode,
     canvas: Canvas,
     opacity: Double,
     diagnostics: DiagnosticCollector,
   ) {
-    val bitmap = imageResolver.resolve(node.url)
+    // A raster the engine produced comes first, because it needs no resolver and no address: a
+    // `heatmap`
+    // or an `isocontour` builds its image inside the compile and carries the pixels. Asking the
+    // resolver
+    // for its (empty) URL is how every one of those was silently dropped — the SVG renderer encodes
+    // them
+    // as data URLs and drew them all along, so the two renderers disagreed about a whole mark type.
+    val bitmap = node.raster?.let { rasterBitmap(it) } ?: imageResolver.resolve(node.url)
     if (bitmap == null) {
       // Never silently omit a mark (PROJECT_BRIEF.md 13.3).
       diagnostics.error(
@@ -616,6 +660,12 @@ public class AndroidCanvasSceneRenderer(
      * Reusable gradient arrays are sized once; longer gradients are truncated with a diagnostic.
      */
     public const val GRADIENT_STOP_LIMIT: Int = 32
+
+    /**
+     * How many decoded rasters to keep. A chart with more distinct images than this is not the
+     * case.
+     */
+    private const val RASTER_CACHE_LIMIT: Int = 16
   }
 }
 
