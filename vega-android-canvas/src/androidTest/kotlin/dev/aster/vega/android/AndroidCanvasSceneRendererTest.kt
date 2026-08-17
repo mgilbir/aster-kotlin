@@ -122,6 +122,46 @@ class AndroidCanvasSceneRendererTest {
     assertEquals(Color.WHITE, bitmap.getPixel(80, 80))
   }
 
+  /**
+   * An image the **engine** produced draws without any resolver.
+   *
+   * A `heatmap` or an `isocontour` builds its image during the compile and carries the pixels on
+   * the node; there is no URL to resolve. This renderer only ever asked the resolver, so every one
+   * of those marks was dropped — and reported as an unresolved image, which pointed at the wrong
+   * problem. The SVG renderer encoded them as data URLs and drew them all along, so the two
+   * disagreed about a whole mark type.
+   */
+  @Test
+  fun anEngineProducedRasterIsDrawnWithoutAResolver() {
+    // Four pixels: red, green / blue, white. `0xAARRGGBB`, which is what ARGB_8888 wants.
+    val pixels =
+      intArrayOf(
+        0xFFFF0000.toInt(),
+        0xFF00FF00.toInt(),
+        0xFF0000FF.toInt(),
+        0xFFFFFFFF.toInt(),
+      )
+    val node =
+      ImageNode(
+        id = ids.allocate(),
+        url = "",
+        raster = dev.aster.vega.scene.RasterImage(width = 2, height = 2, pixels = pixels),
+        x = 0.0,
+        y = 0.0,
+        width = 100.0,
+        height = 100.0,
+        smooth = false,
+      )
+    // `AndroidImageResolver.None` on purpose: if the raster needed the resolver this would draw
+    // nothing.
+    val bitmap = renderToBitmap(sceneOf(node))
+
+    // The raster is stretched over the whole 100×100 box, so each quadrant is one source pixel.
+    assertEquals(Color.RED, bitmap.getPixel(25, 25))
+    assertEquals(Color.GREEN, bitmap.getPixel(75, 25))
+    assertEquals(Color.BLUE, bitmap.getPixel(25, 75))
+  }
+
   @Test
   fun backgroundIsPainted() {
     val bitmap = renderToBitmap(sceneOf(background = SceneColor.parse("#ff0000")))

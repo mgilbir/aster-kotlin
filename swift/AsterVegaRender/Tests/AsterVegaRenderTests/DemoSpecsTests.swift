@@ -31,10 +31,11 @@ final class DemoSpecsTests: XCTestCase {
   /// also shares its cache, which is what keeps this test from reading `cars.json` twice.
   private static let loader = VegaDataLoader(
     localDirectory: URL(fileURLWithPath: #filePath)
-      .deletingLastPathComponent()
-      .deletingLastPathComponent()
-      .deletingLastPathComponent()
-      .deletingLastPathComponent()
+      .deletingLastPathComponent()  // AsterVegaRenderTests
+      .deletingLastPathComponent()  // Tests
+      .deletingLastPathComponent()  // AsterVegaRender
+      .deletingLastPathComponent()  // swift
+      .deletingLastPathComponent()  // the repository
       .appendingPathComponent("test-fixtures")
   )
 

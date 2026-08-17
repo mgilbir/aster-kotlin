@@ -69,6 +69,28 @@ the item it fills — `x1: 0, x2: 1` is left edge to right edge whatever the mar
 multiplies them through the item's bounds and a target receives absolute points. The Compose renderer
 splits it the same way.
 
+## Images
+
+Two sources, because a scene has two.
+
+Most images are a **URL** the specification gave, and resolving one is the host's business: a chart is
+often data a reader pasted, so the address in it is the specification's choice and the policy about
+following it belongs to the host — the same argument `DataLoader` makes for data. `CoreGraphicsTarget`
+takes a `resolveImage` closure and draws nothing without one, collecting the URLs it could not answer in
+`unresolved` so a caller can say so rather than leave a silent hole. A `data:` URL needs no host and is
+decoded here.
+
+The other source is the one nobody thinks about: a **`heatmap`** or an **`isocontour`** builds its image
+inside the engine and carries the pixels on the node, with no address at all. A renderer that only
+understood URLs dropped every one of them — and a chart missing its raster looks like a chart whose
+transform did nothing. That was true of `AndroidCanvasSceneRenderer` as well, which is fixed alongside
+this.
+
+The pixels cross the boundary as a PNG data URL from the engine's own `PngEncoder` — one call instead of
+120,000. A `KotlinIntArray` is read element by element from Swift, so a modest heatmap would otherwise be
+that many boundary crossings per frame. Decodes are cached by the raster's `digest`, which is stable for
+identical pixels.
+
 ## Text
 
 `CoreGraphicsTarget` takes an injectable `drawText` closure and draws no glyphs itself. The engine
