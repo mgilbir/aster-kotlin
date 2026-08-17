@@ -704,6 +704,34 @@ broke nothing, and the pressure would then be to loosen the comparison until it 
 Sampling named pixels — this one is the bar's colour, that one is the background, the corner of the
 circle's bounding box is not filled — says what is actually being claimed, and says why when it breaks.
 
+## Kotlin's source compatibility is not the boundary's
+
+Giving a Kotlin parameter a default is invisible to every Kotlin caller and **breaks every Swift one**. A
+default argument has no Obj-C representation, so Swift must name every parameter — and nothing on the Kotlin
+side reports it. The module compiles, the JVM tests pass, and the break appears the next time somebody
+builds the Swift package.
+
+Which, once, was after it had been merged: `TextRun` gained `lines` in the array-text fix, and `main` was
+left with a Swift suite that did not compile. Two things had to be true for that to happen, and both are
+fixed:
+
+1. **`scripts/swift-test.sh` was reporting on a stale build.** SwiftPM tracks its own sources but not a
+   framework handed to it through `-F`, so a rebuilt `AsterVega.framework` left the previously compiled test
+   module in place and the suite was checked against the old headers. It now fingerprints the exported
+   header and rebuilds from scratch when it changes. A gate that cannot fail is worse than no gate.
+
+2. **Nothing described the exported surface.** `scripts/foreign-api.sh` snapshots it —
+   `swift/AsterVegaRender/foreign-api.txt`, 4,465 symbols with every initialiser's full parameter list — in
+   the same spirit as the differential references: a change is not forbidden, it is *shown*. Accepting one
+   is `scripts/foreign-api.sh --accept`, and the diff goes into the review.
+
+   Verified the way the fixtures are: adding a defaulted parameter to `TextRun` makes it fail with exactly
+   the line that broke —
+   `-TextRun.init(text:style:...:lineBreak:lines:)` / `+TextRun.init(...:lines:hazardExample:)`.
+
+The Swift suite only covers the part of the boundary this repository happens to use. The snapshot covers all
+of it, which matters for a host outside this repository.
+
 ## A text array is a list of lines
 
 A `text` channel whose value is an array — `{"value": ["first", "second"]}` — is one line per element
