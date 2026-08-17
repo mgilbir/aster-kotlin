@@ -2,6 +2,9 @@
 .gradle/
 build/
 */build/
+# SwiftPM's build directory, which is `.build` rather than `build` and so escaped the two rules above.
+# It holds a module cache and an index store — thousands of files, none of them source.
+.build/
 local.properties
 
 # Node
