@@ -290,4 +290,8 @@ Interaction and semantic accessibility trees
 `vega-model`, `vega-expression`, `vega-dataflow`, `vega-scene`, `vega-runtime`, `vega-svg` and
 `test-fixtures` contain no Android types; `NoAndroidTypesTest` enforces that.
 
+Two demo apps render specifications on a real device: `demo/` on Android, and
+[`swift/AsterVegaDemo`](swift/AsterVegaDemo) on iOS — SwiftUI over the CoreGraphics renderer, listing
+each chart together with everything the engine could not honour. `scripts/ios-demo.sh` builds it.
+
 Design decisions are recorded in [docs/adr/](docs/adr/).
