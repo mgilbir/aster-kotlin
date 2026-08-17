@@ -507,10 +507,18 @@ public fun groupKey(datum: VegaValue, groupBy: List<String>): List<VegaValue> = 
  */
 internal fun VegaValue.asComparableKey(): String =
   when (this) {
-    is VegaValue.Str -> "s:$value"
-    is VegaValue.Num -> "n:${JsSemantics.numberToString(value)}"
-    // A date is a number for this purpose: two rows on the same instant are the same group,
-    // however that instant was written.
-    is VegaValue.Timestamp -> "n:${JsSemantics.numberToString(epochMillis)}"
-    else -> "o:${JsSemantics.toStringValue(this)}"
+    // **Untagged, so a number and its own text are one key.** Upstream indexes and groups through
+    // `fastmap`, which is object-backed, so JavaScript coerces every key to a string before it is
+    // stored: the integer `1001` and the string `"1001"` are the same property. Tagging them apart
+    // — `"s:1001"` against `"n:1001"` — split what upstream merges, and it showed up as a join that
+    // matched nothing: a TSV column of `"22051"` against TopoJSON's integer `22051` drew an empty
+    // map with no error. Verified both ways against upstream, which merges the two into one
+    // aggregate group and matches the two in one lookup.
+    is VegaValue.Str -> value
+    is VegaValue.Num -> JsSemantics.numberToString(value)
+    // A date keeps a namespace of its own, which is *closer* to upstream than sharing one: a `Date`
+    // used as a key stringifies to its written form, not to its epoch, so it cannot collide with a
+    // number that happens to have the same digits.
+    is VegaValue.Timestamp -> "date:${JsSemantics.numberToString(epochMillis)}"
+    else -> JsSemantics.toStringValue(this)
   }
