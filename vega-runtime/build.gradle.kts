@@ -7,6 +7,23 @@ kotlin {
   iosSimulatorArm64()
   linuxX64()
 
+  // The framework Swift sees. A renderer written against CoreGraphics needs the whole vocabulary —
+  // a compiled `Scene` and the nodes in it — so the modules that define them are `export`ed rather
+  // than merely depended on; without that their types arrive as opaque handles Swift cannot read.
+  //
+  // Static, because a static framework needs no embedding step in the consuming app and cannot go
+  // missing at launch. `baseName` is what `import AsterVega` refers to.
+  listOf(iosArm64(), iosSimulatorArm64(), macosArm64()).forEach { target ->
+    target.binaries.framework {
+      baseName = "AsterVega"
+      isStatic = true
+      export(project(":vega-model"))
+      export(project(":vega-scene"))
+      export(project(":vega-expression"))
+      export(project(":vega-dataflow"))
+    }
+  }
+
   sourceSets {
     commonMain {
       kotlin.srcDir("src/main/kotlin")
