@@ -1403,50 +1403,40 @@ That completes the 0.2.0 review: **number** replaced a whole file, **text** gave
 whitespace set and the lexer its grammar, and **uri** turned out to be unreachable, since Vega's
 expression registry has no URI function among its 119.
 
-## A fitted projection read back by its own table draws unfitted, and says nothing
+## A composite projection was the one thing `fit` never reached
 
 Reported from another agent as three Vega-Lite fixtures pending because "this runtime can't yet fit
 a projection to an extent, and a projection fitted to the tables that read it back through geopoint
-is a cycle to a strict ordering". Checked, and the diagnosis is wrong in both halves while the
-underlying complaint is real.
+is a cycle to a strict ordering". Neither is so, and my own first diagnosis was wrong as well —
+worth writing down, because the wrong answer was more interesting than the right one and took three
+probes to discard.
 
-**This runtime does fit a projection to an extent.** `config-group-projection.vg.json` and
-`geojson-transform.vg.json` both fit one to a dataset through a signal, and both pass.
-`ProjectionResolver` resolves `fit`, `extent` and `size`; `GeoProjection` has `fitExtent`.
+**Fitting to an extent works**, and has: `config-group-projection.vg.json` and
+`geojson-transform.vg.json` both fit a projection to a dataset through a signal.
 
-**A projection fitted to a dataset is not by itself a cycle upstream refuses.** Fitting to the table
-*itself* — `fit: {signal: "data('pts')"}` on a dataset carrying a `geopoint` — is refused by Vega
-with "Cycle detected in dataflow graph". But that is not what Vega-Lite emits. Compile any lon/lat
-chart and it produces:
+**The cycle is not one.** Fitting to the table *itself* is refused by upstream too — Vega answers
+"Cycle detected in dataflow graph". What Vega-Lite emits is different: the `geojson` transform
+publishes a signal, the projection fits to *that*, and `geopoint` follows. At Vega's per-transform
+granularity there is no cycle, and **this engine already handles it** — `DataResolver` marks the
+projections stale on `setSignal` and rebuilds them lazily, which is exactly what a `geopoint` two
+lines below a `geojson` needs. The comment on `refreshProjections` had described the problem and
+solved it some time ago.
 
-```
-data_0: transform [ {geojson, fields, signal: geojson_0}, {geopoint, projection} ]
-projection: { fit: {signal: geojson_0}, size: {signal: "[width, height]"} }
-```
+I diagnosed a dataset-granularity ordering bug from the symptom and was wrong. What settled it was
+changing one word in the probe: **`mercator` fitted correctly and `albersUsa` did not.** The
+dataflow was never involved.
 
-The cycle is broken by a **signal**, and it is only breakable because Vega's operators are *per
-transform*: `geojson` runs, publishes `geojson_0`, the projection fits to it, and `geopoint` runs
-after. At transform granularity there is no cycle at all.
+`albersUsa` is a **composite**, and `fitExtent` lived on the concrete projection rather than on the
+interface the composite implements, so `build()` set its scale, translate and precision and then
+returned without ever offering it the fit. A fitted composite therefore drew at the family's
+unfitted default — x at 431.97 where upstream has 85.26 — silently, which is the outcome this
+engine is meant not to produce. It is also the projection Vega-Lite reaches for by default on any
+United States chart, so the gap was not exotic.
 
-**What this engine does is worse than refusing.** Our dependency graph is at *dataset* granularity —
-`Operator.Data(name)` — so `data_0` waits for the projection and the projection waits for `data_0`.
-Something breaks that edge silently: the specification compiles clean, three marks are drawn, and
-the projection is **never fitted**. On the probe above, x came out 431.97 where upstream has 85.26.
-A wrong chart with no diagnostic is the one outcome this engine is supposed not to produce.
-
-Two ways forward, and the second is the real one:
-
-- **Report it.** When a projection's `fit` depends on a dataset that also reads that projection,
-  say so rather than drawing. Small, and consistent with how `word-cloud` and `projections` are
-  handled — but it would leave every Vega-Lite geographic chart refused.
-- **Order by transform rather than by dataset.** Split a dataset's pipeline at the point it
-  publishes a signal, so the stages before it can precede a projection and the stages after can
-  follow. This is what upstream does and what the Vega-Lite compiler needs. It touches
-  `DataflowOrder` and the pipeline runner, and nothing else has needed it so far, which is why the
-  granularity has held up until now.
-
-No fixture is committed for this: it would fail, and the gates stay green. The reproduction is the
-compiled Vega-Lite output above.
+The fix is the same arithmetic a plain projection uses: measure at a reference scale with the origin
+at zero, then scale and translate so the measured box lands in the requested one. A composite needs
+nothing special — its three pieces move together because they are driven from one `k`, `tx` and
+`ty`. `projection-fit-composite.vg.json` pins the whole pattern end to end.
 
 ## Where the remaining packages stand
 
