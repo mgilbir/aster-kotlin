@@ -1,29 +1,56 @@
 {
   "$schema": "https://vega.github.io/schema/vega/v6.json",
-  "description": "A grid of maps: the outlines are joined on as whole records, gathered into a collection of their own, and the grid has one projection so every cell is drawn at the same scale.",
+  "description": "A grid of maps: the outlines are joined on as whole records, gathered into a collection of their own, and the grid has one projection so every cell is drawn at the same scale. The figures are inline, so the join key is a number on both sides without a loader having to infer one.",
   "background": "white",
   "padding": 5,
   "data": [
+    {
+      "name": "source_0",
+      "values": [
+        {
+          "id": 1,
+          "rate": 0.04,
+          "band": "low"
+        },
+        {
+          "id": 4,
+          "rate": 0.09,
+          "band": "high"
+        },
+        {
+          "id": 5,
+          "rate": 0.06,
+          "band": "low"
+        },
+        {
+          "id": 6,
+          "rate": 0.11,
+          "band": "high"
+        },
+        {
+          "id": 8,
+          "rate": 0.03,
+          "band": "low"
+        },
+        {
+          "id": 12,
+          "rate": 0.1,
+          "band": "high"
+        }
+      ]
+    },
     {
       "name": "source_1",
       "url": "data/us-10m.json",
       "format": {
         "type": "topojson",
-        "feature": "counties"
+        "feature": "states"
       }
     },
     {
-      "name": "source_0",
-      "url": "data/unemployment.tsv",
-      "format": {
-        "type": "tsv"
-      },
+      "name": "data_0",
+      "source": "source_0",
       "transform": [
-        {
-          "type": "formula",
-          "expr": "datum.rate > 0.08 ? 'high' : 'low'",
-          "as": "band"
-        },
         {
           "type": "lookup",
           "from": "source_1",
@@ -52,7 +79,7 @@
     },
     {
       "name": "row_domain",
-      "source": "source_0",
+      "source": "data_0",
       "transform": [
         {
           "type": "aggregate",
@@ -141,7 +168,7 @@
       "from": {
         "facet": {
           "name": "facet",
-          "data": "source_0",
+          "data": "data_0",
           "groupby": [
             "band"
           ]
@@ -205,7 +232,7 @@
       "name": "color",
       "type": "linear",
       "domain": {
-        "data": "source_0",
+        "data": "data_0",
         "field": "rate"
       },
       "range": "heatmap",
