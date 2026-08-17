@@ -14,8 +14,12 @@ import dev.aster.vega.model.VegaValue
 internal class DataPipeline(
   private val view: UnitView,
   private val diagnostics: DiagnosticCollector,
-  /** Registers a `lookup`'s second dataset and answers with the name it was given. */
-  private val registerLookup: ((VegaValue) -> String)? = null,
+  /**
+   * Registers a `lookup`'s second dataset under an output name, answering with that name.
+   *
+   * The name is the caller's, not the table's: see [Transforms.lookupOrdinal].
+   */
+  private val registerLookup: ((VegaValue, String) -> String)? = null,
   /**
    * Whether a selection remembers its rows by **identity**, which needs a column to remember.
    *
@@ -1083,8 +1087,28 @@ internal class DataPipeline(
     OWN,
   }
 
+  /**
+   * Which of its **owner's** joins each of this view's `lookup` transforms is, by index.
+   *
+   * `parseTransformArray` keeps one counter per call and is called once per model, over that
+   * model's own transforms — so the second join a model writes is its `lookup_1` however many joins
+   * the models above it wrote first. This view's array is those arrays laid end to end, an
+   * ancestor's before its own, so counting within each owner reproduces the same numbers.
+   */
+  private fun lookupOrdinals(): Map<Int, Int> {
+    val seen = mutableMapOf<String, Int>()
+    val ordinals = mutableMapOf<Int, Int>()
+    view.spec.transforms.forEachIndexed { index, transform ->
+      if (!transform.has("lookup")) return@forEachIndexed
+      val owner = view.transformOwners.getOrNull(index) ?: view.name
+      ordinals[index] = seen.getOrElse(owner) { 0 }.also { seen[owner] = it + 1 }
+    }
+    return ordinals
+  }
+
   private fun userTransforms(head: DataNode, which: Written = Written.ALL): DataNode {
     var last = head
+    val lookupOrdinals = lookupOrdinals()
     view.spec.transforms.forEachIndexed { index, transform ->
       // A transform belongs to the model it was written on, and the ones an ancestor wrote were
       // run in *that* model's pass — above everything this view does. It matters twice: below a
@@ -1099,6 +1123,7 @@ internal class DataPipeline(
           registerLookup,
           { param -> "lookup_$param" },
           { suffix -> view.prefixedForTransform(index, suffix) },
+          lookupOrdinals[index] ?: 0,
           view.selections,
         )
       val path = "$.transform[$index]"

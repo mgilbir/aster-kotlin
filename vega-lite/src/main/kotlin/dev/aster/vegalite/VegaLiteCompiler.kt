@@ -252,6 +252,12 @@ private class Compilation(
         }
       }
     }
+    // `parseProjection` **recurses**: every level that is not a unit merges what the level below it
+    // agreed on, so a concatenation merges its plots the same way a layer merges its members. Three
+    // copies of one map are three plots, and merged they are one projection named for the chart —
+    // fitted to everything all three draw, so the three are drawn at a single scale. Left per plot,
+    // each copy fitted itself to its own outlines and the row came out three maps of three sizes.
+    elevateProjection(plotTree)
 
     val views = plots.flatMap { it.views }
     views.forEach { it.selections = selections }
@@ -907,6 +913,40 @@ private class Compilation(
           }
         }
       }
+
+  /**
+   * `parseNonUnitProjections` above the plots: the views a node draws geography with, merged.
+   *
+   * Answers with the views a level contributes upward, which is the ones it merged — and with
+   * **nothing** where its children disagreed, exactly as upstream returns no component for a level
+   * it could not merge. A disagreement is therefore not an obstacle to the level above: those
+   * children keep the projections they had, and whatever else agreed is still merged around them.
+   *
+   * Bottom-up, so an outer concatenation renames over an inner one's merge and the outermost name
+   * is the one that survives — `renameProjection` walking down, seen from the other end.
+   */
+  private fun elevateProjection(node: Node): List<UnitView> {
+    val geographic =
+      when (node) {
+        is Node.Leaf -> node.plot.views.filter { it.hasProjection }
+        is Node.Nest -> node.children.flatMap { elevateProjection(it) }
+      }
+    if (geographic.isEmpty()) return emptyList()
+    if (geographic.any { it.projection != geographic.first().projection }) return emptyList()
+    // A leaf has merged already, in the pass over the plots: this is the level *above* it.
+    if (node !is Node.Nest) return geographic
+    val name =
+      Fields.varName(listOf(node.name, "projection").filter { it.isNotEmpty() }.joinToString("_"))
+    geographic.forEachIndexed { index, view ->
+      view.projectionName = name
+      view.projectionMerged = index != 0
+      // The merge carries the fit, and only the one that carries it: a view that was the first of
+      // its own plot's merge is not the first of this one, and would otherwise write a second
+      // projection fitted to a subset of what the chart draws.
+      view.projectionFitViews = if (index == 0) geographic else emptyList()
+    }
+    return geographic
+  }
 
   /** The plot a view belongs to, where the compiler has been told about it. */
   private fun plotOfView(view: UnitView): Plot? =
@@ -2027,26 +2067,25 @@ private class Compilation(
       facet
         ?.takeIf { views.size > 1 || views.any { view -> DataPipeline.needsRawTable(view) } }
         ?.let { FacetNode(it.named("facet")) }
-    var lookupCount = 0
-    val register: (VegaValue) -> String = { table ->
-      val existing = order.indexOf(table)
-      val name = "source_${if (existing >= 0) existing else order.size.also { order += table }}"
-      // `LookupNode.make`: the joined table is given a **named point** of its own on the source it
-      // comes from. That is what makes the source a fork — the table is written out bare and
-      // whatever else reads it derives from it — so a chart that both joins against a table and
-      // draws from it does not join against the drawing's own steps.
-      // Only where the chart **also draws from** that table. Then the source is a fork — the table
-      // written out bare and the drawing's own steps deriving from it — so the join is against the
-      // table rather than against what the drawing made of it. A table read for the join alone is
-      // already bare and needs no point of its own.
-      if (views.none { it.spec.data == table }) name
-      else {
-        val key = "lookup_${lookupCount++}"
-        val output = OutputNode(key)
-        roots.getOrPut(table) { SourceNode(table) }.then(output)
-        lookupOutputs[key] = output
-        key
+    // `LookupNode.make`: the joined table is given a **named point** of its own on the source it
+    // comes from, and the join names that point rather than the table. Two things follow, and both
+    // are the reason it is done unconditionally rather than only where the chart also draws from
+    // the table.
+    //
+    // The point makes the source a fork — the table written out bare and the drawing's own steps
+    // deriving from it — so a chart that both joins against a table and draws from it does not join
+    // against the drawing's own steps.
+    //
+    // And the point's *name* carries the model the join was written on, which is what tells two
+    // copies of one join apart from two joins. Named for the table it reads instead, three copies
+    // of one plot folded into a single node above the fork where upstream keeps one per copy, and
+    // the whole chart came out a dataset short.
+    val register: (VegaValue, String) -> String = { table, key ->
+      if (table !in order) order += table
+      lookupOutputs.getOrPut(key) {
+        OutputNode(key).also { roots.getOrPut(table) { SourceNode(table) }.then(it) }
       }
+      key
     }
     val outputs = views.map { view ->
       val data = view.spec.data!!
