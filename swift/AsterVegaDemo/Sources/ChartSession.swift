@@ -106,24 +106,22 @@ final class ChartSession {
     let presets = overrides
     loading = true
 
-    let handle = Holder(controller: controller)
     work = Task { [weak self] in
-      // `setSpecAsync` would be the natural call and cannot be made from here: its `dispatcher`
-      // parameter is non-optional in the generated header and `Dispatchers` is not in the exported
-      // surface at all, so there is no way to name one. The synchronous `setSpec` on a detached task
-      // reaches the same place — off this actor, which is the point — and the boxing below is the
-      // assertion that a controller crossing that boundary is safe because nothing else touches it.
-      let compiled = await Task.detached(priority: .userInitiated) {
-        Compiled(spec: handle.controller.setSpec(json: specification))
-      }.value
-      guard let self, !Task.isCancelled else { return }
+      guard let self else { return }
+      // The engine's own off-thread compile, on its default dispatcher. This is the single-argument
+      // overload, which exists because a Kotlin default argument does not cross the Obj-C boundary:
+      // the two-argument form demands a `CoroutineDispatcher` that no exported symbol can produce, so
+      // a foreign host could not reach this path at all and had to run the synchronous `setSpec` on a
+      // thread of its own.
+      let compiled = try? await self.controller.setSpecAsync(json: specification)
+      guard !Task.isCancelled else { return }
 
       // A preset control is applied through the dataflow rather than by recompiling with it.
       for (name, value) in presets {
         self.controller.setSignal(name: name, value: value)
       }
 
-      self.diagnostics = compiled.spec.diagnostics
+      if let compiled { self.diagnostics = compiled.diagnostics }
       self.refreshControls()
       self.publish()
       self.loading = false
@@ -147,16 +145,6 @@ final class ChartSession {
     } else {
       failure = nil
     }
-  }
-
-  /// Carries the controller across the actor boundary; see `Request` in the loader's own notes.
-  private struct Holder: @unchecked Sendable {
-    let controller: VegaChartController
-  }
-
-  /// The same, for the compiled specification coming back.
-  private struct Compiled: @unchecked Sendable {
-    let spec: CompiledSpec
   }
 
   private func refreshControls() {
@@ -205,6 +193,67 @@ final class ChartSession {
         event: ChartInputEventLongPress(point: PointD(x: point.x, y: point.y))
       )
       self.after(point)
+    }
+  }
+
+  /// A drag, which pans the chart. `phase` separates a drag in progress from the end of one.
+  func pan(by delta: Point, phase: GesturePhase) {
+    serialised {
+      self.controller.dispatch(
+        event: ChartInputEventPan(delta: VectorD(dx: delta.x, dy: delta.y), phase: phase)
+      )
+      self.publish()
+    }
+  }
+
+  /// A pinch, which zooms about the point it was centred on.
+  func zoom(by scaleFactor: Double, at anchor: Point, phase: GesturePhase) {
+    serialised {
+      self.controller.dispatch(
+        event: ChartInputEventZoom(
+          scaleFactor: scaleFactor,
+          anchor: PointD(x: anchor.x, y: anchor.y),
+          phase: phase
+        )
+      )
+      self.publish()
+    }
+  }
+
+  /// A pointer moving without touching — a trackpad or a mouse on iPad, and nothing on a phone.
+  ///
+  /// Wired anyway rather than dismissed as "iOS has no hover": a chart whose tooltips only work on one
+  /// platform is a gap in this host, not a property of the device. Where there genuinely is no pointer
+  /// the gesture simply never fires.
+  func hover(at point: Point?) {
+    serialised {
+      self.controller.setHitTestOptions(options: HitTestOptions.companion.Mouse)
+      if let point {
+        self.controller.dispatch(
+          event: ChartInputEventPointerMoved(point: PointD(x: point.x, y: point.y))
+        )
+      } else {
+        // The exit still carries a point — the last one, as far as the chart is concerned.
+        self.controller.dispatch(event: ChartInputEventPointerExited(point: PointD(x: 0, y: 0)))
+      }
+      self.publish()
+    }
+  }
+
+  /// Whether the chart has been panned or zoomed away from where it started.
+  ///
+  /// Read from the controller's own interaction state rather than tracked here, so the button appears
+  /// when the chart has actually moved — including a move some other gesture or handler made.
+  var canReset: Bool {
+    let state = controller.snapshot.interactionState
+    return state.viewportScale != 1.0 || state.viewportOffset.dx != 0 || state.viewportOffset.dy != 0
+  }
+
+  /// Puts the chart back where it started, since a pan and a zoom are otherwise one-way.
+  func resetViewport() {
+    serialised {
+      self.controller.resetViewport()
+      self.publish()
     }
   }
 

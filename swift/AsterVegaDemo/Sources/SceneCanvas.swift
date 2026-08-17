@@ -20,6 +20,11 @@ struct SceneCanvas: View {
   @State private var canvasSize: CGSize = .zero
   /// So `-tap` fires once rather than on every layout pass.
   @State private var tapped = false
+  /// The pan and pinch reported so far, so each gesture change can be sent as an increment.
+  @State private var panned: CGSize = .zero
+  @State private var pinched: CGFloat = 1
+  /// Where the last finger went down, for a long press — which SwiftUI reports without a location.
+  @State private var lastDown: CGPoint = .zero
 
   var body: some View {
     Canvas { graphics, size in
@@ -41,6 +46,27 @@ struct SceneCanvas: View {
       }
     )
     .gesture(touch)
+    .simultaneousGesture(pinch)
+    .simultaneousGesture(
+      LongPressGesture().onEnded { _ in
+        // A long press has no location in SwiftUI, so the last place a finger went down is the honest
+        // answer — which the drag gesture above has already recorded.
+        guard let session, let point = scenePoint(of: lastDown) else { return }
+        session.longPress(at: point)
+      }
+    )
+    // A pointer that moves without touching: a trackpad or mouse on iPad, and nothing on a phone. Wired
+    // rather than dismissed as "iOS has no hover", because a chart whose tooltips work on one platform
+    // only is a gap in the host rather than a property of the device.
+    .onContinuousHover { phase in
+      guard let session else { return }
+      switch phase {
+      case .active(let location):
+        if let point = scenePoint(of: location) { session.hover(at: point) }
+      case .ended:
+        session.hover(at: nil)
+      }
+    }
   }
 
   private func report(_ size: CGSize) {
@@ -79,15 +105,71 @@ struct SceneCanvas: View {
     if let point = scenePoint(of: location) { session.tap(at: point) }
   }
 
+  /// The whole gesture vocabulary, so a chart answers the same touches on iOS as it does on Android.
+  ///
+  /// `DragGesture(minimumDistance: 0)` rather than `TapGesture`, because a tap gesture reports *that* a
+  /// tap happened and not where — and the whole question is where. A drag that stays put is a tap; one
+  /// that moves is a pan, which is the same distinction the Android view's `GestureDetector` makes.
   private var touch: some Gesture {
-    // `DragGesture(minimumDistance: 0)` rather than `TapGesture`, because a tap gesture reports *that*
-    // a tap happened and not where — and the whole question here is where.
     DragGesture(minimumDistance: 0)
+      .onChanged { value in
+        guard let session else { return }
+        lastDown = value.startLocation
+        let travelled = hypot(value.translation.width, value.translation.height)
+        guard travelled > Self.tapSlop else { return }
+        // Incremental, because the controller adds each delta to the viewport offset: handing it the
+        // gesture's cumulative translation every time would accelerate the pan quadratically.
+        let previous = panned
+        panned = value.translation
+        session.pan(
+          by: Point(
+            x: Double(value.translation.width - previous.width) / max(scale, 0.0001),
+            y: Double(value.translation.height - previous.height) / max(scale, 0.0001)
+          ),
+          phase: GesturePhase.changed
+        )
+      }
       .onEnded { value in
-        guard let session, let point = scenePoint(of: value.location) else { return }
-        session.tap(at: point)
+        guard let session else { return }
+        let travelled = hypot(value.translation.width, value.translation.height)
+        if travelled <= Self.tapSlop {
+          if let point = scenePoint(of: value.location) { session.tap(at: point) }
+        } else {
+          session.pan(by: Point(x: 0, y: 0), phase: GesturePhase.ended)
+        }
+        panned = .zero
       }
   }
+
+  /// A pinch. The anchor is where the fingers were centred, so a chart zooms about what is being looked
+  /// at rather than about its own middle.
+  private var pinch: some Gesture {
+    MagnifyGesture()
+      .onChanged { value in
+        guard let session else { return }
+        // Also incremental: `magnification` is cumulative and the controller multiplies.
+        let step = value.magnification / max(pinched, 0.0001)
+        pinched = value.magnification
+        session.zoom(
+          by: Double(step),
+          at: scenePoint(of: CGPoint(x: value.startLocation.x, y: value.startLocation.y))
+            ?? Point(x: 0, y: 0),
+          phase: GesturePhase.changed
+        )
+      }
+      .onEnded { _ in
+        pinched = 1
+        session?.zoom(by: 1, at: Point(x: 0, y: 0), phase: GesturePhase.ended)
+      }
+  }
+
+  /// The fit scale, for turning a gesture's screen distance into scene distance.
+  private var scale: CGFloat {
+    CGFloat(placement(in: canvasSize)?.scale ?? 1)
+  }
+
+  /// How far a finger may travel and still be a tap rather than a pan.
+  private static let tapSlop: CGFloat = 8
 
   /// A point in the canvas turned into the chart's own surface coordinates.
   ///

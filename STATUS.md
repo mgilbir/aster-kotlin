@@ -483,11 +483,29 @@ ordering), and the pipeline is now verified end to end on one fixture, but the b
 - 1,348 JVM tests pass (`./scripts/test-core.sh`, `./gradlew test`), plus 12 for the Compose
   Multiplatform renderer: 7 in `commonTest`, compiled for Android, both iOS targets and the JVM, and 5
   rasterising through Compose's own Skia backend with `ImageComposeScene` — no window, no display.
-- 39 Swift tests pass (`./scripts/swift-test.sh`), which links the macOS framework with Gradle first
+- 44 Swift tests pass (`./scripts/swift-test.sh`), which links the macOS framework with Gradle first
   because SwiftPM cannot build its own dependency. Four assert the sequence of draw calls a compiled
   specification produces; five sample pixels from a `CGContext`, including one that draws a gradient
   through a clip and one that checks text appears when CoreText is lent to the renderer and is absent
   when it is not.
+- **The iOS host dispatches the same gestures the Android one does** — tap, long press, pan, zoom and
+  pointer hover — because a capability present on one host and absent on another is a gap in the host, not
+  a property of the platform. Hover is wired even though a finger has none: iPad has pointers, and where
+  there is genuinely none the gesture simply never fires. Pan deltas and pinch factors go over
+  incrementally, since the controller adds and multiplies them; a host sending cumulative values
+  accelerates the pan and compounds the zoom, which is asserted rather than remembered.
+
+  One gap turned out to be the **engine's** rather than a host's. `setSpecAsync` could not be called from
+  Swift at all: a Kotlin default argument does not cross the Obj-C boundary, so the exported signature
+  demanded a `CoroutineDispatcher`, and `Dispatchers` is not in the exported surface — there was no way to
+  name one. Compiling off the calling thread, the whole point of that function, was unreachable from a
+  foreign host. It now has a single-argument overload, which is what the iOS app calls.
+
+  What remains unequal, and honestly: images (the Swift renderer has no resolver seam yet, Android does),
+  the accessibility tree (Android has `ExploreByTouchHelper`; iOS has nothing), and export to SVG, PNG or
+  PDF — that last one needs `vega-svg` added to the framework's exports before Swift can reach it. All
+  three are closable and none is a platform limit.
+
 - **Touch works on iOS**, through `VegaChartController` rather than a second hit-testing path: a tap is
   dispatched into the compiled dataflow, hit-tested, run through the specification's `on` handlers and
   read back as a new scene. Five Swift tests cover it headlessly — including the two halves of the host

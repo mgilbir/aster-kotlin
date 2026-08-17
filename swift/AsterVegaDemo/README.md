@@ -85,6 +85,20 @@ Two consequences worth knowing:
 
 ## Touch
 
+Tap, long press, drag to pan, pinch to zoom, and pointer hover where a pointer exists. The same
+vocabulary the Android view dispatches, because a capability that works on one host and not another is a
+gap in the host rather than a property of the platform.
+
+A drag that stays within a few points is a tap and one that travels is a pan — the same distinction
+Android's `GestureDetector` makes. Pan deltas and pinch factors are sent **incrementally**: the controller
+adds and multiplies them, so handing over a gesture's cumulative value on every change would accelerate
+the pan and compound the zoom. A "Reset view" button appears once the chart has been moved, read from the
+controller's own interaction state rather than tracked here.
+
+Hover is wired even though a finger has none: iPad has pointers, and `onContinuousHover` reports them.
+Where there is genuinely no pointer the gesture never fires, which is the platform's limit rather than
+this app's.
+
 A tap goes through `VegaChartController` into the compiled dataflow: hit-tested against the scene, run
 through whatever `on` handlers the specification declared, and read back out as a new scene. That is why
 this app uses the controller rather than `SpecCompiler` directly — a specification's handlers only exist in
