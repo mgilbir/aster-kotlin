@@ -1438,6 +1438,70 @@ at zero, then scale and translate so the measured box lands in the requested one
 nothing special — its three pieces move together because they are driven from one `k`, `tx` and
 `ty`. `projection-fit-composite.vg.json` pins the whole pattern end to end.
 
+## A join across types, which was not the reported cause either (#9)
+
+Issue #9 read: delimited cells stay strings, `DataResolver` has no `format.parse` handling and no
+inference, and upstream infers by default. Three claims, and the two about this engine are wrong
+while the one about upstream is wrong the other way:
+
+- **`format.parse` is applied**, at `DataResolver:540` — `if (spec.parseAuto) values = inferred(...)`
+  and `if (spec.parse.isNotEmpty()) values = ... parseFields(...)`. `parallel-coordinates` and
+  `parse-date-patterns` have been relying on it. I wrote a second implementation before finding the
+  first, and the two fixtures failed by *double-parsing*, which is what caught it.
+- **Upstream does not infer by default.** `read(tsv, {type: 'tsv'})` keeps every cell a string;
+  inference happens only with `parse: "auto"`. And Vega-Lite emits no parse at all for a `.tsv`, so
+  upstream had no types either.
+
+Which leaves the real question: why did upstream's join match when neither side had parsed anything?
+Because upstream indexes through **`fastmap`**, which is object-backed, so JavaScript coerces every
+key to a string before storing it — the integer `22051` and the string `"22051"` are the same
+property. This engine's `asComparableKey` tagged them apart, `"s:22051"` against `"n:22051"`, so the
+join matched nothing and drew an empty map without a word.
+
+The tag is gone. It was wrong in two places rather than one: upstream merges a number and its own
+text into a single **aggregate group** too, which was checked before changing anything. A date keeps
+a namespace of its own, which is *closer* to upstream than sharing one, since a `Date` used as a key
+stringifies to its written form rather than to its epoch.
+
+`format-parse.vg.json` pins all of it: a stated parse, `"auto"`, an untyped column that stays a
+string, and the join that matches anyway. It also pins something worth knowing — `parse: "date"`
+answers a **number**, because `vega-util`'s `toDate` is `Date.parse`, so `isDate` is false after it;
+only the `date:`/`utc:` pattern forms build a real date.
+
+## Two publishers of one fit, which no ordering can satisfy (#10)
+
+A projection fitted to feature collections from **two** datasets, where each of those datasets reads
+the projection back through `geopoint` — what Vega-Lite emits for a layered map, points over the
+routes between them, framed so the projection covers both. Issue #10, and the diagnosis in it is
+right where the two before it were not: there is no order to find.
+
+Each publisher has to publish before *any* reader runs. A walk that resolves a dataset once must
+pick one to go first, and whichever reader runs earliest sees a fit built from half the geometry. In
+this engine the two datasets waited on each other and it reported a cycle; with the wait removed but
+nothing else changed, the first layer landed at **x=0 where upstream has 80**. Both symptoms, one
+cause.
+
+Upstream has no knot because its operators are **per transform**: `geojson` publishes, the projection
+waits for every signal it names, `geopoint` follows. Reaching that here would mean splitting a
+dataset's pipeline into per-transform nodes, which nothing else has needed and which is a large
+change to make for one shape.
+
+So the fit is made **eventually consistent instead**, which is what the issue suggested:
+
+- `DataflowOrder` no longer makes a *publisher* wait for its own projection's other publishers. That
+  wait is what closed the loop, and it can only forbid orders the second pass corrects anyway. A
+  reader that publishes nothing still waits, because for it the first pass is the only one.
+- `SpecCompiler` then resolves those datasets **again**, once every publisher has had its say. The
+  first pass exists to collect the signals; the second is the one whose rows are kept. Only datasets
+  that read a multi-publisher fit are re-run, so nothing else pays for it — and re-running is what
+  upstream does too, by re-pulsing until the fit settles.
+
+`projection-fit-two-publishers.vg.json` pins it: two layers, one fit, both framed together. 190
+fixtures.
+
+The Vega-Lite fixture this came from, `geo-rules`, is on the compiler branch and can come off
+`PROJECTION_PENDING` once that branch has this.
+
 ## Where the remaining packages stand
 
 **Rewritten from the ledgers, which the previous version of this section had drifted a long way
