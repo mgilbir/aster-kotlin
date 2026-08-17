@@ -483,9 +483,18 @@ ordering), and the pipeline is now verified end to end on one fixture, but the b
 - 1,348 JVM tests pass (`./scripts/test-core.sh`, `./gradlew test`), plus 12 for the Compose
   Multiplatform renderer: 7 in `commonTest`, compiled for Android, both iOS targets and the JVM, and 5
   rasterising through Compose's own Skia backend with `ImageComposeScene` — no window, no display.
-- 7 Swift tests pass (`./scripts/swift-test.sh`), which links the macOS framework with Gradle first
+- 9 Swift tests pass (`./scripts/swift-test.sh`), which links the macOS framework with Gradle first
   because SwiftPM cannot build its own dependency. Four assert the sequence of draw calls a compiled
-  specification produces; three sample pixels from a `CGContext`.
+  specification produces; five sample pixels from a `CGContext`, including one that draws a gradient
+  through a clip and one that checks text appears when CoreText is lent to the renderer and is absent
+  when it is not.
+- The **iOS demo app** (`swift/AsterVegaDemo`, built by `scripts/ios-demo.sh`) compiles for both the
+  simulator and a device slice, verified by `--check`, which type-checks the app and the renderer
+  against each slice of the XCFramework at Swift 6. It has **not been run**: this machine has no iOS
+  simulator *runtime* installed, and Xcode refuses every destination without one — `xcodebuild` cannot
+  even build. `xcodebuild -downloadPlatform iOS` installs it, and the script says so rather than
+  failing obscurely. Type-checking is not running, and the difference is worth stating plainly: it
+  proves the app builds, not that a chart appears.
 - Android lint is clean with `warningsAsErrors` on every Android module.
 - 63 instrumented tests pass on an API 37 arm64 emulator (`./scripts/test-android.sh`): 49 in
   `vega-android-canvas`, 4 in `vega-compose`, 10 in `demo`. Three groups of them cover what no JVM
@@ -563,6 +572,12 @@ A fourth was found the same way and is a lesson about Compose rather than about 
 no intrinsic size still drew solid fills while resolving every **gradient** to black. `VegaChart` now
 takes the scene's own declared size unless a caller's modifier overrides it, which is what a
 specification with a `width` and a `height` is asking for anyway.
+
+The Swift renderer started solid-only, which the iOS demo made untenable: `gradient-fills` is in the
+fixture corpus, and a demo that silently omitted those marks while the Compose renderer drew them would
+be a renderer with a hole in it rather than a demo. It now paints gradients by clipping to the mark's
+path — CoreGraphics has no gradient *fill* — and draws text through an injected `CoreTextDrawing.draw`.
+Both are checked in pixels.
 
 None of these renderers compare against golden images. Rasterisation and antialiasing belong to Skia
 and CoreGraphics and change between their versions; a byte-exact golden would fail on an upgrade that

@@ -1,3 +1,5 @@
+import org.jetbrains.kotlin.gradle.plugin.mpp.apple.XCFramework
+
 plugins { alias(libs.plugins.kotlin.multiplatform) }
 
 kotlin {
@@ -13,6 +15,20 @@ kotlin {
   //
   // Static, because a static framework needs no embedding step in the consuming app and cannot go
   // missing at launch. `baseName` is what `import AsterVega` refers to.
+  // The iOS slices are also bundled into an **XCFramework**, which is what an Xcode project can
+  // link
+  // as one artifact: a device build and a simulator build of the same framework cannot sit in the
+  // same
+  // search path, and an app that has to pick between two directories by SDK is an app that links
+  // the
+  // wrong one eventually. `assembleAsterVegaDebugXCFramework` builds it; `scripts/ios-demo.sh` runs
+  // that before xcodebuild.
+  //
+  // macOS stays out of it deliberately: the Swift package's tests point straight at
+  // `bin/macosArm64/debugFramework`, and adding a platform to an XCFramework does not change that
+  // path but does make the assembly task slower for every iOS build.
+  val xcframework = XCFramework("AsterVega")
+
   listOf(iosArm64(), iosSimulatorArm64(), macosArm64()).forEach { target ->
     target.binaries.framework {
       baseName = "AsterVega"
@@ -21,6 +37,7 @@ kotlin {
       export(project(":vega-scene"))
       export(project(":vega-expression"))
       export(project(":vega-dataflow"))
+      if (target.name != "macosArm64") xcframework.add(this)
     }
   }
 

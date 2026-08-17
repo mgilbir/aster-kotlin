@@ -1,0 +1,289 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 56;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		A50000000000000000000002 /* AsterVegaDemoApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = A50000000000000000000001 /* AsterVegaDemoApp.swift */; };
+		A50000000000000000000004 /* GalleryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A50000000000000000000003 /* GalleryView.swift */; };
+		A50000000000000000000006 /* SceneCanvas.swift in Sources */ = {isa = PBXBuildFile; fileRef = A50000000000000000000005 /* SceneCanvas.swift */; };
+		A50000000000000000000008 /* SpecLibrary.swift in Sources */ = {isa = PBXBuildFile; fileRef = A50000000000000000000007 /* SpecLibrary.swift */; };
+		A5000000000000000000000A /* DrawTarget.swift in Sources */ = {isa = PBXBuildFile; fileRef = A50000000000000000000009 /* DrawTarget.swift */; };
+		A5000000000000000000000C /* SceneWalk.swift in Sources */ = {isa = PBXBuildFile; fileRef = A5000000000000000000000B /* SceneWalk.swift */; };
+		A5000000000000000000000E /* CoreGraphicsTarget.swift in Sources */ = {isa = PBXBuildFile; fileRef = A5000000000000000000000D /* CoreGraphicsTarget.swift */; };
+		A50000000000000000000010 /* RecordingTarget.swift in Sources */ = {isa = PBXBuildFile; fileRef = A5000000000000000000000F /* RecordingTarget.swift */; };
+		A50000000000000000000012 /* CoreTextDrawing.swift in Sources */ = {isa = PBXBuildFile; fileRef = A50000000000000000000011 /* CoreTextDrawing.swift */; };
+		A50000000000000000000014 /* Specs in Resources */ = {isa = PBXBuildFile; fileRef = A50000000000000000000013 /* Specs */; };
+		A50000000000000000000016 /* AsterVega.xcframework in Frameworks */ = {isa = PBXBuildFile; fileRef = A50000000000000000000015 /* AsterVega.xcframework */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXFileReference section */
+		A50000000000000000000001 /* AsterVegaDemoApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AsterVegaDemoApp.swift; sourceTree = "<group>"; };
+		A50000000000000000000003 /* GalleryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GalleryView.swift; sourceTree = "<group>"; };
+		A50000000000000000000005 /* SceneCanvas.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SceneCanvas.swift; sourceTree = "<group>"; };
+		A50000000000000000000007 /* SpecLibrary.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpecLibrary.swift; sourceTree = "<group>"; };
+		A50000000000000000000009 /* DrawTarget.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = DrawTarget.swift; path = ../AsterVegaRender/Sources/AsterVegaRender/DrawTarget.swift; sourceTree = "<group>"; };
+		A5000000000000000000000B /* SceneWalk.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = SceneWalk.swift; path = ../AsterVegaRender/Sources/AsterVegaRender/SceneWalk.swift; sourceTree = "<group>"; };
+		A5000000000000000000000D /* CoreGraphicsTarget.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = CoreGraphicsTarget.swift; path = ../AsterVegaRender/Sources/AsterVegaRender/CoreGraphicsTarget.swift; sourceTree = "<group>"; };
+		A5000000000000000000000F /* RecordingTarget.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = RecordingTarget.swift; path = ../AsterVegaRender/Sources/AsterVegaRender/RecordingTarget.swift; sourceTree = "<group>"; };
+		A50000000000000000000011 /* CoreTextDrawing.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = CoreTextDrawing.swift; path = ../AsterVegaRender/Sources/AsterVegaRender/CoreTextDrawing.swift; sourceTree = "<group>"; };
+		A50000000000000000000013 /* Specs */ = {isa = PBXFileReference; lastKnownFileType = folder; path = Specs; sourceTree = "<group>"; };
+		A50000000000000000000015 /* AsterVega.xcframework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.xcframework; name = AsterVega.xcframework; path = ../../vega-runtime/build/XCFrameworks/debug/AsterVega.xcframework; sourceTree = "<group>"; };
+		A50000000000000000000017 /* AsterVegaDemo.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = AsterVegaDemo.app; sourceTree = BUILT_PRODUCTS_DIR; };
+/* End PBXFileReference section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		A50000000000000000000027 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				A50000000000000000000016 /* AsterVega.xcframework in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		A50000000000000000000018 = {
+			isa = PBXGroup;
+			children = (
+				A50000000000000000000019,
+				A5000000000000000000001A,
+				A5000000000000000000001B,
+				A5000000000000000000001C,
+				A5000000000000000000001D,
+			);
+			sourceTree = "<group>";
+		};
+		A50000000000000000000019 /* Sources */ = {
+			isa = PBXGroup;
+			children = (
+				A50000000000000000000001 /* AsterVegaDemoApp.swift */,
+				A50000000000000000000003 /* GalleryView.swift */,
+				A50000000000000000000005 /* SceneCanvas.swift */,
+				A50000000000000000000007 /* SpecLibrary.swift */,
+			);
+			path = Sources;
+			sourceTree = "<group>";
+		};
+		A5000000000000000000001A /* AsterVegaRender */ = {
+			isa = PBXGroup;
+			children = (
+				A50000000000000000000009 /* DrawTarget.swift */,
+				A5000000000000000000000B /* SceneWalk.swift */,
+				A5000000000000000000000D /* CoreGraphicsTarget.swift */,
+				A5000000000000000000000F /* RecordingTarget.swift */,
+				A50000000000000000000011 /* CoreTextDrawing.swift */,
+			);
+			name = AsterVegaRender;
+			sourceTree = "<group>";
+		};
+		A5000000000000000000001B /* Resources */ = {
+			isa = PBXGroup;
+			children = (
+				A50000000000000000000013 /* Specs */,
+			);
+			path = Resources;
+			sourceTree = "<group>";
+		};
+		A5000000000000000000001C /* Frameworks */ = {
+			isa = PBXGroup;
+			children = (
+				A50000000000000000000015 /* AsterVega.xcframework */,
+			);
+			name = Frameworks;
+			sourceTree = "<group>";
+		};
+		A5000000000000000000001D /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				A50000000000000000000017 /* AsterVegaDemo.app */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		A5000000000000000000001E /* AsterVegaDemo */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = A50000000000000000000021 /* Build configuration list for PBXNativeTarget "AsterVegaDemo" */;
+			buildPhases = (
+				A50000000000000000000026 /* Sources */,
+				A50000000000000000000027 /* Frameworks */,
+				A50000000000000000000028 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = AsterVegaDemo;
+			productName = AsterVegaDemo;
+			productReference = A50000000000000000000017 /* AsterVegaDemo.app */;
+			productType = "com.apple.product-type.application";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		A5000000000000000000001F /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = 1;
+				LastSwiftUpdateCheck = 2660;
+				LastUpgradeCheck = 2660;
+			};
+			buildConfigurationList = A50000000000000000000020 /* Build configuration list for PBXProject "AsterVegaDemo" */;
+			compatibilityVersion = "Xcode 14.0";
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				en,
+				Base,
+			);
+			mainGroup = A50000000000000000000018;
+			productRefGroup = A5000000000000000000001D /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				A5000000000000000000001E /* AsterVegaDemo */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		A50000000000000000000028 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				A50000000000000000000014 /* Specs in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		A50000000000000000000026 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				A50000000000000000000002 /* AsterVegaDemoApp.swift in Sources */,
+				A50000000000000000000004 /* GalleryView.swift in Sources */,
+				A50000000000000000000006 /* SceneCanvas.swift in Sources */,
+				A50000000000000000000008 /* SpecLibrary.swift in Sources */,
+				A5000000000000000000000A /* DrawTarget.swift in Sources */,
+				A5000000000000000000000C /* SceneWalk.swift in Sources */,
+				A5000000000000000000000E /* CoreGraphicsTarget.swift in Sources */,
+				A50000000000000000000010 /* RecordingTarget.swift in Sources */,
+				A50000000000000000000012 /* CoreTextDrawing.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin XCBuildConfiguration section */
+		A50000000000000000000022 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				IPHONEOS_DEPLOYMENT_TARGET = 16.0;
+				ONLY_ACTIVE_ARCH = YES;
+				SDKROOT = iphoneos;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				SWIFT_VERSION = 6.0;
+			};
+			name = Debug;
+		};
+		A50000000000000000000023 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 16.0;
+				SDKROOT = iphoneos;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				SWIFT_VERSION = 6.0;
+				VALIDATE_PRODUCT = YES;
+			};
+			name = Release;
+		};
+		A50000000000000000000024 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = "";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				ENABLE_PREVIEWS = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
+				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				MARKETING_VERSION = 1.0;
+				OTHER_LDFLAGS = "-ObjC";
+				PRODUCT_BUNDLE_IDENTIFIER = dev.aster.vega.demo;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		A50000000000000000000025 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = "";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				ENABLE_PREVIEWS = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
+				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				MARKETING_VERSION = 1.0;
+				OTHER_LDFLAGS = "-ObjC";
+				PRODUCT_BUNDLE_IDENTIFIER = dev.aster.vega.demo;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		A50000000000000000000020 /* Build configuration list for PBXProject "AsterVegaDemo" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				A50000000000000000000022 /* Debug */,
+				A50000000000000000000023 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		A50000000000000000000021 /* Build configuration list for PBXNativeTarget "AsterVegaDemo" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				A50000000000000000000024 /* Debug */,
+				A50000000000000000000025 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+/* End XCConfigurationList section */
+	};
+	rootObject = A5000000000000000000001F /* Project object */;
+}
