@@ -116,6 +116,112 @@ final class TouchTests: XCTestCase {
     )
   }
 
+  // MARK: - The rest of the gesture vocabulary
+
+  /// A pan moves the viewport, and the controller accumulates the deltas it is given.
+  ///
+  /// Incremental by contract: a host that handed over a gesture's *cumulative* translation on every
+  /// change would accelerate the pan, which is why the view sends the difference each time.
+  func testAPanMovesTheViewportByTheDeltasGiven() throws {
+    let chart = controller()
+    _ = chart.setSpec(json: specification)
+    XCTAssertEqual(chart.snapshot.interactionState.viewportOffset.dx, 0)
+
+    chart.dispatch(
+      event: ChartInputEventPan(delta: VectorD(dx: 10, dy: 4), phase: GesturePhase.changed)
+    )
+    chart.dispatch(
+      event: ChartInputEventPan(delta: VectorD(dx: 5, dy: 1), phase: GesturePhase.changed)
+    )
+    chart.dispatch(
+      event: ChartInputEventPan(delta: VectorD(dx: 0, dy: 0), phase: GesturePhase.ended)
+    )
+
+    let offset = chart.snapshot.interactionState.viewportOffset
+    XCTAssertEqual(offset.dx, 15, accuracy: 0.001, "the two deltas add up")
+    XCTAssertEqual(offset.dy, 5, accuracy: 0.001)
+  }
+
+  /// A pinch scales the viewport about its anchor, and multiplies rather than replaces.
+  func testAZoomScalesTheViewport() throws {
+    let chart = controller()
+    _ = chart.setSpec(json: specification)
+    XCTAssertEqual(chart.snapshot.interactionState.viewportScale, 1)
+
+    chart.dispatch(
+      event: ChartInputEventZoom(
+        scaleFactor: 2, anchor: PointD(x: 100, y: 50), phase: GesturePhase.changed
+      )
+    )
+    XCTAssertEqual(chart.snapshot.interactionState.viewportScale, 2, accuracy: 0.001)
+
+    // Multiplied, not assigned: two pinches of 2 make 4.
+    chart.dispatch(
+      event: ChartInputEventZoom(
+        scaleFactor: 2, anchor: PointD(x: 100, y: 50), phase: GesturePhase.changed
+      )
+    )
+    XCTAssertEqual(chart.snapshot.interactionState.viewportScale, 4, accuracy: 0.001)
+  }
+
+  /// A panned or zoomed chart can be put back, which is what makes the gestures safe to offer.
+  func testTheViewportResets() throws {
+    let chart = controller()
+    _ = chart.setSpec(json: specification)
+    chart.dispatch(
+      event: ChartInputEventPan(delta: VectorD(dx: 30, dy: 12), phase: GesturePhase.ended)
+    )
+    chart.dispatch(
+      event: ChartInputEventZoom(
+        scaleFactor: 3, anchor: PointD(x: 0, y: 0), phase: GesturePhase.ended
+      )
+    )
+
+    chart.resetViewport()
+
+    let state = chart.snapshot.interactionState
+    XCTAssertEqual(state.viewportScale, 1, accuracy: 0.001)
+    XCTAssertEqual(state.viewportOffset.dx, 0, accuracy: 0.001)
+    XCTAssertEqual(state.viewportOffset.dy, 0, accuracy: 0.001)
+  }
+
+  /// A pan is inverted along with the fit scale when a point is hit-tested.
+  ///
+  /// The two together are what a host gets wrong most easily: the controller divides by
+  /// `contentScale * viewportScale` and subtracts the offset, so a chart that has been panned is hit at
+  /// the panned position — not where the mark was drawn before the finger moved.
+  func testAMarkIsHitAtItsPannedPosition() throws {
+    let chart = controller()
+    _ = chart.setSpec(json: specification)
+    // Push the chart 40 units right, so the left bar's interior at scene x=50 is now at surface x=90.
+    chart.dispatch(
+      event: ChartInputEventPan(delta: VectorD(dx: 40, dy: 0), phase: GesturePhase.ended)
+    )
+
+    chart.dispatch(event: ChartInputEventTap(point: PointD(x: 90, y: 70)))
+    XCTAssertEqual(
+      try record(chart).filter { $0.contains("#b22222") }.count, 1,
+      "the tap follows the chart it can see"
+    )
+  }
+
+  /// A pointer moving without touching. No fingers involved, and iPad has them.
+  func testAPointerMoveIsAccepted() throws {
+    let chart = controller()
+    _ = chart.setSpec(json: specification)
+
+    chart.setHitTestOptions(options: HitTestOptions.companion.Mouse)
+    chart.dispatch(event: ChartInputEventPointerMoved(point: PointD(x: 50, y: 70)))
+    // Hovering a bar is what a tooltip hangs off, so the hovered node is the thing to check.
+    XCTAssertNotNil(
+      chart.snapshot.interactionState.hoveredNodeId,
+      "a pointer over a mark hovers it"
+    )
+
+    chart.dispatch(event: ChartInputEventPointerExited(point: PointD(x: 50, y: 70)))
+    XCTAssertNil(chart.snapshot.interactionState.hoveredNodeId, "leaving clears it")
+  }
+
   /// A selection is readable from Swift, which is what lets the app say what was touched.
   func testTheSelectionIsReadableAfterATap() throws {
     let chart = controller()

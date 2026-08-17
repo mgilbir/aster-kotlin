@@ -122,6 +122,10 @@ private struct ChartDetail: View {
           Text(summary(of: scene))
             .font(.caption)
             .foregroundStyle(Color.secondary)
+          if session.canReset {
+            Button("Reset view") { session.resetViewport() }
+              .font(.caption)
+          }
           if let touched = session.lastTouch {
             // What the tap found, read back from the chart's own interaction state — so a touch that
             // reached the dataflow is visible rather than merely believed.

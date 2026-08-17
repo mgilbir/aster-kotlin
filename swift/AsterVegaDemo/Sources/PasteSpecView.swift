@@ -102,6 +102,11 @@ struct PasteSpecView: View {
         .frame(maxWidth: .infinity, alignment: .leading)
     }
 
+    if session.canReset {
+      Button("Reset view") { session.resetViewport() }
+        .font(.caption)
+    }
+
     if let touched = session.lastTouch {
       Text(touched).font(.caption).foregroundStyle(Color.accentColor)
     }
