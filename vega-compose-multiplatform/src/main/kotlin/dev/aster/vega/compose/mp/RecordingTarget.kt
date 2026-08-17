@@ -1,5 +1,6 @@
 package dev.aster.vega.compose.mp
 
+import dev.aster.vega.scene.RasterImage
 import kotlin.math.abs
 import kotlin.math.roundToLong
 
@@ -85,8 +86,23 @@ public class RecordingTarget : SceneDrawTarget {
     )
   }
 
-  override fun image(url: String, rect: DrawRect, opacity: Double) {
-    note("image $url ${show(rect)}${if (opacity != 1.0) " opacity ${show(opacity)}" else ""}")
+  override fun image(
+    url: String,
+    raster: RasterImage?,
+    rect: DrawRect,
+    fit: DrawImageFit,
+    smooth: Boolean,
+    opacity: Double,
+  ) {
+    // A raster is described by its size: it has no address, and its pixels are neither readable nor
+    // stable
+    // as text.
+    val source = raster?.let { "raster ${it.width}x${it.height}" } ?: url
+    note(
+      "image $source ${show(rect)} ${fit.name.lowercase()}" +
+        (if (!smooth) " sharp" else "") +
+        (if (opacity != 1.0) " opacity ${show(opacity)}" else "")
+    )
   }
 
   private fun note(line: String) {
