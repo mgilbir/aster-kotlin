@@ -31,7 +31,12 @@ final class CoreTextTextEngineTests: XCTestCase {
       ellipsis: "…",
       // Null, so the run splits on newlines. A specification naming a `lineBreak` splits on that
       // instead, which the shared layout handles and this engine never sees.
-      lineBreak: nil
+      lineBreak: nil,
+      // Also null: an explicit line list is what a `text` channel whose value is an *array* produces, and
+      // `displayLines` prefers it over splitting. Kotlin gives both of these a default; a default does not
+      // cross the Obj-C boundary, so Swift has to name every parameter — which is why adding one to
+      // `TextRun` breaks Swift callers that a Kotlin caller would never notice.
+      lines: nil
     )
   }
 
