@@ -9000,6 +9000,22 @@
   "hidden": false
  },
  {
+  "fixture": "format-parse",
+  "kind": "group",
+  "role": "graphics-object",
+  "roleDescription": "group mark container",
+  "label": null,
+  "hidden": false
+ },
+ {
+  "fixture": "format-parse",
+  "kind": "text",
+  "role": "graphics-object",
+  "roleDescription": "text mark container",
+  "label": null,
+  "hidden": false
+ },
+ {
   "fixture": "geo-measures",
   "kind": "group",
   "role": "graphics-object",
@@ -14889,6 +14905,30 @@
  },
  {
   "fixture": "projection-fit-composite",
+  "kind": "symbol",
+  "role": "graphics-symbol",
+  "roleDescription": "symbol mark container",
+  "label": null,
+  "hidden": false
+ },
+ {
+  "fixture": "projection-fit-two-publishers",
+  "kind": "group",
+  "role": "graphics-object",
+  "roleDescription": "group mark container",
+  "label": null,
+  "hidden": false
+ },
+ {
+  "fixture": "projection-fit-two-publishers",
+  "kind": "symbol",
+  "role": "graphics-symbol",
+  "roleDescription": "symbol mark container",
+  "label": null,
+  "hidden": false
+ },
+ {
+  "fixture": "projection-fit-two-publishers",
   "kind": "symbol",
   "role": "graphics-symbol",
   "roleDescription": "symbol mark container",

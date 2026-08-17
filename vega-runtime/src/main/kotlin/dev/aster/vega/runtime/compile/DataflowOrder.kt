@@ -227,6 +227,35 @@ internal class DataflowOrder(
       }
     }
 
+    /**
+     * The datasets that publish each projection's fit, by name.
+     *
+     * A fit written `{"signal": "[geo_a, geo_b]"}` names two signals, and a `geojson` transform in
+     * some dataset writes each. Knowing *which* datasets those are is what tells a mutual wait (two
+     * publishers, no order) from an ordinary one (a reader waiting for someone else's fit).
+     */
+    private val projectionPublishers: Map<String, Set<String>> by lazy {
+      projections.associate { projection ->
+        val source = (projection.fit as? VegaValue.Obj)?.fields?.get("signal")?.asString()
+        val names = mutableSetOf<String>()
+        if (source != null) {
+          for (dataset in data) {
+            for (transform in dataset.transform) {
+              val published =
+                ((transform as? VegaValue.Obj)?.fields?.get("signal") as? VegaValue.Str)?.value
+              if (
+                published != null &&
+                  Regex("\\b${Regex.escape(published)}\\b").containsMatchIn(source)
+              ) {
+                names += dataset.name
+              }
+            }
+          }
+        }
+        projection.name to names
+      }
+    }
+
     /** Which projection each transform type names, so a dataset waits for that projection's fit. */
     private val projectionParameter = "projection"
     private val scaleSpecs = scales.associateBy { it.name }
@@ -334,7 +363,19 @@ internal class DataflowOrder(
         // shape, wrong scale, and nothing said.
         val named =
           ((transform as? VegaValue.Obj)?.fields?.get(projectionParameter) as? VegaValue.Str)?.value
-        named?.let { projectionSources[it]?.let(result::addAll) }
+        named?.let { projection ->
+          // …**unless this dataset is one of the publishers**, and there is more than one. Two
+          // datasets that each publish part of a fit and each read it back wait for one another,
+          // which is a cycle with no ordering to find: whichever went first would read a fit built
+          // from half the geometry. Upstream has no such knot because its operators are per
+          // transform. `SpecCompiler` resolves these datasets a second time once every publisher
+          // has published, so the edge would only forbid an order that the second pass makes
+          // correct anyway. A reader that publishes *nothing* still waits, because for it the first
+          // pass is the only one.
+          val publishers = projectionPublishers[projection] ?: emptySet()
+          if (publishers.size > 1 && spec.name in publishers) return@let
+          projectionSources[projection]?.let(result::addAll)
+        }
       }
       return result
     }
