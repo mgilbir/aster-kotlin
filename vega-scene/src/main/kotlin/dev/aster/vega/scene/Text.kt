@@ -165,25 +165,57 @@ public interface TextEngine {
  * but do not match any real font. Anything comparing against on-device metrics must use the
  * documented wider text tolerances (PROJECT_BRIEF.md 18.4).
  */
-public class MetricTextEngine(
-  private val advanceRatio: Double = 0.6,
-  private val ascentRatio: Double = 0.8,
-  private val descentRatio: Double = 0.2,
-) : TextEngine {
+/**
+ * A [TextEngine] that owns the **layout** and asks a subclass only how wide the text is.
+ *
+ * Laying a run out — splitting it on newlines, honouring `limit` and its ellipsis, wrapping to a
+ * constraint, stacking baselines, deriving bounds from the alignment — is the same arithmetic
+ * whatever measures the glyphs. What differs between platforms is one question: how wide is this
+ * string in this style. So that is the only thing a subclass answers.
+ *
+ * This exists because it was written three times. [MetricTextEngine] had it, `AndroidTextEngine`
+ * had its own copy with a different wrapping rule, and a CoreText engine for iOS would have been
+ * the third — at which point "the same implementation must be used for measuring and for drawing"
+ * (see [TextEngine]) becomes impossible to keep true by inspection. A label sits where the layout
+ * put it, so a second layout is a second answer to where labels go.
+ *
+ * Subclasses are expected from other languages as well: `CoreTextTextEngine` in
+ * `swift/AsterVegaRender` is a Swift subclass, which is what makes an iOS chart measure text with
+ * the same font that draws it.
+ */
+public abstract class MeasuredTextEngine : TextEngine {
 
-  override fun measure(text: TextRun, constraint: SizeD?): TextMetrics =
+  /**
+   * The advance width of `line` in `style`, including any letter spacing between its characters.
+   */
+  public abstract fun advanceOf(line: String, style: TextStyle): Double
+
+  /** How far the tallest glyph rises above the baseline. */
+  public abstract fun ascentOf(style: TextStyle): Double
+
+  /** How far the lowest glyph falls below it. */
+  public abstract fun descentOf(style: TextStyle): Double
+
+  /**
+   * The line height to use when the style names none.
+   *
+   * Upstream's default is `fontSize + 2`, not a ratio — `vega-scenegraph`'s `lineHeight(item)`. The
+   * two agree at 10 point and part company everywhere else, which nothing noticed until a legend
+   * title arrived with two lines in it. A platform engine may prefer its font's own line height and
+   * overrides this to say so.
+   */
+  public open fun defaultLineHeightOf(style: TextStyle): Double = style.fontSize + 2.0
+
+  final override fun measure(text: TextRun, constraint: SizeD?): TextMetrics =
     layout(text, constraint).metrics
 
-  override fun layout(text: TextRun, constraint: SizeD?): TextLayout {
+  final override fun layout(text: TextRun, constraint: SizeD?): TextLayout {
     val style = text.style
-    // Upstream's default is `fontSize + 2`, not a ratio — `vega-scenegraph`'s `lineHeight(item)`.
-    // The two agree at 10 point and part company everywhere else, which nothing noticed until a
-    // legend title arrived with two lines in it.
-    val lineHeight = style.lineHeight ?: (style.fontSize + 2.0)
-    val ascent = style.fontSize * ascentRatio
-    val descent = style.fontSize * descentRatio
+    val lineHeight = style.lineHeight ?: defaultLineHeightOf(style)
+    val ascent = ascentOf(style)
+    val descent = descentOf(style)
 
-    val rawLines = text.displayLines { advance(it, style) }
+    val rawLines = text.displayLines { advanceOf(it, style) }
     val wrapped =
       if (constraint?.width != null && constraint.width > 0.0) {
         rawLines.flatMap { wrap(it, style, constraint.width) }
@@ -192,7 +224,7 @@ public class MetricTextEngine(
       }
 
     val lines = wrapped.mapIndexed { index, line ->
-      TextLine(text = line, width = advance(line, style), baselineY = index * lineHeight)
+      TextLine(text = line, width = advanceOf(line, style), baselineY = index * lineHeight)
     }
     val width = lines.maxOfOrNull { it.width } ?: 0.0
     val height = if (lines.isEmpty()) 0.0 else (lines.size - 1) * lineHeight + ascent + descent
@@ -214,10 +246,9 @@ public class MetricTextEngine(
     )
   }
 
-  private fun advance(line: String, style: TextStyle): Double =
-    if (line.isEmpty()) 0.0
-    else line.length * style.fontSize * advanceRatio + (line.length - 1) * style.letterSpacing
-
+  /**
+   * Greedy word wrapping: a word that does not fit starts a line, and one that never fits gets one.
+   */
   private fun wrap(line: String, style: TextStyle, maxWidth: Double): List<String> {
     if (line.isEmpty()) return listOf("")
     val words = line.split(' ')
@@ -225,7 +256,7 @@ public class MetricTextEngine(
     var current = StringBuilder()
     for (word in words) {
       val candidate = if (current.isEmpty()) word else "$current $word"
-      if (advance(candidate, style) <= maxWidth || current.isEmpty()) {
+      if (advanceOf(candidate, style) <= maxWidth || current.isEmpty()) {
         current = StringBuilder(candidate)
       } else {
         result.add(current.toString())
@@ -235,6 +266,29 @@ public class MetricTextEngine(
     result.add(current.toString())
     return result
   }
+}
+
+/**
+ * Deterministic, platform-independent text engine used by JVM tests and by SVG export when no
+ * platform engine is supplied.
+ *
+ * Advance widths are a fixed fraction of the font size, so measurements are stable across machines
+ * but do not match any real font. Anything comparing against on-device metrics must use the
+ * documented wider text tolerances (PROJECT_BRIEF.md 18.4).
+ */
+public class MetricTextEngine(
+  private val advanceRatio: Double = 0.6,
+  private val ascentRatio: Double = 0.8,
+  private val descentRatio: Double = 0.2,
+) : MeasuredTextEngine() {
+
+  override fun advanceOf(line: String, style: TextStyle): Double =
+    if (line.isEmpty()) 0.0
+    else line.length * style.fontSize * advanceRatio + (line.length - 1) * style.letterSpacing
+
+  override fun ascentOf(style: TextStyle): Double = style.fontSize * ascentRatio
+
+  override fun descentOf(style: TextStyle): Double = style.fontSize * descentRatio
 }
 
 /**

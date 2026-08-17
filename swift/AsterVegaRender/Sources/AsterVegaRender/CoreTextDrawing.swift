@@ -53,46 +53,32 @@ public enum CoreTextDrawing {
     let line = CTLineCreateWithAttributedString(attributed)
 
     context.saveGState()
+    // Rotation turns about the run's **anchor**, not its pen position: a rotated axis label pivots on
+    // the point the axis put it at, and pivoting on the left end of the text instead swings a
+    // right-aligned label away from its tick.
+    if run.angleDegrees != 0 {
+      context.translateBy(x: CGFloat(run.anchor.x), y: CGFloat(run.anchor.y))
+      context.rotate(by: CGFloat(run.angleDegrees) * .pi / 180)
+      context.translateBy(x: -CGFloat(run.anchor.x), y: -CGFloat(run.anchor.y))
+    }
     // CoreText draws up from a baseline, and every coordinate this renderer produces is in a space
     // whose y grows *down* — the caller has already flipped the context to make that true. Flipping
-    // back around the anchor is what keeps the glyphs upright inside it; without this the text is
+    // back about the pen position is what keeps the glyphs upright inside it; without this the text is
     // drawn mirrored, which is the classic symptom and worth naming.
     context.translateBy(x: CGFloat(run.origin.x), y: CGFloat(run.origin.y))
     context.scaleBy(x: 1, y: -1)
-    if run.angleDegrees != 0 {
-      context.rotate(by: -CGFloat(run.angleDegrees) * .pi / 180)
-    }
     context.textPosition = .zero
     CTLineDraw(line, context)
     context.restoreGState()
   }
 
   private static func font(for run: DrawTextRun) -> CTFont {
-    // A specification names a font family as a string, and whether that face is installed is the
-    // device's business. A name that resolves is used; one that does not falls back to the system
-    // font at the right size and weight, which is legible rather than absent.
-    let size = CGFloat(run.fontSize)
-    var traits: [CFString: Any] = [:]
-    if run.fontWeight >= 600 || run.italic {
-      var symbolic: CTFontSymbolicTraits = []
-      if run.fontWeight >= 600 { symbolic.insert(.traitBold) }
-      if run.italic { symbolic.insert(.traitItalic) }
-      traits[kCTFontSymbolicTrait] = symbolic.rawValue
-    }
-
-    var attributes: [CFString: Any] = [kCTFontSizeAttribute: size]
-    let family = run.fontFamily.split(separator: ",").first.map {
-      $0.trimmingCharacters(in: CharacterSet(charactersIn: " '\""))
-    }
-    if let family, !family.isEmpty, family.lowercased() != "sans-serif" {
-      attributes[kCTFontFamilyNameAttribute] = family
-    }
-    if !traits.isEmpty {
-      attributes[kCTFontTraitsAttribute] = traits as CFDictionary
-    }
-
-    let descriptor = CTFontDescriptorCreateWithAttributes(attributes as CFDictionary)
-    return CTFontCreateWithFontDescriptor(descriptor, size, nil)
+    CoreTextFonts.font(
+      family: run.fontFamily,
+      size: run.fontSize,
+      weight: run.fontWeight,
+      italic: run.italic
+    )
   }
 
   private static let sRGB = CGColorSpace(name: CGColorSpace.sRGB) ?? CGColorSpaceCreateDeviceRGB()

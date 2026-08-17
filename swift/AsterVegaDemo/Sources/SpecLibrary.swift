@@ -57,7 +57,7 @@ enum SpecLibrary {
     let request = Request(json: spec.json, loader: loader)
     return await Task.detached(priority: .background) {
       let compiled = SpecCompiler(
-        textEngine: MetricTextEngine(advanceRatio: 0.6, ascentRatio: 0.8, descentRatio: 0.2),
+        textEngine: CoreTextTextEngine(),
         loader: request.loader,
         randomSeed: 42,
         clock: ClockCompanion.shared.Fixed

@@ -104,7 +104,9 @@ final class ChartSession {
       let outcome = await Task.detached(priority: .userInitiated) {
         Outcome(
           compiled: SpecCompiler(
-            textEngine: MetricTextEngine(advanceRatio: 0.6, ascentRatio: 0.8, descentRatio: 0.2),
+            // CoreText, so a label is laid out by the font that draws it. With the portable ratio
+            // engine every reserved box was the wrong width and the axis numbers sat over the line.
+            textEngine: CoreTextTextEngine(),
             loader: request.loader,
             randomSeed: 42,
             clock: ClockCompanion.shared.Fixed
