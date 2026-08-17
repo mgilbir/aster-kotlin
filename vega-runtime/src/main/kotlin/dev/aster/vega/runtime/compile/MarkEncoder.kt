@@ -659,6 +659,17 @@ public class MarkEncoder(
     // fills
     // only the nine that belong to a slice, so it printed "null" twenty-four times.
     val content = textOf(channels["text"], datum)
+    // An **array** text value is a list of lines, not a comma-joined string.
+    //
+    // `asString()` joins an array with commas, which is right for every other channel and wrong for
+    // this
+    // one: upstream's `textLines` returns the array itself when it holds more than one element, so
+    // `["first", "second"]` is a two-line label. Joined instead, the label came out as
+    // `first,second` on
+    // one line — and its bounds were wrong in both directions, so a chart sized around it was laid
+    // out
+    // around the wrong rectangle. No fixture used an array here, which is why it went unnoticed.
+    val textLines = arrayLines(channels["text"], datum)
     val angle = number(channels["angle"], datum) ?: 0.0
     // `dx` and `dy` shift the anchor without affecting alignment — but for rotated text upstream
     // applies them *after* the rotation, so an offset runs along the text rather than along the
@@ -699,7 +710,13 @@ public class MarkEncoder(
       )
     val run =
       TextRun(
-        text = content,
+        text = textLines?.joinToString("\n") ?: content,
+        // Carried as a list rather than encoded into `text`, so `lineBreak` can stay on the item
+        // exactly
+        // as the specification wrote it while being ignored — which is what upstream does, and what
+        // a
+        // fixture caught this engine not doing.
+        lines = textLines,
         style = textStyle,
         align = textAlign(string(channels["align"], datum)),
         baseline = textBaseline(string(channels["baseline"], datum)),
@@ -709,6 +726,9 @@ public class MarkEncoder(
         ellipsis = string(channels["ellipsis"], datum) ?: "\u2026",
         // `lineBreak` splits one string into lines on a separator of the specification's choosing —
         // `"lineBreak": "/"` turns a path into a stack.
+        // Kept whatever the text is: upstream records it on the item and ignores it for an array,
+        // which
+        // `displayLines` now does by preferring the explicit line list.
         lineBreak = string(channels["lineBreak"], datum)?.takeIf { it.isNotEmpty() },
       )
 
@@ -1371,6 +1391,26 @@ public class MarkEncoder(
    */
   private fun textOf(channel: ChannelValue?, datum: VegaValue): String =
     string(channel, datum)?.trim() ?: ""
+
+  /**
+   * The lines an **array** text value carries, or null when it is not one.
+   *
+   * Upstream's `lineArray`: an array of more than one element *is* the line list, and an array of
+   * exactly one element collapses to that element — so a single-element array is a plain
+   * single-line label rather than a one-line multi-line one. Each line is trimmed, as `textValue`
+   * trims; `limit` truncation happens later, per line, in `displayLines`.
+   *
+   * The lines go onto `TextRun.lines`, which `displayLines` prefers over splitting `text` — so an
+   * element containing a newline stays one line, as upstream keeps it, and `lineBreak` survives on
+   * the item while being ignored. The first version of this cleared `lineBreak` instead: it
+   * rendered correctly and recorded a scene upstream does not produce, which the `text-array-lines`
+   * fixture caught immediately.
+   */
+  private fun arrayLines(channel: ChannelValue?, datum: VegaValue): List<String>? {
+    val array = value(channel, datum) as? VegaValue.Arr ?: return null
+    if (array.values.size <= 1) return null
+    return array.values.map { it.asString().trim() }
+  }
 
   /**
    * A channel as text, or null when it holds nothing.

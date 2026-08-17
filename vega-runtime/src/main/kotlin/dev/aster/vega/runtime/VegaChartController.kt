@@ -253,6 +253,22 @@ public class VegaChartController(
     return publish(compiler.compileJson(json))
   }
 
+  /**
+   * Compiles off the calling thread on the default dispatcher.
+   *
+   * The same as the two-argument [setSpecAsync] with its default, spelled as its own function
+   * because a **default argument does not cross the Obj-C boundary**. Kotlin/Native exports only
+   * the full parameter list, and `Dispatchers` is not in the exported surface at all — so from
+   * Swift the other overload asks for a value that cannot be named, and compiling off the main
+   * thread was unreachable from a foreign host. An iOS host had to fall back to the synchronous
+   * [setSpec] on a thread of its own, which works and is not the API this class advertises.
+   *
+   * Parity between hosts is the point: a capability that exists for Kotlin and not for Swift is a
+   * gap in this boundary rather than a limitation of the platform.
+   */
+  public suspend fun setSpecAsync(json: String): CompiledSpec =
+    setSpecAsync(json, Dispatchers.Default)
+
   /** The text of the loaded specification, so a fired handler can recompile it. */
   private var loadedSpecJson: String? = null
 
@@ -278,6 +294,10 @@ public class VegaChartController(
    *
    * Compilations are serialized, so the text engine is only ever touched by one at a time. The host
    * still must not hand this controller the engine its renderer draws with; see the class docs.
+   *
+   * A host that is not Kotlin should call the single-argument [setSpecAsync] instead: a default
+   * argument does not survive the Obj-C boundary, so from Swift this overload demands a
+   * `CoroutineDispatcher` that no exported symbol can produce.
    */
   public suspend fun setSpecAsync(
     json: String,
