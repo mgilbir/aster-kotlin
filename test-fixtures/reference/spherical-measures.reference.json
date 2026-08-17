@@ -1,0 +1,261 @@
+{
+  "marks": [
+    {
+      "opacity": 1,
+      "role": "axis-tick",
+      "stroke": "#888",
+      "strokeWidth": 1,
+      "type": "rule",
+      "x": 0.5,
+      "x2": -4.5,
+      "y": 15.5,
+      "y2": 15.5
+    },
+    {
+      "opacity": 1,
+      "role": "axis-tick",
+      "stroke": "#888",
+      "strokeWidth": 1,
+      "type": "rule",
+      "x": 0.5,
+      "x2": -4.5,
+      "y": 41.5,
+      "y2": 41.5
+    },
+    {
+      "opacity": 1,
+      "role": "axis-tick",
+      "stroke": "#888",
+      "strokeWidth": 1,
+      "type": "rule",
+      "x": 0.5,
+      "x2": -4.5,
+      "y": 67.5,
+      "y2": 67.5
+    },
+    {
+      "opacity": 1,
+      "role": "axis-tick",
+      "stroke": "#888",
+      "strokeWidth": 1,
+      "type": "rule",
+      "x": 0.5,
+      "x2": -4.5,
+      "y": 92.5,
+      "y2": 92.5
+    },
+    {
+      "opacity": 1,
+      "role": "axis-tick",
+      "stroke": "#888",
+      "strokeWidth": 1,
+      "type": "rule",
+      "x": 0.5,
+      "x2": -4.5,
+      "y": 118.5,
+      "y2": 118.5
+    },
+    {
+      "opacity": 1,
+      "role": "axis-tick",
+      "stroke": "#888",
+      "strokeWidth": 1,
+      "type": "rule",
+      "x": 0.5,
+      "x2": -4.5,
+      "y": 144.5,
+      "y2": 144.5
+    },
+    {
+      "align": "right",
+      "angle": 0,
+      "baseline": "middle",
+      "fill": "#000",
+      "font": "sans-serif",
+      "fontSize": 10,
+      "limit": 180,
+      "opacity": 1,
+      "role": "axis-label",
+      "text": "box, wound clockwise",
+      "type": "text",
+      "x": -6.5,
+      "y": 15.483871
+    },
+    {
+      "align": "right",
+      "angle": 0,
+      "baseline": "middle",
+      "fill": "#000",
+      "font": "sans-serif",
+      "fontSize": 10,
+      "limit": 180,
+      "opacity": 1,
+      "role": "axis-label",
+      "text": "box, wound the other way",
+      "type": "text",
+      "x": -6.5,
+      "y": 41.290323
+    },
+    {
+      "align": "right",
+      "angle": 0,
+      "baseline": "middle",
+      "fill": "#000",
+      "font": "sans-serif",
+      "fontSize": 10,
+      "limit": 180,
+      "opacity": 1,
+      "role": "axis-label",
+      "text": "wide",
+      "type": "text",
+      "x": -6.5,
+      "y": 67.096774
+    },
+    {
+      "align": "right",
+      "angle": 0,
+      "baseline": "middle",
+      "fill": "#000",
+      "font": "sans-serif",
+      "fontSize": 10,
+      "limit": 180,
+      "opacity": 1,
+      "role": "axis-label",
+      "text": "across the antimeridian",
+      "type": "text",
+      "x": -6.5,
+      "y": 92.903226
+    },
+    {
+      "align": "right",
+      "angle": 0,
+      "baseline": "middle",
+      "fill": "#000",
+      "font": "sans-serif",
+      "fontSize": 10,
+      "limit": 180,
+      "opacity": 1,
+      "role": "axis-label",
+      "text": "a line",
+      "type": "text",
+      "x": -6.5,
+      "y": 118.709677
+    },
+    {
+      "align": "right",
+      "angle": 0,
+      "baseline": "middle",
+      "fill": "#000",
+      "font": "sans-serif",
+      "fontSize": 10,
+      "limit": 180,
+      "opacity": 1,
+      "role": "axis-label",
+      "text": "two points",
+      "type": "text",
+      "x": -6.5,
+      "y": 144.516129
+    },
+    {
+      "opacity": 1,
+      "role": "axis-domain",
+      "stroke": "#888",
+      "strokeWidth": 1,
+      "type": "rule",
+      "x": 0.5,
+      "x2": 0.5,
+      "y": 0.5,
+      "y2": 160.5
+    },
+    {
+      "baseline": "middle",
+      "fill": "#000",
+      "font": "sans-serif",
+      "fontSize": 11,
+      "role": "mark",
+      "text": "12.566066 sr, at −179.500,−0.500, w−180.0 n90.0",
+      "type": "text",
+      "x": 0,
+      "y": 15.483871
+    },
+    {
+      "baseline": "middle",
+      "fill": "#000",
+      "font": "sans-serif",
+      "fontSize": 11,
+      "role": "mark",
+      "text": "0.000305 sr, at 0.500,0.500, w0.0 n1.0",
+      "type": "text",
+      "x": 0,
+      "y": 41.290323
+    },
+    {
+      "baseline": "middle",
+      "fill": "#000",
+      "font": "sans-serif",
+      "fontSize": 11,
+      "role": "mark",
+      "text": "9.818795 sr, at 180.000,−3.926, w−180.0 n90.0",
+      "type": "text",
+      "x": 0,
+      "y": 67.096774
+    },
+    {
+      "baseline": "middle",
+      "fill": "#000",
+      "font": "sans-serif",
+      "fontSize": 11,
+      "role": "mark",
+      "text": "0.000000 sr, at 179.977,15.002, w179.0 n20.0",
+      "type": "text",
+      "x": 0,
+      "y": 92.903226
+    },
+    {
+      "baseline": "middle",
+      "fill": "#000",
+      "font": "sans-serif",
+      "fontSize": 11,
+      "role": "mark",
+      "text": "0.000000 sr, at 0.000,0.000, w−45.0 n0.0",
+      "type": "text",
+      "x": 0,
+      "y": 118.709677
+    },
+    {
+      "baseline": "middle",
+      "fill": "#000",
+      "font": "sans-serif",
+      "fontSize": 11,
+      "role": "mark",
+      "text": "0.000000 sr, at 0.000,0.000, w−10.0 n10.0",
+      "type": "text",
+      "x": 0,
+      "y": 144.516129
+    }
+  ],
+  "scales": {
+    "yscale": {
+      "bandwidth": 20.645161,
+      "domain": [
+        "box, wound clockwise",
+        "box, wound the other way",
+        "wide",
+        "across the antimeridian",
+        "a line",
+        "two points"
+      ],
+      "range": [
+        0,
+        160
+      ],
+      "step": 25.806452
+    }
+  },
+  "size": {
+    "height": 170,
+    "width": 606
+  },
+  "spec": "spherical-measures.vg.json",
+  "vegaVersion": "6.3.1"
+}

@@ -119,7 +119,13 @@ public class ParsedExpression(
           else -> return@walk
         }
       val first = node.arguments.firstOrNull()
-      val literal = (first as? Node.Literal)?.value?.let { it as? VegaValue.Str }?.value
+      // Upstream's visitors branch on the argument being a **`Literal` node**, not on its being a
+      // string, and the difference is load-bearing. `geoArea(null, feature)` — the documented way
+      // to measure on the globe rather than through a projection — names no scale, and reading it
+      // as "some scale, we cannot tell which" made *every* scale a dependency of the dataset and
+      // reported a cycle for a chart upstream compiles. A non-string literal names whatever it
+      // stringifies to, which matches no operator, so it contributes nothing.
+      val literal = (first as? Node.Literal)?.value?.let { JsSemantics.toStringValue(it) }
       when {
         literal != null -> into.add(literal)
         into === datasets -> unnamedDataset = true

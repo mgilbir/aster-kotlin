@@ -10,6 +10,7 @@ import dev.aster.vega.dataflow.geo.PathCentroidSink
 import dev.aster.vega.dataflow.geo.PathStringSink
 import dev.aster.vega.dataflow.geo.Projection
 import dev.aster.vega.dataflow.geo.Projections
+import dev.aster.vega.dataflow.geo.SphericalMeasure
 import dev.aster.vega.expression.JsSemantics
 import dev.aster.vega.model.DiagnosticCodes
 import dev.aster.vega.model.VegaValue
@@ -258,8 +259,11 @@ public object GeoMeasure {
    * balances on the part that has area.
    */
   public fun centroid(definition: ProjectionDefinition?, geojson: VegaValue): DoubleArray? {
+    // No projection is not "the identity projection": upstream's `geoMethod` calls d3's *spherical*
+    // centroid, which is a different measurement on a different surface.
+    if (definition == null) return SphericalMeasure.centroid(geojson)
     val sink = PathCentroidSink()
-    val stream = definition?.build()?.stream(sink) ?: sink
+    val stream = definition.build()?.stream(sink) ?: sink
     GeoJsonStream.stream(geojson, stream)
     return sink.result()
   }
@@ -282,8 +286,10 @@ public object GeoMeasure {
    * against it expects.
    */
   public fun area(definition: ProjectionDefinition?, geojson: VegaValue): Double {
+    // Steradians on the globe, not square units of a page that was never drawn.
+    if (definition == null) return SphericalMeasure.area(geojson)
     val sink = PathAreaSink()
-    val stream = definition?.build()?.stream(sink) ?: sink
+    val stream = definition.build()?.stream(sink) ?: sink
     GeoJsonStream.stream(geojson, stream)
     return sink.result()
   }
@@ -296,8 +302,11 @@ public object GeoMeasure {
    * that survived, not by the part that was asked for.
    */
   public fun bounds(definition: ProjectionDefinition?, geojson: VegaValue): DoubleArray? {
+    // On the globe, where longitude wraps: two islands at ±179° are two degrees apart, and the box
+    // that says otherwise spans the Pacific the wrong way round.
+    if (definition == null) return SphericalMeasure.bounds(geojson)
     val sink = PathBoundsSink()
-    val stream = definition?.build()?.stream(sink) ?: sink
+    val stream = definition.build()?.stream(sink) ?: sink
     GeoJsonStream.stream(geojson, stream)
     return sink.result()
   }

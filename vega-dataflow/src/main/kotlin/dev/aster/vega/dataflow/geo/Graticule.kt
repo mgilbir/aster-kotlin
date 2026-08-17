@@ -65,6 +65,57 @@ internal class Graticule {
       )
     )
 
+  /** Each line on its own, as `LineString` features — d3's `graticule.lines()`. */
+  fun lineStrings(): VegaValue =
+    VegaValue.Arr(
+      lines().map { line ->
+        VegaValue.Obj(
+          linkedMapOf(
+            "type" to VegaValue.Str("LineString"),
+            "coordinates" to VegaValue.Arr(line.map { point(it) }),
+          )
+        )
+      }
+    )
+
+  /**
+   * The major extent's boundary as one closed ring — d3's `graticule.outline()`.
+   *
+   * Down the western meridian, east along the northern parallel, back up the eastern meridian and
+   * west along the southern one. Each leg drops its first point because the previous leg already
+   * ended there, which is what keeps the ring from repeating a vertex at every corner.
+   */
+  fun outline(): VegaValue {
+    val (bigX0, bigY0, bigX1, bigY1) = extentMajor
+    val meridian = graticuleX(bigY0, bigY1, 90.0)
+    val parallel = graticuleY(bigX0, bigX1, precision)
+    val ring =
+      meridian(bigX0) +
+        parallel(bigY1).drop(1) +
+        meridian(bigX1).reversed().drop(1) +
+        parallel(bigY0).reversed().drop(1)
+    return VegaValue.Obj(
+      linkedMapOf(
+        "type" to VegaValue.Str("Polygon"),
+        "coordinates" to VegaValue.Arr(listOf(VegaValue.Arr(ring.map { point(it) }))),
+      )
+    )
+  }
+
+  /** The configuration read back, which d3 answers when a setter is called with no argument. */
+  fun extentMajorValue(): DoubleArray = extentMajor
+
+  fun extentMinorValue(): DoubleArray = extentMinor
+
+  fun stepMajorValue(): DoubleArray = stepMajor
+
+  fun stepMinorValue(): DoubleArray = stepMinor
+
+  fun precisionValue(): Double = precision
+
+  private fun point(p: DoubleArray): VegaValue =
+    VegaValue.Arr(listOf(VegaValue.Num(p[0]), VegaValue.Num(p[1])))
+
   private fun lines(): List<List<DoubleArray>> {
     val (bigX0, bigY0, bigX1, bigY1) = extentMajor
     val (smallX0, smallY0, smallX1, smallY1) = extentMinor

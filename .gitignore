@@ -22,3 +22,14 @@ node_modules/
 
 # Worktrees for parallel agents; each is its own checkout, not content of this one.
 .claude/worktrees/
+# Scratch directory the upstream-test recorder writes rewritten test files into.
+oracle-js/.recorder-scratch/
+
+# Upstream test vectors are *derived*: `scripts/record-upstream-vectors.sh` rebuilds them from Vega's
+# own test suite at the pinned version, byte-identically. Nearly 5 MB of somebody else's inputs is not
+# worth carrying in this repository's history, and a stale copy would be worse than none.
+#
+# `known-divergences.json` is the exception and stays: it is not a copy of upstream, it is this
+# engine's list of places it disagrees with upstream, and each entry is a bug to fix.
+test-fixtures/upstream-vectors/*.json
+!test-fixtures/upstream-vectors/known-divergences.json

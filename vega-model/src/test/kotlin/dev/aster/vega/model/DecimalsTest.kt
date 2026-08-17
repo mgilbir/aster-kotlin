@@ -26,8 +26,21 @@ class DecimalsTest {
 
   /** Exactly the implementation this replaced, kept as the oracle. */
   private object Reference {
-    fun fixed(value: Double, decimals: Int): String =
-      BigDecimal(value).setScale(decimals, RoundingMode.HALF_UP).toPlainString()
+    /**
+     * `BigDecimal` is the oracle for the *arithmetic*, not for the shape of the answer, and
+     * `toFixed` has two rules `BigDecimal` knows nothing about. **At 10^21 it gives up**: the
+     * specification says to return `ToString(x)` instead, so `(4.8e260).toFixed(6)` is
+     * `4.8371574695849096e+260` rather than 261 digits — and `format('.6f')` in d3 answers the
+     * same, because d3 calls `toFixed`. And a negative zero keeps no sign, because `BigDecimal` has
+     * none either.
+     *
+     * Both were found by swapping the implementation for `ktecma262`'s and reading what disagreed.
+     * The oracle had been encoding this engine's choices rather than the language's.
+     */
+    fun fixed(value: Double, decimals: Int): String {
+      if (kotlin.math.abs(value) >= 1e21) return Decimals.jsString(value)
+      return BigDecimal(value).setScale(decimals, RoundingMode.HALF_UP).toPlainString()
+    }
 
     /**
      * Assembled from `BigDecimal` rather than taken from `String.format("%.Ne")`, which is what the
@@ -46,7 +59,9 @@ class DecimalsTest {
     fun exponential(value: Double, decimals: Int): String {
       if (!value.isFinite())
         return if (value.isNaN()) "NaN" else if (value > 0) "Infinity" else "-Infinity"
-      val sign = if (1.0 / value < 0 || value < 0) "-" else ""
+      // `(-0).toExponential(0)` is `0e+0`: the sign of a negative zero is dropped here, and d3
+      // re-adds one itself when a specifier asks for it.
+      val sign = if (value < 0) "-" else ""
       if (value == 0.0) {
         val mantissa = if (decimals > 0) "0." + "0".repeat(decimals) else "0"
         return "$sign${mantissa}e+0"
@@ -65,15 +80,19 @@ class DecimalsTest {
       return if (exponent < -6 || exponent >= digits) {
         exponential(value, digits - 1)
       } else {
-        fixed(value, digits - 1 - exponent)
+        // **Not** [fixed]: `toPrecision` has no 10^21 rule of its own, so `(1e21).toPrecision(26)`
+        // writes out the digits where `(1e21).toFixed(1)` gives up and returns `1e+21`. Two
+        // functions, two rules, and routing one through the other conflated them.
+        BigDecimal(value).setScale(digits - 1 - exponent, RoundingMode.HALF_UP).toPlainString()
       }
     }
 
-    fun trimmed(value: Double, decimals: Int): String =
-      BigDecimal(value)
-        .setScale(decimals, RoundingMode.HALF_UP)
-        .stripTrailingZeros()
-        .toPlainString()
+    /** [fixed] with the zeros taken off, so it inherits the same two rules. */
+    fun trimmed(value: Double, decimals: Int): String {
+      val text = fixed(value, decimals)
+      if ('.' !in text) return text
+      return text.trimEnd('0').trimEnd('.')
+    }
   }
 
   private fun compare(value: Double, decimals: Int) {

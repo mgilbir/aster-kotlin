@@ -1,6 +1,5 @@
 package dev.aster.vega.runtime.compile
 
-import dev.aster.vega.expression.NumberFormatSubset
 import dev.aster.vega.model.DiagnosticCodes
 import dev.aster.vega.model.DiagnosticCollector
 import dev.aster.vega.model.VegaValue
@@ -1101,14 +1100,13 @@ internal class LegendBuilder(
         reference.size == 1 -> reference[0]
         else -> 1.0
       }
-    val specifier = spec.format?.let { Ticks.spanSpecifier(it, 0.0, step, BAND_FORMAT_COUNT) }
+    val labeller = spec.format?.let { Ticks.spanFormatter(it, 0.0, step, BAND_FORMAT_COUNT) }
     val decimals = decimalsFor(scale.thresholds)
     return { index, value ->
       // The first band opens at negative infinity, and upstream writes nothing rather than a
       // number that bounds nothing.
       if (index == 0) ""
-      else if (specifier != null) NumberFormatSubset.format(value, specifier)
-      else formatTickLabel(value, decimals)
+      else if (labeller != null) labeller(value) else formatTickLabel(value, decimals)
     }
   }
 
@@ -1188,8 +1186,8 @@ internal class LegendBuilder(
       return it
     }
     val specifier = spec.format ?: return null
-    val resolved = Ticks.spanSpecifier(specifier, low, high, count)
-    return { value -> NumberFormatSubset.format(value, resolved) }
+    val labeller = Ticks.spanFormatter(specifier, low, high, count)
+    return { value -> labeller(value) }
   }
 
   /**

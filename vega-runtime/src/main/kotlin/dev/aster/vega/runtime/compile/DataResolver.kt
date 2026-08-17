@@ -26,6 +26,7 @@ import dev.aster.vega.runtime.load.DenyLoader
 import dev.aster.vega.runtime.load.LoadDeniedException
 import dev.aster.vega.runtime.scale.VegaScale
 import kotlinx.datetime.TimeZone
+import kotlinx.serialization.json.JsonPrimitive
 
 /**
  * The datasets visible at one point in a specification, and the tree each of them carries.
@@ -195,24 +196,36 @@ internal class DataResolver(
    * `format.header`, applied the way upstream applies it: as a header **row** prepended to the
    * text.
    *
-   * Not as a list of names handed to the parser, and the difference is visible. Upstream builds the
-   * row with `stringValue` — d3's own quoting — and joins it with the file's delimiter, so a column
-   * name containing the delimiter or a quote comes out quoted and parses back as one field. Handing
-   * the names to the parser directly would skip that and split such a name in two.
+   * Not as a list of names handed to the parser, and the difference is visible: upstream prepends a
+   * *text* row and lets the parser read it back, so the names go through quoting on the way out and
+   * unquoting on the way in.
+   *
+   * The quoting is **`JSON.stringify`**, not the delimited format's own — `vega-util`'s
+   * `stringValue`, always quoted, with backslash escapes. The two are not interchangeable and this
+   * file used to assume they were. A name is JSON-escaped and then read as delimited text, which
+   * round-trips `a,b` but deliberately does not round-trip anything else: `a\b` comes back as
+   * `a\\b`, a tab comes back as the two characters `\t`, and a name containing a quote breaks the
+   * row so thoroughly that upstream yields no columns at all. Verified end to end against
+   * `read(..., {header: [name]})`; matching it matters more than improving it, because a
+   * specification that names its own header is relying on what upstream does with it.
    */
   private fun headed(text: String, spec: DataSpec, delimiter: Char): String {
     if (spec.header.isEmpty()) return text
-    val row = spec.header.joinToString(delimiter.toString()) { quoteField(it, delimiter) }
+    val row = spec.header.joinToString(delimiter.toString()) { stringValue(it) }
     return "$row\n$text"
   }
 
-  /** d3's `stringValue`: quoted only when it has to be, with inner quotes doubled. */
-  private fun quoteField(value: String, delimiter: Char): String =
-    if (value.contains('"') || value.contains(delimiter) || value.contains('\n')) {
-      "\"" + value.replace("\"", "\"\"") + "\""
-    } else {
-      value
-    }
+  /**
+   * `vega-util`'s `stringValue`: the JSON form of the string.
+   *
+   * The line-separator replacements are upstream's, and so is their scope — JavaScript's
+   * `String.replace` with a string pattern rewrites only the **first** occurrence, so a name with
+   * two of them keeps the second. Reproduced rather than corrected.
+   */
+  private fun stringValue(value: String): String {
+    val json = JsonPrimitive(value).toString()
+    return json.replaceFirst("\u2028", "\\u2028").replaceFirst("\u2029", "\\u2029")
+  }
 
   /**
    * A TopoJSON document, decoded into the features or the mesh a map mark draws.
