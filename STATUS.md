@@ -698,7 +698,7 @@ no data is needed to compare two compilers. So every one of them was compiled by
 by this one, and the outputs compared property by property. That is a *measurement*, not a gate: the
 examples are not fixtures here, and nothing about them is checked in.
 
-**124 of 627 matched exactly** at the start, and **621** do now.
+**124 of 627 matched exactly** at the start, and **622** do now.
 
 The value is the *ranking*. The first sweep clustered by root cause, and the three most damaging
 causes were fixed straight away — chosen for what they do to the *picture* rather than for
@@ -713,18 +713,14 @@ frequency:
   where this compiler used `step - 2`, making it nearly four times too wide. `getBandSize` asks the
   scale's kind first and reaches `discreteBandSize` only where the domain is discrete.
 
-The sweep has been the working list ever since, and the 6 that still differ cluster like this:
+The sweep has been the working list ever since, and the 5 that still differ cluster like this:
 
 | Files | Cause |
 | --- | --- |
-| 3 | geographic: a projection inside a **repetition** — whose cause is now known and written below — and the two interactive maps that brush one |
-| 5 | the rest of the **facet data flow**: what is left is a chart whose cells are read by a **selection**, where the brush's own datasets have to be cut per cell as well |
-| 0 | nothing outside the geographic work; the one refusal left of my own is a facet inside a **facet**, described below |
+| 3 | a facet inside a **facet**, which is the only thing still refused by name and is described below |
+| 2 | the two interactive maps that brush **through a projection**, which the selection machinery has no case for |
 
-| 3 | one-offs, each its own rule |
-
-Fourteen are still refused by name: eight geographic, three a facet inside a facet, two a repeat
-inside a concatenation, and one the `url` channel.
+Nothing else in the gallery differs at all, and nothing outside those two causes is refused.
 
 
 The count went 124 → 138 clean, which understates it: a cause is fixed for every file that carries
@@ -4650,22 +4646,41 @@ aggregate, and **not its type**. Two layers over one column, one calling it ordi
 saying nothing, are the same field to a title; keying the title by the type as well titled the axis
 "age, age".
 
-### What a projection inside a repetition still wants
+### A join is named for the model that wrote it, and a projection is merged above the copies
 
-`geo_repeat` is three maps of one table, each joined against the same outlines, and it comes out
-one dataset short: the three copies' joins fold into a single node above the fork, where upstream
-keeps one per copy.
+`geo_repeat` is three maps of one table, each joined against the same outlines. It used to come out
+one dataset short — the three copies' joins folding into a single node above the fork, where
+upstream keeps one per copy — and once they were three, drawn as three maps at three scales.
 
-The cause is **naming**, and it is upstream's own rule read the other way round. A join is named
-through the model that wrote it — `model.getName('lookup_n')` — so three copies of a plot each write
-a differently-named join and no optimizer can see them as one node, while four layers of a *shared*
-model write the same name and fold into one. This compiler names a join for the table it reads, so
-both cases fold, and the two charts want opposite answers.
+The first half is **naming**, and it is upstream's own rule read the other way round. `LookupNode`
+gives the joined table a named point of its own and keeps that name in the node's identity, so a
+join is told apart by the model that wrote it — `model.getName('lookup_' + counter)` — and not by
+the table it reads. Three copies of a plot each write their own name and stay three joins; four
+layers of a *shared* model write one name and fold into one. Naming the point for the table made
+both cases fold, and the two charts want opposite answers: `interactive_global_development` wants
+the fold and `geo_repeat` wants three.
 
-Naming it through the view was tried and is not enough on its own: `transformOwners` is empty for
-the layered chart as well as for the repeated one, so the two cannot yet be told apart at the point
-the join is registered. What is missing is the ownership record reaching that far, which is the same
-plumbing the facet lift needed and the same shape of fix.
+So the point is now made **unconditionally**, where before it was made only when the chart also drew
+from the joined table, and the counter is per model, restarting for each model's own transform
+array as `parseTransformArray` keeps it. Two consequences are worth separating from the rule. The
+name is a placeholder: assembly rewrites every join's `from` to whatever dataset the point turned
+out to be, which is why all three still read `source_1` in the end. And a table read for the join
+alone stops being a dataset with a transform hanging off it, so it sorts with the plain sources —
+which is what put `source_0` and `source_1` back into upstream's order, a difference that had looked
+like a second defect and was only ever a consequence of the fold.
+
+The second half is that `parseProjection` **recurses**. Every level that is not a unit merges what
+the level below it agreed on, so a concatenation merges its plots exactly as a layer merges its
+members — and a repetition is a concatenation by the time anything geographic looks at it. Merged,
+the three copies are one projection named for the chart and fitted to everything all three draw;
+left per plot, each copy fitted itself to its own outlines. A level whose children disagree
+contributes nothing upward rather than blocking the merge, which is upstream returning no component
+for a level it could not merge: those children keep the projections they had, and whatever else
+agreed is still merged around them.
+
+`geo-repeat.vl.json` pins both halves against upstream — two copies, two joins, one projection. It
+is the counterpart of `geo-trellis.vl.json`, which pins the same picture drawn as a grid of cells
+rather than as separate plots.
 
 ### A cell captions itself, and a caption may be two lines
 

@@ -31,12 +31,24 @@ internal class Transforms(
    * dataset, declared beside this view's. The compilation owns the naming, so it hands in the way
    * to register one; without it — as when this class is used only to compile a predicate — a
    * `lookup` is reported instead.
+   *
+   * The second argument is the name the join's *output point* takes, which is not decoration: it is
+   * what tells two copies of one join apart from two joins. See [lookupOrdinal].
    */
-  private val registerLookup: ((VegaValue) -> String)? = null,
+  private val registerLookup: ((VegaValue, String) -> String)? = null,
   /** Answers with the name of the table a selection's picked rows are assembled into. */
   private val registerParamLookup: ((String) -> String)? = null,
   /** How a signal is named through the view it belongs to, a bin publishing two of them. */
   private val prefix: (String) -> String = { it },
+  /**
+   * Which of its model's joins this one is — `lookupCounter` in `parseTransformArray`.
+   *
+   * The counter is **per model**, restarting for each model's own transform array, because the name
+   * it feeds is prefixed by that model's name. Together the two are what make a join's output point
+   * identify the model that wrote it, and that identity is the whole difference between a chart
+   * whose copies fold into one join and a chart whose copies must not.
+   */
+  private val lookupOrdinal: Int = 0,
   /** The chart's selections, which a `{"param": …}` predicate is tested against. */
   private val selections: List<Selection> = emptyList(),
 ) {
@@ -565,8 +577,14 @@ internal class Transforms(
     // while Vega-Lite's `lookup` is the first and `from.fields` the second.
     return listOf(
       obj {
+        // `LookupNode.make` names the join's output point `model.getName('lookup_' + counter)` and
+        // keeps that name in the node's identity, so a join is told apart by the **model that wrote
+        // it** rather than by the table it reads. Three copies of one plot each write their own and
+        // stay three joins; four layers of one model write the same one and fold into a single
+        // node. The name here is a placeholder either way — assembly rewrites it to whatever
+        // dataset the point turned out to be.
         put("type", "lookup")
-        put("from", register(data))
+        put("from", register(data, prefix("lookup_$lookupOrdinal")))
         put("key", key)
         put("fields", strings(listOf(local)))
         // "Lookup a few fields and create a flat output" where `from.fields` names them, and
