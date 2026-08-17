@@ -102,6 +102,10 @@ struct PasteSpecView: View {
         .frame(maxWidth: .infinity, alignment: .leading)
     }
 
+    if let scene = session.scene {
+      ExportButton(scene: scene, name: "pasted-chart")
+    }
+
     if session.canReset {
       Button("Reset view") { session.resetViewport() }
         .font(.caption)

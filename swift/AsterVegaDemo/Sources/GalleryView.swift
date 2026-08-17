@@ -122,6 +122,7 @@ private struct ChartDetail: View {
           Text(summary(of: scene))
             .font(.caption)
             .foregroundStyle(Color.secondary)
+          ExportButton(scene: scene, name: chartName)
           if session.canReset {
             Button("Reset view") { session.resetViewport() }
               .font(.caption)
@@ -165,6 +166,9 @@ private struct ChartDetail: View {
     .navigationBarTitleDisplayMode(.inline)
     .task { session.load(specification: chart.json) }
   }
+
+  /// A file name for an export, from the chart's own id.
+  private var chartName: String { chart.id }
 
   private func summary(of scene: AsterVega.Scene) -> String {
     "\(Int(scene.width)) × \(Int(scene.height)) points, \(markCount(scene)) marks"
