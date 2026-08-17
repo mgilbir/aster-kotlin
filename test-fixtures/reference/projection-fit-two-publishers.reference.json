@@ -1,0 +1,59 @@
+{
+  "marks": [
+    {
+      "fill": "#4c78a8",
+      "role": "mark",
+      "shapeHeight": 8.944272,
+      "shapeLeft": 75.527864,
+      "shapeTop": 88.16412,
+      "shapeWidth": 8.944272,
+      "size": 80,
+      "type": "symbol",
+      "x": 80,
+      "y": 92.636256
+    },
+    {
+      "fill": "#4c78a8",
+      "role": "mark",
+      "shapeHeight": 8.944272,
+      "shapeLeft": 155.527864,
+      "shapeTop": 137.118438,
+      "shapeWidth": 8.944272,
+      "size": 80,
+      "type": "symbol",
+      "x": 160,
+      "y": 141.590574
+    },
+    {
+      "fill": "#4c78a8",
+      "role": "mark",
+      "shapeHeight": 6.324555,
+      "shapeLeft": -3.162278,
+      "shapeTop": 32.688467,
+      "shapeWidth": 6.324555,
+      "size": 40,
+      "type": "symbol",
+      "x": 0,
+      "y": 35.850745
+    },
+    {
+      "fill": "#4c78a8",
+      "role": "mark",
+      "shapeHeight": 6.324555,
+      "shapeLeft": 196.837722,
+      "shapeTop": 160.986978,
+      "shapeWidth": 6.324555,
+      "size": 40,
+      "type": "symbol",
+      "x": 200,
+      "y": 164.149255
+    }
+  ],
+  "scales": {},
+  "size": {
+    "height": 210,
+    "width": 216.324555
+  },
+  "spec": "projection-fit-two-publishers.vg.json",
+  "vegaVersion": "6.3.1"
+}
