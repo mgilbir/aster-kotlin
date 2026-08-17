@@ -1403,6 +1403,41 @@ That completes the 0.2.0 review: **number** replaced a whole file, **text** gave
 whitespace set and the lexer its grammar, and **uri** turned out to be unreachable, since Vega's
 expression registry has no URI function among its 119.
 
+## A composite projection was the one thing `fit` never reached
+
+Reported from another agent as three Vega-Lite fixtures pending because "this runtime can't yet fit
+a projection to an extent, and a projection fitted to the tables that read it back through geopoint
+is a cycle to a strict ordering". Neither is so, and my own first diagnosis was wrong as well —
+worth writing down, because the wrong answer was more interesting than the right one and took three
+probes to discard.
+
+**Fitting to an extent works**, and has: `config-group-projection.vg.json` and
+`geojson-transform.vg.json` both fit a projection to a dataset through a signal.
+
+**The cycle is not one.** Fitting to the table *itself* is refused by upstream too — Vega answers
+"Cycle detected in dataflow graph". What Vega-Lite emits is different: the `geojson` transform
+publishes a signal, the projection fits to *that*, and `geopoint` follows. At Vega's per-transform
+granularity there is no cycle, and **this engine already handles it** — `DataResolver` marks the
+projections stale on `setSignal` and rebuilds them lazily, which is exactly what a `geopoint` two
+lines below a `geojson` needs. The comment on `refreshProjections` had described the problem and
+solved it some time ago.
+
+I diagnosed a dataset-granularity ordering bug from the symptom and was wrong. What settled it was
+changing one word in the probe: **`mercator` fitted correctly and `albersUsa` did not.** The
+dataflow was never involved.
+
+`albersUsa` is a **composite**, and `fitExtent` lived on the concrete projection rather than on the
+interface the composite implements, so `build()` set its scale, translate and precision and then
+returned without ever offering it the fit. A fitted composite therefore drew at the family's
+unfitted default — x at 431.97 where upstream has 85.26 — silently, which is the outcome this
+engine is meant not to produce. It is also the projection Vega-Lite reaches for by default on any
+United States chart, so the gap was not exotic.
+
+The fix is the same arithmetic a plain projection uses: measure at a reference scale with the origin
+at zero, then scale and translate so the measured box lands in the requested one. A composite needs
+nothing special — its three pieces move together because they are driven from one `k`, `tx` and
+`ty`. `projection-fit-composite.vg.json` pins the whole pattern end to end.
+
 ## Where the remaining packages stand
 
 **Rewritten from the ledgers, which the previous version of this section had drifted a long way

@@ -1043,6 +1043,35 @@ internal class AlbersUsa : GeoProjector {
     return this
   }
 
+  /**
+   * `fitExtent` for a composite, which is the same arithmetic as a plain projection's.
+   *
+   * A composite has no `rotate` or `center` to speak of, so this used to be left off it entirely —
+   * and a fitted `albersUsa` therefore drew at the family's unfitted default with nothing said.
+   * That is the projection **Vega-Lite reaches for by default** on any United States chart, so the
+   * gap was not exotic.
+   *
+   * Nothing about the fit needs the pieces: measure the geometry at a reference scale with the
+   * origin at zero, then scale and translate so the measured box lands in the requested one. This
+   * class has `scale`, `translate` and `stream`, which is all of it — the three sub-projections
+   * move together because they are driven from the same `k`, `tx` and `ty`.
+   */
+  fun fitExtent(x0: Double, y0: Double, x1: Double, y1: Double, geojson: VegaValue): AlbersUsa {
+    scale(FIT_REFERENCE_SCALE).translate(0.0, 0.0)
+    val sink = PathBoundsSink()
+    GeoJsonStream.stream(geojson, stream(sink))
+    val bounds = sink.result() ?: return this
+    val width = x1 - x0
+    val height = y1 - y0
+    val spanX = bounds[2] - bounds[0]
+    val spanY = bounds[3] - bounds[1]
+    if (spanX <= 0.0 || spanY <= 0.0) return this
+    val k = kotlin.math.min(width / spanX, height / spanY)
+    val cx = x0 + (width - k * (bounds[2] + bounds[0])) / 2.0
+    val cy = y0 + (height - k * (bounds[3] + bounds[1])) / 2.0
+    return scale(FIT_REFERENCE_SCALE * k).translate(cx, cy)
+  }
+
   override fun stream(sink: GeoStream): GeoStream =
     Multiplex(listOf(lower48.stream(sink), alaska.stream(sink), hawaii.stream(sink)))
 
