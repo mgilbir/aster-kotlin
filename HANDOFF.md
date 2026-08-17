@@ -1468,6 +1468,40 @@ string, and the join that matches anyway. It also pins something worth knowing �
 answers a **number**, because `vega-util`'s `toDate` is `Date.parse`, so `isDate` is false after it;
 only the `date:`/`utc:` pattern forms build a real date.
 
+## Two publishers of one fit, which no ordering can satisfy (#10)
+
+A projection fitted to feature collections from **two** datasets, where each of those datasets reads
+the projection back through `geopoint` — what Vega-Lite emits for a layered map, points over the
+routes between them, framed so the projection covers both. Issue #10, and the diagnosis in it is
+right where the two before it were not: there is no order to find.
+
+Each publisher has to publish before *any* reader runs. A walk that resolves a dataset once must
+pick one to go first, and whichever reader runs earliest sees a fit built from half the geometry. In
+this engine the two datasets waited on each other and it reported a cycle; with the wait removed but
+nothing else changed, the first layer landed at **x=0 where upstream has 80**. Both symptoms, one
+cause.
+
+Upstream has no knot because its operators are **per transform**: `geojson` publishes, the projection
+waits for every signal it names, `geopoint` follows. Reaching that here would mean splitting a
+dataset's pipeline into per-transform nodes, which nothing else has needed and which is a large
+change to make for one shape.
+
+So the fit is made **eventually consistent instead**, which is what the issue suggested:
+
+- `DataflowOrder` no longer makes a *publisher* wait for its own projection's other publishers. That
+  wait is what closed the loop, and it can only forbid orders the second pass corrects anyway. A
+  reader that publishes nothing still waits, because for it the first pass is the only one.
+- `SpecCompiler` then resolves those datasets **again**, once every publisher has had its say. The
+  first pass exists to collect the signals; the second is the one whose rows are kept. Only datasets
+  that read a multi-publisher fit are re-run, so nothing else pays for it — and re-running is what
+  upstream does too, by re-pulsing until the fit settles.
+
+`projection-fit-two-publishers.vg.json` pins it: two layers, one fit, both framed together. 190
+fixtures.
+
+The Vega-Lite fixture this came from, `geo-rules`, is on the compiler branch and can come off
+`PROJECTION_PENDING` once that branch has this.
+
 ## Where the remaining packages stand
 
 **Rewritten from the ledgers, which the previous version of this section had drifted a long way

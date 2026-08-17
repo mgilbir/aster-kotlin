@@ -11,6 +11,7 @@ import dev.aster.vega.model.DiagnosticCollector
 import dev.aster.vega.model.VegaDiagnostic
 import dev.aster.vega.model.VegaValue
 import dev.aster.vega.model.asNumberOrNull
+import dev.aster.vega.model.asString
 import dev.aster.vega.model.spec.AutosizeType
 import dev.aster.vega.model.spec.ChannelValue
 import dev.aster.vega.model.spec.EncodeSpec
@@ -383,6 +384,44 @@ public class SpecCompiler(
       }
     }
 
+    // ---- the second pass a shared fit needs ---------------------------------------------------
+    //
+    // A projection fitted to feature collections from **more than one** dataset cannot be got right
+    // in a single ordered walk. Each publisher has to publish before *any* reader runs, and a walk
+    // that resolves a dataset once has to pick one of them to go first: whichever reader runs
+    // earliest sees a fit built from part of the geometry. On the two-publisher fixture the first
+    // layer landed at x=0 where upstream has 80.
+    //
+    // Upstream has no ordering problem because each transform is its own operator — `geojson`
+    // publishes, the projection waits for every signal it names, and `geopoint` follows. Reaching
+    // that here would mean splitting a dataset's pipeline into per-transform nodes, which nothing
+    // else has needed.
+    //
+    // So the datasets that read such a projection are resolved **again**, once every publisher has
+    // had its say. The first pass exists to collect the signals; the second is the one whose rows
+    // are kept. Only datasets that actually read a shared fit are re-run, so nothing else pays for
+    // it — and re-running is what upstream does too, by re-pulsing until the fit settles.
+    val shared = sharedFitReaders(spec, expressions)
+    if (shared.isNotEmpty()) {
+      for (name in order.order.filterIsInstance<Operator.Data>().map { it.name }) {
+        if (name !in shared) continue
+        dataSpecs[name]?.let { again ->
+          resolved =
+            data.resolve(
+              listOf(again),
+              signalValues,
+              resolved,
+              unresolvedSignals,
+              scales,
+              projectionsSoFar(spec, expressions, signalValues, resolved, scales),
+              refreshProjections = { signals ->
+                projectionsSoFar(spec, expressions, signals, resolved, scales)
+              },
+            )
+        }
+      }
+    }
+
     val datasets = resolved.datasets
     val signals = session.scope(datasets, scales)
     // The plotting area, now that a declared `width` or `height` signal has had its say. Everything
@@ -644,6 +683,51 @@ public class SpecCompiler(
    * report the same unimplemented property once per call, where the scope built after the loop
    * reports it exactly once.
    */
+  /**
+   * The datasets that read a projection whose `fit` draws on a dataset **other than themselves**.
+   *
+   * That is the condition for needing a second pass: a projection fitted only to the table that
+   * reads it back is already handled, because `DataResolver` rebuilds the projections when a
+   * transform publishes a signal and a `geopoint` a line later picks the rebuilt one up. The
+   * problem is a fit that names two publishers, where no single ordering of whole datasets can put
+   * both publications before both readings.
+   *
+   * Returns an empty set for every specification that has no such projection, which is nearly all
+   * of them.
+   */
+  private fun sharedFitReaders(spec: VegaSpec, expressions: ExpressionCompiler): Set<String> {
+    if (spec.projections.isEmpty()) return emptySet()
+    // Which datasets publish each projection's fit, read off the signal names the fit mentions.
+    val publishers = LinkedHashMap<String, Set<String>>()
+    for (projection in spec.projections) {
+      val source = (projection.fit as? VegaValue.Obj)?.fields?.get("signal")?.asString() ?: continue
+      val names = mutableSetOf<String>()
+      for (dataset in spec.data) {
+        for (transform in dataset.transform) {
+          val published =
+            ((transform as? VegaValue.Obj)?.fields?.get("signal") as? VegaValue.Str)?.value
+          if (
+            published != null && Regex("\\b${Regex.escape(published)}\\b").containsMatchIn(source)
+          ) {
+            names += dataset.name
+          }
+        }
+      }
+      if (names.size > 1) publishers[projection.name] = names
+    }
+    if (publishers.isEmpty()) return emptySet()
+    // Which datasets read one of those projections through a transform.
+    val readers = mutableSetOf<String>()
+    for (dataset in spec.data) {
+      for (transform in dataset.transform) {
+        val named =
+          ((transform as? VegaValue.Obj)?.fields?.get("projection") as? VegaValue.Str)?.value
+        if (named != null && publishers.containsKey(named)) readers += dataset.name
+      }
+    }
+    return readers
+  }
+
   private fun projectionsSoFar(
     spec: VegaSpec,
     expressions: ExpressionCompiler,

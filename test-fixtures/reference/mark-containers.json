@@ -14912,6 +14912,30 @@
   "hidden": false
  },
  {
+  "fixture": "projection-fit-two-publishers",
+  "kind": "group",
+  "role": "graphics-object",
+  "roleDescription": "group mark container",
+  "label": null,
+  "hidden": false
+ },
+ {
+  "fixture": "projection-fit-two-publishers",
+  "kind": "symbol",
+  "role": "graphics-symbol",
+  "roleDescription": "symbol mark container",
+  "label": null,
+  "hidden": false
+ },
+ {
+  "fixture": "projection-fit-two-publishers",
+  "kind": "symbol",
+  "role": "graphics-symbol",
+  "roleDescription": "symbol mark container",
+  "label": null,
+  "hidden": false
+ },
+ {
   "fixture": "projection-fit",
   "kind": "group",
   "role": "graphics-object",
