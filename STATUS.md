@@ -480,7 +480,7 @@ ordering), and the pipeline is now verified end to end on one fixture, but the b
 
 ## Verification
 
-- 1,348 JVM tests pass (`./scripts/test-core.sh`, `./gradlew test`), plus 12 for the Compose
+- 1,354 JVM tests pass (`./scripts/test-core.sh`, `./gradlew test`), plus 12 for the Compose
   Multiplatform renderer: 7 in `commonTest`, compiled for Android, both iOS targets and the JVM, and 5
   rasterising through Compose's own Skia backend with `ImageComposeScene` — no window, no display.
 - 62 Swift tests pass (`./scripts/swift-test.sh`), which links the macOS framework with Gradle first
@@ -703,6 +703,28 @@ and CoreGraphics and change between their versions; a byte-exact golden would fa
 broke nothing, and the pressure would then be to loosen the comparison until it stopped failing.
 Sampling named pixels — this one is the bar's colour, that one is the background, the corner of the
 circle's bounding box is not filled — says what is actually being claimed, and says why when it breaks.
+
+## A text array is a list of lines
+
+A `text` channel whose value is an array — `{"value": ["first", "second"]}` — is one line per element
+upstream: `textLines` returns the array itself when it holds more than one. This engine ran it through
+`asString()`, which joins with commas, so the label came out as `first,second` on one line. Its bounds were
+wrong in **both** directions — 79.2 wide against upstream's 52, and 11 tall against 24 — so a chart that
+sizes itself around such a label was laid out around the wrong rectangle. Not only a rendering difference.
+
+No fixture used an array there, across all 190, which is why it survived. Found by accident while writing a
+multi-line test for the Swift renderer, filed as issue #18, and fixed with a fixture that compares against
+upstream — which is the only reason the fix is right rather than plausible.
+
+The first attempt was plausible and wrong, and the fixture said so in one line. Upstream's rule is
+`item.lineBreak && !isArray(item.text)`: `lineBreak` is *ignored* for an array but stays on the item. The
+first fix cleared it, which rendered correctly and recorded a scene upstream does not produce —
+`text/mark[4].lineBreak: expected /, got absent`. So `TextRun` now carries an explicit `lines` list that
+`displayLines` prefers, and `lineBreak` survives untouched.
+
+Three rules are worth remembering, all upstream's: an array of more than one element is the line list; an
+array of exactly one element **collapses** to a plain label rather than a one-line multi-line one; and each
+line is trimmed individually, where this engine had trimmed only the joined whole.
 
 ## Two tests that asserted on a gap, and failed when it closed
 
