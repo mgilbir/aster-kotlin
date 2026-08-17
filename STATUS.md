@@ -483,11 +483,20 @@ ordering), and the pipeline is now verified end to end on one fixture, but the b
 - 1,348 JVM tests pass (`./scripts/test-core.sh`, `./gradlew test`), plus 12 for the Compose
   Multiplatform renderer: 7 in `commonTest`, compiled for Android, both iOS targets and the JVM, and 5
   rasterising through Compose's own Skia backend with `ImageComposeScene` — no window, no display.
-- 34 Swift tests pass (`./scripts/swift-test.sh`), which links the macOS framework with Gradle first
+- 39 Swift tests pass (`./scripts/swift-test.sh`), which links the macOS framework with Gradle first
   because SwiftPM cannot build its own dependency. Four assert the sequence of draw calls a compiled
   specification produces; five sample pixels from a `CGContext`, including one that draws a gradient
   through a clip and one that checks text appears when CoreText is lent to the renderer and is absent
   when it is not.
+- **Touch works on iOS**, through `VegaChartController` rather than a second hit-testing path: a tap is
+  dispatched into the compiled dataflow, hit-tested, run through the specification's `on` handlers and
+  read back as a new scene. Five Swift tests cover it headlessly — including the two halves of the host
+  contract that have caught this project out before. `contentScale` is one: a chart drawn scaled to fit
+  whose host dispatched raw view coordinates misses every mark by the fit factor, which is asserted in
+  both directions now. The other is serialisation: the controller is not safe for concurrent use, and
+  dispatching a tap while the compile ran off-actor left the chart stuck on "no scene". Touches queue
+  behind a compile instead, so a tap during a slow remote load lands rather than being dropped.
+
 - **Data loading and compilation run off the main thread in both demos**, which is what keeps either of
   them answering a tap while a chart is being built. On iOS the compile is a detached task and the
   bundled specifications are listed before any of them is compiled, so the list appears immediately and

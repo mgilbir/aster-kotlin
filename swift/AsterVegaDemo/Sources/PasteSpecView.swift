@@ -91,7 +91,7 @@ struct PasteSpecView: View {
     }
 
     if let scene = session.scene {
-      SceneCanvas(scene: scene)
+      SceneCanvas(scene: scene, session: session)
         .frame(maxWidth: .infinity)
         .background(Color(white: 0.97))
         .overlay(RoundedRectangle(cornerRadius: 4).stroke(Color.secondary.opacity(0.3)))
@@ -100,6 +100,10 @@ struct PasteSpecView: View {
         .font(.callout)
         .foregroundStyle(.red)
         .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    if let touched = session.lastTouch {
+      Text(touched).font(.caption).foregroundStyle(Color.accentColor)
     }
 
     if !session.controls.isEmpty {

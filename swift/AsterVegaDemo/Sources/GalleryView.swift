@@ -115,13 +115,24 @@ private struct ChartDetail: View {
         }
 
         if let scene = session.scene {
-          SceneCanvas(scene: scene)
+          SceneCanvas(scene: scene, session: session)
             .frame(maxWidth: .infinity)
             .background(Color(white: 0.97))
             .overlay(RoundedRectangle(cornerRadius: 4).stroke(Color.secondary.opacity(0.3)))
           Text(summary(of: scene))
             .font(.caption)
             .foregroundStyle(Color.secondary)
+          if let touched = session.lastTouch {
+            // What the tap found, read back from the chart's own interaction state — so a touch that
+            // reached the dataflow is visible rather than merely believed.
+            Text(touched)
+              .font(.caption)
+              .foregroundStyle(Color.accentColor)
+          } else {
+            Text("tap a mark")
+              .font(.caption)
+              .foregroundStyle(Color.secondary)
+          }
         } else {
           Text(session.failure ?? "no scene")
             .foregroundStyle(Color.red)
