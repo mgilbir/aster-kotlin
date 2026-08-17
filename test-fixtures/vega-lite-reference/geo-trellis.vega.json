@@ -1,6 +1,6 @@
 {
   "$schema": "https://vega.github.io/schema/vega/v6.json",
-  "description": "A grid of maps: the outlines are joined on as whole records, gathered into a collection of their own, and the grid has one projection so every cell is drawn at the same scale. The figures are inline, so the join key is a number on both sides without a loader having to infer one.",
+  "description": "A grid of maps: the outlines are joined on as whole records, gathered into a collection of their own, and the grid has one projection so every cell is drawn at the same scale. The figures are inline so the fixture stays about the grid rather than about loading; keying a number against its own text is pinned on its own, by the runtime's format-parse fixture.",
   "background": "white",
   "padding": 5,
   "data": [
