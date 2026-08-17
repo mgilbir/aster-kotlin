@@ -14880,6 +14880,22 @@
   "hidden": false
  },
  {
+  "fixture": "projection-fit-composite",
+  "kind": "group",
+  "role": "graphics-object",
+  "roleDescription": "group mark container",
+  "label": null,
+  "hidden": false
+ },
+ {
+  "fixture": "projection-fit-composite",
+  "kind": "symbol",
+  "role": "graphics-symbol",
+  "roleDescription": "symbol mark container",
+  "label": null,
+  "hidden": false
+ },
+ {
   "fixture": "projection-fit",
   "kind": "group",
   "role": "graphics-object",
