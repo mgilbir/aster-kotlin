@@ -85,6 +85,13 @@ subprojects {
       // Lazily, because this runs as the plugin is applied and `jvmTest` does not exist until the
       // module's own `kotlin { jvm() }` has declared the target.
       sourceSets.configureEach {
+        // `commonTest` runs on **every** target, which is the point: a test here executes on
+        // Kotlin/Native as well as on the JVM, and that is the only way portability stops being a
+        // compile-time claim. `kotlin("test")` is the assertion library that exists on all of them;
+        // the JUnit 5 suites stay in `jvmTest`, where they read files and need a real framework.
+        if (name == "commonTest") {
+          dependencies { implementation(kotlin("test")) }
+        }
         if (name == "jvmTest") {
           dependencies {
             // A source-set dependency block has no `platform()` of its own; the handler does.

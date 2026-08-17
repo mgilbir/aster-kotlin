@@ -199,11 +199,12 @@ public object ImputeTransform : Transform {
             }
       }
 
-    // `partition` seeds the key domain with `keyvals` and then **adds** every key the data
-    // carries: "these values will be automatically augmented with the key values observed in the
-    // input data". Reading `keyvals` as the whole domain instead dropped every observed key it did
-    // not name, so a series lost the rows it already had.
-    val explicit = (params.fields["keyvals"] as? VegaValue.Arr)?.values.orEmpty()
+    // The key domain is `keyvals` **and then** the keys the data has, in first appearance order —
+    // upstream's `partition` seeds the domain with `keyvals` and pushes every unseen key onto it.
+    // Taking `keyvals` *instead of* the observed keys, as this did, loses a row: with
+    // `keyvals: [2, 3]` over data at keys 0 and 1, a group holding only key 0 is missing 2, 3 **and
+    // 1**, and upstream emits all three. Found by replaying upstream's own impute vectors.
+    val explicit = (params.fields["keyvals"] as? VegaValue.Arr)?.values ?: emptyList()
     val domain =
       (explicit + input.map { it.field(key) })
         .filterNot { it is VegaValue.Null }
@@ -216,7 +217,13 @@ public object ImputeTransform : Transform {
       val filler = if (aggregate == null) fallback else aggregateOver(aggregate, field, rows)
       for (value in domain) {
         if (value.asComparableKey() in present) continue
-        val fields = LinkedHashMap<String, VegaValue>(groupBy.size + 2)
+        val fields = LinkedHashMap<String, VegaValue>(groupBy.size + 3)
+        // Upstream marks a row it invented — `t = {_impute: true}` — and puts the flag *first*. It
+        // is how anything downstream tells a synthesised row from a real one: a tooltip that says
+        // "no data" rather than a value, a mark that draws it hollow. Dropping the flag made the
+        // two
+        // indistinguishable.
+        fields[IMPUTE_FLAG] = VegaValue.Bool(true)
         groupBy.forEachIndexed { index, path -> fields[path] = groupKey[index] }
         fields[key] = value
         fields[field] = filler
@@ -225,4 +232,7 @@ public object ImputeTransform : Transform {
     }
     return input + added
   }
+
+  /** Upstream's marker for a tuple `impute` invented, rather than one that was in the data. */
+  private const val IMPUTE_FLAG = "_impute"
 }

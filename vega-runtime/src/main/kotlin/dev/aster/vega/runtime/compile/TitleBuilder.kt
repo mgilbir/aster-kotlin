@@ -237,7 +237,13 @@ internal class TitleBuilder(
                   alignOf(text(spec, "subtitle", "align")) ?: align,
                   styleOf(text(spec, "subtitle", "fontStyle") ?: spec.subtitleFontStyle),
                   baselineOf(text(spec, "subtitle", "baseline")) ?: baseline,
-                  text(spec, "subtitle", "font") ?: spec.subtitleFont ?: spec.font,
+                  // **Not** `?: spec.font`. A subtitle never inherits the title's font family,
+                  // from an explicit `title.font`, from `config.title.font`, or from a `style`
+                  // block — verified against all three. Falling back to it put a `style` that set
+                  // `font: "serif"` on the heading into the subtitle as well, where upstream leaves
+                  // it sans-serif. The other subtitle properties already knew this; only `font`
+                  // reached across.
+                  text(spec, "subtitle", "font") ?: spec.subtitleFont,
                   number(spec, "subtitle", "lineHeight")
                     ?: numbers.resolve(spec.subtitleLineHeight, "title"),
                   number(spec, "subtitle", "limit") ?: limit,

@@ -121,10 +121,17 @@ public class LinearScale(
   init {
     require(domain.size >= 2) { "A linear scale needs at least two domain values, got $domain" }
     require(range.size >= 2) { "A linear scale needs at least two range values, got $range" }
-    require(domain.size == range.size || (domain.size == 2 && range.size == 2)) {
-      "Piecewise domain and range must have equal length: $domain vs $range"
-    }
   }
+
+  /**
+   * How many stops actually take part: `min(domain, range)`, which is d3's rule.
+   *
+   * A domain and a range of different lengths used to **throw** here, and upstream simply uses the
+   * shorter — `domain([-10, 0]).range([0, 1, 2])` maps -5 to 0.5, ignoring the third stop. Refusing
+   * it took the whole chart down for a specification upstream draws, and a range with a spare stop
+   * is an ordinary thing to write while editing one.
+   */
+  private val stops: Int = minOf(domain.size, range.size)
 
   override val bandwidth: Double
     get() = 0.0
@@ -148,17 +155,17 @@ public class LinearScale(
     if (x.isNaN()) return Double.NaN
     // A zero-extent domain has no gradient; d3 returns the range midpoint rather than dividing by
     // 0.
-    val d0 = domain.first()
-    val d1 = domain.last()
-    if (d0 == d1) return (range.first() + range.last()) / 2.0
+    val d0 = domain[0]
+    val d1 = domain[stops - 1]
+    if (d0 == d1) return (range[0] + range[stops - 1]) / 2.0
 
     val input = if (clamp) x.coerceIn(minOf(d0, d1), maxOf(d0, d1)) else x
-    if (domain.size == 2) return interpolate(d0, d1, range.first(), range.last(), input)
+    if (stops == 2) return interpolate(d0, d1, range[0], range[stops - 1], input)
 
     // Piecewise: find the segment containing the input, then interpolate within it.
-    val ascending = domain.last() > domain.first()
+    val ascending = d1 > d0
     var segment = 0
-    while (segment < domain.size - 2) {
+    while (segment < stops - 2) {
       val upper = domain[segment + 1]
       val past = if (ascending) input > upper else input < upper
       if (!past) break
@@ -191,11 +198,16 @@ public class LinearScale(
 
   /** The data value that maps to range position [y]. Only defined for a two-point domain. */
   override fun invert(position: Double): Double {
-    if (domain.size != 2 || range.size != 2) return Double.NaN
+    if (stops != 2) return Double.NaN
     val r0 = range[0]
     val r1 = range[1]
     if (r0 == r1) return Double.NaN
-    val t = (position - r0) / (r1 - r0)
+    // `clamp` works **both ways** in d3, and this only clamped one of them. Inverting a position
+    // outside the range — which is every pointer event past the end of an axis — returned a value
+    // outside the domain: with domain [0, 1] and range [10, 20], `invert(30)` read 2 where upstream
+    // reads 1. A brush or a tooltip built on that selects data the scale says is not there.
+    val clamped = if (clamp) position.coerceIn(minOf(r0, r1), maxOf(r0, r1)) else position
+    val t = (clamped - r0) / (r1 - r0)
     return domain[0] + t * (domain[1] - domain[0])
   }
 
@@ -424,6 +436,9 @@ public abstract class TransformedScale(
     require(range.size >= 2) { "$name needs at least two range values, got $range" }
   }
 
+  /** How many stops take part: `min(domain, range)`, as in [LinearScale]. */
+  private val stops: Int = minOf(domain.size, range.size)
+
   /** The monotonic transform this scale interpolates in. */
   protected abstract fun forward(value: Double): Double
 
@@ -450,26 +465,58 @@ public abstract class TransformedScale(
 
   private fun unrounded(x: Double): Double {
     if (x.isNaN()) return Double.NaN
-    val d0 = forward(domain.first())
-    val d1 = forward(domain.last())
-    if (!d0.isFinite() || !d1.isFinite()) return Double.NaN
-    if (d0 == d1) return (range.first() + range.last()) / 2.0
+    val d0 = forward(domain[0])
+    val dn = forward(domain[stops - 1])
+    if (!d0.isFinite() || !dn.isFinite()) return Double.NaN
+    if (d0 == dn) return (range[0] + range[stops - 1]) / 2.0
 
-    val low = minOf(domain.first(), domain.last())
-    val high = maxOf(domain.first(), domain.last())
+    val low = minOf(domain[0], domain[stops - 1])
+    val high = maxOf(domain[0], domain[stops - 1])
     val input = if (clamp) x.coerceIn(low, high) else x
     val t = forward(input)
     if (!t.isFinite()) return Double.NaN
-    return range.first() + ((t - d0) / (d1 - d0)) * (range.last() - range.first())
+    if (stops == 2) return mix(d0, dn, range[0], range[stops - 1], t)
+
+    // **Piecewise, in the transformed space.** A log, power or symlog scale is upstream's
+    // `continuous()` wearing a transform, so it takes a domain of more than two stops exactly as a
+    // linear one does. This read only the first and last, which is not a rounding difference: a
+    // three-stop power scale over `[4, 2, 1] -> [1, 2, 4]` answered 3.5 for 1.5 where upstream
+    // answers 3, because it interpolated straight across both segments.
+    val ascending = dn > d0
+    var segment = 0
+    while (segment < stops - 2) {
+      val upper = forward(domain[segment + 1])
+      val past = if (ascending) t > upper else t < upper
+      if (!past) break
+      segment++
+    }
+    return mix(
+      forward(domain[segment]),
+      forward(domain[segment + 1]),
+      range[segment],
+      range[segment + 1],
+      t,
+    )
+  }
+
+  /** d3's `interpolateNumber`, in d3's arithmetic — see `LinearScale`. */
+  private fun mix(d0: Double, d1: Double, r0: Double, r1: Double, t: Double): Double {
+    if (d0 == d1) return (r0 + r1) / 2.0
+    val u = (t - d0) / (d1 - d0)
+    return r0 * (1.0 - u) + r1 * u
   }
 
   override fun invert(position: Double): Double {
     val r0 = range.first()
     val r1 = range.last()
     if (r0 == r1) return Double.NaN
+    // Clamped both ways, as in `LinearScale` and for the same reason: d3's `clamp` bounds the input
+    // to `invert` as well as to the scale, so a pointer past the end of a log or power axis reads
+    // the end of the domain rather than a value beyond it.
+    val clamped = if (clamp) position.coerceIn(minOf(r0, r1), maxOf(r0, r1)) else position
     val d0 = forward(domain.first())
     val d1 = forward(domain.last())
-    return backward(d0 + ((position - r0) / (r1 - r0)) * (d1 - d0))
+    return backward(d0 + ((clamped - r0) / (r1 - r0)) * (d1 - d0))
   }
 
   public open fun ticks(count: Int = LinearScale.DEFAULT_TICK_COUNT): List<Double> =
@@ -729,6 +776,29 @@ public sealed interface BinnedScale : VegaScale {
   public val rangeValues: List<VegaValue>
 
   /**
+   * The stretch of domain that maps to [value] — d3's `invertExtent`, and what `invert()` means for
+   * a scale that has buckets rather than a gradient.
+   *
+   * This is how a chart turns a *clicked legend swatch* back into a range of data: a quantize scale
+   * says which values are coloured red, and a selection built on it filters to exactly those.
+   * `invert()` used to report an error for any scale it could not run backwards continuously, which
+   * refused a question upstream answers.
+   *
+   * Null when the value is not one of the range's, which upstream writes as `[NaN, NaN]`. The ends
+   * may be null in their own right: a **threshold** scale's outermost buckets are unbounded,
+   * because a cut point at 10 says nothing about how far below it the first bucket reaches.
+   */
+  public fun invertExtent(value: VegaValue): Pair<Double?, Double?>?
+
+  /**
+   * The shared middle of [invertExtent]: the bucket's own cut points, with the ends left to the
+   * scale, since only it knows whether they are bounded and by what.
+   */
+  public fun extentAt(index: Int, low: Double?, high: Double?): Pair<Double?, Double?> =
+    (if (index > 0) thresholds[index - 1] else low) to
+      (if (index < thresholds.size) thresholds[index] else high)
+
+  /**
    * One input value per bucket, for a legend to colour its swatches with.
    *
    * Taken through [scale] rather than indexing the range directly, so the legend cannot drift out
@@ -779,14 +849,52 @@ public sealed interface BinnedScale : VegaScale {
   public val legendExtent: Pair<Double, Double>
 }
 
-private fun bisectRight(values: List<Double>, x: Double, high: Int = values.size): Int {
-  var low = 0
+/**
+ * d3's `bisectRight`: the index after the last value not greater than [x].
+ *
+ * A band scale inverts a brush with this — `bisectRight(bandStarts, position) - 1` is the band the
+ * pointer is over — and a crossfilter narrows a range with its sibling below, so both are load
+ * bearing rather than helpers.
+ */
+internal fun bisectRight(
+  values: List<Double>,
+  x: Double,
+  low: Int = 0,
+  high: Int = values.size,
+): Int {
+  if (x.isNaN()) return high
+  var lo = low
   var hi = high
-  while (low < hi) {
-    val mid = (low + hi) ushr 1
-    if (x < values[mid]) hi = mid else low = mid + 1
+  while (lo < hi) {
+    val mid = (lo + hi) ushr 1
+    if (x < values[mid]) hi = mid else lo = mid + 1
   }
-  return low
+  return lo
+}
+
+/**
+ * d3's `bisectLeft`: the index of the first value not less than [x].
+ *
+ * A **NaN** needle answers `high` rather than a position, and d3 checks for it up front rather than
+ * leaving it to the comparisons: every comparison against a NaN is false, so the search would
+ * otherwise converge on `low` and claim the value belongs at the front. For a band scale inverting
+ * a pointer position that is not a number, the difference is selecting the first band instead of
+ * none.
+ */
+internal fun bisectLeft(
+  values: List<Double>,
+  x: Double,
+  low: Int = 0,
+  high: Int = values.size,
+): Int {
+  if (x.isNaN()) return high
+  var lo = low
+  var hi = high
+  while (lo < hi) {
+    val mid = (lo + hi) ushr 1
+    if (values[mid] < x) lo = mid + 1 else hi = mid
+  }
+  return lo
 }
 
 /**
@@ -814,6 +922,13 @@ public class QuantizeScale(
 
   override val legendExtent: Pair<Double, Double>
     get() = (domain.firstOrNull() ?: 0.0) to (domain.lastOrNull() ?: 1.0)
+
+  /** Bounded at both ends by the declared domain, which is what makes `quantize` quantize. */
+  override fun invertExtent(value: VegaValue): Pair<Double?, Double?>? {
+    val index = rangeValues.indexOf(value)
+    if (index < 0) return null
+    return extentAt(index, domain.firstOrNull() ?: 0.0, domain.lastOrNull() ?: 1.0)
+  }
 
   override fun scale(value: VegaValue): VegaValue {
     if (rangeValues.isEmpty()) return VegaValue.Null
@@ -855,6 +970,13 @@ public class QuantileScale(
   /** The sample's own extent: a quantile scale's domain is the whole column, sorted. */
   override val legendExtent: Pair<Double, Double>
     get() = (sorted.firstOrNull() ?: 0.0) to (sorted.lastOrNull() ?: 1.0)
+
+  /** Bounded by the **samples**, since a quantile scale's domain is the column itself. */
+  override fun invertExtent(value: VegaValue): Pair<Double?, Double?>? {
+    val index = rangeValues.indexOf(value)
+    if (index < 0) return null
+    return extentAt(index, sorted.firstOrNull(), sorted.lastOrNull())
+  }
 
   override fun scale(value: VegaValue): VegaValue {
     if (rangeValues.isEmpty()) return VegaValue.Null
@@ -899,6 +1021,16 @@ public class ThresholdScale(
    * first and last bands no width at all. Upstream pads by one average band; with a single cut
    * point and no average to take, it pads by a tenth.
    */
+  /**
+   * Unbounded at both ends, and deliberately so: a cut point at 10 says the first bucket holds
+   * everything below 10 and nothing about how far below. Upstream answers `undefined` there.
+   */
+  override fun invertExtent(value: VegaValue): Pair<Double?, Double?>? {
+    val index = rangeValues.indexOf(value)
+    if (index < 0) return null
+    return extentAt(index, null, null)
+  }
+
   override val legendExtent: Pair<Double, Double>
     get() {
       val lo = thresholds.firstOrNull() ?: 0.0
@@ -915,7 +1047,7 @@ public class ThresholdScale(
     // d3 clamps the search to one fewer than the range length, so extra domain values past the end
     // of the range are ignored rather than indexing off it.
     val limit = minOf(thresholds.size, rangeValues.size - 1)
-    return rangeValues[bisectRight(thresholds, x, limit)]
+    return rangeValues[bisectRight(thresholds, x, high = limit)]
   }
 }
 
@@ -946,6 +1078,16 @@ public class BinOrdinalScale(
   /** The interior edges: the first and last bound the outermost buckets and label nothing. */
   override val thresholds: List<Double>
     get() = domain.drop(1).dropLast(1)
+
+  /**
+   * Bounded by the outermost bin edges, which a `bin-ordinal` scale has and a threshold scale does
+   * not: the domain *is* the edges, so the first and last are real bounds rather than absences.
+   */
+  override fun invertExtent(value: VegaValue): Pair<Double?, Double?>? {
+    val index = rangeValues.indexOf(value)
+    if (index < 0) return null
+    return extentAt(index, domain.firstOrNull(), domain.lastOrNull())
+  }
 
   /** The bin edges are the labels, and the last one bounds rather than opens a bucket. */
   override val legendValues: List<Double>
@@ -1001,13 +1143,49 @@ public class SequentialColorScale(
     require(colors.isNotEmpty()) { "$name needs at least one colour" }
   }
 
+  /**
+   * Where [x] sits along the ramp before clamping, in `0..1` for a value inside the domain.
+   *
+   * A **three-point domain makes this a diverging scale**, and Vega composes that itself: a
+   * continuous colour scale with three domain values becomes `diverging-linear` in its registry,
+   * without the specification ever naming it. The middle value then takes the ramp's midpoint
+   * whatever its arithmetic position — the point of a blue-white-red chart is that white sits at
+   * zero, not halfway between the extremes. Reading only the first and last put the neutral colour
+   * wherever the domain's midpoint happened to fall: for `[-10, 0, 20]`, zero came out a third of
+   * the way along and still blue.
+   *
+   * The two halves are scaled independently, `0.5 / (mid - low)` below and `0.5 / (high - mid)`
+   * above, which is d3's `scaleDiverging`.
+   */
+  internal fun position(x: Double): Double {
+    if (domain.size < 3) {
+      val lo = domain.first()
+      val hi = domain.last()
+      // A **zero-width domain sits in the middle of the ramp**, not at its start. d3's `normalize`
+      // answers `constant(0.5)` when the ends coincide, so a colour scale over a column that turns
+      // out to be constant paints the middle colour — the one that says "nothing to compare" —
+      // rather than the extreme. This returned 0 here and the *last* colour in `colorAt`, three
+      // answers between them and none of upstream's.
+      val delta = hi - lo
+      if (delta == 0.0) return 0.5
+      if (delta.isNaN()) return Double.NaN
+      return (x - lo) / delta
+    }
+    val low = domain[0]
+    val mid = domain[1]
+    val high = domain[2]
+    val below = if (low == mid) 0.0 else 0.5 / (mid - low)
+    val above = if (mid == high) 0.0 else 0.5 / (high - mid)
+    // Which half a value belongs to is decided in the domain's own direction, so a descending
+    // domain still puts its middle value at the middle of the ramp.
+    val sign = if (mid < low) -1.0 else 1.0
+    return 0.5 + (x - mid) * (if (sign * x < sign * mid) below else above)
+  }
+
   /** The colour at [x], or `null` when the input cannot be placed on the ramp. */
   public fun colorAt(x: Double): SceneColor? {
     if (x.isNaN()) return null
-    val lo = domain.first()
-    val hi = domain.last()
-    if (lo == hi) return colors.last()
-    val raw = (x - lo) / (hi - lo)
+    val raw = position(x)
     // Sequential scales clamp by default, since a colour past the end of a ramp has no meaning.
     if (!clamp && (raw < 0.0 || raw > 1.0)) return null
     return ColorSpaces.sample(colors, raw.coerceIn(0.0, 1.0), space, gamma)
@@ -1025,6 +1203,10 @@ public class SequentialColorScale(
    * label against the swatch.
    */
   public fun fraction(x: Double): Double {
+    // **Linear over the extent, even when the ramp is diverging.** Upstream's `scaleFraction`
+    // strips the `diverging-` prefix and places labels with a plain scale of the base type over
+    // `[first, last]`: the gradient itself carries the asymmetry in its colour stops, so placing
+    // the labels by the diverging position too would bend them a second time.
     val lo = domain.first()
     val hi = domain.last()
     if (lo == hi) return 0.0

@@ -144,6 +144,22 @@
   "hidden": false
  },
  {
+  "fixture": "arc-radii-inverted",
+  "kind": "group",
+  "role": "graphics-object",
+  "roleDescription": "group mark container",
+  "label": null,
+  "hidden": false
+ },
+ {
+  "fixture": "arc-radii-inverted",
+  "kind": "arc",
+  "role": "graphics-symbol",
+  "roleDescription": "arc mark container",
+  "label": null,
+  "hidden": false
+ },
+ {
   "fixture": "area-gaps",
   "kind": "group",
   "role": "graphics-object",
@@ -2216,6 +2232,30 @@
   "hidden": false
  },
  {
+  "fixture": "diverging-colour",
+  "kind": "group",
+  "role": "graphics-object",
+  "roleDescription": "group mark container",
+  "label": null,
+  "hidden": false
+ },
+ {
+  "fixture": "diverging-colour",
+  "kind": "rect",
+  "role": "graphics-symbol",
+  "roleDescription": "rect mark container",
+  "label": null,
+  "hidden": false
+ },
+ {
+  "fixture": "diverging-colour",
+  "kind": "rect",
+  "role": "graphics-symbol",
+  "roleDescription": "rect mark container",
+  "label": null,
+  "hidden": false
+ },
+ {
   "fixture": "domain-limits",
   "kind": "group",
   "role": "graphics-object",
@@ -2396,6 +2436,22 @@
   "kind": "symbol",
   "role": "graphics-symbol",
   "roleDescription": "symbol mark container",
+  "label": null,
+  "hidden": false
+ },
+ {
+  "fixture": "ecma-trim",
+  "kind": "group",
+  "role": "graphics-object",
+  "roleDescription": "group mark container",
+  "label": null,
+  "hidden": false
+ },
+ {
+  "fixture": "ecma-trim",
+  "kind": "text",
+  "role": "graphics-object",
+  "roleDescription": "text mark container",
   "label": null,
   "hidden": false
  },
@@ -9664,6 +9720,22 @@
   "hidden": false
  },
  {
+  "fixture": "invert-buckets",
+  "kind": "group",
+  "role": "graphics-object",
+  "roleDescription": "group mark container",
+  "label": null,
+  "hidden": false
+ },
+ {
+  "fixture": "invert-buckets",
+  "kind": "text",
+  "role": "graphics-object",
+  "roleDescription": "text mark container",
+  "label": null,
+  "hidden": false
+ },
+ {
   "fixture": "label-limit",
   "kind": "group",
   "role": "graphics-object",
@@ -10388,6 +10460,14 @@
   "kind": "symbol",
   "role": "graphics-symbol",
   "roleDescription": "symbol mark container",
+  "label": null,
+  "hidden": false
+ },
+ {
+  "fixture": "log-axis-labels",
+  "kind": "group",
+  "role": "graphics-object",
+  "roleDescription": "group mark container",
   "label": null,
   "hidden": false
  },
@@ -14352,6 +14432,22 @@
   "hidden": false
  },
  {
+  "fixture": "polylinear-scales",
+  "kind": "group",
+  "role": "graphics-object",
+  "roleDescription": "group mark container",
+  "label": null,
+  "hidden": false
+ },
+ {
+  "fixture": "polylinear-scales",
+  "kind": "text",
+  "role": "graphics-object",
+  "roleDescription": "text mark container",
+  "label": null,
+  "hidden": false
+ },
+ {
   "fixture": "probability-density",
   "kind": "group",
   "role": "graphics-object",
@@ -15008,6 +15104,46 @@
   "hidden": false
  },
  {
+  "fixture": "ramp-through-grey",
+  "kind": "group",
+  "role": "graphics-object",
+  "roleDescription": "group mark container",
+  "label": null,
+  "hidden": false
+ },
+ {
+  "fixture": "ramp-through-grey",
+  "kind": "rect",
+  "role": "graphics-symbol",
+  "roleDescription": "rect mark container",
+  "label": null,
+  "hidden": false
+ },
+ {
+  "fixture": "ramp-through-grey",
+  "kind": "rect",
+  "role": "graphics-symbol",
+  "roleDescription": "rect mark container",
+  "label": null,
+  "hidden": false
+ },
+ {
+  "fixture": "ramp-through-grey",
+  "kind": "rect",
+  "role": "graphics-symbol",
+  "roleDescription": "rect mark container",
+  "label": null,
+  "hidden": false
+ },
+ {
+  "fixture": "ramp-through-grey",
+  "kind": "rect",
+  "role": "graphics-symbol",
+  "roleDescription": "rect mark container",
+  "label": null,
+  "hidden": false
+ },
+ {
   "fixture": "reshape-matrix",
   "kind": "group",
   "role": "graphics-object",
@@ -15456,6 +15592,22 @@
   "hidden": false
  },
  {
+  "fixture": "si-prefix-axis",
+  "kind": "group",
+  "role": "graphics-object",
+  "roleDescription": "group mark container",
+  "label": null,
+  "hidden": false
+ },
+ {
+  "fixture": "si-prefix-axis",
+  "kind": "rect",
+  "role": "graphics-symbol",
+  "roleDescription": "rect mark container",
+  "label": null,
+  "hidden": false
+ },
+ {
   "fixture": "signal-transform-params",
   "kind": "group",
   "role": "graphics-object",
@@ -15524,6 +15676,22 @@
   "kind": "group",
   "role": "graphics-object",
   "roleDescription": "group mark container",
+  "label": null,
+  "hidden": false
+ },
+ {
+  "fixture": "spherical-measures",
+  "kind": "group",
+  "role": "graphics-object",
+  "roleDescription": "group mark container",
+  "label": null,
+  "hidden": false
+ },
+ {
+  "fixture": "spherical-measures",
+  "kind": "text",
+  "role": "graphics-object",
+  "roleDescription": "text mark container",
   "label": null,
   "hidden": false
  },
@@ -17196,6 +17364,22 @@
   "kind": "symbol",
   "role": "graphics-symbol",
   "roleDescription": "symbol mark container",
+  "label": null,
+  "hidden": false
+ },
+ {
+  "fixture": "unicode-identifiers",
+  "kind": "group",
+  "role": "graphics-object",
+  "roleDescription": "group mark container",
+  "label": null,
+  "hidden": false
+ },
+ {
+  "fixture": "unicode-identifiers",
+  "kind": "text",
+  "role": "graphics-object",
+  "roleDescription": "text mark container",
   "label": null,
   "hidden": false
  },

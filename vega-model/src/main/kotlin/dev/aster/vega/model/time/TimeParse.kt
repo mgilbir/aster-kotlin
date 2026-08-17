@@ -225,8 +225,11 @@ public object TimeParse {
       'U' -> number(text, at, 2)?.also { fields.weekSunday = it.value }?.next
       'W' -> number(text, at, 2)?.also { fields.weekMonday = it.value }?.next
       'V' -> number(text, at, 2)?.also { fields.weekIso = it.value }?.next
-      'Q' -> number(text, at, 18)?.also { fields.unixMillis = it.value.toDouble() }?.next
-      's' -> number(text, at, 18)?.also { fields.unixSeconds = it.value.toDouble() }?.next
+      // Read as a **Long**, not an Int: an epoch in milliseconds is thirteen digits and `toInt()`
+      // throws on it, so `parse("%Q")` failed for every real timestamp — including the one d3's own
+      // test uses. The seconds form has the same reach once a date is past 2038.
+      'Q' -> epoch(text, at)?.also { fields.unixMillis = it.value }?.next
+      's' -> epoch(text, at)?.also { fields.unixSeconds = it.value }?.next
       'p' -> named(text, at, PERIODS)?.also { fields.period = it.index }?.next
       'a' ->
         named(text, at, TimeFormat.WEEKDAYS, abbreviated = true)
@@ -259,6 +262,21 @@ public object TimeParse {
    * `numberRe` is `/^\s*\d+/` applied to a *slice* of the input, so the width bounds the slice
    * rather than the digits: `%d` over `" 5x"` reads the space and the 5 and stops.
    */
+  /** An epoch count, which does not fit an `Int`. */
+  private fun epoch(text: String, at: Int): ReadDouble? {
+    var index = at
+    val limit = minOf(text.length, at + 18)
+    while (index < limit && text[index].isWhitespace()) index++
+    val start = index
+    if (index < limit && (text[index] == '-' || text[index] == '+')) index++
+    while (index < limit && text[index].isDigit()) index++
+    val digits = text.substring(start, index)
+    val value = digits.toDoubleOrNull() ?: return null
+    return ReadDouble(value, index)
+  }
+
+  private class ReadDouble(val value: Double, val next: Int)
+
   private fun number(text: String, at: Int, width: Int): Read? {
     var index = at
     val limit = minOf(text.length, at + width)

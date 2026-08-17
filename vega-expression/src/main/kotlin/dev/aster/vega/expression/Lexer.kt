@@ -1,5 +1,7 @@
 package dev.aster.vega.expression
 
+import io.github.mgilbir.ecma262.text.isEcmaIdentifierName
+
 /** A lexical token, with its source offset so a parse error can point at the right character. */
 public data class Token(val type: TokenType, val text: String, val start: Int) {
   override fun toString(): String = "$type('$text')@$start"
@@ -54,7 +56,7 @@ public class Lexer(private val source: String) {
       ch.isDigit() || (ch == '.' && index + 1 < source.length && source[index + 1].isDigit()) ->
         number(start)
       ch == '"' || ch == '\'' -> string(start, ch)
-      ch.isLetter() || ch == '_' || ch == '$' -> identifier(start)
+      isIdentifierStart(ch) -> identifier(start)
       ch in PUNCTUATION -> {
         index++
         Token(TokenType.PUNCTUATION, ch.toString(), start)
@@ -153,11 +155,12 @@ public class Lexer(private val source: String) {
       else -> c
     }
 
+  private fun isIdentifierStart(ch: Char): Boolean = IdentifierChars.isStart(ch)
+
+  private fun isIdentifierPart(ch: Char): Boolean = IdentifierChars.isPart(ch)
+
   private fun identifier(start: Int): Token {
-    while (
-      index < source.length &&
-        (source[index].isLetterOrDigit() || source[index] == '_' || source[index] == '$')
-    ) {
+    while (index < source.length && isIdentifierPart(source[index])) {
       index++
     }
     return Token(TokenType.IDENTIFIER, source.substring(start, index), start)
@@ -205,5 +208,50 @@ public class Lexer(private val source: String) {
         "^",
         "?",
       )
+  }
+}
+
+/**
+ * Which characters may spell an identifier, answered by **ktecma262** rather than approximated.
+ *
+ * A field is reached through `datum.name`, so this grammar decides which columns an expression can
+ * see at all. It used to be a letter-or-digit test, which rejected a decomposed `café`, a letter
+ * number like `Ⅷ`, and the zero-width joiners several scripts need — all of which upstream accepts.
+ *
+ * Reading the Unicode categories directly instead gets closer and still does not arrive: `ID_Start`
+ * and `ID_Continue` carry **`Other_ID_Start`** and **`Other_ID_Continue`** on top of the categories
+ * — the middle dot, the Ethiopic digits, two Mongolian letters — and they move with the Unicode
+ * version the platform happens to ship. Comparing the two found 86 characters where a category test
+ * and the specification disagree.
+ *
+ * The library answers for a whole string, so each character is asked once and remembered. Two
+ * arrays of the Basic Multilingual Plane is a hundred and twenty kilobytes, filled only where a
+ * specification actually reaches; a lexer runs this per character and cannot afford to allocate.
+ */
+private object IdentifierChars {
+  private const val PLANE = 0x10000
+  private val startKnown = BooleanArray(PLANE)
+  private val startValue = BooleanArray(PLANE)
+  private val partKnown = BooleanArray(PLANE)
+  private val partValue = BooleanArray(PLANE)
+
+  fun isStart(ch: Char): Boolean {
+    val at = ch.code
+    if (!startKnown[at]) {
+      startValue[at] = ch.toString().isEcmaIdentifierName()
+      startKnown[at] = true
+    }
+    return startValue[at]
+  }
+
+  fun isPart(ch: Char): Boolean {
+    val at = ch.code
+    if (!partKnown[at]) {
+      // Asked as a *continuation*, which is a different set: a digit continues a name and cannot
+      // begin one.
+      partValue[at] = ("a" + ch).isEcmaIdentifierName()
+      partKnown[at] = true
+    }
+    return partValue[at]
   }
 }

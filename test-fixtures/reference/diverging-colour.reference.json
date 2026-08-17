@@ -1,0 +1,513 @@
+{
+  "marks": [
+    {
+      "opacity": 1,
+      "role": "axis-tick",
+      "stroke": "#888",
+      "strokeWidth": 1,
+      "type": "rule",
+      "x": 0.5,
+      "x2": -4.5,
+      "y": 14.5,
+      "y2": 14.5
+    },
+    {
+      "opacity": 1,
+      "role": "axis-tick",
+      "stroke": "#888",
+      "strokeWidth": 1,
+      "type": "rule",
+      "x": 0.5,
+      "x2": -4.5,
+      "y": 40.5,
+      "y2": 40.5
+    },
+    {
+      "opacity": 1,
+      "role": "axis-tick",
+      "stroke": "#888",
+      "strokeWidth": 1,
+      "type": "rule",
+      "x": 0.5,
+      "x2": -4.5,
+      "y": 66.5,
+      "y2": 66.5
+    },
+    {
+      "opacity": 1,
+      "role": "axis-tick",
+      "stroke": "#888",
+      "strokeWidth": 1,
+      "type": "rule",
+      "x": 0.5,
+      "x2": -4.5,
+      "y": 93.5,
+      "y2": 93.5
+    },
+    {
+      "opacity": 1,
+      "role": "axis-tick",
+      "stroke": "#888",
+      "strokeWidth": 1,
+      "type": "rule",
+      "x": 0.5,
+      "x2": -4.5,
+      "y": 119.5,
+      "y2": 119.5
+    },
+    {
+      "opacity": 1,
+      "role": "axis-tick",
+      "stroke": "#888",
+      "strokeWidth": 1,
+      "type": "rule",
+      "x": 0.5,
+      "x2": -4.5,
+      "y": 145.5,
+      "y2": 145.5
+    },
+    {
+      "align": "right",
+      "angle": 0,
+      "baseline": "middle",
+      "fill": "#000",
+      "font": "sans-serif",
+      "fontSize": 10,
+      "limit": 180,
+      "opacity": 1,
+      "role": "axis-label",
+      "text": "-10",
+      "type": "text",
+      "x": -6.5,
+      "y": 14.42623
+    },
+    {
+      "align": "right",
+      "angle": 0,
+      "baseline": "middle",
+      "fill": "#000",
+      "font": "sans-serif",
+      "fontSize": 10,
+      "limit": 180,
+      "opacity": 1,
+      "role": "axis-label",
+      "text": "-5",
+      "type": "text",
+      "x": -6.5,
+      "y": 40.655738
+    },
+    {
+      "align": "right",
+      "angle": 0,
+      "baseline": "middle",
+      "fill": "#000",
+      "font": "sans-serif",
+      "fontSize": 10,
+      "limit": 180,
+      "opacity": 1,
+      "role": "axis-label",
+      "text": "0",
+      "type": "text",
+      "x": -6.5,
+      "y": 66.885246
+    },
+    {
+      "align": "right",
+      "angle": 0,
+      "baseline": "middle",
+      "fill": "#000",
+      "font": "sans-serif",
+      "fontSize": 10,
+      "limit": 180,
+      "opacity": 1,
+      "role": "axis-label",
+      "text": "5",
+      "type": "text",
+      "x": -6.5,
+      "y": 93.114754
+    },
+    {
+      "align": "right",
+      "angle": 0,
+      "baseline": "middle",
+      "fill": "#000",
+      "font": "sans-serif",
+      "fontSize": 10,
+      "limit": 180,
+      "opacity": 1,
+      "role": "axis-label",
+      "text": "10",
+      "type": "text",
+      "x": -6.5,
+      "y": 119.344262
+    },
+    {
+      "align": "right",
+      "angle": 0,
+      "baseline": "middle",
+      "fill": "#000",
+      "font": "sans-serif",
+      "fontSize": 10,
+      "limit": 180,
+      "opacity": 1,
+      "role": "axis-label",
+      "text": "20",
+      "type": "text",
+      "x": -6.5,
+      "y": 145.57377
+    },
+    {
+      "opacity": 1,
+      "role": "axis-domain",
+      "stroke": "#888",
+      "strokeWidth": 1,
+      "type": "rule",
+      "x": 0.5,
+      "x2": 0.5,
+      "y": 0.5,
+      "y2": 160.5
+    },
+    {
+      "fill": "rgb(19, 75, 133)",
+      "height": 23.606557,
+      "role": "mark",
+      "type": "rect",
+      "width": 60,
+      "x": 0,
+      "y": 2.622951
+    },
+    {
+      "fill": "rgb(125, 182, 214)",
+      "height": 23.606557,
+      "role": "mark",
+      "type": "rect",
+      "width": 60,
+      "x": 0,
+      "y": 28.852459
+    },
+    {
+      "fill": "rgb(242, 240, 235)",
+      "height": 23.606557,
+      "role": "mark",
+      "type": "rect",
+      "width": 60,
+      "x": 0,
+      "y": 55.081967
+    },
+    {
+      "fill": "rgb(252, 216, 169)",
+      "height": 23.606557,
+      "role": "mark",
+      "type": "rect",
+      "width": 60,
+      "x": 0,
+      "y": 81.311475
+    },
+    {
+      "fill": "rgb(242, 169, 82)",
+      "height": 23.606557,
+      "role": "mark",
+      "type": "rect",
+      "width": 60,
+      "x": 0,
+      "y": 107.540984
+    },
+    {
+      "fill": "rgb(153, 74, 7)",
+      "height": 23.606557,
+      "role": "mark",
+      "type": "rect",
+      "width": 60,
+      "x": 0,
+      "y": 133.770492
+    },
+    {
+      "fill": "rgb(19, 75, 133)",
+      "height": 23.606557,
+      "role": "mark",
+      "type": "rect",
+      "width": 60,
+      "x": 70,
+      "y": 2.622951
+    },
+    {
+      "fill": "rgb(78, 148, 195)",
+      "height": 23.606557,
+      "role": "mark",
+      "type": "rect",
+      "width": 60,
+      "x": 70,
+      "y": 28.852459
+    },
+    {
+      "fill": "rgb(175, 211, 230)",
+      "height": 23.606557,
+      "role": "mark",
+      "type": "rect",
+      "width": 60,
+      "x": 70,
+      "y": 55.081967
+    },
+    {
+      "fill": "rgb(242, 240, 235)",
+      "height": 23.606557,
+      "role": "mark",
+      "type": "rect",
+      "width": 60,
+      "x": 70,
+      "y": 81.311475
+    },
+    {
+      "fill": "rgb(251, 202, 139)",
+      "height": 23.606557,
+      "role": "mark",
+      "type": "rect",
+      "width": 60,
+      "x": 70,
+      "y": 107.540984
+    },
+    {
+      "fill": "rgb(153, 74, 7)",
+      "height": 23.606557,
+      "role": "mark",
+      "type": "rect",
+      "width": 60,
+      "x": 70,
+      "y": 133.770492
+    },
+    {
+      "fill": {
+        "gradient": "linear",
+        "stops": [
+          {
+            "color": "rgb(19, 75, 133)",
+            "offset": 0
+          },
+          {
+            "color": "rgb(47, 120, 179)",
+            "offset": 0.066667
+          },
+          {
+            "color": "rgb(93, 162, 203)",
+            "offset": 0.133333
+          },
+          {
+            "color": "rgb(157, 202, 225)",
+            "offset": 0.2
+          },
+          {
+            "color": "rgb(210, 229, 239)",
+            "offset": 0.266667
+          },
+          {
+            "color": "rgb(242, 240, 235)",
+            "offset": 0.333333
+          },
+          {
+            "color": "rgb(247, 232, 211)",
+            "offset": 0.4
+          },
+          {
+            "color": "rgb(252, 224, 186)",
+            "offset": 0.466667
+          },
+          {
+            "color": "rgb(252, 208, 151)",
+            "offset": 0.533333
+          },
+          {
+            "color": "rgb(251, 191, 116)",
+            "offset": 0.6
+          },
+          {
+            "color": "rgb(242, 169, 82)",
+            "offset": 0.666667
+          },
+          {
+            "color": "rgb(232, 147, 47)",
+            "offset": 0.733333
+          },
+          {
+            "color": "rgb(215, 126, 30)",
+            "offset": 0.8
+          },
+          {
+            "color": "rgb(197, 105, 13)",
+            "offset": 0.866667
+          },
+          {
+            "color": "rgb(175, 90, 10)",
+            "offset": 0.933333
+          },
+          {
+            "color": "rgb(153, 74, 7)",
+            "offset": 1
+          }
+        ],
+        "x1": 0,
+        "x2": 0,
+        "y1": 1,
+        "y2": 0
+      },
+      "height": 200,
+      "opacity": 1,
+      "role": "legend-gradient",
+      "stroke": "#ddd",
+      "strokeWidth": 0,
+      "type": "rect",
+      "width": 16,
+      "x": 278,
+      "y": 16
+    },
+    {
+      "align": "left",
+      "baseline": "bottom",
+      "fill": "#000",
+      "font": "sans-serif",
+      "fontSize": 10,
+      "opacity": 1,
+      "role": "legend-label",
+      "text": "−10",
+      "type": "text",
+      "x": 296,
+      "y": 216
+    },
+    {
+      "align": "left",
+      "baseline": "middle",
+      "fill": "#000",
+      "font": "sans-serif",
+      "fontSize": 10,
+      "opacity": 1,
+      "role": "legend-label",
+      "text": "0",
+      "type": "text",
+      "x": 296,
+      "y": 149.333333
+    },
+    {
+      "align": "left",
+      "baseline": "middle",
+      "fill": "#000",
+      "font": "sans-serif",
+      "fontSize": 10,
+      "opacity": 1,
+      "role": "legend-label",
+      "text": "10",
+      "type": "text",
+      "x": 296,
+      "y": 82.666667
+    },
+    {
+      "align": "left",
+      "baseline": "top",
+      "fill": "#000",
+      "font": "sans-serif",
+      "fontSize": 10,
+      "opacity": 1,
+      "role": "legend-label",
+      "text": "20",
+      "type": "text",
+      "x": 296,
+      "y": 16
+    },
+    {
+      "align": "left",
+      "angle": 0,
+      "baseline": "top",
+      "fill": "#000",
+      "font": "sans-serif",
+      "fontSize": 11,
+      "fontWeight": "bold",
+      "limit": 180,
+      "opacity": 1,
+      "role": "legend-title",
+      "text": "diverging",
+      "type": "text",
+      "x": 278,
+      "y": 0
+    }
+  ],
+  "scales": {
+    "diverging": {
+      "domain": [
+        -10,
+        0,
+        20
+      ],
+      "range": [
+        "rgb(19, 75, 133)",
+        "rgb(242, 240, 235)",
+        "rgb(153, 74, 7)"
+      ],
+      "ticks": [
+        -10,
+        -8,
+        -6,
+        -4,
+        -2,
+        0,
+        2,
+        4,
+        6,
+        8,
+        10,
+        12,
+        14,
+        16,
+        18,
+        20
+      ]
+    },
+    "sequential": {
+      "domain": [
+        -10,
+        20
+      ],
+      "range": [
+        "rgb(19, 75, 133)",
+        "rgb(153, 74, 7)"
+      ],
+      "ticks": [
+        -10,
+        -8,
+        -6,
+        -4,
+        -2,
+        0,
+        2,
+        4,
+        6,
+        8,
+        10,
+        12,
+        14,
+        16,
+        18,
+        20
+      ]
+    },
+    "yscale": {
+      "bandwidth": 23.606557,
+      "domain": [
+        -10,
+        -5,
+        0,
+        5,
+        10,
+        20
+      ],
+      "range": [
+        0,
+        160
+      ],
+      "step": 26.229508
+    }
+  },
+  "size": {
+    "height": 226,
+    "width": 398
+  },
+  "spec": "diverging-colour.vg.json",
+  "vegaVersion": "6.3.1"
+}
