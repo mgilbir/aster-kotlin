@@ -1432,12 +1432,18 @@ re-record; regenerate with `scripts/record-upstream-vectors.sh` and they will re
 
 ### What is actually left
 
-- **`d3-interpolate`, 68 of 533.** The one place a real gap remains rather than a classification. Most
-  of the unreplayed are *constructions* returning a function, but `interpolateString` (16 samples) is
-  a feature this engine does not have — upstream interpolates the numbers embedded in a string, so
-  `range: ["0px", "2px"]` animates, and here it does not. Worth deciding on rather than leaving.
-- **`vega-scenegraph`'s `intersect*` family** (44) — hit-testing, which this engine has no equivalent
-  of because it does not handle events. A deliberate absence, not a gap.
+- **`d3-interpolate`, 68 of 533.** I called `interpolateString` a real gap here and **it is not
+  reachable**. A continuous scale whose range is all strings is classified as a *colour* scale by
+  `isContinuousColor` — `_.range.every(isString)` — so `range: ["0px", "10px"]` does not animate
+  upstream either: it parses `"0px"` as a colour, fails, and answers `rgb(0, 0, 0)` for every input,
+  which is what the probe showed. The claim was wrong twice over, and the rest of this package is
+  constructions returning functions.
+- **`vega-scenegraph`'s `intersect*` family** — the three that are geometry are done and replayed
+  (39 vectors, clean first time): `intersectPoint`, `intersectRule` and Liang–Barsky's
+  `intersectBoxLine`, in `MarkIntersect`. `intersectPath` is left out on purpose, because upstream
+  rasterises the path into an offscreen canvas and walks the pixels — a renderer's answer, and it
+  says so itself by returning `true` when there is no context. The `intersect()` *expression* still
+  answers `[]`, which is upstream's answer at signal-resolution time as well.
 - Everything else above is counted with a reason, and the reasons were re-read in this session —
   five of six that said "no equivalent here" turned out to be the *adapter's* gap, not the engine's,
   so treat the remaining ones with suspicion rather than trust.

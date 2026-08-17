@@ -5,6 +5,7 @@ import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.booleanOrNull
 import kotlinx.serialization.json.doubleOrNull
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
@@ -109,6 +110,47 @@ class UpstreamPathParseVectorsTest {
       }
     }
 
+  /** The primitives that are geometry rather than rasterisation; `intersectPath` is not. */
+  private val INTERSECTS = setOf("intersectBoxLine", "intersectRule", "intersectPoint")
+
+  /** A recorded box, which upstream writes as `{x1, y1, x2, y2}`. */
+  private fun box(element: kotlinx.serialization.json.JsonElement?): RectD? {
+    val o = element as? JsonObject ?: return null
+    fun side(key: String) = (o[key] as? JsonPrimitive)?.doubleOrNull
+    val x1 = side("x1") ?: return null
+    val y1 = side("y1") ?: return null
+    val x2 = side("x2") ?: return null
+    val y2 = side("y2") ?: return null
+    return RectD(x1, y1, x2, y2)
+  }
+
+  /** One `intersect*` vector, or null when it is not a shape this engine measures. */
+  private fun intersects(fn: String, args: JsonArray?): Boolean? {
+    if (args == null) return null
+    fun field(of: JsonObject?, key: String) = (of?.get(key) as? JsonPrimitive)?.doubleOrNull
+    return when (fn) {
+      "intersectBoxLine" -> {
+        val b = box(args.getOrNull(0)) ?: return null
+        val numbers = (1..4).map { (args.getOrNull(it) as? JsonPrimitive)?.doubleOrNull }
+        if (numbers.any { it == null }) return null
+        MarkIntersect.boxLine(b, numbers[0]!!, numbers[1]!!, numbers[2]!!, numbers[3]!!)
+      }
+      "intersectRule" -> {
+        val item = args.getOrNull(0) as? JsonObject ?: return null
+        val b = box(args.getOrNull(1)) ?: return null
+        val x = field(item, "x") ?: 0.0
+        val y = field(item, "y") ?: 0.0
+        MarkIntersect.rule(x, y, field(item, "x2") ?: x, field(item, "y2") ?: y, b)
+      }
+      "intersectPoint" -> {
+        val item = args.getOrNull(0) as? JsonObject ?: return null
+        val b = box(args.getOrNull(1)) ?: return null
+        MarkIntersect.point(field(item, "x") ?: 0.0, field(item, "y") ?: 0.0, b)
+      }
+      else -> null
+    }
+  }
+
   @Test
   fun `vega-scenegraph's own path vectors replay against SvgPath`() {
     var replayed = 0
@@ -116,6 +158,21 @@ class UpstreamPathParseVectorsTest {
     val failures = mutableListOf<String>()
 
     for (vector in vectors) {
+      // The `intersect*` primitives: whether a mark meets a rectangle, which is what a brush
+      // selection asks of every mark it drags over.
+      val intersecting = vector["fn"]?.jsonPrimitive?.content
+      if (intersecting in INTERSECTS) {
+        val args = vector["args"] as? JsonArray
+        val expected = (vector["result"] as? JsonPrimitive)?.booleanOrNull
+        val ours = intersects(intersecting!!, args)
+        if (expected == null || ours == null) {
+          unmapped.merge("$intersecting (not a box and an item)", 1, Int::plus)
+          continue
+        }
+        replayed++
+        if (expected != ours) failures.add("$intersecting($args): upstream $expected, ours $ours")
+        continue
+      }
       // `boundStroke` decides how far a stroke reaches past its geometry, which is what a mark's
       // bounds are made of — and bounds drive layout, autosize and clipping, so being short here
       // crops a chart rather than merely mismeasuring one.
@@ -228,7 +285,7 @@ class UpstreamPathParseVectorsTest {
       failures.map { it.substringBefore(':') }.sorted(),
       "the set of path-parser divergences changed; update known-divergences.json",
     )
-    assertTrue(replayed >= 18, "only $replayed vectors replayed; the harness must not shrink")
+    assertTrue(replayed >= 70, "only $replayed vectors replayed; the harness must not shrink")
   }
 
   private fun show(value: Double): String =
