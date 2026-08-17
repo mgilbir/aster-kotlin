@@ -22,6 +22,17 @@ public fun canonicalNumberString(
   if (value == Double.NEGATIVE_INFINITY) return "-Infinity"
 
   val normalized = normalizeZero(value)
+  // **`toFixed` gives up at 10^21 and returns the exponent form**, which is right for a formatter
+  // and wrong for this one: the rule above says the exponent form is never emitted, because an SVG
+  // attribute parser and a golden diff both read a plain decimal more reliably. So a magnitude that
+  // large is written out from its shortest digits — an integer that big has no fraction to lose,
+  // and the digits are the same ones `String(x)` would show.
+  if (kotlin.math.abs(normalized) >= 1e21) {
+    val shortest = Decimals.shortest(normalized)
+    val digits =
+      shortest.digits + "0".repeat((shortest.exponent - shortest.digits.length).coerceAtLeast(0))
+    return if (normalized < 0) "-$digits" else digits
+  }
   val text = Decimals.trimmed(normalized, precision)
   // stripTrailingZeros can leave "0E-6"-style values; toPlainString already expands those, but a
   // rounded-to-zero negative still needs the sign removed.

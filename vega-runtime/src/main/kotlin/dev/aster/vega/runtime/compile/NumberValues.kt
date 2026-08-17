@@ -66,7 +66,17 @@ public class NumberResolver(
         }
     }
 
-  public fun resolveInt(value: NumberValue?, owner: String): Int? = resolve(value, owner)?.toInt()
+  /**
+   * The same, as a whole number — and **not** through Kotlin's `toInt`, which is a trap here.
+   *
+   * `Double.POSITIVE_INFINITY.toInt()` is `Int.MAX_VALUE`, so a `"tickCount": {"signal": "1/0"}`
+   * asked an axis for two billion ticks and exhausted the heap. Upstream answers *no* ticks for
+   * that — `tickIncrement` gives a step of zero and `ticks` returns `[]` — so a non-finite count
+   * becomes zero, which every caller already treats as "none". Found by replaying d3-array's own
+   * vectors, which pass `Infinity` on purpose.
+   */
+  public fun resolveInt(value: NumberValue?, owner: String): Int? =
+    resolve(value, owner)?.let { if (it.isFinite()) it.toInt() else 0 }
 
   /**
    * Evaluates an expression to a list of values, for the places a signal supplies a whole array.

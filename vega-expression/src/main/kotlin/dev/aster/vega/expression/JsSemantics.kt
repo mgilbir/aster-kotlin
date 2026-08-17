@@ -1,7 +1,8 @@
 package dev.aster.vega.expression
 
+import dev.aster.vega.model.Decimals
 import dev.aster.vega.model.VegaValue
-import kotlin.math.floor
+import io.github.mgilbir.ecma262.number.toEcmaDouble
 import kotlin.math.truncate
 
 /**
@@ -61,23 +62,16 @@ public object JsSemantics {
     }
 
   /** `Number(string)`: trims, accepts hex and binary, and treats the empty string as 0. */
-  private fun stringToNumber(text: String): Double {
-    val trimmed = text.trim()
-    if (trimmed.isEmpty()) return 0.0
-    if (trimmed == "Infinity" || trimmed == "+Infinity") return Double.POSITIVE_INFINITY
-    if (trimmed == "-Infinity") return Double.NEGATIVE_INFINITY
-    if (trimmed.length > 2 && (trimmed.startsWith("0x") || trimmed.startsWith("0X"))) {
-      return trimmed.substring(2).toLongOrNull(16)?.toDouble() ?: Double.NaN
-    }
-    if (trimmed.length > 2 && (trimmed.startsWith("0b") || trimmed.startsWith("0B"))) {
-      return trimmed.substring(2).toLongOrNull(2)?.toDouble() ?: Double.NaN
-    }
-    // Kotlin accepts trailing 'd'/'f' suffixes and leading/trailing whitespace forms that
-    // JavaScript
-    // rejects, so screen the text before converting.
-    if (!NUMERIC.matches(trimmed)) return Double.NaN
-    return trimmed.toDoubleOrNull() ?: Double.NaN
-  }
+  /**
+   * `Number(string)`, from **ktecma262**.
+   *
+   * This used to be a hand-rolled screen: trim, special-case `Infinity`, read `0x` and `0b` through
+   * `toLongOrNull`, then a regular expression to keep Kotlin from accepting the `1.0f` and `1.0d`
+   * suffixes JavaScript rejects. It got the common cases right and missed **octal** —
+   * `Number("0o17")` is 15 and this answered NaN — which is the kind of gap a screen written from
+   * memory has and a specification does not.
+   */
+  private fun stringToNumber(text: String): Double = text.toEcmaDouble()
 
   // ---- string coercion ------------------------------------------------------
 
@@ -106,28 +100,7 @@ public object JsSemantics {
    * Whole numbers lose their decimal point (`1` not `1.0`), which matters because string
    * concatenation of a scaled value is common in labels and tooltips.
    */
-  public fun numberToString(value: Double): String =
-    when {
-      value.isNaN() -> "NaN"
-      value == Double.POSITIVE_INFINITY -> "Infinity"
-      value == Double.NEGATIVE_INFINITY -> "-Infinity"
-      value == 0.0 -> "0"
-      value == floor(value) && kotlin.math.abs(value) < 1e21 -> value.toLong().toString()
-      // Kotlin's Double.toString already produces the shortest representation that round-trips,
-      // which
-      // is what JavaScript prints: 2/10 is "0.2", not "0.20000000000000001". Fixed-precision
-      // formatting would expose the binary representation instead.
-      else -> normalizeExponent(value.toString())
-    }
-
-  /** Rewrites Kotlin's `1.0E21` as JavaScript's `1e+21`. */
-  private fun normalizeExponent(text: String): String {
-    val exponentAt = text.indexOf('E')
-    if (exponentAt < 0) return text
-    val mantissa = text.substring(0, exponentAt).removeSuffix(".0")
-    val exponent = text.substring(exponentAt + 1)
-    return "${mantissa}e${if (exponent.startsWith("-")) exponent else "+$exponent"}"
-  }
+  public fun numberToString(value: Double): String = Decimals.jsString(value)
 
   // ---- arithmetic -----------------------------------------------------------
 

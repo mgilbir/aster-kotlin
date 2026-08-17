@@ -235,6 +235,23 @@ public class SignalScope(
       return VegaValue.Arr(listOf(VegaValue.Num(place[0]), VegaValue.Num(place[1])))
     }
     val scale = resolveScale(name, "invert") ?: return VegaValue.Null
+    // A scale with **buckets** runs backwards to a stretch of domain rather than to a point, which
+    // is upstream's `invertExtent` — `invert()` falls to it when there is no continuous inverse.
+    // This used to report an error instead, refusing the question a chart asks when someone clicks
+    // a legend swatch and expects the data behind it.
+    if (scale is BinnedScale) {
+      // A range value the scale never produces still answers a **pair** — `[NaN, NaN]` — rather
+      // than nothing, so an expression reading `[0]` off it gets NaN instead of failing.
+      val extent =
+        scale.invertExtent(value)
+          ?: return VegaValue.Arr(listOf(VegaValue.Num(Double.NaN), VegaValue.Num(Double.NaN)))
+      return VegaValue.Arr(
+        listOf(
+          extent.first?.let { VegaValue.Num(it) } ?: VegaValue.Null,
+          extent.second?.let { VegaValue.Num(it) } ?: VegaValue.Null,
+        )
+      )
+    }
     if (scale !is InvertibleScale) {
       diagnostics?.error(
         DiagnosticCodes.SCALE_UNSUPPORTED_TYPE,

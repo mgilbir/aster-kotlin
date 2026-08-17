@@ -1,0 +1,21 @@
+{
+  "marks": [
+    {
+      "fill": "#000",
+      "font": "sans-serif",
+      "fontSize": 11,
+      "role": "mark",
+      "text": "sum 28",
+      "type": "text",
+      "x": 0,
+      "y": 20
+    }
+  ],
+  "scales": {},
+  "size": {
+    "height": 120,
+    "width": 270
+  },
+  "spec": "unicode-identifiers.vg.json",
+  "vegaVersion": "6.3.1"
+}
