@@ -6,6 +6,9 @@
 agp = "9.3.1"
 kotlin = "2.4.10"
 compose-bom = "2026.06.01"
+## Compose Multiplatform, for the renderer that draws with Compose's own DrawScope on Android, iOS
+## and the desktop. Separate from compose-bom above, which is androidx and Android-only.
+compose-multiplatform = "1.11.1"
 serialization = "1.9.0"
 coroutines = "1.10.2"
 ## Calendar arithmetic for the core. JetBrains' recommendation for dates in shared KMP code, so
@@ -31,10 +34,14 @@ ktfmt = "0.64"
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }
 android-library = { id = "com.android.library", version.ref = "agp" }
+## The Android target of a Kotlin Multiplatform module. Since AGP 9 the plain `com.android.library`
+## plugin refuses to coexist with `kotlin.multiplatform`, and this is its replacement.
+android-kmp-library = { id = "com.android.kotlin.multiplatform.library", version.ref = "agp" }
 kotlin-jvm = { id = "org.jetbrains.kotlin.jvm", version.ref = "kotlin" }
 kotlin-multiplatform = { id = "org.jetbrains.kotlin.multiplatform", version.ref = "kotlin" }
 kotlin-serialization = { id = "org.jetbrains.kotlin.plugin.serialization", version.ref = "kotlin" }
 kotlin-compose = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "kotlin" }
+compose-multiplatform = { id = "org.jetbrains.compose", version.ref = "compose-multiplatform" }
 spotless = { id = "com.diffplug.spotless", version.ref = "spotless" }
 
 [libraries]

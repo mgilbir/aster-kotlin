@@ -480,7 +480,12 @@ ordering), and the pipeline is now verified end to end on one fixture, but the b
 
 ## Verification
 
-- 1,348 JVM tests pass (`./scripts/test-core.sh`, `./gradlew test`).
+- 1,348 JVM tests pass (`./scripts/test-core.sh`, `./gradlew test`), plus 12 for the Compose
+  Multiplatform renderer: 7 in `commonTest`, compiled for Android, both iOS targets and the JVM, and 5
+  rasterising through Compose's own Skia backend with `ImageComposeScene` — no window, no display.
+- 7 Swift tests pass (`./scripts/swift-test.sh`), which links the macOS framework with Gradle first
+  because SwiftPM cannot build its own dependency. Four assert the sequence of draw calls a compiled
+  specification produces; three sample pixels from a `CGContext`.
 - Android lint is clean with `warningsAsErrors` on every Android module.
 - 63 instrumented tests pass on an API 37 arm64 emulator (`./scripts/test-android.sh`): 49 in
   `vega-android-canvas`, 4 in `vega-compose`, 10 in `demo`. Three groups of them cover what no JVM
@@ -522,6 +527,48 @@ with regression tests:
 Two smaller fixes came out of the same pass: `VegaAccessibilityHelper` was adding
 `ACTION_ACCESSIBILITY_FOCUS`, which `ExploreByTouchHelper` rejects; and the sample scenes hard-coded
 dark chrome, so a dark background was unreadable — they now take a `SampleScenes.Palette`.
+
+## Renderers, and what only pixels can check
+
+There are now four renderers over the same immutable scene: `vega-android-canvas` (an
+`android.graphics.Canvas`), `vega-svg` (markup), `vega-compose-multiplatform` (Compose's `DrawScope`
+on Android, iOS and the desktop) and `swift/AsterVegaRender` (CoreGraphics, from Swift, with no Kotlin
+on the drawing side and no Compose anywhere).
+
+The Swift one reaches the engine through the Obj-C framework Kotlin/Native exports. That boundary is
+narrower than Kotlin, and the narrowing that matters is `ScenePaint.Solid`: a `@JvmInline value class`
+implementing an interface has **no Obj-C representation**, so it is absent from the generated header
+and a fill arrives in Swift as an opaque `ScenePaint`. `ForeignPaint`/`ForeignPath` in `vega-scene`
+answer the questions a renderer asks as plain functions instead, and the Kotlin renderers call the
+same ones.
+
+**The differential fixtures cannot see a renderer bug.** They compare scene trees, and the scene tree
+is identical however a renderer reads it. Three real bugs were found the week the second and third
+renderers were written, all three by sampling pixels, and none of them were catchable any other way:
+
+1. **Group opacity was being inherited.** It is not: `vega-scenegraph`'s canvas group saves the
+   graphics state, translates and clips on the way in and never touches `globalAlpha`, and its SVG
+   renderer emits `opacity` on the group's background `path` while leaving the child element bare. A
+   group's opacity paints its own panel. `AndroidCanvasSceneRenderer` had multiplied it into every
+   descendant since Milestone 1, so a half-opaque group drew its opaque child at half.
+2. **A group at zero opacity dropped its whole subtree**, in both the Android and SVG renderers. A
+   probe of upstream's SVG output shows `opacity="0"` on the group's background with the child element
+   still there: a fully transparent group is a group with no panel, not an invisible one.
+3. **Every colour in the Swift renderer was slightly wrong.** `CGColor(red:green:blue:alpha:)` builds
+   its colour in generic RGB rather than sRGB, and the context converted it on the way in, so
+   `steelblue` landed as rgb(86,149,193) instead of rgb(70,130,180) — too small to notice by eye and a
+   different colour.
+
+A fourth was found the same way and is a lesson about Compose rather than about charts: a `Canvas` with
+no intrinsic size still drew solid fills while resolving every **gradient** to black. `VegaChart` now
+takes the scene's own declared size unless a caller's modifier overrides it, which is what a
+specification with a `width` and a `height` is asking for anyway.
+
+None of these renderers compare against golden images. Rasterisation and antialiasing belong to Skia
+and CoreGraphics and change between their versions; a byte-exact golden would fail on an upgrade that
+broke nothing, and the pressure would then be to loosen the comparison until it stopped failing.
+Sampling named pixels — this one is the bar's colour, that one is the background, the corner of the
+circle's bounding box is not filled — says what is actually being claimed, and says why when it breaks.
 
 ## The official Vega examples
 
