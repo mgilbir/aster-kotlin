@@ -1,6 +1,8 @@
 #if canImport(CoreGraphics)
-import CoreGraphics
 import AsterVega
+import CoreGraphics
+import Foundation
+import ImageIO
 
 /// Draws into a `CGContext` — the renderer a device actually uses.
 ///
@@ -16,9 +18,28 @@ public struct CoreGraphicsTarget: DrawTarget {
   /// than wrong text.
   private let drawText: ((DrawTextRun, Brush?, CGContext) -> Void)?
 
-  public init(context: CGContext, drawText: ((DrawTextRun, Brush?, CGContext) -> Void)? = nil) {
+  /// Resolves an image URL to something drawable. Nil draws no images, which is the default.
+  ///
+  /// A URL is not an image and fetching one is not a renderer's job: a chart is often data a reader
+  /// pasted, so the address in it is the specification's choice and the policy about following it belongs
+  /// to the host — the same argument `DataLoader` makes for data. `data:` URLs and engine-produced
+  /// rasters need no resolver and are handled without one.
+  private let resolver: ((String) -> CGImage?)?
+
+  /// URLs the resolver could not answer, for a caller that wants to say so.
+  ///
+  /// A hole in a chart that nobody mentions looks like a specification that asked for nothing, which is
+  /// the opposite of this project's discipline about silence.
+  public private(set) var unresolved: [String] = []
+
+  public init(
+    context: CGContext,
+    drawText: ((DrawTextRun, Brush?, CGContext) -> Void)? = nil,
+    resolveImage: ((String) -> CGImage?)? = nil
+  ) {
     self.context = context
     self.drawText = drawText
+    self.resolver = resolveImage
   }
 
   public mutating func beginGroup(clip: Rect?) {
@@ -63,10 +84,76 @@ public struct CoreGraphicsTarget: DrawTarget {
     drawText?(run, fill, context)
   }
 
-  public mutating func image(url: String, in rect: Rect, opacity: Double) {
-    // A URL is not an image, and fetching one is not a renderer's job; a caller that has the bytes
-    // draws them, and one that does not leaves the space empty rather than blocking a frame on the
-    // network.
+  public mutating func image(
+    url: String,
+    raster: DrawRaster?,
+    in rect: Rect,
+    fit: DrawImageFit,
+    smooth: Bool,
+    opacity: Double
+  ) {
+    guard let decoded = resolve(url: url, raster: raster) else {
+      // Said rather than swallowed: an image that could not be resolved leaves a hole in the chart, and
+      // a hole nobody mentions looks like a specification that asked for nothing. The engine reports its
+      // own unresolved images as diagnostics; a renderer's resolver failures belong to the renderer, so
+      // they are collected here for the caller to read.
+      if !url.isEmpty { unresolved.append(url) }
+      return
+    }
+
+    let box = fit == .contain ? contained(decoded, in: rect) : cg(rect)
+    context.saveGState()
+    context.setAlpha(CGFloat(opacity))
+    context.interpolationQuality = smooth ? .high : .none
+    // Flipped about the destination: a CGImage is drawn bottom-up, and every coordinate here is in a
+    // space whose y grows down — the same asymmetry CoreText has, and the same fix.
+    context.translateBy(x: 0, y: box.midY * 2)
+    context.scaleBy(x: 1, y: -1)
+    context.draw(decoded, in: box)
+    context.restoreGState()
+  }
+
+  /// The image for a URL or a raster, decoded once and kept.
+  private func resolve(url: String, raster: DrawRaster?) -> CGImage? {
+    if let raster {
+      if let cached = Self.cache.image(forRaster: raster.digest) { return cached }
+      // The engine's own PNG encoder, which the SVG renderer already uses for data URLs. One call across
+      // the boundary instead of a call per pixel: a `KotlinIntArray` is read element by element from
+      // Swift, and a modest heatmap is 120,000 of those.
+      let decoded = Self.decode(dataURL: PngEncoder.shared.dataUrl(image: raster.image))
+      if let decoded { Self.cache.store(decoded, forRaster: raster.digest) }
+      return decoded
+    }
+    guard !url.isEmpty else { return nil }
+    if let cached = Self.cache.image(forURL: url) { return cached }
+    // A `data:` URL needs no host at all, so it is answered here rather than pushed onto a resolver that
+    // would have to know how. Anything else is the host's business.
+    let decoded = url.hasPrefix("data:") ? Self.decode(dataURL: url) : resolver?(url)
+    if let decoded { Self.cache.store(decoded, forURL: url) }
+    return decoded
+  }
+
+  /// Fits an image inside `rect`, centred, preserving its aspect ratio.
+  private func contained(_ image: CGImage, in rect: Rect) -> CGRect {
+    let width = Double(image.width)
+    let height = Double(image.height)
+    guard width > 0, height > 0 else { return cg(rect) }
+    let scale = min(rect.width / width, rect.height / height)
+    let drawn = CGSize(width: width * scale, height: height * scale)
+    return CGRect(
+      x: rect.x + (rect.width - drawn.width) / 2,
+      y: rect.y + (rect.height - drawn.height) / 2,
+      width: drawn.width,
+      height: drawn.height
+    )
+  }
+
+  private static func decode(dataURL: String) -> CGImage? {
+    guard let comma = dataURL.firstIndex(of: ","),
+      let data = Data(base64Encoded: String(dataURL[dataURL.index(after: comma)...])),
+      let source = CGImageSourceCreateWithData(data as CFData, nil)
+    else { return nil }
+    return CGImageSourceCreateImageAtIndex(source, 0, nil)
   }
 
   // MARK: - Painting
@@ -226,6 +313,43 @@ public struct CoreGraphicsTarget: DrawTarget {
   /// rgb(70,130,180). Every colour was quietly wrong, by an amount too small to notice by eye and
   /// large enough to be a different colour; naming the space is the fix.
   private static let sRGB = CGColorSpace(name: CGColorSpace.sRGB) ?? CGColorSpaceCreateDeviceRGB()
+
+  /// Decoded images, kept across frames.
+  ///
+  /// Static and locked because a target is created per frame while the images it draws are not: a
+  /// heatmap re-encoded and re-decoded on every redraw would be the most expensive thing in the renderer.
+  /// Keyed by a raster's digest, which is stable for identical pixels, or by the URL.
+  private static let cache = ImageCache()
+
+  private final class ImageCache: @unchecked Sendable {
+    private var byDigest: [Int64: CGImage] = [:]
+    private var byURL: [String: CGImage] = [:]
+    private let lock = NSLock()
+
+    func image(forRaster digest: Int64) -> CGImage? {
+      lock.lock()
+      defer { lock.unlock() }
+      return byDigest[digest]
+    }
+
+    func store(_ image: CGImage, forRaster digest: Int64) {
+      lock.lock()
+      defer { lock.unlock() }
+      byDigest[digest] = image
+    }
+
+    func image(forURL url: String) -> CGImage? {
+      lock.lock()
+      defer { lock.unlock() }
+      return byURL[url]
+    }
+
+    func store(_ image: CGImage, forURL url: String) {
+      lock.lock()
+      defer { lock.unlock() }
+      byURL[url] = image
+    }
+  }
 
   private func cg(_ paint: Paint) -> CGColor {
     CGColor(

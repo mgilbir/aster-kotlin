@@ -51,8 +51,23 @@ public struct RecordingTarget: DrawTarget {
     note(text + paints(fill, stroke))
   }
 
-  public mutating func image(url: String, in rect: Rect, opacity: Double) {
-    note("image \(quoted(url)) in \(show(rect)) opacity \(show(opacity))")
+  public mutating func image(
+    url: String,
+    raster: DrawRaster?,
+    in rect: Rect,
+    fit: DrawImageFit,
+    smooth: Bool,
+    opacity: Double
+  ) {
+    // A raster is described by its size rather than its address: it has no URL, and printing its pixels
+    // would be neither readable nor stable.
+    let source =
+      raster.map { "raster \($0.width)x\($0.height)" } ?? quoted(url)
+    note(
+      "image \(source) in \(show(rect)) \(fit.rawValue)"
+        + (smooth ? "" : " sharp")
+        + (opacity < 1 ? " opacity \(show(opacity))" : "")
+    )
   }
 
   // MARK: - Description

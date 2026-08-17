@@ -204,14 +204,15 @@ public struct SceneWalk {
     case "image":
       guard let image = node as? ImageNode else { return }
       let local = transform.concatenating(Affine(image.transform))
+      // `rect` rather than x/y/width/height: the node has already applied `align` and `baseline` to
+      // produce it, and using the raw channels drew every non-default alignment in the wrong place —
+      // the same mistake text was making before its own fix.
       target.image(
         url: image.url,
-        in: local.apply(
-          rect: RectD(
-            left: image.x, top: image.y,
-            right: image.x + image.width, bottom: image.y + image.height
-          )
-        ),
+        raster: image.raster.map { DrawRaster(image: $0) },
+        in: local.apply(rect: image.rect),
+        fit: image.fit == ImageFit.contain ? .contain : .fill,
+        smooth: image.smooth,
         opacity: own
       )
 

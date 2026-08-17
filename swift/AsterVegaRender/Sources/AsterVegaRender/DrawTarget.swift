@@ -33,8 +33,23 @@ public protocol DrawTarget {
   /// One line of text, positioned at its anchor with alignment already resolved by the engine.
   mutating func text(_ run: DrawTextRun, fill: Brush?, stroke: StrokePaint?)
 
-  /// A bitmap, by the URL the specification gave; a target resolves it however it can.
-  mutating func image(url: String, in rect: Rect, opacity: Double)
+  /// A bitmap.
+  ///
+  /// Two sources, because a scene has two. Most images are a `url` the specification gave, which only a
+  /// host can resolve. But a `heatmap` or an `isocontour` produces its image *in the engine* and carries
+  /// it as a [DrawRaster] — pixels, no address, nothing to fetch — and a renderer that only understood
+  /// URLs would silently drop every one of them.
+  ///
+  /// The rectangle is where the image goes, with `align` and `baseline` already applied. `fit` says what
+  /// to do when the image's own aspect ratio differs from it.
+  mutating func image(
+    url: String,
+    raster: DrawRaster?,
+    in rect: Rect,
+    fit: DrawImageFit,
+    smooth: Bool,
+    opacity: Double
+  )
 }
 
 // MARK: - The vocabulary a target is spoken to in
@@ -185,6 +200,35 @@ public enum PathCommand: Equatable, Sendable {
 /// `baseline`, and turning those into a pen position needs the measured width — which the walk has, from
 /// the layout the engine produced, and a target does not. So the walk does that arithmetic and a target
 /// simply draws: no alignment logic in any renderer, and no chance of two of them disagreeing.
+/// An image the engine produced rather than fetched.
+///
+/// Carried as a handle to the scene's own `RasterImage` plus its digest, and deliberately not as pixels:
+/// the pixels are a `KotlinIntArray`, and reading one from Swift is a call per element — 120,000 of them
+/// for a modest heatmap. A target turns this into a platform image once and caches it by [digest], which
+/// is why the digest is here at all.
+public struct DrawRaster {
+  public let image: RasterImage
+  /// Stable for identical pixels, so a target can cache across frames without comparing them.
+  public let digest: Int64
+  public let width: Int
+  public let height: Int
+
+  public init(image: RasterImage) {
+    self.image = image
+    self.digest = image.digest
+    self.width = Int(image.width)
+    self.height = Int(image.height)
+  }
+}
+
+/// What to do when an image's aspect ratio differs from the rectangle it goes in. The engine's own two.
+public enum DrawImageFit: String, Sendable {
+  /// Stretch to the rectangle, ignoring the source's aspect ratio.
+  case fill
+  /// Preserve the aspect ratio, fitting inside the rectangle and centring what is left over.
+  case contain
+}
+
 public struct DrawTextRun: Equatable, Sendable {
   public let text: String
 

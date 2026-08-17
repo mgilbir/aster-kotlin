@@ -20,6 +20,10 @@ final class VegaDataLoaderTests: XCTestCase {
       .deletingLastPathComponent()  // Tests
       .deletingLastPathComponent()  // AsterVegaRender
       .deletingLastPathComponent()  // swift
+      .deletingLastPathComponent()  // the repository — one more than it looks, and the reason
+      // `testALocalFileIsPreferredAndNoNetworkIsNeeded` was quietly passing over the network: the
+      // directory did not exist, so every read fell through to the fetch it was meant to prove
+      // unnecessary.
       .appendingPathComponent("test-fixtures")
   }
 
