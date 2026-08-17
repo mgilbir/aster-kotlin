@@ -113,6 +113,80 @@ final class SceneWalkTests: XCTestCase {
     XCTAssertTrue(paths[0].contains("commands"), paths[0])
   }
 
+  /// A run's `align` and `baseline` are resolved by the walk, into a pen position.
+  ///
+  /// This is the bug that survived the CoreText engine: the metrics were right and the labels still sat
+  /// over the axis line, because a right-aligned label was being drawn *rightwards* from its anchor
+  /// instead of ending there. A target draws from a pen position and knows nothing about alignment, so
+  /// this is where it has to be correct.
+  func testAlignmentIsResolvedIntoThePenPosition() throws {
+    // Three labels at the same x, differing only in alignment.
+    let drawn = record(
+      try scene(
+        """
+        {"$schema": "https://vega.github.io/schema/vega/v6.json",
+         "width": 200, "height": 60, "padding": 0,
+         "marks": [
+           {"type": "text", "encode": {"enter": {
+             "x": {"value": 100}, "y": {"value": 20},
+             "text": {"value": "MMMM"}, "align": {"value": "left"},
+             "baseline": {"value": "alphabetic"}, "fill": {"value": "black"}}}},
+           {"type": "text", "encode": {"enter": {
+             "x": {"value": 100}, "y": {"value": 40},
+             "text": {"value": "MMMM"}, "align": {"value": "right"},
+             "baseline": {"value": "alphabetic"}, "fill": {"value": "black"}}}},
+           {"type": "text", "encode": {"enter": {
+             "x": {"value": 100}, "y": {"value": 55},
+             "text": {"value": "MMMM"}, "align": {"value": "center"},
+             "baseline": {"value": "alphabetic"}, "fill": {"value": "black"}}}}]}
+        """
+      )
+    )
+    let labels = drawn.filter { $0.contains("text ") }
+    XCTAssertEqual(labels.count, 3, "\(drawn.joined(separator: "\n"))")
+
+    func penX(_ line: String) throws -> Double {
+      // `text "MMMM" at (x,y) …`
+      let after = try XCTUnwrap(line.components(separatedBy: " at (").last)
+      return try XCTUnwrap(Double(after.components(separatedBy: ",")[0]))
+    }
+
+    let left = try penX(labels[0])
+    let right = try penX(labels[1])
+    let centre = try penX(labels[2])
+
+    // Left-aligned starts at the anchor; right-aligned ends there, so it starts a width earlier;
+    // centred starts half a width earlier. The width is the engine's, whatever font it measured with.
+    XCTAssertEqual(left, 100, accuracy: 0.01, "left-aligned starts at its anchor")
+    XCTAssertLessThan(right, left, "right-aligned starts before it")
+    XCTAssertEqual(
+      centre, (left + right) / 2, accuracy: 0.01,
+      "centred sits halfway between the two"
+    )
+  }
+
+  /// Multi-line text is one call per line, stacked by the line height.
+  func testEachLineOfATextRunIsDrawnSeparately() throws {
+    let drawn = record(
+      try scene(
+        """
+        {"$schema": "https://vega.github.io/schema/vega/v6.json",
+         "width": 120, "height": 80, "padding": 0,
+         "marks": [{"type": "text", "encode": {"enter": {
+           "x": {"value": 10}, "y": {"value": 20},
+           "text": {"value": "first\\nsecond"},
+           "fill": {"value": "black"}}}}]}
+        """
+      )
+    )
+    let labels = drawn.filter { $0.contains("text ") }
+    // Two lines, two calls — a walk that drew `layout.run` once would emit one, and the second line
+    // would silently never appear.
+    XCTAssertEqual(labels.count, 2, "\(drawn.joined(separator: "\n"))")
+    XCTAssertTrue(labels[0].contains("\"first\""), labels[0])
+    XCTAssertTrue(labels[1].contains("\"second\""), labels[1])
+  }
+
   func testNothingIsDrawnForAnEmptyChart() throws {
     let drawn = record(
       try scene(

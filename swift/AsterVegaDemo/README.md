@@ -110,15 +110,16 @@ is in. The package's bitmap tests *do* flip, because a bare `CGBitmapContext` ha
 bottom left. That difference belongs to the caller, which is exactly why the renderer flips nothing
 itself.
 
-## Text is laid out one way and drawn another
+## Text
 
-The app compiles with `MetricTextEngine`, the portable ratio-based engine, and then draws the resulting
-runs with CoreText. So a label's *position* comes from approximate metrics while its *glyphs* come from
-the device's font, and a long label can overhang the box the layout reserved for it.
+Labels are measured with **CoreText**, the same font that draws them, through `CoreTextTextEngine`. That
+matters more than it sounds: this app first shipped measuring with the portable ratio-based engine — whose
+advance widths are a fixed fraction of the font size and match no real font — and then drawing with
+CoreText, so every box the layout reserved was the wrong width and the axis numbers sat on the axis line.
 
-The seam to close that is already there — `SpecCompiler(textEngine:)` — and closing it means a
-`TextEngine` implemented over CoreText, the way `AndroidTextEngine` does it on the other platform. Worth
-doing; not done here.
+The engine's own documentation says it plainly: *the same implementation must be used for measuring and
+for drawing.* `CoreTextTextEngine` is a Swift subclass of `MeasuredTextEngine`, which owns the layout and
+asks only how wide a string is — so the platform engine is three measurements and no second layout.
 
 ## The project file
 

@@ -152,18 +152,27 @@ public class DrawScopeTarget(
             fontFamily = FontFamily.Default,
           ),
       )
-    // The engine positions a run at its baseline anchor with alignment already resolved; Compose
-    // draws from a top-left corner, and the measured height is what turns one into the other.
-    val topLeft = Offset(run.origin.x.toFloat(), (run.origin.y - layout.size.height).toFloat())
+    // The walk has already resolved `align` and `baseline` into a pen position, which is the
+    // *baseline*
+    // of this line — Compose draws from a top-left corner, and the run's ascent is what turns one
+    // into
+    // the other. The ascent comes from the scene's own layout rather than from this measurement, so
+    // the
+    // glyphs sit where the chart's arithmetic put them even if the two disagree about the font.
+    val topLeft = Offset(run.origin.x.toFloat(), (run.origin.y - run.ascent).toFloat())
     val alpha = colour?.alpha?.toFloat() ?: 1f
     clipped {
       if (run.angleDegrees == 0.0) {
         scope.drawText(layout, topLeft = topLeft, alpha = alpha)
       } else {
-        // Rotated about the anchor the engine gave, not the corner Compose draws from.
+        // Rotation turns about the run's **anchor**, not its pen position: a rotated axis label
+        // pivots
+        // on the point the axis put it at, and pivoting on the left end of the text instead swings
+        // a
+        // right-aligned label away from its tick.
         scope.rotate(
           degrees = run.angleDegrees.toFloat(),
-          pivot = Offset(run.origin.x.toFloat(), run.origin.y.toFloat()),
+          pivot = Offset(run.anchor.x.toFloat(), run.anchor.y.toFloat()),
         ) {
           drawText(layout, topLeft = topLeft, alpha = alpha)
         }

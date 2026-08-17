@@ -88,3 +88,20 @@ mirrored, which is the classic symptom and worth naming.
 
 `DrawTextRun` is named that way, rather than `TextRun`, because the engine exports a `TextRun` of its own
 — the one a scene holds — and a file importing both modules could not otherwise say which it meant.
+
+`CoreTextTextEngine` closes the loop: it measures with the same font, as a subclass of the engine's
+`MeasuredTextEngine`, which owns the layout and asks only for advances, an ascent and a descent. Compile a
+chart with it and the boxes the layout reserves are the boxes the glyphs fill. `CoreTextFonts` resolves a
+specification's family/size/weight into a `CTFont` and is shared by the measuring and the drawing, because
+measuring with one font and drawing with another is the same bug wearing a hat.
+
+### Alignment is the walk's job
+
+A scene gives a text node an anchor plus an `align` and a `baseline`; turning those into a pen position
+needs the measured width, which the walk has from the layout and a target does not. So the walk emits **one
+call per line**, already positioned, and a target draws from a pen position with no alignment logic at all.
+
+That is not a stylistic choice — it is a bug fix. Before it, a right-aligned axis label was drawn
+*rightwards* from its anchor instead of ending there, which put the numbers on top of the axis line, and
+multi-line text drew only its first line because the walk never looked at `layout.lines`. Rotation turns
+about the **anchor**, not the pen, or a rotated label swings away from its tick.

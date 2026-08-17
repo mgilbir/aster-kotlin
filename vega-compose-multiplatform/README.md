@@ -60,6 +60,19 @@ opacity still draws them — it is a group with no background, not an invisible 
 upstream's behaviour in both of its renderers, it is the opposite of the natural guess, and two of this
 project's renderers guessed wrong before pixels said otherwise. See `SceneWalk`'s own notes.
 
+## Alignment is the walk's job
+
+A scene gives a text node an anchor plus an `align` and a `baseline`; turning those into a pen position
+needs the measured width, which `SceneWalk` has from the layout and a target does not. So the walk emits
+**one call per line**, already positioned, and `DrawScopeTarget` draws from a pen position — subtracting
+only the ascent, because Compose draws from a top-left corner.
+
+This was a real defect in both this renderer and the Swift one, found in the iOS demo: a right-aligned axis
+label drawn rightwards from its anchor sits on top of the axis line, and multi-line text drew only its
+first line because the walk never looked at `layout.lines`. The pixel test
+`alignment puts the ink on the right side of the anchor` is the guard, and it fails if the walk stops
+resolving alignment.
+
 ## Text
 
 `DrawScopeTarget` takes a `TextMeasurer` — `rememberTextMeasurer()` inside a composable, which

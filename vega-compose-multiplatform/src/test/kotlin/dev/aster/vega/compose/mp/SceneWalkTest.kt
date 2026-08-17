@@ -172,6 +172,73 @@ class SceneWalkTest {
     assertTrue(drawn.none { it.contains("#000000") }, "the panel does not:\n$all")
   }
 
+  /**
+   * A run's `align` and `baseline` are resolved by the walk, into a pen position.
+   *
+   * The bug this pins down was visible in the iOS demo and identical here: a right-aligned axis
+   * label drawn *rightwards* from its anchor sits on top of the axis line instead of ending at it.
+   * A target draws from a pen position and knows nothing about alignment, so this is where it has
+   * to be right.
+   */
+  @Test
+  fun `alignment is resolved into the pen position`() {
+    val drawn =
+      record(
+        """
+        {"${'$'}schema": "https://vega.github.io/schema/vega/v6.json",
+         "width": 200, "height": 60, "padding": 0,
+         "marks": [
+           {"type": "text", "encode": {"enter": {
+             "x": {"value": 100}, "y": {"value": 20},
+             "text": {"value": "MMMM"}, "align": {"value": "left"},
+             "fill": {"value": "black"}}}},
+           {"type": "text", "encode": {"enter": {
+             "x": {"value": 100}, "y": {"value": 40},
+             "text": {"value": "MMMM"}, "align": {"value": "right"},
+             "fill": {"value": "black"}}}},
+           {"type": "text", "encode": {"enter": {
+             "x": {"value": 100}, "y": {"value": 55},
+             "text": {"value": "MMMM"}, "align": {"value": "center"},
+             "fill": {"value": "black"}}}}]}
+        """
+      )
+    val labels = drawn.filter { it.contains("text ") }
+    assertEquals(3, labels.size, drawn.joinToString("\n"))
+
+    // `text "MMMM" at (x,y) …`
+    fun penX(line: String): Double = line.substringAfter(" at (").substringBefore(",").toDouble()
+
+    val left = penX(labels[0])
+    val right = penX(labels[1])
+    val centre = penX(labels[2])
+
+    assertEquals(100.0, left, 0.01, "left-aligned starts at its anchor")
+    assertTrue(right < left, "right-aligned starts before it: $right vs $left")
+    assertEquals((left + right) / 2, centre, 0.01, "centred sits halfway between the two")
+  }
+
+  /** Multi-line text is one call per line, stacked by the line height. */
+  @Test
+  fun `each line of a text run is drawn separately`() {
+    val drawn =
+      record(
+        """
+        {"${'$'}schema": "https://vega.github.io/schema/vega/v6.json",
+         "width": 120, "height": 80, "padding": 0,
+         "marks": [{"type": "text", "encode": {"enter": {
+           "x": {"value": 10}, "y": {"value": 20},
+           "text": {"value": "first\nsecond"},
+           "fill": {"value": "black"}}}}]}
+        """
+      )
+    val labels = drawn.filter { it.contains("text ") }
+    // A walk that drew `layout.run` once would emit one call, and the second line would never
+    // appear.
+    assertEquals(2, labels.size, drawn.joinToString("\n"))
+    assertTrue(labels[0].contains("\"first\""), labels[0])
+    assertTrue(labels[1].contains("\"second\""), labels[1])
+  }
+
   @Test
   fun `a gradient reaches the target as absolute points rather than fractions`() {
     val drawn =

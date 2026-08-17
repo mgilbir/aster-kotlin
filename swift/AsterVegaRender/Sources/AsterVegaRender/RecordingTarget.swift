@@ -44,6 +44,7 @@ public struct RecordingTarget: DrawTarget {
 
   public mutating func text(_ run: DrawTextRun, fill: Brush?, stroke: StrokePaint?) {
     var text = "text \(quoted(run.text)) at \(show(run.origin))"
+    if run.angleDegrees != 0 { text += " about \(show(run.anchor))" }
     text += " \(run.fontFamily) \(show(run.fontSize)) w\(run.fontWeight)"
     if run.italic { text += " italic" }
     if run.angleDegrees != 0 { text += " rotated \(show(run.angleDegrees))" }

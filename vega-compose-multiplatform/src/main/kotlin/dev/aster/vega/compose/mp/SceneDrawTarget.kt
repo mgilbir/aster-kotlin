@@ -160,9 +160,23 @@ public sealed interface DrawPathCommand {
   public data object Close : DrawPathCommand
 }
 
+/**
+ * One line of text to draw, positioned.
+ *
+ * **One of these per line, already aligned.** A scene gives a run an anchor plus an `align` and a
+ * `baseline`, and turning those into a pen position needs the measured width — which the walk has,
+ * from the layout the engine produced, and a target does not. So the walk does that arithmetic and
+ * a target simply draws: no alignment logic in any renderer, and no chance of two of them
+ * disagreeing.
+ */
 public data class DrawTextRun(
   val text: String,
+  /** Where the pen starts: the left edge of this line, **on its baseline**. */
   val origin: DrawPoint,
+  /** The run's own anchor, which is what rotation turns about — not the pen position. */
+  val anchor: DrawPoint,
+  /** The font's ascent, for a surface that draws from a box's top corner rather than a baseline. */
+  val ascent: Double,
   val fontFamily: String,
   val fontSize: Double,
   val fontWeight: Int,

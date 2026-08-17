@@ -18,6 +18,8 @@ import dev.aster.vega.scene.Stroke
 import dev.aster.vega.scene.StrokeCap
 import dev.aster.vega.scene.StrokeJoin
 import dev.aster.vega.scene.SymbolNode
+import dev.aster.vega.scene.TextAlign
+import dev.aster.vega.scene.TextBaseline
 import dev.aster.vega.scene.TextNode
 import dev.aster.vega.scene.Transform2D
 import kotlin.math.abs
@@ -107,24 +109,7 @@ public class SceneWalk {
           brush(node.fill, node.opacity, node.bounds, local),
           stroke(node.stroke, node.opacity, node.bounds, local),
         )
-      is TextNode ->
-        if (!node.absent) {
-          val run = node.layout.run
-          val style = run.style
-          target.text(
-            DrawTextRun(
-              text = run.text,
-              origin = local.applyTo(DrawPoint(node.x, node.y)),
-              fontFamily = style.fontFamily,
-              fontSize = style.fontSize,
-              fontWeight = style.fontWeight,
-              italic = style.fontStyle == FontStyle.ITALIC,
-              angleDegrees = node.angleDegrees,
-            ),
-            brush(node.fill, node.opacity, node.bounds, local),
-            stroke(node.stroke, node.opacity, node.bounds, local),
-          )
-        }
+      is TextNode -> if (!node.absent) walkText(node, local, target)
       is ImageNode ->
         target.image(
           node.url,
@@ -177,6 +162,65 @@ public class SceneWalk {
     }
 
     target.endGroup()
+  }
+
+  /**
+   * Draws a text node: one call per line, with `align` and `baseline` resolved into a pen position.
+   *
+   * The offsets are [textBounds]' own, which is what the engine used to compute this node's bounds
+   * — so the glyphs land inside the space the layout reserved rather than beside it. Getting this
+   * wrong is not subtle in a chart: a right-aligned axis label drawn rightwards from its anchor
+   * sits on top of the axis line, which is exactly how it looked before this existed.
+   */
+  private fun walkText(node: TextNode, local: Transform2D, target: SceneDrawTarget) {
+    val layout = node.layout
+    val run = layout.run
+    val style = run.style
+    val metrics = layout.metrics
+    val fill = brush(node.fill, node.opacity, node.bounds, local)
+    val stroke = stroke(node.stroke, node.opacity, node.bounds, local)
+
+    val top =
+      when (run.baseline) {
+        TextBaseline.TOP,
+        TextBaseline.LINE_TOP -> 0.0
+        TextBaseline.MIDDLE -> -metrics.height / 2.0
+        TextBaseline.BOTTOM,
+        TextBaseline.LINE_BOTTOM -> -metrics.height
+        TextBaseline.ALPHABETIC -> -metrics.ascent
+      }
+    val anchor = local.applyTo(DrawPoint(node.x, node.y))
+
+    // Every line is anchored at the same point and aligned by *its own* width, which is what an SVG
+    // `tspan` with an absolute `x` does.
+    for (line in layout.lines) {
+      val leading =
+        when (run.align) {
+          TextAlign.LEFT -> 0.0
+          TextAlign.CENTER -> -line.width / 2.0
+          TextAlign.RIGHT -> -line.width
+        }
+      target.text(
+        DrawTextRun(
+          text = line.text,
+          origin =
+            local.applyTo(
+              node.x + leading,
+              // The baseline of this line: the box's top, down by the ascent, then by the stack.
+              node.y + top + metrics.ascent + line.baselineY,
+            ),
+          anchor = anchor,
+          ascent = metrics.ascent,
+          fontFamily = style.fontFamily,
+          fontSize = style.fontSize,
+          fontWeight = style.fontWeight,
+          italic = style.fontStyle == FontStyle.ITALIC,
+          angleDegrees = node.angleDegrees,
+        ),
+        fill,
+        stroke,
+      )
+    }
   }
 
   // MARK: reading the scene
