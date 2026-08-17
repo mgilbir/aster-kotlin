@@ -483,21 +483,48 @@ ordering), and the pipeline is now verified end to end on one fixture, but the b
 - 1,348 JVM tests pass (`./scripts/test-core.sh`, `./gradlew test`), plus 12 for the Compose
   Multiplatform renderer: 7 in `commonTest`, compiled for Android, both iOS targets and the JVM, and 5
   rasterising through Compose's own Skia backend with `ImageComposeScene` — no window, no display.
-- 9 Swift tests pass (`./scripts/swift-test.sh`), which links the macOS framework with Gradle first
+- 26 Swift tests pass (`./scripts/swift-test.sh`), which links the macOS framework with Gradle first
   because SwiftPM cannot build its own dependency. Four assert the sequence of draw calls a compiled
   specification produces; five sample pixels from a `CGContext`, including one that draws a gradient
   through a clip and one that checks text appears when CoreText is lent to the renderer and is absent
   when it is not.
-- The **iOS demo app** (`swift/AsterVegaDemo`, built by `scripts/ios-demo.sh`) compiles for both the
-  simulator and a device slice, verified by `--check`, which type-checks the app and the renderer
-  against each slice of the XCFramework at Swift 6. It has **not been run**: this machine has no iOS
-  simulator *runtime* installed, and Xcode refuses every destination without one — `xcodebuild` cannot
-  even build. `xcodebuild -downloadPlatform iOS` installs it, and the script says so rather than
-  failing obscurely. Type-checking is not running, and the difference is worth stating plainly: it
-  proves the app builds, not that a chart appears.
+- **Data loading and compilation run off the main thread in both demos**, which is what keeps either of
+  them answering a tap while a chart is being built. On iOS the compile is a detached task and the
+  bundled specifications are listed before any of them is compiled, so the list appears immediately and
+  each row's status fills in behind it. On Android `setSpecAsync` already dispatched to
+  `Dispatchers.Default`, but two things beside it did not: the asset read for a bundled specification, and
+  `chart.build(...)` for a sample scene — which measures text and lays out axes, so it is processing
+  rather than construction. Both now go through `withContext`.
+
+- The **iOS demo app** (`swift/AsterVegaDemo`, built by `scripts/ios-demo.sh`) was **built, installed
+  and driven on an iOS 26.5 simulator**. Every bundled chart draws; the paste screen compiles typed or
+  pasted JSON; and a specification's `bind` controls appear as native ones and move the chart —
+  `bar-line-toggle` at its slider's minimum draws 25 bars and at its maximum draws a line over 200
+  points, which is that specification switching mark type, not the renderer guessing.
+
+  A specification's `url` resolves locally first and then from `https://vega.github.io/vega/`, so the
+  examples' datasets work whether or not they are bundled — verified both ways on the simulator:
+  `parallel-coordinates` drew all 406 cars from the bundled `data/cars.json`, and a pasted specification
+  reading `data/population.json`, which is *not* bundled, fetched it from Vega's site and drew it.
+  `VegaDataLoader` is in the renderer package so the app and its tests share one policy, and that policy
+  is the interesting half: one allowed prefix, `..` refused rather than normalised, absolute paths
+  refused. `DataLoader` denies by default because a `url` in a pasted specification asks this process to
+  fetch an address the specification chose, which left open is a server-side request forgery primitive.
+
+  That interface needed one change to be implementable from Swift at all: its two methods are now
+  `@Throws(LoadDeniedException::class)`. A Kotlin function that throws needs no annotation, but the Obj-C
+  boundary only grows an error out-parameter when told to — so a loader written in Swift compiled fine
+  and had **no way to refuse anything**, which is the one thing the interface exists to do.
+
+  Getting there needed Apple's simulator runtime (8.5 GB, `xcodebuild -downloadPlatform iOS`): Xcode
+  lists the iOS SDK but refuses every destination without the matching platform, so `xcodebuild` cannot
+  even build without it. `scripts/ios-demo.sh --check` remains the path for a machine that has not got
+  it, type-checking the app and the renderer against both slices of the XCFramework at Swift 6. That is
+  not running, and the difference is worth keeping in mind: it proves the app builds, not that a chart
+  appears.
 - Android lint is clean with `warningsAsErrors` on every Android module.
-- 63 instrumented tests pass on an API 37 arm64 emulator (`./scripts/test-android.sh`): 49 in
-  `vega-android-canvas`, 4 in `vega-compose`, 10 in `demo`. Three groups of them cover what no JVM
+- 66 instrumented tests pass on an API 37 arm64 emulator (`./scripts/test-android.sh`): 51 in
+  `vega-android-canvas`, 4 in `vega-compose`, 11 in `demo`. Three groups of them cover what no JVM
   test can: one compiles every bundled specification with the device's own font metrics, which the
   differential tests deliberately cannot because they measure text upstream's way; three tap a real
   view with a synthetic `MotionEvent` and read the pixels back, which is the only way to know the
@@ -573,6 +600,13 @@ no intrinsic size still drew solid fills while resolving every **gradient** to b
 takes the scene's own declared size unless a caller's modifier overrides it, which is what a
 specification with a `width` and a `height` is asking for anyway.
 
+`ForeignSignals` is the second accessor surface the Obj-C boundary forced, after `ForeignPaint`, and for
+the identical reason: every interesting `VegaValue` is a `@JvmInline value class` and so is absent from
+the generated header. That one bites harder than a fill did — a host could *draw* a slider from
+`SignalInput` and had no way to construct the value telling the chart where the reader put it, so
+controls were readable and inert. The lesson generalises: a value class implementing an interface is
+invisible to Obj-C, and every one of them on a host-facing path needs a plain-function accessor.
+
 The Swift renderer started solid-only, which the iOS demo made untenable: `gradient-fills` is in the
 fixture corpus, and a demo that silently omitted those marks while the Compose renderer drew them would
 be a renderer with a hole in it rather than a demo. It now paints gradients by clipping to the mark's
@@ -584,6 +618,25 @@ and CoreGraphics and change between their versions; a byte-exact golden would fa
 broke nothing, and the pressure would then be to loosen the comparison until it stopped failing.
 Sampling named pixels — this one is the bar's colour, that one is the background, the corner of the
 circle's bounding box is not filled — says what is actually being claimed, and says why when it breaks.
+
+## Two tests that asserted on a gap, and failed when it closed
+
+Running `:demo:connectedDebugAndroidTest` for the first time in a while found two failures that had
+nothing to do with the change being made. `aPastedSpecificationUsingSomethingUnsupportedSaysWhichPart`
+pasted a `shape` mark and asserted the demo reported it as undrawable;
+`anIgnoredPropertyIsReportedWithoutClaimingTheChartIsWrong` did the same with `cornerRadiusTopLeft`.
+Both now compile cleanly, because both features were implemented — so both tests failed **because the
+engine got better**.
+
+That is worth naming as a category. A test that asserts a feature is missing breaks the day the feature
+lands, and it breaks in the most misleading way available: a red suite that says nothing is wrong.
+Neither test was really about `shape` or about per-corner radii; they were about the demo *reporting*
+what it could not honour. So they now use `nonesuchMark` and `nonesuchProperty` — names that cannot ever
+be implemented — and they test the reporting, which is what they were for.
+
+The rule the next one of these should be measured against: **assert on the reporting, not on the gap.**
+A test that will pass forever if the engine improves is testing behaviour; one that fails when it
+improves was testing a snapshot of the todo list.
 
 ## The official Vega examples
 
