@@ -1,0 +1,100 @@
+{
+  "marks": [
+    {
+      "fill": "#4c78a8",
+      "role": "mark",
+      "shapeHeight": 14.142136,
+      "shapeLeft": 12.928932,
+      "shapeTop": 12.928932,
+      "shapeWidth": 14.142136,
+      "size": 200,
+      "type": "symbol",
+      "x": 20,
+      "y": 20
+    },
+    {
+      "fill": "#f58518",
+      "role": "mark",
+      "shapeHeight": 14.142136,
+      "shapeLeft": 82.928932,
+      "shapeTop": 52.928932,
+      "shapeWidth": 14.142136,
+      "size": 200,
+      "type": "symbol",
+      "x": 90,
+      "y": 60
+    },
+    {
+      "fill": "#e45756",
+      "role": "mark",
+      "shapeHeight": 14.142136,
+      "shapeLeft": 152.928932,
+      "shapeTop": 27.928932,
+      "shapeWidth": 14.142136,
+      "size": 200,
+      "type": "symbol",
+      "x": 160,
+      "y": 35
+    },
+    {
+      "fill": "#000",
+      "font": "sans-serif",
+      "fontSize": 9,
+      "role": "mark",
+      "text": "0,1",
+      "type": "text",
+      "x": 4,
+      "y": 95
+    }
+  ],
+  "scales": {
+    "colour": {
+      "domain": [
+        "a",
+        "b",
+        "c"
+      ],
+      "range": [
+        "#4c78a8",
+        "#f58518",
+        "#e45756",
+        "#72b7b2",
+        "#54a24b",
+        "#eeca3b",
+        "#b279a2",
+        "#ff9da6",
+        "#9d755d",
+        "#bab0ac"
+      ]
+    },
+    "pos": {
+      "domain": [
+        0,
+        1
+      ],
+      "range": [
+        0,
+        1
+      ],
+      "ticks": [
+        0,
+        0.1,
+        0.2,
+        0.3,
+        0.4,
+        0.5,
+        0.6,
+        0.7,
+        0.8,
+        0.9,
+        1
+      ]
+    }
+  },
+  "size": {
+    "height": 110,
+    "width": 210
+  },
+  "spec": "identity-scale.vg.json",
+  "vegaVersion": "6.3.1"
+}

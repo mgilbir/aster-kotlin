@@ -1,0 +1,133 @@
+{
+  "marks": [
+    {
+      "fill": "#4c78a8",
+      "role": "mark",
+      "shapeHeight": 102.984134,
+      "shapeLeft": 82.339649,
+      "shapeTop": 8.529012,
+      "shapeWidth": 69.660351,
+      "type": "arc"
+    },
+    {
+      "fill": "#f58518",
+      "role": "mark",
+      "shapeHeight": 53.267296,
+      "shapeLeft": 65.110344,
+      "shapeTop": 98.732704,
+      "shapeWidth": 73.41937,
+      "type": "arc"
+    },
+    {
+      "fill": "#e45756",
+      "role": "mark",
+      "shapeHeight": 98.594804,
+      "shapeLeft": 8,
+      "shapeTop": 48.486854,
+      "shapeWidth": 60.88049,
+      "type": "arc"
+    },
+    {
+      "fill": "#72b7b2",
+      "role": "mark",
+      "shapeHeight": 43.685979,
+      "shapeLeft": 21.470286,
+      "shapeTop": 17.581317,
+      "shapeWidth": 42.666859,
+      "type": "arc"
+    },
+    {
+      "fill": "#54a24b",
+      "role": "mark",
+      "shapeHeight": 42.234091,
+      "shapeLeft": 54.989199,
+      "shapeTop": 8.529012,
+      "shapeWidth": 22.671152,
+      "type": "arc"
+    },
+    {
+      "fill": "#4c78a8",
+      "role": "mark",
+      "shapeHeight": 106.092926,
+      "shapeLeft": 238,
+      "shapeTop": 6.968644,
+      "shapeWidth": 76,
+      "stroke": "#ffffff",
+      "strokeWidth": 1,
+      "type": "arc"
+    },
+    {
+      "fill": "#f58518",
+      "role": "mark",
+      "shapeHeight": 76,
+      "shapeLeft": 222.74861,
+      "shapeTop": 78,
+      "shapeWidth": 76.647762,
+      "stroke": "#ffffff",
+      "strokeWidth": 1,
+      "type": "arc"
+    },
+    {
+      "fill": "#e45756",
+      "role": "mark",
+      "shapeHeight": 101.187892,
+      "shapeLeft": 166,
+      "shapeTop": 46.93843,
+      "shapeWidth": 76,
+      "stroke": "#ffffff",
+      "strokeWidth": 1,
+      "type": "arc"
+    },
+    {
+      "fill": "#72b7b2",
+      "role": "mark",
+      "shapeHeight": 65.314711,
+      "shapeLeft": 180.603627,
+      "shapeTop": 16.685289,
+      "shapeWidth": 61.396373,
+      "stroke": "#ffffff",
+      "strokeWidth": 1,
+      "type": "arc"
+    },
+    {
+      "fill": "#54a24b",
+      "role": "mark",
+      "shapeHeight": 75.031356,
+      "shapeLeft": 213.14918,
+      "shapeTop": 6.968644,
+      "shapeWidth": 28.85082,
+      "stroke": "#ffffff",
+      "strokeWidth": 1,
+      "type": "arc"
+    }
+  ],
+  "scales": {
+    "colour": {
+      "domain": [
+        "alpha",
+        "beta",
+        "gamma",
+        "delta",
+        "epsilon"
+      ],
+      "range": [
+        "#4c78a8",
+        "#f58518",
+        "#e45756",
+        "#72b7b2",
+        "#54a24b",
+        "#eeca3b",
+        "#b279a2",
+        "#ff9da6",
+        "#9d755d",
+        "#bab0ac"
+      ]
+    }
+  },
+  "size": {
+    "height": 170,
+    "width": 330
+  },
+  "spec": "arc-padding.vg.json",
+  "vegaVersion": "6.3.1"
+}

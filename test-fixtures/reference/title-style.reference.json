@@ -1,0 +1,96 @@
+{
+  "marks": [
+    {
+      "fill": "#4c78a8",
+      "height": 53.333333,
+      "role": "mark",
+      "type": "rect",
+      "width": 104,
+      "x": 0,
+      "y": 66.666667
+    },
+    {
+      "fill": "#4c78a8",
+      "height": 120,
+      "role": "mark",
+      "type": "rect",
+      "width": 104,
+      "x": 130,
+      "y": 0
+    },
+    {
+      "align": "right",
+      "angle": 4,
+      "baseline": "middle",
+      "fill": "#1b4965",
+      "font": "serif",
+      "fontSize": 15,
+      "fontWeight": 600,
+      "limit": 200,
+      "lineHeight": 20,
+      "opacity": 1,
+      "role": "title-text",
+      "text": "A heading long enough\nto need two lines",
+      "type": "text"
+    },
+    {
+      "align": "right",
+      "angle": 4,
+      "baseline": "middle",
+      "fill": "#7a7a7a",
+      "font": "monospace",
+      "fontSize": 10,
+      "fontWeight": "bold",
+      "limit": 200,
+      "lineHeight": 15,
+      "opacity": 1,
+      "role": "title-subtitle",
+      "text": "and a subtitle\nthat also wraps",
+      "type": "text",
+      "x": 0,
+      "y": -44.327472
+    }
+  ],
+  "scales": {
+    "x": {
+      "bandwidth": 130,
+      "domain": [
+        "a",
+        "b"
+      ],
+      "range": [
+        0,
+        260
+      ],
+      "step": 130
+    },
+    "y": {
+      "domain": [
+        0,
+        9
+      ],
+      "range": [
+        120,
+        0
+      ],
+      "ticks": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9
+      ]
+    }
+  },
+  "size": {
+    "height": 249.011648,
+    "width": 463.485479
+  },
+  "spec": "title-style.vg.json",
+  "vegaVersion": "6.3.1"
+}

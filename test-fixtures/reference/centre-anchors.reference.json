@@ -1,0 +1,229 @@
+{
+  "marks": [
+    {
+      "fill": "#4c78a8",
+      "fillOpacity": 0.6,
+      "height": 20,
+      "role": "mark",
+      "type": "rect",
+      "width": 30,
+      "x": 25,
+      "y": 20
+    },
+    {
+      "fill": "#4c78a8",
+      "fillOpacity": 0.6,
+      "height": 12,
+      "role": "mark",
+      "type": "rect",
+      "width": 50,
+      "x": 85,
+      "y": 64
+    },
+    {
+      "fill": "#4c78a8",
+      "fillOpacity": 0.6,
+      "height": 40,
+      "role": "mark",
+      "type": "rect",
+      "width": 20,
+      "x": 190,
+      "y": 90
+    },
+    {
+      "fill": "#f58518",
+      "height": 8,
+      "role": "mark",
+      "type": "rect",
+      "width": 30,
+      "x": 10,
+      "y": 160
+    },
+    {
+      "fill": "#f58518",
+      "height": 8,
+      "role": "mark",
+      "type": "rect",
+      "width": 50,
+      "x": 60,
+      "y": 160
+    },
+    {
+      "fill": "#f58518",
+      "height": 8,
+      "role": "mark",
+      "type": "rect",
+      "width": 20,
+      "x": 180,
+      "y": 160
+    },
+    {
+      "fill": "#54a24b",
+      "height": 5,
+      "role": "mark",
+      "type": "rect",
+      "width": 20,
+      "x": 40,
+      "y": 170
+    },
+    {
+      "fill": "#54a24b",
+      "height": 5,
+      "role": "mark",
+      "type": "rect",
+      "width": 50,
+      "x": 60,
+      "y": 170
+    },
+    {
+      "fill": "#54a24b",
+      "height": 5,
+      "role": "mark",
+      "type": "rect",
+      "width": 140,
+      "x": 60,
+      "y": 170
+    },
+    {
+      "fill": "#e45756",
+      "role": "mark",
+      "shapeHeight": 8.944272,
+      "shapeLeft": 35.527864,
+      "shapeTop": 25.527864,
+      "shapeWidth": 8.944272,
+      "size": 80,
+      "type": "symbol",
+      "x": 40,
+      "y": 30
+    },
+    {
+      "fill": "#e45756",
+      "role": "mark",
+      "shapeHeight": 8.944272,
+      "shapeLeft": 105.527864,
+      "shapeTop": 65.527864,
+      "shapeWidth": 8.944272,
+      "size": 80,
+      "type": "symbol",
+      "x": 110,
+      "y": 70
+    },
+    {
+      "fill": "#e45756",
+      "role": "mark",
+      "shapeHeight": 8.944272,
+      "shapeLeft": 195.527864,
+      "shapeTop": 105.527864,
+      "shapeWidth": 8.944272,
+      "size": 80,
+      "type": "symbol",
+      "x": 200,
+      "y": 110
+    },
+    {
+      "align": "center",
+      "fill": "#333",
+      "font": "sans-serif",
+      "fontSize": 11,
+      "role": "mark",
+      "text": "40",
+      "type": "text",
+      "x": 40,
+      "y": 190
+    },
+    {
+      "align": "center",
+      "fill": "#333",
+      "font": "sans-serif",
+      "fontSize": 11,
+      "role": "mark",
+      "text": "110",
+      "type": "text",
+      "x": 110,
+      "y": 190
+    },
+    {
+      "align": "center",
+      "fill": "#333",
+      "font": "sans-serif",
+      "fontSize": 11,
+      "role": "mark",
+      "text": "200",
+      "type": "text",
+      "x": 200,
+      "y": 190
+    },
+    {
+      "closed": 0,
+      "points": "40 30 110 70 200 110",
+      "role": "mark",
+      "stroke": "#9d755d",
+      "strokeWidth": 2,
+      "type": "line"
+    },
+    {
+      "fill": "#eeeeee",
+      "height": 10,
+      "role": "scope",
+      "stroke": "#bab0ac",
+      "type": "group",
+      "width": 30,
+      "x": 25,
+      "y": 140
+    },
+    {
+      "fill": "#b279a2",
+      "height": 10,
+      "role": "mark",
+      "type": "rect",
+      "width": 4,
+      "x": 25,
+      "y": 140
+    },
+    {
+      "fill": "#eeeeee",
+      "height": 10,
+      "role": "scope",
+      "stroke": "#bab0ac",
+      "type": "group",
+      "width": 50,
+      "x": 85,
+      "y": 140
+    },
+    {
+      "fill": "#b279a2",
+      "height": 10,
+      "role": "mark",
+      "type": "rect",
+      "width": 4,
+      "x": 85,
+      "y": 140
+    },
+    {
+      "fill": "#eeeeee",
+      "height": 10,
+      "role": "scope",
+      "stroke": "#bab0ac",
+      "type": "group",
+      "width": 20,
+      "x": 190,
+      "y": 140
+    },
+    {
+      "fill": "#b279a2",
+      "height": 10,
+      "role": "mark",
+      "type": "rect",
+      "width": 4,
+      "x": 190,
+      "y": 140
+    }
+  ],
+  "scales": {},
+  "size": {
+    "height": 210,
+    "width": 310
+  },
+  "spec": "centre-anchors.vg.json",
+  "vegaVersion": "6.3.1"
+}

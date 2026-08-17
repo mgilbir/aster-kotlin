@@ -1,0 +1,10 @@
+import { readFileSync } from 'node:fs';
+import * as vega from 'vega';
+const spec = JSON.parse(readFileSync(process.argv[2], 'utf8'));
+const view = new vega.View(vega.parse(spec), { renderer: 'none' });
+await view.runAsync();
+const s = view.scale(process.argv[3]);
+console.log('domain', s.domain().map(d => d instanceof Date ? d.toISOString() : d));
+console.log('range', s.range());
+console.log('ticks', s.ticks().map(d => d.toISOString()));
+await view.finalize();

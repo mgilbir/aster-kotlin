@@ -1,0 +1,65 @@
+{
+  "marks": [
+    {
+      "fill": "#c7e9c0",
+      "role": "mark",
+      "shapeHeight": 124,
+      "shapeLeft": 57.25637,
+      "shapeTop": 38,
+      "shapeWidth": 185.487261,
+      "stroke": "#31a354",
+      "type": "shape"
+    },
+    {
+      "fill": "#c7e9c0",
+      "role": "mark",
+      "shapeHeight": 124,
+      "shapeLeft": 57.25637,
+      "shapeTop": 38,
+      "shapeWidth": 185.487261,
+      "stroke": "#31a354",
+      "type": "shape"
+    },
+    {
+      "height": 120,
+      "role": "mark",
+      "stroke": "#e6550d",
+      "strokeDash": "3,3",
+      "strokeWidth": 1,
+      "type": "rect",
+      "width": 181.487261,
+      "x": 59.25637,
+      "y": 40
+    },
+    {
+      "fill": "#9ecae1",
+      "role": "mark",
+      "shapeHeight": 7.043163,
+      "shapeLeft": 146.478418,
+      "shapeTop": 21.478418,
+      "shapeWidth": 7.043163,
+      "size": 9.260841,
+      "stroke": "#3182bd",
+      "type": "symbol",
+      "x": 150,
+      "y": 25
+    },
+    {
+      "fill": "#333333",
+      "font": "sans-serif",
+      "fontSize": 10,
+      "role": "mark",
+      "text": "scale 34.3",
+      "type": "text",
+      "x": 10,
+      "y": 16
+    }
+  ],
+  "scales": {},
+  "size": {
+    "height": 210,
+    "width": 310
+  },
+  "spec": "geo-measures.vg.json",
+  "vegaVersion": "6.3.1"
+}

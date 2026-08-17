@@ -1,0 +1,376 @@
+{
+  "marks": [
+    {
+      "opacity": 1,
+      "role": "axis-tick",
+      "stroke": "#888",
+      "strokeWidth": 1,
+      "type": "rule",
+      "x": 85.5,
+      "x2": 85.5,
+      "y": 126.5,
+      "y2": 131.5
+    },
+    {
+      "opacity": 1,
+      "role": "axis-tick",
+      "stroke": "#888",
+      "strokeWidth": 1,
+      "type": "rule",
+      "x": 178.5,
+      "x2": 178.5,
+      "y": 126.5,
+      "y2": 131.5
+    },
+    {
+      "align": "right",
+      "angle": -30,
+      "baseline": "top",
+      "fill": "#000",
+      "font": "sans-serif",
+      "fontSize": 10,
+      "limit": 180,
+      "opacity": 1,
+      "role": "axis-label",
+      "text": "01 May",
+      "type": "text",
+      "x": 85.151163,
+      "y": 133.5
+    },
+    {
+      "align": "right",
+      "angle": -30,
+      "baseline": "top",
+      "fill": "#000",
+      "font": "sans-serif",
+      "fontSize": 10,
+      "limit": 180,
+      "opacity": 1,
+      "role": "axis-label",
+      "text": "01 Jun",
+      "type": "text",
+      "x": 178.872093,
+      "y": 133.5
+    },
+    {
+      "opacity": 1,
+      "role": "axis-domain",
+      "stroke": "#888",
+      "strokeWidth": 1,
+      "type": "rule",
+      "x": 0.5,
+      "x2": 260.5,
+      "y": 126.5,
+      "y2": 126.5
+    },
+    {
+      "opacity": 1,
+      "role": "axis-tick",
+      "stroke": "#888",
+      "strokeWidth": 1,
+      "type": "rule",
+      "x": 0.5,
+      "x2": -4.5,
+      "y": 80.5,
+      "y2": 80.5
+    },
+    {
+      "opacity": 1,
+      "role": "axis-tick",
+      "stroke": "#888",
+      "strokeWidth": 1,
+      "type": "rule",
+      "x": 0.5,
+      "x2": -4.5,
+      "y": 55.5,
+      "y2": 55.5
+    },
+    {
+      "opacity": 1,
+      "role": "axis-tick",
+      "stroke": "#888",
+      "strokeWidth": 1,
+      "type": "rule",
+      "x": 0.5,
+      "x2": -4.5,
+      "y": 30.5,
+      "y2": 30.5
+    },
+    {
+      "opacity": 1,
+      "role": "axis-tick",
+      "stroke": "#888",
+      "strokeWidth": 1,
+      "type": "rule",
+      "x": 0.5,
+      "x2": -4.5,
+      "y": 5.5,
+      "y2": 5.5
+    },
+    {
+      "align": "right",
+      "angle": 0,
+      "baseline": "middle",
+      "fill": "#000",
+      "font": "sans-serif",
+      "fontSize": 10,
+      "limit": 180,
+      "opacity": 1,
+      "role": "axis-label",
+      "text": "0",
+      "type": "text",
+      "x": -6.5,
+      "y": 80.5
+    },
+    {
+      "align": "right",
+      "angle": 0,
+      "baseline": "middle",
+      "fill": "#000",
+      "font": "sans-serif",
+      "fontSize": 10,
+      "limit": 180,
+      "opacity": 1,
+      "role": "axis-label",
+      "text": "5",
+      "type": "text",
+      "x": -6.5,
+      "y": 55.5
+    },
+    {
+      "align": "right",
+      "angle": 0,
+      "baseline": "middle",
+      "fill": "#000",
+      "font": "sans-serif",
+      "fontSize": 10,
+      "limit": 180,
+      "opacity": 1,
+      "role": "axis-label",
+      "text": "10",
+      "type": "text",
+      "x": -6.5,
+      "y": 30.5
+    },
+    {
+      "align": "right",
+      "angle": 0,
+      "baseline": "middle",
+      "fill": "#000",
+      "font": "sans-serif",
+      "fontSize": 10,
+      "limit": 180,
+      "opacity": 1,
+      "role": "axis-label",
+      "text": "15",
+      "type": "text",
+      "x": -6.5,
+      "y": 5.5
+    },
+    {
+      "opacity": 1,
+      "role": "axis-domain",
+      "stroke": "#888",
+      "strokeWidth": 1,
+      "type": "rule",
+      "x": 0.5,
+      "x2": 0.5,
+      "y": 80.5,
+      "y2": 0.5
+    },
+    {
+      "closed": 0,
+      "points": "0 60 42.325581 35 87.674419 50 145.116279 20 202.55814 40 260 5",
+      "role": "mark",
+      "stroke": "#4c78a8",
+      "strokeWidth": 2,
+      "type": "line"
+    },
+    {
+      "fill": "#e45756",
+      "role": "mark",
+      "shapeHeight": 6.708204,
+      "shapeLeft": -2.283366,
+      "shapeTop": 66.645898,
+      "shapeWidth": 6.708204,
+      "size": 45,
+      "type": "symbol",
+      "x": 1.070736,
+      "y": 70
+    },
+    {
+      "fill": "#e45756",
+      "role": "mark",
+      "shapeHeight": 6.708204,
+      "shapeLeft": 40.577584,
+      "shapeTop": 41.645898,
+      "shapeWidth": 6.708204,
+      "size": 45,
+      "type": "symbol",
+      "x": 43.931686,
+      "y": 45
+    },
+    {
+      "fill": "#e45756",
+      "role": "mark",
+      "shapeHeight": 6.708204,
+      "shapeLeft": 86.724225,
+      "shapeTop": 56.645898,
+      "shapeWidth": 6.708204,
+      "size": 45,
+      "type": "symbol",
+      "x": 90.078327,
+      "y": 60
+    },
+    {
+      "fill": "#e45756",
+      "role": "mark",
+      "shapeHeight": 6.708204,
+      "shapeLeft": 142.559981,
+      "shapeTop": 26.645898,
+      "shapeWidth": 6.708204,
+      "size": 45,
+      "type": "symbol",
+      "x": 145.914083,
+      "y": 30
+    },
+    {
+      "fill": "#e45756",
+      "role": "mark",
+      "shapeHeight": 6.708204,
+      "shapeLeft": 202.216796,
+      "shapeTop": 51.645898,
+      "shapeWidth": 6.708204,
+      "size": 45,
+      "type": "symbol",
+      "x": 205.570898,
+      "y": 55
+    },
+    {
+      "fill": "#e45756",
+      "role": "mark",
+      "shapeHeight": 6.708204,
+      "shapeLeft": 258.556428,
+      "shapeTop": 11.645898,
+      "shapeWidth": 6.708204,
+      "size": 45,
+      "type": "symbol",
+      "x": 261.91053,
+      "y": 15
+    },
+    {
+      "fill": "#666666",
+      "font": "sans-serif",
+      "fontSize": 8,
+      "role": "mark",
+      "text": "Apr 03 08:30",
+      "type": "text",
+      "x": 0,
+      "y": 98
+    },
+    {
+      "fill": "#666666",
+      "font": "sans-serif",
+      "fontSize": 8,
+      "role": "mark",
+      "text": "Apr 17 12:45",
+      "type": "text",
+      "x": 0,
+      "y": 103
+    },
+    {
+      "fill": "#666666",
+      "font": "sans-serif",
+      "fontSize": 8,
+      "role": "mark",
+      "text": "May 02 19:05",
+      "type": "text",
+      "x": 0,
+      "y": 100
+    },
+    {
+      "fill": "#666666",
+      "font": "sans-serif",
+      "fontSize": 8,
+      "role": "mark",
+      "text": "May 21 06:20",
+      "type": "text",
+      "x": 0,
+      "y": 106
+    },
+    {
+      "fill": "#666666",
+      "font": "sans-serif",
+      "fontSize": 8,
+      "role": "mark",
+      "text": "Jun 09 23:55",
+      "type": "text",
+      "x": 0,
+      "y": 101
+    },
+    {
+      "fill": "#666666",
+      "font": "sans-serif",
+      "fontSize": 8,
+      "role": "mark",
+      "text": "Jun 28 15:10",
+      "type": "text",
+      "x": 0,
+      "y": 109
+    }
+  ],
+  "scales": {
+    "x": {
+      "domain": [
+        1775174400000,
+        1782604800000
+      ],
+      "range": [
+        0,
+        260
+      ],
+      "ticks": [
+        {},
+        {},
+        {},
+        {},
+        {},
+        {},
+        {},
+        {},
+        {},
+        {},
+        {},
+        {},
+        {}
+      ]
+    },
+    "y": {
+      "domain": [
+        0,
+        16
+      ],
+      "range": [
+        80,
+        0
+      ],
+      "ticks": [
+        0,
+        2,
+        4,
+        6,
+        8,
+        10,
+        12,
+        14,
+        16
+      ]
+    }
+  },
+  "size": {
+    "height": 175.660254,
+    "width": 298.264632
+  },
+  "spec": "parse-date-patterns.vg.json",
+  "vegaVersion": "6.3.1"
+}
