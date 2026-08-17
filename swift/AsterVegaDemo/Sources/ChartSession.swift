@@ -240,6 +240,15 @@ final class ChartSession {
     }
   }
 
+  /// The marks currently selected, for the accessibility tree to mark as such.
+  ///
+  /// `Set<AnyHashable>` rather than a set of node ids: `SceneNodeId` is a value class, so it has no Obj-C
+  /// representation and crosses as an opaque box. Opaque is enough here — the set is handed straight back
+  /// to the engine, which knows what is in it.
+  var selectedNodeIds: Set<AnyHashable> {
+    controller.snapshot.interactionState.selection.nodeIds
+  }
+
   /// Whether the chart has been panned or zoomed away from where it started.
   ///
   /// Read from the controller's own interaction state rather than tracked here, so the button appears

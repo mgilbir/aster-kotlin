@@ -45,6 +45,46 @@ struct SceneCanvas: View {
           .onChange(of: proxy.size) { _, new in report(new) }
       }
     )
+    // VoiceOver. Each mark the engine marked focusable becomes an element with its own label, its own
+    // frame and its own activation, which is what lets a reader explore a chart by swiping through it
+    // rather than being told "image".
+    //
+    // The elements come from `AccessibilityTree` in the core — the same policy Android's
+    // `ExploreByTouchHelper` uses, including the rule that a chart denser than 120 focusable marks
+    // becomes one summary instead of an unusable list. That policy is a statement about screen readers
+    // rather than about a platform, so it is not written twice.
+    .accessibilityElement(children: .ignore)
+    .accessibilityChildren {
+      ForEach(accessibleElements, id: \.offset) { entry in
+        let placement = placement(in: canvasSize)
+        Rectangle()
+          .fill(Color.clear)
+          .frame(
+            width: max(entry.element.bounds.width, 1) * (placement?.scale ?? 1),
+            height: max(entry.element.bounds.height, 1) * (placement?.scale ?? 1)
+          )
+          .position(
+            x: (entry.element.bounds.left + entry.element.bounds.width / 2)
+              * (placement?.scale ?? 1) + Double(placement?.left ?? 0),
+            y: (entry.element.bounds.top + entry.element.bounds.height / 2)
+              * (placement?.scale ?? 1) + Double(placement?.top ?? 0)
+          )
+          .accessibilityLabel(entry.element.label)
+          .accessibilityAddTraits(entry.element.selected ? [.isButton, .isSelected] : .isButton)
+          .accessibilityAction {
+            // Activating an element selects the mark, so a reader can drive the same handlers a finger
+            // does rather than only hear about them.
+            guard let session, let placement, entry.element.nodeId != nil else { return }
+            session.tap(
+              at: Point(
+                x: entry.element.bounds.left + entry.element.bounds.width / 2,
+                y: entry.element.bounds.top + entry.element.bounds.height / 2
+              )
+            )
+            _ = placement
+          }
+      }
+    }
     .gesture(touch)
     .simultaneousGesture(pinch)
     .simultaneousGesture(
@@ -162,6 +202,21 @@ struct SceneCanvas: View {
         session?.zoom(by: 1, at: Point(x: 0, y: 0), phase: GesturePhase.ended)
       }
   }
+
+  /// The chart's accessible elements, paired with an index so `ForEach` has something stable to key on.
+  ///
+  /// `AccessibleElement` comes from Kotlin and is not `Identifiable`; the offset is enough here because
+  /// the list is rebuilt whenever the scene is.
+  private var accessibleElements: [(offset: Int, element: AccessibleElement)] {
+    guard let scene = session?.scene ?? sceneIfDescribable else { return [] }
+    return Array(
+      AccessibilityTree.shared.elements(scene: scene, selectedNodeIds: session?.selectedNodeIds ?? [])
+        .enumerated()
+    ).map { (offset: $0.offset, element: $0.element) }
+  }
+
+  /// The scene this canvas draws, for the case where there is no session to ask.
+  private var sceneIfDescribable: AsterVega.Scene? { scene }
 
   /// The fit scale, for turning a gesture's screen distance into scene distance.
   private var scale: CGFloat {

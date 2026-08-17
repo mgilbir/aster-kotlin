@@ -483,7 +483,7 @@ ordering), and the pipeline is now verified end to end on one fixture, but the b
 - 1,348 JVM tests pass (`./scripts/test-core.sh`, `./gradlew test`), plus 12 for the Compose
   Multiplatform renderer: 7 in `commonTest`, compiled for Android, both iOS targets and the JVM, and 5
   rasterising through Compose's own Skia backend with `ImageComposeScene` — no window, no display.
-- 44 Swift tests pass (`./scripts/swift-test.sh`), which links the macOS framework with Gradle first
+- 54 Swift tests pass (`./scripts/swift-test.sh`), which links the macOS framework with Gradle first
   because SwiftPM cannot build its own dependency. Four assert the sequence of draw calls a compiled
   specification produces; five sample pixels from a `CGContext`, including one that draws a gradient
   through a clip and one that checks text appears when CoreText is lent to the renderer and is absent
@@ -501,10 +501,20 @@ ordering), and the pipeline is now verified end to end on one fixture, but the b
   name one. Compiling off the calling thread, the whole point of that function, was unreachable from a
   foreign host. It now has a single-argument overload, which is what the iOS app calls.
 
-  What remains unequal, and honestly: images (the Swift renderer has no resolver seam yet, Android does),
-  the accessibility tree (Android has `ExploreByTouchHelper`; iOS has nothing), and export to SVG, PNG or
-  PDF — that last one needs `vega-svg` added to the framework's exports before Swift can reach it. All
-  three are closable and none is a platform limit.
+  **Images** and the **accessibility tree** are now equal, and closing each moved a policy out of a host:
+
+  - Images had two sources and both renderers understood one. A `heatmap` or an `isocontour` builds its
+    image inside the engine and carries the pixels with no address, so a renderer that only resolved URLs
+    dropped every raster — on Android too, reported as an unresolved image, which pointed at the wrong
+    problem. The pixels reach Swift as a PNG data URL from the engine's own encoder: one boundary call
+    rather than 120,000, since a `KotlinIntArray` is read element by element from Swift.
+  - Accessibility was worse than absent on iOS: the *rules* — which marks are announced, in what order,
+    and when a dense chart becomes one summary rather than an unusable list — lived inside Android's
+    `ExploreByTouchHelper` subclass. They are now `AccessibilityTree` in `vega-scene`, tested there, and
+    both hosts read it. A screen reader's experience of a chart is not a platform detail.
+
+  Export to SVG, PNG or PDF is the one left, and it needs `vega-svg` added to the framework's exports
+  before Swift can reach it at all.
 
 - **Touch works on iOS**, through `VegaChartController` rather than a second hit-testing path: a tap is
   dispatched into the compiled dataflow, hit-tested, run through the specification's `on` handlers and

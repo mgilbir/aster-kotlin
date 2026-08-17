@@ -120,6 +120,22 @@ Two details are the host's responsibility, and both have bitten this project onc
 What was touched is read back from the chart's own interaction state and shown under it, so a tap that
 reached the dataflow is visible rather than merely believed.
 
+## Accessibility
+
+Each mark the engine marked focusable becomes a VoiceOver element with its own label, its own frame and its
+own activation — so a chart can be explored by swiping through it rather than announced as "image".
+Activating an element selects the mark, which drives the same handlers a finger does.
+
+The elements come from `AccessibilityTree` in `vega-scene`, not from this app. Which marks are worth
+announcing, in what order, and when a dense chart becomes a single summary instead of an unusable list, are
+statements about screen readers rather than about a platform. Those rules used to live inside Android's
+`ExploreByTouchHelper` subclass, which is precisely why iOS had none: they were in a class no other host
+could reach. Android now reads the same tree, so the two cannot describe the same chart differently.
+
+**Verified to the boundary, not through VoiceOver.** The rules are tested in Kotlin and the elements are
+tested as readable from Swift; the SwiftUI wiring that turns them into accessibility elements is not
+covered by an automated test. Closing that means an XCUITest target, which this project does not have yet.
+
 ## Diagnostics
 
 Listing what the engine could not honour is the point rather than decoration. This engine's discipline is
