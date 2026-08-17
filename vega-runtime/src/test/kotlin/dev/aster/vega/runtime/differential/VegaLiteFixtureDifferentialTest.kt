@@ -204,23 +204,21 @@ class VegaLiteFixtureDifferentialTest {
     val GRID_LAYOUT_PENDING = setOf("facet-footer")
 
     /**
-     * Fixtures pending on one thing the runtime's projections do not yet do.
+     * Fixtures pending on the runtime's projections. **Empty**, and the history is the useful part.
      *
-     * Both halves of what this used to say were wrong, and the record is worth keeping. **Fitting**
-     * to an extent works, including for a composite — `albersUsa` is three projections in a coat,
-     * and `fitExtent` reaching only the concrete projection is what made a fitted composite draw at
-     * its family's unfitted default. And a projection fitted to the table that reads it back is not
-     * a cycle: upstream refuses that construction too, and what Vega-Lite emits instead is a
-     * `geojson` transform publishing a signal, the projection fitting to *that*, and `geopoint`
-     * following — which this engine handles by marking projections stale on `setSignal`.
+     * Three reasons were given for this set over its life and all three were wrong. Fitting to an
+     * extent was said not to work: it did, and the real fault was `fitExtent` reaching only a
+     * concrete projection and never the interface a **composite** implements, so a fitted
+     * `albersUsa` drew at its family's unfitted default. A projection fitted to the table that
+     * reads it back was called a cycle: upstream refuses that construction too, and what Vega-Lite
+     * emits instead is a signal the projection fits to, which this engine handles. A fit published
+     * by *two* datasets was then called an unorderable cycle: it is unorderable, and the answer was
+     * never an order — a shared fit is eventually consistent, refitting as each collection arrives.
      *
-     * What is left is narrower and real: a projection fitted to collections published by **two**
-     * datasets, each of which reads it back. Neither can be resolved before the projection, and the
-     * projection needs both — a cycle to an ordering that resolves each dataset once, where Vega
-     * re-fits and re-pulses until it settles. `geo-rules` is that chart: one layer of airports and
-     * one of routes between them, fitted together so the map frames both.
+     * Kept because the next projection that misbehaves will need somewhere honest to sit, and
+     * because a diagnosis read off a symptom has now been wrong here three times running.
      */
-    val PROJECTION_PENDING = setOf("geo-rules")
+    val PROJECTION_PENDING = emptySet<String>()
 
     val repositoryRoot: File = File(System.getProperty("user.dir")).parentFile
 

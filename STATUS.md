@@ -4520,33 +4520,32 @@ One rule came with them that is not geographic at all: `config.aria: false` take
 out of the accessibility tree, so no mark carries a role description or a spoken summary and every
 guide says `aria: false` on itself.
 
-The compiled specifications match upstream's byte for byte, and the drawings agree too — with one
-exception, arrived at after both of my first guesses turned out to be wrong. The record of that is
-worth more than the conclusion.
+The compiled specifications match upstream's byte for byte, and so do the drawings: every geographic
+fixture is checked end to end and `PROJECTION_PENDING` is empty. Getting there took four wrong
+diagnoses of mine, and those are worth more than the conclusion.
 
-I reported two gaps. Neither was real. **Fitting** to an extent worked all along; two fixtures had
-been doing it. And a projection **fitted to the table that reads it back** is not a cycle — upstream
-refuses that construction too, and what Vega-Lite actually emits is a `geojson` transform publishing
-a signal, the projection fitting to *that*, and `geopoint` following, which this engine already
-handles by marking projections stale when a signal changes. The real blocker under both symptoms was
-that `fitExtent` reached only a concrete projection and not the interface a **composite** implements,
-so a fitted `albersUsa` — the projection Vega-Lite reaches for on any chart of the United States —
-drew silently at its family's unfitted default. Fixed on main, and `geo-points` and `geo-trellis`
-draw correctly now.
+I said a projection could not be **fitted** to an extent. It could, and had been. I said a projection
+fitted to the table that reads it back was a **cycle**. Upstream refuses that construction too, and
+what Vega-Lite emits instead is a `geojson` transform publishing a signal, the projection fitting to
+*that*, and `geopoint` following — which this engine already handled. The fault under both symptoms
+was that `fitExtent` reached only a concrete projection and never the interface a **composite**
+implements, so a fitted `albersUsa` — the projection every chart of the United States asks for by
+name — drew silently at its family's unfitted default. Then I said a fit published by *two* datasets
+was an ordering problem with no solution. It has no ordering solution: a shared fit is **eventually
+consistent**, refitting as each collection arrives, and that is what it now does.
 
-What is left is narrower and does exist: a projection fitted to collections published by **two**
-datasets, each of which reads it back. Neither can be resolved before the projection and the
-projection needs both, which is a cycle to an ordering that resolves each dataset once, where Vega
-re-fits and re-pulses until it settles. `geo-rules` is that chart, and it is the only fixture on the
-shelf.
+The fourth was the same mistake in the loader. A grid of maps drew empty, and I reported that
+delimited cells stay strings, that `format.parse` is never applied, and that upstream infers types by
+default. `format.parse` **is** applied — `DataResolver.parseFields`, which a grep of mine missed and
+which two fixtures already relied on — and upstream does **not** infer for a stated `tsv`, so it had
+no types either. The join matched upstream because its index is object-backed and JavaScript coerces
+every key to text, where this engine tagged `"s:22051"` apart from `"n:22051"`. A number and its own
+text are one key now, in a group as much as in a join. The `geo-trellis` fixture states its figures
+inline all the same, so that it tests the grid of maps it was written for rather than the loading;
+`test-fixtures/specs/format-parse.vg.json` pins the coercion on its own.
 
-One thing found on the way, and it is the loader's rather than the projections': **delimited text is
-never typed**. `DelimitedText.parse` reads every cell as a string and nothing applies `format.parse`
-or infers a type afterwards, where upstream's loader infers by default. It stays invisible while
-every column a chart reads is one the compiler wrote a parse for, and it shows the moment a column is
-used untyped — a `lookup` key joining a numeric id against text, which matches nothing and draws an
-empty chart. The first `geo-trellis` fixture had exactly that shape and was rewritten to state its
-figures inline, so that it tests the grid of maps it was written for rather than the loader.
+The pattern is the point: four diagnoses read off a symptom, four wrong, each one plausible. The
+symptom was real every time and the cause was never where it looked.
 
 ### What a facet inside a facet would take
 
