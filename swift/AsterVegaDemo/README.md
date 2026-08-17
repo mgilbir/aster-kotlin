@@ -17,7 +17,8 @@ xcrun simctl launch AsterVega-iPhone dev.aster.vega.demo -chart bar-line-toggle 
 ```
 
 `-chart` opens straight onto a chart (or `•paste` for the paste screen), `-signal name=value` presets a
-bound signal, and `-spec <path>` renders a specification from a file. Between them a screenshot of a
+bound signal, `-spec <path>` renders a specification from a file, and `-tap x,y` taps the chart at a point
+in **scene** coordinates once it has been placed. Between them a screenshot of a
 chart *under* a control, or of pasted JSON, is scriptable — the simulator cannot tap a button, and
 reading the clipboard raises a system permission alert that cannot be dismissed from the command line
 either.
@@ -81,6 +82,29 @@ Two consequences worth knowing:
   interesting.
 - **The loader caches.** A bound signal recompiles the whole specification on every change, so without a
   cache a slider over a remote dataset would refetch per frame.
+
+## Touch
+
+A tap goes through `VegaChartController` into the compiled dataflow: hit-tested against the scene, run
+through whatever `on` handlers the specification declared, and read back out as a new scene. That is why
+this app uses the controller rather than `SpecCompiler` directly — a specification's handlers only exist in
+a running dataflow, so a host that recompiled from JSON on every tap would discard the state each tap had
+just created. Setting a bound signal takes the same route now, which is both cheaper than a recompile and
+what a specification describes.
+
+Two details are the host's responsibility, and both have bitten this project once:
+
+- **`contentScale`.** The controller divides an incoming point by it, so a chart drawn scaled-to-fit whose
+  host sent raw view coordinates would miss every mark by exactly the fit factor. `SceneCanvas` computes
+  its placement once and uses it for both the drawing and the touch inversion, because two copies of that
+  arithmetic is how a tap lands next to the bar it looked like it hit.
+- **Serialisation.** The controller is not safe for concurrent use, and the compile deliberately runs off
+  the main actor. Dispatching a tap mid-compile left the chart stuck showing "no scene"; touches now queue
+  behind any compile in flight, which is also better behaviour — a tap during a slow remote load lands when
+  the chart appears rather than being dropped.
+
+What was touched is read back from the chart's own interaction state and shown under it, so a tap that
+reached the dataflow is visible rather than merely believed.
 
 ## Diagnostics
 

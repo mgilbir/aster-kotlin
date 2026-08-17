@@ -38,12 +38,12 @@
 		A5000000000000000000000F /* RecordingTarget.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = RecordingTarget.swift; path = ../AsterVegaRender/Sources/AsterVegaRender/RecordingTarget.swift; sourceTree = "<group>"; };
 		A50000000000000000000011 /* CoreTextDrawing.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = CoreTextDrawing.swift; path = ../AsterVegaRender/Sources/AsterVegaRender/CoreTextDrawing.swift; sourceTree = "<group>"; };
 		A50000000000000000000013 /* Specs */ = {isa = PBXFileReference; lastKnownFileType = folder; path = Specs; sourceTree = "<group>"; };
-		A50000000000000000000015 /* AsterVega.xcframework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.xcframework; name = AsterVega.xcframework; path = ../../vega-runtime/build/XCFrameworks/debug/AsterVega.xcframework; sourceTree = "<group>"; };
+		A50000000000000000000015 /* AsterVega.xcframework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.xcframework; name = AsterVega.xcframework; path = "../../vega-runtime/build/XCFrameworks/debug/AsterVega.xcframework"; sourceTree = "<group>"; };
 		A50000000000000000000017 /* AsterVegaDemo.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = AsterVegaDemo.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		A50000000000000000000029 /* ChartControls.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChartControls.swift; sourceTree = "<group>"; };
 		A5000000000000000000002B /* ChartSession.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChartSession.swift; sourceTree = "<group>"; };
 		A5000000000000000000002D /* PasteSpecView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PasteSpecView.swift; sourceTree = "<group>"; };
-		A5000000000000000000002F /* data */ = {isa = PBXFileReference; lastKnownFileType = folder; name = data; path = ../../test-fixtures/data; sourceTree = SOURCE_ROOT; };
+		A5000000000000000000002F /* data */ = {isa = PBXFileReference; lastKnownFileType = folder; name = data; path = "../../test-fixtures/data"; sourceTree = SOURCE_ROOT; };
 		A50000000000000000000031 /* VegaDataLoader.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = VegaDataLoader.swift; path = ../AsterVegaRender/Sources/AsterVegaRender/VegaDataLoader.swift; sourceTree = "<group>"; };
 		A50000000000000000000033 /* CoreTextFonts.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = CoreTextFonts.swift; path = ../AsterVegaRender/Sources/AsterVegaRender/CoreTextFonts.swift; sourceTree = "<group>"; };
 		A50000000000000000000035 /* CoreTextTextEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = CoreTextTextEngine.swift; path = ../AsterVegaRender/Sources/AsterVegaRender/CoreTextTextEngine.swift; sourceTree = "<group>"; };
@@ -64,11 +64,11 @@
 		A50000000000000000000018 = {
 			isa = PBXGroup;
 			children = (
-				A50000000000000000000019,
-				A5000000000000000000001A,
-				A5000000000000000000001B,
-				A5000000000000000000001C,
-				A5000000000000000000001D,
+				A50000000000000000000019 /* Sources */,
+				A5000000000000000000001A /* AsterVegaRender */,
+				A5000000000000000000001B /* Resources */,
+				A5000000000000000000001C /* Frameworks */,
+				A5000000000000000000001D /* Products */,
 			);
 			sourceTree = "<group>";
 		};
