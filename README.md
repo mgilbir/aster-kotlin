@@ -94,8 +94,10 @@ includeBuild("../aster-kotlin")
 ```kotlin
 // build.gradle.kts
 dependencies {
-  implementation("dev.aster.vega:vega-compose")      // Compose API
+  implementation("dev.aster.vega:vega-compose")      // Compose API, Android
   implementation("dev.aster.vega:vega-android-canvas") // View API
+  // Compose Multiplatform: the same renderer on Android, iOS and the desktop.
+  implementation("dev.aster.vega:vega-compose-multiplatform")
 }
 ```
 
@@ -303,11 +305,12 @@ Dataflow graph                vega-dataflow, vega-expression
         ↓
 Immutable scene snapshot      vega-scene
         ↓
-┌─────────────────┬─────────────────┬─────────────────┐
-│ Android Canvas  │ SVG serializer  │ Bitmap/PNG/PDF  │
-│ vega-android-   │ vega-svg        │ vega-android-   │
-│ canvas          │                 │ canvas          │
-└─────────────────┴─────────────────┴─────────────────┘
+┌────────────────┬────────────────┬────────────────┬────────────────┬────────────────┐
+│ Android Canvas │ SVG serializer │ Bitmap/PNG/PDF │ Compose        │ CoreGraphics   │
+│ vega-android-  │ vega-svg       │ vega-android-  │ Multiplatform  │ swift/AsterVe- │
+│ canvas         │                │ canvas         │ vega-compose-  │ gaRender       │
+│                │                │                │ multiplatform  │                │
+└────────────────┴────────────────┴────────────────┴────────────────┴────────────────┘
         ↓
 Interaction and semantic accessibility trees
 ```
@@ -317,5 +320,9 @@ Interaction and semantic accessibility trees
 
 `vega-lite` compiles Vega-Lite to Vega and depends on `vega-model` alone: it emits a specification,
 it does not execute one, so a Vega-Lite chart takes exactly the path a Vega chart does from there.
+
+Two demo apps render specifications on a real device: `demo/` on Android, and
+[`swift/AsterVegaDemo`](swift/AsterVegaDemo) on iOS — SwiftUI over the CoreGraphics renderer, listing
+each chart together with everything the engine could not honour. `scripts/ios-demo.sh` builds it.
 
 Design decisions are recorded in [docs/adr/](docs/adr/).

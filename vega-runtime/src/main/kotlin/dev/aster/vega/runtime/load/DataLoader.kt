@@ -26,6 +26,12 @@ public class LoadDeniedException(message: String) : Exception(message)
  *
  * Splitting them means the decision can be tested, logged and reasoned about without any I/O, and
  * that a caller cannot accidentally fetch something it never checked.
+ *
+ * Both methods are `@Throws(LoadDeniedException::class)` for the sake of hosts that are not Kotlin.
+ * A Kotlin function that throws needs no annotation, but the Obj-C boundary only grows an error
+ * out-parameter when it is told to — without it a loader written in Swift compiled fine and had
+ * **no way to refuse anything**, which is the one thing this interface exists to do. The annotation
+ * costs Kotlin callers nothing and is what makes the contract expressible from outside.
  */
 public interface DataLoader {
 
@@ -38,7 +44,7 @@ public interface DataLoader {
    *
    * @throws LoadDeniedException if the policy refuses it.
    */
-  public fun sanitize(uri: String): String
+  @Throws(LoadDeniedException::class) public fun sanitize(uri: String): String
 
   /**
    * Fetches the contents of a URI already passed through [sanitize].
@@ -49,7 +55,7 @@ public interface DataLoader {
    * @throws LoadDeniedException if the policy refuses it, or any other exception if the fetch
    *   fails.
    */
-  public fun load(uri: String): String
+  @Throws(LoadDeniedException::class) public fun load(uri: String): String
 }
 
 /**
