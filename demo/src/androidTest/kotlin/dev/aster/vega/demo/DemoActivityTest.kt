@@ -186,26 +186,40 @@ class DemoActivityTest {
    */
   @Test
   fun aPastedSpecificationUsingSomethingUnsupportedSaysWhichPart() {
+    // A mark type that cannot exist, rather than a real one this engine has not implemented yet.
+    //
+    // That is the whole point of the change: this test used to use `shape`, and it started failing
+    // the
+    // day `shape` was implemented — asserting on a gap means the test breaks when the gap closes,
+    // which
+    // is the opposite of what a regression test should do. A name that is unknown by construction
+    // keeps
+    // testing the reporting rather than the engine's coverage.
     val withUnsupported =
       goodSpec.replace(
         """"marks": [{"type": "rect",""",
-        """"marks": [{"type": "shape", "aria": false}, {"type": "rect",""",
+        """"marks": [{"type": "nonesuchMark"}, {"type": "rect",""",
       )
     val report = PasteReport.of(compileOnDevice(withUnsupported))
     assertTrue(report.headline, report.headline.contains("not the chart the specification asked"))
     // Errors and warnings are counted separately: one means the picture is missing something, the
     // other that it is very nearly right.
     assertTrue(report.headline, report.headline.contains("1 thing could not be drawn"))
-    assertTrue(report.details.toString(), report.details.any { it.contains("shape") })
+    assertTrue(report.details.toString(), report.details.any { it.contains("nonesuchMark") })
   }
 
-  /** A property that is merely ignored is a softer message than a mark that never drew. */
+  /**
+   * A property that is merely ignored is a softer message than a mark that never drew.
+   *
+   * The channel name is unknown by construction, for the same reason as above: this used to say
+   * `cornerRadiusTopLeft`, and it began failing the day per-corner radii were implemented.
+   */
   @Test
   fun anIgnoredPropertyIsReportedWithoutClaimingTheChartIsWrong() {
     val withIgnored =
       goodSpec.replace(
         """"y2": {"scale": "y", "value": 0}""",
-        """"y2": {"scale": "y", "value": 0}, "cornerRadiusTopLeft": {"value": 4}""",
+        """"y2": {"scale": "y", "value": 0}, "nonesuchProperty": {"value": 4}""",
       )
     val report = PasteReport.of(compileOnDevice(withIgnored))
     assertTrue(report.headline, !report.headline.contains("could not be drawn"))

@@ -1,0 +1,79 @@
+{
+  "marks": [
+    {
+      "align": "left",
+      "baseline": "top",
+      "fill": "black",
+      "font": "sans-serif",
+      "fontSize": 11,
+      "role": "mark",
+      "text": "first line\nsecond line\nthird",
+      "type": "text",
+      "x": 20,
+      "y": 25
+    },
+    {
+      "align": "center",
+      "baseline": "middle",
+      "fill": "black",
+      "font": "sans-serif",
+      "fontSize": 11,
+      "role": "mark",
+      "text": "first line\nsecond line\nthird",
+      "type": "text",
+      "x": 130,
+      "y": 25
+    },
+    {
+      "align": "right",
+      "baseline": "bottom",
+      "fill": "black",
+      "font": "sans-serif",
+      "fontSize": 11,
+      "role": "mark",
+      "text": "first line\nsecond line\nthird",
+      "type": "text",
+      "x": 240,
+      "y": 25
+    },
+    {
+      "fill": "firebrick",
+      "font": "sans-serif",
+      "fontSize": 13,
+      "role": "mark",
+      "text": "only one element",
+      "type": "text",
+      "x": 20,
+      "y": 95
+    },
+    {
+      "fill": "steelblue",
+      "font": "sans-serif",
+      "fontSize": 11,
+      "lineBreak": "/",
+      "role": "mark",
+      "text": "kept\napart",
+      "type": "text",
+      "x": 20,
+      "y": 120
+    },
+    {
+      "fill": "seagreen",
+      "font": "sans-serif",
+      "fontSize": 11,
+      "lineBreak": "/",
+      "role": "mark",
+      "text": "split/on/slashes",
+      "type": "text",
+      "x": 150,
+      "y": 120
+    }
+  ],
+  "scales": {},
+  "size": {
+    "height": 160,
+    "width": 270
+  },
+  "spec": "text-array-lines.vg.json",
+  "vegaVersion": "6.3.1"
+}

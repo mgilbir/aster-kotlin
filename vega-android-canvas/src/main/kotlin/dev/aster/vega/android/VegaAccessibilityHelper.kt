@@ -6,6 +6,7 @@ import android.view.accessibility.AccessibilityNodeInfo
 import androidx.core.view.accessibility.AccessibilityNodeInfoCompat
 import androidx.customview.widget.ExploreByTouchHelper
 import dev.aster.vega.runtime.ChartInputEvent
+import dev.aster.vega.scene.AccessibilityTree
 import dev.aster.vega.scene.PointD
 import dev.aster.vega.scene.RectD
 import dev.aster.vega.scene.Scene
@@ -54,43 +55,24 @@ internal class VegaAccessibilityHelper(private val view: VegaChartView) :
     scene: Scene,
     selectedIds: Set<dev.aster.vega.scene.SceneNodeId>,
   ): List<VirtualNode> {
-    val describable =
-      scene
-        .flatten()
-        .filter { placed ->
-          val descriptor = placed.node.metadata.accessibility
-          placed.node.visible && descriptor != null && descriptor.focusable
-        }
-        .sortedBy { it.node.metadata.accessibility?.traversalIndex ?: 0 }
-
-    // Adaptive strategy (PROJECT_BRIEF.md 12): expose every mark while the chart is small, and fall
-    // back to a summary once it would create an unbounded tree.
-    if (describable.size > MAX_EXPOSED_MARKS) {
-      return summaryNodes(scene, describable.size)
-    }
-
-    return describable.mapIndexed { index, placed ->
-      val descriptor = requireNotNull(placed.node.metadata.accessibility)
+    // The policy — which marks are worth announcing, in what order, and when a dense chart becomes
+    // a
+    // summary instead — is [AccessibilityTree] in `vega-scene`, shared with every other host. It
+    // used to
+    // live here, which is why iOS had no accessibility at all: a screen reader's experience of a
+    // chart
+    // was an Android detail. All that is left here is the translation into Android's own node type.
+    val nodesById = scene.flatten().associateBy { it.node.id }
+    return AccessibilityTree.elements(scene, selectedIds).mapIndexed { index, element ->
       VirtualNode(
         id = index,
-        label = descriptor.value?.let { "${descriptor.label}: $it" } ?: descriptor.label,
-        bounds = placed.worldBounds,
-        node = placed.node,
-        selected = placed.node.id in selectedIds,
+        label = element.label,
+        bounds = element.bounds,
+        node = element.nodeId?.let { nodesById[it]?.node },
+        selected = element.selected,
       )
     }
   }
-
-  private fun summaryNodes(scene: Scene, markCount: Int): List<VirtualNode> =
-    listOf(
-      VirtualNode(
-        id = 0,
-        label = "Chart with $markCount marks. Too dense to explore individually.",
-        bounds = scene.viewport,
-        node = null,
-        selected = false,
-      )
-    )
 
   override fun getVirtualViewAt(x: Float, y: Float): Int {
     val point = toScene(x, y)
@@ -183,9 +165,12 @@ internal class VegaAccessibilityHelper(private val view: VegaChartView) :
 
   companion object {
     /**
-     * Above this many focusable marks the tree collapses to a summary. Chosen so exploration stays
-     * usable with TalkBack; charts denser than this need aggregate descriptions, not more nodes.
+     * Above this many focusable marks the tree collapses to a summary.
+     *
+     * Kept as an alias so existing callers and tests still read it, but the number itself belongs
+     * with the policy in [AccessibilityTree] — two constants meaning the same thing is how the
+     * summary threshold ends up differing between a chart's Android and iOS descriptions.
      */
-    const val MAX_EXPOSED_MARKS: Int = 120
+    const val MAX_EXPOSED_MARKS: Int = AccessibilityTree.MAX_EXPOSED_MARKS
   }
 }

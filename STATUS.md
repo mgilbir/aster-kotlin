@@ -480,10 +480,100 @@ ordering), and the pipeline is now verified end to end on one fixture, but the b
 
 ## Verification
 
-- 1,348 JVM tests pass (`./scripts/test-core.sh`, `./gradlew test`).
+- 1,354 JVM tests pass (`./scripts/test-core.sh`, `./gradlew test`), plus 12 for the Compose
+  Multiplatform renderer: 7 in `commonTest`, compiled for Android, both iOS targets and the JVM, and 5
+  rasterising through Compose's own Skia backend with `ImageComposeScene` — no window, no display.
+- 62 Swift tests pass (`./scripts/swift-test.sh`), which links the macOS framework with Gradle first
+  because SwiftPM cannot build its own dependency. Four assert the sequence of draw calls a compiled
+  specification produces; five sample pixels from a `CGContext`, including one that draws a gradient
+  through a clip and one that checks text appears when CoreText is lent to the renderer and is absent
+  when it is not.
+- **The iOS host dispatches the same gestures the Android one does** — tap, long press, pan, zoom and
+  pointer hover — because a capability present on one host and absent on another is a gap in the host, not
+  a property of the platform. Hover is wired even though a finger has none: iPad has pointers, and where
+  there is genuinely none the gesture simply never fires. Pan deltas and pinch factors go over
+  incrementally, since the controller adds and multiplies them; a host sending cumulative values
+  accelerates the pan and compounds the zoom, which is asserted rather than remembered.
+
+  One gap turned out to be the **engine's** rather than a host's. `setSpecAsync` could not be called from
+  Swift at all: a Kotlin default argument does not cross the Obj-C boundary, so the exported signature
+  demanded a `CoroutineDispatcher`, and `Dispatchers` is not in the exported surface — there was no way to
+  name one. Compiling off the calling thread, the whole point of that function, was unreachable from a
+  foreign host. It now has a single-argument overload, which is what the iOS app calls.
+
+  **Images** and the **accessibility tree** are now equal, and closing each moved a policy out of a host:
+
+  - Images had two sources and both renderers understood one. A `heatmap` or an `isocontour` builds its
+    image inside the engine and carries the pixels with no address, so a renderer that only resolved URLs
+    dropped every raster — on Android too, reported as an unresolved image, which pointed at the wrong
+    problem. The pixels reach Swift as a PNG data URL from the engine's own encoder: one boundary call
+    rather than 120,000, since a `KotlinIntArray` is read element by element from Swift.
+  - Accessibility was worse than absent on iOS: the *rules* — which marks are announced, in what order,
+    and when a dense chart becomes one summary rather than an unusable list — lived inside Android's
+    `ExploreByTouchHelper` subclass. They are now `AccessibilityTree` in `vega-scene`, tested there, and
+    both hosts read it. A screen reader's experience of a chart is not a platform detail.
+
+  **Export** is closed too, and the blocker was one line of build configuration: `vega-svg` was not on the
+  framework's export list, so a serializer that already compiled for `iosArm64` was unreachable from Swift.
+  SVG now comes from the engine — the same markup the differential harness compares against upstream — while
+  PNG and PDF are drawn through the renderer that draws the screen, so an export looks like what the reader
+  saw. The PDF is vector, not a rasterised image.
+
+  The Compose renderer draws images too now, which was the last of these. Decoding genuinely has no common
+  answer in Compose Multiplatform — Android has `BitmapFactory`, the desktop and iOS have
+  `org.jetbrains.skia.Image` — so it is an `expect`/`actual` pair over a `skiaMain` source set shared by the
+  desktop and both iOS targets. A seam where the platforms differ, rather than a renderer that draws nothing.
+
+  What is left unequal is now only what the platforms themselves differ on: hover needs a pointer, and
+  Android's multi-line text goes through `StaticLayout` for line breaking and bidi that the greedy shared
+  wrap does not attempt.
+
+- **Touch works on iOS**, through `VegaChartController` rather than a second hit-testing path: a tap is
+  dispatched into the compiled dataflow, hit-tested, run through the specification's `on` handlers and
+  read back as a new scene. Five Swift tests cover it headlessly — including the two halves of the host
+  contract that have caught this project out before. `contentScale` is one: a chart drawn scaled to fit
+  whose host dispatched raw view coordinates misses every mark by the fit factor, which is asserted in
+  both directions now. The other is serialisation: the controller is not safe for concurrent use, and
+  dispatching a tap while the compile ran off-actor left the chart stuck on "no scene". Touches queue
+  behind a compile instead, so a tap during a slow remote load lands rather than being dropped.
+
+- **Data loading and compilation run off the main thread in both demos**, which is what keeps either of
+  them answering a tap while a chart is being built. On iOS the compile is a detached task and the
+  bundled specifications are listed before any of them is compiled, so the list appears immediately and
+  each row's status fills in behind it. On Android `setSpecAsync` already dispatched to
+  `Dispatchers.Default`, but two things beside it did not: the asset read for a bundled specification, and
+  `chart.build(...)` for a sample scene — which measures text and lays out axes, so it is processing
+  rather than construction. Both now go through `withContext`.
+
+- The **iOS demo app** (`swift/AsterVegaDemo`, built by `scripts/ios-demo.sh`) was **built, installed
+  and driven on an iOS 26.5 simulator**. Every bundled chart draws; the paste screen compiles typed or
+  pasted JSON; and a specification's `bind` controls appear as native ones and move the chart —
+  `bar-line-toggle` at its slider's minimum draws 25 bars and at its maximum draws a line over 200
+  points, which is that specification switching mark type, not the renderer guessing.
+
+  A specification's `url` resolves locally first and then from `https://vega.github.io/vega/`, so the
+  examples' datasets work whether or not they are bundled — verified both ways on the simulator:
+  `parallel-coordinates` drew all 406 cars from the bundled `data/cars.json`, and a pasted specification
+  reading `data/population.json`, which is *not* bundled, fetched it from Vega's site and drew it.
+  `VegaDataLoader` is in the renderer package so the app and its tests share one policy, and that policy
+  is the interesting half: one allowed prefix, `..` refused rather than normalised, absolute paths
+  refused. `DataLoader` denies by default because a `url` in a pasted specification asks this process to
+  fetch an address the specification chose, which left open is a server-side request forgery primitive.
+
+  That interface needed one change to be implementable from Swift at all: its two methods are now
+  `@Throws(LoadDeniedException::class)`. A Kotlin function that throws needs no annotation, but the Obj-C
+  boundary only grows an error out-parameter when told to — so a loader written in Swift compiled fine
+  and had **no way to refuse anything**, which is the one thing the interface exists to do.
+
+  Getting there needed Apple's simulator runtime (8.5 GB, `xcodebuild -downloadPlatform iOS`): Xcode
+  lists the iOS SDK but refuses every destination without the matching platform, so `xcodebuild` cannot
+  even build without it. `scripts/ios-demo.sh --check` remains the path for a machine that has not got
+  it, type-checking the app and the renderer against both slices of the XCFramework at Swift 6. That is
+  not running, and the difference is worth keeping in mind: it proves the app builds, not that a chart
+  appears.
 - Android lint is clean with `warningsAsErrors` on every Android module.
-- 63 instrumented tests pass on an API 37 arm64 emulator (`./scripts/test-android.sh`): 49 in
-  `vega-android-canvas`, 4 in `vega-compose`, 10 in `demo`. Three groups of them cover what no JVM
+- 66 instrumented tests pass on an API 37 arm64 emulator (`./scripts/test-android.sh`): 51 in
+  `vega-android-canvas`, 4 in `vega-compose`, 11 in `demo`. Three groups of them cover what no JVM
   test can: one compiles every bundled specification with the device's own font metrics, which the
   differential tests deliberately cannot because they measure text upstream's way; three tap a real
   view with a synthetic `MotionEvent` and read the pixels back, which is the only way to know the
@@ -522,6 +612,138 @@ with regression tests:
 Two smaller fixes came out of the same pass: `VegaAccessibilityHelper` was adding
 `ACTION_ACCESSIBILITY_FOCUS`, which `ExploreByTouchHelper` rejects; and the sample scenes hard-coded
 dark chrome, so a dark background was unreadable — they now take a `SampleScenes.Palette`.
+
+## Where labels go, and the two bugs that put them in the wrong place
+
+The iOS demo drew its axis numbers on top of the axis line. Two separate causes, and the first fix did not
+move a pixel — worth recording, because the obvious diagnosis was only half of it.
+
+**The metrics.** The app compiled with `MetricTextEngine`, whose advance widths are a fixed fraction of the
+font size — deliberately stable across machines and matching no real font — and then drew the glyphs with
+CoreText. Every box the layout reserved was the wrong width. The engine's own documentation had said what
+to do about it since Milestone 1: *the same implementation must be used for measuring and for drawing.*
+
+The fix is not a second layout. `MeasuredTextEngine` in `vega-scene` now owns the layout — newlines,
+`limit` and its ellipsis, wrapping, baselines, bounds from the alignment — and asks a subclass only how
+wide a string is in a style, plus its ascent and descent. `MetricTextEngine` is that with ratios;
+`CoreTextTextEngine` in `swift/AsterVegaRender` is a **Swift subclass** with CoreText, which is what makes
+a platform engine three measurements instead of a parallel implementation. Extracting it changed nothing:
+190 fixtures and the full JVM suite passed before and after, which is what made it safe to build on.
+
+`AndroidTextEngine` deliberately does not use it and implements `TextEngine` directly — it hands
+multi-line text to `StaticLayout`, so Android's own line breaking, font fallback and bidirectional
+handling apply. That is a better answer where it exists, not a duplicate.
+
+**The alignment, which was the visible bug all along.** With correct metrics the labels still sat on the
+line, because both new renderers ignored the run's `align` and `baseline` entirely: a right-aligned label
+was drawn *rightwards* from its anchor instead of ending at it. Multi-line text was worse — the walk drew
+`layout.run` once and never looked at `layout.lines`, so only the first line ever appeared.
+
+Resolving that is the walk's job, not a target's: it needs the measured width, which the walk has from the
+layout and a target does not. Both walks now emit one call per line, already positioned, with the offsets
+`textBounds` itself uses — so glyphs land inside the space the layout reserved. Rotation turns about the
+anchor rather than the pen, or a rotated label swings away from its tick.
+
+The order of the two fixes is the lesson. Correct metrics with wrong alignment looks exactly like wrong
+metrics, and it would have been easy to declare the first fix a failure and revert it. What separated them
+was a test asserting the *pen position* — three labels at one anchor, one per alignment — which is a
+question about arithmetic rather than about how a chart looks.
+
+## Renderers, and what only pixels can check
+
+There are now four renderers over the same immutable scene: `vega-android-canvas` (an
+`android.graphics.Canvas`), `vega-svg` (markup), `vega-compose-multiplatform` (Compose's `DrawScope`
+on Android, iOS and the desktop) and `swift/AsterVegaRender` (CoreGraphics, from Swift, with no Kotlin
+on the drawing side and no Compose anywhere).
+
+The Swift one reaches the engine through the Obj-C framework Kotlin/Native exports. That boundary is
+narrower than Kotlin, and the narrowing that matters is `ScenePaint.Solid`: a `@JvmInline value class`
+implementing an interface has **no Obj-C representation**, so it is absent from the generated header
+and a fill arrives in Swift as an opaque `ScenePaint`. `ForeignPaint`/`ForeignPath` in `vega-scene`
+answer the questions a renderer asks as plain functions instead, and the Kotlin renderers call the
+same ones.
+
+**The differential fixtures cannot see a renderer bug.** They compare scene trees, and the scene tree
+is identical however a renderer reads it. Three real bugs were found the week the second and third
+renderers were written, all three by sampling pixels, and none of them were catchable any other way:
+
+1. **Group opacity was being inherited.** It is not: `vega-scenegraph`'s canvas group saves the
+   graphics state, translates and clips on the way in and never touches `globalAlpha`, and its SVG
+   renderer emits `opacity` on the group's background `path` while leaving the child element bare. A
+   group's opacity paints its own panel. `AndroidCanvasSceneRenderer` had multiplied it into every
+   descendant since Milestone 1, so a half-opaque group drew its opaque child at half.
+2. **A group at zero opacity dropped its whole subtree**, in both the Android and SVG renderers. A
+   probe of upstream's SVG output shows `opacity="0"` on the group's background with the child element
+   still there: a fully transparent group is a group with no panel, not an invisible one.
+3. **Every colour in the Swift renderer was slightly wrong.** `CGColor(red:green:blue:alpha:)` builds
+   its colour in generic RGB rather than sRGB, and the context converted it on the way in, so
+   `steelblue` landed as rgb(86,149,193) instead of rgb(70,130,180) — too small to notice by eye and a
+   different colour.
+
+A fourth was found the same way and is a lesson about Compose rather than about charts: a `Canvas` with
+no intrinsic size still drew solid fills while resolving every **gradient** to black. `VegaChart` now
+takes the scene's own declared size unless a caller's modifier overrides it, which is what a
+specification with a `width` and a `height` is asking for anyway.
+
+`ForeignSignals` is the second accessor surface the Obj-C boundary forced, after `ForeignPaint`, and for
+the identical reason: every interesting `VegaValue` is a `@JvmInline value class` and so is absent from
+the generated header. That one bites harder than a fill did — a host could *draw* a slider from
+`SignalInput` and had no way to construct the value telling the chart where the reader put it, so
+controls were readable and inert. The lesson generalises: a value class implementing an interface is
+invisible to Obj-C, and every one of them on a host-facing path needs a plain-function accessor.
+
+The Swift renderer started solid-only, which the iOS demo made untenable: `gradient-fills` is in the
+fixture corpus, and a demo that silently omitted those marks while the Compose renderer drew them would
+be a renderer with a hole in it rather than a demo. It now paints gradients by clipping to the mark's
+path — CoreGraphics has no gradient *fill* — and draws text through an injected `CoreTextDrawing.draw`.
+Both are checked in pixels.
+
+None of these renderers compare against golden images. Rasterisation and antialiasing belong to Skia
+and CoreGraphics and change between their versions; a byte-exact golden would fail on an upgrade that
+broke nothing, and the pressure would then be to loosen the comparison until it stopped failing.
+Sampling named pixels — this one is the bar's colour, that one is the background, the corner of the
+circle's bounding box is not filled — says what is actually being claimed, and says why when it breaks.
+
+## A text array is a list of lines
+
+A `text` channel whose value is an array — `{"value": ["first", "second"]}` — is one line per element
+upstream: `textLines` returns the array itself when it holds more than one. This engine ran it through
+`asString()`, which joins with commas, so the label came out as `first,second` on one line. Its bounds were
+wrong in **both** directions — 79.2 wide against upstream's 52, and 11 tall against 24 — so a chart that
+sizes itself around such a label was laid out around the wrong rectangle. Not only a rendering difference.
+
+No fixture used an array there, across all 190, which is why it survived. Found by accident while writing a
+multi-line test for the Swift renderer, filed as issue #18, and fixed with a fixture that compares against
+upstream — which is the only reason the fix is right rather than plausible.
+
+The first attempt was plausible and wrong, and the fixture said so in one line. Upstream's rule is
+`item.lineBreak && !isArray(item.text)`: `lineBreak` is *ignored* for an array but stays on the item. The
+first fix cleared it, which rendered correctly and recorded a scene upstream does not produce —
+`text/mark[4].lineBreak: expected /, got absent`. So `TextRun` now carries an explicit `lines` list that
+`displayLines` prefers, and `lineBreak` survives untouched.
+
+Three rules are worth remembering, all upstream's: an array of more than one element is the line list; an
+array of exactly one element **collapses** to a plain label rather than a one-line multi-line one; and each
+line is trimmed individually, where this engine had trimmed only the joined whole.
+
+## Two tests that asserted on a gap, and failed when it closed
+
+Running `:demo:connectedDebugAndroidTest` for the first time in a while found two failures that had
+nothing to do with the change being made. `aPastedSpecificationUsingSomethingUnsupportedSaysWhichPart`
+pasted a `shape` mark and asserted the demo reported it as undrawable;
+`anIgnoredPropertyIsReportedWithoutClaimingTheChartIsWrong` did the same with `cornerRadiusTopLeft`.
+Both now compile cleanly, because both features were implemented — so both tests failed **because the
+engine got better**.
+
+That is worth naming as a category. A test that asserts a feature is missing breaks the day the feature
+lands, and it breaks in the most misleading way available: a red suite that says nothing is wrong.
+Neither test was really about `shape` or about per-corner radii; they were about the demo *reporting*
+what it could not honour. So they now use `nonesuchMark` and `nonesuchProperty` — names that cannot ever
+be implemented — and they test the reporting, which is what they were for.
+
+The rule the next one of these should be measured against: **assert on the reporting, not on the gap.**
+A test that will pass forever if the engine improves is testing behaviour; one that fails when it
+improves was testing a snapshot of the todo list.
 
 ## The official Vega examples
 

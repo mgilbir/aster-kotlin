@@ -20,6 +20,7 @@ import dev.aster.vega.scene.SceneColor
 import dev.aster.vega.scene.SceneNode
 import dev.aster.vega.scene.SceneNodeIdAllocator
 import dev.aster.vega.scene.ScenePaint
+import dev.aster.vega.scene.SizeD
 import dev.aster.vega.scene.Stroke
 import dev.aster.vega.scene.StrokeCap
 import dev.aster.vega.scene.SymbolNode
@@ -47,6 +48,54 @@ class SvgRendererTest {
       background = background,
       root = GroupNode(id = ids.allocate(), children = children.toList()),
     )
+
+  /**
+   * A group's opacity applies to its **own** panel and is not inherited by its children.
+   *
+   * Verified against upstream, which is the only reason to believe it: `vega-scenegraph`'s canvas
+   * group saves the graphics state, translates and clips on the way in and never touches
+   * `globalAlpha`, and its SVG renderer emits `opacity` on the group's background `path` while
+   * leaving the child element bare. So a half-opaque group containing an opaque mark is a solid
+   * mark on a washed-out panel, and a group at zero opacity still shows everything inside it.
+   *
+   * This is here because the Android renderer got it wrong and nothing noticed. The differential
+   * fixtures compare scene trees, and a scene tree is identical either way — only pixels or markup
+   * can tell the difference.
+   */
+  @Test
+  fun `a group's opacity paints its panel and is not inherited`() {
+    val child =
+      RectNode(
+        id = ids.allocate(),
+        x = 10.0,
+        y = 10.0,
+        width = 30.0,
+        height = 30.0,
+        fill = Fill.of(SceneColor.Black),
+      )
+    val faded =
+      GroupNode(
+        id = ids.allocate(),
+        opacity = 0.5,
+        size = SizeD(100.0, 50.0),
+        fill = Fill.of(SceneColor.Black),
+        children = listOf(child),
+      )
+
+    val svg = sceneOf(faded).toSvg()
+    // The panel carries the opacity.
+    assertTrue(svg.contains("opacity=\"0.5\""), svg)
+    // The child does not: exactly one element in the output mentions an opacity.
+    assertEquals(1, svg.split("opacity=\"").size - 1, "only the group's own panel is faded:\n$svg")
+
+    // At zero the panel disappears and the children stay, which is upstream's behaviour and was not
+    // this renderer's: it used to return early and drop the subtree.
+    val invisible = sceneOf(faded.copy(opacity = 0.0)).toSvg()
+    assertTrue(
+      invisible.contains("M10,10") || invisible.contains("x=\"10\""),
+      "a zero-opacity group still draws its children:\n$invisible",
+    )
+  }
 
   @Test
   fun `output is well-formed xml`() {

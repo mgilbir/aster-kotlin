@@ -130,7 +130,11 @@ public class SvgRenderer(private val options: SvgOptions = SvgOptions()) {
     warnings: MutableList<SvgExportWarning>,
     depth: Int,
   ) {
-    if (!node.visible || node.opacity <= 0.0) return
+    // A fully transparent *group* still emits its children: upstream puts `opacity="0"` on the
+    // group's own background path and leaves the child elements exactly as they were, because a
+    // group's opacity applies to its panel and is not inherited. Anything else paints nothing at
+    // zero opacity, so omitting it says the same thing in less markup.
+    if (!node.visible || (node.opacity <= 0.0 && node !is GroupNode)) return
 
     // An `href` makes the item a link, which in SVG means wrapping whatever it draws in an anchor —
     // upstream emits `<a xlink:href="…">` around the element and nothing else. Done here rather

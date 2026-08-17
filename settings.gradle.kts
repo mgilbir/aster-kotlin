@@ -38,6 +38,9 @@ include(":vega-android-canvas")
 
 include(":vega-compose")
 
+// Compose Multiplatform: the same renderer on Android, iOS and the desktop.
+include(":vega-compose-multiplatform")
+
 include(":demo")
 
 include(":benchmark")

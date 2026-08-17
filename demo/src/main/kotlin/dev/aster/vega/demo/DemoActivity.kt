@@ -48,7 +48,9 @@ import dev.aster.vega.runtime.VegaChartController
 import dev.aster.vega.runtime.interaction.CoroutineScheduler
 import dev.aster.vega.svg.toSvg
 import java.io.File
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.withContext
 
 /**
  * Demonstrates the whole surface: hand-authored scenes and compiled Vega specifications rendered
@@ -135,7 +137,13 @@ private fun DemoScreen() {
         status = report!!.headline
       }
     } else if (asset != null) {
-      val json = context.assets.open(asset).bufferedReader().use { it.readText() }
+      // Read on an I/O thread. `LaunchedEffect` runs its body on the main dispatcher, so this would
+      // otherwise be a file read on the thread that has to stay answering taps — small files today,
+      // and the wrong place for a read whatever its size.
+      val json =
+        withContext(Dispatchers.IO) {
+          context.assets.open(asset).bufferedReader().use { it.readText() }
+        }
       val compiled = controller.setSpecAsync(json)
       val errors = compiled.diagnostics.count { it.severity >= DiagnosticSeverity.ERROR }
       status =
@@ -143,7 +151,11 @@ private fun DemoScreen() {
         else if (errors > 0) "$asset compiled with $errors error(s)"
         else "$asset compiled: ${compiled.diagnostics.size} diagnostic(s)"
     } else {
-      chart.build(textEngine, dark)?.let { controller.setScene(it) }
+      // Built off the main thread as well: a sample scene is *processing* — it measures text and
+      // lays
+      // out axes and legends — and `setSpecAsync` only covers the compiled path.
+      val scene = withContext(Dispatchers.Default) { chart.build(textEngine, dark) }
+      scene?.let { controller.setScene(it) }
       status = "Tap a mark, drag to pan, pinch to zoom."
     }
   }
