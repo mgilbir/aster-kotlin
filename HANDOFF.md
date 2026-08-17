@@ -1438,6 +1438,36 @@ at zero, then scale and translate so the measured box lands in the requested one
 nothing special — its three pieces move together because they are driven from one `k`, `tx` and
 `ty`. `projection-fit-composite.vg.json` pins the whole pattern end to end.
 
+## A join across types, which was not the reported cause either (#9)
+
+Issue #9 read: delimited cells stay strings, `DataResolver` has no `format.parse` handling and no
+inference, and upstream infers by default. Three claims, and the two about this engine are wrong
+while the one about upstream is wrong the other way:
+
+- **`format.parse` is applied**, at `DataResolver:540` — `if (spec.parseAuto) values = inferred(...)`
+  and `if (spec.parse.isNotEmpty()) values = ... parseFields(...)`. `parallel-coordinates` and
+  `parse-date-patterns` have been relying on it. I wrote a second implementation before finding the
+  first, and the two fixtures failed by *double-parsing*, which is what caught it.
+- **Upstream does not infer by default.** `read(tsv, {type: 'tsv'})` keeps every cell a string;
+  inference happens only with `parse: "auto"`. And Vega-Lite emits no parse at all for a `.tsv`, so
+  upstream had no types either.
+
+Which leaves the real question: why did upstream's join match when neither side had parsed anything?
+Because upstream indexes through **`fastmap`**, which is object-backed, so JavaScript coerces every
+key to a string before storing it — the integer `22051` and the string `"22051"` are the same
+property. This engine's `asComparableKey` tagged them apart, `"s:22051"` against `"n:22051"`, so the
+join matched nothing and drew an empty map without a word.
+
+The tag is gone. It was wrong in two places rather than one: upstream merges a number and its own
+text into a single **aggregate group** too, which was checked before changing anything. A date keeps
+a namespace of its own, which is *closer* to upstream than sharing one, since a `Date` used as a key
+stringifies to its written form rather than to its epoch.
+
+`format-parse.vg.json` pins all of it: a stated parse, `"auto"`, an untyped column that stays a
+string, and the join that matches anyway. It also pins something worth knowing — `parse: "date"`
+answers a **number**, because `vega-util`'s `toDate` is `Date.parse`, so `isDate` is false after it;
+only the `date:`/`utc:` pattern forms build a real date.
+
 ## Where the remaining packages stand
 
 **Rewritten from the ledgers, which the previous version of this section had drifted a long way

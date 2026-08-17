@@ -1,0 +1,21 @@
+{
+  "marks": [
+    {
+      "fill": "#000",
+      "font": "sans-serif",
+      "fontSize": 11,
+      "role": "mark",
+      "text": "stated true,false auto true,true untyped true joined Autauga",
+      "type": "text",
+      "x": 0,
+      "y": 20
+    }
+  ],
+  "scales": {},
+  "size": {
+    "height": 130,
+    "width": 538
+  },
+  "spec": "format-parse.vg.json",
+  "vegaVersion": "6.3.1"
+}
