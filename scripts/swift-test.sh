@@ -24,6 +24,12 @@ fi
 # The Swift package's search path names this exact directory.
 ./gradlew :vega-runtime:linkDebugFrameworkMacosArm64
 
+# What the boundary exports, checked before anything is compiled against it.
+#
+# The other half of the same lesson: `swift test` catches a break in the API *this repository* uses, and
+# says nothing about the rest of the surface a host outside it depends on. The snapshot covers all of it.
+./scripts/foreign-api.sh
+
 cd swift/AsterVegaRender
 
 # Discard SwiftPM's build when the framework has changed underneath it.
