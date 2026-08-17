@@ -72,6 +72,18 @@ public data class TextRun(
    * the original string and not the broken one.
    */
   val lineBreak: String? = null,
+  /**
+   * The lines, when the specification gave them as a list rather than as one string.
+   *
+   * A `text` channel whose value is an **array** is a line list — upstream's `textLines` returns
+   * the array itself — and that has to be carried separately from [text] rather than encoded into
+   * it, because `lineBreak` stays on the item and must be *ignored*: upstream's condition is
+   * `item.lineBreak && !isArray(item.text)`. Clearing `lineBreak` instead would render correctly
+   * and record the wrong scene, which is exactly what a differential fixture caught.
+   *
+   * Null for the ordinary case, where [text] is split on [lineBreak] or on newlines.
+   */
+  val lines: List<String>? = null,
 )
 
 /**
@@ -116,7 +128,9 @@ public fun TextRun.displayLine(line: String, measure: (String) -> Double): Strin
  * first line down to nothing.
  */
 public fun TextRun.displayLines(measure: (String) -> Double): List<String> =
-  (if (lineBreak != null) text.split(lineBreak) else text.split('\n')).map {
+  // An explicit line list wins, and `lineBreak` is ignored when there is one — upstream's
+  // `item.lineBreak && !isArray(item.text)`. The two mechanisms never combine.
+  (lines ?: if (lineBreak != null) text.split(lineBreak) else text.split('\n')).map {
     displayLine(it, measure)
   }
 
