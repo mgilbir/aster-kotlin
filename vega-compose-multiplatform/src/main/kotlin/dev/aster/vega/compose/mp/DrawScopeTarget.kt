@@ -7,6 +7,8 @@ import androidx.compose.ui.geometry.RoundRect
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.FilterQuality
+import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.SolidColor
@@ -22,7 +24,13 @@ import androidx.compose.ui.text.drawText
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.sp
+import dev.aster.vega.scene.RasterImage
+import kotlin.io.encoding.Base64
+import kotlin.io.encoding.ExperimentalEncodingApi
+import kotlin.math.roundToInt
 
 /**
  * Draws into Compose's [DrawScope] — the renderer a device actually uses, on every platform.
@@ -44,7 +52,21 @@ import androidx.compose.ui.unit.sp
 public class DrawScopeTarget(
   private val scope: DrawScope,
   private val textMeasurer: TextMeasurer? = null,
+  /**
+   * Resolves an image URL to something drawable. Null draws no URL images, which is the default.
+   *
+   * A URL is not an image and fetching one is not a renderer's job: a chart is often data a reader
+   * pasted, so the address in it is the specification's choice and the policy about following it
+   * belongs to the host — the same argument `DataLoader` makes for data.
+   */
+  private val resolveImage: ((String) -> ImageBitmap?)? = null,
 ) : SceneDrawTarget {
+
+  /** URLs the resolver could not answer, for a caller that wants to say so. */
+  public val unresolvedImages: MutableList<String> = mutableListOf()
+
+  private val cachedRasters = HashMap<Long, ImageBitmap>()
+  private val cachedUrls = HashMap<String, ImageBitmap>()
 
   /**
    * The clips still open, innermost last.
@@ -180,10 +202,84 @@ public class DrawScopeTarget(
     }
   }
 
-  override fun image(url: String, rect: DrawRect, opacity: Double) {
-    // A URL is not an image, and fetching one is not a renderer's job — a caller with the bytes
-    // draws
-    // them, and one without leaves the space empty rather than blocking a frame on the network.
+  override fun image(
+    url: String,
+    raster: RasterImage?,
+    rect: DrawRect,
+    fit: DrawImageFit,
+    smooth: Boolean,
+    opacity: Double,
+  ) {
+    val decoded = resolve(url, raster)
+    if (decoded == null) {
+      // Said rather than swallowed: a hole in a chart that nobody mentions looks like a
+      // specification
+      // that asked for nothing, which is the opposite of this project's discipline about silence.
+      if (url.isNotEmpty()) unresolvedImages += url
+      return
+    }
+
+    val destination = if (fit == DrawImageFit.CONTAIN) contained(decoded, rect) else rect
+    clipped {
+      scope.drawImage(
+        image = decoded,
+        dstOffset = IntOffset(destination.x.roundToInt(), destination.y.roundToInt()),
+        dstSize =
+          IntSize(
+            destination.width.roundToInt().coerceAtLeast(1),
+            destination.height.roundToInt().coerceAtLeast(1),
+          ),
+        alpha = opacity.toFloat().coerceIn(0f, 1f),
+        filterQuality = if (smooth) FilterQuality.Medium else FilterQuality.None,
+      )
+    }
+  }
+
+  /**
+   * The image for a URL or a raster, decoded once and kept.
+   *
+   * Keyed by the raster's digest, which is stable for identical pixels, or by the URL — so a chart
+   * redrawn per frame decodes each image once rather than once per frame.
+   */
+  private fun resolve(url: String, raster: RasterImage?): ImageBitmap? {
+    if (raster != null) {
+      cachedRasters[raster.digest]?.let {
+        return it
+      }
+      return decodeRaster(raster)?.also { cachedRasters[raster.digest] = it }
+    }
+    if (url.isEmpty()) return null
+    cachedUrls[url]?.let {
+      return it
+    }
+    // A `data:` URL needs no host, so it is answered here rather than pushed onto a resolver that
+    // would
+    // have to know how. Anything else is the host's business.
+    val decoded = if (url.startsWith("data:")) decodeDataUrl(url) else resolveImage?.invoke(url)
+    return decoded?.also { cachedUrls[url] = it }
+  }
+
+  @OptIn(ExperimentalEncodingApi::class)
+  private fun decodeDataUrl(url: String): ImageBitmap? {
+    val comma = url.indexOf(',')
+    if (comma < 0) return null
+    return runCatching { decodeImageBytes(Base64.decode(url.substring(comma + 1))) }.getOrNull()
+  }
+
+  /** Fits an image inside [rect], centred, preserving its aspect ratio. */
+  private fun contained(image: ImageBitmap, rect: DrawRect): DrawRect {
+    val width = image.width.toDouble()
+    val height = image.height.toDouble()
+    if (width <= 0.0 || height <= 0.0) return rect
+    val scale = minOf(rect.width / width, rect.height / height)
+    val drawnWidth = width * scale
+    val drawnHeight = height * scale
+    return DrawRect(
+      x = rect.x + (rect.width - drawnWidth) / 2.0,
+      y = rect.y + (rect.height - drawnHeight) / 2.0,
+      width = drawnWidth,
+      height = drawnHeight,
+    )
   }
 
   // MARK: - Compose translation

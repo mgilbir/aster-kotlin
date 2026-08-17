@@ -4,6 +4,7 @@ import dev.aster.vega.scene.Fill
 import dev.aster.vega.scene.FontStyle
 import dev.aster.vega.scene.ForeignPaint
 import dev.aster.vega.scene.GroupNode
+import dev.aster.vega.scene.ImageFit
 import dev.aster.vega.scene.ImageNode
 import dev.aster.vega.scene.PathCommand
 import dev.aster.vega.scene.PathData
@@ -111,10 +112,18 @@ public class SceneWalk {
         )
       is TextNode -> if (!node.absent) walkText(node, local, target)
       is ImageNode ->
+        // `rect` rather than the raw channels: the node has already applied `align` and `baseline`
+        // to
+        // produce it, so using x/y/width/height drew every non-default alignment in the wrong place
+        // — the
+        // same mistake text was making before its own fix.
         target.image(
-          node.url,
-          local.applyTo(RectD(node.x, node.y, node.x + node.width, node.y + node.height)),
-          node.opacity,
+          url = node.url,
+          raster = node.raster,
+          rect = local.applyTo(node.rect),
+          fit = if (node.fit == ImageFit.CONTAIN) DrawImageFit.CONTAIN else DrawImageFit.FILL,
+          smooth = node.smooth,
+          opacity = node.opacity,
         )
     }
   }

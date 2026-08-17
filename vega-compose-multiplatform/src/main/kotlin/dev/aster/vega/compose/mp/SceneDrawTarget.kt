@@ -1,5 +1,6 @@
 package dev.aster.vega.compose.mp
 
+import dev.aster.vega.scene.RasterImage
 import dev.aster.vega.scene.SceneColor
 
 /**
@@ -37,8 +38,25 @@ public interface SceneDrawTarget {
   /** One line of text, positioned at its anchor with alignment already resolved by the engine. */
   public fun text(run: DrawTextRun, fill: DrawBrush?, stroke: DrawStroke?)
 
-  /** A bitmap, by the URL the specification gave; a target resolves it however it can. */
-  public fun image(url: String, rect: DrawRect, opacity: Double)
+  /**
+   * A bitmap.
+   *
+   * Two sources, because a scene has two. Most images are a `url` only a host can resolve, but a
+   * `heatmap` or an `isocontour` produces its image *in the engine* and carries it as [raster] —
+   * pixels, no address, nothing to fetch. A renderer that only understood URLs dropped every one of
+   * them, which looks exactly like a transform that did nothing.
+   *
+   * The rectangle already has `align` and `baseline` applied; [fit] says what to do when the
+   * image's own aspect ratio differs from it.
+   */
+  public fun image(
+    url: String,
+    raster: RasterImage?,
+    rect: DrawRect,
+    fit: DrawImageFit,
+    smooth: Boolean,
+    opacity: Double,
+  )
 }
 
 // The vocabulary a target is spoken to in. Plain data, so `commonTest` can assert on it and so no
@@ -116,6 +134,17 @@ public sealed interface DrawBrush {
 }
 
 public data class DrawStop(val offset: Double, val paint: DrawPaint)
+
+/**
+ * What to do when an image's aspect ratio differs from the rectangle it goes in. The engine's own
+ * two.
+ */
+public enum class DrawImageFit {
+  /** Stretch to the rectangle, ignoring the source's aspect ratio. */
+  FILL,
+  /** Preserve the aspect ratio, fitting inside the rectangle and centring what is left over. */
+  CONTAIN,
+}
 
 public enum class DrawLineCap {
   Butt,

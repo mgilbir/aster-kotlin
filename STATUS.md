@@ -519,10 +519,14 @@ ordering), and the pipeline is now verified end to end on one fixture, but the b
   PNG and PDF are drawn through the renderer that draws the screen, so an export looks like what the reader
   saw. The PDF is vector, not a rasterised image.
 
-  The three hosts are now equal on images, accessibility, export and the whole gesture vocabulary. What is
-  left unequal is only what the platforms themselves differ on: hover needs a pointer, and the Compose
-  renderer decodes no images because Compose Multiplatform has no common image decoder — that one needs an
-  `expect`/`actual` per target rather than a shared answer.
+  The Compose renderer draws images too now, which was the last of these. Decoding genuinely has no common
+  answer in Compose Multiplatform — Android has `BitmapFactory`, the desktop and iOS have
+  `org.jetbrains.skia.Image` — so it is an `expect`/`actual` pair over a `skiaMain` source set shared by the
+  desktop and both iOS targets. A seam where the platforms differ, rather than a renderer that draws nothing.
+
+  What is left unequal is now only what the platforms themselves differ on: hover needs a pointer, and
+  Android's multi-line text goes through `StaticLayout` for line breaking and bidi that the greedy shared
+  wrap does not attempt.
 
 - **Touch works on iOS**, through `VegaChartController` rather than a second hit-testing path: a tap is
   dispatched into the compiled dataflow, hit-tested, run through the specification's `on` handlers and

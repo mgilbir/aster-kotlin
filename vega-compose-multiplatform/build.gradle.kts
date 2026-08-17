@@ -22,7 +22,25 @@ kotlin {
   compilerOptions { allWarningsAsErrors.set(true) }
   explicitApi()
 
+  // Decoding an image is the one thing Compose Multiplatform has no common answer for: Android has
+  // `BitmapFactory` and the Skia-backed targets have `org.jetbrains.skia.Image`. So there is a
+  // `skiaMain`
+  // shared by the desktop and both iOS targets, and an `androidMain` beside it — an
+  // `expect`/`actual` pair
+  // rather than a renderer that draws no images, which is what "limited only by the host" has to
+  // mean when
+  // the hosts genuinely differ.
+  applyDefaultHierarchyTemplate()
+
   sourceSets {
+    val skiaMain by creating {
+      dependsOn(commonMain.get())
+      kotlin.srcDir("src/skiaMain/kotlin")
+    }
+    jvmMain.get().dependsOn(skiaMain)
+    iosMain.get().dependsOn(skiaMain)
+    androidMain.get().kotlin.srcDir("src/androidMain/kotlin")
+
     commonMain {
       kotlin.srcDir("src/main/kotlin")
       dependencies {
@@ -43,6 +61,14 @@ kotlin {
     // what
     // lets `DrawScopeTargetTest` check actual pixels. Only the JVM source set needs it — the walk's
     // own tests draw into a recording and want nothing from Compose at all.
-    jvmTest { dependencies { implementation(compose.desktop.currentOs) } }
+    jvmTest {
+      dependencies {
+        implementation(compose.desktop.currentOs)
+        // A real file loader, so the raster test compiles a specification that actually reads its
+        // data
+        // rather than asserting on the diagnostic a refusal produces.
+        implementation(project(":vega-loader"))
+      }
+    }
   }
 }

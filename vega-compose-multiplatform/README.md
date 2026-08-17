@@ -60,6 +60,25 @@ opacity still draws them — it is a group with no background, not an invisible 
 upstream's behaviour in both of its renderers, it is the opposite of the natural guess, and two of this
 project's renderers guessed wrong before pixels said otherwise. See `SceneWalk`'s own notes.
 
+## Images
+
+Both sources a scene has: a `url` a host resolves, and a **raster the engine produced** — a `heatmap` or an
+`isocontour` builds its image during the compile and carries the pixels with no address at all. A renderer
+that only understood URLs dropped every one of those, which looks exactly like a transform that did nothing.
+
+Decoding is the one thing Compose Multiplatform has no common answer for: Android has `BitmapFactory`, and
+the desktop and iOS have `org.jetbrains.skia.Image`. So `decodeImageBytes` is an `expect`/`actual` pair with
+a `skiaMain` source set shared by the desktop and both iOS targets. That is what "limited only by the host"
+looks like when the hosts genuinely differ — a seam, rather than a renderer that quietly draws nothing.
+
+A raster takes a different route on each side for the same reason: Android builds a `Bitmap` straight from
+the `IntArray`, because `0xAARRGGBB` is already `ARGB_8888` and it is a copy; Skia wants encoded bytes, so
+that side goes through the engine's own `PngEncoder` — the same encoder the SVG renderer uses for data URLs,
+so a raster on screen and one in an exported SVG come from identical bytes.
+
+Decodes are cached by the raster's `digest` or by the URL, so a chart redrawn per frame decodes each image
+once. A URL the resolver cannot answer is collected in `unresolvedImages` rather than silently skipped.
+
 ## Alignment is the walk's job
 
 A scene gives a text node an anchor plus an `align` and a `baseline`; turning those into a pen position
