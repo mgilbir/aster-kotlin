@@ -190,6 +190,58 @@ class DrawScopeTargetTest {
     )
   }
 
+  /**
+   * A right-aligned label ends at its anchor; a left-aligned one starts there.
+   *
+   * In pixels, because that is the only place the bug showed: the recording tests assert the pen
+   * position and would pass whatever the target then did with it. Two labels at the same anchor,
+   * one aligned each way, must put their ink on opposite sides of it.
+   */
+  @Test
+  fun `alignment puts the ink on the right side of the anchor`() {
+    val image =
+      raster(
+        """
+        {"${'$'}schema": "https://vega.github.io/schema/vega/v6.json",
+         "width": 100, "height": 50, "padding": 0,
+         "background": "white",
+         "marks": [
+           {"type": "text", "encode": {"enter": {
+             "x": {"value": 50}, "y": {"value": 15},
+             "text": {"value": "IIII"}, "align": {"value": "right"},
+             "fontSize": {"value": 14}, "fill": {"value": "black"}}}},
+           {"type": "text", "encode": {"enter": {
+             "x": {"value": 50}, "y": {"value": 40},
+             "text": {"value": "IIII"}, "align": {"value": "left"},
+             "fontSize": {"value": 14}, "fill": {"value": "black"}}}}]}
+        """
+      )
+
+    fun inkInColumn(from: Int, until: Int, rows: IntRange): Int {
+      var count = 0
+      for (y in rows) for (x in from until until) if (image.at(x, y).first < 128) count++
+      return count
+    }
+
+    // The right-aligned label is on rows around y=15, and its ink must be left of x=50.
+    val rightAlignedLeftOfAnchor = inkInColumn(0, 50, 2..20)
+    val rightAlignedRightOfAnchor = inkInColumn(51, 100, 2..20)
+    assertTrue(
+      rightAlignedLeftOfAnchor > 0 && rightAlignedRightOfAnchor == 0,
+      "right-aligned ink sits before the anchor: " +
+        "$rightAlignedLeftOfAnchor before, $rightAlignedRightOfAnchor after",
+    )
+
+    // The left-aligned one, around y=40, must be right of it.
+    val leftAlignedLeftOfAnchor = inkInColumn(0, 50, 28..46)
+    val leftAlignedRightOfAnchor = inkInColumn(51, 100, 28..46)
+    assertTrue(
+      leftAlignedRightOfAnchor > 0 && leftAlignedLeftOfAnchor == 0,
+      "left-aligned ink sits after the anchor: " +
+        "$leftAlignedLeftOfAnchor before, $leftAlignedRightOfAnchor after",
+    )
+  }
+
   @Test
   fun `a group's clip keeps its children inside it`() {
     val image =

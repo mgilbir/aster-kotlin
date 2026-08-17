@@ -149,21 +149,57 @@ public struct SceneWalk {
     case "text":
       guard let text = node as? TextNode, !text.absent else { return }
       let local = transform.concatenating(Affine(text.transform))
-      let run = text.layout.run
+      let layout = text.layout
+      let run = layout.run
       let style = run.style
-      target.text(
-        DrawTextRun(
-          text: run.text,
-          origin: local.apply(point: Point(x: text.x, y: text.y)),
-          fontFamily: style.fontFamily,
-          fontSize: style.fontSize,
-          fontWeight: Int(style.fontWeight),
-          italic: style.fontStyle == FontStyle.italic,
-          angleDegrees: text.angleDegrees
-        ),
-        fill: brush(text.fill, opacity: own, bounds: text.bounds, through: local),
-        stroke: stroke(text.stroke, opacity: own, bounds: text.bounds, through: local)
-      )
+      let metrics = layout.metrics
+      let fill = brush(text.fill, opacity: own, bounds: text.bounds, through: local)
+      let stroke = stroke(text.stroke, opacity: own, bounds: text.bounds, through: local)
+
+      // Where the *box* sits relative to the anchor. These are `textBounds` in `vega-scene`, which is
+      // what the engine used to compute this node's own bounds — so the glyphs land inside the space the
+      // layout reserved rather than beside it.
+      let top: Double
+      switch run.baseline {
+      case TextBaseline.top, TextBaseline.lineTop: top = 0
+      case TextBaseline.middle: top = -metrics.height / 2
+      case TextBaseline.bottom, TextBaseline.lineBottom: top = -metrics.height
+      default: top = -metrics.ascent  // alphabetic
+      }
+
+      // One call per line. Every line is anchored at the same point and aligned by *its own* width,
+      // which is what an SVG `tspan` with an absolute `x` does.
+      for line in layout.lines {
+        let leading: Double
+        switch run.align {
+        case TextAlign.center: leading = -line.width / 2
+        case TextAlign.right: leading = -line.width
+        default: leading = 0  // left
+        }
+        let anchor = local.apply(point: Point(x: text.x, y: text.y))
+        let pen = local.apply(
+          point: Point(
+            x: text.x + leading,
+            // The baseline of this line: the box's top, down by the ascent, then by the stack.
+            y: text.y + top + metrics.ascent + line.baselineY
+          )
+        )
+        target.text(
+          DrawTextRun(
+            text: line.text,
+            origin: pen,
+            anchor: anchor,
+            ascent: metrics.ascent,
+            fontFamily: style.fontFamily,
+            fontSize: style.fontSize,
+            fontWeight: Int(style.fontWeight),
+            italic: style.fontStyle == FontStyle.italic,
+            angleDegrees: text.angleDegrees
+          ),
+          fill: fill,
+          stroke: stroke
+        )
+      }
 
     case "image":
       guard let image = node as? ImageNode else { return }

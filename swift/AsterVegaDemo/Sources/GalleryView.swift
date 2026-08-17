@@ -68,13 +68,17 @@ struct GalleryView: View {
       // Listing is file I/O and compiling is the engine — both off the main thread, and the list is
       // shown before any of the compiling starts.
       if charts.isEmpty { charts = await SpecLibrary.list() }
-      for spec in charts where statuses[spec.id] == nil {
-        statuses[spec.id] = await SpecLibrary.status(of: spec, loader: SpecLibrary.loader)
-      }
+
+      // Navigation first. A deep link should open its chart at once rather than queue behind fifteen
+      // compiles — and the statuses below are only a subtitle.
       if let requested = requestedChart,
         requested == Self.pasteDestination || charts.contains(where: { $0.id == requested })
       {
         path = [requested]
+      }
+
+      for spec in charts where statuses[spec.id] == nil {
+        statuses[spec.id] = await SpecLibrary.status(of: spec, loader: SpecLibrary.loader)
       }
     }
   }

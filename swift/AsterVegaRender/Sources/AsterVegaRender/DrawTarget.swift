@@ -175,14 +175,27 @@ public enum PathCommand: Equatable, Sendable {
   case close
 }
 
-/// One line of text to draw.
+/// One line of text to draw, positioned.
 ///
 /// Named `DrawTextRun` rather than `TextRun` because the engine exports a `TextRun` of its own — the
 /// one a scene holds, with a full style attached — and a file importing both modules could not then say
 /// which it meant. The Compose renderer's equivalent has the same name for the same reason.
+///
+/// **One of these per line, already aligned.** A scene gives a run an anchor plus an `align` and a
+/// `baseline`, and turning those into a pen position needs the measured width — which the walk has, from
+/// the layout the engine produced, and a target does not. So the walk does that arithmetic and a target
+/// simply draws: no alignment logic in any renderer, and no chance of two of them disagreeing.
 public struct DrawTextRun: Equatable, Sendable {
   public let text: String
+
+  /// Where the pen starts: the left edge of this line, **on its baseline**.
   public let origin: Point
+
+  /// The run's own anchor, which is what rotation turns about — not the pen position.
+  public let anchor: Point
+
+  /// The font's ascent, for a surface that draws from a box's top corner rather than from a baseline.
+  public let ascent: Double
   public let fontFamily: String
   public let fontSize: Double
   public let fontWeight: Int
@@ -192,6 +205,8 @@ public struct DrawTextRun: Equatable, Sendable {
   public init(
     text: String,
     origin: Point,
+    anchor: Point,
+    ascent: Double,
     fontFamily: String,
     fontSize: Double,
     fontWeight: Int,
@@ -200,6 +215,8 @@ public struct DrawTextRun: Equatable, Sendable {
   ) {
     self.text = text
     self.origin = origin
+    self.anchor = anchor
+    self.ascent = ascent
     self.fontFamily = fontFamily
     self.fontSize = fontSize
     self.fontWeight = fontWeight

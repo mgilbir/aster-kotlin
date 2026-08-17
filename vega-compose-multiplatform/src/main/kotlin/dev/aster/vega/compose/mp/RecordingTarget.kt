@@ -79,7 +79,8 @@ public class RecordingTarget : SceneDrawTarget {
       "text \"${run.text}\" at ${show(run.origin)} ${run.fontFamily} ${show(run.fontSize)}" +
         (if (run.fontWeight != 400) " w${run.fontWeight}" else "") +
         (if (run.italic) " italic" else "") +
-        (if (run.angleDegrees != 0.0) " angle ${show(run.angleDegrees)}" else "") +
+        (if (run.angleDegrees != 0.0) " angle ${show(run.angleDegrees)} about ${show(run.anchor)}"
+        else "") +
         paints(fill, stroke)
     )
   }

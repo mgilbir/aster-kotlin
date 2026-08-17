@@ -483,7 +483,7 @@ ordering), and the pipeline is now verified end to end on one fixture, but the b
 - 1,348 JVM tests pass (`./scripts/test-core.sh`, `./gradlew test`), plus 12 for the Compose
   Multiplatform renderer: 7 in `commonTest`, compiled for Android, both iOS targets and the JVM, and 5
   rasterising through Compose's own Skia backend with `ImageComposeScene` — no window, no display.
-- 26 Swift tests pass (`./scripts/swift-test.sh`), which links the macOS framework with Gradle first
+- 34 Swift tests pass (`./scripts/swift-test.sh`), which links the macOS framework with Gradle first
   because SwiftPM cannot build its own dependency. Four assert the sequence of draw calls a compiled
   specification produces; five sample pixels from a `CGContext`, including one that draws a gradient
   through a clip and one that checks text appears when CoreText is lent to the renderer and is absent
@@ -563,6 +563,42 @@ with regression tests:
 Two smaller fixes came out of the same pass: `VegaAccessibilityHelper` was adding
 `ACTION_ACCESSIBILITY_FOCUS`, which `ExploreByTouchHelper` rejects; and the sample scenes hard-coded
 dark chrome, so a dark background was unreadable — they now take a `SampleScenes.Palette`.
+
+## Where labels go, and the two bugs that put them in the wrong place
+
+The iOS demo drew its axis numbers on top of the axis line. Two separate causes, and the first fix did not
+move a pixel — worth recording, because the obvious diagnosis was only half of it.
+
+**The metrics.** The app compiled with `MetricTextEngine`, whose advance widths are a fixed fraction of the
+font size — deliberately stable across machines and matching no real font — and then drew the glyphs with
+CoreText. Every box the layout reserved was the wrong width. The engine's own documentation had said what
+to do about it since Milestone 1: *the same implementation must be used for measuring and for drawing.*
+
+The fix is not a second layout. `MeasuredTextEngine` in `vega-scene` now owns the layout — newlines,
+`limit` and its ellipsis, wrapping, baselines, bounds from the alignment — and asks a subclass only how
+wide a string is in a style, plus its ascent and descent. `MetricTextEngine` is that with ratios;
+`CoreTextTextEngine` in `swift/AsterVegaRender` is a **Swift subclass** with CoreText, which is what makes
+a platform engine three measurements instead of a parallel implementation. Extracting it changed nothing:
+190 fixtures and the full JVM suite passed before and after, which is what made it safe to build on.
+
+`AndroidTextEngine` deliberately does not use it and implements `TextEngine` directly — it hands
+multi-line text to `StaticLayout`, so Android's own line breaking, font fallback and bidirectional
+handling apply. That is a better answer where it exists, not a duplicate.
+
+**The alignment, which was the visible bug all along.** With correct metrics the labels still sat on the
+line, because both new renderers ignored the run's `align` and `baseline` entirely: a right-aligned label
+was drawn *rightwards* from its anchor instead of ending at it. Multi-line text was worse — the walk drew
+`layout.run` once and never looked at `layout.lines`, so only the first line ever appeared.
+
+Resolving that is the walk's job, not a target's: it needs the measured width, which the walk has from the
+layout and a target does not. Both walks now emit one call per line, already positioned, with the offsets
+`textBounds` itself uses — so glyphs land inside the space the layout reserved. Rotation turns about the
+anchor rather than the pen, or a rotated label swings away from its tick.
+
+The order of the two fixes is the lesson. Correct metrics with wrong alignment looks exactly like wrong
+metrics, and it would have been easy to declare the first fix a failure and revert it. What separated them
+was a test asserting the *pen position* — three labels at one anchor, one per alignment — which is a
+question about arithmetic rather than about how a chart looks.
 
 ## Renderers, and what only pixels can check
 
