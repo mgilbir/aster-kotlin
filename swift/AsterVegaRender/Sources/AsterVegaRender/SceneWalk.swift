@@ -28,9 +28,11 @@ public struct SceneWalk {
       target.rect(
         Rect(x: 0, y: 0, width: scene.width, height: scene.height),
         corners: .square,
-        fill: Paint(
-          red: background.red, green: background.green,
-          blue: background.blue, alpha: background.alpha
+        fill: .solid(
+          Paint(
+            red: background.red, green: background.green,
+            blue: background.blue, alpha: background.alpha
+          )
         ),
         stroke: nil
       )
@@ -57,23 +59,46 @@ public struct SceneWalk {
       // been composed rather than the one it was reached with.
       let clip = group.clip.map { local.apply(rect: $0) }
       target.beginGroup(clip: clip)
-      // Its own paint, if any, sits behind its children — a group is how an axis draws its panel.
-      if let size = group.size {
-        let box = local.apply(rect: RectD(left: 0, top: 0, right: size.width, bottom: size.height))
-        let fill = ForeignPaint.shared.solidFill(fill: group.fill)
-        let stroke = ForeignPaint.shared.solidStroke(stroke: group.stroke)
-        if fill != nil || stroke != nil {
-          target.rect(
-            box,
-            corners: corners(of: group),
-            fill: paint(fill, opacity: own),
-            stroke: strokePaint(group.stroke, colour: stroke, opacity: own)
-          )
-        }
+      // Its own paint, if any — a group is how an axis or a facet cell draws its panel, and this is
+      // the only thing a group's opacity applies to.
+      //
+      // `paintRect` and `effectiveStrokeOffset` are the scene node's own answers rather than
+      // `size`: a group stroked at about one unit is nudged half a unit so its outline lands on a
+      // pixel boundary instead of straddling one, which is upstream's rule and not a renderer's.
+      let panel = own > 0 ? group.paintRect : nil
+      if let panelBox = panel {
+        let nudge = group.effectiveStrokeOffset
+        let nudged = RectD(
+          left: panelBox.left + nudge, top: panelBox.top + nudge,
+          right: panelBox.right + nudge, bottom: panelBox.bottom + nudge
+        )
+        let box = local.apply(rect: nudged)
+        // `strokeForeground` puts the outline over the children rather than under them; the fill
+        // still goes underneath.
+        target.rect(
+          box,
+          corners: corners(of: group),
+          fill: brush(group.fill, opacity: own, bounds: panelBox, through: local),
+          stroke: group.strokeForeground
+            ? nil : stroke(group.stroke, opacity: own, bounds: panelBox, through: local)
+        )
       }
       // Drawn whatever the group's own opacity is — a transparent group is not an invisible one.
       for child in group.children {
         walk(node: child, transform: local, into: &target)
+      }
+      if let panelBox = panel, group.strokeForeground {
+        let nudge = group.effectiveStrokeOffset
+        let nudged = RectD(
+          left: panelBox.left + nudge, top: panelBox.top + nudge,
+          right: panelBox.right + nudge, bottom: panelBox.bottom + nudge
+        )
+        target.rect(
+          local.apply(rect: nudged),
+          corners: corners(of: group),
+          fill: nil,
+          stroke: stroke(group.stroke, opacity: own, bounds: panelBox, through: local)
+        )
       }
       target.endGroup()
 
@@ -88,12 +113,8 @@ public struct SceneWalk {
           )
         ),
         corners: corners(of: rect),
-        fill: paint(ForeignPaint.shared.solidFill(fill: rect.fill), opacity: own),
-        stroke: strokePaint(
-          rect.stroke,
-          colour: ForeignPaint.shared.solidStroke(stroke: rect.stroke),
-          opacity: own
-        )
+        fill: brush(rect.fill, opacity: own, bounds: rect.bounds, through: local),
+        stroke: stroke(rect.stroke, opacity: own, bounds: rect.bounds, through: local)
       )
 
     case "rule":
@@ -102,11 +123,7 @@ public struct SceneWalk {
       target.line(
         from: local.apply(point: Point(x: rule.x1, y: rule.y1)),
         to: local.apply(point: Point(x: rule.x2, y: rule.y2)),
-        stroke: strokePaint(
-          rule.stroke,
-          colour: ForeignPaint.shared.solidStroke(stroke: rule.stroke),
-          opacity: own
-        )
+        stroke: stroke(rule.stroke, opacity: own, bounds: rule.bounds, through: local)
       )
 
     case "path":
@@ -114,12 +131,8 @@ public struct SceneWalk {
       let local = transform.concatenating(Affine(path.transform))
       target.path(
         commands(of: path.path, through: local),
-        fill: paint(ForeignPaint.shared.solidFill(fill: path.fill), opacity: own),
-        stroke: strokePaint(
-          path.stroke,
-          colour: ForeignPaint.shared.solidStroke(stroke: path.stroke),
-          opacity: own
-        )
+        fill: brush(path.fill, opacity: own, bounds: path.bounds, through: local),
+        stroke: stroke(path.stroke, opacity: own, bounds: path.bounds, through: local)
       )
 
     case "symbol":
@@ -129,12 +142,8 @@ public struct SceneWalk {
       let local = transform.concatenating(Affine(symbol.transform))
       target.path(
         commands(of: symbol.outline, through: local),
-        fill: paint(ForeignPaint.shared.solidFill(fill: symbol.fill), opacity: own),
-        stroke: strokePaint(
-          symbol.stroke,
-          colour: ForeignPaint.shared.solidStroke(stroke: symbol.stroke),
-          opacity: own
-        )
+        fill: brush(symbol.fill, opacity: own, bounds: symbol.bounds, through: local),
+        stroke: stroke(symbol.stroke, opacity: own, bounds: symbol.bounds, through: local)
       )
 
     case "text":
@@ -143,7 +152,7 @@ public struct SceneWalk {
       let run = text.layout.run
       let style = run.style
       target.text(
-        TextRun(
+        DrawTextRun(
           text: run.text,
           origin: local.apply(point: Point(x: text.x, y: text.y)),
           fontFamily: style.fontFamily,
@@ -152,12 +161,8 @@ public struct SceneWalk {
           italic: style.fontStyle == FontStyle.italic,
           angleDegrees: text.angleDegrees
         ),
-        fill: paint(ForeignPaint.shared.solidFill(fill: text.fill), opacity: own),
-        stroke: strokePaint(
-          text.stroke,
-          colour: ForeignPaint.shared.solidStroke(stroke: text.stroke),
-          opacity: own
-        )
+        fill: brush(text.fill, opacity: own, bounds: text.bounds, through: local),
+        stroke: stroke(text.stroke, opacity: own, bounds: text.bounds, through: local)
       )
 
     case "image":
@@ -225,31 +230,123 @@ public struct SceneWalk {
     )
   }
 
-  private func paint(_ colour: SceneColor?, opacity: Double) -> Paint? {
-    guard let colour, colour.alpha * opacity > 0 else { return nil }
-    return Paint(
-      red: colour.red, green: colour.green, blue: colour.blue,
-      alpha: colour.alpha * opacity
-    )
+  /// A fill as a brush, with the item's own opacity multiplied in, or nil when it paints nothing.
+  ///
+  /// `ForeignPaint` answers the solid case — the same function the Compose renderer calls, so there is
+  /// one description of "what colour is this" rather than two that could drift.
+  private func brush(
+    _ fill: Fill?,
+    opacity: Double,
+    bounds: RectD,
+    through transform: Affine
+  ) -> Brush? {
+    guard let fill else { return nil }
+    let overall = opacity * fill.opacity
+    if overall <= 0 { return nil }
+    if let colour = ForeignPaint.shared.solidFill(fill: fill) {
+      let solid = Paint(
+        red: colour.red, green: colour.green, blue: colour.blue,
+        alpha: colour.alpha * opacity
+      )
+      return solid.alpha > 0 ? .solid(solid) : nil
+    }
+    return gradient(fill.paint, alpha: overall, bounds: bounds, through: transform)
   }
 
-  private func strokePaint(
+  private func stroke(
     _ stroke: Stroke?,
-    colour: SceneColor?,
-    opacity: Double
+    opacity: Double,
+    bounds: RectD,
+    through transform: Affine
   ) -> StrokePaint? {
-    guard let stroke, stroke.width > 0, let paint = paint(colour, opacity: opacity) else {
+    guard let stroke, stroke.width > 0 else { return nil }
+    let overall = opacity * stroke.opacity
+    if overall <= 0 { return nil }
+
+    let brush: Brush
+    if let colour = ForeignPaint.shared.solidStroke(stroke: stroke) {
+      let solid = Paint(
+        red: colour.red, green: colour.green, blue: colour.blue,
+        alpha: colour.alpha * opacity
+      )
+      guard solid.alpha > 0 else { return nil }
+      brush = .solid(solid)
+    } else if let gradient = gradient(
+      stroke.paint, alpha: overall, bounds: bounds, through: transform
+    ) {
+      brush = gradient
+    } else {
       return nil
     }
+
+    // A transform scales a stroke's width as well as its geometry, and the walk has already applied
+    // the transform to the geometry — so the width has to follow it here or a scaled chart draws its
+    // hairlines at their unscaled thickness.
+    let scale = transform.averageScale
     return StrokePaint(
-      paint: paint,
-      width: stroke.width,
+      brush: brush,
+      width: stroke.width * scale,
       cap: cap(stroke.cap),
       join: join(stroke.join),
       miterLimit: stroke.miterLimit,
-      dash: stroke.dashArray.map { $0.doubleValue },
-      dashOffset: stroke.dashOffset
+      dash: stroke.dashArray.map { $0.doubleValue * scale },
+      dashOffset: stroke.dashOffset * scale
     )
+  }
+
+  /// A gradient resolved against the item it paints.
+  ///
+  /// Vega writes a gradient's coordinates as fractions of the item's own bounds — `x1: 0, x2: 1` is
+  /// left edge to right edge whatever the mark's size — so they are multiplied through those bounds
+  /// here and the target receives absolute surface points.
+  private func gradient(
+    _ paint: ScenePaint?,
+    alpha: Double,
+    bounds: RectD,
+    through transform: Affine
+  ) -> Brush? {
+    let reader = ForeignPaint.shared
+    if let linear = reader.linearGradient(paint: paint) {
+      let stops = linear.stops.map {
+        GradientStop(offset: $0.offset, paint: Paint.of($0.color))
+      }
+      guard !stops.isEmpty else { return nil }
+      return .linear(
+        from: transform.apply(
+          point: Point(
+            x: bounds.left + linear.x1 * bounds.width,
+            y: bounds.top + linear.y1 * bounds.height
+          )
+        ),
+        to: transform.apply(
+          point: Point(
+            x: bounds.left + linear.x2 * bounds.width,
+            y: bounds.top + linear.y2 * bounds.height
+          )
+        ),
+        stops: stops,
+        alpha: alpha
+      )
+    }
+    if let radial = reader.radialGradient(paint: paint) {
+      let stops = radial.stops.map {
+        GradientStop(offset: $0.offset, paint: Paint.of($0.color))
+      }
+      let radius = radial.radius * max(bounds.width, bounds.height) * transform.averageScale
+      guard !stops.isEmpty, radius > 0 else { return nil }
+      return .radial(
+        centre: transform.apply(
+          point: Point(
+            x: bounds.left + radial.cx * bounds.width,
+            y: bounds.top + radial.cy * bounds.height
+          )
+        ),
+        radius: radius,
+        stops: stops,
+        alpha: alpha
+      )
+    }
+    return nil
   }
 
   private func cap(_ value: StrokeCap) -> LineCap {
@@ -306,6 +403,16 @@ struct Affine {
       e: a * other.e + c * other.f + e,
       f: b * other.e + d * other.f + f
     )
+  }
+
+  /// How much this transform scales a length, averaged over the two axes.
+  ///
+  /// A stroke width is a length, not a coordinate, so it does not go through the matrix — but it has
+  /// to follow it. Averaging is what a single width can say about a transform that scales the axes
+  /// differently; the scenes this engine publishes scale them together.
+  var averageScale: Double {
+    let identity = a == 1 && b == 0 && c == 0 && d == 1
+    return identity ? 1 : ((a * a + b * b).squareRoot() + (c * c + d * d).squareRoot()) / 2
   }
 
   func apply(point: Point) -> Point {

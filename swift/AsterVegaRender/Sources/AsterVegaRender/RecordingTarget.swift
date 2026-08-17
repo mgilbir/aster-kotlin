@@ -28,7 +28,7 @@ public struct RecordingTarget: DrawTarget {
     depth = max(0, depth - 1)
   }
 
-  public mutating func rect(_ rect: Rect, corners: Corners, fill: Paint?, stroke: StrokePaint?) {
+  public mutating func rect(_ rect: Rect, corners: Corners, fill: Brush?, stroke: StrokePaint?) {
     var text = "rect \(show(rect))"
     if !corners.isSquare { text += " corners \(show(corners))" }
     note(text + paints(fill, stroke))
@@ -38,11 +38,11 @@ public struct RecordingTarget: DrawTarget {
     note("line \(show(from)) -> \(show(to))" + paints(nil, stroke))
   }
 
-  public mutating func path(_ commands: [PathCommand], fill: Paint?, stroke: StrokePaint?) {
+  public mutating func path(_ commands: [PathCommand], fill: Brush?, stroke: StrokePaint?) {
     note("path \(commands.count) commands \(summary(commands))" + paints(fill, stroke))
   }
 
-  public mutating func text(_ run: TextRun, fill: Paint?, stroke: StrokePaint?) {
+  public mutating func text(_ run: DrawTextRun, fill: Brush?, stroke: StrokePaint?) {
     var text = "text \(quoted(run.text)) at \(show(run.origin))"
     text += " \(run.fontFamily) \(show(run.fontSize)) w\(run.fontWeight)"
     if run.italic { text += " italic" }
@@ -56,11 +56,11 @@ public struct RecordingTarget: DrawTarget {
 
   // MARK: - Description
 
-  private func paints(_ fill: Paint?, _ stroke: StrokePaint?) -> String {
+  private func paints(_ fill: Brush?, _ stroke: StrokePaint?) -> String {
     var text = ""
     if let fill { text += " fill \(show(fill))" }
     if let stroke {
-      text += " stroke \(show(stroke.paint)) w\(show(stroke.width))"
+      text += " stroke \(show(stroke.brush)) w\(show(stroke.width))"
       if stroke.cap != .butt { text += " \(stroke.cap.rawValue)" }
       if stroke.join != .miter { text += " \(stroke.join.rawValue)" }
       if !stroke.dash.isEmpty { text += " dash[\(stroke.dash.map(show).joined(separator: ","))]" }
@@ -97,6 +97,21 @@ public struct RecordingTarget: DrawTarget {
 
   private func show(_ corners: Corners) -> String {
     "\(show(corners.topLeft))/\(show(corners.topRight))/\(show(corners.bottomRight))/\(show(corners.bottomLeft))"
+  }
+
+  /// A brush, described the way the Compose renderer's recorder describes one, so the two
+  /// renderers' recordings can be read side by side.
+  private func show(_ brush: Brush) -> String {
+    switch brush {
+    case .solid(let paint):
+      return show(paint)
+    case .linear(let from, let to, let stops, let alpha):
+      return "linear \(show(from))->\(show(to)) \(stops.count) stops"
+        + (alpha < 1 ? "@\(show(alpha))" : "")
+    case .radial(let centre, let radius, let stops, let alpha):
+      return "radial \(show(centre)) r\(show(radius)) \(stops.count) stops"
+        + (alpha < 1 ? "@\(show(alpha))" : "")
+    }
   }
 
   private func show(_ paint: Paint) -> String {

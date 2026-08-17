@@ -14,9 +14,9 @@ public struct CoreGraphicsTarget: DrawTarget {
   /// cannot fully precompute for a foreign surface: the engine positions a run, and the platform
   /// draws the glyphs. A caller that has CoreText wires it in; one that does not gets no text rather
   /// than wrong text.
-  private let drawText: ((TextRun, Paint?, CGContext) -> Void)?
+  private let drawText: ((DrawTextRun, Brush?, CGContext) -> Void)?
 
-  public init(context: CGContext, drawText: ((TextRun, Paint?, CGContext) -> Void)? = nil) {
+  public init(context: CGContext, drawText: ((DrawTextRun, Brush?, CGContext) -> Void)? = nil) {
     self.context = context
     self.drawText = drawText
   }
@@ -32,7 +32,7 @@ public struct CoreGraphicsTarget: DrawTarget {
     context.restoreGState()
   }
 
-  public mutating func rect(_ rect: Rect, corners: Corners, fill: Paint?, stroke: StrokePaint?) {
+  public mutating func rect(_ rect: Rect, corners: Corners, fill: Brush?, stroke: StrokePaint?) {
     let path = corners.isSquare ? CGPath(rect: cg(rect), transform: nil) : rounded(rect, corners)
     paint(path: path, fill: fill, stroke: stroke)
   }
@@ -45,7 +45,7 @@ public struct CoreGraphicsTarget: DrawTarget {
     paint(path: path, fill: nil, stroke: stroke)
   }
 
-  public mutating func path(_ commands: [PathCommand], fill: Paint?, stroke: StrokePaint?) {
+  public mutating func path(_ commands: [PathCommand], fill: Brush?, stroke: StrokePaint?) {
     let path = CGMutablePath()
     for command in commands {
       switch command {
@@ -59,7 +59,7 @@ public struct CoreGraphicsTarget: DrawTarget {
     paint(path: path, fill: fill, stroke: stroke)
   }
 
-  public mutating func text(_ run: TextRun, fill: Paint?, stroke: StrokePaint?) {
+  public mutating func text(_ run: DrawTextRun, fill: Brush?, stroke: StrokePaint?) {
     drawText?(run, fill, context)
   }
 
@@ -71,14 +71,39 @@ public struct CoreGraphicsTarget: DrawTarget {
 
   // MARK: - Painting
 
-  private func paint(path: CGPath, fill: Paint?, stroke: StrokePaint?) {
+  private func paint(path: CGPath, fill: Brush?, stroke: StrokePaint?) {
     if let fill {
-      context.setFillColor(cg(fill))
-      context.addPath(path)
-      context.fillPath()
+      switch fill {
+      case .solid(let colour):
+        context.setFillColor(cg(colour))
+        context.addPath(path)
+        context.fillPath()
+      case .linear, .radial:
+        // CoreGraphics has no gradient *fill*: a gradient is drawn over a region, so the region is
+        // the clip. Saved and restored around it, because a clip is the one piece of state here that
+        // would otherwise leak into the next mark.
+        context.saveGState()
+        context.addPath(path)
+        context.clip()
+        draw(gradient: fill)
+        context.restoreGState()
+      }
     }
     guard let stroke else { return }
-    context.setStrokeColor(cg(stroke.paint))
+    // A gradient-stroked mark is drawn by clipping to the *stroked* outline and filling that, which
+    // is the same trick: `replacePathWithStrokedPath` turns the pen into a region.
+    if case .solid(let colour) = stroke.brush {
+      context.setStrokeColor(cg(colour))
+    } else {
+      context.saveGState()
+      context.addPath(path)
+      applyStrokeStyle(stroke)
+      context.replacePathWithStrokedPath()
+      context.clip()
+      draw(gradient: stroke.brush)
+      context.restoreGState()
+      return
+    }
     context.setLineWidth(CGFloat(stroke.width))
     context.setLineCap(
       stroke.cap == .round ? .round : stroke.cap == .square ? .square : .butt
@@ -96,6 +121,71 @@ public struct CoreGraphicsTarget: DrawTarget {
     }
     context.addPath(path)
     context.strokePath()
+  }
+
+  /// Sets the pen up: width, caps, joins and dashes, without touching colour.
+  private func applyStrokeStyle(_ stroke: StrokePaint) {
+    context.setLineWidth(CGFloat(stroke.width))
+    context.setLineCap(stroke.cap == .round ? .round : stroke.cap == .square ? .square : .butt)
+    context.setLineJoin(stroke.join == .round ? .round : stroke.join == .bevel ? .bevel : .miter)
+    context.setMiterLimit(CGFloat(stroke.miterLimit))
+    if stroke.dash.isEmpty {
+      context.setLineDash(phase: 0, lengths: [])
+    } else {
+      context.setLineDash(
+        phase: CGFloat(stroke.dashOffset), lengths: stroke.dash.map { CGFloat($0) }
+      )
+    }
+  }
+
+  /// Draws a gradient across the current clip.
+  ///
+  /// `drawsBeforeStartLocation`/`drawsAfterEndLocation` are what make this match every other
+  /// renderer: a gradient's stops describe the span between its two points, and the area outside that
+  /// span takes the nearest stop's colour rather than nothing. Without them a bar whose gradient runs
+  /// between two interior points would have transparent ends.
+  private func draw(gradient brush: Brush) {
+    let alpha = brush.alpha
+    switch brush {
+    case .solid:
+      return
+    case .linear(let from, let to, let stops, _):
+      guard let gradient = cg(stops: stops, alpha: alpha) else { return }
+      context.drawLinearGradient(
+        gradient,
+        start: cg(from),
+        end: cg(to),
+        options: [.drawsBeforeStartLocation, .drawsAfterEndLocation]
+      )
+    case .radial(let centre, let radius, let stops, _):
+      guard let gradient = cg(stops: stops, alpha: alpha) else { return }
+      context.drawRadialGradient(
+        gradient,
+        startCenter: cg(centre),
+        startRadius: 0,
+        endCenter: cg(centre),
+        endRadius: CGFloat(radius),
+        options: [.drawsBeforeStartLocation, .drawsAfterEndLocation]
+      )
+    }
+  }
+
+  private func cg(stops: [GradientStop], alpha: Double) -> CGGradient? {
+    let colours = stops.map { stop -> CGColor in
+      // The item's opacity is multiplied into each stop rather than set as a context alpha, because a
+      // gradient is drawn inside a saved state whose alpha would also apply to the clip's edges.
+      cg(
+        Paint(
+          red: stop.paint.red, green: stop.paint.green, blue: stop.paint.blue,
+          alpha: stop.paint.alpha * alpha
+        )
+      )
+    }
+    return CGGradient(
+      colorsSpace: Self.sRGB,
+      colors: colours as CFArray,
+      locations: stops.map { CGFloat($0.offset) }
+    )
   }
 
   /// A rectangle with four independent radii, each clamped so opposite corners cannot overlap.
