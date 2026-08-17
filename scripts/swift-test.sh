@@ -25,4 +25,27 @@ fi
 ./gradlew :vega-runtime:linkDebugFrameworkMacosArm64
 
 cd swift/AsterVegaRender
+
+# Discard SwiftPM's build when the framework has changed underneath it.
+#
+# This is not housekeeping. SwiftPM tracks its own sources but not a framework handed to it through
+# `-F`, so a rebuilt `AsterVega.framework` leaves the previously compiled test module in place and
+# `swift test` reports success against the *old* headers. That is not hypothetical: adding a parameter
+# to `TextRun` broke every Swift caller of it, this gate reported 62 passing, and the break was found
+# only after the change had been merged.
+#
+# The stamp is the framework header's fingerprint. Same header, incremental build; changed header, a
+# clean one — which costs a few seconds and is the difference between a gate and a formality.
+HEADER="../../vega-runtime/build/bin/macosArm64/debugFramework/AsterVega.framework/Headers/AsterVega.h"
+STAMP=".build/aster-framework.stamp"
+if [ -f "$HEADER" ]; then
+  FINGERPRINT="$(shasum -a 256 "$HEADER" | cut -d' ' -f1)"
+  if [ ! -f "$STAMP" ] || [ "$(cat "$STAMP")" != "$FINGERPRINT" ]; then
+    echo "==> The exported framework changed; rebuilding the Swift package from scratch"
+    rm -rf .build
+    mkdir -p .build
+    printf '%s' "$FINGERPRINT" > "$STAMP"
+  fi
+fi
+
 swift test "$@"
