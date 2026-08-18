@@ -130,9 +130,16 @@ public class VegaChartController(
    * own dates are parsed, which is part of the wire format rather than of the language.
    */
   private val locale: VegaLocale = VegaLocale.EnglishUS,
+  /**
+   * A `config` block this host supplies, which a specification's own beats key by key.
+   *
+   * A chart arriving from a server carries the colours that server chose; an app drawing it on a
+   * dark surface says otherwise here rather than by rewriting the payload. See `SpecCompiler`.
+   */
+  private val hostConfig: VegaValue? = null,
 ) {
 
-  private val compiler = SpecCompiler(textEngine, loader, locale = locale)
+  private val compiler = SpecCompiler(textEngine, loader, locale = locale, hostConfig = hostConfig)
 
   /** The debounced handlers waiting, by the signal and delay that identify them. */
   private val pendingDebounces = mutableMapOf<Pair<String, Double>, ScheduledTask>()

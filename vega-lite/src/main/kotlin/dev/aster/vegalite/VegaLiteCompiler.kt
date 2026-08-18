@@ -4,6 +4,7 @@ import dev.aster.vega.model.DiagnosticCollector
 import dev.aster.vega.model.VegaDiagnostic
 import dev.aster.vega.model.VegaJson
 import dev.aster.vega.model.VegaValue
+import dev.aster.vega.model.spec.mergeConfig
 
 /** A compiled Vega-Lite specification: the Vega it became, and everything it could not honour. */
 public data class VegaLiteCompilation(
@@ -36,7 +37,29 @@ public data class VegaLiteCompilation(
  * selection parameters and the composite marks (`boxplot`, `errorbar`, `errorband`) are reported by
  * name and not approximated.
  */
-public class VegaLiteCompiler {
+public class VegaLiteCompiler(
+  /**
+   * A `config` block the **host** supplies, which the specification's own beats key by key.
+   *
+   * This is how an app themes a chart it did not write. A specification arriving from a server
+   * carries the colours that server chose — a `tableau10` scheme picked for a white page, a white
+   * point overlay — and an app drawing it on a dark surface has to be able to say otherwise without
+   * rewriting the payload. `Config` is internal and built from the specification alone, so before
+   * this there was no way in at all.
+   *
+   * Merged by [mergeConfig], which is `vega-util`'s own `mergeConfig`: a block is merged property
+   * by property, an object inside a block overwrites, and `legend.layout` and each `style` entry
+   * recurse one level further. The specification is the **later** source, so it wins wherever both
+   * name the same property — a theme is a default and a stated value is an override of it.
+   *
+   * Two things it cannot do, and both are properties of Vega-Lite rather than of this seam. A
+   * mark's own encoded property beats every configuration block, so a specification writing
+   * `mark.point.fill` keeps its white point whatever a host says; and `Normalize.pointOverlay` uses
+   * that `point` object verbatim as the overlay mark's definition. A host that has to change one of
+   * those is rewriting the specification, and can inject its `config` in the same pass.
+   */
+  private val hostConfig: VegaValue? = null
+) {
 
   public fun compileJson(json: String): VegaLiteCompilation {
     val diagnostics = DiagnosticCollector()
@@ -55,7 +78,14 @@ public class VegaLiteCompiler {
       )
       return VegaLiteCompilation(null, diagnostics.diagnostics)
     }
-    return Compilation(spec, diagnostics).run()
+    return Compilation(withHostConfig(spec), diagnostics).run()
+  }
+
+  /** The specification with the host's configuration merged **under** its own. */
+  private fun withHostConfig(spec: VegaValue.Obj): VegaValue.Obj {
+    val host = hostConfig ?: return spec
+    val merged = mergeConfig(host, spec.fields["config"]) ?: return spec
+    return VegaValue.Obj(LinkedHashMap(spec.fields).apply { put("config", merged) })
   }
 }
 

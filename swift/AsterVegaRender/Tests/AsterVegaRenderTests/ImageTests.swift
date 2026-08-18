@@ -30,7 +30,8 @@ final class ImageTests: XCTestCase {
       clock: ClockCompanion.shared.Fixed,
       // Spelled out because a Kotlin default argument has no Obj-C representation: Swift names every
       // parameter or does not compile. `EnglishUS` is what upstream produces.
-      locale: VegaLocale.Companion.shared.EnglishUS
+      locale: VegaLocale.Companion.shared.EnglishUS,
+      hostConfig: nil
     )
     .compileJson(json: json, signalOverrides: [:], itemEncodes: [:])
     return try XCTUnwrap(compiled.scene)

@@ -11,6 +11,7 @@ import dev.aster.vega.expression.VegaExpressionCompiler
 import dev.aster.vega.model.DiagnosticCodes
 import dev.aster.vega.model.DiagnosticCollector
 import dev.aster.vega.model.VegaDiagnostic
+import dev.aster.vega.model.VegaJson
 import dev.aster.vega.model.VegaValue
 import dev.aster.vega.model.asNumberOrNull
 import dev.aster.vega.model.asString
@@ -22,6 +23,7 @@ import dev.aster.vega.model.spec.MarkSpec
 import dev.aster.vega.model.spec.MarkType
 import dev.aster.vega.model.spec.SpecParser
 import dev.aster.vega.model.spec.VegaSpec
+import dev.aster.vega.model.spec.mergeConfig
 import dev.aster.vega.runtime.load.DataLoader
 import dev.aster.vega.runtime.load.DenyLoader
 import dev.aster.vega.runtime.scale.VegaScale
@@ -130,6 +132,20 @@ public class SpecCompiler(
    * in every language, because d3's parsing is part of the wire format.
    */
   private val locale: VegaLocale = VegaLocale.EnglishUS,
+  /**
+   * A `config` block the **host** supplies, which the specification's own beats key by key.
+   *
+   * How an app themes a chart it did not write: a specification carries the colours whoever
+   * produced it chose, and an app drawing it on a dark surface has to be able to say otherwise.
+   * Merged by [mergeConfig] — `vega-util`'s own rules — with the specification as the later and
+   * therefore winning source, because a theme is a default and a stated value overrides it.
+   *
+   * Applied where a **specification enters** the engine, which is [compileJson] and
+   * [VegaLiteCompiler]. The [compile] overload takes a specification a caller has already parsed
+   * and cannot merge JSON into it; such a caller merges with `mergeConfig` themselves, which is the
+   * same function this uses.
+   */
+  private val hostConfig: VegaValue? = null,
 ) {
 
   public fun compileJson(
@@ -137,7 +153,25 @@ public class SpecCompiler(
     signalOverrides: Map<String, VegaValue> = emptyMap(),
     itemEncodes: Map<SceneNodeId, ItemEncode> = emptyMap(),
   ): CompiledSpec {
-    val parsed = SpecParser().parseJson(json)
+    val parser = SpecParser()
+    val parsed =
+      if (hostConfig == null) {
+        parser.parseJson(json)
+      } else {
+        // Merged before parsing, because the parser reads `config` on the way past and every guide
+        // resolves its own properties against what it found there.
+        val diagnostics = DiagnosticCollector()
+        val root = VegaJson.parseOrNull(json, diagnostics)
+        if (root !is VegaValue.Obj) {
+          parser.parseJson(json)
+        } else {
+          val merged = mergeConfig(hostConfig, root.fields["config"])
+          parser.parse(
+            if (merged == null) root
+            else VegaValue.Obj(LinkedHashMap(root.fields).apply { put("config", merged) })
+          )
+        }
+      }
     val spec =
       parsed.spec ?: return CompiledSpec(null, emptyMap(), EMPTY_SIGNALS, parsed.diagnostics)
     val compiled = compile(spec, signalOverrides, itemEncodes)
