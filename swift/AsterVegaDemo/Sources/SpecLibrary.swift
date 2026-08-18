@@ -60,7 +60,8 @@ enum SpecLibrary {
         textEngine: CoreTextTextEngine(),
         loader: request.loader,
         randomSeed: 42,
-        clock: ClockCompanion.shared.Fixed
+        clock: ClockCompanion.shared.Fixed,
+        locale: VegaLocale.Companion.shared.EnglishUS
       )
       .compileJson(json: request.json, signalOverrides: [:], itemEncodes: [:])
 

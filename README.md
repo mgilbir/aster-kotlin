@@ -201,6 +201,38 @@ Bitmap, PNG and PDF all render through the same Canvas backend as the live view,
 matches what is on screen. Anything that could not be drawn faithfully comes back in `warnings`
 rather than being silently dropped.
 
+## Locale example
+
+Everything the engine *generates* — a month name on a time axis, a thousands separator, the sentence a
+screen reader is given — comes from a `VegaLocale` the host supplies, beside the text engine and for
+the same reason: the platform knows it and common Kotlin cannot reach it. The fields are d3's own
+locale definitions, so a d3 locale JSON copies across field for field.
+
+```kotlin
+val dutch = VegaLocale(
+    months = listOf("januari", "februari", /* … */),
+    shortMonths = listOf("jan", "feb", /* … */),
+    days = listOf("zondag", "maandag", /* … */),
+    shortDays = listOf("zo", "ma", /* … */),
+    periods = listOf("a.m.", "p.m."),
+    date = "%d-%m-%Y",
+    time = "%H:%M:%S",
+    decimal = ",",
+    thousands = ".",
+    captions = DutchCaptions,   // see VegaCaptions
+)
+
+val controller = VegaChartController(textEngine = view.chartTextEngine, locale = dutch)
+```
+
+The captions are an interface rather than a string table, because they are grammar: a sentence puts a
+title inside quotation marks a language chooses, joins a list with a conjunction it chooses, and agrees
+a plural with a number. `VegaCaptions.English` is upstream's own wording and the default.
+
+**Parsing is deliberately not localised.** A specification writing `"Jan 5 2026"` in its own data means
+January in every language — d3's parsing is part of the wire format — so `TimeFormat.MONTHS` stays
+English and only what is *written* follows the locale.
+
 ## Interaction example
 
 ```kotlin
@@ -233,10 +265,10 @@ lifecycleScope.launch {
 - **`wordcloud` and `contour`** are the two documented data transforms that are not implemented. An
   unimplemented transform stops that dataset's pipeline and says so, rather than passing rows on that
   later stages were not meant to see.
-- **No locales.** Every month name, weekday name and number format the engine generates is English and
-  en-US: `TimeFormat` says so at the top of the file. A Dutch chart gets English month abbreviations on
-  its time axis. A host can override a particular axis with `axis.format`, which is applied over the
-  derived properties.
+- **No locale is built in.** The engine generates English and en-US **unless the host supplies a
+  locale** — `VegaLocale`, whose fields are d3's own locale definitions, given to `SpecCompiler` or
+  `VegaChartController` beside the text engine. Nothing ships a language: common Kotlin cannot reach a
+  platform's date or number formatting, so the names come from the host or from nowhere.
 - **`width: "container"` falls back to `config.view.continuousWidth`.** `containerSize()` has no
   container to measure outside a browser; a host that knows its available width sets the `width` signal
   itself.

@@ -22,7 +22,10 @@ final class SceneWalkTests: XCTestCase {
       textEngine: MetricTextEngine(advanceRatio: 0.6, ascentRatio: 0.8, descentRatio: 0.2),
       loader: DenyLoader(),
       randomSeed: 42,
-      clock: ClockCompanion.shared.Fixed
+      clock: ClockCompanion.shared.Fixed,
+      // Spelled out because a Kotlin default argument has no Obj-C representation: Swift names every
+      // parameter or does not compile. `EnglishUS` is what upstream produces.
+      locale: VegaLocale.Companion.shared.EnglishUS
     )
     let compiled = compiler.compileJson(json: json, signalOverrides: [:], itemEncodes: [:])
     let complaints = compiled.diagnostics.filter {

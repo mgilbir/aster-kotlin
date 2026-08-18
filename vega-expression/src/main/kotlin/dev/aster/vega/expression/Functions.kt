@@ -4,6 +4,7 @@ import dev.aster.vega.model.VegaValue
 import dev.aster.vega.model.asNumberOrNull
 import dev.aster.vega.model.asString
 import dev.aster.vega.model.field
+import dev.aster.vega.model.locale.VegaLocale
 import dev.aster.vega.model.time.DateValues
 import dev.aster.vega.model.time.TimeFormat
 import dev.aster.vega.model.time.TimeInterval
@@ -126,9 +127,22 @@ public object Functions {
       else -> null
     }?.let { TimeStepper(it, 1, zone) }
 
-  public val functions: Map<String, ExpressionFunction> = buildFunctions()
+  /** The function table with d3's own `en-US` locale, which is what upstream produces. */
+  public val functions: Map<String, ExpressionFunction> = buildFunctions(VegaLocale.EnglishUS)
 
-  private fun buildFunctions(): Map<String, ExpressionFunction> {
+  /**
+   * The same table, with the seven locale-dependent functions bound to [locale].
+   *
+   * `monthFormat`, `monthAbbrevFormat`, `dayFormat`, `dayAbbrevFormat`, `timeFormat`, `utcFormat`
+   * and `format` are the whole of it: everything else in here is arithmetic or string handling that
+   * no language changes. A host reaches this through the compiler rather than directly —
+   * `SpecCompiler` takes the locale and hands it down — and the default instance above is returned
+   * unchanged for the default locale so nothing pays for a feature it does not use.
+   */
+  public fun functionsFor(locale: VegaLocale): Map<String, ExpressionFunction> =
+    if (locale == VegaLocale.EnglishUS) functions else buildFunctions(locale)
+
+  private fun buildFunctions(locale: VegaLocale): Map<String, ExpressionFunction> {
     val map = LinkedHashMap<String, ExpressionFunction>()
 
     // ---- arrays and sequences -----------------------------------------------
@@ -440,7 +454,7 @@ public object Functions {
       VegaValue.Str(padText(text, length, character, align))
     }
     map["format"] = ExpressionFunction { args ->
-      VegaValue.Str(NumberFormat.format(args.number(0), args.string(1)))
+      VegaValue.Str(NumberFormat.format(args.number(0), args.string(1), locale))
     }
 
     // ---- strings and arrays -------------------------------------------------
@@ -808,13 +822,17 @@ public object Functions {
     // so
     // day 0 is Sunday. Both wrap, so month 12 is January again and day −1 is Saturday, and a
     // non-integer gives the empty string rather than a name for a day that does not exist.
-    map["monthFormat"] = ExpressionFunction { args -> monthName(args.at(0), abbreviate = false) }
-    map["monthAbbrevFormat"] = ExpressionFunction { args ->
-      monthName(args.at(0), abbreviate = true)
+    map["monthFormat"] = ExpressionFunction { args ->
+      monthName(args.at(0), abbreviate = false, locale)
     }
-    map["dayFormat"] = ExpressionFunction { args -> weekdayName(args.at(0), abbreviate = false) }
+    map["monthAbbrevFormat"] = ExpressionFunction { args ->
+      monthName(args.at(0), abbreviate = true, locale)
+    }
+    map["dayFormat"] = ExpressionFunction { args ->
+      weekdayName(args.at(0), abbreviate = false, locale)
+    }
     map["dayAbbrevFormat"] = ExpressionFunction { args ->
-      weekdayName(args.at(0), abbreviate = true)
+      weekdayName(args.at(0), abbreviate = true, locale)
     }
     dateField(map, "hours") { it.hour.toDouble() }
     dateField(map, "minutes") { it.minute.toDouble() }
@@ -841,8 +859,8 @@ public object Functions {
       VegaValue.Str(TimeUnits.specifier(units, overrides.orEmpty()))
     }
 
-    map["timeFormat"] = ExpressionFunction { args -> formatted(args, localZone()) }
-    map["utcFormat"] = ExpressionFunction { args -> formatted(args, TimeZone.UTC) }
+    map["timeFormat"] = ExpressionFunction { args -> formatted(args, localZone(), locale) }
+    map["utcFormat"] = ExpressionFunction { args -> formatted(args, TimeZone.UTC, locale) }
 
     /**
      * `timeParse(text, specifier)` and `utcParse` — a date read back out of a formatted string.
@@ -1269,18 +1287,23 @@ public object Functions {
     }
   }
 
-  /** `monthFormat`/`monthAbbrevFormat`, over a month index that wraps. */
-  private fun monthName(value: VegaValue, abbreviate: Boolean): VegaValue {
+  /**
+   * `monthFormat`/`monthAbbrevFormat`, over a month index that wraps.
+   *
+   * The **locale's** names, not the parsing list: upstream gets these by formatting a date it
+   * builds for the purpose, so they are whatever `%B` and `%b` would write.
+   */
+  private fun monthName(value: VegaValue, abbreviate: Boolean, locale: VegaLocale): VegaValue {
     val month = integerIndex(value) ?: return VegaValue.Str("")
-    val name = TimeFormat.MONTHS[((month % 12) + 12) % 12]
-    return VegaValue.Str(if (abbreviate) name.take(3) else name)
+    val index = ((month % 12) + 12) % 12
+    return VegaValue.Str(if (abbreviate) locale.shortMonths[index] else locale.months[index])
   }
 
   /** `dayFormat`/`dayAbbrevFormat`, over a weekday index that wraps; 0 is Sunday. */
-  private fun weekdayName(value: VegaValue, abbreviate: Boolean): VegaValue {
+  private fun weekdayName(value: VegaValue, abbreviate: Boolean, locale: VegaLocale): VegaValue {
     val day = integerIndex(value) ?: return VegaValue.Str("")
-    val name = TimeFormat.WEEKDAYS[((day % 7) + 7) % 7]
-    return VegaValue.Str(if (abbreviate) name.take(3) else name)
+    val index = ((day % 7) + 7) % 7
+    return VegaValue.Str(if (abbreviate) locale.shortDays[index] else locale.days[index])
   }
 
   /**
@@ -1394,10 +1417,10 @@ public object Functions {
     return VegaValue.Timestamp(millis)
   }
 
-  private fun formatted(args: List<VegaValue>, zone: TimeZone): VegaValue {
+  private fun formatted(args: List<VegaValue>, zone: TimeZone, locale: VegaLocale): VegaValue {
     val instant = instantOf(args.at(0))
     if (instant.isNaN()) return VegaValue.Str("Invalid Date")
-    return VegaValue.Str(TimeFormat.format(instant, args.string(1), zone))
+    return VegaValue.Str(TimeFormat.format(instant, args.string(1), zone, locale))
   }
 
   /** Epoch milliseconds for a value that is already an instant, or that reads as an ISO date. */

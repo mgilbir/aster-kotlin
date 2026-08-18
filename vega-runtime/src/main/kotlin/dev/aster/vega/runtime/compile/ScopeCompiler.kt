@@ -16,6 +16,7 @@ import dev.aster.vega.model.VegaValue
 import dev.aster.vega.model.asNumberOrNull
 import dev.aster.vega.model.asString
 import dev.aster.vega.model.field
+import dev.aster.vega.model.locale.VegaLocale
 import dev.aster.vega.model.parseFieldPath
 import dev.aster.vega.model.roundHalfUp
 import dev.aster.vega.model.spec.AxisSpec
@@ -128,6 +129,8 @@ internal class ScopeCompiler(
    * [ItemEncode] for why *when* it was applied matters.
    */
   private val itemEncodes: Map<dev.aster.vega.scene.SceneNodeId, ItemEncode> = emptyMap(),
+  /** The language every generated name, number and spoken sentence is written in. */
+  private val locale: VegaLocale = VegaLocale.EnglishUS,
 ) {
 
   /**
@@ -213,6 +216,7 @@ internal class ScopeCompiler(
         textEngine,
         extent,
         origin,
+        locale = locale,
       )
     val numbers =
       NumberResolver(expressions, scope.signals, diagnostics) { channel ->
@@ -221,7 +225,16 @@ internal class ScopeCompiler(
     // The encoder goes to the axis builder as well: a label's `encode` block resolves through the
     // same channel machinery a mark's does, over the tick as its datum.
     val axisBuilder =
-      AxisBuilder(scope.scales, scope.scaleTypes, ids, textEngine, diagnostics, numbers, encoder)
+      AxisBuilder(
+        scope.scales,
+        scope.scaleTypes,
+        ids,
+        textEngine,
+        diagnostics,
+        numbers,
+        encoder,
+        locale,
+      )
 
     val children = mutableListOf<SceneNode>()
     // How far the drawing reaches, which is what a title is placed against. It starts as the
@@ -380,7 +393,7 @@ internal class ScopeCompiler(
       content = content.union(built.guideBounds)
     }
     val legendNodes =
-      LegendBuilder(scope.scales, ids, textEngine, diagnostics, numbers, encoder)
+      LegendBuilder(scope.scales, ids, textEngine, diagnostics, numbers, encoder, locale)
         .build(
           legends,
           extent,
@@ -1278,7 +1291,7 @@ internal class ScopeCompiler(
           role =
             if (kind == "group" || kind == "text" || describing) "graphics-object"
             else "graphics-symbol",
-          roleDescription = "$kind mark container",
+          roleDescription = locale.captions.markContainerRole(kind),
           label = mark.description,
         )
       }

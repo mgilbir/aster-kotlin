@@ -41,7 +41,8 @@ final class TouchTests: XCTestCase {
       textEngine: CoreTextTextEngine(),
       clock: { KotlinLong(value: 0) },
       loader: DenyLoader(),
-      scheduler: nil
+      scheduler: nil,
+      locale: VegaLocale.Companion.shared.EnglishUS
     )
   }
 
