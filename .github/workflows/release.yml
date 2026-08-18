@@ -67,6 +67,12 @@ jobs:
           ./.github/scripts/changelog-section.sh "$version" > /dev/null
           echo "CHANGELOG.md has a section for $version."
 
+      - name: Record upstream's test vectors
+        # `check.sh` says it will skip the replays without these, but the replay guards also assert
+        # the harness has not *shrunk* — `replayed >= 60` — so on a fresh clone they fail rather than
+        # skip. The vectors are gitignored by design, being derived, so CI records them first.
+        run: ./scripts/record-upstream-vectors.sh
+
       - name: Check
         # A release is never published from a red build. This is the gate the repository uses, which
         # compiles every target and runs the JVM and native suites.

@@ -254,9 +254,14 @@ class UpstreamTransformVectorsTest {
           continue
         }
       replayed++
-      val want = expected.map { canonical(it) }
-      val got = actual.map { canonical(it) }
-      if (want != got) {
+      // Compared structurally rather than by rendered string, so that a number may agree within a
+      // few ulps; see `Agreement`. The strings are still what gets *reported*.
+      val same =
+        expected.size == actual.size &&
+          expected.indices.all { Agreement.agree(expected[it], actual[it]) }
+      if (!same) {
+        val want = expected.map { canonical(it) }
+        val got = actual.map { canonical(it) }
         failures.add("$op params=${canonical(spec)}\n    upstream: $want\n    ours    : $got")
       }
     }

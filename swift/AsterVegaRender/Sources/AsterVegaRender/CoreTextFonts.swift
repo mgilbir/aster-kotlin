@@ -33,12 +33,31 @@ enum CoreTextFonts {
     var symbolic: CTFontSymbolicTraits = []
     if weight >= 600 { symbolic.insert(.traitBold) }
     if italic { symbolic.insert(.traitItalic) }
-    if !symbolic.isEmpty {
-      attributes[kCTFontTraitsAttribute] = [kCTFontSymbolicTrait: symbolic.rawValue] as CFDictionary
-    }
 
-    let descriptor = CTFontDescriptorCreateWithAttributes(attributes as CFDictionary)
-    let font = CTFontCreateWithFontDescriptor(descriptor, points, nil)
+    // The traits are applied to a font, not asked for in the descriptor, and the difference is not
+    // cosmetic. A descriptor carrying a bold trait and *no* family name — which is every generic
+    // family, since `sans-serif` names no installed face — does not mean "the system font, bold". It
+    // means "some font that is bold", and CoreText is free to answer with an unrelated family. On one
+    // machine that is a bold system face; on GitHub's runner it was a face **narrower than the
+    // regular one**, which is how a bold label came out shorter than its plain equivalent.
+    //
+    // Anchoring the family first and asking that font for its bold variant keeps the answer in the
+    // family that was asked for. A family with no bold face on the device keeps the regular one,
+    // which is the same "legible rather than absent" bargain as an unresolvable family name.
+    let base: CTFont =
+      if attributes.count > 1 {
+        CTFontCreateWithFontDescriptor(
+          CTFontDescriptorCreateWithAttributes(attributes as CFDictionary), points, nil)
+      } else {
+        CTFontCreateUIFontForLanguage(.system, points, nil)
+          ?? CTFontCreateWithFontDescriptor(
+            CTFontDescriptorCreateWithAttributes(attributes as CFDictionary), points, nil)
+      }
+
+    let font =
+      symbolic.isEmpty
+        ? base
+        : CTFontCreateCopyWithSymbolicTraits(base, points, nil, symbolic, symbolic) ?? base
     cache.store(font, for: key)
     return font
   }
