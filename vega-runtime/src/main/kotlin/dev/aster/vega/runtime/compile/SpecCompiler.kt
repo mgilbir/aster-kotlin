@@ -37,6 +37,7 @@ import dev.aster.vega.scene.SceneColor
 import dev.aster.vega.scene.SceneNode
 import dev.aster.vega.scene.SceneNodeId
 import dev.aster.vega.scene.SceneNodeIdAllocator
+import dev.aster.vega.scene.SizeD
 import dev.aster.vega.scene.TextEngine
 import dev.aster.vega.scene.Transform2D
 import kotlin.math.ceil
@@ -146,6 +147,20 @@ public class SpecCompiler(
    * same function this uses.
    */
   private val hostConfig: VegaValue? = null,
+  /**
+   * The size of the surface the chart is drawn in, which `width: "container"` asks for.
+   *
+   * A responsive width cannot come from the specification — `"container"` says "ask the page", and
+   * there is no page — so it comes from the host, the one party that knows it. Vega-Lite compiles
+   * `"container"` into a signal reading `containerSize()`, so this is what that function answers
+   * with; without it a chart falls back to `config.view.continuousWidth`, which is 300 and is what
+   * upstream falls back to outside a browser.
+   *
+   * Usually only the width is known — a chart in a scrolling list has as much height as it asks for
+   * — and a zero or absent dimension leaves that dimension to the fallback, so a host can answer
+   * the half it knows.
+   */
+  private val containerSize: SizeD? = null,
 ) {
 
   public fun compileJson(
@@ -315,8 +330,20 @@ public class SpecCompiler(
     // The expression functions carry the locale too: `monthFormat`, `timeFormat` and `format` are
     // seven of the 119 whose answer depends on it, and a `calculate` transform writing
     // `timeFormat(datum.t, '%b %Y')` is how most charts label a derived column.
+    // The container size goes the same way: `width: "container"` compiles to a signal that reads
+    // `containerSize()`, so the host's answer arrives through the function table like the locale's.
     val expressions =
-      CachingExpressionCompiler(VegaExpressionCompiler(Evaluator(Functions.functionsFor(locale))))
+      CachingExpressionCompiler(
+        VegaExpressionCompiler(
+          Evaluator(
+            Functions.functionsFor(
+              locale,
+              containerWidth = containerSize?.width?.takeIf { it > 0.0 },
+              containerHeight = containerSize?.height?.takeIf { it > 0.0 },
+            )
+          )
+        )
+      )
 
     // Datasets, scales and signals are resolved in **one dependency order**, not in three phases.
     //

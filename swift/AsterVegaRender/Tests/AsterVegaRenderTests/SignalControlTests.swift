@@ -43,7 +43,8 @@ final class SignalControlTests: XCTestCase {
       // Spelled out because a Kotlin default argument has no Obj-C representation: Swift names every
       // parameter or does not compile. `EnglishUS` is what upstream produces.
       locale: VegaLocale.Companion.shared.EnglishUS,
-      hostConfig: nil
+      hostConfig: nil,
+      containerSize: nil
     )
     .compileJson(json: specification, signalOverrides: overrides, itemEncodes: [:])
   }
@@ -148,7 +149,8 @@ final class SignalControlTests: XCTestCase {
       // Spelled out because a Kotlin default argument has no Obj-C representation: Swift names every
       // parameter or does not compile. `EnglishUS` is what upstream produces.
       locale: VegaLocale.Companion.shared.EnglishUS,
-      hostConfig: nil
+      hostConfig: nil,
+      containerSize: nil
     )
     .compileJson(
       json: """

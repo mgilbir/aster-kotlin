@@ -201,6 +201,26 @@ Bitmap, PNG and PDF all render through the same Canvas backend as the live view,
 matches what is on screen. Anything that could not be drawn faithfully comes back in `warnings`
 rather than being silently dropped.
 
+## A responsive width
+
+`width: "container"` asks the page how much room there is, and there is no page — so the host answers,
+because it is the only party that knows. It is a **compile** input rather than a draw-time one: Vega-Lite
+turns `"container"` into a signal, and every scale range, axis extent and mark position downstream is
+resolved from it.
+
+```kotlin
+val controller = VegaChartController(textEngine = engine, containerSize = SizeD(width, height))
+
+// And again whenever the layout changes. Setting it recompiles, so this belongs on a layout pass
+// rather than on every frame of a resize animation; the signal values a reader has set survive it.
+controller.containerSize = SizeD(newWidth, newHeight)
+```
+
+With nothing supplied a chart takes `config.view.continuousWidth` — 300, which is exactly what upstream
+falls back to outside a browser, and what the differential fixtures compare against. A zero or absent
+dimension does the same for that dimension alone, so a host that knows only its width says only its
+width.
+
 ## Theming a chart you did not write
 
 A `config` block the host supplies, which the specification's own beats key by key. A chart arriving
@@ -305,9 +325,6 @@ lifecycleScope.launch {
   locale** — `VegaLocale`, whose fields are d3's own locale definitions, given to `SpecCompiler` or
   `VegaChartController` beside the text engine. Nothing ships a language: common Kotlin cannot reach a
   platform's date or number formatting, so the names come from the host or from nowhere.
-- **`width: "container"` falls back to `config.view.continuousWidth`.** `containerSize()` has no
-  container to measure outside a browser; a host that knows its available width sets the `width` signal
-  itself.
 - **Pan and zoom are a view transform**, so the axes do not rescale with the zoom. Vega-style zoom that
   updates the scale domains needs the dataflow.
 - **Text metrics are platform metrics, not browser metrics.** Structural geometry compares tightly
