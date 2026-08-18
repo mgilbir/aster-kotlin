@@ -1,0 +1,561 @@
+{
+  "$schema": "https://vega.github.io/schema/vega/v6.json",
+  "description": "A grid whose cells are grids standing beside a plain plot: the levels belong to the plot that wrote them, so they are peeled where that plot's specification is normalised and lifted per plot. Everything the nest publishes runs through the plot's own name — `concat_0_cell` holding `concat_0_child_cell`, and the cell the marks are drawn in is `concat_0_child_child_width` wide. It also pins the split being per plot: only this plot's cells compute their own rows, and the plain plot beside it derives its chain as it always did.",
+  "background": "white",
+  "padding": 5,
+  "data": [
+    {
+      "name": "source_0",
+      "values": [
+        {
+          "region": "north",
+          "size": "big",
+          "x": 1,
+          "y": 4
+        },
+        {
+          "region": "north",
+          "size": "small",
+          "x": 2,
+          "y": 3
+        },
+        {
+          "region": "south",
+          "size": "big",
+          "x": 3,
+          "y": 2
+        },
+        {
+          "region": "south",
+          "size": "small",
+          "x": 4,
+          "y": 1
+        }
+      ]
+    },
+    {
+      "name": "concat_0_column_domain",
+      "source": "source_0",
+      "transform": [
+        {
+          "type": "aggregate",
+          "groupby": [
+            "region"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "data_2",
+      "source": "source_0",
+      "transform": [
+        {
+          "type": "filter",
+          "expr": "isValid(datum[\"x\"]) && isFinite(+datum[\"x\"]) && isValid(datum[\"y\"]) && isFinite(+datum[\"y\"])"
+        }
+      ]
+    },
+    {
+      "name": "data_3",
+      "source": "source_0",
+      "transform": [
+        {
+          "type": "aggregate",
+          "groupby": [
+            "region"
+          ],
+          "ops": [
+            "sum"
+          ],
+          "fields": [
+            "x"
+          ],
+          "as": [
+            "sum_x"
+          ]
+        },
+        {
+          "type": "filter",
+          "expr": "isValid(datum[\"sum_x\"]) && isFinite(+datum[\"sum_x\"])"
+        }
+      ]
+    }
+  ],
+  "signals": [
+    {
+      "name": "concat_0_child_child_width",
+      "value": 120
+    },
+    {
+      "name": "concat_0_child_child_height",
+      "value": 80
+    },
+    {
+      "name": "concat_1_width",
+      "value": 120
+    },
+    {
+      "name": "concat_1_height",
+      "value": 80
+    }
+  ],
+  "layout": {
+    "padding": 20,
+    "bounds": "full",
+    "align": "each"
+  },
+  "marks": [
+    {
+      "type": "group",
+      "name": "concat_0_group",
+      "layout": {
+        "padding": 20,
+        "headerBand": {
+          "column": 0.5
+        },
+        "offset": {
+          "columnTitle": 10
+        },
+        "columns": {
+          "signal": "length(data('concat_0_column_domain'))"
+        },
+        "bounds": "full",
+        "align": "all"
+      },
+      "marks": [
+        {
+          "name": "column-title",
+          "type": "group",
+          "role": "column-title",
+          "title": {
+            "text": "region",
+            "style": "guide-title",
+            "offset": 10
+          }
+        },
+        {
+          "name": "concat_0_column_header",
+          "type": "group",
+          "role": "column-header",
+          "from": {
+            "data": "concat_0_column_domain"
+          },
+          "sort": {
+            "field": "datum[\"region\"]",
+            "order": "ascending"
+          },
+          "title": {
+            "text": {
+              "signal": "isValid(parent[\"region\"]) ? parent[\"region\"] : \"\"+parent[\"region\"]"
+            },
+            "style": "guide-label",
+            "frame": "group",
+            "offset": 10
+          }
+        },
+        {
+          "name": "concat_0_cell",
+          "type": "group",
+          "from": {
+            "facet": {
+              "name": "concat_0_facet",
+              "data": "source_0",
+              "groupby": [
+                "region"
+              ]
+            }
+          },
+          "sort": {
+            "field": [
+              "datum[\"region\"]"
+            ],
+            "order": [
+              "ascending"
+            ]
+          },
+          "data": [
+            {
+              "name": "concat_0_child_row_domain",
+              "source": "concat_0_facet",
+              "transform": [
+                {
+                  "type": "aggregate",
+                  "groupby": [
+                    "size"
+                  ]
+                }
+              ]
+            }
+          ],
+          "layout": {
+            "padding": 20,
+            "offset": {
+              "rowTitle": 10
+            },
+            "columns": 1,
+            "bounds": "full",
+            "align": "all"
+          },
+          "marks": [
+            {
+              "name": "row-title",
+              "type": "group",
+              "role": "row-title",
+              "title": {
+                "text": "size",
+                "orient": "left",
+                "style": "guide-title",
+                "offset": 10
+              }
+            },
+            {
+              "name": "concat_0_child_row_header",
+              "type": "group",
+              "role": "row-header",
+              "from": {
+                "data": "concat_0_child_row_domain"
+              },
+              "sort": {
+                "field": "datum[\"size\"]",
+                "order": "ascending"
+              },
+              "title": {
+                "text": {
+                  "signal": "isValid(parent[\"size\"]) ? parent[\"size\"] : \"\"+parent[\"size\"]"
+                },
+                "orient": "left",
+                "style": "guide-label",
+                "frame": "group",
+                "offset": 10
+              },
+              "encode": {
+                "update": {
+                  "height": {
+                    "signal": "concat_0_child_child_height"
+                  }
+                }
+              },
+              "axes": [
+                {
+                  "scale": "concat_0_y",
+                  "orient": "left",
+                  "grid": false,
+                  "title": "y",
+                  "labelOverlap": true,
+                  "tickCount": {
+                    "signal": "ceil(concat_0_child_child_height/40)"
+                  },
+                  "zindex": 0
+                }
+              ]
+            },
+            {
+              "name": "concat_0_child_column_footer",
+              "type": "group",
+              "role": "column-footer",
+              "encode": {
+                "update": {
+                  "width": {
+                    "signal": "concat_0_child_child_width"
+                  }
+                }
+              },
+              "axes": [
+                {
+                  "scale": "concat_0_x",
+                  "orient": "bottom",
+                  "grid": false,
+                  "title": "x",
+                  "labelFlush": true,
+                  "labelOverlap": true,
+                  "tickCount": {
+                    "signal": "ceil(concat_0_child_child_width/40)"
+                  },
+                  "zindex": 0
+                }
+              ]
+            },
+            {
+              "name": "concat_0_child_cell",
+              "type": "group",
+              "style": "cell",
+              "from": {
+                "facet": {
+                  "name": "concat_0_child_facet",
+                  "data": "concat_0_facet",
+                  "groupby": [
+                    "size"
+                  ]
+                }
+              },
+              "sort": {
+                "field": [
+                  "datum[\"size\"]"
+                ],
+                "order": [
+                  "ascending"
+                ]
+              },
+              "data": [
+                {
+                  "source": "concat_0_child_facet",
+                  "name": "data_0",
+                  "transform": [
+                    {
+                      "type": "filter",
+                      "expr": "isValid(datum[\"x\"]) && isFinite(+datum[\"x\"]) && isValid(datum[\"y\"]) && isFinite(+datum[\"y\"])"
+                    }
+                  ]
+                }
+              ],
+              "encode": {
+                "update": {
+                  "width": {
+                    "signal": "concat_0_child_child_width"
+                  },
+                  "height": {
+                    "signal": "concat_0_child_child_height"
+                  }
+                }
+              },
+              "marks": [
+                {
+                  "name": "concat_0_child_child_marks",
+                  "type": "symbol",
+                  "style": [
+                    "point"
+                  ],
+                  "from": {
+                    "data": "data_0"
+                  },
+                  "encode": {
+                    "update": {
+                      "opacity": {
+                        "value": 0.7
+                      },
+                      "fill": {
+                        "value": "transparent"
+                      },
+                      "stroke": {
+                        "value": "#4c78a8"
+                      },
+                      "ariaRoleDescription": {
+                        "value": "point"
+                      },
+                      "description": {
+                        "signal": "\"x: \" + (format(datum[\"x\"], \"\")) + \"; y: \" + (format(datum[\"y\"], \"\"))"
+                      },
+                      "x": {
+                        "scale": "concat_0_x",
+                        "field": "x"
+                      },
+                      "y": {
+                        "scale": "concat_0_y",
+                        "field": "y"
+                      }
+                    }
+                  }
+                }
+              ],
+              "axes": [
+                {
+                  "scale": "concat_0_x",
+                  "orient": "bottom",
+                  "gridScale": "concat_0_y",
+                  "grid": true,
+                  "tickCount": {
+                    "signal": "ceil(concat_0_child_child_width/40)"
+                  },
+                  "domain": false,
+                  "labels": false,
+                  "aria": false,
+                  "maxExtent": 0,
+                  "minExtent": 0,
+                  "ticks": false,
+                  "zindex": 0
+                },
+                {
+                  "scale": "concat_0_y",
+                  "orient": "left",
+                  "gridScale": "concat_0_x",
+                  "grid": true,
+                  "tickCount": {
+                    "signal": "ceil(concat_0_child_child_height/40)"
+                  },
+                  "domain": false,
+                  "labels": false,
+                  "aria": false,
+                  "maxExtent": 0,
+                  "minExtent": 0,
+                  "ticks": false,
+                  "zindex": 0
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "group",
+      "name": "concat_1_group",
+      "style": "cell",
+      "encode": {
+        "update": {
+          "width": {
+            "signal": "concat_1_width"
+          },
+          "height": {
+            "signal": "concat_1_height"
+          }
+        }
+      },
+      "marks": [
+        {
+          "name": "concat_1_marks",
+          "type": "rect",
+          "style": [
+            "bar"
+          ],
+          "from": {
+            "data": "data_3"
+          },
+          "encode": {
+            "update": {
+              "fill": {
+                "value": "#4c78a8"
+              },
+              "ariaRoleDescription": {
+                "value": "bar"
+              },
+              "description": {
+                "signal": "\"region: \" + (isValid(datum[\"region\"]) ? isArray(datum[\"region\"]) ? join(datum[\"region\"], ' ') : datum[\"region\"] : \"\"+datum[\"region\"]) + \"; Sum of x: \" + (format(datum[\"sum_x\"], \"\"))"
+              },
+              "x": {
+                "scale": "concat_1_x",
+                "field": "region"
+              },
+              "width": {
+                "signal": "max(0.25, bandwidth('concat_1_x'))"
+              },
+              "y": {
+                "scale": "concat_1_y",
+                "field": "sum_x"
+              },
+              "y2": {
+                "scale": "concat_1_y",
+                "value": 0
+              }
+            }
+          }
+        }
+      ],
+      "axes": [
+        {
+          "scale": "concat_1_y",
+          "orient": "left",
+          "gridScale": "concat_1_x",
+          "grid": true,
+          "tickCount": {
+            "signal": "ceil(concat_1_height/40)"
+          },
+          "domain": false,
+          "labels": false,
+          "aria": false,
+          "maxExtent": 0,
+          "minExtent": 0,
+          "ticks": false,
+          "zindex": 0
+        },
+        {
+          "scale": "concat_1_x",
+          "orient": "bottom",
+          "grid": false,
+          "title": "region",
+          "labelAlign": "right",
+          "labelAngle": 270,
+          "labelBaseline": "middle",
+          "zindex": 0
+        },
+        {
+          "scale": "concat_1_y",
+          "orient": "left",
+          "grid": false,
+          "title": "Sum of x",
+          "labelOverlap": true,
+          "tickCount": {
+            "signal": "ceil(concat_1_height/40)"
+          },
+          "zindex": 0
+        }
+      ]
+    }
+  ],
+  "scales": [
+    {
+      "name": "concat_0_x",
+      "type": "linear",
+      "domain": {
+        "data": "data_2",
+        "field": "x"
+      },
+      "range": [
+        0,
+        {
+          "signal": "concat_0_child_child_width"
+        }
+      ],
+      "nice": true,
+      "zero": true
+    },
+    {
+      "name": "concat_0_y",
+      "type": "linear",
+      "domain": {
+        "data": "data_2",
+        "field": "y"
+      },
+      "range": [
+        {
+          "signal": "concat_0_child_child_height"
+        },
+        0
+      ],
+      "nice": true,
+      "zero": true
+    },
+    {
+      "name": "concat_1_x",
+      "type": "band",
+      "domain": {
+        "data": "data_3",
+        "field": "region",
+        "sort": true
+      },
+      "range": [
+        0,
+        {
+          "signal": "concat_1_width"
+        }
+      ],
+      "paddingInner": 0.1,
+      "paddingOuter": 0.05
+    },
+    {
+      "name": "concat_1_y",
+      "type": "linear",
+      "domain": {
+        "data": "data_3",
+        "field": "sum_x"
+      },
+      "range": [
+        {
+          "signal": "concat_1_height"
+        },
+        0
+      ],
+      "nice": true,
+      "zero": true
+    }
+  ]
+}
