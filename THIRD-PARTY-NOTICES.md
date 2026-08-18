@@ -5,7 +5,19 @@ upstream implementations rather than against its own expectations. Both the code
 and the fixtures therefore derive from other people's work, and this file records
 whose, under what terms, and which parts of this repository are involved.
 
-The project's own licence is BSD 3-Clause, matching Vega's. See `LICENSE`.
+The project's own licence is **BSD 3-Clause**, matching Vega's. See `LICENSE`,
+which is the canonical text and nothing else — the reasoning lives here so that
+licence-detection tools can recognise the file.
+
+BSD 3-Clause rather than something more permissive, and not by preference: a
+translation is a derivative work, so neither the upstream notices nor the third
+clause below — no using the holder's name to endorse — may be dropped from one.
+Those would have bound the ported parts whatever `LICENSE` said, and matching
+upstream avoids having to draw a line between what is original here and what
+derives, through code as close to upstream as the scales or the expression engine.
+
+`LICENSE` carries three copyright lines: this project's, the University of
+Washington Interactive Data Lab's, and Mike Bostock's.
 
 ---
 

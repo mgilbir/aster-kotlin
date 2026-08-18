@@ -5,17 +5,6 @@ Copyright (c) 2015-2023, University of Washington Interactive Data Lab
 Copyright (c) 2010-2023, Mike Bostock
 All rights reserved.
 
-This project is a port of Vega and Vega-Lite to Kotlin. It is therefore a
-derivative of work by the University of Washington Interactive Data Lab (Vega,
-Vega-Lite, the vega-* packages and vega-datasets, all BSD 3-Clause) and by Mike
-Bostock (the d3-* packages and topojson, all ISC). Their notices are retained
-above and their licence texts, together with what in this repository derives
-from each, are in THIRD-PARTY-NOTICES.md.
-
-BSD 3-Clause is this project's licence rather than a more permissive one because
-that is what the code it ports is under: a translation is a derivative work, and
-neither notice nor the third clause below may be dropped from one.
-
 Redistribution and use in source and binary forms, with or without
 modification, are permitted provided that the following conditions are met:
 
