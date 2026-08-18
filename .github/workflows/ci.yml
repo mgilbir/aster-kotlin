@@ -93,19 +93,22 @@ jobs:
         run: ./gradlew centralBundle verifyCentralBundle --no-configuration-cache
 
       - name: Say how many tests actually ran
-        # A green run that skipped everything is worse than a red one, and nothing in Gradle's output
-        # says which happened: it prints a count only for test tasks that *fail*. So the counts are
-        # summed from the JUnit XML and held to a floor.
+        # A green run that quietly skipped a suite is worse than a red one, and nothing in Gradle's
+        # output distinguishes them: it prints a test count only for tasks that *fail*. The first run
+        # of this workflow reported two numbers, both from failures, and said nothing whatsoever about
+        # the other eleven test tasks. So the counts are summed from the JUnit XML here.
         #
-        # The floor is what this host runs today, less a margin — not a target. It is here to catch a
-        # suite that stopped running, which is exactly what a missing fixture directory looks like:
-        # tests that quietly assume themselves away rather than failing.
+        # Two assertions, and the per-module one is the one that bites. A whole-suite floor would not
+        # have caught what actually happened: vega-runtime — 2787 tests, holding both differential
+        # gates — did not run at all, because the build stopped at the first failing module. Naming
+        # the modules is what makes "the suite ran" checkable rather than plausible.
         if: always()
         run: |
           set -euo pipefail
           python3 - "${{ runner.os }}" <<'PY'
           import glob, sys, xml.etree.ElementTree as ET
           from collections import Counter
+
           host = sys.argv[1]
           total = skipped = failed = 0
           per, per_skip = Counter(), Counter()
@@ -121,22 +124,48 @@ jobs:
               module = path.split("/")[0]
               per[module] += tests
               per_skip[module] += int(root.get("skipped", 0))
+
           print(f"{total} tests, {skipped} skipped, {failed} failed")
           for module in sorted(per):
-              print(f"  {module:32} {per[module]:5} tests, {per_skip[module]:4} skipped")
+              print(f"  {module:34}{per[module]:6} tests, {per_skip[module]:4} skipped")
 
-          # macOS compiles and runs every target; Linux runs the JVM and linuxX64 suites only.
-          floor = 7000 if host == "macOS" else 5000
-          if total < floor:
-              print(f"::error::only {total} tests ran; expected at least {floor}. "
-                    "A suite has stopped running — check for missing fixtures.")
+          problems = []
+
+          # Every host runs the JVM suites, so every host owes these. The counts are what this
+          # workflow observed, less a margin; they are a shrink detector, not a target to grow.
+          for module, least in (
+              ("vega-runtime", 2500),
+              ("vega-lite", 800),
+              ("vega-expression", 440),
+              ("vega-dataflow", 210),
+              ("vega-scene", 170),
+              ("vega-model", 70),
+              ("vega-svg", 25),
+              ("vega-loader", 9),
+              ("vega-compose-multiplatform", 20),
+          ):
+              if per[module] < least:
+                  problems.append(f"{module} ran {per[module]} tests, expected at least {least}")
+
+          # macOS additionally runs the commonTest suites on Kotlin/Native.
+          if host == "macOS":
+              native = sum(
+                  int(ET.parse(p).getroot().get("tests", 0))
+                  for p in glob.glob("*/build/test-results/*Arm64Test/**/*.xml", recursive=True)
+              )
+              if native < 20:
+                  problems.append(f"only {native} tests ran on Kotlin/Native, expected at least 20")
+
+          # The replays guard their own size internally (`replayed >= 60`, `>= 9750`), so a skip here
+          # means a suite decided its fixtures were absent. Two are legitimately conditional.
+          if skipped > 10:
+              problems.append(f"{skipped} tests skipped; suites are assuming themselves away")
+
+          for problem in problems:
+              print(f"::error::{problem}")
+          if problems:
               sys.exit(1)
-          # Skips are for a genuinely absent capability, and there are two of those. A jump means
-          # tests are assuming themselves away.
-          if skipped > 50:
-              print(f"::error::{skipped} tests skipped, which is more than this suite should skip.")
-              sys.exit(1)
-          print(f"{total} tests ran on {host}, {skipped} skipped — above the floor of {floor}.")
+          print(f"{total} tests ran on {host}, {skipped} skipped, every expected module present.")
           PY
 
       - name: Upload test reports
@@ -144,5 +173,8 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: test-reports-${{ matrix.os }}
-          path: "**/build/reports/tests/**"
+          path: |
+            **/build/reports/tests/**
+            **/build/test-results/**/*.xml
+            build/upstream-transform-ledger.txt
           retention-days: 14

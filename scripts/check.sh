@@ -25,13 +25,30 @@ if [ -z "$(ls test-fixtures/upstream-vectors/vega-*.json 2>/dev/null)" ]; then
   echo "      will be skipped. Run scripts/record-upstream-vectors.sh to replay Vega's own tests."
 fi
 
-./gradlew \
+# The Apple targets cannot be built anywhere but a Mac. Naming them on Linux does not fail — Kotlin
+# registers the tasks and then disables them — so the run goes green having quietly skipped the four
+# compiles and the native test task that are the whole point of asking. Say which set is running.
+apple_tasks=(
+  compileKotlinMacosArm64
+  compileKotlinIosArm64
+  compileKotlinIosSimulatorArm64
+  macosArm64Test
+)
+if [ "$(uname -s)" = "Darwin" ]; then
+  host_tasks=("${apple_tasks[@]}")
+else
+  host_tasks=()
+  echo "note: this host is $(uname -s), so the Apple targets (${apple_tasks[*]}) are not being built."
+  echo "      Only a macOS run covers them; linuxX64 below is the portability check available here."
+fi
+
+# `--continue` because the inventory is the point: without it the first failing module aborts the
+# build, and a run that stopped after vega-dataflow looks much like one that passed the other eight.
+# A failing task still fails the build.
+./gradlew --continue \
   spotlessCheck \
   test \
-  compileKotlinMacosArm64 \
-  compileKotlinIosArm64 \
-  compileKotlinIosSimulatorArm64 \
   compileKotlinLinuxX64 \
-  macosArm64Test \
+  "${host_tasks[@]}" \
   lint \
   :demo:assembleDebug

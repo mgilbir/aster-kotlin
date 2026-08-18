@@ -125,7 +125,9 @@ class UpstreamStatisticsVectorsTest {
               else -> Statistics.quantileUniform(x, a ?: 0.0, b ?: 1.0)
             }
           replayed++
-          if (show(answer) != show(ours))
+          // These nine all run through `exp`, `log` or `erf`, where two runtimes' `libm` need not
+          // agree in the last bit; see `Agreement`.
+          if (!Agreement.agree(answer, ours))
             failures.add("$fn($x, $a, $b): upstream $answer, ours $ours")
         }
         "bin" -> {
