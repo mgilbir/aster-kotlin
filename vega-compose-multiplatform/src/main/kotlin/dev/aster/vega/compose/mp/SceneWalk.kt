@@ -225,6 +225,7 @@ public class SceneWalk {
           fontWeight = style.fontWeight,
           italic = style.fontStyle == FontStyle.ITALIC,
           angleDegrees = node.angleDegrees,
+          letterSpacing = style.letterSpacing,
         ),
         fill,
         stroke,
