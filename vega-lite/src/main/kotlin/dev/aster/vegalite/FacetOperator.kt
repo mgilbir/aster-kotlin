@@ -26,7 +26,26 @@ internal object FacetOperator {
    * down into the encoding, which is what leaves the one-level case exactly as it was; the rest are
    * handed back for the compiler to lift in turn.
    */
-  class Peeled(val spec: VegaValue.Obj, val inner: List<VegaValue.Obj>)
+  class Peeled(
+    val spec: VegaValue.Obj,
+    val inner: List<VegaValue.Obj>,
+    /**
+     * Every level's facet definition, outermost first — including the one folded into [spec].
+     *
+     * Read only where the cell cannot take the fold: a grid whose cell is a **concatenation** has
+     * no encoding to fold into, so the compiler builds the concatenation itself and wraps it in
+     * grids made from these.
+     */
+    val levels: List<VegaValue.Obj> = emptyList(),
+    /**
+     * Whether the cell is a **composition** rather than a view or a layer of views.
+     *
+     * Then [spec] is the cell as written, with nothing folded into it, and [levels] holds every
+     * grid that wraps it. The ordinary case is the other way round: [spec] is the leaf with the
+     * outermost level folded into its encoding, and [inner] holds the rest.
+     */
+    val cellIsComposition: Boolean = false,
+  )
 
   /**
    * The equivalent view with the outermost facet's channels in its encoding, or null where it
@@ -72,22 +91,25 @@ internal object FacetOperator {
       node = template
     }
     val leaf = node
-    // A grid's cell is a view or a **layer** of views. Anything else is a different composition:
-    // upstream puts a `ConcatModel` under the `FacetModel`, where this compiler puts a grid
-    // *inside*
-    // a plot and has no way to put plots inside a cell. Refused by name rather than approximated —
-    // the facet channels were being carried down into a leaf that never reads an encoding, so the
-    // chart came out as a bare concatenation with no grid in it and nothing said.
-    for (composition in listOf("hconcat", "vconcat", "concat", "repeat")) {
-      if (!leaf.has(composition)) continue
-      diagnostics.fatal(
-        VegaLiteDiagnostics.UNSUPPORTED_COMPOSITION,
-        "A `$composition` inside a `facet` is not implemented; a grid's cell is a view or a " +
-          "layer of views. A grid inside a concatenation does compile, which is the same two " +
-          "compositions the other way round.",
-        jsonPath = "$.spec.$composition",
+    // A cell that is a **concatenation** has no encoding for a facet channel to be folded into, so
+    // the fold below would drop it — which is exactly what used to happen, leaving a bare
+    // concatenation with no grid in it. Such a chart is compiled the other way about: the
+    // concatenation is built and the grids wrap it. What that needs is the levels themselves and
+    // the
+    // cell as written, and both are handed back untouched.
+    if (listOf("hconcat", "vconcat", "concat", "repeat").any { leaf.has(it) }) {
+      return Peeled(
+        // What the levels above contribute still reaches it — its data above all, which is written
+        // on the chart and not on the cell. Only the encoding is left behind, there being none to
+        // fold a facet channel into, which is why this cell is a composition and not a view.
+        obj {
+          inherited.forEach { (key, value) -> if (key != "encoding") put(key, value) }
+          leaf.fields.forEach { (key, value) -> put(key, value) }
+        },
+        emptyList(),
+        levels,
+        cellIsComposition = true,
       )
-      return null
     }
     val outermost = levels.first()
     val mapping = outermost.has("row") || outermost.has("column")
@@ -124,6 +146,7 @@ internal object FacetOperator {
         )
       },
       levels.drop(1),
+      levels,
     )
   }
 }

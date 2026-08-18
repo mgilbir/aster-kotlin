@@ -1,0 +1,445 @@
+{
+  "$schema": "https://vega.github.io/schema/vega/v6.json",
+  "description": "A grid whose cell holds plots, which is the inverse of every other grid here and needed compiling the other way about. There is no encoding for the facet channel to be lifted out of, so the concatenation is built as the chart — under the name the grid gives its cell, which is what makes its plots `child_concat_0` and `child_concat_1` — and the grid is made straight from the level and wraps the whole of it. The cell then carries what a concatenation carries: its layout, the chain each plot computes per cell, and each plot's own scales, which measure the rows that cell was handed and can only be built where those rows are visible.",
+  "background": "white",
+  "padding": 5,
+  "data": [
+    {
+      "name": "source_0",
+      "values": [
+        {
+          "a": "p",
+          "x": 1,
+          "y": 2
+        },
+        {
+          "a": "q",
+          "x": 3,
+          "y": 4
+        }
+      ]
+    },
+    {
+      "name": "column_domain",
+      "source": "source_0",
+      "transform": [
+        {
+          "type": "aggregate",
+          "groupby": [
+            "a"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "data_2",
+      "source": "source_0",
+      "transform": [
+        {
+          "type": "filter",
+          "expr": "isValid(datum[\"x\"]) && isFinite(+datum[\"x\"]) && isValid(datum[\"y\"]) && isFinite(+datum[\"y\"])"
+        }
+      ]
+    },
+    {
+      "name": "data_3",
+      "source": "source_0",
+      "transform": [
+        {
+          "type": "stack",
+          "groupby": [
+            "a"
+          ],
+          "field": "y",
+          "sort": {
+            "field": [],
+            "order": []
+          },
+          "as": [
+            "y_start",
+            "y_end"
+          ],
+          "offset": "zero"
+        },
+        {
+          "type": "filter",
+          "expr": "isValid(datum[\"y\"]) && isFinite(+datum[\"y\"])"
+        }
+      ]
+    }
+  ],
+  "signals": [
+    {
+      "name": "child_height",
+      "value": 40
+    },
+    {
+      "name": "child_childWidth",
+      "value": 60
+    }
+  ],
+  "layout": {
+    "padding": 20,
+    "headerBand": {
+      "column": 0.5
+    },
+    "offset": {
+      "columnTitle": 10
+    },
+    "columns": {
+      "signal": "length(data('column_domain'))"
+    },
+    "bounds": "full",
+    "align": "all"
+  },
+  "marks": [
+    {
+      "name": "column-title",
+      "type": "group",
+      "role": "column-title",
+      "title": {
+        "text": "a",
+        "style": "guide-title",
+        "offset": 10
+      }
+    },
+    {
+      "name": "column_header",
+      "type": "group",
+      "role": "column-header",
+      "from": {
+        "data": "column_domain"
+      },
+      "sort": {
+        "field": "datum[\"a\"]",
+        "order": "ascending"
+      },
+      "title": {
+        "text": {
+          "signal": "isValid(parent[\"a\"]) ? parent[\"a\"] : \"\"+parent[\"a\"]"
+        },
+        "style": "guide-label",
+        "frame": "group",
+        "offset": 10
+      }
+    },
+    {
+      "name": "cell",
+      "type": "group",
+      "from": {
+        "facet": {
+          "name": "facet",
+          "data": "source_0",
+          "groupby": [
+            "a"
+          ]
+        }
+      },
+      "sort": {
+        "field": [
+          "datum[\"a\"]"
+        ],
+        "order": [
+          "ascending"
+        ]
+      },
+      "data": [
+        {
+          "source": "facet",
+          "name": "data_0",
+          "transform": [
+            {
+              "type": "filter",
+              "expr": "isValid(datum[\"x\"]) && isFinite(+datum[\"x\"]) && isValid(datum[\"y\"]) && isFinite(+datum[\"y\"])"
+            }
+          ]
+        },
+        {
+          "source": "facet",
+          "name": "data_1",
+          "transform": [
+            {
+              "type": "stack",
+              "groupby": [],
+              "field": "y",
+              "sort": {
+                "field": [],
+                "order": []
+              },
+              "as": [
+                "y_start",
+                "y_end"
+              ],
+              "offset": "zero"
+            },
+            {
+              "type": "filter",
+              "expr": "isValid(datum[\"y\"]) && isFinite(+datum[\"y\"])"
+            }
+          ]
+        }
+      ],
+      "layout": {
+        "padding": 20,
+        "bounds": "full",
+        "align": "each"
+      },
+      "marks": [
+        {
+          "type": "group",
+          "name": "child_concat_0_group",
+          "style": "cell",
+          "encode": {
+            "update": {
+              "width": {
+                "signal": "child_childWidth"
+              },
+              "height": {
+                "signal": "child_height"
+              }
+            }
+          },
+          "marks": [
+            {
+              "name": "child_concat_0_marks",
+              "type": "symbol",
+              "style": [
+                "point"
+              ],
+              "from": {
+                "data": "data_0"
+              },
+              "encode": {
+                "update": {
+                  "opacity": {
+                    "value": 0.7
+                  },
+                  "fill": {
+                    "value": "transparent"
+                  },
+                  "stroke": {
+                    "value": "#4c78a8"
+                  },
+                  "ariaRoleDescription": {
+                    "value": "point"
+                  },
+                  "description": {
+                    "signal": "\"x: \" + (format(datum[\"x\"], \"\")) + \"; y: \" + (format(datum[\"y\"], \"\"))"
+                  },
+                  "x": {
+                    "scale": "child_concat_0_x",
+                    "field": "x"
+                  },
+                  "y": {
+                    "scale": "child_concat_0_y",
+                    "field": "y"
+                  }
+                }
+              }
+            }
+          ],
+          "axes": [
+            {
+              "scale": "child_concat_0_x",
+              "orient": "bottom",
+              "gridScale": "child_concat_0_y",
+              "grid": true,
+              "tickCount": {
+                "signal": "ceil(child_childWidth/40)"
+              },
+              "domain": false,
+              "labels": false,
+              "aria": false,
+              "maxExtent": 0,
+              "minExtent": 0,
+              "ticks": false,
+              "zindex": 0
+            },
+            {
+              "scale": "child_concat_0_y",
+              "orient": "left",
+              "gridScale": "child_concat_0_x",
+              "grid": true,
+              "tickCount": {
+                "signal": "ceil(child_height/40)"
+              },
+              "domain": false,
+              "labels": false,
+              "aria": false,
+              "maxExtent": 0,
+              "minExtent": 0,
+              "ticks": false,
+              "zindex": 0
+            },
+            {
+              "scale": "child_concat_0_x",
+              "orient": "bottom",
+              "grid": false,
+              "title": "x",
+              "labelFlush": true,
+              "labelOverlap": true,
+              "tickCount": {
+                "signal": "ceil(child_childWidth/40)"
+              },
+              "zindex": 0
+            },
+            {
+              "scale": "child_concat_0_y",
+              "orient": "left",
+              "grid": false,
+              "title": "y",
+              "labelOverlap": true,
+              "tickCount": {
+                "signal": "ceil(child_height/40)"
+              },
+              "zindex": 0
+            }
+          ]
+        },
+        {
+          "type": "group",
+          "name": "child_concat_1_group",
+          "style": "cell",
+          "encode": {
+            "update": {
+              "width": {
+                "signal": "child_childWidth"
+              },
+              "height": {
+                "signal": "child_height"
+              }
+            }
+          },
+          "signals": [
+            {
+              "name": "height",
+              "update": "child_height"
+            }
+          ],
+          "marks": [
+            {
+              "name": "child_concat_1_marks",
+              "type": "rect",
+              "style": [
+                "bar"
+              ],
+              "from": {
+                "data": "data_1"
+              },
+              "encode": {
+                "update": {
+                  "fill": {
+                    "value": "#4c78a8"
+                  },
+                  "ariaRoleDescription": {
+                    "value": "bar"
+                  },
+                  "description": {
+                    "signal": "\"y: \" + (format(datum[\"y\"], \"\"))"
+                  },
+                  "x": {
+                    "scale": "child_concat_1_x",
+                    "field": "y_end"
+                  },
+                  "x2": {
+                    "scale": "child_concat_1_x",
+                    "field": "y_start"
+                  },
+                  "yc": {
+                    "signal": "child_height",
+                    "mult": 0.5
+                  },
+                  "height": {
+                    "signal": "0.9 * height"
+                  }
+                }
+              }
+            }
+          ],
+          "axes": [
+            {
+              "scale": "child_concat_1_x",
+              "orient": "bottom",
+              "grid": true,
+              "tickCount": {
+                "signal": "ceil(child_childWidth/40)"
+              },
+              "domain": false,
+              "labels": false,
+              "aria": false,
+              "maxExtent": 0,
+              "minExtent": 0,
+              "ticks": false,
+              "zindex": 0
+            },
+            {
+              "scale": "child_concat_1_x",
+              "orient": "bottom",
+              "grid": false,
+              "title": "y",
+              "labelFlush": true,
+              "labelOverlap": true,
+              "tickCount": {
+                "signal": "ceil(child_childWidth/40)"
+              },
+              "zindex": 0
+            }
+          ]
+        }
+      ],
+      "scales": [
+        {
+          "name": "child_concat_0_x",
+          "type": "linear",
+          "domain": {
+            "data": "data_0",
+            "field": "x"
+          },
+          "range": [
+            0,
+            {
+              "signal": "child_childWidth"
+            }
+          ],
+          "nice": true,
+          "zero": true
+        },
+        {
+          "name": "child_concat_0_y",
+          "type": "linear",
+          "domain": {
+            "data": "data_0",
+            "field": "y"
+          },
+          "range": [
+            {
+              "signal": "child_height"
+            },
+            0
+          ],
+          "nice": true,
+          "zero": true
+        },
+        {
+          "name": "child_concat_1_x",
+          "type": "linear",
+          "domain": {
+            "data": "data_1",
+            "fields": [
+              "y_start",
+              "y_end"
+            ]
+          },
+          "range": [
+            0,
+            {
+              "signal": "child_childWidth"
+            }
+          ],
+          "nice": true,
+          "zero": true
+        }
+      ]
+    }
+  ]
+}
