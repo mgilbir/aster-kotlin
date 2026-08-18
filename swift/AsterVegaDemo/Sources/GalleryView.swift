@@ -37,7 +37,7 @@ struct GalleryView: View {
           NavigationLink(value: Self.pasteDestination) {
             VStack(alignment: .leading, spacing: 2) {
               Text("Paste a specification").font(.body)
-              Text("your own Vega JSON, with its controls")
+              Text("your own Vega or Vega-Lite, with its controls")
                 .font(.caption)
                 .foregroundStyle(Color.secondary)
             }
