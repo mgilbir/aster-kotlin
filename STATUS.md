@@ -4951,10 +4951,31 @@ shared `childWidth` was written into the plain plot's marks and scales. No galle
 trellis beside a plain plot of matching size, which is why 627 clean examples had not caught it;
 `facet-concat-size.vl.json` does.
 
-What is still refused by name is a **repetition inside a grid**: a repeat below a facet is not
-normalised where it stands. The two tests that assert an unimplemented composition is reported have
-now been repointed twice as the compositions above them were implemented, which is the honest
-maintenance cost of asserting on a limitation rather than on a rule.
+### What a grid cannot hold, said rather than approximated
+
+Probing the compositions *around* the nesting found a worse failure than a refusal. A
+**concatenation inside a grid** used to compile, and compile to the wrong chart: the facet channels
+were carried down into a leaf that never reads an encoding, so the grid vanished and what came out
+was a bare concatenation — with no diagnostic at all. A wrong chart with nothing said is the failure
+this project least wants, and it was reachable from four lines of specification.
+
+Upstream puts a `ConcatModel` under the `FacetModel` for that chart. This compiler puts a grid
+*inside* a plot and has no way to put plots inside a cell, so the two compositions work one way
+round and not the other: a grid inside a concatenation compiles, a concatenation inside a grid is
+refused by name. A `repeat` there is the same thing, becoming a concatenation before anything looks
+at it.
+
+Beside it, a report that named the wrong thing. A **composition inside a layer** — which is not a
+chart Vega-Lite describes, and which upstream throws on while normalising — was reported as a
+*missing mark*: a `facet` has no `mark` of its own, so the innermost check failed first and sent the
+reader looking for a mark in a specification whose trouble was the composition around it.
+
+So three compositions now report by name, and the two tests that assert an unimplemented composition
+is reported have been repointed twice as the compositions above them were implemented. That is the
+maintenance cost of asserting on a limitation rather than on a rule, and worth paying while any
+limitation is left — but the assertions worth more are the two that pin the *reporting*, because
+both of those cases were wrong in a way no fixture could have caught: one compiled the wrong chart,
+and the other blamed the wrong line.
 
 ### A grid belongs to the plot that holds it
 

@@ -72,6 +72,23 @@ internal object FacetOperator {
       node = template
     }
     val leaf = node
+    // A grid's cell is a view or a **layer** of views. Anything else is a different composition:
+    // upstream puts a `ConcatModel` under the `FacetModel`, where this compiler puts a grid
+    // *inside*
+    // a plot and has no way to put plots inside a cell. Refused by name rather than approximated —
+    // the facet channels were being carried down into a leaf that never reads an encoding, so the
+    // chart came out as a bare concatenation with no grid in it and nothing said.
+    for (composition in listOf("hconcat", "vconcat", "concat", "repeat")) {
+      if (!leaf.has(composition)) continue
+      diagnostics.fatal(
+        VegaLiteDiagnostics.UNSUPPORTED_COMPOSITION,
+        "A `$composition` inside a `facet` is not implemented; a grid's cell is a view or a " +
+          "layer of views. A grid inside a concatenation does compile, which is the same two " +
+          "compositions the other way round.",
+        jsonPath = "$.spec.$composition",
+      )
+      return null
+    }
     val outermost = levels.first()
     val mapping = outermost.has("row") || outermost.has("column")
 
