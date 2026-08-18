@@ -88,6 +88,16 @@ internal class Selection(
    */
   var owner: UnitView? = null
 
+  /**
+   * `UnitModel.hasProjection` for the unit this selection was declared on — whether it draws a map.
+   *
+   * Filled in by [of] rather than read off [owner], because a condition testing this selection is
+   * compiled while the encoding is parsed, which is before any view has been named or claimed one.
+   * A brush that reached the marks by identity and a test that still compared columns was the whole
+   * of what was left wrong once the machinery was right.
+   */
+  var onGeography: Boolean = false
+
   /** `unitName`: the declaring view's name, as the expression a tuple records. */
   /**
    * The name a picked tuple records — the model it was picked in.
@@ -114,9 +124,15 @@ internal class Selection(
       else
         type == "point" && !bindsScales && (on as? VegaValue.Obj)?.string("type") != "pointerover"
 
-  /** Whether a picked row is remembered by its **identity** rather than by any column of it. */
+  /**
+   * Whether a picked row is remembered by its **identity** rather than by any column of it.
+   *
+   * `proj.hasSelectionId`, which two different specifications reach: a click that names neither a
+   * field nor an encoding, and — whatever it names — a drag over a **map**, where `interval.parse`
+   * writes `fields = [SELECTION_ID]` because there is no scaled channel to invert a pixel through.
+   */
   val byIdentity: Boolean
-    get() = type != "interval" && fields.isEmpty() && channels.isEmpty()
+    get() = throughProjection() || (type != "interval" && fields.isEmpty() && channels.isEmpty())
 
   /** Whether the voronoi overlay's cells are stripes along one channel rather than tiles. */
   private fun projectedChannels(view: UnitView): Set<String> =
@@ -145,6 +161,34 @@ internal class Selection(
     const val SELECTION_ID: String = "_vgsid_"
 
     /**
+     * The one-shot timer a brush over a map opens with — `GEO_INIT_TICK`, a workaround upstream
+     * carries for vega/vega#3481.
+     *
+     * Such a brush finds its rows by intersecting its rectangle with the drawn marks, and on the
+     * first pulse there are no drawn marks to intersect with: the scenegraph is not populated yet.
+     * So a timer fires once and pulses the dataflow again, and it returns an object rather than a
+     * value so that it settles after that one tick instead of firing forever.
+     */
+    const val GEO_INIT_TICK: String = "geo_interval_init_tick"
+
+    /** The tick itself, written once however many brushes over maps a chart opens with. */
+    fun geoInitTick(): VegaValue = obj {
+      put("name", GEO_INIT_TICK)
+      put("value", VegaValue.Null)
+      put(
+        "on",
+        arr(
+          listOf(
+            obj {
+              put("events", "timer{1}")
+              put("update", "$GEO_INIT_TICK === null ? {} : $GEO_INIT_TICK")
+            }
+          )
+        ),
+      )
+    }
+
+    /**
      * `defaultConfig` in `selection.ts` — the parts of a selection a specification leaves out.
      *
      * A `point` selection is clicked, remembers rows by identity, toggles with the shift key and
@@ -159,14 +203,25 @@ internal class Selection(
      */
     fun of(spec: VegaValue.Obj): List<Selection> {
       val found = mutableListOf<Selection>()
-      fun walk(node: VegaValue.Obj) {
-        found += from(node.array("params").orEmpty())
+      // `UnitModel.hasProjection`, asked of the unit each selection is **declared on** and asked
+      // here rather than of the view later: a condition testing the selection is compiled while the
+      // encoding is being parsed, which is before any view has been named or claimed. A layer's
+      // shared encoding is handed down, so the channels are the union of what stands above and what
+      // the unit writes itself.
+      fun walk(node: VegaValue.Obj, above: Set<String>) {
+        val channels = above + node.obj("encoding")?.fields?.keys.orEmpty()
+        val geography =
+          node["mark"].let { it == VegaValue.Str("geoshape") || it.string("type") == "geoshape" } ||
+            channels.any { it in Channels.GEO_POSITION_CHANNELS }
+        found += from(node.array("params").orEmpty()).onEach { it.onGeography = geography }
         for (composition in listOf("layer", "hconcat", "vconcat", "concat")) {
-          node.array(composition).orEmpty().forEach { (it as? VegaValue.Obj)?.let(::walk) }
+          node.array(composition).orEmpty().forEach {
+            (it as? VegaValue.Obj)?.let { child -> walk(child, channels) }
+          }
         }
-        node.obj("spec")?.let(::walk)
+        node.obj("spec")?.let { walk(it, channels) }
       }
-      walk(spec)
+      walk(spec, emptySet())
       // **Not** deduplicated by name: a selection belongs to a unit, and two plots may each declare
       // one called `hover`. They share a store and a resolve signal, and each still needs its own
       // machinery in its own group, or only the plot that happened to be walked first reacts.
@@ -309,9 +364,7 @@ internal class Selection(
     private fun numeric(value: VegaValue): Double = (value as? VegaValue.Num)?.value ?: 0.0
 
     /** Whether anything in this chart remembers a row by its identity, which needs `_vgsid_`. */
-    fun needsIdentity(selections: List<Selection>): Boolean = selections.any {
-      it.type == "point" && it.byIdentity
-    }
+    fun needsIdentity(selections: List<Selection>): Boolean = selections.any { it.byIdentity }
   }
 
   /**
@@ -379,7 +432,24 @@ internal class Selection(
         ),
       )
     }
-    if (view != null && initial != null && projected.isNotEmpty()) {
+    // A brush over a **map** remembers rows, so the row it opens with is written as an identity
+    // rather than as an extent with a projection beside it: `{unit, _vgsid_: …}` against
+    // `{unit, fields, values}`. The values are still the stated latitudes — they are what the
+    // first tick brushes with — and the store's own sort by `_vgsid_` comes from [byIdentity].
+    if (view != null && initial != null && projected.isNotEmpty() && byIdentity) {
+      val first = intervalProjections(view).first()
+      put(
+        "values",
+        arr(
+          listOf(
+            obj {
+              put("unit", owner?.name ?: "")
+              put(SELECTION_ID, arr(initial.array(first.written).orEmpty()))
+            }
+          )
+        ),
+      )
+    } else if (view != null && initial != null && projected.isNotEmpty()) {
       put(
         "values",
         arr(
@@ -447,45 +517,93 @@ internal class Selection(
     if (projected.isEmpty()) return emptyList()
     val brush = "${name}_brush"
     val out = mutableListOf<VegaValue>()
-    val dataSignals = projected.map { (_, field) -> "${name}_${Fields.varName(field)}" }
-    val tupleValue =
-      "unit: $unit, fields: ${name}_tuple_fields, values: " +
-        "[${projected.joinToString(", ") { (channel, _) ->
-          "[" + (initial?.array(channel).orEmpty()).joinToString(", ") { literal(it) } + "]"
-        }}]"
-    out += obj {
-      put("name", "${name}_tuple")
-      if (initial != null) put("init", "{$tupleValue}")
-      put(
-        "on",
-        arr(
-          listOf(
-            obj {
-              put("events", arr(listOf(obj { put("signal", dataSignals.joinToString(" || ")) })))
-              put(
-                "update",
-                "${dataSignals.joinToString(" && ")} ? {unit: $unit, " +
-                  "fields: ${name}_tuple_fields, values: [${dataSignals.joinToString(",")}]} : null",
-              )
+    val items = intervalProjections(view)
+    if (throughProjection()) {
+      // A brush over a map picks the **rows its rectangle covers**. There is no scaled channel to
+      // invert a pixel through, so `intersect` asks the scenegraph which marks fall inside the
+      // rectangle and `vlSelectionTuples` turns each into a tuple carrying that row's identity.
+      // A channel the brush does not run along spans the plot, which is what makes a one-channel
+      // brush a band across the map rather than a line.
+      val across = items.firstOrNull { it.channel == "x" }
+      val down = items.firstOrNull { it.channel == "y" }
+      val box =
+        "[[${across?.let { "${it.visual}[0]" } ?: "0"}, ${down?.let { "${it.visual}[0]" } ?: "0"}]," +
+          "[${across?.let { "${it.visual}[1]" } ?: view.widthSignal}, " +
+          "${down?.let { "${it.visual}[1]" } ?: view.heightSignal}]]"
+      out += obj {
+        put("name", "${name}_tuple")
+        put(
+          "on",
+          arr(
+            listOf(
+              obj {
+                put(
+                  "events",
+                  arr(
+                    // **One** entry for both channels, not one each: a drag moves them together,
+                    // and two entries would build the tuple twice for every pointer move.
+                    listOfNotNull(
+                      items
+                        .takeIf { it.isNotEmpty() }
+                        ?.let { obj { put("signal", it.joinToString(" || ") { p -> p.visual }) } },
+                      // The scenegraph is not populated on the first pulse, so a brush that opens
+                      // already drawn has nothing to intersect with until something pulses the
+                      // dataflow again. That is what the tick is for.
+                      initial?.let { obj { put("signal", GEO_INIT_TICK) } },
+                    )
+                  ),
+                )
+                put(
+                  "update",
+                  "vlSelectionTuples(intersect($box, " +
+                    "{markname: ${quoted(view.prefixed("marks"))}}, unit.mark), {unit: $unit})",
+                )
+              }
+            )
+          ),
+        )
+      }
+    } else {
+      val dataSignals = items.map { it.data ?: Fields.varName("${name}_${it.field}") }
+      val tupleValue =
+        "unit: $unit, fields: ${name}_tuple_fields, values: " +
+          "[${items.joinToString(", ") { item ->
+            "[" + (initial?.array(item.written).orEmpty()).joinToString(", ") { literal(it) } + "]"
+          }}]"
+      out += obj {
+        put("name", "${name}_tuple")
+        if (initial != null) put("init", "{$tupleValue}")
+        put(
+          "on",
+          arr(
+            listOf(
+              obj {
+                put("events", arr(listOf(obj { put("signal", dataSignals.joinToString(" || ")) })))
+                put(
+                  "update",
+                  "${dataSignals.joinToString(" && ")} ? {unit: $unit, " +
+                    "fields: ${name}_tuple_fields, values: [${dataSignals.joinToString(",")}]} : null",
+                )
+              }
+            )
+          ),
+        )
+      }
+      out += obj {
+        put("name", "${name}_tuple_fields")
+        put(
+          "value",
+          arr(
+            projected.map { (channel, field) ->
+              obj {
+                put("field", field)
+                put("channel", channel)
+                put("type", projectionType(view, channel))
+              }
             }
-          )
-        ),
-      )
-    }
-    out += obj {
-      put("name", "${name}_tuple_fields")
-      put(
-        "value",
-        arr(
-          projected.map { (channel, field) ->
-            obj {
-              put("field", field)
-              put("channel", channel)
-              put("type", projectionType(view, channel))
-            }
-          }
-        ),
-      )
+          ),
+        )
+      }
     }
     // A brush is grabbed **on the brush** — the selector's own streams, each scoped to the brush
     // mark; a bound scale is grabbed anywhere in the plot, there being no rectangle to take hold
@@ -506,13 +624,21 @@ internal class Selection(
               put(
                 "update",
                 "{x: x(unit), y: y(unit)" +
-                  projected.joinToString("") { (channel, _) ->
-                    // A bound scale is panned from its **domain**, a brush from its own pixels.
-                    val extent =
-                      if (bindsScales) "domain(${quoted(view.scale(channel))})"
-                      else "slice(${name}_$channel)"
-                    ", extent_$channel: $extent"
-                  } +
+                  // `translate.ts` writes `extent_x` and then `extent_y`, whichever channel the
+                  // selection was projected onto first — a brush over a map is projected in the
+                  // order the stated extent named its places, and the anchor is written in the
+                  // order the page runs.
+                  listOf("x", "y")
+                    .mapNotNull { channel ->
+                      val item =
+                        items.firstOrNull { it.channel == channel } ?: return@mapNotNull null
+                      // A bound scale is panned from its **domain**, a brush from its own pixels.
+                      val extent =
+                        if (bindsScales) "domain(${quoted(view.scale(channel))})"
+                        else "slice(${item.visual})"
+                      ", extent_$channel: $extent"
+                    }
+                    .joinToString("") +
                   "}",
               )
             }
@@ -613,12 +739,12 @@ internal class Selection(
     if (bindsScales) return emptyList()
     val projected = intervalChannels(view)
     if (projected.isEmpty()) return emptyList()
-    val channels = projected.map { it.first }.toSet()
+    val pixels = intervalProjections(view).associate { it.channel to it.visual }
     val store = "data(${quoted(store)})"
     fun place(channel: String, far: Boolean): VegaValue {
       val own: VegaValue.Obj =
-        if (channel in channels) {
-          obj { put("signal", "${name}_$channel[${if (far) 1 else 0}]") }
+        if (channel in pixels) {
+          obj { put("signal", "${pixels.getValue(channel)}[${if (far) 1 else 0}]") }
         } else if (far) {
           obj { put("field", obj { put("group", if (channel == "x") "width" else "height") }) }
         } else {
@@ -667,10 +793,13 @@ internal class Selection(
     }
     val outlined = obj {
       update.fields.forEach { (key, value) -> put(key, value) }
+      // Across before down, as `vgStroke` tests them, whichever channel was projected first.
       val visible =
-        projected.joinToString(" && ") { (channel, _) ->
-          "${name}_$channel[0] !== ${name}_$channel[1]"
-        }
+        listOf("x", "y")
+          .mapNotNull { pixels[it] }
+          .joinToString(" && ") { signal ->
+            "$signal[0] !== $signal[1]"
+          }
       // Everything but the fill is painted **over** the marks, and only while the brush has extent:
       // a rectangle of no width is a click, and outlining it would draw a line across the plot.
       brushPaint.fields.forEach { (key, value) ->
@@ -1316,17 +1445,60 @@ internal class Selection(
     if (projected.isEmpty()) return out
     if (bindsScales) return boundScaleSignals(view, projected)
     val dragStreams = dragStreams()
+    val items = intervalProjections(view)
+    val geo = throughProjection()
+    // A brush over a map is placed by **inverting the projection once**, not by scaling each end:
+    // the two stated places are turned into two points on the page, and each channel then takes
+    // the coordinate it runs along. A brush along one channel only has no place for the other, so
+    // it borrows the middle of the plot — `projection_center`, which is what the middle of the
+    // page inverts back to.
+    if (geo && initial != null) {
+      val projection = quoted(view.projectionName)
+      val stated = { item: IntervalProjection, end: Int ->
+        initial.array(item.written)?.getOrNull(end)?.let { literal(it) }
+      }
+      val across = items.firstOrNull { it.channel == "x" }
+      val down = items.firstOrNull { it.channel == "y" }
+      if (across == null || down == null) {
+        out += obj {
+          put("name", "${view.projectionName}_center")
+          put(
+            "update",
+            "invert($projection, [${view.widthSignal}/2, ${view.heightSignal}/2])",
+          )
+        }
+      }
+      val centre = { index: Int -> "${view.projectionName}_center[$index]" }
+      val place = { end: Int ->
+        "scale($projection, [${across?.let { stated(it, end) } ?: centre(0)}, " +
+          "${down?.let { stated(it, end) } ?: centre(1)}])"
+      }
+      out += obj {
+        put("name", "${name}_init")
+        put("init", "[${place(0)}, ${place(1)}]")
+      }
+    }
 
-    for ((channel, field) in projected) {
-      val pixels = "${name}_$channel"
-      val data = "${name}_${Fields.varName(field)}"
+    for (item in items) {
+      val (channel, field) = item.channel to item.field
+      val pixels = item.visual
+      val data = item.data ?: Fields.varName("${name}_$field")
       val size = if (channel == "x") view.widthSignal else view.heightSignal
       val scale = view.scale(channel)
-      val start = (initial?.array(channel))?.getOrNull(0)
-      val end = (initial?.array(channel))?.getOrNull(1)
+      val start = (initial?.array(item.written))?.getOrNull(0)
+      val end = (initial?.array(item.written))?.getOrNull(1)
       out += obj {
         put("name", pixels)
-        if (start != null && end != null) {
+        if (geo) {
+          // The brush's own end of `_init`: each channel takes the coordinate it runs along, out
+          // of the pair of points the two stated places projected to.
+          val coordinate = if (channel == "x") 0 else 1
+          if (start != null && end != null) {
+            put("init", "[${name}_init[0][$coordinate], ${name}_init[1][$coordinate]]")
+          } else {
+            put("value", arr(emptyList()))
+          }
+        } else if (start != null && end != null) {
           put(
             "init",
             "[scale(${quoted(scale)}, ${literal(start)}), scale(${quoted(scale)}, ${literal(end)})]",
@@ -1357,18 +1529,22 @@ internal class Selection(
               )
             } +
               listOfNotNull(
-                obj {
-                  put("events", obj { put("signal", "${name}_scale_trigger") })
-                  // A **continuous** scale can be panned and zoomed, so the brush is rewritten in
-                  // its new pixels; a band or a point scale cannot be, so any other change to its
-                  // domain — a filter, a new category — clears the brush instead of moving it.
-                  put(
-                    "update",
-                    if (continuous(view, channel))
-                      "[scale(${quoted(scale)}, $data[0]), scale(${quoted(scale)}, $data[1])]"
-                    else "[0, 0]",
-                  )
-                },
+                // A brush over a map has no scale to react to, and nothing to rewrite itself from
+                // if it did: its pixels are the whole of what it knows.
+                if (geo) null
+                else
+                  obj {
+                    put("events", obj { put("signal", "${name}_scale_trigger") })
+                    // A **continuous** scale can be panned and zoomed, so the brush is rewritten in
+                    // its new pixels; a band or a point scale cannot be, so any other change to its
+                    // domain — a filter, a new category — clears the brush instead of moving it.
+                    put(
+                      "update",
+                      if (continuous(view, channel))
+                        "[scale(${quoted(scale)}, $data[0]), scale(${quoted(scale)}, $data[1])]"
+                      else "[0, 0]",
+                    )
+                  },
                 clear?.let {
                   obj {
                     put(
@@ -1404,6 +1580,9 @@ internal class Selection(
           ),
         )
       }
+      // What the pixels invert to, which a brush over a map does not have: there is no scale to
+      // invert through, and the rows it covers are found by intersecting the rectangle instead.
+      if (geo) continue
       out += obj {
         put("name", data)
         if (start != null && end != null) put("init", "[${literal(start)}, ${literal(end)}]")
@@ -1423,6 +1602,7 @@ internal class Selection(
         )
       }
     }
+    if (geo) return out
 
     // A change of *scale* rewrites the brush rather than clearing it: the trigger fires whenever a
     // scale it reads is rebuilt, and every channel whose data extent no longer matches its pixels
@@ -1603,8 +1783,16 @@ internal class Selection(
 
   private fun channelProjections(view: UnitView): List<Pair<String, String>> {
     // A selection that states neither is projected onto **x and y** if it is dragged, and onto the
-    // row's own identity if it is clicked — so a click has no channel projection at all.
-    val wanted = channels.ifEmpty { if (type == "interval") listOf("x", "y") else emptyList() }
+    // row's own identity if it is clicked — so a click has no channel projection at all. Over a
+    // map it is onto **longitude and latitude**, or onto whatever the stated starting extent named.
+    val wanted = channels.ifEmpty {
+      when {
+        type != "interval" -> emptyList()
+        !throughProjection() -> listOf("x", "y")
+        else ->
+          (initial as? VegaValue.Obj)?.fields?.keys?.toList() ?: Channels.GEO_POSITION_CHANNELS
+      }
+    }
     return wanted
       .mapNotNull { channel ->
         val def = view.spec.fieldDef(channel) ?: return@mapNotNull null
@@ -1618,7 +1806,11 @@ internal class Selection(
         // placed
         // by and so the one an inverted pixel extent can be compared with.
         val field = if (def.timeUnit != null) Fields.vgField(def) else def.field
-        channel to field
+        // `getPositionChannelFromLatLong`: a place is dragged along the page, not along a scale, so
+        // a geographic channel is remapped onto the position channel it is drawn on. What it was
+        // written as still matters — it is what the pixel signal is named for — and that is kept in
+        // [IntervalProjection] rather than here, where a point selection reads the same list.
+        (Channels.positionOfGeo(channel) ?: channel) to field
       }
       // "Prevent duplicate projections on the same field." One column bound to **both** channels
       // is one projection, keyed by the field and keeping the channel that reached it first: the
@@ -1650,6 +1842,66 @@ internal class Selection(
   fun intervalChannels(view: UnitView): List<Pair<String, String>> =
     if (type != "interval") emptyList()
     else channelProjections(view).filter { it.first == "x" || it.first == "y" }
+
+  /**
+   * One channel a brush is dragged along, with the two signals it is worked through.
+   *
+   * The names come from `signalName`, which is not the mechanical thing it looks like: the *data*
+   * name is taken first, from the **field**, and the *visual* name second, from the **channel as
+   * written** — before a geographic channel has been remapped onto its position. So a brush over
+   * `latitude` asks for `brush_latitude` twice and the second one is given `brush_latitude_1`,
+   * which is where that suffix comes from and why it appears over a map and nowhere else.
+   */
+  class IntervalProjection(
+    /** `x` or `y`: where on the page the drag runs, a place having been remapped onto it. */
+    val channel: String,
+    /** The channel the specification wrote, which is what a stated starting extent is keyed by. */
+    val written: String,
+    val field: String,
+    /** The pixel extent the drag writes. */
+    val visual: String,
+    /** What that extent inverts to. A brush over a map has none — it picks rows, not values. */
+    val data: String?,
+  )
+
+  /** [intervalChannels], with the signal names each channel is worked through. */
+  fun intervalProjections(view: UnitView): List<IntervalProjection> {
+    if (type != "interval") return emptyList()
+    val geo = throughProjection()
+    val written = channels.ifEmpty {
+      if (!geo) listOf("x", "y")
+      else (initial as? VegaValue.Obj)?.fields?.keys?.toList() ?: Channels.GEO_POSITION_CHANNELS
+    }
+    // Paired with the channel *as written*, so the remap can be undone for the naming. Both lists
+    // are built by the same walk, so a channel dropped by one — an aggregate, a missing field — is
+    // dropped by the other and the two stay in step.
+    val remapped = channelProjections(view).filter { it.first == "x" || it.first == "y" }
+    val original = written.filter { channel ->
+      view.spec.fieldDef(channel)?.let { it.aggregate == null && it.field != null } == true
+    }
+    return remapped.mapIndexed { index, (channel, field) ->
+      val written = original.getOrNull(index) ?: channel
+      val data = Fields.varName("${name}_$field")
+      val visual = Fields.varName("${name}_$written")
+      IntervalProjection(
+        channel = channel,
+        written = written,
+        field = field,
+        visual = if (visual == data) "${visual}_1" else visual,
+        data = if (geo) null else data,
+      )
+    }
+  }
+
+  /**
+   * `model.hasProjection` in `interval.parse`: whether this brush is dragged over a **map**.
+   *
+   * It changes what the brush *is*. A brush over two scales remembers the extent it inverts to and
+   * tests a row by comparing columns; a brush over a projection has no scaled channel to invert
+   * through, so it remembers the **rows it covers** — `fields = [SELECTION_ID]` — found by
+   * intersecting its rectangle with the marks themselves.
+   */
+  fun throughProjection(): Boolean = type == "interval" && onGeography && !bindsScales
 
   /** The top-level signal the tests read: the store, resolved into one set of picked values. */
   fun resolveSignal(): VegaValue = obj {

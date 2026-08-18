@@ -698,7 +698,7 @@ no data is needed to compare two compilers. So every one of them was compiled by
 by this one, and the outputs compared property by property. That is a *measurement*, not a gate: the
 examples are not fixtures here, and nothing about them is checked in.
 
-**124 of 627 matched exactly** at the start, and **622** do now.
+**124 of 627 matched exactly** at the start, and **624** do now.
 
 The value is the *ranking*. The first sweep clustered by root cause, and the three most damaging
 causes were fixed straight away — chosen for what they do to the *picture* rather than for
@@ -713,14 +713,9 @@ frequency:
   where this compiler used `step - 2`, making it nearly four times too wide. `getBandSize` asks the
   scale's kind first and reaches `discreteBandSize` only where the domain is discrete.
 
-The sweep has been the working list ever since, and the 5 that still differ cluster like this:
-
-| Files | Cause |
-| --- | --- |
-| 3 | a facet inside a **facet**, which is the only thing still refused by name and is described below |
-| 2 | the two interactive maps that brush **through a projection**, which the selection machinery has no case for |
-
-Nothing else in the gallery differs at all, and nothing outside those two causes is refused.
+The sweep has been the working list ever since, and **3** examples still differ. All three are one
+cause — a facet inside a **facet**, described below — and it is the only thing left refused by name.
+Nothing else in the gallery differs at all.
 
 
 The count went 124 → 138 clean, which understates it: a cause is fixed for every file that carries
@@ -4681,6 +4676,70 @@ agreed is still merged around them.
 `geo-repeat.vl.json` pins both halves against upstream — two copies, two joins, one projection. It
 is the counterpart of `geo-trellis.vl.json`, which pins the same picture drawn as a grid of cells
 rather than as separate plots.
+
+### A brush over a map picks rows, not values
+
+The last two geographic charts drag a brush across a map, and a brush over a map is a **different
+kind of selection** from a brush over two scales — not the same one with a projection in the way.
+That is the whole of it, and everything else follows.
+
+An ordinary brush remembers the extent it inverts to and tests a row by comparing columns against
+it. A map has no scaled channel to invert a pixel through, so `interval.parse` writes `fields =
+[SELECTION_ID]` and the brush remembers **the rows its rectangle covers**: `intersect` asks the
+scenegraph which marks fall inside the rectangle and `vlSelectionTuples` turns each into a tuple
+carrying that row's identity. So the store sorts by `_vgsid_`, the condition tests with
+`vlSelectionIdTest`, there is no `_tuple_fields` and no data signal at all — the pixels are the whole
+of what the brush knows.
+
+Four smaller things hang off that, each of which was its own difference:
+
+- **The channels are places, and places are remapped.** `getPositionChannelFromLatLong` turns
+  `longitude` into `x` and `latitude` into `y`, so a brush declared over latitude is dragged down the
+  page. What it was *written* as still matters, because the pixel signal is named for it: the data
+  name is taken first from the field and the visual name second from the channel-as-written, so a
+  brush over a column called `latitude` asks for `brush_latitude` twice and the second is given
+  `brush_latitude_1`. That suffix is a collision, not an index, and it appears over a map and
+  nowhere else.
+- **A one-channel brush borrows the middle of the plot.** The two stated places have to be projected
+  to two points, and a brush along latitude alone has no longitude to project with; it takes
+  whatever the centre of the page inverts back to — which is all `projection_center` is. The
+  rectangle then spans the plot the other way, making the brush a band across the map rather than a
+  line.
+- **An aggregate's rows have no identity yet**, so a view whose selection remembers rows by identity
+  writes one again below its aggregate — including an aggregate the specification *stated*, which is
+  where this compiler had the rule only for one an encoding asked for. A map of aggregated places is
+  exactly the case: without it the circles cannot be picked at all.
+- **The scenegraph is empty on the first pulse.** A brush that opens already drawn has nothing to
+  intersect with, so upstream ticks a one-shot timer to pulse the dataflow again —
+  `geo_interval_init_tick`, a workaround it carries for vega/vega#3481. It returns an object rather
+  than a value so that it settles after that tick instead of firing forever.
+
+Two orderings are worth writing down because they are not the same ordering. The **projection**
+order is the order the specification named its places — a `value` of `{latitude, longitude}` is
+projected latitude first — and the tuple's event signal is joined in that order, as one entry rather
+than one per channel, because a drag moves both together. The **page** order is always across and
+then down: `translate.ts` writes `extent_x` before `extent_y` and the brush's outline tests `x`
+before `y` whichever channel was projected first.
+
+`geo-brush.vl.json` and `geo-brush-one-channel.vl.json` pin the two shapes — and adding them found
+**two gaps in the runtime**, which is the thing worth recording here. Both fixtures compiled to
+specifications matching upstream property for property, and neither could be *drawn*: the end-to-end
+gate ran the compiled Vega and got a brush at the origin with no size.
+
+- `scale('projection', [lon, lat])` had no answer. Projections share the scale namespace in an
+  expression and this engine had only the backward half of that sharing — `invert` reached a
+  projection, `scale` did not — so the two stated corners of the brush never became points.
+- `conicEqualArea` had **no inverse at all**, and `albers` is that projection pointed at the United
+  States while `albersUsa` is three of them. So no map of the United States could read a point back
+  to a place, which is the family Vega-Lite reaches for there by default. A composite was thought to
+  have no single inverse; d3 answers it by asking which inset box the point falls in, which is a
+  rule and not an approximation.
+
+Neither was visible to the specification comparison, and both are exactly what the second gate
+exists for: a compiled specification that matches upstream and still draws the wrong picture.
+`ProjectionInverseTest` pins the arithmetic as a **round trip** against the forward direction, which
+is already verified path by path against d3's own output — so the fixed point is upstream's rather
+than a number typed here.
 
 ### A cell captions itself, and a caption may be two lines
 

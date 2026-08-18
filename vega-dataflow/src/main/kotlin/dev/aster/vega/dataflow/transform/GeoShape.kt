@@ -282,11 +282,34 @@ public object GeoMeasure {
    * A point on the page read back to longitude and latitude.
    *
    * `invert('projection', p)` — how a map turns where someone clicked into where on Earth that is.
-   * Null for a projection with no closed-form inverse, and for the composite ones, which are three
-   * projections and have no single answer.
+   * Null for a projection with no closed-form inverse.
+   *
+   * A **composite** was in that sentence too, on the reasoning that three projections have no one
+   * answer. They do: the insets sit at known offsets, so the point says which piece drew it. That
+   * left the family Vega-Lite reaches for on any United States chart unable to answer at all.
    */
   public fun invert(definition: ProjectionDefinition, x: Double, y: Double): DoubleArray? =
-    (definition.build() as? Projection)?.invert(x, y)
+    when (val projection = definition.build()) {
+      is Projection -> projection.invert(x, y)
+      is AlbersUsa -> projection.invert(x, y)
+      else -> null
+    }
+
+  /**
+   * A place on the globe put on the page — the direction [invert] runs back from.
+   *
+   * `scale('projection', [lon, lat])`. Projections share the **scale namespace** in an expression,
+   * and this is the half of that sharing the engine did not have. A brush dragged over a map opens
+   * with two stated places and has to turn them into two points before it can be drawn, so without
+   * it the rectangle came out at the origin with no size at all. Composites answer here as readily
+   * as simple projections, which is why it asks for a [GeoProjector] rather than a [Projection] —
+   * placing a point forward is what every projection can do; only reading one back is special.
+   */
+  public fun project(
+    definition: ProjectionDefinition,
+    longitude: Double,
+    latitude: Double,
+  ): DoubleArray? = definition.build()?.apply(longitude, latitude)
 
   /**
    * The area a geometry covers once drawn, in square units of the page.
