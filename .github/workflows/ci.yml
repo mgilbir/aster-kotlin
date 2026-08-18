@@ -1,11 +1,18 @@
 name: CI
 
-# Every push and pull request. The repository had no CI at all until the release work needed it,
-# which meant `main` was only ever as green as the last person's local run.
+# `main` only, plus a manual trigger. Not pull requests: a run is about thirty minutes across the two
+# hosts, and at the rate branches land here that is not worth paying on every push to every branch.
+# The gates are the same ones `scripts/check.sh`, `scripts/oracle.sh` and `scripts/vega-lite-oracle.sh`
+# run locally, and running them locally before landing is the working agreement.
+#
+# What that trades away, so it is a choice rather than a surprise: nothing checks a branch on a host
+# other than the one it was written on, and a host-specific failure is found on `main` after the merge
+# rather than before it. Both failures this workflow has caught were exactly that kind — a `libm` that
+# rounds differently on glibc, and a font the runner resolves differently. So expect to fix forward on
+# `main` occasionally, and keep this green, because it is the gate a release is cut behind.
 on:
   push:
     branches: [main]
-  pull_request:
   workflow_dispatch:
 
 permissions:
@@ -37,21 +44,25 @@ jobs:
             oracles: "false"
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Set up JDK 21
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: "21"
 
       - name: Set up node
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
           node-version: "20"
 
       - name: Set up Gradle
-        uses: gradle/actions/setup-gradle@v4
+        # v5, not the current v6, and deliberately: v6 moved the caching component out of the
+        # open-source action into a separate library under Gradle's Terms of Use, which upgrading
+        # accepts on the project's behalf. v5 is what clears the Node 20 deprecation without taking
+        # that on. Revisit as a licensing decision, not a version bump.
+        uses: gradle/actions/setup-gradle@v5
 
       - name: Record upstream's test vectors
         # `check.sh` says it will skip the replays without these, but the replay guards also assert
@@ -114,7 +125,7 @@ jobs:
 
       - name: Build and check the Central bundle
         # Not only at release time. A publication that would be missing from the bundle is much
-        # cheaper to find on a pull request than on the one run that uploads it.
+        # cheaper to find on an ordinary run of `main` than on the one run that uploads it.
         if: runner.os == 'macOS'
         run: ./gradlew centralBundle verifyCentralBundle --no-configuration-cache
 
@@ -214,7 +225,7 @@ jobs:
 
       - name: Upload test reports
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: test-reports-${{ matrix.os }}
           path: |
