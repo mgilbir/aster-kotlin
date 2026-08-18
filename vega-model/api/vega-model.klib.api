@@ -211,6 +211,7 @@ abstract interface dev.aster.vega.model.locale/VegaCaptions { // dev.aster.vega.
     abstract fun boundaryDomain(kotlin.collections/List<kotlin/String>): kotlin/String // dev.aster.vega.model.locale/VegaCaptions.boundaryDomain|boundaryDomain(kotlin.collections.List<kotlin.String>){}[0]
     abstract fun channelName(kotlin/String): kotlin/String // dev.aster.vega.model.locale/VegaCaptions.channelName|channelName(kotlin.String){}[0]
     abstract fun continuousDomain(kotlin/String, kotlin/String): kotlin/String // dev.aster.vega.model.locale/VegaCaptions.continuousDomain|continuousDomain(kotlin.String;kotlin.String){}[0]
+    abstract fun denseChartSummary(kotlin/Int): kotlin/String // dev.aster.vega.model.locale/VegaCaptions.denseChartSummary|denseChartSummary(kotlin.Int){}[0]
     abstract fun discreteDomain(kotlin/Int, kotlin.collections/List<kotlin/String>, kotlin/String?): kotlin/String // dev.aster.vega.model.locale/VegaCaptions.discreteDomain|discreteDomain(kotlin.Int;kotlin.collections.List<kotlin.String>;kotlin.String?){}[0]
     abstract fun identityDomain(): kotlin/String // dev.aster.vega.model.locale/VegaCaptions.identityDomain|identityDomain(){}[0]
     abstract fun legend(kotlin/String, kotlin/String?, kotlin.collections/List<kotlin/String>, kotlin/String): kotlin/String // dev.aster.vega.model.locale/VegaCaptions.legend|legend(kotlin.String;kotlin.String?;kotlin.collections.List<kotlin.String>;kotlin.String){}[0]

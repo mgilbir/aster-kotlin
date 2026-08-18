@@ -1,5 +1,7 @@
 package dev.aster.vega.scene
 
+import dev.aster.vega.model.locale.VegaCaptions
+
 /**
  * One element a screen reader can land on: what to say, and where it is.
  *
@@ -26,6 +28,32 @@ public data class AccessibleElement(
    * tell from the label alone.
    */
   public val isSummary: Boolean = false,
+  /**
+   * The ARIA role this element came from: `graphics-symbol`, `graphics-object`, `axis`, `legend`.
+   *
+   * Carried because a host cannot otherwise tell an axis from a data point, and both hosts that
+   * consume this tree worked around its absence by announcing **everything** as a button —
+   * `className = "android.widget.Button"` on Android and `.isButton` on iOS. Announcing an axis
+   * caption as a button is wrong: a reader is told they can activate a thing that does nothing.
+   */
+  public val role: String? = null,
+  /**
+   * `aria-roledescription` — what kind of thing this is, in words, and in the chart's own language.
+   *
+   * The pair a reader actually hears: role `graphics-symbol` with "line mark" is heard as "line
+   * mark", where the role alone is heard as nothing useful.
+   */
+  public val roleDescription: String? = null,
+  /**
+   * Whether activating this element does anything — whether it stands for a **mark**.
+   *
+   * The other half of the same gap [role] closes. A host has to decide two things about an element:
+   * what to call it, and whether to offer an activation. Both hosts were guessing at the second by
+   * announcing everything as a button, so a reader was told they could activate an axis caption,
+   * and activating it did nothing. This is the engine's own answer: the descriptor sits on a node
+   * whose `NodeMetadata.role` is `mark`, so a tap on it reaches the dataflow.
+   */
+  public val activatable: Boolean = false,
 )
 
 /**
@@ -68,6 +96,12 @@ public object AccessibilityTree {
   public fun elements(
     scene: Scene,
     selectedNodeIds: Set<SceneNodeId> = emptySet(),
+    /**
+     * The language the one sentence this object writes itself is in — the dense-chart summary.
+     *
+     * Everything else here is a label the compiler already produced in the chart's own locale.
+     */
+    captions: VegaCaptions = VegaCaptions.English,
   ): List<AccessibleElement> {
     val describable =
       scene
@@ -81,11 +115,14 @@ public object AccessibilityTree {
     if (describable.size > MAX_EXPOSED_MARKS) {
       return listOf(
         AccessibleElement(
-          label = "Chart with ${describable.size} marks. Too dense to explore individually.",
+          label = captions.denseChartSummary(describable.size),
           bounds = scene.viewport,
           nodeId = null,
           selected = false,
           isSummary = true,
+          // A summary stands for the whole drawing, which is upstream's `graphics-document`.
+          role = "graphics-document",
+          roleDescription = null,
         )
       )
     }
@@ -100,6 +137,9 @@ public object AccessibilityTree {
         bounds = placed.worldBounds,
         nodeId = placed.node.id,
         selected = placed.node.id in selectedNodeIds,
+        role = descriptor.role,
+        roleDescription = descriptor.roleDescription,
+        activatable = placed.node.metadata.role == "mark",
       )
     }
   }

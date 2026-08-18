@@ -271,6 +271,7 @@ public abstract interface class dev/aster/vega/model/locale/VegaCaptions {
 	public abstract fun boundaryDomain (Ljava/util/List;)Ljava/lang/String;
 	public abstract fun channelName (Ljava/lang/String;)Ljava/lang/String;
 	public abstract fun continuousDomain (Ljava/lang/String;Ljava/lang/String;)Ljava/lang/String;
+	public abstract fun denseChartSummary (I)Ljava/lang/String;
 	public abstract fun discreteDomain (ILjava/util/List;Ljava/lang/String;)Ljava/lang/String;
 	public abstract fun identityDomain ()Ljava/lang/String;
 	public abstract fun legend (Ljava/lang/String;Ljava/lang/String;Ljava/util/List;Ljava/lang/String;)Ljava/lang/String;

@@ -77,6 +77,9 @@ class LocaleTest {
     override fun markRole(markType: String): String = "$markType-markering"
 
     override fun markContainerRole(markType: String): String = "$markType-markeringsgroep"
+
+    override fun denseChartSummary(marks: Int): String =
+      "Diagram met $marks markeringen. Te dicht om afzonderlijk te verkennen."
   }
 
   private val dutch =

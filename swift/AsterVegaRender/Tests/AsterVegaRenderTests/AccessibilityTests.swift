@@ -44,7 +44,7 @@ final class AccessibilityTests: XCTestCase {
     """
 
   func testAChartsMarksAreReadableAsAccessibleElements() throws {
-    let elements = AccessibilityTree.shared.elements(scene: try scene(bars), selectedNodeIds: [])
+    let elements = AccessibilityTree.shared.elements(scene: try scene(bars), selectedNodeIds: [], captions: VegaCaptionsCompanion.shared.English)
 
     XCTAssertFalse(elements.isEmpty, "a chart with described marks has elements to announce")
     // The engine builds each label from the mark's own description, which is what a reader hears.
@@ -84,7 +84,8 @@ final class AccessibilityTests: XCTestCase {
              "description": {"signal": "'point ' + datum.c"}}}}]}
         """
       ),
-      selectedNodeIds: []
+      selectedNodeIds: [],
+      captions: VegaCaptionsCompanion.shared.English
     )
 
     XCTAssertEqual(elements.count, 1, "a dense chart says what it is instead of enumerating itself")

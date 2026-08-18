@@ -229,7 +229,7 @@ struct SceneCanvas: View {
   private var accessibleElements: [(offset: Int, element: AccessibleElement)] {
     guard let scene = session?.scene ?? sceneIfDescribable else { return [] }
     return Array(
-      AccessibilityTree.shared.elements(scene: scene, selectedNodeIds: session?.selectedNodeIds ?? [])
+      AccessibilityTree.shared.elements(scene: scene, selectedNodeIds: session?.selectedNodeIds ?? [], captions: VegaCaptionsCompanion.shared.English)
         .enumerated()
     ).map { (offset: $0.offset, element: $0.element) }
   }

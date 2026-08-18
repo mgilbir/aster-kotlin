@@ -1,5 +1,6 @@
 package dev.aster.vega.scene
 
+import dev.aster.vega.model.locale.VegaCaptions
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertTrue
@@ -138,5 +139,87 @@ class AccessibilityTreeTest {
     val elements =
       AccessibilityTree.elements(sceneOf(mark("shown"), mark("gone").copy(visible = false)))
     assertEquals(listOf("shown"), elements.map { it.label })
+  }
+
+  /**
+   * What kind of thing an element is, which the tree used to drop on the floor.
+   *
+   * `AccessibilityDescriptor` has carried a `role` and a `roleDescription` since the aria channels
+   * were ported and every builder sets them, and `AccessibleElement` exposed neither — so a host
+   * could not tell an axis from a data point, and both of them worked around it by announcing
+   * everything as a button. Announcing a caption as a button tells a reader they can activate it,
+   * and then nothing happens when they try.
+   */
+  @Test
+  fun `an element carries its role, its role description and whether it can be activated`() {
+    val markNode =
+      RectNode(
+        id = ids.allocate(),
+        x = 0.0,
+        y = 0.0,
+        width = 10.0,
+        height = 10.0,
+        metadata =
+          NodeMetadata(
+            role = "mark",
+            accessibility =
+              AccessibilityDescriptor(
+                label = "Total",
+                value = "18",
+                role = "graphics-symbol",
+                roleDescription = "rect mark",
+                focusable = true,
+              ),
+          ),
+      )
+    val axisNode =
+      RectNode(
+        id = ids.allocate(),
+        x = 0.0,
+        y = 0.0,
+        width = 10.0,
+        height = 10.0,
+        metadata =
+          NodeMetadata(
+            role = "axis",
+            accessibility =
+              AccessibilityDescriptor(
+                label = "X-axis for a discrete scale",
+                role = "graphics-symbol",
+                roleDescription = "axis",
+                focusable = true,
+              ),
+          ),
+      )
+
+    val elements = AccessibilityTree.elements(sceneOf(markNode, axisNode))
+    val mark = elements.first { it.label.startsWith("Total") }
+    val axis = elements.first { it.label.startsWith("X-axis") }
+
+    assertEquals("graphics-symbol", mark.role)
+    assertEquals("rect mark", mark.roleDescription)
+    assertTrue(mark.activatable, "a mark is what a tap reaches")
+
+    assertEquals("axis", axis.roleDescription)
+    assertFalse(axis.activatable, "activating an axis caption does nothing, so do not offer it")
+  }
+
+  /** The one sentence the tree writes itself, in the chart's own language. */
+  @Test
+  fun `the dense-chart summary comes from the captions`() {
+    val dense = sceneOf(*Array(AccessibilityTree.MAX_EXPOSED_MARKS + 1) { mark("mark $it") })
+    val dutch =
+      object : VegaCaptions by VegaCaptions.English {
+        override fun denseChartSummary(marks: Int): String = "Diagram met $marks markeringen."
+      }
+
+    val element = AccessibilityTree.elements(dense, captions = dutch).single()
+    assertEquals(
+      "Diagram met ${AccessibilityTree.MAX_EXPOSED_MARKS + 1} markeringen.",
+      element.label,
+    )
+    assertTrue(element.isSummary)
+    assertEquals("graphics-document", element.role)
+    assertFalse(element.activatable, "a summary stands for the drawing, not for a mark")
   }
 }

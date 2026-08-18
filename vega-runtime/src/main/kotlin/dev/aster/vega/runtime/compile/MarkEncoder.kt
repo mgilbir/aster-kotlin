@@ -21,7 +21,12 @@ import dev.aster.vega.model.spec.EncodeEntry
 import dev.aster.vega.model.spec.FieldRef
 import dev.aster.vega.model.spec.MarkSpec
 import dev.aster.vega.model.spec.MarkType
+import dev.aster.vega.model.time.TimeFormat
+import dev.aster.vega.runtime.scale.LinearScale
 import dev.aster.vega.runtime.scale.PositionScale
+import dev.aster.vega.runtime.scale.SequentialColorScale
+import dev.aster.vega.runtime.scale.TimeScale
+import dev.aster.vega.runtime.scale.TransformedScale
 import dev.aster.vega.runtime.scale.VegaScale
 import dev.aster.vega.scene.AccessibilityDescriptor
 import dev.aster.vega.scene.ArcPath
@@ -69,6 +74,7 @@ import dev.aster.vega.scene.Transform2D
 import dev.aster.vega.scene.curve
 import dev.aster.vega.scene.spokenNumber
 import kotlin.math.pow
+import kotlinx.datetime.TimeZone
 
 /**
  * Turns a mark specification plus its data into scene nodes.
@@ -2010,6 +2016,57 @@ public class MarkEncoder(
     value.asNumberOrNull()?.let(::spokenNumber) ?: value.asString()
 
   /**
+   * A datum's value said the way the **scale that placed it** labels it.
+   *
+   * The defect this replaces was not a gap: `describe` read the raw column off the datum, and on
+   * any chart whose first scaled channel is temporal — which is every time series, and every
+   * payload a `timeUnit` produces — the first scaled channel is an instant. So a reader exploring a
+   * line of weekly scores heard "1781683200000: 5" where they expected "17 June: 5". The
+   * formatted text already existed a few files away, on the scale itself.
+   *
+   * Per scale kind, because each has its own answer and only the first is surprising:
+   * - a **time** scale writes the date, and the time of day as well when the instant carries one —
+   *   both in the locale's own order. Not the multi-format an axis tick uses: that is chosen for a
+   *   *row* of labels, where the coarser unit is already on the tick beside it, and on its own it
+   *   reads a 10 a.m. reading as "10 AM" with the day thrown away. A reader landing on one point
+   *   has no neighbour to borrow the date from;
+   * - a **continuous** scale writes as many decimals as its own tick step implies, so a reader
+   *   hears "1.2" and not "1.2000000000000002";
+   * - a **discrete** scale's values are already the strings its domain holds, so they stand;
+   * - anything with no scale — a plain `value`, or a scale this cannot resolve — falls back to
+   *   [spoken], which is where this started.
+   */
+  private fun spokenThrough(
+    channel: ChannelValue.Scaled?,
+    value: VegaValue,
+    datum: VegaValue,
+  ): String {
+    val number = value.asNumberOrNull() ?: return value.asString()
+    val scale = channel?.let { scales[scaleNameOf(it, datum)] } ?: return spokenNumber(number)
+    return when (scale) {
+      is TimeScale -> spokenInstant(number, scale.zone)
+      is LinearScale -> scale.formatTick(number, locale = locale)
+      is TransformedScale -> scale.formatTick(number, locale = locale)
+      is SequentialColorScale -> scale.formatTick(number, locale = locale)
+      else -> spokenNumber(number)
+    }
+  }
+
+  /**
+   * One instant as a reader hears it: the locale's date, plus its time of day when it has one.
+   *
+   * Midnight is treated as a date and nothing more, which is what a daily series carries — a
+   * `timeUnit` of `yearmonthdate` truncates to it — and anything else keeps the clock, because a
+   * reading taken at 10 a.m. is not the same measurement as one taken at midnight and a reader
+   * cannot see which they are on.
+   */
+  private fun spokenInstant(millis: Double, zone: TimeZone): String {
+    val at = TimeFormat.at(millis, zone)
+    val midnight = at.hour == 0 && at.minute == 0 && at.second == 0 && at.nanosecond == 0
+    return TimeFormat.format(millis, if (midnight) "%x" else "%x %X", zone, locale)
+  }
+
+  /**
    * What a screen reader is told about one mark.
    *
    * Upstream's model, plus one deliberate addition. Upstream labels an individual item **only**
@@ -2056,14 +2113,17 @@ public class MarkEncoder(
         )
       }
 
-    val labelField =
-      channels.values.filterIsInstance<ChannelValue.Scaled>().firstNotNullOfOrNull { it.field }
-    val valueField =
-      channels.values.filterIsInstance<ChannelValue.Scaled>().mapNotNull { it.field }.lastOrNull()
-    if (labelField == null) return null
+    val scaled = channels.values.filterIsInstance<ChannelValue.Scaled>().filter { it.field != null }
+    val labelChannel = scaled.firstOrNull()
+    val valueChannel = scaled.lastOrNull()
+    val labelField = labelChannel?.field ?: return null
+    val valueField = valueChannel?.field
     return AccessibilityDescriptor(
-      label = spoken(datum.fieldOf(labelField)),
-      value = valueField?.takeIf { it != labelField }?.let { spoken(datum.fieldOf(it)) },
+      label = spokenThrough(labelChannel, datum.fieldOf(labelField), datum),
+      value =
+        valueField
+          ?.takeIf { it != labelField }
+          ?.let { spokenThrough(valueChannel, datum.fieldOf(it), datum) },
       role = role,
       roleDescription = roleDescription,
       focusable = true,
