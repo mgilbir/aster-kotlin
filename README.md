@@ -11,24 +11,22 @@ work actually stands, and [SUPPORTED_FEATURES.md](SUPPORTED_FEATURES.md) for the
 
 ## Current status
 
-Milestones 0, 1 and 2 are complete: the repository builds, the scene graph and Android Canvas renderer
-work, and SVG output is deterministic and golden-tested. Milestone 3 is in progress.
+A Vega or a Vega-Lite specification compiles end to end and draws. Expressions and signals, 49 of
+upstream's 51 documented data transforms, the 16 scale types it models, all 12 of Vega's mark types,
+axes, legends and titles, group layout and autosize, and event handlers that recompile the chart.
+`VegaChartController.setSpec` takes a specification and compiles it; `setSpecAsync` does it off the
+calling thread.
 
-**A Vega specification compiles end to end, and is verified against upstream Vega.** `SpecCompiler`
-turns a compiled Vega JSON specification into a scene, and `BarFixtureDifferentialTest` compares the
-result against upstream: for `test-fixtures/specs/bar.vg.json` all 48 marks and both scales match
-exactly. Run `./scripts/oracle.sh` to regenerate the reference data and re-check.
+It is checked against upstream rather than against itself. `./scripts/oracle.sh` renders every fixture
+with the pinned `vega@6.3.1` and compares the resulting scene mark by mark and scale by scale;
+`./scripts/vega-lite-oracle.sh` compiles every Vega-Lite fixture with the pinned `vega-lite@6.4.3` and
+compares the emitted Vega **property by property**, then draws both and compares those scenes too. 191
+Vega differential fixtures and 281 Vega-Lite fixtures are committed together with their references, and
+[`test-fixtures/INDEX.md`](test-fixtures/INDEX.md) is the generated index of what each one covers.
 
-That slice is deliberately thin. Supported today: `linear`, `band`, `point` and `ordinal` scales; the
-`rect` mark; axes with ticks, labels, gridlines and domain lines; `autosize: pad`. **Not** supported:
-expressions and signals, all 40 data transforms, the other eleven mark types, legends and titles. Each
-of those reports a diagnostic rather than rendering something wrong — see `SUPPORTED_FEATURES.md` for
-the matrix and `STATUS.md` for how much of upstream Vega that leaves.
-
-`VegaChartController.setSpec` is not yet wired to the compiler; build a scene with `SpecCompiler` and
-pass it to `setScene`. Charts can also be built as scene graphs directly — see
-`test-fixtures/src/main/kotlin/dev/aster/vega/fixtures/SampleScenes.kt` for worked bar, stacked bar,
-line, area and scatter examples.
+Anything unsupported produces a structured diagnostic rather than a wrong picture.
+[SUPPORTED_FEATURES.md](SUPPORTED_FEATURES.md) is the per-feature matrix, with the known differences
+from upstream; "Known limitations" below is the short version.
 
 ## Supported features
 
@@ -47,23 +45,33 @@ Fully supported today:
 
 Compiles from a **Vega-Lite** specification, property for property against upstream's own compiler:
 
-- a single view or a layer of views, over the `bar`, `point`, `circle`, `square`, `tick`, `line`,
-  `area`, `rect`, `rule` and `text` marks
-- the position, colour, size, shape, text, detail and order channels, with `aggregate`, `bin`,
-  `timeUnit`, sorting and stacking
+- a single view, a `layer` of views, a `facet` grid, `concat`/`hconcat`/`vconcat` and `repeat`, over
+  the `arc`, `bar`, `point`, `circle`, `square`, `tick`, `line`, `area`, `trail`, `rect`, `rule` and
+  `text` marks, and the `boxplot`, `errorbar` and `errorband` composites they are rewritten into
+- the position, polar, offset, colour, size, shape, text, tooltip, href, detail and order channels,
+  with `aggregate`, `bin`, `timeUnit`, sorting, stacking and `impute`
+- every transform a specification can write: `aggregate`, `bin`, `calculate`, `density`, `extent`,
+  `filter`, `flatten`, `fold`, `impute`, `joinaggregate`, `loess`, `lookup`, `pivot`, `quantile`,
+  `regression`, `sample`, `stack`, `timeUnit` and `window`
+- `params`, and the selections they drive
 - the defaults that make Vega-Lite short: scale types and ranges, a plot sized from its own
   categories, gridlines, tick counts, label angles, legends and titles
 
 Compiles from a Vega specification, verified against upstream:
 
-- `linear`, `band`, `point`, `ordinal` scales, with d3-exact tick generation and `nice`
-- the `rect` mark, with Vega's x/x2/width and y/y2/height channel pairs and band offsets
-- axes: ticks, labels, gridlines, domain lines, all four orientations
-- `autosize: pad` layout
+- scales: `linear`, `log`, `pow`, `sqrt`, `symlog`, `time`, `utc`, `ordinal`, `band`, `point`,
+  `sequential`, `quantile`, `quantize`, `threshold`, `bin-ordinal` and `identity`, with d3-exact tick
+  generation, `nice`, and all 68 of upstream's colour schemes
+- every mark encoder: `arc`, `area`, `group`, `image`, `line`, `path`, `rect`, `rule`, `shape`,
+  `symbol`, `text` and `trail`, with Vega's channel pairs, band offsets and all seventeen
+  interpolation methods
+- axes, legends and titles, including label overlap removal, truncation and the `config` cascade
+- 49 of upstream's 51 documented data transforms, the two exceptions being `wordcloud` and `contour`
+- expressions and signals, event handlers, and the `autosize` and group `layout` rules
 
-Planned: expressions and signals, the 40 data transforms, the remaining eleven mark encoders, legends
-and titles (Milestones 3-5), signal-driven interaction (6), richer accessibility (7), performance work
-(9).
+Reported by name rather than approximated: `wordcloud` and `contour`, the expression functions that
+need a browser or a view, incremental dataflow, and the composite Vega-Lite marks. See
+`SUPPORTED_FEATURES.md` for the full list and `STATUS.md` for what is being worked on.
 
 ### Vega-Lite
 
@@ -84,21 +92,40 @@ val compiled = controller.setSpec(converted.vegaJson ?: text)
 
 ## Installation
 
-The library is not published yet. Depend on the modules from a local checkout:
+Every library module publishes to Maven Central under `io.github.mgilbir.astervega`, one version for
+all of them, cut from a tag by `.github/workflows/release.yml` (see "Releasing"). Until the first tag
+is pushed there is nothing on Central yet: `./gradlew publishToMavenLocal` installs the same
+coordinates locally and the snippet below then resolves against `mavenLocal()`.
 
 ```kotlin
-// settings.gradle.kts
-includeBuild("../aster-kotlin")
+dependencies {
+  // The engine: a specification in, a scene out, plus the controller a host drives.
+  implementation("io.github.mgilbir.astervega:vega-runtime:0.1.0")
+  // Vega-Lite in, Vega out. Only needed if the specifications are Vega-Lite.
+  implementation("io.github.mgilbir.astervega:vega-lite:0.1.0")
+
+  // One renderer, whichever suits the host:
+  implementation("io.github.mgilbir.astervega:vega-android-canvas:0.1.0")        // Android View
+  implementation("io.github.mgilbir.astervega:vega-compose:0.1.0")               // Jetpack Compose
+  implementation("io.github.mgilbir.astervega:vega-compose-multiplatform:0.1.0") // Compose MP
+}
 ```
 
-```kotlin
-// build.gradle.kts
-dependencies {
-  implementation("dev.aster.vega:vega-compose")      // Compose API, Android
-  implementation("dev.aster.vega:vega-android-canvas") // View API
-  // Compose Multiplatform: the same renderer on Android, iOS and the desktop.
-  implementation("dev.aster.vega:vega-compose-multiplatform")
-}
+`vega-model`, `vega-expression`, `vega-dataflow`, `vega-scene` and `vega-svg` are published too and
+arrive transitively; depend on one directly only to use it on its own.
+
+On **iOS and macOS**, Swift Package Manager. The engine arrives as a pre-compiled XCFramework attached
+to the release, so a consuming build needs no Kotlin toolchain and never runs Gradle:
+
+```swift
+// Package.swift
+.package(url: "https://github.com/mgilbir/aster-kotlin", from: "0.1.0")
+```
+
+```swift
+.target(name: "YourFeature", dependencies: [
+  .product(name: "AsterVegaRender", package: "aster-kotlin"),  // the CoreGraphics renderer
+])
 ```
 
 ## View example
@@ -136,6 +163,14 @@ VegaChart(
 The Compose API hosts the canonical `VegaChartView` through `AndroidView`, so both APIs share
 identical text metrics, rendering, hit testing and accessibility. See
 [docs/adr/0003-compose-hosts-the-view.md](docs/adr/0003-compose-hosts-the-view.md).
+
+`vega-compose-multiplatform` is the other Compose renderer: it paints a compiled scene straight onto a
+`DrawScope`, so it runs on Android, iOS and the desktop with no `View` beneath it.
+
+```kotlin
+val compiled = SpecCompiler(textEngine).compileJson(specJson)
+compiled.scene?.let { VegaChart(scene = it, modifier = Modifier.fillMaxSize()) }
+```
 
 ## Export example
 
@@ -182,29 +217,33 @@ lifecycleScope.launch {
 
 ## Known limitations
 
-- **Only a subset of Vega compiles.** Four scale types, one mark type, axes without titles. One
-  differential fixture passes out of the 100 the brief asks for.
-- **No expression evaluation.** Every `{"signal": ...}` reports
-  `VEGA_EXPRESSION_UNSUPPORTED_FUNCTION` and the channel is dropped. This is the biggest gap, because
-  signals are pervasive in real specifications.
-- **No data transforms.** All 40 report `VEGA_TRANSFORM_NOT_IMPLEMENTED`, and the dataset passes through
-  untransformed — so a chart that needs one shows the wrong data, visibly and with an explanation.
-- **Legends and titles are not generated** from a specification (Milestone 5).
-- **`setSpec` is not wired to the compiler**; call `SpecCompiler` and `setScene` yourself.
-- **Pan and zoom are a view transform**, so axes do not rescale with the zoom. Vega-style zoom that
-  updates scale domains needs the dataflow (Milestone 6).
+- **No incremental dataflow.** A transform recomputes its whole dataset; the `DataflowOperator`
+  contract exists with no pulse propagation behind it. Correct, and slower than upstream on a large
+  table.
+- **`wordcloud` and `contour`** are the two documented data transforms that are not implemented. An
+  unimplemented transform stops that dataset's pipeline and says so, rather than passing rows on that
+  later stages were not meant to see.
+- **No locales.** Every month name, weekday name and number format the engine generates is English and
+  en-US: `TimeFormat` says so at the top of the file. A Dutch chart gets English month abbreviations on
+  its time axis. A host can override a particular axis with `axis.format`, which is applied over the
+  derived properties.
+- **The Compose Multiplatform renderer measures text with `MetricTextEngine`**, whose advance is a
+  ratio of the font size and matches no real font, so its axis labels are laid out from widths that are
+  not the ones it draws with. The Android View and the CoreGraphics renderers measure with the font
+  they draw with.
+- **`width: "container"` falls back to `config.view.continuousWidth`.** `containerSize()` has no
+  container to measure outside a browser; a host that knows its available width sets the `width` signal
+  itself.
+- **Pan and zoom are a view transform**, so the axes do not rescale with the zoom. Vega-style zoom that
+  updates the scale domains needs the dataflow.
 - **Text metrics are platform metrics, not browser metrics.** Structural geometry compares tightly
   against upstream Vega; glyph bounds need the wider documented tolerances.
-- **Images need an `AndroidImageResolver`.** Without one, image marks report
-  `VEGA_EXPORT_IMAGE_UNRESOLVED` instead of drawing.
+- **Images need a resolver.** Without one, image marks report `VEGA_EXPORT_IMAGE_UNRESOLVED` instead of
+  drawing.
 - **Blend modes below API 29** are limited to the PorterDuff subset; anything else reports
   `VEGA_RENDER_UNSUPPORTED_BLEND_MODE`.
-- **No performance measurements yet.** The targets in PROJECT_BRIEF.md 19 are unverified; nothing has
-  been run on physical hardware.
-- **No geographic projections or force layouts.** Out of scope for the first release.
-- **Vega-Lite compiles a single view or a layer of them.** Faceting, concatenation, repetition,
-  selection parameters and the composite marks (`boxplot`, `errorbar`, `errorband`) are reported by
-  name rather than approximated. See `SUPPORTED_FEATURES.md`.
+- **No performance measurements on physical hardware.** The targets in PROJECT_BRIEF.md 19 are
+  unverified; the microbenchmarks run, but not on a device.
 
 ## Development
 
@@ -217,7 +256,7 @@ lifecycleScope.launch {
 | Android Gradle Plugin | 9.3.1 |
 | Gradle | 9.5.0 |
 | Compile SDK / Target SDK | 37 |
-| Minimum SDK | 23 |
+| Minimum SDK | 26 |
 | Compose BOM | 2026.06.01 |
 | Node (oracle only) | 20 or newer |
 

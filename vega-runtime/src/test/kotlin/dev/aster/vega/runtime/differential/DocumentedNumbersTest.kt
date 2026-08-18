@@ -1,0 +1,114 @@
+package dev.aster.vega.runtime.differential
+
+import dev.aster.vega.dataflow.transform.TransformRegistry
+import dev.aster.vega.model.VegaJson
+import dev.aster.vega.model.VegaValue
+import dev.aster.vega.model.spec.MarkType
+import dev.aster.vega.model.spec.ScaleType
+import java.io.File
+import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertTrue
+import org.junit.jupiter.api.Test
+
+/**
+ * The counts the documentation states, checked against what the code and the corpus actually hold.
+ *
+ * Every number here had drifted at least once, and two of them disagreed with a second copy of
+ * themselves in the same file: `STATUS.md` claimed 138 differential fixtures in one place and 188
+ * in another beside a directory of 191, and the transform count was one too high everywhere it
+ * appeared. A number in prose has nothing holding it to the thing it counts, so each one is written
+ * in **one shape** that this test looks for and compares against the source of truth. Rephrasing is
+ * fine; dropping the phrase is not, because a count nobody can find is a count nobody checks.
+ */
+class DocumentedNumbersTest {
+
+  @Test
+  fun `the documented transform count is the registry's size`() {
+    assertCount(
+      Regex("""(\d+) of upstream's 51 documented data transforms"""),
+      TransformRegistry.Default.types.size,
+    )
+  }
+
+  @Test
+  fun `the documented mark and scale type counts are the enums' sizes`() {
+    assertCount(Regex("""all (\d+) of Vega's mark types"""), MarkType.entries.size)
+    assertCount(Regex("""the (\d+) scale types it models"""), ScaleType.entries.size)
+  }
+
+  @Test
+  fun `the documented fixture counts are what is on disk`() {
+    assertCount(
+      Regex("""(\d+) Vega differential fixtures"""),
+      countFiles("test-fixtures/specs", ".vg.json"),
+    )
+    assertCount(
+      Regex("""(\d+) Vega-Lite fixtures"""),
+      countFiles("test-fixtures/vega-lite", ".vl.json"),
+    )
+  }
+
+  @Test
+  fun `the annotated fixture table names fixtures that exist, with upstream's mark counts`() {
+    val rows = Regex("""^\| `([a-z0-9-]+)` \| (\d+) \| """, RegexOption.MULTILINE)
+    val missing = mutableListOf<String>()
+    val wrongCount = mutableListOf<String>()
+
+    val status = File(repositoryRoot, "STATUS.md").readText()
+    for (row in rows.findAll(status)) {
+      val (name, stated) = row.destructured
+      val reference = File(repositoryRoot, "test-fixtures/reference/$name.reference.json")
+      if (!reference.isFile) {
+        missing += name
+        continue
+      }
+      val marks =
+        ((VegaJson.parse(reference.readText()) as VegaValue.Obj).fields["marks"] as VegaValue.Arr)
+          .values
+          .size
+      if (marks != stated.toInt()) wrongCount += "$name states $stated, upstream draws $marks"
+    }
+
+    assertEquals(emptyList<String>(), missing, "STATUS.md names fixtures that are not on disk")
+    assertEquals(emptyList<String>(), wrongCount, "STATUS.md states the wrong mark count")
+  }
+
+  /**
+   * Asserts every occurrence of [pattern] across the documentation names [expected], and that there
+   * is at least one.
+   */
+  private fun assertCount(pattern: Regex, expected: Int) {
+    var found = 0
+    for (name in DOCUMENTS) {
+      val file = File(repositoryRoot, name)
+      assertTrue(file.isFile, "missing documentation file: $name")
+      file.readText().lineSequence().forEachIndexed { index, line ->
+        pattern.findAll(line).forEach { match ->
+          found++
+          assertEquals(
+            expected,
+            match.groupValues[1].toInt(),
+            "$name:${index + 1} states \"${match.value}\"",
+          )
+        }
+      }
+    }
+    assertTrue(
+      found > 0,
+      "no documentation states \"${pattern.pattern}\"; a count nobody can find is a count " +
+        "nobody checks, so keep the phrase or update this test",
+    )
+  }
+
+  private fun countFiles(directory: String, suffix: String): Int =
+    requireNotNull(File(repositoryRoot, directory).listFiles()) { "no directory: $directory" }
+      .count { it.name.endsWith(suffix) }
+
+  private companion object {
+    val repositoryRoot: File = File(System.getProperty("user.dir")).parentFile
+
+    /** The documents that state numbers about the engine. */
+    val DOCUMENTS =
+      listOf("README.md", "STATUS.md", "SUPPORTED_FEATURES.md", "test-fixtures/INDEX.md")
+  }
+}
