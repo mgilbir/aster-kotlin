@@ -33,6 +33,16 @@ final class ChartSession {
   /// rather than merely believed.
   private(set) var lastTouch: String?
 
+  /// Which grammar the text was taken for, and what compiling it reported.
+  ///
+  /// Said rather than inferred. Someone pasting a chart has pasted a chart, not a dialect, so the
+  /// decision is made for them — and then shown, because a Vega-Lite specification read as Vega fails
+  /// for a reason that reads like nonsense. The Android demo has said this from the start; iOS could
+  /// not, because the compiler was not on this side of the boundary at all.
+  private(set) var grammar: String?
+
+  private(set) var vegaLiteDiagnostics: [VegaDiagnostic] = []
+
   /// The controller owns the compiled dataflow and the interaction state.
   ///
   /// Held for the session's lifetime, because a tap is only meaningful against the dataflow the scene
@@ -98,6 +108,8 @@ final class ChartSession {
       diagnostics = []
       controls = []
       failure = nil
+      grammar = nil
+      vegaLiteDiagnostics = []
       return
     }
 
@@ -108,12 +120,21 @@ final class ChartSession {
 
     work = Task { [weak self] in
       guard let self else { return }
+      // **Either grammar.** Translating Vega-Lite is a compile of its own, so it happens here rather
+      // than on the main actor, for the same reason the engine's own compile does. A specification
+      // that is already Vega passes straight through untouched.
+      let converted = VegaLiteInput.shared.toVega(json: specification)
+      self.grammar = converted.wasVegaLite ? "read as Vega-Lite and compiled" : "read as Vega"
+      self.vegaLiteDiagnostics = converted.wasVegaLite ? converted.diagnostics : []
+      // Falling back to the text as written where Vega-Lite compilation produced nothing: the runtime
+      // will then report on it, which is a better failure than this layer inventing one.
+      let vega = converted.vegaJson ?? specification
       // The engine's own off-thread compile, on its default dispatcher. This is the single-argument
       // overload, which exists because a Kotlin default argument does not cross the Obj-C boundary:
       // the two-argument form demands a `CoroutineDispatcher` that no exported symbol can produce, so
       // a foreign host could not reach this path at all and had to run the synchronous `setSpec` on a
       // thread of its own.
-      let compiled = try? await self.controller.setSpecAsync(json: specification)
+      let compiled = try? await self.controller.setSpecAsync(json: vega)
       guard !Task.isCancelled else { return }
 
       // A preset control is applied through the dataflow rather than by recompiling with it.
