@@ -151,7 +151,8 @@ public final class dev/aster/vega/expression/ExpressionSyntaxException : java/la
 
 public final class dev/aster/vega/expression/Functions {
 	public static final field INSTANCE Ldev/aster/vega/expression/Functions;
-	public final fun functionsFor (Ldev/aster/vega/model/locale/VegaLocale;)Ljava/util/Map;
+	public final fun functionsFor (Ldev/aster/vega/model/locale/VegaLocale;Ljava/lang/Double;Ljava/lang/Double;)Ljava/util/Map;
+	public static synthetic fun functionsFor$default (Ldev/aster/vega/expression/Functions;Ldev/aster/vega/model/locale/VegaLocale;Ljava/lang/Double;Ljava/lang/Double;ILjava/lang/Object;)Ljava/util/Map;
 	public final fun getConstants ()Ljava/util/Map;
 	public final fun getFunctions ()Ljava/util/Map;
 	public final fun getKnownUnsupported ()Ljava/util/Map;

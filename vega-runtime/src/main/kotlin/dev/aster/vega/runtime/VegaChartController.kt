@@ -32,6 +32,7 @@ import dev.aster.vega.scene.Scene
 import dev.aster.vega.scene.SceneHitIndex
 import dev.aster.vega.scene.SceneNode
 import dev.aster.vega.scene.SceneNodeId
+import dev.aster.vega.scene.SizeD
 import dev.aster.vega.scene.TextEngine
 import kotlin.time.Clock
 import kotlinx.coroutines.CancellationException
@@ -93,7 +94,7 @@ public data class ChartState(
  */
 public class VegaChartController(
   initialScene: Scene = Scene.empty(),
-  textEngine: TextEngine = MetricTextEngine(),
+  private val textEngine: TextEngine = MetricTextEngine(),
   /**
    * Wall-clock milliseconds, for throttling an event stream.
    *
@@ -110,7 +111,7 @@ public class VegaChartController(
    * `vega-loader` has the two shapes worth having, a directory and a directory backed by a base
    * URL. Without this seam a host could not opt in at all, whatever the loader could do.
    */
-  loader: DataLoader = DenyLoader,
+  private val loader: DataLoader = DenyLoader,
   /**
    * How the chart waits, for the two constructs that need to be woken rather than prompted.
    *
@@ -137,9 +138,42 @@ public class VegaChartController(
    * dark surface says otherwise here rather than by rewriting the payload. See `SpecCompiler`.
    */
   private val hostConfig: VegaValue? = null,
+  /**
+   * The size of the surface the chart is drawn in; see the [containerSize] property, which a host
+   * sets again whenever its layout changes.
+   */
+  containerSize: SizeD? = null,
 ) {
 
-  private val compiler = SpecCompiler(textEngine, loader, locale = locale, hostConfig = hostConfig)
+  private var compiler = newCompiler(containerSize)
+
+  private fun newCompiler(size: SizeD?) =
+    SpecCompiler(textEngine, loader, locale = locale, hostConfig = hostConfig, containerSize = size)
+
+  /**
+   * The size of the surface the chart is drawn in, which `width: "container"` asks for.
+   *
+   * A responsive width cannot come from the specification: `"container"` means "ask the page", and
+   * a host is the one party that knows how much room a chart has. Setting it **recompiles** the
+   * loaded specification, because the size reaches the chart as a signal the compiler resolves —
+   * which is why a host sets this on a layout change rather than on every frame of a resize
+   * animation.
+   *
+   * Null, and a chart falls back to `config.view.continuousWidth` — 300, which is upstream's own
+   * answer outside a browser. A zero or absent dimension does the same for that dimension alone, so
+   * a host that knows only its width says only its width.
+   *
+   * The signal values a reader has set survive the recompile: a resize is not a reason to forget
+   * them.
+   */
+  public var containerSize: SizeD? = containerSize
+    set(value) {
+      if (field == value) return
+      field = value
+      compiler = newCompiler(value)
+      val json = loadedSpecJson ?: return
+      publish(compiler.compileJson(json, signals.overrides, signals.itemEncodes))
+    }
 
   /** The debounced handlers waiting, by the signal and delay that identify them. */
   private val pendingDebounces = mutableMapOf<Pair<String, Double>, ScheduledTask>()

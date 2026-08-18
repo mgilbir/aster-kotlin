@@ -43,7 +43,8 @@ final class TouchTests: XCTestCase {
       loader: DenyLoader(),
       scheduler: nil,
       locale: VegaLocale.Companion.shared.EnglishUS,
-      hostConfig: nil
+      hostConfig: nil,
+      containerSize: nil
     )
   }
 
