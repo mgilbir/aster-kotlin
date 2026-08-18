@@ -1,0 +1,452 @@
+public final class dev/aster/vega/expression/AstKt {
+	public static final fun datumFieldPath (Ldev/aster/vega/expression/Node;)Ljava/lang/String;
+	public static final fun walk (Ldev/aster/vega/expression/Node;Lkotlin/jvm/functions/Function1;)V
+}
+
+public final class dev/aster/vega/expression/CachingExpressionCompiler : dev/aster/vega/expression/ExpressionCompiler {
+	public fun <init> (Ldev/aster/vega/expression/ExpressionCompiler;I)V
+	public synthetic fun <init> (Ldev/aster/vega/expression/ExpressionCompiler;IILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun clear ()V
+	public fun compile (Ljava/lang/String;)Ldev/aster/vega/expression/ExpressionResult;
+	public final fun getSize ()I
+}
+
+public abstract interface class dev/aster/vega/expression/Clock {
+	public static final field Companion Ldev/aster/vega/expression/Clock$Companion;
+	public static final field PINNED D
+	public abstract fun now ()D
+}
+
+public final class dev/aster/vega/expression/Clock$Companion {
+	public static final field PINNED D
+	public final fun getFixed ()Ldev/aster/vega/expression/Clock;
+}
+
+public final class dev/aster/vega/expression/Evaluator {
+	public fun <init> ()V
+	public fun <init> (Ljava/util/Map;Ljava/util/Map;)V
+	public synthetic fun <init> (Ljava/util/Map;Ljava/util/Map;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun evaluate (Ldev/aster/vega/expression/Node;Ldev/aster/vega/expression/ExpressionScope;)Ldev/aster/vega/model/VegaValue;
+}
+
+public abstract interface class dev/aster/vega/expression/Expression {
+	public abstract fun evaluate (Ldev/aster/vega/expression/ExpressionScope;)Ldev/aster/vega/model/VegaValue;
+	public abstract fun getDataDependencies ()Ljava/util/Set;
+	public abstract fun getFieldDependencies ()Ljava/util/Set;
+	public abstract fun getReadsUnnamedDataset ()Z
+	public abstract fun getReadsUnnamedScale ()Z
+	public abstract fun getScaleDependencies ()Ljava/util/Set;
+	public abstract fun getSignalDependencies ()Ljava/util/Set;
+	public abstract fun getSource ()Ljava/lang/String;
+	public abstract fun getWrittenDatasets ()Ljava/util/Set;
+}
+
+public abstract interface class dev/aster/vega/expression/ExpressionCompiler {
+	public abstract fun compile (Ljava/lang/String;)Ldev/aster/vega/expression/ExpressionResult;
+}
+
+public final class dev/aster/vega/expression/ExpressionEvaluationException : java/lang/Exception {
+	public fun <init> (Ldev/aster/vega/model/VegaDiagnostic;)V
+	public final fun getDiagnostic ()Ldev/aster/vega/model/VegaDiagnostic;
+}
+
+public abstract interface class dev/aster/vega/expression/ExpressionFunction {
+	public abstract fun invoke (Ljava/util/List;)Ldev/aster/vega/model/VegaValue;
+}
+
+public final class dev/aster/vega/expression/ExpressionKt {
+	public static final fun indataCounts (Ljava/util/List;Ljava/lang/String;)Ljava/util/Map;
+	public static final fun indataLookup (Ljava/util/Map;Ldev/aster/vega/model/VegaValue;)Ldev/aster/vega/model/VegaValue;
+}
+
+public abstract interface class dev/aster/vega/expression/ExpressionResult {
+}
+
+public final class dev/aster/vega/expression/ExpressionResult$Compiled : dev/aster/vega/expression/ExpressionResult {
+	public fun <init> (Ldev/aster/vega/expression/Expression;)V
+	public final fun component1 ()Ldev/aster/vega/expression/Expression;
+	public final fun copy (Ldev/aster/vega/expression/Expression;)Ldev/aster/vega/expression/ExpressionResult$Compiled;
+	public static synthetic fun copy$default (Ldev/aster/vega/expression/ExpressionResult$Compiled;Ldev/aster/vega/expression/Expression;ILjava/lang/Object;)Ldev/aster/vega/expression/ExpressionResult$Compiled;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getExpression ()Ldev/aster/vega/expression/Expression;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class dev/aster/vega/expression/ExpressionResult$Failed : dev/aster/vega/expression/ExpressionResult {
+	public fun <init> (Ldev/aster/vega/model/VegaDiagnostic;)V
+	public final fun component1 ()Ldev/aster/vega/model/VegaDiagnostic;
+	public final fun copy (Ldev/aster/vega/model/VegaDiagnostic;)Ldev/aster/vega/expression/ExpressionResult$Failed;
+	public static synthetic fun copy$default (Ldev/aster/vega/expression/ExpressionResult$Failed;Ldev/aster/vega/model/VegaDiagnostic;ILjava/lang/Object;)Ldev/aster/vega/expression/ExpressionResult$Failed;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getDiagnostic ()Ldev/aster/vega/model/VegaDiagnostic;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public abstract interface class dev/aster/vega/expression/ExpressionScope {
+	public fun activeItem ()Ldev/aster/vega/model/VegaValue;
+	public fun applyScale (Ljava/lang/String;Ldev/aster/vega/model/VegaValue;)Ldev/aster/vega/model/VegaValue;
+	public abstract fun dataset (Ljava/lang/String;)Ljava/util/List;
+	public fun encodeItem (Ldev/aster/vega/model/VegaValue;Ljava/lang/String;)V
+	public fun eventPoint ()Ldev/aster/vega/model/VegaValue;
+	public fun geoArea (Ljava/lang/String;Ldev/aster/vega/model/VegaValue;)Ldev/aster/vega/model/VegaValue;
+	public fun geoBounds (Ljava/lang/String;Ldev/aster/vega/model/VegaValue;)Ldev/aster/vega/model/VegaValue;
+	public fun geoCentroid (Ljava/lang/String;Ldev/aster/vega/model/VegaValue;)Ldev/aster/vega/model/VegaValue;
+	public fun geoScale (Ljava/lang/String;)Ldev/aster/vega/model/VegaValue;
+	public fun geoShape (Ljava/lang/String;Ldev/aster/vega/model/VegaValue;)Ldev/aster/vega/model/VegaValue;
+	public abstract fun getDatum ()Ldev/aster/vega/model/VegaValue;
+	public fun getRandom ()Ldev/aster/vega/expression/RandomStream;
+	public fun gradient (Ljava/lang/String;Ldev/aster/vega/model/VegaValue;Ldev/aster/vega/model/VegaValue;Ldev/aster/vega/model/VegaValue;)Ldev/aster/vega/model/VegaValue;
+	public fun inScope (Ldev/aster/vega/model/VegaValue;)Z
+	public fun indata (Ljava/lang/String;Ljava/lang/String;Ldev/aster/vega/model/VegaValue;)Ldev/aster/vega/model/VegaValue;
+	public fun intersect (Ldev/aster/vega/model/VegaValue;Ldev/aster/vega/model/VegaValue;)Ldev/aster/vega/model/VegaValue;
+	public fun intersectLasso (Ljava/lang/String;Ldev/aster/vega/model/VegaValue;Ldev/aster/vega/model/VegaValue;)Ldev/aster/vega/model/VegaValue;
+	public fun invertScale (Ljava/lang/String;Ldev/aster/vega/model/VegaValue;)Ldev/aster/vega/model/VegaValue;
+	public fun log (Ljava/lang/String;Ljava/lang/String;)V
+	public fun modifyDataset (Ljava/lang/String;Ldev/aster/vega/model/VegaValue;Ldev/aster/vega/model/VegaValue;Ldev/aster/vega/model/VegaValue;)D
+	public fun now ()D
+	public fun scaleBandwidth (Ljava/lang/String;)Ldev/aster/vega/model/VegaValue;
+	public fun scaleDomain (Ljava/lang/String;)Ldev/aster/vega/model/VegaValue;
+	public fun scaleRange (Ljava/lang/String;)Ldev/aster/vega/model/VegaValue;
+	public fun setDataset (Ljava/lang/String;Ljava/util/List;)V
+	public abstract fun signal (Ljava/lang/String;)Ldev/aster/vega/model/VegaValue;
+	public fun treeAncestors (Ljava/lang/String;Ldev/aster/vega/model/VegaValue;)Ldev/aster/vega/model/VegaValue;
+	public fun treePath (Ljava/lang/String;Ldev/aster/vega/model/VegaValue;Ldev/aster/vega/model/VegaValue;)Ldev/aster/vega/model/VegaValue;
+}
+
+public final class dev/aster/vega/expression/ExpressionScope$DefaultImpls {
+	public static fun activeItem (Ldev/aster/vega/expression/ExpressionScope;)Ldev/aster/vega/model/VegaValue;
+	public static fun applyScale (Ldev/aster/vega/expression/ExpressionScope;Ljava/lang/String;Ldev/aster/vega/model/VegaValue;)Ldev/aster/vega/model/VegaValue;
+	public static fun encodeItem (Ldev/aster/vega/expression/ExpressionScope;Ldev/aster/vega/model/VegaValue;Ljava/lang/String;)V
+	public static fun eventPoint (Ldev/aster/vega/expression/ExpressionScope;)Ldev/aster/vega/model/VegaValue;
+	public static fun geoArea (Ldev/aster/vega/expression/ExpressionScope;Ljava/lang/String;Ldev/aster/vega/model/VegaValue;)Ldev/aster/vega/model/VegaValue;
+	public static fun geoBounds (Ldev/aster/vega/expression/ExpressionScope;Ljava/lang/String;Ldev/aster/vega/model/VegaValue;)Ldev/aster/vega/model/VegaValue;
+	public static fun geoCentroid (Ldev/aster/vega/expression/ExpressionScope;Ljava/lang/String;Ldev/aster/vega/model/VegaValue;)Ldev/aster/vega/model/VegaValue;
+	public static fun geoScale (Ldev/aster/vega/expression/ExpressionScope;Ljava/lang/String;)Ldev/aster/vega/model/VegaValue;
+	public static fun geoShape (Ldev/aster/vega/expression/ExpressionScope;Ljava/lang/String;Ldev/aster/vega/model/VegaValue;)Ldev/aster/vega/model/VegaValue;
+	public static fun getRandom (Ldev/aster/vega/expression/ExpressionScope;)Ldev/aster/vega/expression/RandomStream;
+	public static fun gradient (Ldev/aster/vega/expression/ExpressionScope;Ljava/lang/String;Ldev/aster/vega/model/VegaValue;Ldev/aster/vega/model/VegaValue;Ldev/aster/vega/model/VegaValue;)Ldev/aster/vega/model/VegaValue;
+	public static fun inScope (Ldev/aster/vega/expression/ExpressionScope;Ldev/aster/vega/model/VegaValue;)Z
+	public static fun indata (Ldev/aster/vega/expression/ExpressionScope;Ljava/lang/String;Ljava/lang/String;Ldev/aster/vega/model/VegaValue;)Ldev/aster/vega/model/VegaValue;
+	public static fun intersect (Ldev/aster/vega/expression/ExpressionScope;Ldev/aster/vega/model/VegaValue;Ldev/aster/vega/model/VegaValue;)Ldev/aster/vega/model/VegaValue;
+	public static fun intersectLasso (Ldev/aster/vega/expression/ExpressionScope;Ljava/lang/String;Ldev/aster/vega/model/VegaValue;Ldev/aster/vega/model/VegaValue;)Ldev/aster/vega/model/VegaValue;
+	public static fun invertScale (Ldev/aster/vega/expression/ExpressionScope;Ljava/lang/String;Ldev/aster/vega/model/VegaValue;)Ldev/aster/vega/model/VegaValue;
+	public static fun log (Ldev/aster/vega/expression/ExpressionScope;Ljava/lang/String;Ljava/lang/String;)V
+	public static fun modifyDataset (Ldev/aster/vega/expression/ExpressionScope;Ljava/lang/String;Ldev/aster/vega/model/VegaValue;Ldev/aster/vega/model/VegaValue;Ldev/aster/vega/model/VegaValue;)D
+	public static fun now (Ldev/aster/vega/expression/ExpressionScope;)D
+	public static fun scaleBandwidth (Ldev/aster/vega/expression/ExpressionScope;Ljava/lang/String;)Ldev/aster/vega/model/VegaValue;
+	public static fun scaleDomain (Ldev/aster/vega/expression/ExpressionScope;Ljava/lang/String;)Ldev/aster/vega/model/VegaValue;
+	public static fun scaleRange (Ldev/aster/vega/expression/ExpressionScope;Ljava/lang/String;)Ldev/aster/vega/model/VegaValue;
+	public static fun setDataset (Ldev/aster/vega/expression/ExpressionScope;Ljava/lang/String;Ljava/util/List;)V
+	public static fun treeAncestors (Ldev/aster/vega/expression/ExpressionScope;Ljava/lang/String;Ldev/aster/vega/model/VegaValue;)Ldev/aster/vega/model/VegaValue;
+	public static fun treePath (Ldev/aster/vega/expression/ExpressionScope;Ljava/lang/String;Ldev/aster/vega/model/VegaValue;Ldev/aster/vega/model/VegaValue;)Ldev/aster/vega/model/VegaValue;
+}
+
+public final class dev/aster/vega/expression/ExpressionSyntaxException : java/lang/Exception {
+	public fun <init> (Ljava/lang/String;ILjava/lang/String;)V
+	public final fun getOffset ()I
+	public final fun getSource ()Ljava/lang/String;
+}
+
+public final class dev/aster/vega/expression/Functions {
+	public static final field INSTANCE Ldev/aster/vega/expression/Functions;
+	public final fun getConstants ()Ljava/util/Map;
+	public final fun getFunctions ()Ljava/util/Map;
+	public final fun getKnownUnsupported ()Ljava/util/Map;
+}
+
+public final class dev/aster/vega/expression/JsSemantics {
+	public static final field INSTANCE Ldev/aster/vega/expression/JsSemantics;
+	public final fun add (Ldev/aster/vega/model/VegaValue;Ldev/aster/vega/model/VegaValue;)Ldev/aster/vega/model/VegaValue;
+	public final fun compare (Ldev/aster/vega/model/VegaValue;Ldev/aster/vega/model/VegaValue;)Ljava/lang/Integer;
+	public final fun looseEquals (Ldev/aster/vega/model/VegaValue;Ldev/aster/vega/model/VegaValue;)Z
+	public final fun numberToString (D)Ljava/lang/String;
+	public final fun remainder (DD)D
+	public final fun strictEquals (Ldev/aster/vega/model/VegaValue;Ldev/aster/vega/model/VegaValue;)Z
+	public final fun toInt32 (Ldev/aster/vega/model/VegaValue;)I
+	public final fun toNumber (Ldev/aster/vega/model/VegaValue;)D
+	public final fun toStringValue (Ldev/aster/vega/model/VegaValue;)Ljava/lang/String;
+	public final fun toUint32 (Ldev/aster/vega/model/VegaValue;)J
+	public final fun truthy (Ldev/aster/vega/model/VegaValue;)Z
+}
+
+public final class dev/aster/vega/expression/Lexer {
+	public fun <init> (Ljava/lang/String;)V
+	public final fun tokenize ()Ljava/util/List;
+}
+
+public abstract interface class dev/aster/vega/expression/Node {
+}
+
+public final class dev/aster/vega/expression/Node$ArrayLiteral : dev/aster/vega/expression/Node {
+	public fun <init> (Ljava/util/List;)V
+	public final fun component1 ()Ljava/util/List;
+	public final fun copy (Ljava/util/List;)Ldev/aster/vega/expression/Node$ArrayLiteral;
+	public static synthetic fun copy$default (Ldev/aster/vega/expression/Node$ArrayLiteral;Ljava/util/List;ILjava/lang/Object;)Ldev/aster/vega/expression/Node$ArrayLiteral;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getElements ()Ljava/util/List;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class dev/aster/vega/expression/Node$Binary : dev/aster/vega/expression/Node {
+	public fun <init> (Ljava/lang/String;Ldev/aster/vega/expression/Node;Ldev/aster/vega/expression/Node;)V
+	public final fun component1 ()Ljava/lang/String;
+	public final fun component2 ()Ldev/aster/vega/expression/Node;
+	public final fun component3 ()Ldev/aster/vega/expression/Node;
+	public final fun copy (Ljava/lang/String;Ldev/aster/vega/expression/Node;Ldev/aster/vega/expression/Node;)Ldev/aster/vega/expression/Node$Binary;
+	public static synthetic fun copy$default (Ldev/aster/vega/expression/Node$Binary;Ljava/lang/String;Ldev/aster/vega/expression/Node;Ldev/aster/vega/expression/Node;ILjava/lang/Object;)Ldev/aster/vega/expression/Node$Binary;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getLeft ()Ldev/aster/vega/expression/Node;
+	public final fun getOperator ()Ljava/lang/String;
+	public final fun getRight ()Ldev/aster/vega/expression/Node;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class dev/aster/vega/expression/Node$Call : dev/aster/vega/expression/Node {
+	public fun <init> (Ldev/aster/vega/expression/Node;Ljava/util/List;)V
+	public final fun component1 ()Ldev/aster/vega/expression/Node;
+	public final fun component2 ()Ljava/util/List;
+	public final fun copy (Ldev/aster/vega/expression/Node;Ljava/util/List;)Ldev/aster/vega/expression/Node$Call;
+	public static synthetic fun copy$default (Ldev/aster/vega/expression/Node$Call;Ldev/aster/vega/expression/Node;Ljava/util/List;ILjava/lang/Object;)Ldev/aster/vega/expression/Node$Call;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getArguments ()Ljava/util/List;
+	public final fun getCallee ()Ldev/aster/vega/expression/Node;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class dev/aster/vega/expression/Node$Conditional : dev/aster/vega/expression/Node {
+	public fun <init> (Ldev/aster/vega/expression/Node;Ldev/aster/vega/expression/Node;Ldev/aster/vega/expression/Node;)V
+	public final fun component1 ()Ldev/aster/vega/expression/Node;
+	public final fun component2 ()Ldev/aster/vega/expression/Node;
+	public final fun component3 ()Ldev/aster/vega/expression/Node;
+	public final fun copy (Ldev/aster/vega/expression/Node;Ldev/aster/vega/expression/Node;Ldev/aster/vega/expression/Node;)Ldev/aster/vega/expression/Node$Conditional;
+	public static synthetic fun copy$default (Ldev/aster/vega/expression/Node$Conditional;Ldev/aster/vega/expression/Node;Ldev/aster/vega/expression/Node;Ldev/aster/vega/expression/Node;ILjava/lang/Object;)Ldev/aster/vega/expression/Node$Conditional;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getAlternate ()Ldev/aster/vega/expression/Node;
+	public final fun getConsequent ()Ldev/aster/vega/expression/Node;
+	public final fun getTest ()Ldev/aster/vega/expression/Node;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class dev/aster/vega/expression/Node$Identifier : dev/aster/vega/expression/Node {
+	public fun <init> (Ljava/lang/String;)V
+	public final fun component1 ()Ljava/lang/String;
+	public final fun copy (Ljava/lang/String;)Ldev/aster/vega/expression/Node$Identifier;
+	public static synthetic fun copy$default (Ldev/aster/vega/expression/Node$Identifier;Ljava/lang/String;ILjava/lang/Object;)Ldev/aster/vega/expression/Node$Identifier;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getName ()Ljava/lang/String;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class dev/aster/vega/expression/Node$Literal : dev/aster/vega/expression/Node {
+	public fun <init> (Ldev/aster/vega/model/VegaValue;)V
+	public final fun component1 ()Ldev/aster/vega/model/VegaValue;
+	public final fun copy (Ldev/aster/vega/model/VegaValue;)Ldev/aster/vega/expression/Node$Literal;
+	public static synthetic fun copy$default (Ldev/aster/vega/expression/Node$Literal;Ldev/aster/vega/model/VegaValue;ILjava/lang/Object;)Ldev/aster/vega/expression/Node$Literal;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getValue ()Ldev/aster/vega/model/VegaValue;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class dev/aster/vega/expression/Node$Logical : dev/aster/vega/expression/Node {
+	public fun <init> (Ljava/lang/String;Ldev/aster/vega/expression/Node;Ldev/aster/vega/expression/Node;)V
+	public final fun component1 ()Ljava/lang/String;
+	public final fun component2 ()Ldev/aster/vega/expression/Node;
+	public final fun component3 ()Ldev/aster/vega/expression/Node;
+	public final fun copy (Ljava/lang/String;Ldev/aster/vega/expression/Node;Ldev/aster/vega/expression/Node;)Ldev/aster/vega/expression/Node$Logical;
+	public static synthetic fun copy$default (Ldev/aster/vega/expression/Node$Logical;Ljava/lang/String;Ldev/aster/vega/expression/Node;Ldev/aster/vega/expression/Node;ILjava/lang/Object;)Ldev/aster/vega/expression/Node$Logical;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getLeft ()Ldev/aster/vega/expression/Node;
+	public final fun getOperator ()Ljava/lang/String;
+	public final fun getRight ()Ldev/aster/vega/expression/Node;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class dev/aster/vega/expression/Node$Member : dev/aster/vega/expression/Node {
+	public fun <init> (Ldev/aster/vega/expression/Node;Ldev/aster/vega/expression/Node;Z)V
+	public final fun component1 ()Ldev/aster/vega/expression/Node;
+	public final fun component2 ()Ldev/aster/vega/expression/Node;
+	public final fun component3 ()Z
+	public final fun copy (Ldev/aster/vega/expression/Node;Ldev/aster/vega/expression/Node;Z)Ldev/aster/vega/expression/Node$Member;
+	public static synthetic fun copy$default (Ldev/aster/vega/expression/Node$Member;Ldev/aster/vega/expression/Node;Ldev/aster/vega/expression/Node;ZILjava/lang/Object;)Ldev/aster/vega/expression/Node$Member;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getComputed ()Z
+	public final fun getProperty ()Ldev/aster/vega/expression/Node;
+	public final fun getTarget ()Ldev/aster/vega/expression/Node;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class dev/aster/vega/expression/Node$ObjectLiteral : dev/aster/vega/expression/Node {
+	public fun <init> (Ljava/util/List;)V
+	public final fun component1 ()Ljava/util/List;
+	public final fun copy (Ljava/util/List;)Ldev/aster/vega/expression/Node$ObjectLiteral;
+	public static synthetic fun copy$default (Ldev/aster/vega/expression/Node$ObjectLiteral;Ljava/util/List;ILjava/lang/Object;)Ldev/aster/vega/expression/Node$ObjectLiteral;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getEntries ()Ljava/util/List;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class dev/aster/vega/expression/Node$Unary : dev/aster/vega/expression/Node {
+	public fun <init> (Ljava/lang/String;Ldev/aster/vega/expression/Node;)V
+	public final fun component1 ()Ljava/lang/String;
+	public final fun component2 ()Ldev/aster/vega/expression/Node;
+	public final fun copy (Ljava/lang/String;Ldev/aster/vega/expression/Node;)Ldev/aster/vega/expression/Node$Unary;
+	public static synthetic fun copy$default (Ldev/aster/vega/expression/Node$Unary;Ljava/lang/String;Ldev/aster/vega/expression/Node;ILjava/lang/Object;)Ldev/aster/vega/expression/Node$Unary;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getOperand ()Ldev/aster/vega/expression/Node;
+	public final fun getOperator ()Ljava/lang/String;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class dev/aster/vega/expression/NumberFormat {
+	public static final field INSTANCE Ldev/aster/vega/expression/NumberFormat;
+	public final fun format (DLdev/aster/vega/expression/NumberFormat$Spec;Ljava/lang/String;)Ljava/lang/String;
+	public final fun format (DLjava/lang/String;)Ljava/lang/String;
+	public static synthetic fun format$default (Ldev/aster/vega/expression/NumberFormat;DLdev/aster/vega/expression/NumberFormat$Spec;Ljava/lang/String;ILjava/lang/Object;)Ljava/lang/String;
+	public final fun parse (Ljava/lang/String;)Ldev/aster/vega/expression/NumberFormat$Spec;
+	public final fun precisionFixed (D)I
+	public final fun precisionPrefix (DD)I
+	public final fun precisionRound (DD)I
+	public final fun prefixed (Ldev/aster/vega/expression/NumberFormat$Spec;D)Lkotlin/jvm/functions/Function1;
+}
+
+public final class dev/aster/vega/expression/NumberFormat$Spec {
+	public fun <init> ()V
+	public fun <init> (CCCLjava/lang/Character;ZLjava/lang/Integer;ZLjava/lang/Integer;ZLjava/lang/Character;)V
+	public synthetic fun <init> (CCCLjava/lang/Character;ZLjava/lang/Integer;ZLjava/lang/Integer;ZLjava/lang/Character;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()C
+	public final fun component10 ()Ljava/lang/Character;
+	public final fun component2 ()C
+	public final fun component3 ()C
+	public final fun component4 ()Ljava/lang/Character;
+	public final fun component5 ()Z
+	public final fun component6 ()Ljava/lang/Integer;
+	public final fun component7 ()Z
+	public final fun component8 ()Ljava/lang/Integer;
+	public final fun component9 ()Z
+	public final fun copy (CCCLjava/lang/Character;ZLjava/lang/Integer;ZLjava/lang/Integer;ZLjava/lang/Character;)Ldev/aster/vega/expression/NumberFormat$Spec;
+	public static synthetic fun copy$default (Ldev/aster/vega/expression/NumberFormat$Spec;CCCLjava/lang/Character;ZLjava/lang/Integer;ZLjava/lang/Integer;ZLjava/lang/Character;ILjava/lang/Object;)Ldev/aster/vega/expression/NumberFormat$Spec;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getAlign ()C
+	public final fun getComma ()Z
+	public final fun getFill ()C
+	public final fun getPrecision ()Ljava/lang/Integer;
+	public final fun getSign ()C
+	public final fun getSymbol ()Ljava/lang/Character;
+	public final fun getTrim ()Z
+	public final fun getType ()Ljava/lang/Character;
+	public final fun getWidth ()Ljava/lang/Integer;
+	public final fun getZero ()Z
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class dev/aster/vega/expression/ParsedExpression : dev/aster/vega/expression/Expression {
+	public fun <init> (Ljava/lang/String;Ldev/aster/vega/expression/Node;Ldev/aster/vega/expression/Evaluator;)V
+	public fun evaluate (Ldev/aster/vega/expression/ExpressionScope;)Ldev/aster/vega/model/VegaValue;
+	public final fun evaluateOrNull-IoAF18A (Ldev/aster/vega/expression/ExpressionScope;)Ljava/lang/Object;
+	public final fun getAst ()Ldev/aster/vega/expression/Node;
+	public fun getDataDependencies ()Ljava/util/Set;
+	public fun getFieldDependencies ()Ljava/util/Set;
+	public fun getReadsUnnamedDataset ()Z
+	public fun getReadsUnnamedScale ()Z
+	public fun getScaleDependencies ()Ljava/util/Set;
+	public fun getSignalDependencies ()Ljava/util/Set;
+	public fun getSource ()Ljava/lang/String;
+	public fun getWrittenDatasets ()Ljava/util/Set;
+}
+
+public final class dev/aster/vega/expression/Parser {
+	public fun <init> (Ljava/lang/String;)V
+	public final fun parse ()Ldev/aster/vega/expression/Node;
+}
+
+public final class dev/aster/vega/expression/RandomStream {
+	public static final field Companion Ldev/aster/vega/expression/RandomStream$Companion;
+	public static final field DEFAULT_SEED J
+	public fun <init> ()V
+	public fun <init> (J)V
+	public synthetic fun <init> (JILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun bootstrapConfidence (Ljava/util/List;ID)Lkotlin/Pair;
+	public static synthetic fun bootstrapConfidence$default (Ldev/aster/vega/expression/RandomStream;Ljava/util/List;IDILjava/lang/Object;)Lkotlin/Pair;
+	public final fun next ()D
+	public final fun sampleLogNormal (Ljava/lang/Double;Ljava/lang/Double;)D
+	public final fun sampleNormal (Ljava/lang/Double;Ljava/lang/Double;)D
+	public final fun sampleUniform (Ljava/lang/Double;Ljava/lang/Double;)D
+}
+
+public final class dev/aster/vega/expression/RandomStream$Companion {
+}
+
+public final class dev/aster/vega/expression/RefusingExpressionCompiler : dev/aster/vega/expression/ExpressionCompiler {
+	public fun <init> ()V
+	public fun compile (Ljava/lang/String;)Ldev/aster/vega/expression/ExpressionResult;
+}
+
+public final class dev/aster/vega/expression/Statistics {
+	public static final field INSTANCE Ldev/aster/vega/expression/Statistics;
+	public final fun cumulativeLogNormal (DDD)D
+	public static synthetic fun cumulativeLogNormal$default (Ldev/aster/vega/expression/Statistics;DDDILjava/lang/Object;)D
+	public final fun cumulativeNormal (DDD)D
+	public static synthetic fun cumulativeNormal$default (Ldev/aster/vega/expression/Statistics;DDDILjava/lang/Object;)D
+	public final fun cumulativeUniform (DDD)D
+	public static synthetic fun cumulativeUniform$default (Ldev/aster/vega/expression/Statistics;DDDILjava/lang/Object;)D
+	public final fun densityLogNormal (DDD)D
+	public static synthetic fun densityLogNormal$default (Ldev/aster/vega/expression/Statistics;DDDILjava/lang/Object;)D
+	public final fun densityNormal (DDD)D
+	public static synthetic fun densityNormal$default (Ldev/aster/vega/expression/Statistics;DDDILjava/lang/Object;)D
+	public final fun densityUniform (DDD)D
+	public static synthetic fun densityUniform$default (Ldev/aster/vega/expression/Statistics;DDDILjava/lang/Object;)D
+	public final fun quantileLogNormal (DDD)D
+	public static synthetic fun quantileLogNormal$default (Ldev/aster/vega/expression/Statistics;DDDILjava/lang/Object;)D
+	public final fun quantileNormal (DDD)D
+	public static synthetic fun quantileNormal$default (Ldev/aster/vega/expression/Statistics;DDDILjava/lang/Object;)D
+	public final fun quantileUniform (DDD)D
+	public static synthetic fun quantileUniform$default (Ldev/aster/vega/expression/Statistics;DDDILjava/lang/Object;)D
+}
+
+public final class dev/aster/vega/expression/Token {
+	public fun <init> (Ldev/aster/vega/expression/TokenType;Ljava/lang/String;I)V
+	public final fun component1 ()Ldev/aster/vega/expression/TokenType;
+	public final fun component2 ()Ljava/lang/String;
+	public final fun component3 ()I
+	public final fun copy (Ldev/aster/vega/expression/TokenType;Ljava/lang/String;I)Ldev/aster/vega/expression/Token;
+	public static synthetic fun copy$default (Ldev/aster/vega/expression/Token;Ldev/aster/vega/expression/TokenType;Ljava/lang/String;IILjava/lang/Object;)Ldev/aster/vega/expression/Token;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getStart ()I
+	public final fun getText ()Ljava/lang/String;
+	public final fun getType ()Ldev/aster/vega/expression/TokenType;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class dev/aster/vega/expression/TokenType : java/lang/Enum {
+	public static final field END Ldev/aster/vega/expression/TokenType;
+	public static final field IDENTIFIER Ldev/aster/vega/expression/TokenType;
+	public static final field NUMBER Ldev/aster/vega/expression/TokenType;
+	public static final field OPERATOR Ldev/aster/vega/expression/TokenType;
+	public static final field PUNCTUATION Ldev/aster/vega/expression/TokenType;
+	public static final field STRING Ldev/aster/vega/expression/TokenType;
+	public static fun getEntries ()Lkotlin/enums/EnumEntries;
+	public static fun valueOf (Ljava/lang/String;)Ldev/aster/vega/expression/TokenType;
+	public static fun values ()[Ldev/aster/vega/expression/TokenType;
+}
+
+public final class dev/aster/vega/expression/VegaExpressionCompiler : dev/aster/vega/expression/ExpressionCompiler {
+	public fun <init> ()V
+	public fun <init> (Ldev/aster/vega/expression/Evaluator;)V
+	public synthetic fun <init> (Ldev/aster/vega/expression/Evaluator;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun compile (Ljava/lang/String;)Ldev/aster/vega/expression/ExpressionResult;
+}
+

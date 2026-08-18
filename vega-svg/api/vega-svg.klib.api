@@ -1,0 +1,90 @@
+// Klib ABI Dump
+// Targets: [iosArm64, iosSimulatorArm64, linuxX64, macosArm64]
+// Rendering settings:
+// - Signature version: 2
+// - Show manifest properties: true
+// - Show declarations: true
+
+// Library unique name: <io.github.mgilbir.astervega:vega-svg>
+final enum class dev.aster.vega.svg/SvgImagePolicy : kotlin/Enum<dev.aster.vega.svg/SvgImagePolicy> { // dev.aster.vega.svg/SvgImagePolicy|null[0]
+    enum entry REFERENCE // dev.aster.vega.svg/SvgImagePolicy.REFERENCE|null[0]
+    enum entry REQUIRE_RESOLVED // dev.aster.vega.svg/SvgImagePolicy.REQUIRE_RESOLVED|null[0]
+
+    final val entries // dev.aster.vega.svg/SvgImagePolicy.entries|#static{}entries[0]
+        final fun <get-entries>(): kotlin.enums/EnumEntries<dev.aster.vega.svg/SvgImagePolicy> // dev.aster.vega.svg/SvgImagePolicy.entries.<get-entries>|<get-entries>#static(){}[0]
+
+    final fun valueOf(kotlin/String): dev.aster.vega.svg/SvgImagePolicy // dev.aster.vega.svg/SvgImagePolicy.valueOf|valueOf#static(kotlin.String){}[0]
+    final fun values(): kotlin/Array<dev.aster.vega.svg/SvgImagePolicy> // dev.aster.vega.svg/SvgImagePolicy.values|values#static(){}[0]
+}
+
+final class dev.aster.vega.svg/SvgDocument { // dev.aster.vega.svg/SvgDocument|null[0]
+    constructor <init>(kotlin/String, kotlin.collections/List<dev.aster.vega.svg/SvgExportWarning>) // dev.aster.vega.svg/SvgDocument.<init>|<init>(kotlin.String;kotlin.collections.List<dev.aster.vega.svg.SvgExportWarning>){}[0]
+
+    final val svg // dev.aster.vega.svg/SvgDocument.svg|{}svg[0]
+        final fun <get-svg>(): kotlin/String // dev.aster.vega.svg/SvgDocument.svg.<get-svg>|<get-svg>(){}[0]
+    final val warnings // dev.aster.vega.svg/SvgDocument.warnings|{}warnings[0]
+        final fun <get-warnings>(): kotlin.collections/List<dev.aster.vega.svg/SvgExportWarning> // dev.aster.vega.svg/SvgDocument.warnings.<get-warnings>|<get-warnings>(){}[0]
+
+    final fun component1(): kotlin/String // dev.aster.vega.svg/SvgDocument.component1|component1(){}[0]
+    final fun component2(): kotlin.collections/List<dev.aster.vega.svg/SvgExportWarning> // dev.aster.vega.svg/SvgDocument.component2|component2(){}[0]
+    final fun copy(kotlin/String = ..., kotlin.collections/List<dev.aster.vega.svg/SvgExportWarning> = ...): dev.aster.vega.svg/SvgDocument // dev.aster.vega.svg/SvgDocument.copy|copy(kotlin.String;kotlin.collections.List<dev.aster.vega.svg.SvgExportWarning>){}[0]
+    final fun equals(kotlin/Any?): kotlin/Boolean // dev.aster.vega.svg/SvgDocument.equals|equals(kotlin.Any?){}[0]
+    final fun hashCode(): kotlin/Int // dev.aster.vega.svg/SvgDocument.hashCode|hashCode(){}[0]
+    final fun toString(): kotlin/String // dev.aster.vega.svg/SvgDocument.toString|toString(){}[0]
+}
+
+final class dev.aster.vega.svg/SvgExportWarning { // dev.aster.vega.svg/SvgExportWarning|null[0]
+    constructor <init>(kotlin/String, kotlin/String, kotlin/String) // dev.aster.vega.svg/SvgExportWarning.<init>|<init>(kotlin.String;kotlin.String;kotlin.String){}[0]
+
+    final val code // dev.aster.vega.svg/SvgExportWarning.code|{}code[0]
+        final fun <get-code>(): kotlin/String // dev.aster.vega.svg/SvgExportWarning.code.<get-code>|<get-code>(){}[0]
+    final val message // dev.aster.vega.svg/SvgExportWarning.message|{}message[0]
+        final fun <get-message>(): kotlin/String // dev.aster.vega.svg/SvgExportWarning.message.<get-message>|<get-message>(){}[0]
+    final val nodeType // dev.aster.vega.svg/SvgExportWarning.nodeType|{}nodeType[0]
+        final fun <get-nodeType>(): kotlin/String // dev.aster.vega.svg/SvgExportWarning.nodeType.<get-nodeType>|<get-nodeType>(){}[0]
+
+    final fun component1(): kotlin/String // dev.aster.vega.svg/SvgExportWarning.component1|component1(){}[0]
+    final fun component2(): kotlin/String // dev.aster.vega.svg/SvgExportWarning.component2|component2(){}[0]
+    final fun component3(): kotlin/String // dev.aster.vega.svg/SvgExportWarning.component3|component3(){}[0]
+    final fun copy(kotlin/String = ..., kotlin/String = ..., kotlin/String = ...): dev.aster.vega.svg/SvgExportWarning // dev.aster.vega.svg/SvgExportWarning.copy|copy(kotlin.String;kotlin.String;kotlin.String){}[0]
+    final fun equals(kotlin/Any?): kotlin/Boolean // dev.aster.vega.svg/SvgExportWarning.equals|equals(kotlin.Any?){}[0]
+    final fun hashCode(): kotlin/Int // dev.aster.vega.svg/SvgExportWarning.hashCode|hashCode(){}[0]
+    final fun toString(): kotlin/String // dev.aster.vega.svg/SvgExportWarning.toString|toString(){}[0]
+}
+
+final class dev.aster.vega.svg/SvgOptions { // dev.aster.vega.svg/SvgOptions|null[0]
+    constructor <init>(kotlin/Int = ..., kotlin/Boolean = ..., kotlin/String = ..., dev.aster.vega.svg/SvgImagePolicy = ..., kotlin/Boolean = ..., kotlin/Boolean = ...) // dev.aster.vega.svg/SvgOptions.<init>|<init>(kotlin.Int;kotlin.Boolean;kotlin.String;dev.aster.vega.svg.SvgImagePolicy;kotlin.Boolean;kotlin.Boolean){}[0]
+
+    final val idPrefix // dev.aster.vega.svg/SvgOptions.idPrefix|{}idPrefix[0]
+        final fun <get-idPrefix>(): kotlin/String // dev.aster.vega.svg/SvgOptions.idPrefix.<get-idPrefix>|<get-idPrefix>(){}[0]
+    final val imagePolicy // dev.aster.vega.svg/SvgOptions.imagePolicy|{}imagePolicy[0]
+        final fun <get-imagePolicy>(): dev.aster.vega.svg/SvgImagePolicy // dev.aster.vega.svg/SvgOptions.imagePolicy.<get-imagePolicy>|<get-imagePolicy>(){}[0]
+    final val includeAccessibility // dev.aster.vega.svg/SvgOptions.includeAccessibility|{}includeAccessibility[0]
+        final fun <get-includeAccessibility>(): kotlin/Boolean // dev.aster.vega.svg/SvgOptions.includeAccessibility.<get-includeAccessibility>|<get-includeAccessibility>(){}[0]
+    final val includeMetadata // dev.aster.vega.svg/SvgOptions.includeMetadata|{}includeMetadata[0]
+        final fun <get-includeMetadata>(): kotlin/Boolean // dev.aster.vega.svg/SvgOptions.includeMetadata.<get-includeMetadata>|<get-includeMetadata>(){}[0]
+    final val precision // dev.aster.vega.svg/SvgOptions.precision|{}precision[0]
+        final fun <get-precision>(): kotlin/Int // dev.aster.vega.svg/SvgOptions.precision.<get-precision>|<get-precision>(){}[0]
+    final val pretty // dev.aster.vega.svg/SvgOptions.pretty|{}pretty[0]
+        final fun <get-pretty>(): kotlin/Boolean // dev.aster.vega.svg/SvgOptions.pretty.<get-pretty>|<get-pretty>(){}[0]
+
+    final fun component1(): kotlin/Int // dev.aster.vega.svg/SvgOptions.component1|component1(){}[0]
+    final fun component2(): kotlin/Boolean // dev.aster.vega.svg/SvgOptions.component2|component2(){}[0]
+    final fun component3(): kotlin/String // dev.aster.vega.svg/SvgOptions.component3|component3(){}[0]
+    final fun component4(): dev.aster.vega.svg/SvgImagePolicy // dev.aster.vega.svg/SvgOptions.component4|component4(){}[0]
+    final fun component5(): kotlin/Boolean // dev.aster.vega.svg/SvgOptions.component5|component5(){}[0]
+    final fun component6(): kotlin/Boolean // dev.aster.vega.svg/SvgOptions.component6|component6(){}[0]
+    final fun copy(kotlin/Int = ..., kotlin/Boolean = ..., kotlin/String = ..., dev.aster.vega.svg/SvgImagePolicy = ..., kotlin/Boolean = ..., kotlin/Boolean = ...): dev.aster.vega.svg/SvgOptions // dev.aster.vega.svg/SvgOptions.copy|copy(kotlin.Int;kotlin.Boolean;kotlin.String;dev.aster.vega.svg.SvgImagePolicy;kotlin.Boolean;kotlin.Boolean){}[0]
+    final fun equals(kotlin/Any?): kotlin/Boolean // dev.aster.vega.svg/SvgOptions.equals|equals(kotlin.Any?){}[0]
+    final fun hashCode(): kotlin/Int // dev.aster.vega.svg/SvgOptions.hashCode|hashCode(){}[0]
+    final fun toString(): kotlin/String // dev.aster.vega.svg/SvgOptions.toString|toString(){}[0]
+}
+
+final class dev.aster.vega.svg/SvgRenderer { // dev.aster.vega.svg/SvgRenderer|null[0]
+    constructor <init>(dev.aster.vega.svg/SvgOptions = ...) // dev.aster.vega.svg/SvgRenderer.<init>|<init>(dev.aster.vega.svg.SvgOptions){}[0]
+
+    final fun render(dev.aster.vega.scene/Scene): dev.aster.vega.svg/SvgDocument // dev.aster.vega.svg/SvgRenderer.render|render(dev.aster.vega.scene.Scene){}[0]
+}
+
+final fun (dev.aster.vega.scene/Scene).dev.aster.vega.svg/toSvg(dev.aster.vega.svg/SvgOptions = ...): kotlin/String // dev.aster.vega.svg/toSvg|toSvg@dev.aster.vega.scene.Scene(dev.aster.vega.svg.SvgOptions){}[0]
+final fun dev.aster.vega.svg/escapeXml(kotlin/String): kotlin/String // dev.aster.vega.svg/escapeXml|escapeXml(kotlin.String){}[0]

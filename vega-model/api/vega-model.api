@@ -1,0 +1,2170 @@
+public final class dev/aster/vega/model/CanonicalNumberKt {
+	public static final field DEFAULT_DECIMAL_PRECISION I
+	public static final field MINUS_SIGN Ljava/lang/String;
+	public static final fun canonicalNumberString (DI)Ljava/lang/String;
+	public static synthetic fun canonicalNumberString$default (DIILjava/lang/Object;)Ljava/lang/String;
+	public static final fun finiteOr (DD)D
+	public static synthetic fun finiteOr$default (DDILjava/lang/Object;)D
+	public static final fun normalizeZero (D)D
+	public static final fun roundHalfUp (D)D
+	public static final fun withTypographicMinus (Ljava/lang/String;)Ljava/lang/String;
+}
+
+public final class dev/aster/vega/model/Decimals {
+	public static final field INSTANCE Ldev/aster/vega/model/Decimals;
+	public final fun exponential (DI)Ljava/lang/String;
+	public final fun fixed (DI)Ljava/lang/String;
+	public final fun jsString (D)Ljava/lang/String;
+	public final fun shortest (D)Ldev/aster/vega/model/Decimals$Shortest;
+	public final fun significant (DI)Ljava/lang/String;
+	public final fun trimmed (DI)Ljava/lang/String;
+}
+
+public final class dev/aster/vega/model/Decimals$Shortest {
+	public final fun getDigits ()Ljava/lang/String;
+	public final fun getExponent ()I
+}
+
+public final class dev/aster/vega/model/DelimitedText {
+	public static final field INSTANCE Ldev/aster/vega/model/DelimitedText;
+	public final fun format (Ljava/util/List;CLjava/util/List;)Ljava/lang/String;
+	public static synthetic fun format$default (Ldev/aster/vega/model/DelimitedText;Ljava/util/List;CLjava/util/List;ILjava/lang/Object;)Ljava/lang/String;
+	public final fun formatRow (Ljava/util/List;C)Ljava/lang/String;
+	public final fun formatRows (Ljava/util/List;C)Ljava/lang/String;
+	public final fun formatValue (Ljava/lang/String;C)Ljava/lang/String;
+	public final fun parse (Ljava/lang/String;C)Ljava/util/List;
+	public final fun parseRows (Ljava/lang/String;C)Ljava/util/List;
+}
+
+public final class dev/aster/vega/model/DiagnosticCodes {
+	public static final field EXPORT_IMAGE_UNRESOLVED Ljava/lang/String;
+	public static final field EXPORT_UNSUPPORTED_OPERATION Ljava/lang/String;
+	public static final field EXPRESSION_LOG Ljava/lang/String;
+	public static final field EXPRESSION_PARSE_ERROR Ljava/lang/String;
+	public static final field EXPRESSION_UNSUPPORTED_FUNCTION Ljava/lang/String;
+	public static final field INSTANCE Ldev/aster/vega/model/DiagnosticCodes;
+	public static final field PARSE_INVALID_JSON Ljava/lang/String;
+	public static final field PARSE_MISSING_PROPERTY Ljava/lang/String;
+	public static final field PARSE_UNKNOWN_MARK Ljava/lang/String;
+	public static final field PARSE_UNKNOWN_PROPERTY Ljava/lang/String;
+	public static final field RENDER_UNSUPPORTED_BLEND_MODE Ljava/lang/String;
+	public static final field RENDER_UNSUPPORTED_NODE Ljava/lang/String;
+	public static final field SCALE_INVALID_DOMAIN Ljava/lang/String;
+	public static final field SCALE_UNSUPPORTED_TYPE Ljava/lang/String;
+	public static final field SIGNAL_CYCLE Ljava/lang/String;
+	public static final field TRANSFORM_INVALID_PARAMETER Ljava/lang/String;
+	public static final field TRANSFORM_NOT_IMPLEMENTED Ljava/lang/String;
+}
+
+public final class dev/aster/vega/model/DiagnosticCollector {
+	public fun <init> ()V
+	public final fun add (Ldev/aster/vega/model/VegaDiagnostic;)V
+	public final fun addAll (Ljava/lang/Iterable;)V
+	public final fun clear ()V
+	public final fun error (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/Throwable;)V
+	public static synthetic fun error$default (Ldev/aster/vega/model/DiagnosticCollector;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/Throwable;ILjava/lang/Object;)V
+	public final fun fatal (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/Throwable;)V
+	public static synthetic fun fatal$default (Ldev/aster/vega/model/DiagnosticCollector;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/Throwable;ILjava/lang/Object;)V
+	public final fun getDiagnostics ()Ljava/util/List;
+	public final fun getHasErrors ()Z
+	public final fun getHasFatal ()Z
+	public final fun info (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)V
+	public static synthetic fun info$default (Ldev/aster/vega/model/DiagnosticCollector;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;ILjava/lang/Object;)V
+	public final fun warn (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)V
+	public static synthetic fun warn$default (Ldev/aster/vega/model/DiagnosticCollector;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;ILjava/lang/Object;)V
+}
+
+public final class dev/aster/vega/model/DiagnosticSeverity : java/lang/Enum {
+	public static final field ERROR Ldev/aster/vega/model/DiagnosticSeverity;
+	public static final field FATAL Ldev/aster/vega/model/DiagnosticSeverity;
+	public static final field INFO Ldev/aster/vega/model/DiagnosticSeverity;
+	public static final field WARNING Ldev/aster/vega/model/DiagnosticSeverity;
+	public static fun getEntries ()Lkotlin/enums/EnumEntries;
+	public static fun valueOf (Ljava/lang/String;)Ldev/aster/vega/model/DiagnosticSeverity;
+	public static fun values ()[Ldev/aster/vega/model/DiagnosticSeverity;
+}
+
+public final class dev/aster/vega/model/JsonBridgeKt {
+	public static final fun toVegaValue (Lkotlinx/serialization/json/JsonElement;)Ldev/aster/vega/model/VegaValue;
+}
+
+public final class dev/aster/vega/model/TopoJson {
+	public static final field INSTANCE Ldev/aster/vega/model/TopoJson;
+	public final fun feature (Ldev/aster/vega/model/VegaValue;Ljava/lang/String;)Ljava/util/List;
+	public final fun mesh (Ldev/aster/vega/model/VegaValue;Ljava/lang/String;Ldev/aster/vega/model/TopoJson$MeshFilter;)Ljava/util/List;
+}
+
+public final class dev/aster/vega/model/TopoJson$MeshFilter : java/lang/Enum {
+	public static final field ALL Ldev/aster/vega/model/TopoJson$MeshFilter;
+	public static final field EXTERIOR Ldev/aster/vega/model/TopoJson$MeshFilter;
+	public static final field INTERIOR Ldev/aster/vega/model/TopoJson$MeshFilter;
+	public static fun getEntries ()Lkotlin/enums/EnumEntries;
+	public static fun valueOf (Ljava/lang/String;)Ldev/aster/vega/model/TopoJson$MeshFilter;
+	public static fun values ()[Ldev/aster/vega/model/TopoJson$MeshFilter;
+}
+
+public final class dev/aster/vega/model/VegaDiagnostic {
+	public fun <init> (Ldev/aster/vega/model/DiagnosticSeverity;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/Throwable;)V
+	public synthetic fun <init> (Ldev/aster/vega/model/DiagnosticSeverity;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/Throwable;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()Ldev/aster/vega/model/DiagnosticSeverity;
+	public final fun component2 ()Ljava/lang/String;
+	public final fun component3 ()Ljava/lang/String;
+	public final fun component4 ()Ljava/lang/String;
+	public final fun component5 ()Ljava/lang/String;
+	public final fun component6 ()Ljava/lang/Throwable;
+	public final fun copy (Ldev/aster/vega/model/DiagnosticSeverity;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/Throwable;)Ldev/aster/vega/model/VegaDiagnostic;
+	public static synthetic fun copy$default (Ldev/aster/vega/model/VegaDiagnostic;Ldev/aster/vega/model/DiagnosticSeverity;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/Throwable;ILjava/lang/Object;)Ldev/aster/vega/model/VegaDiagnostic;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getCause ()Ljava/lang/Throwable;
+	public final fun getCode ()Ljava/lang/String;
+	public final fun getJsonPath ()Ljava/lang/String;
+	public final fun getMessage ()Ljava/lang/String;
+	public final fun getOperator ()Ljava/lang/String;
+	public final fun getSeverity ()Ldev/aster/vega/model/DiagnosticSeverity;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class dev/aster/vega/model/VegaJson {
+	public static final field INSTANCE Ldev/aster/vega/model/VegaJson;
+	public final fun parse (Ljava/lang/String;)Ldev/aster/vega/model/VegaValue;
+	public final fun parseOrNull (Ljava/lang/String;Ldev/aster/vega/model/DiagnosticCollector;)Ldev/aster/vega/model/VegaValue;
+	public final fun write (Ldev/aster/vega/model/VegaValue;)Ljava/lang/String;
+}
+
+public final class dev/aster/vega/model/VegaSpecException : java/lang/Exception {
+	public fun <init> (Ldev/aster/vega/model/VegaDiagnostic;Ljava/lang/Throwable;)V
+	public synthetic fun <init> (Ldev/aster/vega/model/VegaDiagnostic;Ljava/lang/Throwable;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun getDiagnostic ()Ldev/aster/vega/model/VegaDiagnostic;
+}
+
+public abstract interface class dev/aster/vega/model/VegaValue {
+	public static final field Companion Ldev/aster/vega/model/VegaValue$Companion;
+}
+
+public final class dev/aster/vega/model/VegaValue$Arr : dev/aster/vega/model/VegaValue {
+	public static final synthetic fun box-impl (Ljava/util/List;)Ldev/aster/vega/model/VegaValue$Arr;
+	public static fun constructor-impl (Ljava/util/List;)Ljava/util/List;
+	public fun equals (Ljava/lang/Object;)Z
+	public static fun equals-impl (Ljava/util/List;Ljava/lang/Object;)Z
+	public static final fun equals-impl0 (Ljava/util/List;Ljava/util/List;)Z
+	public final fun getValues ()Ljava/util/List;
+	public fun hashCode ()I
+	public static fun hashCode-impl (Ljava/util/List;)I
+	public fun toString ()Ljava/lang/String;
+	public static fun toString-impl (Ljava/util/List;)Ljava/lang/String;
+	public final synthetic fun unbox-impl ()Ljava/util/List;
+}
+
+public final class dev/aster/vega/model/VegaValue$Bool : dev/aster/vega/model/VegaValue {
+	public static final synthetic fun box-impl (Z)Ldev/aster/vega/model/VegaValue$Bool;
+	public static fun constructor-impl (Z)Z
+	public fun equals (Ljava/lang/Object;)Z
+	public static fun equals-impl (ZLjava/lang/Object;)Z
+	public static final fun equals-impl0 (ZZ)Z
+	public final fun getValue ()Z
+	public fun hashCode ()I
+	public static fun hashCode-impl (Z)I
+	public fun toString ()Ljava/lang/String;
+	public static fun toString-impl (Z)Ljava/lang/String;
+	public final synthetic fun unbox-impl ()Z
+}
+
+public final class dev/aster/vega/model/VegaValue$Companion {
+	public final fun getEmptyArray-WmB2b3w ()Ljava/util/List;
+	public final fun getEmptyObject-kyrVumU ()Ljava/util/Map;
+	public final fun of (D)Ldev/aster/vega/model/VegaValue;
+	public final fun of (I)Ldev/aster/vega/model/VegaValue;
+	public final fun of (Ljava/lang/String;)Ldev/aster/vega/model/VegaValue;
+	public final fun of (Z)Ldev/aster/vega/model/VegaValue;
+}
+
+public final class dev/aster/vega/model/VegaValue$Null : dev/aster/vega/model/VegaValue {
+	public static final field INSTANCE Ldev/aster/vega/model/VegaValue$Null;
+	public fun equals (Ljava/lang/Object;)Z
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class dev/aster/vega/model/VegaValue$Num : dev/aster/vega/model/VegaValue {
+	public static final synthetic fun box-impl (D)Ldev/aster/vega/model/VegaValue$Num;
+	public static fun constructor-impl (D)D
+	public fun equals (Ljava/lang/Object;)Z
+	public static fun equals-impl (DLjava/lang/Object;)Z
+	public static final fun equals-impl0 (DD)Z
+	public final fun getValue ()D
+	public fun hashCode ()I
+	public static fun hashCode-impl (D)I
+	public fun toString ()Ljava/lang/String;
+	public static fun toString-impl (D)Ljava/lang/String;
+	public final synthetic fun unbox-impl ()D
+}
+
+public final class dev/aster/vega/model/VegaValue$Obj : dev/aster/vega/model/VegaValue {
+	public static final synthetic fun box-impl (Ljava/util/Map;)Ldev/aster/vega/model/VegaValue$Obj;
+	public static fun constructor-impl (Ljava/util/Map;)Ljava/util/Map;
+	public fun equals (Ljava/lang/Object;)Z
+	public static fun equals-impl (Ljava/util/Map;Ljava/lang/Object;)Z
+	public static final fun equals-impl0 (Ljava/util/Map;Ljava/util/Map;)Z
+	public final fun getFields ()Ljava/util/Map;
+	public fun hashCode ()I
+	public static fun hashCode-impl (Ljava/util/Map;)I
+	public fun toString ()Ljava/lang/String;
+	public static fun toString-impl (Ljava/util/Map;)Ljava/lang/String;
+	public final synthetic fun unbox-impl ()Ljava/util/Map;
+}
+
+public final class dev/aster/vega/model/VegaValue$Pattern : dev/aster/vega/model/VegaValue {
+	public fun <init> (Ljava/lang/String;Ljava/lang/String;)V
+	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/String;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getFlags ()Ljava/lang/String;
+	public final fun getRegex ()Lio/github/mgilbir/ecma262/RegExp;
+	public final fun getSource ()Ljava/lang/String;
+	public final fun getText ()Ljava/lang/String;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class dev/aster/vega/model/VegaValue$Str : dev/aster/vega/model/VegaValue {
+	public static final synthetic fun box-impl (Ljava/lang/String;)Ldev/aster/vega/model/VegaValue$Str;
+	public static fun constructor-impl (Ljava/lang/String;)Ljava/lang/String;
+	public fun equals (Ljava/lang/Object;)Z
+	public static fun equals-impl (Ljava/lang/String;Ljava/lang/Object;)Z
+	public static final fun equals-impl0 (Ljava/lang/String;Ljava/lang/String;)Z
+	public final fun getValue ()Ljava/lang/String;
+	public fun hashCode ()I
+	public static fun hashCode-impl (Ljava/lang/String;)I
+	public fun toString ()Ljava/lang/String;
+	public static fun toString-impl (Ljava/lang/String;)Ljava/lang/String;
+	public final synthetic fun unbox-impl ()Ljava/lang/String;
+}
+
+public final class dev/aster/vega/model/VegaValue$Timestamp : dev/aster/vega/model/VegaValue {
+	public static final synthetic fun box-impl (D)Ldev/aster/vega/model/VegaValue$Timestamp;
+	public static fun constructor-impl (D)D
+	public fun equals (Ljava/lang/Object;)Z
+	public static fun equals-impl (DLjava/lang/Object;)Z
+	public static final fun equals-impl0 (DD)Z
+	public final fun getEpochMillis ()D
+	public fun hashCode ()I
+	public static fun hashCode-impl (D)I
+	public fun toString ()Ljava/lang/String;
+	public static fun toString-impl (D)Ljava/lang/String;
+	public final synthetic fun unbox-impl ()D
+}
+
+public final class dev/aster/vega/model/VegaValueKt {
+	public static final fun asBoolean (Ldev/aster/vega/model/VegaValue;)Z
+	public static final fun asDouble (Ldev/aster/vega/model/VegaValue;)D
+	public static final fun asNumberOrNull (Ldev/aster/vega/model/VegaValue;)Ljava/lang/Double;
+	public static final fun asString (Ldev/aster/vega/model/VegaValue;)Ljava/lang/String;
+	public static final fun field (Ldev/aster/vega/model/VegaValue;Ljava/lang/String;)Ldev/aster/vega/model/VegaValue;
+	public static final fun isMissing (Ldev/aster/vega/model/VegaValue;)Z
+	public static final fun parseFieldPath (Ljava/lang/String;)Ljava/util/List;
+}
+
+public final class dev/aster/vega/model/spec/Anchor : java/lang/Enum {
+	public static final field Companion Ldev/aster/vega/model/spec/Anchor$Companion;
+	public static final field END Ldev/aster/vega/model/spec/Anchor;
+	public static final field MIDDLE Ldev/aster/vega/model/spec/Anchor;
+	public static final field START Ldev/aster/vega/model/spec/Anchor;
+	public static fun getEntries ()Lkotlin/enums/EnumEntries;
+	public static fun valueOf (Ljava/lang/String;)Ldev/aster/vega/model/spec/Anchor;
+	public static fun values ()[Ldev/aster/vega/model/spec/Anchor;
+}
+
+public final class dev/aster/vega/model/spec/Anchor$Companion {
+	public final fun fromName (Ljava/lang/String;)Ldev/aster/vega/model/spec/Anchor;
+}
+
+public final class dev/aster/vega/model/spec/Autosize {
+	public static final field Companion Ldev/aster/vega/model/spec/Autosize$Companion;
+	public fun <init> ()V
+	public fun <init> (Ldev/aster/vega/model/spec/AutosizeType;ZLjava/lang/String;)V
+	public synthetic fun <init> (Ldev/aster/vega/model/spec/AutosizeType;ZLjava/lang/String;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()Ldev/aster/vega/model/spec/AutosizeType;
+	public final fun component2 ()Z
+	public final fun component3 ()Ljava/lang/String;
+	public final fun copy (Ldev/aster/vega/model/spec/AutosizeType;ZLjava/lang/String;)Ldev/aster/vega/model/spec/Autosize;
+	public static synthetic fun copy$default (Ldev/aster/vega/model/spec/Autosize;Ldev/aster/vega/model/spec/AutosizeType;ZLjava/lang/String;ILjava/lang/Object;)Ldev/aster/vega/model/spec/Autosize;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getContains ()Ljava/lang/String;
+	public final fun getResize ()Z
+	public final fun getType ()Ldev/aster/vega/model/spec/AutosizeType;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class dev/aster/vega/model/spec/Autosize$Companion {
+	public final fun getDefault ()Ldev/aster/vega/model/spec/Autosize;
+}
+
+public final class dev/aster/vega/model/spec/AutosizeType : java/lang/Enum {
+	public static final field FIT Ldev/aster/vega/model/spec/AutosizeType;
+	public static final field FIT_X Ldev/aster/vega/model/spec/AutosizeType;
+	public static final field FIT_Y Ldev/aster/vega/model/spec/AutosizeType;
+	public static final field NONE Ldev/aster/vega/model/spec/AutosizeType;
+	public static final field PAD Ldev/aster/vega/model/spec/AutosizeType;
+	public static fun getEntries ()Lkotlin/enums/EnumEntries;
+	public final fun isFit ()Z
+	public static fun valueOf (Ljava/lang/String;)Ldev/aster/vega/model/spec/AutosizeType;
+	public static fun values ()[Ldev/aster/vega/model/spec/AutosizeType;
+}
+
+public final class dev/aster/vega/model/spec/AxisSpec {
+	public fun <init> (Ljava/lang/String;Ldev/aster/vega/model/spec/Orient;Ljava/lang/String;Ljava/lang/String;Ldev/aster/vega/model/spec/NumberValue;Ldev/aster/vega/model/spec/NumberValue;Ldev/aster/vega/model/spec/Anchor;Ldev/aster/vega/model/spec/NumberValue;Ldev/aster/vega/model/spec/NumberValue;Ldev/aster/vega/model/spec/NumberValue;Ljava/lang/Boolean;Ljava/lang/String;Ldev/aster/vega/model/spec/NumberValue;Ljava/lang/Double;ZLjava/lang/String;ZZZZLdev/aster/vega/model/spec/NumberValue;Ldev/aster/vega/model/spec/NumberValue;Ljava/lang/String;Ljava/lang/Integer;Ldev/aster/vega/model/spec/NumberValue;Ldev/aster/vega/model/spec/NumberValue;Ldev/aster/vega/model/spec/NumberValue;Ldev/aster/vega/model/spec/NumberValue;Ldev/aster/vega/model/spec/ChannelValue;Ldev/aster/vega/model/spec/NumberValue;Ldev/aster/vega/model/spec/NumberValue;Ldev/aster/vega/model/spec/NumberValue;Ljava/lang/String;Ljava/lang/String;ILjava/util/List;Ljava/lang/String;Ldev/aster/vega/model/spec/NumberValue;Ldev/aster/vega/model/spec/NumberValue;Ljava/lang/String;Ljava/lang/String;Ldev/aster/vega/model/spec/NumberValue;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ldev/aster/vega/model/spec/NumberValue;Ldev/aster/vega/model/spec/NumberValue;ZLjava/lang/String;Ljava/lang/Double;Ldev/aster/vega/model/spec/NumberValue;Ldev/aster/vega/model/spec/NumberValue;Ldev/aster/vega/model/spec/NumberValue;Ljava/util/Map;Ldev/aster/vega/model/spec/GuideStroke;Ldev/aster/vega/model/spec/GuideStroke;Ldev/aster/vega/model/spec/GuideStroke;Ldev/aster/vega/model/spec/GuideStroke;Ldev/aster/vega/model/spec/GuideStroke;)V
+	public synthetic fun <init> (Ljava/lang/String;Ldev/aster/vega/model/spec/Orient;Ljava/lang/String;Ljava/lang/String;Ldev/aster/vega/model/spec/NumberValue;Ldev/aster/vega/model/spec/NumberValue;Ldev/aster/vega/model/spec/Anchor;Ldev/aster/vega/model/spec/NumberValue;Ldev/aster/vega/model/spec/NumberValue;Ldev/aster/vega/model/spec/NumberValue;Ljava/lang/Boolean;Ljava/lang/String;Ldev/aster/vega/model/spec/NumberValue;Ljava/lang/Double;ZLjava/lang/String;ZZZZLdev/aster/vega/model/spec/NumberValue;Ldev/aster/vega/model/spec/NumberValue;Ljava/lang/String;Ljava/lang/Integer;Ldev/aster/vega/model/spec/NumberValue;Ldev/aster/vega/model/spec/NumberValue;Ldev/aster/vega/model/spec/NumberValue;Ldev/aster/vega/model/spec/NumberValue;Ldev/aster/vega/model/spec/ChannelValue;Ldev/aster/vega/model/spec/NumberValue;Ldev/aster/vega/model/spec/NumberValue;Ldev/aster/vega/model/spec/NumberValue;Ljava/lang/String;Ljava/lang/String;ILjava/util/List;Ljava/lang/String;Ldev/aster/vega/model/spec/NumberValue;Ldev/aster/vega/model/spec/NumberValue;Ljava/lang/String;Ljava/lang/String;Ldev/aster/vega/model/spec/NumberValue;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ldev/aster/vega/model/spec/NumberValue;Ldev/aster/vega/model/spec/NumberValue;ZLjava/lang/String;Ljava/lang/Double;Ldev/aster/vega/model/spec/NumberValue;Ldev/aster/vega/model/spec/NumberValue;Ldev/aster/vega/model/spec/NumberValue;Ljava/util/Map;Ldev/aster/vega/model/spec/GuideStroke;Ldev/aster/vega/model/spec/GuideStroke;Ldev/aster/vega/model/spec/GuideStroke;Ldev/aster/vega/model/spec/GuideStroke;Ldev/aster/vega/model/spec/GuideStroke;IILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()Ljava/lang/String;
+	public final fun component10 ()Ldev/aster/vega/model/spec/NumberValue;
+	public final fun component11 ()Ljava/lang/Boolean;
+	public final fun component12 ()Ljava/lang/String;
+	public final fun component13 ()Ldev/aster/vega/model/spec/NumberValue;
+	public final fun component14 ()Ljava/lang/Double;
+	public final fun component15 ()Z
+	public final fun component16 ()Ljava/lang/String;
+	public final fun component17 ()Z
+	public final fun component18 ()Z
+	public final fun component19 ()Z
+	public final fun component2 ()Ldev/aster/vega/model/spec/Orient;
+	public final fun component20 ()Z
+	public final fun component21 ()Ldev/aster/vega/model/spec/NumberValue;
+	public final fun component22 ()Ldev/aster/vega/model/spec/NumberValue;
+	public final fun component23 ()Ljava/lang/String;
+	public final fun component24 ()Ljava/lang/Integer;
+	public final fun component25 ()Ldev/aster/vega/model/spec/NumberValue;
+	public final fun component26 ()Ldev/aster/vega/model/spec/NumberValue;
+	public final fun component27 ()Ldev/aster/vega/model/spec/NumberValue;
+	public final fun component28 ()Ldev/aster/vega/model/spec/NumberValue;
+	public final fun component29 ()Ldev/aster/vega/model/spec/ChannelValue;
+	public final fun component3 ()Ljava/lang/String;
+	public final fun component30 ()Ldev/aster/vega/model/spec/NumberValue;
+	public final fun component31 ()Ldev/aster/vega/model/spec/NumberValue;
+	public final fun component32 ()Ldev/aster/vega/model/spec/NumberValue;
+	public final fun component33 ()Ljava/lang/String;
+	public final fun component34 ()Ljava/lang/String;
+	public final fun component35 ()I
+	public final fun component36 ()Ljava/util/List;
+	public final fun component37 ()Ljava/lang/String;
+	public final fun component38 ()Ldev/aster/vega/model/spec/NumberValue;
+	public final fun component39 ()Ldev/aster/vega/model/spec/NumberValue;
+	public final fun component4 ()Ljava/lang/String;
+	public final fun component40 ()Ljava/lang/String;
+	public final fun component41 ()Ljava/lang/String;
+	public final fun component42 ()Ldev/aster/vega/model/spec/NumberValue;
+	public final fun component43 ()Ljava/lang/String;
+	public final fun component44 ()Ljava/lang/String;
+	public final fun component45 ()Ljava/lang/String;
+	public final fun component46 ()Ljava/lang/String;
+	public final fun component47 ()Ldev/aster/vega/model/spec/NumberValue;
+	public final fun component48 ()Ldev/aster/vega/model/spec/NumberValue;
+	public final fun component49 ()Z
+	public final fun component5 ()Ldev/aster/vega/model/spec/NumberValue;
+	public final fun component50 ()Ljava/lang/String;
+	public final fun component51 ()Ljava/lang/Double;
+	public final fun component52 ()Ldev/aster/vega/model/spec/NumberValue;
+	public final fun component53 ()Ldev/aster/vega/model/spec/NumberValue;
+	public final fun component54 ()Ldev/aster/vega/model/spec/NumberValue;
+	public final fun component55 ()Ljava/util/Map;
+	public final fun component56 ()Ldev/aster/vega/model/spec/GuideStroke;
+	public final fun component57 ()Ldev/aster/vega/model/spec/GuideStroke;
+	public final fun component58 ()Ldev/aster/vega/model/spec/GuideStroke;
+	public final fun component59 ()Ldev/aster/vega/model/spec/GuideStroke;
+	public final fun component6 ()Ldev/aster/vega/model/spec/NumberValue;
+	public final fun component60 ()Ldev/aster/vega/model/spec/GuideStroke;
+	public final fun component7 ()Ldev/aster/vega/model/spec/Anchor;
+	public final fun component8 ()Ldev/aster/vega/model/spec/NumberValue;
+	public final fun component9 ()Ldev/aster/vega/model/spec/NumberValue;
+	public final fun copy (Ljava/lang/String;Ldev/aster/vega/model/spec/Orient;Ljava/lang/String;Ljava/lang/String;Ldev/aster/vega/model/spec/NumberValue;Ldev/aster/vega/model/spec/NumberValue;Ldev/aster/vega/model/spec/Anchor;Ldev/aster/vega/model/spec/NumberValue;Ldev/aster/vega/model/spec/NumberValue;Ldev/aster/vega/model/spec/NumberValue;Ljava/lang/Boolean;Ljava/lang/String;Ldev/aster/vega/model/spec/NumberValue;Ljava/lang/Double;ZLjava/lang/String;ZZZZLdev/aster/vega/model/spec/NumberValue;Ldev/aster/vega/model/spec/NumberValue;Ljava/lang/String;Ljava/lang/Integer;Ldev/aster/vega/model/spec/NumberValue;Ldev/aster/vega/model/spec/NumberValue;Ldev/aster/vega/model/spec/NumberValue;Ldev/aster/vega/model/spec/NumberValue;Ldev/aster/vega/model/spec/ChannelValue;Ldev/aster/vega/model/spec/NumberValue;Ldev/aster/vega/model/spec/NumberValue;Ldev/aster/vega/model/spec/NumberValue;Ljava/lang/String;Ljava/lang/String;ILjava/util/List;Ljava/lang/String;Ldev/aster/vega/model/spec/NumberValue;Ldev/aster/vega/model/spec/NumberValue;Ljava/lang/String;Ljava/lang/String;Ldev/aster/vega/model/spec/NumberValue;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ldev/aster/vega/model/spec/NumberValue;Ldev/aster/vega/model/spec/NumberValue;ZLjava/lang/String;Ljava/lang/Double;Ldev/aster/vega/model/spec/NumberValue;Ldev/aster/vega/model/spec/NumberValue;Ldev/aster/vega/model/spec/NumberValue;Ljava/util/Map;Ldev/aster/vega/model/spec/GuideStroke;Ldev/aster/vega/model/spec/GuideStroke;Ldev/aster/vega/model/spec/GuideStroke;Ldev/aster/vega/model/spec/GuideStroke;Ldev/aster/vega/model/spec/GuideStroke;)Ldev/aster/vega/model/spec/AxisSpec;
+	public static synthetic fun copy$default (Ldev/aster/vega/model/spec/AxisSpec;Ljava/lang/String;Ldev/aster/vega/model/spec/Orient;Ljava/lang/String;Ljava/lang/String;Ldev/aster/vega/model/spec/NumberValue;Ldev/aster/vega/model/spec/NumberValue;Ldev/aster/vega/model/spec/Anchor;Ldev/aster/vega/model/spec/NumberValue;Ldev/aster/vega/model/spec/NumberValue;Ldev/aster/vega/model/spec/NumberValue;Ljava/lang/Boolean;Ljava/lang/String;Ldev/aster/vega/model/spec/NumberValue;Ljava/lang/Double;ZLjava/lang/String;ZZZZLdev/aster/vega/model/spec/NumberValue;Ldev/aster/vega/model/spec/NumberValue;Ljava/lang/String;Ljava/lang/Integer;Ldev/aster/vega/model/spec/NumberValue;Ldev/aster/vega/model/spec/NumberValue;Ldev/aster/vega/model/spec/NumberValue;Ldev/aster/vega/model/spec/NumberValue;Ldev/aster/vega/model/spec/ChannelValue;Ldev/aster/vega/model/spec/NumberValue;Ldev/aster/vega/model/spec/NumberValue;Ldev/aster/vega/model/spec/NumberValue;Ljava/lang/String;Ljava/lang/String;ILjava/util/List;Ljava/lang/String;Ldev/aster/vega/model/spec/NumberValue;Ldev/aster/vega/model/spec/NumberValue;Ljava/lang/String;Ljava/lang/String;Ldev/aster/vega/model/spec/NumberValue;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ldev/aster/vega/model/spec/NumberValue;Ldev/aster/vega/model/spec/NumberValue;ZLjava/lang/String;Ljava/lang/Double;Ldev/aster/vega/model/spec/NumberValue;Ldev/aster/vega/model/spec/NumberValue;Ldev/aster/vega/model/spec/NumberValue;Ljava/util/Map;Ldev/aster/vega/model/spec/GuideStroke;Ldev/aster/vega/model/spec/GuideStroke;Ldev/aster/vega/model/spec/GuideStroke;Ldev/aster/vega/model/spec/GuideStroke;Ldev/aster/vega/model/spec/GuideStroke;IILjava/lang/Object;)Ldev/aster/vega/model/spec/AxisSpec;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getAria ()Z
+	public final fun getBandPosition ()Ldev/aster/vega/model/spec/NumberValue;
+	public final fun getDescription ()Ljava/lang/String;
+	public final fun getDomainLine ()Z
+	public final fun getDomainStyle ()Ldev/aster/vega/model/spec/GuideStroke;
+	public final fun getEncode ()Ljava/util/Map;
+	public final fun getFormat ()Ljava/lang/String;
+	public final fun getFormatExpression ()Ljava/lang/String;
+	public final fun getFormatType ()Ljava/lang/String;
+	public final fun getFormatTypeExpression ()Ljava/lang/String;
+	public final fun getGrid ()Z
+	public final fun getGridScale ()Ljava/lang/String;
+	public final fun getGridStyle ()Ldev/aster/vega/model/spec/GuideStroke;
+	public final fun getLabelAlign ()Ljava/lang/String;
+	public final fun getLabelAngle ()Ldev/aster/vega/model/spec/NumberValue;
+	public final fun getLabelBaseline ()Ljava/lang/String;
+	public final fun getLabelBound ()Ljava/lang/Double;
+	public final fun getLabelFlush ()Ljava/lang/Double;
+	public final fun getLabelFlushOffset ()Ldev/aster/vega/model/spec/NumberValue;
+	public final fun getLabelFontSize ()Ldev/aster/vega/model/spec/NumberValue;
+	public final fun getLabelLimit ()Ldev/aster/vega/model/spec/NumberValue;
+	public final fun getLabelOffset ()Ldev/aster/vega/model/spec/NumberValue;
+	public final fun getLabelOverlap ()Ljava/lang/String;
+	public final fun getLabelPadding ()Ldev/aster/vega/model/spec/NumberValue;
+	public final fun getLabelSeparation ()Ldev/aster/vega/model/spec/NumberValue;
+	public final fun getLabelStyle ()Ldev/aster/vega/model/spec/GuideStroke;
+	public final fun getLabels ()Z
+	public final fun getMaxExtent ()Ldev/aster/vega/model/spec/NumberValue;
+	public final fun getMinExtent ()Ldev/aster/vega/model/spec/NumberValue;
+	public final fun getOffset ()Ldev/aster/vega/model/spec/NumberValue;
+	public final fun getOffsetChannel ()Ldev/aster/vega/model/spec/ChannelValue;
+	public final fun getOrient ()Ldev/aster/vega/model/spec/Orient;
+	public final fun getPosition ()Ldev/aster/vega/model/spec/NumberValue;
+	public final fun getScale ()Ljava/lang/String;
+	public final fun getTickBand ()Ljava/lang/String;
+	public final fun getTickCount ()Ldev/aster/vega/model/spec/NumberValue;
+	public final fun getTickExtra ()Z
+	public final fun getTickInterval ()Ljava/lang/String;
+	public final fun getTickMinStep ()Ldev/aster/vega/model/spec/NumberValue;
+	public final fun getTickOffset ()Ldev/aster/vega/model/spec/NumberValue;
+	public final fun getTickRound ()Ljava/lang/Boolean;
+	public final fun getTickSize ()Ldev/aster/vega/model/spec/NumberValue;
+	public final fun getTickStep ()Ljava/lang/Integer;
+	public final fun getTickStyle ()Ldev/aster/vega/model/spec/GuideStroke;
+	public final fun getTicks ()Z
+	public final fun getTitle ()Ljava/lang/String;
+	public final fun getTitleAlign ()Ljava/lang/String;
+	public final fun getTitleAnchor ()Ldev/aster/vega/model/spec/Anchor;
+	public final fun getTitleAngle ()Ldev/aster/vega/model/spec/NumberValue;
+	public final fun getTitleBaseline ()Ljava/lang/String;
+	public final fun getTitleExpression ()Ljava/lang/String;
+	public final fun getTitleFontSize ()Ldev/aster/vega/model/spec/NumberValue;
+	public final fun getTitleLimit ()Ldev/aster/vega/model/spec/NumberValue;
+	public final fun getTitlePadding ()Ldev/aster/vega/model/spec/NumberValue;
+	public final fun getTitleStyle ()Ldev/aster/vega/model/spec/GuideStroke;
+	public final fun getTitleX ()Ldev/aster/vega/model/spec/NumberValue;
+	public final fun getTitleY ()Ldev/aster/vega/model/spec/NumberValue;
+	public final fun getTranslate ()Ldev/aster/vega/model/spec/NumberValue;
+	public final fun getValues ()Ljava/util/List;
+	public final fun getZindex ()I
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public abstract interface class dev/aster/vega/model/spec/BinsSpec {
+}
+
+public final class dev/aster/vega/model/spec/BinsSpec$Signal : dev/aster/vega/model/spec/BinsSpec {
+	public fun <init> (Ljava/lang/String;)V
+	public final fun component1 ()Ljava/lang/String;
+	public final fun copy (Ljava/lang/String;)Ldev/aster/vega/model/spec/BinsSpec$Signal;
+	public static synthetic fun copy$default (Ldev/aster/vega/model/spec/BinsSpec$Signal;Ljava/lang/String;ILjava/lang/Object;)Ldev/aster/vega/model/spec/BinsSpec$Signal;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getExpression ()Ljava/lang/String;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class dev/aster/vega/model/spec/BinsSpec$Steps : dev/aster/vega/model/spec/BinsSpec {
+	public fun <init> ()V
+	public fun <init> (Ldev/aster/vega/model/spec/NumberValue;Ldev/aster/vega/model/spec/NumberValue;Ldev/aster/vega/model/spec/NumberValue;)V
+	public synthetic fun <init> (Ldev/aster/vega/model/spec/NumberValue;Ldev/aster/vega/model/spec/NumberValue;Ldev/aster/vega/model/spec/NumberValue;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()Ldev/aster/vega/model/spec/NumberValue;
+	public final fun component2 ()Ldev/aster/vega/model/spec/NumberValue;
+	public final fun component3 ()Ldev/aster/vega/model/spec/NumberValue;
+	public final fun copy (Ldev/aster/vega/model/spec/NumberValue;Ldev/aster/vega/model/spec/NumberValue;Ldev/aster/vega/model/spec/NumberValue;)Ldev/aster/vega/model/spec/BinsSpec$Steps;
+	public static synthetic fun copy$default (Ldev/aster/vega/model/spec/BinsSpec$Steps;Ldev/aster/vega/model/spec/NumberValue;Ldev/aster/vega/model/spec/NumberValue;Ldev/aster/vega/model/spec/NumberValue;ILjava/lang/Object;)Ldev/aster/vega/model/spec/BinsSpec$Steps;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getStart ()Ldev/aster/vega/model/spec/NumberValue;
+	public final fun getStep ()Ldev/aster/vega/model/spec/NumberValue;
+	public final fun getStop ()Ldev/aster/vega/model/spec/NumberValue;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class dev/aster/vega/model/spec/BinsSpec$Values : dev/aster/vega/model/spec/BinsSpec {
+	public fun <init> (Ljava/util/List;)V
+	public final fun component1 ()Ljava/util/List;
+	public final fun copy (Ljava/util/List;)Ldev/aster/vega/model/spec/BinsSpec$Values;
+	public static synthetic fun copy$default (Ldev/aster/vega/model/spec/BinsSpec$Values;Ljava/util/List;ILjava/lang/Object;)Ldev/aster/vega/model/spec/BinsSpec$Values;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getValues ()Ljava/util/List;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public abstract interface class dev/aster/vega/model/spec/ChannelValue {
+}
+
+public final class dev/aster/vega/model/spec/ChannelValue$Adjusted : dev/aster/vega/model/spec/ChannelValue {
+	public fun <init> (Ldev/aster/vega/model/spec/ChannelValue;Ldev/aster/vega/model/spec/ChannelValue;Ldev/aster/vega/model/spec/ChannelValue;Ldev/aster/vega/model/spec/ChannelValue;Z)V
+	public synthetic fun <init> (Ldev/aster/vega/model/spec/ChannelValue;Ldev/aster/vega/model/spec/ChannelValue;Ldev/aster/vega/model/spec/ChannelValue;Ldev/aster/vega/model/spec/ChannelValue;ZILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()Ldev/aster/vega/model/spec/ChannelValue;
+	public final fun component2 ()Ldev/aster/vega/model/spec/ChannelValue;
+	public final fun component3 ()Ldev/aster/vega/model/spec/ChannelValue;
+	public final fun component4 ()Ldev/aster/vega/model/spec/ChannelValue;
+	public final fun component5 ()Z
+	public final fun copy (Ldev/aster/vega/model/spec/ChannelValue;Ldev/aster/vega/model/spec/ChannelValue;Ldev/aster/vega/model/spec/ChannelValue;Ldev/aster/vega/model/spec/ChannelValue;Z)Ldev/aster/vega/model/spec/ChannelValue$Adjusted;
+	public static synthetic fun copy$default (Ldev/aster/vega/model/spec/ChannelValue$Adjusted;Ldev/aster/vega/model/spec/ChannelValue;Ldev/aster/vega/model/spec/ChannelValue;Ldev/aster/vega/model/spec/ChannelValue;Ldev/aster/vega/model/spec/ChannelValue;ZILjava/lang/Object;)Ldev/aster/vega/model/spec/ChannelValue$Adjusted;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getBase ()Ldev/aster/vega/model/spec/ChannelValue;
+	public final fun getExponent ()Ldev/aster/vega/model/spec/ChannelValue;
+	public final fun getMult ()Ldev/aster/vega/model/spec/ChannelValue;
+	public final fun getOffset ()Ldev/aster/vega/model/spec/ChannelValue;
+	public final fun getRound ()Z
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class dev/aster/vega/model/spec/ChannelValue$Conditional : dev/aster/vega/model/spec/ChannelValue {
+	public fun <init> (Ljava/util/List;)V
+	public final fun component1 ()Ljava/util/List;
+	public final fun copy (Ljava/util/List;)Ldev/aster/vega/model/spec/ChannelValue$Conditional;
+	public static synthetic fun copy$default (Ldev/aster/vega/model/spec/ChannelValue$Conditional;Ljava/util/List;ILjava/lang/Object;)Ldev/aster/vega/model/spec/ChannelValue$Conditional;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getRules ()Ljava/util/List;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class dev/aster/vega/model/spec/ChannelValue$Constant : dev/aster/vega/model/spec/ChannelValue {
+	public fun <init> (Ldev/aster/vega/model/VegaValue;)V
+	public final fun component1 ()Ldev/aster/vega/model/VegaValue;
+	public final fun copy (Ldev/aster/vega/model/VegaValue;)Ldev/aster/vega/model/spec/ChannelValue$Constant;
+	public static synthetic fun copy$default (Ldev/aster/vega/model/spec/ChannelValue$Constant;Ldev/aster/vega/model/VegaValue;ILjava/lang/Object;)Ldev/aster/vega/model/spec/ChannelValue$Constant;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getValue ()Ldev/aster/vega/model/VegaValue;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class dev/aster/vega/model/spec/ChannelValue$Field : dev/aster/vega/model/spec/ChannelValue {
+	public fun <init> (Ldev/aster/vega/model/spec/FieldRef;)V
+	public final fun component1 ()Ldev/aster/vega/model/spec/FieldRef;
+	public final fun copy (Ldev/aster/vega/model/spec/FieldRef;)Ldev/aster/vega/model/spec/ChannelValue$Field;
+	public static synthetic fun copy$default (Ldev/aster/vega/model/spec/ChannelValue$Field;Ldev/aster/vega/model/spec/FieldRef;ILjava/lang/Object;)Ldev/aster/vega/model/spec/ChannelValue$Field;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getRef ()Ldev/aster/vega/model/spec/FieldRef;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class dev/aster/vega/model/spec/ChannelValue$Scaled : dev/aster/vega/model/spec/ChannelValue {
+	public fun <init> (Ljava/lang/String;Ldev/aster/vega/model/spec/FieldRef;Ldev/aster/vega/model/spec/FieldRef;Ldev/aster/vega/model/VegaValue;Ljava/lang/String;Ljava/lang/Double;)V
+	public synthetic fun <init> (Ljava/lang/String;Ldev/aster/vega/model/spec/FieldRef;Ldev/aster/vega/model/spec/FieldRef;Ldev/aster/vega/model/VegaValue;Ljava/lang/String;Ljava/lang/Double;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()Ljava/lang/String;
+	public final fun component2 ()Ldev/aster/vega/model/spec/FieldRef;
+	public final fun component3 ()Ldev/aster/vega/model/spec/FieldRef;
+	public final fun component4 ()Ldev/aster/vega/model/VegaValue;
+	public final fun component5 ()Ljava/lang/String;
+	public final fun component6 ()Ljava/lang/Double;
+	public final fun copy (Ljava/lang/String;Ldev/aster/vega/model/spec/FieldRef;Ldev/aster/vega/model/spec/FieldRef;Ldev/aster/vega/model/VegaValue;Ljava/lang/String;Ljava/lang/Double;)Ldev/aster/vega/model/spec/ChannelValue$Scaled;
+	public static synthetic fun copy$default (Ldev/aster/vega/model/spec/ChannelValue$Scaled;Ljava/lang/String;Ldev/aster/vega/model/spec/FieldRef;Ldev/aster/vega/model/spec/FieldRef;Ldev/aster/vega/model/VegaValue;Ljava/lang/String;Ljava/lang/Double;ILjava/lang/Object;)Ldev/aster/vega/model/spec/ChannelValue$Scaled;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getBand ()Ljava/lang/Double;
+	public final fun getField ()Ldev/aster/vega/model/spec/FieldRef;
+	public final fun getScale ()Ljava/lang/String;
+	public final fun getScaleRef ()Ldev/aster/vega/model/spec/FieldRef;
+	public final fun getSignal ()Ljava/lang/String;
+	public final fun getValue ()Ldev/aster/vega/model/VegaValue;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class dev/aster/vega/model/spec/ChannelValue$Signal : dev/aster/vega/model/spec/ChannelValue {
+	public fun <init> (Ljava/lang/String;)V
+	public final fun component1 ()Ljava/lang/String;
+	public final fun copy (Ljava/lang/String;)Ldev/aster/vega/model/spec/ChannelValue$Signal;
+	public static synthetic fun copy$default (Ldev/aster/vega/model/spec/ChannelValue$Signal;Ljava/lang/String;ILjava/lang/Object;)Ldev/aster/vega/model/spec/ChannelValue$Signal;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getExpression ()Ljava/lang/String;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class dev/aster/vega/model/spec/ConditionalRule {
+	public fun <init> (Ljava/lang/String;Ldev/aster/vega/model/spec/ChannelValue;)V
+	public final fun component1 ()Ljava/lang/String;
+	public final fun component2 ()Ldev/aster/vega/model/spec/ChannelValue;
+	public final fun copy (Ljava/lang/String;Ldev/aster/vega/model/spec/ChannelValue;)Ldev/aster/vega/model/spec/ConditionalRule;
+	public static synthetic fun copy$default (Ldev/aster/vega/model/spec/ConditionalRule;Ljava/lang/String;Ldev/aster/vega/model/spec/ChannelValue;ILjava/lang/Object;)Ldev/aster/vega/model/spec/ConditionalRule;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getProduction ()Ldev/aster/vega/model/spec/ChannelValue;
+	public final fun getTest ()Ljava/lang/String;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class dev/aster/vega/model/spec/DataSpec {
+	public fun <init> (Ljava/lang/String;Ljava/util/List;Ldev/aster/vega/model/VegaValue;Ljava/lang/String;Ljava/lang/String;Ljava/util/List;Ljava/util/List;Ljava/util/Map;ZLjava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/util/List;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)V
+	public synthetic fun <init> (Ljava/lang/String;Ljava/util/List;Ldev/aster/vega/model/VegaValue;Ljava/lang/String;Ljava/lang/String;Ljava/util/List;Ljava/util/List;Ljava/util/Map;ZLjava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/util/List;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()Ljava/lang/String;
+	public final fun component10 ()Ljava/lang/String;
+	public final fun component11 ()Ljava/lang/String;
+	public final fun component12 ()Ljava/lang/String;
+	public final fun component13 ()Ljava/util/List;
+	public final fun component14 ()Ljava/lang/String;
+	public final fun component15 ()Ljava/lang/String;
+	public final fun component16 ()Ljava/lang/String;
+	public final fun component2 ()Ljava/util/List;
+	public final fun component3 ()Ldev/aster/vega/model/VegaValue;
+	public final fun component4 ()Ljava/lang/String;
+	public final fun component5 ()Ljava/lang/String;
+	public final fun component6 ()Ljava/util/List;
+	public final fun component7 ()Ljava/util/List;
+	public final fun component8 ()Ljava/util/Map;
+	public final fun component9 ()Z
+	public final fun copy (Ljava/lang/String;Ljava/util/List;Ldev/aster/vega/model/VegaValue;Ljava/lang/String;Ljava/lang/String;Ljava/util/List;Ljava/util/List;Ljava/util/Map;ZLjava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/util/List;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)Ldev/aster/vega/model/spec/DataSpec;
+	public static synthetic fun copy$default (Ldev/aster/vega/model/spec/DataSpec;Ljava/lang/String;Ljava/util/List;Ldev/aster/vega/model/VegaValue;Ljava/lang/String;Ljava/lang/String;Ljava/util/List;Ljava/util/List;Ljava/util/Map;ZLjava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/util/List;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;ILjava/lang/Object;)Ldev/aster/vega/model/spec/DataSpec;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getDelimiter ()Ljava/lang/String;
+	public final fun getDocument ()Ldev/aster/vega/model/VegaValue;
+	public final fun getFeature ()Ljava/lang/String;
+	public final fun getFormatType ()Ljava/lang/String;
+	public final fun getHeader ()Ljava/util/List;
+	public final fun getMesh ()Ljava/lang/String;
+	public final fun getMeshFilter ()Ljava/lang/String;
+	public final fun getName ()Ljava/lang/String;
+	public final fun getParse ()Ljava/util/Map;
+	public final fun getParseAuto ()Z
+	public final fun getProperty ()Ljava/lang/String;
+	public final fun getSources ()Ljava/util/List;
+	public final fun getTransform ()Ljava/util/List;
+	public final fun getUrl ()Ljava/lang/String;
+	public final fun getUrlSignal ()Ljava/lang/String;
+	public final fun getValues ()Ljava/util/List;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class dev/aster/vega/model/spec/Direction : java/lang/Enum {
+	public static final field Companion Ldev/aster/vega/model/spec/Direction$Companion;
+	public static final field HORIZONTAL Ldev/aster/vega/model/spec/Direction;
+	public static final field VERTICAL Ldev/aster/vega/model/spec/Direction;
+	public static fun getEntries ()Lkotlin/enums/EnumEntries;
+	public static fun valueOf (Ljava/lang/String;)Ldev/aster/vega/model/spec/Direction;
+	public static fun values ()[Ldev/aster/vega/model/spec/Direction;
+}
+
+public final class dev/aster/vega/model/spec/Direction$Companion {
+	public final fun fromName (Ljava/lang/String;)Ldev/aster/vega/model/spec/Direction;
+}
+
+public abstract interface class dev/aster/vega/model/spec/DomainSort {
+	public abstract fun getDescending ()Z
+	public abstract fun getOrderSignal ()Ljava/lang/String;
+}
+
+public final class dev/aster/vega/model/spec/DomainSort$ByAggregate : dev/aster/vega/model/spec/DomainSort {
+	public fun <init> (Ljava/lang/String;Ljava/lang/String;ZLjava/lang/String;)V
+	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/String;ZLjava/lang/String;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()Ljava/lang/String;
+	public final fun component2 ()Ljava/lang/String;
+	public final fun component3 ()Z
+	public final fun component4 ()Ljava/lang/String;
+	public final fun copy (Ljava/lang/String;Ljava/lang/String;ZLjava/lang/String;)Ldev/aster/vega/model/spec/DomainSort$ByAggregate;
+	public static synthetic fun copy$default (Ldev/aster/vega/model/spec/DomainSort$ByAggregate;Ljava/lang/String;Ljava/lang/String;ZLjava/lang/String;ILjava/lang/Object;)Ldev/aster/vega/model/spec/DomainSort$ByAggregate;
+	public fun equals (Ljava/lang/Object;)Z
+	public fun getDescending ()Z
+	public final fun getField ()Ljava/lang/String;
+	public final fun getOp ()Ljava/lang/String;
+	public fun getOrderSignal ()Ljava/lang/String;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class dev/aster/vega/model/spec/DomainSort$ByValue : dev/aster/vega/model/spec/DomainSort {
+	public fun <init> ()V
+	public fun <init> (ZLjava/lang/String;)V
+	public synthetic fun <init> (ZLjava/lang/String;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()Z
+	public final fun component2 ()Ljava/lang/String;
+	public final fun copy (ZLjava/lang/String;)Ldev/aster/vega/model/spec/DomainSort$ByValue;
+	public static synthetic fun copy$default (Ldev/aster/vega/model/spec/DomainSort$ByValue;ZLjava/lang/String;ILjava/lang/Object;)Ldev/aster/vega/model/spec/DomainSort$ByValue;
+	public fun equals (Ljava/lang/Object;)Z
+	public fun getDescending ()Z
+	public fun getOrderSignal ()Ljava/lang/String;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public abstract interface class dev/aster/vega/model/spec/DomainSpec {
+}
+
+public final class dev/aster/vega/model/spec/DomainSpec$FromField : dev/aster/vega/model/spec/DomainSpec {
+	public fun <init> (Ljava/lang/String;Ldev/aster/vega/model/spec/FieldRef;Ldev/aster/vega/model/spec/DomainSort;)V
+	public synthetic fun <init> (Ljava/lang/String;Ldev/aster/vega/model/spec/FieldRef;Ldev/aster/vega/model/spec/DomainSort;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()Ljava/lang/String;
+	public final fun component2 ()Ldev/aster/vega/model/spec/FieldRef;
+	public final fun component3 ()Ldev/aster/vega/model/spec/DomainSort;
+	public final fun copy (Ljava/lang/String;Ldev/aster/vega/model/spec/FieldRef;Ldev/aster/vega/model/spec/DomainSort;)Ldev/aster/vega/model/spec/DomainSpec$FromField;
+	public static synthetic fun copy$default (Ldev/aster/vega/model/spec/DomainSpec$FromField;Ljava/lang/String;Ldev/aster/vega/model/spec/FieldRef;Ldev/aster/vega/model/spec/DomainSort;ILjava/lang/Object;)Ldev/aster/vega/model/spec/DomainSpec$FromField;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getData ()Ljava/lang/String;
+	public final fun getField ()Ldev/aster/vega/model/spec/FieldRef;
+	public final fun getSort ()Ldev/aster/vega/model/spec/DomainSort;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class dev/aster/vega/model/spec/DomainSpec$FromFields : dev/aster/vega/model/spec/DomainSpec {
+	public fun <init> (Ljava/lang/String;Ljava/util/List;Ldev/aster/vega/model/spec/DomainSort;)V
+	public synthetic fun <init> (Ljava/lang/String;Ljava/util/List;Ldev/aster/vega/model/spec/DomainSort;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()Ljava/lang/String;
+	public final fun component2 ()Ljava/util/List;
+	public final fun component3 ()Ldev/aster/vega/model/spec/DomainSort;
+	public final fun copy (Ljava/lang/String;Ljava/util/List;Ldev/aster/vega/model/spec/DomainSort;)Ldev/aster/vega/model/spec/DomainSpec$FromFields;
+	public static synthetic fun copy$default (Ldev/aster/vega/model/spec/DomainSpec$FromFields;Ljava/lang/String;Ljava/util/List;Ldev/aster/vega/model/spec/DomainSort;ILjava/lang/Object;)Ldev/aster/vega/model/spec/DomainSpec$FromFields;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getData ()Ljava/lang/String;
+	public final fun getFields ()Ljava/util/List;
+	public final fun getSort ()Ldev/aster/vega/model/spec/DomainSort;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class dev/aster/vega/model/spec/DomainSpec$FromSignal : dev/aster/vega/model/spec/DomainSpec {
+	public fun <init> (Ljava/lang/String;)V
+	public final fun component1 ()Ljava/lang/String;
+	public final fun copy (Ljava/lang/String;)Ldev/aster/vega/model/spec/DomainSpec$FromSignal;
+	public static synthetic fun copy$default (Ldev/aster/vega/model/spec/DomainSpec$FromSignal;Ljava/lang/String;ILjava/lang/Object;)Ldev/aster/vega/model/spec/DomainSpec$FromSignal;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getExpression ()Ljava/lang/String;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class dev/aster/vega/model/spec/DomainSpec$Literal : dev/aster/vega/model/spec/DomainSpec {
+	public fun <init> (Ljava/util/List;)V
+	public final fun component1 ()Ljava/util/List;
+	public final fun copy (Ljava/util/List;)Ldev/aster/vega/model/spec/DomainSpec$Literal;
+	public static synthetic fun copy$default (Ldev/aster/vega/model/spec/DomainSpec$Literal;Ljava/util/List;ILjava/lang/Object;)Ldev/aster/vega/model/spec/DomainSpec$Literal;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getValues ()Ljava/util/List;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class dev/aster/vega/model/spec/DomainSpec$Union : dev/aster/vega/model/spec/DomainSpec {
+	public fun <init> (Ljava/util/List;Ldev/aster/vega/model/spec/DomainSort;)V
+	public synthetic fun <init> (Ljava/util/List;Ldev/aster/vega/model/spec/DomainSort;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()Ljava/util/List;
+	public final fun component2 ()Ldev/aster/vega/model/spec/DomainSort;
+	public final fun copy (Ljava/util/List;Ldev/aster/vega/model/spec/DomainSort;)Ldev/aster/vega/model/spec/DomainSpec$Union;
+	public static synthetic fun copy$default (Ldev/aster/vega/model/spec/DomainSpec$Union;Ljava/util/List;Ldev/aster/vega/model/spec/DomainSort;ILjava/lang/Object;)Ldev/aster/vega/model/spec/DomainSpec$Union;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getParts ()Ljava/util/List;
+	public final fun getSort ()Ldev/aster/vega/model/spec/DomainSort;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class dev/aster/vega/model/spec/DomainSpec$Unset : dev/aster/vega/model/spec/DomainSpec {
+	public static final field INSTANCE Ldev/aster/vega/model/spec/DomainSpec$Unset;
+	public fun equals (Ljava/lang/Object;)Z
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class dev/aster/vega/model/spec/EncodeSpec {
+	public fun <init> ()V
+	public fun <init> (Ljava/util/Map;Ljava/util/Map;Ljava/util/Map;Ljava/util/Map;Ljava/util/Map;)V
+	public synthetic fun <init> (Ljava/util/Map;Ljava/util/Map;Ljava/util/Map;Ljava/util/Map;Ljava/util/Map;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()Ljava/util/Map;
+	public final fun component2 ()Ljava/util/Map;
+	public final fun component3 ()Ljava/util/Map;
+	public final fun component4 ()Ljava/util/Map;
+	public final fun component5 ()Ljava/util/Map;
+	public final fun copy (Ljava/util/Map;Ljava/util/Map;Ljava/util/Map;Ljava/util/Map;Ljava/util/Map;)Ldev/aster/vega/model/spec/EncodeSpec;
+	public static synthetic fun copy$default (Ldev/aster/vega/model/spec/EncodeSpec;Ljava/util/Map;Ljava/util/Map;Ljava/util/Map;Ljava/util/Map;Ljava/util/Map;ILjava/lang/Object;)Ldev/aster/vega/model/spec/EncodeSpec;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getEffective ()Ljava/util/Map;
+	public final fun getEnter ()Ljava/util/Map;
+	public final fun getExit ()Ljava/util/Map;
+	public final fun getHover ()Ljava/util/Map;
+	public final fun getNamed ()Ljava/util/Map;
+	public final fun getUpdate ()Ljava/util/Map;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class dev/aster/vega/model/spec/EventConfig {
+	public fun <init> ()V
+	public fun <init> (Ldev/aster/vega/model/spec/EventPermit;Ldev/aster/vega/model/spec/EventPermit;Ldev/aster/vega/model/spec/EventPermit;Ldev/aster/vega/model/spec/EventPermit;Ldev/aster/vega/model/spec/EventPermit;Ldev/aster/vega/model/spec/EventPermit;ZZ)V
+	public synthetic fun <init> (Ldev/aster/vega/model/spec/EventPermit;Ldev/aster/vega/model/spec/EventPermit;Ldev/aster/vega/model/spec/EventPermit;Ldev/aster/vega/model/spec/EventPermit;Ldev/aster/vega/model/spec/EventPermit;Ldev/aster/vega/model/spec/EventPermit;ZZILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()Ldev/aster/vega/model/spec/EventPermit;
+	public final fun component2 ()Ldev/aster/vega/model/spec/EventPermit;
+	public final fun component3 ()Ldev/aster/vega/model/spec/EventPermit;
+	public final fun component4 ()Ldev/aster/vega/model/spec/EventPermit;
+	public final fun component5 ()Ldev/aster/vega/model/spec/EventPermit;
+	public final fun component6 ()Ldev/aster/vega/model/spec/EventPermit;
+	public final fun component7 ()Z
+	public final fun component8 ()Z
+	public final fun copy (Ldev/aster/vega/model/spec/EventPermit;Ldev/aster/vega/model/spec/EventPermit;Ldev/aster/vega/model/spec/EventPermit;Ldev/aster/vega/model/spec/EventPermit;Ldev/aster/vega/model/spec/EventPermit;Ldev/aster/vega/model/spec/EventPermit;ZZ)Ldev/aster/vega/model/spec/EventConfig;
+	public static synthetic fun copy$default (Ldev/aster/vega/model/spec/EventConfig;Ldev/aster/vega/model/spec/EventPermit;Ldev/aster/vega/model/spec/EventPermit;Ldev/aster/vega/model/spec/EventPermit;Ldev/aster/vega/model/spec/EventPermit;Ldev/aster/vega/model/spec/EventPermit;Ldev/aster/vega/model/spec/EventPermit;ZZILjava/lang/Object;)Ldev/aster/vega/model/spec/EventConfig;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getAllowDefault ()Ldev/aster/vega/model/spec/EventPermit;
+	public final fun getBind ()Z
+	public final fun getGlobalCursor ()Z
+	public final fun getPreventDefault ()Ldev/aster/vega/model/spec/EventPermit;
+	public final fun getSelector ()Ldev/aster/vega/model/spec/EventPermit;
+	public final fun getTimer ()Ldev/aster/vega/model/spec/EventPermit;
+	public final fun getView ()Ldev/aster/vega/model/spec/EventPermit;
+	public final fun getWindow ()Ldev/aster/vega/model/spec/EventPermit;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public abstract interface class dev/aster/vega/model/spec/EventPermit {
+	public static final field Companion Ldev/aster/vega/model/spec/EventPermit$Companion;
+}
+
+public final class dev/aster/vega/model/spec/EventPermit$All : dev/aster/vega/model/spec/EventPermit {
+	public fun <init> (Z)V
+	public final fun component1 ()Z
+	public final fun copy (Z)Ldev/aster/vega/model/spec/EventPermit$All;
+	public static synthetic fun copy$default (Ldev/aster/vega/model/spec/EventPermit$All;ZILjava/lang/Object;)Ldev/aster/vega/model/spec/EventPermit$All;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getValue ()Z
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class dev/aster/vega/model/spec/EventPermit$Companion {
+	public final fun of (Ldev/aster/vega/model/VegaValue;Z)Ldev/aster/vega/model/spec/EventPermit;
+	public static synthetic fun of$default (Ldev/aster/vega/model/spec/EventPermit$Companion;Ldev/aster/vega/model/VegaValue;ZILjava/lang/Object;)Ldev/aster/vega/model/spec/EventPermit;
+}
+
+public final class dev/aster/vega/model/spec/EventPermit$Types : dev/aster/vega/model/spec/EventPermit {
+	public fun <init> (Ljava/util/Set;)V
+	public final fun component1 ()Ljava/util/Set;
+	public final fun copy (Ljava/util/Set;)Ldev/aster/vega/model/spec/EventPermit$Types;
+	public static synthetic fun copy$default (Ldev/aster/vega/model/spec/EventPermit$Types;Ljava/util/Set;ILjava/lang/Object;)Ldev/aster/vega/model/spec/EventPermit$Types;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getTypes ()Ljava/util/Set;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class dev/aster/vega/model/spec/EventPermit$Unrestricted : dev/aster/vega/model/spec/EventPermit {
+	public static final field INSTANCE Ldev/aster/vega/model/spec/EventPermit$Unrestricted;
+	public fun equals (Ljava/lang/Object;)Z
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class dev/aster/vega/model/spec/EventSelector {
+	public static final field INSTANCE Ldev/aster/vega/model/spec/EventSelector;
+	public final fun asTimerStream (Ldev/aster/vega/model/spec/EventStream;)Ldev/aster/vega/model/spec/EventStream;
+	public final fun parse (Ljava/lang/String;Ljava/lang/String;)Ljava/util/List;
+	public static synthetic fun parse$default (Ldev/aster/vega/model/spec/EventSelector;Ljava/lang/String;Ljava/lang/String;ILjava/lang/Object;)Ljava/util/List;
+}
+
+public final class dev/aster/vega/model/spec/EventSelectorException : java/lang/IllegalArgumentException {
+	public fun <init> (Ljava/lang/String;)V
+}
+
+public final class dev/aster/vega/model/spec/EventStream {
+	public static final field Companion Ldev/aster/vega/model/spec/EventStream$Companion;
+	public static final field SOURCE_SCOPE Ljava/lang/String;
+	public static final field SOURCE_TIMER Ljava/lang/String;
+	public static final field SOURCE_VIEW Ljava/lang/String;
+	public static final field SOURCE_WINDOW Ljava/lang/String;
+	public fun <init> ()V
+	public fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/util/List;Ljava/lang/Double;Ljava/lang/Double;ZLjava/util/List;Ldev/aster/vega/model/spec/EventStream;)V
+	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/util/List;Ljava/lang/Double;Ljava/lang/Double;ZLjava/util/List;Ldev/aster/vega/model/spec/EventStream;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()Ljava/lang/String;
+	public final fun component10 ()Ldev/aster/vega/model/spec/EventStream;
+	public final fun component2 ()Ljava/lang/String;
+	public final fun component3 ()Ljava/lang/String;
+	public final fun component4 ()Ljava/lang/String;
+	public final fun component5 ()Ljava/util/List;
+	public final fun component6 ()Ljava/lang/Double;
+	public final fun component7 ()Ljava/lang/Double;
+	public final fun component8 ()Z
+	public final fun component9 ()Ljava/util/List;
+	public final fun copy (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/util/List;Ljava/lang/Double;Ljava/lang/Double;ZLjava/util/List;Ldev/aster/vega/model/spec/EventStream;)Ldev/aster/vega/model/spec/EventStream;
+	public static synthetic fun copy$default (Ldev/aster/vega/model/spec/EventStream;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/util/List;Ljava/lang/Double;Ljava/lang/Double;ZLjava/util/List;Ldev/aster/vega/model/spec/EventStream;ILjava/lang/Object;)Ldev/aster/vega/model/spec/EventStream;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getBetween ()Ljava/util/List;
+	public final fun getConsume ()Z
+	public final fun getDebounce ()Ljava/lang/Double;
+	public final fun getFilters ()Ljava/util/List;
+	public final fun getMarkName ()Ljava/lang/String;
+	public final fun getMarkType ()Ljava/lang/String;
+	public final fun getNested ()Ldev/aster/vega/model/spec/EventStream;
+	public final fun getSource ()Ljava/lang/String;
+	public final fun getThrottle ()Ljava/lang/Double;
+	public final fun getType ()Ljava/lang/String;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class dev/aster/vega/model/spec/EventStream$Companion {
+}
+
+public final class dev/aster/vega/model/spec/FacetMeasure {
+	public fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)V
+	public final fun component1 ()Ljava/lang/String;
+	public final fun component2 ()Ljava/lang/String;
+	public final fun component3 ()Ljava/lang/String;
+	public final fun copy (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)Ldev/aster/vega/model/spec/FacetMeasure;
+	public static synthetic fun copy$default (Ldev/aster/vega/model/spec/FacetMeasure;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;ILjava/lang/Object;)Ldev/aster/vega/model/spec/FacetMeasure;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getField ()Ljava/lang/String;
+	public final fun getName ()Ljava/lang/String;
+	public final fun getOp ()Ljava/lang/String;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class dev/aster/vega/model/spec/FacetSpec {
+	public fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/util/List;Ljava/util/List;Ljava/lang/String;Z)V
+	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/util/List;Ljava/util/List;Ljava/lang/String;ZILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()Ljava/lang/String;
+	public final fun component2 ()Ljava/lang/String;
+	public final fun component3 ()Ljava/util/List;
+	public final fun component4 ()Ljava/util/List;
+	public final fun component5 ()Ljava/lang/String;
+	public final fun component6 ()Z
+	public final fun copy (Ljava/lang/String;Ljava/lang/String;Ljava/util/List;Ljava/util/List;Ljava/lang/String;Z)Ldev/aster/vega/model/spec/FacetSpec;
+	public static synthetic fun copy$default (Ldev/aster/vega/model/spec/FacetSpec;Ljava/lang/String;Ljava/lang/String;Ljava/util/List;Ljava/util/List;Ljava/lang/String;ZILjava/lang/Object;)Ldev/aster/vega/model/spec/FacetSpec;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getAggregate ()Ljava/util/List;
+	public final fun getCrossed ()Z
+	public final fun getData ()Ljava/lang/String;
+	public final fun getField ()Ljava/lang/String;
+	public final fun getGroupby ()Ljava/util/List;
+	public final fun getName ()Ljava/lang/String;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public abstract interface class dev/aster/vega/model/spec/FieldRef {
+	public fun getPlainPath ()Ljava/lang/String;
+}
+
+public final class dev/aster/vega/model/spec/FieldRef$Datum : dev/aster/vega/model/spec/FieldRef {
+	public fun <init> (Ljava/lang/String;)V
+	public final fun component1 ()Ljava/lang/String;
+	public final fun copy (Ljava/lang/String;)Ldev/aster/vega/model/spec/FieldRef$Datum;
+	public static synthetic fun copy$default (Ldev/aster/vega/model/spec/FieldRef$Datum;Ljava/lang/String;ILjava/lang/Object;)Ldev/aster/vega/model/spec/FieldRef$Datum;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getPath ()Ljava/lang/String;
+	public fun getPlainPath ()Ljava/lang/String;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class dev/aster/vega/model/spec/FieldRef$DefaultImpls {
+	public static fun getPlainPath (Ldev/aster/vega/model/spec/FieldRef;)Ljava/lang/String;
+}
+
+public final class dev/aster/vega/model/spec/FieldRef$Group : dev/aster/vega/model/spec/FieldRef {
+	public fun <init> (Ljava/lang/String;)V
+	public final fun component1 ()Ljava/lang/String;
+	public final fun copy (Ljava/lang/String;)Ldev/aster/vega/model/spec/FieldRef$Group;
+	public static synthetic fun copy$default (Ldev/aster/vega/model/spec/FieldRef$Group;Ljava/lang/String;ILjava/lang/Object;)Ldev/aster/vega/model/spec/FieldRef$Group;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getPath ()Ljava/lang/String;
+	public fun getPlainPath ()Ljava/lang/String;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class dev/aster/vega/model/spec/FieldRef$Parent : dev/aster/vega/model/spec/FieldRef {
+	public fun <init> (Ljava/lang/String;)V
+	public final fun component1 ()Ljava/lang/String;
+	public final fun copy (Ljava/lang/String;)Ldev/aster/vega/model/spec/FieldRef$Parent;
+	public static synthetic fun copy$default (Ldev/aster/vega/model/spec/FieldRef$Parent;Ljava/lang/String;ILjava/lang/Object;)Ldev/aster/vega/model/spec/FieldRef$Parent;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getPath ()Ljava/lang/String;
+	public fun getPlainPath ()Ljava/lang/String;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class dev/aster/vega/model/spec/FieldRef$ParentOf : dev/aster/vega/model/spec/FieldRef {
+	public fun <init> (Ldev/aster/vega/model/spec/FieldRef;)V
+	public final fun component1 ()Ldev/aster/vega/model/spec/FieldRef;
+	public final fun copy (Ldev/aster/vega/model/spec/FieldRef;)Ldev/aster/vega/model/spec/FieldRef$ParentOf;
+	public static synthetic fun copy$default (Ldev/aster/vega/model/spec/FieldRef$ParentOf;Ldev/aster/vega/model/spec/FieldRef;ILjava/lang/Object;)Ldev/aster/vega/model/spec/FieldRef$ParentOf;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getName ()Ldev/aster/vega/model/spec/FieldRef;
+	public fun getPlainPath ()Ljava/lang/String;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class dev/aster/vega/model/spec/FieldRef$Plain : dev/aster/vega/model/spec/FieldRef {
+	public fun <init> (Ljava/lang/String;)V
+	public final fun component1 ()Ljava/lang/String;
+	public final fun copy (Ljava/lang/String;)Ldev/aster/vega/model/spec/FieldRef$Plain;
+	public static synthetic fun copy$default (Ldev/aster/vega/model/spec/FieldRef$Plain;Ljava/lang/String;ILjava/lang/Object;)Ldev/aster/vega/model/spec/FieldRef$Plain;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getPath ()Ljava/lang/String;
+	public fun getPlainPath ()Ljava/lang/String;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class dev/aster/vega/model/spec/FieldRef$Signal : dev/aster/vega/model/spec/FieldRef {
+	public fun <init> (Ljava/lang/String;)V
+	public final fun component1 ()Ljava/lang/String;
+	public final fun copy (Ljava/lang/String;)Ldev/aster/vega/model/spec/FieldRef$Signal;
+	public static synthetic fun copy$default (Ldev/aster/vega/model/spec/FieldRef$Signal;Ljava/lang/String;ILjava/lang/Object;)Ldev/aster/vega/model/spec/FieldRef$Signal;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getExpression ()Ljava/lang/String;
+	public fun getPlainPath ()Ljava/lang/String;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class dev/aster/vega/model/spec/FromSpec {
+	public fun <init> ()V
+	public fun <init> (Ljava/lang/String;Ldev/aster/vega/model/spec/FacetSpec;)V
+	public synthetic fun <init> (Ljava/lang/String;Ldev/aster/vega/model/spec/FacetSpec;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()Ljava/lang/String;
+	public final fun component2 ()Ldev/aster/vega/model/spec/FacetSpec;
+	public final fun copy (Ljava/lang/String;Ldev/aster/vega/model/spec/FacetSpec;)Ldev/aster/vega/model/spec/FromSpec;
+	public static synthetic fun copy$default (Ldev/aster/vega/model/spec/FromSpec;Ljava/lang/String;Ldev/aster/vega/model/spec/FacetSpec;ILjava/lang/Object;)Ldev/aster/vega/model/spec/FromSpec;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getData ()Ljava/lang/String;
+	public final fun getFacet ()Ldev/aster/vega/model/spec/FacetSpec;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class dev/aster/vega/model/spec/GuideConfig {
+	public static final field Companion Ldev/aster/vega/model/spec/GuideConfig$Companion;
+	public fun <init> (Ljava/util/Map;)V
+	public final fun axisDefaults (Ldev/aster/vega/model/spec/Orient;Z)Ljava/util/List;
+	public final fun block-Q8FYTYw (Ljava/lang/String;)Ljava/util/Map;
+	public final fun legendDefaults ()Ljava/util/List;
+	public final fun markDefaults (Ljava/lang/String;Ljava/util/List;)Lkotlin/Pair;
+	public final fun projectionDefaults ()Ljava/util/List;
+	public final fun rangeDefault (Ljava/lang/String;)Ldev/aster/vega/model/VegaValue;
+	public final fun styleBlock-Q8FYTYw (Ljava/lang/String;)Ljava/util/Map;
+	public final fun styleDefaults-Q8FYTYw (Ljava/util/List;)Ljava/util/Map;
+	public final fun titleDefaults ()Ljava/util/List;
+}
+
+public final class dev/aster/vega/model/spec/GuideConfig$Companion {
+	public final fun getEmpty ()Ldev/aster/vega/model/spec/GuideConfig;
+	public final fun merge-nNYH0bI (Ljava/util/Map;Ljava/util/List;)Ljava/util/Map;
+}
+
+public final class dev/aster/vega/model/spec/GuideStroke {
+	public fun <init> ()V
+	public fun <init> (Ljava/lang/String;Ljava/lang/Double;Ljava/util/List;Ljava/lang/Double;Ljava/lang/String;Ljava/lang/Double;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/Double;Ljava/util/Map;)V
+	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/Double;Ljava/util/List;Ljava/lang/Double;Ljava/lang/String;Ljava/lang/Double;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/Double;Ljava/util/Map;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()Ljava/lang/String;
+	public final fun component10 ()Ljava/lang/String;
+	public final fun component11 ()Ljava/lang/String;
+	public final fun component12 ()Ljava/lang/Double;
+	public final fun component13 ()Ljava/util/Map;
+	public final fun component2 ()Ljava/lang/Double;
+	public final fun component3 ()Ljava/util/List;
+	public final fun component4 ()Ljava/lang/Double;
+	public final fun component5 ()Ljava/lang/String;
+	public final fun component6 ()Ljava/lang/Double;
+	public final fun component7 ()Ljava/lang/String;
+	public final fun component8 ()Ljava/lang/String;
+	public final fun component9 ()Ljava/lang/String;
+	public final fun copy (Ljava/lang/String;Ljava/lang/Double;Ljava/util/List;Ljava/lang/Double;Ljava/lang/String;Ljava/lang/Double;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/Double;Ljava/util/Map;)Ldev/aster/vega/model/spec/GuideStroke;
+	public static synthetic fun copy$default (Ldev/aster/vega/model/spec/GuideStroke;Ljava/lang/String;Ljava/lang/Double;Ljava/util/List;Ljava/lang/Double;Ljava/lang/String;Ljava/lang/Double;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/Double;Ljava/util/Map;ILjava/lang/Object;)Ldev/aster/vega/model/spec/GuideStroke;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getAlign ()Ljava/lang/String;
+	public final fun getBaseline ()Ljava/lang/String;
+	public final fun getCap ()Ljava/lang/String;
+	public final fun getColor ()Ljava/lang/String;
+	public final fun getDash ()Ljava/util/List;
+	public final fun getDashOffset ()Ljava/lang/Double;
+	public final fun getFont ()Ljava/lang/String;
+	public final fun getFontStyle ()Ljava/lang/String;
+	public final fun getFontWeight ()Ljava/lang/String;
+	public final fun getLineHeight ()Ljava/lang/Double;
+	public final fun getOpacity ()Ljava/lang/Double;
+	public final fun getSignals ()Ljava/util/Map;
+	public final fun getWidth ()Ljava/lang/Double;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class dev/aster/vega/model/spec/LayoutOffset {
+	public fun <init> ()V
+	public fun <init> (Ldev/aster/vega/model/spec/NumberValue;Ldev/aster/vega/model/spec/NumberValue;Ldev/aster/vega/model/spec/NumberValue;Ldev/aster/vega/model/spec/NumberValue;Ldev/aster/vega/model/spec/NumberValue;Ldev/aster/vega/model/spec/NumberValue;)V
+	public synthetic fun <init> (Ldev/aster/vega/model/spec/NumberValue;Ldev/aster/vega/model/spec/NumberValue;Ldev/aster/vega/model/spec/NumberValue;Ldev/aster/vega/model/spec/NumberValue;Ldev/aster/vega/model/spec/NumberValue;Ldev/aster/vega/model/spec/NumberValue;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()Ldev/aster/vega/model/spec/NumberValue;
+	public final fun component2 ()Ldev/aster/vega/model/spec/NumberValue;
+	public final fun component3 ()Ldev/aster/vega/model/spec/NumberValue;
+	public final fun component4 ()Ldev/aster/vega/model/spec/NumberValue;
+	public final fun component5 ()Ldev/aster/vega/model/spec/NumberValue;
+	public final fun component6 ()Ldev/aster/vega/model/spec/NumberValue;
+	public final fun copy (Ldev/aster/vega/model/spec/NumberValue;Ldev/aster/vega/model/spec/NumberValue;Ldev/aster/vega/model/spec/NumberValue;Ldev/aster/vega/model/spec/NumberValue;Ldev/aster/vega/model/spec/NumberValue;Ldev/aster/vega/model/spec/NumberValue;)Ldev/aster/vega/model/spec/LayoutOffset;
+	public static synthetic fun copy$default (Ldev/aster/vega/model/spec/LayoutOffset;Ldev/aster/vega/model/spec/NumberValue;Ldev/aster/vega/model/spec/NumberValue;Ldev/aster/vega/model/spec/NumberValue;Ldev/aster/vega/model/spec/NumberValue;Ldev/aster/vega/model/spec/NumberValue;Ldev/aster/vega/model/spec/NumberValue;ILjava/lang/Object;)Ldev/aster/vega/model/spec/LayoutOffset;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getColumnFooter ()Ldev/aster/vega/model/spec/NumberValue;
+	public final fun getColumnHeader ()Ldev/aster/vega/model/spec/NumberValue;
+	public final fun getColumnTitle ()Ldev/aster/vega/model/spec/NumberValue;
+	public final fun getRowFooter ()Ldev/aster/vega/model/spec/NumberValue;
+	public final fun getRowHeader ()Ldev/aster/vega/model/spec/NumberValue;
+	public final fun getRowTitle ()Ldev/aster/vega/model/spec/NumberValue;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class dev/aster/vega/model/spec/LayoutSpec {
+	public fun <init> ()V
+	public fun <init> (Ldev/aster/vega/model/spec/NumberValue;Ldev/aster/vega/model/spec/NumberValue;Ldev/aster/vega/model/spec/NumberValue;Ldev/aster/vega/model/spec/LayoutOffset;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;ZZLjava/lang/Double;Ljava/lang/Double;Ljava/lang/Double;Ljava/lang/Double;Ljava/lang/Double;Ljava/lang/Double;Ljava/lang/String;Ljava/lang/String;Ljava/util/Map;)V
+	public synthetic fun <init> (Ldev/aster/vega/model/spec/NumberValue;Ldev/aster/vega/model/spec/NumberValue;Ldev/aster/vega/model/spec/NumberValue;Ldev/aster/vega/model/spec/LayoutOffset;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;ZZLjava/lang/Double;Ljava/lang/Double;Ljava/lang/Double;Ljava/lang/Double;Ljava/lang/Double;Ljava/lang/Double;Ljava/lang/String;Ljava/lang/String;Ljava/util/Map;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()Ldev/aster/vega/model/spec/NumberValue;
+	public final fun component10 ()Ljava/lang/Double;
+	public final fun component11 ()Ljava/lang/Double;
+	public final fun component12 ()Ljava/lang/Double;
+	public final fun component13 ()Ljava/lang/Double;
+	public final fun component14 ()Ljava/lang/Double;
+	public final fun component15 ()Ljava/lang/Double;
+	public final fun component16 ()Ljava/lang/String;
+	public final fun component17 ()Ljava/lang/String;
+	public final fun component18 ()Ljava/util/Map;
+	public final fun component2 ()Ldev/aster/vega/model/spec/NumberValue;
+	public final fun component3 ()Ldev/aster/vega/model/spec/NumberValue;
+	public final fun component4 ()Ldev/aster/vega/model/spec/LayoutOffset;
+	public final fun component5 ()Ljava/lang/String;
+	public final fun component6 ()Ljava/lang/String;
+	public final fun component7 ()Ljava/lang/String;
+	public final fun component8 ()Z
+	public final fun component9 ()Z
+	public final fun copy (Ldev/aster/vega/model/spec/NumberValue;Ldev/aster/vega/model/spec/NumberValue;Ldev/aster/vega/model/spec/NumberValue;Ldev/aster/vega/model/spec/LayoutOffset;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;ZZLjava/lang/Double;Ljava/lang/Double;Ljava/lang/Double;Ljava/lang/Double;Ljava/lang/Double;Ljava/lang/Double;Ljava/lang/String;Ljava/lang/String;Ljava/util/Map;)Ldev/aster/vega/model/spec/LayoutSpec;
+	public static synthetic fun copy$default (Ldev/aster/vega/model/spec/LayoutSpec;Ldev/aster/vega/model/spec/NumberValue;Ldev/aster/vega/model/spec/NumberValue;Ldev/aster/vega/model/spec/NumberValue;Ldev/aster/vega/model/spec/LayoutOffset;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;ZZLjava/lang/Double;Ljava/lang/Double;Ljava/lang/Double;Ljava/lang/Double;Ljava/lang/Double;Ljava/lang/Double;Ljava/lang/String;Ljava/lang/String;Ljava/util/Map;ILjava/lang/Object;)Ldev/aster/vega/model/spec/LayoutSpec;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun footerBand (Z)Ljava/lang/Double;
+	public final fun getAlignColumn ()Ljava/lang/String;
+	public final fun getAlignRow ()Ljava/lang/String;
+	public final fun getBounds ()Ljava/lang/String;
+	public final fun getCenterColumn ()Z
+	public final fun getCenterRow ()Z
+	public final fun getColumnPadding ()Ldev/aster/vega/model/spec/NumberValue;
+	public final fun getColumns ()Ldev/aster/vega/model/spec/NumberValue;
+	public final fun getFooterBandColumn ()Ljava/lang/Double;
+	public final fun getFooterBandRow ()Ljava/lang/Double;
+	public final fun getHeaderBandColumn ()Ljava/lang/Double;
+	public final fun getHeaderBandRow ()Ljava/lang/Double;
+	public final fun getOffset ()Ldev/aster/vega/model/spec/LayoutOffset;
+	public final fun getOffsets ()Ljava/util/Map;
+	public final fun getRowPadding ()Ldev/aster/vega/model/spec/NumberValue;
+	public final fun getTitleAnchorColumn ()Ljava/lang/String;
+	public final fun getTitleAnchorRow ()Ljava/lang/String;
+	public final fun getTitleBandColumn ()Ljava/lang/Double;
+	public final fun getTitleBandRow ()Ljava/lang/Double;
+	public fun hashCode ()I
+	public final fun headerBand (Z)Ljava/lang/Double;
+	public final fun offsetFor (Ljava/lang/String;)D
+	public final fun titleAtEnd (Z)Z
+	public final fun titleBand (Z)D
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class dev/aster/vega/model/spec/LegendOrient : java/lang/Enum {
+	public static final field BOTTOM Ldev/aster/vega/model/spec/LegendOrient;
+	public static final field BOTTOM_LEFT Ldev/aster/vega/model/spec/LegendOrient;
+	public static final field BOTTOM_RIGHT Ldev/aster/vega/model/spec/LegendOrient;
+	public static final field Companion Ldev/aster/vega/model/spec/LegendOrient$Companion;
+	public static final field LEFT Ldev/aster/vega/model/spec/LegendOrient;
+	public static final field NONE Ldev/aster/vega/model/spec/LegendOrient;
+	public static final field RIGHT Ldev/aster/vega/model/spec/LegendOrient;
+	public static final field TOP Ldev/aster/vega/model/spec/LegendOrient;
+	public static final field TOP_LEFT Ldev/aster/vega/model/spec/LegendOrient;
+	public static final field TOP_RIGHT Ldev/aster/vega/model/spec/LegendOrient;
+	public static fun getEntries ()Lkotlin/enums/EnumEntries;
+	public final fun isSide ()Z
+	public static fun valueOf (Ljava/lang/String;)Ldev/aster/vega/model/spec/LegendOrient;
+	public static fun values ()[Ldev/aster/vega/model/spec/LegendOrient;
+}
+
+public final class dev/aster/vega/model/spec/LegendOrient$Companion {
+	public final fun fromName (Ljava/lang/String;)Ldev/aster/vega/model/spec/LegendOrient;
+}
+
+public final class dev/aster/vega/model/spec/LegendSpec {
+	public fun <init> ()V
+	public fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ldev/aster/vega/model/spec/LegendType;Ldev/aster/vega/model/spec/LegendOrient;Ldev/aster/vega/model/spec/Direction;Ljava/lang/String;Ljava/lang/String;Ljava/util/List;Ljava/lang/String;Ldev/aster/vega/model/spec/NumberValue;Ljava/lang/String;Ljava/lang/Integer;Ldev/aster/vega/model/spec/NumberValue;Ldev/aster/vega/model/spec/NumberValue;Ldev/aster/vega/model/spec/NumberValue;Ljava/lang/String;Ldev/aster/vega/model/spec/Anchor;Ldev/aster/vega/model/spec/NumberValue;Ldev/aster/vega/model/spec/NumberValue;Ldev/aster/vega/model/spec/NumberValue;Ldev/aster/vega/model/spec/NumberValue;Ljava/lang/String;Ldev/aster/vega/model/spec/NumberValue;Ldev/aster/vega/model/spec/NumberValue;Ldev/aster/vega/model/spec/NumberValue;Ldev/aster/vega/model/spec/NumberValue;Ldev/aster/vega/model/spec/NumberValue;Ldev/aster/vega/model/spec/NumberValue;Ldev/aster/vega/model/spec/NumberValue;Ldev/aster/vega/model/spec/NumberValue;Ldev/aster/vega/model/spec/NumberValue;Ldev/aster/vega/model/spec/NumberValue;Ljava/lang/String;Ljava/lang/String;Ldev/aster/vega/model/spec/NumberValue;Ljava/lang/String;Ldev/aster/vega/model/spec/NumberValue;Ljava/lang/String;Ldev/aster/vega/model/spec/NumberValue;Ldev/aster/vega/model/spec/NumberValue;Ldev/aster/vega/model/spec/NumberValue;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ldev/aster/vega/model/spec/NumberValue;ZLjava/lang/String;Ljava/lang/Double;Ljava/util/List;ILdev/aster/vega/model/spec/GuideStroke;Ldev/aster/vega/model/spec/GuideStroke;Ldev/aster/vega/model/spec/GuideStroke;Ljava/lang/String;Ldev/aster/vega/model/spec/NumberValue;Ldev/aster/vega/model/spec/NumberValue;Ljava/util/Map;)V
+	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ldev/aster/vega/model/spec/LegendType;Ldev/aster/vega/model/spec/LegendOrient;Ldev/aster/vega/model/spec/Direction;Ljava/lang/String;Ljava/lang/String;Ljava/util/List;Ljava/lang/String;Ldev/aster/vega/model/spec/NumberValue;Ljava/lang/String;Ljava/lang/Integer;Ldev/aster/vega/model/spec/NumberValue;Ldev/aster/vega/model/spec/NumberValue;Ldev/aster/vega/model/spec/NumberValue;Ljava/lang/String;Ldev/aster/vega/model/spec/Anchor;Ldev/aster/vega/model/spec/NumberValue;Ldev/aster/vega/model/spec/NumberValue;Ldev/aster/vega/model/spec/NumberValue;Ldev/aster/vega/model/spec/NumberValue;Ljava/lang/String;Ldev/aster/vega/model/spec/NumberValue;Ldev/aster/vega/model/spec/NumberValue;Ldev/aster/vega/model/spec/NumberValue;Ldev/aster/vega/model/spec/NumberValue;Ldev/aster/vega/model/spec/NumberValue;Ldev/aster/vega/model/spec/NumberValue;Ldev/aster/vega/model/spec/NumberValue;Ldev/aster/vega/model/spec/NumberValue;Ldev/aster/vega/model/spec/NumberValue;Ldev/aster/vega/model/spec/NumberValue;Ljava/lang/String;Ljava/lang/String;Ldev/aster/vega/model/spec/NumberValue;Ljava/lang/String;Ldev/aster/vega/model/spec/NumberValue;Ljava/lang/String;Ldev/aster/vega/model/spec/NumberValue;Ldev/aster/vega/model/spec/NumberValue;Ldev/aster/vega/model/spec/NumberValue;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ldev/aster/vega/model/spec/NumberValue;ZLjava/lang/String;Ljava/lang/Double;Ljava/util/List;ILdev/aster/vega/model/spec/GuideStroke;Ldev/aster/vega/model/spec/GuideStroke;Ldev/aster/vega/model/spec/GuideStroke;Ljava/lang/String;Ldev/aster/vega/model/spec/NumberValue;Ldev/aster/vega/model/spec/NumberValue;Ljava/util/Map;IILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()Ljava/lang/String;
+	public final fun component10 ()Ldev/aster/vega/model/spec/LegendOrient;
+	public final fun component11 ()Ldev/aster/vega/model/spec/Direction;
+	public final fun component12 ()Ljava/lang/String;
+	public final fun component13 ()Ljava/lang/String;
+	public final fun component14 ()Ljava/util/List;
+	public final fun component15 ()Ljava/lang/String;
+	public final fun component16 ()Ldev/aster/vega/model/spec/NumberValue;
+	public final fun component17 ()Ljava/lang/String;
+	public final fun component18 ()Ljava/lang/Integer;
+	public final fun component19 ()Ldev/aster/vega/model/spec/NumberValue;
+	public final fun component2 ()Ljava/lang/String;
+	public final fun component20 ()Ldev/aster/vega/model/spec/NumberValue;
+	public final fun component21 ()Ldev/aster/vega/model/spec/NumberValue;
+	public final fun component22 ()Ljava/lang/String;
+	public final fun component23 ()Ldev/aster/vega/model/spec/Anchor;
+	public final fun component24 ()Ldev/aster/vega/model/spec/NumberValue;
+	public final fun component25 ()Ldev/aster/vega/model/spec/NumberValue;
+	public final fun component26 ()Ldev/aster/vega/model/spec/NumberValue;
+	public final fun component27 ()Ldev/aster/vega/model/spec/NumberValue;
+	public final fun component28 ()Ljava/lang/String;
+	public final fun component29 ()Ldev/aster/vega/model/spec/NumberValue;
+	public final fun component3 ()Ljava/lang/String;
+	public final fun component30 ()Ldev/aster/vega/model/spec/NumberValue;
+	public final fun component31 ()Ldev/aster/vega/model/spec/NumberValue;
+	public final fun component32 ()Ldev/aster/vega/model/spec/NumberValue;
+	public final fun component33 ()Ldev/aster/vega/model/spec/NumberValue;
+	public final fun component34 ()Ldev/aster/vega/model/spec/NumberValue;
+	public final fun component35 ()Ldev/aster/vega/model/spec/NumberValue;
+	public final fun component36 ()Ldev/aster/vega/model/spec/NumberValue;
+	public final fun component37 ()Ldev/aster/vega/model/spec/NumberValue;
+	public final fun component38 ()Ldev/aster/vega/model/spec/NumberValue;
+	public final fun component39 ()Ljava/lang/String;
+	public final fun component4 ()Ljava/lang/String;
+	public final fun component40 ()Ljava/lang/String;
+	public final fun component41 ()Ldev/aster/vega/model/spec/NumberValue;
+	public final fun component42 ()Ljava/lang/String;
+	public final fun component43 ()Ldev/aster/vega/model/spec/NumberValue;
+	public final fun component44 ()Ljava/lang/String;
+	public final fun component45 ()Ldev/aster/vega/model/spec/NumberValue;
+	public final fun component46 ()Ldev/aster/vega/model/spec/NumberValue;
+	public final fun component47 ()Ldev/aster/vega/model/spec/NumberValue;
+	public final fun component48 ()Ljava/lang/String;
+	public final fun component49 ()Ljava/lang/String;
+	public final fun component5 ()Ljava/lang/String;
+	public final fun component50 ()Ljava/lang/String;
+	public final fun component51 ()Ldev/aster/vega/model/spec/NumberValue;
+	public final fun component52 ()Z
+	public final fun component53 ()Ljava/lang/String;
+	public final fun component54 ()Ljava/lang/Double;
+	public final fun component55 ()Ljava/util/List;
+	public final fun component56 ()I
+	public final fun component57 ()Ldev/aster/vega/model/spec/GuideStroke;
+	public final fun component58 ()Ldev/aster/vega/model/spec/GuideStroke;
+	public final fun component59 ()Ldev/aster/vega/model/spec/GuideStroke;
+	public final fun component6 ()Ljava/lang/String;
+	public final fun component60 ()Ljava/lang/String;
+	public final fun component61 ()Ldev/aster/vega/model/spec/NumberValue;
+	public final fun component62 ()Ldev/aster/vega/model/spec/NumberValue;
+	public final fun component63 ()Ljava/util/Map;
+	public final fun component7 ()Ljava/lang/String;
+	public final fun component8 ()Ljava/lang/String;
+	public final fun component9 ()Ldev/aster/vega/model/spec/LegendType;
+	public final fun copy (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ldev/aster/vega/model/spec/LegendType;Ldev/aster/vega/model/spec/LegendOrient;Ldev/aster/vega/model/spec/Direction;Ljava/lang/String;Ljava/lang/String;Ljava/util/List;Ljava/lang/String;Ldev/aster/vega/model/spec/NumberValue;Ljava/lang/String;Ljava/lang/Integer;Ldev/aster/vega/model/spec/NumberValue;Ldev/aster/vega/model/spec/NumberValue;Ldev/aster/vega/model/spec/NumberValue;Ljava/lang/String;Ldev/aster/vega/model/spec/Anchor;Ldev/aster/vega/model/spec/NumberValue;Ldev/aster/vega/model/spec/NumberValue;Ldev/aster/vega/model/spec/NumberValue;Ldev/aster/vega/model/spec/NumberValue;Ljava/lang/String;Ldev/aster/vega/model/spec/NumberValue;Ldev/aster/vega/model/spec/NumberValue;Ldev/aster/vega/model/spec/NumberValue;Ldev/aster/vega/model/spec/NumberValue;Ldev/aster/vega/model/spec/NumberValue;Ldev/aster/vega/model/spec/NumberValue;Ldev/aster/vega/model/spec/NumberValue;Ldev/aster/vega/model/spec/NumberValue;Ldev/aster/vega/model/spec/NumberValue;Ldev/aster/vega/model/spec/NumberValue;Ljava/lang/String;Ljava/lang/String;Ldev/aster/vega/model/spec/NumberValue;Ljava/lang/String;Ldev/aster/vega/model/spec/NumberValue;Ljava/lang/String;Ldev/aster/vega/model/spec/NumberValue;Ldev/aster/vega/model/spec/NumberValue;Ldev/aster/vega/model/spec/NumberValue;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ldev/aster/vega/model/spec/NumberValue;ZLjava/lang/String;Ljava/lang/Double;Ljava/util/List;ILdev/aster/vega/model/spec/GuideStroke;Ldev/aster/vega/model/spec/GuideStroke;Ldev/aster/vega/model/spec/GuideStroke;Ljava/lang/String;Ldev/aster/vega/model/spec/NumberValue;Ldev/aster/vega/model/spec/NumberValue;Ljava/util/Map;)Ldev/aster/vega/model/spec/LegendSpec;
+	public static synthetic fun copy$default (Ldev/aster/vega/model/spec/LegendSpec;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ldev/aster/vega/model/spec/LegendType;Ldev/aster/vega/model/spec/LegendOrient;Ldev/aster/vega/model/spec/Direction;Ljava/lang/String;Ljava/lang/String;Ljava/util/List;Ljava/lang/String;Ldev/aster/vega/model/spec/NumberValue;Ljava/lang/String;Ljava/lang/Integer;Ldev/aster/vega/model/spec/NumberValue;Ldev/aster/vega/model/spec/NumberValue;Ldev/aster/vega/model/spec/NumberValue;Ljava/lang/String;Ldev/aster/vega/model/spec/Anchor;Ldev/aster/vega/model/spec/NumberValue;Ldev/aster/vega/model/spec/NumberValue;Ldev/aster/vega/model/spec/NumberValue;Ldev/aster/vega/model/spec/NumberValue;Ljava/lang/String;Ldev/aster/vega/model/spec/NumberValue;Ldev/aster/vega/model/spec/NumberValue;Ldev/aster/vega/model/spec/NumberValue;Ldev/aster/vega/model/spec/NumberValue;Ldev/aster/vega/model/spec/NumberValue;Ldev/aster/vega/model/spec/NumberValue;Ldev/aster/vega/model/spec/NumberValue;Ldev/aster/vega/model/spec/NumberValue;Ldev/aster/vega/model/spec/NumberValue;Ldev/aster/vega/model/spec/NumberValue;Ljava/lang/String;Ljava/lang/String;Ldev/aster/vega/model/spec/NumberValue;Ljava/lang/String;Ldev/aster/vega/model/spec/NumberValue;Ljava/lang/String;Ldev/aster/vega/model/spec/NumberValue;Ldev/aster/vega/model/spec/NumberValue;Ldev/aster/vega/model/spec/NumberValue;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ldev/aster/vega/model/spec/NumberValue;ZLjava/lang/String;Ljava/lang/Double;Ljava/util/List;ILdev/aster/vega/model/spec/GuideStroke;Ldev/aster/vega/model/spec/GuideStroke;Ldev/aster/vega/model/spec/GuideStroke;Ljava/lang/String;Ldev/aster/vega/model/spec/NumberValue;Ldev/aster/vega/model/spec/NumberValue;Ljava/util/Map;IILjava/lang/Object;)Ldev/aster/vega/model/spec/LegendSpec;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getAria ()Z
+	public final fun getBackgroundStrokeDash ()Ljava/util/List;
+	public final fun getBackgroundStrokeWidth ()Ljava/lang/Double;
+	public final fun getChannelCount ()I
+	public final fun getClipHeight ()Ldev/aster/vega/model/spec/NumberValue;
+	public final fun getColumnPadding ()Ldev/aster/vega/model/spec/NumberValue;
+	public final fun getColumns ()Ldev/aster/vega/model/spec/NumberValue;
+	public final fun getCornerRadius ()Ldev/aster/vega/model/spec/NumberValue;
+	public final fun getDescription ()Ljava/lang/String;
+	public final fun getDirection ()Ldev/aster/vega/model/spec/Direction;
+	public final fun getEncode ()Ljava/util/Map;
+	public final fun getFill ()Ljava/lang/String;
+	public final fun getFillColor ()Ljava/lang/String;
+	public final fun getFormat ()Ljava/lang/String;
+	public final fun getFormatExpression ()Ljava/lang/String;
+	public final fun getFormatType ()Ljava/lang/String;
+	public final fun getFormatTypeExpression ()Ljava/lang/String;
+	public final fun getGradientLength ()Ldev/aster/vega/model/spec/NumberValue;
+	public final fun getGradientOpacity ()Ldev/aster/vega/model/spec/NumberValue;
+	public final fun getGradientStrokeColor ()Ljava/lang/String;
+	public final fun getGradientStrokeWidth ()Ldev/aster/vega/model/spec/NumberValue;
+	public final fun getGradientThickness ()Ldev/aster/vega/model/spec/NumberValue;
+	public final fun getGridAlign ()Ljava/lang/String;
+	public final fun getLabelFontSize ()Ldev/aster/vega/model/spec/NumberValue;
+	public final fun getLabelLimit ()Ldev/aster/vega/model/spec/NumberValue;
+	public final fun getLabelOffset ()Ldev/aster/vega/model/spec/NumberValue;
+	public final fun getLabelOverlap ()Ljava/lang/String;
+	public final fun getLabelSeparation ()Ldev/aster/vega/model/spec/NumberValue;
+	public final fun getLabelStyle ()Ldev/aster/vega/model/spec/GuideStroke;
+	public final fun getLegendX ()Ldev/aster/vega/model/spec/NumberValue;
+	public final fun getLegendY ()Ldev/aster/vega/model/spec/NumberValue;
+	public final fun getOffset ()Ldev/aster/vega/model/spec/NumberValue;
+	public final fun getOpacity ()Ljava/lang/String;
+	public final fun getOrient ()Ldev/aster/vega/model/spec/LegendOrient;
+	public final fun getPadding ()Ldev/aster/vega/model/spec/NumberValue;
+	public final fun getRowPadding ()Ldev/aster/vega/model/spec/NumberValue;
+	public final fun getScale ()Ljava/lang/String;
+	public final fun getShape ()Ljava/lang/String;
+	public final fun getSize ()Ljava/lang/String;
+	public final fun getStroke ()Ljava/lang/String;
+	public final fun getStrokeColor ()Ljava/lang/String;
+	public final fun getStrokeDashScale ()Ljava/lang/String;
+	public final fun getStrokeWidthScale ()Ljava/lang/String;
+	public final fun getSymbolFillColor ()Ljava/lang/String;
+	public final fun getSymbolLimit ()Ldev/aster/vega/model/spec/NumberValue;
+	public final fun getSymbolOffset ()Ldev/aster/vega/model/spec/NumberValue;
+	public final fun getSymbolSize ()Ldev/aster/vega/model/spec/NumberValue;
+	public final fun getSymbolStrokeWidth ()Ldev/aster/vega/model/spec/NumberValue;
+	public final fun getSymbolStyle ()Ldev/aster/vega/model/spec/GuideStroke;
+	public final fun getSymbolType ()Ljava/lang/String;
+	public final fun getTickCount ()Ldev/aster/vega/model/spec/NumberValue;
+	public final fun getTickInterval ()Ljava/lang/String;
+	public final fun getTickMinStep ()Ldev/aster/vega/model/spec/NumberValue;
+	public final fun getTickStep ()Ljava/lang/Integer;
+	public final fun getTitle ()Ljava/lang/String;
+	public final fun getTitleAnchor ()Ldev/aster/vega/model/spec/Anchor;
+	public final fun getTitleExpression ()Ljava/lang/String;
+	public final fun getTitleFontSize ()Ldev/aster/vega/model/spec/NumberValue;
+	public final fun getTitleLimit ()Ldev/aster/vega/model/spec/NumberValue;
+	public final fun getTitleOrient ()Ljava/lang/String;
+	public final fun getTitlePadding ()Ldev/aster/vega/model/spec/NumberValue;
+	public final fun getTitleStyle ()Ldev/aster/vega/model/spec/GuideStroke;
+	public final fun getType ()Ldev/aster/vega/model/spec/LegendType;
+	public final fun getValues ()Ljava/util/List;
+	public final fun getZindex ()I
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class dev/aster/vega/model/spec/LegendType : java/lang/Enum {
+	public static final field Companion Ldev/aster/vega/model/spec/LegendType$Companion;
+	public static final field DISCRETE Ldev/aster/vega/model/spec/LegendType;
+	public static final field GRADIENT Ldev/aster/vega/model/spec/LegendType;
+	public static final field SYMBOL Ldev/aster/vega/model/spec/LegendType;
+	public static fun getEntries ()Lkotlin/enums/EnumEntries;
+	public static fun valueOf (Ljava/lang/String;)Ldev/aster/vega/model/spec/LegendType;
+	public static fun values ()[Ldev/aster/vega/model/spec/LegendType;
+}
+
+public final class dev/aster/vega/model/spec/LegendType$Companion {
+	public final fun fromName (Ljava/lang/String;)Ldev/aster/vega/model/spec/LegendType;
+}
+
+public final class dev/aster/vega/model/spec/MarkSort {
+	public fun <init> (Ljava/util/List;Ljava/util/List;)V
+	public synthetic fun <init> (Ljava/util/List;Ljava/util/List;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()Ljava/util/List;
+	public final fun component2 ()Ljava/util/List;
+	public final fun copy (Ljava/util/List;Ljava/util/List;)Ldev/aster/vega/model/spec/MarkSort;
+	public static synthetic fun copy$default (Ldev/aster/vega/model/spec/MarkSort;Ljava/util/List;Ljava/util/List;ILjava/lang/Object;)Ldev/aster/vega/model/spec/MarkSort;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getFields ()Ljava/util/List;
+	public final fun getOrders ()Ljava/util/List;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class dev/aster/vega/model/spec/MarkSpec {
+	public fun <init> (Ldev/aster/vega/model/spec/MarkType;Ljava/lang/String;Ljava/lang/String;Ldev/aster/vega/model/spec/FromSpec;Ljava/lang/String;Ldev/aster/vega/model/spec/MarkSort;Ljava/util/List;Ldev/aster/vega/model/spec/EncodeSpec;Ljava/util/List;Ljava/util/List;Ljava/util/List;Ljava/util/List;Ljava/util/List;Ljava/util/List;Ljava/util/List;Ldev/aster/vega/model/spec/LayoutSpec;Ldev/aster/vega/model/spec/TitleSpec;IZZLjava/lang/String;ZLjava/util/Map;Ljava/util/Map;)V
+	public synthetic fun <init> (Ldev/aster/vega/model/spec/MarkType;Ljava/lang/String;Ljava/lang/String;Ldev/aster/vega/model/spec/FromSpec;Ljava/lang/String;Ldev/aster/vega/model/spec/MarkSort;Ljava/util/List;Ldev/aster/vega/model/spec/EncodeSpec;Ljava/util/List;Ljava/util/List;Ljava/util/List;Ljava/util/List;Ljava/util/List;Ljava/util/List;Ljava/util/List;Ldev/aster/vega/model/spec/LayoutSpec;Ldev/aster/vega/model/spec/TitleSpec;IZZLjava/lang/String;ZLjava/util/Map;Ljava/util/Map;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()Ldev/aster/vega/model/spec/MarkType;
+	public final fun component10 ()Ljava/util/List;
+	public final fun component11 ()Ljava/util/List;
+	public final fun component12 ()Ljava/util/List;
+	public final fun component13 ()Ljava/util/List;
+	public final fun component14 ()Ljava/util/List;
+	public final fun component15 ()Ljava/util/List;
+	public final fun component16 ()Ldev/aster/vega/model/spec/LayoutSpec;
+	public final fun component17 ()Ldev/aster/vega/model/spec/TitleSpec;
+	public final fun component18 ()I
+	public final fun component19 ()Z
+	public final fun component2 ()Ljava/lang/String;
+	public final fun component20 ()Z
+	public final fun component21 ()Ljava/lang/String;
+	public final fun component22 ()Z
+	public final fun component23 ()Ljava/util/Map;
+	public final fun component24 ()Ljava/util/Map;
+	public final fun component3 ()Ljava/lang/String;
+	public final fun component4 ()Ldev/aster/vega/model/spec/FromSpec;
+	public final fun component5 ()Ljava/lang/String;
+	public final fun component6 ()Ldev/aster/vega/model/spec/MarkSort;
+	public final fun component7 ()Ljava/util/List;
+	public final fun component8 ()Ldev/aster/vega/model/spec/EncodeSpec;
+	public final fun component9 ()Ljava/util/List;
+	public final fun copy (Ldev/aster/vega/model/spec/MarkType;Ljava/lang/String;Ljava/lang/String;Ldev/aster/vega/model/spec/FromSpec;Ljava/lang/String;Ldev/aster/vega/model/spec/MarkSort;Ljava/util/List;Ldev/aster/vega/model/spec/EncodeSpec;Ljava/util/List;Ljava/util/List;Ljava/util/List;Ljava/util/List;Ljava/util/List;Ljava/util/List;Ljava/util/List;Ldev/aster/vega/model/spec/LayoutSpec;Ldev/aster/vega/model/spec/TitleSpec;IZZLjava/lang/String;ZLjava/util/Map;Ljava/util/Map;)Ldev/aster/vega/model/spec/MarkSpec;
+	public static synthetic fun copy$default (Ldev/aster/vega/model/spec/MarkSpec;Ldev/aster/vega/model/spec/MarkType;Ljava/lang/String;Ljava/lang/String;Ldev/aster/vega/model/spec/FromSpec;Ljava/lang/String;Ldev/aster/vega/model/spec/MarkSort;Ljava/util/List;Ldev/aster/vega/model/spec/EncodeSpec;Ljava/util/List;Ljava/util/List;Ljava/util/List;Ljava/util/List;Ljava/util/List;Ljava/util/List;Ljava/util/List;Ldev/aster/vega/model/spec/LayoutSpec;Ldev/aster/vega/model/spec/TitleSpec;IZZLjava/lang/String;ZLjava/util/Map;Ljava/util/Map;ILjava/lang/Object;)Ldev/aster/vega/model/spec/MarkSpec;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getAria ()Z
+	public final fun getAxes ()Ljava/util/List;
+	public final fun getClip ()Z
+	public final fun getConfigAboveDefaults ()Ljava/util/Map;
+	public final fun getConfigBelowDefaults ()Ljava/util/Map;
+	public final fun getData ()Ljava/util/List;
+	public final fun getDescription ()Ljava/lang/String;
+	public final fun getEncode ()Ldev/aster/vega/model/spec/EncodeSpec;
+	public final fun getFrom ()Ldev/aster/vega/model/spec/FromSpec;
+	public final fun getInteractive ()Z
+	public final fun getKey ()Ljava/lang/String;
+	public final fun getLayout ()Ldev/aster/vega/model/spec/LayoutSpec;
+	public final fun getLegends ()Ljava/util/List;
+	public final fun getMarks ()Ljava/util/List;
+	public final fun getName ()Ljava/lang/String;
+	public final fun getProjections ()Ljava/util/List;
+	public final fun getRole ()Ljava/lang/String;
+	public final fun getScales ()Ljava/util/List;
+	public final fun getSignals ()Ljava/util/List;
+	public final fun getSort ()Ldev/aster/vega/model/spec/MarkSort;
+	public final fun getTitle ()Ldev/aster/vega/model/spec/TitleSpec;
+	public final fun getTransform ()Ljava/util/List;
+	public final fun getType ()Ldev/aster/vega/model/spec/MarkType;
+	public final fun getZindex ()I
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class dev/aster/vega/model/spec/MarkType : java/lang/Enum {
+	public static final field ARC Ldev/aster/vega/model/spec/MarkType;
+	public static final field AREA Ldev/aster/vega/model/spec/MarkType;
+	public static final field Companion Ldev/aster/vega/model/spec/MarkType$Companion;
+	public static final field GROUP Ldev/aster/vega/model/spec/MarkType;
+	public static final field IMAGE Ldev/aster/vega/model/spec/MarkType;
+	public static final field LINE Ldev/aster/vega/model/spec/MarkType;
+	public static final field PATH Ldev/aster/vega/model/spec/MarkType;
+	public static final field RECT Ldev/aster/vega/model/spec/MarkType;
+	public static final field RULE Ldev/aster/vega/model/spec/MarkType;
+	public static final field SHAPE Ldev/aster/vega/model/spec/MarkType;
+	public static final field SYMBOL Ldev/aster/vega/model/spec/MarkType;
+	public static final field TEXT Ldev/aster/vega/model/spec/MarkType;
+	public static final field TRAIL Ldev/aster/vega/model/spec/MarkType;
+	public static fun getEntries ()Lkotlin/enums/EnumEntries;
+	public static fun valueOf (Ljava/lang/String;)Ldev/aster/vega/model/spec/MarkType;
+	public static fun values ()[Ldev/aster/vega/model/spec/MarkType;
+}
+
+public final class dev/aster/vega/model/spec/MarkType$Companion {
+	public final fun fromName (Ljava/lang/String;)Ldev/aster/vega/model/spec/MarkType;
+}
+
+public abstract interface class dev/aster/vega/model/spec/NumberList {
+}
+
+public final class dev/aster/vega/model/spec/NumberList$Items : dev/aster/vega/model/spec/NumberList {
+	public fun <init> (Ljava/util/List;)V
+	public final fun component1 ()Ljava/util/List;
+	public final fun copy (Ljava/util/List;)Ldev/aster/vega/model/spec/NumberList$Items;
+	public static synthetic fun copy$default (Ldev/aster/vega/model/spec/NumberList$Items;Ljava/util/List;ILjava/lang/Object;)Ldev/aster/vega/model/spec/NumberList$Items;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getValues ()Ljava/util/List;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class dev/aster/vega/model/spec/NumberList$None : dev/aster/vega/model/spec/NumberList {
+	public static final field INSTANCE Ldev/aster/vega/model/spec/NumberList$None;
+}
+
+public final class dev/aster/vega/model/spec/NumberList$Signal : dev/aster/vega/model/spec/NumberList {
+	public fun <init> (Ljava/lang/String;)V
+	public final fun component1 ()Ljava/lang/String;
+	public final fun copy (Ljava/lang/String;)Ldev/aster/vega/model/spec/NumberList$Signal;
+	public static synthetic fun copy$default (Ldev/aster/vega/model/spec/NumberList$Signal;Ljava/lang/String;ILjava/lang/Object;)Ldev/aster/vega/model/spec/NumberList$Signal;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getExpression ()Ljava/lang/String;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public abstract interface class dev/aster/vega/model/spec/NumberValue {
+}
+
+public final class dev/aster/vega/model/spec/NumberValue$Constant : dev/aster/vega/model/spec/NumberValue {
+	public fun <init> (D)V
+	public final fun component1 ()D
+	public final fun copy (D)Ldev/aster/vega/model/spec/NumberValue$Constant;
+	public static synthetic fun copy$default (Ldev/aster/vega/model/spec/NumberValue$Constant;DILjava/lang/Object;)Ldev/aster/vega/model/spec/NumberValue$Constant;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getValue ()D
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class dev/aster/vega/model/spec/NumberValue$Reference : dev/aster/vega/model/spec/NumberValue {
+	public fun <init> (Ldev/aster/vega/model/spec/ChannelValue;)V
+	public final fun component1 ()Ldev/aster/vega/model/spec/ChannelValue;
+	public final fun copy (Ldev/aster/vega/model/spec/ChannelValue;)Ldev/aster/vega/model/spec/NumberValue$Reference;
+	public static synthetic fun copy$default (Ldev/aster/vega/model/spec/NumberValue$Reference;Ldev/aster/vega/model/spec/ChannelValue;ILjava/lang/Object;)Ldev/aster/vega/model/spec/NumberValue$Reference;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getChannel ()Ldev/aster/vega/model/spec/ChannelValue;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class dev/aster/vega/model/spec/NumberValue$Signal : dev/aster/vega/model/spec/NumberValue {
+	public fun <init> (Ljava/lang/String;)V
+	public final fun component1 ()Ljava/lang/String;
+	public final fun copy (Ljava/lang/String;)Ldev/aster/vega/model/spec/NumberValue$Signal;
+	public static synthetic fun copy$default (Ldev/aster/vega/model/spec/NumberValue$Signal;Ljava/lang/String;ILjava/lang/Object;)Ldev/aster/vega/model/spec/NumberValue$Signal;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getExpression ()Ljava/lang/String;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class dev/aster/vega/model/spec/Orient : java/lang/Enum {
+	public static final field BOTTOM Ldev/aster/vega/model/spec/Orient;
+	public static final field Companion Ldev/aster/vega/model/spec/Orient$Companion;
+	public static final field LEFT Ldev/aster/vega/model/spec/Orient;
+	public static final field RIGHT Ldev/aster/vega/model/spec/Orient;
+	public static final field TOP Ldev/aster/vega/model/spec/Orient;
+	public static fun getEntries ()Lkotlin/enums/EnumEntries;
+	public final fun isVertical ()Z
+	public static fun valueOf (Ljava/lang/String;)Ldev/aster/vega/model/spec/Orient;
+	public static fun values ()[Ldev/aster/vega/model/spec/Orient;
+}
+
+public final class dev/aster/vega/model/spec/Orient$Companion {
+	public final fun fromName (Ljava/lang/String;)Ldev/aster/vega/model/spec/Orient;
+}
+
+public final class dev/aster/vega/model/spec/Padding {
+	public static final field Companion Ldev/aster/vega/model/spec/Padding$Companion;
+	public fun <init> ()V
+	public fun <init> (DDDD)V
+	public synthetic fun <init> (DDDDILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()D
+	public final fun component2 ()D
+	public final fun component3 ()D
+	public final fun component4 ()D
+	public final fun copy (DDDD)Ldev/aster/vega/model/spec/Padding;
+	public static synthetic fun copy$default (Ldev/aster/vega/model/spec/Padding;DDDDILjava/lang/Object;)Ldev/aster/vega/model/spec/Padding;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getBottom ()D
+	public final fun getLeft ()D
+	public final fun getRight ()D
+	public final fun getTop ()D
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class dev/aster/vega/model/spec/Padding$Companion {
+	public final fun getDefault ()Ldev/aster/vega/model/spec/Padding;
+	public final fun uniform (D)Ldev/aster/vega/model/spec/Padding;
+}
+
+public final class dev/aster/vega/model/spec/ParsedSpec {
+	public fun <init> (Ldev/aster/vega/model/spec/VegaSpec;Ljava/util/List;)V
+	public final fun component1 ()Ldev/aster/vega/model/spec/VegaSpec;
+	public final fun component2 ()Ljava/util/List;
+	public final fun copy (Ldev/aster/vega/model/spec/VegaSpec;Ljava/util/List;)Ldev/aster/vega/model/spec/ParsedSpec;
+	public static synthetic fun copy$default (Ldev/aster/vega/model/spec/ParsedSpec;Ldev/aster/vega/model/spec/VegaSpec;Ljava/util/List;ILjava/lang/Object;)Ldev/aster/vega/model/spec/ParsedSpec;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getDiagnostics ()Ljava/util/List;
+	public final fun getSpec ()Ldev/aster/vega/model/spec/VegaSpec;
+	public fun hashCode ()I
+	public final fun isUsable ()Z
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class dev/aster/vega/model/spec/ProjectionSpec {
+	public fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ldev/aster/vega/model/spec/NumberValue;Ldev/aster/vega/model/spec/NumberList;Ldev/aster/vega/model/spec/NumberList;Ldev/aster/vega/model/spec/NumberList;Ldev/aster/vega/model/spec/NumberValue;Ldev/aster/vega/model/spec/NumberValue;Ldev/aster/vega/model/spec/NumberValue;Ljava/util/List;Ldev/aster/vega/model/spec/NumberList;Ldev/aster/vega/model/spec/NumberValue;Ldev/aster/vega/model/spec/NumberValue;Ldev/aster/vega/model/spec/NumberValue;Ldev/aster/vega/model/VegaValue;Ljava/util/List;Ldev/aster/vega/model/spec/NumberList;)V
+	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ldev/aster/vega/model/spec/NumberValue;Ldev/aster/vega/model/spec/NumberList;Ldev/aster/vega/model/spec/NumberList;Ldev/aster/vega/model/spec/NumberList;Ldev/aster/vega/model/spec/NumberValue;Ldev/aster/vega/model/spec/NumberValue;Ldev/aster/vega/model/spec/NumberValue;Ljava/util/List;Ldev/aster/vega/model/spec/NumberList;Ldev/aster/vega/model/spec/NumberValue;Ldev/aster/vega/model/spec/NumberValue;Ldev/aster/vega/model/spec/NumberValue;Ldev/aster/vega/model/VegaValue;Ljava/util/List;Ldev/aster/vega/model/spec/NumberList;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()Ljava/lang/String;
+	public final fun component10 ()Ldev/aster/vega/model/spec/NumberValue;
+	public final fun component11 ()Ljava/util/List;
+	public final fun component12 ()Ldev/aster/vega/model/spec/NumberList;
+	public final fun component13 ()Ldev/aster/vega/model/spec/NumberValue;
+	public final fun component14 ()Ldev/aster/vega/model/spec/NumberValue;
+	public final fun component15 ()Ldev/aster/vega/model/spec/NumberValue;
+	public final fun component16 ()Ldev/aster/vega/model/VegaValue;
+	public final fun component17 ()Ljava/util/List;
+	public final fun component18 ()Ldev/aster/vega/model/spec/NumberList;
+	public final fun component2 ()Ljava/lang/String;
+	public final fun component3 ()Ljava/lang/String;
+	public final fun component4 ()Ldev/aster/vega/model/spec/NumberValue;
+	public final fun component5 ()Ldev/aster/vega/model/spec/NumberList;
+	public final fun component6 ()Ldev/aster/vega/model/spec/NumberList;
+	public final fun component7 ()Ldev/aster/vega/model/spec/NumberList;
+	public final fun component8 ()Ldev/aster/vega/model/spec/NumberValue;
+	public final fun component9 ()Ldev/aster/vega/model/spec/NumberValue;
+	public final fun copy (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ldev/aster/vega/model/spec/NumberValue;Ldev/aster/vega/model/spec/NumberList;Ldev/aster/vega/model/spec/NumberList;Ldev/aster/vega/model/spec/NumberList;Ldev/aster/vega/model/spec/NumberValue;Ldev/aster/vega/model/spec/NumberValue;Ldev/aster/vega/model/spec/NumberValue;Ljava/util/List;Ldev/aster/vega/model/spec/NumberList;Ldev/aster/vega/model/spec/NumberValue;Ldev/aster/vega/model/spec/NumberValue;Ldev/aster/vega/model/spec/NumberValue;Ldev/aster/vega/model/VegaValue;Ljava/util/List;Ldev/aster/vega/model/spec/NumberList;)Ldev/aster/vega/model/spec/ProjectionSpec;
+	public static synthetic fun copy$default (Ldev/aster/vega/model/spec/ProjectionSpec;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ldev/aster/vega/model/spec/NumberValue;Ldev/aster/vega/model/spec/NumberList;Ldev/aster/vega/model/spec/NumberList;Ldev/aster/vega/model/spec/NumberList;Ldev/aster/vega/model/spec/NumberValue;Ldev/aster/vega/model/spec/NumberValue;Ldev/aster/vega/model/spec/NumberValue;Ljava/util/List;Ldev/aster/vega/model/spec/NumberList;Ldev/aster/vega/model/spec/NumberValue;Ldev/aster/vega/model/spec/NumberValue;Ldev/aster/vega/model/spec/NumberValue;Ldev/aster/vega/model/VegaValue;Ljava/util/List;Ldev/aster/vega/model/spec/NumberList;ILjava/lang/Object;)Ldev/aster/vega/model/spec/ProjectionSpec;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getAngle ()Ldev/aster/vega/model/spec/NumberValue;
+	public final fun getCenter ()Ldev/aster/vega/model/spec/NumberList;
+	public final fun getClipAngle ()Ldev/aster/vega/model/spec/NumberValue;
+	public final fun getClipExtent ()Ljava/util/List;
+	public final fun getExtent ()Ljava/util/List;
+	public final fun getFit ()Ldev/aster/vega/model/VegaValue;
+	public final fun getName ()Ljava/lang/String;
+	public final fun getParallels ()Ldev/aster/vega/model/spec/NumberList;
+	public final fun getPointRadius ()Ldev/aster/vega/model/spec/NumberValue;
+	public final fun getPrecision ()Ldev/aster/vega/model/spec/NumberValue;
+	public final fun getReflectX ()Ldev/aster/vega/model/spec/NumberValue;
+	public final fun getReflectY ()Ldev/aster/vega/model/spec/NumberValue;
+	public final fun getRotate ()Ldev/aster/vega/model/spec/NumberList;
+	public final fun getScale ()Ldev/aster/vega/model/spec/NumberValue;
+	public final fun getSize ()Ldev/aster/vega/model/spec/NumberList;
+	public final fun getTranslate ()Ldev/aster/vega/model/spec/NumberList;
+	public final fun getType ()Ljava/lang/String;
+	public final fun getTypeSignal ()Ljava/lang/String;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public abstract interface class dev/aster/vega/model/spec/RangeSpec {
+}
+
+public final class dev/aster/vega/model/spec/RangeSpec$FromField : dev/aster/vega/model/spec/RangeSpec {
+	public fun <init> (Ljava/lang/String;Ljava/lang/String;)V
+	public final fun component1 ()Ljava/lang/String;
+	public final fun component2 ()Ljava/lang/String;
+	public final fun copy (Ljava/lang/String;Ljava/lang/String;)Ldev/aster/vega/model/spec/RangeSpec$FromField;
+	public static synthetic fun copy$default (Ldev/aster/vega/model/spec/RangeSpec$FromField;Ljava/lang/String;Ljava/lang/String;ILjava/lang/Object;)Ldev/aster/vega/model/spec/RangeSpec$FromField;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getData ()Ljava/lang/String;
+	public final fun getField ()Ljava/lang/String;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class dev/aster/vega/model/spec/RangeSpec$Literal : dev/aster/vega/model/spec/RangeSpec {
+	public fun <init> (Ljava/util/List;)V
+	public final fun component1 ()Ljava/util/List;
+	public final fun copy (Ljava/util/List;)Ldev/aster/vega/model/spec/RangeSpec$Literal;
+	public static synthetic fun copy$default (Ldev/aster/vega/model/spec/RangeSpec$Literal;Ljava/util/List;ILjava/lang/Object;)Ldev/aster/vega/model/spec/RangeSpec$Literal;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getValues ()Ljava/util/List;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class dev/aster/vega/model/spec/RangeSpec$Named : dev/aster/vega/model/spec/RangeSpec {
+	public fun <init> (Ljava/lang/String;)V
+	public final fun component1 ()Ljava/lang/String;
+	public final fun copy (Ljava/lang/String;)Ldev/aster/vega/model/spec/RangeSpec$Named;
+	public static synthetic fun copy$default (Ldev/aster/vega/model/spec/RangeSpec$Named;Ljava/lang/String;ILjava/lang/Object;)Ldev/aster/vega/model/spec/RangeSpec$Named;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getName ()Ljava/lang/String;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class dev/aster/vega/model/spec/RangeSpec$Scheme : dev/aster/vega/model/spec/RangeSpec {
+	public fun <init> (Ldev/aster/vega/model/spec/SchemeRef;Ljava/lang/Integer;Ljava/lang/String;)V
+	public synthetic fun <init> (Ldev/aster/vega/model/spec/SchemeRef;Ljava/lang/Integer;Ljava/lang/String;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()Ldev/aster/vega/model/spec/SchemeRef;
+	public final fun component2 ()Ljava/lang/Integer;
+	public final fun component3 ()Ljava/lang/String;
+	public final fun copy (Ldev/aster/vega/model/spec/SchemeRef;Ljava/lang/Integer;Ljava/lang/String;)Ldev/aster/vega/model/spec/RangeSpec$Scheme;
+	public static synthetic fun copy$default (Ldev/aster/vega/model/spec/RangeSpec$Scheme;Ldev/aster/vega/model/spec/SchemeRef;Ljava/lang/Integer;Ljava/lang/String;ILjava/lang/Object;)Ldev/aster/vega/model/spec/RangeSpec$Scheme;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getCount ()Ljava/lang/Integer;
+	public final fun getCountSignal ()Ljava/lang/String;
+	public final fun getScheme ()Ldev/aster/vega/model/spec/SchemeRef;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class dev/aster/vega/model/spec/RangeSpec$Signal : dev/aster/vega/model/spec/RangeSpec {
+	public fun <init> (Ljava/lang/String;)V
+	public final fun component1 ()Ljava/lang/String;
+	public final fun copy (Ljava/lang/String;)Ldev/aster/vega/model/spec/RangeSpec$Signal;
+	public static synthetic fun copy$default (Ldev/aster/vega/model/spec/RangeSpec$Signal;Ljava/lang/String;ILjava/lang/Object;)Ldev/aster/vega/model/spec/RangeSpec$Signal;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getExpression ()Ljava/lang/String;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class dev/aster/vega/model/spec/RangeSpec$Step : dev/aster/vega/model/spec/RangeSpec {
+	public fun <init> (Ldev/aster/vega/model/spec/NumberValue;)V
+	public final fun component1 ()Ldev/aster/vega/model/spec/NumberValue;
+	public final fun copy (Ldev/aster/vega/model/spec/NumberValue;)Ldev/aster/vega/model/spec/RangeSpec$Step;
+	public static synthetic fun copy$default (Ldev/aster/vega/model/spec/RangeSpec$Step;Ldev/aster/vega/model/spec/NumberValue;ILjava/lang/Object;)Ldev/aster/vega/model/spec/RangeSpec$Step;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getStep ()Ldev/aster/vega/model/spec/NumberValue;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class dev/aster/vega/model/spec/RangeSpec$Unset : dev/aster/vega/model/spec/RangeSpec {
+	public static final field INSTANCE Ldev/aster/vega/model/spec/RangeSpec$Unset;
+	public fun equals (Ljava/lang/Object;)Z
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class dev/aster/vega/model/spec/ScaleSpec {
+	public fun <init> (Ljava/lang/String;Ldev/aster/vega/model/spec/ScaleType;Ldev/aster/vega/model/spec/DomainSpec;Ldev/aster/vega/model/spec/DomainSpec;ZLdev/aster/vega/model/spec/NumberValue;Ldev/aster/vega/model/spec/NumberValue;Ldev/aster/vega/model/spec/NumberValue;Ldev/aster/vega/model/spec/RangeSpec;ZLjava/lang/String;ZZZLjava/lang/Integer;Ljava/lang/String;Ljava/lang/Integer;Ljava/lang/Boolean;Ldev/aster/vega/model/spec/NumberValue;Ldev/aster/vega/model/spec/NumberValue;Ldev/aster/vega/model/spec/NumberValue;Ldev/aster/vega/model/spec/NumberValue;Ldev/aster/vega/model/spec/NumberValue;Ldev/aster/vega/model/spec/NumberValue;Ldev/aster/vega/model/spec/NumberValue;Ljava/lang/String;Ljava/lang/Double;Ldev/aster/vega/model/spec/BinsSpec;)V
+	public synthetic fun <init> (Ljava/lang/String;Ldev/aster/vega/model/spec/ScaleType;Ldev/aster/vega/model/spec/DomainSpec;Ldev/aster/vega/model/spec/DomainSpec;ZLdev/aster/vega/model/spec/NumberValue;Ldev/aster/vega/model/spec/NumberValue;Ldev/aster/vega/model/spec/NumberValue;Ldev/aster/vega/model/spec/RangeSpec;ZLjava/lang/String;ZZZLjava/lang/Integer;Ljava/lang/String;Ljava/lang/Integer;Ljava/lang/Boolean;Ldev/aster/vega/model/spec/NumberValue;Ldev/aster/vega/model/spec/NumberValue;Ldev/aster/vega/model/spec/NumberValue;Ldev/aster/vega/model/spec/NumberValue;Ldev/aster/vega/model/spec/NumberValue;Ldev/aster/vega/model/spec/NumberValue;Ldev/aster/vega/model/spec/NumberValue;Ljava/lang/String;Ljava/lang/Double;Ldev/aster/vega/model/spec/BinsSpec;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()Ljava/lang/String;
+	public final fun component10 ()Z
+	public final fun component11 ()Ljava/lang/String;
+	public final fun component12 ()Z
+	public final fun component13 ()Z
+	public final fun component14 ()Z
+	public final fun component15 ()Ljava/lang/Integer;
+	public final fun component16 ()Ljava/lang/String;
+	public final fun component17 ()Ljava/lang/Integer;
+	public final fun component18 ()Ljava/lang/Boolean;
+	public final fun component19 ()Ldev/aster/vega/model/spec/NumberValue;
+	public final fun component2 ()Ldev/aster/vega/model/spec/ScaleType;
+	public final fun component20 ()Ldev/aster/vega/model/spec/NumberValue;
+	public final fun component21 ()Ldev/aster/vega/model/spec/NumberValue;
+	public final fun component22 ()Ldev/aster/vega/model/spec/NumberValue;
+	public final fun component23 ()Ldev/aster/vega/model/spec/NumberValue;
+	public final fun component24 ()Ldev/aster/vega/model/spec/NumberValue;
+	public final fun component25 ()Ldev/aster/vega/model/spec/NumberValue;
+	public final fun component26 ()Ljava/lang/String;
+	public final fun component27 ()Ljava/lang/Double;
+	public final fun component28 ()Ldev/aster/vega/model/spec/BinsSpec;
+	public final fun component3 ()Ldev/aster/vega/model/spec/DomainSpec;
+	public final fun component4 ()Ldev/aster/vega/model/spec/DomainSpec;
+	public final fun component5 ()Z
+	public final fun component6 ()Ldev/aster/vega/model/spec/NumberValue;
+	public final fun component7 ()Ldev/aster/vega/model/spec/NumberValue;
+	public final fun component8 ()Ldev/aster/vega/model/spec/NumberValue;
+	public final fun component9 ()Ldev/aster/vega/model/spec/RangeSpec;
+	public final fun copy (Ljava/lang/String;Ldev/aster/vega/model/spec/ScaleType;Ldev/aster/vega/model/spec/DomainSpec;Ldev/aster/vega/model/spec/DomainSpec;ZLdev/aster/vega/model/spec/NumberValue;Ldev/aster/vega/model/spec/NumberValue;Ldev/aster/vega/model/spec/NumberValue;Ldev/aster/vega/model/spec/RangeSpec;ZLjava/lang/String;ZZZLjava/lang/Integer;Ljava/lang/String;Ljava/lang/Integer;Ljava/lang/Boolean;Ldev/aster/vega/model/spec/NumberValue;Ldev/aster/vega/model/spec/NumberValue;Ldev/aster/vega/model/spec/NumberValue;Ldev/aster/vega/model/spec/NumberValue;Ldev/aster/vega/model/spec/NumberValue;Ldev/aster/vega/model/spec/NumberValue;Ldev/aster/vega/model/spec/NumberValue;Ljava/lang/String;Ljava/lang/Double;Ldev/aster/vega/model/spec/BinsSpec;)Ldev/aster/vega/model/spec/ScaleSpec;
+	public static synthetic fun copy$default (Ldev/aster/vega/model/spec/ScaleSpec;Ljava/lang/String;Ldev/aster/vega/model/spec/ScaleType;Ldev/aster/vega/model/spec/DomainSpec;Ldev/aster/vega/model/spec/DomainSpec;ZLdev/aster/vega/model/spec/NumberValue;Ldev/aster/vega/model/spec/NumberValue;Ldev/aster/vega/model/spec/NumberValue;Ldev/aster/vega/model/spec/RangeSpec;ZLjava/lang/String;ZZZLjava/lang/Integer;Ljava/lang/String;Ljava/lang/Integer;Ljava/lang/Boolean;Ldev/aster/vega/model/spec/NumberValue;Ldev/aster/vega/model/spec/NumberValue;Ldev/aster/vega/model/spec/NumberValue;Ldev/aster/vega/model/spec/NumberValue;Ldev/aster/vega/model/spec/NumberValue;Ldev/aster/vega/model/spec/NumberValue;Ldev/aster/vega/model/spec/NumberValue;Ljava/lang/String;Ljava/lang/Double;Ldev/aster/vega/model/spec/BinsSpec;ILjava/lang/Object;)Ldev/aster/vega/model/spec/ScaleSpec;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getAlign ()Ldev/aster/vega/model/spec/NumberValue;
+	public final fun getBase ()Ldev/aster/vega/model/spec/NumberValue;
+	public final fun getBins ()Ldev/aster/vega/model/spec/BinsSpec;
+	public final fun getClamp ()Z
+	public final fun getConstant ()Ldev/aster/vega/model/spec/NumberValue;
+	public final fun getDomain ()Ldev/aster/vega/model/spec/DomainSpec;
+	public final fun getDomainImplicit ()Z
+	public final fun getDomainMax ()Ldev/aster/vega/model/spec/NumberValue;
+	public final fun getDomainMid ()Ldev/aster/vega/model/spec/NumberValue;
+	public final fun getDomainMin ()Ldev/aster/vega/model/spec/NumberValue;
+	public final fun getDomainRaw ()Ldev/aster/vega/model/spec/DomainSpec;
+	public final fun getExponent ()Ldev/aster/vega/model/spec/NumberValue;
+	public final fun getInterpolate ()Ljava/lang/String;
+	public final fun getInterpolateGamma ()Ljava/lang/Double;
+	public final fun getName ()Ljava/lang/String;
+	public final fun getNice ()Z
+	public final fun getNiceCount ()Ljava/lang/Integer;
+	public final fun getNiceInterval ()Ljava/lang/String;
+	public final fun getNiceStep ()Ljava/lang/Integer;
+	public final fun getPadding ()Ldev/aster/vega/model/spec/NumberValue;
+	public final fun getPaddingInner ()Ldev/aster/vega/model/spec/NumberValue;
+	public final fun getPaddingOuter ()Ldev/aster/vega/model/spec/NumberValue;
+	public final fun getRange ()Ldev/aster/vega/model/spec/RangeSpec;
+	public final fun getReverse ()Z
+	public final fun getReverseSignal ()Ljava/lang/String;
+	public final fun getRound ()Z
+	public final fun getType ()Ldev/aster/vega/model/spec/ScaleType;
+	public final fun getZero ()Ljava/lang/Boolean;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class dev/aster/vega/model/spec/ScaleType : java/lang/Enum {
+	public static final field BAND Ldev/aster/vega/model/spec/ScaleType;
+	public static final field BIN_ORDINAL Ldev/aster/vega/model/spec/ScaleType;
+	public static final field Companion Ldev/aster/vega/model/spec/ScaleType$Companion;
+	public static final field IDENTITY Ldev/aster/vega/model/spec/ScaleType;
+	public static final field LINEAR Ldev/aster/vega/model/spec/ScaleType;
+	public static final field LOG Ldev/aster/vega/model/spec/ScaleType;
+	public static final field ORDINAL Ldev/aster/vega/model/spec/ScaleType;
+	public static final field POINT Ldev/aster/vega/model/spec/ScaleType;
+	public static final field POW Ldev/aster/vega/model/spec/ScaleType;
+	public static final field QUANTILE Ldev/aster/vega/model/spec/ScaleType;
+	public static final field QUANTIZE Ldev/aster/vega/model/spec/ScaleType;
+	public static final field SEQUENTIAL Ldev/aster/vega/model/spec/ScaleType;
+	public static final field SQRT Ldev/aster/vega/model/spec/ScaleType;
+	public static final field SYMLOG Ldev/aster/vega/model/spec/ScaleType;
+	public static final field THRESHOLD Ldev/aster/vega/model/spec/ScaleType;
+	public static final field TIME Ldev/aster/vega/model/spec/ScaleType;
+	public static final field UTC Ldev/aster/vega/model/spec/ScaleType;
+	public static fun getEntries ()Lkotlin/enums/EnumEntries;
+	public final fun isContinuous ()Z
+	public final fun isDiscrete ()Z
+	public static fun valueOf (Ljava/lang/String;)Ldev/aster/vega/model/spec/ScaleType;
+	public static fun values ()[Ldev/aster/vega/model/spec/ScaleType;
+}
+
+public final class dev/aster/vega/model/spec/ScaleType$Companion {
+	public final fun fromName (Ljava/lang/String;)Ldev/aster/vega/model/spec/ScaleType;
+}
+
+public abstract interface class dev/aster/vega/model/spec/SchemeRef {
+}
+
+public final class dev/aster/vega/model/spec/SchemeRef$Colors : dev/aster/vega/model/spec/SchemeRef {
+	public fun <init> (Ljava/util/List;)V
+	public final fun component1 ()Ljava/util/List;
+	public final fun copy (Ljava/util/List;)Ldev/aster/vega/model/spec/SchemeRef$Colors;
+	public static synthetic fun copy$default (Ldev/aster/vega/model/spec/SchemeRef$Colors;Ljava/util/List;ILjava/lang/Object;)Ldev/aster/vega/model/spec/SchemeRef$Colors;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getValues ()Ljava/util/List;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class dev/aster/vega/model/spec/SchemeRef$Named : dev/aster/vega/model/spec/SchemeRef {
+	public fun <init> (Ljava/lang/String;)V
+	public final fun component1 ()Ljava/lang/String;
+	public final fun copy (Ljava/lang/String;)Ldev/aster/vega/model/spec/SchemeRef$Named;
+	public static synthetic fun copy$default (Ldev/aster/vega/model/spec/SchemeRef$Named;Ljava/lang/String;ILjava/lang/Object;)Ldev/aster/vega/model/spec/SchemeRef$Named;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getName ()Ljava/lang/String;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class dev/aster/vega/model/spec/SchemeRef$Signal : dev/aster/vega/model/spec/SchemeRef {
+	public fun <init> (Ljava/lang/String;)V
+	public final fun component1 ()Ljava/lang/String;
+	public final fun copy (Ljava/lang/String;)Ldev/aster/vega/model/spec/SchemeRef$Signal;
+	public static synthetic fun copy$default (Ldev/aster/vega/model/spec/SchemeRef$Signal;Ljava/lang/String;ILjava/lang/Object;)Ldev/aster/vega/model/spec/SchemeRef$Signal;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getExpression ()Ljava/lang/String;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public abstract interface class dev/aster/vega/model/spec/SignalBind {
+	public static final field Companion Ldev/aster/vega/model/spec/SignalBind$Companion;
+	public abstract fun getDebounceMillis ()Ljava/lang/Double;
+	public abstract fun getName ()Ljava/lang/String;
+}
+
+public final class dev/aster/vega/model/spec/SignalBind$Checkbox : dev/aster/vega/model/spec/SignalBind {
+	public fun <init> ()V
+	public fun <init> (Ljava/lang/String;Ljava/lang/Double;)V
+	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/Double;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()Ljava/lang/String;
+	public final fun component2 ()Ljava/lang/Double;
+	public final fun copy (Ljava/lang/String;Ljava/lang/Double;)Ldev/aster/vega/model/spec/SignalBind$Checkbox;
+	public static synthetic fun copy$default (Ldev/aster/vega/model/spec/SignalBind$Checkbox;Ljava/lang/String;Ljava/lang/Double;ILjava/lang/Object;)Ldev/aster/vega/model/spec/SignalBind$Checkbox;
+	public fun equals (Ljava/lang/Object;)Z
+	public fun getDebounceMillis ()Ljava/lang/Double;
+	public fun getName ()Ljava/lang/String;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class dev/aster/vega/model/spec/SignalBind$Choice : dev/aster/vega/model/spec/SignalBind {
+	public fun <init> (Ljava/util/List;Ljava/util/List;ZLjava/lang/String;Ljava/lang/Double;)V
+	public synthetic fun <init> (Ljava/util/List;Ljava/util/List;ZLjava/lang/String;Ljava/lang/Double;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()Ljava/util/List;
+	public final fun component2 ()Ljava/util/List;
+	public final fun component3 ()Z
+	public final fun component4 ()Ljava/lang/String;
+	public final fun component5 ()Ljava/lang/Double;
+	public final fun copy (Ljava/util/List;Ljava/util/List;ZLjava/lang/String;Ljava/lang/Double;)Ldev/aster/vega/model/spec/SignalBind$Choice;
+	public static synthetic fun copy$default (Ldev/aster/vega/model/spec/SignalBind$Choice;Ljava/util/List;Ljava/util/List;ZLjava/lang/String;Ljava/lang/Double;ILjava/lang/Object;)Ldev/aster/vega/model/spec/SignalBind$Choice;
+	public fun equals (Ljava/lang/Object;)Z
+	public fun getDebounceMillis ()Ljava/lang/Double;
+	public final fun getLabels ()Ljava/util/List;
+	public fun getName ()Ljava/lang/String;
+	public final fun getOptions ()Ljava/util/List;
+	public final fun getRadio ()Z
+	public fun hashCode ()I
+	public final fun labelAt (I)Ljava/lang/String;
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class dev/aster/vega/model/spec/SignalBind$Companion {
+	public final fun valueText (Ldev/aster/vega/model/VegaValue;)Ljava/lang/String;
+}
+
+public final class dev/aster/vega/model/spec/SignalBind$Field : dev/aster/vega/model/spec/SignalBind {
+	public fun <init> (Ljava/lang/String;Ljava/util/Map;Ljava/lang/String;Ljava/lang/Double;)V
+	public synthetic fun <init> (Ljava/lang/String;Ljava/util/Map;Ljava/lang/String;Ljava/lang/Double;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun attributeText (Ljava/lang/String;)Ljava/lang/String;
+	public final fun component1 ()Ljava/lang/String;
+	public final fun component2 ()Ljava/util/Map;
+	public final fun component3 ()Ljava/lang/String;
+	public final fun component4 ()Ljava/lang/Double;
+	public final fun copy (Ljava/lang/String;Ljava/util/Map;Ljava/lang/String;Ljava/lang/Double;)Ldev/aster/vega/model/spec/SignalBind$Field;
+	public static synthetic fun copy$default (Ldev/aster/vega/model/spec/SignalBind$Field;Ljava/lang/String;Ljava/util/Map;Ljava/lang/String;Ljava/lang/Double;ILjava/lang/Object;)Ldev/aster/vega/model/spec/SignalBind$Field;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getAttributes ()Ljava/util/Map;
+	public fun getDebounceMillis ()Ljava/lang/Double;
+	public final fun getInput ()Ljava/lang/String;
+	public fun getName ()Ljava/lang/String;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class dev/aster/vega/model/spec/SignalBind$Range : dev/aster/vega/model/spec/SignalBind {
+	public fun <init> ()V
+	public fun <init> (Ljava/lang/Double;Ljava/lang/Double;Ljava/lang/Double;Ljava/lang/String;Ljava/lang/Double;)V
+	public synthetic fun <init> (Ljava/lang/Double;Ljava/lang/Double;Ljava/lang/Double;Ljava/lang/String;Ljava/lang/Double;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()Ljava/lang/Double;
+	public final fun component2 ()Ljava/lang/Double;
+	public final fun component3 ()Ljava/lang/Double;
+	public final fun component4 ()Ljava/lang/String;
+	public final fun component5 ()Ljava/lang/Double;
+	public final fun copy (Ljava/lang/Double;Ljava/lang/Double;Ljava/lang/Double;Ljava/lang/String;Ljava/lang/Double;)Ldev/aster/vega/model/spec/SignalBind$Range;
+	public static synthetic fun copy$default (Ldev/aster/vega/model/spec/SignalBind$Range;Ljava/lang/Double;Ljava/lang/Double;Ljava/lang/Double;Ljava/lang/String;Ljava/lang/Double;ILjava/lang/Object;)Ldev/aster/vega/model/spec/SignalBind$Range;
+	public fun equals (Ljava/lang/Object;)Z
+	public fun getDebounceMillis ()Ljava/lang/Double;
+	public final fun getMax ()Ljava/lang/Double;
+	public final fun getMin ()Ljava/lang/Double;
+	public fun getName ()Ljava/lang/String;
+	public final fun getStep ()Ljava/lang/Double;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class dev/aster/vega/model/spec/SignalHandler {
+	public fun <init> ()V
+	public fun <init> (Ljava/util/List;Ljava/util/List;Ljava/util/List;Ldev/aster/vega/model/spec/SignalUpdate;Ldev/aster/vega/model/VegaValue;Z)V
+	public synthetic fun <init> (Ljava/util/List;Ljava/util/List;Ljava/util/List;Ldev/aster/vega/model/spec/SignalUpdate;Ldev/aster/vega/model/VegaValue;ZILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()Ljava/util/List;
+	public final fun component2 ()Ljava/util/List;
+	public final fun component3 ()Ljava/util/List;
+	public final fun component4 ()Ldev/aster/vega/model/spec/SignalUpdate;
+	public final fun component5 ()Ldev/aster/vega/model/VegaValue;
+	public final fun component6 ()Z
+	public final fun copy (Ljava/util/List;Ljava/util/List;Ljava/util/List;Ldev/aster/vega/model/spec/SignalUpdate;Ldev/aster/vega/model/VegaValue;Z)Ldev/aster/vega/model/spec/SignalHandler;
+	public static synthetic fun copy$default (Ldev/aster/vega/model/spec/SignalHandler;Ljava/util/List;Ljava/util/List;Ljava/util/List;Ldev/aster/vega/model/spec/SignalUpdate;Ldev/aster/vega/model/VegaValue;ZILjava/lang/Object;)Ldev/aster/vega/model/spec/SignalHandler;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getEncode ()Ldev/aster/vega/model/VegaValue;
+	public final fun getForce ()Z
+	public final fun getScaleSources ()Ljava/util/List;
+	public final fun getSignalSources ()Ljava/util/List;
+	public final fun getStreams ()Ljava/util/List;
+	public final fun getUpdate ()Ldev/aster/vega/model/spec/SignalUpdate;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class dev/aster/vega/model/spec/SignalSpec {
+	public fun <init> (Ljava/lang/String;Ldev/aster/vega/model/VegaValue;Ljava/lang/String;Ljava/lang/String;Ljava/util/List;Ldev/aster/vega/model/spec/SignalBind;)V
+	public synthetic fun <init> (Ljava/lang/String;Ldev/aster/vega/model/VegaValue;Ljava/lang/String;Ljava/lang/String;Ljava/util/List;Ldev/aster/vega/model/spec/SignalBind;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()Ljava/lang/String;
+	public final fun component2 ()Ldev/aster/vega/model/VegaValue;
+	public final fun component3 ()Ljava/lang/String;
+	public final fun component4 ()Ljava/lang/String;
+	public final fun component5 ()Ljava/util/List;
+	public final fun component6 ()Ldev/aster/vega/model/spec/SignalBind;
+	public final fun copy (Ljava/lang/String;Ldev/aster/vega/model/VegaValue;Ljava/lang/String;Ljava/lang/String;Ljava/util/List;Ldev/aster/vega/model/spec/SignalBind;)Ldev/aster/vega/model/spec/SignalSpec;
+	public static synthetic fun copy$default (Ldev/aster/vega/model/spec/SignalSpec;Ljava/lang/String;Ldev/aster/vega/model/VegaValue;Ljava/lang/String;Ljava/lang/String;Ljava/util/List;Ldev/aster/vega/model/spec/SignalBind;ILjava/lang/Object;)Ldev/aster/vega/model/spec/SignalSpec;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getBind ()Ldev/aster/vega/model/spec/SignalBind;
+	public final fun getExpression ()Ljava/lang/String;
+	public final fun getInit ()Ljava/lang/String;
+	public final fun getName ()Ljava/lang/String;
+	public final fun getOn ()Ljava/util/List;
+	public final fun getUpdate ()Ljava/lang/String;
+	public final fun getValue ()Ldev/aster/vega/model/VegaValue;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public abstract interface class dev/aster/vega/model/spec/SignalUpdate {
+}
+
+public final class dev/aster/vega/model/spec/SignalUpdate$Constant : dev/aster/vega/model/spec/SignalUpdate {
+	public fun <init> (Ldev/aster/vega/model/VegaValue;)V
+	public final fun component1 ()Ldev/aster/vega/model/VegaValue;
+	public final fun copy (Ldev/aster/vega/model/VegaValue;)Ldev/aster/vega/model/spec/SignalUpdate$Constant;
+	public static synthetic fun copy$default (Ldev/aster/vega/model/spec/SignalUpdate$Constant;Ldev/aster/vega/model/VegaValue;ILjava/lang/Object;)Ldev/aster/vega/model/spec/SignalUpdate$Constant;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getValue ()Ldev/aster/vega/model/VegaValue;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class dev/aster/vega/model/spec/SignalUpdate$Expression : dev/aster/vega/model/spec/SignalUpdate {
+	public fun <init> (Ljava/lang/String;)V
+	public final fun component1 ()Ljava/lang/String;
+	public final fun copy (Ljava/lang/String;)Ldev/aster/vega/model/spec/SignalUpdate$Expression;
+	public static synthetic fun copy$default (Ldev/aster/vega/model/spec/SignalUpdate$Expression;Ljava/lang/String;ILjava/lang/Object;)Ldev/aster/vega/model/spec/SignalUpdate$Expression;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getExpr ()Ljava/lang/String;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class dev/aster/vega/model/spec/SignalUpdate$Reference : dev/aster/vega/model/spec/SignalUpdate {
+	public fun <init> (Ljava/lang/String;)V
+	public final fun component1 ()Ljava/lang/String;
+	public final fun copy (Ljava/lang/String;)Ldev/aster/vega/model/spec/SignalUpdate$Reference;
+	public static synthetic fun copy$default (Ldev/aster/vega/model/spec/SignalUpdate$Reference;Ljava/lang/String;ILjava/lang/Object;)Ldev/aster/vega/model/spec/SignalUpdate$Reference;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getName ()Ljava/lang/String;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class dev/aster/vega/model/spec/SpecParser {
+	public fun <init> ()V
+	public final fun parse (Ldev/aster/vega/model/VegaValue;)Ldev/aster/vega/model/spec/ParsedSpec;
+	public final fun parseJson (Ljava/lang/String;)Ldev/aster/vega/model/spec/ParsedSpec;
+}
+
+public final class dev/aster/vega/model/spec/TitleSpec {
+	public fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ldev/aster/vega/model/spec/Orient;Ldev/aster/vega/model/spec/Anchor;Ljava/lang/String;Ldev/aster/vega/model/spec/NumberValue;Ldev/aster/vega/model/spec/NumberValue;Ldev/aster/vega/model/spec/NumberValue;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ldev/aster/vega/model/spec/NumberValue;Ldev/aster/vega/model/spec/NumberValue;Ljava/lang/String;Ldev/aster/vega/model/spec/NumberValue;Ljava/lang/String;Ldev/aster/vega/model/spec/NumberValue;ZLjava/lang/String;ZLdev/aster/vega/model/spec/NumberValue;Ldev/aster/vega/model/spec/NumberValue;Ldev/aster/vega/model/spec/NumberValue;ILjava/util/Map;)V
+	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ldev/aster/vega/model/spec/Orient;Ldev/aster/vega/model/spec/Anchor;Ljava/lang/String;Ldev/aster/vega/model/spec/NumberValue;Ldev/aster/vega/model/spec/NumberValue;Ldev/aster/vega/model/spec/NumberValue;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ldev/aster/vega/model/spec/NumberValue;Ldev/aster/vega/model/spec/NumberValue;Ljava/lang/String;Ldev/aster/vega/model/spec/NumberValue;Ljava/lang/String;Ldev/aster/vega/model/spec/NumberValue;ZLjava/lang/String;ZLdev/aster/vega/model/spec/NumberValue;Ldev/aster/vega/model/spec/NumberValue;Ldev/aster/vega/model/spec/NumberValue;ILjava/util/Map;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()Ljava/lang/String;
+	public final fun component10 ()Ljava/lang/String;
+	public final fun component11 ()Ljava/lang/String;
+	public final fun component12 ()Ljava/lang/String;
+	public final fun component13 ()Ljava/lang/String;
+	public final fun component14 ()Ljava/lang/String;
+	public final fun component15 ()Ljava/lang/String;
+	public final fun component16 ()Ljava/lang/String;
+	public final fun component17 ()Ljava/lang/String;
+	public final fun component18 ()Ldev/aster/vega/model/spec/NumberValue;
+	public final fun component19 ()Ldev/aster/vega/model/spec/NumberValue;
+	public final fun component2 ()Ljava/lang/String;
+	public final fun component20 ()Ljava/lang/String;
+	public final fun component21 ()Ldev/aster/vega/model/spec/NumberValue;
+	public final fun component22 ()Ljava/lang/String;
+	public final fun component23 ()Ldev/aster/vega/model/spec/NumberValue;
+	public final fun component24 ()Z
+	public final fun component25 ()Ljava/lang/String;
+	public final fun component26 ()Z
+	public final fun component27 ()Ldev/aster/vega/model/spec/NumberValue;
+	public final fun component28 ()Ldev/aster/vega/model/spec/NumberValue;
+	public final fun component29 ()Ldev/aster/vega/model/spec/NumberValue;
+	public final fun component3 ()Ljava/lang/String;
+	public final fun component30 ()I
+	public final fun component31 ()Ljava/util/Map;
+	public final fun component4 ()Ldev/aster/vega/model/spec/Orient;
+	public final fun component5 ()Ldev/aster/vega/model/spec/Anchor;
+	public final fun component6 ()Ljava/lang/String;
+	public final fun component7 ()Ldev/aster/vega/model/spec/NumberValue;
+	public final fun component8 ()Ldev/aster/vega/model/spec/NumberValue;
+	public final fun component9 ()Ldev/aster/vega/model/spec/NumberValue;
+	public final fun copy (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ldev/aster/vega/model/spec/Orient;Ldev/aster/vega/model/spec/Anchor;Ljava/lang/String;Ldev/aster/vega/model/spec/NumberValue;Ldev/aster/vega/model/spec/NumberValue;Ldev/aster/vega/model/spec/NumberValue;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ldev/aster/vega/model/spec/NumberValue;Ldev/aster/vega/model/spec/NumberValue;Ljava/lang/String;Ldev/aster/vega/model/spec/NumberValue;Ljava/lang/String;Ldev/aster/vega/model/spec/NumberValue;ZLjava/lang/String;ZLdev/aster/vega/model/spec/NumberValue;Ldev/aster/vega/model/spec/NumberValue;Ldev/aster/vega/model/spec/NumberValue;ILjava/util/Map;)Ldev/aster/vega/model/spec/TitleSpec;
+	public static synthetic fun copy$default (Ldev/aster/vega/model/spec/TitleSpec;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ldev/aster/vega/model/spec/Orient;Ldev/aster/vega/model/spec/Anchor;Ljava/lang/String;Ldev/aster/vega/model/spec/NumberValue;Ldev/aster/vega/model/spec/NumberValue;Ldev/aster/vega/model/spec/NumberValue;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ldev/aster/vega/model/spec/NumberValue;Ldev/aster/vega/model/spec/NumberValue;Ljava/lang/String;Ldev/aster/vega/model/spec/NumberValue;Ljava/lang/String;Ldev/aster/vega/model/spec/NumberValue;ZLjava/lang/String;ZLdev/aster/vega/model/spec/NumberValue;Ldev/aster/vega/model/spec/NumberValue;Ldev/aster/vega/model/spec/NumberValue;ILjava/util/Map;ILjava/lang/Object;)Ldev/aster/vega/model/spec/TitleSpec;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getAlign ()Ljava/lang/String;
+	public final fun getAnchor ()Ldev/aster/vega/model/spec/Anchor;
+	public final fun getAngle ()Ldev/aster/vega/model/spec/NumberValue;
+	public final fun getAria ()Z
+	public final fun getBaseline ()Ljava/lang/String;
+	public final fun getColor ()Ljava/lang/String;
+	public final fun getDx ()Ldev/aster/vega/model/spec/NumberValue;
+	public final fun getDy ()Ldev/aster/vega/model/spec/NumberValue;
+	public final fun getEncode ()Ljava/util/Map;
+	public final fun getFont ()Ljava/lang/String;
+	public final fun getFontSize ()Ldev/aster/vega/model/spec/NumberValue;
+	public final fun getFontStyle ()Ljava/lang/String;
+	public final fun getFontWeight ()Ljava/lang/String;
+	public final fun getFrame ()Ljava/lang/String;
+	public final fun getInteractive ()Z
+	public final fun getLimit ()Ldev/aster/vega/model/spec/NumberValue;
+	public final fun getLineHeight ()Ldev/aster/vega/model/spec/NumberValue;
+	public final fun getName ()Ljava/lang/String;
+	public final fun getOffset ()Ldev/aster/vega/model/spec/NumberValue;
+	public final fun getOrient ()Ldev/aster/vega/model/spec/Orient;
+	public final fun getSubtitle ()Ljava/lang/String;
+	public final fun getSubtitleColor ()Ljava/lang/String;
+	public final fun getSubtitleFont ()Ljava/lang/String;
+	public final fun getSubtitleFontSize ()Ldev/aster/vega/model/spec/NumberValue;
+	public final fun getSubtitleFontStyle ()Ljava/lang/String;
+	public final fun getSubtitleFontWeight ()Ljava/lang/String;
+	public final fun getSubtitleLineHeight ()Ldev/aster/vega/model/spec/NumberValue;
+	public final fun getSubtitlePadding ()Ldev/aster/vega/model/spec/NumberValue;
+	public final fun getText ()Ljava/lang/String;
+	public final fun getTextExpression ()Ljava/lang/String;
+	public final fun getZindex ()I
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class dev/aster/vega/model/spec/VegaSpec {
+	public fun <init> (Ljava/lang/Double;Ljava/lang/Double;Ldev/aster/vega/model/spec/Padding;Ldev/aster/vega/model/spec/Autosize;Ljava/lang/String;Ljava/util/Map;Ldev/aster/vega/model/spec/EventConfig;Ljava/util/List;Ljava/util/List;Ljava/util/List;Ljava/util/List;Ljava/util/List;Ldev/aster/vega/model/spec/TitleSpec;Ldev/aster/vega/model/spec/LayoutSpec;Ljava/util/List;Ljava/util/List;Ldev/aster/vega/model/spec/EncodeSpec;Ljava/lang/String;Ljava/util/Map;)V
+	public synthetic fun <init> (Ljava/lang/Double;Ljava/lang/Double;Ldev/aster/vega/model/spec/Padding;Ldev/aster/vega/model/spec/Autosize;Ljava/lang/String;Ljava/util/Map;Ldev/aster/vega/model/spec/EventConfig;Ljava/util/List;Ljava/util/List;Ljava/util/List;Ljava/util/List;Ljava/util/List;Ldev/aster/vega/model/spec/TitleSpec;Ldev/aster/vega/model/spec/LayoutSpec;Ljava/util/List;Ljava/util/List;Ldev/aster/vega/model/spec/EncodeSpec;Ljava/lang/String;Ljava/util/Map;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()Ljava/lang/Double;
+	public final fun component10 ()Ljava/util/List;
+	public final fun component11 ()Ljava/util/List;
+	public final fun component12 ()Ljava/util/List;
+	public final fun component13 ()Ldev/aster/vega/model/spec/TitleSpec;
+	public final fun component14 ()Ldev/aster/vega/model/spec/LayoutSpec;
+	public final fun component15 ()Ljava/util/List;
+	public final fun component16 ()Ljava/util/List;
+	public final fun component17 ()Ldev/aster/vega/model/spec/EncodeSpec;
+	public final fun component18 ()Ljava/lang/String;
+	public final fun component19 ()Ljava/util/Map;
+	public final fun component2 ()Ljava/lang/Double;
+	public final fun component3 ()Ldev/aster/vega/model/spec/Padding;
+	public final fun component4 ()Ldev/aster/vega/model/spec/Autosize;
+	public final fun component5 ()Ljava/lang/String;
+	public final fun component6 ()Ljava/util/Map;
+	public final fun component7 ()Ldev/aster/vega/model/spec/EventConfig;
+	public final fun component8 ()Ljava/util/List;
+	public final fun component9 ()Ljava/util/List;
+	public final fun copy (Ljava/lang/Double;Ljava/lang/Double;Ldev/aster/vega/model/spec/Padding;Ldev/aster/vega/model/spec/Autosize;Ljava/lang/String;Ljava/util/Map;Ldev/aster/vega/model/spec/EventConfig;Ljava/util/List;Ljava/util/List;Ljava/util/List;Ljava/util/List;Ljava/util/List;Ldev/aster/vega/model/spec/TitleSpec;Ldev/aster/vega/model/spec/LayoutSpec;Ljava/util/List;Ljava/util/List;Ldev/aster/vega/model/spec/EncodeSpec;Ljava/lang/String;Ljava/util/Map;)Ldev/aster/vega/model/spec/VegaSpec;
+	public static synthetic fun copy$default (Ldev/aster/vega/model/spec/VegaSpec;Ljava/lang/Double;Ljava/lang/Double;Ldev/aster/vega/model/spec/Padding;Ldev/aster/vega/model/spec/Autosize;Ljava/lang/String;Ljava/util/Map;Ldev/aster/vega/model/spec/EventConfig;Ljava/util/List;Ljava/util/List;Ljava/util/List;Ljava/util/List;Ljava/util/List;Ldev/aster/vega/model/spec/TitleSpec;Ldev/aster/vega/model/spec/LayoutSpec;Ljava/util/List;Ljava/util/List;Ldev/aster/vega/model/spec/EncodeSpec;Ljava/lang/String;Ljava/util/Map;ILjava/lang/Object;)Ldev/aster/vega/model/spec/VegaSpec;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getAutosize ()Ldev/aster/vega/model/spec/Autosize;
+	public final fun getAxes ()Ljava/util/List;
+	public final fun getBackground ()Ljava/lang/String;
+	public final fun getData ()Ljava/util/List;
+	public final fun getDescription ()Ljava/lang/String;
+	public final fun getEncode ()Ldev/aster/vega/model/spec/EncodeSpec;
+	public final fun getEvents ()Ldev/aster/vega/model/spec/EventConfig;
+	public final fun getFrameConfig ()Ljava/util/Map;
+	public final fun getHeight ()Ljava/lang/Double;
+	public final fun getLayout ()Ldev/aster/vega/model/spec/LayoutSpec;
+	public final fun getLegends ()Ljava/util/List;
+	public final fun getMarks ()Ljava/util/List;
+	public final fun getPadding ()Ldev/aster/vega/model/spec/Padding;
+	public final fun getProjections ()Ljava/util/List;
+	public final fun getScales ()Ljava/util/List;
+	public final fun getSignals ()Ljava/util/List;
+	public final fun getStyleAboveDefaults ()Ljava/util/Map;
+	public final fun getTitle ()Ldev/aster/vega/model/spec/TitleSpec;
+	public final fun getWidth ()Ljava/lang/Double;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class dev/aster/vega/model/time/DateValues {
+	public static final field INSTANCE Ldev/aster/vega/model/time/DateValues;
+	public final fun parse (Ldev/aster/vega/model/VegaValue;Lkotlinx/datetime/TimeZone;)Ldev/aster/vega/model/VegaValue;
+	public static synthetic fun parse$default (Ldev/aster/vega/model/time/DateValues;Ldev/aster/vega/model/VegaValue;Lkotlinx/datetime/TimeZone;ILjava/lang/Object;)Ldev/aster/vega/model/VegaValue;
+	public final fun parseIso (Ljava/lang/String;Lkotlinx/datetime/TimeZone;)Ljava/lang/Double;
+	public static synthetic fun parseIso$default (Ldev/aster/vega/model/time/DateValues;Ljava/lang/String;Lkotlinx/datetime/TimeZone;ILjava/lang/Object;)Ljava/lang/Double;
+	public final fun parseSlashes (Ljava/lang/String;Lkotlinx/datetime/TimeZone;)Ljava/lang/Double;
+	public static synthetic fun parseSlashes$default (Ldev/aster/vega/model/time/DateValues;Ljava/lang/String;Lkotlinx/datetime/TimeZone;ILjava/lang/Object;)Ljava/lang/Double;
+	public final fun parseTextual (Ljava/lang/String;Lkotlinx/datetime/TimeZone;)Ljava/lang/Double;
+	public static synthetic fun parseTextual$default (Ldev/aster/vega/model/time/DateValues;Ljava/lang/String;Lkotlinx/datetime/TimeZone;ILjava/lang/Object;)Ljava/lang/Double;
+}
+
+public final class dev/aster/vega/model/time/TimeFormat {
+	public static final field INSTANCE Ldev/aster/vega/model/time/TimeFormat;
+	public final fun at (DLkotlinx/datetime/TimeZone;)Lkotlinx/datetime/LocalDateTime;
+	public final fun format (DLjava/lang/String;Lkotlinx/datetime/TimeZone;)Ljava/lang/String;
+	public final fun format (Lkotlinx/datetime/LocalDateTime;Ljava/lang/String;)Ljava/lang/String;
+	public final fun getMONTHS ()Ljava/util/List;
+	public final fun getWEEKDAYS ()Ljava/util/List;
+}
+
+public final class dev/aster/vega/model/time/TimeInterval : java/lang/Enum {
+	public static final field Companion Ldev/aster/vega/model/time/TimeInterval$Companion;
+	public static final field DAY Ldev/aster/vega/model/time/TimeInterval;
+	public static final field HOUR Ldev/aster/vega/model/time/TimeInterval;
+	public static final field MILLISECOND Ldev/aster/vega/model/time/TimeInterval;
+	public static final field MINUTE Ldev/aster/vega/model/time/TimeInterval;
+	public static final field MONTH Ldev/aster/vega/model/time/TimeInterval;
+	public static final field SECOND Ldev/aster/vega/model/time/TimeInterval;
+	public static final field WEEK Ldev/aster/vega/model/time/TimeInterval;
+	public static final field YEAR Ldev/aster/vega/model/time/TimeInterval;
+	public final fun getApproximateMillis ()D
+	public static fun getEntries ()Lkotlin/enums/EnumEntries;
+	public static fun valueOf (Ljava/lang/String;)Ldev/aster/vega/model/time/TimeInterval;
+	public static fun values ()[Ldev/aster/vega/model/time/TimeInterval;
+}
+
+public final class dev/aster/vega/model/time/TimeInterval$Companion {
+	public final fun forUnit (Ljava/lang/String;)Lkotlin/Pair;
+}
+
+public final class dev/aster/vega/model/time/TimeParse {
+	public static final field INSTANCE Ldev/aster/vega/model/time/TimeParse;
+	public final fun parse (Ljava/lang/String;Ljava/lang/String;Lkotlinx/datetime/TimeZone;Z)Ljava/lang/Double;
+}
+
+public final class dev/aster/vega/model/time/TimeStepper {
+	public fun <init> (Ldev/aster/vega/model/time/TimeInterval;ILkotlinx/datetime/TimeZone;Z)V
+	public synthetic fun <init> (Ldev/aster/vega/model/time/TimeInterval;ILkotlinx/datetime/TimeZone;ZILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun ceil (D)D
+	public final fun count (DD)D
+	public final fun floor (D)D
+	public final fun getInterval ()Ldev/aster/vega/model/time/TimeInterval;
+	public final fun getStep ()I
+	public final fun getZone ()Lkotlinx/datetime/TimeZone;
+	public final fun offset (DI)D
+	public final fun range (DD)Ljava/util/List;
+	public final fun round (D)D
+}
+
+public final class dev/aster/vega/model/time/TimeUnits {
+	public static final field INSTANCE Ldev/aster/vega/model/time/TimeUnits;
+	public final fun detect (Ljava/util/List;Lkotlinx/datetime/TimeZone;)Lkotlin/Pair;
+	public final fun getALL ()Ljava/util/List;
+	public final fun specifier (Ljava/util/List;Ljava/util/Map;)Ljava/lang/String;
+	public static synthetic fun specifier$default (Ldev/aster/vega/model/time/TimeUnits;Ljava/util/List;Ljava/util/Map;ILjava/lang/Object;)Ljava/lang/String;
+}
+

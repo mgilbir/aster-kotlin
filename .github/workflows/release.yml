@@ -1,7 +1,17 @@
 name: Release
 
-# Publishes the artifacts for a version tag. The tag is the trigger, so the released bits are always
-# exactly what was tagged.
+# Publishes the version in `build.gradle.kts`, and **creates the tag itself** at the end.
+#
+# The tag used to be the trigger, and that ordering could not work for Swift. A `binaryTarget` needs
+# the artefact's SHA256 in `Package.swift`, a checksum cannot be known until the artefact exists, and
+# the artefact is built from the tag — so the manifest inside a tag named the *previous* release's
+# binary, and a consumer pinning one tag for Gradle and the same tag for Swift got a Swift package
+# pointing at the wrong version or, for the first release, at nothing at all. An external adopter's
+# acceptance criterion was one tag for both platforms, and they were right that it should be.
+#
+# So the order is inverted: this workflow builds, publishes, writes the checksum into `Package.swift`,
+# commits that, and only then tags the commit it wrote. One tag, correct for both ecosystems, and the
+# release page hangs off it.
 #
 # Three jobs, because the work has three homes:
 #
@@ -10,10 +20,8 @@ name: Release
 #   publish  macOS. The only host that can compile every target: Apple targets need Xcode, and
 #            Kotlin/Native cross-compiles the Linux target from macOS, so one host produces the
 #            complete set. `ktecma262` 0.1.2 was built on Linux and shipped with no native variants.
-#   release  Linux. Makes the release page from the changelog and attaches the XCFramework.
+#   release  Linux. Writes the manifest, tags it, and makes the release page from the changelog.
 on:
-  push:
-    tags: ["v*"]
   workflow_dispatch:
 
 permissions:
@@ -41,22 +49,23 @@ jobs:
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v5
 
-      - name: Check the tag matches the project version
-        # Guards against tagging v0.2.0 while the build still says 0.1.0, which would publish
-        # artifacts that disagree with their own tag.
+      - name: Check this version has not been released
+        # The version in the build file is the one thing that names a release, so the guard is that
+        # its tag does not exist yet. Re-running for a version already tagged would publish nothing
+        # to Central — a version there is immutable — and would leave a second tag pointing at a
+        # different commit, which is worse than a failed build.
         run: |
           set -euo pipefail
-          if [ "$GITHUB_EVENT_NAME" != "push" ]; then
-            echo "Manual run; skipping tag/version comparison."
-            exit 0
-          fi
-          tag="${GITHUB_REF_NAME#v}"
           version=$(sed -n 's/^version = "\(.*\)"$/\1/p' build.gradle.kts)
-          if [ "$tag" != "$version" ]; then
-            echo "::error::Tag ${GITHUB_REF_NAME} does not match project version ${version}."
+          if [ -z "$version" ]; then
+            echo '::error::No version = "x.y.z" line in build.gradle.kts.'
             exit 1
           fi
-          echo "Tag ${GITHUB_REF_NAME} matches project version ${version}."
+          if git ls-remote --exit-code --tags origin "refs/tags/v$version" >/dev/null 2>&1; then
+            echo "::error::v$version is already tagged. Bump the version in build.gradle.kts."
+            exit 1
+          fi
+          echo "Releasing $version; v$version does not exist yet."
 
       - name: Check the changelog has a section for this version
         # Fails here rather than after publishing, when the release notes are the only thing left and
@@ -208,20 +217,19 @@ jobs:
           retention-days: 90
 
   release:
-    name: GitHub release
+    name: Tag and release (Linux)
     needs: publish
-    # Only a tag names a version to release. A manual run publishes to Central but has no tag to hang
-    # a release page on.
-    if: startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-latest
     permissions:
-      # The only job that writes to the repository: the release page, and the Package.swift commit.
+      # The only job that writes to the repository: the manifest commit, the tag, and the release page.
       contents: write
 
     steps:
+      # The **dispatched commit**, not whatever `main` points at by now. The artefacts were built from
+      # this tree, so this is the tree the tag has to name.
       - uses: actions/checkout@v7
         with:
-          ref: main
+          ref: ${{ github.sha }}
 
       - name: Download artifacts
         uses: actions/download-artifact@v8
@@ -229,12 +237,63 @@ jobs:
           name: aster-kotlin-artifacts
           path: artifacts
 
+      - name: Point Package.swift at the XCFramework that was just built
+        # First, not last. The checksum can only be known now that the artefact exists, and the tag has
+        # to be able to name a commit whose manifest is already correct — that is the whole reason this
+        # workflow tags rather than being triggered by a tag.
+        run: |
+          set -euo pipefail
+          version=$(sed -n 's/^version = "\(.*\)"$/\1/p' build.gradle.kts)
+          checksum=$(cat "artifacts/AsterVega-$version.xcframework.zip.sha256")
+          test -n "$checksum"
+          python3 - "$version" "$checksum" <<'PY'
+          import re, sys
+          version, checksum = sys.argv[1], sys.argv[2]
+          text = open("Package.swift", encoding="utf-8").read()
+          text = re.sub(r'let version = "[^"]*"', f'let version = "{version}"', text)
+          text = re.sub(r'let checksum = "[^"]*"', f'let checksum = "{checksum}"', text)
+          open("Package.swift", "w", encoding="utf-8").write(text)
+          PY
+          grep -q "$checksum" Package.swift
+          grep -q "let version = \"$version\"" Package.swift
+
+          if ! git diff --quiet Package.swift; then
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add Package.swift
+            git commit -m "Point Package.swift at the $version XCFramework
+
+          Written by the release workflow once the asset exists, a checksum not being
+          knowable before then. The tag for $version is this commit, so a Swift
+          consumer and a Gradle consumer pin the same one."
+          fi
+
+          # Nothing but the manifest may differ from what was built, or the tag would name a tree the
+          # artefacts did not come from.
+          changed=$(git diff --name-only "${{ github.sha }}" HEAD)
+          if [ -n "$changed" ] && [ "$changed" != "Package.swift" ]; then
+            echo "::error::the release commit changes more than Package.swift: $changed"
+            exit 1
+          fi
+          echo "version=$version" >> "$GITHUB_ENV"
+
+      - name: Push the manifest and tag it
+        # The push to `main` is a **fast-forward or nothing**: if someone landed a commit while the
+        # release was building, the artefacts on the runner are no longer what `main` says, and the
+        # honest outcome is a failed release rather than a tag that is a lie. Nothing has been made
+        # public at this point — the Central deployment is still USER_MANAGED and unreleased.
+        run: |
+          set -euo pipefail
+          git push origin "HEAD:main"
+          git tag -a "v$version" -m "Aster Vega $version"
+          git push origin "refs/tags/v$version"
+          echo "Tagged v$version at $(git rev-parse HEAD)."
+
       - name: Create the release
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          version="${GITHUB_REF_NAME#v}"
 
           # Notes come from the changelog, so the release page and the file in the repository cannot
           # drift apart.
@@ -250,49 +309,17 @@ jobs:
             echo "implementation(\"io.github.mgilbir.astervega:vega-lite:$version\")"
             echo '```'
             echo ""
-            echo "Swift Package Manager — the XCFramework is attached below."
-            echo "\`Package.swift\` on \`main\` points at it; see the note there about why a tag's"
-            echo "manifest names the previous release's binary."
+            echo "Swift Package Manager — the XCFramework is attached below, and \`Package.swift\` at"
+            echo "tag \`v$version\` names it with its checksum:"
+            echo ""
+            echo '```swift'
+            echo ".package(url: \"https://github.com/${GITHUB_REPOSITORY}\", from: \"$version\")"
+            echo '```'
           } >> notes.md
 
-          if gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1; then
-            gh release edit "$GITHUB_REF_NAME" --notes-file notes.md --latest
-            gh release upload "$GITHUB_REF_NAME" artifacts/* --clobber
-          else
-            gh release create "$GITHUB_REF_NAME" \
-              --title "Aster Vega $version" \
-              --notes-file notes.md \
-              --latest \
-              artifacts/*
-          fi
-          echo "https://github.com/${GITHUB_REPOSITORY}/releases/tag/${GITHUB_REF_NAME}"
-
-      - name: Point Package.swift at the published XCFramework
-        # After the asset exists, because a checksum cannot be computed before it does. This is why a
-        # tag's own manifest names the previous release's binary, and why Swift consumers track `main`.
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          set -euo pipefail
-          version="${GITHUB_REF_NAME#v}"
-          checksum=$(cat "artifacts/AsterVega-$version.xcframework.zip.sha256")
-          python3 - "$version" "$checksum" <<'PY'
-          import re, sys
-          version, checksum = sys.argv[1], sys.argv[2]
-          text = open("Package.swift", encoding="utf-8").read()
-          text = re.sub(r'let version = "[^"]*"', f'let version = "{version}"', text)
-          text = re.sub(r'let checksum = "[^"]*"', f'let checksum = "{checksum}"', text)
-          open("Package.swift", "w", encoding="utf-8").write(text)
-          PY
-          if git diff --quiet Package.swift; then
-            echo "Package.swift already points at $version."
-            exit 0
-          fi
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add Package.swift
-          git commit -m "Point Package.swift at the $version XCFramework
-
-          Written by the release workflow once the asset exists, a checksum not being
-          knowable before then."
-          git push origin HEAD:main
+          gh release create "v$version" \
+            --title "Aster Vega $version" \
+            --notes-file notes.md \
+            --latest \
+            artifacts/*
+          echo "https://github.com/${GITHUB_REPOSITORY}/releases/tag/v$version"

@@ -1,0 +1,1509 @@
+public final class dev/aster/vega/scene/AccessibilityDescriptor {
+	public fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;ZIZ)V
+	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;ZIZILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()Ljava/lang/String;
+	public final fun component2 ()Ljava/lang/String;
+	public final fun component3 ()Ljava/lang/String;
+	public final fun component4 ()Ljava/lang/String;
+	public final fun component5 ()Z
+	public final fun component6 ()I
+	public final fun component7 ()Z
+	public final fun copy (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;ZIZ)Ldev/aster/vega/scene/AccessibilityDescriptor;
+	public static synthetic fun copy$default (Ldev/aster/vega/scene/AccessibilityDescriptor;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;ZIZILjava/lang/Object;)Ldev/aster/vega/scene/AccessibilityDescriptor;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getDerived ()Z
+	public final fun getFocusable ()Z
+	public final fun getLabel ()Ljava/lang/String;
+	public final fun getRole ()Ljava/lang/String;
+	public final fun getRoleDescription ()Ljava/lang/String;
+	public final fun getTraversalIndex ()I
+	public final fun getValue ()Ljava/lang/String;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class dev/aster/vega/scene/AccessibilityTree {
+	public static final field INSTANCE Ldev/aster/vega/scene/AccessibilityTree;
+	public static final field MAX_EXPOSED_MARKS I
+	public final fun elements (Ldev/aster/vega/scene/Scene;Ljava/util/Set;)Ljava/util/List;
+	public static synthetic fun elements$default (Ldev/aster/vega/scene/AccessibilityTree;Ldev/aster/vega/scene/Scene;Ljava/util/Set;ILjava/lang/Object;)Ljava/util/List;
+}
+
+public final class dev/aster/vega/scene/AccessibleElement {
+	public synthetic fun <init> (Ljava/lang/String;Ldev/aster/vega/scene/RectD;Ldev/aster/vega/scene/SceneNodeId;ZZILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public synthetic fun <init> (Ljava/lang/String;Ldev/aster/vega/scene/RectD;Ldev/aster/vega/scene/SceneNodeId;ZZLkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()Ljava/lang/String;
+	public final fun component2 ()Ldev/aster/vega/scene/RectD;
+	public final fun component3-0z_ufP4 ()Ldev/aster/vega/scene/SceneNodeId;
+	public final fun component4 ()Z
+	public final fun component5 ()Z
+	public final fun copy-P3yH6Bg (Ljava/lang/String;Ldev/aster/vega/scene/RectD;Ldev/aster/vega/scene/SceneNodeId;ZZ)Ldev/aster/vega/scene/AccessibleElement;
+	public static synthetic fun copy-P3yH6Bg$default (Ldev/aster/vega/scene/AccessibleElement;Ljava/lang/String;Ldev/aster/vega/scene/RectD;Ldev/aster/vega/scene/SceneNodeId;ZZILjava/lang/Object;)Ldev/aster/vega/scene/AccessibleElement;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getBounds ()Ldev/aster/vega/scene/RectD;
+	public final fun getLabel ()Ljava/lang/String;
+	public final fun getNodeId-0z_ufP4 ()Ldev/aster/vega/scene/SceneNodeId;
+	public final fun getSelected ()Z
+	public fun hashCode ()I
+	public final fun isSummary ()Z
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class dev/aster/vega/scene/ArcPath {
+	public static final field INSTANCE Ldev/aster/vega/scene/ArcPath;
+	public final fun build (DDDDDDDDLjava/lang/Double;)Ldev/aster/vega/scene/PathData;
+	public static synthetic fun build$default (Ldev/aster/vega/scene/ArcPath;DDDDDDDDLjava/lang/Double;ILjava/lang/Object;)Ldev/aster/vega/scene/PathData;
+}
+
+public final class dev/aster/vega/scene/ColorSpaces {
+	public static final field INSTANCE Ldev/aster/vega/scene/ColorSpaces;
+	public final fun fromCubehelix (Ldev/aster/vega/scene/ColorSpaces$Cubehelix;D)Ldev/aster/vega/scene/SceneColor;
+	public static synthetic fun fromCubehelix$default (Ldev/aster/vega/scene/ColorSpaces;Ldev/aster/vega/scene/ColorSpaces$Cubehelix;DILjava/lang/Object;)Ldev/aster/vega/scene/SceneColor;
+	public final fun fromHcl (Ldev/aster/vega/scene/ColorSpaces$Hcl;D)Ldev/aster/vega/scene/SceneColor;
+	public static synthetic fun fromHcl$default (Ldev/aster/vega/scene/ColorSpaces;Ldev/aster/vega/scene/ColorSpaces$Hcl;DILjava/lang/Object;)Ldev/aster/vega/scene/SceneColor;
+	public final fun fromHsl (Ldev/aster/vega/scene/ColorSpaces$Hsl;D)Ldev/aster/vega/scene/SceneColor;
+	public static synthetic fun fromHsl$default (Ldev/aster/vega/scene/ColorSpaces;Ldev/aster/vega/scene/ColorSpaces$Hsl;DILjava/lang/Object;)Ldev/aster/vega/scene/SceneColor;
+	public final fun fromLab (Ldev/aster/vega/scene/ColorSpaces$Lab;D)Ldev/aster/vega/scene/SceneColor;
+	public static synthetic fun fromLab$default (Ldev/aster/vega/scene/ColorSpaces;Ldev/aster/vega/scene/ColorSpaces$Lab;DILjava/lang/Object;)Ldev/aster/vega/scene/SceneColor;
+	public final fun interpolate (Ldev/aster/vega/scene/SceneColor;Ldev/aster/vega/scene/SceneColor;DLdev/aster/vega/scene/ColorSpaces$Interpolation;D)Ldev/aster/vega/scene/SceneColor;
+	public static synthetic fun interpolate$default (Ldev/aster/vega/scene/ColorSpaces;Ldev/aster/vega/scene/SceneColor;Ldev/aster/vega/scene/SceneColor;DLdev/aster/vega/scene/ColorSpaces$Interpolation;DILjava/lang/Object;)Ldev/aster/vega/scene/SceneColor;
+	public final fun interpolateCubehelix (Ldev/aster/vega/scene/SceneColor;Ldev/aster/vega/scene/SceneColor;DZ)Ldev/aster/vega/scene/SceneColor;
+	public static synthetic fun interpolateCubehelix$default (Ldev/aster/vega/scene/ColorSpaces;Ldev/aster/vega/scene/SceneColor;Ldev/aster/vega/scene/SceneColor;DZILjava/lang/Object;)Ldev/aster/vega/scene/SceneColor;
+	public final fun interpolateHcl (Ldev/aster/vega/scene/SceneColor;Ldev/aster/vega/scene/SceneColor;DZ)Ldev/aster/vega/scene/SceneColor;
+	public static synthetic fun interpolateHcl$default (Ldev/aster/vega/scene/ColorSpaces;Ldev/aster/vega/scene/SceneColor;Ldev/aster/vega/scene/SceneColor;DZILjava/lang/Object;)Ldev/aster/vega/scene/SceneColor;
+	public final fun interpolateHsl (Ldev/aster/vega/scene/SceneColor;Ldev/aster/vega/scene/SceneColor;DZ)Ldev/aster/vega/scene/SceneColor;
+	public static synthetic fun interpolateHsl$default (Ldev/aster/vega/scene/ColorSpaces;Ldev/aster/vega/scene/SceneColor;Ldev/aster/vega/scene/SceneColor;DZILjava/lang/Object;)Ldev/aster/vega/scene/SceneColor;
+	public final fun interpolateLab (Ldev/aster/vega/scene/SceneColor;Ldev/aster/vega/scene/SceneColor;D)Ldev/aster/vega/scene/SceneColor;
+	public final fun interpolateRgb (Ldev/aster/vega/scene/SceneColor;Ldev/aster/vega/scene/SceneColor;DD)Ldev/aster/vega/scene/SceneColor;
+	public static synthetic fun interpolateRgb$default (Ldev/aster/vega/scene/ColorSpaces;Ldev/aster/vega/scene/SceneColor;Ldev/aster/vega/scene/SceneColor;DDILjava/lang/Object;)Ldev/aster/vega/scene/SceneColor;
+	public final fun sample (Ljava/util/List;DLdev/aster/vega/scene/ColorSpaces$Interpolation;D)Ldev/aster/vega/scene/SceneColor;
+	public static synthetic fun sample$default (Ldev/aster/vega/scene/ColorSpaces;Ljava/util/List;DLdev/aster/vega/scene/ColorSpaces$Interpolation;DILjava/lang/Object;)Ldev/aster/vega/scene/SceneColor;
+	public final fun toCubehelix (Ldev/aster/vega/scene/SceneColor;)Ldev/aster/vega/scene/ColorSpaces$Cubehelix;
+	public final fun toHcl (Ldev/aster/vega/scene/SceneColor;)Ldev/aster/vega/scene/ColorSpaces$Hcl;
+	public final fun toHsl (Ldev/aster/vega/scene/SceneColor;)Ldev/aster/vega/scene/ColorSpaces$Hsl;
+	public final fun toLab (Ldev/aster/vega/scene/SceneColor;)Ldev/aster/vega/scene/ColorSpaces$Lab;
+}
+
+public final class dev/aster/vega/scene/ColorSpaces$Cubehelix {
+	public fun <init> (DDD)V
+	public final fun component1 ()D
+	public final fun component2 ()D
+	public final fun component3 ()D
+	public final fun copy (DDD)Ldev/aster/vega/scene/ColorSpaces$Cubehelix;
+	public static synthetic fun copy$default (Ldev/aster/vega/scene/ColorSpaces$Cubehelix;DDDILjava/lang/Object;)Ldev/aster/vega/scene/ColorSpaces$Cubehelix;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getHue ()D
+	public final fun getLightness ()D
+	public final fun getSaturation ()D
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class dev/aster/vega/scene/ColorSpaces$Hcl {
+	public fun <init> (DDD)V
+	public final fun component1 ()D
+	public final fun component2 ()D
+	public final fun component3 ()D
+	public final fun copy (DDD)Ldev/aster/vega/scene/ColorSpaces$Hcl;
+	public static synthetic fun copy$default (Ldev/aster/vega/scene/ColorSpaces$Hcl;DDDILjava/lang/Object;)Ldev/aster/vega/scene/ColorSpaces$Hcl;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getChroma ()D
+	public final fun getHue ()D
+	public final fun getLightness ()D
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class dev/aster/vega/scene/ColorSpaces$Hsl {
+	public fun <init> (DDD)V
+	public final fun component1 ()D
+	public final fun component2 ()D
+	public final fun component3 ()D
+	public final fun copy (DDD)Ldev/aster/vega/scene/ColorSpaces$Hsl;
+	public static synthetic fun copy$default (Ldev/aster/vega/scene/ColorSpaces$Hsl;DDDILjava/lang/Object;)Ldev/aster/vega/scene/ColorSpaces$Hsl;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getHue ()D
+	public final fun getLightness ()D
+	public final fun getSaturation ()D
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class dev/aster/vega/scene/ColorSpaces$Interpolation : java/lang/Enum {
+	public static final field CUBEHELIX Ldev/aster/vega/scene/ColorSpaces$Interpolation;
+	public static final field CUBEHELIX_LONG Ldev/aster/vega/scene/ColorSpaces$Interpolation;
+	public static final field Companion Ldev/aster/vega/scene/ColorSpaces$Interpolation$Companion;
+	public static final field HCL Ldev/aster/vega/scene/ColorSpaces$Interpolation;
+	public static final field HCL_LONG Ldev/aster/vega/scene/ColorSpaces$Interpolation;
+	public static final field HSL Ldev/aster/vega/scene/ColorSpaces$Interpolation;
+	public static final field HSL_LONG Ldev/aster/vega/scene/ColorSpaces$Interpolation;
+	public static final field LAB Ldev/aster/vega/scene/ColorSpaces$Interpolation;
+	public static final field RGB Ldev/aster/vega/scene/ColorSpaces$Interpolation;
+	public static fun getEntries ()Lkotlin/enums/EnumEntries;
+	public static fun valueOf (Ljava/lang/String;)Ldev/aster/vega/scene/ColorSpaces$Interpolation;
+	public static fun values ()[Ldev/aster/vega/scene/ColorSpaces$Interpolation;
+}
+
+public final class dev/aster/vega/scene/ColorSpaces$Interpolation$Companion {
+	public final fun fromName (Ljava/lang/String;)Ldev/aster/vega/scene/ColorSpaces$Interpolation;
+}
+
+public final class dev/aster/vega/scene/ColorSpaces$Lab {
+	public fun <init> (DDD)V
+	public final fun component1 ()D
+	public final fun component2 ()D
+	public final fun component3 ()D
+	public final fun copy (DDD)Ldev/aster/vega/scene/ColorSpaces$Lab;
+	public static synthetic fun copy$default (Ldev/aster/vega/scene/ColorSpaces$Lab;DDDILjava/lang/Object;)Ldev/aster/vega/scene/ColorSpaces$Lab;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getA ()D
+	public final fun getB ()D
+	public final fun getLightness ()D
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class dev/aster/vega/scene/Corners {
+	public static final field Companion Ldev/aster/vega/scene/Corners$Companion;
+	public fun <init> (DDDD)V
+	public final fun component1 ()D
+	public final fun component2 ()D
+	public final fun component3 ()D
+	public final fun component4 ()D
+	public final fun copy (DDDD)Ldev/aster/vega/scene/Corners;
+	public static synthetic fun copy$default (Ldev/aster/vega/scene/Corners;DDDDILjava/lang/Object;)Ldev/aster/vega/scene/Corners;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getBottomLeft ()D
+	public final fun getBottomRight ()D
+	public final fun getTopLeft ()D
+	public final fun getTopRight ()D
+	public fun hashCode ()I
+	public final fun isSquare ()Z
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class dev/aster/vega/scene/Corners$Companion {
+	public final fun of (DDDDDD)Ldev/aster/vega/scene/Corners;
+}
+
+public final class dev/aster/vega/scene/CurveKind : java/lang/Enum {
+	public static final field BASIS Ldev/aster/vega/scene/CurveKind;
+	public static final field BASIS_CLOSED Ldev/aster/vega/scene/CurveKind;
+	public static final field BASIS_OPEN Ldev/aster/vega/scene/CurveKind;
+	public static final field BUNDLE Ldev/aster/vega/scene/CurveKind;
+	public static final field CARDINAL Ldev/aster/vega/scene/CurveKind;
+	public static final field CARDINAL_CLOSED Ldev/aster/vega/scene/CurveKind;
+	public static final field CARDINAL_OPEN Ldev/aster/vega/scene/CurveKind;
+	public static final field CATMULL_ROM Ldev/aster/vega/scene/CurveKind;
+	public static final field CATMULL_ROM_CLOSED Ldev/aster/vega/scene/CurveKind;
+	public static final field CATMULL_ROM_OPEN Ldev/aster/vega/scene/CurveKind;
+	public static final field Companion Ldev/aster/vega/scene/CurveKind$Companion;
+	public static final field LINEAR Ldev/aster/vega/scene/CurveKind;
+	public static final field LINEAR_CLOSED Ldev/aster/vega/scene/CurveKind;
+	public static final field MONOTONE Ldev/aster/vega/scene/CurveKind;
+	public static final field NATURAL Ldev/aster/vega/scene/CurveKind;
+	public static final field STEP Ldev/aster/vega/scene/CurveKind;
+	public static final field STEP_AFTER Ldev/aster/vega/scene/CurveKind;
+	public static final field STEP_BEFORE Ldev/aster/vega/scene/CurveKind;
+	public final fun getDefaultTension ()D
+	public static fun getEntries ()Lkotlin/enums/EnumEntries;
+	public final fun isClosed ()Z
+	public final fun isOpen ()Z
+	public static fun valueOf (Ljava/lang/String;)Ldev/aster/vega/scene/CurveKind;
+	public static fun values ()[Ldev/aster/vega/scene/CurveKind;
+}
+
+public final class dev/aster/vega/scene/CurveKind$Companion {
+	public final fun fromName (Ljava/lang/String;)Ldev/aster/vega/scene/CurveKind;
+}
+
+public final class dev/aster/vega/scene/CurvesKt {
+	public static final fun curve (Ldev/aster/vega/scene/PathBuilder;Ljava/util/List;Ldev/aster/vega/scene/CurveKind;ZLjava/lang/Double;Z)Ldev/aster/vega/scene/PathBuilder;
+	public static synthetic fun curve$default (Ldev/aster/vega/scene/PathBuilder;Ljava/util/List;Ldev/aster/vega/scene/CurveKind;ZLjava/lang/Double;ZILjava/lang/Object;)Ldev/aster/vega/scene/PathBuilder;
+}
+
+public final class dev/aster/vega/scene/Fill {
+	public static final field Companion Ldev/aster/vega/scene/Fill$Companion;
+	public fun <init> (Ldev/aster/vega/scene/ScenePaint;D)V
+	public synthetic fun <init> (Ldev/aster/vega/scene/ScenePaint;DILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()Ldev/aster/vega/scene/ScenePaint;
+	public final fun component2 ()D
+	public final fun copy (Ldev/aster/vega/scene/ScenePaint;D)Ldev/aster/vega/scene/Fill;
+	public static synthetic fun copy$default (Ldev/aster/vega/scene/Fill;Ldev/aster/vega/scene/ScenePaint;DILjava/lang/Object;)Ldev/aster/vega/scene/Fill;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getOpacity ()D
+	public final fun getPaint ()Ldev/aster/vega/scene/ScenePaint;
+	public fun hashCode ()I
+	public final fun isVisible ()Z
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class dev/aster/vega/scene/Fill$Companion {
+	public final fun of (Ldev/aster/vega/scene/SceneColor;)Ldev/aster/vega/scene/Fill;
+}
+
+public final class dev/aster/vega/scene/FontStyle : java/lang/Enum {
+	public static final field ITALIC Ldev/aster/vega/scene/FontStyle;
+	public static final field NORMAL Ldev/aster/vega/scene/FontStyle;
+	public static fun getEntries ()Lkotlin/enums/EnumEntries;
+	public static fun valueOf (Ljava/lang/String;)Ldev/aster/vega/scene/FontStyle;
+	public static fun values ()[Ldev/aster/vega/scene/FontStyle;
+}
+
+public final class dev/aster/vega/scene/ForeignPaint {
+	public static final field INSTANCE Ldev/aster/vega/scene/ForeignPaint;
+	public final fun isGradient (Ldev/aster/vega/scene/ScenePaint;)Z
+	public final fun linearGradient (Ldev/aster/vega/scene/ScenePaint;)Ldev/aster/vega/scene/ScenePaint$LinearGradient;
+	public final fun radialGradient (Ldev/aster/vega/scene/ScenePaint;)Ldev/aster/vega/scene/ScenePaint$RadialGradient;
+	public final fun solidColor (Ldev/aster/vega/scene/ScenePaint;)Ldev/aster/vega/scene/SceneColor;
+	public final fun solidFill (Ldev/aster/vega/scene/Fill;)Ldev/aster/vega/scene/SceneColor;
+	public final fun solidStroke (Ldev/aster/vega/scene/Stroke;)Ldev/aster/vega/scene/SceneColor;
+}
+
+public final class dev/aster/vega/scene/ForeignPath {
+	public static final field INSTANCE Ldev/aster/vega/scene/ForeignPath;
+	public final fun kind (Ldev/aster/vega/scene/PathCommand;)Ljava/lang/String;
+	public final fun x (Ldev/aster/vega/scene/PathCommand;)D
+	public final fun x1 (Ldev/aster/vega/scene/PathCommand;)D
+	public final fun x2 (Ldev/aster/vega/scene/PathCommand;)D
+	public final fun y (Ldev/aster/vega/scene/PathCommand;)D
+	public final fun y1 (Ldev/aster/vega/scene/PathCommand;)D
+	public final fun y2 (Ldev/aster/vega/scene/PathCommand;)D
+}
+
+public final class dev/aster/vega/scene/ForeignRenderersKt {
+	public static final fun foreignKind (Ldev/aster/vega/scene/SceneNode;)Ljava/lang/String;
+}
+
+public final class dev/aster/vega/scene/GradientStop {
+	public fun <init> (DLdev/aster/vega/scene/SceneColor;)V
+	public final fun component1 ()D
+	public final fun component2 ()Ldev/aster/vega/scene/SceneColor;
+	public final fun copy (DLdev/aster/vega/scene/SceneColor;)Ldev/aster/vega/scene/GradientStop;
+	public static synthetic fun copy$default (Ldev/aster/vega/scene/GradientStop;DLdev/aster/vega/scene/SceneColor;ILjava/lang/Object;)Ldev/aster/vega/scene/GradientStop;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getColor ()Ldev/aster/vega/scene/SceneColor;
+	public final fun getOffset ()D
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class dev/aster/vega/scene/GroupNode : dev/aster/vega/scene/SceneNode {
+	public synthetic fun <init> (JLjava/util/List;Ldev/aster/vega/scene/Transform2D;DZLdev/aster/vega/scene/NodeMetadata;Ldev/aster/vega/scene/Fill;Ldev/aster/vega/scene/Stroke;Ldev/aster/vega/scene/SizeD;DLjava/lang/Double;Ljava/lang/Double;Ljava/lang/Double;Ljava/lang/Double;Ljava/lang/Double;ZZLdev/aster/vega/scene/RectD;Ldev/aster/vega/scene/PathData;Ldev/aster/vega/scene/SceneBlendMode;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public synthetic fun <init> (JLjava/util/List;Ldev/aster/vega/scene/Transform2D;DZLdev/aster/vega/scene/NodeMetadata;Ldev/aster/vega/scene/Fill;Ldev/aster/vega/scene/Stroke;Ldev/aster/vega/scene/SizeD;DLjava/lang/Double;Ljava/lang/Double;Ljava/lang/Double;Ljava/lang/Double;Ljava/lang/Double;ZZLdev/aster/vega/scene/RectD;Ldev/aster/vega/scene/PathData;Ldev/aster/vega/scene/SceneBlendMode;Lkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1-aJBrClo ()J
+	public final fun component10 ()D
+	public final fun component11 ()Ljava/lang/Double;
+	public final fun component12 ()Ljava/lang/Double;
+	public final fun component13 ()Ljava/lang/Double;
+	public final fun component14 ()Ljava/lang/Double;
+	public final fun component15 ()Ljava/lang/Double;
+	public final fun component16 ()Z
+	public final fun component17 ()Z
+	public final fun component18 ()Ldev/aster/vega/scene/RectD;
+	public final fun component19 ()Ldev/aster/vega/scene/PathData;
+	public final fun component2 ()Ljava/util/List;
+	public final fun component20 ()Ldev/aster/vega/scene/SceneBlendMode;
+	public final fun component3 ()Ldev/aster/vega/scene/Transform2D;
+	public final fun component4 ()D
+	public final fun component5 ()Z
+	public final fun component6 ()Ldev/aster/vega/scene/NodeMetadata;
+	public final fun component7 ()Ldev/aster/vega/scene/Fill;
+	public final fun component8 ()Ldev/aster/vega/scene/Stroke;
+	public final fun component9 ()Ldev/aster/vega/scene/SizeD;
+	public final fun copy-dkNoT7c (JLjava/util/List;Ldev/aster/vega/scene/Transform2D;DZLdev/aster/vega/scene/NodeMetadata;Ldev/aster/vega/scene/Fill;Ldev/aster/vega/scene/Stroke;Ldev/aster/vega/scene/SizeD;DLjava/lang/Double;Ljava/lang/Double;Ljava/lang/Double;Ljava/lang/Double;Ljava/lang/Double;ZZLdev/aster/vega/scene/RectD;Ldev/aster/vega/scene/PathData;Ldev/aster/vega/scene/SceneBlendMode;)Ldev/aster/vega/scene/GroupNode;
+	public static synthetic fun copy-dkNoT7c$default (Ldev/aster/vega/scene/GroupNode;JLjava/util/List;Ldev/aster/vega/scene/Transform2D;DZLdev/aster/vega/scene/NodeMetadata;Ldev/aster/vega/scene/Fill;Ldev/aster/vega/scene/Stroke;Ldev/aster/vega/scene/SizeD;DLjava/lang/Double;Ljava/lang/Double;Ljava/lang/Double;Ljava/lang/Double;Ljava/lang/Double;ZZLdev/aster/vega/scene/RectD;Ldev/aster/vega/scene/PathData;Ldev/aster/vega/scene/SceneBlendMode;ILjava/lang/Object;)Ldev/aster/vega/scene/GroupNode;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getBlendMode ()Ldev/aster/vega/scene/SceneBlendMode;
+	public fun getBounds ()Ldev/aster/vega/scene/RectD;
+	public final fun getBoundsFromChildren ()Z
+	public final fun getChildren ()Ljava/util/List;
+	public final fun getClip ()Ldev/aster/vega/scene/RectD;
+	public final fun getClipPath ()Ldev/aster/vega/scene/PathData;
+	public final fun getCornerRadius ()D
+	public final fun getCornerRadiusBottomLeft ()Ljava/lang/Double;
+	public final fun getCornerRadiusBottomRight ()Ljava/lang/Double;
+	public final fun getCornerRadiusTopLeft ()Ljava/lang/Double;
+	public final fun getCornerRadiusTopRight ()Ljava/lang/Double;
+	public final fun getEffectiveStrokeOffset ()D
+	public final fun getFill ()Ldev/aster/vega/scene/Fill;
+	public fun getId-aJBrClo ()J
+	public fun getMetadata ()Ldev/aster/vega/scene/NodeMetadata;
+	public fun getOpacity ()D
+	public final fun getPaintRect ()Ldev/aster/vega/scene/RectD;
+	public final fun getRoundedPaintPath ()Ldev/aster/vega/scene/PathData;
+	public final fun getSize ()Ldev/aster/vega/scene/SizeD;
+	public final fun getStroke ()Ldev/aster/vega/scene/Stroke;
+	public final fun getStrokeForeground ()Z
+	public final fun getStrokeOffset ()Ljava/lang/Double;
+	public fun getTransform ()Ldev/aster/vega/scene/Transform2D;
+	public fun getVisible ()Z
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class dev/aster/vega/scene/HitResult {
+	public fun <init> (Ldev/aster/vega/scene/SceneNode;Ljava/util/List;Ldev/aster/vega/scene/Transform2D;Ldev/aster/vega/scene/PointD;)V
+	public final fun component1 ()Ldev/aster/vega/scene/SceneNode;
+	public final fun component2 ()Ljava/util/List;
+	public final fun component3 ()Ldev/aster/vega/scene/Transform2D;
+	public final fun component4 ()Ldev/aster/vega/scene/PointD;
+	public final fun copy (Ldev/aster/vega/scene/SceneNode;Ljava/util/List;Ldev/aster/vega/scene/Transform2D;Ldev/aster/vega/scene/PointD;)Ldev/aster/vega/scene/HitResult;
+	public static synthetic fun copy$default (Ldev/aster/vega/scene/HitResult;Ldev/aster/vega/scene/SceneNode;Ljava/util/List;Ldev/aster/vega/scene/Transform2D;Ldev/aster/vega/scene/PointD;ILjava/lang/Object;)Ldev/aster/vega/scene/HitResult;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getAncestors ()Ljava/util/List;
+	public final fun getLocalPoint ()Ldev/aster/vega/scene/PointD;
+	public final fun getNode ()Ldev/aster/vega/scene/SceneNode;
+	public final fun getWorldTransform ()Ldev/aster/vega/scene/Transform2D;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class dev/aster/vega/scene/HitTestKt {
+	public static final fun hitsPrecisely (Ldev/aster/vega/scene/SceneNode;Ldev/aster/vega/scene/PointD;Ldev/aster/vega/scene/HitTestOptions;)Z
+}
+
+public final class dev/aster/vega/scene/HitTestOptions {
+	public static final field Companion Ldev/aster/vega/scene/HitTestOptions$Companion;
+	public fun <init> ()V
+	public fun <init> (DDZI)V
+	public synthetic fun <init> (DDZIILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()D
+	public final fun component2 ()D
+	public final fun component3 ()Z
+	public final fun component4 ()I
+	public final fun copy (DDZI)Ldev/aster/vega/scene/HitTestOptions;
+	public static synthetic fun copy$default (Ldev/aster/vega/scene/HitTestOptions;DDZIILjava/lang/Object;)Ldev/aster/vega/scene/HitTestOptions;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getBoundsTolerance ()D
+	public final fun getRequireInteractive ()Z
+	public final fun getSpatialIndexThreshold ()I
+	public final fun getStrokeTolerance ()D
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class dev/aster/vega/scene/HitTestOptions$Companion {
+	public final fun getMouse ()Ldev/aster/vega/scene/HitTestOptions;
+	public final fun getTouch ()Ldev/aster/vega/scene/HitTestOptions;
+}
+
+public final class dev/aster/vega/scene/ImageAlign : java/lang/Enum {
+	public static final field CENTER Ldev/aster/vega/scene/ImageAlign;
+	public static final field Companion Ldev/aster/vega/scene/ImageAlign$Companion;
+	public static final field LEFT Ldev/aster/vega/scene/ImageAlign;
+	public static final field RIGHT Ldev/aster/vega/scene/ImageAlign;
+	public static fun getEntries ()Lkotlin/enums/EnumEntries;
+	public static fun valueOf (Ljava/lang/String;)Ldev/aster/vega/scene/ImageAlign;
+	public static fun values ()[Ldev/aster/vega/scene/ImageAlign;
+}
+
+public final class dev/aster/vega/scene/ImageAlign$Companion {
+	public final fun fromName (Ljava/lang/String;)Ldev/aster/vega/scene/ImageAlign;
+}
+
+public final class dev/aster/vega/scene/ImageBaseline : java/lang/Enum {
+	public static final field BOTTOM Ldev/aster/vega/scene/ImageBaseline;
+	public static final field Companion Ldev/aster/vega/scene/ImageBaseline$Companion;
+	public static final field MIDDLE Ldev/aster/vega/scene/ImageBaseline;
+	public static final field TOP Ldev/aster/vega/scene/ImageBaseline;
+	public static fun getEntries ()Lkotlin/enums/EnumEntries;
+	public static fun valueOf (Ljava/lang/String;)Ldev/aster/vega/scene/ImageBaseline;
+	public static fun values ()[Ldev/aster/vega/scene/ImageBaseline;
+}
+
+public final class dev/aster/vega/scene/ImageBaseline$Companion {
+	public final fun fromName (Ljava/lang/String;)Ldev/aster/vega/scene/ImageBaseline;
+}
+
+public final class dev/aster/vega/scene/ImageFit : java/lang/Enum {
+	public static final field CONTAIN Ldev/aster/vega/scene/ImageFit;
+	public static final field FILL Ldev/aster/vega/scene/ImageFit;
+	public static fun getEntries ()Lkotlin/enums/EnumEntries;
+	public static fun valueOf (Ljava/lang/String;)Ldev/aster/vega/scene/ImageFit;
+	public static fun values ()[Ldev/aster/vega/scene/ImageFit;
+}
+
+public final class dev/aster/vega/scene/ImageNode : dev/aster/vega/scene/SceneNode {
+	public synthetic fun <init> (JLjava/lang/String;Ldev/aster/vega/scene/RasterImage;DDDDLdev/aster/vega/scene/ImageFit;ZLdev/aster/vega/scene/ImageAlign;Ldev/aster/vega/scene/ImageBaseline;Ldev/aster/vega/scene/Transform2D;DZLdev/aster/vega/scene/NodeMetadata;Ldev/aster/vega/scene/SceneBlendMode;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public synthetic fun <init> (JLjava/lang/String;Ldev/aster/vega/scene/RasterImage;DDDDLdev/aster/vega/scene/ImageFit;ZLdev/aster/vega/scene/ImageAlign;Ldev/aster/vega/scene/ImageBaseline;Ldev/aster/vega/scene/Transform2D;DZLdev/aster/vega/scene/NodeMetadata;Ldev/aster/vega/scene/SceneBlendMode;Lkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1-aJBrClo ()J
+	public final fun component10 ()Ldev/aster/vega/scene/ImageAlign;
+	public final fun component11 ()Ldev/aster/vega/scene/ImageBaseline;
+	public final fun component12 ()Ldev/aster/vega/scene/Transform2D;
+	public final fun component13 ()D
+	public final fun component14 ()Z
+	public final fun component15 ()Ldev/aster/vega/scene/NodeMetadata;
+	public final fun component16 ()Ldev/aster/vega/scene/SceneBlendMode;
+	public final fun component2 ()Ljava/lang/String;
+	public final fun component3 ()Ldev/aster/vega/scene/RasterImage;
+	public final fun component4 ()D
+	public final fun component5 ()D
+	public final fun component6 ()D
+	public final fun component7 ()D
+	public final fun component8 ()Ldev/aster/vega/scene/ImageFit;
+	public final fun component9 ()Z
+	public final fun copy-ByFtNOQ (JLjava/lang/String;Ldev/aster/vega/scene/RasterImage;DDDDLdev/aster/vega/scene/ImageFit;ZLdev/aster/vega/scene/ImageAlign;Ldev/aster/vega/scene/ImageBaseline;Ldev/aster/vega/scene/Transform2D;DZLdev/aster/vega/scene/NodeMetadata;Ldev/aster/vega/scene/SceneBlendMode;)Ldev/aster/vega/scene/ImageNode;
+	public static synthetic fun copy-ByFtNOQ$default (Ldev/aster/vega/scene/ImageNode;JLjava/lang/String;Ldev/aster/vega/scene/RasterImage;DDDDLdev/aster/vega/scene/ImageFit;ZLdev/aster/vega/scene/ImageAlign;Ldev/aster/vega/scene/ImageBaseline;Ldev/aster/vega/scene/Transform2D;DZLdev/aster/vega/scene/NodeMetadata;Ldev/aster/vega/scene/SceneBlendMode;ILjava/lang/Object;)Ldev/aster/vega/scene/ImageNode;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getAlign ()Ldev/aster/vega/scene/ImageAlign;
+	public final fun getBaseline ()Ldev/aster/vega/scene/ImageBaseline;
+	public final fun getBlendMode ()Ldev/aster/vega/scene/SceneBlendMode;
+	public fun getBounds ()Ldev/aster/vega/scene/RectD;
+	public final fun getFit ()Ldev/aster/vega/scene/ImageFit;
+	public final fun getHeight ()D
+	public fun getId-aJBrClo ()J
+	public fun getMetadata ()Ldev/aster/vega/scene/NodeMetadata;
+	public fun getOpacity ()D
+	public final fun getRaster ()Ldev/aster/vega/scene/RasterImage;
+	public final fun getRect ()Ldev/aster/vega/scene/RectD;
+	public final fun getSmooth ()Z
+	public fun getTransform ()Ldev/aster/vega/scene/Transform2D;
+	public final fun getUrl ()Ljava/lang/String;
+	public fun getVisible ()Z
+	public final fun getWidth ()D
+	public final fun getX ()D
+	public final fun getY ()D
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class dev/aster/vega/scene/MarkAccessibility {
+	public fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Z)V
+	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;ZILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()Ljava/lang/String;
+	public final fun component2 ()Ljava/lang/String;
+	public final fun component3 ()Ljava/lang/String;
+	public final fun component4 ()Z
+	public final fun copy (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Z)Ldev/aster/vega/scene/MarkAccessibility;
+	public static synthetic fun copy$default (Ldev/aster/vega/scene/MarkAccessibility;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;ZILjava/lang/Object;)Ldev/aster/vega/scene/MarkAccessibility;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getHidden ()Z
+	public final fun getLabel ()Ljava/lang/String;
+	public final fun getRole ()Ljava/lang/String;
+	public final fun getRoleDescription ()Ljava/lang/String;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class dev/aster/vega/scene/MarkIntersect {
+	public static final field INSTANCE Ldev/aster/vega/scene/MarkIntersect;
+	public final fun boxLine (Ldev/aster/vega/scene/RectD;DDDD)Z
+	public final fun point (DDLdev/aster/vega/scene/RectD;)Z
+	public final fun rect (DDDDLdev/aster/vega/scene/RectD;)Z
+	public final fun rule (DDDDLdev/aster/vega/scene/RectD;)Z
+}
+
+public abstract class dev/aster/vega/scene/MeasuredTextEngine : dev/aster/vega/scene/TextEngine {
+	public fun <init> ()V
+	public abstract fun advanceOf (Ljava/lang/String;Ldev/aster/vega/scene/TextStyle;)D
+	public abstract fun ascentOf (Ldev/aster/vega/scene/TextStyle;)D
+	public fun defaultLineHeightOf (Ldev/aster/vega/scene/TextStyle;)D
+	public abstract fun descentOf (Ldev/aster/vega/scene/TextStyle;)D
+	public final fun layout (Ldev/aster/vega/scene/TextRun;Ldev/aster/vega/scene/SizeD;)Ldev/aster/vega/scene/TextLayout;
+	public final fun measure (Ldev/aster/vega/scene/TextRun;Ldev/aster/vega/scene/SizeD;)Ldev/aster/vega/scene/TextMetrics;
+}
+
+public final class dev/aster/vega/scene/MetricTextEngine : dev/aster/vega/scene/MeasuredTextEngine {
+	public fun <init> ()V
+	public fun <init> (DDD)V
+	public synthetic fun <init> (DDDILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun advanceOf (Ljava/lang/String;Ldev/aster/vega/scene/TextStyle;)D
+	public fun ascentOf (Ldev/aster/vega/scene/TextStyle;)D
+	public fun descentOf (Ldev/aster/vega/scene/TextStyle;)D
+}
+
+public final class dev/aster/vega/scene/NodeMetadata {
+	public static final field Companion Ldev/aster/vega/scene/NodeMetadata$Companion;
+	public fun <init> ()V
+	public fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/Double;Ljava/lang/Long;Ljava/lang/Integer;ZLdev/aster/vega/model/VegaValue;Ldev/aster/vega/model/VegaValue;Ljava/lang/String;Ljava/lang/String;ILdev/aster/vega/scene/AccessibilityDescriptor;Ljava/lang/Integer;Ldev/aster/vega/scene/MarkAccessibility;)V
+	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/Double;Ljava/lang/Long;Ljava/lang/Integer;ZLdev/aster/vega/model/VegaValue;Ldev/aster/vega/model/VegaValue;Ljava/lang/String;Ljava/lang/String;ILdev/aster/vega/scene/AccessibilityDescriptor;Ljava/lang/Integer;Ldev/aster/vega/scene/MarkAccessibility;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()Ljava/lang/String;
+	public final fun component10 ()Ldev/aster/vega/model/VegaValue;
+	public final fun component11 ()Ljava/lang/String;
+	public final fun component12 ()Ljava/lang/String;
+	public final fun component13 ()I
+	public final fun component14 ()Ldev/aster/vega/scene/AccessibilityDescriptor;
+	public final fun component15 ()Ljava/lang/Integer;
+	public final fun component16 ()Ldev/aster/vega/scene/MarkAccessibility;
+	public final fun component2 ()Ljava/lang/String;
+	public final fun component3 ()Ljava/lang/String;
+	public final fun component4 ()Ljava/lang/String;
+	public final fun component5 ()Ljava/lang/Double;
+	public final fun component6 ()Ljava/lang/Long;
+	public final fun component7 ()Ljava/lang/Integer;
+	public final fun component8 ()Z
+	public final fun component9 ()Ldev/aster/vega/model/VegaValue;
+	public final fun copy (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/Double;Ljava/lang/Long;Ljava/lang/Integer;ZLdev/aster/vega/model/VegaValue;Ldev/aster/vega/model/VegaValue;Ljava/lang/String;Ljava/lang/String;ILdev/aster/vega/scene/AccessibilityDescriptor;Ljava/lang/Integer;Ldev/aster/vega/scene/MarkAccessibility;)Ldev/aster/vega/scene/NodeMetadata;
+	public static synthetic fun copy$default (Ldev/aster/vega/scene/NodeMetadata;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/Double;Ljava/lang/Long;Ljava/lang/Integer;ZLdev/aster/vega/model/VegaValue;Ldev/aster/vega/model/VegaValue;Ljava/lang/String;Ljava/lang/String;ILdev/aster/vega/scene/AccessibilityDescriptor;Ljava/lang/Integer;Ldev/aster/vega/scene/MarkAccessibility;ILjava/lang/Object;)Ldev/aster/vega/scene/NodeMetadata;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getAccessibility ()Ldev/aster/vega/scene/AccessibilityDescriptor;
+	public final fun getCursor ()Ljava/lang/String;
+	public final fun getDatum ()Ldev/aster/vega/model/VegaValue;
+	public final fun getDatumId ()Ljava/lang/Long;
+	public final fun getDatumIndex ()Ljava/lang/Integer;
+	public final fun getHref ()Ljava/lang/String;
+	public final fun getInteractive ()Z
+	public final fun getInterpolate ()Ljava/lang/String;
+	public final fun getMarkAccessibility ()Ldev/aster/vega/scene/MarkAccessibility;
+	public final fun getMarkKind ()Ljava/lang/String;
+	public final fun getMarkName ()Ljava/lang/String;
+	public final fun getMarkOrdinal ()Ljava/lang/Integer;
+	public final fun getRole ()Ljava/lang/String;
+	public final fun getTension ()Ljava/lang/Double;
+	public final fun getTooltip ()Ldev/aster/vega/model/VegaValue;
+	public final fun getZindex ()I
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class dev/aster/vega/scene/NodeMetadata$Companion {
+	public final fun getNone ()Ldev/aster/vega/scene/NodeMetadata;
+}
+
+public final class dev/aster/vega/scene/PathBuilder {
+	public static final field Companion Ldev/aster/vega/scene/PathBuilder$Companion;
+	public static final field KAPPA D
+	public fun <init> ()V
+	public final fun arcTo (DDDDD)Ldev/aster/vega/scene/PathBuilder;
+	public final fun build ()Ldev/aster/vega/scene/PathData;
+	public final fun circle (DDD)Ldev/aster/vega/scene/PathBuilder;
+	public final fun close ()Ldev/aster/vega/scene/PathBuilder;
+	public final fun cubicTo (DDDDDD)Ldev/aster/vega/scene/PathBuilder;
+	public final fun lineTo (DD)Ldev/aster/vega/scene/PathBuilder;
+	public final fun moveTo (DD)Ldev/aster/vega/scene/PathBuilder;
+	public final fun polyline (Ljava/util/List;Z)Ldev/aster/vega/scene/PathBuilder;
+	public static synthetic fun polyline$default (Ldev/aster/vega/scene/PathBuilder;Ljava/util/List;ZILjava/lang/Object;)Ldev/aster/vega/scene/PathBuilder;
+	public final fun quadraticTo (DDDD)Ldev/aster/vega/scene/PathBuilder;
+	public final fun rect (DDDD)Ldev/aster/vega/scene/PathBuilder;
+	public final fun steps (Ljava/util/List;Ldev/aster/vega/scene/StepPosition;)Ldev/aster/vega/scene/PathBuilder;
+}
+
+public final class dev/aster/vega/scene/PathBuilder$Companion {
+}
+
+public abstract interface class dev/aster/vega/scene/PathCommand {
+}
+
+public final class dev/aster/vega/scene/PathCommand$Close : dev/aster/vega/scene/PathCommand {
+	public static final field INSTANCE Ldev/aster/vega/scene/PathCommand$Close;
+	public fun equals (Ljava/lang/Object;)Z
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class dev/aster/vega/scene/PathCommand$CubicTo : dev/aster/vega/scene/PathCommand {
+	public fun <init> (DDDDDD)V
+	public final fun component1 ()D
+	public final fun component2 ()D
+	public final fun component3 ()D
+	public final fun component4 ()D
+	public final fun component5 ()D
+	public final fun component6 ()D
+	public final fun copy (DDDDDD)Ldev/aster/vega/scene/PathCommand$CubicTo;
+	public static synthetic fun copy$default (Ldev/aster/vega/scene/PathCommand$CubicTo;DDDDDDILjava/lang/Object;)Ldev/aster/vega/scene/PathCommand$CubicTo;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getX ()D
+	public final fun getX1 ()D
+	public final fun getX2 ()D
+	public final fun getY ()D
+	public final fun getY1 ()D
+	public final fun getY2 ()D
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class dev/aster/vega/scene/PathCommand$LineTo : dev/aster/vega/scene/PathCommand {
+	public fun <init> (DD)V
+	public final fun component1 ()D
+	public final fun component2 ()D
+	public final fun copy (DD)Ldev/aster/vega/scene/PathCommand$LineTo;
+	public static synthetic fun copy$default (Ldev/aster/vega/scene/PathCommand$LineTo;DDILjava/lang/Object;)Ldev/aster/vega/scene/PathCommand$LineTo;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getX ()D
+	public final fun getY ()D
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class dev/aster/vega/scene/PathCommand$MoveTo : dev/aster/vega/scene/PathCommand {
+	public fun <init> (DD)V
+	public final fun component1 ()D
+	public final fun component2 ()D
+	public final fun copy (DD)Ldev/aster/vega/scene/PathCommand$MoveTo;
+	public static synthetic fun copy$default (Ldev/aster/vega/scene/PathCommand$MoveTo;DDILjava/lang/Object;)Ldev/aster/vega/scene/PathCommand$MoveTo;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getX ()D
+	public final fun getY ()D
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class dev/aster/vega/scene/PathData {
+	public static final field Companion Ldev/aster/vega/scene/PathData$Companion;
+	public static final field DEFAULT_FLATTEN_TOLERANCE D
+	public fun <init> (Ljava/util/List;)V
+	public final fun containsEvenOdd (Ldev/aster/vega/scene/PointD;D)Z
+	public static synthetic fun containsEvenOdd$default (Ldev/aster/vega/scene/PathData;Ldev/aster/vega/scene/PointD;DILjava/lang/Object;)Z
+	public final fun distanceToOutline (Ldev/aster/vega/scene/PointD;D)D
+	public static synthetic fun distanceToOutline$default (Ldev/aster/vega/scene/PathData;Ldev/aster/vega/scene/PointD;DILjava/lang/Object;)D
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun flatten (D)Ljava/util/List;
+	public static synthetic fun flatten$default (Ldev/aster/vega/scene/PathData;DILjava/lang/Object;)Ljava/util/List;
+	public final fun getBounds ()Ldev/aster/vega/scene/RectD;
+	public final fun getCommands ()Ljava/util/List;
+	public fun hashCode ()I
+	public final fun isEmpty ()Z
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class dev/aster/vega/scene/PathData$Companion {
+	public final fun build (Lkotlin/jvm/functions/Function1;)Ldev/aster/vega/scene/PathData;
+	public final fun getEmpty ()Ldev/aster/vega/scene/PathData;
+}
+
+public final class dev/aster/vega/scene/PathKt {
+	public static final fun distanceToSegment (Ldev/aster/vega/scene/PointD;Ldev/aster/vega/scene/PointD;Ldev/aster/vega/scene/PointD;)D
+}
+
+public final class dev/aster/vega/scene/PathNode : dev/aster/vega/scene/SceneNode {
+	public synthetic fun <init> (JLdev/aster/vega/scene/PathData;ZLdev/aster/vega/scene/Fill;Ldev/aster/vega/scene/Stroke;Ldev/aster/vega/scene/Transform2D;DZLdev/aster/vega/scene/NodeMetadata;Ldev/aster/vega/scene/SceneBlendMode;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public synthetic fun <init> (JLdev/aster/vega/scene/PathData;ZLdev/aster/vega/scene/Fill;Ldev/aster/vega/scene/Stroke;Ldev/aster/vega/scene/Transform2D;DZLdev/aster/vega/scene/NodeMetadata;Ldev/aster/vega/scene/SceneBlendMode;Lkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1-aJBrClo ()J
+	public final fun component10 ()Ldev/aster/vega/scene/SceneBlendMode;
+	public final fun component2 ()Ldev/aster/vega/scene/PathData;
+	public final fun component3 ()Z
+	public final fun component4 ()Ldev/aster/vega/scene/Fill;
+	public final fun component5 ()Ldev/aster/vega/scene/Stroke;
+	public final fun component6 ()Ldev/aster/vega/scene/Transform2D;
+	public final fun component7 ()D
+	public final fun component8 ()Z
+	public final fun component9 ()Ldev/aster/vega/scene/NodeMetadata;
+	public final fun copy-vbd-GOw (JLdev/aster/vega/scene/PathData;ZLdev/aster/vega/scene/Fill;Ldev/aster/vega/scene/Stroke;Ldev/aster/vega/scene/Transform2D;DZLdev/aster/vega/scene/NodeMetadata;Ldev/aster/vega/scene/SceneBlendMode;)Ldev/aster/vega/scene/PathNode;
+	public static synthetic fun copy-vbd-GOw$default (Ldev/aster/vega/scene/PathNode;JLdev/aster/vega/scene/PathData;ZLdev/aster/vega/scene/Fill;Ldev/aster/vega/scene/Stroke;Ldev/aster/vega/scene/Transform2D;DZLdev/aster/vega/scene/NodeMetadata;Ldev/aster/vega/scene/SceneBlendMode;ILjava/lang/Object;)Ldev/aster/vega/scene/PathNode;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getAbsent ()Z
+	public final fun getBlendMode ()Ldev/aster/vega/scene/SceneBlendMode;
+	public fun getBounds ()Ldev/aster/vega/scene/RectD;
+	public final fun getFill ()Ldev/aster/vega/scene/Fill;
+	public fun getId-aJBrClo ()J
+	public fun getMetadata ()Ldev/aster/vega/scene/NodeMetadata;
+	public fun getOpacity ()D
+	public final fun getPath ()Ldev/aster/vega/scene/PathData;
+	public final fun getStroke ()Ldev/aster/vega/scene/Stroke;
+	public fun getTransform ()Ldev/aster/vega/scene/Transform2D;
+	public fun getVisible ()Z
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class dev/aster/vega/scene/PlacedNode {
+	public fun <init> (Ldev/aster/vega/scene/SceneNode;Ldev/aster/vega/scene/Transform2D;)V
+	public final fun component1 ()Ldev/aster/vega/scene/SceneNode;
+	public final fun component2 ()Ldev/aster/vega/scene/Transform2D;
+	public final fun copy (Ldev/aster/vega/scene/SceneNode;Ldev/aster/vega/scene/Transform2D;)Ldev/aster/vega/scene/PlacedNode;
+	public static synthetic fun copy$default (Ldev/aster/vega/scene/PlacedNode;Ldev/aster/vega/scene/SceneNode;Ldev/aster/vega/scene/Transform2D;ILjava/lang/Object;)Ldev/aster/vega/scene/PlacedNode;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getNode ()Ldev/aster/vega/scene/SceneNode;
+	public final fun getWorldBounds ()Ldev/aster/vega/scene/RectD;
+	public final fun getWorldTransform ()Ldev/aster/vega/scene/Transform2D;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class dev/aster/vega/scene/PngEncoder {
+	public static final field INSTANCE Ldev/aster/vega/scene/PngEncoder;
+	public final fun dataUrl (Ldev/aster/vega/scene/RasterImage;)Ljava/lang/String;
+	public final fun encode (Ldev/aster/vega/scene/RasterImage;)[B
+}
+
+public final class dev/aster/vega/scene/PointD {
+	public static final field Companion Ldev/aster/vega/scene/PointD$Companion;
+	public fun <init> (DD)V
+	public final fun component1 ()D
+	public final fun component2 ()D
+	public final fun copy (DD)Ldev/aster/vega/scene/PointD;
+	public static synthetic fun copy$default (Ldev/aster/vega/scene/PointD;DDILjava/lang/Object;)Ldev/aster/vega/scene/PointD;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getX ()D
+	public final fun getY ()D
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class dev/aster/vega/scene/PointD$Companion {
+	public final fun getOrigin ()Ldev/aster/vega/scene/PointD;
+}
+
+public final class dev/aster/vega/scene/RasterImage {
+	public fun <init> (II[I)V
+	public final fun getDigest ()J
+	public final fun getHeight ()I
+	public final fun getPixels ()[I
+	public final fun getWidth ()I
+}
+
+public final class dev/aster/vega/scene/RectD {
+	public static final field Companion Ldev/aster/vega/scene/RectD$Companion;
+	public fun <init> (DDDD)V
+	public final fun component1 ()D
+	public final fun component2 ()D
+	public final fun component3 ()D
+	public final fun component4 ()D
+	public final fun contains (DD)Z
+	public final fun contains (Ldev/aster/vega/scene/PointD;)Z
+	public final fun copy (DDDD)Ldev/aster/vega/scene/RectD;
+	public static synthetic fun copy$default (Ldev/aster/vega/scene/RectD;DDDDILjava/lang/Object;)Ldev/aster/vega/scene/RectD;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun expand (D)Ldev/aster/vega/scene/RectD;
+	public final fun getBottom ()D
+	public final fun getCenterX ()D
+	public final fun getCenterY ()D
+	public final fun getHeight ()D
+	public final fun getLeft ()D
+	public final fun getRight ()D
+	public final fun getTop ()D
+	public final fun getWidth ()D
+	public fun hashCode ()I
+	public final fun intersects (Ldev/aster/vega/scene/RectD;)Z
+	public final fun isEmpty ()Z
+	public final fun normalized ()Ldev/aster/vega/scene/RectD;
+	public fun toString ()Ljava/lang/String;
+	public final fun translate (DD)Ldev/aster/vega/scene/RectD;
+	public final fun union (Ldev/aster/vega/scene/RectD;)Ldev/aster/vega/scene/RectD;
+}
+
+public final class dev/aster/vega/scene/RectD$Companion {
+	public final fun fromPoints (Ljava/lang/Iterable;)Ldev/aster/vega/scene/RectD;
+	public final fun fromSize (DDDD)Ldev/aster/vega/scene/RectD;
+	public final fun getEmpty ()Ldev/aster/vega/scene/RectD;
+}
+
+public final class dev/aster/vega/scene/RectNode : dev/aster/vega/scene/SceneNode {
+	public synthetic fun <init> (JDDDDDLjava/lang/Double;Ljava/lang/Double;Ljava/lang/Double;Ljava/lang/Double;Ldev/aster/vega/scene/Fill;Ldev/aster/vega/scene/Stroke;Ldev/aster/vega/scene/Transform2D;DZLdev/aster/vega/scene/NodeMetadata;Ldev/aster/vega/scene/SceneBlendMode;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public synthetic fun <init> (JDDDDDLjava/lang/Double;Ljava/lang/Double;Ljava/lang/Double;Ljava/lang/Double;Ldev/aster/vega/scene/Fill;Ldev/aster/vega/scene/Stroke;Ldev/aster/vega/scene/Transform2D;DZLdev/aster/vega/scene/NodeMetadata;Ldev/aster/vega/scene/SceneBlendMode;Lkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1-aJBrClo ()J
+	public final fun component10 ()Ljava/lang/Double;
+	public final fun component11 ()Ldev/aster/vega/scene/Fill;
+	public final fun component12 ()Ldev/aster/vega/scene/Stroke;
+	public final fun component13 ()Ldev/aster/vega/scene/Transform2D;
+	public final fun component14 ()D
+	public final fun component15 ()Z
+	public final fun component16 ()Ldev/aster/vega/scene/NodeMetadata;
+	public final fun component17 ()Ldev/aster/vega/scene/SceneBlendMode;
+	public final fun component2 ()D
+	public final fun component3 ()D
+	public final fun component4 ()D
+	public final fun component5 ()D
+	public final fun component6 ()D
+	public final fun component7 ()Ljava/lang/Double;
+	public final fun component8 ()Ljava/lang/Double;
+	public final fun component9 ()Ljava/lang/Double;
+	public final fun copy-okwcvI4 (JDDDDDLjava/lang/Double;Ljava/lang/Double;Ljava/lang/Double;Ljava/lang/Double;Ldev/aster/vega/scene/Fill;Ldev/aster/vega/scene/Stroke;Ldev/aster/vega/scene/Transform2D;DZLdev/aster/vega/scene/NodeMetadata;Ldev/aster/vega/scene/SceneBlendMode;)Ldev/aster/vega/scene/RectNode;
+	public static synthetic fun copy-okwcvI4$default (Ldev/aster/vega/scene/RectNode;JDDDDDLjava/lang/Double;Ljava/lang/Double;Ljava/lang/Double;Ljava/lang/Double;Ldev/aster/vega/scene/Fill;Ldev/aster/vega/scene/Stroke;Ldev/aster/vega/scene/Transform2D;DZLdev/aster/vega/scene/NodeMetadata;Ldev/aster/vega/scene/SceneBlendMode;ILjava/lang/Object;)Ldev/aster/vega/scene/RectNode;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getBlendMode ()Ldev/aster/vega/scene/SceneBlendMode;
+	public fun getBounds ()Ldev/aster/vega/scene/RectD;
+	public final fun getCornerRadius ()D
+	public final fun getCornerRadiusBottomLeft ()Ljava/lang/Double;
+	public final fun getCornerRadiusBottomRight ()Ljava/lang/Double;
+	public final fun getCornerRadiusTopLeft ()Ljava/lang/Double;
+	public final fun getCornerRadiusTopRight ()Ljava/lang/Double;
+	public final fun getCorners ()Ldev/aster/vega/scene/Corners;
+	public final fun getEffectiveCornerRadius ()D
+	public final fun getFill ()Ldev/aster/vega/scene/Fill;
+	public final fun getHeight ()D
+	public fun getId-aJBrClo ()J
+	public fun getMetadata ()Ldev/aster/vega/scene/NodeMetadata;
+	public fun getOpacity ()D
+	public final fun getRect ()Ldev/aster/vega/scene/RectD;
+	public final fun getRoundedPath ()Ldev/aster/vega/scene/PathData;
+	public final fun getStroke ()Ldev/aster/vega/scene/Stroke;
+	public fun getTransform ()Ldev/aster/vega/scene/Transform2D;
+	public fun getVisible ()Z
+	public final fun getWidth ()D
+	public final fun getX ()D
+	public final fun getY ()D
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class dev/aster/vega/scene/RectPath {
+	public static final field INSTANCE Ldev/aster/vega/scene/RectPath;
+	public final fun of (DDDDLdev/aster/vega/scene/Corners;)Ldev/aster/vega/scene/PathData;
+}
+
+public final class dev/aster/vega/scene/RuleNode : dev/aster/vega/scene/SceneNode {
+	public synthetic fun <init> (JDDDDLdev/aster/vega/scene/Stroke;Ldev/aster/vega/scene/Transform2D;DZLdev/aster/vega/scene/NodeMetadata;Ldev/aster/vega/scene/SceneBlendMode;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public synthetic fun <init> (JDDDDLdev/aster/vega/scene/Stroke;Ldev/aster/vega/scene/Transform2D;DZLdev/aster/vega/scene/NodeMetadata;Ldev/aster/vega/scene/SceneBlendMode;Lkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1-aJBrClo ()J
+	public final fun component10 ()Ldev/aster/vega/scene/NodeMetadata;
+	public final fun component11 ()Ldev/aster/vega/scene/SceneBlendMode;
+	public final fun component2 ()D
+	public final fun component3 ()D
+	public final fun component4 ()D
+	public final fun component5 ()D
+	public final fun component6 ()Ldev/aster/vega/scene/Stroke;
+	public final fun component7 ()Ldev/aster/vega/scene/Transform2D;
+	public final fun component8 ()D
+	public final fun component9 ()Z
+	public final fun copy-rX1iq2U (JDDDDLdev/aster/vega/scene/Stroke;Ldev/aster/vega/scene/Transform2D;DZLdev/aster/vega/scene/NodeMetadata;Ldev/aster/vega/scene/SceneBlendMode;)Ldev/aster/vega/scene/RuleNode;
+	public static synthetic fun copy-rX1iq2U$default (Ldev/aster/vega/scene/RuleNode;JDDDDLdev/aster/vega/scene/Stroke;Ldev/aster/vega/scene/Transform2D;DZLdev/aster/vega/scene/NodeMetadata;Ldev/aster/vega/scene/SceneBlendMode;ILjava/lang/Object;)Ldev/aster/vega/scene/RuleNode;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getBlendMode ()Ldev/aster/vega/scene/SceneBlendMode;
+	public fun getBounds ()Ldev/aster/vega/scene/RectD;
+	public fun getId-aJBrClo ()J
+	public fun getMetadata ()Ldev/aster/vega/scene/NodeMetadata;
+	public fun getOpacity ()D
+	public final fun getStroke ()Ldev/aster/vega/scene/Stroke;
+	public fun getTransform ()Ldev/aster/vega/scene/Transform2D;
+	public fun getVisible ()Z
+	public final fun getX1 ()D
+	public final fun getX2 ()D
+	public final fun getY1 ()D
+	public final fun getY2 ()D
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class dev/aster/vega/scene/Scene {
+	public static final field Companion Ldev/aster/vega/scene/Scene$Companion;
+	public fun <init> (DDLdev/aster/vega/scene/SceneColor;Ldev/aster/vega/scene/GroupNode;J)V
+	public synthetic fun <init> (DDLdev/aster/vega/scene/SceneColor;Ldev/aster/vega/scene/GroupNode;JILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()D
+	public final fun component2 ()D
+	public final fun component3 ()Ldev/aster/vega/scene/SceneColor;
+	public final fun component4 ()Ldev/aster/vega/scene/GroupNode;
+	public final fun component5 ()J
+	public final fun copy (DDLdev/aster/vega/scene/SceneColor;Ldev/aster/vega/scene/GroupNode;J)Ldev/aster/vega/scene/Scene;
+	public static synthetic fun copy$default (Ldev/aster/vega/scene/Scene;DDLdev/aster/vega/scene/SceneColor;Ldev/aster/vega/scene/GroupNode;JILjava/lang/Object;)Ldev/aster/vega/scene/Scene;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getBackground ()Ldev/aster/vega/scene/SceneColor;
+	public final fun getContentBounds ()Ldev/aster/vega/scene/RectD;
+	public final fun getHeight ()D
+	public final fun getNodeCount ()I
+	public final fun getRevision ()J
+	public final fun getRoot ()Ldev/aster/vega/scene/GroupNode;
+	public final fun getViewport ()Ldev/aster/vega/scene/RectD;
+	public final fun getWidth ()D
+	public fun hashCode ()I
+	public final fun replacing (Ljava/util/Map;)Ldev/aster/vega/scene/Scene;
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class dev/aster/vega/scene/Scene$Companion {
+	public final fun empty (DD)Ldev/aster/vega/scene/Scene;
+	public static synthetic fun empty$default (Ldev/aster/vega/scene/Scene$Companion;DDILjava/lang/Object;)Ldev/aster/vega/scene/Scene;
+}
+
+public final class dev/aster/vega/scene/SceneBlendMode : java/lang/Enum {
+	public static final field COLOR Ldev/aster/vega/scene/SceneBlendMode;
+	public static final field COLOR_BURN Ldev/aster/vega/scene/SceneBlendMode;
+	public static final field COLOR_DODGE Ldev/aster/vega/scene/SceneBlendMode;
+	public static final field DARKEN Ldev/aster/vega/scene/SceneBlendMode;
+	public static final field DIFFERENCE Ldev/aster/vega/scene/SceneBlendMode;
+	public static final field EXCLUSION Ldev/aster/vega/scene/SceneBlendMode;
+	public static final field HARD_LIGHT Ldev/aster/vega/scene/SceneBlendMode;
+	public static final field HUE Ldev/aster/vega/scene/SceneBlendMode;
+	public static final field LIGHTEN Ldev/aster/vega/scene/SceneBlendMode;
+	public static final field LUMINOSITY Ldev/aster/vega/scene/SceneBlendMode;
+	public static final field MULTIPLY Ldev/aster/vega/scene/SceneBlendMode;
+	public static final field NORMAL Ldev/aster/vega/scene/SceneBlendMode;
+	public static final field OVERLAY Ldev/aster/vega/scene/SceneBlendMode;
+	public static final field SATURATION Ldev/aster/vega/scene/SceneBlendMode;
+	public static final field SCREEN Ldev/aster/vega/scene/SceneBlendMode;
+	public static final field SOFT_LIGHT Ldev/aster/vega/scene/SceneBlendMode;
+	public static fun getEntries ()Lkotlin/enums/EnumEntries;
+	public static fun valueOf (Ljava/lang/String;)Ldev/aster/vega/scene/SceneBlendMode;
+	public static fun values ()[Ldev/aster/vega/scene/SceneBlendMode;
+}
+
+public final class dev/aster/vega/scene/SceneColor {
+	public static final field Companion Ldev/aster/vega/scene/SceneColor$Companion;
+	public fun <init> (DDDD)V
+	public synthetic fun <init> (DDDDILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()D
+	public final fun component2 ()D
+	public final fun component3 ()D
+	public final fun component4 ()D
+	public final fun copy (DDDD)Ldev/aster/vega/scene/SceneColor;
+	public static synthetic fun copy$default (Ldev/aster/vega/scene/SceneColor;DDDDILjava/lang/Object;)Ldev/aster/vega/scene/SceneColor;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getAlpha ()D
+	public final fun getBlue ()D
+	public final fun getGreen ()D
+	public final fun getRed ()D
+	public fun hashCode ()I
+	public final fun isTransparent ()Z
+	public final fun toArgb ()I
+	public final fun toCssHex ()Ljava/lang/String;
+	public final fun toCssRgb ()Ljava/lang/String;
+	public final fun toHsl ()Lkotlin/Triple;
+	public fun toString ()Ljava/lang/String;
+	public final fun withAlpha (D)Ldev/aster/vega/scene/SceneColor;
+}
+
+public final class dev/aster/vega/scene/SceneColor$Companion {
+	public final fun acceptedByD3 (Ljava/lang/String;)Z
+	public final fun fromArgb (I)Ldev/aster/vega/scene/SceneColor;
+	public final fun getBlack ()Ldev/aster/vega/scene/SceneColor;
+	public final fun getTransparent ()Ldev/aster/vega/scene/SceneColor;
+	public final fun getWhite ()Ldev/aster/vega/scene/SceneColor;
+	public final fun parse (Ljava/lang/String;)Ldev/aster/vega/scene/SceneColor;
+}
+
+public final class dev/aster/vega/scene/SceneHitIndex {
+	public fun <init> (Ldev/aster/vega/scene/Scene;Ldev/aster/vega/scene/HitTestOptions;)V
+	public synthetic fun <init> (Ldev/aster/vega/scene/Scene;Ldev/aster/vega/scene/HitTestOptions;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun getIndexedNodeCount ()I
+	public final fun getUsesSpatialIndex ()Z
+	public final fun hitTest (Ldev/aster/vega/scene/PointD;)Ldev/aster/vega/scene/HitResult;
+	public final fun nodesIntersecting (Ldev/aster/vega/scene/RectD;)Ljava/util/List;
+}
+
+public final class dev/aster/vega/scene/SceneKt {
+	public static final fun findNode-DetAXdY (Ldev/aster/vega/scene/Scene;J)Ldev/aster/vega/scene/SceneNode;
+	public static final fun flatten (Ldev/aster/vega/scene/Scene;)Ljava/util/List;
+	public static final fun paintOrder (Ljava/util/List;)Ljava/util/List;
+	public static final fun walk (Ldev/aster/vega/scene/SceneNode;Lkotlin/jvm/functions/Function2;)V
+}
+
+public abstract interface class dev/aster/vega/scene/SceneNode {
+	public abstract fun getBounds ()Ldev/aster/vega/scene/RectD;
+	public abstract fun getId-aJBrClo ()J
+	public abstract fun getMetadata ()Ldev/aster/vega/scene/NodeMetadata;
+	public abstract fun getOpacity ()D
+	public abstract fun getTransform ()Ldev/aster/vega/scene/Transform2D;
+	public abstract fun getVisible ()Z
+}
+
+public final class dev/aster/vega/scene/SceneNodeId {
+	public static final field Companion Ldev/aster/vega/scene/SceneNodeId$Companion;
+	public static final synthetic fun box-impl (J)Ldev/aster/vega/scene/SceneNodeId;
+	public static fun constructor-impl (J)J
+	public fun equals (Ljava/lang/Object;)Z
+	public static fun equals-impl (JLjava/lang/Object;)Z
+	public static final fun equals-impl0 (JJ)Z
+	public final fun getValue ()J
+	public fun hashCode ()I
+	public static fun hashCode-impl (J)I
+	public fun toString ()Ljava/lang/String;
+	public static fun toString-impl (J)Ljava/lang/String;
+	public final synthetic fun unbox-impl ()J
+}
+
+public final class dev/aster/vega/scene/SceneNodeId$Companion {
+	public final fun getNone-aJBrClo ()J
+}
+
+public final class dev/aster/vega/scene/SceneNodeIdAllocator {
+	public fun <init> ()V
+	public fun <init> (J)V
+	public synthetic fun <init> (JILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun allocate-aJBrClo ()J
+	public final fun mark ()J
+	public final fun rewind (J)V
+}
+
+public final class dev/aster/vega/scene/SceneNodeKt {
+	public static final fun getTransformedBounds (Ldev/aster/vega/scene/SceneNode;)Ldev/aster/vega/scene/RectD;
+	public static final fun spokenNumber (D)Ljava/lang/String;
+	public static final fun transformedBy (Ldev/aster/vega/scene/PathData;Ldev/aster/vega/scene/Transform2D;)Ldev/aster/vega/scene/PathData;
+	public static final fun typeName (Ldev/aster/vega/scene/SceneNode;)Ljava/lang/String;
+	public static final fun withMetadata (Ldev/aster/vega/scene/SceneNode;Ldev/aster/vega/scene/NodeMetadata;)Ldev/aster/vega/scene/SceneNode;
+}
+
+public abstract interface class dev/aster/vega/scene/ScenePaint {
+	public static final field Companion Ldev/aster/vega/scene/ScenePaint$Companion;
+}
+
+public final class dev/aster/vega/scene/ScenePaint$Companion {
+	public final fun getBlack ()Ldev/aster/vega/scene/ScenePaint;
+	public final fun solid (Ldev/aster/vega/scene/SceneColor;)Ldev/aster/vega/scene/ScenePaint;
+}
+
+public final class dev/aster/vega/scene/ScenePaint$LinearGradient : dev/aster/vega/scene/ScenePaint {
+	public fun <init> (DDDDLjava/util/List;)V
+	public final fun component1 ()D
+	public final fun component2 ()D
+	public final fun component3 ()D
+	public final fun component4 ()D
+	public final fun component5 ()Ljava/util/List;
+	public final fun copy (DDDDLjava/util/List;)Ldev/aster/vega/scene/ScenePaint$LinearGradient;
+	public static synthetic fun copy$default (Ldev/aster/vega/scene/ScenePaint$LinearGradient;DDDDLjava/util/List;ILjava/lang/Object;)Ldev/aster/vega/scene/ScenePaint$LinearGradient;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getStops ()Ljava/util/List;
+	public final fun getX1 ()D
+	public final fun getX2 ()D
+	public final fun getY1 ()D
+	public final fun getY2 ()D
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class dev/aster/vega/scene/ScenePaint$RadialGradient : dev/aster/vega/scene/ScenePaint {
+	public fun <init> (DDDDDLjava/util/List;)V
+	public synthetic fun <init> (DDDDDLjava/util/List;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()D
+	public final fun component2 ()D
+	public final fun component3 ()D
+	public final fun component4 ()D
+	public final fun component5 ()D
+	public final fun component6 ()Ljava/util/List;
+	public final fun copy (DDDDDLjava/util/List;)Ldev/aster/vega/scene/ScenePaint$RadialGradient;
+	public static synthetic fun copy$default (Ldev/aster/vega/scene/ScenePaint$RadialGradient;DDDDDLjava/util/List;ILjava/lang/Object;)Ldev/aster/vega/scene/ScenePaint$RadialGradient;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getCx ()D
+	public final fun getCy ()D
+	public final fun getFocusX ()D
+	public final fun getFocusY ()D
+	public final fun getRadius ()D
+	public final fun getStops ()Ljava/util/List;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class dev/aster/vega/scene/ScenePaint$Solid : dev/aster/vega/scene/ScenePaint {
+	public static final synthetic fun box-impl (Ldev/aster/vega/scene/SceneColor;)Ldev/aster/vega/scene/ScenePaint$Solid;
+	public static fun constructor-impl (Ldev/aster/vega/scene/SceneColor;)Ldev/aster/vega/scene/SceneColor;
+	public fun equals (Ljava/lang/Object;)Z
+	public static fun equals-impl (Ldev/aster/vega/scene/SceneColor;Ljava/lang/Object;)Z
+	public static final fun equals-impl0 (Ldev/aster/vega/scene/SceneColor;Ldev/aster/vega/scene/SceneColor;)Z
+	public final fun getColor ()Ldev/aster/vega/scene/SceneColor;
+	public fun hashCode ()I
+	public static fun hashCode-impl (Ldev/aster/vega/scene/SceneColor;)I
+	public fun toString ()Ljava/lang/String;
+	public static fun toString-impl (Ldev/aster/vega/scene/SceneColor;)Ljava/lang/String;
+	public final synthetic fun unbox-impl ()Ldev/aster/vega/scene/SceneColor;
+}
+
+public final class dev/aster/vega/scene/SceneSnapshotKt {
+	public static final fun toCanonicalJson (Ldev/aster/vega/scene/Scene;IZZ)Ljava/lang/String;
+	public static synthetic fun toCanonicalJson$default (Ldev/aster/vega/scene/Scene;IZZILjava/lang/Object;)Ljava/lang/String;
+}
+
+public final class dev/aster/vega/scene/SceneSnapshotSerializer {
+	public fun <init> ()V
+	public fun <init> (IZZ)V
+	public synthetic fun <init> (IZZILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun serialize (Ldev/aster/vega/scene/Scene;)Ljava/lang/String;
+}
+
+public final class dev/aster/vega/scene/SizeD {
+	public static final field Companion Ldev/aster/vega/scene/SizeD$Companion;
+	public fun <init> (DD)V
+	public final fun component1 ()D
+	public final fun component2 ()D
+	public final fun copy (DD)Ldev/aster/vega/scene/SizeD;
+	public static synthetic fun copy$default (Ldev/aster/vega/scene/SizeD;DDILjava/lang/Object;)Ldev/aster/vega/scene/SizeD;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getHeight ()D
+	public final fun getWidth ()D
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class dev/aster/vega/scene/SizeD$Companion {
+	public final fun getZero ()Ldev/aster/vega/scene/SizeD;
+}
+
+public final class dev/aster/vega/scene/StepPosition : java/lang/Enum {
+	public static final field AFTER Ldev/aster/vega/scene/StepPosition;
+	public static final field BEFORE Ldev/aster/vega/scene/StepPosition;
+	public static final field MIDDLE Ldev/aster/vega/scene/StepPosition;
+	public static fun getEntries ()Lkotlin/enums/EnumEntries;
+	public static fun valueOf (Ljava/lang/String;)Ldev/aster/vega/scene/StepPosition;
+	public static fun values ()[Ldev/aster/vega/scene/StepPosition;
+}
+
+public final class dev/aster/vega/scene/Stroke {
+	public static final field Companion Ldev/aster/vega/scene/Stroke$Companion;
+	public static final field DEFAULT_MITER_LIMIT D
+	public fun <init> (Ldev/aster/vega/scene/ScenePaint;DLdev/aster/vega/scene/StrokeCap;Ldev/aster/vega/scene/StrokeJoin;DLjava/util/List;DD)V
+	public synthetic fun <init> (Ldev/aster/vega/scene/ScenePaint;DLdev/aster/vega/scene/StrokeCap;Ldev/aster/vega/scene/StrokeJoin;DLjava/util/List;DDILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun boundsExpansion (Z)D
+	public static synthetic fun boundsExpansion$default (Ldev/aster/vega/scene/Stroke;ZILjava/lang/Object;)D
+	public final fun component1 ()Ldev/aster/vega/scene/ScenePaint;
+	public final fun component2 ()D
+	public final fun component3 ()Ldev/aster/vega/scene/StrokeCap;
+	public final fun component4 ()Ldev/aster/vega/scene/StrokeJoin;
+	public final fun component5 ()D
+	public final fun component6 ()Ljava/util/List;
+	public final fun component7 ()D
+	public final fun component8 ()D
+	public final fun copy (Ldev/aster/vega/scene/ScenePaint;DLdev/aster/vega/scene/StrokeCap;Ldev/aster/vega/scene/StrokeJoin;DLjava/util/List;DD)Ldev/aster/vega/scene/Stroke;
+	public static synthetic fun copy$default (Ldev/aster/vega/scene/Stroke;Ldev/aster/vega/scene/ScenePaint;DLdev/aster/vega/scene/StrokeCap;Ldev/aster/vega/scene/StrokeJoin;DLjava/util/List;DDILjava/lang/Object;)Ldev/aster/vega/scene/Stroke;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getCap ()Ldev/aster/vega/scene/StrokeCap;
+	public final fun getDashArray ()Ljava/util/List;
+	public final fun getDashOffset ()D
+	public final fun getHalfWidth ()D
+	public final fun getJoin ()Ldev/aster/vega/scene/StrokeJoin;
+	public final fun getMiterLimit ()D
+	public final fun getOpacity ()D
+	public final fun getPaint ()Ldev/aster/vega/scene/ScenePaint;
+	public final fun getWidth ()D
+	public fun hashCode ()I
+	public final fun isVisible ()Z
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class dev/aster/vega/scene/Stroke$Companion {
+}
+
+public final class dev/aster/vega/scene/StrokeCap : java/lang/Enum {
+	public static final field BUTT Ldev/aster/vega/scene/StrokeCap;
+	public static final field ROUND Ldev/aster/vega/scene/StrokeCap;
+	public static final field SQUARE Ldev/aster/vega/scene/StrokeCap;
+	public static fun getEntries ()Lkotlin/enums/EnumEntries;
+	public static fun valueOf (Ljava/lang/String;)Ldev/aster/vega/scene/StrokeCap;
+	public static fun values ()[Ldev/aster/vega/scene/StrokeCap;
+}
+
+public final class dev/aster/vega/scene/StrokeJoin : java/lang/Enum {
+	public static final field BEVEL Ldev/aster/vega/scene/StrokeJoin;
+	public static final field MITER Ldev/aster/vega/scene/StrokeJoin;
+	public static final field ROUND Ldev/aster/vega/scene/StrokeJoin;
+	public static fun getEntries ()Lkotlin/enums/EnumEntries;
+	public static fun valueOf (Ljava/lang/String;)Ldev/aster/vega/scene/StrokeJoin;
+	public static fun values ()[Ldev/aster/vega/scene/StrokeJoin;
+}
+
+public final class dev/aster/vega/scene/SvgPath {
+	public static final field INSTANCE Ldev/aster/vega/scene/SvgPath;
+	public final fun parse (Ljava/lang/String;)Ldev/aster/vega/scene/SvgPath$Result;
+}
+
+public final class dev/aster/vega/scene/SvgPath$Result {
+	public fun <init> (Ldev/aster/vega/scene/PathData;Z)V
+	public final fun component1 ()Ldev/aster/vega/scene/PathData;
+	public final fun component2 ()Z
+	public final fun copy (Ldev/aster/vega/scene/PathData;Z)Ldev/aster/vega/scene/SvgPath$Result;
+	public static synthetic fun copy$default (Ldev/aster/vega/scene/SvgPath$Result;Ldev/aster/vega/scene/PathData;ZILjava/lang/Object;)Ldev/aster/vega/scene/SvgPath$Result;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getComplete ()Z
+	public final fun getPath ()Ldev/aster/vega/scene/PathData;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class dev/aster/vega/scene/SymbolNode : dev/aster/vega/scene/SceneNode {
+	public synthetic fun <init> (JDDDLdev/aster/vega/scene/SymbolShape;DLdev/aster/vega/scene/Fill;Ldev/aster/vega/scene/Stroke;Ldev/aster/vega/scene/PathData;Ldev/aster/vega/scene/Transform2D;DZLdev/aster/vega/scene/NodeMetadata;Ldev/aster/vega/scene/SceneBlendMode;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public synthetic fun <init> (JDDDLdev/aster/vega/scene/SymbolShape;DLdev/aster/vega/scene/Fill;Ldev/aster/vega/scene/Stroke;Ldev/aster/vega/scene/PathData;Ldev/aster/vega/scene/Transform2D;DZLdev/aster/vega/scene/NodeMetadata;Ldev/aster/vega/scene/SceneBlendMode;Lkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1-aJBrClo ()J
+	public final fun component10 ()Ldev/aster/vega/scene/Transform2D;
+	public final fun component11 ()D
+	public final fun component12 ()Z
+	public final fun component13 ()Ldev/aster/vega/scene/NodeMetadata;
+	public final fun component14 ()Ldev/aster/vega/scene/SceneBlendMode;
+	public final fun component2 ()D
+	public final fun component3 ()D
+	public final fun component4 ()D
+	public final fun component5 ()Ldev/aster/vega/scene/SymbolShape;
+	public final fun component6 ()D
+	public final fun component7 ()Ldev/aster/vega/scene/Fill;
+	public final fun component8 ()Ldev/aster/vega/scene/Stroke;
+	public final fun component9 ()Ldev/aster/vega/scene/PathData;
+	public final fun copy-Y0LsSP4 (JDDDLdev/aster/vega/scene/SymbolShape;DLdev/aster/vega/scene/Fill;Ldev/aster/vega/scene/Stroke;Ldev/aster/vega/scene/PathData;Ldev/aster/vega/scene/Transform2D;DZLdev/aster/vega/scene/NodeMetadata;Ldev/aster/vega/scene/SceneBlendMode;)Ldev/aster/vega/scene/SymbolNode;
+	public static synthetic fun copy-Y0LsSP4$default (Ldev/aster/vega/scene/SymbolNode;JDDDLdev/aster/vega/scene/SymbolShape;DLdev/aster/vega/scene/Fill;Ldev/aster/vega/scene/Stroke;Ldev/aster/vega/scene/PathData;Ldev/aster/vega/scene/Transform2D;DZLdev/aster/vega/scene/NodeMetadata;Ldev/aster/vega/scene/SceneBlendMode;ILjava/lang/Object;)Ldev/aster/vega/scene/SymbolNode;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getAngleDegrees ()D
+	public final fun getBlendMode ()Ldev/aster/vega/scene/SceneBlendMode;
+	public fun getBounds ()Ldev/aster/vega/scene/RectD;
+	public final fun getCustomPath ()Ldev/aster/vega/scene/PathData;
+	public final fun getFill ()Ldev/aster/vega/scene/Fill;
+	public fun getId-aJBrClo ()J
+	public fun getMetadata ()Ldev/aster/vega/scene/NodeMetadata;
+	public fun getOpacity ()D
+	public final fun getOutline ()Ldev/aster/vega/scene/PathData;
+	public final fun getReference ()D
+	public final fun getShape ()Ldev/aster/vega/scene/SymbolShape;
+	public final fun getSize ()D
+	public final fun getStroke ()Ldev/aster/vega/scene/Stroke;
+	public fun getTransform ()Ldev/aster/vega/scene/Transform2D;
+	public fun getVisible ()Z
+	public final fun getX ()D
+	public final fun getY ()D
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class dev/aster/vega/scene/SymbolShape : java/lang/Enum {
+	public static final field ARROW Ldev/aster/vega/scene/SymbolShape;
+	public static final field CIRCLE Ldev/aster/vega/scene/SymbolShape;
+	public static final field CROSS Ldev/aster/vega/scene/SymbolShape;
+	public static final field DIAMOND Ldev/aster/vega/scene/SymbolShape;
+	public static final field SQUARE Ldev/aster/vega/scene/SymbolShape;
+	public static final field STROKE Ldev/aster/vega/scene/SymbolShape;
+	public static final field TRIANGLE Ldev/aster/vega/scene/SymbolShape;
+	public static final field TRIANGLE_DOWN Ldev/aster/vega/scene/SymbolShape;
+	public static final field TRIANGLE_LEFT Ldev/aster/vega/scene/SymbolShape;
+	public static final field TRIANGLE_RIGHT Ldev/aster/vega/scene/SymbolShape;
+	public static final field TRIANGLE_UP Ldev/aster/vega/scene/SymbolShape;
+	public static final field WEDGE Ldev/aster/vega/scene/SymbolShape;
+	public static fun getEntries ()Lkotlin/enums/EnumEntries;
+	public static fun valueOf (Ljava/lang/String;)Ldev/aster/vega/scene/SymbolShape;
+	public static fun values ()[Ldev/aster/vega/scene/SymbolShape;
+}
+
+public final class dev/aster/vega/scene/TextAlign : java/lang/Enum {
+	public static final field CENTER Ldev/aster/vega/scene/TextAlign;
+	public static final field LEFT Ldev/aster/vega/scene/TextAlign;
+	public static final field RIGHT Ldev/aster/vega/scene/TextAlign;
+	public static fun getEntries ()Lkotlin/enums/EnumEntries;
+	public static fun valueOf (Ljava/lang/String;)Ldev/aster/vega/scene/TextAlign;
+	public static fun values ()[Ldev/aster/vega/scene/TextAlign;
+}
+
+public final class dev/aster/vega/scene/TextBaseline : java/lang/Enum {
+	public static final field ALPHABETIC Ldev/aster/vega/scene/TextBaseline;
+	public static final field BOTTOM Ldev/aster/vega/scene/TextBaseline;
+	public static final field LINE_BOTTOM Ldev/aster/vega/scene/TextBaseline;
+	public static final field LINE_TOP Ldev/aster/vega/scene/TextBaseline;
+	public static final field MIDDLE Ldev/aster/vega/scene/TextBaseline;
+	public static final field TOP Ldev/aster/vega/scene/TextBaseline;
+	public static fun getEntries ()Lkotlin/enums/EnumEntries;
+	public static fun valueOf (Ljava/lang/String;)Ldev/aster/vega/scene/TextBaseline;
+	public static fun values ()[Ldev/aster/vega/scene/TextBaseline;
+}
+
+public final class dev/aster/vega/scene/TextDirection : java/lang/Enum {
+	public static final field LTR Ldev/aster/vega/scene/TextDirection;
+	public static final field RTL Ldev/aster/vega/scene/TextDirection;
+	public static fun getEntries ()Lkotlin/enums/EnumEntries;
+	public static fun valueOf (Ljava/lang/String;)Ldev/aster/vega/scene/TextDirection;
+	public static fun values ()[Ldev/aster/vega/scene/TextDirection;
+}
+
+public abstract interface class dev/aster/vega/scene/TextEngine {
+	public abstract fun layout (Ldev/aster/vega/scene/TextRun;Ldev/aster/vega/scene/SizeD;)Ldev/aster/vega/scene/TextLayout;
+	public static synthetic fun layout$default (Ldev/aster/vega/scene/TextEngine;Ldev/aster/vega/scene/TextRun;Ldev/aster/vega/scene/SizeD;ILjava/lang/Object;)Ldev/aster/vega/scene/TextLayout;
+	public abstract fun measure (Ldev/aster/vega/scene/TextRun;Ldev/aster/vega/scene/SizeD;)Ldev/aster/vega/scene/TextMetrics;
+	public static synthetic fun measure$default (Ldev/aster/vega/scene/TextEngine;Ldev/aster/vega/scene/TextRun;Ldev/aster/vega/scene/SizeD;ILjava/lang/Object;)Ldev/aster/vega/scene/TextMetrics;
+}
+
+public final class dev/aster/vega/scene/TextEngine$DefaultImpls {
+	public static synthetic fun layout$default (Ldev/aster/vega/scene/TextEngine;Ldev/aster/vega/scene/TextRun;Ldev/aster/vega/scene/SizeD;ILjava/lang/Object;)Ldev/aster/vega/scene/TextLayout;
+	public static synthetic fun measure$default (Ldev/aster/vega/scene/TextEngine;Ldev/aster/vega/scene/TextRun;Ldev/aster/vega/scene/SizeD;ILjava/lang/Object;)Ldev/aster/vega/scene/TextMetrics;
+}
+
+public final class dev/aster/vega/scene/TextKt {
+	public static final fun displayLine (Ldev/aster/vega/scene/TextRun;Ljava/lang/String;Lkotlin/jvm/functions/Function1;)Ljava/lang/String;
+	public static final fun displayLines (Ldev/aster/vega/scene/TextRun;Lkotlin/jvm/functions/Function1;)Ljava/util/List;
+	public static final fun textBounds (Ldev/aster/vega/scene/TextRun;Ldev/aster/vega/scene/TextMetrics;)Ldev/aster/vega/scene/RectD;
+}
+
+public final class dev/aster/vega/scene/TextLayout {
+	public fun <init> (Ldev/aster/vega/scene/TextRun;Ldev/aster/vega/scene/TextMetrics;Ljava/util/List;Ldev/aster/vega/scene/RectD;)V
+	public final fun component1 ()Ldev/aster/vega/scene/TextRun;
+	public final fun component2 ()Ldev/aster/vega/scene/TextMetrics;
+	public final fun component3 ()Ljava/util/List;
+	public final fun component4 ()Ldev/aster/vega/scene/RectD;
+	public final fun copy (Ldev/aster/vega/scene/TextRun;Ldev/aster/vega/scene/TextMetrics;Ljava/util/List;Ldev/aster/vega/scene/RectD;)Ldev/aster/vega/scene/TextLayout;
+	public static synthetic fun copy$default (Ldev/aster/vega/scene/TextLayout;Ldev/aster/vega/scene/TextRun;Ldev/aster/vega/scene/TextMetrics;Ljava/util/List;Ldev/aster/vega/scene/RectD;ILjava/lang/Object;)Ldev/aster/vega/scene/TextLayout;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getBounds ()Ldev/aster/vega/scene/RectD;
+	public final fun getLines ()Ljava/util/List;
+	public final fun getMetrics ()Ldev/aster/vega/scene/TextMetrics;
+	public final fun getRun ()Ldev/aster/vega/scene/TextRun;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class dev/aster/vega/scene/TextLayoutCache : dev/aster/vega/scene/TextEngine {
+	public fun <init> (Ldev/aster/vega/scene/TextEngine;I)V
+	public synthetic fun <init> (Ldev/aster/vega/scene/TextEngine;IILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun clear ()V
+	public final fun getSize ()I
+	public fun layout (Ldev/aster/vega/scene/TextRun;Ldev/aster/vega/scene/SizeD;)Ldev/aster/vega/scene/TextLayout;
+	public fun measure (Ldev/aster/vega/scene/TextRun;Ldev/aster/vega/scene/SizeD;)Ldev/aster/vega/scene/TextMetrics;
+}
+
+public final class dev/aster/vega/scene/TextLine {
+	public fun <init> (Ljava/lang/String;DD)V
+	public final fun component1 ()Ljava/lang/String;
+	public final fun component2 ()D
+	public final fun component3 ()D
+	public final fun copy (Ljava/lang/String;DD)Ldev/aster/vega/scene/TextLine;
+	public static synthetic fun copy$default (Ldev/aster/vega/scene/TextLine;Ljava/lang/String;DDILjava/lang/Object;)Ldev/aster/vega/scene/TextLine;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getBaselineY ()D
+	public final fun getText ()Ljava/lang/String;
+	public final fun getWidth ()D
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class dev/aster/vega/scene/TextMetrics {
+	public fun <init> (DDDDID)V
+	public final fun component1 ()D
+	public final fun component2 ()D
+	public final fun component3 ()D
+	public final fun component4 ()D
+	public final fun component5 ()I
+	public final fun component6 ()D
+	public final fun copy (DDDDID)Ldev/aster/vega/scene/TextMetrics;
+	public static synthetic fun copy$default (Ldev/aster/vega/scene/TextMetrics;DDDDIDILjava/lang/Object;)Ldev/aster/vega/scene/TextMetrics;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getAscent ()D
+	public final fun getDescent ()D
+	public final fun getHeight ()D
+	public final fun getLineCount ()I
+	public final fun getLineHeight ()D
+	public final fun getWidth ()D
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class dev/aster/vega/scene/TextNode : dev/aster/vega/scene/SceneNode {
+	public synthetic fun <init> (JDDLdev/aster/vega/scene/TextLayout;Ldev/aster/vega/scene/Fill;Ldev/aster/vega/scene/Stroke;DLdev/aster/vega/scene/Transform2D;DZLdev/aster/vega/scene/NodeMetadata;Ldev/aster/vega/scene/SceneBlendMode;ZILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public synthetic fun <init> (JDDLdev/aster/vega/scene/TextLayout;Ldev/aster/vega/scene/Fill;Ldev/aster/vega/scene/Stroke;DLdev/aster/vega/scene/Transform2D;DZLdev/aster/vega/scene/NodeMetadata;Ldev/aster/vega/scene/SceneBlendMode;ZLkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1-aJBrClo ()J
+	public final fun component10 ()Z
+	public final fun component11 ()Ldev/aster/vega/scene/NodeMetadata;
+	public final fun component12 ()Ldev/aster/vega/scene/SceneBlendMode;
+	public final fun component13 ()Z
+	public final fun component2 ()D
+	public final fun component3 ()D
+	public final fun component4 ()Ldev/aster/vega/scene/TextLayout;
+	public final fun component5 ()Ldev/aster/vega/scene/Fill;
+	public final fun component6 ()Ldev/aster/vega/scene/Stroke;
+	public final fun component7 ()D
+	public final fun component8 ()Ldev/aster/vega/scene/Transform2D;
+	public final fun component9 ()D
+	public final fun copy-3VHcDDE (JDDLdev/aster/vega/scene/TextLayout;Ldev/aster/vega/scene/Fill;Ldev/aster/vega/scene/Stroke;DLdev/aster/vega/scene/Transform2D;DZLdev/aster/vega/scene/NodeMetadata;Ldev/aster/vega/scene/SceneBlendMode;Z)Ldev/aster/vega/scene/TextNode;
+	public static synthetic fun copy-3VHcDDE$default (Ldev/aster/vega/scene/TextNode;JDDLdev/aster/vega/scene/TextLayout;Ldev/aster/vega/scene/Fill;Ldev/aster/vega/scene/Stroke;DLdev/aster/vega/scene/Transform2D;DZLdev/aster/vega/scene/NodeMetadata;Ldev/aster/vega/scene/SceneBlendMode;ZILjava/lang/Object;)Ldev/aster/vega/scene/TextNode;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getAbsent ()Z
+	public final fun getAngleDegrees ()D
+	public final fun getBlendMode ()Ldev/aster/vega/scene/SceneBlendMode;
+	public fun getBounds ()Ldev/aster/vega/scene/RectD;
+	public final fun getFill ()Ldev/aster/vega/scene/Fill;
+	public fun getId-aJBrClo ()J
+	public final fun getLayout ()Ldev/aster/vega/scene/TextLayout;
+	public fun getMetadata ()Ldev/aster/vega/scene/NodeMetadata;
+	public fun getOpacity ()D
+	public final fun getStroke ()Ldev/aster/vega/scene/Stroke;
+	public final fun getText ()Ljava/lang/String;
+	public fun getTransform ()Ldev/aster/vega/scene/Transform2D;
+	public fun getVisible ()Z
+	public final fun getX ()D
+	public final fun getY ()D
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class dev/aster/vega/scene/TextRun {
+	public fun <init> (Ljava/lang/String;Ldev/aster/vega/scene/TextStyle;Ldev/aster/vega/scene/TextAlign;Ldev/aster/vega/scene/TextBaseline;DLjava/lang/String;Ljava/lang/String;Ljava/util/List;)V
+	public synthetic fun <init> (Ljava/lang/String;Ldev/aster/vega/scene/TextStyle;Ldev/aster/vega/scene/TextAlign;Ldev/aster/vega/scene/TextBaseline;DLjava/lang/String;Ljava/lang/String;Ljava/util/List;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()Ljava/lang/String;
+	public final fun component2 ()Ldev/aster/vega/scene/TextStyle;
+	public final fun component3 ()Ldev/aster/vega/scene/TextAlign;
+	public final fun component4 ()Ldev/aster/vega/scene/TextBaseline;
+	public final fun component5 ()D
+	public final fun component6 ()Ljava/lang/String;
+	public final fun component7 ()Ljava/lang/String;
+	public final fun component8 ()Ljava/util/List;
+	public final fun copy (Ljava/lang/String;Ldev/aster/vega/scene/TextStyle;Ldev/aster/vega/scene/TextAlign;Ldev/aster/vega/scene/TextBaseline;DLjava/lang/String;Ljava/lang/String;Ljava/util/List;)Ldev/aster/vega/scene/TextRun;
+	public static synthetic fun copy$default (Ldev/aster/vega/scene/TextRun;Ljava/lang/String;Ldev/aster/vega/scene/TextStyle;Ldev/aster/vega/scene/TextAlign;Ldev/aster/vega/scene/TextBaseline;DLjava/lang/String;Ljava/lang/String;Ljava/util/List;ILjava/lang/Object;)Ldev/aster/vega/scene/TextRun;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getAlign ()Ldev/aster/vega/scene/TextAlign;
+	public final fun getBaseline ()Ldev/aster/vega/scene/TextBaseline;
+	public final fun getEllipsis ()Ljava/lang/String;
+	public final fun getLimit ()D
+	public final fun getLineBreak ()Ljava/lang/String;
+	public final fun getLines ()Ljava/util/List;
+	public final fun getStyle ()Ldev/aster/vega/scene/TextStyle;
+	public final fun getText ()Ljava/lang/String;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class dev/aster/vega/scene/TextStyle {
+	public fun <init> ()V
+	public fun <init> (Ljava/lang/String;DILdev/aster/vega/scene/FontStyle;DLjava/lang/Double;Ljava/lang/String;Ldev/aster/vega/scene/TextDirection;)V
+	public synthetic fun <init> (Ljava/lang/String;DILdev/aster/vega/scene/FontStyle;DLjava/lang/Double;Ljava/lang/String;Ldev/aster/vega/scene/TextDirection;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()Ljava/lang/String;
+	public final fun component2 ()D
+	public final fun component3 ()I
+	public final fun component4 ()Ldev/aster/vega/scene/FontStyle;
+	public final fun component5 ()D
+	public final fun component6 ()Ljava/lang/Double;
+	public final fun component7 ()Ljava/lang/String;
+	public final fun component8 ()Ldev/aster/vega/scene/TextDirection;
+	public final fun copy (Ljava/lang/String;DILdev/aster/vega/scene/FontStyle;DLjava/lang/Double;Ljava/lang/String;Ldev/aster/vega/scene/TextDirection;)Ldev/aster/vega/scene/TextStyle;
+	public static synthetic fun copy$default (Ldev/aster/vega/scene/TextStyle;Ljava/lang/String;DILdev/aster/vega/scene/FontStyle;DLjava/lang/Double;Ljava/lang/String;Ldev/aster/vega/scene/TextDirection;ILjava/lang/Object;)Ldev/aster/vega/scene/TextStyle;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getDirection ()Ldev/aster/vega/scene/TextDirection;
+	public final fun getFontFamily ()Ljava/lang/String;
+	public final fun getFontSize ()D
+	public final fun getFontStyle ()Ldev/aster/vega/scene/FontStyle;
+	public final fun getFontWeight ()I
+	public final fun getLetterSpacing ()D
+	public final fun getLineHeight ()Ljava/lang/Double;
+	public final fun getLocale ()Ljava/lang/String;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class dev/aster/vega/scene/TrailPath {
+	public static final field INSTANCE Ldev/aster/vega/scene/TrailPath;
+	public final fun build (Ljava/util/List;)Ldev/aster/vega/scene/PathData;
+}
+
+public final class dev/aster/vega/scene/Transform2D {
+	public static final field Companion Ldev/aster/vega/scene/Transform2D$Companion;
+	public fun <init> (DDDDDD)V
+	public final fun apply (DD)Ldev/aster/vega/scene/PointD;
+	public final fun apply (Ldev/aster/vega/scene/PointD;)Ldev/aster/vega/scene/PointD;
+	public final fun component1 ()D
+	public final fun component2 ()D
+	public final fun component3 ()D
+	public final fun component4 ()D
+	public final fun component5 ()D
+	public final fun component6 ()D
+	public final fun concat (Ldev/aster/vega/scene/Transform2D;)Ldev/aster/vega/scene/Transform2D;
+	public final fun copy (DDDDDD)Ldev/aster/vega/scene/Transform2D;
+	public static synthetic fun copy$default (Ldev/aster/vega/scene/Transform2D;DDDDDDILjava/lang/Object;)Ldev/aster/vega/scene/Transform2D;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getA ()D
+	public final fun getB ()D
+	public final fun getC ()D
+	public final fun getD ()D
+	public final fun getDeterminant ()D
+	public final fun getE ()D
+	public final fun getF ()D
+	public fun hashCode ()I
+	public final fun invert ()Ldev/aster/vega/scene/Transform2D;
+	public final fun isIdentity ()Z
+	public final fun mapBounds (Ldev/aster/vega/scene/RectD;)Ldev/aster/vega/scene/RectD;
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class dev/aster/vega/scene/Transform2D$Companion {
+	public final fun getIdentity ()Ldev/aster/vega/scene/Transform2D;
+	public final fun rotateDegrees (D)Ldev/aster/vega/scene/Transform2D;
+	public final fun rotateRadians (D)Ldev/aster/vega/scene/Transform2D;
+	public final fun scale (DD)Ldev/aster/vega/scene/Transform2D;
+	public static synthetic fun scale$default (Ldev/aster/vega/scene/Transform2D$Companion;DDILjava/lang/Object;)Ldev/aster/vega/scene/Transform2D;
+	public final fun translate (DD)Ldev/aster/vega/scene/Transform2D;
+}
+
+public final class dev/aster/vega/scene/VectorD {
+	public static final field Companion Ldev/aster/vega/scene/VectorD$Companion;
+	public fun <init> (DD)V
+	public final fun component1 ()D
+	public final fun component2 ()D
+	public final fun copy (DD)Ldev/aster/vega/scene/VectorD;
+	public static synthetic fun copy$default (Ldev/aster/vega/scene/VectorD;DDILjava/lang/Object;)Ldev/aster/vega/scene/VectorD;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getDx ()D
+	public final fun getDy ()D
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class dev/aster/vega/scene/VectorD$Companion {
+	public final fun getZero ()Ldev/aster/vega/scene/VectorD;
+}
+

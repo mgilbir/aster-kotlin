@@ -1,0 +1,331 @@
+public abstract interface class dev/aster/vega/compose/mp/DrawBrush {
+	public abstract fun getAlpha ()D
+}
+
+public final class dev/aster/vega/compose/mp/DrawBrush$Linear : dev/aster/vega/compose/mp/DrawBrush {
+	public static final field $stable I
+	public fun <init> (Ldev/aster/vega/compose/mp/DrawPoint;Ldev/aster/vega/compose/mp/DrawPoint;Ljava/util/List;D)V
+	public final fun component1 ()Ldev/aster/vega/compose/mp/DrawPoint;
+	public final fun component2 ()Ldev/aster/vega/compose/mp/DrawPoint;
+	public final fun component3 ()Ljava/util/List;
+	public final fun component4 ()D
+	public final fun copy (Ldev/aster/vega/compose/mp/DrawPoint;Ldev/aster/vega/compose/mp/DrawPoint;Ljava/util/List;D)Ldev/aster/vega/compose/mp/DrawBrush$Linear;
+	public static synthetic fun copy$default (Ldev/aster/vega/compose/mp/DrawBrush$Linear;Ldev/aster/vega/compose/mp/DrawPoint;Ldev/aster/vega/compose/mp/DrawPoint;Ljava/util/List;DILjava/lang/Object;)Ldev/aster/vega/compose/mp/DrawBrush$Linear;
+	public fun equals (Ljava/lang/Object;)Z
+	public fun getAlpha ()D
+	public final fun getFrom ()Ldev/aster/vega/compose/mp/DrawPoint;
+	public final fun getStops ()Ljava/util/List;
+	public final fun getTo ()Ldev/aster/vega/compose/mp/DrawPoint;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class dev/aster/vega/compose/mp/DrawBrush$Radial : dev/aster/vega/compose/mp/DrawBrush {
+	public static final field $stable I
+	public fun <init> (Ldev/aster/vega/compose/mp/DrawPoint;DLjava/util/List;D)V
+	public final fun component1 ()Ldev/aster/vega/compose/mp/DrawPoint;
+	public final fun component2 ()D
+	public final fun component3 ()Ljava/util/List;
+	public final fun component4 ()D
+	public final fun copy (Ldev/aster/vega/compose/mp/DrawPoint;DLjava/util/List;D)Ldev/aster/vega/compose/mp/DrawBrush$Radial;
+	public static synthetic fun copy$default (Ldev/aster/vega/compose/mp/DrawBrush$Radial;Ldev/aster/vega/compose/mp/DrawPoint;DLjava/util/List;DILjava/lang/Object;)Ldev/aster/vega/compose/mp/DrawBrush$Radial;
+	public fun equals (Ljava/lang/Object;)Z
+	public fun getAlpha ()D
+	public final fun getCenter ()Ldev/aster/vega/compose/mp/DrawPoint;
+	public final fun getRadius ()D
+	public final fun getStops ()Ljava/util/List;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class dev/aster/vega/compose/mp/DrawBrush$Solid : dev/aster/vega/compose/mp/DrawBrush {
+	public static final field $stable I
+	public fun <init> (Ldev/aster/vega/compose/mp/DrawPaint;)V
+	public final fun component1 ()Ldev/aster/vega/compose/mp/DrawPaint;
+	public final fun copy (Ldev/aster/vega/compose/mp/DrawPaint;)Ldev/aster/vega/compose/mp/DrawBrush$Solid;
+	public static synthetic fun copy$default (Ldev/aster/vega/compose/mp/DrawBrush$Solid;Ldev/aster/vega/compose/mp/DrawPaint;ILjava/lang/Object;)Ldev/aster/vega/compose/mp/DrawBrush$Solid;
+	public fun equals (Ljava/lang/Object;)Z
+	public fun getAlpha ()D
+	public final fun getPaint ()Ldev/aster/vega/compose/mp/DrawPaint;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class dev/aster/vega/compose/mp/DrawCorners {
+	public static final field $stable I
+	public static final field Companion Ldev/aster/vega/compose/mp/DrawCorners$Companion;
+	public fun <init> (DDDD)V
+	public final fun component1 ()D
+	public final fun component2 ()D
+	public final fun component3 ()D
+	public final fun component4 ()D
+	public final fun copy (DDDD)Ldev/aster/vega/compose/mp/DrawCorners;
+	public static synthetic fun copy$default (Ldev/aster/vega/compose/mp/DrawCorners;DDDDILjava/lang/Object;)Ldev/aster/vega/compose/mp/DrawCorners;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getBottomLeft ()D
+	public final fun getBottomRight ()D
+	public final fun getTopLeft ()D
+	public final fun getTopRight ()D
+	public fun hashCode ()I
+	public final fun isSquare ()Z
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class dev/aster/vega/compose/mp/DrawCorners$Companion {
+	public final fun getSquare ()Ldev/aster/vega/compose/mp/DrawCorners;
+}
+
+public final class dev/aster/vega/compose/mp/DrawImageFit : java/lang/Enum {
+	public static final field CONTAIN Ldev/aster/vega/compose/mp/DrawImageFit;
+	public static final field FILL Ldev/aster/vega/compose/mp/DrawImageFit;
+	public static fun getEntries ()Lkotlin/enums/EnumEntries;
+	public static fun valueOf (Ljava/lang/String;)Ldev/aster/vega/compose/mp/DrawImageFit;
+	public static fun values ()[Ldev/aster/vega/compose/mp/DrawImageFit;
+}
+
+public final class dev/aster/vega/compose/mp/DrawLineCap : java/lang/Enum {
+	public static final field Butt Ldev/aster/vega/compose/mp/DrawLineCap;
+	public static final field Round Ldev/aster/vega/compose/mp/DrawLineCap;
+	public static final field Square Ldev/aster/vega/compose/mp/DrawLineCap;
+	public static fun getEntries ()Lkotlin/enums/EnumEntries;
+	public static fun valueOf (Ljava/lang/String;)Ldev/aster/vega/compose/mp/DrawLineCap;
+	public static fun values ()[Ldev/aster/vega/compose/mp/DrawLineCap;
+}
+
+public final class dev/aster/vega/compose/mp/DrawLineJoin : java/lang/Enum {
+	public static final field Bevel Ldev/aster/vega/compose/mp/DrawLineJoin;
+	public static final field Miter Ldev/aster/vega/compose/mp/DrawLineJoin;
+	public static final field Round Ldev/aster/vega/compose/mp/DrawLineJoin;
+	public static fun getEntries ()Lkotlin/enums/EnumEntries;
+	public static fun valueOf (Ljava/lang/String;)Ldev/aster/vega/compose/mp/DrawLineJoin;
+	public static fun values ()[Ldev/aster/vega/compose/mp/DrawLineJoin;
+}
+
+public final class dev/aster/vega/compose/mp/DrawPaint {
+	public static final field $stable I
+	public static final field Companion Ldev/aster/vega/compose/mp/DrawPaint$Companion;
+	public fun <init> (DDDD)V
+	public final fun component1 ()D
+	public final fun component2 ()D
+	public final fun component3 ()D
+	public final fun component4 ()D
+	public final fun copy (DDDD)Ldev/aster/vega/compose/mp/DrawPaint;
+	public static synthetic fun copy$default (Ldev/aster/vega/compose/mp/DrawPaint;DDDDILjava/lang/Object;)Ldev/aster/vega/compose/mp/DrawPaint;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getAlpha ()D
+	public final fun getBlue ()D
+	public final fun getGreen ()D
+	public final fun getRed ()D
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class dev/aster/vega/compose/mp/DrawPaint$Companion {
+	public final fun of (Ldev/aster/vega/scene/SceneColor;)Ldev/aster/vega/compose/mp/DrawPaint;
+}
+
+public abstract interface class dev/aster/vega/compose/mp/DrawPathCommand {
+}
+
+public final class dev/aster/vega/compose/mp/DrawPathCommand$Close : dev/aster/vega/compose/mp/DrawPathCommand {
+	public static final field $stable I
+	public static final field INSTANCE Ldev/aster/vega/compose/mp/DrawPathCommand$Close;
+	public fun equals (Ljava/lang/Object;)Z
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class dev/aster/vega/compose/mp/DrawPathCommand$CubicTo : dev/aster/vega/compose/mp/DrawPathCommand {
+	public static final field $stable I
+	public fun <init> (Ldev/aster/vega/compose/mp/DrawPoint;Ldev/aster/vega/compose/mp/DrawPoint;Ldev/aster/vega/compose/mp/DrawPoint;)V
+	public final fun component1 ()Ldev/aster/vega/compose/mp/DrawPoint;
+	public final fun component2 ()Ldev/aster/vega/compose/mp/DrawPoint;
+	public final fun component3 ()Ldev/aster/vega/compose/mp/DrawPoint;
+	public final fun copy (Ldev/aster/vega/compose/mp/DrawPoint;Ldev/aster/vega/compose/mp/DrawPoint;Ldev/aster/vega/compose/mp/DrawPoint;)Ldev/aster/vega/compose/mp/DrawPathCommand$CubicTo;
+	public static synthetic fun copy$default (Ldev/aster/vega/compose/mp/DrawPathCommand$CubicTo;Ldev/aster/vega/compose/mp/DrawPoint;Ldev/aster/vega/compose/mp/DrawPoint;Ldev/aster/vega/compose/mp/DrawPoint;ILjava/lang/Object;)Ldev/aster/vega/compose/mp/DrawPathCommand$CubicTo;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getControl1 ()Ldev/aster/vega/compose/mp/DrawPoint;
+	public final fun getControl2 ()Ldev/aster/vega/compose/mp/DrawPoint;
+	public final fun getTo ()Ldev/aster/vega/compose/mp/DrawPoint;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class dev/aster/vega/compose/mp/DrawPathCommand$LineTo : dev/aster/vega/compose/mp/DrawPathCommand {
+	public static final field $stable I
+	public fun <init> (Ldev/aster/vega/compose/mp/DrawPoint;)V
+	public final fun component1 ()Ldev/aster/vega/compose/mp/DrawPoint;
+	public final fun copy (Ldev/aster/vega/compose/mp/DrawPoint;)Ldev/aster/vega/compose/mp/DrawPathCommand$LineTo;
+	public static synthetic fun copy$default (Ldev/aster/vega/compose/mp/DrawPathCommand$LineTo;Ldev/aster/vega/compose/mp/DrawPoint;ILjava/lang/Object;)Ldev/aster/vega/compose/mp/DrawPathCommand$LineTo;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getTo ()Ldev/aster/vega/compose/mp/DrawPoint;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class dev/aster/vega/compose/mp/DrawPathCommand$MoveTo : dev/aster/vega/compose/mp/DrawPathCommand {
+	public static final field $stable I
+	public fun <init> (Ldev/aster/vega/compose/mp/DrawPoint;)V
+	public final fun component1 ()Ldev/aster/vega/compose/mp/DrawPoint;
+	public final fun copy (Ldev/aster/vega/compose/mp/DrawPoint;)Ldev/aster/vega/compose/mp/DrawPathCommand$MoveTo;
+	public static synthetic fun copy$default (Ldev/aster/vega/compose/mp/DrawPathCommand$MoveTo;Ldev/aster/vega/compose/mp/DrawPoint;ILjava/lang/Object;)Ldev/aster/vega/compose/mp/DrawPathCommand$MoveTo;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getTo ()Ldev/aster/vega/compose/mp/DrawPoint;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class dev/aster/vega/compose/mp/DrawPoint {
+	public static final field $stable I
+	public fun <init> (DD)V
+	public final fun component1 ()D
+	public final fun component2 ()D
+	public final fun copy (DD)Ldev/aster/vega/compose/mp/DrawPoint;
+	public static synthetic fun copy$default (Ldev/aster/vega/compose/mp/DrawPoint;DDILjava/lang/Object;)Ldev/aster/vega/compose/mp/DrawPoint;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getX ()D
+	public final fun getY ()D
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class dev/aster/vega/compose/mp/DrawRect {
+	public static final field $stable I
+	public fun <init> (DDDD)V
+	public final fun component1 ()D
+	public final fun component2 ()D
+	public final fun component3 ()D
+	public final fun component4 ()D
+	public final fun copy (DDDD)Ldev/aster/vega/compose/mp/DrawRect;
+	public static synthetic fun copy$default (Ldev/aster/vega/compose/mp/DrawRect;DDDDILjava/lang/Object;)Ldev/aster/vega/compose/mp/DrawRect;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getHeight ()D
+	public final fun getWidth ()D
+	public final fun getX ()D
+	public final fun getY ()D
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class dev/aster/vega/compose/mp/DrawScopeTarget : dev/aster/vega/compose/mp/SceneDrawTarget {
+	public static final field $stable I
+	public fun <init> (Landroidx/compose/ui/graphics/drawscope/DrawScope;Landroidx/compose/ui/text/TextMeasurer;Lkotlin/jvm/functions/Function1;)V
+	public synthetic fun <init> (Landroidx/compose/ui/graphics/drawscope/DrawScope;Landroidx/compose/ui/text/TextMeasurer;Lkotlin/jvm/functions/Function1;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun beginGroup (Ldev/aster/vega/compose/mp/DrawRect;)V
+	public fun endGroup ()V
+	public final fun getUnresolvedImages ()Ljava/util/List;
+	public fun image (Ljava/lang/String;Ldev/aster/vega/scene/RasterImage;Ldev/aster/vega/compose/mp/DrawRect;Ldev/aster/vega/compose/mp/DrawImageFit;ZD)V
+	public fun line (Ldev/aster/vega/compose/mp/DrawPoint;Ldev/aster/vega/compose/mp/DrawPoint;Ldev/aster/vega/compose/mp/DrawStroke;)V
+	public fun path (Ljava/util/List;Ldev/aster/vega/compose/mp/DrawBrush;Ldev/aster/vega/compose/mp/DrawStroke;)V
+	public fun rect (Ldev/aster/vega/compose/mp/DrawRect;Ldev/aster/vega/compose/mp/DrawCorners;Ldev/aster/vega/compose/mp/DrawBrush;Ldev/aster/vega/compose/mp/DrawStroke;)V
+	public fun text (Ldev/aster/vega/compose/mp/DrawTextRun;Ldev/aster/vega/compose/mp/DrawBrush;Ldev/aster/vega/compose/mp/DrawStroke;)V
+}
+
+public final class dev/aster/vega/compose/mp/DrawStop {
+	public static final field $stable I
+	public fun <init> (DLdev/aster/vega/compose/mp/DrawPaint;)V
+	public final fun component1 ()D
+	public final fun component2 ()Ldev/aster/vega/compose/mp/DrawPaint;
+	public final fun copy (DLdev/aster/vega/compose/mp/DrawPaint;)Ldev/aster/vega/compose/mp/DrawStop;
+	public static synthetic fun copy$default (Ldev/aster/vega/compose/mp/DrawStop;DLdev/aster/vega/compose/mp/DrawPaint;ILjava/lang/Object;)Ldev/aster/vega/compose/mp/DrawStop;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getOffset ()D
+	public final fun getPaint ()Ldev/aster/vega/compose/mp/DrawPaint;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class dev/aster/vega/compose/mp/DrawStroke {
+	public static final field $stable I
+	public fun <init> (Ldev/aster/vega/compose/mp/DrawBrush;DLdev/aster/vega/compose/mp/DrawLineCap;Ldev/aster/vega/compose/mp/DrawLineJoin;DLjava/util/List;D)V
+	public final fun component1 ()Ldev/aster/vega/compose/mp/DrawBrush;
+	public final fun component2 ()D
+	public final fun component3 ()Ldev/aster/vega/compose/mp/DrawLineCap;
+	public final fun component4 ()Ldev/aster/vega/compose/mp/DrawLineJoin;
+	public final fun component5 ()D
+	public final fun component6 ()Ljava/util/List;
+	public final fun component7 ()D
+	public final fun copy (Ldev/aster/vega/compose/mp/DrawBrush;DLdev/aster/vega/compose/mp/DrawLineCap;Ldev/aster/vega/compose/mp/DrawLineJoin;DLjava/util/List;D)Ldev/aster/vega/compose/mp/DrawStroke;
+	public static synthetic fun copy$default (Ldev/aster/vega/compose/mp/DrawStroke;Ldev/aster/vega/compose/mp/DrawBrush;DLdev/aster/vega/compose/mp/DrawLineCap;Ldev/aster/vega/compose/mp/DrawLineJoin;DLjava/util/List;DILjava/lang/Object;)Ldev/aster/vega/compose/mp/DrawStroke;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getBrush ()Ldev/aster/vega/compose/mp/DrawBrush;
+	public final fun getCap ()Ldev/aster/vega/compose/mp/DrawLineCap;
+	public final fun getDash ()Ljava/util/List;
+	public final fun getDashOffset ()D
+	public final fun getJoin ()Ldev/aster/vega/compose/mp/DrawLineJoin;
+	public final fun getMiterLimit ()D
+	public final fun getWidth ()D
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class dev/aster/vega/compose/mp/DrawTextRun {
+	public static final field $stable I
+	public fun <init> (Ljava/lang/String;Ldev/aster/vega/compose/mp/DrawPoint;Ldev/aster/vega/compose/mp/DrawPoint;DLjava/lang/String;DIZD)V
+	public final fun component1 ()Ljava/lang/String;
+	public final fun component2 ()Ldev/aster/vega/compose/mp/DrawPoint;
+	public final fun component3 ()Ldev/aster/vega/compose/mp/DrawPoint;
+	public final fun component4 ()D
+	public final fun component5 ()Ljava/lang/String;
+	public final fun component6 ()D
+	public final fun component7 ()I
+	public final fun component8 ()Z
+	public final fun component9 ()D
+	public final fun copy (Ljava/lang/String;Ldev/aster/vega/compose/mp/DrawPoint;Ldev/aster/vega/compose/mp/DrawPoint;DLjava/lang/String;DIZD)Ldev/aster/vega/compose/mp/DrawTextRun;
+	public static synthetic fun copy$default (Ldev/aster/vega/compose/mp/DrawTextRun;Ljava/lang/String;Ldev/aster/vega/compose/mp/DrawPoint;Ldev/aster/vega/compose/mp/DrawPoint;DLjava/lang/String;DIZDILjava/lang/Object;)Ldev/aster/vega/compose/mp/DrawTextRun;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getAnchor ()Ldev/aster/vega/compose/mp/DrawPoint;
+	public final fun getAngleDegrees ()D
+	public final fun getAscent ()D
+	public final fun getFontFamily ()Ljava/lang/String;
+	public final fun getFontSize ()D
+	public final fun getFontWeight ()I
+	public final fun getItalic ()Z
+	public final fun getOrigin ()Ldev/aster/vega/compose/mp/DrawPoint;
+	public final fun getText ()Ljava/lang/String;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class dev/aster/vega/compose/mp/RecordingTarget : dev/aster/vega/compose/mp/SceneDrawTarget {
+	public static final field $stable I
+	public fun <init> ()V
+	public fun beginGroup (Ldev/aster/vega/compose/mp/DrawRect;)V
+	public fun endGroup ()V
+	public final fun getCalls ()Ljava/util/List;
+	public fun image (Ljava/lang/String;Ldev/aster/vega/scene/RasterImage;Ldev/aster/vega/compose/mp/DrawRect;Ldev/aster/vega/compose/mp/DrawImageFit;ZD)V
+	public fun line (Ldev/aster/vega/compose/mp/DrawPoint;Ldev/aster/vega/compose/mp/DrawPoint;Ldev/aster/vega/compose/mp/DrawStroke;)V
+	public fun path (Ljava/util/List;Ldev/aster/vega/compose/mp/DrawBrush;Ldev/aster/vega/compose/mp/DrawStroke;)V
+	public fun rect (Ldev/aster/vega/compose/mp/DrawRect;Ldev/aster/vega/compose/mp/DrawCorners;Ldev/aster/vega/compose/mp/DrawBrush;Ldev/aster/vega/compose/mp/DrawStroke;)V
+	public fun text (Ldev/aster/vega/compose/mp/DrawTextRun;Ldev/aster/vega/compose/mp/DrawBrush;Ldev/aster/vega/compose/mp/DrawStroke;)V
+	public fun toString ()Ljava/lang/String;
+}
+
+public abstract interface class dev/aster/vega/compose/mp/SceneDrawTarget {
+	public abstract fun beginGroup (Ldev/aster/vega/compose/mp/DrawRect;)V
+	public abstract fun endGroup ()V
+	public abstract fun image (Ljava/lang/String;Ldev/aster/vega/scene/RasterImage;Ldev/aster/vega/compose/mp/DrawRect;Ldev/aster/vega/compose/mp/DrawImageFit;ZD)V
+	public abstract fun line (Ldev/aster/vega/compose/mp/DrawPoint;Ldev/aster/vega/compose/mp/DrawPoint;Ldev/aster/vega/compose/mp/DrawStroke;)V
+	public abstract fun path (Ljava/util/List;Ldev/aster/vega/compose/mp/DrawBrush;Ldev/aster/vega/compose/mp/DrawStroke;)V
+	public abstract fun rect (Ldev/aster/vega/compose/mp/DrawRect;Ldev/aster/vega/compose/mp/DrawCorners;Ldev/aster/vega/compose/mp/DrawBrush;Ldev/aster/vega/compose/mp/DrawStroke;)V
+	public abstract fun text (Ldev/aster/vega/compose/mp/DrawTextRun;Ldev/aster/vega/compose/mp/DrawBrush;Ldev/aster/vega/compose/mp/DrawStroke;)V
+}
+
+public final class dev/aster/vega/compose/mp/SceneFit : java/lang/Enum {
+	public static final field Contain Ldev/aster/vega/compose/mp/SceneFit;
+	public static final field None Ldev/aster/vega/compose/mp/SceneFit;
+	public static fun getEntries ()Lkotlin/enums/EnumEntries;
+	public static fun valueOf (Ljava/lang/String;)Ldev/aster/vega/compose/mp/SceneFit;
+	public static fun values ()[Ldev/aster/vega/compose/mp/SceneFit;
+}
+
+public final class dev/aster/vega/compose/mp/SceneWalk {
+	public static final field $stable I
+	public fun <init> ()V
+	public final fun draw (Ldev/aster/vega/scene/Scene;Ldev/aster/vega/compose/mp/SceneDrawTarget;)V
+}
+
+public final class dev/aster/vega/compose/mp/VegaChartKt {
+	public static final fun VegaChart (Ldev/aster/vega/scene/Scene;Landroidx/compose/ui/Modifier;Ldev/aster/vega/compose/mp/SceneFit;Landroidx/compose/ui/text/TextMeasurer;Landroidx/compose/runtime/Composer;II)V
+}
+
