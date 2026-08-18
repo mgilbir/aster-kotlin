@@ -168,9 +168,19 @@ identical text metrics, rendering, hit testing and accessibility. See
 `DrawScope`, so it runs on Android, iOS and the desktop with no `View` beneath it.
 
 ```kotlin
-val compiled = SpecCompiler(textEngine).compileJson(specJson)
-compiled.scene?.let { VegaChart(scene = it, modifier = Modifier.fillMaxSize()) }
+// The engine measures with the composition's own font, density and text scale, and the chart draws
+// with the same ones. Compiling with something else — `MetricTextEngine`, say — lays the chart out
+// from advances no font would draw.
+val textEngine = rememberVegaTextEngine()
+val compiled = remember(textEngine, specJson) { SpecCompiler(textEngine).compileJson(specJson) }
+
+compiled.scene?.let {
+  VegaChart(scene = it, modifier = Modifier.fillMaxSize(), textEngine = textEngine)
+}
 ```
+
+A host that ships its own face passes a resolver — `rememberVegaTextEngine { FontFamily(googleSansFlex) }`
+— and both the measurement and the drawing use it.
 
 ## Export example
 
@@ -227,10 +237,6 @@ lifecycleScope.launch {
   en-US: `TimeFormat` says so at the top of the file. A Dutch chart gets English month abbreviations on
   its time axis. A host can override a particular axis with `axis.format`, which is applied over the
   derived properties.
-- **The Compose Multiplatform renderer measures text with `MetricTextEngine`**, whose advance is a
-  ratio of the font size and matches no real font, so its axis labels are laid out from widths that are
-  not the ones it draws with. The Android View and the CoreGraphics renderers measure with the font
-  they draw with.
 - **`width: "container"` falls back to `config.view.continuousWidth`.** `containerSize()` has no
   container to measure outside a browser; a host that knows its available width sets the `width` signal
   itself.

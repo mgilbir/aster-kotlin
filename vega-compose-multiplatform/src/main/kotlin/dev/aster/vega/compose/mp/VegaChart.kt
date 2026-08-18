@@ -5,10 +5,10 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.drawscope.scale
 import androidx.compose.ui.graphics.drawscope.translate
-import androidx.compose.ui.text.TextMeasurer
-import androidx.compose.ui.text.rememberTextMeasurer
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
 import dev.aster.vega.scene.Scene
 
@@ -31,19 +31,31 @@ public fun VegaChart(
   scene: Scene,
   modifier: Modifier = Modifier,
   fit: SceneFit = SceneFit.Contain,
-  textMeasurer: TextMeasurer = rememberTextMeasurer(),
+  textEngine: ComposeTextEngine = rememberVegaTextEngine(),
 ) {
   val walk = remember { SceneWalk() }
+  val density = LocalDensity.current.density
   // The scene's size first, so a caller's modifier can override it and a caller without one still
   // gets a chart. Scene units are CSS pixels, which is what a dp is on the platforms this runs on.
   Canvas(modifier = Modifier.size(scene.width.dp, scene.height.dp).then(modifier)) {
     val scale =
       when (fit) {
-        SceneFit.None -> 1.0f
+        // **The density, not one.** A scene unit is a dp, so "its own size" means one scene unit
+        // per
+        // dp — which is `density` pixels. Drawing at a scale of 1 made the chart come out at a
+        // third
+        // of its size on a 3x screen while every glyph was drawn at the right size, because text
+        // went
+        // through `sp` and everything else did not. Both halves of that are fixed here and in
+        // `DrawScopeTarget.text`.
+        SceneFit.None -> density
         SceneFit.Contain ->
           if (scene.width <= 0.0 || scene.height <= 0.0) {
-            1.0f
+            density
           } else {
+            // Already in pixels on both sides — `size` is the canvas's pixel size and the scene's
+            // own
+            // size is in dp — so this factor carries the density with it.
             minOf(size.width / scene.width.toFloat(), size.height / scene.height.toFloat())
           }
       }
@@ -52,8 +64,15 @@ public fun VegaChart(
     val left = if (fit == SceneFit.None) 0f else (size.width - scene.width.toFloat() * scale) / 2f
     val top = if (fit == SceneFit.None) 0f else (size.height - scene.height.toFloat() * scale) / 2f
     translate(left = left, top = top) {
-      scale(scale = scale, pivot = androidx.compose.ui.geometry.Offset.Zero) {
-        walk.draw(scene, DrawScopeTarget(this, textMeasurer))
+      scale(scale = scale, pivot = Offset.Zero) {
+        walk.draw(
+          scene,
+          DrawScopeTarget(
+            scope = this,
+            textMeasurer = textEngine.measurer,
+            fontFamilyResolver = textEngine.fontFamilyResolver,
+          ),
+        )
       }
     }
   }
@@ -64,6 +83,6 @@ public enum class SceneFit {
   /** Scaled to fit, keeping its aspect ratio, and centred. */
   Contain,
 
-  /** Drawn at its own size, in the slot's top-left corner. */
+  /** Drawn at its own size — one scene unit per dp — in the slot's top-left corner. */
   None,
 }
