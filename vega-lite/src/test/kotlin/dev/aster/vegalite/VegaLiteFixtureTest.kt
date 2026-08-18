@@ -5,6 +5,7 @@ import dev.aster.vega.model.VegaJson
 import dev.aster.vega.model.VegaValue
 import java.io.File
 import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertNull
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.params.ParameterizedTest
@@ -136,6 +137,77 @@ class VegaLiteFixtureTest {
     val vega = requireNotNull(compiled.toJson()) { "no Vega specification" }
     assertTrue(vega.contains("child_child_width"), "the innermost cell is two levels deep")
     assertTrue(vega.contains("child_cell"), "the inner cell group")
+  }
+
+  @Test
+  fun `a composition a grid cannot hold is reported rather than dropped`() {
+    // The worst of the three failure modes this compiler had: a concatenation inside a grid used to
+    // **compile**, and compile to the wrong chart. The facet channels were carried down into a leaf
+    // that never reads an encoding, so the grid vanished and what came out was a bare concatenation
+    // — with no diagnostic at all. A wrong chart with nothing said is the thing this repository
+    // least wants, so the assertion is on the report and not only on the refusal.
+    val compiled =
+      VegaLiteCompiler()
+        .compileJson(
+          """
+          {
+            "data": {"values": [{"a": "p", "x": 1}]},
+            "facet": {"column": {"field": "a"}},
+            "spec": {
+              "hconcat": [
+                {"mark": "point", "encoding": {"x": {"field": "x", "type": "quantitative"}}}
+              ]
+            }
+          }
+          """
+            .trimIndent()
+        )
+    assertNull(compiled.toJson(), "a chart that cannot be compiled should produce nothing")
+    val reported =
+      compiled.diagnostics.filter { it.code == VegaLiteDiagnostics.UNSUPPORTED_COMPOSITION }
+    assertTrue(reported.isNotEmpty(), "it should be reported, got ${compiled.diagnostics}")
+    assertTrue(
+      reported.first().message.contains("hconcat"),
+      "and the report should name the composition: ${reported.first().message}",
+    )
+  }
+
+  @Test
+  fun `a composition inside a layer names the composition and not a missing mark`() {
+    // It was reported as a **missing mark**, which named the symptom: a `facet` has no `mark` of
+    // its
+    // own, so the first thing to fail was the innermost check. That sent the reader looking for a
+    // mark in a specification whose trouble was the composition around it.
+    val compiled =
+      VegaLiteCompiler()
+        .compileJson(
+          """
+          {
+            "data": {"values": [{"a": "p", "x": 1}]},
+            "layer": [
+              {
+                "facet": {"column": {"field": "a"}},
+                "spec": {
+                  "mark": "point",
+                  "encoding": {"x": {"field": "x", "type": "quantitative"}}
+                }
+              }
+            ]
+          }
+          """
+            .trimIndent()
+        )
+    val reported =
+      compiled.diagnostics.filter { it.code == VegaLiteDiagnostics.UNSUPPORTED_COMPOSITION }
+    assertTrue(reported.isNotEmpty(), "it should be reported, got ${compiled.diagnostics}")
+    assertTrue(
+      reported.first().message.contains("facet") && reported.first().message.contains("layer"),
+      "naming both sides of it: ${reported.first().message}",
+    )
+    assertTrue(
+      compiled.diagnostics.none { it.code == VegaLiteDiagnostics.MISSING_MARK },
+      "and not as a missing mark: ${compiled.diagnostics}",
+    )
   }
 
   @Test

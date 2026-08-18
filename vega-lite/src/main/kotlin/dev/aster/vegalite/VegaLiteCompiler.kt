@@ -1701,6 +1701,21 @@ private class Compilation(
       ) {
         parent.array("layer").orEmpty().forEachIndexed { index, layer ->
           val child = layer as? VegaValue.Obj ?: return@forEachIndexed
+          // A layer's member is a view or a layer of views — never a composition that arranges
+          // plots. Upstream refuses these too, throwing while it normalises; this compiler used to
+          // report a **missing mark** instead, which named the symptom and sent the reader looking
+          // for a mark in a specification whose trouble was the composition around it.
+          for (composition in listOf("facet", "repeat", "hconcat", "vconcat", "concat")) {
+            if (!child.has(composition)) continue
+            diagnostics.fatal(
+              VegaLiteDiagnostics.UNSUPPORTED_COMPOSITION,
+              "A `$composition` inside a `layer` is not implemented, and is not a chart Vega-Lite " +
+                "describes: a layer draws its members over one another, so each is a view or a " +
+                "layer of views.",
+              jsonPath = "$path.layer[$index].$composition",
+            )
+            return
+          }
           val merged = inherited(parent, child)
           // A layer that names itself is compiled under that name, which is what a `repeat` over
           // `layer` relies on: its copies are `child__layer_b`, not `layer_0`.
