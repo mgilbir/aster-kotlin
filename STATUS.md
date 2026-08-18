@@ -1,11 +1,14 @@
 # Status
 
-Last updated: 2026-08-09
+Where the work stands, as of the commit this file was last changed in — `git log -1 STATUS.md` is the
+date, so there is no banner here to go stale. Numbers that can be derived are: `DocumentedNumbersTest`
+compares the counts in this file against the code and the corpus and fails when they drift, and
+`test-fixtures/INDEX.md` is generated from the fixtures themselves.
 
 ## Picking this up
 
-- **Branch `milestone-0-bootstrap`. Nothing has been pushed, and nothing goes on `main`.** The name is
-  now historical; the work has run well past Milestone 0.
+- Work happens on a branch and lands on `main` through a pull request. CI (`.github/workflows/ci.yml`)
+  runs the gate on Linux and macOS for every push and pull request.
 - Read `CONTRIBUTING.md` first. The method matters more than the remaining feature list: probe upstream
   before implementing, add a fixture and expect it to fail, report anything unsupported by name.
 - `./scripts/check.sh` is the gate — format, all tests, lint, demo APK. `./scripts/oracle.sh`
@@ -17,12 +20,16 @@ Last updated: 2026-08-09
 ## Current milestone
 
 Milestones 0, 1 and 2 complete. **Milestones 3, 4 and 5 in progress**: Vega specifications compile
-end to end — expressions, signals, 50 of upstream's 51 data transforms, every scale type in scope,
-and an event handler that recompiles the chart — and are verified against upstream Vega by
+end to end — expressions, signals, 49 of upstream's 51 documented data transforms, every scale
+type in scope, and an event handler that recompiles the chart — and are verified against upstream Vega by
 differential tests.
 
-One hundred and thirty-eight differential fixtures pass, all matching upstream exactly on every mark and
-scale output:
+191 Vega differential fixtures and 281 Vega-Lite fixtures pass, every one of them matching upstream
+exactly on every mark and scale output. The complete list is generated rather than written down —
+`test-fixtures/INDEX.md`, one row per fixture with its mark count, mark types, transforms and scales,
+regenerated and checked by `FixtureIndexTest`. What follows is the annotated set: the landmark fixtures
+and what each was added to pin down. Every name in it is checked to still exist by
+`DocumentedNumbersTest`.
 
 | Fixture | Marks | Covers |
 | --- | --- | --- |
@@ -104,35 +111,35 @@ scale output:
 | `qq-plot` | 332 | two plots gridded side by side, a url from a signal, `quantileNormal`, gridlines that undo an axis offset |
 | `budget-forecasts` | 77 | `argmin` over a filtered group, a scaled channel taking its value from a signal, `bandPosition`, a label placed by an axis `encode` block |
 | `probability-density` | 533 | a scale over a dataset and two datasets over that scale — the case no fixed order of the phases resolves; a `normal` density whose mean and stdev come from another dataset's aggregate |
-| `published-signals` | 11 | a signal reading a signal an `extent` transform *published*, sizing a scale range and a mark width |
+| `published-signals` | 16 | a signal reading a signal an `extent` transform *published*, sizing a scale range and a mark width |
 | `bin-settings` | 36 | `bin` publishing the settings it chose, a `nice: false` extent that does not divide evenly, an anchored grid, and a value that falls off it |
-| `autosize-fit` | 30 | the plotting area shrunk so the drawing comes out the declared size, with angled labels and two axis titles overhanging |
-| `autosize-fit-x` | 30 | the same on the horizontal axis only, the vertical growing the way `pad` does |
-| `autosize-fit-y` | 30 | and the same the other way round |
+| `autosize-fit` | 24 | the plotting area shrunk so the drawing comes out the declared size, with angled labels and two axis titles overhanging |
+| `autosize-fit-x` | 24 | the same on the horizontal axis only, the vertical growing the way `pad` does |
+| `autosize-fit-y` | 24 | and the same the other way round |
 | `stock-index-chart` | 53 | a CSV of `Jan 1 2000` dates, a label placed only by `y2`, `fit` sizing |
-| `overview-plus-detail` | 96 | the same dates, two linked views |
+| `overview-plus-detail` | 71 | the same dates, two linked views |
 | `parallel-coordinates` | 554 | a scale named per row by the datum, a field read off the parent under a name the datum supplies, one axis per column placed by a scaled `offset` |
 | `u-district-cuisine` | 252 | a ridgeline plot: `facet.aggregate`, mark `sort`, a literal domain with a signal in it, axis labels renamed through a second scale |
 | `platformer` | 7517 | `hsl` read apart and put back together, a self-referencing signal, a clipped group that scrolls past its window |
-| `pacman` | 1263 | `setdata` writing a dataset from a signal |
+| `pacman` | 392 | `setdata` writing a dataset from a signal |
 | `edge-bundling` | 989 | pre-faceted data and `treePath` over a stratified tree |
-| `radial-tree-layout` | 552 | Vega's radial tree: every node placed by a transform reading a computed signal, which used to draw the whole diagram on the origin |
+| `radial-tree-layout` | 755 | Vega's radial tree: every node placed by a transform reading a computed signal, which used to draw the whole diagram on the origin |
 | `donut-chart-labelled` | 108 | Vega's labelled donut: 33 label slots of which nine are filled, leader lines with no outline, and debug rectangles left invisible |
-| `multi-source-pluck` | 12 | a dataset concatenating two sources, and a signal plucking one column out of the result |
+| `multi-source-pluck` | 14 | a dataset concatenating two sources, and a signal plucking one column out of the result |
 | `interactive-legend` | 454 | a brush `rect` with no `x` until someone drags one, and a legend swatch whose opacity is a conditional rule |
 | `histogram-null-values` | 47 | Vega's film-rating histogram: a scale whose ticks are `bin`'s own boundaries, a second band scale for the null bar, `fit` sizing, and 3,201 rows from a relative `url` |
 | `time-units` | 40 | Vega's time-unit bar chart: a scale domain whose *field name* comes from a signal, a band axis of instants labelled by `formatType: "time"` with a specifier `timeUnitSpecifier` chose, and an italic subtitle |
 | `calendar-view` | 6311 | Vega's calendar view: 21 faceted years ordered by a `sort` over the *datum*, `timeOffset` moving a week's Sunday to its Monday, axis labels hidden by a rule of their own, and a legend whose title stands beside its ramp |
 | `crossfilter-flights` | 171 | Vega's cross-filter: 200,000 rows binned three ways, `crossfilter` recording which range query each fails and `resolvefilter` reading those verdicts back per histogram |
-| `clock` | 93 | Vega's world clock, on a stopped clock: `now()` pinned to the same instant on both sides |
-| `watch` | 92 | The same face drawn from arcs, and the second example built on `now()` |
+| `clock` | 91 | Vega's world clock, on a stopped clock: `now()` pinned to the same instant on both sides |
+| `watch` | 90 | The same face drawn from arcs, and the second example built on `now()` |
 | `error-bars` | 61 | Vega's error bars: `ci0`/`ci1` by bootstrap, and a band axis whose ticks sit on the band edges with one more pegged to the leading one |
 | `hypothetical-outcome-plots` | 60 | Twelve bars whose heights are twelve draws from the chart's stream, in the order upstream draws them |
 | `volcano-contours` | 21 | Vega's contour plot of Maungawhau: marching squares over a 61 x 87 raster grid, drawn through a mark-level `geopath` |
 | `bar-line-toggle` | 100 | A chart that switches views by emptying one of two datasets, so half its scales have no domain at all |
 | `serpentine-timeline` | 80 | Vega's serpentine timeline: a scale reached from a `formula`, a `reverse` chosen by a signal, and eleven labels haloed by a text stroke |
 | `pi-monte-carlo` | 2148 | Vega's Monte Carlo estimate of pi: two styled cells laid out `align: none` and `bounds: flush`, a grid driven by a second scale, flushed end labels, and 2,000 seeded points |
-| `density-heatmaps` | 89 | Vega's density heatmaps: `kde2d` over a scatter, painted as an image by `heatmap` — three grids, one per series, each with its own colour |
+| `density-heatmaps` | 76 | Vega's density heatmaps: `kde2d` over a scatter, painted as an image by `heatmap` — three grids, one per series, each with its own colour |
 | `contour-plot` | 460 | Vega's contour plot: the same three densities under their contour lines, so the raster and the vector reading of one grid have to agree |
 | `packed-bubble` | 32 | Vega's packed bubble chart: a force simulation left **running**, so the picture is the single tick upstream takes before its timer would |
 | `force-directed` | 331 | Vega's Les Miserables node-link diagram: 300 iterations of collide, centre, n-body and link over 77 nodes, and the edges drawn from the ends the simulation resolved |
@@ -144,11 +151,11 @@ scale output:
 | `geo-points` | 30 | Six cities placed by `geopoint` under three projections at once, joined by rules so a misplaced point moves a line as well as a dot |
 | `airport-connections` | 650 | Vega's airport map: 49 states through `albersUsa`, and a **Voronoi** cell over each of 597 airports so the pointer always has a nearest one — invisible, and compared outline by outline |
 | `mark-join-key` | 23 | a mark `key` collapsing two rows onto one item, as text and as a number, beside a mark with no key that draws every row |
-| `mark-descriptions` | 12 | what a reader is told about a *mark*: a described series, a decorative rule hidden with `aria: false`, and items that name their own role |
+| `mark-descriptions` | 25 | what a reader is told about a *mark*: a described series, a decorative rule hidden with `aria: false`, and items that name their own role |
 | `axis-discretizing` | 89 | an axis on each of the four discretizing scales, whose ranges are steps rather than colours |
 | `scope-shadowing` | 11 | a group redeclaring a signal and a scale the outer scope already has, and an inner group shadowing the shadow |
 | `timeunit-dst-scale` | 37 | hourly readings bucketed by local and by UTC hours across the spring change, ticked by a two-hour interval |
-| `legend-discretizing` | 71 | the stacked colour bar each discretizing scale is legended as, and the same scale asked for as symbols labelled by range |
+| `legend-discretizing` | 66 | the stacked colour bar each discretizing scale is legended as, and the same scale asked for as symbols labelled by range |
 | `impute-pivot` | 41 | a missing series filled in before stacking, and the same table pivoted so a column is named by the data |
 | `nest-treemap` | 28 | a hierarchy built from a flat table by nesting two keys, sized by a treemap that sorts its nodes by their own totals |
 | `hierarchy-options` | 40 | the pack, partition and tree layouts with their own options: a radius column, rounding, padding, the cluster method, separation off, and output names of the specification's choosing |
@@ -169,70 +176,63 @@ against a harness that can say we are wrong — which golden tests cannot.
 
 ## Scope: how much of Vega this is
 
-Measured against the pinned upstream packages in `oracle-js/node_modules`, so these numbers are
-checkable rather than estimated.
+Measured against the pinned upstream packages the oracles install into `oracle-js/node_modules`, so the
+numbers are checkable rather than estimated, and pinned by `DocumentedNumbersTest` where they can be
+derived from this repository.
 
-Upstream Vega is 31 packages, roughly 28,500 lines of source, and leans on about 35,000 further lines
-of `d3-*` code (d3-scale, d3-shape, d3-time-format, d3-array, d3-interpolate) that a native port has to
-reimplement. It exposes **40 transforms, 119 expression functions, 12 mark types and ~15 scale types.**
+Upstream Vega is 31 packages, and leans on the `d3-*` libraries (d3-scale, d3-shape, d3-time-format,
+d3-array, d3-interpolate) that a native port has to reimplement. It exposes **51 documented data
+transforms, 119 expression functions and 12 mark types**.
 
-This repository is around 25,000 lines of main source and 11,000 of tests. It covers the **output half**
-of the pipeline, the testing and diagnostic infrastructure, and — as of Milestone 3 — a thin but
-upstream-verified slice through parsing, scales, rect encoding and axes:
+This repository is about 76,500 lines of main Kotlin, 27,700 of Kotlin tests and 5,300 of Swift. It
+covers the whole path from a specification to a drawn scene:
 
-| Built here | Upstream equivalent | State |
-| --- | --- | --- |
-| Scene graph, geometry, paths, hit index | part of `vega-scenegraph` (4,994) | 7 of 12 node types; rendering and hit-testing side only. All 12 symbol shapes pinned to upstream, plus outlines read from SVG path strings |
-| Canvas renderer, SVG serializer | rest of `vega-scenegraph` | complete for those 7 |
-| Diagnostics, canonical snapshots, goldens, oracle scaffolding | no upstream equivalent | complete |
-| `vega-scale` (linear, log, pow, sqrt, symlog, time, utc, band, point, ordinal, sequential) + d3-array ticks | 790 + parts of d3-scale, d3-array | every scale type in scope — the 11 continuous and discrete ones plus quantize, quantile, threshold and bin-ordinal — exact against upstream, with all 68 colour schemes |
-| `vega-parser` (width, height, padding, autosize, data, signals, scales, axes, legends, titles, marks, group scopes, `layout`, `config`) | 3,790 | a subset, and every property it does not read is reported by name |
-| `vega-encode` (mark encoders, axes, legends, titles) | 952 | all 12 mark encoders; axes, legends and titles including overlap removal, truncation and the `config` cascade; every one of Vega's seventeen interpolation methods with its own reading of `tension`; every encode channel in the vocabulary |
-| `vega-expression` + `vega-functions` | 2,388 | language complete; 82 of 119 functions, with 17 more reported by name and reason |
-| `vega-transforms` (35 of 40) | 3,754 | the 12 the brief lists plus `timeunit`, `pie`, `window`, `sequence`, `lookup`, `impute`, `cross`, `pivot`, `countpattern`, the statistical family — `quantile`, `regression`, `loess`, `kde`, `density`, `dotbin` — and the whole hierarchy family: `stratify`, `nest`, `treemap`, `partition`, `pack`, `tree`, plus `treelinks` and `linkpath`, which turn a laid-out tree into the edges drawn between its nodes. Exact against upstream |
-| `vega-dataflow` | 2,081 | contracts and scheduling only; no pulse propagation |
+| Built here | State |
+| --- | --- |
+| Scene graph, geometry, paths, hit index | Every node type the renderers draw, with tight bounds including stroke extents, affine transforms and cubic path maths. All 12 symbol shapes pinned to upstream, plus outlines read from SVG path strings |
+| Renderers | Android Canvas, Compose Multiplatform's `DrawScope`, CoreGraphics through Swift, and an SVG serializer; bitmap, PNG and PDF through the Canvas backend |
+| Diagnostics, canonical snapshots, goldens, oracle scaffolding | No upstream equivalent. Two differential oracles, one for Vega and one for Vega-Lite, with 191 Vega differential fixtures and 281 Vega-Lite fixtures |
+| Scales | The 16 scale types it models — the continuous and discrete ones plus `quantile`, `quantize`, `threshold`, `bin-ordinal` and `identity` — exact against upstream, with d3-exact ticks, `nice`, and all 68 colour schemes |
+| Specification parsing | Width, height, padding, autosize, data, signals, scales, axes, legends, titles, marks, group scopes, `layout` and `config`. Every property it does not read is reported by name |
+| Mark encoding, axes, legends, titles | All 12 mark encoders; guides including overlap removal, truncation and the `config` cascade; all seventeen interpolation methods, each with its own reading of `tension`; every encode channel in the vocabulary |
+| Expressions | The language is complete, and every one of upstream's 119 functions is implemented or resolved against the scope; `Functions.knownUnsupported` is empty and `ExpressionReferenceTest` carries upstream's own list, so one added upstream shows up as a failure |
+| Transforms | 49 of upstream's 51 documented data transforms, exact against upstream's own outputs |
+| Interaction | Event streams including `between`, signal updates, and the handlers a specification declares. Pan and zoom are a view transform |
+| Accessibility | One semantic tree in common code, consumed by the Android View and the Swift renderer; guide captions ported from upstream's own `aria.js` and checked against it |
 
-The entire data and specification half is absent:
+What is **not** here, and what a chart gets instead:
 
-| Missing | Upstream size | Here |
-| --- | --- | --- |
-| `vega-transforms` — the other 19 transforms | most of 3,754 | 0 |
-| `vega-dataflow` — pulse propagation and incremental evaluation | 2,081 | contracts only |
-| `vega-functions` — the other 44 functions, mostly colour, geo and selection | most of 790 | 0 |
-| Remaining scale types — quantile, quantize, threshold, bin-ordinal | rest of `vega-scale` | all four; their legends draw the right colours as swatches rather than upstream's stacked bar |
-| Line and area interpolation — `catmull-rom` and `bundle` | part of d3-shape | 0, reported; the step and spline families are implemented |
-| Banded legends, trellis footers, legend `symbolLimit` | parts of `vega-encode`, `vega-view-transforms` | 0, reported |
-| `vega-view`, `vega-view-transforms` — the view lifecycle and incremental layout | 2,623 | bounds, grid layout and label overlap removal |
-| `vega-event-selector` — event-stream DSL | 191 | 0 |
-| `vega-time`, `vega-format` — `timeunit`, locales, format strings | 587 + d3-format, d3-time-format | tick selection and default labels only |
-| geo, force, label, voronoi, wordcloud, crossfilter | ~4,300 | 0, and all explicit non-goals (PROJECT_BRIEF.md 3.3). The statistics and most of the hierarchy family that used to sit here are now done |
+| Missing | Here |
+| --- | --- |
+| Pulse propagation and incremental evaluation | Contracts and deterministic scheduling only; a transform recomputes its whole dataset. Correct, and slower than upstream on a large table |
+| `wordcloud` and `contour` | Reported by name. An unimplemented transform stops that dataset's pipeline rather than passing rows on that later stages were not meant to see |
+| Locales | Every generated month name, weekday name and number format is English and en-US; `TimeFormat` says so at the top of the file. A host can override one axis with `axis.format` |
+| A text engine for the Compose Multiplatform renderer | It falls back to `MetricTextEngine`, whose advance is a ratio of the font size and matches no real font, so its labels are laid out from widths it does not draw with |
+| Accessibility and activation on the Compose Multiplatform renderer | The tree is computed and that renderer does not expose it; the Android View and the Swift renderer do |
+| A container width for `width: "container"` | `containerSize()` has nothing to measure outside a browser, so the chart takes `config.view.continuousWidth`; a host that knows its width sets the `width` signal |
+| Domain adjustment and reset-zoom | Planned. Zoom moves the view, not the scale domains |
+| Performance measured on physical hardware | Not done. The microbenchmarks run, but not on a device |
 
-Full parity was never the goal — PROJECT_BRIEF.md 3.3 rules most of that last row out. But the brief's
-own MVP definition (section 23) stands at roughly **6.5 of its 15 criteria**, and the unmet ones are the
-substantive compatibility items:
+Full parity was never the goal — PROJECT_BRIEF.md 3.3 rules some of it out on purpose. The brief's own
+MVP definition (section 23) stands at **13 of its 15 criteria**:
 
 | MVP criterion | State |
 | --- | --- |
-| 1. Compiled Vega JSON loads without JavaScript | **Yes**, for a substantial subset — `VegaChartController.setSpec` loads it and the demo renders three bundled specifications on device |
-| 2. Bar, line, area, scatter, stacked bar render natively | **Yes** — all five compile from a specification, and small multiples of them too |
+| 1. Compiled Vega JSON loads without JavaScript | **Yes** — `VegaChartController.setSpec` compiles it, and the demos render bundled and pasted specifications on device |
+| 2. Bar, line, area, scatter, stacked bar render natively | **Yes** — all five, and small multiples of them |
 | 3. Axes, legends, labels and titles supported | **Yes** — all four |
-| 4. Basic transforms and scales execute in Kotlin | **Yes** — every scale type in scope, including time and UTC and the four discretizing ones, and 50 of upstream's 51 transforms |
+| 4. Basic transforms and scales execute in Kotlin | **Yes** — the 16 scale types it models, and 49 of upstream's 51 documented data transforms |
 | 5. Tap, hover, tooltip, selection, pan, zoom | Yes |
 | 6. View and Compose APIs | Yes |
 | 7. SVG, PNG, PDF export | Yes |
-| 8. TalkBack can describe and navigate | Partial — virtual nodes are tested by instrumentation, not with TalkBack itself |
-| 9. At least 100 compatibility fixtures pass | **Yes** — 188 |
+| 8. TalkBack can describe and navigate | **Partial** — explored manually with TalkBack on an API 37 emulator and pinned by instrumented tests; not on physical hardware, and the Compose Multiplatform renderer exposes no tree at all |
+| 9. At least 100 compatibility fixtures pass | **Yes** — 191 Vega differential fixtures |
 | 10. Core runtime has no Android dependency | Yes |
 | 11. Renders without WebView | Yes |
 | 12. Build and test loop runs from the terminal | Yes |
-| 13. Performance measured on a physical device | No |
-| 14. Unsupported features produce explicit diagnostics | Yes, in the areas that exist |
+| 13. Performance measured on a physical device | **No** |
+| 14. Unsupported features produce explicit diagnostics | Yes |
 | 15. Instructions to reproduce from a clean macOS install | Yes |
-
-Remaining work for the MVP subset — excluding the non-goals — is on the order of 8,000 more lines of
-Kotlin plus the fixture corpus. The foundation was built first deliberately (PROJECT_BRIEF.md milestone
-ordering), and the pipeline is now verified end to end on one fixture, but the bulk of Vega's behaviour
-— expressions, dataflow, transforms, the other eleven mark types — is still ahead.
 
 ## Completed work
 
@@ -286,7 +286,8 @@ ordering), and the pipeline is now verified end to end on one fixture, but the b
 - **Expression language**: lexer, precedence-climbing parser and tree-walking evaluator for the full
   JavaScript expression subset Vega uses. No `eval`, no reflection, no generated bytecode.
 - **JavaScript coercion semantics** in `JsSemantics`, pinned by 115 reference vectors from upstream.
-- **82 of upstream's 119 functions**, with the excluded ones reporting by name and reason.
+- **Every one of upstream's 119 functions**, implemented or resolved against the scope; the list of
+  known-unsupported ones is now empty and a test asserts it.
 - **Signals**: `update` beats `init` beats `value`, dependency-ordered, `width`/`height`/`padding`
   implicit, cycles reported as the path that closed them.
 - **Conditional encode rules** (`[{test, ...}, {...}]`) for every channel kind.

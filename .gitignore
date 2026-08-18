@@ -17,6 +17,11 @@ local.properties
 # Node
 node_modules/
 
+# Python bytecode. The release workflow's helper scripts are Python, and running one locally
+# leaves a __pycache__ beside it; one .pyc was committed that way.
+__pycache__/
+*.pyc
+
 # macOS
 .DS_Store
 
