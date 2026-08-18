@@ -6,6 +6,7 @@ import dev.aster.vega.model.VegaValue
 import dev.aster.vega.model.asDouble
 import dev.aster.vega.model.asNumberOrNull
 import dev.aster.vega.model.asString
+import dev.aster.vega.model.locale.VegaLocale
 import dev.aster.vega.model.spec.Anchor
 import dev.aster.vega.model.spec.AxisSpec
 import dev.aster.vega.model.spec.Orient
@@ -88,6 +89,13 @@ public class AxisBuilder(
    * still lays its labels out the way it always has.
    */
   private val channels: MarkEncoder? = null,
+  /**
+   * The language every generated name and number is written in.
+   *
+   * A tick label's month, a caption's sentence, a thousands separator. Defaults to d3's `en-US`, so
+   * a chart compiled without one is what upstream draws.
+   */
+  private val locale: VegaLocale = VegaLocale.EnglishUS,
 ) {
 
   /** One tick's label text and its position along the axis. */
@@ -512,6 +520,7 @@ public class AxisBuilder(
                       scaleTypes[spec.scale],
                       specifier,
                       spec.formatType,
+                      locale,
                     ))
                   ?.let {
                     AccessibilityDescriptor(
@@ -1178,7 +1187,7 @@ public class AxisBuilder(
     // ones whose labels would otherwise be their own values. It is what a chart uses to label a
     // band of instants, since there is no temporal scale anywhere to infer it from.
     // `formatType` decides the grammar and the shared formatter knows how; see [GuideFormat].
-    GuideFormat.timeLabeller(format, formatType)?.let { write ->
+    GuideFormat.timeLabeller(format, formatType, locale)?.let { write ->
       return { value ->
         val instant = value.asDouble()
         if (instant.isNaN()) value.asString() else write(instant)
@@ -1192,7 +1201,8 @@ public class AxisBuilder(
     if (format != null && scale is TimeScale) {
       return { value ->
         val instant = value.asDouble()
-        if (instant.isNaN()) value.asString() else TimeFormat.format(instant, format, scale.zone)
+        if (instant.isNaN()) value.asString()
+        else TimeFormat.format(instant, format, scale.zone, locale)
       }
     }
     // An explicit specifier replaces the precision the scale would have chosen, and applies only
@@ -1208,7 +1218,7 @@ public class AxisBuilder(
           is TransformedScale -> scale.domain
           is TimeScale -> scale.domain
         }
-      val labeller = Ticks.spanFormatter(format, numeric.first(), numeric.last(), count)
+      val labeller = Ticks.spanFormatter(format, numeric.first(), numeric.last(), count, locale)
       return { value ->
         val number = value.asDouble()
         if (number.isNaN()) value.asString() else labeller(number)
@@ -1216,15 +1226,15 @@ public class AxisBuilder(
     }
     return when (scale) {
       is LinearScale -> { value ->
-        scale.formatTick(value.asDouble(), count)
+        scale.formatTick(value.asDouble(), count, locale)
       }
       is TransformedScale -> { value ->
-        scale.formatTick(value.asDouble(), count)
+        scale.formatTick(value.asDouble(), count, locale)
       }
       // A time label is written at its own granularity — a January tick carries the year — so it
       // comes from the tick itself rather than from a shared precision.
       is TimeScale -> { value ->
-        TimeTicks.label(value.asDouble(), scale.zone)
+        TimeTicks.label(value.asDouble(), scale.zone, locale)
       }
       else -> { value ->
         value.asString()
@@ -1272,7 +1282,7 @@ public class AxisBuilder(
         // the
         // crowded ones and only it knows which.
         val format = labeller(scale, count, specifier, spec.formatType)
-        scale.ticks(count).zip(scale.tickLabels(count)).map { (value, label) ->
+        scale.ticks(count).zip(scale.tickLabels(count, locale)).map { (value, label) ->
           Tick(
             if (specifier == null && spec.formatType == null) label
             else format(VegaValue.Num(value)),
@@ -1293,7 +1303,7 @@ public class AxisBuilder(
             linear = false,
           )
         val format = labeller(scale, count, specifier, spec.formatType)
-        scale.ticks(count).zip(scale.tickLabels(count)).map { (value, label) ->
+        scale.ticks(count).zip(scale.tickLabels(count, locale)).map { (value, label) ->
           Tick(
             if (specifier == null && spec.formatType == null) label
             else format(VegaValue.Num(value)),
@@ -1318,7 +1328,8 @@ public class AxisBuilder(
           val format = labeller(scale, AxisDefaults.DEFAULT_TICK_COUNT, specifier, spec.formatType)
           return TimeTicks.intervalTicks(scale.domain, stepper).map { value ->
             Tick(
-              if (specifier == null && spec.formatType == null) TimeTicks.label(value, scale.zone)
+              if (specifier == null && spec.formatType == null)
+                TimeTicks.label(value, scale.zone, locale)
               else format(VegaValue.Num(value)),
               scale.apply(value),
               VegaValue.Num(value),
@@ -1339,7 +1350,7 @@ public class AxisBuilder(
         // time
         // axis was ignored and every label came back multi-formatted.
         val format = labeller(scale, count, specifier, spec.formatType)
-        scale.ticks(count).zip(scale.tickLabels(count)).map { (value, label) ->
+        scale.ticks(count).zip(scale.tickLabels(count, locale)).map { (value, label) ->
           Tick(
             if (specifier == null && spec.formatType == null) label
             else format(VegaValue.Num(value)),
@@ -1403,7 +1414,7 @@ public class AxisBuilder(
     formatType: String?,
   ): (VegaValue) -> String {
     if (scale is QuantizeScale) {
-      GuideFormat.timeLabeller(specifier, formatType)?.let { write ->
+      GuideFormat.timeLabeller(specifier, formatType, locale)?.let { write ->
         return { value ->
           val instant = value.asDouble()
           if (instant.isNaN()) value.asString() else write(instant)
@@ -1412,12 +1423,12 @@ public class AxisBuilder(
       val low = scale.domain.firstOrNull() ?: 0.0
       val high = scale.domain.lastOrNull() ?: 1.0
       if (specifier != null) {
-        val labeller = Ticks.spanFormatter(specifier, low, high, count)
+        val labeller = Ticks.spanFormatter(specifier, low, high, count, locale)
         return { value -> labeller(value.asDouble()) }
       }
       val step = Ticks.stepFrom(Ticks.tickIncrement(low, high, count))
       val precision = if (step.isFinite()) Ticks.precisionForStep(step) else 0
-      return { value -> formatTickLabel(value.asDouble(), precision) }
+      return { value -> formatTickLabel(value.asDouble(), precision, locale) }
     }
     return { value -> value.asString() }
   }

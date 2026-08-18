@@ -1,5 +1,6 @@
 package dev.aster.vega.runtime.compile
 
+import dev.aster.vega.model.locale.VegaLocale
 import dev.aster.vega.model.time.TimeFormat
 import dev.aster.vega.runtime.scale.Ticks
 import dev.aster.vega.runtime.scale.TimeTicks
@@ -25,7 +26,11 @@ internal object GuideFormat {
    * With no specifier the label is upstream's **multi**-format: each value is written at its own
    * granularity, so a January tick carries the year and the ones after it do not.
    */
-  fun timeLabeller(format: String?, formatType: String?): ((Double) -> String)? {
+  fun timeLabeller(
+    format: String?,
+    formatType: String?,
+    locale: VegaLocale = VegaLocale.EnglishUS,
+  ): ((Double) -> String)? {
     val zone =
       when (formatType) {
         "time" -> TimeZone.currentSystemDefault()
@@ -35,8 +40,8 @@ internal object GuideFormat {
     return { instant ->
       when {
         instant.isNaN() -> ""
-        format == null -> TimeTicks.label(instant, zone)
-        else -> TimeFormat.format(instant, format, zone)
+        format == null -> TimeTicks.label(instant, zone, locale)
+        else -> TimeFormat.format(instant, format, zone, locale)
       }
     }
   }

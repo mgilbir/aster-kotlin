@@ -5,6 +5,7 @@ import dev.aster.vega.model.DiagnosticCollector
 import dev.aster.vega.model.VegaValue
 import dev.aster.vega.model.asNumberOrNull
 import dev.aster.vega.model.asString
+import dev.aster.vega.model.locale.VegaLocale
 import dev.aster.vega.model.roundHalfUp
 import dev.aster.vega.model.spec.Anchor
 import dev.aster.vega.model.spec.Direction
@@ -102,6 +103,13 @@ internal class LegendBuilder(
    * scale, a swatch's fill opacity. Optional, because a legend built without one still draws.
    */
   private val channels: MarkEncoder? = null,
+  /**
+   * The language every generated name and number is written in.
+   *
+   * A tick label's month, a caption's sentence, a thousands separator. Defaults to d3's `en-US`, so
+   * a chart compiled without one is what upstream draws.
+   */
+  private val locale: VegaLocale = VegaLocale.EnglishUS,
 ) {
 
   /** Upstream's `3 * 10`: three ticks at ten times the resolution, for a band label's precision. */
@@ -309,7 +317,7 @@ internal class LegendBuilder(
               if (entries.any { it.metadata.role == "legend-entry-item" }) {
                 MarkAccessibility(
                   role = "graphics-object",
-                  roleDescription = "group mark container",
+                  roleDescription = locale.captions.markContainerRole("group"),
                 )
               } else {
                 null
@@ -1178,13 +1186,14 @@ internal class LegendBuilder(
         reference.size == 1 -> reference[0]
         else -> 1.0
       }
-    val labeller = spec.format?.let { Ticks.spanFormatter(it, 0.0, step, BAND_FORMAT_COUNT) }
+    val labeller =
+      spec.format?.let { Ticks.spanFormatter(it, 0.0, step, BAND_FORMAT_COUNT, locale) }
     val decimals = decimalsFor(scale.thresholds)
     return { index, value ->
       // The first band opens at negative infinity, and upstream writes nothing rather than a
       // number that bounds nothing.
       if (index == 0) ""
-      else if (labeller != null) labeller(value) else formatTickLabel(value, decimals)
+      else if (labeller != null) labeller(value) else formatTickLabel(value, decimals, locale)
     }
   }
 
@@ -1232,13 +1241,13 @@ internal class LegendBuilder(
       )
     val values = scale.ticks(count)
     val format = numberLabeller(spec, scale.domain.first(), scale.domain.last(), count)
-    val labels = format?.let { f -> values.map { f(it) } } ?: scale.tickLabels(count)
+    val labels = format?.let { f -> values.map { f(it) } } ?: scale.tickLabels(count, locale)
     // Two ticks across a whole ramp says almost nothing, so upstream labels the domain's own ends
     // instead — which is why a [0, 19] domain reads "0" and "19" rather than "0" and "10".
     if (values.size < 3 && scale.domain.first() != scale.domain.last()) {
       val ends = listOf(scale.domain.first(), scale.domain.last())
       return ends.map {
-        Entry(VegaValue.Num(it), format?.invoke(it) ?: scale.formatTick(it, count))
+        Entry(VegaValue.Num(it), format?.invoke(it) ?: scale.formatTick(it, count, locale))
       }
     }
     return values.indices.map { Entry(VegaValue.Num(values[it]), labels[it]) }
@@ -1260,11 +1269,11 @@ internal class LegendBuilder(
   ): ((Double) -> String)? {
     // `formatType` decides the grammar before the scale or the specifier gets a say, which is how a
     // legend over instants reads as dates: its scale is a colour ramp and knows nothing about time.
-    GuideFormat.timeLabeller(spec.format, spec.formatType)?.let {
+    GuideFormat.timeLabeller(spec.format, spec.formatType, locale)?.let {
       return it
     }
     val specifier = spec.format ?: return null
-    val labeller = Ticks.spanFormatter(specifier, low, high, count)
+    val labeller = Ticks.spanFormatter(specifier, low, high, count, locale)
     return { value -> labeller(value) }
   }
 
@@ -1286,8 +1295,8 @@ internal class LegendBuilder(
       val instant = value.toDoubleOrNull()
       when {
         instant == null -> value
-        specifier == null -> TimeTicks.label(instant, zone)
-        else -> TimeFormat.format(instant, specifier, zone)
+        specifier == null -> TimeTicks.label(instant, zone, locale)
+        else -> TimeFormat.format(instant, specifier, zone, locale)
       }
     }
   }
@@ -1351,7 +1360,8 @@ internal class LegendBuilder(
       return boundaries.dropLast(1).mapIndexed { index, low ->
         Entry(
           VegaValue.Num(low),
-          "${formatTickLabel(low, decimals)} – " + formatTickLabel(boundaries[index + 1], decimals),
+          "${formatTickLabel(low, decimals, locale)} – " +
+            formatTickLabel(boundaries[index + 1], decimals, locale),
         )
       }
     }
@@ -1365,9 +1375,11 @@ internal class LegendBuilder(
       is PointScale -> scale.domain.map { Entry(VegaValue.Str(it), dates?.invoke(it) ?: it) }
       // A legend's own `format` wins over the scale's tick labels, exactly as an axis's does: a
       // rate scale labelled `.1%` reads "10.0%" and not "0.1".
-      is LinearScale -> numeric(spec, scale.ticks(count), scale.tickLabels(count), count)
-      is TransformedScale -> numeric(spec, scale.ticks(count), scale.tickLabels(count), count)
-      is SequentialColorScale -> numeric(spec, scale.ticks(count), scale.tickLabels(count), count)
+      is LinearScale -> numeric(spec, scale.ticks(count), scale.tickLabels(count, locale), count)
+      is TransformedScale ->
+        numeric(spec, scale.ticks(count), scale.tickLabels(count, locale), count)
+      is SequentialColorScale ->
+        numeric(spec, scale.ticks(count), scale.tickLabels(count, locale), count)
       is TimeScale -> {
         // A legend's `tickCount` takes a calendar unit as an axis's does — `{"interval": "month"}`
         // on a legend over a time scale asks for one entry a month, not for five of whatever the
@@ -1380,8 +1392,8 @@ internal class LegendBuilder(
           if (stepper != null) TimeTicks.intervalTicks(scale.domain, stepper)
           else scale.ticks(count)
         val labels =
-          if (stepper != null) values.map { TimeTicks.label(it, scale.zone) }
-          else scale.tickLabels(count)
+          if (stepper != null) values.map { TimeTicks.label(it, scale.zone, locale) }
+          else scale.tickLabels(count, locale)
         values.zip(labels).map { (v, l) -> Entry(VegaValue.Num(v), l) }
       }
       // A banded legend, approximately. Upstream draws one as a *stacked colour bar* —
@@ -1541,7 +1553,7 @@ internal class LegendBuilder(
     // `array(item.text).join(' ')`. The lines reach here already joined by the newline the text
     // node draws on, and turning them back into spaces is the same operation.
     val title = titleTextOf(spec, scaleName)?.replace("\n", " ")
-    return GuideCaption.legend(kind, title, channels, scale, spec.format, spec.formatType)
+    return GuideCaption.legend(kind, title, channels, scale, spec.format, spec.formatType, locale)
   }
 
   private fun node(built: Built, x: Double, y: Double): SceneNode {

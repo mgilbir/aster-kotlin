@@ -3,7 +3,9 @@ package dev.aster.vega.runtime.compile
 import dev.aster.vega.dataflow.transform.ProjectionDefinition
 import dev.aster.vega.expression.CachingExpressionCompiler
 import dev.aster.vega.expression.Clock
+import dev.aster.vega.expression.Evaluator
 import dev.aster.vega.expression.ExpressionCompiler
+import dev.aster.vega.expression.Functions
 import dev.aster.vega.expression.RandomStream
 import dev.aster.vega.expression.VegaExpressionCompiler
 import dev.aster.vega.model.DiagnosticCodes
@@ -12,6 +14,7 @@ import dev.aster.vega.model.VegaDiagnostic
 import dev.aster.vega.model.VegaValue
 import dev.aster.vega.model.asNumberOrNull
 import dev.aster.vega.model.asString
+import dev.aster.vega.model.locale.VegaLocale
 import dev.aster.vega.model.spec.AutosizeType
 import dev.aster.vega.model.spec.ChannelValue
 import dev.aster.vega.model.spec.EncodeSpec
@@ -113,6 +116,20 @@ public class SpecCompiler(
    */
   private val randomSeed: Long = RandomStream.DEFAULT_SEED,
   private val clock: Clock = Clock.Fixed,
+  /**
+   * The language everything the engine **generates** is written in: a month name on a time axis, a
+   * thousands separator, a spoken caption.
+   *
+   * A data holder rather than a language tag, and supplied by the host for the same reason
+   * [textEngine] is — the platform knows this and common Kotlin cannot reach it. See `VegaLocale`,
+   * whose fields are d3's own locale definitions so a host can copy one across. Defaults to d3's
+   * `en-US`, which is what upstream produces and what every differential fixture is compared
+   * against.
+   *
+   * It does not touch **parsing**: a specification writing `"Jan 5 2026"` in its data means January
+   * in every language, because d3's parsing is part of the wire format.
+   */
+  private val locale: VegaLocale = VegaLocale.EnglishUS,
 ) {
 
   public fun compileJson(
@@ -261,7 +278,11 @@ public class SpecCompiler(
             )
           ),
       )
-    val expressions = CachingExpressionCompiler(VegaExpressionCompiler())
+    // The expression functions carry the locale too: `monthFormat`, `timeFormat` and `format` are
+    // seven of the 119 whose answer depends on it, and a `calculate` transform writing
+    // `timeFormat(datum.t, '%b %Y')` is how most charts label a derived column.
+    val expressions =
+      CachingExpressionCompiler(VegaExpressionCompiler(Evaluator(Functions.functionsFor(locale))))
 
     // Datasets, scales and signals are resolved in **one dependency order**, not in three phases.
     //
@@ -451,6 +472,7 @@ public class SpecCompiler(
         stream,
         clock,
         itemEncodes,
+        locale,
       )
     val scope =
       scopeCompiler.compile(
@@ -506,6 +528,7 @@ public class SpecCompiler(
         scope.signals.withScales(scope.scales, diagnostics),
         expressions,
         textEngine,
+        locale = locale,
       )
     val encoded =
       encoder.encodeGroup(
@@ -540,7 +563,10 @@ public class SpecCompiler(
           // in
           // the corpus, none of which labels its frame.
           markAccessibility =
-            MarkAccessibility(role = "graphics-object", roleDescription = "group mark container"),
+            MarkAccessibility(
+              role = "graphics-object",
+              roleDescription = locale.captions.markContainerRole("group"),
+            ),
         )
     )
   }

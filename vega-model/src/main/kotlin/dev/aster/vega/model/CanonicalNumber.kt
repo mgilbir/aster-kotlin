@@ -1,5 +1,7 @@
 package dev.aster.vega.model
 
+import dev.aster.vega.model.locale.VegaLocale
+
 /**
  * Canonical numeric formatting shared by snapshot serialization, SVG output and label text.
  *
@@ -59,6 +61,15 @@ public const val MINUS_SIGN: String = "−"
  */
 public fun withTypographicMinus(text: String): String =
   if (text.startsWith("-")) MINUS_SIGN + text.substring(1) else text
+
+/**
+ * The same substitution with the sign a **locale** writes a negative with.
+ *
+ * d3's `minus` is part of a locale definition and not a constant: U+2212 is the en-US default, and
+ * a language that writes a negative some other way says so there.
+ */
+public fun withTypographicMinus(text: String, locale: VegaLocale): String =
+  if (text.startsWith("-")) locale.minus + text.substring(1) else text
 
 /**
  * JavaScript's `Math.round`: halves go to positive infinity, so `-2.5` rounds to `-2`.

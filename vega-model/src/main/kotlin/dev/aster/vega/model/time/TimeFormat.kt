@@ -1,5 +1,6 @@
 package dev.aster.vega.model.time
 
+import dev.aster.vega.model.locale.VegaLocale
 import kotlin.time.Instant
 import kotlinx.datetime.DateTimeUnit
 import kotlinx.datetime.LocalDate
@@ -16,17 +17,24 @@ import kotlinx.datetime.toLocalDateTime
 /**
  * The strftime subset d3-time-format's default formats use, and only that.
  *
- * Locales are not implemented: every name here is English, which is what upstream produces with its
- * own default locale. A specification asking for a directive that is not here gets it back verbatim
- * rather than a wrong substitution, so a reader can see what was not understood.
+ * **Formatting takes a [VegaLocale]** and defaults to d3's own `en-US`, so a chart drawn without
+ * one is byte-for-byte what upstream draws. The names a *format* writes come from that locale;
+ * [MONTHS] and [WEEKDAYS] below are the English ones **parsing** reads, and the two are
+ * deliberately different things — see the note on each.
+ *
+ * A specification asking for a directive that is not here gets it back verbatim rather than a wrong
+ * substitution, so a reader can see what was not understood.
  */
 public object TimeFormat {
 
   /**
-   * The month names `%B` writes, shared rather than restated.
+   * The month names **parsing** reads, which are English and stay English.
    *
-   * `monthFormat()` needs the same list, and upstream gets it the same way — by formatting a date
-   * it builds for the purpose — so two copies would be two things to keep in step.
+   * d3's parsing is part of the wire format: a specification writing `"Jan 5 2026"` in its own data
+   * means January whatever language the chart is drawn in, so `TimeParse` and `DateValues` read
+   * this list and never the locale's. What a *label* says is [VegaLocale.months]; replacing these
+   * with a locale's names would break the reading of every specification that writes a month by
+   * name.
    */
   public val MONTHS: List<String> =
     listOf(
@@ -44,7 +52,11 @@ public object TimeFormat {
       "December",
     )
 
-  /** The weekday names `%A` writes, Sunday first, which is the week d3 labels against. */
+  /**
+   * The weekday names **parsing** reads, Sunday first, which is the week d3 labels against.
+   *
+   * English, and for the same reason [MONTHS] is; a label's weekday comes from [VegaLocale.days].
+   */
   public val WEEKDAYS: List<String> =
     listOf("Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday")
 
@@ -52,8 +64,12 @@ public object TimeFormat {
   public fun at(millis: Double, zone: TimeZone): LocalDateTime =
     Instant.fromEpochMilliseconds(millis.toLong()).toLocalDateTime(zone)
 
-  public fun format(millis: Double, pattern: String, zone: TimeZone): String =
-    render(pattern, at(millis, zone), millis, zone)
+  public fun format(
+    millis: Double,
+    pattern: String,
+    zone: TimeZone,
+    locale: VegaLocale = VegaLocale.EnglishUS,
+  ): String = render(pattern, at(millis, zone), millis, zone, locale)
 
   /**
    * Formats without an instant, for a caller that only has a local time.
@@ -62,8 +78,18 @@ public object TimeFormat {
    * seconds since the epoch, and the offset — so this reconstructs one in UTC. Every other
    * directive reads the local fields and is unaffected.
    */
-  public fun format(at: LocalDateTime, pattern: String): String =
-    render(pattern, at, at.toInstant(TimeZone.UTC).toEpochMilliseconds().toDouble(), TimeZone.UTC)
+  public fun format(
+    at: LocalDateTime,
+    pattern: String,
+    locale: VegaLocale = VegaLocale.EnglishUS,
+  ): String =
+    render(
+      pattern,
+      at,
+      at.toInstant(TimeZone.UTC).toEpochMilliseconds().toDouble(),
+      TimeZone.UTC,
+      locale,
+    )
 
   /**
    * d3's directive table, whole, including the **padding modifiers**.
@@ -75,7 +101,13 @@ public object TimeFormat {
    * both), the ISO week trio `%G`, `%g` and `%V`, `%u` (Monday-based weekday), `%Q` and `%s` (the
    * instant itself), and `%Z` (the offset).
    */
-  private fun render(pattern: String, at: LocalDateTime, millis: Double, zone: TimeZone): String {
+  private fun render(
+    pattern: String,
+    at: LocalDateTime,
+    millis: Double,
+    zone: TimeZone,
+    locale: VegaLocale,
+  ): String {
     val out = StringBuilder(pattern.length + 8)
     // Sunday-first, because that is the week d3 labels against.
     val weekday = at.date.dayOfWeek.isoDayNumber % 7
@@ -110,10 +142,10 @@ public object TimeFormat {
         'Y' -> out.append(padSigned(at.year % 10000, 4))
         'y' -> out.append(padSigned(at.year % 100, 2))
         'm' -> number(at.month.number, 2)
-        'B' -> out.append(MONTHS[at.month.number - 1])
-        'b' -> out.append(MONTHS[at.month.number - 1].take(3))
-        'A' -> out.append(WEEKDAYS[weekday])
-        'a' -> out.append(WEEKDAYS[weekday].take(3))
+        'B' -> out.append(locale.months[at.month.number - 1])
+        'b' -> out.append(locale.shortMonths[at.month.number - 1])
+        'A' -> out.append(locale.days[weekday])
+        'a' -> out.append(locale.shortDays[weekday])
         'd' -> number(at.day, 2)
         'e' -> number(at.day, 2, default = ' ')
         'j' -> number(at.date.dayOfYear, 3)
@@ -129,7 +161,7 @@ public object TimeFormat {
         'H' -> number(at.hour, 2)
         // Twelve-hour clock, where midnight and noon both read 12 rather than 0.
         'I' -> number((at.hour % 12).let { if (it == 0) 12 else it }, 2)
-        'p' -> out.append(if (at.hour < 12) "AM" else "PM")
+        'p' -> out.append(if (at.hour < 12) locale.periods[0] else locale.periods[1])
         'M' -> number(at.minute, 2)
         'S' -> number(at.second, 2)
         'L' -> number(at.nanosecond / 1_000_000, 3)
@@ -137,10 +169,12 @@ public object TimeFormat {
         'Q' -> out.append(millis.toLong())
         's' -> out.append((millis / 1000.0).toLong())
         'Z' -> out.append(offset(millis, zone))
-        // The locale's own compositions, which d3's en-US locale spells out this way.
-        'c' -> out.append(render("%x, %X", at, millis, zone))
-        'x' -> out.append(render("%-m/%-d/%Y", at, millis, zone))
-        'X' -> out.append(render("%-I:%M:%S %p", at, millis, zone))
+        // The locale's own compositions. d3's en-US spells these three out as the defaults on
+        // `VegaLocale`, and a locale that writes its dates the other way round says so there rather
+        // than by rewriting every specification that uses `%x`.
+        'c' -> out.append(render(locale.dateTime, at, millis, zone, locale))
+        'x' -> out.append(render(locale.date, at, millis, zone, locale))
+        'X' -> out.append(render(locale.time, at, millis, zone, locale))
         '%' -> out.append('%')
         else -> {
           // Unknown directive: emit it as written rather than guessing.

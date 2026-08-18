@@ -1,6 +1,7 @@
 package dev.aster.vega.runtime.scale
 
 import dev.aster.vega.expression.NumberFormat
+import dev.aster.vega.model.locale.VegaLocale
 import dev.aster.vega.model.roundHalfUp
 import kotlin.math.abs
 import kotlin.math.ceil
@@ -255,6 +256,7 @@ public object Ticks {
     start: Double,
     stop: Double,
     count: Int,
+    locale: VegaLocale = VegaLocale.EnglishUS,
   ): (Double) -> String {
     val parsed = NumberFormat.parse(specifier)
     if (parsed != null && parsed.type == 's' && parsed.precision == null) {
@@ -262,12 +264,12 @@ public object Ticks {
       val magnitude = maxOf(abs(start), abs(stop))
       if (step.isFinite() && step > 0.0) {
         val precision = NumberFormat.precisionPrefix(step, magnitude).coerceIn(0, 20)
-        val prefixed = NumberFormat.prefixed(parsed.copy(precision = precision), magnitude)
+        val prefixed = NumberFormat.prefixed(parsed.copy(precision = precision), magnitude, locale)
         return { value -> prefixed(value) }
       }
     }
     val resolved = spanSpecifier(specifier, start, stop, count)
-    return { value -> NumberFormat.format(value, resolved) }
+    return { value -> NumberFormat.format(value, resolved, locale) }
   }
 
   /**

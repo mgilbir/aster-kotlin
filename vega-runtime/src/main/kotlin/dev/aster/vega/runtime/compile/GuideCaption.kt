@@ -1,5 +1,6 @@
 package dev.aster.vega.runtime.compile
 
+import dev.aster.vega.model.locale.VegaLocale
 import dev.aster.vega.model.spec.ScaleType
 import dev.aster.vega.model.time.TimeFormat
 import dev.aster.vega.runtime.scale.BandScale
@@ -47,6 +48,16 @@ internal object GuideCaption {
   private const val DATE_PATTERN = "%A, %d %B %Y, %I:%M:%S %p"
 
   /**
+   * The same long form, with the locale's own time of day in it.
+   *
+   * Upstream's `%X` is the locale's time, which for d3's en-US default is the twelve-hour clock the
+   * constant above spells out. A locale that writes a 24-hour clock says so in `VegaLocale.time`,
+   * and a caption reading a whole timestamp out should use it rather than the American one.
+   */
+  private fun datePattern(locale: VegaLocale): String =
+    if (locale == VegaLocale.EnglishUS) DATE_PATTERN else "%A, %d %B %Y, %X"
+
+  /**
    * @param declaredType the scale's `type` as written, not its runtime class.
    *
    * `sqrt` and `pow` build the same object here, and a specification that wrote `sqrt` should hear
@@ -67,15 +78,16 @@ internal object GuideCaption {
     format: String? = null,
     /** The axis's `formatType`, which decides whether [format] is read as a date or a number. */
     formatType: String? = null,
+    /** The language every name and number in the sentence is written in. */
+    locale: VegaLocale = VegaLocale.EnglishUS,
   ): String? {
     if (scale == null) return null
-    val axis = if (orient == "left" || orient == "right") "Y-axis" else "X-axis"
-    return buildString {
-      append(axis)
-      if (!title.isNullOrBlank()) append(" titled '$title'")
-      append(" for a ${typeName(scale, declaredType)} scale")
-      append(" with ${domain(scale, format, formatType)}")
-    }
+    return locale.captions.axis(
+      vertical = orient == "left" || orient == "right",
+      title = title,
+      scaleType = typeName(scale, declaredType),
+      domain = domain(scale, format, formatType, locale),
+    )
   }
 
   /**
@@ -93,21 +105,16 @@ internal object GuideCaption {
      * And its `formatType`, without which a legend over instants reads its domain as milliseconds.
      */
     formatType: String? = null,
+    /** The language every name and number in the sentence is written in. */
+    locale: VegaLocale = VegaLocale.EnglishUS,
   ): String? {
     if (scale == null || channels.isEmpty()) return null
-    return buildString {
-      append("$kind legend".trim().replaceFirstChar { it.uppercase() })
-      if (!title.isNullOrBlank()) append(" titled '$title'")
-      append(" for ${channelNames(channels)}")
-      append(" with ${domain(scale, format, formatType)}")
-    }
-  }
-
-  /** `fill` and `stroke` are read as colours; everything else keeps its own name. */
-  private fun channelNames(channels: List<String>): String {
-    val named = channels.map { if (it == "fill" || it == "stroke") "$it color" else it }
-    return if (named.size < 2) named.first()
-    else named.dropLast(1).joinToString(", ") + " and " + named.last()
+    return locale.captions.legend(
+      kind = kind,
+      title = title,
+      channels = channels.map { locale.captions.channelName(it) },
+      domain = domain(scale, format, formatType, locale),
+    )
   }
 
   private fun typeName(scale: VegaScale, declaredType: ScaleType?): String =
@@ -129,21 +136,26 @@ internal object GuideCaption {
    * ranges and the boundaries are what a reader needs to place a mark. A **discrete** scale reads
    * its values, truncated. A **continuous** one reads its two ends.
    */
-  private fun domain(scale: VegaScale, format: String? = null, formatType: String? = null): String =
+  private fun domain(
+    scale: VegaScale,
+    format: String? = null,
+    formatType: String? = null,
+    locale: VegaLocale = VegaLocale.EnglishUS,
+  ): String =
     when (scale) {
       // An identity scale has no domain to describe: it maps the value itself, so a guide over one
       // is a guide over the data as it stands.
-      is IdentityScale -> "the values themselves"
+      is IdentityScale -> locale.captions.identityDomain()
       is BinnedScale -> {
         // The same formatter the bands themselves use: the precision comes from the narrowest
         // interval, not from the whole span, so a reader hears "2.1%" and not "0.021429".
-        val write = threshold(format, scale)
-        val cuts = scale.thresholds.map(write)
-        "${cuts.size} boundar${if (cuts.size == 1) "y" else "ies"}: ${cuts.joinToString(", ")}"
+        val write = threshold(format, scale, locale)
+        locale.captions.boundaryDomain(scale.thresholds.map(write))
       }
-      is BandScale -> discrete(scale.domain.map { spoken(it, format, formatType) })
-      is PointScale -> discrete(scale.domain.map { spoken(it, format, formatType) })
-      is OrdinalScale -> discrete(scale.domain.map { spoken(it, format, formatType) })
+      is BandScale -> discrete(scale.domain.map { spoken(it, format, formatType, locale) }, locale)
+      is PointScale -> discrete(scale.domain.map { spoken(it, format, formatType, locale) }, locale)
+      is OrdinalScale ->
+        discrete(scale.domain.map { spoken(it, format, formatType, locale) }, locale)
       is TimeScale -> {
         // A named format wins over the full date, expanded the way a caption expands one: a `%b`
         // axis
@@ -152,27 +164,28 @@ internal object GuideCaption {
         // should say which clock it is on.
         val pattern = format?.replace("%a", "%A")?.replace("%b", "%B")
         val suffix = if (pattern == null && scale.zone == TimeZone.UTC) " UTC" else ""
-        val from = TimeFormat.format(scale.domain.first(), pattern ?: DATE_PATTERN, scale.zone)
-        val to = TimeFormat.format(scale.domain.last(), pattern ?: DATE_PATTERN, scale.zone)
-        "values from $from$suffix to $to$suffix"
+        val write = { at: Double ->
+          TimeFormat.format(at, pattern ?: datePattern(locale), scale.zone, locale) + suffix
+        }
+        locale.captions.continuousDomain(write(scale.domain.first()), write(scale.domain.last()))
       }
       is TransformedScale ->
-        continuous(scale.domain.first(), scale.domain.last()) { v, _ ->
-          spokenInstant(v, format, formatType)
-            ?: spelled(format, scale.domain)?.invoke(v)
-            ?: scale.formatTick(v, CAPTION_TICK_COUNT)
+        continuous(scale.domain.first(), scale.domain.last(), locale) { v, _ ->
+          spokenInstant(v, format, formatType, locale)
+            ?: spelled(format, scale.domain, locale)?.invoke(v)
+            ?: scale.formatTick(v, CAPTION_TICK_COUNT, locale)
         }
       is SequentialColorScale ->
-        continuous(scale.domain.first(), scale.domain.last()) { v, _ ->
-          spokenInstant(v, format, formatType)
-            ?: spelled(format, scale.domain)?.invoke(v)
-            ?: scale.formatTick(v, CAPTION_TICK_COUNT)
+        continuous(scale.domain.first(), scale.domain.last(), locale) { v, _ ->
+          spokenInstant(v, format, formatType, locale)
+            ?: spelled(format, scale.domain, locale)?.invoke(v)
+            ?: scale.formatTick(v, CAPTION_TICK_COUNT, locale)
         }
       is LinearScale ->
-        continuous(scale.domain.first(), scale.domain.last()) { v, _ ->
-          spokenInstant(v, format, formatType)
-            ?: spelled(format, scale.domain)?.invoke(v)
-            ?: scale.formatTick(v, CAPTION_TICK_COUNT)
+        continuous(scale.domain.first(), scale.domain.last(), locale) { v, _ ->
+          spokenInstant(v, format, formatType, locale)
+            ?: spelled(format, scale.domain, locale)?.invoke(v)
+            ?: scale.formatTick(v, CAPTION_TICK_COUNT, locale)
         }
     }
 
@@ -185,7 +198,12 @@ internal object GuideCaption {
    * — with one addition: where no format was given at all the full date carries its zone, because a
    * caption that reads out a whole timestamp should say which clock it is on.
    */
-  private fun spokenInstant(value: Double, format: String?, formatType: String?): String? {
+  private fun spokenInstant(
+    value: Double,
+    format: String?,
+    formatType: String?,
+    locale: VegaLocale,
+  ): String? {
     val zone =
       when (formatType) {
         "time" -> TimeZone.currentSystemDefault()
@@ -194,7 +212,7 @@ internal object GuideCaption {
       }
     val pattern = format?.replace("%a", "%A")?.replace("%b", "%B")
     val suffix = if (pattern == null && zone == TimeZone.UTC) " UTC" else ""
-    return TimeFormat.format(value, pattern ?: DATE_PATTERN, zone) + suffix
+    return TimeFormat.format(value, pattern ?: datePattern(locale), zone, locale) + suffix
   }
 
   /**
@@ -203,15 +221,13 @@ internal object GuideCaption {
    * Past seven values the whole list stops being listenable, and the last one still matters — it is
    * where the axis ends. Upstream's rule, and the phrasing that goes with it.
    */
-  private fun discrete(values: List<String>): String {
+  private fun discrete(values: List<String>, locale: VegaLocale): String {
     val n = values.size
-    val body =
-      if (n > MAX_VALUES) {
-        values.take(MAX_VALUES - 2).joinToString(", ") + ", ending with " + values.last()
-      } else {
-        values.joinToString(", ")
-      }
-    return "$n value${if (n == 1) "" else "s"}: $body"
+    return if (n > MAX_VALUES) {
+      locale.captions.discreteDomain(n, values.take(MAX_VALUES - 2), endingWith = values.last())
+    } else {
+      locale.captions.discreteDomain(n, values, endingWith = null)
+    }
   }
 
   /**
@@ -221,7 +237,11 @@ internal object GuideCaption {
    * width of its declared domain — rather than the domain's whole extent, which is what makes a
    * scale of seven buckets over `[0, 0.15]` read to a tenth of a percent.
    */
-  private fun threshold(format: String?, scale: BinnedScale): (Double) -> String {
+  private fun threshold(
+    format: String?,
+    scale: BinnedScale,
+    locale: VegaLocale,
+  ): (Double) -> String {
     val reference =
       if (scale is QuantileScale) scale.thresholds
       else scale.legendExtent.let { listOf(it.first, it.second) }
@@ -240,9 +260,9 @@ internal object GuideCaption {
       // decimals off the values instead read them out in full.
       val increment = Ticks.stepFrom(Ticks.tickIncrement(0.0, step, THRESHOLD_FORMAT_COUNT))
       val decimals = if (increment.isFinite()) Ticks.precisionForStep(increment) else 0
-      return { value -> formatTickLabel(value, decimals) }
+      return { value -> formatTickLabel(value, decimals, locale) }
     }
-    return Ticks.spanFormatter(format, 0.0, step, THRESHOLD_FORMAT_COUNT)
+    return Ticks.spanFormatter(format, 0.0, step, THRESHOLD_FORMAT_COUNT, locale)
   }
 
   /** Upstream's `3 * 10`: three ticks at ten times the resolution. */
@@ -255,9 +275,13 @@ internal object GuideCaption {
    * of five: a specifier naming no precision takes as many decimals as the step needs, so a ramp
    * over fractions is read out as "−6% to 6%" and not "−0.060000% to 0.060000%".
    */
-  private fun spelled(format: String?, domain: List<Double>): ((Double) -> String)? {
+  private fun spelled(
+    format: String?,
+    domain: List<Double>,
+    locale: VegaLocale,
+  ): ((Double) -> String)? {
     if (format == null) return null
-    return Ticks.spanFormatter(format, domain.first(), domain.last(), CAPTION_TICK_COUNT)
+    return Ticks.spanFormatter(format, domain.first(), domain.last(), CAPTION_TICK_COUNT, locale)
   }
 
   /**
@@ -267,7 +291,12 @@ internal object GuideCaption {
    * and `%b` becomes `%B` — so an axis whose labels say "Sun" is described as "Sunday". Without a
    * format type there is nothing temporal to expand and the value stands as it is written.
    */
-  private fun spoken(value: String, format: String?, formatType: String?): String {
+  private fun spoken(
+    value: String,
+    format: String?,
+    formatType: String?,
+    locale: VegaLocale,
+  ): String {
     val zone =
       when (formatType) {
         "time" -> TimeZone.currentSystemDefault()
@@ -275,12 +304,20 @@ internal object GuideCaption {
         else -> return value
       }
     val instant = value.toDoubleOrNull() ?: return value
-    val pattern = format?.replace("%a", "%A")?.replace("%b", "%B") ?: DATE_PATTERN
-    return TimeFormat.format(instant, pattern, zone)
+    val pattern = format?.replace("%a", "%A")?.replace("%b", "%B") ?: datePattern(locale)
+    return TimeFormat.format(instant, pattern, zone, locale)
   }
 
-  private fun continuous(low: Double, high: Double, format: (Double, Int) -> String): String =
-    "values from ${format(low, CAPTION_TICK_COUNT)} to ${format(high, CAPTION_TICK_COUNT)}"
+  private fun continuous(
+    low: Double,
+    high: Double,
+    locale: VegaLocale,
+    format: (Double, Int) -> String,
+  ): String =
+    locale.captions.continuousDomain(
+      format(low, CAPTION_TICK_COUNT),
+      format(high, CAPTION_TICK_COUNT),
+    )
 
   /** As many decimals as the cut points need to stay distinct; see the banded legend. */
   private fun decimalsFor(values: List<Double>): Int {

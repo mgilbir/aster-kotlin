@@ -14,6 +14,7 @@ import dev.aster.vega.model.asNumberOrNull
 import dev.aster.vega.model.asString
 import dev.aster.vega.model.field
 import dev.aster.vega.model.isMissing
+import dev.aster.vega.model.locale.VegaLocale
 import dev.aster.vega.model.roundHalfUp
 import dev.aster.vega.model.spec.ChannelValue
 import dev.aster.vega.model.spec.EncodeEntry
@@ -115,6 +116,14 @@ public class MarkEncoder(
    * segment its own group's height too far down.
    */
   private val groupOrigin: PointD = PointD(0.0, 0.0),
+  /**
+   * The language a derived accessibility label is written in; see `VegaLocale`.
+   *
+   * A mark's own role description — "line mark" — is a sentence a reader hears, so it comes from
+   * the locale's captions rather than from a string in this file. Defaults to English, which is
+   * what upstream says.
+   */
+  private val locale: VegaLocale = VegaLocale.EnglishUS,
 ) {
 
   /** `width`, `height` and the origin off the enclosing group item; anything else is a signal. */
@@ -2033,7 +2042,8 @@ public class MarkEncoder(
     val role =
       string(channels["ariaRole"], datum)
         ?: if (spec.type == MarkType.GROUP) "graphics-object" else "graphics-symbol"
-    val roleDescription = string(channels["ariaRoleDescription"], datum) ?: "$kind mark"
+    val roleDescription =
+      string(channels["ariaRoleDescription"], datum) ?: locale.captions.markRole(kind)
     // The specification's own words win over anything derived from the channels.
     string(channels["description"], datum)
       ?.takeIf { it.isNotBlank() }

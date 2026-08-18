@@ -4,6 +4,7 @@ import dev.aster.vega.model.Decimals
 import dev.aster.vega.model.VegaValue
 import dev.aster.vega.model.asDouble
 import dev.aster.vega.model.asString
+import dev.aster.vega.model.locale.VegaLocale
 import dev.aster.vega.model.roundHalfUp
 import dev.aster.vega.model.withTypographicMinus
 import dev.aster.vega.scene.ColorSpaces
@@ -215,15 +216,21 @@ public class LinearScale(
     Ticks.ticks(domain.first(), domain.last(), count)
 
   /** Default label text for a tick, matching Vega's digits-from-step behaviour. */
-  public fun formatTick(value: Double, count: Int = DEFAULT_TICK_COUNT): String {
+  public fun formatTick(
+    value: Double,
+    count: Int = DEFAULT_TICK_COUNT,
+    locale: VegaLocale = VegaLocale.EnglishUS,
+  ): String {
     val step = Ticks.stepFrom(Ticks.tickIncrement(domain.first(), domain.last(), count))
     val precision = if (step.isFinite()) Ticks.precisionForStep(step) else DEGENERATE_PRECISION
-    return formatTickLabel(value, precision)
+    return formatTickLabel(value, precision, locale)
   }
 
   /** Labels aligned with [ticks], so a scale can suppress some of them. */
-  public fun tickLabels(count: Int = DEFAULT_TICK_COUNT): List<String> =
-    ticks(count).map { formatTick(it, count) }
+  public fun tickLabels(
+    count: Int = DEFAULT_TICK_COUNT,
+    locale: VegaLocale = VegaLocale.EnglishUS,
+  ): List<String> = ticks(count).map { formatTick(it, count, locale) }
 
   public companion object {
     public const val DEFAULT_TICK_COUNT: Int = 10
@@ -522,17 +529,24 @@ public abstract class TransformedScale(
   public open fun ticks(count: Int = LinearScale.DEFAULT_TICK_COUNT): List<Double> =
     Ticks.ticks(domain.first(), domain.last(), count)
 
-  public open fun formatTick(value: Double, count: Int = LinearScale.DEFAULT_TICK_COUNT): String {
+  public open fun formatTick(
+    value: Double,
+    count: Int = LinearScale.DEFAULT_TICK_COUNT,
+    locale: VegaLocale = VegaLocale.EnglishUS,
+  ): String {
     val step = Ticks.stepFrom(Ticks.tickIncrement(domain.first(), domain.last(), count))
     return formatTickLabel(
       value,
       if (step.isFinite()) Ticks.precisionForStep(step) else DEGENERATE_PRECISION,
+      locale,
     )
   }
 
   /** Labels aligned with [ticks]. Overridden where a scale suppresses some of them. */
-  public open fun tickLabels(count: Int = LinearScale.DEFAULT_TICK_COUNT): List<String> =
-    ticks(count).map { formatTick(it, count) }
+  public open fun tickLabels(
+    count: Int = LinearScale.DEFAULT_TICK_COUNT,
+    locale: VegaLocale = VegaLocale.EnglishUS,
+  ): List<String> = ticks(count).map { formatTick(it, count, locale) }
 }
 
 /**
@@ -576,9 +590,9 @@ public class LogScale(
   override fun ticks(count: Int): List<Double> =
     Ticks.logTicks(domain.first(), domain.last(), base, count)
 
-  override fun formatTick(value: Double, count: Int): String =
+  override fun formatTick(value: Double, count: Int, locale: VegaLocale): String =
     // Log ticks are powers and their small multiples, so a fixed decimal count does not apply.
-    formatTickLabel(value, if (value == floor(value)) 0 else 2)
+    formatTickLabel(value, if (value == floor(value)) 0 else 2, locale)
 
   /**
    * Log tick labels, with the crowded ones blanked as d3 and Vega do.
@@ -591,7 +605,7 @@ public class LogScale(
    *
    * A blank label is not a missing tick: the tick mark is still drawn.
    */
-  override fun tickLabels(count: Int): List<String> {
+  override fun tickLabels(count: Int, locale: VegaLocale): List<String> {
     val values = ticks(count)
     if (values.isEmpty()) return emptyList()
     val threshold = maxOf(1.0, base * count / values.size)
@@ -599,7 +613,7 @@ public class LogScale(
       var mantissa = kotlin.math.abs(value) / base.pow(roundHalfUp(logMagnitude(value)))
       // Guard the case where floating point leaves the mantissa just under 1.
       if (mantissa * base < base - 0.5) mantissa *= base
-      if (mantissa <= threshold + MANTISSA_EPSILON) formatTick(value, count) else ""
+      if (mantissa <= threshold + MANTISSA_EPSILON) formatTick(value, count, locale) else ""
     }
   }
 
@@ -702,8 +716,10 @@ public class TimeScale(
   public fun ticks(count: Int = LinearScale.DEFAULT_TICK_COUNT): List<Double> =
     TimeTicks.ticks(domain.first(), domain.last(), count, zone)
 
-  public fun tickLabels(count: Int = LinearScale.DEFAULT_TICK_COUNT): List<String> =
-    ticks(count).map { TimeTicks.label(it, zone) }
+  public fun tickLabels(
+    count: Int = LinearScale.DEFAULT_TICK_COUNT,
+    locale: VegaLocale = VegaLocale.EnglishUS,
+  ): List<String> = ticks(count).map { TimeTicks.label(it, zone, locale) }
 }
 
 /**
@@ -1218,18 +1234,26 @@ public class SequentialColorScale(
     Ticks.ticks(domain.first(), domain.last(), count)
 
   /** Default label text for [value], with the decimals the tick step implies. */
-  public fun formatTick(value: Double, count: Int = LinearScale.DEFAULT_TICK_COUNT): String {
+  public fun formatTick(
+    value: Double,
+    count: Int = LinearScale.DEFAULT_TICK_COUNT,
+    locale: VegaLocale = VegaLocale.EnglishUS,
+  ): String {
     val step = Ticks.stepFrom(Ticks.tickIncrement(domain.first(), domain.last(), count))
     return formatTickLabel(
       value,
       if (step.isFinite()) Ticks.precisionForStep(step) else DEGENERATE_PRECISION,
+      locale,
     )
   }
 
-  public fun tickLabels(count: Int = LinearScale.DEFAULT_TICK_COUNT): List<String> {
+  public fun tickLabels(
+    count: Int = LinearScale.DEFAULT_TICK_COUNT,
+    locale: VegaLocale = VegaLocale.EnglishUS,
+  ): List<String> {
     val step = Ticks.stepFrom(Ticks.tickIncrement(domain.first(), domain.last(), count))
     val precision = if (step.isFinite()) Ticks.precisionForStep(step) else DEGENERATE_PRECISION
-    return ticks(count).map { formatTickLabel(it, precision) }
+    return ticks(count).map { formatTickLabel(it, precision, locale) }
   }
 }
 
@@ -1254,19 +1278,51 @@ public class SequentialColorScale(
  */
 private const val DEGENERATE_PRECISION = 6
 
-public fun formatTickLabel(value: Double, decimals: Int): String =
-  withTypographicMinus(groupThousands(formatNumber(value, decimals)))
+public fun formatTickLabel(
+  value: Double,
+  decimals: Int,
+  locale: VegaLocale = VegaLocale.EnglishUS,
+): String = withTypographicMinus(groupThousands(formatNumber(value, decimals), locale), locale)
 
-/** Inserts `,` every three digits of the integer part, leaving any fraction alone. */
-public fun groupThousands(text: String): String {
+/**
+ * Inserts the locale's group separator through the integer part, leaving any fraction alone, and
+ * writes the fraction behind the locale's decimal separator.
+ *
+ * The grouping is the locale's too: `[3]` for most of the world, `[3, 2]` for the Indian system
+ * where a lakh is `1,00,000`. A locale whose separator is the empty string groups with nothing,
+ * which is how several languages write a four-digit year without a comma in it.
+ */
+public fun groupThousands(text: String, locale: VegaLocale = VegaLocale.EnglishUS): String {
   val negative = text.startsWith("-")
   val body = if (negative) text.substring(1) else text
   val dot = body.indexOf('.')
   val integerPart = if (dot < 0) body else body.substring(0, dot)
-  if (integerPart.length <= 3 || integerPart.any { !it.isDigit() }) return text
-  val fraction = if (dot < 0) "" else body.substring(dot)
-  val grouped = integerPart.reversed().chunked(3).joinToString(",").reversed()
+  if (integerPart.any { !it.isDigit() }) return text
+  val fraction = if (dot < 0) "" else locale.decimal + body.substring(dot + 1)
+  val grouped = grouped(integerPart, locale)
   return (if (negative) "-" else "") + grouped + fraction
+}
+
+/**
+ * The digits of a whole number with the locale's separator between its groups.
+ *
+ * d3's own walk: the group sizes are taken from the front of `grouping` and the **last** one
+ * repeats, so `[3]` never changes and `[3, 2]` gives thousands, then hundreds of thousands, then
+ * lakhs.
+ */
+private fun grouped(digits: String, locale: VegaLocale): String {
+  if (locale.thousands.isEmpty()) return digits
+  val pieces = mutableListOf<String>()
+  var index = digits.length
+  var group = 0
+  while (index > 0) {
+    val size = locale.grouping[minOf(group, locale.grouping.size - 1)]
+    val from = maxOf(0, index - size)
+    pieces += digits.substring(from, index)
+    index = from
+    group++
+  }
+  return pieces.reversed().joinToString(locale.thousands)
 }
 
 public fun formatNumber(value: Double, decimals: Int): String {

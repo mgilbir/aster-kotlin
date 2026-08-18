@@ -1,6 +1,7 @@
 package dev.aster.vega.expression
 
 import dev.aster.vega.model.Decimals
+import dev.aster.vega.model.locale.VegaLocale
 import dev.aster.vega.model.roundHalfUp
 import io.github.mgilbir.ecma262.number.toEcmaString
 import kotlin.math.abs
@@ -88,9 +89,15 @@ public object NumberFormat {
   }
 
   /** Formats [value] with [specifier], as `d3.format` does. */
-  public fun format(value: Double, specifier: String): String {
-    val parsed = parse(specifier) ?: return withTypographicMinus(JsSemantics.numberToString(value))
-    return format(value, parsed)
+  public fun format(
+    value: Double,
+    specifier: String,
+    locale: VegaLocale = VegaLocale.EnglishUS,
+  ): String {
+    val parsed =
+      parse(specifier)
+        ?: return withTypographicMinus(JsSemantics.numberToString(value), locale.minus)
+    return format(value, parsed, locale = locale)
   }
 
   /**
@@ -102,7 +109,12 @@ public object NumberFormat {
    * the `M`, and `formatPrefix("($~s", 1000)(-1000)` writes `($1k)` with the prefix inside the
    * parentheses. Appending afterwards gets both wrong.
    */
-  public fun format(value: Double, requested: Spec, extra: String = ""): String {
+  public fun format(
+    value: Double,
+    requested: Spec,
+    extra: String = "",
+    locale: VegaLocale = VegaLocale.EnglishUS,
+  ): String {
     var spec = requested
     var type = spec.type
     var comma = spec.comma
@@ -190,7 +202,7 @@ public object NumberFormat {
 
       prefix =
         (if (negative) {
-          if (spec.sign == '(') "(" else MINUS
+          if (spec.sign == '(') "(" else locale.minus
         } else if (spec.sign == '-' || spec.sign == '(') {
           ""
         } else {
@@ -202,17 +214,21 @@ public object NumberFormat {
           (if (negative && spec.sign == '(') ")" else "")
 
       // Only the leading digits are grouped and padded; a fraction or an exponent goes to the
-      // suffix.
+      // suffix. The **decimal separator** is substituted here, at the split, which is where d3 does
+      // it: the fraction leaves the numeric part at this point, so this is the last moment anything
+      // knows which `.` is a decimal point and which belongs to an exponent's `e-3`.
       if (type in "defgprs%") {
         val split = body.indexOfFirst { it < '0' || it > '9' }
         if (split >= 0) {
-          suffix = body.substring(split) + suffix
+          suffix =
+            (if (body[split] == '.') locale.decimal + body.substring(split + 1)
+            else body.substring(split)) + suffix
           body = body.substring(0, split)
         }
       }
     }
 
-    if (comma && !spec.zero) body = group(body, Int.MAX_VALUE)
+    if (comma && !spec.zero) body = group(body, Int.MAX_VALUE, locale)
 
     val length = prefix.length + body.length + suffix.length
     var padding =
@@ -224,6 +240,7 @@ public object NumberFormat {
         group(
           padding + body,
           if (padding.isNotEmpty()) (spec.width ?: 0) - suffix.length else Int.MAX_VALUE,
+          locale,
         )
       padding = ""
     }
@@ -295,12 +312,16 @@ public object NumberFormat {
    * a property of the *span*, not of the number. d3 achieves it by rewriting the type to `f`,
    * scaling every value by the prefix's power of ten, and appending the prefix itself.
    */
-  public fun prefixed(spec: Spec, reference: Double): (Double) -> String {
+  public fun prefixed(
+    spec: Spec,
+    reference: Double,
+    locale: VegaLocale = VegaLocale.EnglishUS,
+  ): (Double) -> String {
     val exponent = prefixExponentFor(reference)
     val scale = 10.0.pow(-exponent)
     val prefix = PREFIXES[8 + exponent / 3]
     val fixed = spec.copy(type = 'f')
-    return { value -> format(scale * value, fixed, prefix) }
+    return { value -> format(scale * value, fixed, prefix, locale) }
   }
 
   /**
@@ -453,26 +474,36 @@ public object NumberFormat {
     else text
   }
 
-  /** Thousands separators, right to left, with d3's width limit for the zero-fill case. */
-  private fun group(value: String, width: Int): String {
+  /**
+   * Group separators, right to left, with d3's width limit for the zero-fill case.
+   *
+   * The group **sizes** come from the locale and the last one repeats, which is d3's own walk:
+   * `[3]` never changes and `[3, 2]` gives thousands, hundreds of thousands, then lakhs. The width
+   * limit is the zero-fill rule — a `08,d` is eight characters *including* its separators — so the
+   * last group is narrowed rather than overflowing the field.
+   */
+  private fun group(value: String, width: Int, locale: VegaLocale): String {
     val pieces = mutableListOf<String>()
     var index = value.length
     var length = 0
-    var size = 3
+    var group = 0
+    var size = locale.grouping[0]
     while (index > 0 && size > 0) {
       if (length + size + 1 > width) size = max(1, width - length)
       pieces += value.substring(max(0, index - size), index)
       index -= size
       length += size + 1
       if (length > width) break
-      size = 3
+      group++
+      size = locale.grouping[min(group, locale.grouping.size - 1)]
     }
-    return pieces.reversed().joinToString(",")
+    return pieces.reversed().joinToString(locale.thousands)
   }
 
   /**
-   * d3 writes a negative with U+2212, which is a different glyph from the hyphen an exponent uses.
+   * d3 writes a negative with U+2212 by default, which is a different glyph from the hyphen an
+   * exponent uses — and which a locale may replace.
    */
-  private fun withTypographicMinus(text: String): String =
-    if (text.startsWith("-")) MINUS + text.substring(1) else text
+  private fun withTypographicMinus(text: String, minus: String = MINUS): String =
+    if (text.startsWith("-")) minus + text.substring(1) else text
 }

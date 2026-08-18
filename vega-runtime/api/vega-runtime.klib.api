@@ -438,16 +438,16 @@ abstract class dev.aster.vega.runtime.scale/TransformedScale : dev.aster.vega.ru
     abstract fun backward(kotlin/Double): kotlin/Double // dev.aster.vega.runtime.scale/TransformedScale.backward|backward(kotlin.Double){}[0]
     abstract fun forward(kotlin/Double): kotlin/Double // dev.aster.vega.runtime.scale/TransformedScale.forward|forward(kotlin.Double){}[0]
     final fun apply(kotlin/Double): kotlin/Double // dev.aster.vega.runtime.scale/TransformedScale.apply|apply(kotlin.Double){}[0]
-    open fun formatTick(kotlin/Double, kotlin/Int = ...): kotlin/String // dev.aster.vega.runtime.scale/TransformedScale.formatTick|formatTick(kotlin.Double;kotlin.Int){}[0]
+    open fun formatTick(kotlin/Double, kotlin/Int = ..., dev.aster.vega.model.locale/VegaLocale = ...): kotlin/String // dev.aster.vega.runtime.scale/TransformedScale.formatTick|formatTick(kotlin.Double;kotlin.Int;dev.aster.vega.model.locale.VegaLocale){}[0]
     open fun invert(kotlin/Double): kotlin/Double // dev.aster.vega.runtime.scale/TransformedScale.invert|invert(kotlin.Double){}[0]
     open fun position(dev.aster.vega.model/VegaValue): kotlin/Double // dev.aster.vega.runtime.scale/TransformedScale.position|position(dev.aster.vega.model.VegaValue){}[0]
     open fun scale(dev.aster.vega.model/VegaValue): dev.aster.vega.model/VegaValue // dev.aster.vega.runtime.scale/TransformedScale.scale|scale(dev.aster.vega.model.VegaValue){}[0]
-    open fun tickLabels(kotlin/Int = ...): kotlin.collections/List<kotlin/String> // dev.aster.vega.runtime.scale/TransformedScale.tickLabels|tickLabels(kotlin.Int){}[0]
+    open fun tickLabels(kotlin/Int = ..., dev.aster.vega.model.locale/VegaLocale = ...): kotlin.collections/List<kotlin/String> // dev.aster.vega.runtime.scale/TransformedScale.tickLabels|tickLabels(kotlin.Int;dev.aster.vega.model.locale.VegaLocale){}[0]
     open fun ticks(kotlin/Int = ...): kotlin.collections/List<kotlin/Double> // dev.aster.vega.runtime.scale/TransformedScale.ticks|ticks(kotlin.Int){}[0]
 }
 
 final class dev.aster.vega.runtime.compile/AxisBuilder { // dev.aster.vega.runtime.compile/AxisBuilder|null[0]
-    constructor <init>(kotlin.collections/Map<kotlin/String, dev.aster.vega.runtime.scale/VegaScale>, kotlin.collections/Map<kotlin/String, dev.aster.vega.model.spec/ScaleType>, dev.aster.vega.scene/SceneNodeIdAllocator, dev.aster.vega.scene/TextEngine, dev.aster.vega.model/DiagnosticCollector, dev.aster.vega.runtime.compile/NumberResolver, dev.aster.vega.runtime.compile/MarkEncoder? = ...) // dev.aster.vega.runtime.compile/AxisBuilder.<init>|<init>(kotlin.collections.Map<kotlin.String,dev.aster.vega.runtime.scale.VegaScale>;kotlin.collections.Map<kotlin.String,dev.aster.vega.model.spec.ScaleType>;dev.aster.vega.scene.SceneNodeIdAllocator;dev.aster.vega.scene.TextEngine;dev.aster.vega.model.DiagnosticCollector;dev.aster.vega.runtime.compile.NumberResolver;dev.aster.vega.runtime.compile.MarkEncoder?){}[0]
+    constructor <init>(kotlin.collections/Map<kotlin/String, dev.aster.vega.runtime.scale/VegaScale>, kotlin.collections/Map<kotlin/String, dev.aster.vega.model.spec/ScaleType>, dev.aster.vega.scene/SceneNodeIdAllocator, dev.aster.vega.scene/TextEngine, dev.aster.vega.model/DiagnosticCollector, dev.aster.vega.runtime.compile/NumberResolver, dev.aster.vega.runtime.compile/MarkEncoder? = ..., dev.aster.vega.model.locale/VegaLocale = ...) // dev.aster.vega.runtime.compile/AxisBuilder.<init>|<init>(kotlin.collections.Map<kotlin.String,dev.aster.vega.runtime.scale.VegaScale>;kotlin.collections.Map<kotlin.String,dev.aster.vega.model.spec.ScaleType>;dev.aster.vega.scene.SceneNodeIdAllocator;dev.aster.vega.scene.TextEngine;dev.aster.vega.model.DiagnosticCollector;dev.aster.vega.runtime.compile.NumberResolver;dev.aster.vega.runtime.compile.MarkEncoder?;dev.aster.vega.model.locale.VegaLocale){}[0]
 
     final fun build(dev.aster.vega.model.spec/AxisSpec, dev.aster.vega.runtime.compile/PlotSize, dev.aster.vega.runtime.compile/PlotSize = ...): dev.aster.vega.runtime.compile/AxisBuilder.BuiltAxis? // dev.aster.vega.runtime.compile/AxisBuilder.build|build(dev.aster.vega.model.spec.AxisSpec;dev.aster.vega.runtime.compile.PlotSize;dev.aster.vega.runtime.compile.PlotSize){}[0]
 
@@ -515,7 +515,7 @@ final class dev.aster.vega.runtime.compile/ItemEncode { // dev.aster.vega.runtim
 }
 
 final class dev.aster.vega.runtime.compile/MarkEncoder { // dev.aster.vega.runtime.compile/MarkEncoder|null[0]
-    constructor <init>(kotlin.collections/Map<kotlin/String, dev.aster.vega.runtime.scale/VegaScale>, dev.aster.vega.scene/SceneNodeIdAllocator, dev.aster.vega.model/DiagnosticCollector, dev.aster.vega.runtime.compile/SignalScope = ..., dev.aster.vega.expression/ExpressionCompiler = ..., dev.aster.vega.scene/TextEngine = ..., dev.aster.vega.runtime.compile/PlotSize = ..., dev.aster.vega.scene/PointD = ...) // dev.aster.vega.runtime.compile/MarkEncoder.<init>|<init>(kotlin.collections.Map<kotlin.String,dev.aster.vega.runtime.scale.VegaScale>;dev.aster.vega.scene.SceneNodeIdAllocator;dev.aster.vega.model.DiagnosticCollector;dev.aster.vega.runtime.compile.SignalScope;dev.aster.vega.expression.ExpressionCompiler;dev.aster.vega.scene.TextEngine;dev.aster.vega.runtime.compile.PlotSize;dev.aster.vega.scene.PointD){}[0]
+    constructor <init>(kotlin.collections/Map<kotlin/String, dev.aster.vega.runtime.scale/VegaScale>, dev.aster.vega.scene/SceneNodeIdAllocator, dev.aster.vega.model/DiagnosticCollector, dev.aster.vega.runtime.compile/SignalScope = ..., dev.aster.vega.expression/ExpressionCompiler = ..., dev.aster.vega.scene/TextEngine = ..., dev.aster.vega.runtime.compile/PlotSize = ..., dev.aster.vega.scene/PointD = ..., dev.aster.vega.model.locale/VegaLocale = ...) // dev.aster.vega.runtime.compile/MarkEncoder.<init>|<init>(kotlin.collections.Map<kotlin.String,dev.aster.vega.runtime.scale.VegaScale>;dev.aster.vega.scene.SceneNodeIdAllocator;dev.aster.vega.model.DiagnosticCollector;dev.aster.vega.runtime.compile.SignalScope;dev.aster.vega.expression.ExpressionCompiler;dev.aster.vega.scene.TextEngine;dev.aster.vega.runtime.compile.PlotSize;dev.aster.vega.scene.PointD;dev.aster.vega.model.locale.VegaLocale){}[0]
 
     final fun channelAny(dev.aster.vega.model.spec/ChannelValue, dev.aster.vega.model/VegaValue): dev.aster.vega.model/VegaValue? // dev.aster.vega.runtime.compile/MarkEncoder.channelAny|channelAny(dev.aster.vega.model.spec.ChannelValue;dev.aster.vega.model.VegaValue){}[0]
     final fun channelBoolean(dev.aster.vega.model.spec/ChannelValue, dev.aster.vega.model/VegaValue): kotlin/Boolean? // dev.aster.vega.runtime.compile/MarkEncoder.channelBoolean|channelBoolean(dev.aster.vega.model.spec.ChannelValue;dev.aster.vega.model.VegaValue){}[0]
@@ -611,7 +611,7 @@ final class dev.aster.vega.runtime.compile/SignalScope : dev.aster.vega.expressi
 }
 
 final class dev.aster.vega.runtime.compile/SpecCompiler { // dev.aster.vega.runtime.compile/SpecCompiler|null[0]
-    constructor <init>(dev.aster.vega.scene/TextEngine = ..., dev.aster.vega.runtime.load/DataLoader = ..., kotlin/Long = ..., dev.aster.vega.expression/Clock = ...) // dev.aster.vega.runtime.compile/SpecCompiler.<init>|<init>(dev.aster.vega.scene.TextEngine;dev.aster.vega.runtime.load.DataLoader;kotlin.Long;dev.aster.vega.expression.Clock){}[0]
+    constructor <init>(dev.aster.vega.scene/TextEngine = ..., dev.aster.vega.runtime.load/DataLoader = ..., kotlin/Long = ..., dev.aster.vega.expression/Clock = ..., dev.aster.vega.model.locale/VegaLocale = ...) // dev.aster.vega.runtime.compile/SpecCompiler.<init>|<init>(dev.aster.vega.scene.TextEngine;dev.aster.vega.runtime.load.DataLoader;kotlin.Long;dev.aster.vega.expression.Clock;dev.aster.vega.model.locale.VegaLocale){}[0]
 
     final fun compile(dev.aster.vega.model.spec/VegaSpec, kotlin.collections/Map<kotlin/String, dev.aster.vega.model/VegaValue> = ..., kotlin.collections/Map<dev.aster.vega.scene/SceneNodeId, dev.aster.vega.runtime.compile/ItemEncode> = ...): dev.aster.vega.runtime.compile/CompiledSpec // dev.aster.vega.runtime.compile/SpecCompiler.compile|compile(dev.aster.vega.model.spec.VegaSpec;kotlin.collections.Map<kotlin.String,dev.aster.vega.model.VegaValue>;kotlin.collections.Map<dev.aster.vega.scene.SceneNodeId,dev.aster.vega.runtime.compile.ItemEncode>){}[0]
     final fun compileJson(kotlin/String, kotlin.collections/Map<kotlin/String, dev.aster.vega.model/VegaValue> = ..., kotlin.collections/Map<dev.aster.vega.scene/SceneNodeId, dev.aster.vega.runtime.compile/ItemEncode> = ...): dev.aster.vega.runtime.compile/CompiledSpec // dev.aster.vega.runtime.compile/SpecCompiler.compileJson|compileJson(kotlin.String;kotlin.collections.Map<kotlin.String,dev.aster.vega.model.VegaValue>;kotlin.collections.Map<dev.aster.vega.scene.SceneNodeId,dev.aster.vega.runtime.compile.ItemEncode>){}[0]
@@ -868,11 +868,11 @@ final class dev.aster.vega.runtime.scale/LinearScale : dev.aster.vega.runtime.sc
         final fun <get-round>(): kotlin/Boolean // dev.aster.vega.runtime.scale/LinearScale.round.<get-round>|<get-round>(){}[0]
 
     final fun apply(kotlin/Double): kotlin/Double // dev.aster.vega.runtime.scale/LinearScale.apply|apply(kotlin.Double){}[0]
-    final fun formatTick(kotlin/Double, kotlin/Int = ...): kotlin/String // dev.aster.vega.runtime.scale/LinearScale.formatTick|formatTick(kotlin.Double;kotlin.Int){}[0]
+    final fun formatTick(kotlin/Double, kotlin/Int = ..., dev.aster.vega.model.locale/VegaLocale = ...): kotlin/String // dev.aster.vega.runtime.scale/LinearScale.formatTick|formatTick(kotlin.Double;kotlin.Int;dev.aster.vega.model.locale.VegaLocale){}[0]
     final fun invert(kotlin/Double): kotlin/Double // dev.aster.vega.runtime.scale/LinearScale.invert|invert(kotlin.Double){}[0]
     final fun position(dev.aster.vega.model/VegaValue): kotlin/Double // dev.aster.vega.runtime.scale/LinearScale.position|position(dev.aster.vega.model.VegaValue){}[0]
     final fun scale(dev.aster.vega.model/VegaValue): dev.aster.vega.model/VegaValue // dev.aster.vega.runtime.scale/LinearScale.scale|scale(dev.aster.vega.model.VegaValue){}[0]
-    final fun tickLabels(kotlin/Int = ...): kotlin.collections/List<kotlin/String> // dev.aster.vega.runtime.scale/LinearScale.tickLabels|tickLabels(kotlin.Int){}[0]
+    final fun tickLabels(kotlin/Int = ..., dev.aster.vega.model.locale/VegaLocale = ...): kotlin.collections/List<kotlin/String> // dev.aster.vega.runtime.scale/LinearScale.tickLabels|tickLabels(kotlin.Int;dev.aster.vega.model.locale.VegaLocale){}[0]
     final fun ticks(kotlin/Int = ...): kotlin.collections/List<kotlin/Double> // dev.aster.vega.runtime.scale/LinearScale.ticks|ticks(kotlin.Int){}[0]
 
     final object Companion { // dev.aster.vega.runtime.scale/LinearScale.Companion|null[0]
@@ -891,8 +891,8 @@ final class dev.aster.vega.runtime.scale/LogScale : dev.aster.vega.runtime.scale
     final val isValid // dev.aster.vega.runtime.scale/LogScale.isValid|{}isValid[0]
         final fun <get-isValid>(): kotlin/Boolean // dev.aster.vega.runtime.scale/LogScale.isValid.<get-isValid>|<get-isValid>(){}[0]
 
-    final fun formatTick(kotlin/Double, kotlin/Int): kotlin/String // dev.aster.vega.runtime.scale/LogScale.formatTick|formatTick(kotlin.Double;kotlin.Int){}[0]
-    final fun tickLabels(kotlin/Int): kotlin.collections/List<kotlin/String> // dev.aster.vega.runtime.scale/LogScale.tickLabels|tickLabels(kotlin.Int){}[0]
+    final fun formatTick(kotlin/Double, kotlin/Int, dev.aster.vega.model.locale/VegaLocale): kotlin/String // dev.aster.vega.runtime.scale/LogScale.formatTick|formatTick(kotlin.Double;kotlin.Int;dev.aster.vega.model.locale.VegaLocale){}[0]
+    final fun tickLabels(kotlin/Int, dev.aster.vega.model.locale/VegaLocale): kotlin.collections/List<kotlin/String> // dev.aster.vega.runtime.scale/LogScale.tickLabels|tickLabels(kotlin.Int;dev.aster.vega.model.locale.VegaLocale){}[0]
     final fun ticks(kotlin/Int): kotlin.collections/List<kotlin/Double> // dev.aster.vega.runtime.scale/LogScale.ticks|ticks(kotlin.Int){}[0]
 }
 
@@ -999,10 +999,10 @@ final class dev.aster.vega.runtime.scale/SequentialColorScale : dev.aster.vega.r
         final fun <get-space>(): dev.aster.vega.scene/ColorSpaces.Interpolation // dev.aster.vega.runtime.scale/SequentialColorScale.space.<get-space>|<get-space>(){}[0]
 
     final fun colorAt(kotlin/Double): dev.aster.vega.scene/SceneColor? // dev.aster.vega.runtime.scale/SequentialColorScale.colorAt|colorAt(kotlin.Double){}[0]
-    final fun formatTick(kotlin/Double, kotlin/Int = ...): kotlin/String // dev.aster.vega.runtime.scale/SequentialColorScale.formatTick|formatTick(kotlin.Double;kotlin.Int){}[0]
+    final fun formatTick(kotlin/Double, kotlin/Int = ..., dev.aster.vega.model.locale/VegaLocale = ...): kotlin/String // dev.aster.vega.runtime.scale/SequentialColorScale.formatTick|formatTick(kotlin.Double;kotlin.Int;dev.aster.vega.model.locale.VegaLocale){}[0]
     final fun fraction(kotlin/Double): kotlin/Double // dev.aster.vega.runtime.scale/SequentialColorScale.fraction|fraction(kotlin.Double){}[0]
     final fun scale(dev.aster.vega.model/VegaValue): dev.aster.vega.model/VegaValue // dev.aster.vega.runtime.scale/SequentialColorScale.scale|scale(dev.aster.vega.model.VegaValue){}[0]
-    final fun tickLabels(kotlin/Int = ...): kotlin.collections/List<kotlin/String> // dev.aster.vega.runtime.scale/SequentialColorScale.tickLabels|tickLabels(kotlin.Int){}[0]
+    final fun tickLabels(kotlin/Int = ..., dev.aster.vega.model.locale/VegaLocale = ...): kotlin.collections/List<kotlin/String> // dev.aster.vega.runtime.scale/SequentialColorScale.tickLabels|tickLabels(kotlin.Int;dev.aster.vega.model.locale.VegaLocale){}[0]
     final fun ticks(kotlin/Int = ...): kotlin.collections/List<kotlin/Double> // dev.aster.vega.runtime.scale/SequentialColorScale.ticks|ticks(kotlin.Int){}[0]
 }
 
@@ -1053,7 +1053,7 @@ final class dev.aster.vega.runtime.scale/TimeScale : dev.aster.vega.runtime.scal
     final fun invert(kotlin/Double): kotlin/Double // dev.aster.vega.runtime.scale/TimeScale.invert|invert(kotlin.Double){}[0]
     final fun position(dev.aster.vega.model/VegaValue): kotlin/Double // dev.aster.vega.runtime.scale/TimeScale.position|position(dev.aster.vega.model.VegaValue){}[0]
     final fun scale(dev.aster.vega.model/VegaValue): dev.aster.vega.model/VegaValue // dev.aster.vega.runtime.scale/TimeScale.scale|scale(dev.aster.vega.model.VegaValue){}[0]
-    final fun tickLabels(kotlin/Int = ...): kotlin.collections/List<kotlin/String> // dev.aster.vega.runtime.scale/TimeScale.tickLabels|tickLabels(kotlin.Int){}[0]
+    final fun tickLabels(kotlin/Int = ..., dev.aster.vega.model.locale/VegaLocale = ...): kotlin.collections/List<kotlin/String> // dev.aster.vega.runtime.scale/TimeScale.tickLabels|tickLabels(kotlin.Int;dev.aster.vega.model.locale.VegaLocale){}[0]
     final fun ticks(kotlin/Int = ...): kotlin.collections/List<kotlin/Double> // dev.aster.vega.runtime.scale/TimeScale.ticks|ticks(kotlin.Int){}[0]
 }
 
@@ -1221,7 +1221,7 @@ final class dev.aster.vega.runtime/SignalInput { // dev.aster.vega.runtime/Signa
 }
 
 final class dev.aster.vega.runtime/VegaChartController { // dev.aster.vega.runtime/VegaChartController|null[0]
-    constructor <init>(dev.aster.vega.scene/Scene = ..., dev.aster.vega.scene/TextEngine = ..., kotlin/Function0<kotlin/Long> = ..., dev.aster.vega.runtime.load/DataLoader = ..., dev.aster.vega.runtime.interaction/Scheduler? = ...) // dev.aster.vega.runtime/VegaChartController.<init>|<init>(dev.aster.vega.scene.Scene;dev.aster.vega.scene.TextEngine;kotlin.Function0<kotlin.Long>;dev.aster.vega.runtime.load.DataLoader;dev.aster.vega.runtime.interaction.Scheduler?){}[0]
+    constructor <init>(dev.aster.vega.scene/Scene = ..., dev.aster.vega.scene/TextEngine = ..., kotlin/Function0<kotlin/Long> = ..., dev.aster.vega.runtime.load/DataLoader = ..., dev.aster.vega.runtime.interaction/Scheduler? = ..., dev.aster.vega.model.locale/VegaLocale = ...) // dev.aster.vega.runtime/VegaChartController.<init>|<init>(dev.aster.vega.scene.Scene;dev.aster.vega.scene.TextEngine;kotlin.Function0<kotlin.Long>;dev.aster.vega.runtime.load.DataLoader;dev.aster.vega.runtime.interaction.Scheduler?;dev.aster.vega.model.locale.VegaLocale){}[0]
 
     final val diagnostics // dev.aster.vega.runtime/VegaChartController.diagnostics|{}diagnostics[0]
         final fun <get-diagnostics>(): kotlinx.coroutines.flow/StateFlow<kotlin.collections/List<dev.aster.vega.model/VegaDiagnostic>> // dev.aster.vega.runtime/VegaChartController.diagnostics.<get-diagnostics>|<get-diagnostics>(){}[0]
@@ -1432,7 +1432,7 @@ final object dev.aster.vega.runtime.scale/Ticks { // dev.aster.vega.runtime.scal
     final fun nice(kotlin.collections/List<kotlin/Double>, kotlin/Int = ...): kotlin.collections/List<kotlin/Double> // dev.aster.vega.runtime.scale/Ticks.nice|nice(kotlin.collections.List<kotlin.Double>;kotlin.Int){}[0]
     final fun niceLog(kotlin.collections/List<kotlin/Double>, kotlin/Double): kotlin.collections/List<kotlin/Double> // dev.aster.vega.runtime.scale/Ticks.niceLog|niceLog(kotlin.collections.List<kotlin.Double>;kotlin.Double){}[0]
     final fun precisionForStep(kotlin/Double): kotlin/Int // dev.aster.vega.runtime.scale/Ticks.precisionForStep|precisionForStep(kotlin.Double){}[0]
-    final fun spanFormatter(kotlin/String, kotlin/Double, kotlin/Double, kotlin/Int): kotlin/Function1<kotlin/Double, kotlin/String> // dev.aster.vega.runtime.scale/Ticks.spanFormatter|spanFormatter(kotlin.String;kotlin.Double;kotlin.Double;kotlin.Int){}[0]
+    final fun spanFormatter(kotlin/String, kotlin/Double, kotlin/Double, kotlin/Int, dev.aster.vega.model.locale/VegaLocale = ...): kotlin/Function1<kotlin/Double, kotlin/String> // dev.aster.vega.runtime.scale/Ticks.spanFormatter|spanFormatter(kotlin.String;kotlin.Double;kotlin.Double;kotlin.Int;dev.aster.vega.model.locale.VegaLocale){}[0]
     final fun spanSpecifier(kotlin/String, kotlin/Double, kotlin/Double, kotlin/Int): kotlin/String // dev.aster.vega.runtime.scale/Ticks.spanSpecifier|spanSpecifier(kotlin.String;kotlin.Double;kotlin.Double;kotlin.Int){}[0]
     final fun step(kotlin/Double, kotlin/Double, kotlin/Double): kotlin/Double // dev.aster.vega.runtime.scale/Ticks.step|step(kotlin.Double;kotlin.Double;kotlin.Double){}[0]
     final fun stepFrom(kotlin/Double): kotlin/Double // dev.aster.vega.runtime.scale/Ticks.stepFrom|stepFrom(kotlin.Double){}[0]
@@ -1443,9 +1443,9 @@ final object dev.aster.vega.runtime.scale/Ticks { // dev.aster.vega.runtime.scal
 }
 
 final object dev.aster.vega.runtime.scale/TimeTicks { // dev.aster.vega.runtime.scale/TimeTicks|null[0]
-    final fun format(kotlin/Double, kotlin/String, kotlinx.datetime/TimeZone): kotlin/String // dev.aster.vega.runtime.scale/TimeTicks.format|format(kotlin.Double;kotlin.String;kotlinx.datetime.TimeZone){}[0]
+    final fun format(kotlin/Double, kotlin/String, kotlinx.datetime/TimeZone, dev.aster.vega.model.locale/VegaLocale = ...): kotlin/String // dev.aster.vega.runtime.scale/TimeTicks.format|format(kotlin.Double;kotlin.String;kotlinx.datetime.TimeZone;dev.aster.vega.model.locale.VegaLocale){}[0]
     final fun intervalTicks(kotlin.collections/List<kotlin/Double>, dev.aster.vega.model.time/TimeStepper): kotlin.collections/List<kotlin/Double> // dev.aster.vega.runtime.scale/TimeTicks.intervalTicks|intervalTicks(kotlin.collections.List<kotlin.Double>;dev.aster.vega.model.time.TimeStepper){}[0]
-    final fun label(kotlin/Double, kotlinx.datetime/TimeZone): kotlin/String // dev.aster.vega.runtime.scale/TimeTicks.label|label(kotlin.Double;kotlinx.datetime.TimeZone){}[0]
+    final fun label(kotlin/Double, kotlinx.datetime/TimeZone, dev.aster.vega.model.locale/VegaLocale = ...): kotlin/String // dev.aster.vega.runtime.scale/TimeTicks.label|label(kotlin.Double;kotlinx.datetime.TimeZone;dev.aster.vega.model.locale.VegaLocale){}[0]
     final fun nice(kotlin/Double, kotlin/Double, kotlin/Int, kotlinx.datetime/TimeZone): kotlin/Pair<kotlin/Double, kotlin/Double> // dev.aster.vega.runtime.scale/TimeTicks.nice|nice(kotlin.Double;kotlin.Double;kotlin.Int;kotlinx.datetime.TimeZone){}[0]
     final fun tickStepper(kotlin/Double, kotlin/Double, kotlin/Int, kotlinx.datetime/TimeZone): dev.aster.vega.model.time/TimeStepper // dev.aster.vega.runtime.scale/TimeTicks.tickStepper|tickStepper(kotlin.Double;kotlin.Double;kotlin.Int;kotlinx.datetime.TimeZone){}[0]
     final fun ticks(kotlin/Double, kotlin/Double, kotlin/Int, kotlinx.datetime/TimeZone): kotlin.collections/List<kotlin/Double> // dev.aster.vega.runtime.scale/TimeTicks.ticks|ticks(kotlin.Double;kotlin.Double;kotlin.Int;kotlinx.datetime.TimeZone){}[0]
@@ -1468,5 +1468,5 @@ final object dev.aster.vega.runtime/ForeignSignals { // dev.aster.vega.runtime/F
 }
 
 final fun dev.aster.vega.runtime.scale/formatNumber(kotlin/Double, kotlin/Int): kotlin/String // dev.aster.vega.runtime.scale/formatNumber|formatNumber(kotlin.Double;kotlin.Int){}[0]
-final fun dev.aster.vega.runtime.scale/formatTickLabel(kotlin/Double, kotlin/Int): kotlin/String // dev.aster.vega.runtime.scale/formatTickLabel|formatTickLabel(kotlin.Double;kotlin.Int){}[0]
-final fun dev.aster.vega.runtime.scale/groupThousands(kotlin/String): kotlin/String // dev.aster.vega.runtime.scale/groupThousands|groupThousands(kotlin.String){}[0]
+final fun dev.aster.vega.runtime.scale/formatTickLabel(kotlin/Double, kotlin/Int, dev.aster.vega.model.locale/VegaLocale = ...): kotlin/String // dev.aster.vega.runtime.scale/formatTickLabel|formatTickLabel(kotlin.Double;kotlin.Int;dev.aster.vega.model.locale.VegaLocale){}[0]
+final fun dev.aster.vega.runtime.scale/groupThousands(kotlin/String, dev.aster.vega.model.locale/VegaLocale = ...): kotlin/String // dev.aster.vega.runtime.scale/groupThousands|groupThousands(kotlin.String;dev.aster.vega.model.locale.VegaLocale){}[0]

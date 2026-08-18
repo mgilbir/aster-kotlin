@@ -151,6 +151,7 @@ public final class dev/aster/vega/expression/ExpressionSyntaxException : java/la
 
 public final class dev/aster/vega/expression/Functions {
 	public static final field INSTANCE Ldev/aster/vega/expression/Functions;
+	public final fun functionsFor (Ldev/aster/vega/model/locale/VegaLocale;)Ljava/util/Map;
 	public final fun getConstants ()Ljava/util/Map;
 	public final fun getFunctions ()Ljava/util/Map;
 	public final fun getKnownUnsupported ()Ljava/util/Map;
@@ -311,14 +312,16 @@ public final class dev/aster/vega/expression/Node$Unary : dev/aster/vega/express
 
 public final class dev/aster/vega/expression/NumberFormat {
 	public static final field INSTANCE Ldev/aster/vega/expression/NumberFormat;
-	public final fun format (DLdev/aster/vega/expression/NumberFormat$Spec;Ljava/lang/String;)Ljava/lang/String;
-	public final fun format (DLjava/lang/String;)Ljava/lang/String;
-	public static synthetic fun format$default (Ldev/aster/vega/expression/NumberFormat;DLdev/aster/vega/expression/NumberFormat$Spec;Ljava/lang/String;ILjava/lang/Object;)Ljava/lang/String;
+	public final fun format (DLdev/aster/vega/expression/NumberFormat$Spec;Ljava/lang/String;Ldev/aster/vega/model/locale/VegaLocale;)Ljava/lang/String;
+	public final fun format (DLjava/lang/String;Ldev/aster/vega/model/locale/VegaLocale;)Ljava/lang/String;
+	public static synthetic fun format$default (Ldev/aster/vega/expression/NumberFormat;DLdev/aster/vega/expression/NumberFormat$Spec;Ljava/lang/String;Ldev/aster/vega/model/locale/VegaLocale;ILjava/lang/Object;)Ljava/lang/String;
+	public static synthetic fun format$default (Ldev/aster/vega/expression/NumberFormat;DLjava/lang/String;Ldev/aster/vega/model/locale/VegaLocale;ILjava/lang/Object;)Ljava/lang/String;
 	public final fun parse (Ljava/lang/String;)Ldev/aster/vega/expression/NumberFormat$Spec;
 	public final fun precisionFixed (D)I
 	public final fun precisionPrefix (DD)I
 	public final fun precisionRound (DD)I
-	public final fun prefixed (Ldev/aster/vega/expression/NumberFormat$Spec;D)Lkotlin/jvm/functions/Function1;
+	public final fun prefixed (Ldev/aster/vega/expression/NumberFormat$Spec;DLdev/aster/vega/model/locale/VegaLocale;)Lkotlin/jvm/functions/Function1;
+	public static synthetic fun prefixed$default (Ldev/aster/vega/expression/NumberFormat;Ldev/aster/vega/expression/NumberFormat$Spec;DLdev/aster/vega/model/locale/VegaLocale;ILjava/lang/Object;)Lkotlin/jvm/functions/Function1;
 }
 
 public final class dev/aster/vega/expression/NumberFormat$Spec {

@@ -19,7 +19,10 @@ final class SceneExportTests: XCTestCase {
       textEngine: CoreTextTextEngine(),
       loader: DenyLoader(),
       randomSeed: 42,
-      clock: ClockCompanion.shared.Fixed
+      clock: ClockCompanion.shared.Fixed,
+      // Spelled out because a Kotlin default argument has no Obj-C representation: Swift names every
+      // parameter or does not compile. `EnglishUS` is what upstream produces.
+      locale: VegaLocale.Companion.shared.EnglishUS
     )
     .compileJson(json: json, signalOverrides: [:], itemEncodes: [:])
     return try XCTUnwrap(compiled.scene)

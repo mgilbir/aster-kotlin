@@ -9,6 +9,7 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.viewinterop.AndroidView
 import dev.aster.vega.android.VegaChartView
+import dev.aster.vega.model.locale.VegaLocale
 import dev.aster.vega.runtime.ChartEvent
 import dev.aster.vega.runtime.VegaChartController
 import dev.aster.vega.scene.Scene
@@ -70,9 +71,18 @@ public fun VegaChart(
   VegaChart(controller = controller, modifier = modifier, onEvent = onEvent)
 }
 
-/** Creates and remembers a controller across recompositions. */
+/**
+ * Creates and remembers a controller across recompositions.
+ *
+ * @param locale the language every generated name and number is written in — a month on a time
+ *   axis, a thousands separator, a spoken caption. Defaults to d3's `en-US`. Remembered against it,
+ *   so a host that negotiates its user's language rebuilds the controller when that changes.
+ */
 @Composable
-public fun rememberVegaChartController(scene: Scene = Scene.empty()): VegaChartController =
-  remember {
-    VegaChartController.fromScene(scene)
+public fun rememberVegaChartController(
+  scene: Scene = Scene.empty(),
+  locale: VegaLocale = VegaLocale.EnglishUS,
+): VegaChartController =
+  remember(locale) {
+    VegaChartController(initialScene = scene, locale = locale)
   }
