@@ -211,4 +211,12 @@ public data class DrawTextRun(
   val fontWeight: Int,
   val italic: Boolean,
   val angleDegrees: Double,
+  /**
+   * Extra space after every character, in scene units, as CSS `letter-spacing` means it.
+   *
+   * Carried because the **measurement** includes it: a run laid out with spacing and drawn without
+   * it is drawn narrower than the box the axis reserved, which is the measure-and-draw mismatch
+   * this vocabulary exists to avoid, in miniature.
+   */
+  val letterSpacing: Double = 0.0,
 )

@@ -207,7 +207,6 @@ What is **not** here, and what a chart gets instead:
 | Pulse propagation and incremental evaluation | Contracts and deterministic scheduling only; a transform recomputes its whole dataset. Correct, and slower than upstream on a large table |
 | `wordcloud` and `contour` | Reported by name. An unimplemented transform stops that dataset's pipeline rather than passing rows on that later stages were not meant to see |
 | Locales | Every generated month name, weekday name and number format is English and en-US; `TimeFormat` says so at the top of the file. A host can override one axis with `axis.format` |
-| A text engine for the Compose Multiplatform renderer | It falls back to `MetricTextEngine`, whose advance is a ratio of the font size and matches no real font, so its labels are laid out from widths it does not draw with |
 | Accessibility and activation on the Compose Multiplatform renderer | The tree is computed and that renderer does not expose it; the Android View and the Swift renderer do |
 | A container width for `width: "container"` | `containerSize()` has nothing to measure outside a browser, so the chart takes `config.view.continuousWidth`; a host that knows its width sets the `width` signal |
 | Domain adjustment and reset-zoom | Planned. Zoom moves the view, not the scale domains |

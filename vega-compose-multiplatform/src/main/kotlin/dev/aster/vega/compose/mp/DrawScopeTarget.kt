@@ -19,15 +19,13 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.clipRect
 import androidx.compose.ui.graphics.drawscope.rotate
 import androidx.compose.ui.text.TextMeasurer
-import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.drawText
 import androidx.compose.ui.text.font.FontFamily
-import androidx.compose.ui.text.font.FontStyle
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntSize
-import androidx.compose.ui.unit.sp
+import dev.aster.vega.scene.FontStyle as SceneFontStyle
 import dev.aster.vega.scene.RasterImage
+import dev.aster.vega.scene.TextStyle as SceneTextStyle
 import kotlin.io.encoding.Base64
 import kotlin.io.encoding.ExperimentalEncodingApi
 import kotlin.math.roundToInt
@@ -52,6 +50,15 @@ import kotlin.math.roundToInt
 public class DrawScopeTarget(
   private val scope: DrawScope,
   private val textMeasurer: TextMeasurer? = null,
+  /**
+   * Turns a specification's font family name into a Compose family, as [ComposeTextEngine] does.
+   *
+   * It has to be the **same** resolver the engine measured with. A chart laid out in one face and
+   * drawn in another is the defect that `MetricTextEngine` used to cause here, with the faces the
+   * wrong way round; `VegaChart` takes the engine itself and reads this off it so a caller cannot
+   * pass one and forget the other.
+   */
+  private val fontFamilyResolver: (String) -> FontFamily? = ::genericFontFamily,
   /**
    * Resolves an image URL to something drawable. Null draws no URL images, which is the default.
    *
@@ -163,16 +170,29 @@ public class DrawScopeTarget(
       measurer.measure(
         text = run.text,
         style =
-          TextStyle(
-            color = colour?.let { colour(it) } ?: Color.Black,
-            fontSize = run.fontSize.sp,
-            fontWeight = FontWeight(run.fontWeight.coerceIn(1, 1000)),
-            fontStyle = if (run.italic) FontStyle.Italic else FontStyle.Normal,
-            // A specification names a font family as a string, and resolving that string to a face
-            // installed on the device is the platform's business. `Default` is the honest answer
-            // here: a caller needing a particular face supplies a measurer that knows it.
-            fontFamily = FontFamily.Default,
-          ),
+          composeStyleOf(
+              SceneTextStyle(
+                fontFamily = run.fontFamily,
+                fontSize = run.fontSize,
+                fontWeight = run.fontWeight,
+                fontStyle = if (run.italic) SceneFontStyle.ITALIC else SceneFontStyle.NORMAL,
+                letterSpacing = run.letterSpacing,
+              ),
+              // **One sp per scene unit divided by the density**, and this is the line the whole
+              // conversion turns on. Every coordinate arriving here is in scene units, and the
+              // scope
+              // this draws into has already been scaled by the density — so a Compose pixel *is* a
+              // scene unit here. An `sp` is not: it is a pixel times the density times the reader's
+              // font scale. Passing `run.fontSize.sp` therefore applied the density a second time,
+              // and at 3x every label was drawn three times the size of the box the layout reserved
+              // for it. The one test that could have caught it pins the density to 1.
+              //
+              // Dividing by the density leaves the font scale, which is deliberate: the engine
+              // measured with it, so the reserved box is already the larger one.
+              spPerSceneUnit = 1f / scope.density,
+              fontFamilyResolver = fontFamilyResolver,
+            )
+            .copy(color = colour?.let { colour(it) } ?: Color.Black),
       )
     // The walk has already resolved `align` and `baseline` into a pen position, which is the
     // *baseline*

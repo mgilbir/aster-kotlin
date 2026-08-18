@@ -1,3 +1,18 @@
+public final class dev/aster/vega/compose/mp/ComposeTextEngine : dev/aster/vega/scene/MeasuredTextEngine {
+	public static final field $stable I
+	public fun <init> (Landroidx/compose/ui/text/TextMeasurer;Landroidx/compose/ui/unit/Density;Lkotlin/jvm/functions/Function1;)V
+	public synthetic fun <init> (Landroidx/compose/ui/text/TextMeasurer;Landroidx/compose/ui/unit/Density;Lkotlin/jvm/functions/Function1;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun advanceOf (Ljava/lang/String;Ldev/aster/vega/scene/TextStyle;)D
+	public fun ascentOf (Ldev/aster/vega/scene/TextStyle;)D
+	public fun defaultLineHeightOf (Ldev/aster/vega/scene/TextStyle;)D
+	public fun descentOf (Ldev/aster/vega/scene/TextStyle;)D
+}
+
+public final class dev/aster/vega/compose/mp/ComposeTextEngineKt {
+	public static final fun genericFontFamily (Ljava/lang/String;)Landroidx/compose/ui/text/font/FontFamily;
+	public static final fun rememberVegaTextEngine (Lkotlin/jvm/functions/Function1;Landroidx/compose/runtime/Composer;II)Ldev/aster/vega/compose/mp/ComposeTextEngine;
+}
+
 public abstract interface class dev/aster/vega/compose/mp/DrawBrush {
 	public abstract fun getAlpha ()D
 }
@@ -209,8 +224,8 @@ public final class dev/aster/vega/compose/mp/DrawRect {
 
 public final class dev/aster/vega/compose/mp/DrawScopeTarget : dev/aster/vega/compose/mp/SceneDrawTarget {
 	public static final field $stable I
-	public fun <init> (Landroidx/compose/ui/graphics/drawscope/DrawScope;Landroidx/compose/ui/text/TextMeasurer;Lkotlin/jvm/functions/Function1;)V
-	public synthetic fun <init> (Landroidx/compose/ui/graphics/drawscope/DrawScope;Landroidx/compose/ui/text/TextMeasurer;Lkotlin/jvm/functions/Function1;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun <init> (Landroidx/compose/ui/graphics/drawscope/DrawScope;Landroidx/compose/ui/text/TextMeasurer;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function1;)V
+	public synthetic fun <init> (Landroidx/compose/ui/graphics/drawscope/DrawScope;Landroidx/compose/ui/text/TextMeasurer;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function1;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public fun beginGroup (Ldev/aster/vega/compose/mp/DrawRect;)V
 	public fun endGroup ()V
 	public final fun getUnresolvedImages ()Ljava/util/List;
@@ -261,8 +276,10 @@ public final class dev/aster/vega/compose/mp/DrawStroke {
 
 public final class dev/aster/vega/compose/mp/DrawTextRun {
 	public static final field $stable I
-	public fun <init> (Ljava/lang/String;Ldev/aster/vega/compose/mp/DrawPoint;Ldev/aster/vega/compose/mp/DrawPoint;DLjava/lang/String;DIZD)V
+	public fun <init> (Ljava/lang/String;Ldev/aster/vega/compose/mp/DrawPoint;Ldev/aster/vega/compose/mp/DrawPoint;DLjava/lang/String;DIZDD)V
+	public synthetic fun <init> (Ljava/lang/String;Ldev/aster/vega/compose/mp/DrawPoint;Ldev/aster/vega/compose/mp/DrawPoint;DLjava/lang/String;DIZDDILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public final fun component1 ()Ljava/lang/String;
+	public final fun component10 ()D
 	public final fun component2 ()Ldev/aster/vega/compose/mp/DrawPoint;
 	public final fun component3 ()Ldev/aster/vega/compose/mp/DrawPoint;
 	public final fun component4 ()D
@@ -271,8 +288,8 @@ public final class dev/aster/vega/compose/mp/DrawTextRun {
 	public final fun component7 ()I
 	public final fun component8 ()Z
 	public final fun component9 ()D
-	public final fun copy (Ljava/lang/String;Ldev/aster/vega/compose/mp/DrawPoint;Ldev/aster/vega/compose/mp/DrawPoint;DLjava/lang/String;DIZD)Ldev/aster/vega/compose/mp/DrawTextRun;
-	public static synthetic fun copy$default (Ldev/aster/vega/compose/mp/DrawTextRun;Ljava/lang/String;Ldev/aster/vega/compose/mp/DrawPoint;Ldev/aster/vega/compose/mp/DrawPoint;DLjava/lang/String;DIZDILjava/lang/Object;)Ldev/aster/vega/compose/mp/DrawTextRun;
+	public final fun copy (Ljava/lang/String;Ldev/aster/vega/compose/mp/DrawPoint;Ldev/aster/vega/compose/mp/DrawPoint;DLjava/lang/String;DIZDD)Ldev/aster/vega/compose/mp/DrawTextRun;
+	public static synthetic fun copy$default (Ldev/aster/vega/compose/mp/DrawTextRun;Ljava/lang/String;Ldev/aster/vega/compose/mp/DrawPoint;Ldev/aster/vega/compose/mp/DrawPoint;DLjava/lang/String;DIZDDILjava/lang/Object;)Ldev/aster/vega/compose/mp/DrawTextRun;
 	public fun equals (Ljava/lang/Object;)Z
 	public final fun getAnchor ()Ldev/aster/vega/compose/mp/DrawPoint;
 	public final fun getAngleDegrees ()D
@@ -281,6 +298,7 @@ public final class dev/aster/vega/compose/mp/DrawTextRun {
 	public final fun getFontSize ()D
 	public final fun getFontWeight ()I
 	public final fun getItalic ()Z
+	public final fun getLetterSpacing ()D
 	public final fun getOrigin ()Ldev/aster/vega/compose/mp/DrawPoint;
 	public final fun getText ()Ljava/lang/String;
 	public fun hashCode ()I
@@ -326,6 +344,6 @@ public final class dev/aster/vega/compose/mp/SceneWalk {
 }
 
 public final class dev/aster/vega/compose/mp/VegaChartKt {
-	public static final fun VegaChart (Ldev/aster/vega/scene/Scene;Landroidx/compose/ui/Modifier;Ldev/aster/vega/compose/mp/SceneFit;Landroidx/compose/ui/text/TextMeasurer;Landroidx/compose/runtime/Composer;II)V
+	public static final fun VegaChart (Ldev/aster/vega/scene/Scene;Landroidx/compose/ui/Modifier;Ldev/aster/vega/compose/mp/SceneFit;Ldev/aster/vega/compose/mp/ComposeTextEngine;Landroidx/compose/runtime/Composer;II)V
 }
 
