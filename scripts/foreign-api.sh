@@ -23,9 +23,16 @@ MODE="${1:-check}"
 HEADER="vega-runtime/build/bin/macosArm64/debugFramework/AsterVega.framework/Headers/AsterVega.h"
 SNAPSHOT="swift/AsterVegaRender/foreign-api.txt"
 
+# **Always**, not only when the header is missing. A header left over from another commit makes this
+# check pass against a surface nobody is shipping, which is the one failure mode a snapshot gate must not
+# have — and it is not hypothetical: comparing against a stale header reported "no change" for a commit
+# that had added a dozen symbols. Gradle is incremental, so a link with nothing to do costs a second.
+echo "==> Linking the framework, which is where the header comes from"
+./gradlew :vega-runtime:linkDebugFrameworkMacosArm64
+
 if [ ! -f "$HEADER" ]; then
-  echo "==> Linking the framework, which is where the header comes from"
-  ./gradlew :vega-runtime:linkDebugFrameworkMacosArm64
+  echo "No header at $HEADER even after linking; something is wrong with the framework task." >&2
+  exit 1
 fi
 
 # Every exported symbol, qualified by the type that owns it. The header's own `swift_name` attributes are

@@ -2,31 +2,71 @@ import AsterVega
 import CoreGraphics
 import SwiftUI
 
-/// Draws a compiled scene into a SwiftUI `Canvas`.
+/// A compiled scene as a SwiftUI view: drawn, touched and spoken.
 ///
 /// The whole of the drawing is `SceneWalk` into a `CoreGraphicsTarget` — the same two types the
-/// package's tests exercise, so what appears here is what those tests assert about.
+/// package's tests exercise, so what appears here is what those tests assert about. Around it are the
+/// three things a host would otherwise write again: the aspect-fit arithmetic shared between drawing
+/// and hit testing, the gesture vocabulary, and the VoiceOver overlay.
+///
+/// It lived in the demo, and an adopter counted the cost of that precisely: about 2,400 lines of this
+/// renderer owned by hand, including the pieces that took real bug fixes to get right. So it is here,
+/// public, and the demo uses it the way any other app does.
+///
+/// ```swift
+/// @State private var session = ChartSession()
+/// // …
+/// if let scene = session.scene {
+///   VegaChartView(scene: scene, session: session)
+/// }
+/// ```
 ///
 /// **No flip.** SwiftUI's canvas already has its origin at the top left with y growing down, which is
 /// the space a scene is in, so a chart drawn straight into it is the right way up. The bitmap tests in
 /// the package *do* flip, because a `CGBitmapContext` on its own has its origin at the bottom left —
 /// that difference belongs to the caller, which is why the renderer does not flip anything itself.
-struct SceneCanvas: View {
-  let scene: AsterVega.Scene
+@available(macOS 14.0, iOS 17.0, tvOS 17.0, watchOS 10.0, *)
+public struct VegaChartView: View {
+  private let scene: AsterVega.Scene
   /// Where a touch goes. Nil for a chart that is only being looked at.
-  var session: ChartSession?
+  private let session: ChartSession?
+  /// Told where the chart ended up, for a host that has to invert a point itself.
+  private let onPlaced: ((ChartPlacement) -> Void)?
+  /// The language the accessibility tree's own summary sentence is written in.
+  private let captions: VegaCaptions?
+
+  /// Creates a chart view.
+  ///
+  /// - Parameters:
+  ///   - scene: the compiled scene to draw. A `ChartSession` publishes one.
+  ///   - session: where touches go. Nil draws a chart nobody can touch, which is right for one that is
+  ///     only being looked at — the drawing and the VoiceOver overlay still work.
+  ///   - onPlaced: called with the fit scale and centring offset whenever the view is laid out. Only a
+  ///     host that has to turn a point of its own into scene coordinates needs it; the gestures and the
+  ///     accessibility overlay use the same numbers internally.
+  ///   - captions: the language the accessibility tree's dense-chart summary is written in. Every other
+  ///     label reaches the scene already in the chart's own language, from the compiler's locale.
+  public init(
+    scene: AsterVega.Scene,
+    session: ChartSession? = nil,
+    captions: VegaCaptions? = nil,
+    onPlaced: ((ChartPlacement) -> Void)? = nil
+  ) {
+    self.scene = scene
+    self.session = session
+    self.captions = captions
+    self.onPlaced = onPlaced
+  }
 
   /// The canvas's size, remembered so a gesture can undo the same placement the drawing used.
   @State private var canvasSize: CGSize = .zero
-  /// So `-tap` fires once rather than on every layout pass.
-  @State private var tapped = false
   /// The pan and pinch reported so far, so each gesture change can be sent as an increment.
   @State private var panned: CGSize = .zero
   @State private var pinched: CGFloat = 1
   /// Where the last finger went down, for a long press — which SwiftUI reports without a location.
   @State private var lastDown: CGPoint = .zero
 
-  var body: some View {
+  public var body: some View {
     ZStack {
       canvas
       // VoiceOver, as real positioned views rather than `accessibilityChildren`.
@@ -97,29 +137,7 @@ struct SceneCanvas: View {
         height: Double(size.height) / placement.scale
       )
     )
-    performLaunchTap(placement: placement)
-  }
-
-  /// `-tap x,y` taps the chart at a point in **scene** coordinates once it has been placed.
-  ///
-  /// The simulator can launch an app but cannot tap it, so a screenshot of a chart *after* a touch is
-  /// otherwise impossible to script. It deliberately goes the long way round — scene point to canvas
-  /// location, then back through `scenePoint(of:)` — so what it exercises is the same inversion a finger
-  /// does, rather than a shortcut that could pass while real taps miss.
-  private func performLaunchTap(placement: (scale: Double, left: CGFloat, top: CGFloat)) {
-    guard !tapped, let session,
-      let argument = UserDefaults.standard.string(forKey: "tap")
-    else { return }
-    let halves = argument.split(separator: ",")
-    guard halves.count == 2, let sceneX = Double(halves[0]), let sceneY = Double(halves[1]) else {
-      return
-    }
-    tapped = true
-    let location = CGPoint(
-      x: CGFloat(sceneX) * CGFloat(placement.scale) + placement.left,
-      y: CGFloat(sceneY) * CGFloat(placement.scale) + placement.top
-    )
-    if let point = scenePoint(of: location) { session.tap(at: point) }
+    onPlaced?(ChartPlacement(scale: placement.scale, left: placement.left, top: placement.top))
   }
 
   /// The whole gesture vocabulary, so a chart answers the same touches on iOS as it does on Android.
@@ -201,7 +219,16 @@ struct SceneCanvas: View {
             )
             .accessibilityElement()
             .accessibilityLabel(entry.element.label)
-            .accessibilityAddTraits(entry.element.selected ? [.isButton, .isSelected] : .isButton)
+            // What kind of thing it is, in the chart's own language: the engine writes this through
+            // its locale, so a Dutch chart says "lijn-markering" rather than "line mark".
+            .accessibilityRespondsToUserInteraction(entry.element.activatable)
+            .accessibilityInputLabels(
+              entry.element.roleDescription.map { [entry.element.label, $0] } ?? [entry.element.label]
+            )
+            // A **button only where activating it does something.** Every element used to be a button,
+            // which tells a reader they can activate an axis caption and then does nothing when they
+            // try; `activatable` is the engine's own answer to which elements are marks.
+            .accessibilityAddTraits(traits(for: entry.element))
             // `.default` rather than an unnamed action: without the kind this registers a *custom* action,
             // which a reader has to go looking for and which an activation does not invoke.
             .accessibilityAction(.default) {
@@ -222,6 +249,19 @@ struct SceneCanvas: View {
     }
   }
 
+  /// The traits an element carries.
+  ///
+  /// A mark is a button because activating it selects it and may open a tooltip; a guide's caption is
+  /// text, because there is nothing behind it to activate. Both hosts used to say button for
+  /// everything, which is a promise the chart does not keep.
+  private func traits(for element: AccessibleElement) -> AccessibilityTraits {
+    var traits = AccessibilityTraits()
+    if element.activatable { _ = traits.insert(.isButton) }
+    if element.selected { _ = traits.insert(.isSelected) }
+    if element.isSummary { _ = traits.insert(.isSummaryElement) }
+    return traits
+  }
+
   /// The chart's accessible elements, paired with an index so `ForEach` has something stable to key on.
   ///
   /// `AccessibleElement` comes from Kotlin and is not `Identifiable`; the offset is enough here because
@@ -229,8 +269,15 @@ struct SceneCanvas: View {
   private var accessibleElements: [(offset: Int, element: AccessibleElement)] {
     guard let scene = session?.scene ?? sceneIfDescribable else { return [] }
     return Array(
-      AccessibilityTree.shared.elements(scene: scene, selectedNodeIds: session?.selectedNodeIds ?? [], captions: VegaCaptionsCompanion.shared.English)
-        .enumerated()
+      AccessibilityTree.shared.elements(
+        scene: scene,
+        selectedNodeIds: session?.selectedNodeIds ?? [],
+        // The one sentence the tree writes itself — the dense-chart summary. English here because a
+        // view has no locale of its own to consult; a host drawing charts in another language passes its
+        // own captions to the compiler, and everything else in the tree is already in that language.
+        captions: captions ?? VegaCaptionsCompanion.shared.English
+      )
+      .enumerated()
     ).map { (offset: $0.offset, element: $0.element) }
   }
 
@@ -294,5 +341,36 @@ struct SceneCanvas: View {
     SceneWalk().draw(scene: scene, into: &target)
 
     context.restoreGState()
+  }
+}
+
+/// Where a chart ended up inside the view: the fit scale, and the offset it was centred by.
+///
+/// Handed to a host through ``VegaChartView/init(scene:session:onPlaced:)`` for the one thing a host
+/// might have to do itself — turn a point of its own into the chart's coordinates. The gestures and the
+/// accessibility overlay share these numbers internally, which is the point: two copies of this
+/// arithmetic is how a tap lands beside the bar it looked like it hit.
+public struct ChartPlacement: Sendable, Equatable {
+  /// Scene units to points. A scene is drawn scaled to fit and centred.
+  public let scale: Double
+  /// How far the drawing was inset from the view's left edge, in points.
+  public let left: CGFloat
+  /// And from its top edge.
+  public let top: CGFloat
+
+  public init(scale: Double, left: CGFloat, top: CGFloat) {
+    self.scale = scale
+    self.left = left
+    self.top = top
+  }
+
+  /// A point in the view turned into the chart's own surface coordinates.
+  ///
+  /// The inverse of what the drawing does, minus the division by the scale: `contentScale` is part of
+  /// the controller's contract and it divides by that itself, so what a host hands over is a point in
+  /// scaled surface space with the offset removed. Applying the fit twice is the trap this method
+  /// exists to keep a host out of.
+  public func scenePoint(of location: CGPoint) -> Point {
+    Point(x: Double(location.x - left), y: Double(location.y - top))
   }
 }

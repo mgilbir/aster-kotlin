@@ -124,8 +124,22 @@ to the release, so a consuming build needs no Kotlin toolchain and never runs Gr
 
 ```swift
 .target(name: "YourFeature", dependencies: [
-  .product(name: "AsterVegaRender", package: "aster-kotlin"),  // the CoreGraphics renderer
+  .product(name: "AsterVegaRender", package: "aster-kotlin"),  // the renderer and the SwiftUI view
 ])
+```
+
+`AsterVegaRender` is a chart, not a drawing primitive: `ChartSession` compiles either grammar off the
+main thread and publishes the scene, and `VegaChartView` draws it with the gestures and a positioned
+VoiceOver overlay.
+
+```swift
+@State private var session = ChartSession()
+// …
+if let scene = session.scene {
+  VegaChartView(scene: scene, session: session)
+}
+// …
+.task { session.load(specification: specification) }
 ```
 
 ## View example
