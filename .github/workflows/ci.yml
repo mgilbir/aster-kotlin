@@ -72,6 +72,22 @@ jobs:
       - name: Check
         run: ./scripts/check.sh
 
+      - name: Snapshot what check.sh ran
+        # Taken here, before the oracle steps, because a Gradle test task *replaces* its results
+        # directory. `oracle.sh` re-runs `:vega-runtime:jvmTest` under `--tests` filters, so after it
+        # the directory holds the four fixture classes it asked for and no trace of the other
+        # forty-two — which read as a suite that had shrunk from 2787 tests to 2276 when it had not.
+        # The counts below are of `check.sh`'s run, which is the run being asserted about.
+        if: always()
+        run: |
+          set -euo pipefail
+          for xml in */build/test-results/*/*.xml; do
+            [ -f "$xml" ] || continue
+            destination="/tmp/check-test-results/$(dirname "$xml")"
+            mkdir -p "$destination"
+            cp "$xml" "$destination/"
+          done
+
       - name: Differential tests against upstream Vega
         if: matrix.oracles == 'true'
         run: ./scripts/oracle.sh
@@ -115,25 +131,25 @@ jobs:
         if: always()
         run: |
           set -euo pipefail
-          python3 - "${{ runner.os }}" <<'PY'
+          python3 - "${{ runner.os }}" /tmp/check-test-results <<'PY'
           import glob, sys, xml.etree.ElementTree as ET
           from collections import Counter
 
-          host = sys.argv[1]
+          host, root = sys.argv[1], sys.argv[2]
           total = skipped = failed = 0
           per, per_skip = Counter(), Counter()
-          for path in glob.glob("*/build/test-results/**/*.xml", recursive=True):
+          for path in glob.glob(f"{root}/*/build/test-results/**/*.xml", recursive=True):
               try:
-                  root = ET.parse(path).getroot()
+                  suite = ET.parse(path).getroot()
               except ET.ParseError:
                   continue
-              tests = int(root.get("tests", 0))
+              tests = int(suite.get("tests", 0))
               total += tests
-              skipped += int(root.get("skipped", 0))
-              failed += int(root.get("failures", 0)) + int(root.get("errors", 0))
-              module = path.split("/")[0]
+              skipped += int(suite.get("skipped", 0))
+              failed += int(suite.get("failures", 0)) + int(suite.get("errors", 0))
+              module = path[len(root) :].lstrip("/").split("/")[0]
               per[module] += tests
-              per_skip[module] += int(root.get("skipped", 0))
+              per_skip[module] += int(suite.get("skipped", 0))
 
           print(f"{total} tests, {skipped} skipped, {failed} failed")
           for module in sorted(per):
@@ -143,12 +159,12 @@ jobs:
           # "some tests skipped" and "the Vega-Lite scene gate is not running".
           if skipped:
               where, why = Counter(), {}
-              for path in glob.glob("*/build/test-results/**/*.xml", recursive=True):
+              for path in glob.glob(f"{root}/*/build/test-results/**/*.xml", recursive=True):
                   try:
-                      root = ET.parse(path).getroot()
+                      suite = ET.parse(path).getroot()
                   except ET.ParseError:
                       continue
-                  for case in root.iter("testcase"):
+                  for case in suite.iter("testcase"):
                       for skip in case.iter("skipped"):
                           name = case.get("classname", "?").rsplit(".", 1)[-1]
                           where[name] += 1
@@ -179,7 +195,7 @@ jobs:
           if host == "macOS":
               native = sum(
                   int(ET.parse(p).getroot().get("tests", 0))
-                  for p in glob.glob("*/build/test-results/*Arm64Test/**/*.xml", recursive=True)
+                  for p in glob.glob(f"{root}/*/build/test-results/*Arm64Test/**/*.xml", recursive=True)
               )
               if native < 20:
                   problems.append(f"only {native} tests ran on Kotlin/Native, expected at least 20")
