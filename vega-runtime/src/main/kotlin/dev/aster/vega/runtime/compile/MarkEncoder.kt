@@ -292,6 +292,56 @@ public class MarkEncoder(
   )
 
   /**
+   * A group's own extent along one axis, from whichever pair of channels states it.
+   *
+   * A group is **rect-like**: Vega gives it extent from `x2`/`y2` as readily as from
+   * `width`/`height`, and Vega-Lite relies on that — a stacked bar with a rounded end is wrapped in
+   * a group positioned by `y`/`y2` and marked `clip: true`, so that the radius applies to the stack
+   * rather than to each segment. Reading only `height`, that group came out **zero-high**; and
+   * because it clips, it clipped away the very bars it was there to round. The chart drew its axes,
+   * its gridlines and its labels, and no data — with no diagnostic, since nothing had gone wrong as
+   * far as the engine knew.
+   *
+   * The rule is `resolveSpan`'s, which the rect encoder already uses: an end channel with a start
+   * gives the span between them, lower edge first; an end alone is measured back by the size; and a
+   * centre channel halves whatever size there is. What is *not* borrowed is that function's
+   * diagnostic for a mark with no position at all, because for a group that is the ordinary case —
+   * an axis group and the scene root are pure containers, and they state no extent by design.
+   *
+   * @return the start, and the size where one can be determined — `null` size meaning no extent,
+   *   and a group with no extent paints nothing and measures only its children.
+   */
+  private fun groupExtent(
+    channels: EncodeEntry,
+    datum: VegaValue,
+    startChannel: String,
+    endChannel: String,
+    sizeChannel: String,
+    centerChannel: String,
+  ): Pair<Double, Double?> {
+    var start = position(channels[startChannel], datum)
+    var size = position(channels[sizeChannel], datum)
+    val end = position(channels[endChannel], datum)
+    val center = position(channels[centerChannel], datum)
+    if (end != null) {
+      val from = start
+      if (from != null) {
+        // Lower edge first, as a rect's span is: a group whose `y2` is above its `y` is the same
+        // group upside down, not a group of negative height.
+        start = minOf(from, end)
+        size = maxOf(from, end) - minOf(from, end)
+      } else if (size != null) {
+        start = end - size
+      } else {
+        start = end
+        size = 0.0
+      }
+    }
+    if (center != null) start = center - (size ?: 0.0) / 2
+    return (start ?: 0.0) to size
+  }
+
+  /**
    * Encodes a group mark: one translated container per datum, holding whatever [contents] builds.
    *
    * The nested scene is a callback rather than a parameter because building it needs the group's
@@ -312,17 +362,8 @@ public class MarkEncoder(
       val style = style(channels, datum, spec)
       // Upstream treats an unset dimension as zero once either is given, and gives a group with
       // neither no extent at all — it then paints nothing and measures only its children.
-      val width = position(channels["width"], datum)
-      val height = position(channels["height"], datum)
-      // A group has an extent, so a centre channel halves it — the same adjustment a rect gets.
-      val x =
-        position(channels["xc"], datum)?.minus((width ?: 0.0) / 2)
-          ?: position(channels["x"], datum)
-          ?: 0.0
-      val y =
-        position(channels["yc"], datum)?.minus((height ?: 0.0) / 2)
-          ?: position(channels["y"], datum)
-          ?: 0.0
+      val (x, width) = groupExtent(channels, datum, "x", "x2", "width", "xc")
+      val (y, height) = groupExtent(channels, datum, "y", "y2", "height", "yc")
       val size = if (width == null && height == null) null else SizeD(width ?: 0.0, height ?: 0.0)
       val extent = size ?: SizeD(0.0, 0.0)
 

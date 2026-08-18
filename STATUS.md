@@ -4951,6 +4951,38 @@ shared `childWidth` was written into the plain plot's marks and scales. No galle
 trellis beside a plain plot of matching size, which is why 627 clean examples had not caught it;
 `facet-concat-size.vl.json` does.
 
+### A clipped group with no height, found by looking at the phone
+
+Launching the demo with a Vega-Lite bar chart drew the axes, the gridlines, the titles and the labels
+— and no bars. It said "read as Vega-Lite and compiled", and there was no diagnostic, because as far
+as the engine knew nothing had gone wrong.
+
+A group mark is **rect-like**: Vega gives it extent from `x2`/`y2` as readily as from
+`width`/`height`. This engine read only `width` and `height`. That matters because of what Vega-Lite
+emits for a bar with a rounded end — `cornerRadiusEnd` wraps each stack in a group positioned by
+`y`/`y2` and marked `clip: true`, so the radius rounds the stack rather than every segment in it.
+Read as `height`-only, that wrapper came out **zero-high**; and being clipped, it clipped away the
+very bars it was there to round.
+
+Two things about how it was found are worth more than the fix.
+
+**No fixture could have caught it.** The differential fixtures compare the *marks* in a scene, and a
+group's extent is not a mark: the bars were present, at the right coordinates, identical to
+upstream's. Adding `bar-corner-radius.vl.json` and reverting the fix, all 281 fixtures still passed.
+So the fixture is coverage, and `GroupExtentTest` is the witness — it asserts the extent itself, and
+fails without the fix.
+
+**It was visible only on the phone.** The scene was right, the walk emitted the bars, and a
+`RecordingTarget` records draw calls without applying a clip — so the recording looked correct too.
+Only a renderer that honours the clip shows the bug, which is CoreGraphics on the simulator and Skia
+on a display. A test that records rather than draws cannot see it, which is the same lesson the
+renderers taught earlier in this project and this time cost a screenshot to learn again.
+
+The rule now follows `resolveSpan`, which the rect encoder already used: an end channel with a start
+gives the span between them, lower edge first; an end alone is measured back by the size; a centre
+halves it. What is not borrowed is that function's diagnostic for a mark with no position, because a
+group with no extent is the ordinary case — an axis group and the scene root are pure containers.
+
 ### Vega-Lite on every host, which was a build file and not a restriction
 
 A reader who pastes a chart has pasted a chart, not a dialect, so a host that accepts text accepts
