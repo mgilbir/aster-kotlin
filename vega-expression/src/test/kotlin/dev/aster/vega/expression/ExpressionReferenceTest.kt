@@ -529,7 +529,16 @@ class ExpressionReferenceTest {
         // The vector that tells the two knees apart. A lightness of 4% is a channel of exactly
         // 0.04, which is above WCAG's 0.03928 and below sRGB's 0.04045, so the linear branch would
         // give 0.0030959752 here instead — right to five digits and wrong after that.
-        "luminance('hsl(0, 0%, 4%)')|0.0030954995810608937",
+        //
+        // Asserted as a **bracket** rather than as the value, and this is the one vector here that
+        // is: 4% lightness is a fractional channel of 10.2, and the `pow` that follows is allowed a
+        // one-ulp latitude that no platform guarantees. For this input that latitude lands on a
+        // rounding boundary, so the digits printed on Linux and on macOS differ — `#0a0a0a` beside
+        // it, whose channels are whole numbers, agrees everywhere. The bracket keeps what the
+        // vector
+        // is for, with four significant digits between the two knees and the wobble far inside it.
+        "luminance('hsl(0, 0%, 4%)') > 0.0030954|true",
+        "luminance('hsl(0, 0%, 4%)') < 0.0030956|true",
         // Fractional channels, which is what an hsl colour has. Rounding them to bytes first gives
         // 0.12512359 rather than this.
         "luminance('hsl(210, 50%, 40%)')|0.1250645743288924",

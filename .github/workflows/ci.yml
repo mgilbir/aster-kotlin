@@ -92,6 +92,53 @@ jobs:
         if: runner.os == 'macOS'
         run: ./gradlew centralBundle verifyCentralBundle --no-configuration-cache
 
+      - name: Say how many tests actually ran
+        # A green run that skipped everything is worse than a red one, and nothing in Gradle's output
+        # says which happened: it prints a count only for test tasks that *fail*. So the counts are
+        # summed from the JUnit XML and held to a floor.
+        #
+        # The floor is what this host runs today, less a margin — not a target. It is here to catch a
+        # suite that stopped running, which is exactly what a missing fixture directory looks like:
+        # tests that quietly assume themselves away rather than failing.
+        if: always()
+        run: |
+          set -euo pipefail
+          python3 - "${{ runner.os }}" <<'PY'
+          import glob, sys, xml.etree.ElementTree as ET
+          from collections import Counter
+          host = sys.argv[1]
+          total = skipped = failed = 0
+          per, per_skip = Counter(), Counter()
+          for path in glob.glob("*/build/test-results/**/*.xml", recursive=True):
+              try:
+                  root = ET.parse(path).getroot()
+              except ET.ParseError:
+                  continue
+              tests = int(root.get("tests", 0))
+              total += tests
+              skipped += int(root.get("skipped", 0))
+              failed += int(root.get("failures", 0)) + int(root.get("errors", 0))
+              module = path.split("/")[0]
+              per[module] += tests
+              per_skip[module] += int(root.get("skipped", 0))
+          print(f"{total} tests, {skipped} skipped, {failed} failed")
+          for module in sorted(per):
+              print(f"  {module:32} {per[module]:5} tests, {per_skip[module]:4} skipped")
+
+          # macOS compiles and runs every target; Linux runs the JVM and linuxX64 suites only.
+          floor = 7000 if host == "macOS" else 5000
+          if total < floor:
+              print(f"::error::only {total} tests ran; expected at least {floor}. "
+                    "A suite has stopped running — check for missing fixtures.")
+              sys.exit(1)
+          # Skips are for a genuinely absent capability, and there are two of those. A jump means
+          # tests are assuming themselves away.
+          if skipped > 50:
+              print(f"::error::{skipped} tests skipped, which is more than this suite should skip.")
+              sys.exit(1)
+          print(f"{total} tests ran on {host}, {skipped} skipped — above the floor of {floor}.")
+          PY
+
       - name: Upload test reports
         if: failure()
         uses: actions/upload-artifact@v4
