@@ -207,7 +207,6 @@ What is **not** here, and what a chart gets instead:
 | Pulse propagation and incremental evaluation | Contracts and deterministic scheduling only; a transform recomputes its whole dataset. Correct, and slower than upstream on a large table |
 | `wordcloud` and `contour` | Reported by name. An unimplemented transform stops that dataset's pipeline rather than passing rows on that later stages were not meant to see |
 | A locale in the box | Nothing ships a language, and nothing can: common Kotlin cannot reach a platform's date or number formatting, and `kotlinx-datetime` gives the substitution mechanism and no names. The **seam** exists — `VegaLocale` beside the text engine, with d3's own fields — so a host that has its user's language supplies it and gets months, separators and spoken captions in it |
-| Accessibility and activation on the Compose Multiplatform renderer | The tree is computed and that renderer does not expose it; the Android View and the Swift renderer do |
 | A container width for `width: "container"` | `containerSize()` has nothing to measure outside a browser, so the chart takes `config.view.continuousWidth`; a host that knows its width sets the `width` signal |
 | Domain adjustment and reset-zoom | Planned. Zoom moves the view, not the scale domains |
 | Performance measured on physical hardware | Not done. The microbenchmarks run, but not on a device |
@@ -224,7 +223,7 @@ MVP definition (section 23) stands at **13 of its 15 criteria**:
 | 5. Tap, hover, tooltip, selection, pan, zoom | Yes |
 | 6. View and Compose APIs | Yes |
 | 7. SVG, PNG, PDF export | Yes |
-| 8. TalkBack can describe and navigate | **Partial** — explored manually with TalkBack on an API 37 emulator and pinned by instrumented tests; not on physical hardware, and the Compose Multiplatform renderer exposes no tree at all |
+| 8. TalkBack can describe and navigate | **Partial** — explored manually with TalkBack on an API 37 emulator and pinned by instrumented tests, and every renderer now exposes the tree: the Android View, the Swift one and Compose Multiplatform. Not verified on physical hardware or with a real user |
 | 9. At least 100 compatibility fixtures pass | **Yes** — 193 Vega differential fixtures |
 | 10. Core runtime has no Android dependency | Yes |
 | 11. Renders without WebView | Yes |

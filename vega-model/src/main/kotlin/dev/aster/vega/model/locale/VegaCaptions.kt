@@ -72,6 +72,15 @@ public interface VegaCaptions {
   /** The container a mark's items are announced inside. */
   public fun markContainerRole(markType: String): String
 
+  /**
+   * What a chart too dense to explore mark by mark says instead.
+   *
+   * A scatter plot of four thousand points is not explorable one swipe at a time, so past a
+   * threshold the accessibility tree offers one element for the whole chart — and that element has
+   * to say why it is the only one.
+   */
+  public fun denseChartSummary(marks: Int): String
+
   public companion object {
     /** Upstream's wording, and the default. */
     public val English: VegaCaptions = EnglishCaptions
@@ -124,6 +133,9 @@ private object EnglishCaptions : VegaCaptions {
   override fun markRole(markType: String): String = "$markType mark"
 
   override fun markContainerRole(markType: String): String = "$markType mark container"
+
+  override fun denseChartSummary(marks: Int): String =
+    "Chart with $marks marks. Too dense to explore individually."
 
   /** An English list: commas, and "and" before the last. */
   private fun join(names: List<String>): String =

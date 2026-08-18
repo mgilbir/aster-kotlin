@@ -64,6 +64,10 @@ kotlin {
     jvmTest {
       dependencies {
         implementation(compose.desktop.currentOs)
+        // Compose's own semantics test harness, for the accessibility overlay: an element's label,
+        // its role and its activation are not pixels, so `ImageComposeScene` cannot see them.
+        @OptIn(org.jetbrains.compose.ExperimentalComposeLibrary::class)
+        implementation(compose.uiTest)
         // A real file loader, so the raster test compiles a specification that actually reads its
         // data
         // rather than asserting on the diagnostic a refusal produces.
