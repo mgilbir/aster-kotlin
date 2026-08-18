@@ -157,6 +157,13 @@ internal object Orient2d {
     f: DoubleArray,
     h: DoubleArray,
   ): Int {
+    // Reading one past the end is not an error here, it is the algorithm: the merge advances a
+    // cursor and only *then* asks whether it is still in range, and JavaScript answers `undefined`
+    // for the read that is never used. Kotlin throws instead, so the read is guarded — a set of
+    // **collinear** points is what reaches it, which is exactly what a selection projected onto one
+    // channel produces, every cell's other coordinate being zero.
+    fun at(values: DoubleArray, index: Int): Double =
+      if (index < values.size) values[index] else 0.0
     var enow = e[0]
     var fnow = f[0]
     var eindex = 0
@@ -164,10 +171,10 @@ internal object Orient2d {
     var q: Double
     if ((fnow > enow) == (fnow > -enow)) {
       q = enow
-      enow = e[++eindex]
+      enow = at(e, ++eindex)
     } else {
       q = fnow
-      fnow = f[++findex]
+      fnow = at(f, ++findex)
     }
     var hindex = 0
     var hh: Double
@@ -177,11 +184,11 @@ internal object Orient2d {
       if ((fnow > enow) == (fnow > -enow)) {
         qnew = enow + q
         hh = q - (qnew - enow)
-        enow = e[++eindex]
+        enow = at(e, ++eindex)
       } else {
         qnew = fnow + q
         hh = q - (qnew - fnow)
-        fnow = f[++findex]
+        fnow = at(f, ++findex)
       }
       q = qnew
       if (hh != 0.0) h[hindex++] = hh
@@ -190,12 +197,12 @@ internal object Orient2d {
           qnew = q + enow
           bvirt = qnew - q
           hh = q - (qnew - bvirt) + (enow - bvirt)
-          enow = e[++eindex]
+          enow = at(e, ++eindex)
         } else {
           qnew = q + fnow
           bvirt = qnew - q
           hh = q - (qnew - bvirt) + (fnow - bvirt)
-          fnow = f[++findex]
+          fnow = at(f, ++findex)
         }
         q = qnew
         if (hh != 0.0) h[hindex++] = hh

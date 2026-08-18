@@ -1,0 +1,423 @@
+{
+  "$schema": "https://vega.github.io/schema/vega/v6.json",
+  "description": "A trellis beside a plain plot: the grid belongs to the plot that holds it, and lays its cells out inside that plot's group.",
+  "background": "white",
+  "padding": 5,
+  "data": [
+    {
+      "name": "source_0",
+      "url": "data/cars.json",
+      "format": {
+        "type": "json"
+      }
+    },
+    {
+      "name": "data_0",
+      "source": "source_0",
+      "transform": [
+        {
+          "type": "aggregate",
+          "groupby": [
+            "Cylinders",
+            "Origin"
+          ],
+          "ops": [
+            "mean"
+          ],
+          "fields": [
+            "Horsepower"
+          ],
+          "as": [
+            "mean_Horsepower"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "concat_0_row_domain",
+      "source": "data_0",
+      "transform": [
+        {
+          "type": "aggregate",
+          "groupby": [
+            "Origin"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "data_2",
+      "source": "source_0",
+      "transform": [
+        {
+          "type": "aggregate",
+          "groupby": [
+            "Cylinders"
+          ],
+          "ops": [
+            "mean"
+          ],
+          "fields": [
+            "Horsepower"
+          ],
+          "as": [
+            "mean_Horsepower"
+          ]
+        }
+      ]
+    }
+  ],
+  "signals": [
+    {
+      "name": "concat_0_x_step",
+      "value": 20
+    },
+    {
+      "name": "concat_0_child_width",
+      "update": "bandspace(domain('concat_0_x').length, 1, 0.5) * concat_0_x_step"
+    },
+    {
+      "name": "concat_0_child_height",
+      "value": 30
+    },
+    {
+      "name": "concat_1_x_step",
+      "value": 20
+    },
+    {
+      "name": "concat_1_width",
+      "update": "bandspace(domain('concat_1_x').length, 1, 0.5) * concat_1_x_step"
+    },
+    {
+      "name": "concat_1_height",
+      "value": 50
+    }
+  ],
+  "layout": {
+    "padding": 20,
+    "columns": 1,
+    "bounds": "full",
+    "align": "each"
+  },
+  "marks": [
+    {
+      "type": "group",
+      "name": "concat_0_group",
+      "title": {
+        "text": "By origin",
+        "anchor": "start"
+      },
+      "layout": {
+        "padding": 5,
+        "columns": 1,
+        "bounds": "full",
+        "align": "all"
+      },
+      "marks": [
+        {
+          "name": "concat_0_row_header",
+          "type": "group",
+          "role": "row-header",
+          "from": {
+            "data": "concat_0_row_domain"
+          },
+          "sort": {
+            "field": "datum[\"Origin\"]",
+            "order": "ascending"
+          },
+          "title": {
+            "text": {
+              "signal": "isValid(parent[\"Origin\"]) ? parent[\"Origin\"] : \"\"+parent[\"Origin\"]"
+            },
+            "orient": "left",
+            "style": "guide-label",
+            "frame": "group",
+            "offset": 10
+          },
+          "encode": {
+            "update": {
+              "height": {
+                "signal": "concat_0_child_height"
+              }
+            }
+          },
+          "axes": [
+            {
+              "scale": "concat_0_y",
+              "orient": "left",
+              "grid": false,
+              "labelOverlap": true,
+              "tickCount": {
+                "signal": "ceil(concat_0_child_height/40)"
+              },
+              "zindex": 0
+            }
+          ]
+        },
+        {
+          "name": "concat_0_column_footer",
+          "type": "group",
+          "role": "column-footer",
+          "encode": {
+            "update": {
+              "width": {
+                "signal": "concat_0_child_width"
+              }
+            }
+          },
+          "axes": [
+            {
+              "scale": "concat_0_x",
+              "orient": "bottom",
+              "grid": false,
+              "title": "Cylinders",
+              "labelAlign": "right",
+              "labelAngle": 270,
+              "labelBaseline": "middle",
+              "zindex": 0
+            }
+          ]
+        },
+        {
+          "name": "concat_0_cell",
+          "type": "group",
+          "style": "cell",
+          "from": {
+            "facet": {
+              "name": "concat_0_facet",
+              "data": "data_0",
+              "groupby": [
+                "Origin"
+              ]
+            }
+          },
+          "sort": {
+            "field": [
+              "datum[\"Origin\"]"
+            ],
+            "order": [
+              "ascending"
+            ]
+          },
+          "encode": {
+            "update": {
+              "width": {
+                "signal": "concat_0_child_width"
+              },
+              "height": {
+                "signal": "concat_0_child_height"
+              }
+            }
+          },
+          "marks": [
+            {
+              "name": "concat_0_child_marks",
+              "type": "line",
+              "style": [
+                "line"
+              ],
+              "sort": {
+                "field": "x"
+              },
+              "from": {
+                "data": "concat_0_facet"
+              },
+              "encode": {
+                "update": {
+                  "stroke": {
+                    "value": "#4c78a8"
+                  },
+                  "description": {
+                    "signal": "\"Cylinders: \" + (isValid(datum[\"Cylinders\"]) ? isArray(datum[\"Cylinders\"]) ? join(datum[\"Cylinders\"], ' ') : datum[\"Cylinders\"] : \"\"+datum[\"Cylinders\"]) + \"; Mean of Horsepower: \" + (format(datum[\"mean_Horsepower\"], \"\"))"
+                  },
+                  "x": {
+                    "scale": "concat_0_x",
+                    "field": "Cylinders"
+                  },
+                  "y": {
+                    "scale": "concat_0_y",
+                    "field": "mean_Horsepower"
+                  },
+                  "defined": {
+                    "signal": "isValid(datum[\"mean_Horsepower\"]) && isFinite(+datum[\"mean_Horsepower\"])"
+                  }
+                }
+              }
+            }
+          ],
+          "axes": [
+            {
+              "scale": "concat_0_y",
+              "orient": "left",
+              "gridScale": "concat_0_x",
+              "grid": true,
+              "tickCount": {
+                "signal": "ceil(concat_0_child_height/40)"
+              },
+              "domain": false,
+              "labels": false,
+              "aria": false,
+              "maxExtent": 0,
+              "minExtent": 0,
+              "ticks": false,
+              "zindex": 0
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "group",
+      "name": "concat_1_group",
+      "style": "cell",
+      "encode": {
+        "update": {
+          "width": {
+            "signal": "concat_1_width"
+          },
+          "height": {
+            "signal": "concat_1_height"
+          }
+        }
+      },
+      "marks": [
+        {
+          "name": "concat_1_marks",
+          "type": "line",
+          "style": [
+            "line"
+          ],
+          "sort": {
+            "field": "x"
+          },
+          "from": {
+            "data": "data_2"
+          },
+          "encode": {
+            "update": {
+              "stroke": {
+                "value": "#4c78a8"
+              },
+              "description": {
+                "signal": "\"Cylinders: \" + (isValid(datum[\"Cylinders\"]) ? isArray(datum[\"Cylinders\"]) ? join(datum[\"Cylinders\"], ' ') : datum[\"Cylinders\"] : \"\"+datum[\"Cylinders\"]) + \"; Mean of Horsepower: \" + (format(datum[\"mean_Horsepower\"], \"\"))"
+              },
+              "x": {
+                "scale": "concat_1_x",
+                "field": "Cylinders"
+              },
+              "y": {
+                "scale": "concat_1_y",
+                "field": "mean_Horsepower"
+              },
+              "defined": {
+                "signal": "isValid(datum[\"mean_Horsepower\"]) && isFinite(+datum[\"mean_Horsepower\"])"
+              }
+            }
+          }
+        }
+      ],
+      "axes": [
+        {
+          "scale": "concat_1_y",
+          "orient": "left",
+          "gridScale": "concat_1_x",
+          "grid": true,
+          "tickCount": {
+            "signal": "ceil(concat_1_height/40)"
+          },
+          "domain": false,
+          "labels": false,
+          "aria": false,
+          "maxExtent": 0,
+          "minExtent": 0,
+          "ticks": false,
+          "zindex": 0
+        },
+        {
+          "scale": "concat_1_x",
+          "orient": "bottom",
+          "grid": false,
+          "title": "Cylinders",
+          "labelAlign": "right",
+          "labelAngle": 270,
+          "labelBaseline": "middle",
+          "zindex": 0
+        },
+        {
+          "scale": "concat_1_y",
+          "orient": "left",
+          "grid": false,
+          "labelOverlap": true,
+          "tickCount": {
+            "signal": "ceil(concat_1_height/40)"
+          },
+          "zindex": 0
+        }
+      ]
+    }
+  ],
+  "scales": [
+    {
+      "name": "concat_0_x",
+      "type": "point",
+      "domain": {
+        "data": "data_0",
+        "field": "Cylinders",
+        "sort": true
+      },
+      "range": {
+        "step": {
+          "signal": "concat_0_x_step"
+        }
+      },
+      "padding": 0.5
+    },
+    {
+      "name": "concat_0_y",
+      "type": "linear",
+      "domain": {
+        "data": "data_0",
+        "field": "mean_Horsepower"
+      },
+      "range": [
+        {
+          "signal": "concat_0_child_height"
+        },
+        0
+      ],
+      "nice": true,
+      "zero": true
+    },
+    {
+      "name": "concat_1_x",
+      "type": "point",
+      "domain": {
+        "data": "data_2",
+        "field": "Cylinders",
+        "sort": true
+      },
+      "range": {
+        "step": {
+          "signal": "concat_1_x_step"
+        }
+      },
+      "padding": 0.5
+    },
+    {
+      "name": "concat_1_y",
+      "type": "linear",
+      "domain": {
+        "data": "data_2",
+        "field": "mean_Horsepower"
+      },
+      "range": [
+        {
+          "signal": "concat_1_height"
+        },
+        0
+      ],
+      "nice": true,
+      "zero": true
+    }
+  ]
+}

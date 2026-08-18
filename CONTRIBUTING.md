@@ -54,6 +54,28 @@ has told you less than one that does not.
 `./scripts/oracle.sh` regenerates every reference and runs the comparison. Review a changed reference
 the way you would review a golden: it means either this port or upstream moved.
 
+### Vega-Lite fixtures are compared as *specifications*
+
+`test-fixtures/vega-lite/*.vl.json` go through `./scripts/vega-lite-oracle.sh`, which writes two
+references per fixture: the Vega that upstream's compiler produces, and the scene upstream's renderer
+then draws from it.
+
+```bash
+$EDITOR test-fixtures/vega-lite/my-chart.vl.json
+./scripts/vega-lite-oracle.sh
+```
+
+The first reference is the one to read a failure from. Vega-Lite is almost entirely defaults — a
+scale type, a stack transform, a tick count, a label angle — and each of those is one property of the
+emitted specification, so comparing the specification names the rule that drifted where comparing the
+picture would only say that some marks moved. The second reference is what proves the emitted Vega
+actually draws upstream's chart, and it is where the two can disagree in the other direction.
+
+Port the rules from upstream's own TypeScript, which ships inside the pinned package at
+`oracle-js/node_modules/vega-lite/src`. Every defaulting rule in `vega-lite/` cites the file it came
+from, and the ones that read as arbitrary — a stacked area imputing its gaps to zero, a nominal
+horizontal axis turning its labels to 270 degrees — are exactly the ones that were not guessable.
+
 ### When the harness is what is wrong
 
 Sometimes both sides agree with each other and neither with the renderer. That has happened three
@@ -99,8 +121,8 @@ colour ramps need d3's interpolator tables and a scheme extent.
 
 ## The core stays portable
 
-`vega-model`, `vega-expression`, `vega-dataflow`, `vega-scene`, `vega-runtime` and `vega-svg` are plain
-Kotlin and are meant to move to Kotlin Multiplatform unchanged. No Android types, and no JVM-only APIs:
+`vega-model`, `vega-expression`, `vega-dataflow`, `vega-scene`, `vega-runtime`, `vega-lite` and
+`vega-svg` are plain Kotlin and are meant to move to Kotlin Multiplatform unchanged. No Android types, and no JVM-only APIs:
 
 - calendar work goes through `kotlinx-datetime`, never `java.time` or `Calendar`
 - rounding goes through `roundHalfUp`, which is also more faithful to d3 than `Math.round` — d3 rounds

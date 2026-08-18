@@ -1,0 +1,337 @@
+{
+  "$schema": "https://vega.github.io/schema/vega/v6.json",
+  "description": "Two band charts side by side, each counting its own categories.",
+  "background": "white",
+  "padding": 5,
+  "height": 300,
+  "data": [
+    {
+      "name": "source_0",
+      "url": "data/cars.json",
+      "format": {
+        "type": "json"
+      }
+    },
+    {
+      "name": "data_0",
+      "source": "source_0",
+      "transform": [
+        {
+          "type": "aggregate",
+          "groupby": [
+            "Origin"
+          ],
+          "ops": [
+            "count"
+          ],
+          "fields": [
+            null
+          ],
+          "as": [
+            "__count"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "data_1",
+      "source": "source_0",
+      "transform": [
+        {
+          "type": "aggregate",
+          "groupby": [
+            "Cylinders"
+          ],
+          "ops": [
+            "count"
+          ],
+          "fields": [
+            null
+          ],
+          "as": [
+            "__count"
+          ]
+        }
+      ]
+    }
+  ],
+  "signals": [
+    {
+      "name": "concat_0_x_step",
+      "value": 20
+    },
+    {
+      "name": "concat_0_width",
+      "update": "bandspace(domain('concat_0_x').length, 0.1, 0.05) * concat_0_x_step"
+    },
+    {
+      "name": "concat_1_x_step",
+      "value": 20
+    },
+    {
+      "name": "concat_1_width",
+      "update": "bandspace(domain('concat_1_x').length, 0.1, 0.05) * concat_1_x_step"
+    }
+  ],
+  "layout": {
+    "padding": 20,
+    "bounds": "full",
+    "align": "each"
+  },
+  "marks": [
+    {
+      "type": "group",
+      "name": "concat_0_group",
+      "style": "cell",
+      "encode": {
+        "update": {
+          "width": {
+            "signal": "concat_0_width"
+          },
+          "height": {
+            "signal": "height"
+          }
+        }
+      },
+      "marks": [
+        {
+          "name": "concat_0_marks",
+          "type": "rect",
+          "style": [
+            "bar"
+          ],
+          "from": {
+            "data": "data_0"
+          },
+          "encode": {
+            "update": {
+              "fill": {
+                "value": "#4c78a8"
+              },
+              "ariaRoleDescription": {
+                "value": "bar"
+              },
+              "description": {
+                "signal": "\"Origin: \" + (isValid(datum[\"Origin\"]) ? isArray(datum[\"Origin\"]) ? join(datum[\"Origin\"], ' ') : datum[\"Origin\"] : \"\"+datum[\"Origin\"]) + \"; Count of Records: \" + (format(datum[\"__count\"], \"\"))"
+              },
+              "x": {
+                "scale": "concat_0_x",
+                "field": "Origin"
+              },
+              "width": {
+                "signal": "max(0.25, bandwidth('concat_0_x'))"
+              },
+              "y": {
+                "scale": "concat_0_y",
+                "field": "__count"
+              },
+              "y2": {
+                "scale": "concat_0_y",
+                "value": 0
+              }
+            }
+          }
+        }
+      ],
+      "axes": [
+        {
+          "scale": "concat_0_y",
+          "orient": "left",
+          "gridScale": "concat_0_x",
+          "grid": true,
+          "tickCount": {
+            "signal": "ceil(height/40)"
+          },
+          "domain": false,
+          "labels": false,
+          "aria": false,
+          "maxExtent": 0,
+          "minExtent": 0,
+          "ticks": false,
+          "zindex": 0
+        },
+        {
+          "scale": "concat_0_x",
+          "orient": "bottom",
+          "grid": false,
+          "title": "Origin",
+          "labelAlign": "right",
+          "labelAngle": 270,
+          "labelBaseline": "middle",
+          "zindex": 0
+        },
+        {
+          "scale": "concat_0_y",
+          "orient": "left",
+          "grid": false,
+          "title": "Count of Records",
+          "labelOverlap": true,
+          "tickCount": {
+            "signal": "ceil(height/40)"
+          },
+          "zindex": 0
+        }
+      ]
+    },
+    {
+      "type": "group",
+      "name": "concat_1_group",
+      "style": "cell",
+      "encode": {
+        "update": {
+          "width": {
+            "signal": "concat_1_width"
+          },
+          "height": {
+            "signal": "height"
+          }
+        }
+      },
+      "marks": [
+        {
+          "name": "concat_1_marks",
+          "type": "rect",
+          "style": [
+            "bar"
+          ],
+          "from": {
+            "data": "data_1"
+          },
+          "encode": {
+            "update": {
+              "fill": {
+                "value": "#4c78a8"
+              },
+              "ariaRoleDescription": {
+                "value": "bar"
+              },
+              "description": {
+                "signal": "\"Cylinders: \" + (isValid(datum[\"Cylinders\"]) ? isArray(datum[\"Cylinders\"]) ? join(datum[\"Cylinders\"], ' ') : datum[\"Cylinders\"] : \"\"+datum[\"Cylinders\"]) + \"; Count of Records: \" + (format(datum[\"__count\"], \"\"))"
+              },
+              "x": {
+                "scale": "concat_1_x",
+                "field": "Cylinders"
+              },
+              "width": {
+                "signal": "max(0.25, bandwidth('concat_1_x'))"
+              },
+              "y": {
+                "scale": "concat_1_y",
+                "field": "__count"
+              },
+              "y2": {
+                "scale": "concat_1_y",
+                "value": 0
+              }
+            }
+          }
+        }
+      ],
+      "axes": [
+        {
+          "scale": "concat_1_y",
+          "orient": "left",
+          "gridScale": "concat_1_x",
+          "grid": true,
+          "tickCount": {
+            "signal": "ceil(height/40)"
+          },
+          "domain": false,
+          "labels": false,
+          "aria": false,
+          "maxExtent": 0,
+          "minExtent": 0,
+          "ticks": false,
+          "zindex": 0
+        },
+        {
+          "scale": "concat_1_x",
+          "orient": "bottom",
+          "grid": false,
+          "title": "Cylinders",
+          "labelAlign": "right",
+          "labelAngle": 270,
+          "labelBaseline": "middle",
+          "zindex": 0
+        },
+        {
+          "scale": "concat_1_y",
+          "orient": "left",
+          "grid": false,
+          "title": "Count of Records",
+          "labelOverlap": true,
+          "tickCount": {
+            "signal": "ceil(height/40)"
+          },
+          "zindex": 0
+        }
+      ]
+    }
+  ],
+  "scales": [
+    {
+      "name": "concat_0_x",
+      "type": "band",
+      "domain": {
+        "data": "data_0",
+        "field": "Origin",
+        "sort": true
+      },
+      "range": {
+        "step": {
+          "signal": "concat_0_x_step"
+        }
+      },
+      "paddingInner": 0.1,
+      "paddingOuter": 0.05
+    },
+    {
+      "name": "concat_0_y",
+      "type": "linear",
+      "domain": {
+        "data": "data_0",
+        "field": "__count"
+      },
+      "range": [
+        {
+          "signal": "height"
+        },
+        0
+      ],
+      "nice": true,
+      "zero": true
+    },
+    {
+      "name": "concat_1_x",
+      "type": "band",
+      "domain": {
+        "data": "data_1",
+        "field": "Cylinders",
+        "sort": true
+      },
+      "range": {
+        "step": {
+          "signal": "concat_1_x_step"
+        }
+      },
+      "paddingInner": 0.1,
+      "paddingOuter": 0.05
+    },
+    {
+      "name": "concat_1_y",
+      "type": "linear",
+      "domain": {
+        "data": "data_1",
+        "field": "__count"
+      },
+      "range": [
+        {
+          "signal": "height"
+        },
+        0
+      ],
+      "nice": true,
+      "zero": true
+    }
+  ]
+}

@@ -1,0 +1,244 @@
+{
+  "$schema": "https://vega.github.io/schema/vega/v6.json",
+  "description": "Two layers reading two different tables, and a third joined in beside them.",
+  "background": "white",
+  "padding": 5,
+  "height": 300,
+  "style": "cell",
+  "data": [
+    {
+      "name": "source_0",
+      "values": [
+        {
+          "category": "Alpha",
+          "amount": 28
+        },
+        {
+          "category": "Beta",
+          "amount": 55
+        },
+        {
+          "category": "Gamma",
+          "amount": 43
+        }
+      ]
+    },
+    {
+      "name": "source_1",
+      "values": [
+        {
+          "threshold": 40
+        }
+      ]
+    },
+    {
+      "name": "data_0",
+      "source": "source_0",
+      "transform": [
+        {
+          "type": "stack",
+          "groupby": [
+            "category"
+          ],
+          "field": "amount",
+          "sort": {
+            "field": [],
+            "order": []
+          },
+          "as": [
+            "amount_start",
+            "amount_end"
+          ],
+          "offset": "zero"
+        },
+        {
+          "type": "filter",
+          "expr": "isValid(datum[\"amount\"]) && isFinite(+datum[\"amount\"])"
+        }
+      ]
+    },
+    {
+      "name": "data_1",
+      "source": "source_1",
+      "transform": [
+        {
+          "type": "filter",
+          "expr": "isValid(datum[\"threshold\"]) && isFinite(+datum[\"threshold\"])"
+        }
+      ]
+    }
+  ],
+  "signals": [
+    {
+      "name": "x_step",
+      "value": 20
+    },
+    {
+      "name": "width",
+      "update": "bandspace(domain('x').length, 0.1, 0.05) * x_step"
+    }
+  ],
+  "marks": [
+    {
+      "name": "layer_0_marks",
+      "type": "rect",
+      "style": [
+        "bar"
+      ],
+      "from": {
+        "data": "data_0"
+      },
+      "encode": {
+        "update": {
+          "fill": {
+            "value": "#4c78a8"
+          },
+          "ariaRoleDescription": {
+            "value": "bar"
+          },
+          "description": {
+            "signal": "\"category: \" + (isValid(datum[\"category\"]) ? isArray(datum[\"category\"]) ? join(datum[\"category\"], ' ') : datum[\"category\"] : \"\"+datum[\"category\"]) + \"; amount: \" + (format(datum[\"amount\"], \"\"))"
+          },
+          "x": {
+            "scale": "x",
+            "field": "category"
+          },
+          "width": {
+            "signal": "max(0.25, bandwidth('x'))"
+          },
+          "y": {
+            "scale": "y",
+            "field": "amount_end"
+          },
+          "y2": {
+            "scale": "y",
+            "field": "amount_start"
+          }
+        }
+      }
+    },
+    {
+      "name": "layer_1_marks",
+      "type": "rule",
+      "style": [
+        "rule"
+      ],
+      "from": {
+        "data": "data_1"
+      },
+      "encode": {
+        "update": {
+          "strokeDash": {
+            "value": [
+              4,
+              4
+            ]
+          },
+          "stroke": {
+            "value": "black"
+          },
+          "description": {
+            "signal": "\"threshold: \" + (format(datum[\"threshold\"], \"\"))"
+          },
+          "x": {
+            "field": {
+              "group": "width"
+            }
+          },
+          "x2": {
+            "value": 0
+          },
+          "y": {
+            "scale": "y",
+            "field": "threshold"
+          }
+        }
+      }
+    }
+  ],
+  "scales": [
+    {
+      "name": "x",
+      "type": "band",
+      "domain": {
+        "data": "data_0",
+        "field": "category",
+        "sort": true
+      },
+      "range": {
+        "step": {
+          "signal": "x_step"
+        }
+      },
+      "paddingInner": 0.1,
+      "paddingOuter": 0.05
+    },
+    {
+      "name": "y",
+      "type": "linear",
+      "domain": {
+        "fields": [
+          {
+            "data": "data_0",
+            "field": "amount_start"
+          },
+          {
+            "data": "data_0",
+            "field": "amount_end"
+          },
+          {
+            "data": "data_1",
+            "field": "threshold"
+          }
+        ]
+      },
+      "range": [
+        {
+          "signal": "height"
+        },
+        0
+      ],
+      "nice": true,
+      "zero": true
+    }
+  ],
+  "axes": [
+    {
+      "scale": "y",
+      "orient": "left",
+      "gridScale": "x",
+      "grid": true,
+      "tickCount": {
+        "signal": "ceil(height/40)"
+      },
+      "domain": false,
+      "labels": false,
+      "aria": false,
+      "maxExtent": 0,
+      "minExtent": 0,
+      "ticks": false,
+      "zindex": 0
+    },
+    {
+      "scale": "x",
+      "orient": "bottom",
+      "grid": false,
+      "title": "category",
+      "labelAlign": "right",
+      "labelAngle": 270,
+      "labelBaseline": "middle",
+      "zindex": 0
+    },
+    {
+      "scale": "y",
+      "orient": "left",
+      "grid": false,
+      "title": "amount, threshold",
+      "labelOverlap": true,
+      "tickCount": {
+        "signal": "ceil(height/40)"
+      },
+      "zindex": 0
+    }
+  ]
+}

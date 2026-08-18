@@ -1,0 +1,205 @@
+{
+  "$schema": "https://vega.github.io/schema/vega/v6.json",
+  "description": "A summary of each group as a standard error either side of its mean.",
+  "background": "white",
+  "padding": 5,
+  "height": 300,
+  "style": "cell",
+  "data": [
+    {
+      "name": "source_0",
+      "values": [
+        {
+          "g": "a",
+          "v": 3
+        },
+        {
+          "g": "a",
+          "v": 9
+        },
+        {
+          "g": "a",
+          "v": 5
+        },
+        {
+          "g": "b",
+          "v": 6
+        },
+        {
+          "g": "b",
+          "v": 2
+        },
+        {
+          "g": "b",
+          "v": 8
+        }
+      ]
+    },
+    {
+      "name": "data_0",
+      "source": "source_0",
+      "transform": [
+        {
+          "type": "aggregate",
+          "groupby": [
+            "g"
+          ],
+          "ops": [
+            "stderr",
+            "mean"
+          ],
+          "fields": [
+            "v",
+            "v"
+          ],
+          "as": [
+            "extent_v",
+            "center_v"
+          ]
+        },
+        {
+          "type": "formula",
+          "expr": "datum['center_v'] + datum['extent_v']",
+          "as": "upper_v"
+        },
+        {
+          "type": "formula",
+          "expr": "datum['center_v'] - datum['extent_v']",
+          "as": "lower_v"
+        },
+        {
+          "type": "filter",
+          "expr": "isValid(datum[\"lower_v\"]) && isFinite(+datum[\"lower_v\"])"
+        }
+      ]
+    }
+  ],
+  "signals": [
+    {
+      "name": "x_step",
+      "value": 20
+    },
+    {
+      "name": "width",
+      "update": "bandspace(domain('x').length, 0, 0) * x_step"
+    }
+  ],
+  "marks": [
+    {
+      "name": "marks",
+      "type": "rule",
+      "style": [
+        "rule",
+        "errorbar-rule"
+      ],
+      "from": {
+        "data": "data_0"
+      },
+      "encode": {
+        "update": {
+          "ariaRoleDescription": {
+            "value": "errorbar"
+          },
+          "stroke": {
+            "value": "black"
+          },
+          "tooltip": {
+            "signal": "{\"Mean of v\": format(datum[\"center_v\"], \"\"), \"Mean + stderr of v\": format(datum[\"upper_v\"], \"\"), \"Mean - stderr of v\": format(datum[\"lower_v\"], \"\"), \"g\": isValid(datum[\"g\"]) ? isArray(datum[\"g\"]) ? join(datum[\"g\"], '\\n') : datum[\"g\"] : \"\"+datum[\"g\"]}"
+          },
+          "description": {
+            "signal": "\"g: \" + (isValid(datum[\"g\"]) ? isArray(datum[\"g\"]) ? join(datum[\"g\"], ' ') : datum[\"g\"] : \"\"+datum[\"g\"]) + \"; v: \" + (format(datum[\"lower_v\"], \"\")) + \"; upper_v: \" + (format(datum[\"upper_v\"], \"\")) + \"; Mean of v: \" + (format(datum[\"center_v\"], \"\")) + \"; Mean + stderr of v: \" + (format(datum[\"upper_v\"], \"\")) + \"; Mean - stderr of v: \" + (format(datum[\"lower_v\"], \"\"))"
+          },
+          "x": {
+            "scale": "x",
+            "field": "g",
+            "band": 0.5
+          },
+          "y": {
+            "scale": "y",
+            "field": "lower_v"
+          },
+          "y2": {
+            "scale": "y",
+            "field": "upper_v"
+          }
+        }
+      }
+    }
+  ],
+  "scales": [
+    {
+      "name": "x",
+      "type": "band",
+      "domain": {
+        "data": "data_0",
+        "field": "g",
+        "sort": true
+      },
+      "range": {
+        "step": {
+          "signal": "x_step"
+        }
+      },
+      "paddingInner": 0,
+      "paddingOuter": 0
+    },
+    {
+      "name": "y",
+      "type": "linear",
+      "domain": {
+        "data": "data_0",
+        "fields": [
+          "lower_v",
+          "upper_v"
+        ]
+      },
+      "range": [
+        {
+          "signal": "height"
+        },
+        0
+      ],
+      "nice": true,
+      "zero": true
+    }
+  ],
+  "axes": [
+    {
+      "scale": "y",
+      "orient": "left",
+      "gridScale": "x",
+      "grid": true,
+      "tickCount": {
+        "signal": "ceil(height/40)"
+      },
+      "domain": false,
+      "labels": false,
+      "aria": false,
+      "maxExtent": 0,
+      "minExtent": 0,
+      "ticks": false,
+      "zindex": 0
+    },
+    {
+      "scale": "x",
+      "orient": "bottom",
+      "grid": false,
+      "title": "g",
+      "labelAlign": "right",
+      "labelAngle": 270,
+      "labelBaseline": "middle",
+      "zindex": 0
+    },
+    {
+      "scale": "y",
+      "orient": "left",
+      "grid": false,
+      "title": "v",
+      "labelOverlap": true,
+      "tickCount": {
+        "signal": "ceil(height/40)"
+      },
+      "zindex": 0
+    }
+  ]
+}

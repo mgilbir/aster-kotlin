@@ -1,0 +1,161 @@
+{
+  "$schema": "https://vega.github.io/schema/vega/v6.json",
+  "description": "Rules spanning a range, the shape a min-max plot is drawn as.",
+  "background": "white",
+  "padding": 5,
+  "height": 300,
+  "style": "cell",
+  "data": [
+    {
+      "name": "source_0",
+      "values": [
+        {
+          "c": "A",
+          "lo": 2,
+          "hi": 9
+        },
+        {
+          "c": "B",
+          "lo": 4,
+          "hi": 7
+        },
+        {
+          "c": "C",
+          "lo": 1,
+          "hi": 5
+        }
+      ]
+    },
+    {
+      "name": "data_0",
+      "source": "source_0",
+      "transform": [
+        {
+          "type": "filter",
+          "expr": "isValid(datum[\"lo\"]) && isFinite(+datum[\"lo\"])"
+        }
+      ]
+    }
+  ],
+  "signals": [
+    {
+      "name": "x_step",
+      "value": 20
+    },
+    {
+      "name": "width",
+      "update": "bandspace(domain('x').length, 0, 0) * x_step"
+    }
+  ],
+  "marks": [
+    {
+      "name": "marks",
+      "type": "rule",
+      "style": [
+        "rule"
+      ],
+      "from": {
+        "data": "data_0"
+      },
+      "encode": {
+        "update": {
+          "stroke": {
+            "value": "black"
+          },
+          "description": {
+            "signal": "\"c: \" + (isValid(datum[\"c\"]) ? isArray(datum[\"c\"]) ? join(datum[\"c\"], ' ') : datum[\"c\"] : \"\"+datum[\"c\"]) + \"; lo: \" + (format(datum[\"lo\"], \"\")) + \"; hi: \" + (format(datum[\"hi\"], \"\"))"
+          },
+          "x": {
+            "scale": "x",
+            "field": "c",
+            "band": 0.5
+          },
+          "y": {
+            "scale": "y",
+            "field": "lo"
+          },
+          "y2": {
+            "scale": "y",
+            "field": "hi"
+          }
+        }
+      }
+    }
+  ],
+  "scales": [
+    {
+      "name": "x",
+      "type": "band",
+      "domain": {
+        "data": "data_0",
+        "field": "c",
+        "sort": true
+      },
+      "range": {
+        "step": {
+          "signal": "x_step"
+        }
+      },
+      "paddingInner": 0,
+      "paddingOuter": 0
+    },
+    {
+      "name": "y",
+      "type": "linear",
+      "domain": {
+        "data": "data_0",
+        "fields": [
+          "lo",
+          "hi"
+        ]
+      },
+      "range": [
+        {
+          "signal": "height"
+        },
+        0
+      ],
+      "nice": true,
+      "zero": true
+    }
+  ],
+  "axes": [
+    {
+      "scale": "y",
+      "orient": "left",
+      "gridScale": "x",
+      "grid": true,
+      "tickCount": {
+        "signal": "ceil(height/40)"
+      },
+      "domain": false,
+      "labels": false,
+      "aria": false,
+      "maxExtent": 0,
+      "minExtent": 0,
+      "ticks": false,
+      "zindex": 0
+    },
+    {
+      "scale": "x",
+      "orient": "bottom",
+      "grid": false,
+      "title": "c",
+      "labelAlign": "right",
+      "labelAngle": 270,
+      "labelBaseline": "middle",
+      "zindex": 0
+    },
+    {
+      "scale": "y",
+      "orient": "left",
+      "grid": false,
+      "title": "lo, hi",
+      "labelOverlap": true,
+      "tickCount": {
+        "signal": "ceil(height/40)"
+      },
+      "zindex": 0
+    }
+  ]
+}

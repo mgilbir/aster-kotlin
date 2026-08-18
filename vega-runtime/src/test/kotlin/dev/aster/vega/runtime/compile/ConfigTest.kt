@@ -323,6 +323,58 @@ class ConfigTest {
     assertTrue(compile("""{"style": {"point": {"size": 30}}}""").diagnostics.isEmpty())
   }
 
+  /**
+   * A top-level `style` paints the chart's own group, from Vega's built-in blocks.
+   *
+   * `"style": "cell"` is on every specification Vega-Lite compiles and nothing else writes it, so
+   * this went missing for as long as nothing had compiled one: the plotting area drew without its
+   * grey border, and — a border being half a unit of surface on each side — every such chart came
+   * out a unit smaller than upstream's.
+   */
+  @Test
+  fun `a top-level style paints the chart's own frame`() {
+    val scene =
+      SpecCompiler()
+        .compileJson(
+          """
+          {
+            "width": 100, "height": 60, "padding": 0, "style": "cell",
+            "data": [{"name": "t", "values": [{"v": 1}]}],
+            "marks": []
+          }
+          """
+            .trimIndent()
+        )
+        .scene!!
+    val frame = scene.root.children.first() as dev.aster.vega.scene.GroupNode
+    assertEquals("#dddddd", colourOf(frame.stroke!!.paint))
+    assertEquals(0.0, (frame.fill!!.paint as ScenePaint.Solid).color.alpha, 1e-9)
+    // The stroke straddles the edge, so the surface reaches half a unit past the plotting area.
+    assertEquals(101.0, scene.width, 1e-9)
+    assertEquals(61.0, scene.height, 1e-9)
+  }
+
+  /** `config.mark` is for marks. The chart's frame is not one, and must not take its paint. */
+  @Test
+  fun `a config mark fill does not paint the chart's frame`() {
+    val scene =
+      SpecCompiler()
+        .compileJson(
+          """
+          {
+            "width": 100, "height": 60, "padding": 0,
+            "config": {"mark": {"fill": "#ff0000"}},
+            "data": [{"name": "t", "values": [{"v": 1}]}],
+            "marks": []
+          }
+          """
+            .trimIndent()
+        )
+        .scene!!
+    val frame = scene.root.children.first() as dev.aster.vega.scene.GroupNode
+    assertNull(frame.fill, "the frame took config.mark's fill")
+  }
+
   @Test
   fun `an honoured config reports nothing`() {
     val diagnostics =

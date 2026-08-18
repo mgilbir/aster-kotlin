@@ -132,13 +132,16 @@ private val AXIS_CONSUMED =
     "labels",
     "domain",
     "tickCount",
+    "tickMinStep",
     "tickSize",
     "labelPadding",
     "labelFontSize",
     "offset",
     "zindex",
     "values",
+    "gridScale",
     "labelOverlap",
+    "labelFlush",
     "labelSeparation",
     "labelAngle",
     "labelAlign",
@@ -479,6 +482,7 @@ private val LEGEND_CONSUMED =
     "gridAlign",
     "type",
     "format",
+    "formatType",
     "orient",
     "direction",
     "title",
@@ -533,6 +537,9 @@ private val TITLE_CONSUMED =
     "orient",
     "anchor",
     "frame",
+    "angle",
+    "align",
+    "baseline",
     "offset",
     "subtitlePadding",
     "fontSize",
@@ -543,6 +550,9 @@ private val TITLE_CONSUMED =
     "subtitleFontSize",
     "fontStyle",
     "subtitleFontStyle",
+    "color",
+    "subtitleColor",
+    "style",
     "zindex",
   )
 
@@ -1002,6 +1012,9 @@ public class SpecParser {
         projections =
           parseArray(root, "projections") { value, path -> parseProjection(value, path) },
         encode = parseEncode(root.fields["encode"], "$.encode"),
+        // The chart's own group takes the `config.style` blocks its `style` property names, and
+        // only those — see `GuideConfig.styleDefaults`.
+        styleAboveDefaults = config.styleDefaults(markStyles(root)).fields,
         // `config.group` paints the chart's frame; see [VegaSpec.frameConfig].
         frameConfig =
           ((root.fields["config"] as? VegaValue.Obj)?.fields?.get("group") as? VegaValue.Obj)
@@ -1313,6 +1326,32 @@ public class SpecParser {
           when {
             !signal.isNullOrEmpty() -> signals += signal
             !scale.isNullOrEmpty() -> scales += scale
+            // A `{"merge": [...]}` stream is several streams read as one, which is what a selector
+            // written with commas parses to: the handler fires on any of them. Vega-Lite writes it
+            // for a legend binding, where the click may land on a swatch, a label or the row.
+            (entry.fields["merge"] as? VegaValue.Arr) != null -> {
+              for (part in (entry.fields["merge"] as VegaValue.Arr).values) {
+                val stream =
+                  when (part) {
+                    is VegaValue.Str ->
+                      try {
+                        streams += EventSelector.parse(part.value, defaultSource)
+                        continue
+                      } catch (failure: EventSelectorException) {
+                        diagnostics.error(
+                          DiagnosticCodes.PARSE_UNKNOWN_PROPERTY,
+                          "Could not read the event selector for signal '$signalName': " +
+                            "${failure.message}",
+                          jsonPath = "$path.events",
+                        )
+                        return null
+                      }
+                    is VegaValue.Obj -> parseEventStreamObject(part, "$path.events", defaultSource)
+                    else -> null
+                  } ?: return null
+                streams += stream
+              }
+            }
             else -> {
               val stream = parseEventStreamObject(entry, "$path.events", defaultSource)
               if (stream == null) return null
@@ -1432,15 +1471,6 @@ public class SpecParser {
     path: String,
     defaultSource: String,
   ): EventStream? {
-    (obj.fields["merge"] as? VegaValue.Arr)?.let {
-      diagnostics.error(
-        DiagnosticCodes.PARSE_UNKNOWN_PROPERTY,
-        "A 'merge' stream combines several streams into one; write them as a comma-separated " +
-          "selector string instead",
-        jsonPath = path,
-      )
-      return null
-    }
     val type = obj.fields["type"]?.asString()
     if (type.isNullOrEmpty()) {
       diagnostics.error(
@@ -2127,6 +2157,7 @@ public class SpecParser {
       labels = obj.fields["labels"]?.asBoolean() ?: true,
       domainLine = obj.fields["domain"]?.asBoolean() ?: true,
       tickCount = obj.numberOrSignal("tickCount", "$path.tickCount"),
+      tickMinStep = obj.numberOrSignal("tickMinStep", "$path.tickMinStep"),
       // `tickCount` also takes a time interval, in the same two spellings `nice` does. Read here
       // rather than through `numberOrSignal`, which sees a string or an object and has nothing to
       // make a number of — so the interval form was dropped in silence and the axis fell back to a
@@ -2188,7 +2219,6 @@ public class SpecParser {
         if (band != null) band == "extent" else obj.fields["tickExtra"]?.asBoolean() ?: false,
       tickBand = band,
       labelOffset = obj.numberOrSignal("labelOffset", "$path.labelOffset"),
-      tickMinStep = obj.numberOrSignal("tickMinStep", "$path.tickMinStep"),
       // The same shape as `labelFlush`: `true` is one unit, a number is itself, `false` is nothing.
       labelBound =
         when (val bound = obj.fields["labelBound"]) {
@@ -2497,7 +2527,11 @@ public class SpecParser {
    * where a title speaks in its own — `color`.
    */
   private fun titleStyleLayers(own: VegaValue.Obj): List<VegaValue.Obj> {
-    val names = markStyles(own)
+    // A title that names no style is still styled: `group-title` is the block Vega builds one
+    // with, and a stated `style` *replaces* that slot rather than adding to it. Without the
+    // fallback a Vega-Lite theme's heading colour — which its compiler redirects into
+    // `config.style.group-title` — reached nothing at all and every themed title drew black.
+    val names = markStyles(own).ifEmpty { listOf("group-title") }
     if (names.isEmpty()) return emptyList()
     val translated = LinkedHashMap<String, VegaValue>()
     for (name in names) {
@@ -2815,7 +2849,8 @@ public class SpecParser {
     if (spec.scale == null) {
       diagnostics.error(
         DiagnosticCodes.PARSE_MISSING_PROPERTY,
-        "A legend needs at least one of 'fill', 'stroke', 'size', 'shape' or 'opacity' to say " +
+        "A legend needs at least one of 'size', 'shape', 'fill', 'stroke', 'strokeWidth', " +
+          "'strokeDash' or 'opacity' to say " +
           "which scale it describes",
         jsonPath = path,
       )
@@ -3051,15 +3086,16 @@ public class SpecParser {
       groupby = groupby.orEmpty(),
       aggregate = measures,
       field = obj.fields["field"]?.asString()?.takeIf { it.isNotEmpty() },
+      crossed = (aggregate?.fields?.get("cross") as? VegaValue.Bool)?.value == true,
     )
   }
 
   /**
    * Parses a group's `layout`.
    *
-   * Only the placement is modelled. Headers, footers and titles are separate marks upstream
-   * generates around the grid, and they are reported rather than silently dropped, because a
-   * trellis without its row and column labels is a chart nobody can read.
+   * The placement and the gaps around it are modelled. The properties that decide *which* cell a
+   * band of labels lines up against are reported rather than half-honoured, because a trellis whose
+   * headers label the wrong row is worse than one that says it cannot place them.
    */
   /** The six labels a layout `offset` can name, when it names one number for all of them. */
   private val OFFSET_PARTS =
@@ -3124,6 +3160,7 @@ public class SpecParser {
       columns = obj.numberOrSignal("columns", "$path.columns"),
       rowPadding = rowPadding,
       columnPadding = columnPadding,
+      offset = parseLayoutOffset(obj, path),
       alignRow = layoutAlign(align, "row"),
       alignColumn = layoutAlign(align, "column"),
       bounds = obj.fields["bounds"]?.takeIf { it is VegaValue.Str }?.asString()?.lowercase(),
@@ -3153,6 +3190,27 @@ public class SpecParser {
               OFFSET_PARTS.associateWith { one }
             }
           ?: emptyMap(),
+    )
+  }
+
+  /**
+   * `layout.offset`, which upstream reads through `get(offset, key)` — a bare number answers for
+   * every band, an object answers per band, and anything absent is zero.
+   */
+  private fun parseLayoutOffset(obj: VegaValue.Obj, path: String): LayoutOffset {
+    val value = obj.fields["offset"] ?: return LayoutOffset()
+    if (value !is VegaValue.Obj) {
+      val both = obj.numberOrSignal("offset", "$path.offset") ?: return LayoutOffset()
+      return LayoutOffset(both, both, both, both, both, both)
+    }
+    fun band(name: String) = value.numberOrSignal(name, "$path.offset.$name")
+    return LayoutOffset(
+      rowHeader = band("rowHeader"),
+      columnHeader = band("columnHeader"),
+      rowFooter = band("rowFooter"),
+      columnFooter = band("columnFooter"),
+      rowTitle = band("rowTitle"),
+      columnTitle = band("columnTitle"),
     )
   }
 

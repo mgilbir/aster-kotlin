@@ -1,0 +1,269 @@
+{
+  "$schema": "https://vega.github.io/schema/vega/v6.json",
+  "description": "A click projected onto a colour written entirely as a test: it still remembers the column.",
+  "background": "white",
+  "padding": 5,
+  "width": 300,
+  "style": "cell",
+  "data": [
+    {
+      "name": "click_store"
+    },
+    {
+      "name": "source_0",
+      "url": "data/cars.json",
+      "format": {
+        "type": "json"
+      },
+      "transform": [
+        {
+          "type": "aggregate",
+          "groupby": [
+            "Origin"
+          ],
+          "ops": [
+            "count"
+          ],
+          "fields": [
+            null
+          ],
+          "as": [
+            "__count"
+          ]
+        }
+      ]
+    }
+  ],
+  "signals": [
+    {
+      "name": "y_step",
+      "value": 20
+    },
+    {
+      "name": "height",
+      "update": "bandspace(domain('y').length, 0.1, 0.05) * y_step"
+    },
+    {
+      "name": "unit",
+      "value": {},
+      "on": [
+        {
+          "events": "pointermove",
+          "update": "isTuple(group()) ? group() : unit"
+        }
+      ]
+    },
+    {
+      "name": "click",
+      "update": "vlSelectionResolve(\"click_store\", \"union\", true, true)"
+    },
+    {
+      "name": "click_tuple",
+      "on": [
+        {
+          "events": [
+            {
+              "source": "scope",
+              "type": "click"
+            }
+          ],
+          "update": "datum && item().mark.marktype !== 'group' && indexof(item().mark.role, 'legend') < 0 ? {unit: \"\", fields: click_tuple_fields, values: [(item().isVoronoi ? datum.datum : datum)[\"Origin\"]]} : null",
+          "force": true
+        },
+        {
+          "events": [
+            {
+              "source": "view",
+              "type": "dblclick"
+            }
+          ],
+          "update": "null"
+        }
+      ]
+    },
+    {
+      "name": "click_tuple_fields",
+      "value": [
+        {
+          "field": "Origin",
+          "channel": "color",
+          "type": "E"
+        }
+      ]
+    },
+    {
+      "name": "click_toggle",
+      "value": false,
+      "on": [
+        {
+          "events": [
+            {
+              "source": "scope",
+              "type": "click"
+            }
+          ],
+          "update": "event.shiftKey"
+        },
+        {
+          "events": [
+            {
+              "source": "view",
+              "type": "dblclick"
+            }
+          ],
+          "update": "false"
+        }
+      ]
+    },
+    {
+      "name": "click_modify",
+      "on": [
+        {
+          "events": {
+            "signal": "click_tuple"
+          },
+          "update": "modify(\"click_store\", click_toggle ? null : click_tuple, click_toggle ? null : true, click_toggle ? click_tuple : null)"
+        }
+      ]
+    }
+  ],
+  "marks": [
+    {
+      "name": "marks",
+      "type": "rect",
+      "style": [
+        "bar"
+      ],
+      "interactive": true,
+      "from": {
+        "data": "source_0"
+      },
+      "encode": {
+        "update": {
+          "cursor": {
+            "value": "pointer"
+          },
+          "fill": [
+            {
+              "test": "!length(data(\"click_store\")) || vlSelectionTest(\"click_store\", datum)",
+              "scale": "color",
+              "field": "Origin"
+            },
+            {
+              "value": "lightgray"
+            }
+          ],
+          "ariaRoleDescription": {
+            "value": "bar"
+          },
+          "description": {
+            "signal": "\"Count of Records: \" + (format(datum[\"__count\"], \"\")) + \"; Origin: \" + (isValid(datum[\"Origin\"]) ? isArray(datum[\"Origin\"]) ? join(datum[\"Origin\"], ' ') : datum[\"Origin\"] : \"\"+datum[\"Origin\"])"
+          },
+          "x": {
+            "scale": "x",
+            "field": "__count"
+          },
+          "x2": {
+            "scale": "x",
+            "value": 0
+          },
+          "y": {
+            "scale": "y",
+            "field": "Origin"
+          },
+          "height": {
+            "signal": "max(0.25, bandwidth('y'))"
+          }
+        }
+      }
+    }
+  ],
+  "scales": [
+    {
+      "name": "x",
+      "type": "linear",
+      "domain": {
+        "data": "source_0",
+        "field": "__count"
+      },
+      "range": [
+        0,
+        {
+          "signal": "width"
+        }
+      ],
+      "nice": true,
+      "zero": true
+    },
+    {
+      "name": "y",
+      "type": "band",
+      "domain": {
+        "data": "source_0",
+        "field": "Origin",
+        "sort": true
+      },
+      "range": {
+        "step": {
+          "signal": "y_step"
+        }
+      },
+      "paddingInner": 0.1,
+      "paddingOuter": 0.05
+    },
+    {
+      "name": "color",
+      "type": "ordinal",
+      "domain": {
+        "data": "source_0",
+        "field": "Origin",
+        "sort": true
+      },
+      "range": "category"
+    }
+  ],
+  "axes": [
+    {
+      "scale": "x",
+      "orient": "bottom",
+      "gridScale": "y",
+      "grid": true,
+      "tickCount": {
+        "signal": "ceil(width/40)"
+      },
+      "domain": false,
+      "labels": false,
+      "aria": false,
+      "maxExtent": 0,
+      "minExtent": 0,
+      "ticks": false,
+      "zindex": 0
+    },
+    {
+      "scale": "x",
+      "orient": "bottom",
+      "grid": false,
+      "title": "Count of Records",
+      "labelFlush": true,
+      "labelOverlap": true,
+      "tickCount": {
+        "signal": "ceil(width/40)"
+      },
+      "zindex": 0
+    },
+    {
+      "scale": "y",
+      "orient": "left",
+      "grid": false,
+      "title": "Origin",
+      "zindex": 0
+    }
+  ],
+  "legends": [
+    {
+      "fill": "color",
+      "symbolType": "square",
+      "title": "Origin"
+    }
+  ]
+}

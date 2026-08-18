@@ -1,0 +1,234 @@
+{
+  "$schema": "https://vega.github.io/schema/vega/v6.json",
+  "description": "Two measures drawn over one another, each line a copy of the same template.",
+  "background": "white",
+  "padding": 5,
+  "width": 180,
+  "height": 120,
+  "style": "cell",
+  "data": [
+    {
+      "name": "source_0",
+      "values": [
+        {
+          "step": 1,
+          "amount": 28,
+          "score": 30
+        },
+        {
+          "step": 2,
+          "amount": 55,
+          "score": 21
+        },
+        {
+          "step": 3,
+          "amount": 43,
+          "score": 48
+        },
+        {
+          "step": 4,
+          "amount": 91,
+          "score": 12
+        }
+      ]
+    },
+    {
+      "name": "data_0",
+      "source": "source_0",
+      "transform": [
+        {
+          "type": "formula",
+          "expr": "toNumber(datum[\"step\"])",
+          "as": "step"
+        }
+      ]
+    }
+  ],
+  "marks": [
+    {
+      "name": "child__layer_amount_marks",
+      "type": "line",
+      "style": [
+        "line"
+      ],
+      "sort": {
+        "field": "x"
+      },
+      "from": {
+        "data": "data_0"
+      },
+      "encode": {
+        "update": {
+          "stroke": {
+            "scale": "color",
+            "value": "amount"
+          },
+          "description": {
+            "signal": "\"step: \" + (format(datum[\"step\"], \"\")) + \"; value: \" + (format(datum[\"amount\"], \"\"))"
+          },
+          "x": {
+            "scale": "x",
+            "field": "step"
+          },
+          "y": {
+            "scale": "y",
+            "field": "amount"
+          },
+          "defined": {
+            "signal": "isValid(datum[\"step\"]) && isFinite(+datum[\"step\"]) && isValid(datum[\"amount\"]) && isFinite(+datum[\"amount\"])"
+          }
+        }
+      }
+    },
+    {
+      "name": "child__layer_score_marks",
+      "type": "line",
+      "style": [
+        "line"
+      ],
+      "sort": {
+        "field": "x"
+      },
+      "from": {
+        "data": "data_0"
+      },
+      "encode": {
+        "update": {
+          "stroke": {
+            "scale": "color",
+            "value": "score"
+          },
+          "description": {
+            "signal": "\"step: \" + (format(datum[\"step\"], \"\")) + \"; value: \" + (format(datum[\"score\"], \"\"))"
+          },
+          "x": {
+            "scale": "x",
+            "field": "step"
+          },
+          "y": {
+            "scale": "y",
+            "field": "score"
+          },
+          "defined": {
+            "signal": "isValid(datum[\"step\"]) && isFinite(+datum[\"step\"]) && isValid(datum[\"score\"]) && isFinite(+datum[\"score\"])"
+          }
+        }
+      }
+    }
+  ],
+  "scales": [
+    {
+      "name": "x",
+      "type": "linear",
+      "domain": {
+        "data": "data_0",
+        "field": "step"
+      },
+      "range": [
+        0,
+        {
+          "signal": "width"
+        }
+      ],
+      "nice": true,
+      "zero": false
+    },
+    {
+      "name": "y",
+      "type": "linear",
+      "domain": {
+        "data": "data_0",
+        "fields": [
+          "amount",
+          "score"
+        ]
+      },
+      "range": [
+        {
+          "signal": "height"
+        },
+        0
+      ],
+      "nice": true,
+      "zero": true
+    },
+    {
+      "name": "color",
+      "type": "ordinal",
+      "domain": {
+        "fields": [
+          [
+            "amount"
+          ],
+          [
+            "score"
+          ]
+        ]
+      },
+      "range": "category"
+    }
+  ],
+  "axes": [
+    {
+      "scale": "x",
+      "orient": "bottom",
+      "gridScale": "y",
+      "grid": true,
+      "tickCount": {
+        "signal": "ceil(width/40)"
+      },
+      "domain": false,
+      "labels": false,
+      "aria": false,
+      "maxExtent": 0,
+      "minExtent": 0,
+      "ticks": false,
+      "zindex": 0
+    },
+    {
+      "scale": "y",
+      "orient": "left",
+      "gridScale": "x",
+      "grid": true,
+      "tickCount": {
+        "signal": "ceil(height/40)"
+      },
+      "domain": false,
+      "labels": false,
+      "aria": false,
+      "maxExtent": 0,
+      "minExtent": 0,
+      "ticks": false,
+      "zindex": 0
+    },
+    {
+      "scale": "x",
+      "orient": "bottom",
+      "grid": false,
+      "title": "step",
+      "labelFlush": true,
+      "labelOverlap": true,
+      "tickCount": {
+        "signal": "ceil(width/40)"
+      },
+      "zindex": 0
+    },
+    {
+      "scale": "y",
+      "orient": "left",
+      "grid": false,
+      "title": "value",
+      "labelOverlap": true,
+      "tickCount": {
+        "signal": "ceil(height/40)"
+      },
+      "zindex": 0
+    }
+  ],
+  "legends": [
+    {
+      "stroke": "color",
+      "symbolType": "stroke"
+    }
+  ]
+}

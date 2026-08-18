@@ -1,0 +1,216 @@
+{
+  "$schema": "https://vega.github.io/schema/vega/v6.json",
+  "description": "Lines between two places, joined from a table the chart also draws from: the join reads the table bare and the projection writes both ends of each line.",
+  "background": "white",
+  "padding": 5,
+  "width": 400,
+  "height": 250,
+  "style": "view",
+  "data": [
+    {
+      "name": "source_0",
+      "url": "data/airports.csv",
+      "format": {
+        "type": "csv"
+      }
+    },
+    {
+      "name": "data_0",
+      "source": "source_0",
+      "transform": [
+        {
+          "type": "geojson",
+          "fields": [
+            "longitude",
+            "latitude"
+          ],
+          "signal": "layer_0_geojson_0"
+        },
+        {
+          "type": "geopoint",
+          "projection": "projection",
+          "fields": [
+            "longitude",
+            "latitude"
+          ],
+          "as": [
+            "layer_0_x",
+            "layer_0_y"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "source_1",
+      "url": "data/flights-airport.csv",
+      "format": {
+        "type": "csv",
+        "parse": {
+          "origin": "string"
+        }
+      },
+      "transform": [
+        {
+          "type": "filter",
+          "expr": "datum[\"origin\"]===\"SEA\""
+        },
+        {
+          "type": "lookup",
+          "from": "source_0",
+          "key": "iata",
+          "fields": [
+            "origin"
+          ],
+          "values": [
+            "latitude",
+            "longitude"
+          ],
+          "as": [
+            "origin_latitude",
+            "origin_longitude"
+          ]
+        },
+        {
+          "type": "lookup",
+          "from": "source_0",
+          "key": "iata",
+          "fields": [
+            "destination"
+          ],
+          "values": [
+            "latitude",
+            "longitude"
+          ],
+          "as": [
+            "dest_latitude",
+            "dest_longitude"
+          ]
+        },
+        {
+          "type": "geojson",
+          "fields": [
+            "origin_longitude",
+            "origin_latitude"
+          ],
+          "signal": "layer_1_geojson_0"
+        },
+        {
+          "type": "geojson",
+          "fields": [
+            "dest_longitude",
+            "dest_latitude"
+          ],
+          "signal": "layer_1_geojson_1"
+        },
+        {
+          "type": "geopoint",
+          "projection": "projection",
+          "fields": [
+            "origin_longitude",
+            "origin_latitude"
+          ],
+          "as": [
+            "layer_1_x",
+            "layer_1_y"
+          ]
+        },
+        {
+          "type": "geopoint",
+          "projection": "projection",
+          "fields": [
+            "dest_longitude",
+            "dest_latitude"
+          ],
+          "as": [
+            "layer_1_x2",
+            "layer_1_y2"
+          ]
+        }
+      ]
+    }
+  ],
+  "projections": [
+    {
+      "name": "projection",
+      "size": {
+        "signal": "[width, height]"
+      },
+      "fit": {
+        "signal": "[layer_0_geojson_0, layer_1_geojson_0, layer_1_geojson_1]"
+      },
+      "type": "albersUsa"
+    }
+  ],
+  "marks": [
+    {
+      "name": "layer_0_marks",
+      "type": "symbol",
+      "style": [
+        "circle"
+      ],
+      "from": {
+        "data": "data_0"
+      },
+      "encode": {
+        "update": {
+          "opacity": {
+            "value": 0.7
+          },
+          "fill": {
+            "value": "gray"
+          },
+          "ariaRoleDescription": {
+            "value": "circle"
+          },
+          "description": {
+            "signal": "\"longitude: \" + (format(datum[\"longitude\"], \"\")) + \"; latitude: \" + (format(datum[\"latitude\"], \"\"))"
+          },
+          "x": {
+            "field": "layer_0_x"
+          },
+          "y": {
+            "field": "layer_0_y"
+          },
+          "size": {
+            "value": 5
+          },
+          "shape": {
+            "value": "circle"
+          }
+        }
+      }
+    },
+    {
+      "name": "layer_1_marks",
+      "type": "rule",
+      "style": [
+        "rule"
+      ],
+      "from": {
+        "data": "source_1"
+      },
+      "encode": {
+        "update": {
+          "stroke": {
+            "value": "black"
+          },
+          "description": {
+            "signal": "\"origin_longitude: \" + (format(datum[\"origin_longitude\"], \"\")) + \"; dest_longitude: \" + (format(datum[\"dest_longitude\"], \"\")) + \"; origin_latitude: \" + (format(datum[\"origin_latitude\"], \"\")) + \"; dest_latitude: \" + (format(datum[\"dest_latitude\"], \"\"))"
+          },
+          "x": {
+            "field": "layer_1_x"
+          },
+          "x2": {
+            "field": "layer_1_x2"
+          },
+          "y": {
+            "field": "layer_1_y"
+          },
+          "y2": {
+            "field": "layer_1_y2"
+          }
+        }
+      }
+    }
+  ]
+}

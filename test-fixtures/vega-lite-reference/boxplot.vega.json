@@ -1,0 +1,535 @@
+{
+  "$schema": "https://vega.github.io/schema/vega/v6.json",
+  "description": "A box plot: quartiles, a median, whiskers to the last point inside, and one outlier.",
+  "background": "white",
+  "padding": 5,
+  "height": 300,
+  "style": "cell",
+  "data": [
+    {
+      "name": "source_0",
+      "values": [
+        {
+          "g": "a",
+          "v": 1
+        },
+        {
+          "g": "a",
+          "v": 3
+        },
+        {
+          "g": "a",
+          "v": 4
+        },
+        {
+          "g": "a",
+          "v": 5
+        },
+        {
+          "g": "a",
+          "v": 20
+        },
+        {
+          "g": "b",
+          "v": 2
+        },
+        {
+          "g": "b",
+          "v": 6
+        },
+        {
+          "g": "b",
+          "v": 7
+        },
+        {
+          "g": "b",
+          "v": 9
+        },
+        {
+          "g": "b",
+          "v": 10
+        }
+      ]
+    },
+    {
+      "name": "data_1",
+      "source": "source_0",
+      "transform": [
+        {
+          "type": "joinaggregate",
+          "as": [
+            "lower_box_v",
+            "upper_box_v"
+          ],
+          "ops": [
+            "q1",
+            "q3"
+          ],
+          "fields": [
+            "v",
+            "v"
+          ],
+          "groupby": [
+            "g"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "data_2",
+      "source": "data_1",
+      "transform": [
+        {
+          "type": "filter",
+          "expr": "(datum['v'] < datum['lower_box_v'] - 1.5 * (datum['upper_box_v'] - datum['lower_box_v'])) || (datum['v'] > datum['upper_box_v'] + 1.5 * (datum['upper_box_v'] - datum['lower_box_v']))"
+        },
+        {
+          "type": "filter",
+          "expr": "isValid(datum[\"v\"]) && isFinite(+datum[\"v\"])"
+        }
+      ]
+    },
+    {
+      "name": "data_3",
+      "source": "data_1",
+      "transform": [
+        {
+          "type": "filter",
+          "expr": "(datum['lower_box_v'] - 1.5 * (datum['upper_box_v'] - datum['lower_box_v']) <= datum['v']) && (datum['v'] <= datum['upper_box_v'] + 1.5 * (datum['upper_box_v'] - datum['lower_box_v']))"
+        },
+        {
+          "type": "aggregate",
+          "groupby": [
+            "g"
+          ],
+          "ops": [
+            "min",
+            "max",
+            "min",
+            "max"
+          ],
+          "fields": [
+            "v",
+            "v",
+            "lower_box_v",
+            "upper_box_v"
+          ],
+          "as": [
+            "lower_whisker_v",
+            "upper_whisker_v",
+            "lower_box_v",
+            "upper_box_v"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "data_4",
+      "source": "data_3",
+      "transform": [
+        {
+          "type": "filter",
+          "expr": "isValid(datum[\"lower_whisker_v\"]) && isFinite(+datum[\"lower_whisker_v\"])"
+        }
+      ]
+    },
+    {
+      "name": "data_5",
+      "source": "data_3",
+      "transform": [
+        {
+          "type": "filter",
+          "expr": "isValid(datum[\"upper_box_v\"]) && isFinite(+datum[\"upper_box_v\"])"
+        }
+      ]
+    },
+    {
+      "name": "data_6",
+      "source": "source_0",
+      "transform": [
+        {
+          "type": "aggregate",
+          "groupby": [
+            "g"
+          ],
+          "ops": [
+            "q1",
+            "q3",
+            "median",
+            "min",
+            "max"
+          ],
+          "fields": [
+            "v",
+            "v",
+            "v",
+            "v",
+            "v"
+          ],
+          "as": [
+            "lower_box_v",
+            "upper_box_v",
+            "mid_box_v",
+            "min_v",
+            "max_v"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "data_7",
+      "source": "data_6",
+      "transform": [
+        {
+          "type": "filter",
+          "expr": "isValid(datum[\"lower_box_v\"]) && isFinite(+datum[\"lower_box_v\"])"
+        }
+      ]
+    },
+    {
+      "name": "data_8",
+      "source": "data_6",
+      "transform": [
+        {
+          "type": "filter",
+          "expr": "isValid(datum[\"mid_box_v\"]) && isFinite(+datum[\"mid_box_v\"])"
+        }
+      ]
+    }
+  ],
+  "signals": [
+    {
+      "name": "x_step",
+      "value": 20
+    },
+    {
+      "name": "width",
+      "update": "bandspace(domain('x').length, 0, 0) * x_step"
+    }
+  ],
+  "marks": [
+    {
+      "name": "layer_0_layer_0_marks",
+      "type": "symbol",
+      "style": [
+        "point",
+        "boxplot-outliers"
+      ],
+      "from": {
+        "data": "data_2"
+      },
+      "encode": {
+        "update": {
+          "opacity": {
+            "value": 0.7
+          },
+          "fill": {
+            "value": "transparent"
+          },
+          "stroke": {
+            "value": "#4c78a8"
+          },
+          "ariaRoleDescription": {
+            "value": "point"
+          },
+          "description": {
+            "signal": "\"g: \" + (isValid(datum[\"g\"]) ? isArray(datum[\"g\"]) ? join(datum[\"g\"], ' ') : datum[\"g\"] : \"\"+datum[\"g\"]) + \"; v: \" + (format(datum[\"v\"], \"\"))"
+          },
+          "x": {
+            "scale": "x",
+            "field": "g",
+            "band": 0.5
+          },
+          "y": {
+            "scale": "y",
+            "field": "v"
+          }
+        }
+      }
+    },
+    {
+      "name": "layer_0_layer_1_layer_0_marks",
+      "type": "rule",
+      "style": [
+        "rule",
+        "boxplot-rule"
+      ],
+      "aria": false,
+      "from": {
+        "data": "data_4"
+      },
+      "encode": {
+        "update": {
+          "stroke": {
+            "value": "black"
+          },
+          "tooltip": {
+            "signal": "{\"Upper Whisker of v\": format(datum[\"upper_whisker_v\"], \"\"), \"Lower Whisker of v\": format(datum[\"lower_whisker_v\"], \"\"), \"g\": isValid(datum[\"g\"]) ? isArray(datum[\"g\"]) ? join(datum[\"g\"], '\\n') : datum[\"g\"] : \"\"+datum[\"g\"]}"
+          },
+          "x": {
+            "scale": "x",
+            "field": "g",
+            "band": 0.5
+          },
+          "y": {
+            "scale": "y",
+            "field": "lower_whisker_v"
+          },
+          "y2": {
+            "scale": "y",
+            "field": "lower_box_v"
+          }
+        }
+      }
+    },
+    {
+      "name": "layer_0_layer_1_layer_1_marks",
+      "type": "rule",
+      "style": [
+        "rule",
+        "boxplot-rule"
+      ],
+      "aria": false,
+      "from": {
+        "data": "data_5"
+      },
+      "encode": {
+        "update": {
+          "stroke": {
+            "value": "black"
+          },
+          "tooltip": {
+            "signal": "{\"Upper Whisker of v\": format(datum[\"upper_whisker_v\"], \"\"), \"Lower Whisker of v\": format(datum[\"lower_whisker_v\"], \"\"), \"g\": isValid(datum[\"g\"]) ? isArray(datum[\"g\"]) ? join(datum[\"g\"], '\\n') : datum[\"g\"] : \"\"+datum[\"g\"]}"
+          },
+          "x": {
+            "scale": "x",
+            "field": "g",
+            "band": 0.5
+          },
+          "y": {
+            "scale": "y",
+            "field": "upper_box_v"
+          },
+          "y2": {
+            "scale": "y",
+            "field": "upper_whisker_v"
+          }
+        }
+      }
+    },
+    {
+      "name": "layer_1_layer_0_marks",
+      "type": "rect",
+      "style": [
+        "bar",
+        "boxplot-box"
+      ],
+      "from": {
+        "data": "data_7"
+      },
+      "encode": {
+        "update": {
+          "ariaRoleDescription": {
+            "value": "box"
+          },
+          "fill": {
+            "value": "#4c78a8"
+          },
+          "tooltip": {
+            "signal": "{\"Max of v\": format(datum[\"max_v\"], \"\"), \"Q3 of v\": format(datum[\"upper_box_v\"], \"\"), \"Median of v\": format(datum[\"mid_box_v\"], \"\"), \"Q1 of v\": format(datum[\"lower_box_v\"], \"\"), \"Min of v\": format(datum[\"min_v\"], \"\"), \"g\": isValid(datum[\"g\"]) ? isArray(datum[\"g\"]) ? join(datum[\"g\"], '\\n') : datum[\"g\"] : \"\"+datum[\"g\"]}"
+          },
+          "description": {
+            "signal": "\"g: \" + (isValid(datum[\"g\"]) ? isArray(datum[\"g\"]) ? join(datum[\"g\"], ' ') : datum[\"g\"] : \"\"+datum[\"g\"]) + \"; v: \" + (format(datum[\"lower_box_v\"], \"\")) + \"; upper_box_v: \" + (format(datum[\"upper_box_v\"], \"\")) + \"; Max of v: \" + (format(datum[\"max_v\"], \"\")) + \"; Q3 of v: \" + (format(datum[\"upper_box_v\"], \"\")) + \"; Median of v: \" + (format(datum[\"mid_box_v\"], \"\")) + \"; Q1 of v: \" + (format(datum[\"lower_box_v\"], \"\")) + \"; Min of v: \" + (format(datum[\"min_v\"], \"\"))"
+          },
+          "xc": {
+            "scale": "x",
+            "field": "g",
+            "band": 0.5
+          },
+          "width": {
+            "value": 14
+          },
+          "y": {
+            "scale": "y",
+            "field": "lower_box_v"
+          },
+          "y2": {
+            "scale": "y",
+            "field": "upper_box_v"
+          }
+        }
+      }
+    },
+    {
+      "name": "layer_1_layer_1_marks",
+      "type": "rect",
+      "style": [
+        "tick",
+        "boxplot-median"
+      ],
+      "aria": false,
+      "from": {
+        "data": "data_8"
+      },
+      "encode": {
+        "update": {
+          "opacity": {
+            "value": 0.7
+          },
+          "fill": [
+            {
+              "test": "datum['lower_box_v'] >= datum['upper_box_v']",
+              "value": "#4c78a8"
+            },
+            {
+              "value": "white"
+            }
+          ],
+          "tooltip": {
+            "signal": "{\"Max of v\": format(datum[\"max_v\"], \"\"), \"Q3 of v\": format(datum[\"upper_box_v\"], \"\"), \"Median of v\": format(datum[\"mid_box_v\"], \"\"), \"Q1 of v\": format(datum[\"lower_box_v\"], \"\"), \"Min of v\": format(datum[\"min_v\"], \"\"), \"g\": isValid(datum[\"g\"]) ? isArray(datum[\"g\"]) ? join(datum[\"g\"], '\\n') : datum[\"g\"] : \"\"+datum[\"g\"]}"
+          },
+          "xc": {
+            "scale": "x",
+            "field": "g",
+            "band": 0.5
+          },
+          "width": {
+            "value": 14
+          },
+          "yc": {
+            "scale": "y",
+            "field": "mid_box_v"
+          },
+          "height": {
+            "value": 1
+          }
+        }
+      }
+    }
+  ],
+  "scales": [
+    {
+      "name": "x",
+      "type": "band",
+      "domain": {
+        "fields": [
+          {
+            "data": "data_2",
+            "field": "g"
+          },
+          {
+            "data": "data_4",
+            "field": "g"
+          },
+          {
+            "data": "data_5",
+            "field": "g"
+          },
+          {
+            "data": "data_7",
+            "field": "g"
+          },
+          {
+            "data": "data_8",
+            "field": "g"
+          }
+        ],
+        "sort": true
+      },
+      "range": {
+        "step": {
+          "signal": "x_step"
+        }
+      },
+      "paddingInner": 0,
+      "paddingOuter": 0
+    },
+    {
+      "name": "y",
+      "type": "linear",
+      "domain": {
+        "fields": [
+          {
+            "data": "data_2",
+            "field": "v"
+          },
+          {
+            "data": "data_4",
+            "field": "lower_whisker_v"
+          },
+          {
+            "data": "data_4",
+            "field": "lower_box_v"
+          },
+          {
+            "data": "data_5",
+            "field": "upper_box_v"
+          },
+          {
+            "data": "data_5",
+            "field": "upper_whisker_v"
+          },
+          {
+            "data": "data_7",
+            "field": "lower_box_v"
+          },
+          {
+            "data": "data_7",
+            "field": "upper_box_v"
+          },
+          {
+            "data": "data_8",
+            "field": "mid_box_v"
+          }
+        ]
+      },
+      "range": [
+        {
+          "signal": "height"
+        },
+        0
+      ],
+      "nice": true,
+      "zero": true
+    }
+  ],
+  "axes": [
+    {
+      "scale": "y",
+      "orient": "left",
+      "gridScale": "x",
+      "grid": true,
+      "tickCount": {
+        "signal": "ceil(height/40)"
+      },
+      "domain": false,
+      "labels": false,
+      "aria": false,
+      "maxExtent": 0,
+      "minExtent": 0,
+      "ticks": false,
+      "zindex": 0
+    },
+    {
+      "scale": "x",
+      "orient": "bottom",
+      "grid": false,
+      "title": "g",
+      "labelAlign": "right",
+      "labelAngle": 270,
+      "labelBaseline": "middle",
+      "zindex": 0
+    },
+    {
+      "scale": "y",
+      "orient": "left",
+      "grid": false,
+      "title": "v",
+      "labelOverlap": true,
+      "tickCount": {
+        "signal": "ceil(height/40)"
+      },
+      "zindex": 0
+    }
+  ]
+}

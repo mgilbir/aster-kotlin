@@ -45,6 +45,7 @@ import dev.aster.vega.scene.TextNode
 import dev.aster.vega.scene.TextRun
 import dev.aster.vega.scene.Transform2D
 import dev.aster.vega.scene.transformedBounds
+import kotlin.math.floor
 
 /**
  * Generates axis scene nodes: ticks, labels, gridlines and the domain line.
@@ -248,6 +249,9 @@ public class AxisBuilder(
         }
       for (tick in ticks) {
         val at = tickCoordinate(tick.position, spec)
+        // A gridline's own `encode` block, resolved against the tick: this is how a chart picks the
+        // zero line out of the rest, and Vega-Lite writes every conditional guide property this way
+        // because Vega has no conditional guide properties of its own.
         // Per gridline, for the same reason as a tick: the `encode` block may read the value it
         // marks.
         val gridMetaFor = partMetadata(spec, "grid", tickDatum(tick), gridMeta)
@@ -322,12 +326,16 @@ public class AxisBuilder(
           TextRun(
             text = labelText(spec, tick) ?: tick.label,
             style = labelStyle,
+            // The labels' own `encode` comes first: an angle supplied by a signal cannot be
+            // compared at compile time, so Vega-Lite writes the *comparison* into the encode and
+            // leaves the axis property off. Reading only the property left the labels at the
+            // anchor the orientation would have chosen.
             align =
-              alignOf(spec.labelAlign)
+              alignOf(labelString(spec, "align", tick) ?: spec.labelAlign)
                 ?: (if (spec.orient.isVertical) null else flushed?.let(::flushAlign))
                 ?: labelAlign(spec.orient),
             baseline =
-              baselineOf(spec.labelBaseline)
+              baselineOf(labelString(spec, "baseline", tick) ?: spec.labelBaseline)
                 ?: (if (spec.orient.isVertical) flushed?.let(::flushBaseline) else null)
                 ?: labelBaseline(spec.orient),
             limit = labelLimit,
@@ -785,6 +793,35 @@ public class AxisBuilder(
     spec.offsetChannel?.let { channels?.channelNumber(it, VegaValue.EmptyObject) }
       ?: numbers.resolve(spec.offset, spec.scale)
       ?: 0.0
+
+  /**
+   * How many ticks to ask a continuous scale for, after `tickMinStep` has had its say.
+   *
+   * `tickMinStep` does not place ticks; it *caps the count* — `tickCount` in `vega-scale/ticks.js`.
+   * A span that holds only one minimum step allows two ticks, its two ends, whatever the axis asked
+   * for. Vega-Lite writes the step on every bucketed axis as one bucket's duration, so an axis over
+   * two months offers two ticks rather than the sixteen a request for ten would otherwise produce.
+   *
+   * @param refine whether to keep shrinking the count while the step d3 would choose is still under
+   *   the minimum. Upstream does that only for a plain numeric scale: `!scale.bins &&
+   *   !isLogarithmic && !isTemporal`, because those three do not shrink their step monotonically
+   *   with the count.
+   */
+  private fun tickCountFor(spec: AxisSpec, domain: List<Double>, refine: Boolean): Int {
+    var count = numbers.resolveInt(spec.tickCount, spec.scale) ?: AxisDefaults.DEFAULT_TICK_COUNT
+    val minStep = numbers.resolve(spec.tickMinStep, spec.scale) ?: return count
+    if (domain.isEmpty()) return count
+    val lo = minOf(domain.first(), domain.last())
+    val hi = maxOf(domain.first(), domain.last())
+    val spans = (hi - lo) / minStep
+    // `Math.floor((hi - lo) / minStep || 1) + 1`: a span of nothing still allows two ticks.
+    val allowed = floor(if (spans.isFinite() && spans != 0.0) spans else 1.0).toInt() + 1
+    count = minOf(count, allowed)
+    if (refine && lo < hi) {
+      while (count > 1 && Ticks.stepFrom(Ticks.tickIncrement(lo, hi, count)) < minStep) count--
+    }
+    return count.coerceAtLeast(1)
+  }
 
   /**
    * `tickExtra`: one more tick at the **start** of the first tick's band, labelled with nothing.

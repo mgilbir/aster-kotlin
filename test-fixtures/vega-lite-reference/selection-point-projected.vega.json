@@ -1,0 +1,655 @@
+{
+  "$schema": "https://vega.github.io/schema/vega/v6.json",
+  "description": "A click that picks by a channel rather than by the row's identity, beside a brush — so the pick has to know which channel it projected onto, and that a click on the brush is not a pick.",
+  "background": "white",
+  "padding": 5,
+  "width": 300,
+  "height": 300,
+  "style": "cell",
+  "data": [
+    {
+      "name": "index_store"
+    },
+    {
+      "name": "brush_store"
+    },
+    {
+      "name": "source_0",
+      "url": "data/stocks.csv",
+      "format": {
+        "type": "csv",
+        "parse": {
+          "date": "date"
+        }
+      },
+      "transform": [
+        {
+          "type": "filter",
+          "expr": "datum.symbol !== 'IBM'"
+        },
+        {
+          "type": "filter",
+          "expr": "(isDate(datum[\"date\"]) || (isValid(datum[\"date\"]) && isFinite(+datum[\"date\"]))) && isValid(datum[\"price\"]) && isFinite(+datum[\"price\"])"
+        }
+      ]
+    }
+  ],
+  "signals": [
+    {
+      "name": "unit",
+      "value": {},
+      "on": [
+        {
+          "events": "pointermove",
+          "update": "isTuple(group()) ? group() : unit"
+        }
+      ]
+    },
+    {
+      "name": "index",
+      "update": "vlSelectionResolve(\"index_store\", \"union\", true, true)"
+    },
+    {
+      "name": "brush",
+      "update": "vlSelectionResolve(\"brush_store\", \"union\")"
+    },
+    {
+      "name": "index_tuple",
+      "on": [
+        {
+          "events": [
+            {
+              "source": "scope",
+              "type": "pointerover",
+              "markname": "voronoi"
+            }
+          ],
+          "update": "datum && item().mark.marktype !== 'group' && indexof(item().mark.role, 'legend') < 0 && indexof(item().mark.name, 'brush_brush') < 0 ? {unit: \"\", fields: index_tuple_fields, values: [(item().isVoronoi ? datum.datum : datum)[\"date\"]]} : null",
+          "force": true
+        },
+        {
+          "events": [
+            {
+              "source": "view",
+              "type": "dblclick"
+            }
+          ],
+          "update": "null"
+        }
+      ]
+    },
+    {
+      "name": "index_tuple_fields",
+      "value": [
+        {
+          "field": "date",
+          "channel": "x",
+          "type": "E"
+        }
+      ]
+    },
+    {
+      "name": "index_toggle",
+      "value": false,
+      "on": [
+        {
+          "events": [
+            {
+              "source": "scope",
+              "type": "pointerover",
+              "markname": "voronoi"
+            }
+          ],
+          "update": "event.shiftKey"
+        },
+        {
+          "events": [
+            {
+              "source": "view",
+              "type": "dblclick"
+            }
+          ],
+          "update": "false"
+        }
+      ]
+    },
+    {
+      "name": "index_modify",
+      "on": [
+        {
+          "events": {
+            "signal": "index_tuple"
+          },
+          "update": "modify(\"index_store\", index_toggle ? null : index_tuple, index_toggle ? null : true, index_toggle ? index_tuple : null)"
+        }
+      ]
+    },
+    {
+      "name": "brush_x",
+      "value": [],
+      "on": [
+        {
+          "events": {
+            "source": "scope",
+            "type": "pointerdown",
+            "filter": [
+              "!event.item || event.item.mark.name !== \"brush_brush\""
+            ]
+          },
+          "update": "[x(unit), x(unit)]"
+        },
+        {
+          "events": {
+            "source": "window",
+            "type": "pointermove",
+            "consume": true,
+            "between": [
+              {
+                "source": "scope",
+                "type": "pointerdown",
+                "filter": [
+                  "!event.item || event.item.mark.name !== \"brush_brush\""
+                ]
+              },
+              {
+                "source": "window",
+                "type": "pointerup"
+              }
+            ]
+          },
+          "update": "[brush_x[0], clamp(x(unit), 0, width)]"
+        },
+        {
+          "events": {
+            "signal": "brush_scale_trigger"
+          },
+          "update": "[scale(\"x\", brush_date[0]), scale(\"x\", brush_date[1])]"
+        },
+        {
+          "events": [
+            {
+              "source": "view",
+              "type": "dblclick"
+            }
+          ],
+          "update": "[0, 0]"
+        },
+        {
+          "events": {
+            "signal": "brush_translate_delta"
+          },
+          "update": "clampRange(panLinear(brush_translate_anchor.extent_x, brush_translate_delta.x / span(brush_translate_anchor.extent_x)), 0, width)"
+        },
+        {
+          "events": {
+            "signal": "brush_zoom_delta"
+          },
+          "update": "clampRange(zoomLinear(brush_x, brush_zoom_anchor.x, brush_zoom_delta), 0, width)"
+        }
+      ]
+    },
+    {
+      "name": "brush_date",
+      "on": [
+        {
+          "events": {
+            "signal": "brush_x"
+          },
+          "update": "brush_x[0] === brush_x[1] ? null : invert(\"x\", brush_x)"
+        }
+      ]
+    },
+    {
+      "name": "brush_scale_trigger",
+      "value": {},
+      "on": [
+        {
+          "events": [
+            {
+              "scale": "x"
+            }
+          ],
+          "update": "(!isArray(brush_date) || (+invert(\"x\", brush_x)[0] === +brush_date[0] && +invert(\"x\", brush_x)[1] === +brush_date[1])) ? brush_scale_trigger : {}"
+        }
+      ]
+    },
+    {
+      "name": "brush_tuple",
+      "on": [
+        {
+          "events": [
+            {
+              "signal": "brush_date"
+            }
+          ],
+          "update": "brush_date ? {unit: \"\", fields: brush_tuple_fields, values: [brush_date]} : null"
+        }
+      ]
+    },
+    {
+      "name": "brush_tuple_fields",
+      "value": [
+        {
+          "field": "date",
+          "channel": "x",
+          "type": "R"
+        }
+      ]
+    },
+    {
+      "name": "brush_translate_anchor",
+      "value": {},
+      "on": [
+        {
+          "events": [
+            {
+              "source": "scope",
+              "type": "pointerdown",
+              "markname": "brush_brush"
+            }
+          ],
+          "update": "{x: x(unit), y: y(unit), extent_x: slice(brush_x)}"
+        }
+      ]
+    },
+    {
+      "name": "brush_translate_delta",
+      "value": {},
+      "on": [
+        {
+          "events": [
+            {
+              "source": "window",
+              "type": "pointermove",
+              "consume": true,
+              "between": [
+                {
+                  "source": "scope",
+                  "type": "pointerdown",
+                  "markname": "brush_brush"
+                },
+                {
+                  "source": "window",
+                  "type": "pointerup"
+                }
+              ]
+            }
+          ],
+          "update": "{x: brush_translate_anchor.x - x(unit), y: brush_translate_anchor.y - y(unit)}"
+        }
+      ]
+    },
+    {
+      "name": "brush_zoom_anchor",
+      "on": [
+        {
+          "events": [
+            {
+              "source": "scope",
+              "type": "wheel",
+              "consume": true,
+              "markname": "brush_brush"
+            }
+          ],
+          "update": "{x: x(unit), y: y(unit)}"
+        }
+      ]
+    },
+    {
+      "name": "brush_zoom_delta",
+      "on": [
+        {
+          "events": [
+            {
+              "source": "scope",
+              "type": "wheel",
+              "consume": true,
+              "markname": "brush_brush"
+            }
+          ],
+          "force": true,
+          "update": "pow(1.001, event.deltaY * pow(16, event.deltaMode))"
+        }
+      ]
+    },
+    {
+      "name": "brush_modify",
+      "on": [
+        {
+          "events": {
+            "signal": "brush_tuple"
+          },
+          "update": "modify(\"brush_store\", brush_tuple, true)"
+        }
+      ]
+    }
+  ],
+  "marks": [
+    {
+      "name": "brush_brush_bg",
+      "type": "rect",
+      "clip": true,
+      "encode": {
+        "enter": {
+          "fill": {
+            "value": "#333"
+          },
+          "fillOpacity": {
+            "value": 0.125
+          }
+        },
+        "update": {
+          "x": [
+            {
+              "test": "data(\"brush_store\").length && data(\"brush_store\")[0].unit === \"\"",
+              "signal": "brush_x[0]"
+            },
+            {
+              "value": 0
+            }
+          ],
+          "y": [
+            {
+              "test": "data(\"brush_store\").length && data(\"brush_store\")[0].unit === \"\"",
+              "value": 0
+            },
+            {
+              "value": 0
+            }
+          ],
+          "x2": [
+            {
+              "test": "data(\"brush_store\").length && data(\"brush_store\")[0].unit === \"\"",
+              "signal": "brush_x[1]"
+            },
+            {
+              "value": 0
+            }
+          ],
+          "y2": [
+            {
+              "test": "data(\"brush_store\").length && data(\"brush_store\")[0].unit === \"\"",
+              "field": {
+                "group": "height"
+              }
+            },
+            {
+              "value": 0
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "marks",
+      "type": "symbol",
+      "style": [
+        "point"
+      ],
+      "interactive": true,
+      "from": {
+        "data": "source_0"
+      },
+      "encode": {
+        "update": {
+          "opacity": [
+            {
+              "test": "length(data(\"index_store\")) && vlSelectionTest(\"index_store\", datum)",
+              "value": 1
+            },
+            {
+              "value": 0.3
+            }
+          ],
+          "fill": {
+            "value": "transparent"
+          },
+          "stroke": {
+            "scale": "color",
+            "field": "symbol"
+          },
+          "ariaRoleDescription": {
+            "value": "point"
+          },
+          "description": {
+            "signal": "\"date: \" + (timeFormat(datum[\"date\"], \"%b %d, %Y\")) + \"; price: \" + (format(datum[\"price\"], \"\")) + \"; symbol: \" + (isValid(datum[\"symbol\"]) ? isArray(datum[\"symbol\"]) ? join(datum[\"symbol\"], ' ') : datum[\"symbol\"] : \"\"+datum[\"symbol\"])"
+          },
+          "x": {
+            "scale": "x",
+            "field": "date"
+          },
+          "y": {
+            "scale": "y",
+            "field": "price"
+          }
+        }
+      }
+    },
+    {
+      "name": "voronoi",
+      "type": "path",
+      "interactive": true,
+      "aria": false,
+      "from": {
+        "data": "marks"
+      },
+      "encode": {
+        "update": {
+          "fill": {
+            "value": "transparent"
+          },
+          "strokeWidth": {
+            "value": 0.35
+          },
+          "stroke": {
+            "value": "transparent"
+          },
+          "isVoronoi": {
+            "value": true
+          }
+        }
+      },
+      "transform": [
+        {
+          "type": "voronoi",
+          "x": {
+            "expr": "datum.datum.x || 0"
+          },
+          "y": {
+            "expr": "0"
+          },
+          "size": [
+            {
+              "signal": "width"
+            },
+            {
+              "signal": "height"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "brush_brush",
+      "type": "rect",
+      "clip": true,
+      "encode": {
+        "enter": {
+          "cursor": {
+            "value": "move"
+          },
+          "fill": {
+            "value": "transparent"
+          }
+        },
+        "update": {
+          "x": [
+            {
+              "test": "data(\"brush_store\").length && data(\"brush_store\")[0].unit === \"\"",
+              "signal": "brush_x[0]"
+            },
+            {
+              "value": 0
+            }
+          ],
+          "y": [
+            {
+              "test": "data(\"brush_store\").length && data(\"brush_store\")[0].unit === \"\"",
+              "value": 0
+            },
+            {
+              "value": 0
+            }
+          ],
+          "x2": [
+            {
+              "test": "data(\"brush_store\").length && data(\"brush_store\")[0].unit === \"\"",
+              "signal": "brush_x[1]"
+            },
+            {
+              "value": 0
+            }
+          ],
+          "y2": [
+            {
+              "test": "data(\"brush_store\").length && data(\"brush_store\")[0].unit === \"\"",
+              "field": {
+                "group": "height"
+              }
+            },
+            {
+              "value": 0
+            }
+          ],
+          "stroke": [
+            {
+              "test": "brush_x[0] !== brush_x[1]",
+              "value": "white"
+            },
+            {
+              "value": null
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "scales": [
+    {
+      "name": "x",
+      "type": "time",
+      "domain": {
+        "data": "source_0",
+        "field": "date"
+      },
+      "range": [
+        0,
+        {
+          "signal": "width"
+        }
+      ]
+    },
+    {
+      "name": "y",
+      "type": "linear",
+      "domain": {
+        "data": "source_0",
+        "field": "price"
+      },
+      "range": [
+        {
+          "signal": "height"
+        },
+        0
+      ],
+      "nice": true,
+      "zero": true
+    },
+    {
+      "name": "color",
+      "type": "ordinal",
+      "domain": {
+        "data": "source_0",
+        "field": "symbol",
+        "sort": true
+      },
+      "range": "category"
+    }
+  ],
+  "axes": [
+    {
+      "scale": "x",
+      "orient": "bottom",
+      "gridScale": "y",
+      "grid": true,
+      "tickCount": {
+        "signal": "ceil(width/40)"
+      },
+      "domain": false,
+      "labels": false,
+      "aria": false,
+      "maxExtent": 0,
+      "minExtent": 0,
+      "ticks": false,
+      "zindex": 0
+    },
+    {
+      "scale": "y",
+      "orient": "left",
+      "gridScale": "x",
+      "grid": true,
+      "tickCount": {
+        "signal": "ceil(height/40)"
+      },
+      "domain": false,
+      "labels": false,
+      "aria": false,
+      "maxExtent": 0,
+      "minExtent": 0,
+      "ticks": false,
+      "zindex": 0
+    },
+    {
+      "scale": "x",
+      "orient": "bottom",
+      "grid": false,
+      "title": "date",
+      "labelFlush": true,
+      "labelOverlap": true,
+      "tickCount": {
+        "signal": "ceil(width/40)"
+      },
+      "zindex": 0
+    },
+    {
+      "scale": "y",
+      "orient": "left",
+      "grid": false,
+      "title": "price",
+      "labelOverlap": true,
+      "tickCount": {
+        "signal": "ceil(height/40)"
+      },
+      "zindex": 0
+    }
+  ],
+  "legends": [
+    {
+      "stroke": "color",
+      "symbolType": "circle",
+      "title": "symbol",
+      "encode": {
+        "symbols": {
+          "update": {
+            "fill": {
+              "value": "transparent"
+            },
+            "opacity": {
+              "value": 1
+            }
+          }
+        }
+      }
+    }
+  ]
+}

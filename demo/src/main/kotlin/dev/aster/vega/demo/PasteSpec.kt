@@ -5,6 +5,7 @@ import android.content.Context
 import dev.aster.vega.model.DiagnosticSeverity
 import dev.aster.vega.model.VegaDiagnostic
 import dev.aster.vega.runtime.compile.CompiledSpec
+import dev.aster.vegalite.VegaLiteConversion
 
 /** The text on the clipboard, or `null` if there is nothing readable there. */
 public fun clipboardText(context: Context): String? {
@@ -32,14 +33,27 @@ public data class PasteReport(val headline: String, val details: List<String>) {
 
   public companion object {
 
-    public fun of(compiled: CompiledSpec): PasteReport {
-      val errors = compiled.diagnostics.filter { it.severity >= DiagnosticSeverity.ERROR }
-      val warnings = compiled.diagnostics.filter { it.severity < DiagnosticSeverity.ERROR }
+    /**
+     * @param converted what the Vega-Lite step made of the text, when a host ran one. Its
+     *   diagnostics are shown *before* the runtime's, because they are the earlier stage and a
+     *   construct the compiler refused is why the later stage never saw it.
+     */
+    public fun of(
+      compiled: CompiledSpec,
+      converted: VegaLiteConversion? = null,
+    ): PasteReport {
+      val vegaLite = converted?.diagnostics.orEmpty()
+      val all = vegaLite + compiled.diagnostics
+      val errors = all.filter { it.severity >= DiagnosticSeverity.ERROR }
+      val warnings = all.filter { it.severity < DiagnosticSeverity.ERROR }
+      // Which grammar the text was taken for, said plainly. A Vega-Lite specification read as Vega
+      // fails for reasons that read like nonsense, so this is the first thing to rule out.
+      val grammar = if (converted?.wasVegaLite == true) "Compiled as Vega-Lite. " else ""
 
       if (!compiled.isUsable) {
         return PasteReport(
-          headline = "Did not compile — the previous chart is still shown.",
-          details = compiled.diagnostics.map { it.readable() },
+          headline = grammar + "Did not compile — the previous chart is still shown.",
+          details = all.map { it.readable() },
         )
       }
 
@@ -48,19 +62,20 @@ public data class PasteReport(val headline: String, val details: List<String>) {
       // missing from the picture; a warning means a property was ignored and the picture is very
       // nearly right. Rolling them into one number would flatten a distinction a reader needs.
       val headline =
-        when {
-          errors.isNotEmpty() ->
-            "Rendered $marks nodes — but ${count(errors.size, "thing")} could not be drawn, " +
-              "so this is not the chart the specification asked for" +
-              if (warnings.isEmpty()) "."
-              else
-                ", and ${count(warnings.size, "property")} " +
-                  "${if (warnings.size == 1) "was" else "were"} ignored."
-          warnings.isNotEmpty() ->
-            "Rendered $marks nodes. ${count(warnings.size, "property")} " +
-              "${if (warnings.size == 1) "was" else "were"} ignored."
-          else -> "Rendered $marks nodes with nothing unsupported."
-        }
+        grammar +
+          when {
+            errors.isNotEmpty() ->
+              "Rendered $marks nodes — but ${count(errors.size, "thing")} could not be drawn, " +
+                "so this is not the chart the specification asked for" +
+                if (warnings.isEmpty()) "."
+                else
+                  ", and ${count(warnings.size, "property")} " +
+                    "${if (warnings.size == 1) "was" else "were"} ignored."
+            warnings.isNotEmpty() ->
+              "Rendered $marks nodes. ${count(warnings.size, "property")} " +
+                "${if (warnings.size == 1) "was" else "were"} ignored."
+            else -> "Rendered $marks nodes with nothing unsupported."
+          }
       // Errors first: a dropped mark matters more than an ignored corner radius.
       return PasteReport(headline, (errors + warnings).map { it.readable() })
     }

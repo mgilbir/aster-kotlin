@@ -16,6 +16,7 @@ import dev.aster.vega.model.VegaValue
 import dev.aster.vega.model.asNumberOrNull
 import dev.aster.vega.model.asString
 import dev.aster.vega.model.field
+import dev.aster.vega.model.parseFieldPath
 import dev.aster.vega.model.roundHalfUp
 import dev.aster.vega.model.spec.AxisSpec
 import dev.aster.vega.model.spec.FacetSpec
@@ -24,6 +25,7 @@ import dev.aster.vega.model.spec.LegendSpec
 import dev.aster.vega.model.spec.MarkSort
 import dev.aster.vega.model.spec.MarkSpec
 import dev.aster.vega.model.spec.MarkType
+import dev.aster.vega.model.spec.NumberValue
 import dev.aster.vega.model.spec.ScaleType
 import dev.aster.vega.model.spec.TitleSpec
 import dev.aster.vega.runtime.scale.VegaScale
@@ -37,6 +39,8 @@ import dev.aster.vega.scene.TextEngine
 import dev.aster.vega.scene.Transform2D
 import dev.aster.vega.scene.transformedBounds
 import dev.aster.vega.scene.withMetadata
+import kotlin.math.ceil
+import kotlin.math.floor
 
 /**
  * Everything visible from one point in a specification: the top level, or the inside of a group
@@ -181,6 +185,8 @@ internal class ScopeCompiler(
     layout: LayoutSpec?,
     enclosing: CompileScope,
     extent: PlotSize,
+    /** Where this scope's own group sits in its parent, which `{"group": "x"}` reads. */
+    origin: PointD = PointD(0.0, 0.0),
   ): ScopeContent {
     // Grows as named marks are encoded: a mark drawn from another mark's output needs the items the
     // earlier one produced, and specification order is the order they become available in.
@@ -205,6 +211,7 @@ internal class ScopeCompiler(
         expressions,
         textEngine,
         extent,
+        origin,
       )
     val numbers =
       NumberResolver(expressions, scope.signals, diagnostics) { channel ->
@@ -339,7 +346,15 @@ internal class ScopeCompiler(
         // The items a mark's own transforms produced, not the ones its encoding alone would: a
         // label drawn from a force-directed mark reads the position the simulation settled on.
         exposeItems(transformed.items ?: encoder.items(mark, rows))
-        for (node in built[index].orEmpty()) content = content.union(node.transformedBounds)
+        // `boundMark`: a **clipped** mark reaches no further than the group it is drawn in,
+        // whatever
+        // its items do. A detail plot whose domain is driven by a brush has rows on either side of
+        // that domain, and without this they push the surface out to cover rows nobody can see.
+        val window = RectD(0.0, 0.0, extent.width, extent.height)
+        for (node in built[index].orEmpty()) {
+          val reach = node.transformedBounds
+          content = content.union(if (mark.clip) intersectReach(reach, window) else reach)
+        }
       }
     }
     for (index in paintOrder(marks)) built[index]?.let { children += it }
@@ -436,9 +451,13 @@ internal class ScopeCompiler(
   /**
    * The order a mark's items are taken in, as indices into the built list.
    *
-   * Identity when the mark declares no `sort`. A field this cannot read leaves the order alone
-   * rather than inventing one — the properties an item exposes here are its position, and a
-   * specification sorting on anything else is asking for something that is not in the scene.
+   * Identity when the mark declares no `sort`. The fields are **field accessors on the scene
+   * item**, not expressions — Vega hands them to `vega-util`'s `field()`, which reads
+   * `datum["era"]` as the path `datum` → `era` — so `x` and `y` name where the item ended up and
+   * anything under `datum` names a column of the row it was bound to. A trellis whose cells go in
+   * alphabetical order rather than in the order the rows arrived depends entirely on the second:
+   * the group is sorted by its own facet key. A path neither can read leaves the order alone rather
+   * than inventing one.
    */
   /**
    * A legend measures as its own box rather than as the union of what it drew.
@@ -470,6 +489,7 @@ internal class ScopeCompiler(
     datums: List<VegaValue>,
   ): List<Int> {
     if (sort == null || nodes.isEmpty()) return nodes.indices.toList()
+    val items = datums.map { VegaValue.Obj(mapOf("datum" to it)) }
     val comparator =
       Comparator<Int> { a, b ->
         for ((index, field) in sort.fields.withIndex()) {
@@ -492,31 +512,65 @@ internal class ScopeCompiler(
    * The fields are a **path into the scene item**, not a column of the data — which is why
    * `{"field": "y"}` sorts by where the item ended up and `{"field": "datum.year"}` reaches through
    * it to the row that produced it. Upstream has no special case for either: `vega-util`'s `field`
-   * walks the path, and the item happens to carry both its geometry and its datum. A path this
-   * scene graph cannot follow is reported rather than treated as a tie, because a tie leaves the
-   * items in declaration order and looks exactly like a sort that worked.
+   * walks the path, and the item happens to carry both its geometry and its datum. Walking it the
+   * same way is also what accepts `datum["year"]`, which is how Vega-Lite spells the same reach and
+   * is what orders a trellis's cells by their own facet key. A path this scene graph cannot follow
+   * is reported rather than treated as a tie, because a tie leaves the items in declaration order
+   * and looks exactly like a sort that worked.
    */
-  private fun itemValue(node: SceneNode, datum: VegaValue?, field: String): VegaValue? =
-    when {
-      field == "x" -> VegaValue.Num(node.transform.apply(0.0, 0.0).x)
-      field == "y" -> VegaValue.Num(node.transform.apply(0.0, 0.0).y)
-      field == "datum" -> datum ?: VegaValue.Null
-      field.startsWith("datum.") -> (datum ?: VegaValue.Null).field(field.removePrefix("datum."))
+  private fun itemValue(node: SceneNode, datum: VegaValue?, field: String): VegaValue? {
+    val path = parseFieldPath(field)
+    return when {
+      path == listOf("x") -> VegaValue.Num(node.transform.apply(0.0, 0.0).x)
+      path == listOf("y") -> VegaValue.Num(node.transform.apply(0.0, 0.0).y)
+      path.firstOrNull() == "datum" ->
+        path.drop(1).fold(datum ?: VegaValue.Null) { value, segment -> value.field(segment) }
       else -> {
         diagnostics.warn(
           DiagnosticCodes.TRANSFORM_NOT_IMPLEMENTED,
           "Mark sort reads '$field' off each item, which this scene graph does not carry; " +
-            "only 'x', 'y' and a 'datum.' path are available, so the declared order is kept",
+            "only 'x', 'y' and a path under 'datum' are available, so the declared order is kept",
         )
         null
       }
     }
+  }
 
   private fun group(spec: MarkSpec, outer: CompileScope, encoder: MarkEncoder): BuiltGroup {
     val partitions = partition(spec, outer)
     val inner = arrayOfNulls<RectD>(partitions.size)
     val nodes =
-      encoder.encodeGroup(spec, partitions.map { it.datum }) { _, index, extent ->
+      encoder.encodeGroup(spec, partitions.map { it.datum }) { _, index, extent, origin ->
+        // A group that *encodes* its own size redefines `width` and `height` for everything inside
+        // it, not only where its marks are drawn: a gridline in a trellis cell spans the cell, and
+        // a `"width"` range inside one is the cell's width. Vega gives every group scope its own
+        // size signals; this is that, for the case a specification actually writes — a cell sized
+        // `{"signal": "child_width"}`, which no group-level signal declaration would reveal.
+        val nested = nest(spec, partitions[index], outer)
+        val sized =
+          if (encodesSize(spec)) {
+            CompileScope(
+              nested.data,
+              nested.signals,
+              nested.scales,
+              PlotSize(extent.width, extent.height),
+              nested.scaleTypes,
+              // Everything else the nested scope holds, carried over rather than left to default:
+              // a scope rebuilt by naming some of its parts silently drops the rest, and a group
+              // that sizes itself would stop seeing a projection declared outside it.
+              nested.projections,
+            )
+          } else {
+            nested
+          }
+        // An **empty** facet cell draws nothing at all — not even its gridlines. Vega instantiates
+        // a faceted group's subflow only for keys that rows arrived under, so a cell `cross`
+        // invented to keep the grid rectangular is a group with no contents, which is visibly
+        // different from an empty plotting area with axes drawn across it.
+        if (partitions[index].boundName != null && partitions[index].rows?.isEmpty() == true) {
+          inner[index] = RectD.Empty
+          return@encodeGroup emptyList()
+        }
         val scoped =
           compile(
             spec.marks,
@@ -524,8 +578,9 @@ internal class ScopeCompiler(
             spec.legends,
             spec.title,
             spec.layout,
-            nest(spec, partitions[index], outer),
+            sized,
             PlotSize(extent.width, extent.height),
+            origin,
           )
         inner[index] = scoped.bounds
         scoped.nodes
@@ -564,9 +619,15 @@ internal class ScopeCompiler(
   /**
    * Arranges a whole trellis: the cells on a grid, and the row and column labels around it.
    *
-   * A header is placed against the cell it labels on one axis and against the grid's edge on the
-   * other, so the labels track the grid however it wraps. A title is placed halfway along the grid,
-   * just outside whatever its headers reached.
+   * Ported from upstream's `trellisLayout`, and the two rules that read as arbitrary are the ones
+   * that matter. A band of labels sits at a *whole-unit* edge — the margin is the grid's own edge
+   * rounded **outwards**, `floor` on the near side and `ceil` on the far one — so a cell whose
+   * border straddles the half unit (which every Vega-Lite cell's does, being a stroked rectangle)
+   * pushes its row header out to −1 rather than −0.5. And the margin is measured against zero as
+   * well as against the cells, so a band never crosses into the grid.
+   *
+   * A title is then placed halfway along the *cells*, not halfway along everything the headers
+   * reached: a trellis with wide y-axis labels down its left keeps its heading over the plots.
    */
   private fun trellis(
     layout: LayoutSpec,
@@ -580,11 +641,15 @@ internal class ScopeCompiler(
     val gridded = gridTogether(layout, parts, numbers)
     val cells = gridded.filter { it.first == TrellisRole.CELL }.map { it.second }
     val cellNodes = cells.flatMap { it.nodes }
-    val cellBoxes = cells.flatMap { part -> part.nodes.indices.map { part.boxOf(it) } }
+    // Each cell's reach in the enclosing coordinates, which is what every margin is measured from.
+    val cellBoxes =
+      cells
+        .flatMap { part -> part.nodes.indices.map { part.boxOf(it) } }
+        .mapIndexed { index, box -> cellNodes[index].transform.mapBounds(box) }
     val columns =
       numbers.resolveInt(layout.columns, "layout")?.coerceAtLeast(1)
         ?: cellNodes.size.coerceAtLeast(1)
-    val rows = kotlin.math.ceil(cellNodes.size / columns.toDouble()).toInt().coerceAtLeast(1)
+    val rows = if (cellNodes.isEmpty()) 1 else ceil(cellNodes.size / columns.toDouble()).toInt()
 
     var bounds = cells.fold(RectD.Empty) { acc, part -> acc.union(part.bounds) }
     // The **cells'** extent, captured before the headers widen it: a title is centred on the grid
@@ -594,108 +659,113 @@ internal class ScopeCompiler(
     // lays the headers out afterwards, which is the same thing said by construction.
     val gridBounds = bounds
 
-    // Where the grid begins on each axis: what a header hangs off.
-    val left =
-      cellNodes.indices
-        .filter { it % columns == 0 }
-        .minOfOrNull {
-          cellNodes[it].transform.e + cellBoxes[it].left
-        } ?: 0.0
-    val top = cellNodes.indices.minOfOrNull { cellNodes[it].transform.f + cellBoxes[it].top } ?: 0.0
+    fun offsetOf(value: NumberValue?) = numbers.resolve(value, "layout") ?: 0.0
 
-    // Headers first, because a title is placed just outside whatever they reached. The results are
-    // kept per declaration so the scene can be emitted in specification order, which is the order
-    // upstream emits it in.
-    // The far edges, which the footers hang off: the rightmost reach of the last column and the
-    // lowest of the last row.
-    val right =
-      cellNodes.indices
-        .filter { it % columns == columns - 1 || it == cellNodes.lastIndex }
-        .maxOfOrNull { cellNodes[it].transform.e + cellBoxes[it].right } ?: 0.0
-    val bottom =
-      cellNodes.indices
-        .filter { it >= cellNodes.size - columns }
-        .maxOfOrNull { cellNodes[it].transform.f + cellBoxes[it].bottom } ?: 0.0
-
+    // Each band of labels in turn, and the edge it ends up occupying — which is what the title
+    // beyond it hangs off. The results are kept per declaration so the scene is emitted in
+    // specification order, the order upstream emits it in.
     val placed = HashMap<Int, List<SceneNode>>()
-    val edges = HashMap<TrellisRole, RectD>()
-    val headerRoles =
-      setOf(
-        TrellisRole.ROW_HEADER,
-        TrellisRole.COLUMN_HEADER,
-        TrellisRole.ROW_FOOTER,
-        TrellisRole.COLUMN_FOOTER,
-      )
-    gridded.forEachIndexed { index, (role, part) ->
-      if (role !in headerRoles) return@forEachIndexed
-      val alongRows = role == TrellisRole.ROW_HEADER || role == TrellisRole.ROW_FOOTER
-      val footer = role == TrellisRole.ROW_FOOTER || role == TrellisRole.COLUMN_FOOTER
-      // A band places a header **along** the cell it labels rather than at the cell's own origin:
-      // `null`, which is upstream's default, means the origin, and a fraction means that far across
-      // the cell's own extent. The offset pushes it further out, away from the grid, which is why a
-      // header's is negative and a footer's is not.
-      val band = if (footer) layout.footerBand(alongRows) else layout.headerBand(alongRows)
-      val away =
-        layout.offsetFor(
-          when (role) {
-            TrellisRole.ROW_HEADER -> "rowHeader"
-            TrellisRole.COLUMN_HEADER -> "columnHeader"
-            TrellisRole.ROW_FOOTER -> "rowFooter"
-            else -> "columnFooter"
-          }
-        )
-      var edge = edges[role] ?: RectD.Empty
-      val moved =
-        part.nodes.mapIndexed { position, node ->
-          // Header j labels the first cell of row j, or the j-th cell of the top row. A footer
-          // labels the same rows and columns from the other side.
-          //
-          // More headers than rows is not an error and not a reason to drop one: upstream warns and
-          // lays out the first `limit` of them, leaving the rest where they were. Dropping them
-          // would change the mark count, which is a bigger difference than a label in the wrong
-          // place.
-          // The limit is the number of rows for a row label and of columns for a column one, and it
-          // is not the number of *cells*: six column headers over a two-by-three grid label three
-          // columns, and the other three are left alone rather than lining up under the second row.
-          val limit = if (alongRows) rows else columns
-          val cellIndex = if (alongRows) position * columns else position
-          val cell = if (position >= limit) null else cellNodes.getOrNull(cellIndex)
-          if (cell == null) {
-            node
+    val edges = HashMap<TrellisRole, Double>()
+    for (band in TRELLIS_BANDS) {
+      // Which cells the margin is taken over, and which cell each label lines up with. A column
+      // footer belongs to the *last* row and a row footer to the last column, so both walk the grid
+      // from a different corner than their header does.
+      val start =
+        when (band.role) {
+          TrellisRole.ROW_HEADER,
+          TrellisRole.COLUMN_HEADER -> 0
+          TrellisRole.ROW_FOOTER -> columns - 1
+          else -> (rows - 1) * columns
+        }
+      val stride = if (band.alongRows) columns else 1
+      val offset =
+        when (band.role) {
+          TrellisRole.ROW_HEADER -> -offsetOf(layout.offset.rowHeader)
+          TrellisRole.COLUMN_HEADER -> -offsetOf(layout.offset.columnHeader)
+          TrellisRole.ROW_FOOTER -> offsetOf(layout.offset.rowFooter)
+          else -> offsetOf(layout.offset.columnFooter)
+        }
+      // The margin: zero, or however far past it the cells on that side of the grid reach, rounded
+      // outwards to a whole unit.
+      var margin = 0.0
+      var index = start
+      while (index in cellBoxes.indices) {
+        val box = cellBoxes[index]
+        margin =
+          if (band.leading) {
+            floor(minOf(margin, if (band.alongRows) box.left else box.top))
           } else {
-            val extent = cellBoxes[cellIndex]
+            ceil(maxOf(margin, if (band.alongRows) box.right else box.bottom))
+          }
+        index += stride
+      }
+      margin += offset
+
+      var edge = 0.0
+      var labels = 0
+      gridded.forEachIndexed { declaration, (role, part) ->
+        if (role != band.role) return@forEachIndexed
+        val moved =
+          part.nodes.mapIndexedNotNull { position, node ->
+            // Header j labels the first cell of row j, or the j-th cell of the top row; a footer
+            // labels the same rows and columns from the other side. More labels than rows is not
+            // an error: upstream lays out the first `limit` of them and leaves the rest where they
+            // were rather than dropping them, a missing mark being a bigger difference than a
+            // misplaced one.
+            val limit = if (band.alongRows) rows else columns
+            // Within the limit, the cell may still be past the end — a **wrapped** facet's last
+            // row is short — so the label lines up with the nearest one behind it.
+            var at = start + position * stride
+            val back = if (band.alongRows) 1 else columns
+            while (at >= cellNodes.size && at >= back) at -= back
+            val cell =
+              if (position >= limit) null
+              else cellNodes.getOrNull(at) ?: return@mapIndexedNotNull null
+            if (cell == null) return@mapIndexedNotNull node
+            // A **band** places the label along the cell it names rather than at the cell's own
+            // origin: absent, which is upstream's default, means the origin, and a fraction means
+            // that far across the cell's own extent.
+            val fraction =
+              if (band.leading) layout.headerBand(band.alongRows)
+              else layout.footerBand(band.alongRows)
+            val extent = cellBoxes.getOrNull(at)
             val across =
-              if (alongRows) {
-                band?.let { roundHalfUp(cell.transform.f + extent.top + it * extent.height) }
-                  ?: cell.transform.f
+              if (fraction == null || extent == null) {
+                if (band.alongRows) cell.transform.f else cell.transform.e
+              } else if (band.alongRows) {
+                // `cellBoxes` are already in the enclosing coordinates, so the cell's own
+                // translation is in them: adding it again put every label a cell further along.
+                roundHalfUp(extent.top + fraction * extent.height)
               } else {
-                band?.let { roundHalfUp(cell.transform.e + extent.left + it * extent.width) }
-                  ?: cell.transform.e
+                roundHalfUp(extent.left + fraction * extent.width)
               }
-            val at =
-              when {
-                alongRows && footer -> PointD(right + away, across)
-                alongRows -> PointD(left - away, across)
-                footer -> PointD(across, bottom + away)
-                else -> PointD(across, top - away)
+            val to = if (band.alongRows) PointD(margin, across) else PointD(across, margin)
+            val node2 = moveTo(node, to)
+            val box = node2.transform.mapBounds(part.boxOf(position))
+            bounds = bounds.union(box)
+            val reached =
+              if (band.alongRows) {
+                if (band.leading) box.left else box.right
+              } else {
+                if (band.leading) box.top else box.bottom
               }
-            val node2 = moveTo(node, at)
-            val drawn = node2.transform.mapBounds(part.boxOf(position))
-            bounds = bounds.union(drawn)
-            edge = edge.union(drawn)
+            edge = if (band.leading) floor(minOf(edge, reached)) else ceil(maxOf(edge, reached))
+            labels++
             node2
           }
-        }
-      edges[role] = edge
-      placed[index] = moved
+        placed[declaration] = moved
+      }
+      // With no labels of this kind, the band is still the margin wide, and that is what a title
+      // beyond it clears.
+      edges[band.role] = if (labels > 0) edge else margin
     }
 
-    gridded.forEachIndexed { index, (role, part) ->
+    gridded.forEachIndexed { declaration, (role, part) ->
       if (role != TrellisRole.ROW_TITLE && role != TrellisRole.COLUMN_TITLE) return@forEachIndexed
       val alongRows = role == TrellisRole.ROW_TITLE
       // A title sits just outside whatever the headers reached — or, under `titleAnchor: "end"`,
-      // just outside the *footers* on the far side. Its own offset then pushes it further out, in
-      // whichever direction that is.
+      // just outside the **footers** on the far side, with its own offset pushing it further out
+      // in whichever direction that is.
       val atEnd = layout.titleAtEnd(alongRows)
       val edgeRole =
         when {
@@ -704,28 +774,25 @@ internal class ScopeCompiler(
           atEnd -> TrellisRole.COLUMN_FOOTER
           else -> TrellisRole.COLUMN_HEADER
         }
-      val guideEdge = edges[edgeRole] ?: RectD.Empty
-      val away = layout.offsetFor(if (alongRows) "rowTitle" else "columnTitle")
-      val band = layout.titleBand(alongRows)
+      val band = edges[edgeRole] ?: 0.0
+      val away = offsetOf(if (alongRows) layout.offset.rowTitle else layout.offset.columnTitle)
+      val gap = if (atEnd) band + away else band - away
+      // `titleBand` runs the title along the grid it names, halfway by default.
+      val fraction = layout.titleBand(alongRows)
       val moved =
         part.nodes.mapIndexed { position, node ->
-          val across =
-            if (alongRows) roundHalfUp(gridBounds.top + band * gridBounds.height)
-            else roundHalfUp(gridBounds.left + band * gridBounds.width)
-          val outward =
+          // A title sits just outside the band of labels it heads, centred on the grid it names.
+          val at =
             if (alongRows) {
-              if (atEnd) (if (guideEdge.isEmpty) right else guideEdge.right) + away
-              else (if (guideEdge.isEmpty) left else guideEdge.left) - away
+              PointD(gap, roundHalfUp(gridBounds.top + fraction * gridBounds.height))
             } else {
-              if (atEnd) (if (guideEdge.isEmpty) bottom else guideEdge.bottom) + away
-              else (if (guideEdge.isEmpty) top else guideEdge.top) - away
+              PointD(roundHalfUp(gridBounds.left + fraction * gridBounds.width), gap)
             }
-          val at = if (alongRows) PointD(outward, across) else PointD(across, outward)
           val node2 = moveTo(node, at)
           bounds = bounds.union(node2.transform.mapBounds(part.boxOf(position)))
           node2
         }
-      placed[index] = moved
+      placed[declaration] = moved
     }
 
     val nodes = gridded.flatMapIndexed { index, (_, part) -> placed[index] ?: part.nodes }
@@ -960,6 +1027,40 @@ internal class ScopeCompiler(
    * count: 2}` for a two-row partition. Group order is first appearance in the source data, not
    * sorted order.
    */
+  /**
+   * The grouping keys, with every *combination* filled in where `aggregate.cross` asks for it.
+   *
+   * A trellis crossed by two fields is a rectangle, and a combination no row carries still has to
+   * take its place in it — or the cells after it slide into the gap and every header beside them
+   * names the wrong one. Upstream crosses only where there is more than one dimension to cross, and
+   * it **adds** the missing cells after the ones the rows made rather than rebuilding the order:
+   * each dimension's values in the order the existing groups first showed them, the last dimension
+   * varying fastest.
+   */
+  private fun crossed(
+    groups: Map<List<VegaValue>, List<VegaValue>>,
+    facet: FacetSpec,
+  ): List<Pair<List<VegaValue>, List<VegaValue>>> {
+    val ordered = groups.entries.map { it.key to it.value }
+    if (!facet.crossed || facet.groupby.size < 2) return ordered
+    fun cellKey(key: List<VegaValue>): String = key.joinToString("|") { it.asString() }
+    val values =
+      facet.groupby.indices.map { dimension ->
+        ordered.map { it.first[dimension] }.distinctBy { value -> value.asString() }
+      }
+    val present = ordered.mapTo(mutableSetOf()) { cellKey(it.first) }
+    val filled = ordered.toMutableList()
+    fun generate(prefix: List<VegaValue>) {
+      if (prefix.size == facet.groupby.size) {
+        if (present.add(cellKey(prefix))) filled += prefix to emptyList()
+        return
+      }
+      for (value in values[prefix.size]) generate(prefix + value)
+    }
+    generate(emptyList())
+    return filled
+  }
+
   private fun facetPartitions(
     spec: MarkSpec,
     facet: FacetSpec,
@@ -988,7 +1089,7 @@ internal class ScopeCompiler(
       }
     }
 
-    return groupTuples(source, facet.groupby).map { (key, rows) ->
+    return crossed(groupTuples(source, facet.groupby), facet).map { (key, rows) ->
       val fields = LinkedHashMap<String, VegaValue>(facet.groupby.size + 1)
       facet.groupby.forEachIndexed { index, field -> fields[field] = key[index] }
       fields["count"] = VegaValue.Num(rows.size.toDouble())
@@ -1084,6 +1185,12 @@ internal class ScopeCompiler(
       outer.projections + ProjectionResolver(numbers, diagnostics).resolve(spec.projections),
     )
   }
+
+  /** Whether a group mark states its own `width` or `height` in any of its encode blocks. */
+  private fun encodesSize(spec: MarkSpec): Boolean =
+    listOf(spec.encode.enter, spec.encode.update).any {
+      it.containsKey("width") || it.containsKey("height")
+    }
 
   private fun numberSignal(signals: SignalScope, name: String): Double? =
     signals[name]?.asNumberOrNull()?.takeIf { !it.isNaN() }
@@ -1226,3 +1333,32 @@ internal class ScopeCompiler(
  */
 internal fun unknownSource(name: String, subject: String = "Mark"): String =
   "$subject refers to '$name', which is neither a dataset nor a mark drawn before it in this scope"
+
+/**
+ * One band of labels around a grid: which role fills it, whether it runs down the rows or across
+ * the columns, and whether it sits before the grid or after it.
+ *
+ * @param alongRows a row header and a row footer run down the side, one label per row, and are
+ *   placed horizontally; a column header and footer run along the top or bottom.
+ * @param leading whether the band precedes the grid, which decides both which edge of the cells it
+ *   is measured against and which way that edge is rounded.
+ */
+internal data class TrellisBand(
+  val role: TrellisRole,
+  val alongRows: Boolean,
+  val leading: Boolean,
+)
+
+/**
+ * The four bands of labels a grid can carry, in the order upstream lays them out.
+ *
+ * Headers before footers, because the margin each takes is measured against the cells and a title
+ * beyond a band is measured against the band.
+ */
+private val TRELLIS_BANDS =
+  listOf(
+    TrellisBand(TrellisRole.ROW_HEADER, alongRows = true, leading = true),
+    TrellisBand(TrellisRole.COLUMN_HEADER, alongRows = false, leading = true),
+    TrellisBand(TrellisRole.ROW_FOOTER, alongRows = true, leading = false),
+    TrellisBand(TrellisRole.COLUMN_FOOTER, alongRows = false, leading = false),
+  )

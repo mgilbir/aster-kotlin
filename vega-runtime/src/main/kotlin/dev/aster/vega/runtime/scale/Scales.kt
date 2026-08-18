@@ -138,10 +138,16 @@ public class LinearScale(
 
   override fun position(value: VegaValue): Double = apply(value.asDouble())
 
-  override fun scale(value: VegaValue): VegaValue {
-    val result = position(value)
-    return if (result.isNaN()) VegaValue.Null else VegaValue.Num(result)
-  }
+  /**
+   * A continuous scale of something that is not a number is **not a number**, not nothing.
+   *
+   * The distinction only shows in arithmetic, and there it is the whole answer: JavaScript reads
+   * `null` as zero and propagates `NaN`, so `abs(scale(x, datum.missing) - scale(x, datum.lo))` is
+   * a real zero on one reading and no answer at all on the other. Vega-Lite writes exactly that
+   * expression to decide whether a bar is too thin to see, and a pre-binned column has no `_end` to
+   * give it — so a bar came out a quarter of a unit narrow and shifted along.
+   */
+  override fun scale(value: VegaValue): VegaValue = VegaValue.Num(position(value))
 
   public fun apply(x: Double): Double = if (round) roundHalfUp(unrounded(x)) else unrounded(x)
 
@@ -318,6 +324,48 @@ public class BandScale(
     return if (result.isNaN()) VegaValue.Null else VegaValue.Num(result)
   }
 
+  /**
+   * Which of the bands a stretch of the range covers — `scaleBand.invertRange`.
+   *
+   * A band scale has no continuous inverse, but it does have an answer: the domain values whose
+   * bands the given pixels fall in. A position in the **gap** between two bands belongs to neither,
+   * which is what the bandwidth check drops, and a stretch outside the range answers with nothing.
+   */
+  public fun invertRange(from: Double, to: Double): List<String>? {
+    if (from.isNaN() || to.isNaN() || domain.isEmpty()) return null
+    val reverse = range.last() < range.first()
+    val starts = domain.map { positions[it] ?: Double.NaN }
+    val values = if (reverse) starts.reversed() else starts
+    var low = minOf(from, to)
+    val high = maxOf(from, to)
+    if (high < values.first() || low > maxOf(range.first(), range.last())) return null
+    val last = values.size - 1
+    var a = maxOf(0, bisectRight(values, low) - 1)
+    var b = if (low == high) a else bisectRight(values, high) - 1
+    // A position in the gap *after* a band belongs to no band at all, so the index moves on.
+    if (low - values[a] > bandwidth + 1e-10) a++
+    if (reverse) {
+      val swap = a
+      a = last - b
+      b = last - swap
+    }
+    if (a > b || a > last || b < 0) return null
+    return domain.subList(maxOf(0, a), minOf(domain.size, b + 1))
+  }
+
+  /** The one band a position falls in, or null where it falls in a gap or outside the range. */
+  public fun invert(position: Double): String? = invertRange(position, position)?.firstOrNull()
+
+  private fun bisectRight(values: List<Double>, at: Double): Int {
+    var low = 0
+    var high = values.size
+    while (low < high) {
+      val middle = (low + high) / 2
+      if (at < values[middle]) high = middle else low = middle + 1
+    }
+    return low
+  }
+
   /** Band centres, the positions axis ticks and labels use. */
   public fun centers(): List<Double> = domain.map {
     (positions[it] ?: Double.NaN) + bandwidth / 2.0
@@ -361,6 +409,9 @@ public class PointScale(
 
   override fun scale(value: VegaValue): VegaValue = band.scale(value)
 
+  /** The one point a position falls nearest, through the band this scale is built on. */
+  public fun invert(position: Double): String? = band.invert(position)
+
   public fun ticks(): List<String> = domain
 }
 
@@ -399,10 +450,16 @@ public abstract class TransformedScale(
 
   override fun position(value: VegaValue): Double = apply(value.asDouble())
 
-  override fun scale(value: VegaValue): VegaValue {
-    val result = position(value)
-    return if (result.isNaN()) VegaValue.Null else VegaValue.Num(result)
-  }
+  /**
+   * A continuous scale of something that is not a number is **not a number**, not nothing.
+   *
+   * The distinction only shows in arithmetic, and there it is the whole answer: JavaScript reads
+   * `null` as zero and propagates `NaN`, so `abs(scale(x, datum.missing) - scale(x, datum.lo))` is
+   * a real zero on one reading and no answer at all on the other. Vega-Lite writes exactly that
+   * expression to decide whether a bar is too thin to see, and a pre-binned column has no `_end` to
+   * give it — so a bar came out a quarter of a unit narrow and shifted along.
+   */
+  override fun scale(value: VegaValue): VegaValue = VegaValue.Num(position(value))
 
   public fun apply(x: Double): Double = if (round) roundHalfUp(unrounded(x)) else unrounded(x)
 

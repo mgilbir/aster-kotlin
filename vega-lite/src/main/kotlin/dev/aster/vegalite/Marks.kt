@@ -1,0 +1,2164 @@
+package dev.aster.vegalite
+
+import dev.aster.vega.model.DiagnosticCollector
+import dev.aster.vega.model.VegaValue
+import dev.aster.vega.model.canonicalNumberString
+
+/**
+ * Turns a view's mark and encoding into a Vega mark, port of the files under `compile/mark`.
+ *
+ * The shape of this is upstream's: a base entry that every mark shares — colour, opacity, the
+ * accessibility description — and then per-mark position rules, because where a mark goes is the
+ * part that differs. A bar spans a band and stacks; a point sits at a midpoint; a tick is a rect
+ * one unit thick across its measure. Getting these wrong produces a chart that is subtly, plausibly
+ * wrong rather than obviously broken, which is why each rule below cites the file it came from.
+ */
+internal object Marks {
+
+  /** The Vega mark type each Vega-Lite mark becomes. */
+  private val VG_MARK =
+    mapOf(
+      "bar" to "rect",
+      "rect" to "rect",
+      "tick" to "rect",
+      "point" to "symbol",
+      "circle" to "symbol",
+      "square" to "symbol",
+      "line" to "line",
+      "area" to "area",
+      "rule" to "rule",
+      "text" to "text",
+      "arc" to "arc",
+      // A trail is Vega's own mark: a line whose thickness follows the data, so its `size` channel
+      // becomes a width along the path rather than an area.
+      "trail" to "trail",
+      // A picture is its own Vega mark, positioned like a rect and painted from a file.
+      "image" to "image",
+      // An outline on the globe is a **shape**: a path the projection draws, not a position.
+      "geoshape" to "shape",
+    )
+
+  /**
+   * The Vega channel a Vega-Lite position channel is written as.
+   *
+   * A polar position has no channel of its own in Vega: an arc is a *rectangle in polar
+   * coordinates*, so its two angles are `startAngle`/`endAngle` and its two radii are
+   * `outerRadius`/`innerRadius`. Keeping the mapping in one place is what lets the same rect
+   * positioning rules serve both coordinate systems, which is how upstream compiles an arc too.
+   */
+  private fun vgPositionChannel(channel: String): String =
+    when (channel) {
+      "theta" -> "startAngle"
+      "theta2" -> "endAngle"
+      "radius" -> "outerRadius"
+      "radius2" -> "innerRadius"
+      else -> channel
+    }
+
+  /**
+   * Marks Vega already names in its own accessibility vocabulary, so no role description is added.
+   */
+  private val VG_MARK_NAMES =
+    setOf(
+      "arc",
+      "area",
+      "image",
+      "group",
+      "line",
+      "path",
+      "rect",
+      "rule",
+      "shape",
+      "symbol",
+      "text",
+      "trail",
+    )
+
+  fun marks(view: UnitView): List<VegaValue> {
+    val mark = markGroup(view)
+    // A path mark split by a category is one line per group, which Vega draws by faceting the data
+    // into a group mark — without it every series would join into a single zigzag.
+    val details = pathGroupingFields(view)
+    if (view.spec.mark in PATH_MARKS && details.isNotEmpty()) {
+      val facetName = "faceted_path_${view.prefixed("main")}"
+      return listOf(
+        obj {
+          put("name", view.prefixed("pathgroup"))
+          put("type", "group")
+          put(
+            "from",
+            obj {
+              put(
+                "facet",
+                obj {
+                  put("name", facetName)
+                  // Inside a facet the series are faceted out of the *cell's* rows, not the whole
+                  // table's: `markData` is the cell's own partition, and reading the table instead
+                  // drew every cell's series in every cell.
+                  put("data", view.markData)
+                  put("groupby", strings(details))
+                },
+              )
+            },
+          )
+          put(
+            "encode",
+            obj {
+              put(
+                "update",
+                obj {
+                  put("width", obj { put("field", obj { put("group", "width") }) })
+                  put("height", obj { put("field", obj { put("group", "height") }) })
+                },
+              )
+            },
+          )
+          put("marks", arr(listOf(withSource(mark, facetName))))
+        }
+      )
+    }
+    // A **stacked bar with rounded corners** is drawn inside a group per stack, because the
+    // rounding belongs to the stack and not to any one segment of it: rounding each segment would
+    // round the joins between them as well.
+    stackedCornerRadiusGroup(view, mark)?.let {
+      return listOf(it)
+    }
+    return listOf(mark)
+  }
+
+  /** The four corner radii Vega knows, which is what a rounded stack has to move onto its group. */
+  private val VG_CORNER_RADIUS =
+    listOf(
+      "cornerRadius",
+      "cornerRadiusTopLeft",
+      "cornerRadiusTopRight",
+      "cornerRadiusBottomLeft",
+      "cornerRadiusBottomRight",
+    )
+
+  private val STROKE_PROPERTIES =
+    listOf(
+      "stroke",
+      "strokeWidth",
+      "strokeJoin",
+      "strokeCap",
+      "strokeDash",
+      "strokeDashOffset",
+      "strokeMiterLimit",
+      "strokeOpacity",
+    )
+
+  /**
+   * `getGroupsForStackedBarWithCornerRadius`: a stack of bars drawn inside a group of its own.
+   *
+   * A corner radius on a stacked bar is a property of the *stack*, not of the segment that happens
+   * to be at its end — so the whole stack is faceted into a group, the group is given the radius
+   * and clipped, and the segments are drawn inside it with none. The group's own extent is the min
+   * and max of every segment's two ends, in **pixels**: the accumulation is in data space and the
+   * rounding is not, so the scale is applied inside the expression rather than after it.
+   *
+   * The inner group exists only to undo the outer one's translation, the marks inside a group being
+   * positioned relative to it while their scaled positions are absolute.
+   *
+   * Not for a bar with a `size` encoding: the segments would no longer fill the group's thickness,
+   * and upstream leaves that case alone rather than guessing.
+   */
+  private fun stackedCornerRadiusGroup(view: UnitView, mark: VegaValue.Obj): VegaValue? {
+    if (view.spec.mark != "bar") return null
+    val stack = view.stack ?: return null
+    if (view.spec.fieldDef("size") != null) return null
+    // `some(prop => getMarkPropOrConfig(prop, ...))` — a **truthy** test, so a bar that states a
+    // radius of zero is a plain bar and stays one rect.
+    fun rounded(value: VegaValue?): Boolean =
+      value != null &&
+        value != VegaValue.Null &&
+        value != VegaValue.Bool(false) &&
+        (value as? VegaValue.Num)?.value != 0.0
+    val hasRadius =
+      VG_CORNER_RADIUS.any { rounded(styled(view, it)) } ||
+        rounded(view.markDef.raw.fields["cornerRadiusEnd"])
+    if (!hasRadius) return null
+
+    val channel = stack.fieldChannel
+    if (channel != "x" && channel != "y") return null
+    val other = if (channel == "x") "y" else "x"
+    val thickness = if (channel == "x") "height" else "width"
+    val def = view.spec.encoding[channel] ?: return null
+    val scale = view.scale(channel)
+    val stem = Fields.vgField(def, forAs = true)
+
+    fun extent(op: String): String {
+      val fields =
+        listOf("min_${stem}_start", "max_${stem}_start", "min_${stem}_end", "max_${stem}_end")
+      return "$op(${fields.joinToString(",") { "scale('$scale',datum[${quoted(it)}])" }})"
+    }
+
+    val update = (mark.obj("encode")?.obj("update"))?.fields.orEmpty()
+    val groupUpdate = LinkedHashMap<String, VegaValue>()
+    // Everything that places the stack *across* its own direction belongs to the group; everything
+    // along it is the group's own measured extent.
+    for (key in listOf(other, "${other}c", "${other}2", thickness)) {
+      update[key]?.let { groupUpdate[key] = it }
+    }
+    groupUpdate[channel] = signalRef(extent("min"))
+    groupUpdate["${channel}2"] = signalRef(extent("max"))
+    groupUpdate["clip"] = obj { put("value", true) }
+
+    val innerUpdate = obj {
+      put(
+        channel,
+        obj {
+          put("field", obj { put("group", channel) })
+          put("mult", -1)
+        },
+      )
+      put(thickness, obj { put("field", obj { put("group", thickness) }) })
+    }
+
+    // The segments keep their own place *along* the stack and lose the one across it, the group
+    // having taken that: they are drawn at the group's full thickness, which is why a `size`
+    // encoding cannot come this way.
+    val markUpdate = LinkedHashMap<String, VegaValue>()
+    for ((key, value) in update) {
+      if (key == other || key == "${other}c" || key == "${other}2") continue
+      markUpdate[key] = value
+    }
+    markUpdate[thickness] = obj { put("field", obj { put("group", thickness) }) }
+
+    for (key in VG_CORNER_RADIUS) {
+      val configured = view.config.markConfig("bar").fields[key]
+      val own = markUpdate.remove(key)
+      if (own != null) groupUpdate[key] = own
+      else if (configured != null) groupUpdate[key] = obj { put("value", configured) }
+      // A radius the *configuration* put on every bar has already been moved up, so the segments
+      // have to say they have none — Vega would otherwise apply the style block underneath.
+      if (configured != null) markUpdate[key] = obj { put("value", 0) }
+    }
+    for (key in STROKE_PROPERTIES) {
+      val own = markUpdate[key]
+      if (own != null) groupUpdate[key] = own
+      else
+        view.config.markConfig("bar").fields[key]?.let {
+          groupUpdate[key] = obj { put("value", it) }
+        }
+    }
+    if (groupUpdate.containsKey("stroke")) {
+      groupUpdate["strokeForeground"] = obj { put("value", true) }
+      groupUpdate["strokeOffset"] = obj { put("value", 0) }
+    }
+
+    val groupby =
+      stack.groupbyChannels.flatMap { name ->
+        val dimension = view.spec.fieldDef(name) ?: return@flatMap emptyList()
+        listOfNotNull(
+          Fields.vgField(dimension),
+          if (dimension.bin != null || dimension.timeUnit != null)
+            Fields.vgField(dimension, suffix = "end")
+          else null,
+        )
+      }
+
+    // The facet is named after the *output node* rather than the dataset it resolved to — the
+    // name is not a data reference, so the pass that rewrites those leaves it as it was written.
+    val facetName = "stack_group_${view.prefixed("main")}"
+    val inner = obj {
+      mark.fields.forEach { (key, value) ->
+        when (key) {
+          "from" -> put("from", obj { put("data", facetName) })
+          "encode" ->
+            put(
+              "encode",
+              obj {
+                (value as? VegaValue.Obj)?.fields?.forEach { (part, block) ->
+                  if (part == "update") put("update", VegaValue.Obj(markUpdate))
+                  else put(part, block)
+                }
+              },
+            )
+          else -> put(key, value)
+        }
+      }
+    }
+    return obj {
+      put("type", "group")
+      put(
+        "from",
+        obj {
+          put(
+            "facet",
+            obj {
+              put("data", view.markData)
+              put("name", facetName)
+              put("groupby", strings(groupby))
+              put(
+                "aggregate",
+                obj {
+                  put(
+                    "fields",
+                    strings(listOf("${stem}_start", "${stem}_start", "${stem}_end", "${stem}_end")),
+                  )
+                  put("ops", strings(listOf("min", "max", "min", "max")))
+                },
+              )
+            },
+          )
+        },
+      )
+      put("encode", obj { put("update", VegaValue.Obj(groupUpdate)) })
+      put(
+        "marks",
+        arr(
+          listOf(
+            obj {
+              put("type", "group")
+              put("encode", obj { put("update", innerUpdate) })
+              put("marks", arr(listOf(inner)))
+            }
+          )
+        ),
+      )
+    }
+  }
+
+  private fun withSource(mark: VegaValue.Obj, dataName: String): VegaValue.Obj = obj {
+    mark.fields.forEach { (key, value) ->
+      if (key == "from") put("from", obj { put("data", dataName) }) else put(key, value)
+    }
+  }
+
+  /**
+   * The fields a path mark is grouped by: every non-position field that is not aggregated.
+   *
+   * `pathGroupingFields` in `encoding.ts` reads channel by channel, and two of them are not the
+   * rule they look like. **`size`** groups a line, because a line has one width and a change of
+   * width means a new line; it does not group a *trail*, whose whole point is a width that varies
+   * along one path. **`order`** groups an area, because a stacked area needs its slices in a stated
+   * order, but not a line or a trail, where it only says which way to walk.
+   *
+   * A field named twice is listed twice: one column driving both the colour and the dash pattern
+   * appears in the grouping once per channel, because upstream pushes without looking.
+   */
+  fun pathGroupingFields(view: UnitView): List<String> {
+    val mark = view.spec.mark
+    val grouping =
+      setOf(
+        "color",
+        "fill",
+        "stroke",
+        "opacity",
+        "fillOpacity",
+        "strokeOpacity",
+        "strokeDash",
+        "strokeWidth",
+        "size",
+        "detail",
+        "key",
+        "order",
+      )
+    // The paint channels read a **condition** where the channel has no field of its own —
+    // `getFieldDef(encoding[channel])` — and `detail`, `key` and `order` do not. A line coloured by
+    // its series only where the reader is hovering over it is still one line per series: without
+    // this the whole chart joined into a single zigzag as soon as the colour was written as a test.
+    val conditional =
+      setOf(
+        "color",
+        "fill",
+        "stroke",
+        "opacity",
+        "fillOpacity",
+        "strokeOpacity",
+        "strokeDash",
+        "strokeWidth",
+        "size",
+      )
+    return view.spec.encoding.entries
+      .filter { (channel, _) -> channel in grouping }
+      .filterNot { (channel, _) ->
+        (channel == "size" && mark == "trail") ||
+          (channel == "order" && (mark == "line" || mark == "trail"))
+      }
+      .mapNotNull { (channel, own) ->
+        val def =
+          if (channel in conditional) view.spec.fieldDef(channel) else own.takeIf { it.isFieldDef }
+        def?.takeIf { it.aggregate == null }?.let { Fields.vgField(it) }
+      }
+  }
+
+  private fun markGroup(view: UnitView): VegaValue.Obj {
+    val mark = view.spec.mark
+    return obj {
+      put("name", view.prefixed("marks"))
+      put("type", VG_MARK[mark])
+      // `clip` is a Vega mark property, not a Vega-Lite-only one: it goes straight through, and it
+      // is what keeps a line inside its declared domain instead of running off the plot.
+      val clip = view.markDef.raw.fields["clip"]
+      if (clip != null) put("clip", clip)
+      else if (view.clippedByScale) put("clip", VegaValue.Bool(true))
+      // `projectionClip`: a projection **placed by hand** is not fitted to the plotting area, so
+      // what it draws may run off the edge — a globe at a stated scale is wider than the chart.
+      else if (view.hasProjection && !view.projectionFits) put("clip", VegaValue.Bool(true))
+      put("style", strings(styles(view)))
+      // `interactiveFlag`: a chart with a selection in it has to let the pointer reach its marks.
+      // Without a selection anywhere, the property is left off entirely rather than written false.
+      // Which marks are reachable is the view's own business, not the chart's: a plot that declares
+      // no selection is written **false**, so a click there falls through to the plot that does.
+      if (view.selections.isNotEmpty()) {
+        val own =
+          view.selections.any { it.owner == null || it.owner === view } ||
+            // A **geoshape** is always reachable: what it draws is a place, and a click on a map is
+            // a click on a country whether or not that layer declared the selection.
+            view.spec.mark == "geoshape" ||
+            view.spec.encoding.containsKey("tooltip") ||
+            view.markDef.raw.fields.containsKey("tooltip")
+        put("interactive", VegaValue.Bool(own))
+      }
+      if (view.markDef.raw.fields["aria"] == VegaValue.Bool(false)) {
+        put("aria", VegaValue.Bool(false))
+      }
+      // A line or an area is drawn in the order its points arrive, so the dimension has to be
+      // sorted or the path doubles back on itself.
+      sortOrder(view)?.let { put("sort", it) }
+      put("from", obj { put("data", view.markData) })
+      put("encode", obj { put("update", encodeEntry(view)) })
+      // `postEncodingTransform`: the **projection draws** a geographic shape, after the encoding
+      // has said what colour it is. A `shape` field names the outline where the rows carry one; a
+      // sphere or a graticule is the row itself and names nothing.
+      if (mark == "geoshape") {
+        put(
+          "transform",
+          arr(
+            listOf(
+              obj {
+                put("type", "geoshape")
+                put("projection", view.projectionName)
+                view.spec.encoding["shape"]
+                  ?.takeIf { it.isFieldDef && it.type == MeasureType.GEOJSON }
+                  ?.let { put("field", "datum[${quoted(Fields.vgField(it))}]") }
+              }
+            )
+          ),
+        )
+      }
+    }
+  }
+
+  /**
+   * The `style` list a mark carries, which is its **type first** and then whatever it named.
+   *
+   * `getStyles` upstream is `[].concat(mark.type, mark.style ?? [])`, and the order is what decides
+   * which block wins: a later style overrides an earlier one, so a mark that names a style is
+   * styled by its own type *and then* by the name — not by the name alone. A composite mark's parts
+   * are the case that shows it, each being `["rule", "errorbar-rule"]`.
+   */
+  private fun styles(view: UnitView): List<String> {
+    val declared = view.markDef.raw.fields["style"]
+    val named =
+      when (declared) {
+        is VegaValue.Str -> listOf(declared.value)
+        is VegaValue.Arr -> declared.values.mapNotNull { (it as? VegaValue.Str)?.value }
+        else -> emptyList()
+      }
+    return listOf(view.spec.mark) + named
+  }
+
+  /**
+   * `getSort`: the order a mark's items are drawn in.
+   *
+   * An **`order` channel** names it outright, and then the sort is by that column rather than by
+   * the position — which is the whole of what makes a *connected* scatter plot connected, its line
+   * running through the years rather than left to right. A stacked mark is the exception: there
+   * `order` says how the segments stack, not how the path runs. Failing both, a path is drawn along
+   * its own dimension, or nothing would keep it from doubling back.
+   */
+  private fun sortOrder(view: UnitView): VegaValue? {
+    val order = view.spec.encoding["order"]
+    if (order != null && order.isValueDef && order.value == VegaValue.Null) return null
+    val ordering = listOfNotNull(order) + order?.siblings.orEmpty()
+    if (ordering.any { it.isFieldDef } && view.stack == null) {
+      return obj {
+        put("field", strings(ordering.map { Fields.datumAccess(it) }))
+        put("order", strings(ordering.map { (it.sort as? VegaValue.Str)?.value ?: "ascending" }))
+      }
+    }
+    if (view.spec.mark !in PATH_MARKS) return null
+    val orient = view.markDef.orient
+    val dimension = if (orient == "horizontal") "y" else "x"
+    // `if (isFieldDef(dimensionChannelDef))`: there is an order to draw the points in only where
+    // the
+    // dimension is a **column**. A line whose dimension channel holds a bare value, or holds
+    // nothing
+    // at all, has nothing to be sorted by — and Vega reads `sort: {field: "y"}` on items with no
+    // `y`
+    // as every item comparing equal, which is a sort that does nothing at some cost.
+    if (view.spec.encoding[dimension]?.isFieldDef != true) return null
+    return obj { put("field", dimension) }
+  }
+
+  private fun encodeEntry(view: UnitView): VegaValue.Obj {
+    val mark = view.spec.mark
+    return obj {
+      putAll(baseEncode(view))
+      when (mark) {
+        // A shape has no position at all: the projection draws it where it belongs, and the
+        // `geoshape` transform below the mark is what does the drawing.
+        "geoshape" -> Unit
+        "bar",
+        // A picture is positioned exactly as a rect is: a stated width and height centre it where
+        // a point would have been, and a channel pair spans it between two positions instead.
+        "image",
+        "rect" -> {
+          putAll(rectPosition(view, "x"))
+          putAll(rectPosition(view, "y"))
+        }
+        "point",
+        "circle",
+        "square" -> {
+          putAll(pointPosition(view, "x", "mid", null))
+          putAll(pointPosition(view, "y", "mid", null))
+          putAll(nonPosition(view, "size", "size"))
+          putAll(nonPosition(view, "angle", "angle"))
+          when (mark) {
+            "circle" -> put("shape", obj { put("value", "circle") })
+            "square" -> put("shape", obj { put("value", "square") })
+            else -> putAll(nonPosition(view, "shape", "shape"))
+          }
+        }
+        "line" -> {
+          putAll(pointPosition(view, "x", "mid", null))
+          putAll(pointPosition(view, "y", "mid", null))
+          putAll(nonPosition(view, "size", "strokeWidth"))
+          defined(view)?.let { put("defined", it) }
+        }
+        // A trail differs from a line in one property: its `size` is Vega's own `size`, a width
+        // that varies point by point, rather than one stroke width for the whole path.
+        "trail" -> {
+          putAll(pointPosition(view, "x", "mid", null))
+          putAll(pointPosition(view, "y", "mid", null))
+          putAll(nonPosition(view, "size", "size"))
+          defined(view)?.let { put("defined", it) }
+        }
+        "area" -> {
+          putAll(pointOrRangePosition(view, "x", "zeroOrMin", view.markDef.orient == "horizontal"))
+          putAll(pointOrRangePosition(view, "y", "zeroOrMin", view.markDef.orient == "vertical"))
+          defined(view)?.let { put("defined", it) }
+        }
+        "rule" -> {
+          val orient = view.markDef.orient
+          // A rule between two **places** has neither `x` nor `y`: the projection wrote both ends,
+          // and the geographic channels are what say there is a line to draw at all.
+          if (
+            view.spec.encoding.keys.any { it in setOf("x", "y") } ||
+              view.spec.encoding.keys.any { it in Channels.GEO_POSITION_CHANNELS }
+          ) {
+            putAll(
+              pointOrRangePosition(
+                view,
+                "x",
+                if (orient == "horizontal") "zeroOrMax" else "mid",
+                orient != "vertical",
+              )
+            )
+            putAll(
+              pointOrRangePosition(
+                view,
+                "y",
+                if (orient == "vertical") "zeroOrMax" else "mid",
+                orient != "horizontal",
+              )
+            )
+            putAll(nonPosition(view, "size", "strokeWidth"))
+          }
+        }
+        "tick" -> {
+          // A tick is a thin rect: it spans its measure and is one unit thick across it.
+          val horizontal = view.markDef.orient == "horizontal"
+          val sizeAxis = if (horizontal) "x" else "y"
+          val thicknessAxis = if (horizontal) "y" else "x"
+          putAll(rectPosition(view, sizeAxis))
+          putAll(
+            pointPosition(view, thicknessAxis, "mid", if (thicknessAxis == "y") "yc" else "xc")
+          )
+          val thickness =
+            view.markDef.number("thickness") ?: view.config.markConfig("tick").number("thickness")
+          put(if (horizontal) "height" else "width", obj { put("value", thickness) })
+        }
+        "arc" -> {
+          // An arc is a rect in polar coordinates: its centre comes from the plotting area and its
+          // extent from the two polar channel pairs — unless the mark states a radius outright,
+          // where a donut names its own hole and its own reach and neither is derived.
+          putAll(pointPosition(view, "x", "mid", null))
+          putAll(pointPosition(view, "y", "mid", null))
+          // A polar bound the **mark definition** states, under Vega's own name for it:
+          // `getVgPositionChannel` reads `theta` as a start angle and `radius` as an outer one, so
+          // an arc whose reach and sweep are bound to four range sliders says so in those terms.
+          // Only where the *encoding* names no such channel: a definition and an encoding both
+          // speaking about the sweep is the encoding's to settle, `positionRef` reading the channel
+          // definition first and the mark's own value only as a fallback.
+          val stated =
+            POLAR_MARK_PROPERTIES.mapNotNull { (key, vega) ->
+                if (view.spec.encoding[key] != null) null
+                else view.markDef.raw.fields[key]?.let { vega to markProperty(it) }
+              }
+              .toMap()
+          stated.forEach { (vega, value) -> put(vega, value) }
+          val statedRadius =
+            view.markDef.raw.fields["outerRadius"] != null ||
+              view.markDef.raw.fields["radius"] != null
+          if (statedRadius) {
+            // A stated outer radius still needs an inner one: an arc with no hole is a wedge, and
+            // Vega draws nothing at all where neither radius is given.
+            if (view.markDef.raw.fields["innerRadius"] == null && "innerRadius" !in stated) {
+              put("innerRadius", obj { put("value", 0) })
+            }
+          } else {
+            putAll(rectPosition(view, "radius"))
+          }
+          if ("startAngle" !in stated) putAll(rectPosition(view, "theta"))
+        }
+        "text" -> {
+          putAll(pointPosition(view, "x", "mid", null))
+          putAll(pointPosition(view, "y", "mid", null))
+          textChannel(view)?.let { put("text", it) }
+          putAll(nonPosition(view, "size", "fontSize"))
+          putAll(nonPosition(view, "angle", "angle"))
+          // `getMarkPropOrConfig` reads the mark's **styles** as well as the mark: a text mark
+          // that names a style whose block sets `align` has already been aligned, and writing the
+          // default beside it overrides the very thing the style was for.
+          if (styled(view, "align") == null) put("align", obj { put("value", "center") })
+          if (styled(view, "baseline") == null) put("baseline", obj { put("value", "middle") })
+          // A text mark placed in **polar** coordinates, which is how a pie chart's slices get
+          // their labels: the two channels are read only where the encoding names them, since a
+          // text mark has no default angle or reach the way an arc does — and they keep their own
+          // names, an arc's `outerRadius` and `startAngle` being bounds rather than a placement.
+          putAll(pointPosition(view, "radius", null, "radius"))
+          putAll(pointPosition(view, "theta", null, "theta"))
+        }
+      }
+    }
+  }
+
+  /**
+   * A mark property as the mark, its style blocks and the configuration between them settle it.
+   *
+   * The mark's own wins; failing that, the *last* style block that names it, styles being applied
+   * in order; failing that, the mark type's own configuration.
+   */
+  private fun styled(view: UnitView, property: String): VegaValue? {
+    view.markDef.raw.fields[property]?.let {
+      return it
+    }
+    for (name in styles(view).reversed()) {
+      view.config.style(name)?.fields?.get(property)?.let {
+        return it
+      }
+    }
+    return view.config.markConfig(view.spec.mark).fields[property]
+  }
+
+  /** `baseEncodeEntry`: the properties every mark shares, in upstream's order. */
+  private fun baseEncode(view: UnitView): VegaValue.Obj = obj {
+    // A mark a reader can *click* says so with the pointer: upstream sets the cursor for any point
+    // selection that is not bound to an input, a bound one being driven from the widget instead.
+    if (view.selections.any { it.showsPointer && (it.owner == null || it.owner === view) }) {
+      put("cursor", obj { put("value", "pointer") })
+    }
+    putAll(markDefProperties(view))
+    // `color: 'ignore'` for an **image**: a picture is not painted, it is fetched. A fill written
+    // on one is a colour nothing shows.
+    if (view.spec.mark != "image") putAll(colorEncode(view))
+    putAll(nonPosition(view, "opacity", "opacity"))
+    putAll(nonPosition(view, "fillOpacity", "fillOpacity"))
+    putAll(nonPosition(view, "strokeOpacity", "strokeOpacity"))
+    putAll(nonPosition(view, "strokeWidth", "strokeWidth"))
+    putAll(nonPosition(view, "strokeDash", "strokeDash"))
+    tooltipChannel(view)?.let { put("tooltip", it) }
+    // `href` is a link the mark carries, written the way a text channel is — and a mark that links
+    // somewhere says so with the pointer, since nothing else about it looks clickable.
+    hrefChannel(view)?.let { put("href", it) }
+    // `url` is where an **image** mark fetches its picture from, read as text exactly as `href` is:
+    // a column of file names becomes a column of pictures.
+    urlChannel(view)?.let { put("url", it) }
+    putAll(aria(view))
+    // `zindex.ts`: an `order` written as a **value** raises the mark rather than sorting it. Only
+    // off a path, where `order` is what the points are threaded in, and only as a value: a field
+    // there is a sort key, and a number that came from a scale is not a stacking order. It is what
+    // draws the picked points on top of the rest, since a selection's condition is a value.
+    if (
+      view.spec.mark !in PATH_MARKS && view.spec.encoding["order"]?.let { it.value != null } == true
+    ) {
+      putAll(nonPosition(view, "order", "zindex"))
+    }
+  }
+
+  /**
+   * Mark properties written straight through to the Vega encoding.
+   *
+   * `orient` is passed on only by an area, which uses it to decide which way it is filled;
+   * everywhere else it has already done its work in choosing the position rules.
+   */
+  /**
+   * `cornerRadiusEnd`: round the two corners at the *far* end of a bar and leave the near two.
+   *
+   * Vega has four corner properties and no notion of which end a bar grows from, so this is a
+   * Vega-Lite word that has to be resolved into two of them — and which two depends on the
+   * orientation, a vertical bar ending at the top and a horizontal one at the right.
+   */
+  private val CORNER_RADIUS_END =
+    mapOf(
+      "vertical" to listOf("cornerRadiusTopLeft", "cornerRadiusTopRight"),
+      "horizontal" to listOf("cornerRadiusTopRight", "cornerRadiusBottomRight"),
+    )
+
+  private fun markDefProperties(view: UnitView): VegaValue.Obj = obj {
+    view.markDef.raw.fields["cornerRadiusEnd"]?.let { radius ->
+      val orient = view.markDef.orient ?: "vertical"
+      CORNER_RADIUS_END.getValue(orient).forEach { corner ->
+        put(corner, obj { put("value", radius) })
+      }
+    }
+    // A mark that links somewhere shows the pointer, there being nothing else about it that looks
+    // clickable — `baseEncodeEntry`'s `cursor` rule, which is about the *encoding* and not a style.
+    if (view.spec.encoding["href"] != null && view.markDef.raw.fields["cursor"] == null) {
+      put("cursor", obj { put("value", "pointer") })
+    }
+    if (view.spec.mark == "area" && view.markDef.orient != null) {
+      put("orient", obj { put("value", view.markDef.orient) })
+    }
+    // The reduced opacity a scatter of unaggregated points is drawn with, so overlaps read.
+    if (
+      view.spec.mark in setOf("point", "tick", "circle", "square") &&
+        !Stack.isAggregate(view.spec) &&
+        view.markDef.raw.fields["opacity"] == null &&
+        view.spec.encoding["opacity"] == null
+    ) {
+      put("opacity", obj { put("value", 0.7) })
+    }
+    for ((key, value) in view.markDef.raw.fields) {
+      if (key in VL_ONLY_MARK_PROPERTIES) continue
+      // An **arc** ignores `theta` — `baseEncodeEntry(model, {theta: 'ignore'})` — and Vega has no
+      // `theta2` or `radius2` on any mark, so those three are written above under Vega's own names
+      // instead. `radius` is a Vega property and goes out under its own name as well.
+      if (view.spec.mark == "arc" && key in setOf("theta", "theta2", "radius2")) continue
+      // `{"expr": …}` is Vega-Lite's way of writing a signal, and Vega's is `{"signal": …}` — and
+      // a signal is a *reference*, not a value, so it replaces the whole entry rather than sitting
+      // inside one.
+      val expression = (value as? VegaValue.Obj)?.takeIf { it.fields.keys == setOf("expr") }
+      if (expression != null) put(key, signalRef(expression.string("expr").orEmpty()))
+      else put(key, obj { put("value", value) })
+    }
+  }
+
+  /** What an arc's own polar bounds are called once they reach Vega. */
+  private val POLAR_MARK_PROPERTIES =
+    mapOf(
+      "theta" to "startAngle",
+      "theta2" to "endAngle",
+      "radius" to "outerRadius",
+      "radius2" to "innerRadius",
+    )
+
+  /** A mark-definition value as an encode entry: a signal where it is an `expr`, a value else. */
+  private fun markProperty(value: VegaValue): VegaValue {
+    val expression = (value as? VegaValue.Obj)?.takeIf { it.fields.keys == setOf("expr") }
+    return if (expression != null) signalRef(expression.string("expr").orEmpty())
+    else obj { put("value", value) }
+  }
+
+  /** `isRectBasedMark`: the marks whose size along a channel is a *band* rather than a symbol. */
+  private val RECT_BASED_MARKS = setOf("rect", "bar", "image", "arc", "tick")
+
+  private val VL_ONLY_MARK_PROPERTIES =
+    setOf(
+      "type",
+      "style",
+      "clip",
+      "filled",
+      "orient",
+      "color",
+      "fill",
+      "stroke",
+      "size",
+      "thickness",
+      "binSpacing",
+      "continuousBandSize",
+      "discreteBandSize",
+      "minBandSize",
+      "timeUnitBandSize",
+      "timeUnitBandPosition",
+      "invalid",
+      "tooltip",
+      // Resolved into two of Vega's four corner properties, which end depending on the
+      // orientation; and into an `offset` on the position, Vega having no `xOffset` on a mark.
+      "cornerRadiusEnd",
+      "xOffset",
+      "yOffset",
+      "x2Offset",
+      "y2Offset",
+      "thetaOffset",
+      "theta2Offset",
+      "radiusOffset",
+      "radius2Offset",
+      // Consumed by the overlay normalizer before a mark is built. A `point: false` that reached
+      // here would be emitted as an encode channel Vega has never heard of.
+      "point",
+      "line",
+      "x",
+      "y",
+      "x2",
+      "y2",
+      "width",
+      "height",
+      "aria",
+      "description",
+    )
+
+  /**
+   * `colorEncode()`: which of `fill` and `stroke` carries the colour.
+   *
+   * A legend's swatch starts from this too, so it is shared rather than approximated — the swatch
+   * has to know whether the mark's colour is a constant or a scaled field, and only this knows.
+   *
+   * A filled mark takes its colour in the fill and a hollow one in the stroke, and the *other*
+   * channel is set to transparent on a bar or a point so that a hollow point still has a hit area.
+   */
+  fun colorEncode(view: UnitView, filledOverride: Boolean? = null): VegaValue.Obj {
+    val filled = filledOverride ?: view.markDef.filled
+    val markConfig = view.config.markConfig(view.spec.mark)
+    val declaredColor =
+      view.markDef.raw.fields["color"] ?: view.markDef.raw.fields[if (filled) "fill" else "stroke"]
+    val defaultColor = declaredColor ?: markConfig.fields["color"]
+
+    val transparentIfNeeded =
+      // A **geoshape** is on the list too: an outline drawn but not filled still wants a hit area,
+      // and a transparent fill is what gives one — the same reason a hollow point has one.
+      if (view.spec.mark in setOf("bar", "point", "circle", "square", "geoshape"))
+        VegaValue.Str("transparent")
+      else null
+
+    val defaultFill = if (filled) defaultColor else transparentIfNeeded
+    val defaultStroke = if (!filled) defaultColor else null
+
+    return obj {
+      if (defaultFill != null) put("fill", obj { put("value", defaultFill) })
+      if (defaultStroke != null) put("stroke", obj { put("value", defaultStroke) })
+      val colorChannel = if (filled) "fill" else "stroke"
+      // The mark's own colour is what a *conditional* colour falls through to — upstream passes it
+      // as `defaultValue` into `nonPosition`, so the production rule ends in it. Setting it above
+      // and then overwriting the whole property left a rule with no unconditional arm, and every
+      // mark the condition did not catch was drawn in Vega's own default rather than the chart's.
+      val fallback = if (filled) defaultFill else defaultStroke
+      putAll(
+        nonPosition(
+          view,
+          "color",
+          colorChannel,
+          fallback?.let { obj { put("value", it) } },
+        )
+      )
+      putAll(nonPosition(view, "fill", "fill"))
+      putAll(nonPosition(view, "stroke", "stroke"))
+    }
+  }
+
+  /**
+   * A non-position channel: scaled when it has a field, a literal when it has a value.
+   *
+   * A channel with `condition`s becomes a Vega **production rule** — an array whose entries are
+   * tried in order and whose last has no test. Each condition is built by the same reference
+   * builder as the unconditional part, because a condition may name a field, a datum or a value
+   * just as freely (`wrapCondition`, `compile/mark/encode/conditional.ts`).
+   *
+   * With no encoding at all the *mark definition* still speaks: `{"type": "rule", "size": 2}` is
+   * how a rule is thickened, and `size` is the Vega-Lite name for what Vega calls `strokeWidth`.
+   * That renaming is the reason it cannot simply pass through with the mark's other properties —
+   * and being Vega-Lite-only, it was dropped on the floor instead.
+   */
+  private fun nonPosition(
+    view: UnitView,
+    channel: String,
+    vgChannel: String,
+    defaultRef: VegaValue? = null,
+  ): VegaValue.Obj {
+    val def = view.spec.encoding[channel] ?: return markDefault(view, channel, vgChannel)
+    val rules =
+      def.conditions.mapNotNull { condition ->
+        valueRef(view, channel, condition)?.let { ref ->
+          obj {
+            put("test", condition.test)
+            putAll(ref)
+          }
+        }
+      }
+    // With conditions but no unconditional part, the *mark* supplies the fallback — a median tick
+    // that is white unless its box has no height says only when it is not white, and the white has
+    // to come from somewhere for the rule to have anything to fall through to.
+    val main =
+      valueRef(view, channel, def)
+        ?: markDefault(view, channel, vgChannel, ignoreVgConfig = def.conditions.isEmpty())[
+          vgChannel]
+        ?: defaultRef
+    // A non-position channel gets the same invalid arm a position does under the `show` mode —
+    // `nonposition.ts` asks for one too. A size scaled from a column with nulls in it draws those
+    // rows at the scale's own output for an invalid value rather than leaving them unsized.
+    val invalid = invalidPositionRef(view, channel)
+    if (rules.isEmpty() && invalid == null)
+      return if (main == null) VegaValue.EmptyObject else obj { put(vgChannel, main) }
+    if (invalid != null) return obj { put(vgChannel, arr(rules + invalid + listOfNotNull(main))) }
+    // The array form is used even for a single entry with a test, or Vega has no rule to fall back
+    // to when the test fails.
+    return obj { put(vgChannel, arr(rules + listOfNotNull(main))) }
+  }
+
+  /**
+   * What a channel is worth when nothing encodes it — `getMarkPropOrConfig`.
+   *
+   * The mark's own property wins, under the *Vega* name if it uses one, and the configuration is
+   * consulted only where the two names differ. That last condition is upstream's `ignoreVgConfig`
+   * and it is what keeps the output concise: `config.point.size` is already the `point` style block
+   * Vega applies itself, so restating it here would be the same number written twice.
+   *
+   * It is waived for a channel written **conditionally**. A test with nothing to fall through to
+   * leaves the mark unpainted when the test fails, so the configured value has to be written out as
+   * the rule's last arm even though the style block already says it — the style block is what Vega
+   * applies when the property is absent, and a production rule that reaches its end is not absent.
+   */
+  private fun markDefault(
+    view: UnitView,
+    channel: String,
+    vgChannel: String,
+    ignoreVgConfig: Boolean = true,
+  ): VegaValue.Obj {
+    val own = view.markDef.raw.fields[vgChannel] ?: view.markDef.raw.fields[channel]
+    val value =
+      own
+        ?: if (vgChannel != channel || !ignoreVgConfig) {
+          view.config.markConfig(view.spec.mark).fields[vgChannel]
+        } else {
+          null
+        }
+    if (value == null) return VegaValue.EmptyObject
+    // `signalOrValueRef`: a mark property written as `{"expr": …}` is a **signal**, not a literal —
+    // it is how a chart reads a bound parameter into a graphic property, and written out as a value
+    // it paints the mark with an object.
+    val (key, resolved) = literalRef(value) ?: return VegaValue.EmptyObject
+    return obj { put(vgChannel, obj { put(key, resolved) }) }
+  }
+
+  /**
+   * A literal channel value, or the **signal** an `{"expr": …}` stands for.
+   *
+   * `{"value": {"expr": "tint"}}` is how a chart reads a parameter into a graphic property, and it
+   * is not a literal object: upstream turns the expression into a signal reference in the same
+   * value ref, so a datum written that way still passes through its scale. Writing it out as a
+   * value paints the mark with an object, which the renderer reads as nothing at all.
+   */
+  /**
+   * A mark's own `xOffset`/`yOffset`, as Vega takes it.
+   *
+   * `signalOrValueRef` again: written as `{"expr": …}` it is a **signal**, and a nudge written out
+   * as an object moves the mark nowhere at all.
+   */
+  private fun markOffset(view: UnitView, channel: String): VegaValue? {
+    val stated = view.markDef.raw.fields["${channel}Offset"] ?: return null
+    val (key, value) = literalRef(stated) ?: return null
+    return if (key == "signal") signalRef((value as? VegaValue.Str)?.value.orEmpty()) else value
+  }
+
+  private fun literalRef(value: VegaValue?): Pair<String, VegaValue>? {
+    if (value == null) return null
+    val expr = (value as? VegaValue.Obj)?.takeIf { it.fields.keys == setOf("expr") }?.get("expr")
+    return if (expr != null) "signal" to expr else "value" to value
+  }
+
+  /** One entry of a channel's encoding: a value, a datum through the scale, or a scaled field. */
+  private fun valueRef(view: UnitView, channel: String, def: ChannelDef): VegaValue.Obj? =
+    when {
+      def.isValueDef -> obj { literalRef(def.value)?.let { (key, it) -> put(key, it) } }
+      def.datum != null ->
+        obj {
+          put("scale", scaleName(view, channel))
+          literalRef(def.datum)?.let { (key, it) -> put(key, it) }
+        }
+      // A **bucketed** column read through a non-position scale is read at the bucket's middle,
+      // the same as a position is — `midPoint` in `valueref.ts` takes that branch for every scaled
+      // channel. It matters for the legend as much as for the mark: a size legend's swatches are
+      // drawn from the scale, and a mark placed at a bucket's near edge would be a size the legend
+      // never shows.
+      def.isFieldDef &&
+        def.bin is Binning.Bin &&
+        bandPosition(view, def) != null &&
+        view.scaleType(channel)?.let { !Scales.hasDiscreteDomain(it) } == true ->
+        interpolated(
+          view,
+          channel,
+          Fields.vgField(def),
+          Fields.vgField(def, suffix = "end"),
+          bandPosition(view, def)!!,
+          null,
+        )
+          as VegaValue.Obj
+      def.isFieldDef ->
+        obj {
+          put("scale", scaleName(view, channel))
+          put("field", Fields.vgField(def))
+        }
+      else -> null
+    }
+
+  /**
+   * `getBandPosition`: where in its bucket a value is read, or null where the question is moot.
+   *
+   * A stated position wins. Failing that, a *bucketed* column is read at its middle, and a column
+   * cut to a time unit takes the configured `timeUnitBandPosition` — but only where nothing names
+   * the far end of the interval, since a stated end makes the interval a span rather than a bucket.
+   */
+  private fun bandPosition(view: UnitView, def: ChannelDef, def2: ChannelDef? = null): Double? =
+    def.raw.number("bandPosition")
+      ?: when {
+        !def.isFieldDef -> null
+        def.timeUnit != null && def2 == null ->
+          view.config.markConfig(view.spec.mark).number("timeUnitBandPosition")
+        def.bin is Binning.Bin -> 0.5
+        else -> null
+      }
+
+  private fun scaleName(view: UnitView, channel: String): String? =
+    if (view.hasScale(channel)) view.scale(channel) else null
+
+  /**
+   * `aria()`: the role description and the spoken summary of a mark.
+   *
+   * The summary is assembled from every encoded field, formatted the way that field's own guide
+   * would format it, which is why it is built here rather than left to the renderer.
+   */
+  private fun aria(view: UnitView): VegaValue.Obj = obj {
+    // `aria: false` takes the mark out of the accessibility tree, so there is nothing to say about
+    // it: no role description and no spoken summary. It is a *mark* property rather than an encode
+    // channel, and it is how a composite mark hides its own scaffolding — an error bar's two caps
+    // are read as part of the bar, not as three separate objects.
+    if (view.markDef.raw.fields["aria"] == VegaValue.Bool(false)) return@obj
+    // `config.aria: false` says the same thing about the **whole chart**: there is no accessibility
+    // tree to describe anything to, so neither the role nor the summary is written.
+    if (view.config.raw.fields["aria"] == VegaValue.Bool(false)) return@obj
+    val mark = view.spec.mark
+    // A mark may say what it *is* rather than what it is drawn with: a box plot's box is a rect,
+    // and calling it a rect to a screen reader is naming the tool instead of the thing.
+    val stated = view.markDef.raw.fields["ariaRoleDescription"]
+    if (stated != null) put("ariaRoleDescription", obj { put("value", stated) })
+    else if (mark !in VG_MARK_NAMES) put("ariaRoleDescription", obj { put("value", mark) })
+    val description = descriptionSignal(view)
+    if (description != null) put("description", signalRef(description))
+  }
+
+  /**
+   * `tooltip` — what is shown when the pointer rests on a mark.
+   *
+   * Three forms, and they produce different things. A **list** of fields becomes an object of
+   * title-to-value pairs, which is what a reader sees as a small table. A **single** field becomes
+   * that field's own value, formatted the way its guide would format it — except that a discrete
+   * one joins an array with *line breaks* rather than spaces, this being a tooltip and not a
+   * sentence. And `tooltip: true` on the mark asks for every encoded field, which is the same
+   * object the first form builds by hand.
+   */
+  /**
+   * The tooltip a mark drawn *from another mark's items* carries — `tooltip(model,
+   * {reactiveGeom})`.
+   *
+   * A voronoi cell's datum is the item it covers, so every field is one level deeper: upstream
+   * builds the same expression with `datum.datum` as its accessor, and this is that expression with
+   * the accessor rewritten, which is the same string by construction.
+   */
+  fun reactiveTooltip(view: UnitView): VegaValue? {
+    val tooltip = tooltipChannel(view) as? VegaValue.Obj ?: return null
+    val signal = tooltip.string("signal") ?: return tooltip
+    return signalRef(signal.replace("datum[", "datum.datum["))
+  }
+
+  private fun tooltipChannel(view: UnitView): VegaValue? {
+    val def = view.spec.encoding["tooltip"]
+    if (def != null && view.spec.encoding["tooltip"]?.raw?.fields?.isEmpty() != true) {
+      if (def.isValueDef) return obj { literalRef(def.value)?.let { (key, it) -> put(key, it) } }
+      val defs = listOf(def) + def.siblings
+      // A tooltip **written as a list** is the `{title: expression}` object however many entries
+      // it holds — one field written `[{...}]` is titled, and the same field written bare is not.
+      if (defs.size > 1 || def.isList) return tooltipObject(view, defs)
+      if (def.isFieldDef)
+        return signalRef(fieldExpression(view, def, view.config.forTooltip, separator = "\\n"))
+      return null
+    }
+    // `{"type": "bar", "tooltip": true}` asks for the whole encoding — and so does
+    // `config.mark.tooltip`, which is `getMarkPropOrConfig` rather than a look at the mark alone:
+    // a theme that turns tooltips on turns them on for every mark in the chart.
+    val asked =
+      view.markDef.raw.fields["tooltip"]
+        ?: view.config.markConfig(view.spec.mark).fields["tooltip"]
+        ?: return null
+    if (asked == VegaValue.Bool(true)) return tooltipObject(view, null)
+    if (asked is VegaValue.Obj && asked.string("content") == "encoding") {
+      return tooltipObject(view, null)
+    }
+    if (asked is VegaValue.Obj && asked.string("content") == "data") return signalRef("datum")
+    if (asked is VegaValue.Str) return obj { put("value", asked.value) }
+    return null
+  }
+
+  /** `{"title": expression, …}` — the object a tooltip of several fields is. */
+  private fun tooltipObject(view: UnitView, defs: List<ChannelDef>?): VegaValue? {
+    val pairs =
+      if (defs == null) {
+        tooltipData(view, separator = "\\n")
+      } else {
+        val out = LinkedHashMap<String, String>()
+        for (def in defs) {
+          if (!def.isFieldDef) continue
+          val title =
+            def.explicitTitle?.takeIf { it != VegaValue.Str("") }
+              ?: Fields.defaultTitle(def, view.config.forTooltip)?.let(VegaValue::Str)
+          // A title written as a **list** is one caption on two lines, and one name in a sentence:
+          // a description reads it joined, because a screen reader has no lines to break on.
+          val key =
+            when (title) {
+              is VegaValue.Str -> title.value
+              is VegaValue.Arr ->
+                title.values.mapNotNull { (it as? VegaValue.Str)?.value }.joinToString(", ")
+              else -> continue
+            }
+          if (out.containsKey(key)) continue
+          out[key] = fieldExpression(view, def, view.config.forTooltip, separator = "\\n")
+        }
+        out
+      }
+    if (pairs.isEmpty()) return null
+    return signalRef(pairs.entries.joinToString(", ", "{", "}") { "\"${it.key}\": ${it.value}" })
+  }
+
+  private fun descriptionSignal(view: UnitView): String? {
+    val parts = tooltipData(view)
+    if (parts.isEmpty()) return null
+    return parts.entries
+      .filterNot { it.key.startsWith("_") }
+      .mapIndexed { index, (key, value) ->
+        // The title goes *inside* a JSON string in an expression, so a quotation mark in it has to
+        // be escaped or the expression ends early and the rest is a syntax error.
+        "\"${if (index > 0) "; " else ""}${key.replace("\"", "\\\"")}: \" + ($value)"
+      }
+      .joinToString(" + ")
+  }
+
+  /** Title-to-expression pairs for every encoded field, in specification order. */
+  private fun tooltipData(view: UnitView, separator: String = " "): Map<String, String> {
+    val config = view.config.forTooltip
+    val out = LinkedHashMap<String, String>()
+    val skipped =
+      view.spec.encoding.entries
+        .mapNotNull { (channel, def) ->
+          if (def.bin == Binning.PreBinned) secondaryChannel(channel) else null
+        }
+        .filter { view.spec.encoding[it]?.isFieldDef == true }
+        .toSet()
+    for ((channel, first) in view.spec.encoding) {
+      if (channel == "description") continue
+      // Every entry of a channel written as a list, not only the first: a tooltip naming three
+      // fields describes three, and the mark's spoken description names the same three.
+      // A channel's **conditions** are announced too: a colour written entirely as a condition on
+      // a selection still names a field, and it is the only place that field appears.
+      for (def in listOf(first) + first.siblings + first.conditions) {
+        if (!def.isFieldDef) continue
+        // A pre-binned column is announced as the *span* it covers, and the channel naming the far
+        // edge is then not announced separately — upstream's `toSkip`. Without it a bar over a bin
+        // reads "lo: 0; n: 4; hi: 10", which names three things where there are two.
+        if (channel in skipped) continue
+        // The *field's* own title, not its guide's: upstream reads `fieldDef.title ||
+        // defaultTitle(fieldDef)` here, so hiding an axis title with `axis: {title: null}` restyles
+        // the chart and leaves what a screen reader says about it alone. Reading the guide's title
+        // dropped the channel from the description entirely.
+        // A `title: null` hides the *guide's* caption; it does not take the field out of what a
+        // screen reader says, so the description falls back to the field's own name.
+        // `fieldDef.title || defaultTitle(...)` is an `||`, so an **empty** title falls through to
+        // the field's own name rather than announcing a channel with no name at all.
+        val title =
+          def.explicitTitle?.takeIf { it != VegaValue.Null && it != VegaValue.Str("") }
+            ?: Fields.defaultTitle(def, config)?.let(VegaValue::Str)
+        // A title written as a **list** is one caption on two lines, and one name in a sentence:
+        // a description reads it joined, having no lines to break on.
+        val key =
+          when (title) {
+            is VegaValue.Str -> title.value
+            is VegaValue.Arr ->
+              title.values.mapNotNull { (it as? VegaValue.Str)?.value }.joinToString(", ")
+            else -> continue
+          }
+        if (out.containsKey(key)) continue
+        // A **normalized** stack is announced as the share it takes, not the number behind it: the
+        // position channel carrying the stack reads `end - start`, which is the fraction, and takes
+        // `config.normalizedNumberFormat` — a percentage. Reading the raw field there says 3 where
+        // the bar plainly shows three quarters.
+        val stack = view.stack
+        val normalized =
+          stack != null &&
+            stack.offset == "normalize" &&
+            channel == stack.fieldChannel &&
+            channel in NORMALIZABLE_CHANNELS
+        out[key] =
+          fieldExpression(
+            view,
+            def,
+            config,
+            normalized,
+            binEnd =
+              when (def.bin) {
+                is Binning.Bin -> Fields.datumAccess(def, suffix = "end")
+                // A pre-binned column's far edge is the secondary channel's own field.
+                Binning.PreBinned ->
+                  secondaryChannel(channel)
+                    ?.let { view.spec.encoding[it] }
+                    ?.takeIf { it.isFieldDef }
+                    ?.let { Fields.datumAccess(it) }
+                else -> null
+              },
+            separator = separator,
+          )
+      }
+    }
+    return out
+  }
+
+  /** The position channels a stack can accumulate along, and so the ones a share is read from. */
+  private val NORMALIZABLE_CHANNELS = setOf("x", "y", "theta", "radius")
+
+  /**
+   * How one field's value reads as text: a number through `format`, a date through `timeFormat`, a
+   * category through a validity test that also copes with an array of values.
+   *
+   * A `format` the definition states itself beats the configured default, which is `numberFormat` —
+   * or `normalizedNumberFormat` where the value being read is a *share* of a normalized stack
+   * rather than a quantity.
+   */
+  private fun fieldExpression(
+    view: UnitView,
+    def: ChannelDef,
+    /**
+     * The configuration the formats come from, which for a tooltip is the chart's own under
+     * `config.tooltipFormat` — `{...config, ...config.tooltipFormat}`.
+     */
+    config: Config = view.config,
+    normalizeStack: Boolean = false,
+    /** Where the far edge of a bin is read from, when this definition is a binned one. */
+    binEnd: String? = null,
+    /**
+     * What an array of values is joined with.
+     *
+     * A **tooltip** joins with line breaks, being a small table; a spoken description joins with
+     * spaces, being a sentence. Upstream builds one and rewrites it into the other, which comes to
+     * the same thing said once.
+     */
+    separator: String = " ",
+    /**
+     * Whether an array value is joined rather than printed.
+     *
+     * A **tooltip** and a spoken description join one, being a list of things; a mark's own `text`
+     * does not — `formatSignalRef` has no array branch at all, so a text mark drawn from an array
+     * column prints what Vega prints for one. Sharing the tooltip's expression here put a `join`
+     * into every text mark in the gallery.
+     */
+    arrays: Boolean = true,
+  ): String {
+    val stated = (def.format as? VegaValue.Str)?.value
+    val accessor =
+      if (normalizeStack) {
+        "${Fields.datumAccess(def, suffix = "end")}-${Fields.datumAccess(def, suffix = "start")}"
+      } else {
+        Fields.datumAccess(def)
+      }
+    val number =
+      stated ?: if (normalizeStack) config.normalizedNumberFormat else config.numberFormat ?: ""
+    return when {
+      // An **outline** is not text and is never joined: it is one object, and `isArray` on it would
+      // spell a country out as a list of its own coordinates.
+      def.type == MeasureType.GEOJSON -> "isValid($accessor) ? $accessor : \"\"+$accessor"
+      // `isFieldOrDatumDefForTimeFormat` in `channeldef.ts`: an instant is one a *time unit*
+      // buckets
+      // as much as one typed temporal. A month named on an ordinal scale is still a month, and
+      // upstream speaks it as a date; reading only the type printed the bucket's raw number.
+      // A binned field the specification forced onto a **discrete** scale is spoken as the plain
+      // column it came from: there is no numeric axis left, so upstream reads it as a category
+      // rather than as the range its label spells out.
+      def.bin is Binning.Bin &&
+        (def.type == MeasureType.ORDINAL || def.type == MeasureType.NOMINAL) -> {
+        val plain = "datum[${quoted(def.field.orEmpty())}]"
+        "isValid($plain) ? isArray($plain) ? join($plain, '$separator') : $plain : \"\"+$plain"
+      }
+      def.type == MeasureType.TEMPORAL || def.timeUnit != null -> {
+        val timeUnit = def.timeUnit
+        // `normalizeTimeUnit` reads the `utc` out of the unit's name wherever it sits, so
+        // `binnedutcyearmonth` is universal time as much as `utcmonth` is.
+        val utc = timeUnit?.contains("utc") == true || def.scale.string("type") == "utc"
+        val prefix = if (utc) "utc" else "time"
+        when {
+          // `timeFormatExpression`: a stated format wins over the unit, because the reader asked
+          // for it by name — on the guide for a positioned field, on the definition for a text one.
+          stated != null -> "${prefix}Format($accessor, \"$stated\")"
+          // A bucketed instant is otherwise spoken with the specifier Vega chooses at render time,
+          // the same one its axis labels use — so the description and the axis never disagree.
+          timeUnit != null -> "${prefix}Format($accessor, ${Fields.timeUnitSpecifier(timeUnit)})"
+          else -> "${prefix}Format($accessor, \"${config.timeFormat}\")"
+        }
+      }
+      def.bin != null && binEnd != null -> {
+        // Both edges through the custom format type where one is configured, as the single value
+        // below goes: a bucket reads `1 – 2` whichever function writes the numbers.
+        val write = if (stated == null) config.numberFormatType ?: "format" else "format"
+        "!isValid($accessor) || !isFinite(+$accessor) ? \"null\" : " +
+          "$write($accessor, \"$number\") + \" $BIN_RANGE_DELIMITER \" + $write($binEnd, \"$number\")"
+      }
+      // The same custom format type the guides use, where the configuration named one and this
+      // definition stated no format of its own: `pow(datum["a"], "1.0")` rather than `format(…)`.
+      def.type == MeasureType.QUANTITATIVE && stated == null && config.numberFormatType != null ->
+        "${config.numberFormatType}($accessor, \"$number\")"
+      def.type == MeasureType.QUANTITATIVE || stated != null -> "format($accessor, \"$number\")"
+      !arrays -> "isValid($accessor) ? $accessor : \"\"+$accessor"
+      else -> {
+        // `addLineBreaksToTooltip` builds this one from the **column's own name** rather than from
+        // what the aggregate wrote: `datum["<field>"]`, spelled out. It tells on an `argmin`, whose
+        // value lives inside the row the aggregate kept — upstream reads the bare column there and
+        // this reads what upstream reads.
+        val plain = def.field?.let { "datum[${quoted(it)}]" } ?: accessor
+        "isValid($plain) ? isArray($plain) ? join($plain, '$separator') : $plain : \"\"+$plain"
+      }
+    }
+  }
+
+  /** The en dash upstream puts between a bin's two edges. */
+  private const val BIN_RANGE_DELIMITER = "–"
+
+  /**
+   * `defined`: what breaks a path, rather than filtering the row out of the data.
+   *
+   * `defined.ts` asks the question once per *scaled* channel, not once for x and y: a line coloured
+   * by a continuous field breaks where that colour is missing too. A channel answers "always valid"
+   * when its scale has a discrete domain — a null is simply another category — or when it counts,
+   * because a count has no missing answer.
+   */
+  private fun defined(view: UnitView): VegaValue? {
+    if (!shouldBreakPath(view)) return null
+    // `binSuffix: 'mid'` under an imputed stack: the imputation writes the bin's midpoint, and it
+    // is that column the path is drawn from.
+    val imputed = view.stack?.impute == true
+    val fields = LinkedHashSet<String>()
+    for ((channel, def) in view.spec.encoding) {
+      if (!def.isFieldDef) continue
+      val scaleType = view.scaleType(channel) ?: continue
+      if (!Scales.hasContinuousDomain(scaleType)) continue
+      if (def.aggregate in COUNTING_OPS) continue
+      if (view.config.scaleInvalid(channel) != null) continue
+      // A bin suffix names a *bin's* column, so it only reaches a binned field: `vgField` ignores
+      // it otherwise, and appending it here invented a `value_mid` no transform ever wrote.
+      fields += Fields.datumAccess(def, suffix = if (imputed && def.bin != null) "mid" else null)
+    }
+    if (fields.isEmpty()) return null
+    return signalRef(fields.joinToString(" && ") { "isValid($it) && isFinite(+$it)" })
+  }
+
+  /**
+   * `normalizeInvalidDataMode` in `compile/invalid`: whether an invalid value breaks the path or is
+   * dealt with in the data flow.
+   *
+   * The default — `break-paths-show-path-domains` — reads as "break the path" for a path mark and
+   * "filter the row out" for everything else, which is why only a line, an area and a trail ask.
+   * `filter` and `show` both answer no: one has already removed the row, the other draws it.
+   */
+  private fun shouldBreakPath(view: UnitView): Boolean =
+    view.invalidDataMode == "break-paths-filter-domains" ||
+      view.invalidDataMode == "break-paths-show-domains"
+
+  /** `url`: the picture an image mark draws, read as text and never joined. */
+  private fun urlChannel(view: UnitView): VegaValue? {
+    val def = view.spec.encoding["url"] ?: return null
+    if (def.isValueDef) return obj { literalRef(def.value)?.let { (key, it) -> put(key, it) } }
+    if (!def.isFieldDef) return null
+    return signalRef(fieldExpression(view, def, arrays = false))
+  }
+
+  /** `href`: where a mark links to, read as text and never joined. */
+  private fun hrefChannel(view: UnitView): VegaValue? {
+    val def = view.spec.encoding["href"] ?: return null
+    if (def.isValueDef) return obj { literalRef(def.value)?.let { (key, it) -> put(key, it) } }
+    if (!def.isFieldDef) return null
+    return signalRef(fieldExpression(view, def, arrays = false))
+  }
+
+  private fun textChannel(view: UnitView): VegaValue? {
+    val def = view.spec.encoding["text"] ?: return null
+    if (def.isValueDef) return obj { literalRef(def.value)?.let { (key, it) -> put(key, it) } }
+    if (!def.isFieldDef) return null
+    // A **bucketed** column is spoken as the bucket, not as its near edge: `binFormatExpression`
+    // writes both ends with an en dash between them and says "null" where the row had none. A text
+    // mark labelling the slices of a radial histogram is where it shows.
+    val binEnd = if (def.bin is Binning.Bin) Fields.datumAccess(def, suffix = "end") else null
+    return signalRef(fieldExpression(view, def, binEnd = binEnd, arrays = false))
+  }
+
+  // ---------------------------------------------------------------------------------------------
+  // Position
+  // ---------------------------------------------------------------------------------------------
+
+  /** `pointPosition`: one coordinate, at the middle of whatever the field resolves to. */
+  private fun pointPosition(
+    view: UnitView,
+    channel: String,
+    defaultPos: String?,
+    vgChannel: String?,
+  ): VegaValue.Obj {
+    // A place the **projection** put on the page: with a longitude or a latitude encoded and
+    // nothing said about `x` or `y`, the position is the column `geopoint` wrote, not a scaled one.
+    if (
+      channel in setOf("x", "y") &&
+        view.spec.encoding[channel] == null &&
+        (view.spec.encoding["longitude"] != null || view.spec.encoding["latitude"] != null)
+    ) {
+      return obj {
+        put(vgChannel ?: channel, obj { put("field", view.prefixed(channel)) })
+        // The **second** pair is a second place, and a rule between two places spans them: where
+        // `longitude2` or `latitude2` is encoded, the far end is the column the second `geopoint`
+        // wrote — `pointPosition2OrSize`'s geographic branch.
+        if (view.spec.encoding["longitude2"] != null || view.spec.encoding["latitude2"] != null) {
+          put("${channel}2", obj { put("field", view.prefixed("${channel}2")) })
+        }
+      }
+    }
+    val ref = positionRef(view, channel, defaultPos) ?: return VegaValue.EmptyObject
+    val invalid = invalidPositionRef(view, channel)
+    return obj {
+      put(
+        vgChannel ?: vgPositionChannel(channel),
+        if (invalid == null) ref else arr(listOf(invalid, ref)),
+      )
+    }
+  }
+
+  /**
+   * Where a value the scale cannot place is drawn, under the `show` mode.
+   *
+   * `getConditionalValueRefForIncludingInvalidValue`: the channel gets a *production rule* whose
+   * first arm tests for the invalid value and answers with the scale's own output for one —
+   * `config.scale.invalid` where a specification named it, and otherwise the same zero-or-minimum a
+   * bar measures from. Every other mode has already dealt with the row, by dropping it or by
+   * breaking the path at it, so this is the only one that reaches the encoding.
+   */
+  private fun invalidPositionRef(view: UnitView, channel: String): VegaValue? {
+    if (channel !in Channels.SCALE_CHANNELS) return null
+    val main = mainChannel(channel)
+    // `getScaleInvalidDataMode` asks **per channel**, not once for the mark: a channel the
+    // configuration gives its own answer for is shown whatever the mark's mode says, because
+    // there is now something to show it as. That answer is the rule's first arm below.
+    if (view.invalidDataMode != "show" && view.config.scaleInvalid(main) == null) return null
+    // A **stacked** position is not read from the row at all: it is the accumulated end the stack
+    // transform wrote, which is a number whatever the row held. Only the refs that go through
+    // `midPointRefWithPositionInvalidTest` get the test, and a stacked one does not.
+    if (view.stack != null && main == view.stack.fieldChannel) return null
+    val def = view.spec.fieldDef(main) ?: return null
+    val scaleType = view.scaleType(main) ?: return null
+    if (!Scales.hasContinuousDomain(scaleType)) return null
+    if (def.aggregate in COUNTING_OPS) return null
+    val accessor = Fields.datumAccess(def)
+    val stated = view.config.scaleInvalid(main)
+    val output =
+      when {
+        stated is VegaValue.Obj && stated.has("value") ->
+          obj { literalRef(stated.fields["value"])?.let { (key, it) -> put(key, it) } }
+        else -> scaledZeroOrMinOrMax(view, main, "zeroOrMin")
+      }
+    return obj {
+      put("test", "!isValid($accessor) || !isFinite(+$accessor)")
+      (output as? VegaValue.Obj)?.fields?.forEach { (key, value) -> put(key, value) }
+    }
+  }
+
+  private fun positionRef(view: UnitView, channel: String, defaultPos: String?): VegaValue? {
+    val def = view.spec.encoding[channel]
+    val stack = view.stack
+    val scaleType = view.scaleType(channel)
+
+    val offset = markOffset(view, channel)
+
+    if (def != null && stack != null && channel == stack.fieldChannel) {
+      // A stacked value asked for a **band position** is drawn between the segment's two ends
+      // rather than at the far one — which is what puts a label in the middle of its own wedge
+      // instead of on the line between it and the next. A text mark on a polar channel asks for
+      // the middle without saying so, `positionRef` in `position-point.ts` giving it 0.5, because
+      // a pie chart's labels are for the slices and not for the cuts between them.
+      val bandPosition =
+        def.raw.number("bandPosition")
+          ?: 0.5.takeIf {
+            view.spec.mark == "text" && (channel == "radius" || channel == "theta")
+          }
+      if (def.isFieldDef && bandPosition != null) {
+        return interpolated(
+          view,
+          channel,
+          Fields.vgField(def, suffix = "start"),
+          Fields.vgField(def, suffix = "end"),
+          bandPosition,
+          offset,
+        )
+      }
+      // Otherwise it is drawn at the accumulated end, so the segments sit on one another.
+      return obj {
+        put("scale", scaleName(view, channel))
+        put("field", Fields.vgField(def, suffix = "end"))
+        if (offset != null) put("offset", offset)
+      }
+    }
+
+    // A mark's own nudge applies wherever the position came from — a stated value, a datum, or the
+    // mark's default — and not only to a scaled field. It never displaces an offset an *encoding*
+    // asked for, which has already put the mark in a lane of its own.
+    fun nudged(ref: VegaValue?): VegaValue? {
+      if (ref == null || offset == null) return ref
+      val fields = (ref as? VegaValue.Obj)?.fields ?: return ref
+      if (fields.containsKey("offset")) return ref
+      return obj {
+        fields.forEach { (key, value) -> put(key, value) }
+        put("offset", offset)
+      }
+    }
+
+    if (def != null && (def.isFieldDef || def.datum != null || def.isValueDef)) {
+      return nudged(midPoint(view, channel, def, scaleType))
+    }
+
+    return nudged(defaultPositionRef(view, channel, defaultPos))
+  }
+
+  private fun midPoint(
+    view: UnitView,
+    channel: String,
+    def: ChannelDef,
+    scaleType: String?,
+  ): VegaValue {
+    if (def.isValueDef) {
+      val value = def.value
+      if (value == VegaValue.Str("width") && (channel == "x" || channel == "x2")) {
+        return obj { put("field", obj { put("group", "width") }) }
+      }
+      if (value == VegaValue.Str("height") && (channel == "y" || channel == "y2")) {
+        return obj { put("field", obj { put("group", "height") }) }
+      }
+      return obj { literalRef(value)?.let { (key, it) -> put(key, it) } }
+    }
+    if (def.datum != null) {
+      return obj {
+        put("scale", scaleName(view, mainChannel(channel)))
+        // A datum written as a **date** is the expression that builds the instant, not an object:
+        // Vega has no `{year: 2006}`, and passing one through scaled a mark by an object.
+        val datum = def.datum
+        if (
+          def.type == MeasureType.TEMPORAL &&
+            datum is VegaValue.Obj &&
+            Scales.looksLikeADateTime(datum)
+        ) {
+          put("signal", Transforms(DiagnosticCollector()).dateTimeExpression(datum))
+        } else {
+          literalRef(datum)?.let { (key, it) -> put(key, it) }
+        }
+      }
+    }
+    // A **bucket** is placed by a point inside it rather than at its near edge, and a bucketed
+    // *instant* is a bucket too — `isBinning(bin) || (bandPosition && timeUnit && type ===
+    // TEMPORAL)`. A label over a month asked for the middle of the month sits in the middle of it,
+    // and only a signal can say so: the two edges are columns, and the point between them is not.
+    // Only for a channel that is a bucket in its own right. A **secondary** channel names the far
+    // end of somebody else's — upstream reaches it as a `SecondaryFieldDef`, which carries no type
+    // and so never takes the bucketed branch — and reading it as a bucket of its own put a rect's
+    // far edge halfway into a bucket that does not exist.
+    val bucketed =
+      channel == mainChannel(channel) &&
+        (def.bin is Binning.Bin ||
+          (def.timeUnit != null &&
+            def.type == MeasureType.TEMPORAL &&
+            bandPosition(view, def, view.spec.encoding[secondaryChannel(channel) ?: ""]) != null))
+    // Under an **imputed** stack the midpoint is already a column: the imputation had to compute it
+    // to key on, so the mark reads it rather than working it out again.
+    if (bucketed && view.stack?.impute == true) {
+      return obj {
+        put("scale", scaleName(view, mainChannel(channel)))
+        put("field", Fields.vgField(def, suffix = "mid"))
+      }
+    }
+    if (bucketed && scaleType != null && !Scales.hasDiscreteDomain(scaleType)) {
+      // The middle of a bucket has to be computed from both edges, since only the edges are fields.
+      val position = bandPosition(view, def) ?: 0.5
+      val start = Fields.datumAccess(def)
+      val end = Fields.datumAccess(def, suffix = "end")
+      if (position == 0.0 || position == 1.0) {
+        return obj {
+          put("scale", scaleName(view, mainChannel(channel)))
+          put("field", Fields.vgField(def, suffix = if (position == 0.0) null else "end"))
+        }
+      }
+      return signalRef(
+        "scale(\"${view.scale(mainChannel(channel))}\", " +
+          "${Fields.expressionNumber(1 - position)} * $start + " +
+          "${Fields.expressionNumber(position)} * $end)"
+      )
+    }
+    return obj {
+      put("scale", scaleName(view, mainChannel(channel)))
+      // A binned field on a discrete scale is placed by its **label**: that is what the domain
+      // lists, so the bin's start would name a category the scale has never heard of.
+      val binnedLabels =
+        def.bin is Binning.Bin &&
+          (def.type == MeasureType.ORDINAL || def.type == MeasureType.NOMINAL)
+      put("field", Fields.vgField(def, suffix = if (binnedLabels) "range" else null))
+      // `positionOffset` runs for every position, not only a rect's: a label over a grouped bar
+      // has to move into the same lane the bar did, or it sits over the middle of the group.
+      val offset = offsetRef(view, mainChannel(channel), centred = true)
+      // On a band scale a point belongs in the middle of its band rather than on its edge — unless
+      // an offset has already put it in the middle of a *lane* inside that band, where centring
+      // twice would move it half a group to the right. `bandPosition` is 0 when the offset comes
+      // from an encoding.
+      if (scaleType == "band" && offset == null) put("band", num(0.5))
+      // A mark's own `xOffset` is a plain nudge and applies wherever the position lands.
+      (offset ?: markOffset(view, channel))?.let { put("offset", it) }
+    }
+  }
+
+  /**
+   * `pointPositionDefaultRef`: where a mark goes when the channel says nothing.
+   *
+   * `zeroOrMin` is the baseline a bar grows from — the scaled zero if the domain contains it, and
+   * the near end of the domain if it does not, which is what keeps a bar chart of positive values
+   * from starting off the plot.
+   */
+  private fun defaultPositionRef(view: UnitView, channel: String, defaultPos: String?): VegaValue? {
+    val main = mainChannel(channel)
+    view.markDef.raw.fields[channel]?.let {
+      if (it == VegaValue.Str("width")) return obj { put("field", obj { put("group", "width") }) }
+      if (it == VegaValue.Str("height")) return obj { put("field", obj { put("group", "height") }) }
+      return obj { put("value", it) }
+    }
+    return when (defaultPos) {
+      "zeroOrMin",
+      "zeroOrMax" -> {
+        if (!view.hasScale(main)) {
+          when (main) {
+            "x" -> if (defaultPos == "zeroOrMin") obj { put("value", 0) } else groupField("width")
+            "y" -> if (defaultPos == "zeroOrMin") groupField("height") else obj { put("value", 0) }
+            // A radius runs from the centre to whichever half-extent fits, and an angle from the
+            // twelve o'clock position all the way round.
+            "radius" ->
+              if (defaultPos == "zeroOrMin") obj { put("value", 0) }
+              else signalRef("min(${view.sizeSignal("x")},${view.sizeSignal("y")})/2")
+            "theta" -> if (defaultPos == "zeroOrMin") obj { put("value", 0) } else signalRef("2*PI")
+            else -> null
+          }
+        } else {
+          scaledZeroOrMinOrMax(view, main, defaultPos)
+        }
+      }
+      "mid" -> {
+        // The size signal halved — not the enclosing group's width, which is the same number here
+        // and a different one inside a facet.
+        val size = view.sizeSignal(main)
+        obj {
+          put("signal", size)
+          put("mult", num(0.5))
+        }
+      }
+      else -> null
+    }
+  }
+
+  private fun groupField(name: String): VegaValue = obj { put("field", obj { put("group", name) }) }
+
+  private fun scaledZeroOrMinOrMax(view: UnitView, channel: String, mode: String): VegaValue {
+    val component = view.scaleComponents[channel]
+    val scale = view.scale(channel)
+    val domain = "domain('$scale')"
+    val other = if (mode == "zeroOrMin") "$domain[0]" else "peek($domain)"
+    return when (component?.domainHasZero ?: "maybe") {
+      "definitely" ->
+        obj {
+          put("scale", scale)
+          put("value", 0)
+        }
+      // Not knowable here, so the question is passed to Vega, which has the data.
+      "maybe" -> signalRef("scale('$scale', inrange(0, $domain) ? 0 : $other)")
+      else -> signalRef("scale('$scale', $other)")
+    }
+  }
+
+  /** `rangePosition`: a position and its opposite end, for a bar's measure axis. */
+  private fun rangePosition(
+    view: UnitView,
+    channel: String,
+    defaultPos: String,
+    defaultPos2: String,
+  ): VegaValue.Obj {
+    val channel2 = secondaryChannel(channel)!!
+    // A span between two **places** is both ends at once: `pointPosition` answered with the two
+    // columns the projection wrote, and there is no second position for a scale to add to them.
+    if (
+      view.spec.encoding[channel] == null &&
+        view.spec.encoding.keys.any { it in Channels.GEO_POSITION_CHANNELS }
+    ) {
+      return pointPosition(view, channel, defaultPos, null)
+    }
+    val pos2 = position2Ref(view, channel, channel2, defaultPos2)
+    // With no second position but a **size** the mark states outright, the extent is that size and
+    // the position becomes an *aligned* one: `vgAlignedPositionChannel` centres it by default, so
+    // a picture fifty units wide is placed with its middle where a point would have been.
+    val sizeChannel = if (channel == "x") "width" else if (channel == "y") "height" else null
+    val stated = sizeChannel?.let { view.markDef.raw.fields[it] }
+    if (view.spec.encoding[channel2] == null && stated != null) {
+      val centred = if (channel == "x") "xc" else "yc"
+      return obj {
+        putAll(pointPosition(view, channel, defaultPos, centred))
+        put(sizeChannel, markProperty(stated))
+      }
+    }
+    return obj {
+      putAll(pointPosition(view, channel, defaultPos, null))
+      if (pos2 != null) put(vgPositionChannel(channel2), pos2)
+    }
+  }
+
+  private fun pointOrRangePosition(
+    view: UnitView,
+    channel: String,
+    defaultPos: String,
+    range: Boolean,
+  ): VegaValue.Obj =
+    if (range) rangePosition(view, channel, defaultPos, "zeroOrMin")
+    else pointPosition(view, channel, defaultPos, null)
+
+  private fun position2Ref(
+    view: UnitView,
+    channel: String,
+    channel2: String,
+    defaultPos2: String,
+  ): VegaValue? {
+    val stack = view.stack
+    val def = view.spec.encoding[channel]
+    if (def != null && stack != null && channel == stack.fieldChannel) {
+      return obj {
+        put("scale", scaleName(view, channel))
+        put("field", Fields.vgField(def, suffix = "start"))
+      }
+    }
+    view.spec.encoding[channel2]?.let {
+      return midPoint(view, channel2, it, view.scaleType(channel))
+    }
+    // The mark's own property, named the way *Vega* names the channel: a donut states its hole as
+    // `innerRadius`, which is `radius2` here and has no Vega-Lite name of its own.
+    view.markDef.raw.fields[vgPositionChannel(channel2)]?.let {
+      return obj { put("value", it) }
+    }
+    return defaultPositionRef(view, channel, defaultPos2)
+  }
+
+  /**
+   * `rectPosition`: the rules that give a bar or a rect its extent.
+   *
+   * Three cases, and which one applies is what decides whether a bar is a band wide, a bin wide, or
+   * drawn between two positions.
+   */
+  private fun rectPosition(view: UnitView, channel: String): VegaValue.Obj {
+    val mark = view.spec.mark
+    val orient = view.markDef.orient
+    val def = view.spec.encoding[channel]
+    val channel2 = secondaryChannel(channel)!!
+    val def2 = view.spec.encoding[channel2]
+    val scaleType = view.scaleType(channel)
+    // Only a Cartesian position has a size channel; a polar one is bounded by its second angle or
+    // radius instead, so it always takes the ranged path below.
+    val sizeChannel = if (channel == "x") "width" else if (channel == "y") "height" else null
+
+    val isBarOrTickBand =
+      (mark == "bar" && (if (channel == "x") orient == "vertical" else orient == "horizontal")) ||
+        (mark == "tick" && (if (channel == "y") orient == "vertical" else orient == "horizontal"))
+
+    val hasSize = view.spec.encoding["size"] != null || view.markDef.raw.fields["size"] != null
+
+    if (
+      def != null &&
+        def.isFieldDef &&
+        (def.bin != null || (def.timeUnit != null && def2 == null)) &&
+        !hasSize &&
+        // An **offset** encoding takes the rect off the bucket's edges and puts it in a lane of
+        // its own inside them, so the bucket is no longer what the rect spans and the positioning
+        // is the ordinary banded one — `!encoding[offsetScaleChannel]` in `rectPosition`.
+        !view.hasNestedOffset(channel) &&
+        scaleType != null &&
+        !Scales.hasDiscreteDomain(scaleType)
+    ) {
+      return rectBinPosition(view, channel, def)
+    }
+
+    if (
+      (def != null && scaleType != null && Scales.hasDiscreteDomain(scaleType) ||
+        isBarOrTickBand) && def2 == null
+    ) {
+      return positionAndSize(view, channel, def, sizeChannel)
+    }
+
+    return rangePosition(view, channel, "zeroOrMax", "zeroOrMin")
+  }
+
+  /**
+   * A rect on a discrete scale: placed at the band and made as wide as the band.
+   *
+   * `max(0.25, bandwidth(...))` is upstream's, and the floor is the point: a band narrower than a
+   * quarter of a unit would otherwise disappear at the same moment the axis still claims it is
+   * there.
+   */
+  private fun positionAndSize(
+    view: UnitView,
+    channel: String,
+    def: ChannelDef?,
+    /**
+     * The Vega channel the mark's *extent* is written on, or null for a polar position.
+     *
+     * Vega has no `thetaWidth`, so a slice's extent is simulated: the second angle is the first
+     * plus the size, written as an `offset` on the same reference. `positionAndSize` ends in that
+     * branch, and it is what makes an arc over categories span its band instead of sitting on it.
+     */
+    sizeChannel: String?,
+  ): VegaValue.Obj {
+    val scaleType = view.scaleType(channel)
+    // `(scale || offsetScale)?.get('type')`: where a channel has an offset scale nested in it, the
+    // band the mark fills is the *offset's*, not the position's. A grouped bar over a continuous
+    // axis has no band of its own and would otherwise be measured as a lone continuous rect.
+    val offsetChannel = offsetChannelFor(channel)?.takeIf { view.hasScale(it) }
+    val bandingType = scaleType ?: offsetChannel?.let { view.scaleType(it) }
+    val markConfig = view.config.markConfig(view.spec.mark)
+    val minBandSize = markConfig.number("minBandSize")
+
+    val declaredSize = view.spec.encoding["size"]
+    val markSize = view.markDef.raw.fields["size"]
+
+    val useVlSizeChannel =
+      view.spec.mark == "tick" ||
+        (view.markDef.orient == "horizontal" && channel == "y") ||
+        (view.markDef.orient == "vertical" && channel == "x")
+
+    val sizeRef: VegaValue =
+      when {
+        declaredSize != null && useVlSizeChannel && sizeChannel != null ->
+          nonPosition(view, "size", sizeChannel).fields[sizeChannel] ?: VegaValue.EmptyObject
+        // A mark's stated size may be an **expression** — `{"size": {"expr": 20}}` — and then it is
+        // a signal, as it is everywhere else a value is read.
+        markSize != null && useVlSizeChannel ->
+          literalRef(markSize)?.let { (key, value) -> obj { put(key, value) } }
+            ?: VegaValue.EmptyObject
+        offsetChannel != null || bandingType == "band" -> {
+          // The width of one *nested* mark where there is an offset scale, and of the whole band
+          // where there is not — times the fraction of it the mark asked for, if it asked.
+          val band = offsetChannel ?: channel
+          val fraction = relativeBandSize(view, channel)
+          val bandwidth =
+            if (fraction == 1.0) "bandwidth('${view.scale(band)}')"
+            else "${Fields.expressionNumber(fraction)} * bandwidth('${view.scale(band)}')"
+          signalRef(
+            if (minBandSize != null) "max(${canonicalNumberString(minBandSize)}, $bandwidth)"
+            else bandwidth
+          )
+        }
+        // A rect-based mark on a **continuous** scale is `continuousBandSize` wide — five units for
+        // a bar — not a step less two. `getBandSize` asks the scale's kind first and only reaches
+        // `discreteBandSize` where the domain is discrete, so a bar against a quantitative axis had
+        // been coming out nearly four times too wide.
+        scaleType != null &&
+          !Scales.hasDiscreteDomain(scaleType) &&
+          view.spec.mark in RECT_BASED_MARKS &&
+          markConfig.number("continuousBandSize") != null ->
+          obj { put("value", markConfig.number("continuousBandSize")) }
+        else -> {
+          val discreteBandSize = markConfig.number("discreteBandSize")
+          when {
+            // `defaultSizeRef` asks whether the channel has a field **first**. A rect-based mark
+            // with nothing encoded on this channel spans the plot rather than sitting somewhere in
+            // it at a default width, and it keeps back exactly what a band scale's inner padding
+            // would have kept back — so a lone row of ticks is as thick as one row of a trellis of
+            // them, and a boxplot of one column is as thick as one row of boxes.
+            def == null -> {
+              val padding =
+                view.config.scaleConfig(
+                  when (view.spec.mark) {
+                    "bar" -> "barBandPaddingInner"
+                    "tick" -> "tickBandPaddingInner"
+                    else -> "rectBandPaddingInner"
+                  }
+                )!!
+              // The *plain* `width` or `height`, not this plot's own name for it: a plot with
+              // nothing on the other channel has no gridline scale, so its group already defines
+              // the plain name as an alias — `assembleAxisSignals` — and upstream writes the
+              // expression against that.
+              signalRef("${canonicalNumberString(1 - padding)} * $sizeChannel")
+            }
+            discreteBandSize != null -> obj { put("value", discreteBandSize) }
+            else -> obj { put("value", view.config.step - 2) }
+          }
+        }
+      }
+
+    // `defaultBandAlign`: a rect filling a *relative* band starts at the band's leading edge; one
+    // given a size of its own is centred in it. The band in question may be the offset's.
+    val centred = bandingType != "band" || (declaredSize != null || markSize != null)
+    val vgChannel = if (centred) if (channel == "x") "xc" else "yc" else channel
+
+    val posRef =
+      if (def != null) {
+        // A rect's position takes the invalid arm too — `midPointRefWithPositionInvalidTest` is
+        // what builds it, whichever shape the position takes.
+        val main = midPointForRect(view, channel, def, scaleType, centred)
+        invalidPositionRef(view, channel)?.let { arr(listOf(it, main)) } ?: main
+      } else {
+        // A default position takes the offset too — `positionOffset` runs whether or not the
+        // channel has a definition, so a group of bars with no shared category still fans out
+        // across the plot instead of stacking in its middle.
+        defaultPositionRef(view, channel, "mid")?.let { base ->
+          val offset = offsetRef(view, channel, centred) ?: return@let base
+          obj {
+            (base as? VegaValue.Obj)?.fields?.forEach { (key, value) -> put(key, value) }
+            put("offset", offset)
+          }
+        }
+      }
+
+    if (sizeChannel != null) {
+      return obj {
+        if (posRef != null) put(vgChannel, posRef)
+        put(sizeChannel, sizeRef)
+      }
+    }
+    // A polar position has no size channel: the far end is the near one plus the extent.
+    val extent = (sizeRef as? VegaValue.Obj)?.fields?.get("signal") ?: sizeRef
+    return obj {
+      if (posRef != null) put(vgPositionChannel(channel), posRef)
+      if (posRef is VegaValue.Obj) {
+        put(
+          vgPositionChannel(secondaryChannel(channel)!!),
+          obj {
+            posRef.fields.forEach { (key, value) -> put(key, value) }
+            put("offset", if (extent is VegaValue.Str) signalRef(extent.value) else sizeRef)
+          },
+        )
+      }
+    }
+  }
+
+  private fun midPointForRect(
+    view: UnitView,
+    channel: String,
+    def: ChannelDef,
+    scaleType: String?,
+    centred: Boolean,
+  ): VegaValue {
+    if (view.stack != null && channel == view.stack.fieldChannel) {
+      return obj {
+        put("scale", scaleName(view, channel))
+        put("field", Fields.vgField(def, suffix = "end"))
+      }
+    }
+    if (!def.isFieldDef && def.datum == null) return midPoint(view, channel, def, scaleType)
+    return obj {
+      put("scale", scaleName(view, channel))
+      // A binned field on a discrete scale is placed by its **label**, that being what the domain
+      // lists; the bin's start would name a category the scale has never heard of.
+      val binnedLabels =
+        def.bin is Binning.Bin &&
+          (def.type == MeasureType.ORDINAL || def.type == MeasureType.NOMINAL)
+      put("field", Fields.vgField(def, suffix = if (binnedLabels) "range" else null))
+      // A bar starts at the band's edge and fills it; a centred mark asks for the middle instead;
+      // and one filling a *fraction* of the band starts half of what is left over in, so the two
+      // gaps either side of it match — `(1 - band) / 2`.
+      val fraction = relativeBandSize(view, channel)
+      // A nested offset moves the mark within its band, which is what puts the second bar of a
+      // group beside the first rather than on top of it.
+      val nested = offsetRef(view, channel, centred)
+      // A centred mark sits in the middle of its band — *unless* an **encoding** has already put it
+      // in the middle of a lane inside that band, where centring again would move it half a group
+      // over. `positionAndSize`: `center ? (offsetType === 'encoding' ? 0 : 0.5) : …`.
+      if (scaleType == "band" && centred && nested == null) put("band", num(0.5))
+      else if (scaleType == "band" && !centred && fraction != 1.0) {
+        put("band", num((1 - fraction) / 2))
+      }
+      // A `xOffset`/`yOffset` on the **mark** is a plain nudge, unlike the same name in an
+      // encoding: `positionOffset` reads it as a visual offset and adds it to the position.
+      markOffset(view, channel)?.let { put("offset", it) }
+      nested?.let { put("offset", it) }
+    }
+  }
+
+  /**
+   * `positionOffset`: where a nested offset scale places the mark inside its lane.
+   *
+   * A centred mark sits in the middle of the lane — `bandPosition: 0.5` — and one aligned to the
+   * band's leading edge sits at the lane's start, which is `bandPosition: 0` and written by leaving
+   * the band off.
+   */
+  private fun offsetRef(view: UnitView, channel: String, centred: Boolean): VegaValue? {
+    val offsetChannel = offsetChannelFor(channel)?.takeIf { view.hasScale(it) } ?: return null
+    val offsetDef = view.spec.encoding.getValue(offsetChannel)
+    // A **point** offset places its marks rather than giving each a lane, so there is no lane to
+    // centre in: `bandPosition` is only asked of a band.
+    val banded = view.scaleType(offsetChannel) == "band"
+    return obj {
+      put("scale", view.scale(offsetChannel))
+      // An offset may name a **datum** rather than a field, which is how a repeated layer puts
+      // each copy in a lane of its own: there is no column to read, only the value to look up.
+      if (offsetDef.isFieldDef) put("field", Fields.vgField(offsetDef))
+      else literalRef(offsetDef.datum)?.let { (key, value) -> put(key, value) }
+      if (centred && banded) put("band", num(0.5))
+    }
+  }
+
+  /**
+   * A rect over a binned field: drawn from one bin edge to the other.
+   *
+   * The offsets are the fiddly part and they are upstream's exactly. Half a unit of spacing is
+   * taken off each side so neighbouring bars do not touch, *unless* the bin is narrower than the
+   * mark's minimum width, in which case the offset instead widens the bar back up to that minimum.
+   */
+  private fun rectBinPosition(view: UnitView, channel: String, def: ChannelDef): VegaValue.Obj {
+    val channel2 = secondaryChannel(channel)!!
+    val markConfig = view.config.markConfig(view.spec.mark)
+    val spacing = view.markDef.number("binSpacing") ?: markConfig.number("binSpacing") ?: 0.0
+    val minBandSize = markConfig.number("minBandSize")
+    // The half-unit nudge is the **axis's** translation, and only a Cartesian position has one: an
+    // angle is not drawn against a ruler that sits half a pixel off the data.
+    val polar = channel == "theta" || channel == "radius"
+    val axisTranslate = if (polar) 0.0 else 0.5
+    val sizeExpression =
+      "abs(scale(\"${view.scale(channel)}\", ${Fields.datumAccess(def, suffix = "end")}) - " +
+        "scale(\"${view.scale(channel)}\", ${Fields.datumAccess(def)}))"
+
+    // A **reversed** scale runs the other way, so the half-spacing that pulls a bin's edge inward
+    // has to pull the other way with it — `getBinSpacing`'s `(reverse ? -1 : 1) *`. Upstream writes
+    // the condition out rather than folding it, since a `reverse` may itself be a signal.
+    val reversed =
+      (view.scaleComponents[channel]?.properties?.get("reverse") as? VegaValue.Bool)?.value == true
+    fun offset(isEnd: Boolean): VegaValue? {
+      val spacingOffset = if (isEnd) -spacing / 2 else spacing / 2
+      if (minBandSize == null) {
+        val total = axisTranslate + if (reversed) -spacingOffset else spacingOffset
+        // Nothing to say where the edge is exactly the bucket's: `offset` is written only where it
+        // moves the mark.
+        return if (total == 0.0) null else num(total)
+      }
+      val sign = if (isEnd) "" else "-"
+      // Every number here is written the way JavaScript writes it — `2`, not `2.0`. A Kotlin
+      // `Double` interpolated straight into an expression carries a decimal point Vega-Lite's own
+      // output never has, and the two specifications then differ on a string neither engine reads
+      // as a number.
+      val minimum = canonicalNumberString(minBandSize)
+      val turn = if (reversed) "(true ? -1 : 1) * " else ""
+      // A mark's own offset on this end is added *inside* the spacing, so the two nudges compose
+      // rather than one replacing the other — `(${offset} + ${spacingAndSizeOffset})` upstream.
+      val own = view.markDef.raw.number(if (isEnd) "${channel}Offset" else "${channel2}Offset")
+      val spacingAndSize =
+        "($sizeExpression < $minimum ? ${sign}0.5 * ($minimum - ($sizeExpression)) : " +
+          "${Fields.expressionNumber(spacingOffset)})"
+      val nudged =
+        if (own == null) spacingAndSize else "(${Fields.expressionNumber(own)} + $spacingAndSize)"
+      return signalRef("${Fields.expressionNumber(axisTranslate)} + $turn$nudged")
+    }
+
+    // `x2` takes the bin's start and `x` its end, which is what makes the rect span the bin.
+    val startIsEnd = channel == "x" || channel == "y2"
+    // Where the bin's far edge is read from. A bin *this* compiler asked for has an `_end` column
+    // beside it; a column that arrived **already binned** does not — its far edge is a second
+    // column of its own, named by the secondary channel, and that is the whole reason `bin:
+    // "binned"` requires an `x2`.
+    val endField =
+      if (def.bin == Binning.PreBinned) {
+        val def2 = view.spec.encoding[channel2]
+        if (def2?.isFieldDef == true) Fields.vgField(def2) else Fields.vgField(def, suffix = "end")
+      } else {
+        Fields.vgField(def, suffix = "end")
+      }
+    // `bandPositionForBandSize`: a mark that asks for a *fraction* of its bucket is drawn inside
+    // it rather than across it, so both edges move in by half of what is left over — `(1 - band)/2`
+    // and its complement. A full band leaves them at 0 and 1, which is the bucket's own edges and
+    // the plain field references below.
+    val band = relativeBandSize(view, channel)
+    val near = (1 - band) / 2
+    // A rect shifted off the middle of its bucket is drawn between the two *interpolated* edges a
+    // formula wrote, not between the bucket's own — `useRectOffsetField` in `rectBinPosition`.
+    val shifted = view.offsettedRectPosition(def, channel) != null
+    val startName =
+      if (shifted) "${Fields.vgField(def, forAs = true)}_offsetted_rect_start"
+      else Fields.vgField(def)
+    val endName =
+      if (shifted) "${Fields.vgField(def, forAs = true)}_offsetted_rect_end" else endField
+    return obj {
+      put(
+        vgPositionChannel(channel2),
+        interpolated(view, channel, startName, endName, near, offset(!startIsEnd)),
+      )
+      put(
+        vgPositionChannel(channel),
+        interpolated(view, channel, startName, endName, 1 - near, offset(startIsEnd)),
+      )
+    }
+  }
+
+  /**
+   * How much of its bucket a rect fills, where the mark states it as a fraction.
+   *
+   * `isRelativeBandSize`: `{"width": {"band": 0.7}}` on the mark, or the same shape in the
+   * configured band size. Anything else — a number of units, a signal, nothing at all — leaves the
+   * rect spanning the whole bucket.
+   */
+  private fun relativeBandSize(view: UnitView, channel: String): Double {
+    val sizeChannel = if (channel == "x" || channel == "theta") "width" else "height"
+    val markConfig = view.config.markConfig(view.spec.mark)
+    val stated =
+      view.markDef.raw.obj(sizeChannel)
+        ?: markConfig.obj("continuousBandSize")
+        ?: markConfig.obj("discreteBandSize")
+    stated?.number("band")?.let {
+      return it
+    }
+    // `timeUnitBandSize` is the same fraction written as a bare number, and it applies to a
+    // *bucketed* dimension only: it is how a theme narrows every month's bar at once.
+    if (view.spec.fieldDef(channel)?.timeUnit != null) {
+      markConfig.number("timeUnitBandSize")?.let {
+        return it
+      }
+    }
+    return 1.0
+  }
+
+  /**
+   * `interpolatedSignalRef`: a point *between* a bucket's two edges.
+   *
+   * At 0 or 1 it is one of the edges, and Vega scales the column itself; anywhere between, the
+   * interpolation happens in data space and the scale is applied to the result — which is not the
+   * same as interpolating the two scaled positions once the scale is not linear.
+   */
+  private fun interpolated(
+    view: UnitView,
+    channel: String,
+    startField: String,
+    endField: String,
+    position: Double,
+    offset: VegaValue?,
+  ): VegaValue = obj {
+    if (position == 0.0 || position == 1.0) {
+      put("scale", view.scale(channel))
+      put("field", if (position == 0.0) startField else endField)
+    } else {
+      val start = "datum[${quoted(startField)}]"
+      val end = "datum[${quoted(endField)}]"
+      put(
+        "signal",
+        "scale(\"${view.scale(channel)}\", " +
+          "${Fields.expressionNumber(1 - position)} * $start + " +
+          "${Fields.expressionNumber(position)} * $end)",
+      )
+    }
+    put("offset", offset)
+  }
+}

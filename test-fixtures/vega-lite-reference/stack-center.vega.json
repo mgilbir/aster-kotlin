@@ -1,0 +1,271 @@
+{
+  "$schema": "https://vega.github.io/schema/vega/v6.json",
+  "description": "A stream graph: bars stacked about their own centre rather than from zero.",
+  "background": "white",
+  "padding": 5,
+  "width": 300,
+  "height": 300,
+  "style": "cell",
+  "data": [
+    {
+      "name": "source_0",
+      "values": [
+        {
+          "t": 1,
+          "s": "a",
+          "v": 3
+        },
+        {
+          "t": 1,
+          "s": "b",
+          "v": 5
+        },
+        {
+          "t": 2,
+          "s": "a",
+          "v": 6
+        },
+        {
+          "t": 2,
+          "s": "b",
+          "v": 2
+        },
+        {
+          "t": 3,
+          "s": "a",
+          "v": 1
+        },
+        {
+          "t": 3,
+          "s": "b",
+          "v": 7
+        }
+      ]
+    },
+    {
+      "name": "data_0",
+      "source": "source_0",
+      "transform": [
+        {
+          "type": "formula",
+          "expr": "toNumber(datum[\"t\"])",
+          "as": "t"
+        },
+        {
+          "type": "impute",
+          "field": "v",
+          "groupby": [
+            "s"
+          ],
+          "key": "t",
+          "method": "value",
+          "value": 0
+        },
+        {
+          "type": "stack",
+          "groupby": [
+            "t"
+          ],
+          "field": "v",
+          "sort": {
+            "field": [
+              "s"
+            ],
+            "order": [
+              "descending"
+            ]
+          },
+          "as": [
+            "v_start",
+            "v_end"
+          ],
+          "offset": "center"
+        }
+      ]
+    }
+  ],
+  "marks": [
+    {
+      "name": "pathgroup",
+      "type": "group",
+      "from": {
+        "facet": {
+          "name": "faceted_path_main",
+          "data": "data_0",
+          "groupby": [
+            "s"
+          ]
+        }
+      },
+      "encode": {
+        "update": {
+          "width": {
+            "field": {
+              "group": "width"
+            }
+          },
+          "height": {
+            "field": {
+              "group": "height"
+            }
+          }
+        }
+      },
+      "marks": [
+        {
+          "name": "marks",
+          "type": "area",
+          "style": [
+            "area"
+          ],
+          "sort": {
+            "field": "x"
+          },
+          "from": {
+            "data": "faceted_path_main"
+          },
+          "encode": {
+            "update": {
+              "orient": {
+                "value": "vertical"
+              },
+              "fill": {
+                "scale": "color",
+                "field": "s"
+              },
+              "description": {
+                "signal": "\"t: \" + (format(datum[\"t\"], \"\")) + \"; v: \" + (format(datum[\"v\"], \"\")) + \"; s: \" + (isValid(datum[\"s\"]) ? isArray(datum[\"s\"]) ? join(datum[\"s\"], ' ') : datum[\"s\"] : \"\"+datum[\"s\"])"
+              },
+              "x": {
+                "scale": "x",
+                "field": "t"
+              },
+              "y": {
+                "scale": "y",
+                "field": "v_end"
+              },
+              "y2": {
+                "scale": "y",
+                "field": "v_start"
+              },
+              "defined": {
+                "signal": "isValid(datum[\"t\"]) && isFinite(+datum[\"t\"]) && isValid(datum[\"v\"]) && isFinite(+datum[\"v\"])"
+              }
+            }
+          }
+        }
+      ]
+    }
+  ],
+  "scales": [
+    {
+      "name": "x",
+      "type": "linear",
+      "domain": {
+        "data": "data_0",
+        "field": "t"
+      },
+      "range": [
+        0,
+        {
+          "signal": "width"
+        }
+      ],
+      "nice": true,
+      "zero": false
+    },
+    {
+      "name": "y",
+      "type": "linear",
+      "domain": {
+        "data": "data_0",
+        "fields": [
+          "v_start",
+          "v_end"
+        ]
+      },
+      "range": [
+        {
+          "signal": "height"
+        },
+        0
+      ],
+      "nice": true,
+      "zero": true
+    },
+    {
+      "name": "color",
+      "type": "ordinal",
+      "domain": {
+        "data": "data_0",
+        "field": "s",
+        "sort": true
+      },
+      "range": "category"
+    }
+  ],
+  "axes": [
+    {
+      "scale": "x",
+      "orient": "bottom",
+      "gridScale": "y",
+      "grid": true,
+      "tickCount": {
+        "signal": "ceil(width/40)"
+      },
+      "domain": false,
+      "labels": false,
+      "aria": false,
+      "maxExtent": 0,
+      "minExtent": 0,
+      "ticks": false,
+      "zindex": 0
+    },
+    {
+      "scale": "y",
+      "orient": "left",
+      "gridScale": "x",
+      "grid": true,
+      "tickCount": {
+        "signal": "ceil(height/40)"
+      },
+      "domain": false,
+      "labels": false,
+      "aria": false,
+      "maxExtent": 0,
+      "minExtent": 0,
+      "ticks": false,
+      "zindex": 0
+    },
+    {
+      "scale": "x",
+      "orient": "bottom",
+      "grid": false,
+      "title": "t",
+      "labelFlush": true,
+      "labelOverlap": true,
+      "tickCount": {
+        "signal": "ceil(width/40)"
+      },
+      "zindex": 0
+    },
+    {
+      "scale": "y",
+      "orient": "left",
+      "grid": false,
+      "title": "v",
+      "labelOverlap": true,
+      "tickCount": {
+        "signal": "ceil(height/40)"
+      },
+      "zindex": 0
+    }
+  ],
+  "legends": [
+    {
+      "fill": "color",
+      "symbolType": "circle",
+      "title": "s"
+    }
+  ]
+}

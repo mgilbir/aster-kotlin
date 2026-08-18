@@ -1,0 +1,217 @@
+{
+  "$schema": "https://vega.github.io/schema/vega/v6.json",
+  "description": "Grouped bars whose plot is a fixed width, so the inner band fills whatever the outer one got.",
+  "background": "white",
+  "padding": 5,
+  "width": 220,
+  "height": 110,
+  "style": "cell",
+  "data": [
+    {
+      "name": "source_0",
+      "values": [
+        {
+          "era": "before",
+          "band": "low",
+          "amount": 28
+        },
+        {
+          "era": "before",
+          "band": "high",
+          "amount": 55
+        },
+        {
+          "era": "after",
+          "band": "low",
+          "amount": 43
+        },
+        {
+          "era": "after",
+          "band": "high",
+          "amount": 12
+        }
+      ]
+    },
+    {
+      "name": "data_0",
+      "source": "source_0",
+      "transform": [
+        {
+          "type": "stack",
+          "groupby": [
+            "era",
+            "band"
+          ],
+          "field": "amount",
+          "sort": {
+            "field": [],
+            "order": []
+          },
+          "as": [
+            "amount_start",
+            "amount_end"
+          ],
+          "offset": "zero"
+        },
+        {
+          "type": "filter",
+          "expr": "isValid(datum[\"amount\"]) && isFinite(+datum[\"amount\"])"
+        }
+      ]
+    }
+  ],
+  "marks": [
+    {
+      "name": "marks",
+      "type": "rect",
+      "style": [
+        "bar"
+      ],
+      "from": {
+        "data": "data_0"
+      },
+      "encode": {
+        "update": {
+          "fill": {
+            "scale": "color",
+            "field": "band"
+          },
+          "ariaRoleDescription": {
+            "value": "bar"
+          },
+          "description": {
+            "signal": "\"era: \" + (isValid(datum[\"era\"]) ? isArray(datum[\"era\"]) ? join(datum[\"era\"], ' ') : datum[\"era\"] : \"\"+datum[\"era\"]) + \"; amount: \" + (format(datum[\"amount\"], \"\")) + \"; band: \" + (isValid(datum[\"band\"]) ? isArray(datum[\"band\"]) ? join(datum[\"band\"], ' ') : datum[\"band\"] : \"\"+datum[\"band\"])"
+          },
+          "x": {
+            "scale": "x",
+            "field": "era",
+            "offset": {
+              "scale": "xOffset",
+              "field": "band"
+            }
+          },
+          "width": {
+            "signal": "max(0.25, bandwidth('xOffset'))"
+          },
+          "y": {
+            "scale": "y",
+            "field": "amount_end"
+          },
+          "y2": {
+            "scale": "y",
+            "field": "amount_start"
+          }
+        }
+      }
+    }
+  ],
+  "scales": [
+    {
+      "name": "x",
+      "type": "band",
+      "domain": {
+        "data": "data_0",
+        "field": "era",
+        "sort": true
+      },
+      "range": [
+        0,
+        {
+          "signal": "width"
+        }
+      ],
+      "paddingInner": 0.2,
+      "paddingOuter": 0.2
+    },
+    {
+      "name": "y",
+      "type": "linear",
+      "domain": {
+        "data": "data_0",
+        "fields": [
+          "amount_start",
+          "amount_end"
+        ]
+      },
+      "range": [
+        {
+          "signal": "height"
+        },
+        0
+      ],
+      "nice": true,
+      "zero": true
+    },
+    {
+      "name": "xOffset",
+      "type": "band",
+      "domain": {
+        "data": "data_0",
+        "field": "band",
+        "sort": true
+      },
+      "range": [
+        0,
+        {
+          "signal": "bandwidth('x')"
+        }
+      ]
+    },
+    {
+      "name": "color",
+      "type": "ordinal",
+      "domain": {
+        "data": "data_0",
+        "field": "band",
+        "sort": true
+      },
+      "range": "category"
+    }
+  ],
+  "axes": [
+    {
+      "scale": "y",
+      "orient": "left",
+      "gridScale": "x",
+      "grid": true,
+      "tickCount": {
+        "signal": "ceil(height/40)"
+      },
+      "domain": false,
+      "labels": false,
+      "aria": false,
+      "maxExtent": 0,
+      "minExtent": 0,
+      "ticks": false,
+      "zindex": 0
+    },
+    {
+      "scale": "x",
+      "orient": "bottom",
+      "grid": false,
+      "title": "era",
+      "labelAlign": "right",
+      "labelAngle": 270,
+      "labelBaseline": "middle",
+      "zindex": 0
+    },
+    {
+      "scale": "y",
+      "orient": "left",
+      "grid": false,
+      "title": "amount",
+      "labelOverlap": true,
+      "tickCount": {
+        "signal": "ceil(height/40)"
+      },
+      "zindex": 0
+    }
+  ],
+  "legends": [
+    {
+      "fill": "color",
+      "symbolType": "square",
+      "title": "band"
+    }
+  ]
+}

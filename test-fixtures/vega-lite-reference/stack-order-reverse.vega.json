@@ -1,0 +1,555 @@
+{
+  "$schema": "https://vega.github.io/schema/vega/v6.json",
+  "description": "A stack ordered by a column of its own, one ordered only by direction, and an axis running backwards.",
+  "background": "white",
+  "padding": 5,
+  "width": 150,
+  "data": [
+    {
+      "name": "source_0",
+      "values": [
+        {
+          "site": "Alpha",
+          "variety": "one",
+          "yield": 28,
+          "rank": 3,
+          "power": 120
+        },
+        {
+          "site": "Alpha",
+          "variety": "two",
+          "yield": 55,
+          "rank": 1,
+          "power": 90
+        },
+        {
+          "site": "Beta",
+          "variety": "one",
+          "yield": 43,
+          "rank": 2,
+          "power": 150
+        },
+        {
+          "site": "Beta",
+          "variety": "two",
+          "yield": 12,
+          "rank": 4,
+          "power": 60
+        }
+      ]
+    },
+    {
+      "name": "data_1",
+      "source": "source_0",
+      "transform": [
+        {
+          "type": "aggregate",
+          "groupby": [
+            "site",
+            "variety"
+          ],
+          "ops": [
+            "sum",
+            "sum"
+          ],
+          "fields": [
+            "yield",
+            "rank"
+          ],
+          "as": [
+            "sum_yield",
+            "sum_rank"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "data_2",
+      "source": "data_1",
+      "transform": [
+        {
+          "type": "stack",
+          "groupby": [
+            "site"
+          ],
+          "field": "sum_yield",
+          "sort": {
+            "field": [
+              "variety"
+            ],
+            "order": [
+              "ascending"
+            ]
+          },
+          "as": [
+            "sum_yield_start",
+            "sum_yield_end"
+          ],
+          "offset": "zero"
+        },
+        {
+          "type": "filter",
+          "expr": "isValid(datum[\"sum_yield\"]) && isFinite(+datum[\"sum_yield\"])"
+        }
+      ]
+    },
+    {
+      "name": "data_3",
+      "source": "data_1",
+      "transform": [
+        {
+          "type": "stack",
+          "groupby": [
+            "site"
+          ],
+          "field": "sum_yield",
+          "sort": {
+            "field": [
+              "sum_rank"
+            ],
+            "order": [
+              "ascending"
+            ]
+          },
+          "as": [
+            "sum_yield_start",
+            "sum_yield_end"
+          ],
+          "offset": "zero"
+        },
+        {
+          "type": "filter",
+          "expr": "isValid(datum[\"sum_yield\"]) && isFinite(+datum[\"sum_yield\"])"
+        }
+      ]
+    },
+    {
+      "name": "data_4",
+      "source": "source_0",
+      "transform": [
+        {
+          "type": "filter",
+          "expr": "isValid(datum[\"power\"]) && isFinite(+datum[\"power\"])"
+        }
+      ]
+    }
+  ],
+  "signals": [
+    {
+      "name": "concat_0_height",
+      "value": 90
+    },
+    {
+      "name": "concat_1_height",
+      "value": 90
+    },
+    {
+      "name": "concat_2_height",
+      "value": 20
+    }
+  ],
+  "layout": {
+    "padding": 20,
+    "columns": 1,
+    "bounds": "full",
+    "align": "each"
+  },
+  "marks": [
+    {
+      "type": "group",
+      "name": "concat_0_group",
+      "style": "cell",
+      "encode": {
+        "update": {
+          "width": {
+            "signal": "width"
+          },
+          "height": {
+            "signal": "concat_0_height"
+          }
+        }
+      },
+      "marks": [
+        {
+          "name": "concat_0_marks",
+          "type": "rect",
+          "style": [
+            "bar"
+          ],
+          "from": {
+            "data": "data_3"
+          },
+          "encode": {
+            "update": {
+              "fill": {
+                "scale": "color",
+                "field": "variety"
+              },
+              "ariaRoleDescription": {
+                "value": "bar"
+              },
+              "description": {
+                "signal": "\"Sum of yield: \" + (format(datum[\"sum_yield\"], \"\")) + \"; site: \" + (isValid(datum[\"site\"]) ? isArray(datum[\"site\"]) ? join(datum[\"site\"], ' ') : datum[\"site\"] : \"\"+datum[\"site\"]) + \"; variety: \" + (isValid(datum[\"variety\"]) ? isArray(datum[\"variety\"]) ? join(datum[\"variety\"], ' ') : datum[\"variety\"] : \"\"+datum[\"variety\"]) + \"; Sum of rank: \" + (format(datum[\"sum_rank\"], \"\"))"
+              },
+              "x": {
+                "scale": "concat_0_x",
+                "field": "sum_yield_end"
+              },
+              "x2": {
+                "scale": "concat_0_x",
+                "field": "sum_yield_start"
+              },
+              "y": {
+                "scale": "concat_0_y",
+                "field": "site"
+              },
+              "height": {
+                "signal": "max(0.25, bandwidth('concat_0_y'))"
+              }
+            }
+          }
+        }
+      ],
+      "axes": [
+        {
+          "scale": "concat_0_x",
+          "orient": "bottom",
+          "gridScale": "concat_0_y",
+          "grid": true,
+          "tickCount": {
+            "signal": "ceil(width/40)"
+          },
+          "domain": false,
+          "labels": false,
+          "aria": false,
+          "maxExtent": 0,
+          "minExtent": 0,
+          "ticks": false,
+          "zindex": 0
+        },
+        {
+          "scale": "concat_0_x",
+          "orient": "bottom",
+          "grid": false,
+          "title": "Sum of yield",
+          "labelFlush": true,
+          "labelOverlap": true,
+          "tickCount": {
+            "signal": "ceil(width/40)"
+          },
+          "zindex": 0
+        },
+        {
+          "scale": "concat_0_y",
+          "orient": "left",
+          "grid": false,
+          "title": "site",
+          "zindex": 0
+        }
+      ]
+    },
+    {
+      "type": "group",
+      "name": "concat_1_group",
+      "style": "cell",
+      "encode": {
+        "update": {
+          "width": {
+            "signal": "width"
+          },
+          "height": {
+            "signal": "concat_1_height"
+          }
+        }
+      },
+      "marks": [
+        {
+          "name": "concat_1_marks",
+          "type": "rect",
+          "style": [
+            "bar"
+          ],
+          "from": {
+            "data": "data_2"
+          },
+          "encode": {
+            "update": {
+              "fill": {
+                "scale": "color",
+                "field": "variety"
+              },
+              "ariaRoleDescription": {
+                "value": "bar"
+              },
+              "description": {
+                "signal": "\"site: \" + (isValid(datum[\"site\"]) ? isArray(datum[\"site\"]) ? join(datum[\"site\"], ' ') : datum[\"site\"] : \"\"+datum[\"site\"]) + \"; Sum of yield: \" + (format(datum[\"sum_yield\"], \"\")) + \"; variety: \" + (isValid(datum[\"variety\"]) ? isArray(datum[\"variety\"]) ? join(datum[\"variety\"], ' ') : datum[\"variety\"] : \"\"+datum[\"variety\"])"
+              },
+              "x": {
+                "scale": "concat_1_x",
+                "field": "site"
+              },
+              "width": {
+                "signal": "max(0.25, bandwidth('concat_1_x'))"
+              },
+              "y": {
+                "scale": "concat_1_y",
+                "field": "sum_yield_end"
+              },
+              "y2": {
+                "scale": "concat_1_y",
+                "field": "sum_yield_start"
+              }
+            }
+          }
+        }
+      ],
+      "axes": [
+        {
+          "scale": "concat_1_y",
+          "orient": "left",
+          "gridScale": "concat_1_x",
+          "grid": true,
+          "tickCount": {
+            "signal": "ceil(concat_1_height/40)"
+          },
+          "domain": false,
+          "labels": false,
+          "aria": false,
+          "maxExtent": 0,
+          "minExtent": 0,
+          "ticks": false,
+          "zindex": 0
+        },
+        {
+          "scale": "concat_1_x",
+          "orient": "bottom",
+          "grid": false,
+          "title": "site",
+          "labelAlign": "right",
+          "labelAngle": 270,
+          "labelBaseline": "middle",
+          "zindex": 0
+        },
+        {
+          "scale": "concat_1_y",
+          "orient": "left",
+          "grid": false,
+          "title": "Sum of yield",
+          "labelOverlap": true,
+          "tickCount": {
+            "signal": "ceil(concat_1_height/40)"
+          },
+          "zindex": 0
+        }
+      ]
+    },
+    {
+      "type": "group",
+      "name": "concat_2_group",
+      "style": "cell",
+      "encode": {
+        "update": {
+          "width": {
+            "signal": "width"
+          },
+          "height": {
+            "signal": "concat_2_height"
+          }
+        }
+      },
+      "signals": [
+        {
+          "name": "height",
+          "update": "concat_2_height"
+        }
+      ],
+      "marks": [
+        {
+          "name": "concat_2_marks",
+          "type": "rect",
+          "style": [
+            "tick"
+          ],
+          "from": {
+            "data": "data_4"
+          },
+          "encode": {
+            "update": {
+              "opacity": {
+                "value": 0.7
+              },
+              "fill": {
+                "value": "#4c78a8"
+              },
+              "ariaRoleDescription": {
+                "value": "tick"
+              },
+              "description": {
+                "signal": "\"power: \" + (format(datum[\"power\"], \"\"))"
+              },
+              "yc": {
+                "signal": "concat_2_height",
+                "mult": 0.5
+              },
+              "height": {
+                "signal": "0.75 * height"
+              },
+              "xc": {
+                "scale": "concat_2_x",
+                "field": "power"
+              },
+              "width": {
+                "value": 1
+              }
+            }
+          }
+        }
+      ],
+      "axes": [
+        {
+          "scale": "concat_2_x",
+          "orient": "bottom",
+          "grid": true,
+          "tickCount": {
+            "signal": "ceil(width/40)"
+          },
+          "domain": false,
+          "labels": false,
+          "aria": false,
+          "maxExtent": 0,
+          "minExtent": 0,
+          "ticks": false,
+          "zindex": 0
+        },
+        {
+          "scale": "concat_2_x",
+          "orient": "bottom",
+          "grid": false,
+          "title": "power",
+          "labelFlush": true,
+          "labelOverlap": true,
+          "tickCount": {
+            "signal": "ceil(width/40)"
+          },
+          "zindex": 0
+        }
+      ]
+    }
+  ],
+  "scales": [
+    {
+      "name": "color",
+      "type": "ordinal",
+      "domain": {
+        "fields": [
+          {
+            "data": "data_3",
+            "field": "variety"
+          },
+          {
+            "data": "data_2",
+            "field": "variety"
+          }
+        ],
+        "sort": true
+      },
+      "range": "category"
+    },
+    {
+      "name": "concat_0_x",
+      "type": "linear",
+      "domain": {
+        "data": "data_3",
+        "fields": [
+          "sum_yield_start",
+          "sum_yield_end"
+        ]
+      },
+      "range": [
+        0,
+        {
+          "signal": "width"
+        }
+      ],
+      "nice": true,
+      "zero": true
+    },
+    {
+      "name": "concat_0_y",
+      "type": "band",
+      "domain": {
+        "data": "data_3",
+        "field": "site",
+        "sort": true
+      },
+      "range": [
+        0,
+        {
+          "signal": "concat_0_height"
+        }
+      ],
+      "paddingInner": 0.1,
+      "paddingOuter": 0.05
+    },
+    {
+      "name": "concat_1_x",
+      "type": "band",
+      "domain": {
+        "data": "data_2",
+        "field": "site",
+        "sort": true
+      },
+      "range": [
+        0,
+        {
+          "signal": "width"
+        }
+      ],
+      "paddingInner": 0.1,
+      "paddingOuter": 0.05
+    },
+    {
+      "name": "concat_1_y",
+      "type": "linear",
+      "domain": {
+        "data": "data_2",
+        "fields": [
+          "sum_yield_start",
+          "sum_yield_end"
+        ]
+      },
+      "range": [
+        {
+          "signal": "concat_1_height"
+        },
+        0
+      ],
+      "nice": true,
+      "zero": true
+    },
+    {
+      "name": "concat_2_x",
+      "type": "linear",
+      "domain": {
+        "data": "data_4",
+        "field": "power"
+      },
+      "range": [
+        0,
+        {
+          "signal": "width"
+        }
+      ],
+      "reverse": true,
+      "nice": true,
+      "zero": true
+    }
+  ],
+  "legends": [
+    {
+      "fill": "color",
+      "symbolType": "square",
+      "title": "variety"
+    }
+  ]
+}

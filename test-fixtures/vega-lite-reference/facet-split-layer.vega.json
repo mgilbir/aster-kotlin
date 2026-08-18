@@ -1,0 +1,439 @@
+{
+  "$schema": "https://vega.github.io/schema/vega/v6.json",
+  "description": "Two layers in one cell of a split facet: they share the one partition, and each hangs a chain of its own below it and a copy beside it.",
+  "background": "white",
+  "padding": 5,
+  "data": [
+    {
+      "name": "source_0",
+      "url": "data/barley.json",
+      "format": {
+        "type": "json"
+      }
+    },
+    {
+      "name": "row_domain",
+      "source": "source_0",
+      "transform": [
+        {
+          "type": "aggregate",
+          "groupby": [
+            "site"
+          ],
+          "fields": [
+            "yield"
+          ],
+          "ops": [
+            "median"
+          ],
+          "as": [
+            "median_yield"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "data_2",
+      "source": "source_0",
+      "transform": [
+        {
+          "type": "aggregate",
+          "groupby": [
+            "variety",
+            "year",
+            "site"
+          ],
+          "ops": [
+            "median"
+          ],
+          "fields": [
+            "yield"
+          ],
+          "as": [
+            "median_yield"
+          ]
+        },
+        {
+          "type": "filter",
+          "expr": "isValid(datum[\"median_yield\"]) && isFinite(+datum[\"median_yield\"])"
+        }
+      ]
+    },
+    {
+      "name": "data_3",
+      "source": "source_0",
+      "transform": [
+        {
+          "type": "aggregate",
+          "groupby": [
+            "site"
+          ],
+          "ops": [
+            "median"
+          ],
+          "fields": [
+            "yield"
+          ],
+          "as": [
+            "median_yield"
+          ]
+        },
+        {
+          "type": "filter",
+          "expr": "isValid(datum[\"median_yield\"]) && isFinite(+datum[\"median_yield\"])"
+        }
+      ]
+    }
+  ],
+  "signals": [
+    {
+      "name": "child_width",
+      "value": 300
+    },
+    {
+      "name": "y_step",
+      "value": 12
+    },
+    {
+      "name": "child_height",
+      "update": "bandspace(domain('y').length, 1, 0.5) * y_step"
+    }
+  ],
+  "layout": {
+    "padding": 20,
+    "offset": {
+      "rowTitle": 10
+    },
+    "columns": 1,
+    "bounds": "full",
+    "align": "all"
+  },
+  "marks": [
+    {
+      "name": "row-title",
+      "type": "group",
+      "role": "row-title",
+      "title": {
+        "text": "site",
+        "orient": "left",
+        "style": "guide-title",
+        "offset": 10
+      }
+    },
+    {
+      "name": "row_header",
+      "type": "group",
+      "role": "row-header",
+      "from": {
+        "data": "row_domain"
+      },
+      "sort": {
+        "field": "datum[\"median_yield\"]",
+        "order": "ascending"
+      },
+      "title": {
+        "text": {
+          "signal": "isValid(parent[\"site\"]) ? parent[\"site\"] : \"\"+parent[\"site\"]"
+        },
+        "orient": "left",
+        "style": "guide-label",
+        "frame": "group",
+        "offset": 10
+      },
+      "encode": {
+        "update": {
+          "height": {
+            "signal": "child_height"
+          }
+        }
+      },
+      "axes": [
+        {
+          "scale": "y",
+          "orient": "left",
+          "grid": false,
+          "title": "variety",
+          "zindex": 0
+        }
+      ]
+    },
+    {
+      "name": "column_footer",
+      "type": "group",
+      "role": "column-footer",
+      "encode": {
+        "update": {
+          "width": {
+            "signal": "child_width"
+          }
+        }
+      },
+      "axes": [
+        {
+          "scale": "x",
+          "orient": "bottom",
+          "grid": false,
+          "title": "Median of yield",
+          "labelFlush": true,
+          "labelOverlap": true,
+          "tickCount": {
+            "signal": "ceil(child_width/40)"
+          },
+          "zindex": 0
+        }
+      ]
+    },
+    {
+      "name": "cell",
+      "type": "group",
+      "style": "cell",
+      "from": {
+        "facet": {
+          "name": "facet",
+          "data": "source_0",
+          "groupby": [
+            "site"
+          ],
+          "aggregate": {
+            "fields": [
+              "yield"
+            ],
+            "ops": [
+              "median"
+            ],
+            "as": [
+              "median_yield_by_site"
+            ]
+          }
+        }
+      },
+      "sort": {
+        "field": [
+          "datum[\"median_yield_by_site\"]"
+        ],
+        "order": [
+          "ascending"
+        ]
+      },
+      "data": [
+        {
+          "name": "data_1",
+          "source": "facet",
+          "transform": [
+            {
+              "type": "aggregate",
+              "groupby": [
+                "variety",
+                "year"
+              ],
+              "ops": [
+                "median"
+              ],
+              "fields": [
+                "yield"
+              ],
+              "as": [
+                "median_yield"
+              ]
+            },
+            {
+              "type": "filter",
+              "expr": "isValid(datum[\"median_yield\"]) && isFinite(+datum[\"median_yield\"])"
+            }
+          ]
+        },
+        {
+          "name": "data_2",
+          "source": "facet",
+          "transform": [
+            {
+              "type": "aggregate",
+              "groupby": [],
+              "ops": [
+                "median"
+              ],
+              "fields": [
+                "yield"
+              ],
+              "as": [
+                "median_yield"
+              ]
+            },
+            {
+              "type": "filter",
+              "expr": "isValid(datum[\"median_yield\"]) && isFinite(+datum[\"median_yield\"])"
+            }
+          ]
+        }
+      ],
+      "encode": {
+        "update": {
+          "width": {
+            "signal": "child_width"
+          },
+          "height": {
+            "signal": "child_height"
+          }
+        }
+      },
+      "marks": [
+        {
+          "name": "child_layer_0_marks",
+          "type": "symbol",
+          "style": [
+            "point"
+          ],
+          "from": {
+            "data": "data_1"
+          },
+          "encode": {
+            "update": {
+              "fill": {
+                "value": "transparent"
+              },
+              "stroke": {
+                "scale": "color",
+                "field": "year"
+              },
+              "ariaRoleDescription": {
+                "value": "point"
+              },
+              "description": {
+                "signal": "\"Median of yield: \" + (format(datum[\"median_yield\"], \"\")) + \"; variety: \" + (isValid(datum[\"variety\"]) ? isArray(datum[\"variety\"]) ? join(datum[\"variety\"], ' ') : datum[\"variety\"] : \"\"+datum[\"variety\"]) + \"; year: \" + (isValid(datum[\"year\"]) ? isArray(datum[\"year\"]) ? join(datum[\"year\"], ' ') : datum[\"year\"] : \"\"+datum[\"year\"])"
+              },
+              "x": {
+                "scale": "x",
+                "field": "median_yield"
+              },
+              "y": {
+                "scale": "y",
+                "field": "variety"
+              }
+            }
+          }
+        },
+        {
+          "name": "child_layer_1_marks",
+          "type": "rule",
+          "style": [
+            "rule"
+          ],
+          "from": {
+            "data": "data_2"
+          },
+          "encode": {
+            "update": {
+              "stroke": {
+                "value": "black"
+              },
+              "description": {
+                "signal": "\"Median of yield: \" + (format(datum[\"median_yield\"], \"\"))"
+              },
+              "x": {
+                "scale": "x",
+                "field": "median_yield"
+              },
+              "y": {
+                "value": 0
+              },
+              "y2": {
+                "field": {
+                  "group": "height"
+                }
+              }
+            }
+          }
+        }
+      ],
+      "axes": [
+        {
+          "scale": "x",
+          "orient": "bottom",
+          "gridScale": "y",
+          "grid": true,
+          "tickCount": {
+            "signal": "ceil(child_width/40)"
+          },
+          "domain": false,
+          "labels": false,
+          "aria": false,
+          "maxExtent": 0,
+          "minExtent": 0,
+          "ticks": false,
+          "zindex": 0
+        }
+      ]
+    }
+  ],
+  "scales": [
+    {
+      "name": "x",
+      "type": "linear",
+      "domain": {
+        "fields": [
+          {
+            "data": "data_2",
+            "field": "median_yield"
+          },
+          {
+            "data": "data_3",
+            "field": "median_yield"
+          }
+        ]
+      },
+      "range": [
+        0,
+        {
+          "signal": "child_width"
+        }
+      ],
+      "zero": false,
+      "nice": true
+    },
+    {
+      "name": "y",
+      "type": "point",
+      "domain": {
+        "data": "source_0",
+        "field": "variety",
+        "sort": {
+          "op": "median",
+          "field": "yield",
+          "order": "descending"
+        }
+      },
+      "range": {
+        "step": {
+          "signal": "y_step"
+        }
+      },
+      "padding": 0.5
+    },
+    {
+      "name": "color",
+      "type": "ordinal",
+      "domain": {
+        "data": "data_2",
+        "field": "year",
+        "sort": true
+      },
+      "range": "category"
+    }
+  ],
+  "legends": [
+    {
+      "stroke": "color",
+      "symbolType": "circle",
+      "title": "year",
+      "encode": {
+        "symbols": {
+          "update": {
+            "fill": {
+              "value": "transparent"
+            }
+          }
+        }
+      }
+    }
+  ]
+}

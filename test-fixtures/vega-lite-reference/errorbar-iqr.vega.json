@@ -1,0 +1,318 @@
+{
+  "$schema": "https://vega.github.io/schema/vega/v6.json",
+  "description": "Interquartile ranges with capped ends, drawn sideways from a categorical axis.",
+  "background": "white",
+  "padding": 5,
+  "width": 300,
+  "style": "cell",
+  "data": [
+    {
+      "name": "source_0",
+      "values": [
+        {
+          "g": "a",
+          "v": 3
+        },
+        {
+          "g": "a",
+          "v": 9
+        },
+        {
+          "g": "a",
+          "v": 5
+        },
+        {
+          "g": "a",
+          "v": 1
+        },
+        {
+          "g": "b",
+          "v": 6
+        },
+        {
+          "g": "b",
+          "v": 2
+        },
+        {
+          "g": "b",
+          "v": 8
+        },
+        {
+          "g": "b",
+          "v": 4
+        }
+      ]
+    },
+    {
+      "name": "data_0",
+      "source": "source_0",
+      "transform": [
+        {
+          "type": "aggregate",
+          "groupby": [
+            "g"
+          ],
+          "ops": [
+            "q1",
+            "q3",
+            "median"
+          ],
+          "fields": [
+            "v",
+            "v",
+            "v"
+          ],
+          "as": [
+            "lower_v",
+            "upper_v",
+            "center_v"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "data_1",
+      "source": "data_0",
+      "transform": [
+        {
+          "type": "filter",
+          "expr": "isValid(datum[\"lower_v\"]) && isFinite(+datum[\"lower_v\"])"
+        }
+      ]
+    },
+    {
+      "name": "data_2",
+      "source": "data_0",
+      "transform": [
+        {
+          "type": "filter",
+          "expr": "isValid(datum[\"upper_v\"]) && isFinite(+datum[\"upper_v\"])"
+        }
+      ]
+    }
+  ],
+  "signals": [
+    {
+      "name": "y_step",
+      "value": 20
+    },
+    {
+      "name": "height",
+      "update": "bandspace(domain('y').length, 0.25, 0.125) * y_step"
+    }
+  ],
+  "marks": [
+    {
+      "name": "layer_0_marks",
+      "type": "rect",
+      "style": [
+        "tick",
+        "errorbar-ticks"
+      ],
+      "aria": false,
+      "from": {
+        "data": "data_1"
+      },
+      "encode": {
+        "update": {
+          "opacity": {
+            "value": 0.7
+          },
+          "fill": {
+            "value": "#4c78a8"
+          },
+          "tooltip": {
+            "signal": "{\"Q3 of v\": format(datum[\"upper_v\"], \"\"), \"Q1 of v\": format(datum[\"lower_v\"], \"\"), \"Median of v\": format(datum[\"center_v\"], \"\"), \"g\": isValid(datum[\"g\"]) ? isArray(datum[\"g\"]) ? join(datum[\"g\"], '\\n') : datum[\"g\"] : \"\"+datum[\"g\"]}"
+          },
+          "y": {
+            "scale": "y",
+            "field": "g"
+          },
+          "height": {
+            "signal": "max(0.25, bandwidth('y'))"
+          },
+          "xc": {
+            "scale": "x",
+            "field": "lower_v"
+          },
+          "width": {
+            "value": 2
+          }
+        }
+      }
+    },
+    {
+      "name": "layer_1_marks",
+      "type": "rect",
+      "style": [
+        "tick",
+        "errorbar-ticks"
+      ],
+      "aria": false,
+      "from": {
+        "data": "data_2"
+      },
+      "encode": {
+        "update": {
+          "opacity": {
+            "value": 0.7
+          },
+          "fill": {
+            "value": "#4c78a8"
+          },
+          "tooltip": {
+            "signal": "{\"Q3 of v\": format(datum[\"upper_v\"], \"\"), \"Q1 of v\": format(datum[\"lower_v\"], \"\"), \"Median of v\": format(datum[\"center_v\"], \"\"), \"g\": isValid(datum[\"g\"]) ? isArray(datum[\"g\"]) ? join(datum[\"g\"], '\\n') : datum[\"g\"] : \"\"+datum[\"g\"]}"
+          },
+          "y": {
+            "scale": "y",
+            "field": "g"
+          },
+          "height": {
+            "signal": "max(0.25, bandwidth('y'))"
+          },
+          "xc": {
+            "scale": "x",
+            "field": "upper_v"
+          },
+          "width": {
+            "value": 2
+          }
+        }
+      }
+    },
+    {
+      "name": "layer_2_marks",
+      "type": "rule",
+      "style": [
+        "rule",
+        "errorbar-rule"
+      ],
+      "from": {
+        "data": "data_1"
+      },
+      "encode": {
+        "update": {
+          "ariaRoleDescription": {
+            "value": "errorbar"
+          },
+          "stroke": {
+            "value": "black"
+          },
+          "tooltip": {
+            "signal": "{\"Q3 of v\": format(datum[\"upper_v\"], \"\"), \"Q1 of v\": format(datum[\"lower_v\"], \"\"), \"Median of v\": format(datum[\"center_v\"], \"\"), \"g\": isValid(datum[\"g\"]) ? isArray(datum[\"g\"]) ? join(datum[\"g\"], '\\n') : datum[\"g\"] : \"\"+datum[\"g\"]}"
+          },
+          "description": {
+            "signal": "\"v: \" + (format(datum[\"lower_v\"], \"\")) + \"; g: \" + (isValid(datum[\"g\"]) ? isArray(datum[\"g\"]) ? join(datum[\"g\"], ' ') : datum[\"g\"] : \"\"+datum[\"g\"]) + \"; upper_v: \" + (format(datum[\"upper_v\"], \"\")) + \"; Q3 of v: \" + (format(datum[\"upper_v\"], \"\")) + \"; Q1 of v: \" + (format(datum[\"lower_v\"], \"\")) + \"; Median of v: \" + (format(datum[\"center_v\"], \"\"))"
+          },
+          "x": {
+            "scale": "x",
+            "field": "lower_v"
+          },
+          "x2": {
+            "scale": "x",
+            "field": "upper_v"
+          },
+          "y": {
+            "scale": "y",
+            "field": "g",
+            "band": 0.5
+          },
+          "strokeWidth": {
+            "value": 2
+          }
+        }
+      }
+    }
+  ],
+  "scales": [
+    {
+      "name": "x",
+      "type": "linear",
+      "domain": {
+        "fields": [
+          {
+            "data": "data_1",
+            "field": "lower_v"
+          },
+          {
+            "data": "data_2",
+            "field": "upper_v"
+          },
+          {
+            "data": "data_1",
+            "field": "upper_v"
+          }
+        ]
+      },
+      "range": [
+        0,
+        {
+          "signal": "width"
+        }
+      ],
+      "nice": true,
+      "zero": true
+    },
+    {
+      "name": "y",
+      "type": "band",
+      "domain": {
+        "fields": [
+          {
+            "data": "data_1",
+            "field": "g"
+          },
+          {
+            "data": "data_2",
+            "field": "g"
+          }
+        ],
+        "sort": true
+      },
+      "range": {
+        "step": {
+          "signal": "y_step"
+        }
+      },
+      "paddingInner": 0.25,
+      "paddingOuter": 0.125
+    }
+  ],
+  "axes": [
+    {
+      "scale": "x",
+      "orient": "bottom",
+      "gridScale": "y",
+      "grid": true,
+      "tickCount": {
+        "signal": "ceil(width/40)"
+      },
+      "domain": false,
+      "labels": false,
+      "aria": false,
+      "maxExtent": 0,
+      "minExtent": 0,
+      "ticks": false,
+      "zindex": 0
+    },
+    {
+      "scale": "x",
+      "orient": "bottom",
+      "grid": false,
+      "title": "v",
+      "labelFlush": true,
+      "labelOverlap": true,
+      "tickCount": {
+        "signal": "ceil(width/40)"
+      },
+      "zindex": 0
+    },
+    {
+      "scale": "y",
+      "orient": "left",
+      "grid": false,
+      "title": "g",
+      "zindex": 0
+    }
+  ]
+}

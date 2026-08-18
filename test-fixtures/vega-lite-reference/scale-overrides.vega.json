@@ -1,0 +1,189 @@
+{
+  "$schema": "https://vega.github.io/schema/vega/v6.json",
+  "description": "Scales written out by hand, and two guides switched off.",
+  "background": "white",
+  "padding": 5,
+  "height": 300,
+  "style": "cell",
+  "data": [
+    {
+      "name": "source_0",
+      "values": [
+        {
+          "c": "a",
+          "v": 1,
+          "g": "x"
+        },
+        {
+          "c": "b",
+          "v": 4,
+          "g": "y"
+        },
+        {
+          "c": "d",
+          "v": 7,
+          "g": "x"
+        },
+        {
+          "c": "e",
+          "v": 2,
+          "g": "y"
+        }
+      ]
+    },
+    {
+      "name": "data_0",
+      "source": "source_0",
+      "transform": [
+        {
+          "type": "filter",
+          "expr": "isValid(datum[\"v\"]) && isFinite(+datum[\"v\"])"
+        }
+      ]
+    }
+  ],
+  "signals": [
+    {
+      "name": "x_step",
+      "value": 20
+    },
+    {
+      "name": "width",
+      "update": "bandspace(domain('x').length, 1, 0.5) * x_step"
+    }
+  ],
+  "marks": [
+    {
+      "name": "marks",
+      "type": "symbol",
+      "style": [
+        "point"
+      ],
+      "from": {
+        "data": "data_0"
+      },
+      "encode": {
+        "update": {
+          "opacity": {
+            "value": 0.7
+          },
+          "fill": {
+            "value": "transparent"
+          },
+          "stroke": {
+            "scale": "color",
+            "field": "g"
+          },
+          "ariaRoleDescription": {
+            "value": "point"
+          },
+          "description": {
+            "signal": "\"c: \" + (isValid(datum[\"c\"]) ? isArray(datum[\"c\"]) ? join(datum[\"c\"], ' ') : datum[\"c\"] : \"\"+datum[\"c\"]) + \"; v: \" + (format(datum[\"v\"], \"\")) + \"; g: \" + (isValid(datum[\"g\"]) ? isArray(datum[\"g\"]) ? join(datum[\"g\"], ' ') : datum[\"g\"] : \"\"+datum[\"g\"])"
+          },
+          "x": {
+            "scale": "x",
+            "field": "c"
+          },
+          "y": {
+            "scale": "y",
+            "field": "v"
+          },
+          "size": {
+            "scale": "size",
+            "field": "v"
+          }
+        }
+      }
+    }
+  ],
+  "scales": [
+    {
+      "name": "x",
+      "type": "point",
+      "domain": [
+        "e",
+        "d",
+        "b",
+        "a"
+      ],
+      "range": {
+        "step": {
+          "signal": "x_step"
+        }
+      },
+      "paddingOuter": 0.5,
+      "padding": 0.5
+    },
+    {
+      "name": "y",
+      "type": "linear",
+      "domain": [
+        0,
+        10
+      ],
+      "range": [
+        {
+          "signal": "height"
+        },
+        0
+      ],
+      "nice": false,
+      "zero": true
+    },
+    {
+      "name": "color",
+      "type": "ordinal",
+      "domain": {
+        "data": "data_0",
+        "field": "g",
+        "sort": true
+      },
+      "range": [
+        "#4c78a8",
+        "#f58518"
+      ]
+    },
+    {
+      "name": "size",
+      "type": "linear",
+      "domain": {
+        "data": "data_0",
+        "field": "v"
+      },
+      "range": [
+        20,
+        200
+      ],
+      "zero": true
+    }
+  ],
+  "axes": [
+    {
+      "scale": "x",
+      "orient": "bottom",
+      "grid": false,
+      "labelAngle": 0,
+      "labelBaseline": "top",
+      "zindex": 0
+    }
+  ],
+  "legends": [
+    {
+      "size": "size",
+      "symbolType": "circle",
+      "title": "v",
+      "encode": {
+        "symbols": {
+          "update": {
+            "fill": {
+              "value": "transparent"
+            },
+            "opacity": {
+              "value": 0.7
+            }
+          }
+        }
+      }
+    }
+  ]
+}

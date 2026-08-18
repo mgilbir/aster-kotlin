@@ -217,7 +217,11 @@ const MIRRORED = {
 };
 
 function curveFor(interpolate, orient, tension) {
-  return curves(interpolate, orient, tension == null ? null : tension) || null;
+  // A line that names no `interpolate` is still drawn through a curve — `linear`, which is what
+  // Vega passes when the property is absent. Returning null for it left `closed` reading false by
+  // construction for every plain line, which is a flag that says nothing rather than a flag that
+  // says no: d3 closes a one-point line, and the reference has to record that it does.
+  return curves(interpolate || 'linear', orient, tension == null ? null : tension) || null;
 }
 
 /**
@@ -467,7 +471,16 @@ function record(type, role, item, dx, dy, precision) {
     // Both engines draw its string form, so compare that rather than its type — and an **array** is
     // upstream's multi-line form, so its lines are joined the way both engines lay them out rather
     // than the way `String()` would, with commas.
-    if (entry.text !== undefined) {
+    //
+    // A **null** text is not a text at all, and is not an empty one either: the item exists and is
+    // measured, and it has nothing to draw. `String(null)` is the four letters "null", and writing
+    // those into the reference had this engine dutifully drawing them — the first band of a
+    // discretizing scale's legend reaches to negative infinity and has no lower bound to write.
+    // Dropping the property instead is what `TextNode.absent` models on this side, so the two agree
+    // without either of them inventing an empty string somebody could have meant.
+    if (entry.text === null) {
+      delete entry.text;
+    } else if (entry.text !== undefined) {
       entry.text = Array.isArray(entry.text) ? entry.text.join('\n') : String(entry.text);
     }
   }

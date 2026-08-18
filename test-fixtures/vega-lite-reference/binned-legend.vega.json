@@ -1,0 +1,228 @@
+{
+  "$schema": "https://vega.github.io/schema/vega/v6.json",
+  "description": "A binned colour scale, whose legend labels the buckets rather than the values.",
+  "background": "white",
+  "padding": 5,
+  "width": 300,
+  "height": 300,
+  "style": "cell",
+  "data": [
+    {
+      "name": "source_0",
+      "values": [
+        {
+          "a": 1,
+          "b": 2,
+          "v": 1
+        },
+        {
+          "a": 2,
+          "b": 5,
+          "v": 4
+        },
+        {
+          "a": 3,
+          "b": 1,
+          "v": 7
+        },
+        {
+          "a": 4,
+          "b": 6,
+          "v": 9
+        },
+        {
+          "a": 5,
+          "b": 3,
+          "v": 3
+        }
+      ]
+    },
+    {
+      "name": "data_0",
+      "source": "source_0",
+      "transform": [
+        {
+          "type": "extent",
+          "field": "v",
+          "signal": "bin_maxbins_3_v_extent"
+        },
+        {
+          "type": "bin",
+          "field": "v",
+          "as": [
+            "bin_maxbins_3_v",
+            "bin_maxbins_3_v_end"
+          ],
+          "signal": "bin_maxbins_3_v_bins",
+          "extent": {
+            "signal": "bin_maxbins_3_v_extent"
+          },
+          "maxbins": 3
+        },
+        {
+          "type": "filter",
+          "expr": "isValid(datum[\"a\"]) && isFinite(+datum[\"a\"]) && isValid(datum[\"b\"]) && isFinite(+datum[\"b\"])"
+        }
+      ]
+    }
+  ],
+  "marks": [
+    {
+      "name": "marks",
+      "type": "symbol",
+      "style": [
+        "point"
+      ],
+      "from": {
+        "data": "data_0"
+      },
+      "encode": {
+        "update": {
+          "opacity": {
+            "value": 0.7
+          },
+          "fill": {
+            "value": "transparent"
+          },
+          "stroke": {
+            "scale": "color",
+            "field": "bin_maxbins_3_v"
+          },
+          "ariaRoleDescription": {
+            "value": "point"
+          },
+          "description": {
+            "signal": "\"a: \" + (format(datum[\"a\"], \"\")) + \"; b: \" + (format(datum[\"b\"], \"\")) + \"; v (binned): \" + (!isValid(datum[\"bin_maxbins_3_v\"]) || !isFinite(+datum[\"bin_maxbins_3_v\"]) ? \"null\" : format(datum[\"bin_maxbins_3_v\"], \"\") + \" – \" + format(datum[\"bin_maxbins_3_v_end\"], \"\"))"
+          },
+          "x": {
+            "scale": "x",
+            "field": "a"
+          },
+          "y": {
+            "scale": "y",
+            "field": "b"
+          }
+        }
+      }
+    }
+  ],
+  "scales": [
+    {
+      "name": "x",
+      "type": "linear",
+      "domain": {
+        "data": "data_0",
+        "field": "a"
+      },
+      "range": [
+        0,
+        {
+          "signal": "width"
+        }
+      ],
+      "nice": true,
+      "zero": true
+    },
+    {
+      "name": "y",
+      "type": "linear",
+      "domain": {
+        "data": "data_0",
+        "field": "b"
+      },
+      "range": [
+        {
+          "signal": "height"
+        },
+        0
+      ],
+      "nice": true,
+      "zero": true
+    },
+    {
+      "name": "color",
+      "type": "bin-ordinal",
+      "range": "ramp",
+      "bins": {
+        "signal": "bin_maxbins_3_v_bins"
+      },
+      "interpolate": "hcl"
+    }
+  ],
+  "axes": [
+    {
+      "scale": "x",
+      "orient": "bottom",
+      "gridScale": "y",
+      "grid": true,
+      "tickCount": {
+        "signal": "ceil(width/40)"
+      },
+      "domain": false,
+      "labels": false,
+      "aria": false,
+      "maxExtent": 0,
+      "minExtent": 0,
+      "ticks": false,
+      "zindex": 0
+    },
+    {
+      "scale": "y",
+      "orient": "left",
+      "gridScale": "x",
+      "grid": true,
+      "tickCount": {
+        "signal": "ceil(height/40)"
+      },
+      "domain": false,
+      "labels": false,
+      "aria": false,
+      "maxExtent": 0,
+      "minExtent": 0,
+      "ticks": false,
+      "zindex": 0
+    },
+    {
+      "scale": "x",
+      "orient": "bottom",
+      "grid": false,
+      "title": "a",
+      "labelFlush": true,
+      "labelOverlap": true,
+      "tickCount": {
+        "signal": "ceil(width/40)"
+      },
+      "zindex": 0
+    },
+    {
+      "scale": "y",
+      "orient": "left",
+      "grid": false,
+      "title": "b",
+      "labelOverlap": true,
+      "tickCount": {
+        "signal": "ceil(height/40)"
+      },
+      "zindex": 0
+    }
+  ],
+  "legends": [
+    {
+      "stroke": "color",
+      "symbolType": "circle",
+      "title": "v (binned)",
+      "encode": {
+        "symbols": {
+          "update": {
+            "fill": {
+              "value": "transparent"
+            },
+            "opacity": {
+              "value": 0.7
+            }
+          }
+        }
+      }
+    }
+  ]
+}

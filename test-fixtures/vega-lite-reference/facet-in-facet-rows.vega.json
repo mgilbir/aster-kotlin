@@ -1,0 +1,376 @@
+{
+  "$schema": "https://vega.github.io/schema/vega/v6.json",
+  "description": "A grid whose every cell is itself a grid: two levels of cell group, not one crossed grid. Both levels facet by row, which is what pins the heading rule — `parseFacetHeader` folds the inner level's caption into the outer one's and nulls the inner, so the rows are captioned once, at the top, as `region / size`. It also pins the band: a header naming another grid cannot be as tall as what it names, there being no one cell to match, so it takes `headerBand` and is centred on it instead.",
+  "background": "white",
+  "padding": 5,
+  "data": [
+    {
+      "name": "source_0",
+      "values": [
+        {
+          "region": "north",
+          "size": "big",
+          "x": 1,
+          "y": 4
+        },
+        {
+          "region": "north",
+          "size": "small",
+          "x": 2,
+          "y": 3
+        },
+        {
+          "region": "south",
+          "size": "big",
+          "x": 3,
+          "y": 2
+        },
+        {
+          "region": "south",
+          "size": "small",
+          "x": 4,
+          "y": 1
+        }
+      ]
+    },
+    {
+      "name": "row_domain",
+      "source": "source_0",
+      "transform": [
+        {
+          "type": "aggregate",
+          "groupby": [
+            "region"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "data_2",
+      "source": "source_0",
+      "transform": [
+        {
+          "type": "filter",
+          "expr": "isValid(datum[\"x\"]) && isFinite(+datum[\"x\"]) && isValid(datum[\"y\"]) && isFinite(+datum[\"y\"])"
+        }
+      ]
+    }
+  ],
+  "signals": [
+    {
+      "name": "child_child_width",
+      "value": 120
+    },
+    {
+      "name": "child_child_height",
+      "value": 80
+    }
+  ],
+  "layout": {
+    "padding": 20,
+    "headerBand": {
+      "row": 0.5
+    },
+    "offset": {
+      "rowTitle": 10
+    },
+    "columns": 1,
+    "bounds": "full",
+    "align": "all"
+  },
+  "marks": [
+    {
+      "name": "row-title",
+      "type": "group",
+      "role": "row-title",
+      "title": {
+        "text": "region / size",
+        "orient": "left",
+        "style": "guide-title",
+        "offset": 10
+      }
+    },
+    {
+      "name": "row_header",
+      "type": "group",
+      "role": "row-header",
+      "from": {
+        "data": "row_domain"
+      },
+      "sort": {
+        "field": "datum[\"region\"]",
+        "order": "ascending"
+      },
+      "title": {
+        "text": {
+          "signal": "isValid(parent[\"region\"]) ? parent[\"region\"] : \"\"+parent[\"region\"]"
+        },
+        "orient": "left",
+        "style": "guide-label",
+        "frame": "group",
+        "offset": 10
+      }
+    },
+    {
+      "name": "cell",
+      "type": "group",
+      "from": {
+        "facet": {
+          "name": "facet",
+          "data": "source_0",
+          "groupby": [
+            "region"
+          ]
+        }
+      },
+      "sort": {
+        "field": [
+          "datum[\"region\"]"
+        ],
+        "order": [
+          "ascending"
+        ]
+      },
+      "data": [
+        {
+          "name": "child_row_domain",
+          "source": "facet",
+          "transform": [
+            {
+              "type": "aggregate",
+              "groupby": [
+                "size"
+              ]
+            }
+          ]
+        }
+      ],
+      "layout": {
+        "padding": 20,
+        "columns": 1,
+        "bounds": "full",
+        "align": "all"
+      },
+      "marks": [
+        {
+          "name": "child_row_header",
+          "type": "group",
+          "role": "row-header",
+          "from": {
+            "data": "child_row_domain"
+          },
+          "sort": {
+            "field": "datum[\"size\"]",
+            "order": "ascending"
+          },
+          "title": {
+            "text": {
+              "signal": "isValid(parent[\"size\"]) ? parent[\"size\"] : \"\"+parent[\"size\"]"
+            },
+            "orient": "left",
+            "style": "guide-label",
+            "frame": "group",
+            "offset": 10
+          },
+          "encode": {
+            "update": {
+              "height": {
+                "signal": "child_child_height"
+              }
+            }
+          },
+          "axes": [
+            {
+              "scale": "y",
+              "orient": "left",
+              "grid": false,
+              "title": "y",
+              "labelOverlap": true,
+              "tickCount": {
+                "signal": "ceil(child_child_height/40)"
+              },
+              "zindex": 0
+            }
+          ]
+        },
+        {
+          "name": "child_column_footer",
+          "type": "group",
+          "role": "column-footer",
+          "encode": {
+            "update": {
+              "width": {
+                "signal": "child_child_width"
+              }
+            }
+          },
+          "axes": [
+            {
+              "scale": "x",
+              "orient": "bottom",
+              "grid": false,
+              "title": "x",
+              "labelFlush": true,
+              "labelOverlap": true,
+              "tickCount": {
+                "signal": "ceil(child_child_width/40)"
+              },
+              "zindex": 0
+            }
+          ]
+        },
+        {
+          "name": "child_cell",
+          "type": "group",
+          "style": "cell",
+          "from": {
+            "facet": {
+              "name": "child_facet",
+              "data": "facet",
+              "groupby": [
+                "size"
+              ]
+            }
+          },
+          "sort": {
+            "field": [
+              "datum[\"size\"]"
+            ],
+            "order": [
+              "ascending"
+            ]
+          },
+          "data": [
+            {
+              "source": "child_facet",
+              "name": "data_0",
+              "transform": [
+                {
+                  "type": "filter",
+                  "expr": "isValid(datum[\"x\"]) && isFinite(+datum[\"x\"]) && isValid(datum[\"y\"]) && isFinite(+datum[\"y\"])"
+                }
+              ]
+            }
+          ],
+          "encode": {
+            "update": {
+              "width": {
+                "signal": "child_child_width"
+              },
+              "height": {
+                "signal": "child_child_height"
+              }
+            }
+          },
+          "marks": [
+            {
+              "name": "child_child_marks",
+              "type": "symbol",
+              "style": [
+                "point"
+              ],
+              "from": {
+                "data": "data_0"
+              },
+              "encode": {
+                "update": {
+                  "opacity": {
+                    "value": 0.7
+                  },
+                  "fill": {
+                    "value": "transparent"
+                  },
+                  "stroke": {
+                    "value": "#4c78a8"
+                  },
+                  "ariaRoleDescription": {
+                    "value": "point"
+                  },
+                  "description": {
+                    "signal": "\"x: \" + (format(datum[\"x\"], \"\")) + \"; y: \" + (format(datum[\"y\"], \"\"))"
+                  },
+                  "x": {
+                    "scale": "x",
+                    "field": "x"
+                  },
+                  "y": {
+                    "scale": "y",
+                    "field": "y"
+                  }
+                }
+              }
+            }
+          ],
+          "axes": [
+            {
+              "scale": "x",
+              "orient": "bottom",
+              "gridScale": "y",
+              "grid": true,
+              "tickCount": {
+                "signal": "ceil(child_child_width/40)"
+              },
+              "domain": false,
+              "labels": false,
+              "aria": false,
+              "maxExtent": 0,
+              "minExtent": 0,
+              "ticks": false,
+              "zindex": 0
+            },
+            {
+              "scale": "y",
+              "orient": "left",
+              "gridScale": "x",
+              "grid": true,
+              "tickCount": {
+                "signal": "ceil(child_child_height/40)"
+              },
+              "domain": false,
+              "labels": false,
+              "aria": false,
+              "maxExtent": 0,
+              "minExtent": 0,
+              "ticks": false,
+              "zindex": 0
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "scales": [
+    {
+      "name": "x",
+      "type": "linear",
+      "domain": {
+        "data": "data_2",
+        "field": "x"
+      },
+      "range": [
+        0,
+        {
+          "signal": "child_child_width"
+        }
+      ],
+      "nice": true,
+      "zero": true
+    },
+    {
+      "name": "y",
+      "type": "linear",
+      "domain": {
+        "data": "data_2",
+        "field": "y"
+      },
+      "range": [
+        {
+          "signal": "child_child_height"
+        },
+        0
+      ],
+      "nice": true,
+      "zero": true
+    }
+  ]
+}

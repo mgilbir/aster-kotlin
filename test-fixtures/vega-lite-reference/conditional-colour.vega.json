@@ -1,0 +1,167 @@
+{
+  "$schema": "https://vega.github.io/schema/vega/v6.json",
+  "description": "A colour that is only a condition, which falls through to the mark's own.",
+  "background": "white",
+  "padding": 5,
+  "height": 300,
+  "style": "cell",
+  "data": [
+    {
+      "name": "source_0",
+      "url": "data/movies.json",
+      "format": {
+        "type": "json"
+      },
+      "transform": [
+        {
+          "type": "aggregate",
+          "groupby": [
+            "Major Genre"
+          ],
+          "ops": [
+            "mean"
+          ],
+          "fields": [
+            "Rotten Tomatoes Rating"
+          ],
+          "as": [
+            "mean_Rotten Tomatoes Rating"
+          ]
+        },
+        {
+          "type": "filter",
+          "expr": "isValid(datum[\"mean_Rotten Tomatoes Rating\"]) && isFinite(+datum[\"mean_Rotten Tomatoes Rating\"])"
+        }
+      ]
+    }
+  ],
+  "signals": [
+    {
+      "name": "x_step",
+      "value": 20
+    },
+    {
+      "name": "width",
+      "update": "bandspace(domain('x').length, 0.1, 0.05) * x_step"
+    }
+  ],
+  "marks": [
+    {
+      "name": "marks",
+      "type": "rect",
+      "style": [
+        "bar"
+      ],
+      "from": {
+        "data": "source_0"
+      },
+      "encode": {
+        "update": {
+          "fill": [
+            {
+              "test": "datum['mean_Rotten Tomatoes Rating'] === null",
+              "value": "#aaa"
+            },
+            {
+              "value": "#4c78a8"
+            }
+          ],
+          "ariaRoleDescription": {
+            "value": "bar"
+          },
+          "description": {
+            "signal": "\"Major Genre: \" + (isValid(datum[\"Major Genre\"]) ? isArray(datum[\"Major Genre\"]) ? join(datum[\"Major Genre\"], ' ') : datum[\"Major Genre\"] : \"\"+datum[\"Major Genre\"]) + \"; Mean of Rotten Tomatoes Rating: \" + (format(datum[\"mean_Rotten Tomatoes Rating\"], \"\"))"
+          },
+          "x": {
+            "scale": "x",
+            "field": "Major Genre"
+          },
+          "width": {
+            "signal": "max(0.25, bandwidth('x'))"
+          },
+          "y": {
+            "scale": "y",
+            "field": "mean_Rotten Tomatoes Rating"
+          },
+          "y2": {
+            "scale": "y",
+            "value": 0
+          }
+        }
+      }
+    }
+  ],
+  "scales": [
+    {
+      "name": "x",
+      "type": "band",
+      "domain": {
+        "data": "source_0",
+        "field": "Major Genre",
+        "sort": true
+      },
+      "range": {
+        "step": {
+          "signal": "x_step"
+        }
+      },
+      "paddingInner": 0.1,
+      "paddingOuter": 0.05
+    },
+    {
+      "name": "y",
+      "type": "linear",
+      "domain": {
+        "data": "source_0",
+        "field": "mean_Rotten Tomatoes Rating"
+      },
+      "range": [
+        {
+          "signal": "height"
+        },
+        0
+      ],
+      "nice": true,
+      "zero": true
+    }
+  ],
+  "axes": [
+    {
+      "scale": "y",
+      "orient": "left",
+      "gridScale": "x",
+      "grid": true,
+      "tickCount": {
+        "signal": "ceil(height/40)"
+      },
+      "domain": false,
+      "labels": false,
+      "aria": false,
+      "maxExtent": 0,
+      "minExtent": 0,
+      "ticks": false,
+      "zindex": 0
+    },
+    {
+      "scale": "x",
+      "orient": "bottom",
+      "grid": false,
+      "title": "Major Genre",
+      "labelAlign": "right",
+      "labelAngle": 270,
+      "labelBaseline": "middle",
+      "zindex": 0
+    },
+    {
+      "scale": "y",
+      "orient": "left",
+      "grid": false,
+      "title": "Mean of Rotten Tomatoes Rating",
+      "labelOverlap": true,
+      "tickCount": {
+        "signal": "ceil(height/40)"
+      },
+      "zindex": 0
+    }
+  ]
+}

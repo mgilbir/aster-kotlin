@@ -1,0 +1,450 @@
+{
+  "$schema": "https://vega.github.io/schema/vega/v6.json",
+  "description": "The same shape reached by repetition rather than by concatenation, which is worth its own fixture only because of *when* the rewrite happens: a repeat at the top of a chart is normalised before anything looks at it, and a repeat that is a grid's cell cannot be, because until the grids are peeled off it is not the thing being compiled. So it is normalised after the peel, where it stands.",
+  "background": "white",
+  "padding": 5,
+  "data": [
+    {
+      "name": "source_0",
+      "values": [
+        {
+          "a": "p",
+          "x": 1,
+          "y": 2
+        },
+        {
+          "a": "q",
+          "x": 3,
+          "y": 4
+        }
+      ]
+    },
+    {
+      "name": "column_domain",
+      "source": "source_0",
+      "transform": [
+        {
+          "type": "aggregate",
+          "groupby": [
+            "a"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "data_2",
+      "source": "source_0",
+      "transform": [
+        {
+          "type": "filter",
+          "expr": "isValid(datum[\"x\"]) && isFinite(+datum[\"x\"]) && isValid(datum[\"y\"]) && isFinite(+datum[\"y\"])"
+        }
+      ]
+    },
+    {
+      "name": "data_3",
+      "source": "source_0",
+      "transform": [
+        {
+          "type": "filter",
+          "expr": "isValid(datum[\"y\"]) && isFinite(+datum[\"y\"])"
+        }
+      ]
+    }
+  ],
+  "signals": [
+    {
+      "name": "child_childWidth",
+      "value": 60
+    },
+    {
+      "name": "child_childHeight",
+      "value": 40
+    }
+  ],
+  "layout": {
+    "padding": 20,
+    "headerBand": {
+      "column": 0.5
+    },
+    "offset": {
+      "columnTitle": 10
+    },
+    "columns": {
+      "signal": "length(data('column_domain'))"
+    },
+    "bounds": "full",
+    "align": "all"
+  },
+  "marks": [
+    {
+      "name": "column-title",
+      "type": "group",
+      "role": "column-title",
+      "title": {
+        "text": "a",
+        "style": "guide-title",
+        "offset": 10
+      }
+    },
+    {
+      "name": "column_header",
+      "type": "group",
+      "role": "column-header",
+      "from": {
+        "data": "column_domain"
+      },
+      "sort": {
+        "field": "datum[\"a\"]",
+        "order": "ascending"
+      },
+      "title": {
+        "text": {
+          "signal": "isValid(parent[\"a\"]) ? parent[\"a\"] : \"\"+parent[\"a\"]"
+        },
+        "style": "guide-label",
+        "frame": "group",
+        "offset": 10
+      }
+    },
+    {
+      "name": "cell",
+      "type": "group",
+      "from": {
+        "facet": {
+          "name": "facet",
+          "data": "source_0",
+          "groupby": [
+            "a"
+          ]
+        }
+      },
+      "sort": {
+        "field": [
+          "datum[\"a\"]"
+        ],
+        "order": [
+          "ascending"
+        ]
+      },
+      "data": [
+        {
+          "source": "facet",
+          "name": "data_0",
+          "transform": [
+            {
+              "type": "filter",
+              "expr": "isValid(datum[\"x\"]) && isFinite(+datum[\"x\"]) && isValid(datum[\"y\"]) && isFinite(+datum[\"y\"])"
+            }
+          ]
+        },
+        {
+          "source": "facet",
+          "name": "data_1",
+          "transform": [
+            {
+              "type": "filter",
+              "expr": "isValid(datum[\"y\"]) && isFinite(+datum[\"y\"])"
+            }
+          ]
+        }
+      ],
+      "layout": {
+        "padding": 20,
+        "columns": 2,
+        "bounds": "full",
+        "align": "all"
+      },
+      "marks": [
+        {
+          "type": "group",
+          "name": "child__column_x_group",
+          "style": "cell",
+          "encode": {
+            "update": {
+              "width": {
+                "signal": "child_childWidth"
+              },
+              "height": {
+                "signal": "child_childHeight"
+              }
+            }
+          },
+          "marks": [
+            {
+              "name": "child__column_x_marks",
+              "type": "symbol",
+              "style": [
+                "point"
+              ],
+              "from": {
+                "data": "data_0"
+              },
+              "encode": {
+                "update": {
+                  "opacity": {
+                    "value": 0.7
+                  },
+                  "fill": {
+                    "value": "transparent"
+                  },
+                  "stroke": {
+                    "value": "#4c78a8"
+                  },
+                  "ariaRoleDescription": {
+                    "value": "point"
+                  },
+                  "description": {
+                    "signal": "\"x: \" + (format(datum[\"x\"], \"\")) + \"; y: \" + (format(datum[\"y\"], \"\"))"
+                  },
+                  "x": {
+                    "scale": "child__column_x_x",
+                    "field": "x"
+                  },
+                  "y": {
+                    "scale": "child__column_x_y",
+                    "field": "y"
+                  }
+                }
+              }
+            }
+          ],
+          "axes": [
+            {
+              "scale": "child__column_x_x",
+              "orient": "bottom",
+              "gridScale": "child__column_x_y",
+              "grid": true,
+              "tickCount": {
+                "signal": "ceil(child_childWidth/40)"
+              },
+              "domain": false,
+              "labels": false,
+              "aria": false,
+              "maxExtent": 0,
+              "minExtent": 0,
+              "ticks": false,
+              "zindex": 0
+            },
+            {
+              "scale": "child__column_x_y",
+              "orient": "left",
+              "gridScale": "child__column_x_x",
+              "grid": true,
+              "tickCount": {
+                "signal": "ceil(child_childHeight/40)"
+              },
+              "domain": false,
+              "labels": false,
+              "aria": false,
+              "maxExtent": 0,
+              "minExtent": 0,
+              "ticks": false,
+              "zindex": 0
+            },
+            {
+              "scale": "child__column_x_x",
+              "orient": "bottom",
+              "grid": false,
+              "title": "x",
+              "labelFlush": true,
+              "labelOverlap": true,
+              "tickCount": {
+                "signal": "ceil(child_childWidth/40)"
+              },
+              "zindex": 0
+            },
+            {
+              "scale": "child__column_x_y",
+              "orient": "left",
+              "grid": false,
+              "title": "y",
+              "labelOverlap": true,
+              "tickCount": {
+                "signal": "ceil(child_childHeight/40)"
+              },
+              "zindex": 0
+            }
+          ]
+        },
+        {
+          "type": "group",
+          "name": "child__column_y_group",
+          "style": "cell",
+          "encode": {
+            "update": {
+              "width": {
+                "signal": "child_childWidth"
+              },
+              "height": {
+                "signal": "child_childHeight"
+              }
+            }
+          },
+          "marks": [
+            {
+              "name": "child__column_y_marks",
+              "type": "symbol",
+              "style": [
+                "point"
+              ],
+              "from": {
+                "data": "data_1"
+              },
+              "encode": {
+                "update": {
+                  "opacity": {
+                    "value": 0.7
+                  },
+                  "fill": {
+                    "value": "transparent"
+                  },
+                  "stroke": {
+                    "value": "#4c78a8"
+                  },
+                  "ariaRoleDescription": {
+                    "value": "point"
+                  },
+                  "description": {
+                    "signal": "\"y: \" + (format(datum[\"y\"], \"\"))"
+                  },
+                  "x": {
+                    "scale": "child__column_y_x",
+                    "field": "y"
+                  },
+                  "y": {
+                    "scale": "child__column_y_y",
+                    "field": "y"
+                  }
+                }
+              }
+            }
+          ],
+          "axes": [
+            {
+              "scale": "child__column_y_x",
+              "orient": "bottom",
+              "gridScale": "child__column_y_y",
+              "grid": true,
+              "tickCount": {
+                "signal": "ceil(child_childWidth/40)"
+              },
+              "domain": false,
+              "labels": false,
+              "aria": false,
+              "maxExtent": 0,
+              "minExtent": 0,
+              "ticks": false,
+              "zindex": 0
+            },
+            {
+              "scale": "child__column_y_y",
+              "orient": "left",
+              "gridScale": "child__column_y_x",
+              "grid": true,
+              "tickCount": {
+                "signal": "ceil(child_childHeight/40)"
+              },
+              "domain": false,
+              "labels": false,
+              "aria": false,
+              "maxExtent": 0,
+              "minExtent": 0,
+              "ticks": false,
+              "zindex": 0
+            },
+            {
+              "scale": "child__column_y_x",
+              "orient": "bottom",
+              "grid": false,
+              "title": "y",
+              "labelFlush": true,
+              "labelOverlap": true,
+              "tickCount": {
+                "signal": "ceil(child_childWidth/40)"
+              },
+              "zindex": 0
+            },
+            {
+              "scale": "child__column_y_y",
+              "orient": "left",
+              "grid": false,
+              "title": "y",
+              "labelOverlap": true,
+              "tickCount": {
+                "signal": "ceil(child_childHeight/40)"
+              },
+              "zindex": 0
+            }
+          ]
+        }
+      ],
+      "scales": [
+        {
+          "name": "child__column_x_x",
+          "type": "linear",
+          "domain": {
+            "data": "data_0",
+            "field": "x"
+          },
+          "range": [
+            0,
+            {
+              "signal": "child_childWidth"
+            }
+          ],
+          "nice": true,
+          "zero": true
+        },
+        {
+          "name": "child__column_x_y",
+          "type": "linear",
+          "domain": {
+            "data": "data_0",
+            "field": "y"
+          },
+          "range": [
+            {
+              "signal": "child_childHeight"
+            },
+            0
+          ],
+          "nice": true,
+          "zero": true
+        },
+        {
+          "name": "child__column_y_x",
+          "type": "linear",
+          "domain": {
+            "data": "data_1",
+            "field": "y"
+          },
+          "range": [
+            0,
+            {
+              "signal": "child_childWidth"
+            }
+          ],
+          "nice": true,
+          "zero": true
+        },
+        {
+          "name": "child__column_y_y",
+          "type": "linear",
+          "domain": {
+            "data": "data_1",
+            "field": "y"
+          },
+          "range": [
+            {
+              "signal": "child_childHeight"
+            },
+            0
+          ],
+          "nice": true,
+          "zero": true
+        }
+      ]
+    }
+  ]
+}

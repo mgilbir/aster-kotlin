@@ -1,0 +1,266 @@
+{
+  "$schema": "https://vega.github.io/schema/vega/v6.json",
+  "description": "A label on each segment: the bar's colour and the text's detail key the same stack.",
+  "background": "white",
+  "padding": 5,
+  "width": 300,
+  "style": "cell",
+  "data": [
+    {
+      "name": "source_0",
+      "url": "data/barley.json",
+      "format": {
+        "type": "json"
+      },
+      "transform": [
+        {
+          "type": "aggregate",
+          "groupby": [
+            "variety",
+            "site"
+          ],
+          "ops": [
+            "sum"
+          ],
+          "fields": [
+            "yield"
+          ],
+          "as": [
+            "sum_yield"
+          ]
+        },
+        {
+          "type": "stack",
+          "groupby": [
+            "variety"
+          ],
+          "field": "sum_yield",
+          "sort": {
+            "field": [
+              "site"
+            ],
+            "order": [
+              "ascending"
+            ]
+          },
+          "as": [
+            "sum_yield_start",
+            "sum_yield_end"
+          ],
+          "offset": "normalize"
+        }
+      ]
+    },
+    {
+      "name": "data_0",
+      "source": "source_0",
+      "transform": [
+        {
+          "type": "filter",
+          "expr": "isValid(datum[\"sum_yield\"]) && isFinite(+datum[\"sum_yield\"])"
+        }
+      ]
+    },
+    {
+      "name": "data_1",
+      "source": "source_0",
+      "transform": [
+        {
+          "type": "filter",
+          "expr": "isValid(datum[\"sum_yield\"]) && isFinite(+datum[\"sum_yield\"])"
+        }
+      ]
+    }
+  ],
+  "signals": [
+    {
+      "name": "y_step",
+      "value": 17
+    },
+    {
+      "name": "height",
+      "update": "bandspace(domain('y').length, 0.1, 0.05) * y_step"
+    }
+  ],
+  "marks": [
+    {
+      "name": "layer_0_marks",
+      "type": "rect",
+      "style": [
+        "bar"
+      ],
+      "from": {
+        "data": "data_1"
+      },
+      "encode": {
+        "update": {
+          "fill": {
+            "scale": "color",
+            "field": "site"
+          },
+          "ariaRoleDescription": {
+            "value": "bar"
+          },
+          "description": {
+            "signal": "\"Sum of yield: \" + (format(datum[\"sum_yield_end\"]-datum[\"sum_yield_start\"], \".0%\")) + \"; variety: \" + (isValid(datum[\"variety\"]) ? isArray(datum[\"variety\"]) ? join(datum[\"variety\"], ' ') : datum[\"variety\"] : \"\"+datum[\"variety\"]) + \"; site: \" + (isValid(datum[\"site\"]) ? isArray(datum[\"site\"]) ? join(datum[\"site\"], ' ') : datum[\"site\"] : \"\"+datum[\"site\"])"
+          },
+          "x": {
+            "scale": "x",
+            "field": "sum_yield_end"
+          },
+          "x2": {
+            "scale": "x",
+            "field": "sum_yield_start"
+          },
+          "y": {
+            "scale": "y",
+            "field": "variety"
+          },
+          "height": {
+            "signal": "max(0.25, bandwidth('y'))"
+          }
+        }
+      }
+    },
+    {
+      "name": "layer_1_marks",
+      "type": "text",
+      "style": [
+        "text"
+      ],
+      "from": {
+        "data": "data_0"
+      },
+      "encode": {
+        "update": {
+          "opacity": {
+            "value": 0.9
+          },
+          "fill": {
+            "value": "white"
+          },
+          "description": {
+            "signal": "\"Sum of yield: \" + (format(datum[\"sum_yield_end\"]-datum[\"sum_yield_start\"], \".0%\")) + \"; variety: \" + (isValid(datum[\"variety\"]) ? isArray(datum[\"variety\"]) ? join(datum[\"variety\"], ' ') : datum[\"variety\"] : \"\"+datum[\"variety\"]) + \"; site: \" + (isValid(datum[\"site\"]) ? isArray(datum[\"site\"]) ? join(datum[\"site\"], ' ') : datum[\"site\"] : \"\"+datum[\"site\"])"
+          },
+          "x": {
+            "signal": "scale(\"x\", 0.5 * datum[\"sum_yield_start\"] + 0.5 * datum[\"sum_yield_end\"])"
+          },
+          "y": {
+            "scale": "y",
+            "field": "variety",
+            "band": 0.5
+          },
+          "text": {
+            "signal": "format(datum[\"sum_yield\"], \"\")"
+          },
+          "align": {
+            "value": "center"
+          },
+          "baseline": {
+            "value": "middle"
+          }
+        }
+      }
+    }
+  ],
+  "scales": [
+    {
+      "name": "x",
+      "type": "linear",
+      "domain": [
+        0,
+        1
+      ],
+      "range": [
+        0,
+        {
+          "signal": "width"
+        }
+      ],
+      "nice": true,
+      "zero": true
+    },
+    {
+      "name": "y",
+      "type": "band",
+      "domain": {
+        "fields": [
+          {
+            "data": "data_1",
+            "field": "variety"
+          },
+          {
+            "data": "data_0",
+            "field": "variety"
+          }
+        ],
+        "sort": true
+      },
+      "range": {
+        "step": {
+          "signal": "y_step"
+        }
+      },
+      "paddingInner": 0.1,
+      "paddingOuter": 0.05
+    },
+    {
+      "name": "color",
+      "type": "ordinal",
+      "domain": {
+        "data": "data_1",
+        "field": "site",
+        "sort": true
+      },
+      "range": [
+        "#675193",
+        "#ca8861"
+      ]
+    }
+  ],
+  "axes": [
+    {
+      "scale": "x",
+      "orient": "bottom",
+      "gridScale": "y",
+      "grid": true,
+      "tickCount": {
+        "signal": "ceil(width/40)"
+      },
+      "domain": false,
+      "labels": false,
+      "aria": false,
+      "maxExtent": 0,
+      "minExtent": 0,
+      "ticks": false,
+      "zindex": 0
+    },
+    {
+      "scale": "x",
+      "orient": "bottom",
+      "grid": false,
+      "title": "Sum of yield",
+      "format": ".0%",
+      "labelFlush": true,
+      "labelOverlap": true,
+      "tickCount": {
+        "signal": "ceil(width/40)"
+      },
+      "zindex": 0
+    },
+    {
+      "scale": "y",
+      "orient": "left",
+      "grid": false,
+      "title": "variety",
+      "zindex": 0
+    }
+  ],
+  "legends": [
+    {
+      "fill": "color",
+      "symbolType": "square",
+      "title": "site"
+    }
+  ]
+}

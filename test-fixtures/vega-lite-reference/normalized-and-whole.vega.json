@@ -1,0 +1,392 @@
+{
+  "$schema": "https://vega.github.io/schema/vega/v6.json",
+  "description": "A proportion labelled as one, a count axis stepping by whole numbers, and a theme's own mark colour.",
+  "background": "white",
+  "padding": 5,
+  "height": 100,
+  "data": [
+    {
+      "name": "source_0",
+      "values": [
+        {
+          "era": "before",
+          "band": "low",
+          "amount": 28
+        },
+        {
+          "era": "before",
+          "band": "high",
+          "amount": 55
+        },
+        {
+          "era": "after",
+          "band": "low",
+          "amount": 43
+        },
+        {
+          "era": "after",
+          "band": "high",
+          "amount": 12
+        }
+      ]
+    },
+    {
+      "name": "data_1",
+      "source": "source_0",
+      "transform": [
+        {
+          "type": "aggregate",
+          "groupby": [
+            "era",
+            "band"
+          ],
+          "ops": [
+            "sum"
+          ],
+          "fields": [
+            "amount"
+          ],
+          "as": [
+            "sum_amount"
+          ]
+        },
+        {
+          "type": "stack",
+          "groupby": [
+            "era"
+          ],
+          "field": "sum_amount",
+          "sort": {
+            "field": [
+              "band"
+            ],
+            "order": [
+              "descending"
+            ]
+          },
+          "as": [
+            "sum_amount_start",
+            "sum_amount_end"
+          ],
+          "offset": "normalize"
+        },
+        {
+          "type": "filter",
+          "expr": "isValid(datum[\"sum_amount\"]) && isFinite(+datum[\"sum_amount\"])"
+        }
+      ]
+    },
+    {
+      "name": "data_2",
+      "source": "source_0",
+      "transform": [
+        {
+          "type": "aggregate",
+          "groupby": [
+            "era"
+          ],
+          "ops": [
+            "count"
+          ],
+          "fields": [
+            null
+          ],
+          "as": [
+            "__count"
+          ]
+        }
+      ]
+    }
+  ],
+  "signals": [
+    {
+      "name": "childWidth",
+      "value": 120
+    }
+  ],
+  "layout": {
+    "padding": 20,
+    "bounds": "full",
+    "align": "each"
+  },
+  "marks": [
+    {
+      "type": "group",
+      "name": "concat_0_group",
+      "style": "cell",
+      "encode": {
+        "update": {
+          "width": {
+            "signal": "childWidth"
+          },
+          "height": {
+            "signal": "height"
+          }
+        }
+      },
+      "marks": [
+        {
+          "name": "concat_0_marks",
+          "type": "rect",
+          "style": [
+            "bar"
+          ],
+          "from": {
+            "data": "data_1"
+          },
+          "encode": {
+            "update": {
+              "fill": {
+                "scale": "color",
+                "field": "band"
+              },
+              "ariaRoleDescription": {
+                "value": "bar"
+              },
+              "description": {
+                "signal": "\"era: \" + (isValid(datum[\"era\"]) ? isArray(datum[\"era\"]) ? join(datum[\"era\"], ' ') : datum[\"era\"] : \"\"+datum[\"era\"]) + \"; Sum of amount: \" + (format(datum[\"sum_amount_end\"]-datum[\"sum_amount_start\"], \".0%\")) + \"; band: \" + (isValid(datum[\"band\"]) ? isArray(datum[\"band\"]) ? join(datum[\"band\"], ' ') : datum[\"band\"] : \"\"+datum[\"band\"])"
+              },
+              "x": {
+                "scale": "concat_0_x",
+                "field": "era"
+              },
+              "width": {
+                "signal": "max(0.25, bandwidth('concat_0_x'))"
+              },
+              "y": {
+                "scale": "concat_0_y",
+                "field": "sum_amount_end"
+              },
+              "y2": {
+                "scale": "concat_0_y",
+                "field": "sum_amount_start"
+              }
+            }
+          }
+        }
+      ],
+      "axes": [
+        {
+          "scale": "concat_0_y",
+          "orient": "left",
+          "gridScale": "concat_0_x",
+          "grid": true,
+          "tickCount": {
+            "signal": "ceil(height/40)"
+          },
+          "domain": false,
+          "labels": false,
+          "aria": false,
+          "maxExtent": 0,
+          "minExtent": 0,
+          "ticks": false,
+          "zindex": 0
+        },
+        {
+          "scale": "concat_0_x",
+          "orient": "bottom",
+          "grid": false,
+          "title": "era",
+          "labelAlign": "right",
+          "labelAngle": 270,
+          "labelBaseline": "middle",
+          "zindex": 0
+        },
+        {
+          "scale": "concat_0_y",
+          "orient": "left",
+          "grid": false,
+          "title": "Sum of amount",
+          "format": ".0%",
+          "labelOverlap": true,
+          "tickCount": {
+            "signal": "ceil(height/40)"
+          },
+          "zindex": 0
+        }
+      ]
+    },
+    {
+      "type": "group",
+      "name": "concat_1_group",
+      "style": "cell",
+      "encode": {
+        "update": {
+          "width": {
+            "signal": "childWidth"
+          },
+          "height": {
+            "signal": "height"
+          }
+        }
+      },
+      "marks": [
+        {
+          "name": "concat_1_marks",
+          "type": "rect",
+          "style": [
+            "bar"
+          ],
+          "from": {
+            "data": "data_2"
+          },
+          "encode": {
+            "update": {
+              "fill": {
+                "value": "purple"
+              },
+              "ariaRoleDescription": {
+                "value": "bar"
+              },
+              "description": {
+                "signal": "\"era: \" + (isValid(datum[\"era\"]) ? isArray(datum[\"era\"]) ? join(datum[\"era\"], ' ') : datum[\"era\"] : \"\"+datum[\"era\"]) + \"; Count of Records: \" + (format(datum[\"__count\"], \"d\"))"
+              },
+              "x": {
+                "scale": "concat_1_x",
+                "field": "era"
+              },
+              "width": {
+                "signal": "max(0.25, bandwidth('concat_1_x'))"
+              },
+              "y": {
+                "scale": "concat_1_y",
+                "field": "__count"
+              },
+              "y2": {
+                "scale": "concat_1_y",
+                "value": 0
+              }
+            }
+          }
+        }
+      ],
+      "axes": [
+        {
+          "scale": "concat_1_y",
+          "orient": "left",
+          "gridScale": "concat_1_x",
+          "grid": true,
+          "tickCount": {
+            "signal": "ceil(height/40)"
+          },
+          "tickMinStep": 1,
+          "domain": false,
+          "labels": false,
+          "aria": false,
+          "maxExtent": 0,
+          "minExtent": 0,
+          "ticks": false,
+          "zindex": 0
+        },
+        {
+          "scale": "concat_1_x",
+          "orient": "bottom",
+          "grid": false,
+          "title": "era",
+          "labelAlign": "right",
+          "labelAngle": 270,
+          "labelBaseline": "middle",
+          "zindex": 0
+        },
+        {
+          "scale": "concat_1_y",
+          "orient": "left",
+          "grid": false,
+          "title": "Count of Records",
+          "format": "d",
+          "labelOverlap": true,
+          "tickCount": {
+            "signal": "ceil(height/40)"
+          },
+          "tickMinStep": 1,
+          "zindex": 0
+        }
+      ]
+    }
+  ],
+  "scales": [
+    {
+      "name": "color",
+      "type": "ordinal",
+      "domain": {
+        "data": "data_1",
+        "field": "band",
+        "sort": true
+      },
+      "range": "category"
+    },
+    {
+      "name": "concat_0_x",
+      "type": "band",
+      "domain": {
+        "data": "data_1",
+        "field": "era",
+        "sort": true
+      },
+      "range": [
+        0,
+        {
+          "signal": "childWidth"
+        }
+      ],
+      "paddingInner": 0.1,
+      "paddingOuter": 0.05
+    },
+    {
+      "name": "concat_0_y",
+      "type": "linear",
+      "domain": [
+        0,
+        1
+      ],
+      "range": [
+        {
+          "signal": "height"
+        },
+        0
+      ],
+      "nice": true,
+      "zero": true
+    },
+    {
+      "name": "concat_1_x",
+      "type": "band",
+      "domain": {
+        "data": "data_2",
+        "field": "era",
+        "sort": true
+      },
+      "range": [
+        0,
+        {
+          "signal": "childWidth"
+        }
+      ],
+      "paddingInner": 0.1,
+      "paddingOuter": 0.05
+    },
+    {
+      "name": "concat_1_y",
+      "type": "linear",
+      "domain": {
+        "data": "data_2",
+        "field": "__count"
+      },
+      "range": [
+        {
+          "signal": "height"
+        },
+        0
+      ],
+      "nice": true,
+      "zero": true
+    }
+  ],
+  "legends": [
+    {
+      "fill": "color",
+      "symbolType": "square",
+      "title": "band"
+    }
+  ]
+}

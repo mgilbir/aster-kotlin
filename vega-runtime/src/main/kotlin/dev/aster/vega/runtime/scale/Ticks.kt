@@ -216,6 +216,8 @@ public object Ticks {
   public fun spanSpecifier(specifier: String, start: Double, stop: Double, count: Int): String {
     if (specifier.contains('.')) return specifier
     val type = specifier.lastOrNull()?.takeIf { it.isLetter() || it == '%' }
+    // `s` is resolved by [spanFormatter] instead: one SI prefix is fixed for the whole span, which
+    // no specifier string can say. `d` has no case in upstream's switch.
     if (type == 's' || type == 'd') return specifier
     val step = stepFrom(tickIncrement(start, stop, count))
     if (!step.isFinite() || step <= 0.0) return specifier

@@ -590,7 +590,7 @@ class GroupMarkTest {
         """
         {
           "width": 100, "height": 100, "padding": 0,
-          "layout": {"columns": 2, "center": true, "headerBand": 0.5, "offset": 4},
+          "layout": {"columns": 2, "center": true, "headerBand": 0.5, "titleBand": 0.5},
           "marks": [{"type": "group",
             "encode": {"enter": {"width": {"value": 10}, "height": {"value": 10}}}}]
         }

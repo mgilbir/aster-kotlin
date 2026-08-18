@@ -1,0 +1,247 @@
+{
+  "$schema": "https://vega.github.io/schema/vega/v6.json",
+  "description": "A trellis whose cells carry the only axis: its gridlines draw across a size named rather than scaled, so the cell aliases that name to its own.",
+  "background": "white",
+  "padding": 5,
+  "data": [
+    {
+      "name": "source_0",
+      "url": "data/cars.json",
+      "format": {
+        "type": "json"
+      },
+      "transform": [
+        {
+          "type": "aggregate",
+          "groupby": [
+            "Origin"
+          ],
+          "ops": [
+            "sum"
+          ],
+          "fields": [
+            "Horsepower"
+          ],
+          "as": [
+            "sum_Horsepower"
+          ]
+        },
+        {
+          "type": "filter",
+          "expr": "isValid(datum[\"sum_Horsepower\"]) && isFinite(+datum[\"sum_Horsepower\"])"
+        }
+      ]
+    },
+    {
+      "name": "row_domain",
+      "source": "source_0",
+      "transform": [
+        {
+          "type": "aggregate",
+          "groupby": [
+            "Origin"
+          ]
+        }
+      ]
+    }
+  ],
+  "signals": [
+    {
+      "name": "child_width",
+      "value": 300
+    },
+    {
+      "name": "child_height",
+      "value": 20
+    }
+  ],
+  "layout": {
+    "padding": 20,
+    "offset": {
+      "rowTitle": 10
+    },
+    "columns": 1,
+    "bounds": "full",
+    "align": "all"
+  },
+  "marks": [
+    {
+      "name": "row-title",
+      "type": "group",
+      "role": "row-title",
+      "title": {
+        "text": "Origin",
+        "orient": "left",
+        "style": "guide-title",
+        "offset": 10
+      }
+    },
+    {
+      "name": "row_header",
+      "type": "group",
+      "role": "row-header",
+      "from": {
+        "data": "row_domain"
+      },
+      "sort": {
+        "field": "datum[\"Origin\"]",
+        "order": "ascending"
+      },
+      "title": {
+        "text": {
+          "signal": "isValid(parent[\"Origin\"]) ? parent[\"Origin\"] : \"\"+parent[\"Origin\"]"
+        },
+        "orient": "left",
+        "style": "guide-label",
+        "frame": "group",
+        "offset": 10
+      },
+      "encode": {
+        "update": {
+          "height": {
+            "signal": "child_height"
+          }
+        }
+      }
+    },
+    {
+      "name": "column_footer",
+      "type": "group",
+      "role": "column-footer",
+      "encode": {
+        "update": {
+          "width": {
+            "signal": "child_width"
+          }
+        }
+      },
+      "axes": [
+        {
+          "scale": "x",
+          "orient": "bottom",
+          "grid": false,
+          "title": "Sum of Horsepower",
+          "labelFlush": true,
+          "labelOverlap": true,
+          "tickCount": {
+            "signal": "ceil(child_width/40)"
+          },
+          "zindex": 0
+        }
+      ]
+    },
+    {
+      "name": "cell",
+      "type": "group",
+      "style": "cell",
+      "from": {
+        "facet": {
+          "name": "facet",
+          "data": "source_0",
+          "groupby": [
+            "Origin"
+          ]
+        }
+      },
+      "sort": {
+        "field": [
+          "datum[\"Origin\"]"
+        ],
+        "order": [
+          "ascending"
+        ]
+      },
+      "encode": {
+        "update": {
+          "width": {
+            "signal": "child_width"
+          },
+          "height": {
+            "signal": "child_height"
+          }
+        }
+      },
+      "signals": [
+        {
+          "name": "height",
+          "update": "child_height"
+        }
+      ],
+      "marks": [
+        {
+          "name": "child_marks",
+          "type": "rect",
+          "style": [
+            "bar"
+          ],
+          "from": {
+            "data": "facet"
+          },
+          "encode": {
+            "update": {
+              "fill": {
+                "value": "#4c78a8"
+              },
+              "ariaRoleDescription": {
+                "value": "bar"
+              },
+              "description": {
+                "signal": "\"Sum of Horsepower: \" + (format(datum[\"sum_Horsepower\"], \"\"))"
+              },
+              "x": {
+                "scale": "x",
+                "field": "sum_Horsepower"
+              },
+              "x2": {
+                "scale": "x",
+                "value": 0
+              },
+              "yc": {
+                "signal": "child_height",
+                "mult": 0.5
+              },
+              "height": {
+                "signal": "0.9 * height"
+              }
+            }
+          }
+        }
+      ],
+      "axes": [
+        {
+          "scale": "x",
+          "orient": "bottom",
+          "grid": true,
+          "tickCount": {
+            "signal": "ceil(child_width/40)"
+          },
+          "domain": false,
+          "labels": false,
+          "aria": false,
+          "maxExtent": 0,
+          "minExtent": 0,
+          "ticks": false,
+          "zindex": 0
+        }
+      ]
+    }
+  ],
+  "scales": [
+    {
+      "name": "x",
+      "type": "linear",
+      "domain": {
+        "data": "source_0",
+        "field": "sum_Horsepower"
+      },
+      "range": [
+        0,
+        {
+          "signal": "child_width"
+        }
+      ],
+      "nice": true,
+      "zero": true
+    }
+  ]
+}

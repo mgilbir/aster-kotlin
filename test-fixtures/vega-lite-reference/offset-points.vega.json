@@ -1,0 +1,202 @@
+{
+  "$schema": "https://vega.github.io/schema/vega/v6.json",
+  "description": "Points offset within a band, where the offset places them rather than giving each a lane.",
+  "background": "white",
+  "padding": 5,
+  "height": 300,
+  "style": "cell",
+  "data": [
+    {
+      "name": "source_0",
+      "url": "data/cars.json",
+      "format": {
+        "type": "json"
+      },
+      "transform": [
+        {
+          "type": "aggregate",
+          "groupby": [
+            "Origin",
+            "Cylinders"
+          ],
+          "ops": [
+            "mean"
+          ],
+          "fields": [
+            "Horsepower"
+          ],
+          "as": [
+            "mean_Horsepower"
+          ]
+        },
+        {
+          "type": "filter",
+          "expr": "isValid(datum[\"mean_Horsepower\"]) && isFinite(+datum[\"mean_Horsepower\"])"
+        }
+      ]
+    }
+  ],
+  "signals": [
+    {
+      "name": "x_step",
+      "update": "20 * domain('xOffset').length / (1-0.2)"
+    },
+    {
+      "name": "width",
+      "update": "bandspace(domain('x').length, 0.2, 0.2) * x_step"
+    }
+  ],
+  "marks": [
+    {
+      "name": "marks",
+      "type": "symbol",
+      "style": [
+        "point"
+      ],
+      "from": {
+        "data": "source_0"
+      },
+      "encode": {
+        "update": {
+          "fill": {
+            "value": "transparent"
+          },
+          "stroke": {
+            "scale": "color",
+            "field": "Cylinders"
+          },
+          "ariaRoleDescription": {
+            "value": "point"
+          },
+          "description": {
+            "signal": "\"Origin: \" + (isValid(datum[\"Origin\"]) ? isArray(datum[\"Origin\"]) ? join(datum[\"Origin\"], ' ') : datum[\"Origin\"] : \"\"+datum[\"Origin\"]) + \"; Mean of Horsepower: \" + (format(datum[\"mean_Horsepower\"], \"\")) + \"; Cylinders: \" + (isValid(datum[\"Cylinders\"]) ? isArray(datum[\"Cylinders\"]) ? join(datum[\"Cylinders\"], ' ') : datum[\"Cylinders\"] : \"\"+datum[\"Cylinders\"])"
+          },
+          "x": {
+            "scale": "x",
+            "field": "Origin",
+            "offset": {
+              "scale": "xOffset",
+              "field": "Cylinders"
+            }
+          },
+          "y": {
+            "scale": "y",
+            "field": "mean_Horsepower"
+          }
+        }
+      }
+    }
+  ],
+  "scales": [
+    {
+      "name": "x",
+      "type": "band",
+      "domain": {
+        "data": "source_0",
+        "field": "Origin",
+        "sort": true
+      },
+      "range": {
+        "step": {
+          "signal": "x_step"
+        }
+      },
+      "padding": 0.2
+    },
+    {
+      "name": "y",
+      "type": "linear",
+      "domain": {
+        "data": "source_0",
+        "field": "mean_Horsepower"
+      },
+      "range": [
+        {
+          "signal": "height"
+        },
+        0
+      ],
+      "nice": true,
+      "zero": true
+    },
+    {
+      "name": "xOffset",
+      "type": "point",
+      "domain": {
+        "data": "source_0",
+        "field": "Cylinders",
+        "sort": true
+      },
+      "range": {
+        "step": 20
+      },
+      "paddingOuter": 0.5
+    },
+    {
+      "name": "color",
+      "type": "ordinal",
+      "domain": {
+        "data": "source_0",
+        "field": "Cylinders",
+        "sort": true
+      },
+      "range": "ordinal",
+      "interpolate": "hcl"
+    }
+  ],
+  "axes": [
+    {
+      "scale": "y",
+      "orient": "left",
+      "gridScale": "x",
+      "grid": true,
+      "tickCount": {
+        "signal": "ceil(height/40)"
+      },
+      "domain": false,
+      "labels": false,
+      "aria": false,
+      "maxExtent": 0,
+      "minExtent": 0,
+      "ticks": false,
+      "zindex": 0
+    },
+    {
+      "scale": "x",
+      "orient": "bottom",
+      "grid": false,
+      "title": "Origin",
+      "labelAlign": "right",
+      "labelAngle": 270,
+      "labelBaseline": "middle",
+      "zindex": 0
+    },
+    {
+      "scale": "y",
+      "orient": "left",
+      "grid": false,
+      "title": "Mean of Horsepower",
+      "labelOverlap": true,
+      "tickCount": {
+        "signal": "ceil(height/40)"
+      },
+      "zindex": 0
+    }
+  ],
+  "legends": [
+    {
+      "stroke": "color",
+      "symbolType": "circle",
+      "title": "Cylinders",
+      "encode": {
+        "symbols": {
+          "update": {
+            "fill": {
+              "value": "transparent"
+            }
+          }
+        }
+      }
+    }
+  ]
+}

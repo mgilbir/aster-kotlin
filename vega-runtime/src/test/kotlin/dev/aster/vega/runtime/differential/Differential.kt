@@ -573,7 +573,13 @@ public object Differential {
     // A clipped group hides whatever its children draw outside it, which no coordinate here
     // reveals.
     if (node.clip != null) strings["clip"] = "true"
-    return Mark("group", node.metadata.role, numbers + corners + paintNumbers(node), strings)
+    // A legend **entry** is a group with contents, which upstream gives the same `scope` role a
+    // group mark's cell carries. This scene keeps them apart under its own name so the
+    // accessibility
+    // walk can tell a legend row from a plotting cell; upstream has no such distinction, so the
+    // comparison reads them as one.
+    val role = if (node.metadata.role == "legend-entry-item") "scope" else node.metadata.role
+    return Mark("group", role, numbers + corners + paintNumbers(node), strings)
   }
 
   /**

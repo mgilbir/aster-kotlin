@@ -30,12 +30,16 @@ public object VoronoiTransform : Transform {
   ): List<VegaValue> {
     if (input.isEmpty()) return input
     val as0 = params.string("as") ?: "path"
-    val xField = params.string("x")
-    val yField = params.string("y")
-    if (xField == null || yField == null) {
+    // Either a **field** to read or an **expression** to evaluate: Vega-Lite writes the second,
+    // `{"expr": "datum.datum.x || 0"}`, because the points are mark items and the coordinate it
+    // wants is the one the encoding resolved, not a column of the data. Reading only the first left
+    // every cell without coordinates, so the diagram came out empty and the overlay drew nothing.
+    val x = coordinate(params.fields["x"], context)
+    val y = coordinate(params.fields["y"], context)
+    if (x == null || y == null) {
       context.diagnostics.error(
         dev.aster.vega.model.DiagnosticCodes.TRANSFORM_INVALID_PARAMETER,
-        "voronoi needs 'x' and 'y' naming the fields its points are in",
+        "voronoi needs 'x' and 'y', each naming a field or an expression for its points",
         operator = type,
       )
       return input
@@ -57,8 +61,8 @@ public object VoronoiTransform : Transform {
 
     val coords = DoubleArray(input.size * 2)
     for (index in input.indices) {
-      coords[2 * index] = input[index].field(xField).asDouble()
-      coords[2 * index + 1] = input[index].field(yField).asDouble()
+      coords[2 * index] = x(input[index])
+      coords[2 * index + 1] = y(input[index])
     }
 
     val diagram = VoronoiDiagram(Delaunay(coords), bounds[0], bounds[1], bounds[2], bounds[3])
@@ -68,6 +72,18 @@ public object VoronoiTransform : Transform {
       val path = if (polygon == null || isPoint(polygon)) null else outline(polygon)
       row.withField(as0, path?.let { VegaValue.Str(it) } ?: VegaValue.Null)
     }
+  }
+
+  /** One point's coordinate: a field to read off the row, or an expression to evaluate over it. */
+  private fun coordinate(param: VegaValue?, context: TransformContext): ((VegaValue) -> Double)? {
+    val expression = (param as? VegaValue.Obj)?.string("expr")
+    if (expression != null) {
+      val compiled = TupleExpression(expression, context, type)
+      if (!compiled.isUsable) return null
+      return { row -> compiled.evaluate(row)?.asDouble() ?: 0.0 }
+    }
+    val field = (param as? VegaValue.Str)?.value ?: return null
+    return { row -> row.field(field).asDouble() }
   }
 
   /** A cell that collapsed to a single point draws nothing rather than a zero-area sliver. */

@@ -1,0 +1,221 @@
+{
+  "$schema": "https://vega.github.io/schema/vega/v6.json",
+  "description": "A bucketing and an accumulation written as transforms rather than on the channels.",
+  "background": "white",
+  "padding": 5,
+  "width": 300,
+  "height": 300,
+  "style": "cell",
+  "data": [
+    {
+      "name": "source_0",
+      "url": "data/movies.json",
+      "format": {
+        "type": "json"
+      },
+      "transform": [
+        {
+          "type": "extent",
+          "field": "IMDB Rating",
+          "signal": "bin_maxbins_10_IMDB_Rating_extent"
+        },
+        {
+          "type": "bin",
+          "field": "IMDB Rating",
+          "as": [
+            "binned rating",
+            "binned rating_end"
+          ],
+          "signal": "bin_maxbins_10_IMDB_Rating_bins",
+          "extent": {
+            "signal": "bin_maxbins_10_IMDB_Rating_extent"
+          },
+          "maxbins": 10
+        },
+        {
+          "type": "aggregate",
+          "groupby": [
+            "binned rating",
+            "binned rating_end",
+            "Major Genre"
+          ],
+          "ops": [
+            "count"
+          ],
+          "fields": [
+            null
+          ],
+          "as": [
+            "count"
+          ]
+        },
+        {
+          "type": "stack",
+          "groupby": [
+            "binned rating"
+          ],
+          "field": "count",
+          "sort": {
+            "field": [
+              "Major Genre"
+            ],
+            "order": [
+              "descending"
+            ]
+          },
+          "as": [
+            "low",
+            "high"
+          ],
+          "offset": "normalize"
+        },
+        {
+          "type": "filter",
+          "expr": "isValid(datum[\"binned rating\"]) && isFinite(+datum[\"binned rating\"]) && isValid(datum[\"low\"]) && isFinite(+datum[\"low\"])"
+        }
+      ]
+    }
+  ],
+  "marks": [
+    {
+      "name": "marks",
+      "type": "rect",
+      "style": [
+        "rect"
+      ],
+      "from": {
+        "data": "source_0"
+      },
+      "encode": {
+        "update": {
+          "fill": {
+            "scale": "color",
+            "field": "Major Genre"
+          },
+          "description": {
+            "signal": "\"IMDB Rating (binned): \" + (!isValid(datum[\"binned rating\"]) || !isFinite(+datum[\"binned rating\"]) ? \"null\" : format(datum[\"binned rating\"], \"\") + \" – \" + format(datum[\"binned rating_end\"], \"\")) + \"; low: \" + (format(datum[\"low\"], \"\")) + \"; high: \" + (format(datum[\"high\"], \"\")) + \"; Major Genre: \" + (isValid(datum[\"Major Genre\"]) ? isArray(datum[\"Major Genre\"]) ? join(datum[\"Major Genre\"], ' ') : datum[\"Major Genre\"] : \"\"+datum[\"Major Genre\"])"
+          },
+          "x2": {
+            "scale": "x",
+            "field": "binned rating",
+            "offset": {
+              "signal": "0.5 + (abs(scale(\"x\", datum[\"binned rating_end\"]) - scale(\"x\", datum[\"binned rating\"])) < 0.25 ? -0.5 * (0.25 - (abs(scale(\"x\", datum[\"binned rating_end\"]) - scale(\"x\", datum[\"binned rating\"])))) : 0)"
+            }
+          },
+          "x": {
+            "scale": "x",
+            "field": "binned rating_end",
+            "offset": {
+              "signal": "0.5 + (abs(scale(\"x\", datum[\"binned rating_end\"]) - scale(\"x\", datum[\"binned rating\"])) < 0.25 ? 0.5 * (0.25 - (abs(scale(\"x\", datum[\"binned rating_end\"]) - scale(\"x\", datum[\"binned rating\"])))) : 0)"
+            }
+          },
+          "y": {
+            "scale": "y",
+            "field": "low"
+          },
+          "y2": {
+            "scale": "y",
+            "field": "high"
+          }
+        }
+      }
+    }
+  ],
+  "scales": [
+    {
+      "name": "x",
+      "type": "linear",
+      "domain": {
+        "data": "source_0",
+        "fields": [
+          "binned rating",
+          "binned rating_end"
+        ]
+      },
+      "range": [
+        0,
+        {
+          "signal": "width"
+        }
+      ],
+      "zero": false
+    },
+    {
+      "name": "y",
+      "type": "linear",
+      "domain": {
+        "data": "source_0",
+        "fields": [
+          "low",
+          "high"
+        ]
+      },
+      "range": [
+        {
+          "signal": "height"
+        },
+        0
+      ],
+      "nice": true,
+      "zero": true
+    },
+    {
+      "name": "color",
+      "type": "ordinal",
+      "domain": {
+        "data": "source_0",
+        "field": "Major Genre",
+        "sort": true
+      },
+      "range": "category"
+    }
+  ],
+  "axes": [
+    {
+      "scale": "y",
+      "orient": "left",
+      "gridScale": "x",
+      "grid": true,
+      "tickCount": {
+        "signal": "ceil(height/40)"
+      },
+      "domain": false,
+      "labels": false,
+      "aria": false,
+      "maxExtent": 0,
+      "minExtent": 0,
+      "ticks": false,
+      "zindex": 0
+    },
+    {
+      "scale": "x",
+      "orient": "bottom",
+      "grid": false,
+      "title": "IMDB Rating (binned)",
+      "labelFlush": true,
+      "labelOverlap": true,
+      "tickCount": {
+        "signal": "ceil(width/40)"
+      },
+      "zindex": 1
+    },
+    {
+      "scale": "y",
+      "orient": "left",
+      "grid": false,
+      "title": "low, high",
+      "labelOverlap": true,
+      "tickCount": {
+        "signal": "ceil(height/40)"
+      },
+      "zindex": 0
+    }
+  ],
+  "legends": [
+    {
+      "fill": "color",
+      "symbolType": "square",
+      "title": "Major Genre"
+    }
+  ]
+}

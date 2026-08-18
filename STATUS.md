@@ -1,6 +1,6 @@
 # Status
 
-Last updated: 2026-08-08
+Last updated: 2026-08-09
 
 ## Picking this up
 
@@ -221,7 +221,7 @@ substantive compatibility items:
 | 6. View and Compose APIs | Yes |
 | 7. SVG, PNG, PDF export | Yes |
 | 8. TalkBack can describe and navigate | Partial — virtual nodes are tested by instrumentation, not with TalkBack itself |
-| 9. At least 100 compatibility fixtures pass | **Yes** — 177 |
+| 9. At least 100 compatibility fixtures pass | **Yes** — 188 |
 | 10. Core runtime has no Android dependency | Yes |
 | 11. Renders without WebView | Yes |
 | 12. Build and test loop runs from the terminal | Yes |
@@ -478,11 +478,2139 @@ ordering), and the pipeline is now verified end to end on one fixture, but the b
 - **`VegaHeadlessTextEngine`** reproduces upstream's canvas-free text estimate so layout is comparable
   on the JVM. A comparison engine only.
 
+## Vega-Lite compiles to Vega, in Kotlin
+
+`vega-lite` is new: `VegaLiteCompiler` turns a Vega-Lite specification into a Vega one, in the value
+model the runtime already parses, so a Vega-Lite chart takes exactly the path a Vega chart does from
+that point on. It depends on `vega-model` alone — it emits a specification, it does not execute one.
+
+The rules are ported from upstream's own TypeScript sources, which ship inside the pinned npm package
+(`oracle-js/node_modules/vega-lite/src`), rather than inferred from the documentation. That matters
+because Vega-Lite is *almost entirely* defaults: a specification names a field and gets a scale type,
+a stack transform, a plot sized from its own categories, a tick count that follows that size, a label
+angle, a grid, a legend and a spoken description. Each of those is one rule, and a rule that drifts
+produces a chart that is plausible and wrong.
+
+**The gate is the emitted specification, not the picture.** `scripts/vega-lite-oracle.sh` compiles
+every fixture with upstream and checks two things:
+
+1. `VegaLiteFixtureTest` compares the Vega this compiler emits against upstream's, property by
+   property. Seventy-three fixtures, and all of them match exactly — every transform, scale, signal,
+   axis, legend and mark encoding, down to the accessibility description string.
+2. `VegaLiteFixtureDifferentialTest` runs that output through this engine's own runtime and compares
+   the scene against the one upstream draws. Every mark of every fixture matches, and nothing is
+   skipped: the set that held the one fixture whose cells this runtime gridded differently is empty.
+
+Comparing the specification is what makes a failure legible: it names the rule that drifted, where a
+scene comparison would only say that some marks moved.
+
+### What the fixtures found in the runtime
+
+Five defects, none of which any Vega fixture could have found, because nothing but a Vega-Lite
+compilation writes the constructs that expose them:
+
+- **A top-level `style` was ignored.** Every Vega-Lite chart carries `"style": "cell"` on its root
+  group, and Vega's own default configuration gives that block a transparent fill and a `#ddd`
+  stroke — the thin border around a plotting area. It was drawing without one. Being a border it is
+  also half a unit of surface on each side, so those charts came out a unit small as well.
+- **Vega's built-in `config.style` blocks were missing.** `point`, `circle` and `square` set a symbol
+  size of 30 and a stroke width of 2, so every Vega-Lite scatter plot drew its points at Vega's own
+  default size instead — noticeably too large.
+- **`labelFlush` was reported and dropped.** It hangs the labels at the ends of a range from those
+  ends rather than straddling them. Vega-Lite asks for it on every continuous horizontal axis, and
+  without it those two labels hang outside the plotting area and the whole surface grows to hold
+  them.
+- **`gridScale` was reported and dropped.** A gridline named by a `gridScale` spans *that* scale's
+  range, in that range's direction — so a horizontal axis's gridlines run from the top of the plot
+  back down to the axis, because a vertical scale's range starts at the bottom. The same line drawn
+  the other way round, which is exactly the kind of difference that survives unnoticed until a dashed
+  gridline starts its pattern at the wrong end.
+- **A shape legend drew every entry as a circle.** The entries have to be drawn with the shapes the
+  `shape` scale gives them; a column of identical swatches is not a smaller version of the right
+  answer, it is a legend that says nothing.
+
+### The second eight fixtures found seven more compiler rules and four more runtime defects
+
+The first twelve were written to cover the grammar. The next eight were aimed at *combinations* —
+a bucketed instant, a domain sorted by an aggregate of another field, a ranged bar, a layer sharing
+its parent's encoding — and seven of the eight failed on arrival, which is the corpus doing its job.
+
+In the compiler: a layer inherits its parent's `encoding` and `transform`, not only its data and
+size; a secondary channel (`x2`) takes its type from the channel it bounds, without which `{"field":
+"end"}` reads as a category; a ranged position contributes *both* fields to its scale and both names
+to its axis title; a `timeUnit` contributes the bucket's end as well as its start, and groups the
+aggregate by both; a domain sorted by an aggregate of some other field reads the pre-aggregation
+table, which has to be named for it; a sort every part of a merged domain agrees on belongs to the
+union rather than to each part; and a log axis thins its labels *greedily* rather than by parity.
+
+In the runtime, four more silences of the same kind as the first five:
+
+- **`isDate` was missing from the expression language.** Every Vega-Lite chart over a temporal field
+  filters with `isDate(f) || (isValid(f) && isFinite(+f))`, so the whole x scale collapsed and took
+  the marks and one axis with it. It is answerable here only because an instant is its own type in
+  this value model; upstream tests `value instanceof Date`, so a bare number of milliseconds is not
+  a date to it either, and probing that was what settled the implementation.
+- **A time scale ignored an axis `format`.** Its labels always came from the scale's own
+  multi-format, which writes each tick at its own granularity — so an axis of months read "2012,
+  February, March" where upstream read "Jan, Feb, Mar".
+- **A legend ignored the fill in its own `encode.symbols` block**, which is how a legend explaining
+  some *other* channel still shows the colour its marks are drawn in.
+- **A legend over an opacity scale did not fade its swatches.** A column of equally solid symbols
+  beside a fading scale explains nothing, and the legend's whole job is to demonstrate the channel
+  it names.
+
+### Arcs, and bars side by side
+
+Three more fixtures — `pie`, `donut`, `grouped-bar` — and the two channel families behind them.
+
+An arc is compiled as a *rectangle in polar coordinates*, which is upstream's own framing and not a
+simplification: the same rect positioning rules serve both coordinate systems, with `theta` and
+`radius` written out as Vega's `startAngle`/`endAngle` and `outerRadius`/`innerRadius`. Stacking
+follows into polar, so a pie is a stacked bar bent round a circle, which is what it is.
+
+`xOffset` is the channel that puts several bars inside one band, and four rules follow from it: the
+offset is a band scale of its own, the outer band takes the wider padding meant for groups, the
+bar's width comes from the *inner* scale, and the outer step becomes as many marks as the group
+holds divided by what the padding takes — `20 * bandspace(domain('xOffset').length, 0, 0) / (1-0.2)`.
+Get any one of them wrong and the bars overlap or the chart is the wrong width.
+
+Both went in against the fixtures rather than ahead of them: `donut` failed on its hole (a mark
+property named the way *Vega* names the channel, `innerRadius`, which has no Vega-Lite name of its
+own) and `grouped-bar` on the step arithmetic.
+
+### Where the compiler stands, and what it still refuses
+
+Seventy-three fixtures, each matching upstream's compiler property for property and drawing the chart
+upstream draws. The grammar covered: a single view, a layer of them to any depth, a concatenation of
+either to any depth, a
+repetition of any of those, both facet operators, eleven marks including `arc`,
+the Cartesian and polar position pairs, nested offsets, fourteen of fifteen transforms, sorting,
+binning, time units, stacking, faceting by `row` and `column`, conditional encodings, a line or an
+area that draws its own points, legends, axes, and a user `config` carried through as a theme.
+
+What it still refuses, by name, with the reason each is refused rather than approximated:
+
+- **A selection parameter** — one carrying `select`. It stands for the rows a reader picked, and
+  needs an interaction loop this engine does not run. Reported one parameter at a time, so a
+  specification mixing the two kinds still gets the variables it declared. A **variable** parameter
+  is implemented (below), and a condition naming a `param` is still refused by itself, leaving the
+  rest of its definition standing.
+- **Geographic projections and the `geoshape` mark.** The runtime draws maps — `world-map` is in the
+  Vega corpus — so this is now a *compiler* gap and not an engine one: nothing here yet translates
+  Vega-Lite's `projection` block and its `geoshape` mark into the Vega equivalents.
+- A facet `sort` that names a **written-out list**, whose place in it has to be computed onto every
+  row as a column of its own; and one that names an aggregate on a facet gridded **both** ways,
+  where the key has to be written onto the rows first so each cell can take the greatest of its own.
+  An aggregate sort on a facet gridded one way is implemented (below).
+
+### Concatenation: two plots, and what they do not share
+
+A concatenation is not a chart with more marks in it. Each of its plots keeps its **own position
+scales and its own axes** — `defaultScaleResolve` makes `x` and `y` independent and everything else
+shared — so `concat_0_x` stands beside `concat_1_x` and one colour legend covers both. That is the
+whole shape of it: the marks move into a group per plot, the axes go with them, and the top level
+keeps only the data, the shared scales, the legends and a `layout` that places the groups.
+
+`hconcat`, `vconcat` and `concat` are one construct here because they are one in upstream's compiler
+(`ConcatModel`); what differs is `columns`, and what `columns` decides is **which sizes can merge**.
+A row of plots shares a height and a column shares a width, so `parseConcatLayoutSize` names the
+merged size `height` or `width` where the plots stand along that axis and `childHeight`/`childWidth`
+where they do not — and abandons the merge entirely if the plots disagree or any of them is sized by
+a step, leaving `concat_0_height` beside `concat_1_height`. A merged size that is a plain number
+then leaves the signal list for the top level, which is upstream's own last step.
+
+Three defects came out of the two fixtures, and none of them is about concatenation as such:
+
+- **A shared legend showed only the first plot's half of itself.** Two marks coloured by one column
+  get *one* key between them, and it has to say both things: a bar fills its swatch and a point
+  strokes one, so the merged legend carries `fill` and `stroke` alike. Where they disagree the first
+  view's answer stands, with the two exceptions upstream names — a circle wins over any other glyph,
+  and two different titles are joined rather than one being dropped. Then the *merged* legend's own
+  channels decide what comes out of the symbol encoding: a point's `fill: transparent` is right on
+  its own and blanks every swatch once a scaled `fill` merges in beside it.
+- **A union domain was never sorted.** `{"fields": [...], "sort": true}` orders the *combined* set —
+  upstream counts each part, aggregates the counts together, and only then sorts — where this engine
+  had ordered each part and laid them end to end. With two plots of one table that puts the second
+  plot's first category after the first plot's last, and the colours come out shifted by one.
+- **A rect-based mark with nothing on one channel was 18 units tall.** `defaultSizeRef`'s
+  `!hasFieldDef` branch spans the plot instead, keeping back exactly what a band scale's inner
+  padding would have kept back — `0.75 * height` for a tick. It writes the *plain* size name rather
+  than the plot's own, relying on the alias a plot with no gridline scale already defines.
+
+The last of those is not about concatenation at all: a single-view tick plot with one encoded axis
+was equally wrong, and no fixture had drawn one.
+
+### Repetition: nothing but a rewrite
+
+`repeat` is not a compiler construct at all. Upstream normalizes it away before anything is compiled
+(`CoreNormalizer.mapNonLayerRepeat`), into a concatenation of the same view with `{"repeat": …}`
+replaced by a real column name in each copy — so once a concatenation compiled, the whole of `repeat`
+was a rewrite, and all three of its forms went in together and passed on arrival:
+
+- a **list** repeats over one variable and lays the copies out under `columns`;
+- **`row`/`column`** cross two lists into a scatter-plot matrix, and the grid's width is the number
+  of columns rather than `columns`, which upstream reports as unsupported there;
+- **`layer`** stacks the copies in one plot, so it stays a layer and never becomes a concatenation.
+
+Two details carry the naming. Each copy is *named* — `child__amount`, `child__row_amount_column_score`
+— and upstream's model takes a spec's own `name` over the one its parent offered it, which is why a
+repeated chart's scales read `child__amount_x` rather than `concat_0_x`; honouring a declared name in
+a concatenation's plots and in a layer's members is all that took. And the grid takes `align: "all"`
+where a plain concatenation takes `each`: the copies are one view drawn several times, so their rows
+do line up, and the normalizer says so in the spec it produces.
+
+Three fixtures passing untouched is worth stating plainly rather than quietly: it is what a faithful
+port of the layer beneath is supposed to buy, and the one defect it did find was a rewrite compiled
+and then thrown away — the normalized specification has to *replace* the one being compiled, not
+stand beside it.
+
+### `resolve`, which is what makes a chart dual-axis
+
+`resolve` decides which of a composition's scales and guides its children share. It is the whole
+difference between a layered chart and a **dual-axis** one — the same two marks over one `y` say they
+measure the same thing, and over `{"scale": {"y": "independent"}}` they each get a scale and an axis
+of their own — and it is what puts a colour key under every plot of a concatenation instead of one
+beside the whole chart.
+
+The naming is the mechanism, and it had already been half built: a concatenation names its plots'
+positions `concat_0_x`, and independence is the same idea one level down. So the scale prefix became
+an explicit **name per view per channel**, and everything that mentions a scale reads it from there.
+A shared channel keeps its plain name and one component takes every view's domain; an independent
+one is named for the child that owns it and each child gets a component of its own.
+
+Three rules came out of upstream with it:
+
+- **A resolve governs the outermost composition and nothing below it**, as it does upstream, where
+  every model carries its own. The child it names is a *composition child*, not an expanded view: a
+  line that draws its own points is two views under one layer, and naming the scale from the view
+  gives the line and its points a scale each and draws them apart.
+- **An independent scale forces an independent guide** — `parseGuideResolve` — since one axis cannot
+  label two scales.
+- Two independent axes on a channel would otherwise stack on the same side, so upstream counts how
+  many have landed on each and moves one across when they do not match, counting the side each
+  *asked* for rather than the side it ended on. And only the first rules gridlines: two sets across
+  one plot measure different things and say neither.
+
+### The gallery, swept: 627 examples against upstream's own compiler
+
+Vega-Lite ships 627 example specifications, and compiling is a pure function of the specification —
+no data is needed to compare two compilers. So every one of them was compiled by upstream 6.4.3 and
+by this one, and the outputs compared property by property. That is a *measurement*, not a gate: the
+examples are not fixtures here, and nothing about them is checked in.
+
+**124 of 627 matched exactly** at the start, and **all 627** do now.
+
+The value is the *ranking*. The first sweep clustered by root cause, and the three most damaging
+causes were fixed straight away — chosen for what they do to the *picture* rather than for
+frequency:
+
+- **`mark.clip` was being stripped** as a Vega-Lite-only property. It is a Vega mark property and
+  goes straight through; it is what keeps a line inside a domain narrower than its data.
+- **A channel with no scale at all is not a continuous one.** `defaultUnitSize` falls to the
+  *discrete* size for it, which is a step — so a strip of ticks or a single total is twenty units
+  deep, not three hundred. This was the most common way a gallery chart came out the wrong size.
+- **A rect-based mark on a continuous scale takes `continuousBandSize`** — five units for a bar —
+  where this compiler used `step - 2`, making it nearly four times too wide. `getBandSize` asks the
+  scale's kind first and reaches `discreteBandSize` only where the domain is discrete.
+
+The sweep has been the working list ever since, and it is now empty: **every one of the 627
+compiles to the specification upstream compiles it to**, property for property. The last cause to
+go was a facet inside a facet, described below.
+
+
+The count went 124 → 138 clean, which understates it: a cause is fixed for every file that carries
+it, and most of those files carry several.
+
+The fixture written for the size rule then found a fourth, and it was this branch's own: the size
+merge looked scales up **by channel** in a map keyed by scale **name**, so inside a concatenation
+every plot looked scale-less and three plots of different depths merged into one signal. It had been
+invisible because every existing concat fixture declares its sizes.
+
+A second pass took six more, working down the same ranking:
+
+- **`toNumber` was emitted as `tonumber`.** The parse expression was built by concatenation, and
+  Vega has no such function. A dated parse names a *specifier* rather than a type, too, so
+  `date:'%d/%m'` is `timeParse` and `utc:` its UTC twin.
+- **The `trail` mark was refused** although the runtime draws one — it was simply missing from the
+  compiler's mark list.
+- **`fold` and `flatten` always write their output names**, filling in `key`/`value` and each
+  field's own name. Vega would default them the same way, but the names are what everything
+  downstream groups and scales by, so upstream settles them once.
+- **`{"binned": true}` is `isBinned`, not `isBinning`.** Reading only the string `"binned"` binned
+  an already-binned column a second time, putting a whole `bin` transform and its extent signal into
+  the data flow and shifting everything after it. One example went from thirty differences to one —
+  which was the second half of the same rule: a binned field that states its **step** gives its
+  scale a `bins: {step}`, the ends coming from the domain.
+- **An explicit axis title wins outright across layers**, rather than joining. A layer that names
+  its axis has said what the axis measures; joining titled one `Value, PM2.5 Value`.
+
+And the fixture written to guard those found three more, all of them this branch's own and all from
+the `resolve` work: a bin's offset expression named the *unprefixed* scale, so it read `scale("x", …)`
+inside a plot whose scale is `concat_0_x`; a layer **inside** a concatenation got two of every axis,
+because independence is resolved between the composition's children and a concatenation's children
+are its plots, not the layers within one; and scale **ownership** was being decided by usage rather
+than by the resolve, so a colour scale only one plot happened to draw with was written inside that
+plot instead of beside the chart.
+
+A third and fourth pass took seven more, read straight off the ranked list:
+
+- **The implicit parse stored its type capitalised** — `"Number"` where upstream writes `"number"`.
+  It had been invisible because the *expression* was built by concatenating that same capital, so
+  two wrongs read `toNumber`; fixing the expression showed the `format.parse` underneath.
+- **`config.scale` is Vega-Lite-only** and was reaching the Vega config, and **`config.mark` keeps
+  only what Vega understands** — `color` and `filled` are resolved into a mark's own fill and stroke
+  long before Vega sees anything.
+- **A normalized stack's axis is a percentage**, `config.normalizedNumberFormat`, defaulting to
+  `.0%`. Left off, an axis reads 0, 0.2, 0.4 for what the chart draws as fifths of a whole.
+- **A `d` format asks for whole numbers**, so `defaultTickMinStep` is 1 — read *after* the
+  specification's own axis block, because that is usually where the format comes from.
+- **A `joinaggregate` over the whole table writes no `groupby` at all.** An empty list is a
+  different statement from silence.
+- **A colour ramp is painted at the mark's own opacity**, so a legend beside a chart of translucent
+  points is as translucent as they are.
+- **`config.scale.zero` is a fallback, not an override.** A bar or an area *measures from* zero and
+  that is not a preference — the length of the mark is the value — so the theme settles only what
+  the rules leave open, which is what frees a gantt chart's ranged bars without freeing these. And
+  a `config.style` block is a mark config under another name, so it loses the same Vega-Lite-only
+  properties: `point: true` on a line is a *normalizer's* instruction and means nothing to Vega.
+
+Two runtime gaps are recorded rather than fixed, both found by fixtures written here and both
+withdrawn from the corpus because a fixture has to pass:
+
+- **A non-group mark's `clip` is not applied in the runtime.** The compiler emits it now, but the
+  scene still measures the clipped-away points, so a clipped line makes the chart wider than
+  upstream's.
+- **A plot inside a concatenation is placed one unit low** where it is a ranged bar or a layer. Its
+  specification matches property for property, so this is the runtime's — every mark, gridline and
+  tick in that cell is off by exactly one.
+
+### Five defects behind one chart pasted into the demo
+
+A population pyramid — Vega-Lite's own example — pasted into the demo came out as a scatter of
+squares along a diagonal. It states **no channel types at all**, and this compiler had been falling
+straight through to `nominal`, which turns a summed measure into a category per distinct total.
+`defaultType` is not "look at the data" — nothing has read a row when it runs — it is read off the
+definition: a latitude is a number and a shape is a category whatever they carry; a `sort` written
+as a **list** makes a field ordinal; a `timeUnit` makes it temporal; a `bin` or **any aggregate
+except `argmin`/`argmax`** makes it quantitative; and a stated `scale.type` answers by category.
+Only `count` and `bin` were honoured here.
+
+Fixing that let the same chart name four more, none of which the corpus had reached:
+
+- **`config.view` becomes the `cell` style**, not a `view` one — "View's default style is `cell`",
+  renamed on the way through `stripAndRedirectConfig`. A chart telling its plotting area not to draw
+  a border was still drawing one.
+- **`config.axis.grid: false` was ignored.** Whether there are gridlines is a default, and a theme
+  settles it for every axis at once; reading only the channel's own `axis` block left them on.
+- **A legend along the top runs horizontally** (`defaultDirection`), and `"title": null` **drops the
+  property** rather than writing an empty one — `assembleLegend`, whose comment is "title schema
+  doesn't include null".
+- **A sorted discrete domain reads the pre-aggregation table**, and the test is `isBoolean` on the
+  *settled* sort rather than on what the specification wrote. A plain `true` reads the table being
+  drawn; an aggregate, or the `{"order": "descending"}` that a bare `"descending"` settles into,
+  reads the raw rows. Testing the written form missed the string spelling — which is the one a
+  pyramid uses to run its ages downwards — and with it the whole `data_0` that request creates.
+
+And one in the runtime: **`format: "s"` was not a format at all.** The specifier pattern accepted
+`d`, `f`, `e` and `%`, so `s` failed to parse and fell back to plain number text. An axis shares
+**one** SI prefix, chosen from its largest tick — d3's `tickFormat` pins it there — so the labels
+read `−1.0k` beside `0.0k`, where formatting each value alone would put `0` beside `−1.0k`. The
+precision comes from `precisionPrefix`: decimals enough to tell one step apart *after* the division.
+
+Five defects behind one pasted chart is the argument for the demo's paste box, and for a corpus
+written from upstream's own examples rather than from what this compiler already does.
+
+### A concatenation inside a concatenation
+
+A dashboard is a column of rows, and it needed the flat list of plots to become a tree. Only the
+*shape* did: everything a plot has — views, scales, axes, a size — still belongs to the leaves, so
+the leaf list stays flat and nothing downstream knows about the nesting. What the tree carries is
+three things upstream does at every level rather than once:
+
+- **The names compose.** `concat_0_concat_1_x`, because `defaultScaleResolve` makes positions
+  independent at each level, and the level below inherits the name of the level above.
+- **The sizes merge per level, innermost first**, because a nested concatenation has to settle its
+  own size before the level above can ask what that size is. What a nested one contributes upwards
+  is whatever *its* children merged into — and nothing where they disagreed, which is what stops a
+  column holding a row of plots from claiming a width of its own. A level that merges takes the
+  name over from its children, so the signal is written once and at the level that settled it.
+- **The signals come out in tree order**: each level's own before it recurses, and within a level
+  `width`, `height`, `childWidth`, `childHeight`. That is `assembleLayoutSignals`, and it was the
+  only thing the first attempt got wrong — everything else matched on the first run.
+
+A nested concatenation's group carries a `layout` and nothing else: no style and no `encode`, because
+it is not a plotting area, only a place its plots are arranged in.
+
+### A layer inside a layer, which the naming was already carrying
+
+A nested layer needs nothing new. Its names simply run deeper — `layer_1_layer_0_marks` — which is
+exactly what a composite mark inside a layer already produced, so the machinery had been there since
+the box plot and only the refusal was in the way. Collecting the members recursively is the whole
+change, and the fixture passed on arrival.
+
+The one thing the recursion has to hold on to is the name of the **outermost** member. That is the
+child a top-level `resolve` speaks about; the nesting below it is not a level anything resolves
+against, and naming an independent scale from the innermost view would give a line and its
+annotation a scale each.
+
+### Parameters, where they are values and not selections
+
+A **variable** parameter is a Vega signal and almost nothing else — a value, optionally an `expr`
+computing it from the others, optionally a `bind` describing the input that sets it — because Vega
+already has the construct. `assembleParameterSignals` is the whole translation, and the signals go
+after the layout's own, a parameter being able to read a size and not the other way about.
+
+What the fixture found was not in the parameters at all. `{"value": {"expr": "tint"}}` is how a chart
+reads one into a graphic property, and it is **not a literal object**: upstream turns the expression
+into a `signal` in the same value ref, so a `datum` written that way still passes through its scale
+and comes out `{"scale": "y", "signal": "marker"}`. Writing it out as a value paints the mark with an
+object, which a renderer reads as nothing at all — and nothing about it is reported, because a value
+is exactly the thing a compiler is not supposed to look inside.
+
+A **selection** parameter is still refused, one at a time rather than as a block, so a specification
+mixing the two kinds gets the variables it declared.
+
+### Ordering a trellis by a total none of its rows carries
+
+A facet `sort` that names an aggregate — `{"field": "amount", "op": "sum", "order": "descending"}` —
+is the ordinary way to put the biggest column first, and it needs the key computed before anything
+can be ordered by it. Upstream computes it **twice**, under two names, and both are needed:
+
+- the **domain** dataset's aggregate gains `fields`/`ops`/`as` and holds it as `sum_amount`, which is
+  what the header bands sort on, each of their rows already being one cell's worth;
+- the **cell** group's own `from.facet.aggregate` computes it again over its own partition as
+  `sum_amount_by_era` — suffixed with the faceted field, so the two names cannot collide — which is
+  what the cells sort on.
+
+`DEFAULT_SORT_OP` is **`min`**, not the `sum` the encoding sorts might lead a reader to expect.
+
+Two forms are still reported by name: a sort by a written-out **list**, whose place in it has to be
+computed onto every row as a column of its own; and an aggregate sort on a facet gridded **both**
+ways, where upstream writes the key onto the rows first so that each cell can take the greatest of
+its own. Both are data-flow work rather than another name for the same aggregate.
+
+### A trellis whose cells run backwards, and the two ways it was wrong
+
+A facet channel's `sort` orders the *cells*, not anything inside one, so it lands on the group mark
+that makes them and on the header bands beside it. Ours wrote `ascending` there unconditionally.
+A bare `"descending"` is now honoured; a sort **object** or a sort **array** on a facet channel
+needs a key computed onto the rows before the cells are made, which is data-flow work this compiler
+has not done, and both are now reported by name rather than quietly ignored — which had left the
+cells in the wrong order and said nothing.
+
+The fixture then found two more, both in the runtime and both about the cells this compiler had been
+emitting correctly all along:
+
+- **`aggregate: {cross: true}` was ignored**, so a trellis crossed by two fields lost the cells no
+  row carried and went ragged: the cells after a gap slide into it and every header beside them
+  names the wrong one. Vega crosses only where there is more than one dimension, and it *adds* the
+  missing cells after the ones the rows made rather than rebuilding the order.
+- **An empty cell drew its gridlines.** Vega instantiates a faceted group's subflow only for keys
+  that rows arrived under, so a cell `cross` invented to keep the grid rectangular is a group with
+  no contents at all — visibly different from an empty plotting area with axes ruled across it.
+
+### More than one table, which had been silently one
+
+A layer or a plot may name its own `data`, and this compiler had been building every view's chain
+onto the **first** view's source. A layered chart with a rule at a threshold from a second table
+drew that rule against the bars' rows: a chart that is wrong rather than one that is missing, and
+nothing reported it. It was found by asking what a construct already refused for a concatenation — a
+plot with its own dataset — did for a layer, where nothing refused it at all.
+
+The shape is upstream's. Every table the chart reads is a root, in the order it was first asked for,
+because that order *is* the numbering; a `lookup`'s joined table is a root here too, since a join
+reads a second table rather than deriving from the first. Then the last step of `assembleRootData`:
+"move sources without transforms to the beginning" — a dataset that derives from nothing and does
+nothing is a table the chart was handed, and Vega has to have it before whatever joins against it.
+That rule replaced the special case the `lookup` work had put in for exactly one joined table.
+
+With it, a concatenation's plots may each have their own dataset, and that refusal is gone.
+
+### The facet operator: one rewrite and one layout
+
+`{"facet": …, "spec": …}` is two constructs wearing one name, and only the first is a rewrite.
+
+A **`row`/`column`** facet operator is the same chart as the same two channels written in the view's
+encoding — compiled side by side, upstream's two outputs are byte for byte identical — so the
+channels move down into the encoding and nothing else changes.
+
+A **wrapped** facet, `{"facet": {"field": …}, "columns": n}`, is a layout of its own. A grid of two
+fields knows its shape: the columns are the column facet's values. A wrapped facet has one list and
+a number to wrap it at, so upstream *computes* both — `ceil(length(facet_domain) / columns)` rows and
+`min(length(facet_domain), columns)` columns, as two `sequence` datasets — and draws the shared axes
+once per **position** rather than once per value. The caption moves with it: there is no band of
+column headings to name a cell in, because the columns are places and not values, so every cell
+carries its own caption and the heading over the grid is a `column-title` naming the field.
+
+Both fixtures then failed on the same runtime defect, and it is the kind worth naming: **a trellis's
+cells came out in the order the rows arrived rather than in the order the specification asked for.**
+A mark's `sort` fields are *field accessors on the scene item* — Vega hands them to `vega-util`'s
+`field()`, so `datum["era"]` is the path `datum` → `era` — and this engine read only `x` and `y`,
+being the properties it could see an item having. Everything else was silently ignored, which for a
+faceted group means its own facet key: the one thing that decides which cell goes where. A chart with
+its categories already in order hid it completely, which is why every fixture up to now had.
+
+### Faceting: both halves, in three fixtures
+
+`row`, `column` and both at once compile *and* draw. `faceted` (one row of cells), `faceted-rows`
+(one column of them) and `faceted-grid` (two by two) each match upstream's compiler property for
+property and upstream's renderer mark for mark, surface included — the cell group faceted from the
+data, the `column_domain` and `row_domain` datasets the layout counts and the headers title
+themselves from, the `layout` block, the `child_width`/`child_height` signals, the facet fields
+joining every grouping so a stack stays inside its cell, and the axes *split*: the gridlines stay in
+each cell where the data is, and the labelled axis moves out to a band drawn once for the whole grid.
+
+Six defects on the way, every one of them a silence:
+
+- **A `column-footer` was taken for a cell** and joined the grid, shifting every real cell along and
+  widening the chart by a whole column. Vega-Lite puts a trellis's shared x axis in a column footer
+  and its y axis in a row header, so the tick labels are drawn once rather than under every cell;
+  the runtime knew the header roles and not the footer ones.
+- **A sized group did not give its own `width` to what was inside it.** A gridline in a cell spanned
+  the *chart's* width rather than the cell's, because the subscope's size came only from a group's
+  own signal declarations and a Vega-Lite cell states its size in an `encode` block instead.
+- **A band of labels sat at the grid's own half-unit edge.** Upstream rounds that margin *outwards*
+  to a whole unit — `floor` on the near side, `ceil` on the far one, each measured against zero as
+  well as against the cells (`layoutHeaders`, in `vega-view-transforms`) — so a row header clearing
+  a cell whose stroked border reaches −0.5 goes to −1, and every guide inside it inherits the half
+  unit. `trellis()` is now a port of that function rather than an approximation of it, which also
+  settled two cases nothing had exercised: a *footer* is aligned with the last row or column and not
+  the first, and `layout.offset` — which Vega-Lite writes on every faceted chart, to keep a heading
+  ten units clear of the captions under it — was parsed, reported and dropped.
+- **A grid's heading was centred over its headers instead of over its cells.** Upstream centres it
+  along the bounds `gridLayout` returns, which are the cells alone, so a trellis with wide y-axis
+  labels down its left still has its heading over the plots. Ours drifted left by half a row header.
+- **A group mark's `title` ignored its own `style`.** Every caption in a trellis asks for
+  `guide-label` and every heading for `guide-title`, and both were being set at a chart heading's
+  thirteen points, in bold. Upstream's `guideMark` *replaces* the default `group-title` style with
+  whichever is named, so the four style blocks Vega ships — `guide-label`, `guide-title`,
+  `group-title`, `group-subtitle` — are now written down beside the five that were already there,
+  and a title reads its size, face, weight and colour through the one it names.
+- **A chart with no declared `width` was given a plotting area of 200 by 200**, so a faceted chart
+  came out a whole phantom chart wider than upstream's. Upstream seeds the signal with `spec.width
+  || 0`: a specification with no size is not an incomplete one, it is a chart measured entirely by
+  what it draws, which is how every faceted Vega-Lite chart is written. Probed rather than reasoned
+  about — one rect at (10, 10) and no width renders 30 by 20 plus its padding. The default is zero
+  now, and the diagnostic that used to announce the substitution says instead, at `info`, that the
+  surface comes from the contents.
+
+The last of those was found by a fixture written *because* the ported layout had no test for it, and
+it failed on arrival: **a row-faceted chart put its x axis in a column header and drew it above the
+chart.** Which band a shared axis lands in follows the axis's own orientation — top or left is a
+header, bottom or right a footer (`getHeaderType`, `compile/header/parse.ts`) — and the facet
+channel only decides whether that band is one group per cell or a single one. The compiler had been
+choosing the band from the facet's *direction*, which agrees with upstream for a column facet and is
+upside down for a row facet.
+
+What is left is `align` and `bounds`. This engine grids cells the way `align: "each"` does and
+Vega-Lite asks for `"all"`; the two agree whenever the cells are the same size, which they are on
+every fixture here, and both are still reported by name rather than assumed away.
+
+### Four fixtures aimed at combinations, six more silences
+
+`line-points`, `conditional-test`, `scale-overrides` and `stack-center` were written to cover
+constructs the corpus had never combined, and all four failed on arrival:
+
+- **A condition on a `test` was refused as though it needed a selection.** It does not: a `test` is
+  a predicate on the row, written in a `filter`'s own grammar, and it compiles to a Vega production
+  rule — an array of `{test, …}` entries with the unconditional one last. Both sides now go through
+  the same predicate compiler, which is what keeps `oneOf` spelled `indexof(…) !== -1` in one place
+  rather than two. A condition naming a `param` is still refused, on its own, and the rest of the
+  definition still stands.
+- **A line that draws its own points was drawn as a line with a `point: true` encode channel** —
+  a property Vega has never heard of, reported by nobody. Upstream normalizes it into a *layer*
+  before compiling, and that pass now exists (`Normalize.kt`): the base mark with the overlay
+  properties stripped, then the overlay marks over the same encoding. An area fades to 0.7 first so
+  what is drawn over it stays legible, the overlay inherits the stack offset (a `point` does not
+  stack of its own accord, and without it the points sit at the raw values rather than on the band
+  they belong to), and `x2`/`y2` are dropped because a line given a second position becomes a rule.
+- **Two layers over one dataset each parsed it separately**, so the second layer's chain hung off
+  the source rather than off the first's parse — a different dataset, differently numbered, and one
+  of them never coerced at all. Upstream's `MergeParse` optimizer hoists the parse every branch
+  agrees on above the fork and re-parents **every** branch onto it, including a branch that asked
+  for no parse; that is now `DataNode.mergeParse`.
+- **A quantitative column was never coerced to a number.** Two rules, both upstream's, both about
+  *comparison*: a `min` or `max` aggregate needs numbers or it answers with the alphabetically
+  smallest, and a path mark sorts its rows along its dimension, so a line through 1, 10, 2 is drawn
+  in that order. Neither shows on a chart whose data happens to arrive typed.
+- **A point scale was measured as if its inner padding were zero.** It is always 1 — n points have
+  n−1 steps between them — and its `padding` is the *outer* one: vega-scale builds `point()` as
+  `pointish(band().paddingInner(1))`, where `pointish` renames `padding` to `paddingOuter` and
+  deletes `paddingInner`. Wrong in *both* engines here, in the same direction and by different
+  amounts: the compiler wrote the wrong `bandspace` into the width signal and the runtime measured
+  the wrong step range, so a point chart came out a whole step too wide.
+- **A legend swatch repainted a colour it could not know.** Upstream builds the swatch from the
+  mark's *own* colour encoding and then removes what would say the wrong thing: the channel this
+  legend explains, and any colour that is a scaled field, since a swatch has no datum to scale.
+  Building it from the mark's *default* colour instead looks identical whenever the mark has no
+  colour encoding, and paints a size legend's swatches in the default blue on every chart that does.
+
+And one that is not a silence but a wrong reader: **a mark's spoken description was assembled from
+the guide titles**, so hiding an axis title with `axis: {title: null}` — a restyling — dropped the
+whole channel out of what a screen reader says. Upstream reads the *field's* own title there.
+
+### Four more, aimed at the same places from a different angle
+
+`facet-legend`, `binned-facet`, `text-format` and `sort-array`. The first passed on arrival — a
+legend beside a trellis is placed against the whole grid and already was — and the other three
+found four more silences:
+
+- **A binned field inside a facet lost its domain.** The `bin` transform publishes the boundaries it
+  chose as a signal, and the transform names that signal through the *view* while the scale reading
+  it did not: inside a facet every view is `child_`, so the scale read a signal that was not there.
+  The two spellings agreed for exactly as long as the prefix was empty.
+- **A `format` on a channel was ignored.** `{"field": "v", "format": "$.2f"}` on a text mark drew
+  the bare number, because the text expression read `config.numberFormat` and never the definition's
+  own. Alongside it: the value a **normalized** stack announces is the share it takes, `end - start`
+  through `config.normalizedNumberFormat`, not the quantity behind it — a description that says 3
+  where the bar plainly shows three quarters.
+- **A written-out `sort` order was dropped entirely.** Vega has no comparator that takes a list, so
+  upstream computes each row's *place* in the list as a column and sorts the domain on the smallest
+  place a category carries; a value the list never names falls past the end, which is what puts it
+  last. Ours emitted `sort: true` and drew the categories alphabetically — a chart with the right
+  bars in the wrong order and nothing said about it.
+- **A sort with no `op` defaulted to `min` where upstream uses `sum`.** The distinction is whether
+  the sort field is one of the stack's own dimensions: sorting bars by a field each category already
+  has once means the smallest *is* the value, and sorting them by a field the stack accumulates
+  means asking which column is tallest, which the smallest segment says nothing about.
+
+Three simplifications the assembled domain makes were missing with it, and they are not cosmetic
+when the comparison is property by property: a `count` has no field to count *of*, `ascending` is
+the default order, and a sort on the domain's own field is the natural order with at most a
+direction to it.
+
+### Four aimed at the runtime, through the compiler
+
+`impute-area`, `binned-legend`, `temporal-units` and `layer-independent` were written against
+constructs whose compiled Vega the runtime had never been handed. All four failed, and the failures
+split evenly between the two halves.
+
+In the compiler:
+
+- **`impute` was refused**, so a series with a hole in it was joined straight across the hole — a
+  value nobody measured, drawn as confidently as the ones they did. It is Vega's own `impute`
+  transform with the *other* position channel as its key and a path mark's series fields as its
+  grouping; a method other than `value` is a `window` beside it, written back over the nulls.
+- **A rule's own `size` was dropped.** With no encoding for a channel the *mark definition* still
+  speaks, and `size` is the Vega-Lite name for what Vega calls `strokeWidth` — that renaming being
+  exactly why it cannot pass through with the mark's other properties, and why it fell on the floor.
+- **A `utc` time unit did not say so.** Vega's `timeunit` transform takes a `timezone`, and without
+  it a midnight instant is bucketed against the viewer's own calendar rather than against UTC.
+- **An axis over a cyclic bucket asked for a tick every forty units.** Upstream compares the
+  *normalized* unit — the name with any `utc` taken off the front — against month, hours, day and
+  quarter, and asks for no count at all: twelve months want twelve ticks, not seven.
+- **A bucketed instant reached the end of its bucket on every mark**, where only a mark that
+  *occupies* the span should. Upstream decides by whether the mark has a `timeUnitBandPosition`,
+  which only the rect-shaped configurations define, so a bar over months reaches the end of December
+  and a point over the same months sits on the first of it.
+- **The invalid-value filter read the field's type rather than its scale.** A discrete scale shows
+  an invalid value as another category, so only the fields feeding a continuous domain are filtered;
+  ours filtered a binned colour column too. And the filter is keyed by the *raw* field, which is how
+  one column bucketed two ways on two channels leaves only one of them.
+- **A `bin-ordinal` scale wrote a domain it should not have.** Its domain is inferred from the
+  `bins` property; naming a column of bin starts beside it describes something else.
+
+In the runtime, four more, and every one of them a chart that drew:
+
+- **A path mark ignored its own `sort`.** A `sort` orders the *items* a mark draws, and a line has
+  only one — the whole series — so the ordering has to reach the points inside it. Without that, a
+  row inserted into the middle of a series (by an `impute`, say) was drawn last, and the line went
+  out to the end and doubled back to it.
+- **`tickMinStep` was reported and dropped.** It does not place ticks; it caps the *count*, and a
+  span holding one minimum step allows two ticks whatever was asked for. An axis over two months
+  offered sixteen.
+- **A `bin-ordinal` scale could not be built without a domain**, and its scheme was sampled at the
+  extremes. Upstream takes a continuous scheme's buckets from *inside* it —
+  `quantizeInterpolator` samples at (i+1)/(count+1) — so two buckets of `blues` are its thirds and
+  neither is the white end. A discrete palette is *sliced* rather than spread.
+- **A discretizing scale's legend was symbol swatches**, which the runtime said so about rather
+  than pretending otherwise. It is now the colour bar cut into its buckets: equal bands whatever the
+  cut points are worth, labelled at the joins between them. Probed against upstream on a four-bucket
+  `quantize` scale before a line of it was written.
+
+And the harness was wrong again, for the eighth time. The first band has no lower bound, and
+upstream's scene carries a literal `null` there which its renderers draw as nothing —
+`String(null)` had been writing the four letters "null" into the reference, and this engine drew
+them. Fixed in `oracle-js/src/normalize.js` as well as here, which is where CONTRIBUTING says to
+look when both sides agree and the picture does not.
+
+### Three more, and a scale that answered the wrong kind of nothing
+
+`aggregate-ops`, `binned-axis` and `offset-facet`. The last passed on arrival — grouped bars inside
+a trellis are an offset band inside a faceted cell, and both already worked — and the other two
+found four things:
+
+- **Two layers aggregating one table did it twice.** Upstream's `MergeAggregates` folds sibling
+  aggregates that group by the same fields into one, and the union of their measures is a *union of
+  measures*: the emitted order follows each field's first appearance, which is what puts a `count`,
+  whose field is nothing at all, after every measure of a column. Left apart, each layer read a
+  dataset of its own and the whole numbering shifted.
+- **A pre-binned column had no far edge.** `bin: "binned"` says the data arrives already bucketed,
+  and the bucket's other end is a *second column* named by the secondary channel — which is the
+  whole reason the form requires an `x2`. This engine looked for an `_end` column that was never
+  computed. The same edge is what the row is announced by, as the span it covers rather than as two
+  separate numbers, and it groups the stack alongside the start so that two bins beginning at the
+  same place stay two columns.
+- **A continuous scale of something that is not a number answered `null`, where upstream answers
+  `NaN`.** The distinction only shows in arithmetic and there it is the whole answer: JavaScript
+  reads a null as zero and propagates a NaN. Vega-Lite decides whether a bar is too thin to see
+  with `abs(scale(x, a) - scale(x, b))`, and a pre-binned column has no `_end` to give it — so the
+  question came back as a real zero, the bar was judged too thin, and it came out a quarter of a
+  unit narrow and shifted along.
+
+### Two more, and the last two ways a layer could cost a dataset
+
+`datum-rules` and `axis-values`, both of which failed on the *numbering* rather than on anything
+drawn — and numbering is where a layered chart's datasets say who reads what:
+
+- **Two layers asking the same thing of one table asked it twice.** Upstream's
+  `MergeIdenticalNodes` folds identical sibling branches into one; left apart, each got a dataset
+  and every scale domain read a union of two names where upstream reads one — the same rows,
+  described twice.
+- **A fork spent a dataset name on the table it split.** Where one of the branches is a bare
+  *output* — a name and nothing else, which is what a layer reading the raw rows has — everything
+  else belongs below it rather than beside it, and the fork disappears (`MergeOutputs`). A chart
+  whose second layer draws a rule at a constant had every dataset numbered one too high.
+- **An axis told which ticks to show was also told how many.** `defaultTickCount` returns nothing
+  once `values` are given, and asking for a count beside the list is a second answer to a settled
+  question.
+
+A third fixture was written for **`strokeDash`**, withdrawn when it turned out to name a refusal
+rather than a defect, and then put back once the refusal was gone. The channel tells two series
+apart by their *pattern* rather than by colour, which is what a reader who cannot rely on colour
+needs and what a chart printed in one ink has. Three things were missing and each was its own kind
+of silence: the compiler refused the channel outright; the runtime dropped a *scaled* dash array,
+drawing every series solid and identical; and a legend keyed on it was refused for naming no scale
+it recognised. A fourth came out of the same reading — upstream's canonical-scale order for a
+legend is `size, shape, fill, stroke, strokeWidth, strokeDash, opacity`, and this engine's began
+with `fill`, so a legend encoding both `fill` and `size` was titled from the wrong one.
+
+### What a mark says when you rest on it
+
+`tooltips`, written on the way to the composite marks, which need one. Three silences, and the
+first is the kind that is hardest to notice because the chart looks finished:
+
+- **An explicit `tooltip` encoding was dropped entirely.** A specification asking for three fields
+  in a tooltip got none, and nothing said so. There are three forms and they produce different
+  things: a **list** of fields becomes an object of title-to-value pairs, which reads as a small
+  table; a **single** field becomes that field's own value; and `tooltip: true` on the mark asks
+  for every encoded field. An array of values is joined with *line breaks* in a tooltip and with
+  spaces in a spoken description, which upstream does by building one and rewriting it.
+- **Only the first entry of a channel written as a list survived the parse.** `tooltip`, `detail`
+  and `order` all take one, and everything downstream read one definition — so a tooltip naming
+  three fields named one, and a series split by two details was split by one.
+- **A mark's `style` list left out its own type.** Upstream's `getStyles` is `[].concat(mark.type,
+  mark.style ?? [])`, and the order decides which block wins: a mark that names a style is styled
+  by its type *and then* by the name. Ours replaced the type with the name, so a `config.rule`
+  block stopped reaching a rule that named a style of its own. Nothing in the corpus named one —
+  the composite marks are what do, each part being `["rule", "errorbar-rule"]`.
+
+### The composite marks
+
+`errorbar` and `errorband` compile and draw: `errorbar` (a standard error either side of a mean),
+`errorbar-iqr` (interquartile ranges, capped, drawn sideways) and `errorband` (a standard deviation
+as a filled band with its edges). They are one rewrite with different parts drawn from it — a
+summary of one continuous field per group, then a layer per part over that summary.
+
+The rule worth reading twice is how the **extent** chooses the aggregates, because getting it
+backwards gives error bars of a plausible size that mean something else. `stderr` and `stdev` are a
+*width* measured from a centre, so they aggregate the centre and the width and then add and
+subtract; `ci` and `iqr` are two *positions*, and so are two more aggregates. Which parts are drawn
+is configuration rather than code — `config.errorbar` has `rule: true, ticks: false`, so a plain
+error bar is one rule per group and asking for `ticks` adds the caps.
+
+Three more silences came out of building it:
+
+- **`aria: false` was ignored.** It takes a mark out of the accessibility tree, so there is nothing
+  to say about it — no role description and no spoken summary — and it is a *mark* property rather
+  than an encode channel. It is how a composite mark hides its own scaffolding: an error bar's two
+  caps are read as part of the bar rather than as three separate objects.
+- **An explicitly titled position still merged its title with the other end of the range.** An axis
+  over `lower_v` and `upper_v` read "v, upper_v" where upstream reads "v", because a *stated* title
+  short-circuits the merge (`getFieldDefTitle`).
+- **A parse stayed where the flow put it.** Upstream's `MoveParseUp` lifts it above every step that
+  does not *produce* a field it reads, which is where a composite mark's own aggregate sits — so
+  the coercion of a column happened after the summary that read it rather than before.
+
+And one difference that is a deliberate refusal rather than a defect: an `extent` of `ci` needs
+`ci0`/`ci1`, a bootstrap over a thousand random resamples, which this runtime declines because a
+scene has to be reproducible. The compiler emits it correctly; the runtime says why it cannot draw
+it, and `stderr` is what a symmetric error bar wants anyway.
+
+**`boxplot` compiles and draws too**, and it is the one that needed real machinery rather than more
+rules. A box plot is a *layer of layers*, and it has to be, because its parts read different tables:
+the quartiles are found first and joined back onto every row, which is what lets a row be compared
+with its own group's box; from there the flow forks, one branch keeping the rows outside the
+whiskers and drawing them as points, the other keeping the rows inside and taking their extremes as
+the whisker ends. The box itself is a third summary of the raw rows.
+
+Four things had to exist for that:
+
+- **Nested layer names.** A composite mark names its parts *relative to itself*, so a box plot's
+  whiskers are `layer_0_layer_1_layer_0`. The names are what a mark drawn from another mark reads
+  by, so flattening them is not cosmetic.
+- **One node per transform step.** Two views that begin with the same steps and then differ are one
+  flow that forks, not two flows — and only a per-step node lets the shared prefix be recognised as
+  shared. It changes nothing where there is no fork; where there is one, it is the difference
+  between finding the quartiles once and twice.
+- **The more capable scale type winning a shared channel.** A box plot's parts are a bar, two rules
+  and two ticks, and they share one x scale: upstream ranks the types and puts `band` above `point`
+  above everything continuous, "as they support more types of data". This engine had been keeping
+  whichever layer was declared first, which for a box plot is the outliers — a point scale, and a
+  chart whose boxes had no band to sit in.
+- **A conditional with no unconditional part falling back to the mark's own value.** A median tick
+  is white *unless* its box has no height, and the white has to come from somewhere for the rule to
+  have anything to fall through to.
+
+### Joining a second table, and the row that finds no match
+
+`lookup` was the last refused transform, and the reason it was refused — the joined dataset has to
+be assembled and *named* beside the view's own — turned out to be the whole of the work: a join
+reads a second table, it does not derive from the first, so its data stands beside the source rather
+than below it and is numbered in the same sequence. The one thing to get right in the translation is
+that both grammars say `fields` and mean different things: Vega's `fields` are the rows' own columns
+to match on and its `values` are what to bring across, where Vega-Lite's `lookup` is the first and
+`from.fields` the second.
+
+The fixture then found a runtime defect of a kind worth naming, because it is the failure mode this
+project exists to catch. **A row that matched nothing disappeared from the axis while still being
+drawn.** A discrete domain was collected with the missing values filtered out, so a column whose
+join found no match had no band to stand in — and its bar was drawn anyway, at the origin, on top of
+whatever was there. Vega counts a null as a value: it gets a band of its own, at the front of the
+domain, labelled `null`. A chart that says a category has no name is honest; one that quietly draws
+it on top of another is not.
+
+### An instant is what a *time unit* makes it, not what the type says
+
+Five fixtures — `nested-fields`, `invalid-modes`, `timeunit-ordinal`, `trail`, `date-predicates` —
+and one rule behind three of them. `isFieldOrDatumDefForTimeFormat` in upstream's `channeldef.ts`
+reads a field as an instant when it is typed temporal **or** carries a `timeUnit`, and this compiler
+was reading only the type. A month bucketed onto an ordinal scale is the ordinary way to write a
+seasonal chart, and it came out three ways wrong at once: its spoken description read the bucket's
+raw milliseconds, its axis was given a time specifier without the `formatType` that says to read it
+as one, and the column was never parsed as a date on the way in. The guide side is
+`guideFormatType`, which states `time` wherever the *scale* does not already imply it — a `time`
+scale needs no telling, a band of month names does.
+
+The same reading fixed the legend, which had no `format` at all for a bucketed field, and needed
+`formatType` and a computed `format` added to `LegendSpec` for the runtime to honour it.
+
+### What a chart does with a value it cannot place
+
+`mark.invalid` is five modes and this engine had one. Upstream's default —
+`break-paths-show-path-domains` — is a macro for two different behaviours: a path *breaks* at the
+gap and keeps the row, everything else *drops* the row. Both consumers were hard-coded to the mark
+type, so `invalid: "filter"` on a line was ignored and `invalid: null` had no meaning. The mode is
+now normalised once, on the view, and the mark's `defined` and the data flow's filter both read it —
+they have to agree, because filtering a row the path was going to break at removes the break along
+with the row.
+
+`defined` itself was asking the wrong question: it looked at x and y and at the field's own type,
+where `defined.ts` asks it once per *scaled* channel and answers from the scale's domain. A line
+coloured by a continuous field breaks where that colour is missing too, and a channel whose scale
+has a discrete domain is never invalid — a null is simply another category.
+
+The marks and the *scales* then need not read the same rows, and where they do not the flow has two
+named points rather than one. `break-paths-show-domains` keeps a gap in the domain while dropping it
+from a non-path mark, so the scales read a copy taken **above** the filter;
+`break-paths-filter-domains` does the reverse for a path — draw the break, leave the gap out of the
+extent — so they read one taken *below* it. Both are compiled.
+
+One runtime gap was found doing this and is not fixed. A stacked **area** whose gaps an `impute`
+has already filled is drawn *broken* by this engine where upstream draws it whole: the compiled
+specification matches upstream's, so the `defined` expression is the same one, but this runtime
+answers false for rows the imputation filled and splits the polygon at them — leaving a pair of
+coincident points at each break. The compiler's half of the mode is covered by
+`invalid-break-paths-domains`, which is a non-path mark for that reason.
+
+Two runtime defects came out of the fixture, both in the same function. **A series whose defined
+points never numbered two vanished entirely**: runs of one point were dropped, and with no run left
+the whole mark node was dropped with them. And **the point that broke a series was not in the
+scene** — it is not drawn, having no length, but it is one of the series' points, and upstream's
+scene keeps it. Both are now subpaths: one point each, drawing nothing.
+
+### A field named through a path
+
+`record.high` is a column's *name* in Vega and a path into a nested object in Vega-Lite, and the
+translation between them is a formula per nested field plus a `format.parse` that may come out
+empty and is written anyway. Reading a nested field without it looked for a column no row had.
+Beside it, the *derived* rule from `data/parse.ts`: a column a transform computed is never parsed,
+because it already has the type its transform gave it and the loader has never seen it — which is
+why a `density`'s own output columns stopped being asked for as numbers.
+
+### A signal is an identifier, and a column name need not be one
+
+`varName` in upstream's `util.ts` runs over every name a model hands out, and this compiler was not
+running it. A column called `IMDB Rating` gives a bin signal `bin_maxbins_10_IMDB Rating_bins`,
+which is not a name Vega's expression language can read — every scale domain, every extent and
+every axis that mentioned it was a parse error waiting to happen. Anything outside `[A-Za-z0-9_]`
+becomes an underscore, and a leading digit takes one in front of it.
+
+Two more from the same sweep. A stated `scale.scheme` is a **range** — `parseScheme` returns
+`{scheme: name}` and that becomes the scale's range — where this compiler wrote it as a property
+beside the `"category"` range it would otherwise default to; Vega read the range, so a chart asking
+for `category20` got the ten-colour scheme. And legends are grouped by the **field** they encode,
+not by the scale: one field encoded twice, as a colour *and* as a size, is one key to the reader and
+one legend whose swatches carry both. The scale's own prefix stays in the key so a composition
+resolving its legends independently still gets one per plot, and the discreteness with it, since a
+ramp and a set of swatches cannot be the same legend.
+
+### Three answers to "does this domain contain zero", not two
+
+`domainHasZero()` returns `definitely`, `definitely-not` or **`maybe`**, and the third is the common
+one: a domain read from a column is not known until the data is. This compiler had a boolean, and
+read `maybe` as no — which put a baseline at the bottom of the data rather than at the origin
+whenever the column straddled it. The `maybe` case does not decide at all; it hands the question to
+Vega, which has the data: `scale('y', inrange(0, domain('y')) ? 0 : domain('y')[0])`.
+
+That is also the answer the last invalid-value mode needed. Under `show`, a value no scale can place
+is *drawn*, at the scale's own output for one, and the channel becomes a production rule whose first
+arm tests for it. Every other mode has already dealt with the row — dropped it, or broken the path at
+it — so `show` is the only one that reaches the encoding at all.
+
+`labelExpr` turned out not to be a Vega axis property. `assembleAxis` destructures it out and writes
+`encode.labels.update.text` from it, so passing it through was silently ignored, and passing it
+through on the *gridline* axis named an encode block for a mark that is not drawn.
+
+### A number in an expression is compared as text, so it has to be written as JavaScript writes one
+
+`max(4.0, bandwidth('x'))` and `max(4, bandwidth('x'))` are the same instruction and a different
+string, and the comparison is over the string. A Kotlin `Double` interpolated into an expression
+carries a decimal point Vega-Lite's own output never has — and the display canonicaliser is not the
+answer either, since it *rounds*: `(1 - 0.7) / 2` is `0.15000000000000002`, and `0.15` is a
+different number. `Fields.expressionNumber` writes the shortest text that reads back as the same
+double, which is what `String(n)` does. Nineteen files in the gallery differed on nothing else.
+
+### An offset is a lane, and a lane is not always inside a band
+
+Three rules, all from `getOffsetRange` and `rectPosition`, and each one a chart that was drawn
+wrongly rather than incompletely:
+
+- An offset with **no position** beside it has no band to sit inside, so it spans the whole plot
+  measured from the middle — `[-width/2, width/2]`. The bars had been stacking in the middle.
+- A **continuous** position bucketed by a time unit does have a band: one bucket wide, measured
+  through the scale, inset by half the nested padding at each end. Without it a grouped bar over a
+  year axis had no lane at all.
+- An offset encoding takes a rect **off** the bucket's edges, so the bucket is no longer what the
+  rect spans and the positioning is the ordinary banded one — and the band being filled is the
+  *offset's*, not the position's, which is what makes it `bandwidth('xOffset')` rather than the
+  five units a lone continuous rect gets.
+
+Beside them, `bandPositionForBandSize`: a rect asking for a *fraction* of its bucket
+(`{"width": {"band": 0.7}}`) is drawn inside it, both edges moving in by half of what is left over.
+The interpolation happens in *data* space and the scale is applied to the result, which is not the
+same as interpolating two scaled positions once the scale is not linear.
+
+### An empty title is not a title
+
+`assembleTitle` writes `titleString ? {title} : {}`, so an axis the specification titled `""` has no
+caption at all — and the tooltip and the description read `fieldDef.title || defaultTitle(...)`, an
+`||`, so the same empty title falls through to the field's own name there. One value, two opposite
+readings, and this compiler had a third: it wrote the empty string into both.
+
+`config.mark.tooltip` was also being stripped as a Vega-Lite-only property. It is not one — upstream's
+`VL_ONLY_MARK_CONFIG_INDEX` lists eight keys and that is not among them.
+
+### An explicit value settles a merge before any tie-breaker runs
+
+`mergeValuesWithExplicit` in `compile/split.ts` is three lines and this compiler had none of them:
+a value the *specification* stated beats one derived from a field, and only when both sides are
+derived — or both stated — does the tie-breaker join them. One field encoded as both a colour and a
+size, with a title written on one of them, is titled by the one that was written; this compiler
+joined the two with a comma. The same rule reaches an axis, where the **guide's** own title opens
+`title` in `axis/properties.ts` and settles it outright, so an axis captioned `Temperature (F)`
+stays that rather than gaining `, record.high, normal.high` from the layers under it.
+
+### The largest a mark may be drawn is not a constant
+
+`sizeRangeMax` reads a *step*, and a step is not known at compile time when the position is
+**binned**: the bin transform chooses its own boundaries. Upstream writes the expression instead —
+`pow(0.95 * min(width / ((bins.stop - bins.start) / bins.step), …), 2)` — and this compiler was
+writing the configured step, so a binned scatter's circles were sized against a band that was not
+there. Beside it `interpolateRange`, for a scale that maps a continuum onto *buckets*: Vega cannot
+interpolate a discretizing range itself, so the sequence is written out as an expression.
+
+### Two transforms that take an `extent` are not extent transforms
+
+`isExtent` excludes `density` and `regression` by name, and reading `extent` first turned a whole
+kernel-density transform into an extent one — losing its field, its grouping, its output columns and
+its resolve. `config.mark.tooltip` was also being ignored: `getMarkPropOrConfig` reads the mark
+*and* the configuration, so a theme that turns tooltips on turns them on for every mark.
+
+`impute.keyvals` written as a sequence is now generated rather than refused — `processSequence`
+turns `{start, stop, step}` into a `sequence(...)` signal — and the fixture found a runtime defect
+behind it: **`keyvals` was replacing the key domain instead of augmenting it.** Vega's own
+documentation is explicit that "these values will be automatically augmented with the key values
+observed in the input data", and reading it the other way dropped every observed key the list did
+not name, so a series lost rows it already had.
+
+A label's alignment also follows the side its axis is on — `defaultLabelAlign` compares the angle
+against the axis's *main* orientation and flips when the axis has been moved — so a turned label
+hanging off the top of a chart no longer anchors at the wrong end.
+
+### A title reads differently depending on what kind of model carries it
+
+`assembleTitle` splits on the model: a **unit or layer** anchors its title to the *group*, which
+keeps it over the plotting area when an axis widens the drawing to its left; a **composition**
+cannot, its groups being laid out with no one plotting area to sit over, and takes `anchor: "start"`
+instead. Upstream's own note is that a centred title "does not look nice" over a grid. A plot inside
+a concatenation is still a unit, so it frames its group while the concatenation above it anchors to
+the start.
+
+Beside it, `assembleHeaderProperties`: a facet's `header` names its properties `titleFontSize` and
+`labelFontSize` where a Vega title names them `fontSize`, so each is a rename per part. Without the
+map a header's whole styling was read and dropped.
+
+### Four more rules, each one a chart drawn wrongly
+
+- **`impute` as a transform**, as against an `impute` on a position channel: it names its own field,
+  key and grouping rather than taking them from the encoding, and was refused outright.
+- **A non-position channel gets the invalid arm too.** `nonposition.ts` asks for one, so a size
+  scaled from a column with nulls draws those rows at the scale's own output for an invalid value
+  rather than leaving them unsized.
+- **A reversed scale reverses its bin spacing.** `getBinSpacing` writes `(reverse ? -1 : 1) *` in
+  front of the half-spacing that pulls a bin's edge inward, because on a reversed axis inward is
+  the other way.
+- **An offset moves every position, not only a rect's.** A label over a grouped bar has to move
+  into the same lane the bar did — and *only* into the lane: the position's own band drops to 0
+  where the offset centres it, since centring twice moves the label half a group to the right.
+
+And both curve fits now always name their output columns, defaulting to the two they were computed
+from, as `RegressionTransformNode` does in its constructor.
+
+### `"-x"` is a channel, not an unknown word
+
+`isSortByChannel`: a discrete domain's `sort` may name **another channel** — `"-x"` for "tallest
+bar first", which is how most sorted bar charts in the gallery are written. Read as an unrecognised
+string it silently became the default alphabetical order, which is a chart sorted the wrong way
+rather than one that failed. Expanded, it resolves through the same path a `sort` object takes: the
+categories are ordered by the *aggregate of the other channel's field*, computed from the
+pre-aggregation table, which is also what finally made this compiler name that table where upstream
+names it.
+
+### An aggregate that answers with a whole row
+
+`{"aggregate": {"argmax": "US Gross"}, "field": "Production Budget"}` asks for the production budget
+*of* the highest-grossing row, and the two columns in it play different parts everywhere. The
+aggregate is taken over `US Gross` and its output column is named after that; the `field` is a path
+*into* the row it answers with, appended unescaped because it is a real step into a real object; and
+the default title reads `Production Budget for max US Gross`. Read as an ordinary aggregate the
+whole thing collapsed into one name that no transform wrote.
+
+Two smaller ones fell out of it. Every field definition contributes to the aggregate, not only the
+channels' own — a `tooltip` written as a **list** holds several, and one of them may be the only
+thing asking for one. And a parse cannot climb past a step that produces what it reads *by root*: a
+step producing `argmax_US_Gross` blocks a parse of `argmax_US_Gross['Production Budget']`, though
+the two names differ. Where the parse stays below, it is a formula rather than a `format.parse`,
+since by then the loader has long since finished — `node.parent instanceof SourceNode` is upstream's
+test and it is asked at assembly, after the optimiser has moved what it can.
+
+### How many buckets a `bin: true` asks for depends on the channel
+
+`autoMaxBins`: ten along an axis, where a reader can follow a fine grid; **six** on a colour, a size
+or a facet, where more than a handful of steps stop being tellable apart; four on a stroke dash,
+there being five patterns and four reading better. The number goes into the field's own *name*, so
+reading ten everywhere renamed every column a binned colour scale produced and nothing downstream
+found them.
+
+Three more from the same pass, each a property that was being overridden rather than read:
+
+- **A style block settles a text mark's alignment.** `getMarkPropOrConfig` reads the mark, then the
+  style blocks it names, then the mark type's configuration; this compiler read only the mark, so a
+  label styled `{align: "left"}` had `align: "center"` written beside it by the very default the
+  style existed to replace. The **runtime** had the same gap from the other end — it read `align`,
+  `baseline`, `dx` and `dy` only from the encoding, so a style block's never reached the page.
+- **A stated `padding` settles a band's two ends at once.** The derived inner and outer paddings
+  are for a scale that said nothing; writing them beside a stated one gave Vega three numbers where
+  the specification gave it one.
+- **`{"step": 50, "for": "position"}`** hands the step to the outer band rather than to one mark
+  inside it, so `x_step` is 50 outright and the offset divides whatever band that produced.
+
+And `"header": null` takes a facet's **caption** off rather than its band: the band is also where a
+shared axis is drawn, and that axis is still wanted. A band with neither is the one that disappears.
+
+### A ramp over instants is still a ramp
+
+`isContinuousToContinuous` includes the two **time** scales, and this compiler's own list did not:
+a colour ramp over dates was read as discrete and drawn as a row of square swatches over a
+continuum. Its legend also takes the configured date format outright, `omitTimeFormatConfig` being
+true for an axis and **false** for a legend — an axis chooses its granularity from the span it is
+showing, where a legend's entries stand alone. And a `mean` over a date column still needs the
+column read as dates first, aggregate or no aggregate, or it averages the characters.
+
+Three more from the same pass. A rect's position takes the **invalid arm** like any other, which
+`midPointRefWithPositionInvalidTest` builds whatever shape the position takes. A nested
+concatenation may carry a title of its own, and being a composition it anchors to the start. And a
+size signal is written once per *name*: a size two levels of a tree agree on was named by each of
+them, and Vega reads the first and warns about the rest — nine signals where upstream has three.
+
+The runtime gained one to match: `encode.gradient` is where a ramp's own opacity is written, so a
+legend beside a chart of translucent marks is drawn as translucent as they are rather than solid.
+
+### A column that arrived already bucketed
+
+`binnedyearmonth` and its kin say the *data* was bucketed before it got here, and almost every rule
+that reads a time unit has to know it. There is no `timeunit` transform, only a formula computing
+where the bucket ends — `timeOffset('month', datum['date'], 1)`. The field keeps its own name,
+`vgField` skipping the prefix it would otherwise add. The title is the field's own, there being no
+derivation to announce. And the stack groups by the bucket's start alone, its far edge being a
+column a formula wrote rather than a second name for the same one.
+
+Beside it, a `groupby` is written whenever the specification **stated** one, empty or not: an empty
+list and silence are two different statements and it is the statement that is carried across. A
+boxplot over one ungrouped column states an empty one.
+
+### A column of plots is one width and a stack of heights
+
+Nine files turned on one sentence of `parseConcatLayoutSize`: a nested concatenation contributes
+upward only the dimension it shares **as a whole**. A column of plots has one width and its
+`childHeight` is one cell's, not the column's — so a *row* of columns must not merge on it, and this
+compiler was merging on it and handing the whole chart a height of one cell. The plain name is what
+says which of the two a level settled: `width`/`height` for the dimension the concatenation shares,
+`childWidth`/`childHeight` for the one each cell keeps.
+
+### January is month one to a reader and month zero to Vega
+
+`normalizeMonth` and `normalizeQuarter` shift a **number**, and only a number: a month written as
+`1` is the reader's January and `datetime()`'s month zero, where a month named `"jan"` has already
+been resolved to the index Vega wants and shifting it again reads January as December. Passing the
+number through unshifted put every dated comparison a month late.
+
+Beside it, a **binned** time unit in a predicate needs no bucketing — the column already holds the
+bucket — so only the cast to a number is left, and the rebuilt-from-parts expression this compiler
+was writing compared the bucket against a bucket of the bucket.
+
+### A condition falls through to the mark's own colour
+
+`color(model, {filled})` hands the mark's own colour to `nonPosition` as its `defaultValue`, so a
+production rule *ends* in it. This compiler set the colour and then overwrote the whole property
+with the rule, leaving no unconditional arm — and every mark the condition did not catch was drawn
+in Vega's own default rather than the chart's.
+
+Beside it, `getHeaderChannel`: a facet's `header.orient` of `"bottom"` or `"right"` moves the
+captions to the **footer** band, which is a different group with a different name rather than the
+same one moved. The heading follows them, and the layout anchors it at the end of the grid.
+
+### Inside a trellis, a series belongs to its cell
+
+Two of these, and both drew one cell's rows into another. A stacked path mark's **imputation** is
+done within `facetby.concat(stackby)`, so a gap filled across the cells is a gap filled from the
+wrong rows. And a path mark split into series reads the *cell's* own partition rather than the whole
+table: `markData`, not `mainData` — reading the table drew every cell's series in every cell.
+
+With them, `timeUnitBandSize`: the same fraction a mark writes as `{"width": {"band": 0.7}}`, written
+as a bare number in the configuration, which is how a theme narrows every bucket's bar at once. And
+an offset may name a **datum** rather than a field, which is how a repeated layer puts each copy in
+a lane of its own — there is no column to read, only the value to look up.
+
+### An `order` channel is what makes a connected scatter plot connected
+
+`getSort`: an `order` channel names the drawing order outright, and the mark is then sorted by that
+column rather than by its position — a line running through the years rather than left to right,
+which is the whole of what a connected scatter plot is. A **stacked** mark is the exception, where
+`order` says how the segments stack; and a path with neither is drawn along its own dimension, or
+nothing would keep it from doubling back.
+
+Beside it, two rules about what groups a stack. `getGroupbyFields` pairs a dimension with its far
+edge only where the dimension is **binned** — a bucketed instant's `_end` is a column the time unit
+wrote and the stack has no use for it — and a binned dimension under an *imputation* groups by the
+bin's midpoint instead, two fields not being imputable at once.
+
+### A domain written as dates
+
+A `DateTime` in a scale's domain cannot be handed to Vega as an object: each end becomes the
+expression that builds the instant, wrapped in `{data: …}` so Vega reads it as one *datum* of the
+domain rather than as a list to be spread. The runtime learned to unwrap it at the other end.
+
+### A table that is generated rather than loaded
+
+`{"sequence": {...}}` is the one data source that is a *transform*, and it matters twice over. The
+dataset holds a `sequence` transform instead of `values`; and the flow does **not** fork below it,
+a generator being nothing Vega might overwrite, so the view's own transforms belong in the same
+dataset rather than in a derived one. Its column is derived too, so nothing parses it — this
+compiler was writing a `toNumber` over a number a transform had just produced.
+
+Beside it, a step signal is named after the **scale** rather than the channel: inside a
+concatenation each plot counts its own categories, so a row of band charts reads `concat_1_x_step`
+rather than every plot taking the first one's width.
+
+### A binned field forced onto a discrete scale is a domain of labels
+
+`binRequiresRange`: where a specification puts a `bin` on an *ordinal* channel, the axis has no
+numbers left to derive its labels from, so the bin writes them out — `"5.0 – 6.0"` into a `_range`
+column. Four things then read that column rather than the bin's start: the scale's domain, the
+mark's position, the aggregate's grouping, and — because labels do not sort themselves into numeric
+order, `"1.0 – 2.0"` coming before `"9.0 – 10.0"` alphabetically — the domain's sort, which orders
+them by the bin's own start.
+
+That sort also settled a question about the pre-aggregation table. It is wanted where the
+*specification* stated a sort that reads a column the aggregation removes; a sort this compiler
+*derived* is built from columns the grouping keeps, and reads the same table everything else does.
+
+An **arc** takes a band on its polar positions for the same reason a bar takes one on its Cartesian
+ones: a slice spans an angle, it does not sit at one — and spanning it needs the other half of
+`positionAndSize`, the branch for a channel with no size of its own. Vega has no `thetaWidth`, so
+the far angle is the near one plus the extent, written as an `offset` on the same reference. And a ranged position whose far end is a
+**datum** contributes that constant to the domain — an area drawn down to zero has to cover zero
+whether or not any row holds it.
+
+### The `utc` in a time unit's name sits wherever it likes
+
+`normalizeTimeUnit` reads it out of the whole name, so `binnedutcyearmonth` is universal time as
+much as `utcmonth` is — and reading only the prefix left a universally bucketed column on a *local*
+scale, stepped its far edge with `timeOffset` rather than `utcOffset`, and spoke it with
+`timeFormat`. `utcOffset` is now an expression function too; it had never been asked for.
+
+### `href`, and the pointer that goes with it
+
+The `href` channel is no longer refused: it is a link the mark carries, written the way a text
+channel is. And a mark that links somewhere shows the **pointer** — `baseEncodeEntry` sets the
+cursor from the encoding, not from a style, since nothing else about a linked point looks clickable.
+
+A binned field on a discrete scale is also *spoken* as the plain column it came from: there is no
+numeric axis left, so upstream reads it as a category rather than as the range its label spells out.
+
+### A caption turned to face its row
+
+`defaultHeaderGuideAlign` and `defaultHeaderGuideBaseline` both open with *if the angle is stated*:
+a caption left at whatever angle the renderer chooses is left at whatever anchor it chooses too.
+State one and the caption has to be turned to face its cell — a **row**'s captions run down the side
+of the grid, so each is right-aligned against the cells and centred on them.
+
+The runtime met it halfway. A title's `angle`, `align` and `baseline` were parsed and dropped, so a
+left-oriented caption read upwards however flatly the specification asked for it; and a title
+hanging from its top sits a line above the row it labels, where `baseline: "middle"` puts it beside
+it.
+
+With them, two rules that are one line each: a stated `spacing` is the gap between a grid's cells
+and beats the configured twenty, and a colour scale with a **midpoint** is a *diverging* one, since
+the reader is being shown which side of a value each datum falls and a one-ended ramp cannot say
+that.
+
+### A table handed in by name
+
+`{"data": {"name": "falcon"}}` reads a table the specification supplies in its top-level `datasets`
+block, and both halves of that were missing. A named root **keeps its name** — `if (!root.hasName())`
+guards the numbering upstream, so it does not consume a `source_n` either — and the rows the block
+holds are written out beside it, since the view's own `data` states none. Renaming it breaks the
+hand-off the name exists for.
+
+### A whisker is not a category
+
+A boxplot's whiskers are drawn in **black** whatever the box is coloured: they mark the extent of
+the data rather than naming a category, and taking the category's colour made a coloured boxplot's
+whiskers disappear into its box. The box's thickness also reads a `size` **encoding** written as a
+value, which is how a specification thins a box without touching the rest of the chart.
+
+### A column may be called `source.reco`
+
+`escapePathAccess` escapes a bracket, a dot and both quotes *inside* a path step as well as between
+steps, because a name with a dot in it is a name and not a path: writing `source.reco` unescaped
+tells Vega to look one level into a `source` that is not there. This compiler was escaping only the
+joins.
+
+Three more of the same size. `background` on the specification beats `config.background`, a theme's
+default being what a stated one overrides. A top-level **`view`** block paints the *plotting area*
+rather than the surface around it, so it becomes an `encode` on the chart's own group — the two are
+different colours in the same chart. And `isDiscrete` counts a **binned** field, so a binned heatmap
+draws its axes over the cells as a categorical one does.
+
+An `impute` with a method other than `value` is three transforms, not one: Vega's `impute` fills a
+gap with a **constant** and nothing else, so the gap is filled with null, a `window` averages over
+the frame — which belongs to the window, not to the impute — and a formula writes the result back
+over the nulls.
+
+### Three mark properties that are words rather than values
+
+`cornerRadiusEnd` rounds the two corners at the *far* end of a bar, and Vega has four corner
+properties and no notion of which end a bar grows from — so it resolves into two of them, and which
+two depends on the orientation. `xOffset` and `yOffset` on a **mark** are plain nudges, unlike the
+same names in an encoding, and fold into the position's `offset`. All three had been passed straight
+through as though Vega knew them.
+
+Beside them, a relative band size on a *band* scale, which is two numbers rather than one: the mark
+fills `band * bandwidth(scale)` and starts `(1 - band) / 2` in, so the gaps either side of it match.
+
+### A layer that is not there renames every layer under it
+
+`"outliers": false` takes a boxplot's scatter of far-out rows off, and with it a whole layer — so
+the whiskers *are* the first layer and everything below loses a level of naming. The names are what
+every scale domain and mark reference is written against, so a layer that vanishes silently is a
+chart whose parts point at each other's names.
+
+An arc that states its own `outerRadius` is not measured from the plotting area either: a donut
+naming its own reach means it, and it still needs an inner radius of zero, Vega drawing nothing at
+all where neither is given.
+
+### An angle nobody can read yet
+
+`defaultLabelAlign` has a second half this compiler had never reached: where the label angle comes
+from a **signal**, the comparison cannot be made here, so it is written out as an expression and
+handed to Vega. The two answers then have to live on the labels' own `encode`, an axis property
+taking a constant rather than a rule — which is why upstream's axis carries neither `labelAlign` nor
+`labelBaseline` in that case and an `encode.labels.update` instead.
+
+The runtime met it halfway again: it read the axis *property* and never the labels' encode, so a
+label whose alignment was computed sat wherever the orientation would have put it.
+
+Beside them, `replaceExprRef`: `{"expr": …}` on a guide is Vega-Lite's way of writing a signal and
+Vega's way is `{"signal": …}`. Passed through, the property was unread and the guide stayed at its
+default. And a mark's own `xOffset` applies wherever the position lands — including *inside* a
+bucketed bar's spacing, where the two nudges compose rather than one replacing the other.
+
+### A boxplot of one column has no category to span
+
+Five files turned on one word: a whisker runs along the **measured** axis, and saying so is what
+centres it on the other one. A boxplot with no discrete channel has nothing to span, so its parts
+sit in the middle of the plot — `{signal: "height", mult: 0.5}` — where saying nothing made them
+fill it from edge to edge.
+
+### An offset divides its band the way its mark would
+
+An offset scale is not always a band. It divides a band between the marks nested in it, and *how*
+it divides follows the mark: a bar takes a band of its own inside the group, a point sits at a place
+in it. That one rule settles four things — the offset scale's type, its `paddingOuter` (a point
+scale's ends are padded and its marks have no width to pad within), the step expression that counts
+its entries (`bandspace` counts *bands*, and a point scale has only places), and whether the
+position's offset is centred in a lane at all.
+
+A **position** with an offset nested in it is a band whatever the mark, for the same reason: a point
+scale has no span for the nested marks to divide.
+
+### An array is an object, in JavaScript
+
+`defaultLabelOverlap` reads `!isObject(sort)`, and in JavaScript an **array** is an object — so a
+written-out order suppresses a time unit's label thinning as much as a sort object does. The reason
+is the same one the rule is for: a gap in a *stated* sequence is a question rather than an inference,
+and a reader who wrote out Monday to Sunday is owed all seven.
+
+Beside it, a day folded into a date. A weekday is one-based as a date, and where the day is a known
+number that sum is done at compile time: upstream writes `datetime(2012, 0, 2, …)` for Monday, not
+`datetime(2012, 0, 1+1, …)` — two expressions that mean the same thing and compare as different
+text.
+
+### A bucket a rect is drawn *over* rather than after
+
+Seventeen files, and one rule: `offsetedRectFormulas`. A `bandPosition` other than the middle moves
+a bucketed rect within its bucket, and the two ends it is then drawn between are not the bucket's
+own — they are interpolated between the *previous* bucket's start and this one's, and between this
+one's start and its end, into two columns a formula writes. The scale reaches those columns and the
+mark is drawn between them.
+
+The chart that shows why is a line with a red band over each missing point: at `bandPosition: 0` the
+band has to sit *over* the gap, and reading the bucket's own edges put it after the gap instead —
+half a day late, every time.
+
+Those two columns are columns like any other, so the **grouping** has to carry them: an aggregate
+that throws them away throws away the very numbers the mark is placed by.
+
+### `rangeMin` is one end of a range, not a property beside it
+
+A radial chart says "start the rings at twenty" without writing out the expression for the other
+end, and `rangeMin`/`rangeMax` are how: they **replace the ends** of whatever range the channel
+would have taken and are not emitted themselves. Passed through as properties they were ignored and
+the rings were drawn from the centre.
+
+A wrong guess is worth recording beside it. The first reading was that a radial scale's range begins
+at the *mark's* `innerRadius`, which fitted this chart exactly — both numbers are twenty — and is
+not the rule. The `rangeMin` beside it is what said so.
+
+Beside them, the stack's sort names each field **once**: two channels over one column is one thing
+to sort by, and repeating it in the pair of parallel lists is a comparator that reads the same
+column twice.
+
+### The chart's colour names the box, not the whiskers
+
+A whisker marks the *extent* of the data rather than naming a category, so it is drawn black
+whatever colour the box is — and that means the encoding's colour is withheld from the parts that
+state their own, not merely written under them. Colouring the whiskers made them disappear into the
+box they belong to.
+
+### A name the specification wrote, and a name this compiler derived
+
+`test_aggregate_nested` and a fixture built to mirror it disagreed about the same column, and both
+were right. A column an **encoding** aggregate reads is a *reference* this compiler derived, so a
+dot in it is escaped: `properties\.yield`, or Vega looks one level into `properties`. A column named
+in a `transform` the specification wrote is left exactly as the writer wrote it. The rule is not
+about the character, it is about who wrote the string.
+
+Beside it, three that are one line each. `{"expr": …}` on a **mark** property and on a **scale**
+property is a signal, as it already was on a guide — and a signal is a *reference*, so it replaces
+the whole entry rather than sitting inside a `value`. An angle is a turn from zero, so a label the
+specification wrote at minus forty-five degrees is a label at three hundred and fifteen; the two
+draw alike and compare as different numbers, and the normalisation has to happen *after* the
+specification's own block is copied over, not before. And an impute's grouping is
+`[...stackby, ...facetby]` **concatenated**, not merged: a field that is both a series and a facet
+is named twice, where the stack's *sort* names each field once.
+
+### A parse the specification stated, over rows no loader ever saw
+
+`{"values": [...], "format": {"parse": {...}}}` is not an instruction to the loader — Vega has
+already ingested those rows — so the stated parse joins the flow's own and becomes a *formula*
+there, and only what is left of the format block belongs on the source. An explicit parse also wins
+over one this compiler inferred, which is what `Split(explicit, implicit)` says: a `utc:'%d %b %Y'`
+the reader wrote is not to be replaced by the `toDate` a temporal encoding would have asked for.
+
+That change turned a silent near-miss into a named gap. Reading the stated parse means emitting
+`utcParse`, and `utcParse` is one of the functions this engine refuses by name for want of a
+`strptime`. The chart compiled correctly and had been *rendering* by accident, on a `toDate` that
+was never asked for.
+
+Beside it, the axis title order: `axis.title` first, then the field's own, then the pair a ranged
+position names — and the first of those that answers is the whole answer. A layer whose guide names
+the axis has said what the axis measures, so the fields' own titles add nothing after it.
+
+### Five rules read off the same ranking, and the two runtime defects they exposed
+
+A layer's group **style** is the union of its children's, not one verdict for the lot. A scatter
+plot with a caption pinned to its corner is `["cell", "view"]`: the points want a bordered plotting
+area and the caption, which has no position at all, does not.
+
+A shared scale merges **property by property**, not layer by layer — `parseNonUnitScaleProperty`.
+The first layer to settle a property settles it, and a layer that says nothing about it is passed
+over rather than ending the search. A candlestick's rules come first and have no width to speak of,
+so the bar's `padding` is the only one anybody states, and reading only the first layer lost it.
+
+A field named twice in a path mark's grouping is **listed twice**: one column driving both the
+colour and the dash pattern appears once per channel, because `pathGroupingFields` pushes without
+looking. Deduplicating it split a stocks chart's lines differently from upstream's.
+
+A conditionally written channel **waives `ignoreVgConfig`**. A test with nothing to fall through to
+leaves the mark unpainted when the test fails, so the configured value is written out as the rule's
+last arm even though the style block already says it — a style block is what Vega applies when a
+property is *absent*, and a production rule that reaches its end is not absent.
+
+A stacked value asked for a **band position** is drawn between the segment's two ends rather than at
+the far one, which is what puts a label in the middle of its own wedge instead of on the cut between
+it and the next; a text mark on a polar channel asks for the middle without saying so. The same
+interpolation runs for a *bucketed* column read through any scale, position or not — a size legend's
+swatches come from the scale, and a mark placed at a bucket's near edge would be a size the legend
+never shows. And a theme may write a Vega-Lite-only axis property in `config.axisX` as much as in
+`config.axis`: `labelExpr` and the conditional ones are resolved onto the axis here, because Vega
+has no name for them and would apply nothing. A guide's `test` is a *predicate* in the same grammar
+a `filter` is, and it compiles through the same function — passed through as an object it went
+unread, so a gridline told to dash everywhere but January dashed nowhere at all.
+
+The fixtures written for those found two defects in **this runtime**, both now fixed:
+
+- **A continuous scale ignored its `padding`.** A band scale pads by leaving gaps between bands, but
+  a continuous scale has none to leave gaps between, so Vega asks for the effect the other way round
+  — `padDomain` zooms the domain out by exactly the factor that pulls the data's ends inwards by
+  `padding` pixels, after `zero` and before `nice`. Without it the leftmost bar of a time-series bar
+  chart was sliced in half by the axis. The zoom happens in the scale's own space, so a log, power
+  or symlog domain is padded through its own transform rather than linearly.
+- **A binned scale's symbol legend drew one swatch per boundary.** A scale whose `bins` name cut
+  points has *buckets*, not values: `binValues` drops the last boundary and `formatRange` labels
+  each entry against the next. Ticking the scale instead drew six swatches for four buckets, each
+  labelled with an edge no row can take.
+
+### The optimizer runs until nothing moves, and which sibling survives decides the names
+
+Fifteen gallery examples were fixed by three changes to the data flow, and all three are about the
+*shape* of the tree rather than what any node does. The shape decides the naming — `data_0` versus
+`data_1` — and a mark reading the wrong name is a wrong chart, not a cosmetic difference.
+
+**Every node upstream has a `hash`, and it is over the transform it emits.** This compiler compared
+only three kinds and left the derived steps out, so a line drawn over its own area was two views
+asking one table for the same stack and getting a dataset each. But the hash is over the whole
+*component*, not only what reaches the transform: two stacks that segment the column differently, or
+whose dimension is quantitative in one plot and ordinal in another, emit the same transform from
+different questions and stay apart. Merging on the transform alone drew a pie chart's labels from
+the arcs' own accumulation, and one plot of `test_invalid_null` from another's.
+
+**Time units are folded by their own optimizer, and it keeps the _last_ sibling** —
+`timeUnitChildren.pop()` — where the general one keeps the first. Which of them survives is which
+branch the walk meets first, so a chart whose two layers both bucket one instant has its *second*
+layer numbered `data_0`. That is upstream's numbering, and every scale domain and mark reference in
+the file follows from it. A binned time unit is a `TimeUnitNode` upstream even though it emits
+`formula`, so it is folded the same way.
+
+**`optimizeDataflow` runs its whole sequence again until nothing moves, at most five times.** That
+is not belt and braces: one optimizer's fold makes the next one's siblings. Two layers each
+bucketing an instant and then aggregating it are not sibling aggregates until the time units have
+been folded together, so a single pass leaves the aggregates apart and the datasets doubled.
+
+Beside them, `hasBandEnd`: a bucketed **instant** is a bucket like any other, so a stated
+`bandPosition` puts the mark at a point inside it — a signal interpolating the two edges, since the
+edges are columns and the point between them is not — and the bucket's far edge joins the scale's
+domain. A label over a month asked for the middle of the month now sits in the middle of it.
+
+### Five more from the same list, and a facet channel that was left out of the data flow
+
+**A facet channel is lifted out of the encoding, but not out of the data flow.** It says nothing
+about what a cell *looks like*, so it is taken out before the scales are built — and the column it
+breaks the chart down by may still need bucketing. Upstream does that on the facet's own model,
+above the cell's, so a trellis broken down by `year(date)` buckets the year before it buckets the
+quarter. Left behind, there was no `year_date` column to break down by at all.
+
+**A cell's caption goes through the same rule a mark's text does** — `formatSignalRef` with
+`expr: "parent"`. A bucketed instant is spoken as a date with the specifier Vega picks at render
+time, so a trellis of years is captioned `2005` rather than `1104537600000`.
+
+**`bin` and `stack` written as _transforms_** now compile. They are the same nodes the encoding's
+own produce — `BinNode.makeFromTransform` and `StackNode.makeFromTransform` — with everything
+stated rather than derived, and only the output naming has a rule of its own: one name becomes the
+pair of edges.
+
+**A composite mark's grouping is every channel but the continuous axis**, colour included, and a
+field named on two channels is named twice: `extractTransformsFromEncoding` pushes without looking,
+so a box plot coloured by the column it is categorised by groups by it twice. A **tooltip** is the
+exception — it is taken out of the encoding before the grouping is read and only the part of it that
+asks for an aggregate is put back, because resting on a mark to read a column is not a request to
+break the summary down by it. The `joinaggregate` keeps the repetition and the `aggregate` does not,
+which is not an inconsistency: an aggregate's dimensions are a *set* in `makeFromTransform`, and a
+`joinaggregate` is a transform Vega takes as written.
+
+**A channel written only as a test still needs its scale.** `getFieldOrDatumDef` reads through a
+`condition`, so a median tick that is its category's colour unless its box has no height gets a
+colour scale; reading the unconditional part alone left the rule naming a field it could not look
+up, and the box plot's median was drawn unpainted.
+
+### A stack drawn inside a group, so that the rounding belongs to the stack
+
+`getGroupsForStackedBarWithCornerRadius`: a corner radius on a stacked bar is a property of the
+*stack*, not of whichever segment happens to be at its end — rounding each segment would round the
+joins between them as well. So the whole stack is faceted into a group, the group is given the
+radius and clipped, and the segments are drawn inside it with none. The group's extent along the
+stack is the min and max of every segment's two ends **in pixels**: the accumulation is in data
+space and the rounding is not, so the scale is applied inside the expression. The inner group exists
+only to undo the outer one's translation, marks inside a group being positioned relative to it while
+their scaled positions are absolute.
+
+Two details decide whether the group appears at all. The test is `some(prop =>
+getMarkPropOrConfig(prop, ...))` — **truthy**, so a bar that states a radius of zero is a plain bar
+and stays one rect. And a bar with a `size` encoding is left alone: its segments would no longer
+fill the group's thickness, and upstream does not guess.
+
+Beside it, three smaller rules. A tooltip **written as a list** builds the `{title: expression}`
+object however many entries it holds — one field written `[{…}]` is titled where the same field
+written bare is not. A composite mark's tooltip keeps each channel's own title, so a bucketed column
+reads `Year (year)` rather than the `year_Year` its transform wrote. And a **time unit** on a
+composite mark's channel becomes a transform of its own: the summary happens after the bucketing —
+one interval per bucket, not one per instant — so the unit cannot stay on a channel whose column
+the aggregate has already collapsed. A channel that is not itself temporal is then told to read
+that column as a *time*, nothing about an ordinal band otherwise saying so.
+
+### A child's transforms come after its parent's, not instead of them
+
+The plainest correctness bug of the sweep so far, and it had been sitting under a naming difference.
+A layer or a concatenated plot that writes its own `transform` was having it *replace* the chart's
+rather than follow it — so a population pyramid whose shared transforms compute a `gender` column
+and whose plots each filter on it filtered on a column nothing had written yet. Upstream keeps the
+parent's transforms in the parent model's own data chain and hangs each child's below; concatenating
+the two lists is the same shape, and the optimizers then hoist the shared prefix back above the fork
+by themselves. One example went from thirty differences to one.
+
+Beside it, four smaller rules:
+
+- **The size alias belongs to an axis, not to a scale.** `assembleAxisSignals` walks the assembled
+  axes and asks each one for the extent it will draw its grid across; a plot whose axis is switched
+  off has nothing to draw and needs no alias. Keying it off the *scales* gave a middle column of
+  labels a `width` signal upstream does not write.
+- **A plot's own `view` block paints its own plotting area**, exactly as the chart's does — which is
+  how a column drawn without a border says so on itself rather than on the chart.
+- **`config.concat.spacing`** settles the gap for every concatenation in a chart, and **an empty
+  description is no description** — `isEmpty` drops it rather than announcing a chart whose spoken
+  summary is the empty string.
+- **A discretizing size scale does not start at zero**: its range is a list of sizes to choose
+  between rather than a span to measure along. And a **stated** inner padding is the resolved one,
+  so the outer padding is half of *that* rather than half of the configured default.
+- **A mark configuration's paint reaches its swatch** — `applyMarkConfig({}, model,
+  FILL_STROKE_CONFIG)` — so a bar outlined two units thick has a swatch outlined two units thick.
+  The two colours are dropped again where this legend is the one explaining them.
+
+The fixture written for the first of those found a runtime defect and named a runtime gap. The
+defect: a **discretizing scale's legend labelled each swatch with one edge**, saying nothing about
+which side of it the bucket lay on. `thresholdValues` prepends negative infinity and calls the far
+end positive infinity, and `formatRange` reads each entry against the next — `< 12.2`, `12.2 –
+16.4`, `≥ 20.6`. That is fixed. The gap: a **plot whose `view` block sets `stroke: null` loses its
+group from the scene**. The compiler emits exactly what upstream emits — the specification
+comparison covers it — and the scene comes out one group short, so the fixture is written without
+that block and the case is recorded here rather than passed off as working.
+
+### A bucket imputed at its middle
+
+An imputation fills the gaps in one column keyed on another, and a bucket is *two* columns — so
+`StackNode.assemble` computes the point between them into a column of its own and keys on that.
+Without it the imputation keyed on the bucket's near edge, which is a different set of keys from the
+one the stack groups by, and a stacked area over a binned column had gaps its own grouping could not
+see. The mark then reads that same column rather than working the midpoint out again: it is already
+there, because the imputation had to have it.
+
+The fixture written for it named another runtime gap, and a later attempt on that gap narrowed what
+it actually is. A stacked area over a bucketed column *with nulls in it* comes out with the wrong
+number of vertices: upstream's outline has ten buckets in it and this runtime's has eleven. The
+obvious reading — that the path is drawn through points the mark's `defined` says to omit — is
+**wrong**: dropping the broken points gives nine, not ten. One bucket more than upstream's is
+reaching the mark, so the difference is in the *rows* the imputation produces rather than in how the
+path is traced. That is where the next attempt should start; the change that assumed otherwise was
+reverted rather than shipped. The fixture is written over a column with no nulls meanwhile.
+
+### Three rules about what a channel *is*
+
+**A secondary channel is not a bucket of its own.** It names the far end of somebody else's, and
+upstream reaches it as a `SecondaryFieldDef` — a definition with no type, which never takes the
+bucketed branch. Reading it as a bucket put a rect's far edge halfway into a bucket that does not
+exist, between `month_date_end` and a `month_date_end_end` nothing had written.
+
+**A caption turned a quarter turn is centred**, not pushed to one side. `defaultLabelAlign` through
+the header's own orientation: at ninety degrees the caption's length runs *across* its band rather
+than along it, so there is no side left to push it to. Aligning every turned caption to one edge
+put a trellis's row labels half off their rows.
+
+**`{"domain": {"unionWith": […]}}` widens the domain rather than replacing it** — the stated values
+first, the derived domain after, both in the one union — and the stated values stay a single entry
+of that union rather than becoming one each. Vega takes a literal array as a domain in its own
+right, so splitting it hands the scale two domains of a single value.
+
+### An invalid value the theme has an answer for
+
+`getScaleInvalidDataMode` asks **per channel**, not once for the mark. A theme that writes
+`config.scale.invalid.color` has said what an unplaceable value looks like on that channel — so
+whatever the mark's `invalid` mode says, those rows stay and the channel's production rule paints
+them. Filtering them as well removed the very rows the answer was written for, and leaving the arm
+off the encoding painted them as if they had been valid. Both halves are the same rule, read in two
+places.
+
+Beside it, `convertDomainIfItIsDateTime` in full. On a scale that measures **time**, every end of a
+stated domain becomes the expression that builds the instant, wrapped in `{data: …}` so Vega reads
+it as a datum rather than as a signal to be scaled — and it is the *channel* that decides, not
+whether the value happens to look like a date, so a domain of two epoch milliseconds is two
+instants. `domainMin` and `domainMax` are ends of a domain like any other and go the same way.
+
+The fixture written for that found a runtime defect: **a time scale ignored `domainMin` and
+`domainMax` outright**, where every other continuous scale applies them. A chart asking for one year
+of a decade was drawn with the whole decade in it. `configureDomain` runs the same block whatever
+the scale's type, and so does this now.
+
+### A bucket's interpolated edges belong to the bucket, and one composite collapses where another does not
+
+`TimeUnitNode.assemble` emits, per unit, the bucketing **and** the two interpolated edges a rect
+sitting off the middle of that bucket is drawn between — from the same loop, in that order. Writing
+all the bucketings first and all the edges after put a heatmap bucketed on both axes in an order
+upstream never writes, and the names each pair refers to then belong to the wrong bucket.
+
+A composite mark's grouping is every channel that is *not* aggregated, tooltips included: a tooltip
+naming the column being summarised breaks the summary down by it, and one asking for a mean of that
+column does not, because an aggregate is a measure rather than a grouping. That is one rule where
+this compiler had two half-rules, and it settles both `errorband_tooltip` and
+`boxplot_tooltip_aggregate`'s grouping.
+
+And an **error bar** of one part collapses back into the view — `layer.length > 1 ? {layer} :
+{...layer[0]}` — where an **error band** of one part does not. That asymmetry is upstream's own, in
+its own source, and not a simplification either way: a band with its borders off is still `layer_0`.
+
+### A datum written as a date is an instant
+
+`initFieldDef` reads `isDateTime` and types such a datum **temporal**. Everything follows from
+that: the scale it lands on measures time rather than categories, the plot takes a continuous
+width, and the value itself becomes the expression that builds the instant — in the mark, where
+Vega has no `{year: 2006}` to scale, and in the domain, wrapped so Vega reads it as a datum of the
+domain. A rule drawn at a year had been a category in a band of its own, thirty-eight differences
+deep.
+
+A facet cell is styled by the same rule the chart's own group is — `cell` where it has a Cartesian
+position to border, `view` where it has none — so a trellis of pies has no plotting area in any of
+its cells.
+
+A facet resolves its `theta` scale **independently** — `defaultScaleResolve` is `channel ===
+'theta' ? 'independent' : 'shared'` for a facet — and the resulting `child_theta` is built *inside*
+the cell group rather than beside the chart. That placement is the whole point of resolving it per
+cell: the scale's extent is measured over the rows the facet handed *that* cell, and inside the
+group those rows are the partition Vega named `facet`. Shared instead, a trellis of pies scaled
+every cell against the whole table, so a cell holding a tenth of the data drew a tenth of a pie.
+
+### Taking the main line's work: forty-seven commits, and what the merge itself found
+
+`milestone-0-bootstrap` was merged in at `0166edf` — expression functions, `strptime`, projections,
+guide `encode` folding, rounded rects, colour interpolation in five spaces, `symbolLimit`, title
+anchoring, layout bands. Forty-eight conflicts across fifteen files. Where both sides had built the
+same thing, the fuller port won: their `titleStyleLayers` over a single-name `style`, their
+`TitleBuilder` whole, their `strokeWidthScale`/`strokeDashScale` renaming of the two legend channels
+whose names collide with the legend border's own. Where the two were different things in one place,
+both were kept: the scale padding *and* their `domainRaw` guard on `nice`; their text `limit`,
+`ellipsis` and `lineBreak` *and* the style-block fallback for `align`; their `symbolFillColor`
+fallback *and* the swatch's own `encode` override.
+
+Three of their rules had to be narrowed, and three of mine:
+
+- **A scheme carries its own interpolator**, and `interpolate` does not reach it. Their new HCL
+  interpolation was being applied to `"range": "heatmap"` and every shade came out a unit or two
+  off. `interpolate` applies to a range written out as a list of colours, which is what their own
+  fixture states.
+- **A title with no `style` still takes `group-title`.** Their `titleStyleLayers` returned nothing
+  for one, so a Vega-Lite theme's heading colour — which its compiler redirects into
+  `config.style.group-title` — reached nothing and every themed title drew black.
+- **A line of one point closes its subpath, but one left over from a _break_ does not.** What closes
+  is a line d3 was handed a single point for; a series broken into fragments was handed all of them.
+
+- My **trellis band layout** kept its four bands and its margins, and took their `headerBand`,
+  `footerBand`, `titleBand` and `titleAnchor` on top — and in the grafting, a bug of my own: the
+  cell boxes are already in the enclosing coordinates, so adding the cell's translation again put
+  every band label a whole cell further along.
+- My **`closed` flag in the oracle** was reading false by construction for any line that named no
+  `interpolate`, because `curves(undefined)` is null and the replay never happened. It now defaults
+  to `linear`, which is what Vega passes, so the flag says what it means.
+- My **`{"field": {"group": "y"}}`** never resolved: it fell through to a signal lookup and returned
+  nothing. Nobody had noticed because nothing had moved a group *and* asked a child to move back —
+  until a stacked bar with rounded corners did exactly that, and every segment was drawn its own
+  group's height too far down. The enclosing group's origin is now what the reference reads.
+
+### Three narrowed fixtures, two of them now whole
+
+Three fixtures had been written narrower than the rule they were for, each because a runtime gap
+made the honest version fail. The merge closed two of them and the work above closed the third's
+cause:
+
+- **`stated-parse` is back.** It was withdrawn because reading a stated `format.parse` means
+  emitting `utcParse`, which this engine refused for want of a `strptime`. The main line has one
+  now, so the chart compiles *and* renders.
+- **`concat-shared-transform` has its `view: {stroke: null}` back**, and the gap it named turned
+  out to be two bugs of this engine's own, both fixed here. A **style block's paint is not a
+  built-in default**: a plotting area is a group styled `cell`, whose block fills it transparent and
+  outlines it grey, and a chart that hides the outline by encoding `stroke: null` has not thereby
+  asked for the fill to go too — suppressing both dropped the group from the scene altogether. And
+  an **explicit `null` paint is a statement**, not an unreadable colour: it says this mark has no
+  paint of that kind, so it must not fall through to the configuration and bring the border back.
+- **`errorband-single-part` keeps its narrowed form.** Its cause is the path-ordering gap below,
+  which is still open.
+
+### Selections, which were the largest thing left unimplemented
+
+A hundred and seven of the gallery's differing examples turn on a **selection parameter**, and it
+was refused by name. It is refused no longer. A selection is a set of rows the reader has picked,
+and Vega has no such construct, so the whole of it compiles: a **store** dataset holding the picked
+tuples, an `identifier` transform giving every row a `_vgsid_` to be remembered by (and another
+after any aggregate, whose output tuples are new rows with no identity yet), the signals that write
+the store as events arrive — `_tuple`, `_tuple_fields`, `_toggle`, `_modify` — the `unit` signal
+each tuple records itself against, and a `vlSelectionResolve` the tests read back.
+
+The reading is what makes it worth compiling for an engine with no interaction loop. A chart whose
+colour is conditional on a selection has to draw something before anything is picked, and what it
+draws is decided by the same expression that decides it after a click: `!length(data("x_store")) ||
+vlSelectionIdTest(...)` — an empty store means *every* row passes. So the three selection helpers
+are implemented in the expression language rather than refused, and they answer honestly: with an
+empty store nothing is picked, which is a real state and not a stand-in.
+
+Two rules beside the machinery, both of which fell out of the fixtures rather than the reading: a
+channel's **conditions** hold field definitions of their own — a colour written entirely as
+`{"condition": {"param": …, "aggregate": "count"}}` is the only thing asking for that aggregate, the
+only thing naming that field in the mark's spoken description, and the only thing the legend can be
+built from. And the pointer becomes a hand over a clickable mark but not over a *hovered* one,
+`on: "pointerover"` being a selection nobody clicks.
+
+### Intervals, and who a selection belongs to
+
+A **point** selection is a click; an **interval** is a drag, and a drag has to be represented before
+it can be recorded. Per projected channel there are two signals — the extent in *pixels*, which the
+pointer writes, and the extent in *data*, which is the first inverted through the scale — and the
+pixel signal answers to six streams: the press that starts the brush, the move that drags it, the
+scale change that rewrites it, the double click that clears it, and the pan and zoom that move it
+whole. Around them sit a `_scale_trigger` that fires when a scale the brush reads is rebuilt, and
+the brush itself, drawn as **two** rects: a background under the marks so the data stays legible
+through it, and an outline over them so the pointer can grab it.
+
+What a projection *stores* follows the scale, and it is not a detail: a continuous scale stores the
+**range** the drag named, because a drag over a continuous axis names an interval; a band or a point
+scale stores the **categories** the drag covered, because between two categories there is nothing.
+The same distinction decides what a scale change does — a continuous scale can be panned, so the
+brush is rewritten in its new pixels, while a discrete one cannot, so any other change to its domain
+clears the brush (`[0, 0]`). And the `+` that coerces both sides of the scale-trigger comparison is
+only written where the domain is numeric: `+"USA"` is not a comparison.
+
+The larger correction is about **ownership**. A selection is declared on a *unit*, and until now the
+compiler read only the chart's top-level `params` — which is right for a single view and wrong for
+everything else. Upstream reads `spec.params` off the unit model and nowhere else, so a brush in the
+second plot of a concatenation records `"concat_1"` in every tuple, writes its machinery inside that
+plot's group, and draws its brush around that plot's marks. That is what makes one plot filter
+another, and it is why `interactive` is per view rather than per chart: a plot that declares no
+selection is written `interactive: false`, so a click there falls through to the plot that does.
+
+Two rules that fell out of the fixtures. A projection is named by the field the **marks** are placed
+by — a brush over `yearmonth(date)` remembers `yearmonth_date`, not `date`, or an inverted pixel
+extent has nothing comparable to compare with — and a channel that *aggregates* cannot be projected
+at all, there being no row-level value to test. And `empty: false` does not **negate** a selection
+test: it withdraws the empty store's blanket pass, so nothing is picked until something is. Negating
+it instead drew every row picked until the first click and none of them after it.
+
+A `filter` transform can now name a selection, which is the other half of one plot filtering another;
+`bind` — to `"scales"`, to `"legend"` or to an input element — is still not implemented.
+
+### Dragging the plot itself, and the two ways a selection reaches a scale
+
+A selection **bound to the scales** is not a brush at all. There is no rectangle, so there is no
+pixel extent: each channel keeps only its data signal, the scale reads it back through `domainRaw`,
+and the drag moves the *domain*. Which is why the pan is divided by the plot's size rather than by
+the brush's span, why the zoom anchors at the **inverted** pointer — the point held still is a
+value, not a pixel — and why a log or a power scale gets `panLog`/`zoomPow` with its base or its
+exponent passed along: moving a log axis by a tenth of its width is a factor, not a distance.
+
+A scale domain may also name a selection outright, `{"domain": {"param": "brush"}}`, which is one
+plot deciding another's extent. Two rules there, both upstream's and both counter-intuitive. The
+stated domain does **not** replace the computed one: the selection is assembled to `domainRaw` and
+the data's own domain stays in `domain`, because Vega prefers the raw one only while the selection
+holds something. And `nice` is suppressed by a stated domain only when that domain is an **array** —
+a domain that names a selection is empty until something is picked, so the scale still rounds the
+domain the data gave it outwards.
+
+Both of these make the mark **clipped**: a pan that moves the domain past the data would otherwise
+draw the rows that fell outside the plot. That named a runtime gap of its own — see below.
+
+### The selector was a string, and it was being listened for by name
+
+A selection states the events it reacts to as a *string* in Vega's event-selector grammar —
+`"[pointerdown[!event.shiftKey], pointerup] > pointermove"` is a drag that begins only while the
+shift key is up. This compiler passed anything with selector syntax in it straight through, which
+writes a stream listening for an event of that whole name, and so for nothing at all. The grammar is
+now parsed, ported from `vega-event-selector`: a source before a colon, a mark name after an `@`,
+filters in brackets that may contain brackets of their own, a throttle in braces, a `!` for
+consumption, and commas that separate whole selectors except inside any of those.
+
+Everything a brush listens on now follows from that parse rather than from an assumption. The press
+that starts the brush is the *first* event of the drag's window, whatever that window is; the guard
+that keeps a drag **on** the brush from redrawing it is pushed onto the filters the selector already
+stated rather than replacing them; and a chart with two brushes over one plot — one plain, one with
+the shift key — comes out right for the first time.
+
+Two rules found beside it. A brush's own `mark` block splits between the two rects it is drawn as:
+the fill goes to the background under the marks and everything else to the outline over them, as a
+production rule that paints nothing while the brush has no extent. And the brushes **nest** rather
+than queue: upstream's mark hook returns `[background, …marks, brush]`, so a second selection's
+background lands outside the first's and its outline outside that one's — two brushes are drawn in
+opposite orders above and below the marks.
+
+`nearest: true` is also compiled now. Vega has no notion of picking the closest mark, so Vega-Lite
+lays a **voronoi** overlay over the marks — one transparent cell per point, each covering the ground
+closer to that point than to any other — and scopes the selection's events to it by name. The
+runtime already had a Delaunay triangulation and a voronoi transform, and it was reading the cell
+coordinates as *field names*: Vega-Lite writes them as expressions, `{"expr": "datum.datum.x || 0"}`,
+because the points are mark items and the coordinate wanted is the one the encoding resolved. Every
+cell came out without coordinates, so the diagram was empty and the overlay drew nothing.
+
+### The legend as the control
+
+The last of the three bindings. `{"bind": "legend"}` makes the legend itself what the reader picks
+with, and it compiles to more than a signal: each of the legend's three parts — the swatches, their
+labels, the rows they sit in — is **named**, so the selection's signal can listen for a click on it,
+and made interactive, so the click reaches it at all. A legend entry carries no tuple, so the signal
+walks the scene graph to the symbol's datum, `item().items[0].items[0].datum.value`, and a click
+that lands anywhere else clears it back to null. The picked categories are drawn solid and the rest
+at `unselectedOpacity`, which is what turns a key into a set of switches.
+
+Direct manipulation goes, as it does for a control binding — but the **toggle** stays, handed back
+deliberately so shift-clicking swatches adds to the picked set.
+
+Two runtime gaps it named, one closed. A `{"merge": […]}` stream is several streams read as one,
+which is what a selector written with commas parses to; it was refused, so a legend binding's
+`toggle` had no events at all. That is fixed. The other is recorded below: a legend's `entries`
+block now paints the row, which is what catches a click along its whole width, but the row's own box
+is a unit short and as wide as its own contents rather than as the column.
+
+### A bound scale in a chart of several views cannot be resolved from its store
+
+`vlSelectionResolve` knows nothing about bound scales, and in a chart of several views that matters:
+every unit writes a tuple to the store and the state is whichever unit moved last, which the store
+cannot say. So upstream reassembles it from the **signals** instead — the per-channel data signals
+are declared at the top level, empty, the plot's own copies are marked `push: "outer"` to write into
+them, and the selection's named signal becomes `{"Displacement": grid_Displacement, …}` rather than
+a resolve call.
+
+One ordering fell out beside it. A chart's stores are emitted with the **last** child's first:
+`assembleSelectionData` folds the children in order and each prepends its own, so a concatenation
+whose second plot declares a selection has that selection's store at the head of the data list.
+
+### A jitter is not a lane, and a cell explains what it covers
+
+Two rules that turn on the same distinction — whether the thing nested inside a band is *discrete*.
+
+An **offset scale** divides a band into lanes only where it has lanes to divide it into.
+`getStepFor` says so: a stated `{"step": 50}` is the offset's own step where the offset scale is
+discrete, and the *position's* where it is not. A jitter over `random()` is the second kind, so the
+step sizes the band and the offset fills whatever the band came out as, `[0, bandwidth('y')]`. This
+compiler read every offset as a set of lanes and computed a band wide enough to hold them, which is
+a chart as many times too wide as the column had distinct values.
+
+And a **voronoi** cell carries the marks' own tooltip. The pointer is over a cell rather than over a
+point, so a chart that explains its points explained nothing; upstream builds the same expression
+with `datum.datum` as its accessor, the cell's datum being the item it covers.
+
+### A parse that cannot climb, and a copy that is not its own members
+
+Two placement rules, both about a step above deciding what a step below may do.
+
+A **`pivot`** turns a column of categories into a column each, so nothing above it can say what the
+table will hold — `PivotTransformNode.producedFields` answers `undefined` for exactly that reason.
+An implicit parse therefore cannot climb past one: it stays below and is written as `toDate(…)`
+formulas rather than as `format.parse` on the loader, which is right, because the loader never sees
+the columns the pivot invents.
+
+And a **repeat over a layer** names the *copy*, not its members. Where the repeated spec is itself a
+layer, upstream names the copy `child__layer_AAPL` and numbers its members under it —
+`child__layer_AAPL_layer_0` and `…_layer_1`. Naming every member after the copy gave a line and its
+halo the same name, which is one mark's name for two marks.
+
+Beside them: a `view` block writes **everything** it holds but its `style`, so a `cursor` on the
+plotting area reaches the group encode along with the paint.
+
+### A cell that is as wide as its own categories need
+
+The last thing a facet's independent scale changes, and the least obvious. A cell whose position
+scale is its own and is measured in **steps** has no width the grid can share: each cell holds a
+different number of categories, so each is a different width. Upstream stops emitting the size
+signal altogether and writes the size as an *expression over the cell's row* —
+`bandspace(datum["distinct_age"], 0.1, 0.05) * child_x_step` — which means the facet has to count
+the categories per cell (`getCardinalityAggregateForChild`, a `distinct` in `from.facet.aggregate`)
+and the header band has to count them too, being drawn from the domain dataset rather than from the
+facet's partition. The step signal is then named after the **cell's** scale, `child_x_step`, since
+that is the scale it steps.
+
+### A bucket that arrived bucketed is still a bucket
+
+`offsetedRectFormulas` runs on **both** branches of `timeunit.ts`, and this compiler ran it on one.
+A column cut by `timeUnit` here and a column that arrived as `binnedutcyear` are the same thing
+downstream: a bucket with a start and an end, and a `bandPosition` other than the middle moves the
+rect *within* it, between two interpolated edges rather than the bucket's own. Reading only the
+first branch left a chart configured to centre its bars on the year's start drawing them across the
+year instead.
+
+### What a name reaches, and what a shared scale is required for
+
+A chart may **name itself**, and that name prefixes every scale, mark and step signal in it —
+`getName` again, the same rule that gives a concatenation's children `concat_0_x`. The sizes are the
+exception: `width` and `height` belong to the chart rather than to a level of it.
+
+And two rules about a facet, both following from the same question — *is this cell's scale the
+grid's?* Cells that scale a direction for themselves cannot be **aligned** along it, their plotting
+areas being different widths, so the layout says `align: "none"`; and their **axis** cannot be drawn
+once for the grid either, since one band of labels cannot stand for several different extents. It
+moves into the cell instead, beside the gridlines. A grid faceted both ways is aligned regardless:
+every cell then shares a row and a column with another.
+
+### A selection somebody drives with a slider
+
+`bind` on a point selection may name **controls** rather than scales or a legend, one per projected
+field, and then the controls *are* the interaction. Three things follow, and the third is the one
+that is easy to miss. Each projection gets a signal of its own at the **top** of the chart — a
+control belongs to the page rather than to the drawing — holding null until the reader moves it.
+The tuple stops listening for events and becomes an expression over those signals, null until every
+one of them holds something. And `disableDirectManipulation` takes the click, the clear and the
+toggle off the selection unless the specification asked for them by name, so the marks no longer
+show a pointer either: nothing about this chart is clickable.
+
+### What a mark measures along, decided in the right order
+
+`getDefaultOrient` reads a **second position** before it reads anything else, and this compiler read
+it last. A rule given `x2` runs from one x to another and is horizontal whatever its other channels
+say; only with neither `x2` nor `y2` does the question fall back to which axis carries a measure. A
+rule given *both* has no orientation at all — it is a line segment between two points, and neither
+axis is the one it measures along. And a **binned** first position turns the answer around: the pair
+of edges a bin produces is the extent of the bar's own band, not the direction it grows in.
+
+Beside it, a condition on a parameter that is **not** a selection. `parseSelectionPredicate` falls
+back to `!!name` rather than reporting: a checkbox turning an encoding on and off is a condition on
+a variable's truth, not on a set of picked rows. It was refused, which took the whole condition off
+the channel and drew the chart in its unconditional arm.
+
+### A tooltip on a composite mark is two different requests
+
+`filterTooltipWithAggregatedField` takes a stated tooltip **out** of a composite mark's encoding
+before anything is derived from it, and only its aggregating arms go back — and that turns out to
+settle three things at once. A tooltip that names a column outright is not a request to break the
+summary down by that column: with a box plot tooltipped on the very column it summarises, grouping
+by it gives one box per row. It belongs to the **outliers**, which explain a row; the box explains
+itself, with its own five numbers. And a tooltip that asks for an *aggregate* is a measure of the
+summary: the mean joins the aggregate transform, the parts read it back under the name it wrote,
+and the definition carries its original title over, or a tooltip that read `Mean of Body Mass (g)`
+would read `mean_Body Mass (g)` instead.
+
+Two orderings fell out of it. A composite mark's summary is named by the summarised channel's own
+**title** where it has one — `Mean of Miles per Gallon`, not `Mean of Miles_per_Gallon`. And an
+`aggregate` transform's measures are emitted grouped by the **field** they read, in the order the
+fields first appear: `AggregateNode` keeps them as a map of field to operation and assembles by
+walking it, so two measures of one column come out together however far apart they were asked for.
+
+### A stated colour order is an order for the marks as well
+
+A chart that lists its colour domain has said what order its categories come in, and a reader
+expects to see that order in the *drawing* and not only in the legend. `alignStackOrderWithColorDomain`
+is upstream's answer, and which of two things it does depends on how the chart is drawn. A
+**grouped** chart carries the order on its offset channel, as a `sort` list, and the offset scale's
+domain then reads the place each row holds in it. A **stacked** one has no such channel, so the
+place becomes a column of its own — `indexof(["sun","fog",…], datum['weather'])` — and the `order`
+channel is pointed at it.
+
+The direction of that order is the part worth writing down: **descending** for a vertical stack and
+**ascending** for a horizontal one, because a stack is accumulated from the origin outwards and the
+first listed colour belongs nearest it — at the bottom of a column, at the left of a bar. The
+orientation is the mark's where it states one and the accumulating channel's otherwise, a bar
+measured along x being a horizontal bar.
+
+The rule applies only where the chart states no `order` of its own, and only to a *nominal* colour:
+an ordered or a measured one already has an order to be drawn in.
+
+### A facet may bucket the column it splits on
+
+A trellis whose rows are *buckets* of a column has to bucket that column, and the transform belongs
+to the **facet's** own model rather than to a cell's — which shows in three places at once. The bin
+signals are named plainly where a cell's carry the cell's prefix; the grid is grouped by **both**
+ends of the bucket, since an interval is identified by both and two buckets may start together; and
+the caption is the bucket rather than its near edge, `format(start) – format(end)`, with `"null"`
+for the rows that had no value, an empty bucket still being a cell of the grid. The bin also needs
+no `_range` column: `binRequiresRange` asks about a *scale* channel, and a facet has no scale.
+
+### A click can be projected too, and a collinear set of points
+
+`project.ts` reads `encodings` and `fields` the same way for both kinds of selection, and this
+compiler read only `fields` for a click. So a chart that picks *by the date under the pointer* —
+`{"type": "point", "encodings": ["x"]}` — remembered nothing: its `_tuple_fields` was empty, and the
+value it stored was the row's identity rather than the date. A projection made through a channel
+records which channel it came from, because a test has to know what the value was compared against;
+one made on a bare field does not.
+
+Two rules beside it. A click on another selection's **brush** is not a pick — the rectangle belongs
+to the brush that owns it — so each interval in the same view contributes a clause to the guard. And
+the voronoi cells of a selection projected onto one channel are *stripes* rather than tiles: the
+other coordinate is held at zero, so the nearest point is the nearest along the axis projected.
+
+Which found a crash. A stripe diagram is a set of **collinear** points, and the exact orientation
+predicate underneath the triangulation reads one past the end of its component array while merging:
+the algorithm advances a cursor and only then asks whether it is still in range. JavaScript answers
+`undefined` for a read that is never used; Kotlin throws. Guarded now, and the fixture that found it
+is a selection projected onto one channel — which is how anyone would write "highlight the whole
+day under the pointer".
+
+### One bucketing for two layers, and a scale that cannot be shared
+
+Two more of upstream's optimizers, both about *sharing*, and both with a twist in the tail.
+
+**`MergeBins`.** Two views bucketing one column the same way are one bucketing, and the **last**
+sibling is the one that survives — as with the time units. What makes it more than a fold is that a
+bin publishes signals named after the view that asked for it, `child__layer_US_Gross_bin_maxbins_10_
+IMDB_Rating_bins` and its `_extent`, and everything that read the folded view's names has to read
+the survivor's instead. Upstream keeps a rename map and consults it at every reference; here the
+references are written as they are produced, so the map is applied to the finished specification —
+and to each scale domain *before* it is deduplicated, since two domains that have become the same
+domain are one domain rather than a union of a thing with itself.
+
+**Incompatible scale types resolve independently.** A layer of counts over a layer of labels asks
+for a colour ramp and a pair of named colours on the same channel, and there is no one scale that is
+both. `parseNonUnitScaleCore` notices before merging: where the children's types belong to different
+families the channel is switched to `independent` whatever the resolve said, and the layers get
+`layer_0_color` and `layer_1_color`. The families are upstream's `SCALE_CATEGORY_INDEX`, with its
+one written-out exception — an ordinal *position* can stand for instants, a category being a place
+and so is a date.
+
+### Two identical datasets, kept apart on purpose
+
+The clearest single lesson of this batch. Upstream compiles a concatenation whose two plots read the
+same table through the same validity filter into *two identical datasets*, `data_0` and `data_1`,
+and this compiler merged them into one. The merge is not wrong in general — it is what `data_0` is
+for — but the identity is: `FilterInvalidNode`'s hash is over the **field definitions** it was built
+from, `hash(this.filter)`, and not over the expression it emits. Two views that drop the same rows
+for the same columns are still two nodes when their definitions differ, and a detail plot whose `x`
+scale is driven by a brush differs from the overview beside it in exactly that way. Fifteen gallery
+examples turned on it.
+
+### Two runtime gaps this batch names but does not close
+
+`density`'s fixture is not in the corpus, and `trail`'s draws no legend. Both compile exactly as
+upstream compiles them — the specification comparison covers them — and both are drawn differently
+by *this runtime*:
+
+- **A size the *page* settles is not read.** `width: "container"` compiles to the signal upstream
+  writes — `isFinite(containerSize()[0]) ? containerSize()[0] : 300`, with a `window:resize` handler
+  — and this runtime sizes the surface from the `width` *property*, which such a chart does not
+  have, so it falls back to the default and never fits. Two pieces are missing: a declared
+  `width`/`height` signal has to seed the layout, and the layout's own answer has to be written back
+  over it once the fit is measured.
+- **A signal-valued axis `orient` is refused.** An axis whose side is driven by a parameter reaches
+  the runtime as `orient: {signal: "xAxisOrient"}`, and the axis is parsed into a model that holds
+  the side as a fixed enum — so it is reported by name and the axis is dropped altogether. The
+  compiler's side of it is right, including the label alignment written as a comparison; what the
+  runtime needs is an orientation resolved where the signals are rather than where the JSON is.
+- **A legend entry's row is measured as its contents rather than as the column.** A selection bound
+  to a legend needs the row painted — a transparent fill along the whole width is what catches the
+  click — and that much is drawn now. Its `size` is not: upstream's entry group is a box as wide as
+  the column and a unit taller than this engine measures, and setting the box on every legend entry
+  widened the surface around several ordinary legends. The compiler's side is right and the gallery
+  covers it; a fixture here would pin the wrong number.
+- **A colour ramp over a bucketed instant samples one step out.** A `time` scale with a colour range
+  is now built as the colour scale it is — it was reported as unbuildable, so a line coloured by
+  quarter drew in the mark default and no legend at all — and the shades it produces are one step
+  paler than upstream's. The compiled specification matches upstream property for property, so the
+  difference is in the scale: either the extent this engine samples the scheme over or the fractions
+  the four quarters land at. It has no fixture: the gallery's `line_quarter_legend` covers the
+  compiler's side of it, and a fixture here would pin a colour that is still wrong.
+- **A clipped mark is clipped in its *bounds* and not yet in its drawing.** `boundMark` intersects a
+  clipped mark's reach with the group it is drawn in, and that is now done — a plot whose domain a
+  brush drives no longer sizes its surface to the rows outside that domain. The renderers still draw
+  those rows: `clip` is a property of a group node here, and giving every item one reaches through
+  both renderers and the hit index. The mark comparison passes either way, both engines emitting the
+  same items; the picture differs.
+- **`kde` samples a different grid.** The transform exists and produces a curve; its extent and
+  step count do not match upstream's, so the x domain comes out narrower and the axis carries 12
+  ticks where upstream has 20.
+- **A legend on the `strokeWidth` channel is drawn at the symbol's size**, not the scale's stroke
+  width, and a `stroke` symbol is sized as though it were an area.
+- **A time scale cannot take a colour scheme.** A sequential ramp over instants compiles exactly as
+  upstream compiles it and then fails to build: the scale wants a numeric range and is handed a
+  scheme.
+- **A missing field is `null` here and `undefined` in JavaScript**, and `undefined === null` is
+  false. A condition testing a column the aggregate removed came out true for every row, so a chart
+  whose grey was meant for the exceptions was grey throughout. The distinction needs a value the
+  model does not have.
+- **A universally bucketed column's far edge lands elsewhere.** `binnedutcyearmonth` compiles
+  exactly as upstream compiles it and the bars come out a different width, so the two engines
+  disagree about what `utcOffset('month', …)` steps from. Covered by the sweep, not by a fixture.
+- **A group's `encode` replaces its style's paint rather than overriding it property by
+  property.** A plotting area given a `fill` loses the `#ddd` border its `cell` style was drawing.
+- **`timeParse`/`utcParse` are refused for want of a `strptime`.** A specification that states its
+  own date format now compiles to the `utcParse` upstream compiles it to, and this engine cannot
+  run it — where before it ran a `toDate` nobody asked for.
+- **`domainMid` does not split a colour scale.** A diverging scale compiles exactly as upstream
+  compiles it and the runtime maps it as an ordinary ramp, so the two halves come out swapped.
+- **A facet's footer band reserves no height**, so a chart captioned below its cells comes out
+  short by the caption. `facet-footer` is the one fixture in `GRID_LAYOUT_PENDING`.
+- **A quantile legend labels its buckets with a representative value** rather than the range they
+  cover — `75.75` where upstream reads `75.8 – 95.0` — which is the same gap as the banded legend
+  drawn as swatches.
+
+### One difference is still open
+
+Every mark matches exactly and the surface around them is still between half a unit and a unit small
+in each direction, uniformly, on every fixture. Because nothing drawn has moved, the shortfall has to
+be in a guide *extent* — the one input to the surface that the mark comparison cannot see, since text
+bounds are excluded by design (docs/adr/0006). `VegaLiteFixtureDifferentialTest` asserts the shape of
+the discrepancy rather than tolerating it silently: never larger than upstream, never more than a unit
+smaller, so a regression past that still fails.
+
+There is a second, stranger one, recorded here so the next person does not spend the afternoon on it.
+With `labelOverlap: true` **and** `labelFlush: true` on the same axis, upstream hides every other
+label at a spacing where the final label bounds do not overlap at all — the same axis with either
+property alone keeps them. It is an artifact of Vega's incremental dataflow rather than a rule; this
+compiler is a pure function and has no earlier pass to inherit it from. With `labelFlush` implemented
+the two engines now agree on these fixtures anyway, but the mechanism is not the same one.
+
+### And one the numbers could not have found
+
+**Every SVG export was missing the border around its plotting area.** The exporter painted a group's
+own fill and stroke only when the group *clipped*, and a Vega-Lite plotting area is a group that
+states a size and a `#ddd` border and does not clip — so the border was in the scene graph, drawn on
+the device by the canvas renderer, and counted by the differential comparison, and absent from every
+file the SVG writer produced. The scene graph had already worked out which rectangle a group paints
+(`GroupNode.paintRect`, which the canvas renderer uses); the exporter was not asking it.
+
+It is the eighth entry in the same list as the harness gaps below and the seventh found by putting
+the two pictures side by side: it can only be seen by looking, because both engines' *scenes* agreed
+the whole time.
+
 ## Verification
 
-- 1,354 JVM tests pass (`./scripts/test-core.sh`, `./gradlew test`), plus 12 for the Compose
-  Multiplatform renderer: 7 in `commonTest`, compiled for Android, both iOS targets and the JVM, and 5
-  rasterising through Compose's own Skia backend with `ImageComposeScene` — no window, no display.
+- 2,372 JVM tests pass and none is skipped (`./gradlew test`); the portable core is most of
+  them, and `./scripts/test-core.sh` runs it without an Android SDK. Among them are 18 for the Compose
+  Multiplatform renderer: 9 in `commonTest`, compiled for Android, both iOS targets and the JVM, and 9
+  on the JVM rasterising through Compose's own Skia backend with `ImageComposeScene` — no window, no
+  display.
 - 62 Swift tests pass (`./scripts/swift-test.sh`), which links the macOS framework with Gradle first
   because SwiftPM cannot build its own dependency. Four assert the sequence of draw calls a compiled
   specification produces; five sample pixels from a `CGContext`, including one that draws a gradient
@@ -2442,6 +4570,659 @@ depends on them. Each has a test and a comment; this is the index.
    plural — `"hours"`, `"minutes"`, `"seconds"` — matched nothing, which `nice` had been getting wrong
    too.
 
+### A cell that computes its own rows
+
+Until now every faceted chart hoisted its whole chain **above** the facet: the aggregate ran once
+over the table, the facet cut the result into cells, and the cells had no data of their own. That is
+what upstream does too, most of the time — `moveFacetDown` walks the facet down past every step that
+takes it, adding the facet's own fields to each grouping it passes, until the chain would go on
+without it. What it stops at is a **named point the scales read**, and the pre-aggregation table a
+domain sorted by an aggregate asks for is one.
+
+Where it stops, the chain stays where it is and is computed once per cell, over the rows that cell
+was handed — and a *copy* of it, with the facet's fields added to every grouping, is hung beside the
+facet for the scales to measure (`subtree.ts`, `cloneSubtree`). The two answer different questions.
+A cell's median is the median of its own site; the scale's is the median of every site, and a domain
+built from the first would be a different axis in every cell.
+
+Three things follow, and each was a difference on its own:
+
+- The cell's datasets are assembled by a **second walk** rooted at the facet's *name* — the
+  partition, `trellis_barley_facet` — not at the table the facet reads. They are emitted in the
+  group mark's own `data`, and they share the outer walk's numbering, which is why a cell's first
+  dataset can be `data_1`.
+- The facet's `*_domain` datasets belong **where the facet is**, after the table it reads and before
+  what the scales derive beside it, rather than at the end of the list.
+- The cell group's `from.facet.data` is the table **above** the split, and its `sort.field` is the
+  key the cell measured for itself — `median_yield_by_site`, suffixed with the faceted column so it
+  cannot collide with the one the domain dataset holds. A wrapped facet was reading the faceted
+  column itself and ordering its cells alphabetically.
+
+Three rules about the **shape** above and below it followed from the same reading:
+
+- **One output stands between the table and the partition**, not two. `moveMainDownToFacet` walks
+  the facet model's own main output down until the facet is its only child, and a raw one beside it
+  would spend a dataset name upstream's numbering never spends — every dataset after it was named
+  one too high.
+- **A later layer rebuilds only its own steps** below the facet. What an ancestor wrote is the facet
+  model's and already stands above the partition; writing it again below ran a crossed grid's sort
+  keys twice over rows that already carried them. Which transform belongs to which model was already
+  tracked — `transformOwners` — and the cell was simply not being handed it when the facet was
+  lifted out of the encoding, so every one of them looked like the cell's own. The sort *index* a
+  facet listed by hand is the same kind of column and follows the same rule.
+- **An independent axis is drawn inside the cell**, and it is `parseGuideResolve` that says so: an
+  independent *scale* forces an independent guide, but `resolve: {axis: {x: "independent"}}` asks
+  for one on its own. A band can only label a scale every cell shares, so a chart that resolves its
+  axes independently has no band at all — and then no `*_domain` dataset for a band to read.
+
+A grid faceted **both** ways whose cells size themselves cannot count from the whole table either.
+A column is as wide as its widest cell, and a cell is one row-value and one column-value together,
+so the counting happens once per cell in a `cross_<column>_<row>` dataset grouped by every facet
+field; each band then takes the greatest of its own rather than counting again over rows it no
+longer has. Each band counts along **its own** direction only — a row band is as tall as a cell and
+knows nothing of how wide one is, which is `assembleRowColumnHeaderData` reading
+`{row: 'y', column: 'x'}[channel]`.
+
+One more thing follows the model rather than the grid: `forEachFieldDef` walks a model's encoding
+**as it was written**, so a grid naming its column before its row writes that column's sort index
+first. Everything else about a facet is ordered row-before-column, which is why the declared order
+is kept as a second list rather than a sort of the first.
+
+**Independence is resolved between the children of the composition**, and a facet's child is the
+*cell* — never the layers inside one. A trellis of layers measuring its `x` per cell has one
+`child_x`, not one scale per layer, and one axis over the picture rather than two. Where the flow
+splits, that cell scale reads the cell's **own** tables: a domain over several of them names each,
+and each already has a counterpart computed inside the cell. And an axis in the cell that draws its
+grid across no other scale falls back to `width` or `height` by name — which means the whole chart
+until the cell aliases the name to its own, `assembleAxisSignals` again but one level down.
+
+A last one, off the same reading: `toFieldDefBase` keeps a field's bucketing, its instant and its
+aggregate, and **not its type**. Two layers over one column, one calling it ordinal and the other
+saying nothing, are the same field to a title; keying the title by the type as well titled the axis
+"age, age".
+
+### A join is named for the model that wrote it, and a projection is merged above the copies
+
+`geo_repeat` is three maps of one table, each joined against the same outlines. It used to come out
+one dataset short — the three copies' joins folding into a single node above the fork, where
+upstream keeps one per copy — and once they were three, drawn as three maps at three scales.
+
+The first half is **naming**, and it is upstream's own rule read the other way round. `LookupNode`
+gives the joined table a named point of its own and keeps that name in the node's identity, so a
+join is told apart by the model that wrote it — `model.getName('lookup_' + counter)` — and not by
+the table it reads. Three copies of a plot each write their own name and stay three joins; four
+layers of a *shared* model write one name and fold into one. Naming the point for the table made
+both cases fold, and the two charts want opposite answers: `interactive_global_development` wants
+the fold and `geo_repeat` wants three.
+
+So the point is now made **unconditionally**, where before it was made only when the chart also drew
+from the joined table, and the counter is per model, restarting for each model's own transform
+array as `parseTransformArray` keeps it. Two consequences are worth separating from the rule. The
+name is a placeholder: assembly rewrites every join's `from` to whatever dataset the point turned
+out to be, which is why all three still read `source_1` in the end. And a table read for the join
+alone stops being a dataset with a transform hanging off it, so it sorts with the plain sources —
+which is what put `source_0` and `source_1` back into upstream's order, a difference that had looked
+like a second defect and was only ever a consequence of the fold.
+
+The second half is that `parseProjection` **recurses**. Every level that is not a unit merges what
+the level below it agreed on, so a concatenation merges its plots exactly as a layer merges its
+members — and a repetition is a concatenation by the time anything geographic looks at it. Merged,
+the three copies are one projection named for the chart and fitted to everything all three draw;
+left per plot, each copy fitted itself to its own outlines. A level whose children disagree
+contributes nothing upward rather than blocking the merge, which is upstream returning no component
+for a level it could not merge: those children keep the projections they had, and whatever else
+agreed is still merged around them.
+
+`geo-repeat.vl.json` pins both halves against upstream — two copies, two joins, one projection. It
+is the counterpart of `geo-trellis.vl.json`, which pins the same picture drawn as a grid of cells
+rather than as separate plots.
+
+### A brush over a map picks rows, not values
+
+The last two geographic charts drag a brush across a map, and a brush over a map is a **different
+kind of selection** from a brush over two scales — not the same one with a projection in the way.
+That is the whole of it, and everything else follows.
+
+An ordinary brush remembers the extent it inverts to and tests a row by comparing columns against
+it. A map has no scaled channel to invert a pixel through, so `interval.parse` writes `fields =
+[SELECTION_ID]` and the brush remembers **the rows its rectangle covers**: `intersect` asks the
+scenegraph which marks fall inside the rectangle and `vlSelectionTuples` turns each into a tuple
+carrying that row's identity. So the store sorts by `_vgsid_`, the condition tests with
+`vlSelectionIdTest`, there is no `_tuple_fields` and no data signal at all — the pixels are the whole
+of what the brush knows.
+
+Four smaller things hang off that, each of which was its own difference:
+
+- **The channels are places, and places are remapped.** `getPositionChannelFromLatLong` turns
+  `longitude` into `x` and `latitude` into `y`, so a brush declared over latitude is dragged down the
+  page. What it was *written* as still matters, because the pixel signal is named for it: the data
+  name is taken first from the field and the visual name second from the channel-as-written, so a
+  brush over a column called `latitude` asks for `brush_latitude` twice and the second is given
+  `brush_latitude_1`. That suffix is a collision, not an index, and it appears over a map and
+  nowhere else.
+- **A one-channel brush borrows the middle of the plot.** The two stated places have to be projected
+  to two points, and a brush along latitude alone has no longitude to project with; it takes
+  whatever the centre of the page inverts back to — which is all `projection_center` is. The
+  rectangle then spans the plot the other way, making the brush a band across the map rather than a
+  line.
+- **An aggregate's rows have no identity yet**, so a view whose selection remembers rows by identity
+  writes one again below its aggregate — including an aggregate the specification *stated*, which is
+  where this compiler had the rule only for one an encoding asked for. A map of aggregated places is
+  exactly the case: without it the circles cannot be picked at all.
+- **The scenegraph is empty on the first pulse.** A brush that opens already drawn has nothing to
+  intersect with, so upstream ticks a one-shot timer to pulse the dataflow again —
+  `geo_interval_init_tick`, a workaround it carries for vega/vega#3481. It returns an object rather
+  than a value so that it settles after that tick instead of firing forever.
+
+Two orderings are worth writing down because they are not the same ordering. The **projection**
+order is the order the specification named its places — a `value` of `{latitude, longitude}` is
+projected latitude first — and the tuple's event signal is joined in that order, as one entry rather
+than one per channel, because a drag moves both together. The **page** order is always across and
+then down: `translate.ts` writes `extent_x` before `extent_y` and the brush's outline tests `x`
+before `y` whichever channel was projected first.
+
+`geo-brush.vl.json` and `geo-brush-one-channel.vl.json` pin the two shapes — and adding them found
+**two gaps in the runtime**, which is the thing worth recording here. Both fixtures compiled to
+specifications matching upstream property for property, and neither could be *drawn*: the end-to-end
+gate ran the compiled Vega and got a brush at the origin with no size.
+
+- `scale('projection', [lon, lat])` had no answer. Projections share the scale namespace in an
+  expression and this engine had only the backward half of that sharing — `invert` reached a
+  projection, `scale` did not — so the two stated corners of the brush never became points.
+- `conicEqualArea` had **no inverse at all**, and `albers` is that projection pointed at the United
+  States while `albersUsa` is three of them. So no map of the United States could read a point back
+  to a place, which is the family Vega-Lite reaches for there by default. A composite was thought to
+  have no single inverse; d3 answers it by asking which inset box the point falls in, which is a
+  rule and not an approximation.
+
+Neither was visible to the specification comparison, and both are exactly what the second gate
+exists for: a compiled specification that matches upstream and still draws the wrong picture.
+`ProjectionInverseTest` pins the arithmetic as a **round trip** against the forward direction, which
+is already verified path by path against d3's own output — so the fixed point is upstream's rather
+than a number typed here.
+
+### A cell captions itself, and a caption may be two lines
+
+A wrapped facet whose header states `"title": null` has **no heading over the grid** at all: the
+cells name themselves, and a caption above them naming the column would say it twice. Its header's
+*label* properties belong on the cell's own title, a wrapped facet captioning its cells where a grid
+captions its bands.
+
+Beside it, a rule about titles anywhere: one written as a **list** is one caption on two lines, and
+one name in a sentence. A spoken description reads it joined with commas, having no lines to break
+on — and read as though it were absent, the channel fell back to its field's own name, collided with
+another channel already announced under that name, and dropped out of the description entirely.
+
+### A column of outlines, and the grid that draws them all alike
+
+A `lookup` that names no `from.fields` brings the **whole matched record** across and nests it under
+a name — a map's outlines joined onto a table of figures arrive as one column holding the shape. It
+is then a `shape` channel typed `geojson`, and three things follow from a column of outlines being
+neither a measurement nor a name:
+
+- It is a **feature collection** of its own, gathered like a coordinate pair so that the projection
+  can be fitted to it. The rows with nothing to draw are dropped first — a row without an outline
+  would otherwise widen the extent the map is fitted to by nothing at all.
+- It has **no scale**: `geojson` is not something to choose symbols between, and a scale there put a
+  legend of shapes beside a map.
+- It is **one object** in a spoken description, never joined: `isArray` on a country would spell it
+  out as a list of its own coordinates.
+
+And `parseNonUnitProjections` runs for a **facet** as much as for a layer. A grid whose cells are
+maps has one projection, named for the grid rather than for the cell, so every cell is drawn at the
+same scale — the whole point of a trellis of maps being that its cells can be compared.
+
+### A line between two places, and the table it was joined from
+
+Four rules, and the last of the geographic chart shapes that are not compositions.
+
+A **second coordinate pair** is a second place: `longitude2` and `latitude2` are projected exactly
+as the first pair is, into a second `geopoint` and a second pair of columns, and a mark that spans
+them reads both ends from what the projection wrote rather than adding a scaled one. A rule between
+two places has neither `x` nor `y` at all — the geographic channels are what say there is a line to
+draw. A longitude is a **number** whichever end of a line it is, so all four channels default to
+quantitative; read as names, the far end was spoken as text instead of formatted as a coordinate.
+And the two longitudes are named together and then the two latitudes, which is the order a chart's
+spoken description gives its places in.
+
+A table a chart **both joins against and draws from** is given a named point of its own on the
+source — `LookupNode.make` — which makes that source a fork: the table is written out bare and the
+drawing's own steps derive from it, so the join is against the table rather than against what the
+drawing made of it. Only where the chart draws from it: a table read for the join alone is already
+bare and needs no point.
+
+A **geoshape** is always reachable. What it draws is a place, and a click on a map is a click on a
+country whether or not that layer is the one that declared the selection.
+
+### An outline is drawn by the projection, not placed by two scales
+
+The `geoshape` mark, and the two data sources that make geography out of nothing.
+
+A shape has **no position**: the projection draws it, through a `geoshape` transform hung below the
+mark — `postEncodingTransform`, which runs after the encoding has said what colour the outline is.
+Where the rows carry their own outlines the transform names the column; a sphere or a graticule is
+the row itself and names nothing.
+
+`{"sphere": true}` is the whole globe as one feature, which Vega draws from a row saying
+`{"type": "Sphere"}` — there is no transform that makes a sphere, only the word for it.
+`{"graticule": true}` is a transform, the globe's own grid of meridians and parallels. A view drawn
+from a graticule is **not filled**: `defaultFilled` says so outright, and filling each cell of the
+grid would paint over the map underneath. A geoshape joins the marks that take a transparent fill
+when they are not filled, so that an outline still has a hit area.
+
+Four rules about the projection came with them. It is **handed down** as the data is, so a chart
+that states one draws every member through it and a member that states its own overrides it. A
+property written as an expression is a *signal* to Vega, which has no notion of `expr`. A merged
+projection is built from what its members **specified** and carries no default with it, so a layer
+that says nothing about the kind of map it wants writes nothing — where a single view falls back to
+`equalEarth`. And a member that gathered no feature collection, because what it draws *is* geography,
+contributes its own table to the fit.
+
+### A place is not a position until a projection has been asked
+
+The `longitude` and `latitude` channels, and the `projection` that turns them into pixels. Three
+nodes in the flow and one component beside it:
+
+- `GeoJSONNode` gathers each coordinate pair into a **feature collection**, published as a signal,
+  so that a projection can be fitted to everything the chart draws. Only where the projection is
+  fitted at all: one that states its own `scale` or `translate` has been placed by hand and has
+  nothing to measure itself against.
+- `GeoPointNode` then asks the projection where each pair lands, writing the two pixels onto every
+  row as `x` and `y` — which the mark reads as *columns*, not through a scale. That is the whole of
+  `pointPosition`'s geographic branch: with a longitude or a latitude encoded and nothing said about
+  `x`, the position is the column `geopoint` wrote.
+- A **fitted** projection is given the plotting area to fill and the collections to fill it with, so
+  the map is as large as it can be without anything being said about where it sits; one placed by
+  hand takes the middle of the plotting area unless it says otherwise. The type every chart falls
+  back to is `equalEarth`.
+- A **layer** whose members agree about the projection has one, named for the layer rather than for
+  any member, fitted to everything they all draw — `parseNonUnitProjections`. A map of states under
+  a map of routes is one map, and fitting each layer on its own would draw two of different sizes.
+  The members still name it: their `geopoint` reads the merged projection, and only the writing of
+  it moves up.
+
+One rule came with them that is not geographic at all: `config.aria: false` takes the **whole chart**
+out of the accessibility tree, so no mark carries a role description or a spoken summary and every
+guide says `aria: false` on itself.
+
+The compiled specifications match upstream's byte for byte, and so do the drawings: every geographic
+fixture is checked end to end and `PROJECTION_PENDING` is empty. Getting there took four wrong
+diagnoses of mine, and those are worth more than the conclusion.
+
+I said a projection could not be **fitted** to an extent. It could, and had been. I said a projection
+fitted to the table that reads it back was a **cycle**. Upstream refuses that construction too, and
+what Vega-Lite emits instead is a `geojson` transform publishing a signal, the projection fitting to
+*that*, and `geopoint` following — which this engine already handled. The fault under both symptoms
+was that `fitExtent` reached only a concrete projection and never the interface a **composite**
+implements, so a fitted `albersUsa` — the projection every chart of the United States asks for by
+name — drew silently at its family's unfitted default. Then I said a fit published by *two* datasets
+was an ordering problem with no solution. It has no ordering solution: a shared fit is **eventually
+consistent**, refitting as each collection arrives, and that is what it now does.
+
+The fourth was the same mistake in the loader. A grid of maps drew empty, and I reported that
+delimited cells stay strings, that `format.parse` is never applied, and that upstream infers types by
+default. `format.parse` **is** applied — `DataResolver.parseFields`, which a grep of mine missed and
+which two fixtures already relied on — and upstream does **not** infer for a stated `tsv`, so it had
+no types either. The join matched upstream because its index is object-backed and JavaScript coerces
+every key to text, where this engine tagged `"s:22051"` apart from `"n:22051"`. A number and its own
+text are one key now, in a group as much as in a join. The `geo-trellis` fixture states its figures
+inline all the same, so that it tests the grid of maps it was written for rather than the loading;
+`test-fixtures/specs/format-parse.vg.json` pins the coercion on its own.
+
+The pattern is the point: four diagnoses read off a symptom, four wrong, each one plausible. The
+symptom was real every time and the cause was never where it looked.
+
+### A facet inside a facet
+
+A grid whose every cell is itself a grid is **two levels of cell group**, not one crossed grid, and
+that sentence is the whole of the design. The outer `cell` carries the inner grid's domain dataset,
+its layout and its bands; the inner `child_cell` partitions the outer partition —
+`{"facet": {"name": "child_facet", "data": "facet", …}}` — and holds the marks' own chain in its
+`data`. The names run one level deeper at each step: `child_row_header` inside `cell`, and the cell
+the marks are drawn in is `child_child_width` wide.
+
+**The levels have to be kept apart from the start.** The operator form nests `facet`/`spec`
+arbitrarily deep, and folding it into one encoding would have both levels wanting the `row` channel
+— a single lift then reads them as one crossed grid. So the normalizer *peels*: it walks down to the
+view that is actually drawn, collecting a facet definition per level and inheriting data, size and
+transforms on the way, and only the **outermost** level lands in the encoding. That is what leaves
+the one-level path exactly as it was. Each remaining level is put back into an encoding when its turn
+to be lifted comes, which is the same path the outermost took, and `liftFacet` needed nothing new: it
+was already parameterised by the model that owns the grid, so calling it again with the name the last
+call gave the views is what produces `child`, then `child_child`.
+
+Everything about a **plotting area** belongs to the innermost level — its style, its size, the scales
+resolved within it, its gridlines. A level above only captions and arranges, so its cell group has no
+style, no size and no axes, and what it holds is the level below's layout, that level's own facet
+values, and what that level drew.
+
+Four rules were read off upstream rather than guessed, and each was its own difference:
+
+- **A heading is folded upward per channel**, not per level. `parseFacetHeader` appends the child's
+  caption to its own and nulls the child's, but only where the parent facets on the same channel, so
+  two row grids one inside the other caption the rows once at the top — `"region / size"` — while a
+  column grid holding row grids captions its columns at the top and its rows inside each cell. Two
+  headings where the same nesting by one channel writes one.
+- **A band naming another grid states no size.** `makeHeaderComponent` asks the child for one and a
+  grid has none to give: there is no single cell to be as tall as. It takes `headerBand: 0.5` and is
+  centred on what it names instead.
+- **Columns are counted per cell.** Rows stack however many there are; a column grid inside a cell
+  has to be counted against *that cell's* rows, so the outer partition aggregates a `distinct_` of
+  the inner level's column and the cell reads it back as the number of columns it is wide. The inner
+  layout then states no count of its own — the chart's own would be every cell's columns at once.
+  Upstream's comment points at vega/vega#952 for why it is a field on the group rather than a signal.
+- **The flow always splits.** What stands under the outer partition is the inner grid's own named
+  point, which is exactly the "fork or named output" `moveFacetDown` stops at — so the marks' chain
+  is computed inside the innermost cell from the partition it was handed, and a copy of it sits
+  beside the chart for the scales to measure. A single-level grid hoists that chain above the facet
+  instead, and both are right.
+
+One thing that only a nest could show: **a partition inside a partition still takes a name from the
+chart's own numbering**, though what hangs below it is assembled into a cell group with a numbering
+of its own. Left unnamed, every dataset the chart derived afterwards came out one number low —
+`data_1` where upstream had `data_2` — which looked like a naming convention and was an arithmetic
+error one level down.
+
+One caveat on the numbering, recorded because it is the part I could not derive: whether that inner
+partition spends a number depends on how the chart's table was written. A URL or generated source
+arrives at the fork already named and spends nothing there, so the partition takes the next number; a
+table written out in the specification was pushed above as a dataset of its own, so the fork names the
+derived one and the partition takes none. Both land on the same name from opposite sides. That is read
+off upstream's own output for a nested grid in each shape — `facet-in-facet-rows.vl.json` states its
+rows inline and the three gallery charts load theirs — rather than off the optimizer, and either rule
+alone gets one of the two shapes wrong.
+
+With this the gallery sweep reaches **627 of 627**.
+
+**A nest inside a concatenation** needed one more step, and it is the step the earlier per-plot grid
+work already pointed at: the levels belong to the plot that wrote them, so they are peeled where that
+plot's specification is normalised and lifted per plot, and everything the nest publishes runs through
+the plot's own name — `concat_0_cell` holding `concat_0_child_cell`, its cell `concat_0_child_child_width`
+wide. The **split** had to become per plot with them: a concatenation may hold a nest beside a plain
+plot, and only the nest's cells compute their own rows, where the plain plot derives its chain as it
+always did. Nothing about the recursion is two-deep special-casing — three levels compile too, and
+`facet-in-facet-deep.vl.json` pins that, chaining `facet` to `child_facet` to `child_child_facet`.
+
+Probing that turned up a defect **beside** the nesting, in a chart with no nest in it at all: a
+faceted plot was taking part in a concatenation's size merge. `parseConcatLayoutSize` reads each
+plot's own layout size and a grid has none — the size it knows is one cell's — so a trellis merged
+with the plain plot next to it whenever the two happened to be declared the same width, and the
+shared `childWidth` was written into the plain plot's marks and scales. No gallery example puts a
+trellis beside a plain plot of matching size, which is why 627 clean examples had not caught it;
+`facet-concat-size.vl.json` does.
+
+### A grid whose cell holds plots
+
+Every other grid here lives *inside* a plot and its cell holds that plot's views. A grid whose cell is
+a **concatenation** is the inverse — upstream has a `ConcatModel` under the `FacetModel` — and it had
+to be compiled the other way about.
+
+There is no encoding for the facet channel to be lifted out of, which is the whole difficulty: fold a
+level into a concatenation and it is simply dropped. So the peel hands the levels back untouched, the
+**concatenation is built as the chart** under the name the grid gives its cell — one `child` per
+level, which is what makes its plots `child_concat_0` and `child_concat_1` and carries through to
+their scales and sizes — and the grids are made straight from the levels and wrap the whole of it.
+
+The cell then carries what a concatenation carries, and one thing more:
+
+- its **layout**, since the plots are arranged inside it rather than across the chart;
+- the **chain each plot computes per cell**, all of them hanging off one partition, because the plots
+  share the cell and so share the rows it was handed;
+- and each plot's **own scales**. That is the part that does not follow from the naming: a position
+  scale here is measured over the rows the partition handed *this* cell, so it can only be built
+  where those rows are visible. Written once beside the grid, as a plain concatenation writes them,
+  every cell would build the same scale from every row.
+
+A plot inside such a cell carries no facet channel of its own, so the copy of its chain that stands
+beside the grid for the scales has to be told the facet's columns to group by — `cloneSubtree` adds
+them upstream, and here they are handed to the view directly.
+
+A repetition reaches the same shape, and is worth its own fixture only for *when* it is rewritten: a
+repeat at the top of a chart is normalised before anything looks at it, and one that is a grid's cell
+cannot be, because until the grids are peeled off it is not the thing being compiled.
+
+### What a grid cannot hold, said rather than approximated
+
+Three compositions are refused by name, and the way each was found is the point.
+
+**A concatenation inside a grid used to compile, to the wrong chart** — the facet channels were
+carried into a leaf that never reads an encoding, so the grid vanished and a bare concatenation came
+out, with no diagnostic. That one is now implemented, above. But implementing it produced two more of
+exactly the same kind: a **grid inside that concatenation**, and a **concatenation inside it**, both
+of which compiled to a plausible chart measuring the wrong rows. A cell holds one composition and
+arranges what it drew; a third level would need its own layout inside a cell that has none. So they
+report.
+
+**A composition inside a layer** is the one refusal that cannot become a feature, and it is worth
+being exact about why. Upstream does not fail to implement it — it rejects it, with `Invalid
+specification`, for all four of `facet`, `repeat`, `hconcat` and `vconcat`. Vega-Lite's grammar says a
+layer's members are single views or layers of them, so there is no chart here to reach later and the
+message says that rather than "not implemented". It used to be reported as a *missing mark* — a
+`facet` has none of its own, so the innermost check failed first — which sent the reader looking for a
+mark in a specification whose trouble was the composition around it.
+
+Two look-alikes **are** allowed and do compile, which is what makes the distinction worth drawing: a
+`layer` inside a `layer`, and a repetition whose copies are layered, `{"repeat": {"layer": […]}}` —
+there the repeat is above the layer rather than inside it. Both are pinned.
+
+Reaching for them found a defect that has nothing to do with layers. `getSort` asks whether a path
+mark's **dimension channel is a field** before ordering its points by it: there is an order to draw
+them in only where the dimension is a column. This compiler ordered by the channel name regardless,
+so a line whose dimension channel held nothing handed Vega `sort: {"field": "y"}` for items with no
+`y` — every item comparing equal, which is a sort that does nothing at some cost.
+`path-mark-no-dimension.vl.json` is that mark on its own, without a layer anywhere near it.
+
+The assertion that an unimplemented composition is reported has now been repointed three times as the
+compositions it named were implemented. It is pointed at the layer case now, which is the only one of
+the three that will stay put. The lesson is not about the churn: it is that **every one of these was
+found by probing upstream with a specification nobody had written**, and two of them were producing
+confident wrong output that no fixture could have caught, because no fixture existed to catch it.
+
+### A grid belongs to the plot that holds it
+
+A facet inside a concatenation was refused because this compiler had one grid per *chart*. It now
+has one per plot: the operator is normalised where the child stands, `liftFacet` runs per plot, and
+the names the grid publishes run through the plot that owns it — `concat_0_cell` beside
+`concat_1_marks`.
+
+Four things follow from a grid being a plot rather than being in one:
+
+- Its group has **no plotting area**: no style, no `encode`, and a title anchored to the start
+  rather than framing a rectangle it does not have. Its layout places the cells instead.
+- The size its name carries is one **cell's**, `concat_0_child_width`, and no level above may
+  rename it into a size the plot does not have.
+- `defaultScaleResolve` answers for the composition being asked about. A facet *inside* a
+  concatenation is asked about its own cells, which share everything but `theta`; taking the
+  concatenation's answer — its plots measure their positions separately — put every axis inside the
+  cell and left the header bands empty.
+- Its values stand beside the table they are drawn from rather than at the end of the chart's data,
+  because a plot's own data is assembled when that plot is.
+
+And a fifth, which is not about concatenation at all: **a facet is a node in the flow whether or not
+anything hangs below it**, and a node in the flow takes a name. The dataset it reads is named when
+the walk reaches it, so a chart with a grid in it numbers the tables after that grid one higher than
+a chart without. Where the whole chain is hoisted above the facet that costs nothing — the dataset
+already had a name — which is why it went unnoticed until a grid stood beside a plot that had
+datasets of its own.
+
+### A repetition inside a concatenation is a concatenation
+
+A `repeat` nested in a `vconcat` was refused. It needs nothing new: a repetition *is* a
+concatenation of its copies, and that is already what `Repeat.normalize` makes of one at the top of
+a chart. Normalising the child where it stands rather than refusing it lets the ordinary nesting
+take it, a concatenation's plot being allowed to be a concatenation.
+
+### A picture is fetched, not painted
+
+The `image` mark and the `url` channel that feeds it. A picture is positioned exactly as a rect is —
+a stated width and height centre it where a point would have been, a channel pair spans it between
+two positions — and its `url` is read as text, the same way `href` is: a column of file names
+becomes a column of pictures. What it is *not* is painted, so no fill is written on it;
+`baseEncodeEntry` ignores colour for an image, and a fill there is a colour nothing shows.
+
+The rule that made it work is more general than the mark: with no second position but a **size** the
+mark states outright, the extent is that size and the position becomes an *aligned* one —
+`vgAlignedPositionChannel` centres it by default. That is why a picture fifty units wide is placed
+with its middle where the value falls, and it holds for a bar given a width as much as for an image.
+
+The fixture found a second gap in **this runtime**, also fixed: the image mark read `x` alone, where
+Vega accepts `x`/`x2`, `x`/`width` or a centre and a width and lets `adjustSpatial` reduce whichever
+pair was written to the one the scene item holds. The machinery was already there for rects; the
+image mark simply was not using it, and every picture was drawn at the origin.
+
+### A chart animated by a clock
+
+The `time` channel is a scale like any other: a **band** over the column the frames run through,
+stepped at `config.scale.framesPerSecond` — half a second a frame. Nothing is drawn with it, which
+is why it has no guide; it is read by the signals that advance the frame.
+
+Those are a `timer` selection, `{"on": "timer"}` on a point parameter. The clock itself belongs at
+the top of the chart — `anim_clock`, `last_tick_at`, `is_playing` — and what advances is the time
+*elapsed* since the last tick, so a paused chart keeps its place and a resumed one carries on rather
+than starting over. Each view then reads the scale it walks: where the domain starts, how far the
+range runs, and what value the elapsed time inverts to. The tuple is written from that value, forced
+so a frame is written again even where the value has not changed, and there is no toggle: a frame
+replaces the one before it.
+
+The frame is a **table of its own**. `assembleUnitSelectionData` lifts the selection's filter out of
+the view's main table and hangs it on a `<name>_curr` beside it; the scales still measure the whole
+column — an axis that moved with the frame would be a different chart every tick — and only the
+marks read the frame.
+
+The fixture written for it found a gap in **this runtime**, now fixed: a band scale could not be
+inverted. It has no continuous inverse, but it does have an answer — the domain value whose band a
+position falls in, `scaleBand.invertRange` — and a position in the *gap* between two bands belongs
+to neither. Without it the clock had nothing to read and the chart drew one frame for ever.
+
+### A brush is dragged in a cell, not across a grid
+
+A faceted chart's selection machinery belongs **inside the cell group**. Every signal in it reads
+the pointer against one cell's scales, and there is one of each per cell rather than one for the
+grid; so does the brush rectangle, which is dragged across one cell's rows and no others. This
+compiler was writing all of it at the top and drawing the brush outside the cells altogether.
+
+What stays outside is what a cell cannot own: the store, the signal the store resolves into, and
+whatever a **control** writes — a widget is part of the page rather than of the drawing, and one per
+cell would be a row of them. A selection bound to the *scales* keeps its per-channel signals in the
+cell but pushes them outward, `push: "outer"`, to bare signals declared at the top; and those are
+declared beside the selection's own, one selection at a time, because upstream calls each compiler's
+`topLevelSignals` while it is on that selection.
+
+Four smaller rules came with it, each its own difference:
+
+- A cell whose child declares a selection carries a **`facet` signal** — the datum of the cell the
+  pointer is in — so that a pick made anywhere in the grid is attributed to the right one.
+- The unit a picked tuple records is then not a name but an **expression**: every cell is the same
+  model drawn once per value, so the unit is `"child" + '__facet_column_' + (facet["Series"])`.
+- The voronoi overlay a `nearest` selection picks through is named for the view it covers, which
+  inside a facet is the cell's — `child_voronoi`.
+- A selection bound to controls is bound to them **alone** unless it asked for the pointer by name.
+  `disableDirectManipulation` drops the default click, so a widget-bound parameter does not also
+  change when a mark happens to be clicked — and `resolve: "global"` stated outright is the same as
+  saying nothing, which had been switching the binding off.
+
+### Only what is drawn between two edges needs to know where they are
+
+A column that arrives **already bucketed** carries its near edge and nothing else, so the far one is
+computed — and the two interpolated edges beside it, where a `bandPosition` moves the rect within
+its bucket. "For binned time unit, only produce end if the mark is a rect-based mark, which needs
+*range*": a label drawn beside such a rect is placed at a single position and needs neither.
+
+Computing them for it as well had a second effect, and it was the visible one. The two layers' steps
+were then identical, so they folded into one node above the fork — which put them in the table the
+*parent* derived rather than in each member's own, and every dataset after that was a dataset the
+chart did not have. The domain followed the same rule: the offsetted columns are named only where
+they are computed, `rectBandPosition` being set for a rect-based mark alone.
+
+### A bucketing cannot climb above the step that computes its column
+
+A layer's member buckets its field **before its own transforms** — upstream's own hack, "equivalent
+for merging bin extent for union scale", and what lets two layers over one binned field share a bin.
+Before its *own*: what an ancestor wrote ran in that model's pass, above everything the member does.
+Placing the ancestors' steps below the bucketing put a histogram of a computed column above the
+formula that computes it, and the extent was measured over a column that did not exist yet.
+
+The optimizer's rule was already right — a bucketing that reads a column this step writes cannot
+climb past it — but the step was in the wrong place for it to apply. With the two the right way
+round the crossfilter charts fall out: the two plain columns' bins are shared above, the computed
+one's stays below its formula, and the datasets fork where upstream forks.
+
+Beside it, one rule about a **point** selection on a bucketed field. "Binned fields should capture
+extents, for a range test against the raw field": a click on a bucket remembers the bucket, which is
+its two edges, and the test then asks whether a row's raw value falls between them. Remembering the
+raw column instead picked the one row clicked rather than the bar it was drawn in.
+
+### One column, two channels, one projection
+
+Three rules about a **scatter-plot matrix**, whose diagonal cell plots a column against itself, and
+five gallery charts between them.
+
+"Prevent duplicate projections on the same field." A selection's projection is keyed by the
+**field**, so a column bound to both channels is remembered once, under the channel that reached it
+first. The diagonal cell was getting two pixel extents and two stored values for one drag.
+
+The zoom and pan anchor of a **scale-bound** selection is not the projection, though. It is
+`model.scaleName(X)` and `scaleName(Y)`, whichever the view encodes — one projection there, still
+two directions to drag in.
+
+And the top-level signal a bound selection is read through is the **union across the copies**.
+`topLevelSignals` runs once per unit and appends the mappings it does not already have, because "no
+single selCmpt has a global view": the grid's bound signal names every field any cell is scaled by,
+in the order the cells were written. Taking one copy's answer left a whole column of the matrix
+unbound.
+
+### A selection read as a table
+
+A `lookup` may name a **parameter** instead of a dataset: `{"lookup": "symbol", "from": {"param":
+"index", "key": "symbol"}}` joins each row against the rows that selection has picked. That needs
+the selection to *be* a table, which is `materializeSelections` — a filter on the selection hung off
+the view's own main output, ending in an output node the join names. Upstream builds one for every
+selection and lets its reference counting drop the unread ones; the same answer is reached here by
+asking first which selections a `lookup` names, since an output nobody reads still costs a dataset
+name and every dataset after it would be numbered one too high.
+
+The join's `from` cannot be filled in when the transform is translated — the dataset that output
+node turns out to be is not known until the tree has been walked and named — so it carries the
+node's name and is corrected at the end, which is upstream's own last pass over the assembled data
+("now fix the from references in lookup transforms").
+
+Beside it, a **stated starting value** written as a date. A selection opens with rows already in its
+store, and a store is data rather than an expression: `{"x": {"year": 2005, "month": 1, "date": 1}}`
+becomes the millisecond it names, not a `datetime(…)` call. Two smaller rules came with it — the
+initial row is keyed by the **channel** first and the field second (`v[p.channel] ?? v[p.field]`,
+and a selection projected through `x` is initialised as `{"x": …}`), and the projection it records
+is the same one `_tuple_fields` publishes, channel and all.
+
+### A theme speaks in blocks, and the most specific one wins
+
+Two rules, both about where a property is *read* rather than what it means, and both found in one
+gallery chart drawing its axes by hand out of ticks and rules.
+
+A **style** block outranks every other configuration of a mark property. `getMarkConfig` puts
+`config.style` first, ahead of the per-mark block and `config.mark`, and the styles a mark has are
+its own type followed by whatever its `style` names — the last one that answers winning. That is how
+a parallel-coordinate plot turns its ticks on their side, `config.style.tick.orient: "horizontal"`,
+which swaps which axis the tick's size runs along and which carries its thickness.
+
+`getAxisConfig` asks the **whole chain** for every axis property, not only the ones Vega has never
+heard of. `config.axisX` settling the label angle or taking every caption off was being read only
+where a conditional value was. What a theme settles that way is not written back onto the axis,
+though: Vega knows `labelAngle` and applies the configuration itself, so the angle is used to decide
+which way the labels are aligned and then left where it was — writing it out would say the same
+thing twice, and upstream's rule is exactly that (a value is set only when it is explicit or when
+there is no configured one).
+
+One facet serves however many layers are drawn in a cell. `facetRoot` is a single node with every
+child's chain hanging under it, so the second layer does not cut a partition of its own: it hangs
+its steps below the shared one and a copy beside it, and the two layers' datasets number in the
+order they were written.
+
+Faceting came off this list by being finished, and what it leaves at the front of the Vega-Lite
+work is the **composite-mark normalizer** — `boxplot`, `errorbar` and `errorband`, which upstream
+rewrites into layered views before compiling anything. Layers already work, so it is the rewriting
+that is missing, and it is the last piece that adds *charts* rather than compositions. After it,
+`hconcat`/`vconcat`/`concat` and `repeat`, which need a second kind of layout each.
+
 ~~A fourth candidate: **a transform cannot read a computed signal**.~~ **Resolved**, by the
 dependency ordering that replaced the compile phases. It was described here as needing "the signal
 pass to run in dependency order across the data boundary, which is most of a real dataflow", and
@@ -2461,6 +5242,18 @@ PROJECT_BRIEF.md 18.6 says emulator timings are not authoritative, and it is rig
 explored with it; the tree was already correct and two things it *said* were wrong, both now fixed
 and pinned by instrumented tests. What remains untested there is physical hardware and a real user,
 which is a different claim from "not verified at all".
+
+A note on what the repository carries. The Vega-Lite gate has two kinds of upstream output behind
+it, and they are not kept the same way. The **compiled specifications** — what upstream's compiler
+makes of each fixture — are in the repository, because a diff of one is exactly how a change to a
+compiler rule is reviewed: the rule moves, and the property it moved shows up beside it. The
+**scenes** upstream draws from them are not. They were sixteen megabytes, and they are the one kind
+of reference a diff never explains — nobody reads a forty-thousand-line scene dump to see what
+changed. `scripts/vega-lite-oracle.sh` rebuilds them, so the repository carries the recipe.
+
+A fresh clone therefore has no scenes, and the drawing comparison says so as an **assumption**
+rather than passing: a green tick for a check that did not happen is the failure this repository has
+already had once, which is why the upstream vectors are kept the same way.
 
 A note on the harness, because it is now the fifteenth time. The differential comparison has had to be
 taught to see a symbol's outline, fill and stroke opacity, a dash pattern, a node's own opacity, an
