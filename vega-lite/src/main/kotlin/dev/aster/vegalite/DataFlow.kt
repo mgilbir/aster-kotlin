@@ -71,8 +71,13 @@ internal sealed class DataNode {
     val folded = mutableListOf<DataNode>()
     for (child in children) {
       val key = child.identity() ?: continue
-      val first = kept.putIfAbsent(key, child)
-      if (first != null) {
+      // `putIfAbsent` is a JVM extension, and this file is compiled for five targets. Reading first
+      // and inserting is the same thing: the map never holds a null, so an absent key is the only
+      // way `first` is null, and that is the branch that keeps the child rather than folding it.
+      val first = kept[key]
+      if (first == null) {
+        kept[key] = child
+      } else {
         first.children += child.children
         folded += child
       }

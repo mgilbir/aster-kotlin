@@ -1029,7 +1029,7 @@ private class Compilation(
     val out = LinkedHashMap<String, String>()
     for (view in over) {
       selection.intervalChannels(view).forEach { (_, field) ->
-        out.putIfAbsent(field, Fields.varName("${selection.name}_$field"))
+        out.getOrPut(field) { Fields.varName("${selection.name}_$field") }
       }
     }
     return out.toList()
@@ -1286,7 +1286,7 @@ private class Compilation(
     fun byChannel(): Map<String, ScaleComponent> {
       val out = LinkedHashMap<String, ScaleComponent>()
       for (view in views) view.scaleComponents.forEach { (channel, scale) ->
-        out.putIfAbsent(channel, scale)
+        out.getOrPut(channel) { scale }
       }
       return out
     }
