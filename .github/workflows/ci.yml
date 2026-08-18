@@ -1,0 +1,95 @@
+name: CI
+
+# Every push and pull request. The repository had no CI at all until the release work needed it,
+# which meant `main` was only ever as green as the last person's local run.
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  # A new push supersedes the run in flight for the same ref. Native compiles are slow and there is
+  # no value in finishing a run for a commit nobody is waiting on.
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    name: ${{ matrix.name }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # Linux builds the JVM and linuxX64 targets and runs the differential oracles, which need
+          # node and the pinned upstream packages.
+          - name: Check (Linux, JVM + linuxX64)
+            os: ubuntu-latest
+            oracles: "true"
+          # macOS is the only host that compiles the Apple targets, and the only one that can run the
+          # Swift renderer's own suite.
+          - name: Check (macOS, every target + Swift)
+            os: macos-latest
+            oracles: "false"
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      - name: Set up node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Check
+        run: ./scripts/check.sh
+
+      - name: Differential tests against upstream Vega
+        if: matrix.oracles == 'true'
+        run: ./scripts/oracle.sh
+
+      - name: Differential tests against upstream Vega-Lite
+        if: matrix.oracles == 'true'
+        run: ./scripts/vega-lite-oracle.sh
+
+      - name: Swift renderer
+        # macOS only: it links the framework Kotlin/Native exports, and the API-surface guard in it is
+        # what catches a change to what Swift sees.
+        if: runner.os == 'macOS'
+        run: ./scripts/swift-test.sh
+
+      - name: Type-check the iOS demo
+        if: runner.os == 'macOS'
+        run: ./scripts/ios-demo.sh --check
+
+      - name: Check every declared target is in the module metadata
+        # macOS only, and deliberately: on any other host it is *expected* to fail, because Kotlin
+        # creates no publication for a target the host cannot compile.
+        if: runner.os == 'macOS'
+        run: ./gradlew verifyPublishedVariants
+
+      - name: Build and check the Central bundle
+        # Not only at release time. A publication that would be missing from the bundle is much
+        # cheaper to find on a pull request than on the one run that uploads it.
+        if: runner.os == 'macOS'
+        run: ./gradlew centralBundle verifyCentralBundle --no-configuration-cache
+
+      - name: Upload test reports
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-reports-${{ matrix.os }}
+          path: "**/build/reports/tests/**"
+          retention-days: 14
