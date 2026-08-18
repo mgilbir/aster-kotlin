@@ -115,6 +115,29 @@ struct PasteSpecView: View {
       Text(touched).font(.caption).foregroundStyle(Color.accentColor)
     }
 
+    // Which grammar the text was taken for. Shown rather than guessed at, because a Vega-Lite
+    // specification read as Vega fails for a reason that reads like nonsense — and until the compiler
+    // reached this side of the boundary, reading it as Vega was all this app could do.
+    if let grammar = session.grammar {
+      Text(grammar).font(.caption).foregroundStyle(Color.secondary)
+    }
+
+    // A Vega-Lite report is kept apart from the runtime's. They answer different questions — one says
+    // the specification could not be translated, the other that the translation could not be drawn —
+    // and a reader looking for the cause needs to know which of the two is talking.
+    if !session.vegaLiteDiagnostics.isEmpty {
+      VStack(alignment: .leading, spacing: 8) {
+        Text("Vega-Lite could not honour").font(.headline)
+        ForEach(Array(session.vegaLiteDiagnostics.enumerated()), id: \.offset) { _, diagnostic in
+          VStack(alignment: .leading, spacing: 2) {
+            Text(diagnostic.message).font(.callout)
+            Text(describe(diagnostic)).font(.caption2).foregroundStyle(.secondary)
+          }
+          .frame(maxWidth: .infinity, alignment: .leading)
+        }
+      }
+    }
+
     if !session.controls.isEmpty {
       ChartControls(controls: session.controls, session: session)
     }

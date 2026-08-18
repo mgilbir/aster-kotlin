@@ -4951,6 +4951,40 @@ shared `childWidth` was written into the plain plot's marks and scales. No galle
 trellis beside a plain plot of matching size, which is why 627 clean examples had not caught it;
 `facet-concat-size.vl.json` does.
 
+### Vega-Lite on every host, which was a build file and not a restriction
+
+A reader who pastes a chart has pasted a chart, not a dialect, so a host that accepts text accepts
+**either grammar** — `VegaLiteInput.toVega` decides and then says which way it went. Android had that
+from the start. iOS did not, and neither did the Compose renderer's native targets, and the reason was
+not iOS: `:vega-lite` was declared `kotlin.jvm`, so it was never compiled for Kotlin/Native and was
+never on the framework's export list.
+
+Nothing in the compiler touches the JVM. It emits a specification; it does not execute one. Converting
+it to the five targets the rest of the core builds for needed **four stdlib calls** changed, and no
+platform seam at all:
+
+- `MutableMap.putIfAbsent` in three places, which is a JVM extension. Reading first and inserting is
+  the same thing here, the maps never holding a null.
+- `toSortedMap().toString()`, which identifies a filter-invalid node. The **format is reproduced
+  exactly** rather than improved, because that string is compared between nodes to decide whether two
+  of them fold — so a change to it is a change to which datasets a chart comes out with.
+
+Then `:vega-runtime` exports it, so Swift reaches `VegaLiteInput`, `VegaLiteCompiler` and
+`VegaLiteConversion` by name. That is 42 symbols added to the foreign surface and none removed.
+
+What is asserted, and where, is the point of the exercise. `VegaLiteTests` in the Swift package takes
+a Vega-Lite bar chart through the boundary, compiles it, walks it with the CoreGraphics renderer and
+checks the bars were drawn. `VegaLiteTest` in the Compose module does the same and lives in
+`commonTest`, so it is **compiled for Android, both iOS targets and the JVM** — the compiler being
+unreachable from a native target now fails there rather than in somebody's app. Both also assert that
+the two grammars end at the same drawing, which is what lets a host stop asking which it was given,
+and that a specification this compiler cannot honour reports across the boundary rather than drawing
+something nobody asked for.
+
+The iOS demo's paste screen now converts through it and shows which grammar it read, with the
+Vega-Lite report kept apart from the runtime's — they answer different questions, one saying the
+specification could not be translated and the other that the translation could not be drawn.
+
 ### A grid whose cell holds plots
 
 Every other grid here lives *inside* a plot and its cell holds that plot's views. A grid whose cell is

@@ -42,6 +42,11 @@ kotlin {
       // had
       // no export at all while Android had three formats.
       export(project(":vega-svg"))
+      // The Vega-Lite compiler, so a foreign host can accept **either grammar** from a reader. It
+      // was JVM-only until now for no reason but its build file — nothing in it touches the JVM —
+      // which meant a specification pasted into the Android demo drew a chart and the same text
+      // pasted into the iOS one could not be read at all. That is not a host restriction.
+      export(project(":vega-lite"))
       if (target.name != "macosArm64") xcframework.add(this)
     }
   }
@@ -55,6 +60,11 @@ kotlin {
         api(project(":vega-dataflow"))
         api(project(":vega-scene"))
         api(project(":vega-svg"))
+        // `api` because it is exported to foreign hosts: `VegaLiteInput.toVega` is the entry point
+        // a
+        // host calls with text a reader supplied, so its types have to arrive readable and not as
+        // opaque handles. One-directional still — `:vega-lite` knows nothing about the runtime.
+        api(project(":vega-lite"))
         api(libs.kotlinx.coroutines.core)
       }
     }
@@ -65,10 +75,6 @@ kotlin {
         // why they are the one pair of dependencies that does not follow the core off the JVM.
         implementation(project(":vega-loader"))
         implementation(project(":test-fixtures"))
-        // The Vega-Lite compiler emits a specification; proving that it draws upstream's chart
-        // needs the scene comparison, which lives here. A test-only dependency, and
-        // one-directional: `:vega-lite` itself knows nothing about the runtime.
-        implementation(project(":vega-lite"))
         implementation(libs.kotlinx.coroutines.test)
       }
     }
