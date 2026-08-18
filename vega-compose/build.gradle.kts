@@ -50,3 +50,18 @@ dependencies {
   // deliberately not used; see VegaChartComposeTest.
   debugImplementation(libs.compose.ui.test.manifest)
 }
+
+// An Android library publishes nothing until a variant is chosen: there are two, and Gradle will
+// not
+// guess. `release` is the one a consumer wants, and `withSourcesJar` because Central asks for
+// sources and the Android plugin does not add them by default.
+android { publishing { singleVariant("release") { withSourcesJar() } } }
+
+// `afterEvaluate`, because the Android plugin creates the `release` component while it evaluates
+// and
+// it does not exist yet when this file is read.
+afterEvaluate {
+  publishing {
+    publications { register<MavenPublication>("release") { from(components["release"]) } }
+  }
+}
