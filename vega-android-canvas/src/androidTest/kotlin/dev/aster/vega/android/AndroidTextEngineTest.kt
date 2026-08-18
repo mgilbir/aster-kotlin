@@ -118,4 +118,87 @@ class AndroidTextEngineTest {
     val metrics = engine.measure(TextRun("fallback", style.copy(fontFamily = "NoSuchFont-XYZ")))
     assertTrue(metrics.width > 0.0)
   }
+
+  /**
+   * The layout is the base class's, and these are the two facts that proves.
+   *
+   * `AndroidTextEngine` used to implement `TextEngine` directly and carry its own copy of the
+   * layout — newlines, `limit`, wrapping, baselines — which wrapped through `StaticLayout` where
+   * `MetricTextEngine` and the Swift `CoreTextTextEngine` wrap greedily on spaces. Two answers to
+   * where lines break is two answers to where every label sits, decided by which host drew the
+   * chart. Now there is one layout and three sets of numbers.
+   */
+  @Test
+  fun theLayoutIsTheSharedOneAndTheNumbersArePlatformNumbers() {
+    // A `limit` shortens what is drawn and leaves the run's own text alone — the base class's rule,
+    // which the differential harness and accessibility both depend on.
+    val limited = engine.layout(TextRun("Measurement results", style, limit = 40.0))
+    assertEquals("Measurement results", limited.run.text)
+    assertTrue(
+      "expected an ellipsis in ${limited.lines}",
+      limited.lines.single().text.endsWith("…"),
+    )
+    assertTrue(limited.metrics.width <= 40.0)
+
+    // And the widths are the platform's, not a ratio of the font size: `MetricTextEngine` cannot
+    // tell
+    // `iiii` from `mmmm` and this must.
+    val narrow = engine.measure(TextRun("iiii", style)).width
+    val wide = engine.measure(TextRun("mmmm", style)).width
+    assertTrue("iiii=$narrow mmmm=$wide", wide > narrow * 2.0)
+  }
+
+  /**
+   * The reader's text scale reaches the **measurement**, which is the only place it can do any
+   * good.
+   *
+   * An axis reserves its label box from a measurement, so a scale applied when drawing and not when
+   * measuring is what makes labels overlap at a larger text setting. The parameter existed and
+   * nothing set it; `VegaChartView` now passes the device's own scale.
+   */
+  @Test
+  fun theFontScaleWidensAndHeightensTheMeasurement() {
+    val plain = AndroidTextEngine(fontScale = 1f)
+    val enlarged = AndroidTextEngine(fontScale = 2f)
+
+    val plainMetrics = plain.measure(TextRun("Measurement", style))
+    val enlargedMetrics = enlarged.measure(TextRun("Measurement", style))
+
+    assertEquals(plainMetrics.width * 2.0, enlargedMetrics.width, plainMetrics.width * 0.05)
+    assertEquals(plainMetrics.ascent * 2.0, enlargedMetrics.ascent, plainMetrics.ascent * 0.05)
+    assertEquals(
+      plainMetrics.lineHeight * 2.0,
+      enlargedMetrics.lineHeight,
+      plainMetrics.lineHeight * 0.05,
+    )
+  }
+
+  /**
+   * A measurement cannot be perturbed by what was last drawn with the engine.
+   *
+   * There was one shared `TextPaint`, handed to the renderer, which sets a colour, a shader and an
+   * alignment on it before drawing a label. Measuring and drawing through the same mutable object
+   * made every advance depend on the last thing painted; there are two paints now, configured from
+   * one place.
+   */
+  @Test
+  fun drawingDoesNotDisturbMeasuring() {
+    val before = engine.measure(TextRun("stable", style)).width
+
+    val paint = engine.paintFor(style.copy(fontSize = 40.0, fontFamily = "monospace"))
+    paint.textAlign = engine.androidAlign(TextAlign.CENTER)
+    paint.color = -0x10000
+    paint.textSize = 96f
+
+    assertEquals(before, engine.measure(TextRun("stable", style)).width, 0.01)
+  }
+
+  /** A style measured twice costs one configuration; the cache must not change the answer. */
+  @Test
+  fun repeatedStylesMeasureIdentically() {
+    val styles = List(300) { style.copy(fontSize = 8.0 + it) }
+    val first = styles.map { engine.measure(TextRun("cache", it)).width }
+    val second = styles.map { engine.measure(TextRun("cache", it)).width }
+    assertEquals(first, second)
+  }
 }

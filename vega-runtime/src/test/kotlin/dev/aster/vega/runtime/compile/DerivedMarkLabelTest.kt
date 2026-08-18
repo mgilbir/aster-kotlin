@@ -68,7 +68,7 @@ class DerivedMarkLabelTest {
     )
     // The instant carries a time of day, so the reader gets both: en-US order, since no locale was
     // supplied.
-    assertEquals("6/17/2026 10:00:00 AM: 5", label)
+    assertEquals("6/17/2026 10:00:00 AM: 5.25", label)
   }
 
   @Test
@@ -76,19 +76,26 @@ class DerivedMarkLabelTest {
     // What a daily series carries, and what `timeUnit: yearmonthdate` truncates to: no clock to
     // report, so none is read out.
     val label = labels(timeSeries.replace("2026-06-17T10:00:00", "2026-06-17T00:00:00")).single()
-    assertEquals("6/17/2026: 5", label)
+    assertEquals("6/17/2026: 5.25", label)
   }
 
+  /**
+   * A number is said as the datum holds it, not as the axis rounds it.
+   *
+   * The first version of this asserted the scale's own tick precision, and an instrumented test on
+   * a device disagreed: an axis stepping by two turned a datum of 55.5 into "56", which is a nicer
+   * label and a false statement about one measurement. A tick precision is chosen for a *row* of
+   * labels; a spoken value is about one of them.
+   */
   @Test
-  fun `a continuous value keeps the decimals its own scale would label`() {
-    // The y value is 5.25 over a domain of [0, 27]: the scale's own tick step implies no decimals,
-    // so
-    // a reader hears "5" — the number the axis beside them shows, rather than the full double.
-    assertTrue(labels(timeSeries).single().endsWith(": 5"), labels(timeSeries).single())
+  fun `a number is spoken as the datum holds it`() {
+    // The value is 5.25, and the axis over [0, 27] would label it "5". A reader hears the value.
+    assertTrue(labels(timeSeries).single().endsWith(": 5.25"), labels(timeSeries).single())
 
-    // The same value on a domain a tenth as wide, where the step does imply a decimal.
-    val fine = timeSeries.replace(""""domain": [0, 27]""", """"domain": [5, 5.5]""")
-    assertTrue(labels(fine).single().endsWith(": 5.3"), labels(fine).single())
+    // A whole number is said as one — "18", never "18.0", which a screen reader reads out as
+    // "eighteen point zero".
+    val whole = timeSeries.replace(""""v": 5.25""", """"v": 18""")
+    assertTrue(labels(whole).single().endsWith(": 18"), labels(whole).single())
   }
 
   @Test

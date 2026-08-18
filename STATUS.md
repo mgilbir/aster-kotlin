@@ -259,7 +259,8 @@ MVP definition (section 23) stands at **13 of its 15 criteria**:
 - Canonical scene snapshot serialization with golden tests.
 - `AndroidCanvasSceneRenderer` with renderer-owned `Paint`/`Path`/`Matrix` reuse, gradients, dashes,
   clipping, blend modes, and diagnostics for anything it cannot represent.
-- `AndroidTextEngine` using `TextPaint`/`StaticLayout` for both measurement and drawing.
+- `AndroidTextEngine` using `TextPaint` for both measurement and drawing, over the shared
+  `MeasuredTextEngine` layout.
 - `VegaChartView` with gesture, hover, wheel and keyboard translation, revision-based invalidation,
   virtual accessibility descendants via `ExploreByTouchHelper`, and a snapshot subscription so a
   change made through the controller repaints.
@@ -2756,9 +2757,13 @@ wide a string is in a style, plus its ascent and descent. `MetricTextEngine` is 
 a platform engine three measurements instead of a parallel implementation. Extracting it changed nothing:
 190 fixtures and the full JVM suite passed before and after, which is what made it safe to build on.
 
-`AndroidTextEngine` deliberately does not use it and implements `TextEngine` directly — it hands
-multi-line text to `StaticLayout`, so Android's own line breaking, font fallback and bidirectional
-handling apply. That is a better answer where it exists, not a duplicate.
+`AndroidTextEngine` was the last engine still implementing `TextEngine` directly, and it is a
+`MeasuredTextEngine` subclass now too. What that gave up is `StaticLayout`'s line breaking for a
+*constrained* run — Android's own breaking is a better answer where a constraint exists, but it was the
+**only** host that behaved that way, so a chart's lines broke differently depending on who drew it, and
+upstream Vega does not wrap at all. What it gained is one layout everywhere and, per platform, only the
+numbers the platform is the authority on. Verified on a device: 58 instrumented tests, including four
+new ones for the migration itself.
 
 **The alignment, which was the visible bug all along.** With correct metrics the labels still sat on the
 line, because both new renderers ignored the run's `align` and `baseline` entirely: a right-aligned label
@@ -4475,8 +4480,9 @@ depends on them. Each has a test and a comment; this is the index.
    describe the specification now loaded. A specification that produces no scene leaves the chart
    alone and explains why, rather than blanking it.
 5. ~~**Text measurement on the compile thread.**~~ **Settled**, by the cheapest correct route:
-   per-instance ownership rather than locking. `AndroidTextEngine` keeps one shared `TextPaint` and
-   the renderer hands it out mid-draw, so a lock inside the engine would not have helped. Instead a
+   per-instance ownership rather than locking. `AndroidTextEngine` hands a paint to the renderer
+   mid-draw, so a lock inside the engine would not have helped — and it now keeps a *second*, private
+   paint for measuring, so what was last drawn cannot change an advance. Instead a
    controller that compiles gets its own instance — `VegaChartView.newCompatibleTextEngine()` makes
    that the easy thing to do — and two instances configured alike measure alike, so the layouts still
    match what the surface draws.

@@ -22,11 +22,8 @@ import dev.aster.vega.model.spec.FieldRef
 import dev.aster.vega.model.spec.MarkSpec
 import dev.aster.vega.model.spec.MarkType
 import dev.aster.vega.model.time.TimeFormat
-import dev.aster.vega.runtime.scale.LinearScale
 import dev.aster.vega.runtime.scale.PositionScale
-import dev.aster.vega.runtime.scale.SequentialColorScale
 import dev.aster.vega.runtime.scale.TimeScale
-import dev.aster.vega.runtime.scale.TransformedScale
 import dev.aster.vega.runtime.scale.VegaScale
 import dev.aster.vega.scene.AccessibilityDescriptor
 import dev.aster.vega.scene.ArcPath
@@ -2024,17 +2021,20 @@ public class MarkEncoder(
    * line of depression scores heard "1781683200000: 5" where they expected "17 June: 5". The
    * formatted text already existed a few files away, on the scale itself.
    *
-   * Per scale kind, because each has its own answer and only the first is surprising:
-   * - a **time** scale writes the date, and the time of day as well when the instant carries one —
+   * Only a **time** scale changes what is said, and why the others do not is worth writing down:
+   * the first version of this got it wrong and an instrumented test on a device caught it.
+   * - A **time** scale writes the date, and the time of day as well when the instant carries one,
    *   both in the locale's own order. Not the multi-format an axis tick uses: that is chosen for a
-   *   *row* of labels, where the coarser unit is already on the tick beside it, and on its own it
-   *   reads a 10 a.m. reading as "10 AM" with the day thrown away. A reader landing on one point
-   *   has no neighbour to borrow the date from;
-   * - a **continuous** scale writes as many decimals as its own tick step implies, so a reader
-   *   hears "1.2" and not "1.2000000000000002";
-   * - a **discrete** scale's values are already the strings its domain holds, so they stand;
-   * - anything with no scale — a plain `value`, or a scale this cannot resolve — falls back to
-   *   [spoken], which is where this started.
+   *   *row* of labels, where the coarser unit is already on the tick beside it, and alone it reads
+   *   a 10 a.m. reading as "10 AM" with the day thrown away — a reader landing on one point has no
+   *   neighbour to borrow the date from.
+   * - A **number** is said the way [spokenNumber] says it: a whole number without a decimal point,
+   *   a fraction with its own digits. Emphatically *not* through the scale's `formatTick`. A tick
+   *   precision is chosen for a row of labels, so on an axis stepping by two a datum of 55.5 comes
+   *   out as "56" — a nicer label and a false statement, and this is a statement about one
+   *   measurement. `ChartAccessibilityInstrumentedTest` found that, on a device, having itself been
+   *   written from listening to TalkBack.
+   * - A **discrete** scale's values are already the strings its domain holds, so they stand.
    */
   private fun spokenThrough(
     channel: ChannelValue.Scaled?,
@@ -2042,12 +2042,9 @@ public class MarkEncoder(
     datum: VegaValue,
   ): String {
     val number = value.asNumberOrNull() ?: return value.asString()
-    val scale = channel?.let { scales[scaleNameOf(it, datum)] } ?: return spokenNumber(number)
+    val scale = channel?.let { scales[scaleNameOf(it, datum)] }
     return when (scale) {
       is TimeScale -> spokenInstant(number, scale.zone)
-      is LinearScale -> scale.formatTick(number, locale = locale)
-      is TransformedScale -> scale.formatTick(number, locale = locale)
-      is SequentialColorScale -> scale.formatTick(number, locale = locale)
       else -> spokenNumber(number)
     }
   }
