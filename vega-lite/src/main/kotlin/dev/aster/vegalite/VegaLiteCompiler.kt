@@ -463,7 +463,17 @@ private class Compilation(
               ),
             )
           }
-        )
+        ) +
+          // `interval.topLevelSignals`: one tick for the chart, however many brushes over maps open
+          // already drawn. It is written only where one does — a brush the reader has yet to drag
+          // has nothing to intersect with and nothing to wait for.
+          if (
+            selections.any {
+              it.throughProjection() && it.initial != null
+            }
+          ) {
+            listOf(Selection.geoInitTick())
+          } else emptyList()
     // Upstream's order: the layout's own sizes, then `unit`, then what each selection *resolves*
     // to — because a variable parameter may read one — then the variables, then the machinery that
     // writes the stores.

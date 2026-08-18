@@ -1143,6 +1143,15 @@ internal class DataPipeline(
           aggregateFrom(emitted) ?: timeUnitFrom(emitted) ?: PassThroughNode(listOf(emitted))
         node.fromAncestor = inherited
         last = last.then(node)
+        // An aggregate's output rows are not the rows that went in and have no identity yet, so a
+        // view whose selection remembers rows by identity writes one again below it —
+        // `requiresSelectionId(model)` in `parseTransformArray`, and the same rule that follows an
+        // aggregate an *encoding* asked for. A brush over a map of aggregated places is where it
+        // tells: the brush picks the circles it covers, and a circle with no `_vgsid_` cannot be
+        // picked at all.
+        if (ownsIdentity && node is AggregateNode) {
+          last = last.then(identifierNode()).also { it.fromAncestor = inherited }
+        }
       }
     }
     return last

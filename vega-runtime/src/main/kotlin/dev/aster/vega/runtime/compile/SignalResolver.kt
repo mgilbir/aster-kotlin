@@ -213,8 +213,20 @@ public class SignalScope(
     return indataLookup(counts, value)
   }
 
-  override fun applyScale(name: String, value: VegaValue): VegaValue =
-    resolveScale(name, "scale")?.scale(value) ?: VegaValue.Null
+  override fun applyScale(name: String, value: VegaValue): VegaValue {
+    // Projections share the scale namespace in both directions. `invert` already read a point back
+    // to a place; this places one, which is what turns the two stated corners of a brush over a map
+    // into the rectangle it opens drawn as. A pair in, a pair out, where a scale takes one number.
+    projections[name]?.let { definition ->
+      val place = (value as? VegaValue.Arr)?.values ?: return VegaValue.Null
+      if (place.size < 2) return VegaValue.Null
+      val point =
+        GeoMeasure.project(definition, place[0].asDouble(), place[1].asDouble())
+          ?: return VegaValue.Null
+      return VegaValue.Arr(listOf(VegaValue.Num(point[0]), VegaValue.Num(point[1])))
+    }
+    return resolveScale(name, "scale")?.scale(value) ?: VegaValue.Null
+  }
 
   override fun invertScale(name: String, value: VegaValue): VegaValue {
     // Projections share the scale namespace, and inverting one is what turns a click on a map into

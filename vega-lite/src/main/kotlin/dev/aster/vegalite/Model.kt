@@ -268,6 +268,22 @@ internal object Channels {
   /** The channels that name a place on the globe rather than a position on the page. */
   val GEO_POSITION_CHANNELS = setOf("longitude", "latitude", "longitude2", "latitude2")
 
+  /**
+   * `getPositionChannelFromLatLong`: the position a place ends up drawn at.
+   *
+   * A projection turns the pair into `x` and `y`, so anything working in **pixels** — a brush
+   * dragged over a map, the rectangle it is drawn as — speaks of the position channel while the
+   * specification speaks of the place. Null for anything that was not a place to begin with.
+   */
+  fun positionOfGeo(channel: String): String? =
+    when (channel) {
+      "longitude",
+      "longitude2" -> "x"
+      "latitude",
+      "latitude2" -> "y"
+      else -> null
+    }
+
   /** Every channel that can own a scale, in the order upstream iterates them. */
   val SCALE_CHANNELS =
     listOf(
