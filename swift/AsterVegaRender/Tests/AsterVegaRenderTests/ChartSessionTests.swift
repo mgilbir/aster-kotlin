@@ -83,19 +83,16 @@ final class ChartSessionTests: XCTestCase {
     XCTAssertEqual(session.lastTouch, .tooltip("a"))
   }
 
-  /// What a tap on blank space inside a chart actually finds today.
+  /// A tap on blank space finds nothing — which took a fix to the hit test to be true.
   ///
-  /// Not `.nothing`, which is what this test was written to assert. A **group** node is what the hit test
-  /// finds — the compiler wraps a specification's marks in one and its bounds are the whole plotting
-  /// area — so a tap 75 units from the nearest bar, where the touch tolerance is six, still reports one
-  /// selected mark. It is a different node from the one a tap on a bar selects, which is what the
-  /// assertions below establish.
+  /// It used to report one selected mark. The compiler wraps a specification's marks in a group whose
+  /// bounds are the whole plotting area, and the hit test asked whether a point was *inside* a group
+  /// rather than whether the group **paints** there. So a tap 75 units from the nearest bar selected the
+  /// frame, and a host showed "1 mark selected" with nothing under the finger. Upstream's rule is that a
+  /// group is picked only where it paints — a fill, or a stroke — and that is now the rule here.
   ///
-  /// Pinned rather than corrected. It is the engine's behaviour on every host, `ChartInputEvent.Tap` on
-  /// empty space *does* clear a previous selection (`VegaChartControllerTest` covers that), and whether
-  /// a group ought to be selectable at all is a decision about hit testing rather than about this
-  /// session. Worth a look; not worth a silent change made from Swift.
-  func testATapOnEmptySpaceFindsTheChartsOwnFrame() async {
+  /// Written from Swift, where an adopter would meet it, and kept here for the same reason.
+  func testATapOnEmptySpaceFindsNothing() async {
     let session = await loaded()
     let scene = try! XCTUnwrap(session.scene)
     session.place(
@@ -103,26 +100,17 @@ final class ChartSessionTests: XCTestCase {
       viewport: Rect(x: 0, y: 0, width: scene.width, height: scene.height)
     )
 
+    // Above both bars: the taller one starts 70 units below this point.
     session.tap(at: Point(x: 50, y: 5))
     await session.settle()
 
-    XCTAssertEqual(
-      session.lastTouch,
-      .selected(count: 1),
-      "the frame group is what the hit test finds here; see the note above"
-    )
-    // And the frame is what it found: the root group, not a bar.
-    XCTAssertEqual(session.selectedNodeIds.count, 1)
-    let onEmptySpace = session.selectedNodeIds
+    XCTAssertEqual(session.lastTouch, .nothing(x: 50, y: 5))
+    XCTAssertTrue(session.selectedNodeIds.isEmpty, "nothing was there, so nothing is selected")
 
-    // And it is not the bar: tapping one selects something else.
+    // And a tap that does land on a bar still selects: the frame was the only thing that changed.
     session.tap(at: Point(x: 50, y: 90))
     await session.settle()
-    XCTAssertNotEqual(
-      onEmptySpace,
-      session.selectedNodeIds,
-      "a tap on empty space and a tap on a bar found the same node"
-    )
+    XCTAssertEqual(session.lastTouch, .tooltip("a"))
   }
 
   /// A touch arriving while the first compile is still running.

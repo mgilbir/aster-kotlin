@@ -2018,8 +2018,8 @@ public class MarkEncoder(
    * The defect this replaces was not a gap: `describe` read the raw column off the datum, and on
    * any chart whose first scaled channel is temporal — which is every time series, and every
    * payload a `timeUnit` produces — the first scaled channel is an instant. So a reader exploring a
-   * line of weekly scores heard "1781683200000: 5" where they expected "17 June: 5". The
-   * formatted text already existed a few files away, on the scale itself.
+   * line of weekly scores heard "1781683200000: 5" where they expected "17 June: 5". The formatted
+   * text already existed a few files away, on the scale itself.
    *
    * Only a **time** scale changes what is said, and why the others do not is worth writing down:
    * the first version of this got it wrong and an instrumented test on a device caught it.

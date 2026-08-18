@@ -97,20 +97,41 @@ public class SceneHitIndex(
   private fun buildEntries(): List<Entry> {
     val result = mutableListOf<Entry>()
     var order = 0
-    fun visit(node: SceneNode, parentTransform: Transform2D, ancestors: List<GroupNode>) {
+    /**
+     * @param window the clip every enclosing group has imposed, in **scene** coordinates, or null
+     *   where nothing clips. Upstream returns from `pick` before testing a clipped group's contents
+     *   at all, so a mark clipped away is not merely invisible: it cannot be touched. Carrying the
+     *   window down and narrowing each entry's bounds with it says the same thing in a flat index —
+     *   without it, a line running past the plotting area was still tappable in the padding, which
+     *   is a tap that hits a mark the reader cannot see.
+     */
+    fun visit(
+      node: SceneNode,
+      parentTransform: Transform2D,
+      ancestors: List<GroupNode>,
+      window: RectD?,
+    ) {
       if (!node.visible || node.opacity <= 0.0) return
       val world = parentTransform.concat(node.transform)
+      val worldBounds = world.mapBounds(node.bounds)
+      val visible = window?.let { intersectRects(worldBounds, it) } ?: worldBounds
+      if (visible.isEmpty) return
       // Pre-order numbering mirrors paint order: a group is drawn before its children, so its
       // children get higher numbers and win the hit test over their own ancestors.
       if (!options.requireInteractive || node.metadata.interactive) {
-        result.add(Entry(node, ancestors, world, world.mapBounds(node.bounds), order++))
+        result.add(Entry(node, ancestors, world, visible, order++))
       }
       if (node is GroupNode) {
         val nextAncestors = ancestors + node
-        for (child in node.children) visit(child, world, nextAncestors)
+        val nextWindow =
+          node.clip?.let { clip ->
+            val mapped = world.mapBounds(clip)
+            window?.let { intersectRects(mapped, it) } ?: mapped
+          } ?: window
+        for (child in node.children) visit(child, world, nextAncestors, nextWindow)
       }
     }
-    visit(scene.root, Transform2D.Identity, emptyList())
+    visit(scene.root, Transform2D.Identity, emptyList(), null)
     return result
   }
 
@@ -174,10 +195,10 @@ public class SceneHitIndex(
  */
 public fun hitsPrecisely(node: SceneNode, point: PointD, options: HitTestOptions): Boolean =
   when (node) {
-    is RectNode -> node.bounds.contains(point)
+    is RectNode -> hitsRect(node, point, options)
     is ImageNode -> node.rect.contains(point)
-    is TextNode -> node.bounds.contains(point)
-    is GroupNode -> node.bounds.contains(point)
+    is TextNode -> hitsText(node, point)
+    is GroupNode -> hitsGroup(node, point, options)
     is RuleNode -> {
       val tolerance =
         (if (node.stroke.isVisible) node.stroke.halfWidth else 0.0) + options.strokeTolerance
@@ -199,3 +220,126 @@ public fun hitsPrecisely(node: SceneNode, point: PointD, options: HitTestOptions
           (node.stroke?.halfWidth ?: 0.0) + options.strokeTolerance
       }
   }
+
+/**
+ * Whether a **rect** is the hit, which is the same question upstream asks of a `path` mark.
+ *
+ * `marks/rect.js` picks through `pickPath(rectangle)`, so the test is `isPointInPath` over the
+ * rounded rectangle it draws, or `isPointInStroke` over that outline. Two consequences, and this
+ * used to have neither: the **cut corners** of a rounded bar are not part of it, and an
+ * **unfilled** rect — a frame, a brush outline, a `strokeWidth`-only cell border — is picked on its
+ * edge rather than across its middle.
+ *
+ * A stroke-only rect keeps [HitTestOptions.strokeTolerance], as every other stroke-only mark here
+ * does: upstream is a mouse and this has to answer a finger. A filled one is exact, which is what a
+ * bar chart wants — the neighbouring bar is a pixel away and guessing between them is worse than a
+ * miss.
+ */
+private fun hitsRect(node: RectNode, point: PointD, options: HitTestOptions): Boolean {
+  val rounded = node.roundedPath
+  // `node.fill != null` rather than `fill.isVisible`: upstream asks whether the item *has* a fill
+  // and
+  // `isPointInPath` never looks at alpha, so `"fill": "transparent"` is the idiom for an invisible
+  // tap
+  // target and specifications in the wild use it. A stroke is different — a zero-width one has no
+  // outline to be near — so that one keeps `isVisible`.
+  if (node.fill != null) {
+    if (rounded?.containsEvenOdd(point) ?: node.rect.contains(point)) return true
+  }
+  val stroke = node.stroke
+  if (stroke == null || !stroke.isVisible) return false
+  val reach = stroke.halfWidth + options.strokeTolerance
+  val distance = rounded?.distanceToOutline(point) ?: node.rect.distanceToBoundary(point)
+  return distance <= reach
+}
+
+/**
+ * Whether a **label** is the hit, which for a rotated one is not a question about its box.
+ *
+ * Upstream's `marks/text.js` `hit` refuses a label of zero size, accepts any unrotated one whose
+ * bounds contain the point — the broad phase has already established that — and for a rotated one
+ * turns the *point* back about the label's own anchor and tests the **unrotated** box. A label's
+ * bounds are the axis-aligned reach of the turned box, so a 45° tick label's bounds hold nearly
+ * twice its area; testing them picks the label from a corner where nothing is drawn, which on a
+ * crowded rotated axis means picking the wrong one.
+ */
+private fun hitsText(node: TextNode, point: PointD): Boolean {
+  if (node.layout.run.style.fontSize <= 0.0) return false
+  if (node.angleDegrees == 0.0) return node.bounds.contains(point)
+  val anchorX = if (node.x.isNaN()) 0.0 else node.x
+  val anchorY = if (node.y.isNaN()) 0.0 else node.y
+  val radians = -node.angleDegrees * kotlin.math.PI / 180.0
+  val cos = kotlin.math.cos(radians)
+  val sin = kotlin.math.sin(radians)
+  // Upstream's own arithmetic, anchor-absolute rather than offset-then-translated, for the reason
+  // `TextNode.rotatedAbout` gives: the crumb in `cos(-90°)` is absorbed by the larger term.
+  val px = cos * point.x - sin * point.y + (anchorX - cos * anchorX + sin * anchorY)
+  val py = sin * point.x + cos * point.y + (anchorY - sin * anchorX - cos * anchorY)
+  return node.layout.bounds.translate(anchorX, anchorY).normalized().contains(PointD(px, py))
+}
+
+/**
+ * Whether a **group** is the hit, which is not the same question as whether the point is inside it.
+ *
+ * Upstream's rule is in `vega-scenegraph`'s `marks/group.js`: a group is picked only where it
+ * *paints*. Its background counts when `group.fill || (!strokeForeground && group.stroke)`, and its
+ * foreground stroke counts on its own when the stroke is drawn over the children. A group that
+ * paints nothing is never picked — only its children are.
+ *
+ * This tested `bounds.contains(point)`, so **every** group swallowed every tap inside it. The
+ * visible form of that: a compiled chart wraps its marks in a group whose bounds are the whole
+ * plotting area, so a tap on blank space selected that group and a host reported "1 mark selected"
+ * with nothing under the finger. Found by writing a Swift test that expected "nothing" and reading
+ * what came back instead.
+ *
+ * The rectangle is the group's own **paint rect** — its declared extent, or its clip — rather than
+ * its bounds, which include everything its children reach. Corner radius is honoured through
+ * `roundedPaintPath`, as upstream honours it through `hitCorner`.
+ */
+private fun hitsGroup(node: GroupNode, point: PointD, options: HitTestOptions): Boolean {
+  // A clip is a hard boundary. Upstream returns before testing anything at all when the point is
+  // outside a clipped group's own rectangle, children included — which is what [SceneHitIndex]
+  // reproduces by narrowing every descendant's bounds as it walks.
+  node.clip?.let { if (!it.contains(point)) return false }
+  val rect = node.paintRect ?: return false
+  val rounded = node.roundedPaintPath
+  val stroke = node.stroke
+
+  // The foreground stroke: a group drawn over its children is grabbed by that outline, which is how
+  // a
+  // cell border stays clickable when its own bars run up to it.
+  if (node.strokeForeground && stroke != null && stroke.isVisible) {
+    val reach = stroke.halfWidth + options.strokeTolerance
+    val onOutline =
+      rounded?.let { it.distanceToOutline(point) <= reach }
+        ?: (rect.distanceToBoundary(point) <= reach)
+    if (onOutline) return true
+  }
+
+  // The background: a fill, or a stroke that is *not* drawn in the foreground.
+  val background = node.fill != null || (!node.strokeForeground && stroke != null)
+  if (!background) return false
+  return rounded?.containsEvenOdd(point) ?: rect.contains(point)
+}
+
+/**
+ * Distance from [point] to this rectangle's **boundary**: zero on it, positive both inside and out.
+ *
+ * The outline of a rectangle rather than its area, which is what a stroke covers.
+ */
+private fun RectD.distanceToBoundary(point: PointD): Double {
+  val outsideX = maxOf(left - point.x, point.x - right, 0.0)
+  val outsideY = maxOf(top - point.y, point.y - bottom, 0.0)
+  if (outsideX > 0.0 || outsideY > 0.0) return kotlin.math.hypot(outsideX, outsideY)
+  return minOf(point.x - left, right - point.x, point.y - top, bottom - point.y)
+}
+
+/** The overlap of two rectangles, or empty where they do not meet. */
+private fun intersectRects(a: RectD, b: RectD): RectD {
+  if (a.isEmpty || b.isEmpty) return RectD.Empty
+  val left = maxOf(a.left, b.left)
+  val top = maxOf(a.top, b.top)
+  val right = minOf(a.right, b.right)
+  val bottom = minOf(a.bottom, b.bottom)
+  return if (right <= left || bottom <= top) RectD.Empty else RectD(left, top, right, bottom)
+}

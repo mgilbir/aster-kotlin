@@ -14,8 +14,8 @@ import org.junit.jupiter.api.Test
  * why: exploring a touch screen means landing on individual marks, and an unlabelled one announces
  * nothing. What was wrong is the **value**. `describe` read the first scaled channel's column
  * straight off the datum, and on any time series the first scaled channel is temporal — so a reader
- * exploring a line of weekly scores heard a thirteen-digit epoch number where they expected a
- * date. The formatted text existed already, on the scale that placed the mark.
+ * exploring a line of weekly scores heard a thirteen-digit epoch number where they expected a date.
+ * The formatted text existed already, on the scale that placed the mark.
  */
 class DerivedMarkLabelTest {
 

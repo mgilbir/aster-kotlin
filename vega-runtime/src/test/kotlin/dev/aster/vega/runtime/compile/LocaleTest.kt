@@ -15,7 +15,7 @@ import org.junit.jupiter.api.Test
  * A chart in Dutch, which is the whole of what the locale seam is for.
  *
  * Everything the engine **generates** was English and en-US: `TimeFormat` said so at the top of the
- * file, and a Dutch reader reading a chart of their own weekly scores got English month
+ * file, and a Dutch reader looking at a chart of their own weekly scores got English month
  * abbreviations on it. The names cannot come from the platform — common Kotlin cannot reach a
  * platform's date or number formatting, and `kotlinx-datetime` supplies the substitution mechanism
  * and no names at all — so they come from the host, as the text engine does.
@@ -135,7 +135,7 @@ class LocaleTest {
       .filter { it.metadata.role == role }
       .map { it.layout.run.text }
 
-  /** The weekly-score shape from the review: five weekly scores on a temporal axis. */
+  /** The shape from the review: five weekly scores on a temporal axis. */
   private val weeklyScores =
     """
     {

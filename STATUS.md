@@ -4399,6 +4399,48 @@ Two caveats on the number. It is a desktop JVM with the JIT warm, which is the m
 there is; and it measures compilation only, not the Canvas draw that follows. It is an order of
 magnitude, enough to rule an approach in, and not a substitute for measuring on hardware.
 
+## A mark is picked where it is painted, and nothing is picked through a clip
+
+Four defects in one rule, every one of them reported by a tap that found something the reader could not
+see.
+
+**A group used to be picked anywhere inside its bounds.** `hitsPrecisely` asked
+`node.bounds.contains(point)` for a `GroupNode`, and a group's bounds are its own extent unioned with
+everything its children reach. Every compiled specification wraps its marks in such a group, so a tap on
+blank space inside a chart selected *it*: a host reported "1 mark selected" with nothing under the
+finger, and on iOS a `ChartSession` test written to expect "nothing" had been pinned to expect the frame
+instead — with a note saying it was a hit-testing decision and not a session one. It was.
+
+Upstream's rule is in `vega-scenegraph`'s `marks/group.js`. A group's background is picked when
+`group.fill || (!strokeForeground && group.stroke)`, its foreground stroke is picked on its own outline,
+and a group that paints neither is never the hit — only its children are. The rectangle tested is the
+group's own **paint rect**, its declared extent, not its bounds, and a corner radius cuts it. That is
+`hitsGroup` now, and `HitTestTest` covers each clause: a bare group does not swallow a tap, a filled
+panel is hit on its background, a child still wins where the two overlap, a panel of forty units with a
+mark drawn sixty out is picked on forty, and a border is not a panel.
+
+**And a mark the clip hid was still tappable.** Upstream returns from `pick` before testing a clipped
+group's contents at all; here the clip narrowed what was *drawn* — since #30 — and nothing else, so a
+line running past the plotting area answered a tap in the padding. `SceneHitIndex` now carries the clip
+window down as it walks and intersects every descendant's indexed bounds with it, which says the same
+thing in a flat index. `MarkClipTest` places a finger where a clipped-away symbol would have been and
+gets nothing back; it gets the symbol back before the fix.
+
+**A rect was picked over its bounding box, and a rotated label over its own.** The same mistake once
+more, in the two remaining mark types that tested a box. Upstream picks a rect through
+`pickPath(rectangle)` — `isPointInPath` over the path it *draws* — so the cut corner of a rounded bar is
+not part of it, and an **unfilled** rect (a frame, a brush outline, a cell border) catches a tap on its
+edge and lets one through the hole. `marks/text.js` turns the point back about a label's anchor and tests
+the **unrotated** box, because a label's bounds are the axis-aligned reach of the turned one — nearly
+twice the area at 45°, so on a rotated axis the boxes overlap and a tap in the overlap picked whichever
+came later.
+
+Two details of upstream's rule are load-bearing and easy to miss. A fill of zero opacity is still a hit
+target: upstream asks whether the item *has* a fill and `isPointInPath` never reads alpha, so
+`"fill": "transparent"` over a region is the idiom for an invisible tap target, and specifications in the
+wild use it. And a rect that paints *nothing* is now not a hit at all, which is the one place this got
+stricter — pinned by a test, because it is the kind of change that is noticed as a regression.
+
 ## What a reader should not have to rediscover
 
 Behaviours reproduced deliberately because upstream does them and a chart written against upstream

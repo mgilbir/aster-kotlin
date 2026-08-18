@@ -36,6 +36,7 @@ class HitTestTest {
         y = 10.0,
         width = 20.0,
         height = 20.0,
+        fill = Fill(ScenePaint.Black),
         metadata = interactive,
       )
     val index = SceneHitIndex(sceneOf(rect))
@@ -55,6 +56,7 @@ class HitTestTest {
         y = 0.0,
         width = 50.0,
         height = 50.0,
+        fill = Fill(ScenePaint.Black),
         metadata = interactive,
       )
     val above =
@@ -64,6 +66,7 @@ class HitTestTest {
         y = 0.0,
         width = 50.0,
         height = 50.0,
+        fill = Fill(ScenePaint.Black),
         metadata = interactive,
       )
     val index = SceneHitIndex(sceneOf(below, above))
@@ -72,7 +75,15 @@ class HitTestTest {
 
   @Test
   fun `non-interactive nodes are skipped unless requested`() {
-    val rect = RectNode(id = ids.allocate(), x = 0.0, y = 0.0, width = 50.0, height = 50.0)
+    val rect =
+      RectNode(
+        id = ids.allocate(),
+        x = 0.0,
+        y = 0.0,
+        width = 50.0,
+        height = 50.0,
+        fill = Fill(ScenePaint.Black),
+      )
     assertNull(SceneHitIndex(sceneOf(rect)).hitTest(PointD(10.0, 10.0)))
     assertNotNull(
       SceneHitIndex(sceneOf(rect), HitTestOptions(requireInteractive = false))
@@ -89,6 +100,7 @@ class HitTestTest {
         y = 0.0,
         width = 50.0,
         height = 50.0,
+        fill = Fill(ScenePaint.Black),
         visible = false,
         metadata = interactive,
       )
@@ -105,6 +117,7 @@ class HitTestTest {
         y = 0.0,
         width = 10.0,
         height = 10.0,
+        fill = Fill(ScenePaint.Black),
         metadata = interactive,
       )
     val group =
@@ -131,6 +144,7 @@ class HitTestTest {
         y = 0.0,
         width = 10.0,
         height = 10.0,
+        fill = Fill(ScenePaint.Black),
         metadata = interactive,
       )
     val group = GroupNode(id = ids.allocate(), children = listOf(child), metadata = interactive)
@@ -224,6 +238,7 @@ class HitTestTest {
         y = 0.0,
         width = 10.0,
         height = 10.0,
+        fill = Fill(ScenePaint.Black),
         metadata = interactive,
       )
     val b =
@@ -233,6 +248,7 @@ class HitTestTest {
         y = 40.0,
         width = 10.0,
         height = 10.0,
+        fill = Fill(ScenePaint.Black),
         metadata = interactive,
       )
     val c =
@@ -242,6 +258,7 @@ class HitTestTest {
         y = 90.0,
         width = 10.0,
         height = 10.0,
+        fill = Fill(ScenePaint.Black),
         metadata = interactive,
       )
     val index = SceneHitIndex(sceneOf(a, b, c))
@@ -289,5 +306,267 @@ class HitTestTest {
     assertEquals("bars", hit.node.metadata.markName)
 
     assertNull(index.hitTest(PointD(1.0, scene.height - 1.0)))
+  }
+
+  // ---- groups, which are picked only where they paint ------------------------
+
+  private fun rect(x: Double, y: Double, size: Double = 10.0) =
+    RectNode(
+      id = ids.allocate(),
+      x = x,
+      y = y,
+      width = size,
+      height = size,
+      fill = Fill(ScenePaint.Black),
+      metadata = interactive,
+    )
+
+  /**
+   * The defect this pair of tests exists for.
+   *
+   * A group used to be picked anywhere inside its **bounds**, so a compiled chart — which wraps its
+   * marks in a group whose bounds are the whole plotting area — reported a selected mark for a tap
+   * on blank space. Upstream picks a group only where it *paints*: `group.fill ||
+   * (!strokeForeground && group.stroke)` for its background, and its foreground stroke on its own.
+   * A group that paints nothing is never the hit.
+   */
+  @Test
+  fun `a group that paints nothing does not swallow a tap`() {
+    val child = rect(0.0, 0.0)
+    val frame =
+      GroupNode(
+        id = ids.allocate(),
+        children = listOf(child),
+        size = SizeD(100.0, 100.0),
+        metadata = interactive,
+      )
+    val index = SceneHitIndex(sceneOf(frame))
+
+    assertEquals(child.id, assertPresent(index.hitTest(PointD(5.0, 5.0))).node.id)
+    assertNull(index.hitTest(PointD(80.0, 80.0)), "blank space inside a bare group is not a hit")
+  }
+
+  @Test
+  fun `a group that paints a background is hit on it`() {
+    val child = rect(0.0, 0.0)
+    val panel =
+      GroupNode(
+        id = ids.allocate(),
+        children = listOf(child),
+        size = SizeD(100.0, 100.0),
+        fill = Fill(ScenePaint.Black),
+        metadata = interactive,
+      )
+    val index = SceneHitIndex(sceneOf(panel))
+
+    assertEquals(panel.id, assertPresent(index.hitTest(PointD(80.0, 80.0))).node.id)
+    // And its child still wins where the two overlap, which is paint order doing its job.
+    assertEquals(child.id, assertPresent(index.hitTest(PointD(5.0, 5.0))).node.id)
+  }
+
+  /**
+   * A group is picked on its **paint rect**, not on the union of what its children reach.
+   *
+   * A panel of 40 units with a mark drawn 60 units out is 60 units of bounds and 40 of paint.
+   * Bounds are what a *layout* asks about; a pick asks what was drawn.
+   */
+  @Test
+  fun `a group is hit within its declared extent rather than its bounds`() {
+    val overflowing = rect(70.0, 70.0)
+    val panel =
+      GroupNode(
+        id = ids.allocate(),
+        children = listOf(overflowing),
+        size = SizeD(40.0, 40.0),
+        fill = Fill(ScenePaint.Black),
+        metadata = interactive,
+      )
+    val index = SceneHitIndex(sceneOf(panel))
+
+    assertEquals(panel.id, assertPresent(index.hitTest(PointD(20.0, 20.0))).node.id)
+    assertEquals(overflowing.id, assertPresent(index.hitTest(PointD(75.0, 75.0))).node.id)
+    assertNull(index.hitTest(PointD(55.0, 55.0)), "inside the bounds, outside everything drawn")
+  }
+
+  /** A stroke drawn over the children is grabbed by that outline, within the tap tolerance. */
+  @Test
+  fun `a group stroked in the foreground is hit on its outline`() {
+    val bordered =
+      GroupNode(
+        id = ids.allocate(),
+        children = emptyList(),
+        size = SizeD(50.0, 50.0),
+        stroke = Stroke(paint = ScenePaint.Black, width = 2.0),
+        strokeForeground = true,
+        metadata = interactive,
+      )
+    val index = SceneHitIndex(sceneOf(bordered), HitTestOptions(strokeTolerance = 2.0))
+
+    assertEquals(bordered.id, assertPresent(index.hitTest(PointD(50.0, 25.0))).node.id)
+    // Not its middle: a foreground stroke paints an outline, and there is no fill behind it.
+    assertNull(index.hitTest(PointD(25.0, 25.0)), "a border is not a panel")
+  }
+
+  /**
+   * A mark clipped away cannot be touched, which is the other half of applying `mark.clip`.
+   *
+   * Upstream returns from `pick` before testing a clipped group's contents at all. Drawing already
+   * hid this mark; a hit test that still found it would report a tap on something invisible — and a
+   * pan over a detail plot is exactly where that happens, because the rows outside the brushed
+   * domain are still in the scene.
+   */
+  @Test
+  fun `a clipped-away mark is not hit`() {
+    val inside = rect(5.0, 5.0)
+    val outside = rect(70.0, 70.0)
+    val clipped =
+      GroupNode(
+        id = ids.allocate(),
+        children = listOf(inside, outside),
+        clip = RectD(0.0, 0.0, 40.0, 40.0),
+        metadata = interactive,
+      )
+    val index = SceneHitIndex(sceneOf(clipped))
+
+    assertEquals(inside.id, assertPresent(index.hitTest(PointD(8.0, 8.0))).node.id)
+    assertNull(index.hitTest(PointD(75.0, 75.0)), "outside the clip is outside the chart")
+  }
+
+  // ---- a rect and a label are picked where they are drawn ---------------------
+
+  /**
+   * The cut corner of a rounded bar is not part of it.
+   *
+   * Upstream picks a rect through `pickPath(rectangle)` — `isPointInPath` over the very path it
+   * draws, corner radii included. This tested the bounding box, so the corner a bar does not fill
+   * answered a tap; on a stack of thin rounded bars that is a tap credited to the wrong row.
+   */
+  @Test
+  fun `a rounded rect is not hit in the corner it does not paint`() {
+    val bar =
+      RectNode(
+        id = ids.allocate(),
+        x = 0.0,
+        y = 0.0,
+        width = 40.0,
+        height = 40.0,
+        cornerRadius = 12.0,
+        fill = Fill(ScenePaint.Black),
+        metadata = interactive,
+      )
+    val index = SceneHitIndex(sceneOf(bar))
+
+    assertEquals(bar.id, assertPresent(index.hitTest(PointD(20.0, 20.0))).node.id)
+    assertNull(index.hitTest(PointD(1.0, 1.0)), "the top-left corner is cut away by a radius of 12")
+  }
+
+  /**
+   * An **unfilled** rect is picked on its edge, not across its middle.
+   *
+   * `hitPath` is `(fill && isPointInPath) || (stroke && isPointInStroke)`, so a frame — a brush
+   * outline, a cell border, a `strokeWidth`-only box — catches a tap on the border and lets one
+   * through the hole. The stroke keeps the tap tolerance every other stroke-only mark here gets.
+   */
+  @Test
+  fun `an unfilled rect is hit on its edge and not through its middle`() {
+    val frame =
+      RectNode(
+        id = ids.allocate(),
+        x = 0.0,
+        y = 0.0,
+        width = 60.0,
+        height = 60.0,
+        stroke = Stroke(paint = ScenePaint.Black, width = 2.0),
+        metadata = interactive,
+      )
+    val index = SceneHitIndex(sceneOf(frame), HitTestOptions(strokeTolerance = 2.0))
+
+    assertEquals(frame.id, assertPresent(index.hitTest(PointD(0.0, 30.0))).node.id)
+    assertNull(index.hitTest(PointD(30.0, 30.0)), "a frame has a hole in it")
+  }
+
+  /**
+   * A rect with no paint at all is not a hit target, which is what upstream's `hitPath` says.
+   *
+   * Worth pinning because it is the one case where this got *stricter*: a rect used to be picked
+   * inside its bounds whatever it painted.
+   */
+  @Test
+  fun `a rect that paints nothing is not hit`() {
+    val ghost =
+      RectNode(
+        id = ids.allocate(),
+        x = 0.0,
+        y = 0.0,
+        width = 50.0,
+        height = 50.0,
+        metadata = interactive,
+      )
+    assertNull(SceneHitIndex(sceneOf(ghost)).hitTest(PointD(25.0, 25.0)))
+  }
+
+  /**
+   * A fill of zero opacity is still a hit target.
+   *
+   * Upstream asks whether the item *has* a fill, and `isPointInPath` does not look at alpha — so
+   * `"fill": "transparent"` over a region is the idiom for an invisible tap target, and
+   * specifications in the wild use it. Being faithful here is the difference between that trick
+   * working and a specification silently losing its interaction.
+   */
+  @Test
+  fun `an invisible fill is still picked, because upstream picks it`() {
+    val target =
+      RectNode(
+        id = ids.allocate(),
+        x = 0.0,
+        y = 0.0,
+        width = 50.0,
+        height = 50.0,
+        fill = Fill(ScenePaint.Black, opacity = 0.0),
+        metadata = interactive,
+      )
+    assertEquals(
+      target.id,
+      assertPresent(SceneHitIndex(sceneOf(target)).hitTest(PointD(25.0, 25.0))).node.id,
+    )
+  }
+
+  /**
+   * A rotated label is picked where its ink is, not across the box that holds it.
+   *
+   * `marks/text.js` turns the *point* back about the label's anchor and tests the **unrotated**
+   * box. A label's bounds are the axis-aligned reach of the turned one, which for 45° is nearly
+   * twice the area — so on an axis of rotated tick labels the corners of one box overlap its
+   * neighbours, and a tap in that overlap used to pick whichever came later.
+   */
+  @Test
+  fun `a rotated label is hit on its ink rather than on its bounding box`() {
+    val layout = MetricTextEngine().layout(TextRun("Wednesday", TextStyle(fontSize = 12.0)))
+    val label =
+      TextNode(
+        id = ids.allocate(),
+        x = 50.0,
+        y = 50.0,
+        layout = layout,
+        angleDegrees = 45.0,
+        fill = Fill(ScenePaint.Black),
+        metadata = interactive,
+      )
+    val index = SceneHitIndex(sceneOf(label), HitTestOptions(boundsTolerance = 0.0))
+    val box = label.bounds
+
+    // Along the label's own direction, a step from the anchor stays on the ink.
+    val step = 20.0 / kotlin.math.sqrt(2.0)
+    assertEquals(
+      label.id,
+      assertPresent(index.hitTest(PointD(50.0 + step, 50.0 + step))).node.id,
+      "45° down and to the right of the anchor is where this label runs",
+    )
+    // The far corner of the axis-aligned box is not: it is the reach of a turned rectangle, and
+    // nothing is drawn there.
+    assertNull(
+      index.hitTest(PointD(box.right - 0.5, box.top + 0.5)),
+      "the corner of the bounding box holds no ink: $box",
+    )
   }
 }
