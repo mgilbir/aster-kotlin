@@ -483,6 +483,14 @@ internal object Marks {
     if (view.spec.mark !in PATH_MARKS) return null
     val orient = view.markDef.orient
     val dimension = if (orient == "horizontal") "y" else "x"
+    // `if (isFieldDef(dimensionChannelDef))`: there is an order to draw the points in only where
+    // the
+    // dimension is a **column**. A line whose dimension channel holds a bare value, or holds
+    // nothing
+    // at all, has nothing to be sorted by — and Vega reads `sort: {field: "y"}` on items with no
+    // `y`
+    // as every item comparing equal, which is a sort that does nothing at some cost.
+    if (view.spec.encoding[dimension]?.isFieldDef != true) return null
     return obj { put("field", dimension) }
   }
 

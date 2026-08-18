@@ -1854,16 +1854,23 @@ private class Compilation(
         parent.array("layer").orEmpty().forEachIndexed { index, layer ->
           val child = layer as? VegaValue.Obj ?: return@forEachIndexed
           // A layer's member is a view or a layer of views — never a composition that arranges
-          // plots. Upstream refuses these too, throwing while it normalises; this compiler used to
-          // report a **missing mark** instead, which named the symptom and sent the reader looking
-          // for a mark in a specification whose trouble was the composition around it.
+          // plots. This is the one refusal here that is not a gap to be closed: upstream rejects
+          // the
+          // same four with `Invalid specification`, the grammar saying a layer's members are units
+          // or layers, so there is no chart to reach later and the wording says so. It used to be
+          // reported as a **missing mark** — a `facet` has none of its own, so the innermost check
+          // failed first — which sent the reader looking for a mark in a specification whose
+          // trouble
+          // was the composition around it.
           for (composition in listOf("facet", "repeat", "hconcat", "vconcat", "concat")) {
             if (!child.has(composition)) continue
             diagnostics.fatal(
               VegaLiteDiagnostics.UNSUPPORTED_COMPOSITION,
-              "A `$composition` inside a `layer` is not implemented, and is not a chart Vega-Lite " +
-                "describes: a layer draws its members over one another, so each is a view or a " +
-                "layer of views.",
+              "A `$composition` inside a `layer` is not a chart Vega-Lite describes: a layer draws " +
+                "its members over one another, so each is a single view or a layer of views. " +
+                "Upstream rejects it as an invalid specification rather than compiling it. A " +
+                "`layer` inside a `layer` is allowed and does compile, as does a `repeat` whose " +
+                "copies are layered — `{\"repeat\": {\"layer\": […]}}`.",
               jsonPath = "$path.layer[$index].$composition",
             )
             return
