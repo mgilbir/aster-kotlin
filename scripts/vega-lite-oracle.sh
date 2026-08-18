@@ -9,9 +9,24 @@
 #      differently phrased but draws the same chart still passes, and one that is identically phrased
 #      but draws the wrong chart still fails
 #
-# Both are checked in, so the JVM tests need neither Node nor a network. This regenerates them;
-# review the resulting diff the way you would review a golden.
+# Only the *first* is checked in. The scenes are sixteen megabytes of unreviewable output and are
+# gitignored on purpose, which has a consequence worth stating plainly: on a fresh clone the scene
+# comparison — `VegaLiteFixtureDifferentialTest`, 1126 tests in `:vega-runtime` — does not fail, it
+# **assumes itself away**. It skipped in every CI run until CI started calling this script with
+# `--references-only` before `check.sh`. If you have not run this, you have not run that gate.
+#
+# This regenerates both; review the resulting diff the way you would review a golden.
+#
+#   --references-only   write the references and stop, running no comparison. This is what CI uses to
+#                       arm the scene gate before `check.sh`, on a host where it then runs the whole
+#                       suite rather than just this script's part of it.
 set -euo pipefail
+
+references_only=false
+if [[ ${1:-} == "--references-only" ]]; then
+  references_only=true
+  shift
+fi
 cd "$(dirname "$0")/.."
 
 # Same zone as the Vega oracle and the JVM tests: a time scale is local, so a reference generated in
@@ -53,9 +68,19 @@ for spec in "${specs[@]}"; do
   (cd oracle-js && node src/reference.js "$COMPILED_DIR/$name.vg.json" "$REFERENCE_DIR/$name.reference.json")
 done
 
+if [[ $references_only == true ]]; then
+  echo "Wrote ${#specs[@]} specification and scene reference(s) to $REFERENCE_DIR."
+  echo "The comparisons themselves run in scripts/check.sh."
+  exit 0
+fi
+
 echo "==> Comparing with the Kotlin compiler"
+# `:vega-lite:test` is the *specification* comparison only. The scene comparison lives in
+# `:vega-runtime` and runs from `check.sh`; saying so here stops a green line from reading as
+# though both gates had passed.
 if ./gradlew --console=plain :vega-lite:test > "$ROOT/build/vega-lite-differential.log" 2>&1; then
-  echo "Vega-Lite differential tests passed for ${#specs[@]} fixture(s)."
+  echo "Specifications match upstream for ${#specs[@]} fixture(s)."
+  echo "The scene comparison is VegaLiteFixtureDifferentialTest, run by scripts/check.sh."
   echo "References: $REFERENCE_DIR"
 else
   echo "Vega-Lite differential tests FAILED. Details:" >&2

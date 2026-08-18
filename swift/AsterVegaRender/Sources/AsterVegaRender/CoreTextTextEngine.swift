@@ -32,16 +32,22 @@ public final class CoreTextTextEngine: MeasuredTextEngine {
   public override func advanceOf(line: String, style: TextStyle) -> Double {
     guard !line.isEmpty else { return 0 }
 
-    let attributed = NSAttributedString(
-      string: line,
-      attributes: [
-        NSAttributedString.Key(kCTFontAttributeName as String): font(for: style),
-        // CoreText's `kCTKernAttributeName` is spacing *between* characters, which is what a
-        // specification's `letterSpacing` means — so the trailing gap a naive `count * spacing` would
-        // add does not appear, and neither does the one the reference engine subtracts by hand.
-        NSAttributedString.Key(kCTKernAttributeName as String): style.letterSpacing,
-      ]
-    )
+    var attributes: [NSAttributedString.Key: Any] = [
+      NSAttributedString.Key(kCTFontAttributeName as String): font(for: style)
+    ]
+    // CoreText's `kCTKernAttributeName` is spacing *between* characters, which is what a
+    // specification's `letterSpacing` means — so the trailing gap a naive `count * spacing` would add
+    // does not appear, and neither does the one the reference engine subtracts by hand.
+    //
+    // Set only when there is spacing to apply. Setting it to zero is not the same as leaving it out:
+    // an explicit kern **replaces** the font's own kerning, so a zero switched pair kerning off and
+    // measured every string slightly wider than CoreText would draw it. The drawing path sets no kern
+    // attribute at all, so leaving it out here is what makes the two agree — and agreement is the one
+    // property this engine exists for.
+    if style.letterSpacing != 0 {
+      attributes[NSAttributedString.Key(kCTKernAttributeName as String)] = style.letterSpacing
+    }
+    let attributed = NSAttributedString(string: line, attributes: attributes)
     // A typographic width, not a bounding box: this is the advance the drawing will use, so the two
     // agree by construction. `CTLineGetTypographicBounds` is the same number `CTLineDraw` walks.
     let ctLine = CTLineCreateWithAttributedString(attributed)

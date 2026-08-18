@@ -454,6 +454,23 @@ are **skipped** rather than passing (an assumption, and `scripts/check.sh` print
 and `known-divergences.json` *is* committed, because it is not a copy of upstream but this engine's
 own list of places it disagrees, with a bug behind each entry.
 
+**The Vega-Lite scene gate did not run in CI, ever.** The pair of Vega-Lite references is asymmetric:
+the compiled specifications are committed, the scenes upstream draws from them are gitignored as
+sixteen megabytes of output nobody reads a diff of. `VegaLiteFixtureDifferentialTest` responds to their
+absence with an assumption, so on any fresh clone its 1126 tests — the gate that catches a
+specification matching upstream property for property that still *draws* the wrong chart — reported as
+skipped, on both hosts, in every run. `ci.yml` now calls `vega-lite-oracle.sh --references-only` before
+`check.sh` to arm it, the same shape as `record-upstream-vectors.sh` above. Note that
+`vega-lite-oracle.sh` itself runs only `:vega-lite:test`, the *specification* half; the scene half has
+always belonged to `check.sh`, and the script used to print a line that read as though it had checked
+both.
+
+**The still-open gap this turned up: `letterSpacing` is measured but never drawn.** `DrawTextRun` has
+no `letterSpacing` field, so `CoreTextDrawing` cannot apply it, while `CoreTextTextEngine` does — a
+specification setting it reserves a box of one width and draws text of another, which is the exact
+defect the CoreText engine was written to remove. Closing it means a field on an exported data class,
+so it touches the Obj-C surface snapshot, the Compose renderer and the Android canvas together.
+
 **The replays compare numbers within eight ulps, not bit-for-bit** (`Agreement.kt`). They used to
 compare a double's full decimal expansion, which asserts not that this engine computes the same
 function as upstream but that it reaches the answer through the same `libm` — and nothing can satisfy
