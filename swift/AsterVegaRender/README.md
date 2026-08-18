@@ -6,11 +6,50 @@ draws it into CoreGraphics.
 
 ```
 swift/AsterVegaRender
+├── VegaChartView.swift       a SwiftUI view: the drawing, the gestures and the VoiceOver overlay
+├── ChartSession.swift        one chart being looked at — the compile, the controls, the touches
 ├── DrawTarget.swift          the protocol a surface implements, and the vocabulary it is spoken to in
 ├── SceneWalk.swift           the whole of the renderer's logic — what to draw, in what order
 ├── CoreGraphicsTarget.swift  a CGContext
+├── CoreTextTextEngine.swift  measures text with the font that draws it
 └── RecordingTarget.swift     the draw calls as text, which is what the tests assert
 ```
+
+## Using it
+
+```swift
+import AsterVegaRender
+import SwiftUI
+
+struct MeasurementChart: View {
+  let specification: String
+  @State private var session = ChartSession()
+
+  var body: some View {
+    Group {
+      if let scene = session.scene {
+        VegaChartView(scene: scene, session: session)
+      } else if let failure = session.failure {
+        Text(failure)
+      }
+    }
+    .task { session.load(specification: specification) }
+  }
+}
+```
+
+`ChartSession` compiles either grammar off the main thread, publishes the scene, exposes the
+specification's own bound controls, and reports what a touch found. `VegaChartView` draws it, answers
+taps, long presses, pans, pinches and a hovering pointer, and lays a **positioned** VoiceOver element
+over every mark, axis, legend and title.
+
+Both were in the demo app until an adopter pointed out what that costs: about 2,400 lines of this
+renderer owned by hand, including the parts that took real bug fixes to get right — the aspect-fit
+arithmetic shared between drawing and hit testing, the drag-as-tap slop, the `@MainActor` isolation with
+a serialised queue behind it because the controller is not safe for concurrent use, and the positioned
+accessibility overlay, which exists because `accessibilityChildren` yields frames of `(inf, inf, 0, 0)`
+that a reader cannot touch. They need Observation and SwiftUI, so they are `@available(macOS 14, iOS 17)`;
+everything else in the package keeps the manifest's own floor.
 
 ## Running the tests
 

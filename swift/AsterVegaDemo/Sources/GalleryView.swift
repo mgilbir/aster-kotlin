@@ -99,7 +99,8 @@ struct GalleryView: View {
 /// control cannot work in one and not the other.
 private struct ChartDetail: View {
   let chart: BundledSpec
-  @State private var session = ChartSession()
+  // The loader is the app's, shared so a dataset is fetched once per launch rather than per compile.
+  @State private var session = ChartSession(loader: SpecLibrary.loader)
 
   var body: some View {
     ScrollView {
@@ -115,7 +116,9 @@ private struct ChartDetail: View {
         }
 
         if let scene = session.scene {
-          SceneCanvas(scene: scene, session: session)
+          VegaChartView(scene: scene, session: session) { placement in
+            DemoLaunch.performLaunchTap(on: session, placement: placement)
+          }
             .frame(maxWidth: .infinity)
             .background(Color(white: 0.97))
             .overlay(RoundedRectangle(cornerRadius: 4).stroke(Color.secondary.opacity(0.3)))
@@ -127,7 +130,7 @@ private struct ChartDetail: View {
             Button("Reset view") { session.resetViewport() }
               .font(.caption)
           }
-          if let touched = session.lastTouch {
+          if let touched = session.lastTouch.map(DemoLaunch.describe) {
             // What the tap found, read back from the chart's own interaction state — so a touch that
             // reached the dataflow is visible rather than merely believed.
             Text(touched)
@@ -164,7 +167,7 @@ private struct ChartDetail: View {
     }
     .navigationTitle(chart.name)
     .navigationBarTitleDisplayMode(.inline)
-    .task { session.load(specification: chart.json) }
+    .task { session.load(specification: chart.json, signals: DemoLaunch.presetSignals()) }
   }
 
   /// A file name for an export, from the chart's own id.
