@@ -20,4 +20,15 @@ public object VegaLiteDiagnostics {
   public const val UNSUPPORTED_TOP_LEVEL_PROPERTY: String = "VEGA_LITE_UNSUPPORTED_PROPERTY"
   public const val INVALID_ENCODING: String = "VEGA_LITE_INVALID_ENCODING"
   public const val INFERRED_TYPE: String = "VEGA_LITE_INFERRED_TYPE"
+
+  /**
+   * The specification declares a `$schema` this compiler does not implement.
+   *
+   * Reported rather than refused: a Vega-Lite 5 chart is very largely a Vega-Lite 6 chart, and a
+   * host that has been handed one is better served by a drawing and a note than by nothing. What it
+   * must not be is silent, which it was — `isVegaLite` accepts any URL containing "vega-lite" and
+   * compiles it with version 6 rules, so a version 7 payload would have been compiled as though the
+   * rules had not moved.
+   */
+  public const val SCHEMA_VERSION: String = "VEGA_LITE_SCHEMA_VERSION"
 }

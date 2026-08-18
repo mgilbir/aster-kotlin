@@ -31,6 +31,7 @@ import dev.aster.vega.model.spec.TitleSpec
 import dev.aster.vega.runtime.scale.VegaScale
 import dev.aster.vega.scene.GroupNode
 import dev.aster.vega.scene.MarkAccessibility
+import dev.aster.vega.scene.NodeMetadata
 import dev.aster.vega.scene.PointD
 import dev.aster.vega.scene.RectD
 import dev.aster.vega.scene.SceneNode
@@ -357,7 +358,9 @@ internal class ScopeCompiler(
         }
       }
     }
-    for (index in paintOrder(marks)) built[index]?.let { children += it }
+    for (index in paintOrder(marks)) {
+      built[index]?.let { nodes -> children += clipped(marks[index], nodes, extent) }
+    }
     if (layout != null) {
       val placed =
         trellis(layout, trellisParts, NumberResolver(expressions, scope.signals, diagnostics))
@@ -435,6 +438,41 @@ internal class ScopeCompiler(
    * so asking the finished [GroupNode] how big it is would quietly reintroduce the half-pixel crisp
    * offset that everything outside the cell is careful to exclude.
    */
+  /**
+   * A **clipped** non-group mark's nodes, wrapped in the clip that upstream draws them under.
+   *
+   * `mark.clip` was already read for *bounds* — a clipped mark reaches no further than its group,
+   * which is what keeps a brushed detail plot from pushing the surface out — but nothing applied it
+   * when drawing, so a value past the scale's domain was painted over the axis instead of hidden.
+   * On a measured score that is not a cosmetic defect: the chart shows a number the specification
+   * asked to have cut off.
+   *
+   * Upstream's rule, from `vega-scenegraph`'s `CanvasRenderer.draw` and `util/canvas/clip.js`: a
+   * non-group mark declaring `clip` is drawn with the context clipped to `(0, 0, group.width,
+   * group.height)` — the *enclosing* group's extent, not the mark's own bounds — and
+   * `bound/boundClip.js` intersects the mark's bounds with the same rectangle. A group mark is a
+   * different path and already clips itself; see `MarkEncoder.encodeGroup`.
+   *
+   * The clip arrives as a container because that is the only node in this scene model that carries
+   * one, and it matches the structure upstream's SVG renderer emits — a `clip-path` on the mark's
+   * own group element. It paints nothing itself: with no fill and no stroke a [GroupNode]'s
+   * `paintRect` is null, and its bounds are its children's cut back to the clip, which is
+   * upstream's `boundClip` by construction rather than by a second arithmetic path.
+   */
+  private fun clipped(mark: MarkSpec, nodes: List<SceneNode>, extent: PlotSize): List<SceneNode> {
+    if (!mark.clip || mark.type == MarkType.GROUP || nodes.isEmpty()) return nodes
+    return listOf(
+      GroupNode(
+        id = ids.allocate(),
+        children = nodes,
+        clip = RectD(0.0, 0.0, extent.width, extent.height),
+        // Not a mark of its own: it is the clip the mark is drawn under, so it carries no role, no
+        // datum and no accessibility of its own, and a reader meets the items inside it unchanged.
+        metadata = NodeMetadata.None,
+      )
+    )
+  }
+
   /** A clipped group's reach: what its contents cover, cut back to the window it declares. */
   private fun intersectReach(reach: RectD, clip: RectD): RectD {
     if (reach.isEmpty || clip.isEmpty) return RectD.Empty

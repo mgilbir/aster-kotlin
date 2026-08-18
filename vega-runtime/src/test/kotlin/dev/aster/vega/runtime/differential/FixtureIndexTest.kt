@@ -186,7 +186,9 @@ class FixtureIndexTest {
   private companion object {
     val repositoryRoot: File = File(System.getProperty("user.dir")).parentFile
 
-    /** The keys a Vega-Lite specification composes views under, in the order upstream lists them. */
+    /**
+     * The keys a Vega-Lite specification composes views under, in the order upstream lists them.
+     */
     val COMPOSITION = listOf("layer", "facet", "concat", "hconcat", "vconcat", "repeat")
   }
 }
