@@ -1,0 +1,493 @@
+// Klib ABI Dump
+// Targets: [iosArm64, iosSimulatorArm64, linuxX64, macosArm64]
+// Rendering settings:
+// - Signature version: 2
+// - Show manifest properties: true
+// - Show declarations: true
+
+// Library unique name: <io.github.mgilbir.astervega:vega-expression>
+final enum class dev.aster.vega.expression/TokenType : kotlin/Enum<dev.aster.vega.expression/TokenType> { // dev.aster.vega.expression/TokenType|null[0]
+    enum entry END // dev.aster.vega.expression/TokenType.END|null[0]
+    enum entry IDENTIFIER // dev.aster.vega.expression/TokenType.IDENTIFIER|null[0]
+    enum entry NUMBER // dev.aster.vega.expression/TokenType.NUMBER|null[0]
+    enum entry OPERATOR // dev.aster.vega.expression/TokenType.OPERATOR|null[0]
+    enum entry PUNCTUATION // dev.aster.vega.expression/TokenType.PUNCTUATION|null[0]
+    enum entry STRING // dev.aster.vega.expression/TokenType.STRING|null[0]
+
+    final val entries // dev.aster.vega.expression/TokenType.entries|#static{}entries[0]
+        final fun <get-entries>(): kotlin.enums/EnumEntries<dev.aster.vega.expression/TokenType> // dev.aster.vega.expression/TokenType.entries.<get-entries>|<get-entries>#static(){}[0]
+
+    final fun valueOf(kotlin/String): dev.aster.vega.expression/TokenType // dev.aster.vega.expression/TokenType.valueOf|valueOf#static(kotlin.String){}[0]
+    final fun values(): kotlin/Array<dev.aster.vega.expression/TokenType> // dev.aster.vega.expression/TokenType.values|values#static(){}[0]
+}
+
+abstract fun interface dev.aster.vega.expression/Clock { // dev.aster.vega.expression/Clock|null[0]
+    abstract fun now(): kotlin/Double // dev.aster.vega.expression/Clock.now|now(){}[0]
+
+    final object Companion { // dev.aster.vega.expression/Clock.Companion|null[0]
+        final const val PINNED // dev.aster.vega.expression/Clock.Companion.PINNED|{}PINNED[0]
+            final fun <get-PINNED>(): kotlin/Double // dev.aster.vega.expression/Clock.Companion.PINNED.<get-PINNED>|<get-PINNED>(){}[0]
+
+        final val Fixed // dev.aster.vega.expression/Clock.Companion.Fixed|{}Fixed[0]
+            final fun <get-Fixed>(): dev.aster.vega.expression/Clock // dev.aster.vega.expression/Clock.Companion.Fixed.<get-Fixed>|<get-Fixed>(){}[0]
+    }
+}
+
+abstract fun interface dev.aster.vega.expression/ExpressionFunction { // dev.aster.vega.expression/ExpressionFunction|null[0]
+    abstract fun invoke(kotlin.collections/List<dev.aster.vega.model/VegaValue>): dev.aster.vega.model/VegaValue // dev.aster.vega.expression/ExpressionFunction.invoke|invoke(kotlin.collections.List<dev.aster.vega.model.VegaValue>){}[0]
+}
+
+abstract interface dev.aster.vega.expression/Expression { // dev.aster.vega.expression/Expression|null[0]
+    abstract val dataDependencies // dev.aster.vega.expression/Expression.dataDependencies|{}dataDependencies[0]
+        abstract fun <get-dataDependencies>(): kotlin.collections/Set<kotlin/String> // dev.aster.vega.expression/Expression.dataDependencies.<get-dataDependencies>|<get-dataDependencies>(){}[0]
+    abstract val fieldDependencies // dev.aster.vega.expression/Expression.fieldDependencies|{}fieldDependencies[0]
+        abstract fun <get-fieldDependencies>(): kotlin.collections/Set<kotlin/String> // dev.aster.vega.expression/Expression.fieldDependencies.<get-fieldDependencies>|<get-fieldDependencies>(){}[0]
+    abstract val readsUnnamedDataset // dev.aster.vega.expression/Expression.readsUnnamedDataset|{}readsUnnamedDataset[0]
+        abstract fun <get-readsUnnamedDataset>(): kotlin/Boolean // dev.aster.vega.expression/Expression.readsUnnamedDataset.<get-readsUnnamedDataset>|<get-readsUnnamedDataset>(){}[0]
+    abstract val readsUnnamedScale // dev.aster.vega.expression/Expression.readsUnnamedScale|{}readsUnnamedScale[0]
+        abstract fun <get-readsUnnamedScale>(): kotlin/Boolean // dev.aster.vega.expression/Expression.readsUnnamedScale.<get-readsUnnamedScale>|<get-readsUnnamedScale>(){}[0]
+    abstract val scaleDependencies // dev.aster.vega.expression/Expression.scaleDependencies|{}scaleDependencies[0]
+        abstract fun <get-scaleDependencies>(): kotlin.collections/Set<kotlin/String> // dev.aster.vega.expression/Expression.scaleDependencies.<get-scaleDependencies>|<get-scaleDependencies>(){}[0]
+    abstract val signalDependencies // dev.aster.vega.expression/Expression.signalDependencies|{}signalDependencies[0]
+        abstract fun <get-signalDependencies>(): kotlin.collections/Set<kotlin/String> // dev.aster.vega.expression/Expression.signalDependencies.<get-signalDependencies>|<get-signalDependencies>(){}[0]
+    abstract val source // dev.aster.vega.expression/Expression.source|{}source[0]
+        abstract fun <get-source>(): kotlin/String // dev.aster.vega.expression/Expression.source.<get-source>|<get-source>(){}[0]
+    abstract val writtenDatasets // dev.aster.vega.expression/Expression.writtenDatasets|{}writtenDatasets[0]
+        abstract fun <get-writtenDatasets>(): kotlin.collections/Set<kotlin/String> // dev.aster.vega.expression/Expression.writtenDatasets.<get-writtenDatasets>|<get-writtenDatasets>(){}[0]
+
+    abstract fun evaluate(dev.aster.vega.expression/ExpressionScope): dev.aster.vega.model/VegaValue // dev.aster.vega.expression/Expression.evaluate|evaluate(dev.aster.vega.expression.ExpressionScope){}[0]
+}
+
+abstract interface dev.aster.vega.expression/ExpressionCompiler { // dev.aster.vega.expression/ExpressionCompiler|null[0]
+    abstract fun compile(kotlin/String): dev.aster.vega.expression/ExpressionResult // dev.aster.vega.expression/ExpressionCompiler.compile|compile(kotlin.String){}[0]
+}
+
+abstract interface dev.aster.vega.expression/ExpressionScope { // dev.aster.vega.expression/ExpressionScope|null[0]
+    abstract val datum // dev.aster.vega.expression/ExpressionScope.datum|{}datum[0]
+        abstract fun <get-datum>(): dev.aster.vega.model/VegaValue // dev.aster.vega.expression/ExpressionScope.datum.<get-datum>|<get-datum>(){}[0]
+    open val random // dev.aster.vega.expression/ExpressionScope.random|{}random[0]
+        open fun <get-random>(): dev.aster.vega.expression/RandomStream // dev.aster.vega.expression/ExpressionScope.random.<get-random>|<get-random>(){}[0]
+
+    abstract fun dataset(kotlin/String): kotlin.collections/List<dev.aster.vega.model/VegaValue> // dev.aster.vega.expression/ExpressionScope.dataset|dataset(kotlin.String){}[0]
+    abstract fun signal(kotlin/String): dev.aster.vega.model/VegaValue // dev.aster.vega.expression/ExpressionScope.signal|signal(kotlin.String){}[0]
+    open fun activeItem(): dev.aster.vega.model/VegaValue // dev.aster.vega.expression/ExpressionScope.activeItem|activeItem(){}[0]
+    open fun applyScale(kotlin/String, dev.aster.vega.model/VegaValue): dev.aster.vega.model/VegaValue // dev.aster.vega.expression/ExpressionScope.applyScale|applyScale(kotlin.String;dev.aster.vega.model.VegaValue){}[0]
+    open fun encodeItem(dev.aster.vega.model/VegaValue, kotlin/String) // dev.aster.vega.expression/ExpressionScope.encodeItem|encodeItem(dev.aster.vega.model.VegaValue;kotlin.String){}[0]
+    open fun eventPoint(): dev.aster.vega.model/VegaValue // dev.aster.vega.expression/ExpressionScope.eventPoint|eventPoint(){}[0]
+    open fun geoArea(kotlin/String?, dev.aster.vega.model/VegaValue): dev.aster.vega.model/VegaValue // dev.aster.vega.expression/ExpressionScope.geoArea|geoArea(kotlin.String?;dev.aster.vega.model.VegaValue){}[0]
+    open fun geoBounds(kotlin/String?, dev.aster.vega.model/VegaValue): dev.aster.vega.model/VegaValue // dev.aster.vega.expression/ExpressionScope.geoBounds|geoBounds(kotlin.String?;dev.aster.vega.model.VegaValue){}[0]
+    open fun geoCentroid(kotlin/String?, dev.aster.vega.model/VegaValue): dev.aster.vega.model/VegaValue // dev.aster.vega.expression/ExpressionScope.geoCentroid|geoCentroid(kotlin.String?;dev.aster.vega.model.VegaValue){}[0]
+    open fun geoScale(kotlin/String?): dev.aster.vega.model/VegaValue // dev.aster.vega.expression/ExpressionScope.geoScale|geoScale(kotlin.String?){}[0]
+    open fun geoShape(kotlin/String?, dev.aster.vega.model/VegaValue): dev.aster.vega.model/VegaValue // dev.aster.vega.expression/ExpressionScope.geoShape|geoShape(kotlin.String?;dev.aster.vega.model.VegaValue){}[0]
+    open fun gradient(kotlin/String, dev.aster.vega.model/VegaValue, dev.aster.vega.model/VegaValue, dev.aster.vega.model/VegaValue): dev.aster.vega.model/VegaValue // dev.aster.vega.expression/ExpressionScope.gradient|gradient(kotlin.String;dev.aster.vega.model.VegaValue;dev.aster.vega.model.VegaValue;dev.aster.vega.model.VegaValue){}[0]
+    open fun inScope(dev.aster.vega.model/VegaValue): kotlin/Boolean // dev.aster.vega.expression/ExpressionScope.inScope|inScope(dev.aster.vega.model.VegaValue){}[0]
+    open fun indata(kotlin/String, kotlin/String, dev.aster.vega.model/VegaValue): dev.aster.vega.model/VegaValue // dev.aster.vega.expression/ExpressionScope.indata|indata(kotlin.String;kotlin.String;dev.aster.vega.model.VegaValue){}[0]
+    open fun intersect(dev.aster.vega.model/VegaValue, dev.aster.vega.model/VegaValue): dev.aster.vega.model/VegaValue // dev.aster.vega.expression/ExpressionScope.intersect|intersect(dev.aster.vega.model.VegaValue;dev.aster.vega.model.VegaValue){}[0]
+    open fun intersectLasso(kotlin/String, dev.aster.vega.model/VegaValue, dev.aster.vega.model/VegaValue): dev.aster.vega.model/VegaValue // dev.aster.vega.expression/ExpressionScope.intersectLasso|intersectLasso(kotlin.String;dev.aster.vega.model.VegaValue;dev.aster.vega.model.VegaValue){}[0]
+    open fun invertScale(kotlin/String, dev.aster.vega.model/VegaValue): dev.aster.vega.model/VegaValue // dev.aster.vega.expression/ExpressionScope.invertScale|invertScale(kotlin.String;dev.aster.vega.model.VegaValue){}[0]
+    open fun log(kotlin/String, kotlin/String) // dev.aster.vega.expression/ExpressionScope.log|log(kotlin.String;kotlin.String){}[0]
+    open fun modifyDataset(kotlin/String, dev.aster.vega.model/VegaValue, dev.aster.vega.model/VegaValue, dev.aster.vega.model/VegaValue): kotlin/Double // dev.aster.vega.expression/ExpressionScope.modifyDataset|modifyDataset(kotlin.String;dev.aster.vega.model.VegaValue;dev.aster.vega.model.VegaValue;dev.aster.vega.model.VegaValue){}[0]
+    open fun now(): kotlin/Double // dev.aster.vega.expression/ExpressionScope.now|now(){}[0]
+    open fun scaleBandwidth(kotlin/String): dev.aster.vega.model/VegaValue // dev.aster.vega.expression/ExpressionScope.scaleBandwidth|scaleBandwidth(kotlin.String){}[0]
+    open fun scaleDomain(kotlin/String): dev.aster.vega.model/VegaValue // dev.aster.vega.expression/ExpressionScope.scaleDomain|scaleDomain(kotlin.String){}[0]
+    open fun scaleRange(kotlin/String): dev.aster.vega.model/VegaValue // dev.aster.vega.expression/ExpressionScope.scaleRange|scaleRange(kotlin.String){}[0]
+    open fun setDataset(kotlin/String, kotlin.collections/List<dev.aster.vega.model/VegaValue>) // dev.aster.vega.expression/ExpressionScope.setDataset|setDataset(kotlin.String;kotlin.collections.List<dev.aster.vega.model.VegaValue>){}[0]
+    open fun treeAncestors(kotlin/String, dev.aster.vega.model/VegaValue): dev.aster.vega.model/VegaValue // dev.aster.vega.expression/ExpressionScope.treeAncestors|treeAncestors(kotlin.String;dev.aster.vega.model.VegaValue){}[0]
+    open fun treePath(kotlin/String, dev.aster.vega.model/VegaValue, dev.aster.vega.model/VegaValue): dev.aster.vega.model/VegaValue // dev.aster.vega.expression/ExpressionScope.treePath|treePath(kotlin.String;dev.aster.vega.model.VegaValue;dev.aster.vega.model.VegaValue){}[0]
+}
+
+sealed interface dev.aster.vega.expression/ExpressionResult { // dev.aster.vega.expression/ExpressionResult|null[0]
+    final class Compiled : dev.aster.vega.expression/ExpressionResult { // dev.aster.vega.expression/ExpressionResult.Compiled|null[0]
+        constructor <init>(dev.aster.vega.expression/Expression) // dev.aster.vega.expression/ExpressionResult.Compiled.<init>|<init>(dev.aster.vega.expression.Expression){}[0]
+
+        final val expression // dev.aster.vega.expression/ExpressionResult.Compiled.expression|{}expression[0]
+            final fun <get-expression>(): dev.aster.vega.expression/Expression // dev.aster.vega.expression/ExpressionResult.Compiled.expression.<get-expression>|<get-expression>(){}[0]
+
+        final fun component1(): dev.aster.vega.expression/Expression // dev.aster.vega.expression/ExpressionResult.Compiled.component1|component1(){}[0]
+        final fun copy(dev.aster.vega.expression/Expression = ...): dev.aster.vega.expression/ExpressionResult.Compiled // dev.aster.vega.expression/ExpressionResult.Compiled.copy|copy(dev.aster.vega.expression.Expression){}[0]
+        final fun equals(kotlin/Any?): kotlin/Boolean // dev.aster.vega.expression/ExpressionResult.Compiled.equals|equals(kotlin.Any?){}[0]
+        final fun hashCode(): kotlin/Int // dev.aster.vega.expression/ExpressionResult.Compiled.hashCode|hashCode(){}[0]
+        final fun toString(): kotlin/String // dev.aster.vega.expression/ExpressionResult.Compiled.toString|toString(){}[0]
+    }
+
+    final class Failed : dev.aster.vega.expression/ExpressionResult { // dev.aster.vega.expression/ExpressionResult.Failed|null[0]
+        constructor <init>(dev.aster.vega.model/VegaDiagnostic) // dev.aster.vega.expression/ExpressionResult.Failed.<init>|<init>(dev.aster.vega.model.VegaDiagnostic){}[0]
+
+        final val diagnostic // dev.aster.vega.expression/ExpressionResult.Failed.diagnostic|{}diagnostic[0]
+            final fun <get-diagnostic>(): dev.aster.vega.model/VegaDiagnostic // dev.aster.vega.expression/ExpressionResult.Failed.diagnostic.<get-diagnostic>|<get-diagnostic>(){}[0]
+
+        final fun component1(): dev.aster.vega.model/VegaDiagnostic // dev.aster.vega.expression/ExpressionResult.Failed.component1|component1(){}[0]
+        final fun copy(dev.aster.vega.model/VegaDiagnostic = ...): dev.aster.vega.expression/ExpressionResult.Failed // dev.aster.vega.expression/ExpressionResult.Failed.copy|copy(dev.aster.vega.model.VegaDiagnostic){}[0]
+        final fun equals(kotlin/Any?): kotlin/Boolean // dev.aster.vega.expression/ExpressionResult.Failed.equals|equals(kotlin.Any?){}[0]
+        final fun hashCode(): kotlin/Int // dev.aster.vega.expression/ExpressionResult.Failed.hashCode|hashCode(){}[0]
+        final fun toString(): kotlin/String // dev.aster.vega.expression/ExpressionResult.Failed.toString|toString(){}[0]
+    }
+}
+
+sealed interface dev.aster.vega.expression/Node { // dev.aster.vega.expression/Node|null[0]
+    final class ArrayLiteral : dev.aster.vega.expression/Node { // dev.aster.vega.expression/Node.ArrayLiteral|null[0]
+        constructor <init>(kotlin.collections/List<dev.aster.vega.expression/Node>) // dev.aster.vega.expression/Node.ArrayLiteral.<init>|<init>(kotlin.collections.List<dev.aster.vega.expression.Node>){}[0]
+
+        final val elements // dev.aster.vega.expression/Node.ArrayLiteral.elements|{}elements[0]
+            final fun <get-elements>(): kotlin.collections/List<dev.aster.vega.expression/Node> // dev.aster.vega.expression/Node.ArrayLiteral.elements.<get-elements>|<get-elements>(){}[0]
+
+        final fun component1(): kotlin.collections/List<dev.aster.vega.expression/Node> // dev.aster.vega.expression/Node.ArrayLiteral.component1|component1(){}[0]
+        final fun copy(kotlin.collections/List<dev.aster.vega.expression/Node> = ...): dev.aster.vega.expression/Node.ArrayLiteral // dev.aster.vega.expression/Node.ArrayLiteral.copy|copy(kotlin.collections.List<dev.aster.vega.expression.Node>){}[0]
+        final fun equals(kotlin/Any?): kotlin/Boolean // dev.aster.vega.expression/Node.ArrayLiteral.equals|equals(kotlin.Any?){}[0]
+        final fun hashCode(): kotlin/Int // dev.aster.vega.expression/Node.ArrayLiteral.hashCode|hashCode(){}[0]
+        final fun toString(): kotlin/String // dev.aster.vega.expression/Node.ArrayLiteral.toString|toString(){}[0]
+    }
+
+    final class Binary : dev.aster.vega.expression/Node { // dev.aster.vega.expression/Node.Binary|null[0]
+        constructor <init>(kotlin/String, dev.aster.vega.expression/Node, dev.aster.vega.expression/Node) // dev.aster.vega.expression/Node.Binary.<init>|<init>(kotlin.String;dev.aster.vega.expression.Node;dev.aster.vega.expression.Node){}[0]
+
+        final val left // dev.aster.vega.expression/Node.Binary.left|{}left[0]
+            final fun <get-left>(): dev.aster.vega.expression/Node // dev.aster.vega.expression/Node.Binary.left.<get-left>|<get-left>(){}[0]
+        final val operator // dev.aster.vega.expression/Node.Binary.operator|{}operator[0]
+            final fun <get-operator>(): kotlin/String // dev.aster.vega.expression/Node.Binary.operator.<get-operator>|<get-operator>(){}[0]
+        final val right // dev.aster.vega.expression/Node.Binary.right|{}right[0]
+            final fun <get-right>(): dev.aster.vega.expression/Node // dev.aster.vega.expression/Node.Binary.right.<get-right>|<get-right>(){}[0]
+
+        final fun component1(): kotlin/String // dev.aster.vega.expression/Node.Binary.component1|component1(){}[0]
+        final fun component2(): dev.aster.vega.expression/Node // dev.aster.vega.expression/Node.Binary.component2|component2(){}[0]
+        final fun component3(): dev.aster.vega.expression/Node // dev.aster.vega.expression/Node.Binary.component3|component3(){}[0]
+        final fun copy(kotlin/String = ..., dev.aster.vega.expression/Node = ..., dev.aster.vega.expression/Node = ...): dev.aster.vega.expression/Node.Binary // dev.aster.vega.expression/Node.Binary.copy|copy(kotlin.String;dev.aster.vega.expression.Node;dev.aster.vega.expression.Node){}[0]
+        final fun equals(kotlin/Any?): kotlin/Boolean // dev.aster.vega.expression/Node.Binary.equals|equals(kotlin.Any?){}[0]
+        final fun hashCode(): kotlin/Int // dev.aster.vega.expression/Node.Binary.hashCode|hashCode(){}[0]
+        final fun toString(): kotlin/String // dev.aster.vega.expression/Node.Binary.toString|toString(){}[0]
+    }
+
+    final class Call : dev.aster.vega.expression/Node { // dev.aster.vega.expression/Node.Call|null[0]
+        constructor <init>(dev.aster.vega.expression/Node, kotlin.collections/List<dev.aster.vega.expression/Node>) // dev.aster.vega.expression/Node.Call.<init>|<init>(dev.aster.vega.expression.Node;kotlin.collections.List<dev.aster.vega.expression.Node>){}[0]
+
+        final val arguments // dev.aster.vega.expression/Node.Call.arguments|{}arguments[0]
+            final fun <get-arguments>(): kotlin.collections/List<dev.aster.vega.expression/Node> // dev.aster.vega.expression/Node.Call.arguments.<get-arguments>|<get-arguments>(){}[0]
+        final val callee // dev.aster.vega.expression/Node.Call.callee|{}callee[0]
+            final fun <get-callee>(): dev.aster.vega.expression/Node // dev.aster.vega.expression/Node.Call.callee.<get-callee>|<get-callee>(){}[0]
+
+        final fun component1(): dev.aster.vega.expression/Node // dev.aster.vega.expression/Node.Call.component1|component1(){}[0]
+        final fun component2(): kotlin.collections/List<dev.aster.vega.expression/Node> // dev.aster.vega.expression/Node.Call.component2|component2(){}[0]
+        final fun copy(dev.aster.vega.expression/Node = ..., kotlin.collections/List<dev.aster.vega.expression/Node> = ...): dev.aster.vega.expression/Node.Call // dev.aster.vega.expression/Node.Call.copy|copy(dev.aster.vega.expression.Node;kotlin.collections.List<dev.aster.vega.expression.Node>){}[0]
+        final fun equals(kotlin/Any?): kotlin/Boolean // dev.aster.vega.expression/Node.Call.equals|equals(kotlin.Any?){}[0]
+        final fun hashCode(): kotlin/Int // dev.aster.vega.expression/Node.Call.hashCode|hashCode(){}[0]
+        final fun toString(): kotlin/String // dev.aster.vega.expression/Node.Call.toString|toString(){}[0]
+    }
+
+    final class Conditional : dev.aster.vega.expression/Node { // dev.aster.vega.expression/Node.Conditional|null[0]
+        constructor <init>(dev.aster.vega.expression/Node, dev.aster.vega.expression/Node, dev.aster.vega.expression/Node) // dev.aster.vega.expression/Node.Conditional.<init>|<init>(dev.aster.vega.expression.Node;dev.aster.vega.expression.Node;dev.aster.vega.expression.Node){}[0]
+
+        final val alternate // dev.aster.vega.expression/Node.Conditional.alternate|{}alternate[0]
+            final fun <get-alternate>(): dev.aster.vega.expression/Node // dev.aster.vega.expression/Node.Conditional.alternate.<get-alternate>|<get-alternate>(){}[0]
+        final val consequent // dev.aster.vega.expression/Node.Conditional.consequent|{}consequent[0]
+            final fun <get-consequent>(): dev.aster.vega.expression/Node // dev.aster.vega.expression/Node.Conditional.consequent.<get-consequent>|<get-consequent>(){}[0]
+        final val test // dev.aster.vega.expression/Node.Conditional.test|{}test[0]
+            final fun <get-test>(): dev.aster.vega.expression/Node // dev.aster.vega.expression/Node.Conditional.test.<get-test>|<get-test>(){}[0]
+
+        final fun component1(): dev.aster.vega.expression/Node // dev.aster.vega.expression/Node.Conditional.component1|component1(){}[0]
+        final fun component2(): dev.aster.vega.expression/Node // dev.aster.vega.expression/Node.Conditional.component2|component2(){}[0]
+        final fun component3(): dev.aster.vega.expression/Node // dev.aster.vega.expression/Node.Conditional.component3|component3(){}[0]
+        final fun copy(dev.aster.vega.expression/Node = ..., dev.aster.vega.expression/Node = ..., dev.aster.vega.expression/Node = ...): dev.aster.vega.expression/Node.Conditional // dev.aster.vega.expression/Node.Conditional.copy|copy(dev.aster.vega.expression.Node;dev.aster.vega.expression.Node;dev.aster.vega.expression.Node){}[0]
+        final fun equals(kotlin/Any?): kotlin/Boolean // dev.aster.vega.expression/Node.Conditional.equals|equals(kotlin.Any?){}[0]
+        final fun hashCode(): kotlin/Int // dev.aster.vega.expression/Node.Conditional.hashCode|hashCode(){}[0]
+        final fun toString(): kotlin/String // dev.aster.vega.expression/Node.Conditional.toString|toString(){}[0]
+    }
+
+    final class Identifier : dev.aster.vega.expression/Node { // dev.aster.vega.expression/Node.Identifier|null[0]
+        constructor <init>(kotlin/String) // dev.aster.vega.expression/Node.Identifier.<init>|<init>(kotlin.String){}[0]
+
+        final val name // dev.aster.vega.expression/Node.Identifier.name|{}name[0]
+            final fun <get-name>(): kotlin/String // dev.aster.vega.expression/Node.Identifier.name.<get-name>|<get-name>(){}[0]
+
+        final fun component1(): kotlin/String // dev.aster.vega.expression/Node.Identifier.component1|component1(){}[0]
+        final fun copy(kotlin/String = ...): dev.aster.vega.expression/Node.Identifier // dev.aster.vega.expression/Node.Identifier.copy|copy(kotlin.String){}[0]
+        final fun equals(kotlin/Any?): kotlin/Boolean // dev.aster.vega.expression/Node.Identifier.equals|equals(kotlin.Any?){}[0]
+        final fun hashCode(): kotlin/Int // dev.aster.vega.expression/Node.Identifier.hashCode|hashCode(){}[0]
+        final fun toString(): kotlin/String // dev.aster.vega.expression/Node.Identifier.toString|toString(){}[0]
+    }
+
+    final class Literal : dev.aster.vega.expression/Node { // dev.aster.vega.expression/Node.Literal|null[0]
+        constructor <init>(dev.aster.vega.model/VegaValue) // dev.aster.vega.expression/Node.Literal.<init>|<init>(dev.aster.vega.model.VegaValue){}[0]
+
+        final val value // dev.aster.vega.expression/Node.Literal.value|{}value[0]
+            final fun <get-value>(): dev.aster.vega.model/VegaValue // dev.aster.vega.expression/Node.Literal.value.<get-value>|<get-value>(){}[0]
+
+        final fun component1(): dev.aster.vega.model/VegaValue // dev.aster.vega.expression/Node.Literal.component1|component1(){}[0]
+        final fun copy(dev.aster.vega.model/VegaValue = ...): dev.aster.vega.expression/Node.Literal // dev.aster.vega.expression/Node.Literal.copy|copy(dev.aster.vega.model.VegaValue){}[0]
+        final fun equals(kotlin/Any?): kotlin/Boolean // dev.aster.vega.expression/Node.Literal.equals|equals(kotlin.Any?){}[0]
+        final fun hashCode(): kotlin/Int // dev.aster.vega.expression/Node.Literal.hashCode|hashCode(){}[0]
+        final fun toString(): kotlin/String // dev.aster.vega.expression/Node.Literal.toString|toString(){}[0]
+    }
+
+    final class Logical : dev.aster.vega.expression/Node { // dev.aster.vega.expression/Node.Logical|null[0]
+        constructor <init>(kotlin/String, dev.aster.vega.expression/Node, dev.aster.vega.expression/Node) // dev.aster.vega.expression/Node.Logical.<init>|<init>(kotlin.String;dev.aster.vega.expression.Node;dev.aster.vega.expression.Node){}[0]
+
+        final val left // dev.aster.vega.expression/Node.Logical.left|{}left[0]
+            final fun <get-left>(): dev.aster.vega.expression/Node // dev.aster.vega.expression/Node.Logical.left.<get-left>|<get-left>(){}[0]
+        final val operator // dev.aster.vega.expression/Node.Logical.operator|{}operator[0]
+            final fun <get-operator>(): kotlin/String // dev.aster.vega.expression/Node.Logical.operator.<get-operator>|<get-operator>(){}[0]
+        final val right // dev.aster.vega.expression/Node.Logical.right|{}right[0]
+            final fun <get-right>(): dev.aster.vega.expression/Node // dev.aster.vega.expression/Node.Logical.right.<get-right>|<get-right>(){}[0]
+
+        final fun component1(): kotlin/String // dev.aster.vega.expression/Node.Logical.component1|component1(){}[0]
+        final fun component2(): dev.aster.vega.expression/Node // dev.aster.vega.expression/Node.Logical.component2|component2(){}[0]
+        final fun component3(): dev.aster.vega.expression/Node // dev.aster.vega.expression/Node.Logical.component3|component3(){}[0]
+        final fun copy(kotlin/String = ..., dev.aster.vega.expression/Node = ..., dev.aster.vega.expression/Node = ...): dev.aster.vega.expression/Node.Logical // dev.aster.vega.expression/Node.Logical.copy|copy(kotlin.String;dev.aster.vega.expression.Node;dev.aster.vega.expression.Node){}[0]
+        final fun equals(kotlin/Any?): kotlin/Boolean // dev.aster.vega.expression/Node.Logical.equals|equals(kotlin.Any?){}[0]
+        final fun hashCode(): kotlin/Int // dev.aster.vega.expression/Node.Logical.hashCode|hashCode(){}[0]
+        final fun toString(): kotlin/String // dev.aster.vega.expression/Node.Logical.toString|toString(){}[0]
+    }
+
+    final class Member : dev.aster.vega.expression/Node { // dev.aster.vega.expression/Node.Member|null[0]
+        constructor <init>(dev.aster.vega.expression/Node, dev.aster.vega.expression/Node, kotlin/Boolean) // dev.aster.vega.expression/Node.Member.<init>|<init>(dev.aster.vega.expression.Node;dev.aster.vega.expression.Node;kotlin.Boolean){}[0]
+
+        final val computed // dev.aster.vega.expression/Node.Member.computed|{}computed[0]
+            final fun <get-computed>(): kotlin/Boolean // dev.aster.vega.expression/Node.Member.computed.<get-computed>|<get-computed>(){}[0]
+        final val property // dev.aster.vega.expression/Node.Member.property|{}property[0]
+            final fun <get-property>(): dev.aster.vega.expression/Node // dev.aster.vega.expression/Node.Member.property.<get-property>|<get-property>(){}[0]
+        final val target // dev.aster.vega.expression/Node.Member.target|{}target[0]
+            final fun <get-target>(): dev.aster.vega.expression/Node // dev.aster.vega.expression/Node.Member.target.<get-target>|<get-target>(){}[0]
+
+        final fun component1(): dev.aster.vega.expression/Node // dev.aster.vega.expression/Node.Member.component1|component1(){}[0]
+        final fun component2(): dev.aster.vega.expression/Node // dev.aster.vega.expression/Node.Member.component2|component2(){}[0]
+        final fun component3(): kotlin/Boolean // dev.aster.vega.expression/Node.Member.component3|component3(){}[0]
+        final fun copy(dev.aster.vega.expression/Node = ..., dev.aster.vega.expression/Node = ..., kotlin/Boolean = ...): dev.aster.vega.expression/Node.Member // dev.aster.vega.expression/Node.Member.copy|copy(dev.aster.vega.expression.Node;dev.aster.vega.expression.Node;kotlin.Boolean){}[0]
+        final fun equals(kotlin/Any?): kotlin/Boolean // dev.aster.vega.expression/Node.Member.equals|equals(kotlin.Any?){}[0]
+        final fun hashCode(): kotlin/Int // dev.aster.vega.expression/Node.Member.hashCode|hashCode(){}[0]
+        final fun toString(): kotlin/String // dev.aster.vega.expression/Node.Member.toString|toString(){}[0]
+    }
+
+    final class ObjectLiteral : dev.aster.vega.expression/Node { // dev.aster.vega.expression/Node.ObjectLiteral|null[0]
+        constructor <init>(kotlin.collections/List<kotlin/Pair<dev.aster.vega.expression/Node, dev.aster.vega.expression/Node>>) // dev.aster.vega.expression/Node.ObjectLiteral.<init>|<init>(kotlin.collections.List<kotlin.Pair<dev.aster.vega.expression.Node,dev.aster.vega.expression.Node>>){}[0]
+
+        final val entries // dev.aster.vega.expression/Node.ObjectLiteral.entries|{}entries[0]
+            final fun <get-entries>(): kotlin.collections/List<kotlin/Pair<dev.aster.vega.expression/Node, dev.aster.vega.expression/Node>> // dev.aster.vega.expression/Node.ObjectLiteral.entries.<get-entries>|<get-entries>(){}[0]
+
+        final fun component1(): kotlin.collections/List<kotlin/Pair<dev.aster.vega.expression/Node, dev.aster.vega.expression/Node>> // dev.aster.vega.expression/Node.ObjectLiteral.component1|component1(){}[0]
+        final fun copy(kotlin.collections/List<kotlin/Pair<dev.aster.vega.expression/Node, dev.aster.vega.expression/Node>> = ...): dev.aster.vega.expression/Node.ObjectLiteral // dev.aster.vega.expression/Node.ObjectLiteral.copy|copy(kotlin.collections.List<kotlin.Pair<dev.aster.vega.expression.Node,dev.aster.vega.expression.Node>>){}[0]
+        final fun equals(kotlin/Any?): kotlin/Boolean // dev.aster.vega.expression/Node.ObjectLiteral.equals|equals(kotlin.Any?){}[0]
+        final fun hashCode(): kotlin/Int // dev.aster.vega.expression/Node.ObjectLiteral.hashCode|hashCode(){}[0]
+        final fun toString(): kotlin/String // dev.aster.vega.expression/Node.ObjectLiteral.toString|toString(){}[0]
+    }
+
+    final class Unary : dev.aster.vega.expression/Node { // dev.aster.vega.expression/Node.Unary|null[0]
+        constructor <init>(kotlin/String, dev.aster.vega.expression/Node) // dev.aster.vega.expression/Node.Unary.<init>|<init>(kotlin.String;dev.aster.vega.expression.Node){}[0]
+
+        final val operand // dev.aster.vega.expression/Node.Unary.operand|{}operand[0]
+            final fun <get-operand>(): dev.aster.vega.expression/Node // dev.aster.vega.expression/Node.Unary.operand.<get-operand>|<get-operand>(){}[0]
+        final val operator // dev.aster.vega.expression/Node.Unary.operator|{}operator[0]
+            final fun <get-operator>(): kotlin/String // dev.aster.vega.expression/Node.Unary.operator.<get-operator>|<get-operator>(){}[0]
+
+        final fun component1(): kotlin/String // dev.aster.vega.expression/Node.Unary.component1|component1(){}[0]
+        final fun component2(): dev.aster.vega.expression/Node // dev.aster.vega.expression/Node.Unary.component2|component2(){}[0]
+        final fun copy(kotlin/String = ..., dev.aster.vega.expression/Node = ...): dev.aster.vega.expression/Node.Unary // dev.aster.vega.expression/Node.Unary.copy|copy(kotlin.String;dev.aster.vega.expression.Node){}[0]
+        final fun equals(kotlin/Any?): kotlin/Boolean // dev.aster.vega.expression/Node.Unary.equals|equals(kotlin.Any?){}[0]
+        final fun hashCode(): kotlin/Int // dev.aster.vega.expression/Node.Unary.hashCode|hashCode(){}[0]
+        final fun toString(): kotlin/String // dev.aster.vega.expression/Node.Unary.toString|toString(){}[0]
+    }
+}
+
+final class dev.aster.vega.expression/CachingExpressionCompiler : dev.aster.vega.expression/ExpressionCompiler { // dev.aster.vega.expression/CachingExpressionCompiler|null[0]
+    constructor <init>(dev.aster.vega.expression/ExpressionCompiler, kotlin/Int = ...) // dev.aster.vega.expression/CachingExpressionCompiler.<init>|<init>(dev.aster.vega.expression.ExpressionCompiler;kotlin.Int){}[0]
+
+    final val size // dev.aster.vega.expression/CachingExpressionCompiler.size|{}size[0]
+        final fun <get-size>(): kotlin/Int // dev.aster.vega.expression/CachingExpressionCompiler.size.<get-size>|<get-size>(){}[0]
+
+    final fun clear() // dev.aster.vega.expression/CachingExpressionCompiler.clear|clear(){}[0]
+    final fun compile(kotlin/String): dev.aster.vega.expression/ExpressionResult // dev.aster.vega.expression/CachingExpressionCompiler.compile|compile(kotlin.String){}[0]
+}
+
+final class dev.aster.vega.expression/Evaluator { // dev.aster.vega.expression/Evaluator|null[0]
+    constructor <init>(kotlin.collections/Map<kotlin/String, dev.aster.vega.expression/ExpressionFunction> = ..., kotlin.collections/Map<kotlin/String, dev.aster.vega.model/VegaValue> = ...) // dev.aster.vega.expression/Evaluator.<init>|<init>(kotlin.collections.Map<kotlin.String,dev.aster.vega.expression.ExpressionFunction>;kotlin.collections.Map<kotlin.String,dev.aster.vega.model.VegaValue>){}[0]
+
+    final fun evaluate(dev.aster.vega.expression/Node, dev.aster.vega.expression/ExpressionScope): dev.aster.vega.model/VegaValue // dev.aster.vega.expression/Evaluator.evaluate|evaluate(dev.aster.vega.expression.Node;dev.aster.vega.expression.ExpressionScope){}[0]
+}
+
+final class dev.aster.vega.expression/ExpressionEvaluationException : kotlin/Exception { // dev.aster.vega.expression/ExpressionEvaluationException|null[0]
+    constructor <init>(dev.aster.vega.model/VegaDiagnostic) // dev.aster.vega.expression/ExpressionEvaluationException.<init>|<init>(dev.aster.vega.model.VegaDiagnostic){}[0]
+
+    final val diagnostic // dev.aster.vega.expression/ExpressionEvaluationException.diagnostic|{}diagnostic[0]
+        final fun <get-diagnostic>(): dev.aster.vega.model/VegaDiagnostic // dev.aster.vega.expression/ExpressionEvaluationException.diagnostic.<get-diagnostic>|<get-diagnostic>(){}[0]
+}
+
+final class dev.aster.vega.expression/ExpressionSyntaxException : kotlin/Exception { // dev.aster.vega.expression/ExpressionSyntaxException|null[0]
+    constructor <init>(kotlin/String, kotlin/Int, kotlin/String) // dev.aster.vega.expression/ExpressionSyntaxException.<init>|<init>(kotlin.String;kotlin.Int;kotlin.String){}[0]
+
+    final val offset // dev.aster.vega.expression/ExpressionSyntaxException.offset|{}offset[0]
+        final fun <get-offset>(): kotlin/Int // dev.aster.vega.expression/ExpressionSyntaxException.offset.<get-offset>|<get-offset>(){}[0]
+    final val source // dev.aster.vega.expression/ExpressionSyntaxException.source|{}source[0]
+        final fun <get-source>(): kotlin/String // dev.aster.vega.expression/ExpressionSyntaxException.source.<get-source>|<get-source>(){}[0]
+}
+
+final class dev.aster.vega.expression/Lexer { // dev.aster.vega.expression/Lexer|null[0]
+    constructor <init>(kotlin/String) // dev.aster.vega.expression/Lexer.<init>|<init>(kotlin.String){}[0]
+
+    final fun tokenize(): kotlin.collections/List<dev.aster.vega.expression/Token> // dev.aster.vega.expression/Lexer.tokenize|tokenize(){}[0]
+}
+
+final class dev.aster.vega.expression/ParsedExpression : dev.aster.vega.expression/Expression { // dev.aster.vega.expression/ParsedExpression|null[0]
+    constructor <init>(kotlin/String, dev.aster.vega.expression/Node, dev.aster.vega.expression/Evaluator) // dev.aster.vega.expression/ParsedExpression.<init>|<init>(kotlin.String;dev.aster.vega.expression.Node;dev.aster.vega.expression.Evaluator){}[0]
+
+    final val ast // dev.aster.vega.expression/ParsedExpression.ast|{}ast[0]
+        final fun <get-ast>(): dev.aster.vega.expression/Node // dev.aster.vega.expression/ParsedExpression.ast.<get-ast>|<get-ast>(){}[0]
+    final val dataDependencies // dev.aster.vega.expression/ParsedExpression.dataDependencies|{}dataDependencies[0]
+        final fun <get-dataDependencies>(): kotlin.collections/Set<kotlin/String> // dev.aster.vega.expression/ParsedExpression.dataDependencies.<get-dataDependencies>|<get-dataDependencies>(){}[0]
+    final val fieldDependencies // dev.aster.vega.expression/ParsedExpression.fieldDependencies|{}fieldDependencies[0]
+        final fun <get-fieldDependencies>(): kotlin.collections/Set<kotlin/String> // dev.aster.vega.expression/ParsedExpression.fieldDependencies.<get-fieldDependencies>|<get-fieldDependencies>(){}[0]
+    final val readsUnnamedDataset // dev.aster.vega.expression/ParsedExpression.readsUnnamedDataset|{}readsUnnamedDataset[0]
+        final fun <get-readsUnnamedDataset>(): kotlin/Boolean // dev.aster.vega.expression/ParsedExpression.readsUnnamedDataset.<get-readsUnnamedDataset>|<get-readsUnnamedDataset>(){}[0]
+    final val readsUnnamedScale // dev.aster.vega.expression/ParsedExpression.readsUnnamedScale|{}readsUnnamedScale[0]
+        final fun <get-readsUnnamedScale>(): kotlin/Boolean // dev.aster.vega.expression/ParsedExpression.readsUnnamedScale.<get-readsUnnamedScale>|<get-readsUnnamedScale>(){}[0]
+    final val scaleDependencies // dev.aster.vega.expression/ParsedExpression.scaleDependencies|{}scaleDependencies[0]
+        final fun <get-scaleDependencies>(): kotlin.collections/Set<kotlin/String> // dev.aster.vega.expression/ParsedExpression.scaleDependencies.<get-scaleDependencies>|<get-scaleDependencies>(){}[0]
+    final val signalDependencies // dev.aster.vega.expression/ParsedExpression.signalDependencies|{}signalDependencies[0]
+        final fun <get-signalDependencies>(): kotlin.collections/Set<kotlin/String> // dev.aster.vega.expression/ParsedExpression.signalDependencies.<get-signalDependencies>|<get-signalDependencies>(){}[0]
+    final val source // dev.aster.vega.expression/ParsedExpression.source|{}source[0]
+        final fun <get-source>(): kotlin/String // dev.aster.vega.expression/ParsedExpression.source.<get-source>|<get-source>(){}[0]
+    final val writtenDatasets // dev.aster.vega.expression/ParsedExpression.writtenDatasets|{}writtenDatasets[0]
+        final fun <get-writtenDatasets>(): kotlin.collections/Set<kotlin/String> // dev.aster.vega.expression/ParsedExpression.writtenDatasets.<get-writtenDatasets>|<get-writtenDatasets>(){}[0]
+
+    final fun evaluate(dev.aster.vega.expression/ExpressionScope): dev.aster.vega.model/VegaValue // dev.aster.vega.expression/ParsedExpression.evaluate|evaluate(dev.aster.vega.expression.ExpressionScope){}[0]
+    final fun evaluateOrNull(dev.aster.vega.expression/ExpressionScope): kotlin/Result<dev.aster.vega.model/VegaValue> // dev.aster.vega.expression/ParsedExpression.evaluateOrNull|evaluateOrNull(dev.aster.vega.expression.ExpressionScope){}[0]
+}
+
+final class dev.aster.vega.expression/Parser { // dev.aster.vega.expression/Parser|null[0]
+    constructor <init>(kotlin/String) // dev.aster.vega.expression/Parser.<init>|<init>(kotlin.String){}[0]
+
+    final fun parse(): dev.aster.vega.expression/Node // dev.aster.vega.expression/Parser.parse|parse(){}[0]
+}
+
+final class dev.aster.vega.expression/RandomStream { // dev.aster.vega.expression/RandomStream|null[0]
+    constructor <init>(kotlin/Long = ...) // dev.aster.vega.expression/RandomStream.<init>|<init>(kotlin.Long){}[0]
+
+    final fun bootstrapConfidence(kotlin.collections/List<kotlin/Double>, kotlin/Int = ..., kotlin/Double = ...): kotlin/Pair<kotlin/Double, kotlin/Double>? // dev.aster.vega.expression/RandomStream.bootstrapConfidence|bootstrapConfidence(kotlin.collections.List<kotlin.Double>;kotlin.Int;kotlin.Double){}[0]
+    final fun next(): kotlin/Double // dev.aster.vega.expression/RandomStream.next|next(){}[0]
+    final fun sampleLogNormal(kotlin/Double?, kotlin/Double?): kotlin/Double // dev.aster.vega.expression/RandomStream.sampleLogNormal|sampleLogNormal(kotlin.Double?;kotlin.Double?){}[0]
+    final fun sampleNormal(kotlin/Double?, kotlin/Double?): kotlin/Double // dev.aster.vega.expression/RandomStream.sampleNormal|sampleNormal(kotlin.Double?;kotlin.Double?){}[0]
+    final fun sampleUniform(kotlin/Double?, kotlin/Double?): kotlin/Double // dev.aster.vega.expression/RandomStream.sampleUniform|sampleUniform(kotlin.Double?;kotlin.Double?){}[0]
+
+    final object Companion { // dev.aster.vega.expression/RandomStream.Companion|null[0]
+        final const val DEFAULT_SEED // dev.aster.vega.expression/RandomStream.Companion.DEFAULT_SEED|{}DEFAULT_SEED[0]
+            final fun <get-DEFAULT_SEED>(): kotlin/Long // dev.aster.vega.expression/RandomStream.Companion.DEFAULT_SEED.<get-DEFAULT_SEED>|<get-DEFAULT_SEED>(){}[0]
+    }
+}
+
+final class dev.aster.vega.expression/RefusingExpressionCompiler : dev.aster.vega.expression/ExpressionCompiler { // dev.aster.vega.expression/RefusingExpressionCompiler|null[0]
+    constructor <init>() // dev.aster.vega.expression/RefusingExpressionCompiler.<init>|<init>(){}[0]
+
+    final fun compile(kotlin/String): dev.aster.vega.expression/ExpressionResult // dev.aster.vega.expression/RefusingExpressionCompiler.compile|compile(kotlin.String){}[0]
+}
+
+final class dev.aster.vega.expression/Token { // dev.aster.vega.expression/Token|null[0]
+    constructor <init>(dev.aster.vega.expression/TokenType, kotlin/String, kotlin/Int) // dev.aster.vega.expression/Token.<init>|<init>(dev.aster.vega.expression.TokenType;kotlin.String;kotlin.Int){}[0]
+
+    final val start // dev.aster.vega.expression/Token.start|{}start[0]
+        final fun <get-start>(): kotlin/Int // dev.aster.vega.expression/Token.start.<get-start>|<get-start>(){}[0]
+    final val text // dev.aster.vega.expression/Token.text|{}text[0]
+        final fun <get-text>(): kotlin/String // dev.aster.vega.expression/Token.text.<get-text>|<get-text>(){}[0]
+    final val type // dev.aster.vega.expression/Token.type|{}type[0]
+        final fun <get-type>(): dev.aster.vega.expression/TokenType // dev.aster.vega.expression/Token.type.<get-type>|<get-type>(){}[0]
+
+    final fun component1(): dev.aster.vega.expression/TokenType // dev.aster.vega.expression/Token.component1|component1(){}[0]
+    final fun component2(): kotlin/String // dev.aster.vega.expression/Token.component2|component2(){}[0]
+    final fun component3(): kotlin/Int // dev.aster.vega.expression/Token.component3|component3(){}[0]
+    final fun copy(dev.aster.vega.expression/TokenType = ..., kotlin/String = ..., kotlin/Int = ...): dev.aster.vega.expression/Token // dev.aster.vega.expression/Token.copy|copy(dev.aster.vega.expression.TokenType;kotlin.String;kotlin.Int){}[0]
+    final fun equals(kotlin/Any?): kotlin/Boolean // dev.aster.vega.expression/Token.equals|equals(kotlin.Any?){}[0]
+    final fun hashCode(): kotlin/Int // dev.aster.vega.expression/Token.hashCode|hashCode(){}[0]
+    final fun toString(): kotlin/String // dev.aster.vega.expression/Token.toString|toString(){}[0]
+}
+
+final class dev.aster.vega.expression/VegaExpressionCompiler : dev.aster.vega.expression/ExpressionCompiler { // dev.aster.vega.expression/VegaExpressionCompiler|null[0]
+    constructor <init>(dev.aster.vega.expression/Evaluator = ...) // dev.aster.vega.expression/VegaExpressionCompiler.<init>|<init>(dev.aster.vega.expression.Evaluator){}[0]
+
+    final fun compile(kotlin/String): dev.aster.vega.expression/ExpressionResult // dev.aster.vega.expression/VegaExpressionCompiler.compile|compile(kotlin.String){}[0]
+}
+
+final object dev.aster.vega.expression/Functions { // dev.aster.vega.expression/Functions|null[0]
+    final val constants // dev.aster.vega.expression/Functions.constants|{}constants[0]
+        final fun <get-constants>(): kotlin.collections/Map<kotlin/String, dev.aster.vega.model/VegaValue> // dev.aster.vega.expression/Functions.constants.<get-constants>|<get-constants>(){}[0]
+    final val functions // dev.aster.vega.expression/Functions.functions|{}functions[0]
+        final fun <get-functions>(): kotlin.collections/Map<kotlin/String, dev.aster.vega.expression/ExpressionFunction> // dev.aster.vega.expression/Functions.functions.<get-functions>|<get-functions>(){}[0]
+    final val knownUnsupported // dev.aster.vega.expression/Functions.knownUnsupported|{}knownUnsupported[0]
+        final fun <get-knownUnsupported>(): kotlin.collections/Map<kotlin/String, kotlin/String> // dev.aster.vega.expression/Functions.knownUnsupported.<get-knownUnsupported>|<get-knownUnsupported>(){}[0]
+}
+
+final object dev.aster.vega.expression/JsSemantics { // dev.aster.vega.expression/JsSemantics|null[0]
+    final fun add(dev.aster.vega.model/VegaValue, dev.aster.vega.model/VegaValue): dev.aster.vega.model/VegaValue // dev.aster.vega.expression/JsSemantics.add|add(dev.aster.vega.model.VegaValue;dev.aster.vega.model.VegaValue){}[0]
+    final fun compare(dev.aster.vega.model/VegaValue, dev.aster.vega.model/VegaValue): kotlin/Int? // dev.aster.vega.expression/JsSemantics.compare|compare(dev.aster.vega.model.VegaValue;dev.aster.vega.model.VegaValue){}[0]
+    final fun looseEquals(dev.aster.vega.model/VegaValue, dev.aster.vega.model/VegaValue): kotlin/Boolean // dev.aster.vega.expression/JsSemantics.looseEquals|looseEquals(dev.aster.vega.model.VegaValue;dev.aster.vega.model.VegaValue){}[0]
+    final fun numberToString(kotlin/Double): kotlin/String // dev.aster.vega.expression/JsSemantics.numberToString|numberToString(kotlin.Double){}[0]
+    final fun remainder(kotlin/Double, kotlin/Double): kotlin/Double // dev.aster.vega.expression/JsSemantics.remainder|remainder(kotlin.Double;kotlin.Double){}[0]
+    final fun strictEquals(dev.aster.vega.model/VegaValue, dev.aster.vega.model/VegaValue): kotlin/Boolean // dev.aster.vega.expression/JsSemantics.strictEquals|strictEquals(dev.aster.vega.model.VegaValue;dev.aster.vega.model.VegaValue){}[0]
+    final fun toInt32(dev.aster.vega.model/VegaValue): kotlin/Int // dev.aster.vega.expression/JsSemantics.toInt32|toInt32(dev.aster.vega.model.VegaValue){}[0]
+    final fun toNumber(dev.aster.vega.model/VegaValue): kotlin/Double // dev.aster.vega.expression/JsSemantics.toNumber|toNumber(dev.aster.vega.model.VegaValue){}[0]
+    final fun toStringValue(dev.aster.vega.model/VegaValue): kotlin/String // dev.aster.vega.expression/JsSemantics.toStringValue|toStringValue(dev.aster.vega.model.VegaValue){}[0]
+    final fun toUint32(dev.aster.vega.model/VegaValue): kotlin/Long // dev.aster.vega.expression/JsSemantics.toUint32|toUint32(dev.aster.vega.model.VegaValue){}[0]
+    final fun truthy(dev.aster.vega.model/VegaValue): kotlin/Boolean // dev.aster.vega.expression/JsSemantics.truthy|truthy(dev.aster.vega.model.VegaValue){}[0]
+}
+
+final object dev.aster.vega.expression/NumberFormat { // dev.aster.vega.expression/NumberFormat|null[0]
+    final fun format(kotlin/Double, dev.aster.vega.expression/NumberFormat.Spec, kotlin/String = ...): kotlin/String // dev.aster.vega.expression/NumberFormat.format|format(kotlin.Double;dev.aster.vega.expression.NumberFormat.Spec;kotlin.String){}[0]
+    final fun format(kotlin/Double, kotlin/String): kotlin/String // dev.aster.vega.expression/NumberFormat.format|format(kotlin.Double;kotlin.String){}[0]
+    final fun parse(kotlin/String): dev.aster.vega.expression/NumberFormat.Spec? // dev.aster.vega.expression/NumberFormat.parse|parse(kotlin.String){}[0]
+    final fun precisionFixed(kotlin/Double): kotlin/Int // dev.aster.vega.expression/NumberFormat.precisionFixed|precisionFixed(kotlin.Double){}[0]
+    final fun precisionPrefix(kotlin/Double, kotlin/Double): kotlin/Int // dev.aster.vega.expression/NumberFormat.precisionPrefix|precisionPrefix(kotlin.Double;kotlin.Double){}[0]
+    final fun precisionRound(kotlin/Double, kotlin/Double): kotlin/Int // dev.aster.vega.expression/NumberFormat.precisionRound|precisionRound(kotlin.Double;kotlin.Double){}[0]
+    final fun prefixed(dev.aster.vega.expression/NumberFormat.Spec, kotlin/Double): kotlin/Function1<kotlin/Double, kotlin/String> // dev.aster.vega.expression/NumberFormat.prefixed|prefixed(dev.aster.vega.expression.NumberFormat.Spec;kotlin.Double){}[0]
+
+    final class Spec { // dev.aster.vega.expression/NumberFormat.Spec|null[0]
+        constructor <init>(kotlin/Char = ..., kotlin/Char = ..., kotlin/Char = ..., kotlin/Char? = ..., kotlin/Boolean = ..., kotlin/Int? = ..., kotlin/Boolean = ..., kotlin/Int? = ..., kotlin/Boolean = ..., kotlin/Char? = ...) // dev.aster.vega.expression/NumberFormat.Spec.<init>|<init>(kotlin.Char;kotlin.Char;kotlin.Char;kotlin.Char?;kotlin.Boolean;kotlin.Int?;kotlin.Boolean;kotlin.Int?;kotlin.Boolean;kotlin.Char?){}[0]
+
+        final val align // dev.aster.vega.expression/NumberFormat.Spec.align|{}align[0]
+            final fun <get-align>(): kotlin/Char // dev.aster.vega.expression/NumberFormat.Spec.align.<get-align>|<get-align>(){}[0]
+        final val comma // dev.aster.vega.expression/NumberFormat.Spec.comma|{}comma[0]
+            final fun <get-comma>(): kotlin/Boolean // dev.aster.vega.expression/NumberFormat.Spec.comma.<get-comma>|<get-comma>(){}[0]
+        final val fill // dev.aster.vega.expression/NumberFormat.Spec.fill|{}fill[0]
+            final fun <get-fill>(): kotlin/Char // dev.aster.vega.expression/NumberFormat.Spec.fill.<get-fill>|<get-fill>(){}[0]
+        final val precision // dev.aster.vega.expression/NumberFormat.Spec.precision|{}precision[0]
+            final fun <get-precision>(): kotlin/Int? // dev.aster.vega.expression/NumberFormat.Spec.precision.<get-precision>|<get-precision>(){}[0]
+        final val sign // dev.aster.vega.expression/NumberFormat.Spec.sign|{}sign[0]
+            final fun <get-sign>(): kotlin/Char // dev.aster.vega.expression/NumberFormat.Spec.sign.<get-sign>|<get-sign>(){}[0]
+        final val symbol // dev.aster.vega.expression/NumberFormat.Spec.symbol|{}symbol[0]
+            final fun <get-symbol>(): kotlin/Char? // dev.aster.vega.expression/NumberFormat.Spec.symbol.<get-symbol>|<get-symbol>(){}[0]
+        final val trim // dev.aster.vega.expression/NumberFormat.Spec.trim|{}trim[0]
+            final fun <get-trim>(): kotlin/Boolean // dev.aster.vega.expression/NumberFormat.Spec.trim.<get-trim>|<get-trim>(){}[0]
+        final val type // dev.aster.vega.expression/NumberFormat.Spec.type|{}type[0]
+            final fun <get-type>(): kotlin/Char? // dev.aster.vega.expression/NumberFormat.Spec.type.<get-type>|<get-type>(){}[0]
+        final val width // dev.aster.vega.expression/NumberFormat.Spec.width|{}width[0]
+            final fun <get-width>(): kotlin/Int? // dev.aster.vega.expression/NumberFormat.Spec.width.<get-width>|<get-width>(){}[0]
+        final val zero // dev.aster.vega.expression/NumberFormat.Spec.zero|{}zero[0]
+            final fun <get-zero>(): kotlin/Boolean // dev.aster.vega.expression/NumberFormat.Spec.zero.<get-zero>|<get-zero>(){}[0]
+
+        final fun component1(): kotlin/Char // dev.aster.vega.expression/NumberFormat.Spec.component1|component1(){}[0]
+        final fun component10(): kotlin/Char? // dev.aster.vega.expression/NumberFormat.Spec.component10|component10(){}[0]
+        final fun component2(): kotlin/Char // dev.aster.vega.expression/NumberFormat.Spec.component2|component2(){}[0]
+        final fun component3(): kotlin/Char // dev.aster.vega.expression/NumberFormat.Spec.component3|component3(){}[0]
+        final fun component4(): kotlin/Char? // dev.aster.vega.expression/NumberFormat.Spec.component4|component4(){}[0]
+        final fun component5(): kotlin/Boolean // dev.aster.vega.expression/NumberFormat.Spec.component5|component5(){}[0]
+        final fun component6(): kotlin/Int? // dev.aster.vega.expression/NumberFormat.Spec.component6|component6(){}[0]
+        final fun component7(): kotlin/Boolean // dev.aster.vega.expression/NumberFormat.Spec.component7|component7(){}[0]
+        final fun component8(): kotlin/Int? // dev.aster.vega.expression/NumberFormat.Spec.component8|component8(){}[0]
+        final fun component9(): kotlin/Boolean // dev.aster.vega.expression/NumberFormat.Spec.component9|component9(){}[0]
+        final fun copy(kotlin/Char = ..., kotlin/Char = ..., kotlin/Char = ..., kotlin/Char? = ..., kotlin/Boolean = ..., kotlin/Int? = ..., kotlin/Boolean = ..., kotlin/Int? = ..., kotlin/Boolean = ..., kotlin/Char? = ...): dev.aster.vega.expression/NumberFormat.Spec // dev.aster.vega.expression/NumberFormat.Spec.copy|copy(kotlin.Char;kotlin.Char;kotlin.Char;kotlin.Char?;kotlin.Boolean;kotlin.Int?;kotlin.Boolean;kotlin.Int?;kotlin.Boolean;kotlin.Char?){}[0]
+        final fun equals(kotlin/Any?): kotlin/Boolean // dev.aster.vega.expression/NumberFormat.Spec.equals|equals(kotlin.Any?){}[0]
+        final fun hashCode(): kotlin/Int // dev.aster.vega.expression/NumberFormat.Spec.hashCode|hashCode(){}[0]
+        final fun toString(): kotlin/String // dev.aster.vega.expression/NumberFormat.Spec.toString|toString(){}[0]
+    }
+}
+
+final object dev.aster.vega.expression/Statistics { // dev.aster.vega.expression/Statistics|null[0]
+    final fun cumulativeLogNormal(kotlin/Double, kotlin/Double = ..., kotlin/Double = ...): kotlin/Double // dev.aster.vega.expression/Statistics.cumulativeLogNormal|cumulativeLogNormal(kotlin.Double;kotlin.Double;kotlin.Double){}[0]
+    final fun cumulativeNormal(kotlin/Double, kotlin/Double = ..., kotlin/Double = ...): kotlin/Double // dev.aster.vega.expression/Statistics.cumulativeNormal|cumulativeNormal(kotlin.Double;kotlin.Double;kotlin.Double){}[0]
+    final fun cumulativeUniform(kotlin/Double, kotlin/Double = ..., kotlin/Double = ...): kotlin/Double // dev.aster.vega.expression/Statistics.cumulativeUniform|cumulativeUniform(kotlin.Double;kotlin.Double;kotlin.Double){}[0]
+    final fun densityLogNormal(kotlin/Double, kotlin/Double = ..., kotlin/Double = ...): kotlin/Double // dev.aster.vega.expression/Statistics.densityLogNormal|densityLogNormal(kotlin.Double;kotlin.Double;kotlin.Double){}[0]
+    final fun densityNormal(kotlin/Double, kotlin/Double = ..., kotlin/Double = ...): kotlin/Double // dev.aster.vega.expression/Statistics.densityNormal|densityNormal(kotlin.Double;kotlin.Double;kotlin.Double){}[0]
+    final fun densityUniform(kotlin/Double, kotlin/Double = ..., kotlin/Double = ...): kotlin/Double // dev.aster.vega.expression/Statistics.densityUniform|densityUniform(kotlin.Double;kotlin.Double;kotlin.Double){}[0]
+    final fun quantileLogNormal(kotlin/Double, kotlin/Double = ..., kotlin/Double = ...): kotlin/Double // dev.aster.vega.expression/Statistics.quantileLogNormal|quantileLogNormal(kotlin.Double;kotlin.Double;kotlin.Double){}[0]
+    final fun quantileNormal(kotlin/Double, kotlin/Double = ..., kotlin/Double = ...): kotlin/Double // dev.aster.vega.expression/Statistics.quantileNormal|quantileNormal(kotlin.Double;kotlin.Double;kotlin.Double){}[0]
+    final fun quantileUniform(kotlin/Double, kotlin/Double = ..., kotlin/Double = ...): kotlin/Double // dev.aster.vega.expression/Statistics.quantileUniform|quantileUniform(kotlin.Double;kotlin.Double;kotlin.Double){}[0]
+}
+
+final fun (dev.aster.vega.expression/Node).dev.aster.vega.expression/datumFieldPath(): kotlin/String? // dev.aster.vega.expression/datumFieldPath|datumFieldPath@dev.aster.vega.expression.Node(){}[0]
+final fun (dev.aster.vega.expression/Node).dev.aster.vega.expression/walk(kotlin/Function1<dev.aster.vega.expression/Node, kotlin/Unit>) // dev.aster.vega.expression/walk|walk@dev.aster.vega.expression.Node(kotlin.Function1<dev.aster.vega.expression.Node,kotlin.Unit>){}[0]
+final fun dev.aster.vega.expression/indataCounts(kotlin.collections/List<dev.aster.vega.model/VegaValue>, kotlin/String): kotlin.collections/Map<kotlin/String, kotlin/Int> // dev.aster.vega.expression/indataCounts|indataCounts(kotlin.collections.List<dev.aster.vega.model.VegaValue>;kotlin.String){}[0]
+final fun dev.aster.vega.expression/indataLookup(kotlin.collections/Map<kotlin/String, kotlin/Int>, dev.aster.vega.model/VegaValue): dev.aster.vega.model/VegaValue // dev.aster.vega.expression/indataLookup|indataLookup(kotlin.collections.Map<kotlin.String,kotlin.Int>;dev.aster.vega.model.VegaValue){}[0]

@@ -1,0 +1,431 @@
+// Klib ABI Dump
+// Targets: [iosArm64, iosSimulatorArm64]
+// Rendering settings:
+// - Signature version: 2
+// - Show manifest properties: true
+// - Show declarations: true
+
+// Library unique name: <io.github.mgilbir.astervega:vega-compose-multiplatform>
+final enum class dev.aster.vega.compose.mp/DrawImageFit : kotlin/Enum<dev.aster.vega.compose.mp/DrawImageFit> { // dev.aster.vega.compose.mp/DrawImageFit|null[0]
+    enum entry CONTAIN // dev.aster.vega.compose.mp/DrawImageFit.CONTAIN|null[0]
+    enum entry FILL // dev.aster.vega.compose.mp/DrawImageFit.FILL|null[0]
+
+    final val entries // dev.aster.vega.compose.mp/DrawImageFit.entries|#static{}entries[0]
+        final fun <get-entries>(): kotlin.enums/EnumEntries<dev.aster.vega.compose.mp/DrawImageFit> // dev.aster.vega.compose.mp/DrawImageFit.entries.<get-entries>|<get-entries>#static(){}[0]
+
+    final fun valueOf(kotlin/String): dev.aster.vega.compose.mp/DrawImageFit // dev.aster.vega.compose.mp/DrawImageFit.valueOf|valueOf#static(kotlin.String){}[0]
+    final fun values(): kotlin/Array<dev.aster.vega.compose.mp/DrawImageFit> // dev.aster.vega.compose.mp/DrawImageFit.values|values#static(){}[0]
+}
+
+final enum class dev.aster.vega.compose.mp/DrawLineCap : kotlin/Enum<dev.aster.vega.compose.mp/DrawLineCap> { // dev.aster.vega.compose.mp/DrawLineCap|null[0]
+    enum entry Butt // dev.aster.vega.compose.mp/DrawLineCap.Butt|null[0]
+    enum entry Round // dev.aster.vega.compose.mp/DrawLineCap.Round|null[0]
+    enum entry Square // dev.aster.vega.compose.mp/DrawLineCap.Square|null[0]
+
+    final val entries // dev.aster.vega.compose.mp/DrawLineCap.entries|#static{}entries[0]
+        final fun <get-entries>(): kotlin.enums/EnumEntries<dev.aster.vega.compose.mp/DrawLineCap> // dev.aster.vega.compose.mp/DrawLineCap.entries.<get-entries>|<get-entries>#static(){}[0]
+
+    final fun valueOf(kotlin/String): dev.aster.vega.compose.mp/DrawLineCap // dev.aster.vega.compose.mp/DrawLineCap.valueOf|valueOf#static(kotlin.String){}[0]
+    final fun values(): kotlin/Array<dev.aster.vega.compose.mp/DrawLineCap> // dev.aster.vega.compose.mp/DrawLineCap.values|values#static(){}[0]
+}
+
+final enum class dev.aster.vega.compose.mp/DrawLineJoin : kotlin/Enum<dev.aster.vega.compose.mp/DrawLineJoin> { // dev.aster.vega.compose.mp/DrawLineJoin|null[0]
+    enum entry Bevel // dev.aster.vega.compose.mp/DrawLineJoin.Bevel|null[0]
+    enum entry Miter // dev.aster.vega.compose.mp/DrawLineJoin.Miter|null[0]
+    enum entry Round // dev.aster.vega.compose.mp/DrawLineJoin.Round|null[0]
+
+    final val entries // dev.aster.vega.compose.mp/DrawLineJoin.entries|#static{}entries[0]
+        final fun <get-entries>(): kotlin.enums/EnumEntries<dev.aster.vega.compose.mp/DrawLineJoin> // dev.aster.vega.compose.mp/DrawLineJoin.entries.<get-entries>|<get-entries>#static(){}[0]
+
+    final fun valueOf(kotlin/String): dev.aster.vega.compose.mp/DrawLineJoin // dev.aster.vega.compose.mp/DrawLineJoin.valueOf|valueOf#static(kotlin.String){}[0]
+    final fun values(): kotlin/Array<dev.aster.vega.compose.mp/DrawLineJoin> // dev.aster.vega.compose.mp/DrawLineJoin.values|values#static(){}[0]
+}
+
+final enum class dev.aster.vega.compose.mp/SceneFit : kotlin/Enum<dev.aster.vega.compose.mp/SceneFit> { // dev.aster.vega.compose.mp/SceneFit|null[0]
+    enum entry Contain // dev.aster.vega.compose.mp/SceneFit.Contain|null[0]
+    enum entry None // dev.aster.vega.compose.mp/SceneFit.None|null[0]
+
+    final val entries // dev.aster.vega.compose.mp/SceneFit.entries|#static{}entries[0]
+        final fun <get-entries>(): kotlin.enums/EnumEntries<dev.aster.vega.compose.mp/SceneFit> // dev.aster.vega.compose.mp/SceneFit.entries.<get-entries>|<get-entries>#static(){}[0]
+
+    final fun valueOf(kotlin/String): dev.aster.vega.compose.mp/SceneFit // dev.aster.vega.compose.mp/SceneFit.valueOf|valueOf#static(kotlin.String){}[0]
+    final fun values(): kotlin/Array<dev.aster.vega.compose.mp/SceneFit> // dev.aster.vega.compose.mp/SceneFit.values|values#static(){}[0]
+}
+
+abstract interface dev.aster.vega.compose.mp/SceneDrawTarget { // dev.aster.vega.compose.mp/SceneDrawTarget|null[0]
+    abstract fun beginGroup(dev.aster.vega.compose.mp/DrawRect?) // dev.aster.vega.compose.mp/SceneDrawTarget.beginGroup|beginGroup(dev.aster.vega.compose.mp.DrawRect?){}[0]
+    abstract fun endGroup() // dev.aster.vega.compose.mp/SceneDrawTarget.endGroup|endGroup(){}[0]
+    abstract fun image(kotlin/String, dev.aster.vega.scene/RasterImage?, dev.aster.vega.compose.mp/DrawRect, dev.aster.vega.compose.mp/DrawImageFit, kotlin/Boolean, kotlin/Double) // dev.aster.vega.compose.mp/SceneDrawTarget.image|image(kotlin.String;dev.aster.vega.scene.RasterImage?;dev.aster.vega.compose.mp.DrawRect;dev.aster.vega.compose.mp.DrawImageFit;kotlin.Boolean;kotlin.Double){}[0]
+    abstract fun line(dev.aster.vega.compose.mp/DrawPoint, dev.aster.vega.compose.mp/DrawPoint, dev.aster.vega.compose.mp/DrawStroke?) // dev.aster.vega.compose.mp/SceneDrawTarget.line|line(dev.aster.vega.compose.mp.DrawPoint;dev.aster.vega.compose.mp.DrawPoint;dev.aster.vega.compose.mp.DrawStroke?){}[0]
+    abstract fun path(kotlin.collections/List<dev.aster.vega.compose.mp/DrawPathCommand>, dev.aster.vega.compose.mp/DrawBrush?, dev.aster.vega.compose.mp/DrawStroke?) // dev.aster.vega.compose.mp/SceneDrawTarget.path|path(kotlin.collections.List<dev.aster.vega.compose.mp.DrawPathCommand>;dev.aster.vega.compose.mp.DrawBrush?;dev.aster.vega.compose.mp.DrawStroke?){}[0]
+    abstract fun rect(dev.aster.vega.compose.mp/DrawRect, dev.aster.vega.compose.mp/DrawCorners, dev.aster.vega.compose.mp/DrawBrush?, dev.aster.vega.compose.mp/DrawStroke?) // dev.aster.vega.compose.mp/SceneDrawTarget.rect|rect(dev.aster.vega.compose.mp.DrawRect;dev.aster.vega.compose.mp.DrawCorners;dev.aster.vega.compose.mp.DrawBrush?;dev.aster.vega.compose.mp.DrawStroke?){}[0]
+    abstract fun text(dev.aster.vega.compose.mp/DrawTextRun, dev.aster.vega.compose.mp/DrawBrush?, dev.aster.vega.compose.mp/DrawStroke?) // dev.aster.vega.compose.mp/SceneDrawTarget.text|text(dev.aster.vega.compose.mp.DrawTextRun;dev.aster.vega.compose.mp.DrawBrush?;dev.aster.vega.compose.mp.DrawStroke?){}[0]
+}
+
+sealed interface dev.aster.vega.compose.mp/DrawBrush { // dev.aster.vega.compose.mp/DrawBrush|null[0]
+    abstract val alpha // dev.aster.vega.compose.mp/DrawBrush.alpha|{}alpha[0]
+        abstract fun <get-alpha>(): kotlin/Double // dev.aster.vega.compose.mp/DrawBrush.alpha.<get-alpha>|<get-alpha>(){}[0]
+
+    final class Linear : dev.aster.vega.compose.mp/DrawBrush { // dev.aster.vega.compose.mp/DrawBrush.Linear|null[0]
+        constructor <init>(dev.aster.vega.compose.mp/DrawPoint, dev.aster.vega.compose.mp/DrawPoint, kotlin.collections/List<dev.aster.vega.compose.mp/DrawStop>, kotlin/Double) // dev.aster.vega.compose.mp/DrawBrush.Linear.<init>|<init>(dev.aster.vega.compose.mp.DrawPoint;dev.aster.vega.compose.mp.DrawPoint;kotlin.collections.List<dev.aster.vega.compose.mp.DrawStop>;kotlin.Double){}[0]
+
+        final val alpha // dev.aster.vega.compose.mp/DrawBrush.Linear.alpha|{}alpha[0]
+            final fun <get-alpha>(): kotlin/Double // dev.aster.vega.compose.mp/DrawBrush.Linear.alpha.<get-alpha>|<get-alpha>(){}[0]
+        final val from // dev.aster.vega.compose.mp/DrawBrush.Linear.from|{}from[0]
+            final fun <get-from>(): dev.aster.vega.compose.mp/DrawPoint // dev.aster.vega.compose.mp/DrawBrush.Linear.from.<get-from>|<get-from>(){}[0]
+        final val stops // dev.aster.vega.compose.mp/DrawBrush.Linear.stops|{}stops[0]
+            final fun <get-stops>(): kotlin.collections/List<dev.aster.vega.compose.mp/DrawStop> // dev.aster.vega.compose.mp/DrawBrush.Linear.stops.<get-stops>|<get-stops>(){}[0]
+        final val to // dev.aster.vega.compose.mp/DrawBrush.Linear.to|{}to[0]
+            final fun <get-to>(): dev.aster.vega.compose.mp/DrawPoint // dev.aster.vega.compose.mp/DrawBrush.Linear.to.<get-to>|<get-to>(){}[0]
+
+        final fun component1(): dev.aster.vega.compose.mp/DrawPoint // dev.aster.vega.compose.mp/DrawBrush.Linear.component1|component1(){}[0]
+        final fun component2(): dev.aster.vega.compose.mp/DrawPoint // dev.aster.vega.compose.mp/DrawBrush.Linear.component2|component2(){}[0]
+        final fun component3(): kotlin.collections/List<dev.aster.vega.compose.mp/DrawStop> // dev.aster.vega.compose.mp/DrawBrush.Linear.component3|component3(){}[0]
+        final fun component4(): kotlin/Double // dev.aster.vega.compose.mp/DrawBrush.Linear.component4|component4(){}[0]
+        final fun copy(dev.aster.vega.compose.mp/DrawPoint = ..., dev.aster.vega.compose.mp/DrawPoint = ..., kotlin.collections/List<dev.aster.vega.compose.mp/DrawStop> = ..., kotlin/Double = ...): dev.aster.vega.compose.mp/DrawBrush.Linear // dev.aster.vega.compose.mp/DrawBrush.Linear.copy|copy(dev.aster.vega.compose.mp.DrawPoint;dev.aster.vega.compose.mp.DrawPoint;kotlin.collections.List<dev.aster.vega.compose.mp.DrawStop>;kotlin.Double){}[0]
+        final fun equals(kotlin/Any?): kotlin/Boolean // dev.aster.vega.compose.mp/DrawBrush.Linear.equals|equals(kotlin.Any?){}[0]
+        final fun hashCode(): kotlin/Int // dev.aster.vega.compose.mp/DrawBrush.Linear.hashCode|hashCode(){}[0]
+        final fun toString(): kotlin/String // dev.aster.vega.compose.mp/DrawBrush.Linear.toString|toString(){}[0]
+    }
+
+    final class Radial : dev.aster.vega.compose.mp/DrawBrush { // dev.aster.vega.compose.mp/DrawBrush.Radial|null[0]
+        constructor <init>(dev.aster.vega.compose.mp/DrawPoint, kotlin/Double, kotlin.collections/List<dev.aster.vega.compose.mp/DrawStop>, kotlin/Double) // dev.aster.vega.compose.mp/DrawBrush.Radial.<init>|<init>(dev.aster.vega.compose.mp.DrawPoint;kotlin.Double;kotlin.collections.List<dev.aster.vega.compose.mp.DrawStop>;kotlin.Double){}[0]
+
+        final val alpha // dev.aster.vega.compose.mp/DrawBrush.Radial.alpha|{}alpha[0]
+            final fun <get-alpha>(): kotlin/Double // dev.aster.vega.compose.mp/DrawBrush.Radial.alpha.<get-alpha>|<get-alpha>(){}[0]
+        final val center // dev.aster.vega.compose.mp/DrawBrush.Radial.center|{}center[0]
+            final fun <get-center>(): dev.aster.vega.compose.mp/DrawPoint // dev.aster.vega.compose.mp/DrawBrush.Radial.center.<get-center>|<get-center>(){}[0]
+        final val radius // dev.aster.vega.compose.mp/DrawBrush.Radial.radius|{}radius[0]
+            final fun <get-radius>(): kotlin/Double // dev.aster.vega.compose.mp/DrawBrush.Radial.radius.<get-radius>|<get-radius>(){}[0]
+        final val stops // dev.aster.vega.compose.mp/DrawBrush.Radial.stops|{}stops[0]
+            final fun <get-stops>(): kotlin.collections/List<dev.aster.vega.compose.mp/DrawStop> // dev.aster.vega.compose.mp/DrawBrush.Radial.stops.<get-stops>|<get-stops>(){}[0]
+
+        final fun component1(): dev.aster.vega.compose.mp/DrawPoint // dev.aster.vega.compose.mp/DrawBrush.Radial.component1|component1(){}[0]
+        final fun component2(): kotlin/Double // dev.aster.vega.compose.mp/DrawBrush.Radial.component2|component2(){}[0]
+        final fun component3(): kotlin.collections/List<dev.aster.vega.compose.mp/DrawStop> // dev.aster.vega.compose.mp/DrawBrush.Radial.component3|component3(){}[0]
+        final fun component4(): kotlin/Double // dev.aster.vega.compose.mp/DrawBrush.Radial.component4|component4(){}[0]
+        final fun copy(dev.aster.vega.compose.mp/DrawPoint = ..., kotlin/Double = ..., kotlin.collections/List<dev.aster.vega.compose.mp/DrawStop> = ..., kotlin/Double = ...): dev.aster.vega.compose.mp/DrawBrush.Radial // dev.aster.vega.compose.mp/DrawBrush.Radial.copy|copy(dev.aster.vega.compose.mp.DrawPoint;kotlin.Double;kotlin.collections.List<dev.aster.vega.compose.mp.DrawStop>;kotlin.Double){}[0]
+        final fun equals(kotlin/Any?): kotlin/Boolean // dev.aster.vega.compose.mp/DrawBrush.Radial.equals|equals(kotlin.Any?){}[0]
+        final fun hashCode(): kotlin/Int // dev.aster.vega.compose.mp/DrawBrush.Radial.hashCode|hashCode(){}[0]
+        final fun toString(): kotlin/String // dev.aster.vega.compose.mp/DrawBrush.Radial.toString|toString(){}[0]
+    }
+
+    final class Solid : dev.aster.vega.compose.mp/DrawBrush { // dev.aster.vega.compose.mp/DrawBrush.Solid|null[0]
+        constructor <init>(dev.aster.vega.compose.mp/DrawPaint) // dev.aster.vega.compose.mp/DrawBrush.Solid.<init>|<init>(dev.aster.vega.compose.mp.DrawPaint){}[0]
+
+        final val alpha // dev.aster.vega.compose.mp/DrawBrush.Solid.alpha|{}alpha[0]
+            final fun <get-alpha>(): kotlin/Double // dev.aster.vega.compose.mp/DrawBrush.Solid.alpha.<get-alpha>|<get-alpha>(){}[0]
+        final val paint // dev.aster.vega.compose.mp/DrawBrush.Solid.paint|{}paint[0]
+            final fun <get-paint>(): dev.aster.vega.compose.mp/DrawPaint // dev.aster.vega.compose.mp/DrawBrush.Solid.paint.<get-paint>|<get-paint>(){}[0]
+
+        final fun component1(): dev.aster.vega.compose.mp/DrawPaint // dev.aster.vega.compose.mp/DrawBrush.Solid.component1|component1(){}[0]
+        final fun copy(dev.aster.vega.compose.mp/DrawPaint = ...): dev.aster.vega.compose.mp/DrawBrush.Solid // dev.aster.vega.compose.mp/DrawBrush.Solid.copy|copy(dev.aster.vega.compose.mp.DrawPaint){}[0]
+        final fun equals(kotlin/Any?): kotlin/Boolean // dev.aster.vega.compose.mp/DrawBrush.Solid.equals|equals(kotlin.Any?){}[0]
+        final fun hashCode(): kotlin/Int // dev.aster.vega.compose.mp/DrawBrush.Solid.hashCode|hashCode(){}[0]
+        final fun toString(): kotlin/String // dev.aster.vega.compose.mp/DrawBrush.Solid.toString|toString(){}[0]
+    }
+}
+
+sealed interface dev.aster.vega.compose.mp/DrawPathCommand { // dev.aster.vega.compose.mp/DrawPathCommand|null[0]
+    final class CubicTo : dev.aster.vega.compose.mp/DrawPathCommand { // dev.aster.vega.compose.mp/DrawPathCommand.CubicTo|null[0]
+        constructor <init>(dev.aster.vega.compose.mp/DrawPoint, dev.aster.vega.compose.mp/DrawPoint, dev.aster.vega.compose.mp/DrawPoint) // dev.aster.vega.compose.mp/DrawPathCommand.CubicTo.<init>|<init>(dev.aster.vega.compose.mp.DrawPoint;dev.aster.vega.compose.mp.DrawPoint;dev.aster.vega.compose.mp.DrawPoint){}[0]
+
+        final val control1 // dev.aster.vega.compose.mp/DrawPathCommand.CubicTo.control1|{}control1[0]
+            final fun <get-control1>(): dev.aster.vega.compose.mp/DrawPoint // dev.aster.vega.compose.mp/DrawPathCommand.CubicTo.control1.<get-control1>|<get-control1>(){}[0]
+        final val control2 // dev.aster.vega.compose.mp/DrawPathCommand.CubicTo.control2|{}control2[0]
+            final fun <get-control2>(): dev.aster.vega.compose.mp/DrawPoint // dev.aster.vega.compose.mp/DrawPathCommand.CubicTo.control2.<get-control2>|<get-control2>(){}[0]
+        final val to // dev.aster.vega.compose.mp/DrawPathCommand.CubicTo.to|{}to[0]
+            final fun <get-to>(): dev.aster.vega.compose.mp/DrawPoint // dev.aster.vega.compose.mp/DrawPathCommand.CubicTo.to.<get-to>|<get-to>(){}[0]
+
+        final fun component1(): dev.aster.vega.compose.mp/DrawPoint // dev.aster.vega.compose.mp/DrawPathCommand.CubicTo.component1|component1(){}[0]
+        final fun component2(): dev.aster.vega.compose.mp/DrawPoint // dev.aster.vega.compose.mp/DrawPathCommand.CubicTo.component2|component2(){}[0]
+        final fun component3(): dev.aster.vega.compose.mp/DrawPoint // dev.aster.vega.compose.mp/DrawPathCommand.CubicTo.component3|component3(){}[0]
+        final fun copy(dev.aster.vega.compose.mp/DrawPoint = ..., dev.aster.vega.compose.mp/DrawPoint = ..., dev.aster.vega.compose.mp/DrawPoint = ...): dev.aster.vega.compose.mp/DrawPathCommand.CubicTo // dev.aster.vega.compose.mp/DrawPathCommand.CubicTo.copy|copy(dev.aster.vega.compose.mp.DrawPoint;dev.aster.vega.compose.mp.DrawPoint;dev.aster.vega.compose.mp.DrawPoint){}[0]
+        final fun equals(kotlin/Any?): kotlin/Boolean // dev.aster.vega.compose.mp/DrawPathCommand.CubicTo.equals|equals(kotlin.Any?){}[0]
+        final fun hashCode(): kotlin/Int // dev.aster.vega.compose.mp/DrawPathCommand.CubicTo.hashCode|hashCode(){}[0]
+        final fun toString(): kotlin/String // dev.aster.vega.compose.mp/DrawPathCommand.CubicTo.toString|toString(){}[0]
+    }
+
+    final class LineTo : dev.aster.vega.compose.mp/DrawPathCommand { // dev.aster.vega.compose.mp/DrawPathCommand.LineTo|null[0]
+        constructor <init>(dev.aster.vega.compose.mp/DrawPoint) // dev.aster.vega.compose.mp/DrawPathCommand.LineTo.<init>|<init>(dev.aster.vega.compose.mp.DrawPoint){}[0]
+
+        final val to // dev.aster.vega.compose.mp/DrawPathCommand.LineTo.to|{}to[0]
+            final fun <get-to>(): dev.aster.vega.compose.mp/DrawPoint // dev.aster.vega.compose.mp/DrawPathCommand.LineTo.to.<get-to>|<get-to>(){}[0]
+
+        final fun component1(): dev.aster.vega.compose.mp/DrawPoint // dev.aster.vega.compose.mp/DrawPathCommand.LineTo.component1|component1(){}[0]
+        final fun copy(dev.aster.vega.compose.mp/DrawPoint = ...): dev.aster.vega.compose.mp/DrawPathCommand.LineTo // dev.aster.vega.compose.mp/DrawPathCommand.LineTo.copy|copy(dev.aster.vega.compose.mp.DrawPoint){}[0]
+        final fun equals(kotlin/Any?): kotlin/Boolean // dev.aster.vega.compose.mp/DrawPathCommand.LineTo.equals|equals(kotlin.Any?){}[0]
+        final fun hashCode(): kotlin/Int // dev.aster.vega.compose.mp/DrawPathCommand.LineTo.hashCode|hashCode(){}[0]
+        final fun toString(): kotlin/String // dev.aster.vega.compose.mp/DrawPathCommand.LineTo.toString|toString(){}[0]
+    }
+
+    final class MoveTo : dev.aster.vega.compose.mp/DrawPathCommand { // dev.aster.vega.compose.mp/DrawPathCommand.MoveTo|null[0]
+        constructor <init>(dev.aster.vega.compose.mp/DrawPoint) // dev.aster.vega.compose.mp/DrawPathCommand.MoveTo.<init>|<init>(dev.aster.vega.compose.mp.DrawPoint){}[0]
+
+        final val to // dev.aster.vega.compose.mp/DrawPathCommand.MoveTo.to|{}to[0]
+            final fun <get-to>(): dev.aster.vega.compose.mp/DrawPoint // dev.aster.vega.compose.mp/DrawPathCommand.MoveTo.to.<get-to>|<get-to>(){}[0]
+
+        final fun component1(): dev.aster.vega.compose.mp/DrawPoint // dev.aster.vega.compose.mp/DrawPathCommand.MoveTo.component1|component1(){}[0]
+        final fun copy(dev.aster.vega.compose.mp/DrawPoint = ...): dev.aster.vega.compose.mp/DrawPathCommand.MoveTo // dev.aster.vega.compose.mp/DrawPathCommand.MoveTo.copy|copy(dev.aster.vega.compose.mp.DrawPoint){}[0]
+        final fun equals(kotlin/Any?): kotlin/Boolean // dev.aster.vega.compose.mp/DrawPathCommand.MoveTo.equals|equals(kotlin.Any?){}[0]
+        final fun hashCode(): kotlin/Int // dev.aster.vega.compose.mp/DrawPathCommand.MoveTo.hashCode|hashCode(){}[0]
+        final fun toString(): kotlin/String // dev.aster.vega.compose.mp/DrawPathCommand.MoveTo.toString|toString(){}[0]
+    }
+
+    final object Close : dev.aster.vega.compose.mp/DrawPathCommand { // dev.aster.vega.compose.mp/DrawPathCommand.Close|null[0]
+        final fun equals(kotlin/Any?): kotlin/Boolean // dev.aster.vega.compose.mp/DrawPathCommand.Close.equals|equals(kotlin.Any?){}[0]
+        final fun hashCode(): kotlin/Int // dev.aster.vega.compose.mp/DrawPathCommand.Close.hashCode|hashCode(){}[0]
+        final fun toString(): kotlin/String // dev.aster.vega.compose.mp/DrawPathCommand.Close.toString|toString(){}[0]
+    }
+}
+
+final class dev.aster.vega.compose.mp/DrawCorners { // dev.aster.vega.compose.mp/DrawCorners|null[0]
+    constructor <init>(kotlin/Double, kotlin/Double, kotlin/Double, kotlin/Double) // dev.aster.vega.compose.mp/DrawCorners.<init>|<init>(kotlin.Double;kotlin.Double;kotlin.Double;kotlin.Double){}[0]
+
+    final val bottomLeft // dev.aster.vega.compose.mp/DrawCorners.bottomLeft|{}bottomLeft[0]
+        final fun <get-bottomLeft>(): kotlin/Double // dev.aster.vega.compose.mp/DrawCorners.bottomLeft.<get-bottomLeft>|<get-bottomLeft>(){}[0]
+    final val bottomRight // dev.aster.vega.compose.mp/DrawCorners.bottomRight|{}bottomRight[0]
+        final fun <get-bottomRight>(): kotlin/Double // dev.aster.vega.compose.mp/DrawCorners.bottomRight.<get-bottomRight>|<get-bottomRight>(){}[0]
+    final val isSquare // dev.aster.vega.compose.mp/DrawCorners.isSquare|{}isSquare[0]
+        final fun <get-isSquare>(): kotlin/Boolean // dev.aster.vega.compose.mp/DrawCorners.isSquare.<get-isSquare>|<get-isSquare>(){}[0]
+    final val topLeft // dev.aster.vega.compose.mp/DrawCorners.topLeft|{}topLeft[0]
+        final fun <get-topLeft>(): kotlin/Double // dev.aster.vega.compose.mp/DrawCorners.topLeft.<get-topLeft>|<get-topLeft>(){}[0]
+    final val topRight // dev.aster.vega.compose.mp/DrawCorners.topRight|{}topRight[0]
+        final fun <get-topRight>(): kotlin/Double // dev.aster.vega.compose.mp/DrawCorners.topRight.<get-topRight>|<get-topRight>(){}[0]
+
+    final fun component1(): kotlin/Double // dev.aster.vega.compose.mp/DrawCorners.component1|component1(){}[0]
+    final fun component2(): kotlin/Double // dev.aster.vega.compose.mp/DrawCorners.component2|component2(){}[0]
+    final fun component3(): kotlin/Double // dev.aster.vega.compose.mp/DrawCorners.component3|component3(){}[0]
+    final fun component4(): kotlin/Double // dev.aster.vega.compose.mp/DrawCorners.component4|component4(){}[0]
+    final fun copy(kotlin/Double = ..., kotlin/Double = ..., kotlin/Double = ..., kotlin/Double = ...): dev.aster.vega.compose.mp/DrawCorners // dev.aster.vega.compose.mp/DrawCorners.copy|copy(kotlin.Double;kotlin.Double;kotlin.Double;kotlin.Double){}[0]
+    final fun equals(kotlin/Any?): kotlin/Boolean // dev.aster.vega.compose.mp/DrawCorners.equals|equals(kotlin.Any?){}[0]
+    final fun hashCode(): kotlin/Int // dev.aster.vega.compose.mp/DrawCorners.hashCode|hashCode(){}[0]
+    final fun toString(): kotlin/String // dev.aster.vega.compose.mp/DrawCorners.toString|toString(){}[0]
+
+    final object Companion { // dev.aster.vega.compose.mp/DrawCorners.Companion|null[0]
+        final val Square // dev.aster.vega.compose.mp/DrawCorners.Companion.Square|{}Square[0]
+            final fun <get-Square>(): dev.aster.vega.compose.mp/DrawCorners // dev.aster.vega.compose.mp/DrawCorners.Companion.Square.<get-Square>|<get-Square>(){}[0]
+    }
+}
+
+final class dev.aster.vega.compose.mp/DrawPaint { // dev.aster.vega.compose.mp/DrawPaint|null[0]
+    constructor <init>(kotlin/Double, kotlin/Double, kotlin/Double, kotlin/Double) // dev.aster.vega.compose.mp/DrawPaint.<init>|<init>(kotlin.Double;kotlin.Double;kotlin.Double;kotlin.Double){}[0]
+
+    final val alpha // dev.aster.vega.compose.mp/DrawPaint.alpha|{}alpha[0]
+        final fun <get-alpha>(): kotlin/Double // dev.aster.vega.compose.mp/DrawPaint.alpha.<get-alpha>|<get-alpha>(){}[0]
+    final val blue // dev.aster.vega.compose.mp/DrawPaint.blue|{}blue[0]
+        final fun <get-blue>(): kotlin/Double // dev.aster.vega.compose.mp/DrawPaint.blue.<get-blue>|<get-blue>(){}[0]
+    final val green // dev.aster.vega.compose.mp/DrawPaint.green|{}green[0]
+        final fun <get-green>(): kotlin/Double // dev.aster.vega.compose.mp/DrawPaint.green.<get-green>|<get-green>(){}[0]
+    final val red // dev.aster.vega.compose.mp/DrawPaint.red|{}red[0]
+        final fun <get-red>(): kotlin/Double // dev.aster.vega.compose.mp/DrawPaint.red.<get-red>|<get-red>(){}[0]
+
+    final fun component1(): kotlin/Double // dev.aster.vega.compose.mp/DrawPaint.component1|component1(){}[0]
+    final fun component2(): kotlin/Double // dev.aster.vega.compose.mp/DrawPaint.component2|component2(){}[0]
+    final fun component3(): kotlin/Double // dev.aster.vega.compose.mp/DrawPaint.component3|component3(){}[0]
+    final fun component4(): kotlin/Double // dev.aster.vega.compose.mp/DrawPaint.component4|component4(){}[0]
+    final fun copy(kotlin/Double = ..., kotlin/Double = ..., kotlin/Double = ..., kotlin/Double = ...): dev.aster.vega.compose.mp/DrawPaint // dev.aster.vega.compose.mp/DrawPaint.copy|copy(kotlin.Double;kotlin.Double;kotlin.Double;kotlin.Double){}[0]
+    final fun equals(kotlin/Any?): kotlin/Boolean // dev.aster.vega.compose.mp/DrawPaint.equals|equals(kotlin.Any?){}[0]
+    final fun hashCode(): kotlin/Int // dev.aster.vega.compose.mp/DrawPaint.hashCode|hashCode(){}[0]
+    final fun toString(): kotlin/String // dev.aster.vega.compose.mp/DrawPaint.toString|toString(){}[0]
+
+    final object Companion { // dev.aster.vega.compose.mp/DrawPaint.Companion|null[0]
+        final fun of(dev.aster.vega.scene/SceneColor): dev.aster.vega.compose.mp/DrawPaint // dev.aster.vega.compose.mp/DrawPaint.Companion.of|of(dev.aster.vega.scene.SceneColor){}[0]
+    }
+}
+
+final class dev.aster.vega.compose.mp/DrawPoint { // dev.aster.vega.compose.mp/DrawPoint|null[0]
+    constructor <init>(kotlin/Double, kotlin/Double) // dev.aster.vega.compose.mp/DrawPoint.<init>|<init>(kotlin.Double;kotlin.Double){}[0]
+
+    final val x // dev.aster.vega.compose.mp/DrawPoint.x|{}x[0]
+        final fun <get-x>(): kotlin/Double // dev.aster.vega.compose.mp/DrawPoint.x.<get-x>|<get-x>(){}[0]
+    final val y // dev.aster.vega.compose.mp/DrawPoint.y|{}y[0]
+        final fun <get-y>(): kotlin/Double // dev.aster.vega.compose.mp/DrawPoint.y.<get-y>|<get-y>(){}[0]
+
+    final fun component1(): kotlin/Double // dev.aster.vega.compose.mp/DrawPoint.component1|component1(){}[0]
+    final fun component2(): kotlin/Double // dev.aster.vega.compose.mp/DrawPoint.component2|component2(){}[0]
+    final fun copy(kotlin/Double = ..., kotlin/Double = ...): dev.aster.vega.compose.mp/DrawPoint // dev.aster.vega.compose.mp/DrawPoint.copy|copy(kotlin.Double;kotlin.Double){}[0]
+    final fun equals(kotlin/Any?): kotlin/Boolean // dev.aster.vega.compose.mp/DrawPoint.equals|equals(kotlin.Any?){}[0]
+    final fun hashCode(): kotlin/Int // dev.aster.vega.compose.mp/DrawPoint.hashCode|hashCode(){}[0]
+    final fun toString(): kotlin/String // dev.aster.vega.compose.mp/DrawPoint.toString|toString(){}[0]
+}
+
+final class dev.aster.vega.compose.mp/DrawRect { // dev.aster.vega.compose.mp/DrawRect|null[0]
+    constructor <init>(kotlin/Double, kotlin/Double, kotlin/Double, kotlin/Double) // dev.aster.vega.compose.mp/DrawRect.<init>|<init>(kotlin.Double;kotlin.Double;kotlin.Double;kotlin.Double){}[0]
+
+    final val height // dev.aster.vega.compose.mp/DrawRect.height|{}height[0]
+        final fun <get-height>(): kotlin/Double // dev.aster.vega.compose.mp/DrawRect.height.<get-height>|<get-height>(){}[0]
+    final val width // dev.aster.vega.compose.mp/DrawRect.width|{}width[0]
+        final fun <get-width>(): kotlin/Double // dev.aster.vega.compose.mp/DrawRect.width.<get-width>|<get-width>(){}[0]
+    final val x // dev.aster.vega.compose.mp/DrawRect.x|{}x[0]
+        final fun <get-x>(): kotlin/Double // dev.aster.vega.compose.mp/DrawRect.x.<get-x>|<get-x>(){}[0]
+    final val y // dev.aster.vega.compose.mp/DrawRect.y|{}y[0]
+        final fun <get-y>(): kotlin/Double // dev.aster.vega.compose.mp/DrawRect.y.<get-y>|<get-y>(){}[0]
+
+    final fun component1(): kotlin/Double // dev.aster.vega.compose.mp/DrawRect.component1|component1(){}[0]
+    final fun component2(): kotlin/Double // dev.aster.vega.compose.mp/DrawRect.component2|component2(){}[0]
+    final fun component3(): kotlin/Double // dev.aster.vega.compose.mp/DrawRect.component3|component3(){}[0]
+    final fun component4(): kotlin/Double // dev.aster.vega.compose.mp/DrawRect.component4|component4(){}[0]
+    final fun copy(kotlin/Double = ..., kotlin/Double = ..., kotlin/Double = ..., kotlin/Double = ...): dev.aster.vega.compose.mp/DrawRect // dev.aster.vega.compose.mp/DrawRect.copy|copy(kotlin.Double;kotlin.Double;kotlin.Double;kotlin.Double){}[0]
+    final fun equals(kotlin/Any?): kotlin/Boolean // dev.aster.vega.compose.mp/DrawRect.equals|equals(kotlin.Any?){}[0]
+    final fun hashCode(): kotlin/Int // dev.aster.vega.compose.mp/DrawRect.hashCode|hashCode(){}[0]
+    final fun toString(): kotlin/String // dev.aster.vega.compose.mp/DrawRect.toString|toString(){}[0]
+}
+
+final class dev.aster.vega.compose.mp/DrawScopeTarget : dev.aster.vega.compose.mp/SceneDrawTarget { // dev.aster.vega.compose.mp/DrawScopeTarget|null[0]
+    constructor <init>(androidx.compose.ui.graphics.drawscope/DrawScope, androidx.compose.ui.text/TextMeasurer? = ..., kotlin/Function1<kotlin/String, androidx.compose.ui.graphics/ImageBitmap?>? = ...) // dev.aster.vega.compose.mp/DrawScopeTarget.<init>|<init>(androidx.compose.ui.graphics.drawscope.DrawScope;androidx.compose.ui.text.TextMeasurer?;kotlin.Function1<kotlin.String,androidx.compose.ui.graphics.ImageBitmap?>?){}[0]
+
+    final val unresolvedImages // dev.aster.vega.compose.mp/DrawScopeTarget.unresolvedImages|{}unresolvedImages[0]
+        final fun <get-unresolvedImages>(): kotlin.collections/MutableList<kotlin/String> // dev.aster.vega.compose.mp/DrawScopeTarget.unresolvedImages.<get-unresolvedImages>|<get-unresolvedImages>(){}[0]
+
+    final fun beginGroup(dev.aster.vega.compose.mp/DrawRect?) // dev.aster.vega.compose.mp/DrawScopeTarget.beginGroup|beginGroup(dev.aster.vega.compose.mp.DrawRect?){}[0]
+    final fun endGroup() // dev.aster.vega.compose.mp/DrawScopeTarget.endGroup|endGroup(){}[0]
+    final fun image(kotlin/String, dev.aster.vega.scene/RasterImage?, dev.aster.vega.compose.mp/DrawRect, dev.aster.vega.compose.mp/DrawImageFit, kotlin/Boolean, kotlin/Double) // dev.aster.vega.compose.mp/DrawScopeTarget.image|image(kotlin.String;dev.aster.vega.scene.RasterImage?;dev.aster.vega.compose.mp.DrawRect;dev.aster.vega.compose.mp.DrawImageFit;kotlin.Boolean;kotlin.Double){}[0]
+    final fun line(dev.aster.vega.compose.mp/DrawPoint, dev.aster.vega.compose.mp/DrawPoint, dev.aster.vega.compose.mp/DrawStroke?) // dev.aster.vega.compose.mp/DrawScopeTarget.line|line(dev.aster.vega.compose.mp.DrawPoint;dev.aster.vega.compose.mp.DrawPoint;dev.aster.vega.compose.mp.DrawStroke?){}[0]
+    final fun path(kotlin.collections/List<dev.aster.vega.compose.mp/DrawPathCommand>, dev.aster.vega.compose.mp/DrawBrush?, dev.aster.vega.compose.mp/DrawStroke?) // dev.aster.vega.compose.mp/DrawScopeTarget.path|path(kotlin.collections.List<dev.aster.vega.compose.mp.DrawPathCommand>;dev.aster.vega.compose.mp.DrawBrush?;dev.aster.vega.compose.mp.DrawStroke?){}[0]
+    final fun rect(dev.aster.vega.compose.mp/DrawRect, dev.aster.vega.compose.mp/DrawCorners, dev.aster.vega.compose.mp/DrawBrush?, dev.aster.vega.compose.mp/DrawStroke?) // dev.aster.vega.compose.mp/DrawScopeTarget.rect|rect(dev.aster.vega.compose.mp.DrawRect;dev.aster.vega.compose.mp.DrawCorners;dev.aster.vega.compose.mp.DrawBrush?;dev.aster.vega.compose.mp.DrawStroke?){}[0]
+    final fun text(dev.aster.vega.compose.mp/DrawTextRun, dev.aster.vega.compose.mp/DrawBrush?, dev.aster.vega.compose.mp/DrawStroke?) // dev.aster.vega.compose.mp/DrawScopeTarget.text|text(dev.aster.vega.compose.mp.DrawTextRun;dev.aster.vega.compose.mp.DrawBrush?;dev.aster.vega.compose.mp.DrawStroke?){}[0]
+}
+
+final class dev.aster.vega.compose.mp/DrawStop { // dev.aster.vega.compose.mp/DrawStop|null[0]
+    constructor <init>(kotlin/Double, dev.aster.vega.compose.mp/DrawPaint) // dev.aster.vega.compose.mp/DrawStop.<init>|<init>(kotlin.Double;dev.aster.vega.compose.mp.DrawPaint){}[0]
+
+    final val offset // dev.aster.vega.compose.mp/DrawStop.offset|{}offset[0]
+        final fun <get-offset>(): kotlin/Double // dev.aster.vega.compose.mp/DrawStop.offset.<get-offset>|<get-offset>(){}[0]
+    final val paint // dev.aster.vega.compose.mp/DrawStop.paint|{}paint[0]
+        final fun <get-paint>(): dev.aster.vega.compose.mp/DrawPaint // dev.aster.vega.compose.mp/DrawStop.paint.<get-paint>|<get-paint>(){}[0]
+
+    final fun component1(): kotlin/Double // dev.aster.vega.compose.mp/DrawStop.component1|component1(){}[0]
+    final fun component2(): dev.aster.vega.compose.mp/DrawPaint // dev.aster.vega.compose.mp/DrawStop.component2|component2(){}[0]
+    final fun copy(kotlin/Double = ..., dev.aster.vega.compose.mp/DrawPaint = ...): dev.aster.vega.compose.mp/DrawStop // dev.aster.vega.compose.mp/DrawStop.copy|copy(kotlin.Double;dev.aster.vega.compose.mp.DrawPaint){}[0]
+    final fun equals(kotlin/Any?): kotlin/Boolean // dev.aster.vega.compose.mp/DrawStop.equals|equals(kotlin.Any?){}[0]
+    final fun hashCode(): kotlin/Int // dev.aster.vega.compose.mp/DrawStop.hashCode|hashCode(){}[0]
+    final fun toString(): kotlin/String // dev.aster.vega.compose.mp/DrawStop.toString|toString(){}[0]
+}
+
+final class dev.aster.vega.compose.mp/DrawStroke { // dev.aster.vega.compose.mp/DrawStroke|null[0]
+    constructor <init>(dev.aster.vega.compose.mp/DrawBrush, kotlin/Double, dev.aster.vega.compose.mp/DrawLineCap, dev.aster.vega.compose.mp/DrawLineJoin, kotlin/Double, kotlin.collections/List<kotlin/Double>, kotlin/Double) // dev.aster.vega.compose.mp/DrawStroke.<init>|<init>(dev.aster.vega.compose.mp.DrawBrush;kotlin.Double;dev.aster.vega.compose.mp.DrawLineCap;dev.aster.vega.compose.mp.DrawLineJoin;kotlin.Double;kotlin.collections.List<kotlin.Double>;kotlin.Double){}[0]
+
+    final val brush // dev.aster.vega.compose.mp/DrawStroke.brush|{}brush[0]
+        final fun <get-brush>(): dev.aster.vega.compose.mp/DrawBrush // dev.aster.vega.compose.mp/DrawStroke.brush.<get-brush>|<get-brush>(){}[0]
+    final val cap // dev.aster.vega.compose.mp/DrawStroke.cap|{}cap[0]
+        final fun <get-cap>(): dev.aster.vega.compose.mp/DrawLineCap // dev.aster.vega.compose.mp/DrawStroke.cap.<get-cap>|<get-cap>(){}[0]
+    final val dash // dev.aster.vega.compose.mp/DrawStroke.dash|{}dash[0]
+        final fun <get-dash>(): kotlin.collections/List<kotlin/Double> // dev.aster.vega.compose.mp/DrawStroke.dash.<get-dash>|<get-dash>(){}[0]
+    final val dashOffset // dev.aster.vega.compose.mp/DrawStroke.dashOffset|{}dashOffset[0]
+        final fun <get-dashOffset>(): kotlin/Double // dev.aster.vega.compose.mp/DrawStroke.dashOffset.<get-dashOffset>|<get-dashOffset>(){}[0]
+    final val join // dev.aster.vega.compose.mp/DrawStroke.join|{}join[0]
+        final fun <get-join>(): dev.aster.vega.compose.mp/DrawLineJoin // dev.aster.vega.compose.mp/DrawStroke.join.<get-join>|<get-join>(){}[0]
+    final val miterLimit // dev.aster.vega.compose.mp/DrawStroke.miterLimit|{}miterLimit[0]
+        final fun <get-miterLimit>(): kotlin/Double // dev.aster.vega.compose.mp/DrawStroke.miterLimit.<get-miterLimit>|<get-miterLimit>(){}[0]
+    final val width // dev.aster.vega.compose.mp/DrawStroke.width|{}width[0]
+        final fun <get-width>(): kotlin/Double // dev.aster.vega.compose.mp/DrawStroke.width.<get-width>|<get-width>(){}[0]
+
+    final fun component1(): dev.aster.vega.compose.mp/DrawBrush // dev.aster.vega.compose.mp/DrawStroke.component1|component1(){}[0]
+    final fun component2(): kotlin/Double // dev.aster.vega.compose.mp/DrawStroke.component2|component2(){}[0]
+    final fun component3(): dev.aster.vega.compose.mp/DrawLineCap // dev.aster.vega.compose.mp/DrawStroke.component3|component3(){}[0]
+    final fun component4(): dev.aster.vega.compose.mp/DrawLineJoin // dev.aster.vega.compose.mp/DrawStroke.component4|component4(){}[0]
+    final fun component5(): kotlin/Double // dev.aster.vega.compose.mp/DrawStroke.component5|component5(){}[0]
+    final fun component6(): kotlin.collections/List<kotlin/Double> // dev.aster.vega.compose.mp/DrawStroke.component6|component6(){}[0]
+    final fun component7(): kotlin/Double // dev.aster.vega.compose.mp/DrawStroke.component7|component7(){}[0]
+    final fun copy(dev.aster.vega.compose.mp/DrawBrush = ..., kotlin/Double = ..., dev.aster.vega.compose.mp/DrawLineCap = ..., dev.aster.vega.compose.mp/DrawLineJoin = ..., kotlin/Double = ..., kotlin.collections/List<kotlin/Double> = ..., kotlin/Double = ...): dev.aster.vega.compose.mp/DrawStroke // dev.aster.vega.compose.mp/DrawStroke.copy|copy(dev.aster.vega.compose.mp.DrawBrush;kotlin.Double;dev.aster.vega.compose.mp.DrawLineCap;dev.aster.vega.compose.mp.DrawLineJoin;kotlin.Double;kotlin.collections.List<kotlin.Double>;kotlin.Double){}[0]
+    final fun equals(kotlin/Any?): kotlin/Boolean // dev.aster.vega.compose.mp/DrawStroke.equals|equals(kotlin.Any?){}[0]
+    final fun hashCode(): kotlin/Int // dev.aster.vega.compose.mp/DrawStroke.hashCode|hashCode(){}[0]
+    final fun toString(): kotlin/String // dev.aster.vega.compose.mp/DrawStroke.toString|toString(){}[0]
+}
+
+final class dev.aster.vega.compose.mp/DrawTextRun { // dev.aster.vega.compose.mp/DrawTextRun|null[0]
+    constructor <init>(kotlin/String, dev.aster.vega.compose.mp/DrawPoint, dev.aster.vega.compose.mp/DrawPoint, kotlin/Double, kotlin/String, kotlin/Double, kotlin/Int, kotlin/Boolean, kotlin/Double) // dev.aster.vega.compose.mp/DrawTextRun.<init>|<init>(kotlin.String;dev.aster.vega.compose.mp.DrawPoint;dev.aster.vega.compose.mp.DrawPoint;kotlin.Double;kotlin.String;kotlin.Double;kotlin.Int;kotlin.Boolean;kotlin.Double){}[0]
+
+    final val anchor // dev.aster.vega.compose.mp/DrawTextRun.anchor|{}anchor[0]
+        final fun <get-anchor>(): dev.aster.vega.compose.mp/DrawPoint // dev.aster.vega.compose.mp/DrawTextRun.anchor.<get-anchor>|<get-anchor>(){}[0]
+    final val angleDegrees // dev.aster.vega.compose.mp/DrawTextRun.angleDegrees|{}angleDegrees[0]
+        final fun <get-angleDegrees>(): kotlin/Double // dev.aster.vega.compose.mp/DrawTextRun.angleDegrees.<get-angleDegrees>|<get-angleDegrees>(){}[0]
+    final val ascent // dev.aster.vega.compose.mp/DrawTextRun.ascent|{}ascent[0]
+        final fun <get-ascent>(): kotlin/Double // dev.aster.vega.compose.mp/DrawTextRun.ascent.<get-ascent>|<get-ascent>(){}[0]
+    final val fontFamily // dev.aster.vega.compose.mp/DrawTextRun.fontFamily|{}fontFamily[0]
+        final fun <get-fontFamily>(): kotlin/String // dev.aster.vega.compose.mp/DrawTextRun.fontFamily.<get-fontFamily>|<get-fontFamily>(){}[0]
+    final val fontSize // dev.aster.vega.compose.mp/DrawTextRun.fontSize|{}fontSize[0]
+        final fun <get-fontSize>(): kotlin/Double // dev.aster.vega.compose.mp/DrawTextRun.fontSize.<get-fontSize>|<get-fontSize>(){}[0]
+    final val fontWeight // dev.aster.vega.compose.mp/DrawTextRun.fontWeight|{}fontWeight[0]
+        final fun <get-fontWeight>(): kotlin/Int // dev.aster.vega.compose.mp/DrawTextRun.fontWeight.<get-fontWeight>|<get-fontWeight>(){}[0]
+    final val italic // dev.aster.vega.compose.mp/DrawTextRun.italic|{}italic[0]
+        final fun <get-italic>(): kotlin/Boolean // dev.aster.vega.compose.mp/DrawTextRun.italic.<get-italic>|<get-italic>(){}[0]
+    final val origin // dev.aster.vega.compose.mp/DrawTextRun.origin|{}origin[0]
+        final fun <get-origin>(): dev.aster.vega.compose.mp/DrawPoint // dev.aster.vega.compose.mp/DrawTextRun.origin.<get-origin>|<get-origin>(){}[0]
+    final val text // dev.aster.vega.compose.mp/DrawTextRun.text|{}text[0]
+        final fun <get-text>(): kotlin/String // dev.aster.vega.compose.mp/DrawTextRun.text.<get-text>|<get-text>(){}[0]
+
+    final fun component1(): kotlin/String // dev.aster.vega.compose.mp/DrawTextRun.component1|component1(){}[0]
+    final fun component2(): dev.aster.vega.compose.mp/DrawPoint // dev.aster.vega.compose.mp/DrawTextRun.component2|component2(){}[0]
+    final fun component3(): dev.aster.vega.compose.mp/DrawPoint // dev.aster.vega.compose.mp/DrawTextRun.component3|component3(){}[0]
+    final fun component4(): kotlin/Double // dev.aster.vega.compose.mp/DrawTextRun.component4|component4(){}[0]
+    final fun component5(): kotlin/String // dev.aster.vega.compose.mp/DrawTextRun.component5|component5(){}[0]
+    final fun component6(): kotlin/Double // dev.aster.vega.compose.mp/DrawTextRun.component6|component6(){}[0]
+    final fun component7(): kotlin/Int // dev.aster.vega.compose.mp/DrawTextRun.component7|component7(){}[0]
+    final fun component8(): kotlin/Boolean // dev.aster.vega.compose.mp/DrawTextRun.component8|component8(){}[0]
+    final fun component9(): kotlin/Double // dev.aster.vega.compose.mp/DrawTextRun.component9|component9(){}[0]
+    final fun copy(kotlin/String = ..., dev.aster.vega.compose.mp/DrawPoint = ..., dev.aster.vega.compose.mp/DrawPoint = ..., kotlin/Double = ..., kotlin/String = ..., kotlin/Double = ..., kotlin/Int = ..., kotlin/Boolean = ..., kotlin/Double = ...): dev.aster.vega.compose.mp/DrawTextRun // dev.aster.vega.compose.mp/DrawTextRun.copy|copy(kotlin.String;dev.aster.vega.compose.mp.DrawPoint;dev.aster.vega.compose.mp.DrawPoint;kotlin.Double;kotlin.String;kotlin.Double;kotlin.Int;kotlin.Boolean;kotlin.Double){}[0]
+    final fun equals(kotlin/Any?): kotlin/Boolean // dev.aster.vega.compose.mp/DrawTextRun.equals|equals(kotlin.Any?){}[0]
+    final fun hashCode(): kotlin/Int // dev.aster.vega.compose.mp/DrawTextRun.hashCode|hashCode(){}[0]
+    final fun toString(): kotlin/String // dev.aster.vega.compose.mp/DrawTextRun.toString|toString(){}[0]
+}
+
+final class dev.aster.vega.compose.mp/RecordingTarget : dev.aster.vega.compose.mp/SceneDrawTarget { // dev.aster.vega.compose.mp/RecordingTarget|null[0]
+    constructor <init>() // dev.aster.vega.compose.mp/RecordingTarget.<init>|<init>(){}[0]
+
+    final val calls // dev.aster.vega.compose.mp/RecordingTarget.calls|{}calls[0]
+        final fun <get-calls>(): kotlin.collections/List<kotlin/String> // dev.aster.vega.compose.mp/RecordingTarget.calls.<get-calls>|<get-calls>(){}[0]
+
+    final fun beginGroup(dev.aster.vega.compose.mp/DrawRect?) // dev.aster.vega.compose.mp/RecordingTarget.beginGroup|beginGroup(dev.aster.vega.compose.mp.DrawRect?){}[0]
+    final fun endGroup() // dev.aster.vega.compose.mp/RecordingTarget.endGroup|endGroup(){}[0]
+    final fun image(kotlin/String, dev.aster.vega.scene/RasterImage?, dev.aster.vega.compose.mp/DrawRect, dev.aster.vega.compose.mp/DrawImageFit, kotlin/Boolean, kotlin/Double) // dev.aster.vega.compose.mp/RecordingTarget.image|image(kotlin.String;dev.aster.vega.scene.RasterImage?;dev.aster.vega.compose.mp.DrawRect;dev.aster.vega.compose.mp.DrawImageFit;kotlin.Boolean;kotlin.Double){}[0]
+    final fun line(dev.aster.vega.compose.mp/DrawPoint, dev.aster.vega.compose.mp/DrawPoint, dev.aster.vega.compose.mp/DrawStroke?) // dev.aster.vega.compose.mp/RecordingTarget.line|line(dev.aster.vega.compose.mp.DrawPoint;dev.aster.vega.compose.mp.DrawPoint;dev.aster.vega.compose.mp.DrawStroke?){}[0]
+    final fun path(kotlin.collections/List<dev.aster.vega.compose.mp/DrawPathCommand>, dev.aster.vega.compose.mp/DrawBrush?, dev.aster.vega.compose.mp/DrawStroke?) // dev.aster.vega.compose.mp/RecordingTarget.path|path(kotlin.collections.List<dev.aster.vega.compose.mp.DrawPathCommand>;dev.aster.vega.compose.mp.DrawBrush?;dev.aster.vega.compose.mp.DrawStroke?){}[0]
+    final fun rect(dev.aster.vega.compose.mp/DrawRect, dev.aster.vega.compose.mp/DrawCorners, dev.aster.vega.compose.mp/DrawBrush?, dev.aster.vega.compose.mp/DrawStroke?) // dev.aster.vega.compose.mp/RecordingTarget.rect|rect(dev.aster.vega.compose.mp.DrawRect;dev.aster.vega.compose.mp.DrawCorners;dev.aster.vega.compose.mp.DrawBrush?;dev.aster.vega.compose.mp.DrawStroke?){}[0]
+    final fun text(dev.aster.vega.compose.mp/DrawTextRun, dev.aster.vega.compose.mp/DrawBrush?, dev.aster.vega.compose.mp/DrawStroke?) // dev.aster.vega.compose.mp/RecordingTarget.text|text(dev.aster.vega.compose.mp.DrawTextRun;dev.aster.vega.compose.mp.DrawBrush?;dev.aster.vega.compose.mp.DrawStroke?){}[0]
+    final fun toString(): kotlin/String // dev.aster.vega.compose.mp/RecordingTarget.toString|toString(){}[0]
+}
+
+final class dev.aster.vega.compose.mp/SceneWalk { // dev.aster.vega.compose.mp/SceneWalk|null[0]
+    constructor <init>() // dev.aster.vega.compose.mp/SceneWalk.<init>|<init>(){}[0]
+
+    final fun draw(dev.aster.vega.scene/Scene, dev.aster.vega.compose.mp/SceneDrawTarget) // dev.aster.vega.compose.mp/SceneWalk.draw|draw(dev.aster.vega.scene.Scene;dev.aster.vega.compose.mp.SceneDrawTarget){}[0]
+}
+
+final val dev.aster.vega.compose.mp/dev_aster_vega_compose_mp_DrawBrush_Linear$stableprop // dev.aster.vega.compose.mp/dev_aster_vega_compose_mp_DrawBrush_Linear$stableprop|#static{}dev_aster_vega_compose_mp_DrawBrush_Linear$stableprop[0]
+final val dev.aster.vega.compose.mp/dev_aster_vega_compose_mp_DrawBrush_Radial$stableprop // dev.aster.vega.compose.mp/dev_aster_vega_compose_mp_DrawBrush_Radial$stableprop|#static{}dev_aster_vega_compose_mp_DrawBrush_Radial$stableprop[0]
+final val dev.aster.vega.compose.mp/dev_aster_vega_compose_mp_DrawBrush_Solid$stableprop // dev.aster.vega.compose.mp/dev_aster_vega_compose_mp_DrawBrush_Solid$stableprop|#static{}dev_aster_vega_compose_mp_DrawBrush_Solid$stableprop[0]
+final val dev.aster.vega.compose.mp/dev_aster_vega_compose_mp_DrawCorners$stableprop // dev.aster.vega.compose.mp/dev_aster_vega_compose_mp_DrawCorners$stableprop|#static{}dev_aster_vega_compose_mp_DrawCorners$stableprop[0]
+final val dev.aster.vega.compose.mp/dev_aster_vega_compose_mp_DrawPaint$stableprop // dev.aster.vega.compose.mp/dev_aster_vega_compose_mp_DrawPaint$stableprop|#static{}dev_aster_vega_compose_mp_DrawPaint$stableprop[0]
+final val dev.aster.vega.compose.mp/dev_aster_vega_compose_mp_DrawPathCommand_Close$stableprop // dev.aster.vega.compose.mp/dev_aster_vega_compose_mp_DrawPathCommand_Close$stableprop|#static{}dev_aster_vega_compose_mp_DrawPathCommand_Close$stableprop[0]
+final val dev.aster.vega.compose.mp/dev_aster_vega_compose_mp_DrawPathCommand_CubicTo$stableprop // dev.aster.vega.compose.mp/dev_aster_vega_compose_mp_DrawPathCommand_CubicTo$stableprop|#static{}dev_aster_vega_compose_mp_DrawPathCommand_CubicTo$stableprop[0]
+final val dev.aster.vega.compose.mp/dev_aster_vega_compose_mp_DrawPathCommand_LineTo$stableprop // dev.aster.vega.compose.mp/dev_aster_vega_compose_mp_DrawPathCommand_LineTo$stableprop|#static{}dev_aster_vega_compose_mp_DrawPathCommand_LineTo$stableprop[0]
+final val dev.aster.vega.compose.mp/dev_aster_vega_compose_mp_DrawPathCommand_MoveTo$stableprop // dev.aster.vega.compose.mp/dev_aster_vega_compose_mp_DrawPathCommand_MoveTo$stableprop|#static{}dev_aster_vega_compose_mp_DrawPathCommand_MoveTo$stableprop[0]
+final val dev.aster.vega.compose.mp/dev_aster_vega_compose_mp_DrawPoint$stableprop // dev.aster.vega.compose.mp/dev_aster_vega_compose_mp_DrawPoint$stableprop|#static{}dev_aster_vega_compose_mp_DrawPoint$stableprop[0]
+final val dev.aster.vega.compose.mp/dev_aster_vega_compose_mp_DrawRect$stableprop // dev.aster.vega.compose.mp/dev_aster_vega_compose_mp_DrawRect$stableprop|#static{}dev_aster_vega_compose_mp_DrawRect$stableprop[0]
+final val dev.aster.vega.compose.mp/dev_aster_vega_compose_mp_DrawScopeTarget$stableprop // dev.aster.vega.compose.mp/dev_aster_vega_compose_mp_DrawScopeTarget$stableprop|#static{}dev_aster_vega_compose_mp_DrawScopeTarget$stableprop[0]
+final val dev.aster.vega.compose.mp/dev_aster_vega_compose_mp_DrawStop$stableprop // dev.aster.vega.compose.mp/dev_aster_vega_compose_mp_DrawStop$stableprop|#static{}dev_aster_vega_compose_mp_DrawStop$stableprop[0]
+final val dev.aster.vega.compose.mp/dev_aster_vega_compose_mp_DrawStroke$stableprop // dev.aster.vega.compose.mp/dev_aster_vega_compose_mp_DrawStroke$stableprop|#static{}dev_aster_vega_compose_mp_DrawStroke$stableprop[0]
+final val dev.aster.vega.compose.mp/dev_aster_vega_compose_mp_DrawTextRun$stableprop // dev.aster.vega.compose.mp/dev_aster_vega_compose_mp_DrawTextRun$stableprop|#static{}dev_aster_vega_compose_mp_DrawTextRun$stableprop[0]
+final val dev.aster.vega.compose.mp/dev_aster_vega_compose_mp_RecordingTarget$stableprop // dev.aster.vega.compose.mp/dev_aster_vega_compose_mp_RecordingTarget$stableprop|#static{}dev_aster_vega_compose_mp_RecordingTarget$stableprop[0]
+final val dev.aster.vega.compose.mp/dev_aster_vega_compose_mp_SceneWalk$stableprop // dev.aster.vega.compose.mp/dev_aster_vega_compose_mp_SceneWalk$stableprop|#static{}dev_aster_vega_compose_mp_SceneWalk$stableprop[0]
+
+final fun dev.aster.vega.compose.mp/VegaChart(dev.aster.vega.scene/Scene, androidx.compose.ui/Modifier?, dev.aster.vega.compose.mp/SceneFit?, androidx.compose.ui.text/TextMeasurer?, androidx.compose.runtime/Composer?, kotlin/Int, kotlin/Int) // dev.aster.vega.compose.mp/VegaChart|VegaChart(dev.aster.vega.scene.Scene;androidx.compose.ui.Modifier?;dev.aster.vega.compose.mp.SceneFit?;androidx.compose.ui.text.TextMeasurer?;androidx.compose.runtime.Composer?;kotlin.Int;kotlin.Int){}[0]
+final fun dev.aster.vega.compose.mp/dev_aster_vega_compose_mp_DrawBrush_Linear$stableprop_getter(): kotlin/Int // dev.aster.vega.compose.mp/dev_aster_vega_compose_mp_DrawBrush_Linear$stableprop_getter|dev_aster_vega_compose_mp_DrawBrush_Linear$stableprop_getter(){}[0]
+final fun dev.aster.vega.compose.mp/dev_aster_vega_compose_mp_DrawBrush_Radial$stableprop_getter(): kotlin/Int // dev.aster.vega.compose.mp/dev_aster_vega_compose_mp_DrawBrush_Radial$stableprop_getter|dev_aster_vega_compose_mp_DrawBrush_Radial$stableprop_getter(){}[0]
+final fun dev.aster.vega.compose.mp/dev_aster_vega_compose_mp_DrawBrush_Solid$stableprop_getter(): kotlin/Int // dev.aster.vega.compose.mp/dev_aster_vega_compose_mp_DrawBrush_Solid$stableprop_getter|dev_aster_vega_compose_mp_DrawBrush_Solid$stableprop_getter(){}[0]
+final fun dev.aster.vega.compose.mp/dev_aster_vega_compose_mp_DrawCorners$stableprop_getter(): kotlin/Int // dev.aster.vega.compose.mp/dev_aster_vega_compose_mp_DrawCorners$stableprop_getter|dev_aster_vega_compose_mp_DrawCorners$stableprop_getter(){}[0]
+final fun dev.aster.vega.compose.mp/dev_aster_vega_compose_mp_DrawPaint$stableprop_getter(): kotlin/Int // dev.aster.vega.compose.mp/dev_aster_vega_compose_mp_DrawPaint$stableprop_getter|dev_aster_vega_compose_mp_DrawPaint$stableprop_getter(){}[0]
+final fun dev.aster.vega.compose.mp/dev_aster_vega_compose_mp_DrawPathCommand_Close$stableprop_getter(): kotlin/Int // dev.aster.vega.compose.mp/dev_aster_vega_compose_mp_DrawPathCommand_Close$stableprop_getter|dev_aster_vega_compose_mp_DrawPathCommand_Close$stableprop_getter(){}[0]
+final fun dev.aster.vega.compose.mp/dev_aster_vega_compose_mp_DrawPathCommand_CubicTo$stableprop_getter(): kotlin/Int // dev.aster.vega.compose.mp/dev_aster_vega_compose_mp_DrawPathCommand_CubicTo$stableprop_getter|dev_aster_vega_compose_mp_DrawPathCommand_CubicTo$stableprop_getter(){}[0]
+final fun dev.aster.vega.compose.mp/dev_aster_vega_compose_mp_DrawPathCommand_LineTo$stableprop_getter(): kotlin/Int // dev.aster.vega.compose.mp/dev_aster_vega_compose_mp_DrawPathCommand_LineTo$stableprop_getter|dev_aster_vega_compose_mp_DrawPathCommand_LineTo$stableprop_getter(){}[0]
+final fun dev.aster.vega.compose.mp/dev_aster_vega_compose_mp_DrawPathCommand_MoveTo$stableprop_getter(): kotlin/Int // dev.aster.vega.compose.mp/dev_aster_vega_compose_mp_DrawPathCommand_MoveTo$stableprop_getter|dev_aster_vega_compose_mp_DrawPathCommand_MoveTo$stableprop_getter(){}[0]
+final fun dev.aster.vega.compose.mp/dev_aster_vega_compose_mp_DrawPoint$stableprop_getter(): kotlin/Int // dev.aster.vega.compose.mp/dev_aster_vega_compose_mp_DrawPoint$stableprop_getter|dev_aster_vega_compose_mp_DrawPoint$stableprop_getter(){}[0]
+final fun dev.aster.vega.compose.mp/dev_aster_vega_compose_mp_DrawRect$stableprop_getter(): kotlin/Int // dev.aster.vega.compose.mp/dev_aster_vega_compose_mp_DrawRect$stableprop_getter|dev_aster_vega_compose_mp_DrawRect$stableprop_getter(){}[0]
+final fun dev.aster.vega.compose.mp/dev_aster_vega_compose_mp_DrawScopeTarget$stableprop_getter(): kotlin/Int // dev.aster.vega.compose.mp/dev_aster_vega_compose_mp_DrawScopeTarget$stableprop_getter|dev_aster_vega_compose_mp_DrawScopeTarget$stableprop_getter(){}[0]
+final fun dev.aster.vega.compose.mp/dev_aster_vega_compose_mp_DrawStop$stableprop_getter(): kotlin/Int // dev.aster.vega.compose.mp/dev_aster_vega_compose_mp_DrawStop$stableprop_getter|dev_aster_vega_compose_mp_DrawStop$stableprop_getter(){}[0]
+final fun dev.aster.vega.compose.mp/dev_aster_vega_compose_mp_DrawStroke$stableprop_getter(): kotlin/Int // dev.aster.vega.compose.mp/dev_aster_vega_compose_mp_DrawStroke$stableprop_getter|dev_aster_vega_compose_mp_DrawStroke$stableprop_getter(){}[0]
+final fun dev.aster.vega.compose.mp/dev_aster_vega_compose_mp_DrawTextRun$stableprop_getter(): kotlin/Int // dev.aster.vega.compose.mp/dev_aster_vega_compose_mp_DrawTextRun$stableprop_getter|dev_aster_vega_compose_mp_DrawTextRun$stableprop_getter(){}[0]
+final fun dev.aster.vega.compose.mp/dev_aster_vega_compose_mp_RecordingTarget$stableprop_getter(): kotlin/Int // dev.aster.vega.compose.mp/dev_aster_vega_compose_mp_RecordingTarget$stableprop_getter|dev_aster_vega_compose_mp_RecordingTarget$stableprop_getter(){}[0]
+final fun dev.aster.vega.compose.mp/dev_aster_vega_compose_mp_SceneWalk$stableprop_getter(): kotlin/Int // dev.aster.vega.compose.mp/dev_aster_vega_compose_mp_SceneWalk$stableprop_getter|dev_aster_vega_compose_mp_SceneWalk$stableprop_getter(){}[0]
