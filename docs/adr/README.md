@@ -14,3 +14,4 @@ Amend a record rather than silently changing behaviour that contradicts it.
 | [0005](0005-vega-lite-compilation-is-out-of-scope.md) | Vega-Lite compilation is outside the first release |
 | [0006](0006-text-measurement-and-font-policy.md) | Text measurement and font-compatibility policy |
 | [0007](0007-scene-identity-and-incremental-updates.md) | Scene identity and incremental update policy |
+| [0008](0008-visual-regression-is-structural.md) | Visual regression is checked structurally, not in pixels |
