@@ -1,0 +1,252 @@
+{
+  "$schema": "https://vega.github.io/schema/vega/v6.json",
+  "description": "A grid of maps: the outlines are joined on as whole records, gathered into a collection of their own, and the grid has one projection so every cell is drawn at the same scale. The figures are inline so the fixture stays about the grid rather than about loading; keying a number against its own text is pinned on its own, by the runtime's format-parse fixture.",
+  "background": "white",
+  "padding": 5,
+  "data": [
+    {
+      "name": "source_0",
+      "values": [
+        {
+          "id": 1,
+          "rate": 0.04,
+          "band": "low"
+        },
+        {
+          "id": 4,
+          "rate": 0.09,
+          "band": "high"
+        },
+        {
+          "id": 5,
+          "rate": 0.06,
+          "band": "low"
+        },
+        {
+          "id": 6,
+          "rate": 0.11,
+          "band": "high"
+        },
+        {
+          "id": 8,
+          "rate": 0.03,
+          "band": "low"
+        },
+        {
+          "id": 12,
+          "rate": 0.1,
+          "band": "high"
+        }
+      ]
+    },
+    {
+      "name": "source_1",
+      "url": "data/us-10m.json",
+      "format": {
+        "type": "topojson",
+        "feature": "states"
+      }
+    },
+    {
+      "name": "data_0",
+      "source": "source_0",
+      "transform": [
+        {
+          "type": "lookup",
+          "from": "source_1",
+          "key": "id",
+          "fields": [
+            "id"
+          ],
+          "as": [
+            "geo"
+          ]
+        },
+        {
+          "type": "filter",
+          "expr": "isValid(datum[\"geo\"])"
+        },
+        {
+          "type": "geojson",
+          "geojson": "geo",
+          "signal": "child_geojson_0"
+        },
+        {
+          "type": "filter",
+          "expr": "isValid(datum[\"rate\"]) && isFinite(+datum[\"rate\"])"
+        }
+      ]
+    },
+    {
+      "name": "row_domain",
+      "source": "data_0",
+      "transform": [
+        {
+          "type": "aggregate",
+          "groupby": [
+            "band"
+          ]
+        }
+      ]
+    }
+  ],
+  "projections": [
+    {
+      "name": "projection",
+      "size": {
+        "signal": "[child_width, child_height]"
+      },
+      "fit": {
+        "signal": "child_geojson_0"
+      },
+      "type": "albersUsa"
+    }
+  ],
+  "signals": [
+    {
+      "name": "child_width",
+      "value": 300
+    },
+    {
+      "name": "child_height",
+      "value": 180
+    }
+  ],
+  "layout": {
+    "padding": 20,
+    "offset": {
+      "rowTitle": 10
+    },
+    "columns": 1,
+    "bounds": "full",
+    "align": "all"
+  },
+  "marks": [
+    {
+      "name": "row-title",
+      "type": "group",
+      "role": "row-title",
+      "title": {
+        "text": "band",
+        "orient": "left",
+        "style": "guide-title",
+        "offset": 10
+      }
+    },
+    {
+      "name": "row_header",
+      "type": "group",
+      "role": "row-header",
+      "from": {
+        "data": "row_domain"
+      },
+      "sort": {
+        "field": "datum[\"band\"]",
+        "order": "ascending"
+      },
+      "title": {
+        "text": {
+          "signal": "isValid(parent[\"band\"]) ? parent[\"band\"] : \"\"+parent[\"band\"]"
+        },
+        "orient": "left",
+        "style": "guide-label",
+        "frame": "group",
+        "offset": 10
+      },
+      "encode": {
+        "update": {
+          "height": {
+            "signal": "child_height"
+          }
+        }
+      }
+    },
+    {
+      "name": "cell",
+      "type": "group",
+      "style": "view",
+      "from": {
+        "facet": {
+          "name": "facet",
+          "data": "data_0",
+          "groupby": [
+            "band"
+          ]
+        }
+      },
+      "sort": {
+        "field": [
+          "datum[\"band\"]"
+        ],
+        "order": [
+          "ascending"
+        ]
+      },
+      "encode": {
+        "update": {
+          "width": {
+            "signal": "child_width"
+          },
+          "height": {
+            "signal": "child_height"
+          }
+        }
+      },
+      "marks": [
+        {
+          "name": "child_marks",
+          "type": "shape",
+          "style": [
+            "geoshape"
+          ],
+          "from": {
+            "data": "facet"
+          },
+          "encode": {
+            "update": {
+              "fill": {
+                "scale": "color",
+                "field": "rate"
+              },
+              "ariaRoleDescription": {
+                "value": "geoshape"
+              },
+              "description": {
+                "signal": "\"rate: \" + (format(datum[\"rate\"], \"\")) + \"; geo: \" + (isValid(datum[\"geo\"]) ? datum[\"geo\"] : \"\"+datum[\"geo\"])"
+              }
+            }
+          },
+          "transform": [
+            {
+              "type": "geoshape",
+              "projection": "projection",
+              "field": "datum[\"geo\"]"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "scales": [
+    {
+      "name": "color",
+      "type": "linear",
+      "domain": {
+        "data": "data_0",
+        "field": "rate"
+      },
+      "range": "heatmap",
+      "interpolate": "hcl",
+      "zero": false
+    }
+  ],
+  "legends": [
+    {
+      "fill": "color",
+      "gradientLength": {
+        "signal": "clamp(child_height, 64, 200)"
+      },
+      "title": "rate"
+    }
+  ]
+}

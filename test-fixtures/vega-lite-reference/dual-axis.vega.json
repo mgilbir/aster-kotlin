@@ -1,0 +1,306 @@
+{
+  "$schema": "https://vega.github.io/schema/vega/v6.json",
+  "description": "Two measures over one plot, each with a scale and an axis of its own.",
+  "background": "white",
+  "padding": 5,
+  "width": 200,
+  "height": 140,
+  "style": "cell",
+  "data": [
+    {
+      "name": "source_0",
+      "values": [
+        {
+          "month": "Jan",
+          "revenue": 280,
+          "rate": 3.1
+        },
+        {
+          "month": "Feb",
+          "revenue": 550,
+          "rate": 2.4
+        },
+        {
+          "month": "Mar",
+          "revenue": 430,
+          "rate": 4.8
+        },
+        {
+          "month": "Apr",
+          "revenue": 910,
+          "rate": 1.2
+        }
+      ]
+    },
+    {
+      "name": "data_1",
+      "source": "source_0",
+      "transform": [
+        {
+          "type": "stack",
+          "groupby": [
+            "month"
+          ],
+          "field": "revenue",
+          "sort": {
+            "field": [],
+            "order": []
+          },
+          "as": [
+            "revenue_start",
+            "revenue_end"
+          ],
+          "offset": "zero"
+        },
+        {
+          "type": "filter",
+          "expr": "isValid(datum[\"revenue\"]) && isFinite(+datum[\"revenue\"])"
+        }
+      ]
+    },
+    {
+      "name": "data_2",
+      "source": "source_0",
+      "transform": [
+        {
+          "type": "filter",
+          "expr": "isValid(datum[\"rate\"]) && isFinite(+datum[\"rate\"])"
+        }
+      ]
+    }
+  ],
+  "marks": [
+    {
+      "name": "layer_0_marks",
+      "type": "rect",
+      "style": [
+        "bar"
+      ],
+      "from": {
+        "data": "data_1"
+      },
+      "encode": {
+        "update": {
+          "fill": {
+            "value": "#4c78a8"
+          },
+          "ariaRoleDescription": {
+            "value": "bar"
+          },
+          "description": {
+            "signal": "\"month: \" + (isValid(datum[\"month\"]) ? isArray(datum[\"month\"]) ? join(datum[\"month\"], ' ') : datum[\"month\"] : \"\"+datum[\"month\"]) + \"; revenue: \" + (format(datum[\"revenue\"], \"\"))"
+          },
+          "x": {
+            "scale": "x",
+            "field": "month"
+          },
+          "width": {
+            "signal": "max(0.25, bandwidth('x'))"
+          },
+          "y": {
+            "scale": "layer_0_y",
+            "field": "revenue_end"
+          },
+          "y2": {
+            "scale": "layer_0_y",
+            "field": "revenue_start"
+          }
+        }
+      }
+    },
+    {
+      "name": "layer_1_layer_0_marks",
+      "type": "line",
+      "style": [
+        "line"
+      ],
+      "sort": {
+        "field": "x"
+      },
+      "from": {
+        "data": "source_0"
+      },
+      "encode": {
+        "update": {
+          "stroke": {
+            "value": "firebrick"
+          },
+          "description": {
+            "signal": "\"month: \" + (isValid(datum[\"month\"]) ? isArray(datum[\"month\"]) ? join(datum[\"month\"], ' ') : datum[\"month\"] : \"\"+datum[\"month\"]) + \"; rate: \" + (format(datum[\"rate\"], \"\"))"
+          },
+          "x": {
+            "scale": "x",
+            "field": "month",
+            "band": 0.5
+          },
+          "y": {
+            "scale": "layer_1_y",
+            "field": "rate"
+          },
+          "defined": {
+            "signal": "isValid(datum[\"rate\"]) && isFinite(+datum[\"rate\"])"
+          }
+        }
+      }
+    },
+    {
+      "name": "layer_1_layer_1_marks",
+      "type": "symbol",
+      "style": [
+        "point"
+      ],
+      "from": {
+        "data": "data_2"
+      },
+      "encode": {
+        "update": {
+          "opacity": {
+            "value": 1
+          },
+          "fill": {
+            "value": "#4c78a8"
+          },
+          "ariaRoleDescription": {
+            "value": "point"
+          },
+          "description": {
+            "signal": "\"month: \" + (isValid(datum[\"month\"]) ? isArray(datum[\"month\"]) ? join(datum[\"month\"], ' ') : datum[\"month\"] : \"\"+datum[\"month\"]) + \"; rate: \" + (format(datum[\"rate\"], \"\"))"
+          },
+          "x": {
+            "scale": "x",
+            "field": "month",
+            "band": 0.5
+          },
+          "y": {
+            "scale": "layer_1_y",
+            "field": "rate"
+          }
+        }
+      }
+    }
+  ],
+  "scales": [
+    {
+      "name": "x",
+      "type": "band",
+      "domain": {
+        "fields": [
+          {
+            "data": "data_1",
+            "field": "month"
+          },
+          {
+            "data": "source_0",
+            "field": "month"
+          },
+          {
+            "data": "data_2",
+            "field": "month"
+          }
+        ],
+        "sort": true
+      },
+      "range": [
+        0,
+        {
+          "signal": "width"
+        }
+      ],
+      "paddingInner": 0.1,
+      "paddingOuter": 0.05
+    },
+    {
+      "name": "layer_0_y",
+      "type": "linear",
+      "domain": {
+        "data": "data_1",
+        "fields": [
+          "revenue_start",
+          "revenue_end"
+        ]
+      },
+      "range": [
+        {
+          "signal": "height"
+        },
+        0
+      ],
+      "nice": true,
+      "zero": true
+    },
+    {
+      "name": "layer_1_y",
+      "type": "linear",
+      "domain": {
+        "fields": [
+          {
+            "data": "source_0",
+            "field": "rate"
+          },
+          {
+            "data": "data_2",
+            "field": "rate"
+          }
+        ]
+      },
+      "range": [
+        {
+          "signal": "height"
+        },
+        0
+      ],
+      "nice": true,
+      "zero": true
+    }
+  ],
+  "axes": [
+    {
+      "scale": "layer_0_y",
+      "orient": "left",
+      "gridScale": "x",
+      "grid": true,
+      "tickCount": {
+        "signal": "ceil(height/40)"
+      },
+      "domain": false,
+      "labels": false,
+      "aria": false,
+      "maxExtent": 0,
+      "minExtent": 0,
+      "ticks": false,
+      "zindex": 0
+    },
+    {
+      "scale": "x",
+      "orient": "bottom",
+      "grid": false,
+      "title": "month",
+      "labelAlign": "right",
+      "labelAngle": 270,
+      "labelBaseline": "middle",
+      "zindex": 0
+    },
+    {
+      "scale": "layer_0_y",
+      "orient": "left",
+      "grid": false,
+      "title": "revenue",
+      "labelOverlap": true,
+      "tickCount": {
+        "signal": "ceil(height/40)"
+      },
+      "zindex": 0
+    },
+    {
+      "scale": "layer_1_y",
+      "orient": "right",
+      "grid": false,
+      "title": "rate",
+      "labelOverlap": true,
+      "tickCount": {
+        "signal": "ceil(height/40)"
+      },
+      "zindex": 0
+    }
+  ]
+}

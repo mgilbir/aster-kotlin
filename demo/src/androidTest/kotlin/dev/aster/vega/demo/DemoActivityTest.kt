@@ -9,6 +9,7 @@ import dev.aster.vega.model.DiagnosticSeverity
 import dev.aster.vega.runtime.VegaChartController
 import dev.aster.vega.scene.flatten
 import dev.aster.vega.scene.toCanonicalJson
+import dev.aster.vegalite.VegaLiteInput
 import java.io.File
 import java.io.IOException
 import org.junit.Assert.assertEquals
@@ -108,6 +109,7 @@ class DemoActivityTest {
     for (chart in DemoChart.entries.filter { it.specAsset != null }) {
       val asset = requireNotNull(chart.specAsset)
       val json = context.assets.open(asset).bufferedReader().use { it.readText() }
+      // A specification that fetches gets a loader that can; the rest are read from the assets.
       val controller =
         if (""""url"""" in json) {
           VegaChartController(
@@ -117,7 +119,12 @@ class DemoActivityTest {
         } else {
           VegaChartController(textEngine = AndroidTextEngine())
         }
-      val compiled = controller.setSpec(json)
+      // Through the same routing the screen uses, so a bundled Vega-Lite specification is compiled
+      // the way a pasted one would be rather than handed to the Vega parser as-is.
+      val converted = VegaLiteInput.toVega(json)
+      val vegaLiteErrors = converted.diagnostics.filter { it.severity >= DiagnosticSeverity.ERROR }
+      assertTrue("$asset reported $vegaLiteErrors", vegaLiteErrors.isEmpty())
+      val compiled = controller.setSpec(requireNotNull(converted.vegaJson))
 
       assertTrue("$asset produced no scene", compiled.isUsable)
       val errors = compiled.diagnostics.filter { it.severity >= DiagnosticSeverity.ERROR }

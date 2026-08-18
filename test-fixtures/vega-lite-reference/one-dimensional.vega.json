@@ -1,0 +1,295 @@
+{
+  "$schema": "https://vega.github.io/schema/vega/v6.json",
+  "description": "Two charts that measure one thing: a strip of ticks and a single total, each twenty deep.",
+  "background": "white",
+  "padding": 5,
+  "width": 300,
+  "data": [
+    {
+      "name": "source_0",
+      "values": [
+        {
+          "category": "Alpha",
+          "amount": 28,
+          "start": 2,
+          "end": 9
+        },
+        {
+          "category": "Beta",
+          "amount": 55,
+          "start": 11,
+          "end": 18
+        },
+        {
+          "category": "Gamma",
+          "amount": 43,
+          "start": 21,
+          "end": 27
+        }
+      ]
+    },
+    {
+      "name": "data_1",
+      "source": "source_0",
+      "transform": [
+        {
+          "type": "filter",
+          "expr": "isValid(datum[\"amount\"]) && isFinite(+datum[\"amount\"])"
+        }
+      ]
+    },
+    {
+      "name": "data_2",
+      "source": "source_0",
+      "transform": [
+        {
+          "type": "aggregate",
+          "groupby": [],
+          "ops": [
+            "sum"
+          ],
+          "fields": [
+            "amount"
+          ],
+          "as": [
+            "sum_amount"
+          ]
+        },
+        {
+          "type": "filter",
+          "expr": "isValid(datum[\"sum_amount\"]) && isFinite(+datum[\"sum_amount\"])"
+        }
+      ]
+    }
+  ],
+  "signals": [
+    {
+      "name": "childHeight",
+      "value": 20
+    }
+  ],
+  "layout": {
+    "padding": 20,
+    "columns": 1,
+    "bounds": "full",
+    "align": "each"
+  },
+  "marks": [
+    {
+      "type": "group",
+      "name": "concat_0_group",
+      "style": "cell",
+      "encode": {
+        "update": {
+          "width": {
+            "signal": "width"
+          },
+          "height": {
+            "signal": "childHeight"
+          }
+        }
+      },
+      "signals": [
+        {
+          "name": "height",
+          "update": "childHeight"
+        }
+      ],
+      "marks": [
+        {
+          "name": "concat_0_marks",
+          "type": "rect",
+          "style": [
+            "tick"
+          ],
+          "from": {
+            "data": "data_1"
+          },
+          "encode": {
+            "update": {
+              "opacity": {
+                "value": 0.7
+              },
+              "fill": {
+                "value": "#4c78a8"
+              },
+              "ariaRoleDescription": {
+                "value": "tick"
+              },
+              "description": {
+                "signal": "\"amount: \" + (format(datum[\"amount\"], \"\"))"
+              },
+              "yc": {
+                "signal": "childHeight",
+                "mult": 0.5
+              },
+              "height": {
+                "signal": "0.75 * height"
+              },
+              "xc": {
+                "scale": "concat_0_x",
+                "field": "amount"
+              },
+              "width": {
+                "value": 1
+              }
+            }
+          }
+        }
+      ],
+      "axes": [
+        {
+          "scale": "concat_0_x",
+          "orient": "bottom",
+          "grid": true,
+          "tickCount": {
+            "signal": "ceil(width/40)"
+          },
+          "domain": false,
+          "labels": false,
+          "aria": false,
+          "maxExtent": 0,
+          "minExtent": 0,
+          "ticks": false,
+          "zindex": 0
+        },
+        {
+          "scale": "concat_0_x",
+          "orient": "bottom",
+          "grid": false,
+          "title": "amount",
+          "labelFlush": true,
+          "labelOverlap": true,
+          "tickCount": {
+            "signal": "ceil(width/40)"
+          },
+          "zindex": 0
+        }
+      ]
+    },
+    {
+      "type": "group",
+      "name": "concat_1_group",
+      "style": "cell",
+      "encode": {
+        "update": {
+          "width": {
+            "signal": "width"
+          },
+          "height": {
+            "signal": "childHeight"
+          }
+        }
+      },
+      "signals": [
+        {
+          "name": "height",
+          "update": "childHeight"
+        }
+      ],
+      "marks": [
+        {
+          "name": "concat_1_marks",
+          "type": "rect",
+          "style": [
+            "bar"
+          ],
+          "from": {
+            "data": "data_2"
+          },
+          "encode": {
+            "update": {
+              "fill": {
+                "value": "#4c78a8"
+              },
+              "ariaRoleDescription": {
+                "value": "bar"
+              },
+              "description": {
+                "signal": "\"Sum of amount: \" + (format(datum[\"sum_amount\"], \"\"))"
+              },
+              "x": {
+                "scale": "concat_1_x",
+                "field": "sum_amount"
+              },
+              "x2": {
+                "scale": "concat_1_x",
+                "value": 0
+              },
+              "yc": {
+                "signal": "childHeight",
+                "mult": 0.5
+              },
+              "height": {
+                "signal": "0.9 * height"
+              }
+            }
+          }
+        }
+      ],
+      "axes": [
+        {
+          "scale": "concat_1_x",
+          "orient": "bottom",
+          "grid": true,
+          "tickCount": {
+            "signal": "ceil(width/40)"
+          },
+          "domain": false,
+          "labels": false,
+          "aria": false,
+          "maxExtent": 0,
+          "minExtent": 0,
+          "ticks": false,
+          "zindex": 0
+        },
+        {
+          "scale": "concat_1_x",
+          "orient": "bottom",
+          "grid": false,
+          "title": "Sum of amount",
+          "labelFlush": true,
+          "labelOverlap": true,
+          "tickCount": {
+            "signal": "ceil(width/40)"
+          },
+          "zindex": 0
+        }
+      ]
+    }
+  ],
+  "scales": [
+    {
+      "name": "concat_0_x",
+      "type": "linear",
+      "domain": {
+        "data": "data_1",
+        "field": "amount"
+      },
+      "range": [
+        0,
+        {
+          "signal": "width"
+        }
+      ],
+      "nice": true,
+      "zero": true
+    },
+    {
+      "name": "concat_1_x",
+      "type": "linear",
+      "domain": {
+        "data": "data_2",
+        "field": "sum_amount"
+      },
+      "range": [
+        0,
+        {
+          "signal": "width"
+        }
+      ],
+      "nice": true,
+      "zero": true
+    }
+  ]
+}

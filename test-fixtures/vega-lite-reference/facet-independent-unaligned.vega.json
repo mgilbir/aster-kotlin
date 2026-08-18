@@ -1,0 +1,260 @@
+{
+  "$schema": "https://vega.github.io/schema/vega/v6.json",
+  "description": "A trellis whose cells each scale x for themselves, and so cannot be aligned along it: their plotting areas are different widths.",
+  "background": "white",
+  "padding": 5,
+  "data": [
+    {
+      "name": "source_0",
+      "url": "data/barley.json",
+      "format": {
+        "type": "json"
+      },
+      "transform": [
+        {
+          "type": "aggregate",
+          "groupby": [
+            "variety",
+            "site"
+          ],
+          "ops": [
+            "sum"
+          ],
+          "fields": [
+            "yield"
+          ],
+          "as": [
+            "sum_yield"
+          ]
+        },
+        {
+          "type": "filter",
+          "expr": "isValid(datum[\"sum_yield\"]) && isFinite(+datum[\"sum_yield\"])"
+        }
+      ]
+    },
+    {
+      "name": "row_domain",
+      "source": "source_0",
+      "transform": [
+        {
+          "type": "aggregate",
+          "groupby": [
+            "site"
+          ]
+        }
+      ]
+    }
+  ],
+  "signals": [
+    {
+      "name": "child_width",
+      "value": 200
+    },
+    {
+      "name": "y_step",
+      "value": 20
+    },
+    {
+      "name": "child_height",
+      "update": "bandspace(domain('y').length, 0.1, 0.05) * y_step"
+    }
+  ],
+  "layout": {
+    "padding": 20,
+    "offset": {
+      "rowTitle": 10
+    },
+    "columns": 1,
+    "bounds": "full",
+    "align": "all"
+  },
+  "marks": [
+    {
+      "name": "row-title",
+      "type": "group",
+      "role": "row-title",
+      "title": {
+        "text": "site",
+        "orient": "left",
+        "style": "guide-title",
+        "offset": 10
+      }
+    },
+    {
+      "name": "row_header",
+      "type": "group",
+      "role": "row-header",
+      "from": {
+        "data": "row_domain"
+      },
+      "sort": {
+        "field": "datum[\"site\"]",
+        "order": "ascending"
+      },
+      "title": {
+        "text": {
+          "signal": "isValid(parent[\"site\"]) ? parent[\"site\"] : \"\"+parent[\"site\"]"
+        },
+        "orient": "left",
+        "style": "guide-label",
+        "frame": "group",
+        "offset": 10
+      },
+      "encode": {
+        "update": {
+          "height": {
+            "signal": "child_height"
+          }
+        }
+      },
+      "axes": [
+        {
+          "scale": "y",
+          "orient": "left",
+          "grid": false,
+          "title": "variety",
+          "zindex": 0
+        }
+      ]
+    },
+    {
+      "name": "cell",
+      "type": "group",
+      "style": "cell",
+      "from": {
+        "facet": {
+          "name": "facet",
+          "data": "source_0",
+          "groupby": [
+            "site"
+          ]
+        }
+      },
+      "sort": {
+        "field": [
+          "datum[\"site\"]"
+        ],
+        "order": [
+          "ascending"
+        ]
+      },
+      "encode": {
+        "update": {
+          "width": {
+            "signal": "child_width"
+          },
+          "height": {
+            "signal": "child_height"
+          }
+        }
+      },
+      "marks": [
+        {
+          "name": "child_marks",
+          "type": "rect",
+          "style": [
+            "bar"
+          ],
+          "from": {
+            "data": "facet"
+          },
+          "encode": {
+            "update": {
+              "fill": {
+                "value": "#4c78a8"
+              },
+              "ariaRoleDescription": {
+                "value": "bar"
+              },
+              "description": {
+                "signal": "\"Sum of yield: \" + (format(datum[\"sum_yield\"], \"\")) + \"; variety: \" + (isValid(datum[\"variety\"]) ? isArray(datum[\"variety\"]) ? join(datum[\"variety\"], ' ') : datum[\"variety\"] : \"\"+datum[\"variety\"])"
+              },
+              "x": {
+                "scale": "child_x",
+                "field": "sum_yield"
+              },
+              "x2": {
+                "scale": "child_x",
+                "value": 0
+              },
+              "y": {
+                "scale": "y",
+                "field": "variety"
+              },
+              "height": {
+                "signal": "max(0.25, bandwidth('y'))"
+              }
+            }
+          }
+        }
+      ],
+      "scales": [
+        {
+          "name": "child_x",
+          "type": "linear",
+          "domain": {
+            "data": "facet",
+            "field": "sum_yield"
+          },
+          "range": [
+            0,
+            {
+              "signal": "child_width"
+            }
+          ],
+          "nice": true,
+          "zero": true
+        }
+      ],
+      "axes": [
+        {
+          "scale": "child_x",
+          "orient": "bottom",
+          "gridScale": "y",
+          "grid": true,
+          "tickCount": {
+            "signal": "ceil(child_width/40)"
+          },
+          "domain": false,
+          "labels": false,
+          "aria": false,
+          "maxExtent": 0,
+          "minExtent": 0,
+          "ticks": false,
+          "zindex": 0
+        },
+        {
+          "scale": "child_x",
+          "orient": "bottom",
+          "grid": false,
+          "title": "Sum of yield",
+          "labelFlush": true,
+          "labelOverlap": true,
+          "tickCount": {
+            "signal": "ceil(child_width/40)"
+          },
+          "zindex": 0
+        }
+      ]
+    }
+  ],
+  "scales": [
+    {
+      "name": "y",
+      "type": "band",
+      "domain": {
+        "data": "source_0",
+        "field": "variety",
+        "sort": true
+      },
+      "range": {
+        "step": {
+          "signal": "y_step"
+        }
+      },
+      "paddingInner": 0.1,
+      "paddingOuter": 0.05
+    }
+  ]
+}

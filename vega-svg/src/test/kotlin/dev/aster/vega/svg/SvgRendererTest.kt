@@ -343,6 +343,32 @@ class SvgRendererTest {
   }
 
   @Test
+  fun `a group paints a rectangle of its own size, clipped or not`() {
+    // Vega-Lite's plotting area: a group that states a size and a border and does not clip. The
+    // export read the clip alone, so every chart it compiled lost the thin grey box around its
+    // plot — visible only by putting the SVG beside upstream's.
+    val cell =
+      GroupNode(
+        id = ids.allocate(),
+        children =
+          listOf(RectNode(id = ids.allocate(), x = 1.0, y = 1.0, width = 2.0, height = 2.0)),
+        size = SizeD(40.0, 30.0),
+        stroke = Stroke(ScenePaint.Solid(SceneColor.parse("#ddd")!!)),
+      )
+    val svg = sceneOf(cell).toSvg()
+    // The extent, not the origin: a stroked rectangle is drawn on the half-pixel so its outline
+    // lands on the device grid rather than straddling two rows of pixels, which is `strokeOffset`.
+    assertTrue(
+      svg.contains("""width="40" height="30"""") && svg.contains("stroke=\"#dddddd\""),
+      "the cell's own border is missing:\n$svg",
+    )
+
+    // And a group that paints nothing still paints nothing, size or no size.
+    val plain = GroupNode(id = ids.allocate(), children = emptyList(), size = SizeD(40.0, 30.0))
+    assertFalse(sceneOf(plain).toSvg().contains("<rect"))
+  }
+
+  @Test
   fun `background is emitted as a rect when opaque`() {
     assertTrue(sceneOf(background = SceneColor.White).toSvg().contains("""fill="#ffffff""""))
     assertFalse(sceneOf(background = SceneColor.Transparent).toSvg().contains("<rect"))

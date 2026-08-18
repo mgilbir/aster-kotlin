@@ -1,0 +1,399 @@
+{
+  "$schema": "https://vega.github.io/schema/vega/v6.json",
+  "description": "Titles on a nested concatenation, and a ramp measured against the cell it stands beside.",
+  "background": "white",
+  "padding": 5,
+  "data": [
+    {
+      "name": "source_0",
+      "url": "data/cars.json",
+      "format": {
+        "type": "json"
+      }
+    },
+    {
+      "name": "data_0",
+      "source": "source_0",
+      "transform": [
+        {
+          "type": "filter",
+          "expr": "isValid(datum[\"Horsepower\"]) && isFinite(+datum[\"Horsepower\"]) && isValid(datum[\"Miles_per_Gallon\"]) && isFinite(+datum[\"Miles_per_Gallon\"]) && isValid(datum[\"Acceleration\"]) && isFinite(+datum[\"Acceleration\"])"
+        }
+      ]
+    },
+    {
+      "name": "data_1",
+      "source": "source_0",
+      "transform": [
+        {
+          "type": "filter",
+          "expr": "isValid(datum[\"Weight_in_lbs\"]) && isFinite(+datum[\"Weight_in_lbs\"]) && isValid(datum[\"Miles_per_Gallon\"]) && isFinite(+datum[\"Miles_per_Gallon\"]) && isValid(datum[\"Acceleration\"]) && isFinite(+datum[\"Acceleration\"])"
+        }
+      ]
+    }
+  ],
+  "signals": [
+    {
+      "name": "childWidth",
+      "value": 100
+    },
+    {
+      "name": "concat_0_concat_0_height",
+      "value": 100
+    },
+    {
+      "name": "concat_0_concat_1_height",
+      "value": 140
+    }
+  ],
+  "layout": {
+    "padding": 20,
+    "bounds": "full",
+    "align": "each"
+  },
+  "marks": [
+    {
+      "type": "group",
+      "name": "concat_0_group",
+      "title": {
+        "text": "By power",
+        "anchor": "start"
+      },
+      "layout": {
+        "padding": 20,
+        "columns": 1,
+        "bounds": "full",
+        "align": "each"
+      },
+      "marks": [
+        {
+          "type": "group",
+          "name": "concat_0_concat_0_group",
+          "style": "cell",
+          "encode": {
+            "update": {
+              "width": {
+                "signal": "childWidth"
+              },
+              "height": {
+                "signal": "concat_0_concat_0_height"
+              }
+            }
+          },
+          "marks": [
+            {
+              "name": "concat_0_concat_0_marks",
+              "type": "symbol",
+              "style": [
+                "point"
+              ],
+              "from": {
+                "data": "data_0"
+              },
+              "encode": {
+                "update": {
+                  "opacity": {
+                    "value": 0.7
+                  },
+                  "fill": {
+                    "value": "transparent"
+                  },
+                  "stroke": {
+                    "scale": "color",
+                    "field": "Acceleration"
+                  },
+                  "ariaRoleDescription": {
+                    "value": "point"
+                  },
+                  "description": {
+                    "signal": "\"Horsepower: \" + (format(datum[\"Horsepower\"], \"\")) + \"; Miles_per_Gallon: \" + (format(datum[\"Miles_per_Gallon\"], \"\")) + \"; Acceleration: \" + (format(datum[\"Acceleration\"], \"\"))"
+                  },
+                  "x": {
+                    "scale": "concat_0_concat_0_x",
+                    "field": "Horsepower"
+                  },
+                  "y": {
+                    "scale": "concat_0_concat_0_y",
+                    "field": "Miles_per_Gallon"
+                  }
+                }
+              }
+            }
+          ],
+          "axes": [
+            {
+              "scale": "concat_0_concat_0_x",
+              "orient": "bottom",
+              "gridScale": "concat_0_concat_0_y",
+              "grid": true,
+              "tickCount": {
+                "signal": "ceil(childWidth/40)"
+              },
+              "domain": false,
+              "labels": false,
+              "aria": false,
+              "maxExtent": 0,
+              "minExtent": 0,
+              "ticks": false,
+              "zindex": 0
+            },
+            {
+              "scale": "concat_0_concat_0_y",
+              "orient": "left",
+              "gridScale": "concat_0_concat_0_x",
+              "grid": true,
+              "tickCount": {
+                "signal": "ceil(concat_0_concat_0_height/40)"
+              },
+              "domain": false,
+              "labels": false,
+              "aria": false,
+              "maxExtent": 0,
+              "minExtent": 0,
+              "ticks": false,
+              "zindex": 0
+            },
+            {
+              "scale": "concat_0_concat_0_x",
+              "orient": "bottom",
+              "grid": false,
+              "title": "Horsepower",
+              "labelFlush": true,
+              "labelOverlap": true,
+              "tickCount": {
+                "signal": "ceil(childWidth/40)"
+              },
+              "zindex": 0
+            },
+            {
+              "scale": "concat_0_concat_0_y",
+              "orient": "left",
+              "grid": false,
+              "title": "Miles_per_Gallon",
+              "labelOverlap": true,
+              "tickCount": {
+                "signal": "ceil(concat_0_concat_0_height/40)"
+              },
+              "zindex": 0
+            }
+          ]
+        },
+        {
+          "type": "group",
+          "name": "concat_0_concat_1_group",
+          "style": "cell",
+          "encode": {
+            "update": {
+              "width": {
+                "signal": "childWidth"
+              },
+              "height": {
+                "signal": "concat_0_concat_1_height"
+              }
+            }
+          },
+          "marks": [
+            {
+              "name": "concat_0_concat_1_marks",
+              "type": "symbol",
+              "style": [
+                "point"
+              ],
+              "from": {
+                "data": "data_1"
+              },
+              "encode": {
+                "update": {
+                  "opacity": {
+                    "value": 0.7
+                  },
+                  "fill": {
+                    "value": "transparent"
+                  },
+                  "stroke": {
+                    "scale": "color",
+                    "field": "Acceleration"
+                  },
+                  "ariaRoleDescription": {
+                    "value": "point"
+                  },
+                  "description": {
+                    "signal": "\"Weight_in_lbs: \" + (format(datum[\"Weight_in_lbs\"], \"\")) + \"; Miles_per_Gallon: \" + (format(datum[\"Miles_per_Gallon\"], \"\")) + \"; Acceleration: \" + (format(datum[\"Acceleration\"], \"\"))"
+                  },
+                  "x": {
+                    "scale": "concat_0_concat_1_x",
+                    "field": "Weight_in_lbs"
+                  },
+                  "y": {
+                    "scale": "concat_0_concat_1_y",
+                    "field": "Miles_per_Gallon"
+                  }
+                }
+              }
+            }
+          ],
+          "axes": [
+            {
+              "scale": "concat_0_concat_1_x",
+              "orient": "bottom",
+              "gridScale": "concat_0_concat_1_y",
+              "grid": true,
+              "tickCount": {
+                "signal": "ceil(childWidth/40)"
+              },
+              "domain": false,
+              "labels": false,
+              "aria": false,
+              "maxExtent": 0,
+              "minExtent": 0,
+              "ticks": false,
+              "zindex": 0
+            },
+            {
+              "scale": "concat_0_concat_1_y",
+              "orient": "left",
+              "gridScale": "concat_0_concat_1_x",
+              "grid": true,
+              "tickCount": {
+                "signal": "ceil(concat_0_concat_1_height/40)"
+              },
+              "domain": false,
+              "labels": false,
+              "aria": false,
+              "maxExtent": 0,
+              "minExtent": 0,
+              "ticks": false,
+              "zindex": 0
+            },
+            {
+              "scale": "concat_0_concat_1_x",
+              "orient": "bottom",
+              "grid": false,
+              "title": "Weight_in_lbs",
+              "labelFlush": true,
+              "labelOverlap": true,
+              "tickCount": {
+                "signal": "ceil(childWidth/40)"
+              },
+              "zindex": 0
+            },
+            {
+              "scale": "concat_0_concat_1_y",
+              "orient": "left",
+              "grid": false,
+              "title": "Miles_per_Gallon",
+              "labelOverlap": true,
+              "tickCount": {
+                "signal": "ceil(concat_0_concat_1_height/40)"
+              },
+              "zindex": 0
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "scales": [
+    {
+      "name": "color",
+      "type": "linear",
+      "domain": {
+        "fields": [
+          {
+            "data": "data_0",
+            "field": "Acceleration"
+          },
+          {
+            "data": "data_1",
+            "field": "Acceleration"
+          }
+        ]
+      },
+      "range": "ramp",
+      "interpolate": "hcl",
+      "zero": false
+    },
+    {
+      "name": "concat_0_concat_0_x",
+      "type": "linear",
+      "domain": {
+        "data": "data_0",
+        "field": "Horsepower"
+      },
+      "range": [
+        0,
+        {
+          "signal": "childWidth"
+        }
+      ],
+      "nice": true,
+      "zero": true
+    },
+    {
+      "name": "concat_0_concat_0_y",
+      "type": "linear",
+      "domain": {
+        "data": "data_0",
+        "field": "Miles_per_Gallon"
+      },
+      "range": [
+        {
+          "signal": "concat_0_concat_0_height"
+        },
+        0
+      ],
+      "nice": true,
+      "zero": true
+    },
+    {
+      "name": "concat_0_concat_1_x",
+      "type": "linear",
+      "domain": {
+        "data": "data_1",
+        "field": "Weight_in_lbs"
+      },
+      "range": [
+        0,
+        {
+          "signal": "childWidth"
+        }
+      ],
+      "nice": true,
+      "zero": true
+    },
+    {
+      "name": "concat_0_concat_1_y",
+      "type": "linear",
+      "domain": {
+        "data": "data_1",
+        "field": "Miles_per_Gallon"
+      },
+      "range": [
+        {
+          "signal": "concat_0_concat_1_height"
+        },
+        0
+      ],
+      "nice": true,
+      "zero": true
+    }
+  ],
+  "legends": [
+    {
+      "stroke": "color",
+      "gradientLength": {
+        "signal": "clamp(concat_0_concat_0_height, 64, 200)"
+      },
+      "title": "Acceleration",
+      "encode": {
+        "gradient": {
+          "update": {
+            "opacity": {
+              "value": 0.7
+            }
+          }
+        }
+      }
+    }
+  ]
+}

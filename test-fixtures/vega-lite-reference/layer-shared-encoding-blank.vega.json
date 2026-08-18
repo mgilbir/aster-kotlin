@@ -1,0 +1,244 @@
+{
+  "$schema": "https://vega.github.io/schema/vega/v6.json",
+  "description": "A shared encoding a layer never fills in, and captions taken off for the whole chart.",
+  "background": "white",
+  "padding": 5,
+  "width": 300,
+  "height": 300,
+  "style": "cell",
+  "data": [
+    {
+      "name": "source_1",
+      "values": [
+        {
+          "year": 1960
+        },
+        {
+          "year": 1980
+        },
+        {
+          "year": 2000
+        }
+      ]
+    },
+    {
+      "name": "source_0",
+      "url": "data/driving.json",
+      "format": {
+        "type": "json"
+      },
+      "transform": [
+        {
+          "type": "formula",
+          "expr": "+datum.year + 5",
+          "as": "year_end"
+        },
+        {
+          "type": "stack",
+          "groupby": [
+            "year",
+            "year"
+          ],
+          "field": "miles",
+          "sort": {
+            "field": [],
+            "order": []
+          },
+          "as": [
+            "miles_start",
+            "miles_end"
+          ],
+          "offset": "zero"
+        },
+        {
+          "type": "filter",
+          "expr": "isValid(datum[\"year\"]) && isFinite(+datum[\"year\"]) && isValid(datum[\"miles\"]) && isFinite(+datum[\"miles\"])"
+        }
+      ]
+    },
+    {
+      "name": "data_0",
+      "source": "source_1",
+      "transform": [
+        {
+          "type": "filter",
+          "expr": "isValid(datum[\"year\"]) && isFinite(+datum[\"year\"])"
+        }
+      ]
+    }
+  ],
+  "marks": [
+    {
+      "name": "layer_0_marks",
+      "type": "rect",
+      "style": [
+        "bar"
+      ],
+      "from": {
+        "data": "source_0"
+      },
+      "encode": {
+        "update": {
+          "fill": {
+            "value": "#aaa"
+          },
+          "ariaRoleDescription": {
+            "value": "bar"
+          },
+          "description": {
+            "signal": "\"year: \" + (!isValid(datum[\"year\"]) || !isFinite(+datum[\"year\"]) ? \"null\" : format(datum[\"year\"], \"d\") + \" – \" + format(datum[\"year_end\"], \"d\")) + \"; miles: \" + (format(datum[\"miles\"], \"\"))"
+          },
+          "x2": {
+            "scale": "x",
+            "field": "year",
+            "offset": {
+              "signal": "0.5 + (abs(scale(\"x\", datum[\"year_end\"]) - scale(\"x\", datum[\"year\"])) < 0.25 ? -0.5 * (0.25 - (abs(scale(\"x\", datum[\"year_end\"]) - scale(\"x\", datum[\"year\"])))) : 0.5)"
+            }
+          },
+          "x": {
+            "scale": "x",
+            "field": "year_end",
+            "offset": {
+              "signal": "0.5 + (abs(scale(\"x\", datum[\"year_end\"]) - scale(\"x\", datum[\"year\"])) < 0.25 ? 0.5 * (0.25 - (abs(scale(\"x\", datum[\"year_end\"]) - scale(\"x\", datum[\"year\"])))) : -0.5)"
+            }
+          },
+          "y": {
+            "scale": "y",
+            "field": "miles_end"
+          },
+          "y2": {
+            "scale": "y",
+            "field": "miles_start"
+          }
+        }
+      }
+    },
+    {
+      "name": "layer_1_marks",
+      "type": "rule",
+      "style": [
+        "rule"
+      ],
+      "from": {
+        "data": "data_0"
+      },
+      "encode": {
+        "update": {
+          "stroke": {
+            "value": "#000"
+          },
+          "description": {
+            "signal": "\"year: \" + (format(datum[\"year\"], \"d\"))"
+          },
+          "x": {
+            "scale": "x",
+            "field": "year"
+          },
+          "y": {
+            "value": 0
+          },
+          "y2": {
+            "field": {
+              "group": "height"
+            }
+          }
+        }
+      }
+    }
+  ],
+  "scales": [
+    {
+      "name": "x",
+      "type": "linear",
+      "domain": {
+        "fields": [
+          {
+            "data": "source_0",
+            "field": "year"
+          },
+          {
+            "data": "source_0",
+            "field": "year_end"
+          },
+          {
+            "data": "data_0",
+            "field": "year"
+          }
+        ]
+      },
+      "range": [
+        0,
+        {
+          "signal": "width"
+        }
+      ],
+      "nice": true,
+      "zero": false
+    },
+    {
+      "name": "y",
+      "type": "linear",
+      "domain": {
+        "data": "source_0",
+        "fields": [
+          "miles_start",
+          "miles_end"
+        ]
+      },
+      "range": [
+        {
+          "signal": "height"
+        },
+        0
+      ],
+      "nice": true,
+      "zero": true
+    }
+  ],
+  "axes": [
+    {
+      "scale": "y",
+      "orient": "left",
+      "gridScale": "x",
+      "grid": true,
+      "tickCount": {
+        "signal": "ceil(height/40)"
+      },
+      "domain": false,
+      "labels": false,
+      "aria": false,
+      "maxExtent": 0,
+      "minExtent": 0,
+      "ticks": false,
+      "zindex": 1
+    },
+    {
+      "scale": "x",
+      "orient": "bottom",
+      "grid": false,
+      "format": "d",
+      "tickCount": 5,
+      "labelFlush": true,
+      "labelOverlap": true,
+      "tickMinStep": 1,
+      "zindex": 0
+    },
+    {
+      "scale": "y",
+      "orient": "left",
+      "grid": false,
+      "labelOverlap": true,
+      "tickCount": {
+        "signal": "ceil(height/40)"
+      },
+      "zindex": 1
+    }
+  ],
+  "config": {
+    "axis": {
+      "title": null,
+      "gridColor": "white",
+      "domain": false
+    }
+  }
+}

@@ -1,0 +1,757 @@
+{
+  "$schema": "https://vega.github.io/schema/vega/v6.json",
+  "description": "Histograms of three columns, one of them computed, each brushing the others: a bucketing of a computed column cannot climb above the step that computes it, and a click on a bucket remembers the bucket.",
+  "background": "white",
+  "padding": 5,
+  "data": [
+    {
+      "name": "brush_store"
+    },
+    {
+      "name": "source_0",
+      "url": "data/cars.json",
+      "format": {
+        "type": "json"
+      },
+      "transform": [
+        {
+          "type": "extent",
+          "field": "Acceleration",
+          "signal": "child__column_Acceleration_layer_0_bin_maxbins_20_Acceleration_extent"
+        },
+        {
+          "type": "bin",
+          "field": "Acceleration",
+          "as": [
+            "bin_maxbins_20_Acceleration",
+            "bin_maxbins_20_Acceleration_end"
+          ],
+          "signal": "child__column_Acceleration_layer_0_bin_maxbins_20_Acceleration_bins",
+          "extent": {
+            "signal": "child__column_Acceleration_layer_0_bin_maxbins_20_Acceleration_extent"
+          },
+          "maxbins": 20
+        },
+        {
+          "type": "extent",
+          "field": "Horsepower",
+          "signal": "child__column_Horsepower_layer_0_bin_maxbins_20_Horsepower_extent"
+        },
+        {
+          "type": "bin",
+          "field": "Horsepower",
+          "as": [
+            "bin_maxbins_20_Horsepower",
+            "bin_maxbins_20_Horsepower_end"
+          ],
+          "signal": "child__column_Horsepower_layer_0_bin_maxbins_20_Horsepower_bins",
+          "extent": {
+            "signal": "child__column_Horsepower_layer_0_bin_maxbins_20_Horsepower_extent"
+          },
+          "maxbins": 20
+        },
+        {
+          "type": "formula",
+          "expr": "year(datum.Year)",
+          "as": "built"
+        }
+      ]
+    },
+    {
+      "name": "data_0",
+      "source": "source_0",
+      "transform": [
+        {
+          "type": "extent",
+          "field": "built",
+          "signal": "child__column_built_layer_0_bin_maxbins_20_built_extent"
+        },
+        {
+          "type": "bin",
+          "field": "built",
+          "as": [
+            "bin_maxbins_20_built",
+            "bin_maxbins_20_built_end"
+          ],
+          "signal": "child__column_built_layer_0_bin_maxbins_20_built_bins",
+          "extent": {
+            "signal": "child__column_built_layer_0_bin_maxbins_20_built_extent"
+          },
+          "maxbins": 20
+        },
+        {
+          "type": "filter",
+          "expr": "!length(data(\"brush_store\")) || vlSelectionTest(\"brush_store\", datum)"
+        },
+        {
+          "type": "aggregate",
+          "groupby": [
+            "bin_maxbins_20_built",
+            "bin_maxbins_20_built_end"
+          ],
+          "ops": [
+            "count"
+          ],
+          "fields": [
+            null
+          ],
+          "as": [
+            "__count"
+          ]
+        },
+        {
+          "type": "filter",
+          "expr": "isValid(datum[\"bin_maxbins_20_built\"]) && isFinite(+datum[\"bin_maxbins_20_built\"])"
+        }
+      ]
+    },
+    {
+      "name": "data_1",
+      "source": "source_0",
+      "transform": [
+        {
+          "type": "filter",
+          "expr": "!length(data(\"brush_store\")) || vlSelectionTest(\"brush_store\", datum)"
+        }
+      ]
+    },
+    {
+      "name": "data_2",
+      "source": "data_1",
+      "transform": [
+        {
+          "type": "aggregate",
+          "groupby": [
+            "bin_maxbins_20_Acceleration",
+            "bin_maxbins_20_Acceleration_end"
+          ],
+          "ops": [
+            "count"
+          ],
+          "fields": [
+            null
+          ],
+          "as": [
+            "__count"
+          ]
+        },
+        {
+          "type": "filter",
+          "expr": "isValid(datum[\"bin_maxbins_20_Acceleration\"]) && isFinite(+datum[\"bin_maxbins_20_Acceleration\"])"
+        }
+      ]
+    },
+    {
+      "name": "data_3",
+      "source": "data_1",
+      "transform": [
+        {
+          "type": "aggregate",
+          "groupby": [
+            "bin_maxbins_20_Horsepower",
+            "bin_maxbins_20_Horsepower_end"
+          ],
+          "ops": [
+            "count"
+          ],
+          "fields": [
+            null
+          ],
+          "as": [
+            "__count"
+          ]
+        },
+        {
+          "type": "filter",
+          "expr": "isValid(datum[\"bin_maxbins_20_Horsepower\"]) && isFinite(+datum[\"bin_maxbins_20_Horsepower\"])"
+        }
+      ]
+    }
+  ],
+  "signals": [
+    {
+      "name": "childWidth",
+      "value": 300
+    },
+    {
+      "name": "childHeight",
+      "value": 300
+    },
+    {
+      "name": "unit",
+      "value": {},
+      "on": [
+        {
+          "events": "pointermove",
+          "update": "isTuple(group()) ? group() : unit"
+        }
+      ]
+    },
+    {
+      "name": "brush",
+      "update": "vlSelectionResolve(\"brush_store\", \"union\", true, true)"
+    }
+  ],
+  "layout": {
+    "padding": 20,
+    "columns": 3,
+    "bounds": "full",
+    "align": "all"
+  },
+  "marks": [
+    {
+      "type": "group",
+      "name": "child__column_Horsepower_group",
+      "style": "cell",
+      "encode": {
+        "update": {
+          "width": {
+            "signal": "childWidth"
+          },
+          "height": {
+            "signal": "childHeight"
+          }
+        }
+      },
+      "signals": [
+        {
+          "name": "brush_tuple",
+          "on": [
+            {
+              "events": [
+                {
+                  "source": "scope",
+                  "type": "click"
+                }
+              ],
+              "update": "datum && item().mark.marktype !== 'group' && indexof(item().mark.role, 'legend') < 0 ? {unit: \"child__column_Horsepower_layer_0\", fields: brush_tuple_fields, values: [[(item().isVoronoi ? datum.datum : datum)[\"bin_maxbins_20_Horsepower\"], (item().isVoronoi ? datum.datum : datum)[\"bin_maxbins_20_Horsepower_end\"]]]} : null",
+              "force": true
+            },
+            {
+              "events": [
+                {
+                  "source": "view",
+                  "type": "dblclick"
+                }
+              ],
+              "update": "null"
+            }
+          ]
+        },
+        {
+          "name": "brush_tuple_fields",
+          "value": [
+            {
+              "field": "Horsepower",
+              "channel": "x",
+              "type": "R-RE"
+            }
+          ]
+        },
+        {
+          "name": "brush_toggle",
+          "value": false,
+          "on": [
+            {
+              "events": [
+                {
+                  "source": "scope",
+                  "type": "click"
+                }
+              ],
+              "update": "event.shiftKey"
+            },
+            {
+              "events": [
+                {
+                  "source": "view",
+                  "type": "dblclick"
+                }
+              ],
+              "update": "false"
+            }
+          ]
+        },
+        {
+          "name": "brush_modify",
+          "on": [
+            {
+              "events": {
+                "signal": "brush_tuple"
+              },
+              "update": "modify(\"brush_store\", brush_toggle ? null : brush_tuple, brush_toggle ? null : true, brush_toggle ? brush_tuple : null)"
+            }
+          ]
+        }
+      ],
+      "marks": [
+        {
+          "name": "child__column_Horsepower_layer_0_marks",
+          "type": "rect",
+          "style": [
+            "bar"
+          ],
+          "interactive": true,
+          "from": {
+            "data": "data_3"
+          },
+          "encode": {
+            "update": {
+              "cursor": {
+                "value": "pointer"
+              },
+              "fill": {
+                "value": "#4c78a8"
+              },
+              "ariaRoleDescription": {
+                "value": "bar"
+              },
+              "description": {
+                "signal": "\"Horsepower (binned): \" + (!isValid(datum[\"bin_maxbins_20_Horsepower\"]) || !isFinite(+datum[\"bin_maxbins_20_Horsepower\"]) ? \"null\" : format(datum[\"bin_maxbins_20_Horsepower\"], \"\") + \" – \" + format(datum[\"bin_maxbins_20_Horsepower_end\"], \"\")) + \"; Count of Records: \" + (format(datum[\"__count\"], \"\"))"
+              },
+              "x2": {
+                "scale": "child__column_Horsepower_x",
+                "field": "bin_maxbins_20_Horsepower",
+                "offset": {
+                  "signal": "0.5 + (abs(scale(\"child__column_Horsepower_x\", datum[\"bin_maxbins_20_Horsepower_end\"]) - scale(\"child__column_Horsepower_x\", datum[\"bin_maxbins_20_Horsepower\"])) < 0.25 ? -0.5 * (0.25 - (abs(scale(\"child__column_Horsepower_x\", datum[\"bin_maxbins_20_Horsepower_end\"]) - scale(\"child__column_Horsepower_x\", datum[\"bin_maxbins_20_Horsepower\"])))) : 0.5)"
+                }
+              },
+              "x": {
+                "scale": "child__column_Horsepower_x",
+                "field": "bin_maxbins_20_Horsepower_end",
+                "offset": {
+                  "signal": "0.5 + (abs(scale(\"child__column_Horsepower_x\", datum[\"bin_maxbins_20_Horsepower_end\"]) - scale(\"child__column_Horsepower_x\", datum[\"bin_maxbins_20_Horsepower\"])) < 0.25 ? 0.5 * (0.25 - (abs(scale(\"child__column_Horsepower_x\", datum[\"bin_maxbins_20_Horsepower_end\"]) - scale(\"child__column_Horsepower_x\", datum[\"bin_maxbins_20_Horsepower\"])))) : -0.5)"
+                }
+              },
+              "y": {
+                "scale": "child__column_Horsepower_y",
+                "field": "__count"
+              },
+              "y2": {
+                "scale": "child__column_Horsepower_y",
+                "value": 0
+              }
+            }
+          }
+        }
+      ],
+      "axes": [
+        {
+          "scale": "child__column_Horsepower_x",
+          "orient": "bottom",
+          "grid": false,
+          "title": "Horsepower (binned)",
+          "labelFlush": true,
+          "labelOverlap": true,
+          "tickCount": {
+            "signal": "ceil(childWidth/10)"
+          },
+          "zindex": 0
+        }
+      ]
+    },
+    {
+      "type": "group",
+      "name": "child__column_Acceleration_group",
+      "style": "cell",
+      "encode": {
+        "update": {
+          "width": {
+            "signal": "childWidth"
+          },
+          "height": {
+            "signal": "childHeight"
+          }
+        }
+      },
+      "signals": [
+        {
+          "name": "brush_tuple",
+          "on": [
+            {
+              "events": [
+                {
+                  "source": "scope",
+                  "type": "click"
+                }
+              ],
+              "update": "datum && item().mark.marktype !== 'group' && indexof(item().mark.role, 'legend') < 0 ? {unit: \"child__column_Acceleration_layer_0\", fields: brush_tuple_fields, values: [[(item().isVoronoi ? datum.datum : datum)[\"bin_maxbins_20_Acceleration\"], (item().isVoronoi ? datum.datum : datum)[\"bin_maxbins_20_Acceleration_end\"]]]} : null",
+              "force": true
+            },
+            {
+              "events": [
+                {
+                  "source": "view",
+                  "type": "dblclick"
+                }
+              ],
+              "update": "null"
+            }
+          ]
+        },
+        {
+          "name": "brush_tuple_fields",
+          "value": [
+            {
+              "field": "Acceleration",
+              "channel": "x",
+              "type": "R-RE"
+            }
+          ]
+        },
+        {
+          "name": "brush_toggle",
+          "value": false,
+          "on": [
+            {
+              "events": [
+                {
+                  "source": "scope",
+                  "type": "click"
+                }
+              ],
+              "update": "event.shiftKey"
+            },
+            {
+              "events": [
+                {
+                  "source": "view",
+                  "type": "dblclick"
+                }
+              ],
+              "update": "false"
+            }
+          ]
+        },
+        {
+          "name": "brush_modify",
+          "on": [
+            {
+              "events": {
+                "signal": "brush_tuple"
+              },
+              "update": "modify(\"brush_store\", brush_toggle ? null : brush_tuple, brush_toggle ? null : true, brush_toggle ? brush_tuple : null)"
+            }
+          ]
+        }
+      ],
+      "marks": [
+        {
+          "name": "child__column_Acceleration_layer_0_marks",
+          "type": "rect",
+          "style": [
+            "bar"
+          ],
+          "interactive": true,
+          "from": {
+            "data": "data_2"
+          },
+          "encode": {
+            "update": {
+              "cursor": {
+                "value": "pointer"
+              },
+              "fill": {
+                "value": "#4c78a8"
+              },
+              "ariaRoleDescription": {
+                "value": "bar"
+              },
+              "description": {
+                "signal": "\"Acceleration (binned): \" + (!isValid(datum[\"bin_maxbins_20_Acceleration\"]) || !isFinite(+datum[\"bin_maxbins_20_Acceleration\"]) ? \"null\" : format(datum[\"bin_maxbins_20_Acceleration\"], \"\") + \" – \" + format(datum[\"bin_maxbins_20_Acceleration_end\"], \"\")) + \"; Count of Records: \" + (format(datum[\"__count\"], \"\"))"
+              },
+              "x2": {
+                "scale": "child__column_Acceleration_x",
+                "field": "bin_maxbins_20_Acceleration",
+                "offset": {
+                  "signal": "0.5 + (abs(scale(\"child__column_Acceleration_x\", datum[\"bin_maxbins_20_Acceleration_end\"]) - scale(\"child__column_Acceleration_x\", datum[\"bin_maxbins_20_Acceleration\"])) < 0.25 ? -0.5 * (0.25 - (abs(scale(\"child__column_Acceleration_x\", datum[\"bin_maxbins_20_Acceleration_end\"]) - scale(\"child__column_Acceleration_x\", datum[\"bin_maxbins_20_Acceleration\"])))) : 0.5)"
+                }
+              },
+              "x": {
+                "scale": "child__column_Acceleration_x",
+                "field": "bin_maxbins_20_Acceleration_end",
+                "offset": {
+                  "signal": "0.5 + (abs(scale(\"child__column_Acceleration_x\", datum[\"bin_maxbins_20_Acceleration_end\"]) - scale(\"child__column_Acceleration_x\", datum[\"bin_maxbins_20_Acceleration\"])) < 0.25 ? 0.5 * (0.25 - (abs(scale(\"child__column_Acceleration_x\", datum[\"bin_maxbins_20_Acceleration_end\"]) - scale(\"child__column_Acceleration_x\", datum[\"bin_maxbins_20_Acceleration\"])))) : -0.5)"
+                }
+              },
+              "y": {
+                "scale": "child__column_Acceleration_y",
+                "field": "__count"
+              },
+              "y2": {
+                "scale": "child__column_Acceleration_y",
+                "value": 0
+              }
+            }
+          }
+        }
+      ],
+      "axes": [
+        {
+          "scale": "child__column_Acceleration_x",
+          "orient": "bottom",
+          "grid": false,
+          "title": "Acceleration (binned)",
+          "labelFlush": true,
+          "labelOverlap": true,
+          "tickCount": {
+            "signal": "ceil(childWidth/10)"
+          },
+          "zindex": 0
+        }
+      ]
+    },
+    {
+      "type": "group",
+      "name": "child__column_built_group",
+      "style": "cell",
+      "encode": {
+        "update": {
+          "width": {
+            "signal": "childWidth"
+          },
+          "height": {
+            "signal": "childHeight"
+          }
+        }
+      },
+      "signals": [
+        {
+          "name": "brush_tuple",
+          "on": [
+            {
+              "events": [
+                {
+                  "source": "scope",
+                  "type": "click"
+                }
+              ],
+              "update": "datum && item().mark.marktype !== 'group' && indexof(item().mark.role, 'legend') < 0 ? {unit: \"child__column_built_layer_0\", fields: brush_tuple_fields, values: [[(item().isVoronoi ? datum.datum : datum)[\"bin_maxbins_20_built\"], (item().isVoronoi ? datum.datum : datum)[\"bin_maxbins_20_built_end\"]]]} : null",
+              "force": true
+            },
+            {
+              "events": [
+                {
+                  "source": "view",
+                  "type": "dblclick"
+                }
+              ],
+              "update": "null"
+            }
+          ]
+        },
+        {
+          "name": "brush_tuple_fields",
+          "value": [
+            {
+              "field": "built",
+              "channel": "x",
+              "type": "R-RE"
+            }
+          ]
+        },
+        {
+          "name": "brush_toggle",
+          "value": false,
+          "on": [
+            {
+              "events": [
+                {
+                  "source": "scope",
+                  "type": "click"
+                }
+              ],
+              "update": "event.shiftKey"
+            },
+            {
+              "events": [
+                {
+                  "source": "view",
+                  "type": "dblclick"
+                }
+              ],
+              "update": "false"
+            }
+          ]
+        },
+        {
+          "name": "brush_modify",
+          "on": [
+            {
+              "events": {
+                "signal": "brush_tuple"
+              },
+              "update": "modify(\"brush_store\", brush_toggle ? null : brush_tuple, brush_toggle ? null : true, brush_toggle ? brush_tuple : null)"
+            }
+          ]
+        }
+      ],
+      "marks": [
+        {
+          "name": "child__column_built_layer_0_marks",
+          "type": "rect",
+          "style": [
+            "bar"
+          ],
+          "interactive": true,
+          "from": {
+            "data": "data_0"
+          },
+          "encode": {
+            "update": {
+              "cursor": {
+                "value": "pointer"
+              },
+              "fill": {
+                "value": "#4c78a8"
+              },
+              "ariaRoleDescription": {
+                "value": "bar"
+              },
+              "description": {
+                "signal": "\"built (binned): \" + (!isValid(datum[\"bin_maxbins_20_built\"]) || !isFinite(+datum[\"bin_maxbins_20_built\"]) ? \"null\" : format(datum[\"bin_maxbins_20_built\"], \"\") + \" – \" + format(datum[\"bin_maxbins_20_built_end\"], \"\")) + \"; Count of Records: \" + (format(datum[\"__count\"], \"\"))"
+              },
+              "x2": {
+                "scale": "child__column_built_x",
+                "field": "bin_maxbins_20_built",
+                "offset": {
+                  "signal": "0.5 + (abs(scale(\"child__column_built_x\", datum[\"bin_maxbins_20_built_end\"]) - scale(\"child__column_built_x\", datum[\"bin_maxbins_20_built\"])) < 0.25 ? -0.5 * (0.25 - (abs(scale(\"child__column_built_x\", datum[\"bin_maxbins_20_built_end\"]) - scale(\"child__column_built_x\", datum[\"bin_maxbins_20_built\"])))) : 0.5)"
+                }
+              },
+              "x": {
+                "scale": "child__column_built_x",
+                "field": "bin_maxbins_20_built_end",
+                "offset": {
+                  "signal": "0.5 + (abs(scale(\"child__column_built_x\", datum[\"bin_maxbins_20_built_end\"]) - scale(\"child__column_built_x\", datum[\"bin_maxbins_20_built\"])) < 0.25 ? 0.5 * (0.25 - (abs(scale(\"child__column_built_x\", datum[\"bin_maxbins_20_built_end\"]) - scale(\"child__column_built_x\", datum[\"bin_maxbins_20_built\"])))) : -0.5)"
+                }
+              },
+              "y": {
+                "scale": "child__column_built_y",
+                "field": "__count"
+              },
+              "y2": {
+                "scale": "child__column_built_y",
+                "value": 0
+              }
+            }
+          }
+        }
+      ],
+      "axes": [
+        {
+          "scale": "child__column_built_x",
+          "orient": "bottom",
+          "grid": false,
+          "title": "built (binned)",
+          "labelFlush": true,
+          "labelOverlap": true,
+          "tickCount": {
+            "signal": "ceil(childWidth/10)"
+          },
+          "zindex": 0
+        }
+      ]
+    }
+  ],
+  "scales": [
+    {
+      "name": "child__column_Horsepower_x",
+      "type": "linear",
+      "domain": {
+        "signal": "[child__column_Horsepower_layer_0_bin_maxbins_20_Horsepower_bins.start, child__column_Horsepower_layer_0_bin_maxbins_20_Horsepower_bins.stop]"
+      },
+      "range": [
+        0,
+        {
+          "signal": "childWidth"
+        }
+      ],
+      "bins": {
+        "signal": "child__column_Horsepower_layer_0_bin_maxbins_20_Horsepower_bins"
+      },
+      "zero": false
+    },
+    {
+      "name": "child__column_Horsepower_y",
+      "type": "linear",
+      "domain": {
+        "data": "data_3",
+        "field": "__count"
+      },
+      "range": [
+        {
+          "signal": "childHeight"
+        },
+        0
+      ],
+      "nice": true,
+      "zero": true
+    },
+    {
+      "name": "child__column_Acceleration_x",
+      "type": "linear",
+      "domain": {
+        "signal": "[child__column_Acceleration_layer_0_bin_maxbins_20_Acceleration_bins.start, child__column_Acceleration_layer_0_bin_maxbins_20_Acceleration_bins.stop]"
+      },
+      "range": [
+        0,
+        {
+          "signal": "childWidth"
+        }
+      ],
+      "bins": {
+        "signal": "child__column_Acceleration_layer_0_bin_maxbins_20_Acceleration_bins"
+      },
+      "zero": false
+    },
+    {
+      "name": "child__column_Acceleration_y",
+      "type": "linear",
+      "domain": {
+        "data": "data_2",
+        "field": "__count"
+      },
+      "range": [
+        {
+          "signal": "childHeight"
+        },
+        0
+      ],
+      "nice": true,
+      "zero": true
+    },
+    {
+      "name": "child__column_built_x",
+      "type": "linear",
+      "domain": {
+        "signal": "[child__column_built_layer_0_bin_maxbins_20_built_bins.start, child__column_built_layer_0_bin_maxbins_20_built_bins.stop]"
+      },
+      "range": [
+        0,
+        {
+          "signal": "childWidth"
+        }
+      ],
+      "bins": {
+        "signal": "child__column_built_layer_0_bin_maxbins_20_built_bins"
+      },
+      "zero": false
+    },
+    {
+      "name": "child__column_built_y",
+      "type": "linear",
+      "domain": {
+        "data": "data_0",
+        "field": "__count"
+      },
+      "range": [
+        {
+          "signal": "childHeight"
+        },
+        0
+      ],
+      "nice": true,
+      "zero": true
+    }
+  ]
+}

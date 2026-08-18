@@ -1,0 +1,187 @@
+{
+  "$schema": "https://vega.github.io/schema/vega/v6.json",
+  "description": "A scaled opacity beside a colour written as a literal.",
+  "background": "white",
+  "padding": 5,
+  "width": 300,
+  "height": 300,
+  "style": "cell",
+  "data": [
+    {
+      "name": "source_0",
+      "url": "data/cars.json",
+      "format": {
+        "type": "json"
+      },
+      "transform": [
+        {
+          "type": "filter",
+          "expr": "isValid(datum[\"Horsepower\"]) && isFinite(+datum[\"Horsepower\"]) && isValid(datum[\"Miles_per_Gallon\"]) && isFinite(+datum[\"Miles_per_Gallon\"]) && isValid(datum[\"Weight_in_lbs\"]) && isFinite(+datum[\"Weight_in_lbs\"])"
+        }
+      ]
+    }
+  ],
+  "marks": [
+    {
+      "name": "marks",
+      "type": "symbol",
+      "style": [
+        "circle"
+      ],
+      "from": {
+        "data": "source_0"
+      },
+      "encode": {
+        "update": {
+          "opacity": {
+            "scale": "opacity",
+            "field": "Weight_in_lbs"
+          },
+          "fill": {
+            "value": "firebrick"
+          },
+          "ariaRoleDescription": {
+            "value": "circle"
+          },
+          "description": {
+            "signal": "\"Horsepower: \" + (format(datum[\"Horsepower\"], \"\")) + \"; Miles_per_Gallon: \" + (format(datum[\"Miles_per_Gallon\"], \"\")) + \"; Weight_in_lbs: \" + (format(datum[\"Weight_in_lbs\"], \"\"))"
+          },
+          "x": {
+            "scale": "x",
+            "field": "Horsepower"
+          },
+          "y": {
+            "scale": "y",
+            "field": "Miles_per_Gallon"
+          },
+          "shape": {
+            "value": "circle"
+          }
+        }
+      }
+    }
+  ],
+  "scales": [
+    {
+      "name": "x",
+      "type": "linear",
+      "domain": {
+        "data": "source_0",
+        "field": "Horsepower"
+      },
+      "range": [
+        0,
+        {
+          "signal": "width"
+        }
+      ],
+      "nice": true,
+      "zero": true
+    },
+    {
+      "name": "y",
+      "type": "linear",
+      "domain": {
+        "data": "source_0",
+        "field": "Miles_per_Gallon"
+      },
+      "range": [
+        {
+          "signal": "height"
+        },
+        0
+      ],
+      "nice": true,
+      "zero": true
+    },
+    {
+      "name": "opacity",
+      "type": "linear",
+      "domain": {
+        "data": "source_0",
+        "field": "Weight_in_lbs"
+      },
+      "range": [
+        0.3,
+        0.8
+      ],
+      "zero": false
+    }
+  ],
+  "axes": [
+    {
+      "scale": "x",
+      "orient": "bottom",
+      "gridScale": "y",
+      "grid": true,
+      "tickCount": {
+        "signal": "ceil(width/40)"
+      },
+      "domain": false,
+      "labels": false,
+      "aria": false,
+      "maxExtent": 0,
+      "minExtent": 0,
+      "ticks": false,
+      "zindex": 0
+    },
+    {
+      "scale": "y",
+      "orient": "left",
+      "gridScale": "x",
+      "grid": true,
+      "tickCount": {
+        "signal": "ceil(height/40)"
+      },
+      "domain": false,
+      "labels": false,
+      "aria": false,
+      "maxExtent": 0,
+      "minExtent": 0,
+      "ticks": false,
+      "zindex": 0
+    },
+    {
+      "scale": "x",
+      "orient": "bottom",
+      "grid": false,
+      "title": "Horsepower",
+      "labelFlush": true,
+      "labelOverlap": true,
+      "tickCount": {
+        "signal": "ceil(width/40)"
+      },
+      "zindex": 0
+    },
+    {
+      "scale": "y",
+      "orient": "left",
+      "grid": false,
+      "title": "Miles_per_Gallon",
+      "labelOverlap": true,
+      "tickCount": {
+        "signal": "ceil(height/40)"
+      },
+      "zindex": 0
+    }
+  ],
+  "legends": [
+    {
+      "opacity": "opacity",
+      "symbolType": "circle",
+      "title": "Weight_in_lbs",
+      "encode": {
+        "symbols": {
+          "update": {
+            "fill": {
+              "value": "firebrick"
+            },
+            "stroke": {
+              "value": "transparent"
+            }
+          }
+        }
+      }
+    }
+  ]
+}

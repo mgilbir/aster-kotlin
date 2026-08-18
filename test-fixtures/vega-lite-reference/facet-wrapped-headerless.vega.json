@@ -1,0 +1,316 @@
+{
+  "$schema": "https://vega.github.io/schema/vega/v6.json",
+  "description": "A wrapped facet whose header names nothing: the cells caption themselves in the header's own label size, and a title written as a list is one name in a sentence.",
+  "background": "white",
+  "padding": 5,
+  "data": [
+    {
+      "name": "source_0",
+      "url": "data/cars.json",
+      "format": {
+        "type": "json"
+      },
+      "transform": [
+        {
+          "type": "filter",
+          "expr": "isValid(datum[\"Horsepower\"]) && isFinite(+datum[\"Horsepower\"]) && isValid(datum[\"Miles_per_Gallon\"]) && isFinite(+datum[\"Miles_per_Gallon\"]) && isValid(datum[\"Acceleration\"]) && isFinite(+datum[\"Acceleration\"])"
+        }
+      ]
+    },
+    {
+      "name": "facet_domain",
+      "source": "source_0",
+      "transform": [
+        {
+          "type": "aggregate",
+          "groupby": [
+            "Origin"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "facet_domain_row",
+      "transform": [
+        {
+          "type": "sequence",
+          "start": 0,
+          "stop": {
+            "signal": "ceil(length(data(\"facet_domain\")) / 2)"
+          }
+        }
+      ]
+    },
+    {
+      "name": "facet_domain_column",
+      "transform": [
+        {
+          "type": "sequence",
+          "start": 0,
+          "stop": {
+            "signal": "min(length(data(\"facet_domain\")), 2)"
+          }
+        }
+      ]
+    }
+  ],
+  "signals": [
+    {
+      "name": "child_width",
+      "value": 120
+    },
+    {
+      "name": "child_height",
+      "value": 90
+    }
+  ],
+  "layout": {
+    "padding": 20,
+    "bounds": "full",
+    "align": "all",
+    "columns": 2
+  },
+  "marks": [
+    {
+      "name": "row_header",
+      "type": "group",
+      "role": "row-header",
+      "from": {
+        "data": "facet_domain_row"
+      },
+      "encode": {
+        "update": {
+          "height": {
+            "signal": "child_height"
+          }
+        }
+      },
+      "axes": [
+        {
+          "scale": "y",
+          "orient": "left",
+          "grid": false,
+          "title": "Miles_per_Gallon",
+          "labelOverlap": true,
+          "tickCount": {
+            "signal": "ceil(child_height/40)"
+          },
+          "zindex": 0
+        }
+      ]
+    },
+    {
+      "name": "column_footer",
+      "type": "group",
+      "role": "column-footer",
+      "from": {
+        "data": "facet_domain_column"
+      },
+      "encode": {
+        "update": {
+          "width": {
+            "signal": "child_width"
+          }
+        }
+      },
+      "axes": [
+        {
+          "scale": "x",
+          "orient": "bottom",
+          "grid": false,
+          "title": "Horsepower",
+          "labelFlush": true,
+          "labelOverlap": true,
+          "tickCount": {
+            "signal": "ceil(child_width/40)"
+          },
+          "zindex": 0
+        }
+      ]
+    },
+    {
+      "name": "cell",
+      "type": "group",
+      "title": {
+        "text": {
+          "signal": "isValid(parent[\"Origin\"]) ? parent[\"Origin\"] : \"\"+parent[\"Origin\"]"
+        },
+        "style": "guide-label",
+        "frame": "group",
+        "fontSize": 14,
+        "offset": 10
+      },
+      "style": "cell",
+      "from": {
+        "facet": {
+          "name": "facet",
+          "data": "source_0",
+          "groupby": [
+            "Origin"
+          ]
+        }
+      },
+      "sort": {
+        "field": [
+          "datum[\"Origin\"]"
+        ],
+        "order": [
+          "ascending"
+        ]
+      },
+      "encode": {
+        "update": {
+          "width": {
+            "signal": "child_width"
+          },
+          "height": {
+            "signal": "child_height"
+          }
+        }
+      },
+      "marks": [
+        {
+          "name": "child_marks",
+          "type": "symbol",
+          "style": [
+            "point"
+          ],
+          "from": {
+            "data": "facet"
+          },
+          "encode": {
+            "update": {
+              "opacity": {
+                "value": 0.7
+              },
+              "fill": {
+                "value": "transparent"
+              },
+              "stroke": {
+                "scale": "color",
+                "field": "Acceleration"
+              },
+              "ariaRoleDescription": {
+                "value": "point"
+              },
+              "description": {
+                "signal": "\"Horsepower: \" + (format(datum[\"Horsepower\"], \"\")) + \"; Miles_per_Gallon: \" + (format(datum[\"Miles_per_Gallon\"], \"\")) + \"; Acceleration, 0-60 mph: \" + (format(datum[\"Acceleration\"], \".0f\"))"
+              },
+              "x": {
+                "scale": "x",
+                "field": "Horsepower"
+              },
+              "y": {
+                "scale": "y",
+                "field": "Miles_per_Gallon"
+              }
+            }
+          }
+        }
+      ],
+      "axes": [
+        {
+          "scale": "x",
+          "orient": "bottom",
+          "gridScale": "y",
+          "grid": true,
+          "tickCount": {
+            "signal": "ceil(child_width/40)"
+          },
+          "domain": false,
+          "labels": false,
+          "aria": false,
+          "maxExtent": 0,
+          "minExtent": 0,
+          "ticks": false,
+          "zindex": 0
+        },
+        {
+          "scale": "y",
+          "orient": "left",
+          "gridScale": "x",
+          "grid": true,
+          "tickCount": {
+            "signal": "ceil(child_height/40)"
+          },
+          "domain": false,
+          "labels": false,
+          "aria": false,
+          "maxExtent": 0,
+          "minExtent": 0,
+          "ticks": false,
+          "zindex": 0
+        }
+      ]
+    }
+  ],
+  "scales": [
+    {
+      "name": "x",
+      "type": "linear",
+      "domain": {
+        "data": "source_0",
+        "field": "Horsepower"
+      },
+      "range": [
+        0,
+        {
+          "signal": "child_width"
+        }
+      ],
+      "nice": true,
+      "zero": true
+    },
+    {
+      "name": "y",
+      "type": "linear",
+      "domain": {
+        "data": "source_0",
+        "field": "Miles_per_Gallon"
+      },
+      "range": [
+        {
+          "signal": "child_height"
+        },
+        0
+      ],
+      "nice": true,
+      "zero": true
+    },
+    {
+      "name": "color",
+      "type": "linear",
+      "domain": {
+        "data": "source_0",
+        "field": "Acceleration"
+      },
+      "range": {
+        "scheme": "viridis"
+      },
+      "interpolate": "hcl",
+      "zero": false
+    }
+  ],
+  "legends": [
+    {
+      "format": ".0f",
+      "title": [
+        "Acceleration",
+        "0-60 mph"
+      ],
+      "stroke": "color",
+      "gradientLength": {
+        "signal": "clamp(child_height, 64, 200)"
+      },
+      "encode": {
+        "gradient": {
+          "update": {
+            "opacity": {
+              "value": 0.7
+            }
+          }
+        }
+      }
+    }
+  ]
+}

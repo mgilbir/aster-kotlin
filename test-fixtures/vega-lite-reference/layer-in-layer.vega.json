@@ -1,0 +1,159 @@
+{
+  "$schema": "https://vega.github.io/schema/vega/v6.json",
+  "description": "A layer inside a layer, which is the composition a layer *may* hold and the one thing next to it that is not refused. It earns a fixture because it is the look-alike of a composition inside a layer: those four are rejected by Vega-Lite's own grammar, and this is what distinguishes 'refused because it cannot be described' from 'refused because it is not built yet'. The second mark has only one position channel, which is the second rule here — see `path-mark-no-dimension.vl.json`.",
+  "background": "white",
+  "padding": 5,
+  "width": 300,
+  "height": 20,
+  "style": "cell",
+  "data": [
+    {
+      "name": "source_0",
+      "values": [
+        {
+          "x": 1,
+          "y": 2
+        },
+        {
+          "x": 3,
+          "y": 4
+        }
+      ]
+    },
+    {
+      "name": "data_0",
+      "source": "source_0",
+      "transform": [
+        {
+          "type": "filter",
+          "expr": "isValid(datum[\"x\"]) && isFinite(+datum[\"x\"])"
+        }
+      ]
+    }
+  ],
+  "marks": [
+    {
+      "name": "layer_0_layer_0_marks",
+      "type": "symbol",
+      "style": [
+        "point"
+      ],
+      "from": {
+        "data": "data_0"
+      },
+      "encode": {
+        "update": {
+          "opacity": {
+            "value": 0.7
+          },
+          "fill": {
+            "value": "transparent"
+          },
+          "stroke": {
+            "value": "#4c78a8"
+          },
+          "ariaRoleDescription": {
+            "value": "point"
+          },
+          "description": {
+            "signal": "\"x: \" + (format(datum[\"x\"], \"\"))"
+          },
+          "x": {
+            "scale": "x",
+            "field": "x"
+          },
+          "y": {
+            "signal": "height",
+            "mult": 0.5
+          }
+        }
+      }
+    },
+    {
+      "name": "layer_0_layer_1_marks",
+      "type": "line",
+      "style": [
+        "line"
+      ],
+      "from": {
+        "data": "source_0"
+      },
+      "encode": {
+        "update": {
+          "stroke": {
+            "value": "#4c78a8"
+          },
+          "description": {
+            "signal": "\"y: \" + (format(datum[\"y\"], \"\"))"
+          },
+          "x": {
+            "scale": "x",
+            "field": "y"
+          },
+          "y": {
+            "signal": "height",
+            "mult": 0.5
+          },
+          "defined": {
+            "signal": "isValid(datum[\"y\"]) && isFinite(+datum[\"y\"])"
+          }
+        }
+      }
+    }
+  ],
+  "scales": [
+    {
+      "name": "x",
+      "type": "linear",
+      "domain": {
+        "fields": [
+          {
+            "data": "data_0",
+            "field": "x"
+          },
+          {
+            "data": "source_0",
+            "field": "y"
+          }
+        ]
+      },
+      "range": [
+        0,
+        {
+          "signal": "width"
+        }
+      ],
+      "nice": true,
+      "zero": true
+    }
+  ],
+  "axes": [
+    {
+      "scale": "x",
+      "orient": "bottom",
+      "grid": true,
+      "tickCount": {
+        "signal": "ceil(width/40)"
+      },
+      "domain": false,
+      "labels": false,
+      "aria": false,
+      "maxExtent": 0,
+      "minExtent": 0,
+      "ticks": false,
+      "zindex": 0
+    },
+    {
+      "scale": "x",
+      "orient": "bottom",
+      "grid": false,
+      "title": "x, y",
+      "labelFlush": true,
+      "labelOverlap": true,
+      "tickCount": {
+        "signal": "ceil(width/40)"
+      },
+      "zindex": 0
+    }
+  ]
+}

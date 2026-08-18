@@ -1,0 +1,243 @@
+{
+  "$schema": "https://vega.github.io/schema/vega/v6.json",
+  "description": "A trellis of pies, each scaled against its own cell and none of them bordered.",
+  "background": "white",
+  "padding": 5,
+  "data": [
+    {
+      "name": "source_0",
+      "url": "data/cars.json",
+      "format": {
+        "type": "json"
+      },
+      "transform": [
+        {
+          "type": "aggregate",
+          "groupby": [
+            "Cylinders",
+            "Origin"
+          ],
+          "ops": [
+            "sum"
+          ],
+          "fields": [
+            "Horsepower"
+          ],
+          "as": [
+            "sum_Horsepower"
+          ]
+        },
+        {
+          "type": "stack",
+          "groupby": [
+            "Origin"
+          ],
+          "field": "sum_Horsepower",
+          "sort": {
+            "field": [
+              "Cylinders"
+            ],
+            "order": [
+              "ascending"
+            ]
+          },
+          "as": [
+            "sum_Horsepower_start",
+            "sum_Horsepower_end"
+          ],
+          "offset": "zero"
+        },
+        {
+          "type": "filter",
+          "expr": "isValid(datum[\"sum_Horsepower\"]) && isFinite(+datum[\"sum_Horsepower\"])"
+        }
+      ]
+    },
+    {
+      "name": "column_domain",
+      "source": "source_0",
+      "transform": [
+        {
+          "type": "aggregate",
+          "groupby": [
+            "Origin"
+          ]
+        }
+      ]
+    }
+  ],
+  "signals": [
+    {
+      "name": "child_width",
+      "value": 300
+    },
+    {
+      "name": "child_height",
+      "value": 300
+    }
+  ],
+  "layout": {
+    "padding": 20,
+    "offset": {
+      "columnTitle": 10
+    },
+    "columns": {
+      "signal": "length(data('column_domain'))"
+    },
+    "bounds": "full",
+    "align": "all"
+  },
+  "marks": [
+    {
+      "name": "column-title",
+      "type": "group",
+      "role": "column-title",
+      "title": {
+        "text": "Origin",
+        "style": "guide-title",
+        "offset": 10
+      }
+    },
+    {
+      "name": "column_header",
+      "type": "group",
+      "role": "column-header",
+      "from": {
+        "data": "column_domain"
+      },
+      "sort": {
+        "field": "datum[\"Origin\"]",
+        "order": "ascending"
+      },
+      "title": {
+        "text": {
+          "signal": "isValid(parent[\"Origin\"]) ? parent[\"Origin\"] : \"\"+parent[\"Origin\"]"
+        },
+        "style": "guide-label",
+        "frame": "group",
+        "offset": 10
+      },
+      "encode": {
+        "update": {
+          "width": {
+            "signal": "child_width"
+          }
+        }
+      }
+    },
+    {
+      "name": "cell",
+      "type": "group",
+      "style": "view",
+      "from": {
+        "facet": {
+          "name": "facet",
+          "data": "source_0",
+          "groupby": [
+            "Origin"
+          ]
+        }
+      },
+      "sort": {
+        "field": [
+          "datum[\"Origin\"]"
+        ],
+        "order": [
+          "ascending"
+        ]
+      },
+      "encode": {
+        "update": {
+          "width": {
+            "signal": "child_width"
+          },
+          "height": {
+            "signal": "child_height"
+          }
+        }
+      },
+      "marks": [
+        {
+          "name": "child_marks",
+          "type": "arc",
+          "style": [
+            "arc"
+          ],
+          "from": {
+            "data": "facet"
+          },
+          "encode": {
+            "update": {
+              "outerRadius": {
+                "value": 40
+              },
+              "fill": {
+                "scale": "color",
+                "field": "Cylinders"
+              },
+              "description": {
+                "signal": "\"Sum of Horsepower: \" + (format(datum[\"sum_Horsepower\"], \"\")) + \"; Cylinders: \" + (isValid(datum[\"Cylinders\"]) ? isArray(datum[\"Cylinders\"]) ? join(datum[\"Cylinders\"], ' ') : datum[\"Cylinders\"] : \"\"+datum[\"Cylinders\"])"
+              },
+              "x": {
+                "signal": "child_width",
+                "mult": 0.5
+              },
+              "y": {
+                "signal": "child_height",
+                "mult": 0.5
+              },
+              "innerRadius": {
+                "value": 0
+              },
+              "startAngle": {
+                "scale": "child_theta",
+                "field": "sum_Horsepower_end"
+              },
+              "endAngle": {
+                "scale": "child_theta",
+                "field": "sum_Horsepower_start"
+              }
+            }
+          }
+        }
+      ],
+      "scales": [
+        {
+          "name": "child_theta",
+          "type": "linear",
+          "domain": {
+            "data": "facet",
+            "fields": [
+              "sum_Horsepower_start",
+              "sum_Horsepower_end"
+            ]
+          },
+          "range": [
+            0,
+            6.283185307179586
+          ],
+          "zero": true
+        }
+      ]
+    }
+  ],
+  "scales": [
+    {
+      "name": "color",
+      "type": "ordinal",
+      "domain": {
+        "data": "source_0",
+        "field": "Cylinders",
+        "sort": true
+      },
+      "range": "category"
+    }
+  ],
+  "legends": [
+    {
+      "fill": "color",
+      "symbolType": "circle",
+      "title": "Cylinders"
+    }
+  ]
+}

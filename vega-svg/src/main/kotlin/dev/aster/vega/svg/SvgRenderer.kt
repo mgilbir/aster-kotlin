@@ -206,7 +206,11 @@ public class SvgRenderer(private val options: SvgOptions = SvgOptions()) {
     // group-mark behaviour. `strokeForeground` splits that into two elements — the fill under the
     // children and the stroke over them — because the alternative, one element drawn twice, would
     // paint the fill over the children as well.
-    val background = clipRect?.takeIf { node.fill != null || node.stroke != null }
+    // Which rectangle that is comes from the scene graph's `paintRect`: the group's declared size,
+    // or failing that its clip. Reading the clip alone missed every Vega-Lite chart — its plotting
+    // area states a size and a `#ddd` border and does not clip, so that border was drawn on the
+    // device and absent from every SVG export.
+    val background = node.paintRect?.takeIf { node.fill != null || node.stroke != null }
     if (background != null) {
       renderGroupPaint(node, background, out, defs, depth + 1, stroked = !node.strokeForeground)
     }

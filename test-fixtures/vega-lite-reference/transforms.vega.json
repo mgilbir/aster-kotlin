@@ -1,0 +1,234 @@
+{
+  "$schema": "https://vega.github.io/schema/vega/v6.json",
+  "description": "A window running total over a filtered, calculated field.",
+  "background": "white",
+  "padding": 5,
+  "width": 300,
+  "height": 300,
+  "style": "cell",
+  "data": [
+    {
+      "name": "source_0",
+      "url": "data/barley.json",
+      "format": {
+        "type": "json",
+        "parse": {
+          "site": "string"
+        }
+      },
+      "transform": [
+        {
+          "type": "filter",
+          "expr": "indexof([\"Morris\",\"Waseca\",\"Crookston\"], datum[\"site\"]) !== -1"
+        },
+        {
+          "type": "formula",
+          "expr": "datum.yield * 2",
+          "as": "doubled"
+        },
+        {
+          "type": "joinaggregate",
+          "as": [
+            "site_mean"
+          ],
+          "ops": [
+            "mean"
+          ],
+          "fields": [
+            "yield"
+          ],
+          "groupby": [
+            "site"
+          ]
+        },
+        {
+          "type": "window",
+          "params": [
+            null
+          ],
+          "as": [
+            "rank"
+          ],
+          "ops": [
+            "row_number"
+          ],
+          "fields": [
+            null
+          ],
+          "sort": {
+            "field": [
+              "yield"
+            ],
+            "order": [
+              "descending"
+            ]
+          }
+        },
+        {
+          "type": "filter",
+          "expr": "isValid(datum[\"rank\"]) && isFinite(+datum[\"rank\"]) && isValid(datum[\"doubled\"]) && isFinite(+datum[\"doubled\"])"
+        }
+      ]
+    }
+  ],
+  "marks": [
+    {
+      "name": "marks",
+      "type": "symbol",
+      "style": [
+        "point"
+      ],
+      "from": {
+        "data": "source_0"
+      },
+      "encode": {
+        "update": {
+          "opacity": {
+            "value": 0.7
+          },
+          "fill": {
+            "value": "transparent"
+          },
+          "stroke": {
+            "scale": "color",
+            "field": "site"
+          },
+          "ariaRoleDescription": {
+            "value": "point"
+          },
+          "description": {
+            "signal": "\"rank: \" + (format(datum[\"rank\"], \"\")) + \"; doubled: \" + (format(datum[\"doubled\"], \"\")) + \"; site: \" + (isValid(datum[\"site\"]) ? isArray(datum[\"site\"]) ? join(datum[\"site\"], ' ') : datum[\"site\"] : \"\"+datum[\"site\"])"
+          },
+          "x": {
+            "scale": "x",
+            "field": "rank"
+          },
+          "y": {
+            "scale": "y",
+            "field": "doubled"
+          }
+        }
+      }
+    }
+  ],
+  "scales": [
+    {
+      "name": "x",
+      "type": "linear",
+      "domain": {
+        "data": "source_0",
+        "field": "rank"
+      },
+      "range": [
+        0,
+        {
+          "signal": "width"
+        }
+      ],
+      "nice": true,
+      "zero": true
+    },
+    {
+      "name": "y",
+      "type": "linear",
+      "domain": {
+        "data": "source_0",
+        "field": "doubled"
+      },
+      "range": [
+        {
+          "signal": "height"
+        },
+        0
+      ],
+      "nice": true,
+      "zero": true
+    },
+    {
+      "name": "color",
+      "type": "ordinal",
+      "domain": {
+        "data": "source_0",
+        "field": "site",
+        "sort": true
+      },
+      "range": "category"
+    }
+  ],
+  "axes": [
+    {
+      "scale": "x",
+      "orient": "bottom",
+      "gridScale": "y",
+      "grid": true,
+      "tickCount": {
+        "signal": "ceil(width/40)"
+      },
+      "domain": false,
+      "labels": false,
+      "aria": false,
+      "maxExtent": 0,
+      "minExtent": 0,
+      "ticks": false,
+      "zindex": 0
+    },
+    {
+      "scale": "y",
+      "orient": "left",
+      "gridScale": "x",
+      "grid": true,
+      "tickCount": {
+        "signal": "ceil(height/40)"
+      },
+      "domain": false,
+      "labels": false,
+      "aria": false,
+      "maxExtent": 0,
+      "minExtent": 0,
+      "ticks": false,
+      "zindex": 0
+    },
+    {
+      "scale": "x",
+      "orient": "bottom",
+      "grid": false,
+      "title": "rank",
+      "labelFlush": true,
+      "labelOverlap": true,
+      "tickCount": {
+        "signal": "ceil(width/40)"
+      },
+      "zindex": 0
+    },
+    {
+      "scale": "y",
+      "orient": "left",
+      "grid": false,
+      "title": "doubled",
+      "labelOverlap": true,
+      "tickCount": {
+        "signal": "ceil(height/40)"
+      },
+      "zindex": 0
+    }
+  ],
+  "legends": [
+    {
+      "stroke": "color",
+      "symbolType": "circle",
+      "title": "site",
+      "encode": {
+        "symbols": {
+          "update": {
+            "fill": {
+              "value": "transparent"
+            },
+            "opacity": {
+              "value": 0.7
+            }
+          }
+        }
+      }
+    }
+  ]
+}

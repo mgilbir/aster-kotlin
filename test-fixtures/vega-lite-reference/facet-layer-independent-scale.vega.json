@@ -1,0 +1,378 @@
+{
+  "$schema": "https://vega.github.io/schema/vega/v6.json",
+  "description": "A trellis of layers measuring its x per cell: the layers are one model to the facet, so they share the cell's scale and its axis, and the scale reads the cell's own tables.",
+  "background": "white",
+  "padding": 5,
+  "data": [
+    {
+      "name": "source_0",
+      "url": "data/cars.json",
+      "format": {
+        "type": "json"
+      }
+    },
+    {
+      "name": "column_domain",
+      "source": "source_0",
+      "transform": [
+        {
+          "type": "aggregate",
+          "groupby": [
+            "Origin"
+          ],
+          "fields": [
+            "Cylinders"
+          ],
+          "ops": [
+            "distinct"
+          ],
+          "as": [
+            "distinct_Cylinders"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "data_1",
+      "source": "source_0",
+      "transform": [
+        {
+          "type": "aggregate",
+          "groupby": [
+            "Cylinders",
+            "Origin"
+          ],
+          "ops": [
+            "sum"
+          ],
+          "fields": [
+            "Horsepower"
+          ],
+          "as": [
+            "sum_Horsepower"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "data_2",
+      "source": "data_1",
+      "transform": [
+        {
+          "type": "filter",
+          "expr": "isValid(datum[\"sum_Horsepower\"]) && isFinite(+datum[\"sum_Horsepower\"])"
+        }
+      ]
+    }
+  ],
+  "signals": [
+    {
+      "name": "child_x_step",
+      "value": 17
+    },
+    {
+      "name": "child_height",
+      "value": 300
+    }
+  ],
+  "layout": {
+    "padding": 20,
+    "offset": {
+      "columnTitle": 10
+    },
+    "columns": {
+      "signal": "length(data('column_domain'))"
+    },
+    "bounds": "full",
+    "align": "none"
+  },
+  "marks": [
+    {
+      "name": "column-title",
+      "type": "group",
+      "role": "column-title",
+      "title": {
+        "text": "Origin",
+        "style": "guide-title",
+        "offset": 10
+      }
+    },
+    {
+      "name": "row_header",
+      "type": "group",
+      "role": "row-header",
+      "encode": {
+        "update": {
+          "height": {
+            "signal": "child_height"
+          }
+        }
+      },
+      "axes": [
+        {
+          "scale": "y",
+          "orient": "left",
+          "grid": false,
+          "title": "power",
+          "labelOverlap": true,
+          "tickCount": {
+            "signal": "ceil(child_height/40)"
+          },
+          "zindex": 0
+        }
+      ]
+    },
+    {
+      "name": "column_header",
+      "type": "group",
+      "role": "column-header",
+      "from": {
+        "data": "column_domain"
+      },
+      "sort": {
+        "field": "datum[\"Origin\"]",
+        "order": "ascending"
+      },
+      "title": {
+        "text": {
+          "signal": "isValid(parent[\"Origin\"]) ? parent[\"Origin\"] : \"\"+parent[\"Origin\"]"
+        },
+        "style": "guide-label",
+        "frame": "group",
+        "offset": 10
+      },
+      "encode": {
+        "update": {
+          "width": {
+            "signal": "bandspace(datum[\"distinct_Cylinders\"], 1, 0.5) * child_x_step"
+          }
+        }
+      }
+    },
+    {
+      "name": "cell",
+      "type": "group",
+      "style": "cell",
+      "from": {
+        "facet": {
+          "name": "facet",
+          "data": "source_0",
+          "groupby": [
+            "Origin"
+          ],
+          "aggregate": {
+            "fields": [
+              "Cylinders"
+            ],
+            "ops": [
+              "distinct"
+            ],
+            "as": [
+              "distinct_Cylinders"
+            ]
+          }
+        }
+      },
+      "sort": {
+        "field": [
+          "datum[\"Origin\"]"
+        ],
+        "order": [
+          "ascending"
+        ]
+      },
+      "data": [
+        {
+          "source": "facet",
+          "name": "data_0",
+          "transform": [
+            {
+              "type": "aggregate",
+              "groupby": [
+                "Cylinders"
+              ],
+              "ops": [
+                "sum"
+              ],
+              "fields": [
+                "Horsepower"
+              ],
+              "as": [
+                "sum_Horsepower"
+              ]
+            }
+          ]
+        },
+        {
+          "name": "data_1",
+          "source": "data_0",
+          "transform": [
+            {
+              "type": "filter",
+              "expr": "isValid(datum[\"sum_Horsepower\"]) && isFinite(+datum[\"sum_Horsepower\"])"
+            }
+          ]
+        }
+      ],
+      "encode": {
+        "update": {
+          "width": {
+            "signal": "bandspace(datum[\"distinct_Cylinders\"], 1, 0.5) * child_x_step"
+          },
+          "height": {
+            "signal": "child_height"
+          }
+        }
+      },
+      "marks": [
+        {
+          "name": "child_layer_0_marks",
+          "type": "line",
+          "style": [
+            "line"
+          ],
+          "sort": {
+            "field": "x"
+          },
+          "from": {
+            "data": "data_0"
+          },
+          "encode": {
+            "update": {
+              "stroke": {
+                "value": "#4c78a8"
+              },
+              "description": {
+                "signal": "\"Cylinders: \" + (isValid(datum[\"Cylinders\"]) ? isArray(datum[\"Cylinders\"]) ? join(datum[\"Cylinders\"], ' ') : datum[\"Cylinders\"] : \"\"+datum[\"Cylinders\"]) + \"; power: \" + (format(datum[\"sum_Horsepower\"], \"\"))"
+              },
+              "x": {
+                "scale": "child_x",
+                "field": "Cylinders"
+              },
+              "y": {
+                "scale": "y",
+                "field": "sum_Horsepower"
+              },
+              "defined": {
+                "signal": "isValid(datum[\"sum_Horsepower\"]) && isFinite(+datum[\"sum_Horsepower\"])"
+              }
+            }
+          }
+        },
+        {
+          "name": "child_layer_1_marks",
+          "type": "symbol",
+          "style": [
+            "point"
+          ],
+          "from": {
+            "data": "data_1"
+          },
+          "encode": {
+            "update": {
+              "fill": {
+                "value": "transparent"
+              },
+              "stroke": {
+                "value": "#4c78a8"
+              },
+              "ariaRoleDescription": {
+                "value": "point"
+              },
+              "description": {
+                "signal": "\"Cylinders: \" + (isValid(datum[\"Cylinders\"]) ? isArray(datum[\"Cylinders\"]) ? join(datum[\"Cylinders\"], ' ') : datum[\"Cylinders\"] : \"\"+datum[\"Cylinders\"]) + \"; power: \" + (format(datum[\"sum_Horsepower\"], \"\"))"
+              },
+              "x": {
+                "scale": "child_x",
+                "field": "Cylinders"
+              },
+              "y": {
+                "scale": "y",
+                "field": "sum_Horsepower"
+              }
+            }
+          }
+        }
+      ],
+      "scales": [
+        {
+          "name": "child_x",
+          "type": "point",
+          "domain": {
+            "fields": [
+              {
+                "data": "data_0",
+                "field": "Cylinders"
+              },
+              {
+                "data": "data_1",
+                "field": "Cylinders"
+              }
+            ],
+            "sort": true
+          },
+          "range": {
+            "step": {
+              "signal": "child_x_step"
+            }
+          },
+          "padding": 0.5
+        }
+      ],
+      "axes": [
+        {
+          "scale": "y",
+          "orient": "left",
+          "gridScale": "child_x",
+          "grid": true,
+          "tickCount": {
+            "signal": "ceil(child_height/40)"
+          },
+          "domain": false,
+          "labels": false,
+          "aria": false,
+          "maxExtent": 0,
+          "minExtent": 0,
+          "ticks": false,
+          "zindex": 0
+        },
+        {
+          "scale": "child_x",
+          "orient": "bottom",
+          "grid": false,
+          "title": "Cylinders",
+          "labelAlign": "right",
+          "labelAngle": 270,
+          "labelBaseline": "middle",
+          "zindex": 0
+        }
+      ]
+    }
+  ],
+  "scales": [
+    {
+      "name": "y",
+      "type": "linear",
+      "domain": {
+        "fields": [
+          {
+            "data": "data_1",
+            "field": "sum_Horsepower"
+          },
+          {
+            "data": "data_2",
+            "field": "sum_Horsepower"
+          }
+        ]
+      },
+      "range": [
+        {
+          "signal": "child_height"
+        },
+        0
+      ],
+      "nice": true,
+      "zero": true
+    }
+  ]
+}

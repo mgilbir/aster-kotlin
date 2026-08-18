@@ -1,0 +1,332 @@
+{
+  "$schema": "https://vega.github.io/schema/vega/v6.json",
+  "description": "Four aggregates over one column, including the two that only compare.",
+  "background": "white",
+  "padding": 5,
+  "height": 300,
+  "style": "cell",
+  "data": [
+    {
+      "name": "source_0",
+      "values": [
+        {
+          "g": "a",
+          "v": 3
+        },
+        {
+          "g": "a",
+          "v": 9
+        },
+        {
+          "g": "a",
+          "v": 1
+        },
+        {
+          "g": "b",
+          "v": 5
+        },
+        {
+          "g": "b",
+          "v": 2
+        },
+        {
+          "g": "b",
+          "v": 8
+        }
+      ]
+    },
+    {
+      "name": "data_0",
+      "source": "source_0",
+      "transform": [
+        {
+          "type": "formula",
+          "expr": "toNumber(datum[\"v\"])",
+          "as": "v"
+        },
+        {
+          "type": "aggregate",
+          "groupby": [
+            "g"
+          ],
+          "ops": [
+            "mean",
+            "min",
+            "max",
+            "median",
+            "count"
+          ],
+          "fields": [
+            "v",
+            "v",
+            "v",
+            "v",
+            null
+          ],
+          "as": [
+            "mean_v",
+            "min_v",
+            "max_v",
+            "median_v",
+            "__count"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "data_1",
+      "source": "data_0",
+      "transform": [
+        {
+          "type": "filter",
+          "expr": "isValid(datum[\"mean_v\"]) && isFinite(+datum[\"mean_v\"])"
+        }
+      ]
+    },
+    {
+      "name": "data_2",
+      "source": "data_0",
+      "transform": [
+        {
+          "type": "filter",
+          "expr": "isValid(datum[\"min_v\"]) && isFinite(+datum[\"min_v\"])"
+        }
+      ]
+    },
+    {
+      "name": "data_3",
+      "source": "data_0",
+      "transform": [
+        {
+          "type": "filter",
+          "expr": "isValid(datum[\"median_v\"]) && isFinite(+datum[\"median_v\"])"
+        }
+      ]
+    }
+  ],
+  "signals": [
+    {
+      "name": "x_step",
+      "value": 20
+    },
+    {
+      "name": "width",
+      "update": "bandspace(domain('x').length, 0, 0) * x_step"
+    }
+  ],
+  "marks": [
+    {
+      "name": "layer_0_marks",
+      "type": "rule",
+      "style": [
+        "rule"
+      ],
+      "from": {
+        "data": "data_2"
+      },
+      "encode": {
+        "update": {
+          "stroke": {
+            "value": "black"
+          },
+          "description": {
+            "signal": "\"g: \" + (isValid(datum[\"g\"]) ? isArray(datum[\"g\"]) ? join(datum[\"g\"], ' ') : datum[\"g\"] : \"\"+datum[\"g\"]) + \"; Min of v: \" + (format(datum[\"min_v\"], \"\")) + \"; Max of v: \" + (format(datum[\"max_v\"], \"\"))"
+          },
+          "x": {
+            "scale": "x",
+            "field": "g",
+            "band": 0.5
+          },
+          "y": {
+            "scale": "y",
+            "field": "min_v"
+          },
+          "y2": {
+            "scale": "y",
+            "field": "max_v"
+          },
+          "strokeWidth": {
+            "value": 3
+          }
+        }
+      }
+    },
+    {
+      "name": "layer_1_marks",
+      "type": "symbol",
+      "style": [
+        "point"
+      ],
+      "from": {
+        "data": "data_3"
+      },
+      "encode": {
+        "update": {
+          "size": {
+            "value": 60
+          },
+          "fill": {
+            "value": "#4c78a8"
+          },
+          "ariaRoleDescription": {
+            "value": "point"
+          },
+          "description": {
+            "signal": "\"g: \" + (isValid(datum[\"g\"]) ? isArray(datum[\"g\"]) ? join(datum[\"g\"], ' ') : datum[\"g\"] : \"\"+datum[\"g\"]) + \"; Median of v: \" + (format(datum[\"median_v\"], \"\"))"
+          },
+          "x": {
+            "scale": "x",
+            "field": "g",
+            "band": 0.5
+          },
+          "y": {
+            "scale": "y",
+            "field": "median_v"
+          }
+        }
+      }
+    },
+    {
+      "name": "layer_2_marks",
+      "type": "text",
+      "style": [
+        "text"
+      ],
+      "from": {
+        "data": "data_1"
+      },
+      "encode": {
+        "update": {
+          "dx": {
+            "value": 12
+          },
+          "fill": {
+            "value": "black"
+          },
+          "description": {
+            "signal": "\"g: \" + (isValid(datum[\"g\"]) ? isArray(datum[\"g\"]) ? join(datum[\"g\"], ' ') : datum[\"g\"] : \"\"+datum[\"g\"]) + \"; Mean of v: \" + (format(datum[\"mean_v\"], \"\")) + \"; Count of Records: \" + (format(datum[\"__count\"], \"\"))"
+          },
+          "x": {
+            "scale": "x",
+            "field": "g",
+            "band": 0.5
+          },
+          "y": {
+            "scale": "y",
+            "field": "mean_v"
+          },
+          "text": {
+            "signal": "format(datum[\"__count\"], \"\")"
+          },
+          "align": {
+            "value": "center"
+          },
+          "baseline": {
+            "value": "middle"
+          }
+        }
+      }
+    }
+  ],
+  "scales": [
+    {
+      "name": "x",
+      "type": "band",
+      "domain": {
+        "fields": [
+          {
+            "data": "data_2",
+            "field": "g"
+          },
+          {
+            "data": "data_3",
+            "field": "g"
+          },
+          {
+            "data": "data_1",
+            "field": "g"
+          }
+        ],
+        "sort": true
+      },
+      "range": {
+        "step": {
+          "signal": "x_step"
+        }
+      },
+      "paddingInner": 0,
+      "paddingOuter": 0
+    },
+    {
+      "name": "y",
+      "type": "linear",
+      "domain": {
+        "fields": [
+          {
+            "data": "data_2",
+            "field": "min_v"
+          },
+          {
+            "data": "data_2",
+            "field": "max_v"
+          },
+          {
+            "data": "data_3",
+            "field": "median_v"
+          },
+          {
+            "data": "data_1",
+            "field": "mean_v"
+          }
+        ]
+      },
+      "range": [
+        {
+          "signal": "height"
+        },
+        0
+      ],
+      "nice": true,
+      "zero": true
+    }
+  ],
+  "axes": [
+    {
+      "scale": "y",
+      "orient": "left",
+      "gridScale": "x",
+      "grid": true,
+      "tickCount": {
+        "signal": "ceil(height/40)"
+      },
+      "domain": false,
+      "labels": false,
+      "aria": false,
+      "maxExtent": 0,
+      "minExtent": 0,
+      "ticks": false,
+      "zindex": 0
+    },
+    {
+      "scale": "x",
+      "orient": "bottom",
+      "grid": false,
+      "title": "g",
+      "labelAlign": "right",
+      "labelAngle": 270,
+      "labelBaseline": "middle",
+      "zindex": 0
+    },
+    {
+      "scale": "y",
+      "orient": "left",
+      "grid": false,
+      "title": "Min of v, Max of v, Median of v, Mean of v",
+      "labelOverlap": true,
+      "tickCount": {
+        "signal": "ceil(height/40)"
+      },
+      "zindex": 0
+    }
+  ]
+}

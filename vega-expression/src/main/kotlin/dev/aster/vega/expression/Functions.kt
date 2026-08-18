@@ -306,6 +306,11 @@ public object Functions {
     map.predicate("isString") { it is VegaValue.Str }
     map.predicate("isRegExp") { it is VegaValue.Pattern }
     map.predicate("isDefined") { it !is VegaValue.Null }
+    // Upstream tests `value instanceof Date`, so a *number* of milliseconds is not a date to it
+    // either — which is answerable here only because an instant is its own type in this value
+    // model. Every Vega-Lite chart over a temporal field filters with
+    // `isDate(f) || (isValid(f) && isFinite(+f))`, so without this the whole scale collapses.
+    map.predicate("isDate") { it is VegaValue.Timestamp }
     // `isValid` is narrower than truthiness: it rejects null and NaN but accepts 0 and "".
     map.predicate("isValid") {
       it !is VegaValue.Null && !(it is VegaValue.Num && it.value.isNaN())
@@ -539,6 +544,16 @@ public object Functions {
     // the two days a local clock changes and always 24 in UTC, so a chart that steps a local axis
     // with the UTC function lands an hour off for half the year.
     offsetFunction(map, "utcOffset") { TimeZone.UTC }
+
+    /** The same, stepped in **universal** time: `utcOffset('hours', t, 1)` adds a UTC hour. */
+    map["utcOffset"] = ExpressionFunction { args ->
+      val stepper =
+        stepperFor(args.string(0), TimeZone.UTC) ?: return@ExpressionFunction VegaValue.Null
+      val at = JsSemantics.toNumber(args.at(1))
+      if (!at.isFinite()) return@ExpressionFunction VegaValue.Null
+      val by = args.numberOr(2, 1.0).takeIf { it.isFinite() } ?: 1.0
+      VegaValue.Num(stepper.offset(at, floor(by).toInt()))
+    }
 
     /**
      * `timeSequence(unit, start, stop[, step])` — every boundary in a span, `stop` exclusive.

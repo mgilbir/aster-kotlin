@@ -1,0 +1,665 @@
+{
+  "$schema": "https://vega.github.io/schema/vega/v6.json",
+  "description": "A scatter-plot matrix: two measures crossed against two, each cell its own scales.",
+  "background": "white",
+  "padding": 5,
+  "data": [
+    {
+      "name": "source_0",
+      "values": [
+        {
+          "amount": 28,
+          "score": 3,
+          "weight": 12
+        },
+        {
+          "amount": 55,
+          "score": 7,
+          "weight": 4
+        },
+        {
+          "amount": 43,
+          "score": 5,
+          "weight": 19
+        },
+        {
+          "amount": 91,
+          "score": 2,
+          "weight": 8
+        }
+      ]
+    },
+    {
+      "name": "data_1",
+      "source": "source_0",
+      "transform": [
+        {
+          "type": "filter",
+          "expr": "isValid(datum[\"score\"]) && isFinite(+datum[\"score\"]) && isValid(datum[\"amount\"]) && isFinite(+datum[\"amount\"])"
+        }
+      ]
+    },
+    {
+      "name": "data_2",
+      "source": "source_0",
+      "transform": [
+        {
+          "type": "filter",
+          "expr": "isValid(datum[\"weight\"]) && isFinite(+datum[\"weight\"]) && isValid(datum[\"amount\"]) && isFinite(+datum[\"amount\"])"
+        }
+      ]
+    },
+    {
+      "name": "data_3",
+      "source": "source_0",
+      "transform": [
+        {
+          "type": "filter",
+          "expr": "isValid(datum[\"score\"]) && isFinite(+datum[\"score\"]) && isValid(datum[\"weight\"]) && isFinite(+datum[\"weight\"])"
+        }
+      ]
+    },
+    {
+      "name": "data_4",
+      "source": "source_0",
+      "transform": [
+        {
+          "type": "filter",
+          "expr": "isValid(datum[\"weight\"]) && isFinite(+datum[\"weight\"])"
+        }
+      ]
+    }
+  ],
+  "signals": [
+    {
+      "name": "childWidth",
+      "value": 100
+    },
+    {
+      "name": "childHeight",
+      "value": 100
+    }
+  ],
+  "layout": {
+    "padding": 20,
+    "columns": 2,
+    "bounds": "full",
+    "align": "all"
+  },
+  "marks": [
+    {
+      "type": "group",
+      "name": "child__row_amountcolumn_score_group",
+      "style": "cell",
+      "encode": {
+        "update": {
+          "width": {
+            "signal": "childWidth"
+          },
+          "height": {
+            "signal": "childHeight"
+          }
+        }
+      },
+      "marks": [
+        {
+          "name": "child__row_amountcolumn_score_marks",
+          "type": "symbol",
+          "style": [
+            "point"
+          ],
+          "from": {
+            "data": "data_1"
+          },
+          "encode": {
+            "update": {
+              "opacity": {
+                "value": 0.7
+              },
+              "fill": {
+                "value": "transparent"
+              },
+              "stroke": {
+                "value": "#4c78a8"
+              },
+              "ariaRoleDescription": {
+                "value": "point"
+              },
+              "description": {
+                "signal": "\"score: \" + (format(datum[\"score\"], \"\")) + \"; amount: \" + (format(datum[\"amount\"], \"\"))"
+              },
+              "x": {
+                "scale": "child__row_amountcolumn_score_x",
+                "field": "score"
+              },
+              "y": {
+                "scale": "child__row_amountcolumn_score_y",
+                "field": "amount"
+              }
+            }
+          }
+        }
+      ],
+      "axes": [
+        {
+          "scale": "child__row_amountcolumn_score_x",
+          "orient": "bottom",
+          "gridScale": "child__row_amountcolumn_score_y",
+          "grid": true,
+          "tickCount": {
+            "signal": "ceil(childWidth/40)"
+          },
+          "domain": false,
+          "labels": false,
+          "aria": false,
+          "maxExtent": 0,
+          "minExtent": 0,
+          "ticks": false,
+          "zindex": 0
+        },
+        {
+          "scale": "child__row_amountcolumn_score_y",
+          "orient": "left",
+          "gridScale": "child__row_amountcolumn_score_x",
+          "grid": true,
+          "tickCount": {
+            "signal": "ceil(childHeight/40)"
+          },
+          "domain": false,
+          "labels": false,
+          "aria": false,
+          "maxExtent": 0,
+          "minExtent": 0,
+          "ticks": false,
+          "zindex": 0
+        },
+        {
+          "scale": "child__row_amountcolumn_score_x",
+          "orient": "bottom",
+          "grid": false,
+          "title": "score",
+          "labelFlush": true,
+          "labelOverlap": true,
+          "tickCount": {
+            "signal": "ceil(childWidth/40)"
+          },
+          "zindex": 0
+        },
+        {
+          "scale": "child__row_amountcolumn_score_y",
+          "orient": "left",
+          "grid": false,
+          "title": "amount",
+          "labelOverlap": true,
+          "tickCount": {
+            "signal": "ceil(childHeight/40)"
+          },
+          "zindex": 0
+        }
+      ]
+    },
+    {
+      "type": "group",
+      "name": "child__row_amountcolumn_weight_group",
+      "style": "cell",
+      "encode": {
+        "update": {
+          "width": {
+            "signal": "childWidth"
+          },
+          "height": {
+            "signal": "childHeight"
+          }
+        }
+      },
+      "marks": [
+        {
+          "name": "child__row_amountcolumn_weight_marks",
+          "type": "symbol",
+          "style": [
+            "point"
+          ],
+          "from": {
+            "data": "data_2"
+          },
+          "encode": {
+            "update": {
+              "opacity": {
+                "value": 0.7
+              },
+              "fill": {
+                "value": "transparent"
+              },
+              "stroke": {
+                "value": "#4c78a8"
+              },
+              "ariaRoleDescription": {
+                "value": "point"
+              },
+              "description": {
+                "signal": "\"weight: \" + (format(datum[\"weight\"], \"\")) + \"; amount: \" + (format(datum[\"amount\"], \"\"))"
+              },
+              "x": {
+                "scale": "child__row_amountcolumn_weight_x",
+                "field": "weight"
+              },
+              "y": {
+                "scale": "child__row_amountcolumn_weight_y",
+                "field": "amount"
+              }
+            }
+          }
+        }
+      ],
+      "axes": [
+        {
+          "scale": "child__row_amountcolumn_weight_x",
+          "orient": "bottom",
+          "gridScale": "child__row_amountcolumn_weight_y",
+          "grid": true,
+          "tickCount": {
+            "signal": "ceil(childWidth/40)"
+          },
+          "domain": false,
+          "labels": false,
+          "aria": false,
+          "maxExtent": 0,
+          "minExtent": 0,
+          "ticks": false,
+          "zindex": 0
+        },
+        {
+          "scale": "child__row_amountcolumn_weight_y",
+          "orient": "left",
+          "gridScale": "child__row_amountcolumn_weight_x",
+          "grid": true,
+          "tickCount": {
+            "signal": "ceil(childHeight/40)"
+          },
+          "domain": false,
+          "labels": false,
+          "aria": false,
+          "maxExtent": 0,
+          "minExtent": 0,
+          "ticks": false,
+          "zindex": 0
+        },
+        {
+          "scale": "child__row_amountcolumn_weight_x",
+          "orient": "bottom",
+          "grid": false,
+          "title": "weight",
+          "labelFlush": true,
+          "labelOverlap": true,
+          "tickCount": {
+            "signal": "ceil(childWidth/40)"
+          },
+          "zindex": 0
+        },
+        {
+          "scale": "child__row_amountcolumn_weight_y",
+          "orient": "left",
+          "grid": false,
+          "title": "amount",
+          "labelOverlap": true,
+          "tickCount": {
+            "signal": "ceil(childHeight/40)"
+          },
+          "zindex": 0
+        }
+      ]
+    },
+    {
+      "type": "group",
+      "name": "child__row_weightcolumn_score_group",
+      "style": "cell",
+      "encode": {
+        "update": {
+          "width": {
+            "signal": "childWidth"
+          },
+          "height": {
+            "signal": "childHeight"
+          }
+        }
+      },
+      "marks": [
+        {
+          "name": "child__row_weightcolumn_score_marks",
+          "type": "symbol",
+          "style": [
+            "point"
+          ],
+          "from": {
+            "data": "data_3"
+          },
+          "encode": {
+            "update": {
+              "opacity": {
+                "value": 0.7
+              },
+              "fill": {
+                "value": "transparent"
+              },
+              "stroke": {
+                "value": "#4c78a8"
+              },
+              "ariaRoleDescription": {
+                "value": "point"
+              },
+              "description": {
+                "signal": "\"score: \" + (format(datum[\"score\"], \"\")) + \"; weight: \" + (format(datum[\"weight\"], \"\"))"
+              },
+              "x": {
+                "scale": "child__row_weightcolumn_score_x",
+                "field": "score"
+              },
+              "y": {
+                "scale": "child__row_weightcolumn_score_y",
+                "field": "weight"
+              }
+            }
+          }
+        }
+      ],
+      "axes": [
+        {
+          "scale": "child__row_weightcolumn_score_x",
+          "orient": "bottom",
+          "gridScale": "child__row_weightcolumn_score_y",
+          "grid": true,
+          "tickCount": {
+            "signal": "ceil(childWidth/40)"
+          },
+          "domain": false,
+          "labels": false,
+          "aria": false,
+          "maxExtent": 0,
+          "minExtent": 0,
+          "ticks": false,
+          "zindex": 0
+        },
+        {
+          "scale": "child__row_weightcolumn_score_y",
+          "orient": "left",
+          "gridScale": "child__row_weightcolumn_score_x",
+          "grid": true,
+          "tickCount": {
+            "signal": "ceil(childHeight/40)"
+          },
+          "domain": false,
+          "labels": false,
+          "aria": false,
+          "maxExtent": 0,
+          "minExtent": 0,
+          "ticks": false,
+          "zindex": 0
+        },
+        {
+          "scale": "child__row_weightcolumn_score_x",
+          "orient": "bottom",
+          "grid": false,
+          "title": "score",
+          "labelFlush": true,
+          "labelOverlap": true,
+          "tickCount": {
+            "signal": "ceil(childWidth/40)"
+          },
+          "zindex": 0
+        },
+        {
+          "scale": "child__row_weightcolumn_score_y",
+          "orient": "left",
+          "grid": false,
+          "title": "weight",
+          "labelOverlap": true,
+          "tickCount": {
+            "signal": "ceil(childHeight/40)"
+          },
+          "zindex": 0
+        }
+      ]
+    },
+    {
+      "type": "group",
+      "name": "child__row_weightcolumn_weight_group",
+      "style": "cell",
+      "encode": {
+        "update": {
+          "width": {
+            "signal": "childWidth"
+          },
+          "height": {
+            "signal": "childHeight"
+          }
+        }
+      },
+      "marks": [
+        {
+          "name": "child__row_weightcolumn_weight_marks",
+          "type": "symbol",
+          "style": [
+            "point"
+          ],
+          "from": {
+            "data": "data_4"
+          },
+          "encode": {
+            "update": {
+              "opacity": {
+                "value": 0.7
+              },
+              "fill": {
+                "value": "transparent"
+              },
+              "stroke": {
+                "value": "#4c78a8"
+              },
+              "ariaRoleDescription": {
+                "value": "point"
+              },
+              "description": {
+                "signal": "\"weight: \" + (format(datum[\"weight\"], \"\"))"
+              },
+              "x": {
+                "scale": "child__row_weightcolumn_weight_x",
+                "field": "weight"
+              },
+              "y": {
+                "scale": "child__row_weightcolumn_weight_y",
+                "field": "weight"
+              }
+            }
+          }
+        }
+      ],
+      "axes": [
+        {
+          "scale": "child__row_weightcolumn_weight_x",
+          "orient": "bottom",
+          "gridScale": "child__row_weightcolumn_weight_y",
+          "grid": true,
+          "tickCount": {
+            "signal": "ceil(childWidth/40)"
+          },
+          "domain": false,
+          "labels": false,
+          "aria": false,
+          "maxExtent": 0,
+          "minExtent": 0,
+          "ticks": false,
+          "zindex": 0
+        },
+        {
+          "scale": "child__row_weightcolumn_weight_y",
+          "orient": "left",
+          "gridScale": "child__row_weightcolumn_weight_x",
+          "grid": true,
+          "tickCount": {
+            "signal": "ceil(childHeight/40)"
+          },
+          "domain": false,
+          "labels": false,
+          "aria": false,
+          "maxExtent": 0,
+          "minExtent": 0,
+          "ticks": false,
+          "zindex": 0
+        },
+        {
+          "scale": "child__row_weightcolumn_weight_x",
+          "orient": "bottom",
+          "grid": false,
+          "title": "weight",
+          "labelFlush": true,
+          "labelOverlap": true,
+          "tickCount": {
+            "signal": "ceil(childWidth/40)"
+          },
+          "zindex": 0
+        },
+        {
+          "scale": "child__row_weightcolumn_weight_y",
+          "orient": "left",
+          "grid": false,
+          "title": "weight",
+          "labelOverlap": true,
+          "tickCount": {
+            "signal": "ceil(childHeight/40)"
+          },
+          "zindex": 0
+        }
+      ]
+    }
+  ],
+  "scales": [
+    {
+      "name": "child__row_amountcolumn_score_x",
+      "type": "linear",
+      "domain": {
+        "data": "data_1",
+        "field": "score"
+      },
+      "range": [
+        0,
+        {
+          "signal": "childWidth"
+        }
+      ],
+      "nice": true,
+      "zero": true
+    },
+    {
+      "name": "child__row_amountcolumn_score_y",
+      "type": "linear",
+      "domain": {
+        "data": "data_1",
+        "field": "amount"
+      },
+      "range": [
+        {
+          "signal": "childHeight"
+        },
+        0
+      ],
+      "nice": true,
+      "zero": true
+    },
+    {
+      "name": "child__row_amountcolumn_weight_x",
+      "type": "linear",
+      "domain": {
+        "data": "data_2",
+        "field": "weight"
+      },
+      "range": [
+        0,
+        {
+          "signal": "childWidth"
+        }
+      ],
+      "nice": true,
+      "zero": true
+    },
+    {
+      "name": "child__row_amountcolumn_weight_y",
+      "type": "linear",
+      "domain": {
+        "data": "data_2",
+        "field": "amount"
+      },
+      "range": [
+        {
+          "signal": "childHeight"
+        },
+        0
+      ],
+      "nice": true,
+      "zero": true
+    },
+    {
+      "name": "child__row_weightcolumn_score_x",
+      "type": "linear",
+      "domain": {
+        "data": "data_3",
+        "field": "score"
+      },
+      "range": [
+        0,
+        {
+          "signal": "childWidth"
+        }
+      ],
+      "nice": true,
+      "zero": true
+    },
+    {
+      "name": "child__row_weightcolumn_score_y",
+      "type": "linear",
+      "domain": {
+        "data": "data_3",
+        "field": "weight"
+      },
+      "range": [
+        {
+          "signal": "childHeight"
+        },
+        0
+      ],
+      "nice": true,
+      "zero": true
+    },
+    {
+      "name": "child__row_weightcolumn_weight_x",
+      "type": "linear",
+      "domain": {
+        "data": "data_4",
+        "field": "weight"
+      },
+      "range": [
+        0,
+        {
+          "signal": "childWidth"
+        }
+      ],
+      "nice": true,
+      "zero": true
+    },
+    {
+      "name": "child__row_weightcolumn_weight_y",
+      "type": "linear",
+      "domain": {
+        "data": "data_4",
+        "field": "weight"
+      },
+      "range": [
+        {
+          "signal": "childHeight"
+        },
+        0
+      ],
+      "nice": true,
+      "zero": true
+    }
+  ]
+}

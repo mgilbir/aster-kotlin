@@ -1,0 +1,145 @@
+{
+  "$schema": "https://vega.github.io/schema/vega/v6.json",
+  "description": "A size scale that maps a continuum onto buckets, needing one size per bucket.",
+  "background": "white",
+  "padding": 5,
+  "style": "cell",
+  "data": [
+    {
+      "name": "source_0",
+      "url": "data/cars.json",
+      "format": {
+        "type": "json"
+      },
+      "transform": [
+        {
+          "type": "filter",
+          "expr": "isValid(datum[\"Horsepower\"]) && isFinite(+datum[\"Horsepower\"])"
+        }
+      ]
+    }
+  ],
+  "signals": [
+    {
+      "name": "x_step",
+      "value": 20
+    },
+    {
+      "name": "width",
+      "update": "bandspace(domain('x').length, 1, 0.5) * x_step"
+    },
+    {
+      "name": "y_step",
+      "value": 20
+    },
+    {
+      "name": "height",
+      "update": "bandspace(domain('y').length, 1, 0.5) * y_step"
+    }
+  ],
+  "marks": [
+    {
+      "name": "marks",
+      "type": "symbol",
+      "style": [
+        "circle"
+      ],
+      "from": {
+        "data": "source_0"
+      },
+      "encode": {
+        "update": {
+          "opacity": {
+            "value": 0.7
+          },
+          "fill": {
+            "value": "#4c78a8"
+          },
+          "ariaRoleDescription": {
+            "value": "circle"
+          },
+          "description": {
+            "signal": "\"Cylinders: \" + (isValid(datum[\"Cylinders\"]) ? isArray(datum[\"Cylinders\"]) ? join(datum[\"Cylinders\"], ' ') : datum[\"Cylinders\"] : \"\"+datum[\"Cylinders\"]) + \"; Origin: \" + (isValid(datum[\"Origin\"]) ? isArray(datum[\"Origin\"]) ? join(datum[\"Origin\"], ' ') : datum[\"Origin\"] : \"\"+datum[\"Origin\"]) + \"; Horsepower: \" + (format(datum[\"Horsepower\"], \"\"))"
+          },
+          "x": {
+            "scale": "x",
+            "field": "Cylinders"
+          },
+          "y": {
+            "scale": "y",
+            "field": "Origin"
+          },
+          "size": {
+            "scale": "size",
+            "field": "Horsepower"
+          },
+          "shape": {
+            "value": "circle"
+          }
+        }
+      }
+    }
+  ],
+  "scales": [
+    {
+      "name": "x",
+      "type": "point",
+      "domain": {
+        "data": "source_0",
+        "field": "Cylinders",
+        "sort": true
+      },
+      "range": {
+        "step": {
+          "signal": "x_step"
+        }
+      },
+      "padding": 0.5
+    },
+    {
+      "name": "y",
+      "type": "point",
+      "domain": {
+        "data": "source_0",
+        "field": "Origin",
+        "sort": true
+      },
+      "range": {
+        "step": {
+          "signal": "y_step"
+        }
+      },
+      "padding": 0.5
+    },
+    {
+      "name": "size",
+      "type": "quantile",
+      "domain": {
+        "data": "source_0",
+        "field": "Horsepower"
+      },
+      "range": {
+        "signal": "sequence(4, 361 + (361 - 4) / (4 - 1), (361 - 4) / (4 - 1))"
+      }
+    }
+  ],
+  "axes": [
+    {
+      "scale": "x",
+      "orient": "bottom",
+      "grid": false,
+      "title": "Cylinders",
+      "labelAlign": "right",
+      "labelAngle": 270,
+      "labelBaseline": "middle",
+      "zindex": 0
+    },
+    {
+      "scale": "y",
+      "orient": "left",
+      "grid": false,
+      "title": "Origin",
+      "zindex": 0
+    }
+  ]
+}

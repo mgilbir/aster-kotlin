@@ -1,0 +1,519 @@
+{
+  "$schema": "https://vega.github.io/schema/vega/v6.json",
+  "description": "One bar chart drawn once per measure, laid out two to a row.",
+  "background": "white",
+  "padding": 5,
+  "data": [
+    {
+      "name": "source_0",
+      "values": [
+        {
+          "category": "Alpha",
+          "amount": 28,
+          "score": 3,
+          "weight": 12
+        },
+        {
+          "category": "Beta",
+          "amount": 55,
+          "score": 7,
+          "weight": 4
+        },
+        {
+          "category": "Gamma",
+          "amount": 43,
+          "score": 5,
+          "weight": 19
+        }
+      ]
+    },
+    {
+      "name": "data_1",
+      "source": "source_0",
+      "transform": [
+        {
+          "type": "stack",
+          "groupby": [
+            "category"
+          ],
+          "field": "amount",
+          "sort": {
+            "field": [],
+            "order": []
+          },
+          "as": [
+            "amount_start",
+            "amount_end"
+          ],
+          "offset": "zero"
+        },
+        {
+          "type": "filter",
+          "expr": "isValid(datum[\"amount\"]) && isFinite(+datum[\"amount\"])"
+        }
+      ]
+    },
+    {
+      "name": "data_2",
+      "source": "source_0",
+      "transform": [
+        {
+          "type": "stack",
+          "groupby": [
+            "category"
+          ],
+          "field": "score",
+          "sort": {
+            "field": [],
+            "order": []
+          },
+          "as": [
+            "score_start",
+            "score_end"
+          ],
+          "offset": "zero"
+        },
+        {
+          "type": "filter",
+          "expr": "isValid(datum[\"score\"]) && isFinite(+datum[\"score\"])"
+        }
+      ]
+    },
+    {
+      "name": "data_3",
+      "source": "source_0",
+      "transform": [
+        {
+          "type": "stack",
+          "groupby": [
+            "category"
+          ],
+          "field": "weight",
+          "sort": {
+            "field": [],
+            "order": []
+          },
+          "as": [
+            "weight_start",
+            "weight_end"
+          ],
+          "offset": "zero"
+        },
+        {
+          "type": "filter",
+          "expr": "isValid(datum[\"weight\"]) && isFinite(+datum[\"weight\"])"
+        }
+      ]
+    }
+  ],
+  "signals": [
+    {
+      "name": "childWidth",
+      "value": 120
+    },
+    {
+      "name": "childHeight",
+      "value": 90
+    }
+  ],
+  "layout": {
+    "padding": 20,
+    "columns": 2,
+    "bounds": "full",
+    "align": "all"
+  },
+  "marks": [
+    {
+      "type": "group",
+      "name": "child__amount_group",
+      "style": "cell",
+      "encode": {
+        "update": {
+          "width": {
+            "signal": "childWidth"
+          },
+          "height": {
+            "signal": "childHeight"
+          }
+        }
+      },
+      "marks": [
+        {
+          "name": "child__amount_marks",
+          "type": "rect",
+          "style": [
+            "bar"
+          ],
+          "from": {
+            "data": "data_1"
+          },
+          "encode": {
+            "update": {
+              "fill": {
+                "value": "#4c78a8"
+              },
+              "ariaRoleDescription": {
+                "value": "bar"
+              },
+              "description": {
+                "signal": "\"category: \" + (isValid(datum[\"category\"]) ? isArray(datum[\"category\"]) ? join(datum[\"category\"], ' ') : datum[\"category\"] : \"\"+datum[\"category\"]) + \"; amount: \" + (format(datum[\"amount\"], \"\"))"
+              },
+              "x": {
+                "scale": "child__amount_x",
+                "field": "category"
+              },
+              "width": {
+                "signal": "max(0.25, bandwidth('child__amount_x'))"
+              },
+              "y": {
+                "scale": "child__amount_y",
+                "field": "amount_end"
+              },
+              "y2": {
+                "scale": "child__amount_y",
+                "field": "amount_start"
+              }
+            }
+          }
+        }
+      ],
+      "axes": [
+        {
+          "scale": "child__amount_y",
+          "orient": "left",
+          "gridScale": "child__amount_x",
+          "grid": true,
+          "tickCount": {
+            "signal": "ceil(childHeight/40)"
+          },
+          "domain": false,
+          "labels": false,
+          "aria": false,
+          "maxExtent": 0,
+          "minExtent": 0,
+          "ticks": false,
+          "zindex": 0
+        },
+        {
+          "scale": "child__amount_x",
+          "orient": "bottom",
+          "grid": false,
+          "title": "category",
+          "labelAlign": "right",
+          "labelAngle": 270,
+          "labelBaseline": "middle",
+          "zindex": 0
+        },
+        {
+          "scale": "child__amount_y",
+          "orient": "left",
+          "grid": false,
+          "title": "amount",
+          "labelOverlap": true,
+          "tickCount": {
+            "signal": "ceil(childHeight/40)"
+          },
+          "zindex": 0
+        }
+      ]
+    },
+    {
+      "type": "group",
+      "name": "child__score_group",
+      "style": "cell",
+      "encode": {
+        "update": {
+          "width": {
+            "signal": "childWidth"
+          },
+          "height": {
+            "signal": "childHeight"
+          }
+        }
+      },
+      "marks": [
+        {
+          "name": "child__score_marks",
+          "type": "rect",
+          "style": [
+            "bar"
+          ],
+          "from": {
+            "data": "data_2"
+          },
+          "encode": {
+            "update": {
+              "fill": {
+                "value": "#4c78a8"
+              },
+              "ariaRoleDescription": {
+                "value": "bar"
+              },
+              "description": {
+                "signal": "\"category: \" + (isValid(datum[\"category\"]) ? isArray(datum[\"category\"]) ? join(datum[\"category\"], ' ') : datum[\"category\"] : \"\"+datum[\"category\"]) + \"; score: \" + (format(datum[\"score\"], \"\"))"
+              },
+              "x": {
+                "scale": "child__score_x",
+                "field": "category"
+              },
+              "width": {
+                "signal": "max(0.25, bandwidth('child__score_x'))"
+              },
+              "y": {
+                "scale": "child__score_y",
+                "field": "score_end"
+              },
+              "y2": {
+                "scale": "child__score_y",
+                "field": "score_start"
+              }
+            }
+          }
+        }
+      ],
+      "axes": [
+        {
+          "scale": "child__score_y",
+          "orient": "left",
+          "gridScale": "child__score_x",
+          "grid": true,
+          "tickCount": {
+            "signal": "ceil(childHeight/40)"
+          },
+          "domain": false,
+          "labels": false,
+          "aria": false,
+          "maxExtent": 0,
+          "minExtent": 0,
+          "ticks": false,
+          "zindex": 0
+        },
+        {
+          "scale": "child__score_x",
+          "orient": "bottom",
+          "grid": false,
+          "title": "category",
+          "labelAlign": "right",
+          "labelAngle": 270,
+          "labelBaseline": "middle",
+          "zindex": 0
+        },
+        {
+          "scale": "child__score_y",
+          "orient": "left",
+          "grid": false,
+          "title": "score",
+          "labelOverlap": true,
+          "tickCount": {
+            "signal": "ceil(childHeight/40)"
+          },
+          "zindex": 0
+        }
+      ]
+    },
+    {
+      "type": "group",
+      "name": "child__weight_group",
+      "style": "cell",
+      "encode": {
+        "update": {
+          "width": {
+            "signal": "childWidth"
+          },
+          "height": {
+            "signal": "childHeight"
+          }
+        }
+      },
+      "marks": [
+        {
+          "name": "child__weight_marks",
+          "type": "rect",
+          "style": [
+            "bar"
+          ],
+          "from": {
+            "data": "data_3"
+          },
+          "encode": {
+            "update": {
+              "fill": {
+                "value": "#4c78a8"
+              },
+              "ariaRoleDescription": {
+                "value": "bar"
+              },
+              "description": {
+                "signal": "\"category: \" + (isValid(datum[\"category\"]) ? isArray(datum[\"category\"]) ? join(datum[\"category\"], ' ') : datum[\"category\"] : \"\"+datum[\"category\"]) + \"; weight: \" + (format(datum[\"weight\"], \"\"))"
+              },
+              "x": {
+                "scale": "child__weight_x",
+                "field": "category"
+              },
+              "width": {
+                "signal": "max(0.25, bandwidth('child__weight_x'))"
+              },
+              "y": {
+                "scale": "child__weight_y",
+                "field": "weight_end"
+              },
+              "y2": {
+                "scale": "child__weight_y",
+                "field": "weight_start"
+              }
+            }
+          }
+        }
+      ],
+      "axes": [
+        {
+          "scale": "child__weight_y",
+          "orient": "left",
+          "gridScale": "child__weight_x",
+          "grid": true,
+          "tickCount": {
+            "signal": "ceil(childHeight/40)"
+          },
+          "domain": false,
+          "labels": false,
+          "aria": false,
+          "maxExtent": 0,
+          "minExtent": 0,
+          "ticks": false,
+          "zindex": 0
+        },
+        {
+          "scale": "child__weight_x",
+          "orient": "bottom",
+          "grid": false,
+          "title": "category",
+          "labelAlign": "right",
+          "labelAngle": 270,
+          "labelBaseline": "middle",
+          "zindex": 0
+        },
+        {
+          "scale": "child__weight_y",
+          "orient": "left",
+          "grid": false,
+          "title": "weight",
+          "labelOverlap": true,
+          "tickCount": {
+            "signal": "ceil(childHeight/40)"
+          },
+          "zindex": 0
+        }
+      ]
+    }
+  ],
+  "scales": [
+    {
+      "name": "child__amount_x",
+      "type": "band",
+      "domain": {
+        "data": "data_1",
+        "field": "category",
+        "sort": true
+      },
+      "range": [
+        0,
+        {
+          "signal": "childWidth"
+        }
+      ],
+      "paddingInner": 0.1,
+      "paddingOuter": 0.05
+    },
+    {
+      "name": "child__amount_y",
+      "type": "linear",
+      "domain": {
+        "data": "data_1",
+        "fields": [
+          "amount_start",
+          "amount_end"
+        ]
+      },
+      "range": [
+        {
+          "signal": "childHeight"
+        },
+        0
+      ],
+      "nice": true,
+      "zero": true
+    },
+    {
+      "name": "child__score_x",
+      "type": "band",
+      "domain": {
+        "data": "data_2",
+        "field": "category",
+        "sort": true
+      },
+      "range": [
+        0,
+        {
+          "signal": "childWidth"
+        }
+      ],
+      "paddingInner": 0.1,
+      "paddingOuter": 0.05
+    },
+    {
+      "name": "child__score_y",
+      "type": "linear",
+      "domain": {
+        "data": "data_2",
+        "fields": [
+          "score_start",
+          "score_end"
+        ]
+      },
+      "range": [
+        {
+          "signal": "childHeight"
+        },
+        0
+      ],
+      "nice": true,
+      "zero": true
+    },
+    {
+      "name": "child__weight_x",
+      "type": "band",
+      "domain": {
+        "data": "data_3",
+        "field": "category",
+        "sort": true
+      },
+      "range": [
+        0,
+        {
+          "signal": "childWidth"
+        }
+      ],
+      "paddingInner": 0.1,
+      "paddingOuter": 0.05
+    },
+    {
+      "name": "child__weight_y",
+      "type": "linear",
+      "domain": {
+        "data": "data_3",
+        "fields": [
+          "weight_start",
+          "weight_end"
+        ]
+      },
+      "range": [
+        {
+          "signal": "childHeight"
+        },
+        0
+      ],
+      "nice": true,
+      "zero": true
+    }
+  ]
+}

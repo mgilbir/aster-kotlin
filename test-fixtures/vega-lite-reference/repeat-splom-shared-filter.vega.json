@@ -1,0 +1,637 @@
+{
+  "$schema": "https://vega.github.io/schema/vega/v6.json",
+  "description": "A matrix of scatter plots: the cell for (a, b) drops the same rows as the cell for (b, a).",
+  "background": "white",
+  "padding": 5,
+  "data": [
+    {
+      "name": "source_0",
+      "url": "data/cars.json",
+      "format": {
+        "type": "json"
+      }
+    },
+    {
+      "name": "data_0",
+      "source": "source_0",
+      "transform": [
+        {
+          "type": "filter",
+          "expr": "isValid(datum[\"Acceleration\"]) && isFinite(+datum[\"Acceleration\"]) && isValid(datum[\"Horsepower\"]) && isFinite(+datum[\"Horsepower\"])"
+        }
+      ]
+    },
+    {
+      "name": "data_1",
+      "source": "source_0",
+      "transform": [
+        {
+          "type": "filter",
+          "expr": "isValid(datum[\"Horsepower\"]) && isFinite(+datum[\"Horsepower\"])"
+        }
+      ]
+    },
+    {
+      "name": "data_2",
+      "source": "source_0",
+      "transform": [
+        {
+          "type": "filter",
+          "expr": "isValid(datum[\"Acceleration\"]) && isFinite(+datum[\"Acceleration\"])"
+        }
+      ]
+    }
+  ],
+  "signals": [
+    {
+      "name": "childWidth",
+      "value": 300
+    },
+    {
+      "name": "childHeight",
+      "value": 300
+    }
+  ],
+  "layout": {
+    "padding": 20,
+    "columns": 2,
+    "bounds": "full",
+    "align": "all"
+  },
+  "marks": [
+    {
+      "type": "group",
+      "name": "child__row_Horsepowercolumn_Acceleration_group",
+      "style": "cell",
+      "encode": {
+        "update": {
+          "width": {
+            "signal": "childWidth"
+          },
+          "height": {
+            "signal": "childHeight"
+          }
+        }
+      },
+      "marks": [
+        {
+          "name": "child__row_Horsepowercolumn_Acceleration_marks",
+          "type": "symbol",
+          "style": [
+            "point"
+          ],
+          "from": {
+            "data": "data_0"
+          },
+          "encode": {
+            "update": {
+              "opacity": {
+                "value": 0.7
+              },
+              "fill": {
+                "value": "transparent"
+              },
+              "stroke": {
+                "value": "#4c78a8"
+              },
+              "ariaRoleDescription": {
+                "value": "point"
+              },
+              "description": {
+                "signal": "\"Acceleration: \" + (format(datum[\"Acceleration\"], \"\")) + \"; Horsepower: \" + (format(datum[\"Horsepower\"], \"\"))"
+              },
+              "x": {
+                "scale": "child__row_Horsepowercolumn_Acceleration_x",
+                "field": "Acceleration"
+              },
+              "y": {
+                "scale": "child__row_Horsepowercolumn_Acceleration_y",
+                "field": "Horsepower"
+              }
+            }
+          }
+        }
+      ],
+      "axes": [
+        {
+          "scale": "child__row_Horsepowercolumn_Acceleration_x",
+          "orient": "bottom",
+          "gridScale": "child__row_Horsepowercolumn_Acceleration_y",
+          "grid": true,
+          "tickCount": {
+            "signal": "ceil(childWidth/40)"
+          },
+          "domain": false,
+          "labels": false,
+          "aria": false,
+          "maxExtent": 0,
+          "minExtent": 0,
+          "ticks": false,
+          "zindex": 0
+        },
+        {
+          "scale": "child__row_Horsepowercolumn_Acceleration_y",
+          "orient": "left",
+          "gridScale": "child__row_Horsepowercolumn_Acceleration_x",
+          "grid": true,
+          "tickCount": {
+            "signal": "ceil(childHeight/40)"
+          },
+          "domain": false,
+          "labels": false,
+          "aria": false,
+          "maxExtent": 0,
+          "minExtent": 0,
+          "ticks": false,
+          "zindex": 0
+        },
+        {
+          "scale": "child__row_Horsepowercolumn_Acceleration_x",
+          "orient": "bottom",
+          "grid": false,
+          "title": "Acceleration",
+          "labelFlush": true,
+          "labelOverlap": true,
+          "tickCount": {
+            "signal": "ceil(childWidth/40)"
+          },
+          "zindex": 0
+        },
+        {
+          "scale": "child__row_Horsepowercolumn_Acceleration_y",
+          "orient": "left",
+          "grid": false,
+          "title": "Horsepower",
+          "labelOverlap": true,
+          "tickCount": {
+            "signal": "ceil(childHeight/40)"
+          },
+          "zindex": 0
+        }
+      ]
+    },
+    {
+      "type": "group",
+      "name": "child__row_Horsepowercolumn_Horsepower_group",
+      "style": "cell",
+      "encode": {
+        "update": {
+          "width": {
+            "signal": "childWidth"
+          },
+          "height": {
+            "signal": "childHeight"
+          }
+        }
+      },
+      "marks": [
+        {
+          "name": "child__row_Horsepowercolumn_Horsepower_marks",
+          "type": "symbol",
+          "style": [
+            "point"
+          ],
+          "from": {
+            "data": "data_1"
+          },
+          "encode": {
+            "update": {
+              "opacity": {
+                "value": 0.7
+              },
+              "fill": {
+                "value": "transparent"
+              },
+              "stroke": {
+                "value": "#4c78a8"
+              },
+              "ariaRoleDescription": {
+                "value": "point"
+              },
+              "description": {
+                "signal": "\"Horsepower: \" + (format(datum[\"Horsepower\"], \"\"))"
+              },
+              "x": {
+                "scale": "child__row_Horsepowercolumn_Horsepower_x",
+                "field": "Horsepower"
+              },
+              "y": {
+                "scale": "child__row_Horsepowercolumn_Horsepower_y",
+                "field": "Horsepower"
+              }
+            }
+          }
+        }
+      ],
+      "axes": [
+        {
+          "scale": "child__row_Horsepowercolumn_Horsepower_x",
+          "orient": "bottom",
+          "gridScale": "child__row_Horsepowercolumn_Horsepower_y",
+          "grid": true,
+          "tickCount": {
+            "signal": "ceil(childWidth/40)"
+          },
+          "domain": false,
+          "labels": false,
+          "aria": false,
+          "maxExtent": 0,
+          "minExtent": 0,
+          "ticks": false,
+          "zindex": 0
+        },
+        {
+          "scale": "child__row_Horsepowercolumn_Horsepower_y",
+          "orient": "left",
+          "gridScale": "child__row_Horsepowercolumn_Horsepower_x",
+          "grid": true,
+          "tickCount": {
+            "signal": "ceil(childHeight/40)"
+          },
+          "domain": false,
+          "labels": false,
+          "aria": false,
+          "maxExtent": 0,
+          "minExtent": 0,
+          "ticks": false,
+          "zindex": 0
+        },
+        {
+          "scale": "child__row_Horsepowercolumn_Horsepower_x",
+          "orient": "bottom",
+          "grid": false,
+          "title": "Horsepower",
+          "labelFlush": true,
+          "labelOverlap": true,
+          "tickCount": {
+            "signal": "ceil(childWidth/40)"
+          },
+          "zindex": 0
+        },
+        {
+          "scale": "child__row_Horsepowercolumn_Horsepower_y",
+          "orient": "left",
+          "grid": false,
+          "title": "Horsepower",
+          "labelOverlap": true,
+          "tickCount": {
+            "signal": "ceil(childHeight/40)"
+          },
+          "zindex": 0
+        }
+      ]
+    },
+    {
+      "type": "group",
+      "name": "child__row_Accelerationcolumn_Acceleration_group",
+      "style": "cell",
+      "encode": {
+        "update": {
+          "width": {
+            "signal": "childWidth"
+          },
+          "height": {
+            "signal": "childHeight"
+          }
+        }
+      },
+      "marks": [
+        {
+          "name": "child__row_Accelerationcolumn_Acceleration_marks",
+          "type": "symbol",
+          "style": [
+            "point"
+          ],
+          "from": {
+            "data": "data_2"
+          },
+          "encode": {
+            "update": {
+              "opacity": {
+                "value": 0.7
+              },
+              "fill": {
+                "value": "transparent"
+              },
+              "stroke": {
+                "value": "#4c78a8"
+              },
+              "ariaRoleDescription": {
+                "value": "point"
+              },
+              "description": {
+                "signal": "\"Acceleration: \" + (format(datum[\"Acceleration\"], \"\"))"
+              },
+              "x": {
+                "scale": "child__row_Accelerationcolumn_Acceleration_x",
+                "field": "Acceleration"
+              },
+              "y": {
+                "scale": "child__row_Accelerationcolumn_Acceleration_y",
+                "field": "Acceleration"
+              }
+            }
+          }
+        }
+      ],
+      "axes": [
+        {
+          "scale": "child__row_Accelerationcolumn_Acceleration_x",
+          "orient": "bottom",
+          "gridScale": "child__row_Accelerationcolumn_Acceleration_y",
+          "grid": true,
+          "tickCount": {
+            "signal": "ceil(childWidth/40)"
+          },
+          "domain": false,
+          "labels": false,
+          "aria": false,
+          "maxExtent": 0,
+          "minExtent": 0,
+          "ticks": false,
+          "zindex": 0
+        },
+        {
+          "scale": "child__row_Accelerationcolumn_Acceleration_y",
+          "orient": "left",
+          "gridScale": "child__row_Accelerationcolumn_Acceleration_x",
+          "grid": true,
+          "tickCount": {
+            "signal": "ceil(childHeight/40)"
+          },
+          "domain": false,
+          "labels": false,
+          "aria": false,
+          "maxExtent": 0,
+          "minExtent": 0,
+          "ticks": false,
+          "zindex": 0
+        },
+        {
+          "scale": "child__row_Accelerationcolumn_Acceleration_x",
+          "orient": "bottom",
+          "grid": false,
+          "title": "Acceleration",
+          "labelFlush": true,
+          "labelOverlap": true,
+          "tickCount": {
+            "signal": "ceil(childWidth/40)"
+          },
+          "zindex": 0
+        },
+        {
+          "scale": "child__row_Accelerationcolumn_Acceleration_y",
+          "orient": "left",
+          "grid": false,
+          "title": "Acceleration",
+          "labelOverlap": true,
+          "tickCount": {
+            "signal": "ceil(childHeight/40)"
+          },
+          "zindex": 0
+        }
+      ]
+    },
+    {
+      "type": "group",
+      "name": "child__row_Accelerationcolumn_Horsepower_group",
+      "style": "cell",
+      "encode": {
+        "update": {
+          "width": {
+            "signal": "childWidth"
+          },
+          "height": {
+            "signal": "childHeight"
+          }
+        }
+      },
+      "marks": [
+        {
+          "name": "child__row_Accelerationcolumn_Horsepower_marks",
+          "type": "symbol",
+          "style": [
+            "point"
+          ],
+          "from": {
+            "data": "data_0"
+          },
+          "encode": {
+            "update": {
+              "opacity": {
+                "value": 0.7
+              },
+              "fill": {
+                "value": "transparent"
+              },
+              "stroke": {
+                "value": "#4c78a8"
+              },
+              "ariaRoleDescription": {
+                "value": "point"
+              },
+              "description": {
+                "signal": "\"Horsepower: \" + (format(datum[\"Horsepower\"], \"\")) + \"; Acceleration: \" + (format(datum[\"Acceleration\"], \"\"))"
+              },
+              "x": {
+                "scale": "child__row_Accelerationcolumn_Horsepower_x",
+                "field": "Horsepower"
+              },
+              "y": {
+                "scale": "child__row_Accelerationcolumn_Horsepower_y",
+                "field": "Acceleration"
+              }
+            }
+          }
+        }
+      ],
+      "axes": [
+        {
+          "scale": "child__row_Accelerationcolumn_Horsepower_x",
+          "orient": "bottom",
+          "gridScale": "child__row_Accelerationcolumn_Horsepower_y",
+          "grid": true,
+          "tickCount": {
+            "signal": "ceil(childWidth/40)"
+          },
+          "domain": false,
+          "labels": false,
+          "aria": false,
+          "maxExtent": 0,
+          "minExtent": 0,
+          "ticks": false,
+          "zindex": 0
+        },
+        {
+          "scale": "child__row_Accelerationcolumn_Horsepower_y",
+          "orient": "left",
+          "gridScale": "child__row_Accelerationcolumn_Horsepower_x",
+          "grid": true,
+          "tickCount": {
+            "signal": "ceil(childHeight/40)"
+          },
+          "domain": false,
+          "labels": false,
+          "aria": false,
+          "maxExtent": 0,
+          "minExtent": 0,
+          "ticks": false,
+          "zindex": 0
+        },
+        {
+          "scale": "child__row_Accelerationcolumn_Horsepower_x",
+          "orient": "bottom",
+          "grid": false,
+          "title": "Horsepower",
+          "labelFlush": true,
+          "labelOverlap": true,
+          "tickCount": {
+            "signal": "ceil(childWidth/40)"
+          },
+          "zindex": 0
+        },
+        {
+          "scale": "child__row_Accelerationcolumn_Horsepower_y",
+          "orient": "left",
+          "grid": false,
+          "title": "Acceleration",
+          "labelOverlap": true,
+          "tickCount": {
+            "signal": "ceil(childHeight/40)"
+          },
+          "zindex": 0
+        }
+      ]
+    }
+  ],
+  "scales": [
+    {
+      "name": "child__row_Horsepowercolumn_Acceleration_x",
+      "type": "linear",
+      "domain": {
+        "data": "data_0",
+        "field": "Acceleration"
+      },
+      "range": [
+        0,
+        {
+          "signal": "childWidth"
+        }
+      ],
+      "nice": true,
+      "zero": true
+    },
+    {
+      "name": "child__row_Horsepowercolumn_Acceleration_y",
+      "type": "linear",
+      "domain": {
+        "data": "data_0",
+        "field": "Horsepower"
+      },
+      "range": [
+        {
+          "signal": "childHeight"
+        },
+        0
+      ],
+      "nice": true,
+      "zero": true
+    },
+    {
+      "name": "child__row_Horsepowercolumn_Horsepower_x",
+      "type": "linear",
+      "domain": {
+        "data": "data_1",
+        "field": "Horsepower"
+      },
+      "range": [
+        0,
+        {
+          "signal": "childWidth"
+        }
+      ],
+      "nice": true,
+      "zero": true
+    },
+    {
+      "name": "child__row_Horsepowercolumn_Horsepower_y",
+      "type": "linear",
+      "domain": {
+        "data": "data_1",
+        "field": "Horsepower"
+      },
+      "range": [
+        {
+          "signal": "childHeight"
+        },
+        0
+      ],
+      "nice": true,
+      "zero": true
+    },
+    {
+      "name": "child__row_Accelerationcolumn_Acceleration_x",
+      "type": "linear",
+      "domain": {
+        "data": "data_2",
+        "field": "Acceleration"
+      },
+      "range": [
+        0,
+        {
+          "signal": "childWidth"
+        }
+      ],
+      "nice": true,
+      "zero": true
+    },
+    {
+      "name": "child__row_Accelerationcolumn_Acceleration_y",
+      "type": "linear",
+      "domain": {
+        "data": "data_2",
+        "field": "Acceleration"
+      },
+      "range": [
+        {
+          "signal": "childHeight"
+        },
+        0
+      ],
+      "nice": true,
+      "zero": true
+    },
+    {
+      "name": "child__row_Accelerationcolumn_Horsepower_x",
+      "type": "linear",
+      "domain": {
+        "data": "data_0",
+        "field": "Horsepower"
+      },
+      "range": [
+        0,
+        {
+          "signal": "childWidth"
+        }
+      ],
+      "nice": true,
+      "zero": true
+    },
+    {
+      "name": "child__row_Accelerationcolumn_Horsepower_y",
+      "type": "linear",
+      "domain": {
+        "data": "data_0",
+        "field": "Acceleration"
+      },
+      "range": [
+        {
+          "signal": "childHeight"
+        },
+        0
+      ],
+      "nice": true,
+      "zero": true
+    }
+  ]
+}

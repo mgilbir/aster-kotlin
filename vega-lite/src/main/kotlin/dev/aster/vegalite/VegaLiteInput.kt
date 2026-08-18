@@ -1,0 +1,64 @@
+package dev.aster.vegalite
+
+import dev.aster.vega.model.DiagnosticCollector
+import dev.aster.vega.model.VegaDiagnostic
+import dev.aster.vega.model.VegaJson
+import dev.aster.vega.model.VegaValue
+
+/**
+ * A specification a host was handed, and the Vega it turned out to be.
+ *
+ * [vegaJson] is what to give the runtime. It is the input unchanged when the input was already
+ * Vega, and the compiled result when it was Vega-Lite; `null` only when Vega-Lite compilation
+ * produced nothing at all.
+ */
+public data class VegaLiteConversion(
+  val vegaJson: String?,
+  /** True when the input was recognised as Vega-Lite and compiled. */
+  val wasVegaLite: Boolean,
+  /** What the *Vega-Lite* compilation reported. Empty when the input was already Vega. */
+  val diagnostics: List<VegaDiagnostic>,
+)
+
+/**
+ * Accepts either grammar and hands back Vega.
+ *
+ * A host that shows a chart from text a user supplied cannot ask which grammar the text is in — the
+ * user pasted a chart, not a dialect — so this decides, and says which it decided. The decision is
+ * made the way the Vega ecosystem's own embed layer makes it: the `$schema` if there is one, and
+ * otherwise the shape of the specification, since only Vega-Lite has `mark` and `encoding` at the
+ * top level and only Vega has `marks`.
+ *
+ * It is deliberately not a guess dressed up as a fact: [VegaLiteConversion.wasVegaLite] says which
+ * way it went, so a host can put that in front of a reader alongside whatever the compilation
+ * reported.
+ */
+public object VegaLiteInput {
+
+  public fun toVega(json: String): VegaLiteConversion {
+    val diagnostics = DiagnosticCollector()
+    val parsed = VegaJson.parseOrNull(json, diagnostics)
+    // Not JSON at all: hand the text on unchanged and let the Vega parser produce the one
+    // diagnostic a reader needs, rather than producing a second one that says the same thing.
+    if (parsed !is VegaValue.Obj) return VegaLiteConversion(json, false, emptyList())
+
+    if (!isVegaLite(parsed)) return VegaLiteConversion(json, false, emptyList())
+
+    val compiled = VegaLiteCompiler().compile(parsed)
+    return VegaLiteConversion(compiled.toJson(), true, compiled.diagnostics)
+  }
+
+  /** Whether a parsed specification is Vega-Lite rather than Vega. */
+  public fun isVegaLite(spec: VegaValue): Boolean {
+    if (spec !is VegaValue.Obj) return false
+    val schema = (spec.fields["\$schema"] as? VegaValue.Str)?.value
+    if (schema != null) return schema.contains("vega-lite")
+    // No schema: go by shape. Vega's marks are a list under `marks`; Vega-Lite's single mark is
+    // under `mark`, and its compositions name themselves.
+    if (spec.fields.containsKey("marks")) return false
+    return VEGA_LITE_ONLY.any { spec.fields.containsKey(it) }
+  }
+
+  private val VEGA_LITE_ONLY =
+    listOf("mark", "encoding", "layer", "facet", "hconcat", "vconcat", "concat", "repeat")
+}

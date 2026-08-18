@@ -103,13 +103,26 @@ public class MarkEncoder(
    * that spans the cell rather than one that spans the chart.
    */
   private val groupExtent: PlotSize = PlotSize(0.0, 0.0),
+  /**
+   * Where the enclosing group item sits in **its** parent, which `{"field": {"group": "y"}}` reads.
+   *
+   * Upstream compiles that reference to `item.mark.group.y`, so it is the group's own placement and
+   * not a signal. A mark nested in a group that has been moved uses it to move back: a stacked bar
+   * with rounded corners is drawn inside a group placed at the stack's own extent, and an inner
+   * group written `{"field": {"group": "y"}, "mult": -1}` undoes that translation so the bars keep
+   * their scaled positions. Falling through to a signal lookup left the undo at zero and drew every
+   * segment its own group's height too far down.
+   */
+  private val groupOrigin: PointD = PointD(0.0, 0.0),
 ) {
 
-  /** `width` and `height` off the enclosing group item; anything else is a signal lookup. */
+  /** `width`, `height` and the origin off the enclosing group item; anything else is a signal. */
   private fun groupProperty(path: String): VegaValue =
     when (path) {
       "width" -> VegaValue.Num(groupExtent.width)
       "height" -> VegaValue.Num(groupExtent.height)
+      "x" -> VegaValue.Num(groupOrigin.x)
+      "y" -> VegaValue.Num(groupOrigin.y)
       else -> scope.signal(path)
     }
 
@@ -140,14 +153,15 @@ public class MarkEncoder(
       MarkType.RULE -> data.mapIndexedNotNull { index, datum -> rule(at(index), datum, index) }
       MarkType.SYMBOL -> data.mapIndexedNotNull { index, datum -> symbol(at(index), datum, index) }
       MarkType.TEXT -> data.mapIndexedNotNull { index, datum -> text(at(index), datum, index) }
-      // One node for the whole series, not one per datum.
-      MarkType.LINE -> listOfNotNull(line(spec, data))
-      MarkType.AREA -> listOfNotNull(area(spec, data))
+      // One node for the whole series, not one per datum — and the `sort` therefore has to order
+      // the *rows* here, since there are no items left to order afterwards.
+      MarkType.LINE -> listOfNotNull(line(spec, ordered(spec, data)))
+      MarkType.AREA -> listOfNotNull(area(spec, ordered(spec, data)))
       MarkType.ARC -> data.mapIndexedNotNull { index, datum -> arc(at(index), datum, index) }
       MarkType.PATH -> data.mapIndexedNotNull { index, datum -> path(at(index), datum, index) }
       MarkType.SHAPE ->
         data.mapIndexedNotNull { index, datum -> path(at(index), datum, index, "shape") }
-      MarkType.TRAIL -> listOfNotNull(trail(spec, data))
+      MarkType.TRAIL -> listOfNotNull(trail(spec, ordered(spec, data)))
       MarkType.IMAGE -> data.mapIndexedNotNull { index, datum -> image(at(index), datum, index) }
       else -> {
         diagnostics.error(
@@ -188,6 +202,16 @@ public class MarkEncoder(
    */
   public fun channelAny(channel: ChannelValue, datum: VegaValue): VegaValue? =
     channelValue(channel, datum)
+
+  /**
+   * The same, as a colour: an axis picking one gridline out of the rest by a condition on its tick.
+   *
+   * Resolved through the same machinery so the conditional, the signal and the scale lookup all
+   * behave here as they do on a mark — the alternative being a second, smaller reader that agrees
+   * until the day one of them is fixed.
+   */
+  public fun channelColor(channel: ChannelValue, datum: VegaValue): SceneColor? =
+    string(channel, datum)?.let { SceneColor.parse(it) }
 
   /**
    * A mark's scene items, as data another mark can be drawn from.
@@ -281,7 +305,7 @@ public class MarkEncoder(
   public fun encodeGroup(
     spec: MarkSpec,
     data: List<VegaValue>,
-    contents: (datum: VegaValue, index: Int, extent: SizeD) -> List<SceneNode>,
+    contents: (datum: VegaValue, index: Int, extent: SizeD, origin: PointD) -> List<SceneNode>,
   ): List<SceneNode> {
     val channels = spec.encode.effective
     return data.mapIndexed { index, datum ->
@@ -304,7 +328,7 @@ public class MarkEncoder(
 
       GroupNode(
         id = ids.allocate(),
-        children = contents(datum, index, extent),
+        children = contents(datum, index, extent, PointD(x, y)),
         transform = if (x == 0.0 && y == 0.0) Transform2D.Identity else Transform2D.translate(x, y),
         size = size,
         cornerRadius =
@@ -675,7 +699,15 @@ public class MarkEncoder(
     // applies them *after* the rotation, so an offset runs along the text rather than along the
     // page.
     // Rotating them here keeps the anchor as the point the text turns about, which is what it is.
-    val nudge = PointD(number(channels["dx"], datum) ?: 0.0, number(channels["dy"], datum) ?: 0.0)
+    // Every one of these falls back to the mark's own configuration and to the **style blocks** it
+    // names — a label styled `{align: "left", baseline: "middle", dx: 3}` says nothing in its
+    // encoding, and reading only the encoding left it centred on its anchor with no nudge at all.
+    val markConfig = MarkConfig(spec)
+    val nudge =
+      PointD(
+        number(channels["dx"], datum) ?: markConfig.number("dx") ?: 0.0,
+        number(channels["dy"], datum) ?: markConfig.number("dy") ?: 0.0,
+      )
     val offset =
       if (angle == 0.0) nudge else Transform2D.rotateDegrees(angle).apply(nudge.x, nudge.y)
     val style = style(channels, datum, spec)
@@ -684,11 +716,11 @@ public class MarkEncoder(
       TextStyle(
         fontFamily =
           string(channels["font"], datum)
-            ?: MarkConfig(spec).text("font")
+            ?: markConfig.text("font")
             ?: MarkDefaults.TEXT_FONT_FAMILY,
         fontSize =
           number(channels["fontSize"], datum)
-            ?: MarkConfig(spec).number("fontSize")
+            ?: markConfig.number("fontSize")
             ?: MarkDefaults.TEXT_FONT_SIZE,
         fontWeight = fontWeight(channels, datum),
         fontStyle =
@@ -718,8 +750,8 @@ public class MarkEncoder(
         // fixture caught this engine not doing.
         lines = textLines,
         style = textStyle,
-        align = textAlign(string(channels["align"], datum)),
-        baseline = textBaseline(string(channels["baseline"], datum)),
+        align = textAlign(string(channels["align"], datum) ?: markConfig.text("align")),
+        baseline = textBaseline(string(channels["baseline"], datum) ?: markConfig.text("baseline")),
         // Only a limit greater than zero truncates, which is upstream's `textValue`. A negative
         // one is not a truncation from the other end — `dir: "rtl"` is what keeps a label's tail.
         limit = number(channels["limit"], datum) ?: 0.0,
@@ -805,7 +837,15 @@ public class MarkEncoder(
 
     val horizontal = string(channels["orient"], data.first())?.lowercase() == "horizontal"
     val tension = number(channels["tension"], data.first())
-    val path = PathData.build { segments.forEach { trace(it, interpolate, horizontal, tension) } }
+    // A line of **one point** closes its own subpath, which is upstream's own `Z`. One point left
+    // over from a *break* does not: what closes is a line d3 was handed a single point for, and a
+    // series broken into fragments was handed all of them. The break lives in the item's vertices,
+    // which is where it is visible; closing each fragment drew `Z`s upstream has not got and
+    // reported the whole line as a closed polygon.
+    val broken = segments.sumOf { it.size } > 1
+    val path = PathData.build {
+      segments.forEach { trace(it, interpolate, horizontal, tension, partOfArea = broken) }
+    }
     return PathNode(
       id = ids.allocate(),
       path = path,
@@ -900,7 +940,14 @@ public class MarkEncoder(
     return !value
   }
 
-  /** Splits data into runs of consecutive defined points, so `defined: false` breaks the series. */
+  /**
+   * Splits data into runs of consecutive defined points, so `defined: false` breaks the series.
+   *
+   * A run of **one** point is kept. It draws nothing — a path needs two points to have a length —
+   * but the mark it belongs to is still a mark: a series filtered down to a single row, or one
+   * bracketed by two breaks, is present in the scene and carries its colour into the legend.
+   * Dropping the run dropped the whole item with it whenever no run had two points.
+   */
   private fun <T> segments(
     data: List<VegaValue>,
     channels: EncodeEntry,
@@ -910,13 +957,17 @@ public class MarkEncoder(
     var current = mutableListOf<T>()
     for (datum in data) {
       if (broken(channels, datum)) {
-        if (current.size > 1) result.add(current)
+        // The point that broke the series is a subpath of its own. Nothing is drawn to it or from
+        // it — a single point has no length — but it is still one of the series' points, and a
+        // break is exactly the absence of a line *between* two of them.
+        if (current.isNotEmpty()) result.add(current)
+        result.add(listOf(resolve(datum)))
         current = mutableListOf()
       } else {
         current.add(resolve(datum))
       }
     }
-    if (current.size > 1) result.add(current)
+    if (current.isNotEmpty()) result.add(current)
     return result
   }
 
@@ -1029,18 +1080,30 @@ public class MarkEncoder(
     // default. So a rect outlined with a stroke and no fill is an outline, where checking only
     // `fill` would have filled it with the built-in blue.
     val paintsItself = channels["fill"] != null || channels["stroke"] != null
+    // …the **built-in** default, that is. A style block's own paint is not a default in that sense:
+    // a plotting area is a group styled `cell`, whose block fills it transparent and outlines it
+    // grey, and a chart that hides the outline by encoding `stroke: null` has not thereby asked for
+    // the fill to go as well. Suppressing both dropped the group from the scene altogether.
     val fillColour =
-      paintOf(channels["fill"], datum, "fill", spec)
-        ?: defaults
-          .colour("fill", MarkDefaults.fillFor(spec.type))
-          .takeIf { !paintsItself }
-          ?.let { ScenePaint.Solid(it) }
+      // An **encoded null** is a statement: this mark has no paint of that kind, so it must not
+      // fall through to the style block's. `paintedNothing` is what asks; the fall-through below is
+      // upstream's own default for the mark type.
+      if (paintedNothing(channels["fill"], datum)) null
+      else
+        paintOf(channels["fill"], datum, "fill", spec)
+          // …the **built-in** default is what a mark painting itself gives up, not the style
+          // block's: a group styled `cell` is filled transparent and outlined grey, and a chart
+          // that hides the outline by encoding `stroke: null` has not asked for the fill to go too.
+          ?: defaults
+            .colour("fill", MarkDefaults.fillFor(spec.type).takeIf { !paintsItself })
+            ?.let { ScenePaint.Solid(it) }
     val strokeColour =
-      paintOf(channels["stroke"], datum, "stroke", spec)
-        ?: defaults
-          .colour("stroke", MarkDefaults.strokeFor(spec.type))
-          .takeIf { !paintsItself }
-          ?.let { ScenePaint.Solid(it) }
+      if (paintedNothing(channels["stroke"], datum)) null
+      else
+        paintOf(channels["stroke"], datum, "stroke", spec)
+          ?: defaults
+            .colour("stroke", MarkDefaults.strokeFor(spec.type).takeIf { !paintsItself })
+            ?.let { ScenePaint.Solid(it) }
     val fillOpacity =
       number(channels["fillOpacity"], datum) ?: defaults.number("fillOpacity") ?: 1.0
     val strokeOpacity =
@@ -1207,8 +1270,13 @@ public class MarkEncoder(
       )
       return null
     }
-    val width = number(channels["width"], datum)
-    val height = number(channels["height"], datum)
+    // A picture is placed the way a rect is: Vega accepts `x`/`x2`, `x`/`width` or a centre and a
+    // width for it, and `adjustSpatial` is what turns whichever pair was written into the one the
+    // scene item holds. Reading `x` alone left a picture centred on a scaled value at the origin.
+    val horizontal = resolveSpan(channels, datum, "x", "x2", "width", "xc", index, spec)
+    val vertical = resolveSpan(channels, datum, "y", "y2", "height", "yc", index, spec)
+    val width = horizontal?.extent ?: number(channels["width"], datum)
+    val height = vertical?.extent ?: number(channels["height"], datum)
     if (width == null || height == null) {
       diagnostics.warn(
         DiagnosticCodes.EXPORT_IMAGE_UNRESOLVED,
@@ -1227,8 +1295,8 @@ public class MarkEncoder(
       id = ids.allocate(),
       url = url ?: "",
       raster = raster,
-      x = number(channels["x"], datum) ?: 0.0,
-      y = number(channels["y"], datum) ?: 0.0,
+      x = horizontal?.start ?: number(channels["x"], datum) ?: 0.0,
+      y = vertical?.start ?: number(channels["y"], datum) ?: 0.0,
       width = w,
       height = h,
       fit = if (aspect) ImageFit.CONTAIN else ImageFit.FILL,
@@ -1510,6 +1578,45 @@ public class MarkEncoder(
    * Upstream runs the same spatial adjustment over these, but with no width to halve it reduces to
    * this: a centre channel is the position, and it wins over a start channel written beside it.
    */
+  /**
+   * A path mark's rows, in the order its `sort` asks for.
+   *
+   * A `sort` on a mark orders the *items* it draws, and for a line or an area there is only one
+   * item — the whole series — so the ordering has to reach the points inside it instead. That is
+   * what makes `{"sort": {"field": "x"}}` mean anything on a line: it is how a series with a row
+   * inserted into the middle of it (by an `impute`, say) is drawn through that row rather than
+   * doubling back to it from the end.
+   *
+   * The fields are the *item's* properties, which for a row is where that row resolves to.
+   */
+  private fun ordered(spec: MarkSpec, data: List<VegaValue>): List<VegaValue> {
+    val sort = spec.sort ?: return data
+    if (data.size < 2) return data
+    val channels = spec.encode.effective
+    return data.sortedWith { a, b ->
+      var result = 0
+      for ((index, field) in sort.fields.withIndex()) {
+        val left = rowPosition(channels, a, field) ?: continue
+        val right = rowPosition(channels, b, field) ?: continue
+        val comparison = left.compareTo(right)
+        if (comparison != 0) {
+          val descending = sort.orders.getOrNull(index)?.startsWith("desc") == true
+          result = if (descending) -comparison else comparison
+          break
+        }
+      }
+      result
+    }
+  }
+
+  /** Where a row lands on one axis, as the sort sees it. */
+  private fun rowPosition(channels: EncodeEntry, datum: VegaValue, field: String): Double? =
+    when (field) {
+      "x" -> centred(channels, datum, "x", "xc")
+      "y" -> centred(channels, datum, "y", "yc")
+      else -> null
+    }
+
   private fun centred(
     channels: EncodeEntry,
     datum: VegaValue,
@@ -1814,11 +1921,11 @@ public class MarkEncoder(
       }
     // A colour that resolves to **nothing** is no paint, not a bad colour. `{"value": null}` and a
     // field a row has not got both mean "leave this channel unset", which is how a specification
-    // says
-    // "no stroke on these rows" — upstream draws the mark without one and says nothing.
-    // Stringifying
-    // first turned every one of those into the word "null" and then into a complaint: 318 of them
-    // across the published examples, all of which were drawing correctly.
+    // says "no stroke on these rows" — upstream draws the mark without one and says nothing.
+    // Stringifying first turned every one of those into the word "null" and then into a complaint:
+    // 318 of them across the published examples, all of which were drawing correctly. It is also
+    // how a chart hides a border its style block would otherwise draw, so it must not fall through
+    // to the configuration.
     if (resolved.isMissing) return null
     val text = resolved.asString()
     val colour = SceneColor.parse(text)
@@ -1831,6 +1938,15 @@ public class MarkEncoder(
     }
     return colour
   }
+
+  /** Whether a paint channel is present and says, in so many words, that there is no paint. */
+  private fun paintedNothing(channel: ChannelValue?, datum: VegaValue): Boolean =
+    when (channel) {
+      null -> false
+      is ChannelValue.Constant -> channel.value is VegaValue.Null
+      is ChannelValue.Conditional -> paintedNothing(selectRule(channel, datum), datum)
+      else -> false
+    }
 
   /**
    * Builds an accessibility label from the encoded channels.

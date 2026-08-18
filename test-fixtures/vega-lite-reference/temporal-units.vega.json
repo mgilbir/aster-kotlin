@@ -1,0 +1,241 @@
+{
+  "$schema": "https://vega.github.io/schema/vega/v6.json",
+  "description": "A UTC time unit on one axis and a local one on the other, over the same instants.",
+  "background": "white",
+  "padding": 5,
+  "width": 300,
+  "height": 300,
+  "style": "cell",
+  "data": [
+    {
+      "name": "source_0",
+      "values": [
+        {
+          "d": "2012-03-01T05:00:00Z",
+          "v": 3
+        },
+        {
+          "d": "2012-03-15T18:00:00Z",
+          "v": 5
+        },
+        {
+          "d": "2012-04-02T09:00:00Z",
+          "v": 2
+        },
+        {
+          "d": "2012-04-20T23:00:00Z",
+          "v": 6
+        }
+      ]
+    },
+    {
+      "name": "data_0",
+      "source": "source_0",
+      "transform": [
+        {
+          "type": "formula",
+          "expr": "toDate(datum[\"d\"])",
+          "as": "d"
+        },
+        {
+          "field": "d",
+          "type": "timeunit",
+          "units": [
+            "month"
+          ],
+          "timezone": "utc",
+          "as": [
+            "utcmonth_d",
+            "utcmonth_d_end"
+          ]
+        },
+        {
+          "field": "d",
+          "type": "timeunit",
+          "units": [
+            "hours"
+          ],
+          "as": [
+            "hours_d",
+            "hours_d_end"
+          ]
+        },
+        {
+          "type": "filter",
+          "expr": "(isDate(datum[\"hours_d\"]) || (isValid(datum[\"hours_d\"]) && isFinite(+datum[\"hours_d\"]))) && isValid(datum[\"v\"]) && isFinite(+datum[\"v\"])"
+        }
+      ]
+    }
+  ],
+  "marks": [
+    {
+      "name": "marks",
+      "type": "symbol",
+      "style": [
+        "point"
+      ],
+      "from": {
+        "data": "data_0"
+      },
+      "encode": {
+        "update": {
+          "opacity": {
+            "value": 0.7
+          },
+          "fill": {
+            "value": "transparent"
+          },
+          "stroke": {
+            "value": "#4c78a8"
+          },
+          "ariaRoleDescription": {
+            "value": "point"
+          },
+          "description": {
+            "signal": "\"d (month): \" + (utcFormat(datum[\"utcmonth_d\"], timeUnitSpecifier([\"month\"], {\"year-month\":\"%b %Y \",\"year-month-date\":\"%b %d, %Y \"}))) + \"; d (hours): \" + (timeFormat(datum[\"hours_d\"], timeUnitSpecifier([\"hours\"], {\"year-month\":\"%b %Y \",\"year-month-date\":\"%b %d, %Y \"}))) + \"; v: \" + (format(datum[\"v\"], \"\"))"
+          },
+          "x": {
+            "scale": "x",
+            "field": "utcmonth_d"
+          },
+          "y": {
+            "scale": "y",
+            "field": "hours_d"
+          },
+          "size": {
+            "scale": "size",
+            "field": "v"
+          }
+        }
+      }
+    }
+  ],
+  "scales": [
+    {
+      "name": "x",
+      "type": "utc",
+      "domain": {
+        "data": "data_0",
+        "field": "utcmonth_d"
+      },
+      "range": [
+        0,
+        {
+          "signal": "width"
+        }
+      ]
+    },
+    {
+      "name": "y",
+      "type": "time",
+      "domain": {
+        "data": "data_0",
+        "field": "hours_d"
+      },
+      "range": [
+        {
+          "signal": "height"
+        },
+        0
+      ]
+    },
+    {
+      "name": "size",
+      "type": "linear",
+      "domain": {
+        "data": "data_0",
+        "field": "v"
+      },
+      "range": [
+        4,
+        361
+      ],
+      "zero": true
+    }
+  ],
+  "axes": [
+    {
+      "scale": "x",
+      "orient": "bottom",
+      "gridScale": "y",
+      "grid": true,
+      "tickMinStep": {
+        "signal": "datetime(2001, 1, 1, 0, 0, 0, 0) - datetime(2001, 0, 1, 0, 0, 0, 0)"
+      },
+      "domain": false,
+      "labels": false,
+      "aria": false,
+      "maxExtent": 0,
+      "minExtent": 0,
+      "ticks": false,
+      "zindex": 0
+    },
+    {
+      "scale": "y",
+      "orient": "left",
+      "gridScale": "x",
+      "grid": true,
+      "tickMinStep": {
+        "signal": "datetime(2001, 0, 1, 1, 0, 0, 0) - datetime(2001, 0, 1, 0, 0, 0, 0)"
+      },
+      "domain": false,
+      "labels": false,
+      "aria": false,
+      "maxExtent": 0,
+      "minExtent": 0,
+      "ticks": false,
+      "zindex": 0
+    },
+    {
+      "scale": "x",
+      "orient": "bottom",
+      "grid": false,
+      "title": "d (month)",
+      "format": {
+        "signal": "timeUnitSpecifier([\"month\"], {\"year-month\":\"%b %Y \",\"year-month-date\":\"%b %d, %Y \"})"
+      },
+      "labelFlush": true,
+      "labelOverlap": true,
+      "tickMinStep": {
+        "signal": "datetime(2001, 1, 1, 0, 0, 0, 0) - datetime(2001, 0, 1, 0, 0, 0, 0)"
+      },
+      "zindex": 0
+    },
+    {
+      "scale": "y",
+      "orient": "left",
+      "grid": false,
+      "title": "d (hours)",
+      "format": {
+        "signal": "timeUnitSpecifier([\"hours\"], {\"year-month\":\"%b %Y \",\"year-month-date\":\"%b %d, %Y \"})"
+      },
+      "labelOverlap": true,
+      "tickMinStep": {
+        "signal": "datetime(2001, 0, 1, 1, 0, 0, 0) - datetime(2001, 0, 1, 0, 0, 0, 0)"
+      },
+      "zindex": 0
+    }
+  ],
+  "legends": [
+    {
+      "size": "size",
+      "symbolType": "circle",
+      "title": "v",
+      "encode": {
+        "symbols": {
+          "update": {
+            "fill": {
+              "value": "transparent"
+            },
+            "stroke": {
+              "value": "#4c78a8"
+            },
+            "opacity": {
+              "value": 0.7
+            }
+          }
+        }
+      }
+    }
+  ]
+}

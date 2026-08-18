@@ -60,6 +60,18 @@ public data class VegaSpec(
    * the difference between a list of numbers and a chart.
    */
   val description: String? = null,
+  /**
+   * The chart's own group styled from `config.style`, through the top-level `style` property.
+   *
+   * Every Vega-Lite chart writes `"style": "cell"` here, and Vega's default configuration gives
+   * that block a transparent fill and a light grey stroke — the thin border around the plotting
+   * area. Being a border it is also half a unit of surface on each side, which is how leaving it
+   * out makes a chart come out a unit smaller than upstream's while looking almost right.
+   *
+   * Only the named style blocks, never `config.mark`: the frame is not a mark anybody wrote, so a
+   * `config.mark.fill` meant for the bars must not paint the whole plotting area.
+   */
+  val styleAboveDefaults: Map<String, VegaValue> = emptyMap(),
 )
 
 /**
@@ -728,6 +740,22 @@ public data class TitleSpec(
   val encode: Map<String, EncodeSpec> = emptyMap(),
 )
 
+/**
+ * `layout.offset` — the gap between the grid and each band of labels around it.
+ *
+ * Written either as one number for all six or as an object naming them. A trellis's column title
+ * arrives with `{"columnTitle": 10}`, which is the whole difference between a heading that clears
+ * the headers beneath it and one that sits on them.
+ */
+public data class LayoutOffset(
+  val rowHeader: NumberValue? = null,
+  val columnHeader: NumberValue? = null,
+  val rowFooter: NumberValue? = null,
+  val columnFooter: NumberValue? = null,
+  val rowTitle: NumberValue? = null,
+  val columnTitle: NumberValue? = null,
+)
+
 public data class AxisSpec(
   val scale: String,
   val orient: Orient,
@@ -779,13 +807,6 @@ public data class AxisSpec(
    */
   val labelOffset: NumberValue? = null,
   /**
-   * A floor on the gap between ticks, `tickMinStep`.
-   *
-   * Applied by reducing the tick *count* until the step d3 would choose reaches it — there is no
-   * way to ask d3 for a step directly, and asking for fewer ticks is how upstream does it too.
-   */
-  val tickMinStep: NumberValue? = null,
-  /**
    * `labelBound`: how far a label may hang past the scale's range before it is dropped.
    *
    * `true` means upstream's one unit and a number means itself; `false` and absence both mean no
@@ -807,6 +828,14 @@ public data class AxisSpec(
   val labels: Boolean = true,
   val domainLine: Boolean = true,
   val tickCount: NumberValue? = null,
+  /**
+   * `tickMinStep` — the smallest gap between ticks the axis will accept.
+   *
+   * It does not *place* the ticks; it reduces the count until the step the scale would choose is at
+   * least this wide. Vega-Lite writes it on every bucketed axis as the duration of one bucket, so
+   * an axis of months does not offer a tick every other day.
+   */
+  val tickMinStep: NumberValue? = null,
   /**
    * `tickCount` written as a **time interval** — `"hours"`, or `{"interval": "hours", "step": 2}`.
    *
@@ -1225,6 +1254,13 @@ public data class LegendSpec(
    * naming no precision takes as many decimals as the tick step needs, not d3's fixed six.
    */
   val format: String? = null,
+  /**
+   * `format: {"signal": "..."}` — the specifier is computed rather than written.
+   *
+   * A legend over bucketed instants is the case that needs it: the specifier is
+   * `timeUnitSpecifier([...])`, which asks Vega at render time for the pattern that names a month
+   * or a quarter, and there is no constant to write in its place.
+   */
   val tickCount: NumberValue? = null,
   /**
    * `tickCount` written as a **time interval** — `"hours"`, or `{"interval": "hours", "step": 2}`.
@@ -1521,6 +1557,16 @@ public data class FacetSpec(
    * dependency carries the path through the tree it takes, and the cell draws that path.
    */
   val field: String? = null,
+  /**
+   * `aggregate.cross` — every *combination* of the grouping values gets a cell, empty or not.
+   *
+   * A trellis crossed by two fields is a rectangle, and a combination no row carries still has to
+   * take up its place in it, or the cells after it shift into the gap and every label beside them
+   * names the wrong one. Vega's `Aggregate` only crosses when there is more than one dimension to
+   * cross, and it *adds* the missing cells after the ones the rows made rather than rebuilding the
+   * order.
+   */
+  val crossed: Boolean = false,
 )
 
 /** One `facet.aggregate` entry: an operation, the field it reads, and the name it writes. */
@@ -1682,6 +1728,7 @@ public data class LayoutSpec(
   val columns: NumberValue? = null,
   val rowPadding: NumberValue? = null,
   val columnPadding: NumberValue? = null,
+  val offset: LayoutOffset = LayoutOffset(),
   /**
    * `align` — how the cells line up, per axis, as `"each"`, `"all"` or `"none"`.
    *

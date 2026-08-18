@@ -1,0 +1,170 @@
+{
+  "$schema": "https://vega.github.io/schema/vega/v6.json",
+  "description": "One field as both a size and a colour, under the title only one of them named.",
+  "background": "white",
+  "padding": 5,
+  "style": "cell",
+  "data": [
+    {
+      "name": "source_0",
+      "url": "data/cars.json",
+      "format": {
+        "type": "json"
+      }
+    }
+  ],
+  "signals": [
+    {
+      "name": "x_step",
+      "value": 20
+    },
+    {
+      "name": "width",
+      "update": "bandspace(domain('x').length, 1, 0.5) * x_step"
+    },
+    {
+      "name": "y_step",
+      "value": 20
+    },
+    {
+      "name": "height",
+      "update": "bandspace(domain('y').length, 1, 0.5) * y_step"
+    }
+  ],
+  "marks": [
+    {
+      "name": "marks",
+      "type": "symbol",
+      "style": [
+        "circle"
+      ],
+      "from": {
+        "data": "source_0"
+      },
+      "encode": {
+        "update": {
+          "opacity": {
+            "value": 0.7
+          },
+          "fill": {
+            "scale": "color",
+            "field": "Cylinders"
+          },
+          "ariaRoleDescription": {
+            "value": "circle"
+          },
+          "description": {
+            "signal": "\"Cylinders: \" + (isValid(datum[\"Cylinders\"]) ? isArray(datum[\"Cylinders\"]) ? join(datum[\"Cylinders\"], ' ') : datum[\"Cylinders\"] : \"\"+datum[\"Cylinders\"]) + \"; Origin: \" + (isValid(datum[\"Origin\"]) ? isArray(datum[\"Origin\"]) ? join(datum[\"Origin\"], ' ') : datum[\"Origin\"] : \"\"+datum[\"Origin\"])"
+          },
+          "x": {
+            "scale": "x",
+            "field": "Cylinders"
+          },
+          "y": {
+            "scale": "y",
+            "field": "Origin"
+          },
+          "size": {
+            "scale": "size",
+            "field": "Cylinders"
+          },
+          "shape": {
+            "value": "circle"
+          }
+        }
+      }
+    }
+  ],
+  "scales": [
+    {
+      "name": "x",
+      "type": "point",
+      "domain": {
+        "data": "source_0",
+        "field": "Cylinders",
+        "sort": true
+      },
+      "range": {
+        "step": {
+          "signal": "x_step"
+        }
+      },
+      "padding": 0.5
+    },
+    {
+      "name": "y",
+      "type": "point",
+      "domain": {
+        "data": "source_0",
+        "field": "Origin",
+        "sort": true
+      },
+      "range": {
+        "step": {
+          "signal": "y_step"
+        }
+      },
+      "padding": 0.5
+    },
+    {
+      "name": "color",
+      "type": "ordinal",
+      "domain": {
+        "data": "source_0",
+        "field": "Cylinders",
+        "sort": true
+      },
+      "range": "ordinal",
+      "interpolate": "hcl"
+    },
+    {
+      "name": "size",
+      "type": "point",
+      "domain": {
+        "data": "source_0",
+        "field": "Cylinders",
+        "sort": true
+      },
+      "range": [
+        4,
+        361
+      ]
+    }
+  ],
+  "axes": [
+    {
+      "scale": "x",
+      "orient": "bottom",
+      "grid": false,
+      "title": "Cylinders",
+      "labelAlign": "right",
+      "labelAngle": 270,
+      "labelBaseline": "middle",
+      "zindex": 0
+    },
+    {
+      "scale": "y",
+      "orient": "left",
+      "grid": false,
+      "title": "Origin",
+      "zindex": 0
+    }
+  ],
+  "legends": [
+    {
+      "title": "Cylinder count",
+      "fill": "color",
+      "symbolType": "circle",
+      "encode": {
+        "symbols": {
+          "update": {
+            "opacity": {
+              "value": 0.7
+            }
+          }
+        }
+      },
+      "size": "size"
+    }
+  ]
+}

@@ -65,6 +65,10 @@ kotlin {
         // why they are the one pair of dependencies that does not follow the core off the JVM.
         implementation(project(":vega-loader"))
         implementation(project(":test-fixtures"))
+        // The Vega-Lite compiler emits a specification; proving that it draws upstream's chart
+        // needs the scene comparison, which lives here. A test-only dependency, and
+        // one-directional: `:vega-lite` itself knows nothing about the runtime.
+        implementation(project(":vega-lite"))
         implementation(libs.kotlinx.coroutines.test)
       }
     }

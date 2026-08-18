@@ -1,0 +1,142 @@
+{
+  "$schema": "https://vega.github.io/schema/vega/v6.json",
+  "description": "A radial chart whose rings start away from the centre, said as one end of the range.",
+  "background": "white",
+  "padding": 5,
+  "width": 300,
+  "height": 300,
+  "style": "view",
+  "data": [
+    {
+      "name": "source_0",
+      "values": [
+        12,
+        23,
+        47,
+        6,
+        52,
+        19
+      ]
+    },
+    {
+      "name": "data_0",
+      "source": "source_0",
+      "transform": [
+        {
+          "type": "stack",
+          "groupby": [],
+          "field": "data",
+          "sort": {
+            "field": [
+              "data"
+            ],
+            "order": [
+              "ascending"
+            ]
+          },
+          "as": [
+            "data_start",
+            "data_end"
+          ],
+          "offset": "zero"
+        },
+        {
+          "type": "filter",
+          "expr": "isValid(datum[\"data\"]) && isFinite(+datum[\"data\"])"
+        }
+      ]
+    }
+  ],
+  "marks": [
+    {
+      "name": "marks",
+      "type": "arc",
+      "style": [
+        "arc"
+      ],
+      "from": {
+        "data": "data_0"
+      },
+      "encode": {
+        "update": {
+          "stroke": {
+            "value": "#fff"
+          },
+          "innerRadius": {
+            "value": 20
+          },
+          "fill": {
+            "scale": "color",
+            "field": "data"
+          },
+          "description": {
+            "signal": "\"data: \" + (format(datum[\"data\"], \"\"))"
+          },
+          "x": {
+            "signal": "width",
+            "mult": 0.5
+          },
+          "y": {
+            "signal": "height",
+            "mult": 0.5
+          },
+          "outerRadius": {
+            "scale": "radius",
+            "field": "data"
+          },
+          "startAngle": {
+            "scale": "theta",
+            "field": "data_end"
+          },
+          "endAngle": {
+            "scale": "theta",
+            "field": "data_start"
+          }
+        }
+      }
+    }
+  ],
+  "scales": [
+    {
+      "name": "theta",
+      "type": "linear",
+      "domain": {
+        "data": "data_0",
+        "fields": [
+          "data_start",
+          "data_end"
+        ]
+      },
+      "range": [
+        0,
+        6.283185307179586
+      ],
+      "zero": true
+    },
+    {
+      "name": "radius",
+      "type": "sqrt",
+      "domain": {
+        "data": "data_0",
+        "field": "data"
+      },
+      "range": [
+        20,
+        {
+          "signal": "min(width,height)/2"
+        }
+      ],
+      "zero": true
+    },
+    {
+      "name": "color",
+      "type": "ordinal",
+      "domain": {
+        "data": "data_0",
+        "field": "data",
+        "sort": true
+      },
+      "range": "category"
+    }
+  ]
+}

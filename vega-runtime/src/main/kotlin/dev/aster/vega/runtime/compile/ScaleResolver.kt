@@ -42,8 +42,13 @@ import dev.aster.vega.runtime.scale.TimeTicks
 import dev.aster.vega.runtime.scale.VegaScale
 import dev.aster.vega.scene.ColorSpaces
 import dev.aster.vega.scene.SceneColor
+import kotlin.math.abs
 import kotlin.math.ceil
+import kotlin.math.exp
 import kotlin.math.floor
+import kotlin.math.ln
+import kotlin.math.pow
+import kotlin.math.sign
 import kotlinx.datetime.TimeZone
 
 /** The chart's plotting size, which named ranges like `"width"` resolve against. */
@@ -90,8 +95,14 @@ public class ScaleResolver(
       ScaleType.POW -> buildPow(spec, defaultExponent = 1.0)
       ScaleType.SQRT -> buildPow(spec, defaultExponent = 0.5)
       ScaleType.SYMLOG -> buildSymlog(spec)
-      ScaleType.TIME -> buildTime(spec, TimeZone.currentSystemDefault())
-      ScaleType.UTC -> buildTime(spec, TimeZone.UTC)
+      // A **time** scale with a colour range is a colour scale as much as a linear one is: the
+      // domain is still a pair of instants and the ramp is still walked between them, and a chart
+      // that shades its lines by quarter asks for exactly that.
+      ScaleType.TIME ->
+        if (hasColorRange(spec)) buildSequentialColor(spec)
+        else buildTime(spec, TimeZone.currentSystemDefault())
+      ScaleType.UTC ->
+        if (hasColorRange(spec)) buildSequentialColor(spec) else buildTime(spec, TimeZone.UTC)
       ScaleType.BAND -> buildBand(spec)
       ScaleType.POINT -> buildPoint(spec)
       ScaleType.ORDINAL -> buildOrdinal(spec)
@@ -115,7 +126,8 @@ public class ScaleResolver(
     var domain =
       continuousDomain(spec, zeroDefault = spec.bins == null, fallback = listOf(0.0, 1.0))
         ?: return null
-    if (spec.nice && spec.domainRaw == null) domain = niceOf(domain, spec)
+    domain = padded(domain, range, spec)
+    if (spec.nice && !rawApplies(spec)) domain = niceOf(domain, spec)
     return LinearScale(
       spec.name,
       domain,
@@ -222,20 +234,30 @@ public class ScaleResolver(
     val domain =
       (continuousDomain(spec, zeroDefault = false, fallback = listOf(0.0, 1.0)) ?: return null)
         .let {
-          if (spec.nice && spec.domainRaw == null) niceOf(it, spec) else it
+          if (spec.nice && !rawApplies(spec)) niceOf(it, spec) else it
         }
+    // A **scheme** carries its own interpolator, and `interpolate` does not reach it: upstream
+    // hands `scale.interpolator(...)` the scheme's own function, where `interpolate` only ever
+    // applies to a range written out as a list of colours. Honouring it for a scheme walked a
+    // heatmap's ramp through a different space from the one upstream walked it through, and every
+    // shade came out a unit or two off.
+    // A **named** range is one too: `"range": "heatmap"` resolves through `config.range` to a
+    // scheme, and it is the commonest way a Vega-Lite chart asks for one.
+    val scheme = spec.range is RangeSpec.Scheme || spec.range is RangeSpec.Named
     val space =
-      spec.interpolate?.let { name ->
-        ColorSpaces.Interpolation.fromName(name)
-          ?: run {
-            diagnostics.warn(
-              DiagnosticCodes.SCALE_UNSUPPORTED_TYPE,
-              "Colour interpolation space '$name' is not implemented; interpolating in RGB instead",
-              operator = spec.name,
-            )
-            null
-          }
-      } ?: ColorSpaces.Interpolation.RGB
+      spec.interpolate
+        ?.takeIf { !scheme }
+        ?.let { name ->
+          ColorSpaces.Interpolation.fromName(name)
+            ?: run {
+              diagnostics.warn(
+                DiagnosticCodes.SCALE_UNSUPPORTED_TYPE,
+                "Colour interpolation space '$name' is not implemented; interpolating in RGB instead",
+                operator = spec.name,
+              )
+              null
+            }
+        } ?: ColorSpaces.Interpolation.RGB
 
     return SequentialColorScale(
       name = spec.name,
@@ -454,7 +476,16 @@ public class ScaleResolver(
     // here.
     var domain =
       continuousDomain(spec, zeroDefault = false, fallback = listOf(1.0, 10.0)) ?: return null
-    if (spec.nice && spec.domainRaw == null) domain = Ticks.niceLog(domain, base)
+    val logSign = if (domain.first() < 0) -1.0 else 1.0
+    domain =
+      padded(
+        domain,
+        range,
+        spec,
+        lift = { ln(it * logSign) },
+        ground = { logSign * exp(it) },
+      )
+    if (spec.nice && !rawApplies(spec)) domain = Ticks.niceLog(domain, base)
 
     val scale =
       LogScale(spec.name, domain, oriented(range, reversed(spec)), base, spec.clamp, spec.round)
@@ -475,8 +506,16 @@ public class ScaleResolver(
     var domain =
       continuousDomain(spec, zeroDefault = spec.bins == null, fallback = listOf(0.0, 1.0))
         ?: return null
-    if (spec.nice && spec.domainRaw == null) domain = niceOf(domain, spec)
     val exponent = numbers.resolve(spec.exponent, spec.name) ?: defaultExponent
+    domain =
+      padded(
+        domain,
+        range,
+        spec,
+        lift = { signedPow(it, exponent) },
+        ground = { signedPow(it, 1 / exponent) },
+      )
+    if (spec.nice && !rawApplies(spec)) domain = niceOf(domain, spec)
     return PowScale(
       spec.name,
       domain,
@@ -492,8 +531,16 @@ public class ScaleResolver(
     // Symlog is not in upstream's zero list: its domain reaches both signs happily.
     var domain =
       continuousDomain(spec, zeroDefault = false, fallback = listOf(0.0, 1.0)) ?: return null
-    if (spec.nice && spec.domainRaw == null) domain = niceOf(domain, spec)
     val constant = numbers.resolve(spec.constant, spec.name) ?: 1.0
+    domain =
+      padded(
+        domain,
+        range,
+        spec,
+        lift = { sign(it) * ln(1 + abs(it / constant)) },
+        ground = { sign(it) * (exp(abs(it)) - 1) * constant },
+      )
+    if (spec.nice && !rawApplies(spec)) domain = niceOf(domain, spec)
     return SymlogScale(
       spec.name,
       domain,
@@ -538,11 +585,28 @@ public class ScaleResolver(
    */
   private fun rawDomain(spec: ScaleSpec): List<Double>? {
     val raw = spec.domainRaw ?: return null
+    // A raw domain that resolves to **nothing** is not an empty domain, it is no override at all:
+    // `{"signal": "brush[\"Horsepower\"]"}` is null until a reader drags something, and a chart
+    // that reported an error before its first interaction would be a chart that never drew. Asked
+    // quietly, because the ordinary domain path reports what it cannot resolve and this one must
+    // not.
+    if (raw is DomainSpec.FromSignal) {
+      val resolved = numbers.resolveList(raw.expression, spec.name)
+      if (resolved == null || resolved.size < 2) return null
+    }
     return literalNumbers(raw)
       ?: numericExtent(raw, spec.name)?.let {
         listOf(it.start, it.endInclusive)
       }
   }
+
+  /**
+   * Whether `domainRaw` actually settled the domain, which is what suspends `nice`.
+   *
+   * Not the same question as whether one was *written*: a selection that has picked nothing leaves
+   * the scale to compute its own domain, and a computed domain is rounded outwards as usual.
+   */
+  private fun rawApplies(spec: ScaleSpec): Boolean = (rawDomain(spec)?.size ?: 0) >= 2
 
   private fun continuousDomain(
     spec: ScaleSpec,
@@ -624,8 +688,17 @@ public class ScaleResolver(
         val extent = numericExtent(spec.domain, spec.name) ?: return null
         listOf(extent.start, extent.endInclusive)
       }
+    // A **bound** replaces an end of the domain here as it does on any other continuous scale:
+    // upstream's `configureDomain` runs the same block whatever the type, and a time scale that
+    // ignored them drew the whole of the data where a chart had asked for one year of it.
+    val bounded =
+      domain.toMutableList().also {
+        numbers.resolve(spec.domainMin, spec.name)?.let { low -> it[0] = low }
+        numbers.resolve(spec.domainMax, spec.name)?.let { high -> it[it.size - 1] = high }
+      }
+    val padded = padded(bounded, range, spec)
     val niced =
-      if (spec.nice && spec.domainRaw == null) {
+      if (spec.nice && !rawApplies(spec)) {
         // `nice: "month"` rounds out to a **calendar boundary**, where `nice: true` rounds out to
         // whatever step the tick algorithm chose. Over 17 January to 9 May those differ by eleven
         // days at one end — the difference between an axis labelled by months and one by weeks.
@@ -652,7 +725,7 @@ public class ScaleResolver(
           }
         listOf(lo, hi)
       } else {
-        domain
+        padded
       }
     return TimeScale(
       spec.name,
@@ -835,7 +908,26 @@ public class ScaleResolver(
     // upstream sorts only when the domain says `"sort": true`, and a jumbled column really does
     // give
     // a jumbled scale there.
-    val edges = fullNumericDomain(spec)?.distinct() ?: return null
+    // With no domain of its own, **the bins are the domain** — `configureBins` in `vega-encode`,
+    // where a `bin-ordinal` either states its edges as a domain or takes them from `bins`. That is
+    // how a Vega-Lite binned colour scale is written: it says only which bins the transform chose,
+    // because writing the edges out again would be the same numbers a second time.
+    val edges =
+      if (spec.domain == DomainSpec.Unset) {
+        // An unbounded domain, so the boundaries are taken as the bins state them: upstream clamps
+        // them into `scale.domain()`, and a scale with no domain has nothing to clamp them into.
+        binBoundaries(spec, listOf(Double.NEGATIVE_INFINITY, Double.POSITIVE_INFINITY))
+          ?: run {
+            diagnostics.error(
+              DiagnosticCodes.SCALE_INVALID_DOMAIN,
+              "Scale '${spec.name}' is bin-ordinal with neither a domain nor bins to take one from",
+              operator = spec.name,
+            )
+            return null
+          }
+      } else {
+        fullNumericDomain(spec)?.distinct() ?: return null
+      }
     val range = binnedRange(spec, buckets = maxOf(1, edges.size - 1)) ?: return null
     return BinOrdinalScale(spec.name, edges, range)
   }
@@ -910,6 +1002,42 @@ public class ScaleResolver(
     )
 
   /**
+   * `padDomain`: a **continuous** scale's `padding`, which widens the domain rather than the range.
+   *
+   * A band scale pads by leaving gaps between its bands, but a continuous scale has no bands to
+   * leave gaps between — so Vega asks for the same effect the other way round, zooming the domain
+   * out by exactly the factor that pulls the data's own ends inwards by `padding` pixels. It is
+   * what keeps the leftmost bar of a time-series bar chart from being sliced in half by the axis.
+   *
+   * Applied after `zero` and any stated bounds, and **before** `nice` — the order is upstream's
+   * `configureDomain`, and it matters: rounding a padded domain and padding a rounded one differ.
+   */
+  /** Raising a negative value to a fractional power needs the sign handled separately. */
+  private fun signedPow(value: Double, power: Double): Double =
+    if (value < 0.0) -((-value).pow(power)) else value.pow(power)
+
+  private fun padded(
+    domain: List<Double>,
+    range: List<Double>,
+    spec: ScaleSpec,
+    lift: (Double) -> Double = { it },
+    ground: (Double) -> Double = { it },
+  ): List<Double> {
+    val pad = numbers.resolve(spec.padding, spec.name) ?: return domain
+    if (pad == 0.0 || domain.size < 2 || domain.first() == domain.last()) return domain
+    val span = abs(range.last() - range.first())
+    if (span - 2 * pad == 0.0) return domain
+    val factor = span / (span - 2 * pad)
+    val low = lift(domain.first())
+    val high = lift(domain.last())
+    val anchor = (low + high) / 2
+    return domain.toMutableList().also {
+      it[0] = ground(anchor + (low - anchor) * factor)
+      it[it.size - 1] = ground(anchor + (high - anchor) * factor)
+    }
+  }
+
+  /**
    * Every value a union's parts contribute, in the order they were written.
    *
    * The parts are read recursively rather than assumed to be `{data, field}` pairs, so a literal
@@ -975,8 +1103,9 @@ public class ScaleResolver(
           orderedDomain(domain.data, domain.fields, domain.sort, scaleName) ?: return null
         is DomainSpec.FromSignal -> signalDomain(domain, scaleName) ?: return null
         // A discrete union keeps first-appearance order across every part, which is the same rule
-        // a single dataset's domain follows — the parts simply extend the sequence.
-        is DomainSpec.Union -> unionValues(domain.parts, scaleName)
+        // a single dataset's domain follows — the parts simply extend the sequence — until a
+        // `sort` orders the *combined* set, which is not the same as ordering each part.
+        is DomainSpec.Union -> sortedUnion(domain, scaleName)
         DomainSpec.Unset -> {
           diagnostics.error(
             DiagnosticCodes.SCALE_INVALID_DOMAIN,
@@ -1010,16 +1139,58 @@ public class ScaleResolver(
     scaleName: String,
   ): List<VegaValue>? {
     val dataset = dataset(dataName, scaleName) ?: return null
+    // A **missing** value is a category like any other, and dropping it is what makes a row
+    // disappear from a chart that still draws its mark: a lookup that found no match leaves a
+    // column with nothing in it, and upstream gives that column a band of its own at the front of
+    // the domain rather than none at all. Vega's `distinct` counts a null as a value.
     val keys =
-      fields
-        .flatMap { path -> dataset.map { it.field(path) }.filterNot { it.isMissing } }
-        .distinctBy { it.asString() }
+      fields.flatMap { path -> dataset.map { it.field(path) } }.distinctBy { it.asString() }
     val descending = descendingOrder(sort, scaleName)
     return when (sort) {
       null -> keys
       is DomainSort.ByValue -> keys.sortedWith(domainOrder(descending) { it })
       is DomainSort.ByAggregate -> {
         val summaries = aggregateSortKeys(dataset, fields, sort, scaleName) ?: return keys
+        keys.sortedWith(domainOrder(descending) { summaries[it.asString()] ?: VegaValue.Null })
+      }
+    }
+  }
+
+  /**
+   * A union's values, ordered the way `ordinalMultipleDomain` orders them.
+   *
+   * The parts are counted separately and then *aggregated together* before anything is sorted, so a
+   * sorted union is one sequence rather than several laid end to end — which is the whole
+   * difference, and it shows the moment two plots of one table share a colour scale: sorting the
+   * halves separately would put the second plot's first category after the first plot's last.
+   *
+   * A sort by aggregate folds the parts the way upstream's `MULTIDOMAIN_SORT_OPS` does — a count of
+   * counts is their sum, a min of mins is a min — and those are the only three it allows here.
+   */
+  private fun sortedUnion(domain: DomainSpec.Union, scaleName: String): List<VegaValue> {
+    val keys = unionValues(domain.parts, scaleName).distinctBy { it.asString() }
+    // A union's order is settled the same way a single domain's is, a signal having its say first:
+    // `{"order": {"signal": …}}` reverses a shared scale as much as it reverses a lone one.
+    val descending = descendingOrder(domain.sort, scaleName)
+    return when (val sort = domain.sort) {
+      null -> keys
+      is DomainSort.ByValue -> keys.sortedWith(domainOrder(descending) { it })
+      is DomainSort.ByAggregate -> {
+        val parts =
+          domain.parts.flatMap { part ->
+            when (part) {
+              is DomainSpec.FromField ->
+                dataset(part.data, scaleName)?.let { data ->
+                  domainFields(part.field, scaleName).map { data to it }
+                }
+              is DomainSpec.FromFields ->
+                dataset(part.data, scaleName)?.let { data -> part.fields.map { data to it } }
+              // A literal or a signal carries no rows to aggregate over, so it contributes its
+              // values to the domain and nothing to the order.
+              else -> emptyList()
+            } ?: return keys
+          }
+        val summaries = aggregateSortKeys(parts, sort, scaleName) ?: return keys
         keys.sortedWith(domainOrder(descending) { summaries[it.asString()] ?: VegaValue.Null })
       }
     }
@@ -1067,6 +1238,12 @@ public class ScaleResolver(
     fields: List<String>,
     sort: DomainSort.ByAggregate,
     scaleName: String,
+  ): Map<String, VegaValue>? = aggregateSortKeys(fields.map { dataset to it }, sort, scaleName)
+
+  private fun aggregateSortKeys(
+    parts: List<Pair<List<VegaValue>, String>>,
+    sort: DomainSort.ByAggregate,
+    scaleName: String,
   ): Map<String, VegaValue>? {
     val op = AggregateOp.fromName(sort.op)
     if (op == null) {
@@ -1088,7 +1265,7 @@ public class ScaleResolver(
       return null
     }
 
-    val perField = fields.map { path ->
+    val perField = parts.map { (dataset, path) ->
       val groups = LinkedHashMap<String, MutableList<VegaValue>>()
       for (datum in dataset) {
         val value = datum.field(path)
@@ -1126,6 +1303,13 @@ public class ScaleResolver(
    * falling back to `[0, 1]` produces a chart that looks plausible and is not.
    */
   private fun signalDomain(domain: DomainSpec.FromSignal, scaleName: String): List<VegaValue>? {
+    // `{data: …}` around a single value is how a domain names one *datum* rather than a list —
+    // Vega-Lite writes a dated bound that way, `{data: datetime(2012, 0, 1, 0, 0, 0, 0)}`, so the
+    // instant is not mistaken for a two-element domain. Unwrapped, it is one end of the domain.
+    val wrapped = numbers.resolveValue(domain.expression, scaleName) as? VegaValue.Obj
+    wrapped?.fields?.get("data")?.let {
+      return listOf(it)
+    }
     val values = numbers.resolveList(domain.expression, scaleName)
     if (values.isNullOrEmpty()) {
       diagnostics.error(
@@ -1231,10 +1415,19 @@ public class ScaleResolver(
    */
   private fun stepRange(spec: ScaleSpec, step: Double): List<Double>? {
     val domain = discreteDomain(spec.domain, spec.name) ?: return null
+    // A **point** scale is a band scale with its inner padding pinned at 1 — n points have n−1
+    // steps between them — and its `padding` is the *outer* one. vega-scale builds `point()` as
+    // `pointish(band().paddingInner(1))`, and `pointish` renames `padding` to `paddingOuter` and
+    // deletes `paddingInner` outright. Reading `padding` as an inner padding here made a point
+    // chart with `padding: 0.5` come out half a step wider than the space it asked for.
     val inner =
-      numbers.resolve(spec.paddingInner, spec.name)
-        ?: numbers.resolve(spec.padding, spec.name)
-        ?: 0.0
+      if (spec.type == ScaleType.POINT) {
+        1.0
+      } else {
+        numbers.resolve(spec.paddingInner, spec.name)
+          ?: numbers.resolve(spec.padding, spec.name)
+          ?: 0.0
+      }
     val outer =
       numbers.resolve(spec.paddingOuter, spec.name)
         ?: numbers.resolve(spec.padding, spec.name)

@@ -132,6 +132,92 @@ class AxisStyleTest {
     )
   }
 
+  /**
+   * `labelFlush` hangs the labels at the ends of the range from those ends.
+   *
+   * Reference vectors from upstream, on a linear scale from 0 to 100 across 100 units: the label at
+   * the origin aligns left, the one at the far end aligns right, and the one in the middle is left
+   * centred. `true` is a threshold of one unit, so nothing but the two extremes qualifies.
+   */
+  @Test
+  fun `labelFlush hangs the first and last label from the range ends`() {
+    val labels =
+      SpecCompiler()
+        .compileJson(
+          """
+          {
+            "width": 100, "height": 60, "padding": 0,
+            "data": [{"name": "t", "values": [{"v": 0}, {"v": 100}]}],
+            "scales": [
+              {"name": "x", "type": "linear", "domain": {"data": "t", "field": "v"},
+               "range": "width"}
+            ],
+            "axes": [{"orient": "bottom", "scale": "x", "labelFlush": true}]
+          }
+          """
+            .trimIndent()
+        )
+        .scene!!
+        .flatten()
+        .map { it.node }
+        .filterIsInstance<TextNode>()
+        .filter { it.metadata.role == "axis-label" }
+
+    assertTrue(labels.size >= 3, "expected several labels, got ${labels.size}")
+    assertEquals(dev.aster.vega.scene.TextAlign.LEFT, labels.first().layout.run.align)
+    assertEquals(dev.aster.vega.scene.TextAlign.RIGHT, labels.last().layout.run.align)
+    assertEquals(
+      dev.aster.vega.scene.TextAlign.CENTER,
+      labels[labels.size / 2].layout.run.align,
+      "a label away from either end keeps the orientation's own alignment",
+    )
+  }
+
+  /**
+   * A `gridScale` gives the gridlines the *other* scale's range, in that range's direction.
+   *
+   * Upstream draws a bottom axis's gridlines from the far side of the plot back to the axis when
+   * the grid scale is a vertical one, because a vertical scale's range starts at the bottom. It is
+   * the same line drawn the other way round, which is exactly the kind of difference that survives
+   * unnoticed until a dashed gridline starts its pattern at the wrong end.
+   */
+  @Test
+  fun `gridScale takes its direction from the scale it names`() {
+    fun gridlines(gridScale: String) =
+      SpecCompiler()
+        .compileJson(
+          """
+          {
+            "width": 100, "height": 60, "padding": 0,
+            "data": [{"name": "t", "values": [{"v": 0}, {"v": 10}]}],
+            "scales": [
+              {"name": "x", "type": "linear", "domain": {"data": "t", "field": "v"},
+               "range": "width"},
+              {"name": "y", "type": "linear", "domain": {"data": "t", "field": "v"},
+               "range": "height"}
+            ],
+            "axes": [{"orient": "bottom", "scale": "x", "grid": true$gridScale}]
+          }
+          """
+            .trimIndent()
+        )
+        .scene!!
+        .flatten()
+        .map { it.node }
+        .filterIsInstance<RuleNode>()
+        .filter { it.metadata.role == "axis-grid" }
+
+    // `range: "height"` descends — from the bottom of the plot to the top — so a gridline that
+    // follows it starts at the top of the plot in absolute terms and ends on the axis.
+    val directed = gridlines(""", "gridScale": "y"""").first()
+    assertTrue(
+      directed.y1 < directed.y2,
+      "a gridline over a descending scale runs back towards its axis: $directed",
+    )
+    val plain = gridlines("").first()
+    assertTrue(plain.y1 > plain.y2, "without a gridScale it runs away from its axis: $plain")
+  }
+
   // ---- what gets reported ---------------------------------------------------
 
   /**

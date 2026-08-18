@@ -21,6 +21,7 @@ class NoAndroidTypesTest {
       "vega-dataflow",
       "vega-scene",
       "vega-runtime",
+      "vega-lite",
       "vega-svg",
       "test-fixtures",
     )

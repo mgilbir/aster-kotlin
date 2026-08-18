@@ -16,6 +16,7 @@ import kotlin.math.exp
 import kotlin.math.ln
 import kotlin.math.pow
 import kotlin.math.roundToLong
+import kotlin.math.sign
 import kotlin.math.sin
 import kotlin.math.sqrt
 import kotlin.math.tan
@@ -810,6 +811,12 @@ internal object RawProjections {
       else doubleArrayOf(k * cy * sin(lambda), k * sin(phi))
     }
 
+  /**
+   * Invertible, which matters out of proportion to the formula: `albers` is this projection pointed
+   * at the United States, and `albersUsa` is three of them. Without the inverse nothing could read
+   * a point on any map of the United States back to a place — the family Vega-Lite reaches for by
+   * default there — and a brush that asks where the middle of the plot *is* got no answer at all.
+   */
   fun conicEqualArea(y0: Double, y1: Double): RawProjection {
     val sy0 = sin(y0)
     val n = (sy0 + sin(y1)) / 2
@@ -817,15 +824,28 @@ internal object RawProjections {
     if (abs(n) < EPSILON) return cylindricalEqualArea(y0)
     val c = 1 + sy0 * (2 * n - sy0)
     val r0 = sqrt(c) / n
-    return RawProjection { lambda, phi ->
-      val r = sqrt(c - 2 * n * sin(phi)) / n
-      doubleArrayOf(r * sin(lambda * n), r0 - r * cos(lambda * n))
-    }
+    return invertible(
+      { lambda, phi ->
+        val r = sqrt(c - 2 * n * sin(phi)) / n
+        doubleArrayOf(r * sin(lambda * n), r0 - r * cos(lambda * n))
+      },
+      { x, y ->
+        val r0y = r0 - y
+        // `atan2(x, |r0y|)` and then the sign put back: the cone's apex may be above or below the
+        // plane, and taking the angle to a signed radius would fold the southern half onto the
+        // northern one.
+        val longitude = atan2(x, abs(r0y)) / n * sign(r0y)
+        doubleArrayOf(longitude, asin((c - (x * x + r0y * r0y) * n * n) / (2 * n)))
+      },
+    )
   }
 
   private fun cylindricalEqualArea(phi0: Double): RawProjection {
     val cosPhi0 = cos(phi0)
-    return RawProjection { lambda, phi -> doubleArrayOf(lambda * cosPhi0, sin(phi) / cosPhi0) }
+    return invertible(
+      { lambda, phi -> doubleArrayOf(lambda * cosPhi0, sin(phi) / cosPhi0) },
+      { x, y -> doubleArrayOf(x / cosPhi0, asin(y * cosPhi0)) },
+    )
   }
 
   fun conicEquidistant(y0: Double, y1: Double): RawProjection {
@@ -1085,6 +1105,30 @@ internal class AlbersUsa : GeoProjector {
       }
     }
     return null
+  }
+
+  /**
+   * A point on the page read back to a place — d3's `albersUsa.invert`.
+   *
+   * A composite has no single inverse in the way one projection does, and on that reasoning this
+   * class had none at all. d3 answers it differently and the answer is simple: the inset boxes sit
+   * at **known offsets from the middle**, so normalising the point by the scale and translation
+   * says which piece drew it, and that piece is asked. The point is handed on unnormalised, the
+   * piece's own translation already accounting for where its box is.
+   *
+   * Without it nothing could read a place back off a map of the United States — which is what a
+   * brush along one channel asks for when it borrows the centre of the plot.
+   */
+  fun invert(x: Double, y: Double): DoubleArray? {
+    val nx = (x - tx) / k
+    val ny = (y - ty) / k
+    val piece =
+      when {
+        ny >= 0.120 && ny < 0.234 && nx >= -0.425 && nx < -0.214 -> alaska
+        ny >= 0.166 && ny < 0.234 && nx >= -0.214 && nx < -0.115 -> hawaii
+        else -> lower48
+      }
+    return piece.invert(x, y)
   }
 
   /** Pushes everything into every stream at once. */

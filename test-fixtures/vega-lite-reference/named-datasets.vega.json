@@ -1,0 +1,363 @@
+{
+  "$schema": "https://vega.github.io/schema/vega/v6.json",
+  "description": "Two tables handed in by name, which is how a chart takes data it did not carry.",
+  "background": "white",
+  "padding": 5,
+  "width": 300,
+  "height": 150,
+  "style": "cell",
+  "data": [
+    {
+      "name": "falcon",
+      "values": [
+        16.8,
+        19.7,
+        16,
+        19.5,
+        16.4
+      ]
+    },
+    {
+      "name": "square",
+      "values": [
+        24.2,
+        17.9,
+        15.8,
+        58.4,
+        151
+      ]
+    },
+    {
+      "name": "data_0",
+      "source": "falcon",
+      "transform": [
+        {
+          "type": "window",
+          "params": [
+            null
+          ],
+          "as": [
+            "row"
+          ],
+          "ops": [
+            "row_number"
+          ],
+          "fields": [
+            null
+          ],
+          "sort": {
+            "field": [],
+            "order": []
+          }
+        },
+        {
+          "type": "formula",
+          "expr": "1000/datum.data",
+          "as": "fps"
+        },
+        {
+          "type": "formula",
+          "expr": "'Falcon'",
+          "as": "system"
+        }
+      ]
+    },
+    {
+      "name": "data_1",
+      "source": "square",
+      "transform": [
+        {
+          "type": "window",
+          "params": [
+            null
+          ],
+          "as": [
+            "row"
+          ],
+          "ops": [
+            "row_number"
+          ],
+          "fields": [
+            null
+          ],
+          "sort": {
+            "field": [],
+            "order": []
+          }
+        },
+        {
+          "type": "formula",
+          "expr": "1000/datum.data",
+          "as": "fps"
+        },
+        {
+          "type": "formula",
+          "expr": "'Square'",
+          "as": "system"
+        }
+      ]
+    }
+  ],
+  "marks": [
+    {
+      "name": "layer_0_pathgroup",
+      "type": "group",
+      "from": {
+        "facet": {
+          "name": "faceted_path_layer_0_main",
+          "data": "data_0",
+          "groupby": [
+            "system"
+          ]
+        }
+      },
+      "encode": {
+        "update": {
+          "width": {
+            "field": {
+              "group": "width"
+            }
+          },
+          "height": {
+            "field": {
+              "group": "height"
+            }
+          }
+        }
+      },
+      "marks": [
+        {
+          "name": "layer_0_marks",
+          "type": "line",
+          "style": [
+            "line"
+          ],
+          "sort": {
+            "field": "x"
+          },
+          "from": {
+            "data": "faceted_path_layer_0_main"
+          },
+          "encode": {
+            "update": {
+              "stroke": {
+                "scale": "color",
+                "field": "system"
+              },
+              "description": {
+                "signal": "\"run: \" + (format(datum[\"row\"], \"\")) + \"; fps: \" + (format(datum[\"fps\"], \"\")) + \"; system: \" + (isValid(datum[\"system\"]) ? isArray(datum[\"system\"]) ? join(datum[\"system\"], ' ') : datum[\"system\"] : \"\"+datum[\"system\"])"
+              },
+              "x": {
+                "scale": "x",
+                "field": "row"
+              },
+              "y": {
+                "scale": "y",
+                "field": "fps"
+              },
+              "defined": {
+                "signal": "isValid(datum[\"row\"]) && isFinite(+datum[\"row\"]) && isValid(datum[\"fps\"]) && isFinite(+datum[\"fps\"])"
+              }
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "layer_1_pathgroup",
+      "type": "group",
+      "from": {
+        "facet": {
+          "name": "faceted_path_layer_1_main",
+          "data": "data_1",
+          "groupby": [
+            "system"
+          ]
+        }
+      },
+      "encode": {
+        "update": {
+          "width": {
+            "field": {
+              "group": "width"
+            }
+          },
+          "height": {
+            "field": {
+              "group": "height"
+            }
+          }
+        }
+      },
+      "marks": [
+        {
+          "name": "layer_1_marks",
+          "type": "line",
+          "style": [
+            "line"
+          ],
+          "sort": {
+            "field": "x"
+          },
+          "from": {
+            "data": "faceted_path_layer_1_main"
+          },
+          "encode": {
+            "update": {
+              "stroke": {
+                "scale": "color",
+                "field": "system"
+              },
+              "description": {
+                "signal": "\"run: \" + (format(datum[\"row\"], \"\")) + \"; fps: \" + (format(datum[\"fps\"], \"\")) + \"; system: \" + (isValid(datum[\"system\"]) ? isArray(datum[\"system\"]) ? join(datum[\"system\"], ' ') : datum[\"system\"] : \"\"+datum[\"system\"])"
+              },
+              "x": {
+                "scale": "x",
+                "field": "row"
+              },
+              "y": {
+                "scale": "y",
+                "field": "fps"
+              },
+              "defined": {
+                "signal": "isValid(datum[\"row\"]) && isFinite(+datum[\"row\"]) && isValid(datum[\"fps\"]) && isFinite(+datum[\"fps\"])"
+              }
+            }
+          }
+        }
+      ]
+    }
+  ],
+  "scales": [
+    {
+      "name": "x",
+      "type": "linear",
+      "domain": {
+        "fields": [
+          {
+            "data": "data_0",
+            "field": "row"
+          },
+          {
+            "data": "data_1",
+            "field": "row"
+          }
+        ]
+      },
+      "range": [
+        0,
+        {
+          "signal": "width"
+        }
+      ],
+      "nice": true,
+      "zero": false
+    },
+    {
+      "name": "y",
+      "type": "linear",
+      "domain": {
+        "fields": [
+          {
+            "data": "data_0",
+            "field": "fps"
+          },
+          {
+            "data": "data_1",
+            "field": "fps"
+          }
+        ]
+      },
+      "range": [
+        {
+          "signal": "height"
+        },
+        0
+      ],
+      "nice": true,
+      "zero": true
+    },
+    {
+      "name": "color",
+      "type": "ordinal",
+      "domain": {
+        "fields": [
+          {
+            "data": "data_0",
+            "field": "system"
+          },
+          {
+            "data": "data_1",
+            "field": "system"
+          }
+        ],
+        "sort": true
+      },
+      "range": "category"
+    }
+  ],
+  "axes": [
+    {
+      "scale": "x",
+      "orient": "bottom",
+      "gridScale": "y",
+      "grid": true,
+      "tickCount": {
+        "signal": "ceil(width/40)"
+      },
+      "domain": false,
+      "labels": false,
+      "aria": false,
+      "maxExtent": 0,
+      "minExtent": 0,
+      "ticks": false,
+      "zindex": 0
+    },
+    {
+      "scale": "y",
+      "orient": "left",
+      "gridScale": "x",
+      "grid": true,
+      "tickCount": {
+        "signal": "ceil(height/40)"
+      },
+      "domain": false,
+      "labels": false,
+      "aria": false,
+      "maxExtent": 0,
+      "minExtent": 0,
+      "ticks": false,
+      "zindex": 0
+    },
+    {
+      "scale": "x",
+      "orient": "bottom",
+      "grid": false,
+      "title": "run",
+      "labelFlush": true,
+      "labelOverlap": true,
+      "tickCount": {
+        "signal": "ceil(width/40)"
+      },
+      "zindex": 0
+    },
+    {
+      "scale": "y",
+      "orient": "left",
+      "grid": false,
+      "title": "fps",
+      "labelOverlap": true,
+      "tickCount": {
+        "signal": "ceil(height/40)"
+      },
+      "zindex": 0
+    }
+  ],
+  "legends": [
+    {
+      "stroke": "color",
+      "symbolType": "stroke",
+      "title": "system"
+    }
+  ]
+}

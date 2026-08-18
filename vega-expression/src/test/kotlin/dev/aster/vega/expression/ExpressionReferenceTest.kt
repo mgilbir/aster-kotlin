@@ -207,6 +207,11 @@ class ExpressionReferenceTest {
         "sampleNormal",
         "sampleLogNormal",
         "sampleUniform",
+        // The selection helpers read a **store** dataset, so they go through the scope as `data`
+        // does rather than through the function table.
+        "vlSelectionIdTest",
+        "vlSelectionResolve",
+        "vlSelectionTest",
         "warn",
         "info",
         "debug",

@@ -1,0 +1,206 @@
+{
+  "$schema": "https://vega.github.io/schema/vega/v6.json",
+  "description": "A bucketed instant under an area, which has no band to sit in and so no far edge.",
+  "background": "white",
+  "padding": 5,
+  "width": 160,
+  "height": 90,
+  "style": "cell",
+  "data": [
+    {
+      "name": "source_0",
+      "values": [
+        {
+          "when": "2019-03-01",
+          "amount": 28
+        },
+        {
+          "when": "2020-05-01",
+          "amount": 55
+        },
+        {
+          "when": "2021-07-01",
+          "amount": 43
+        }
+      ]
+    },
+    {
+      "name": "data_0",
+      "source": "source_0",
+      "transform": [
+        {
+          "type": "formula",
+          "expr": "toDate(datum[\"when\"])",
+          "as": "when"
+        },
+        {
+          "field": "when",
+          "type": "timeunit",
+          "units": [
+            "year"
+          ],
+          "as": [
+            "year_when",
+            "year_when_end"
+          ]
+        },
+        {
+          "type": "aggregate",
+          "groupby": [
+            "year_when"
+          ],
+          "ops": [
+            "sum"
+          ],
+          "fields": [
+            "amount"
+          ],
+          "as": [
+            "sum_amount"
+          ]
+        }
+      ]
+    }
+  ],
+  "marks": [
+    {
+      "name": "marks",
+      "type": "area",
+      "style": [
+        "area"
+      ],
+      "sort": {
+        "field": "y"
+      },
+      "from": {
+        "data": "data_0"
+      },
+      "encode": {
+        "update": {
+          "orient": {
+            "value": "horizontal"
+          },
+          "fill": {
+            "value": "#4c78a8"
+          },
+          "description": {
+            "signal": "\"Sum of amount: \" + (format(datum[\"sum_amount\"], \"\")) + \"; when (year): \" + (timeFormat(datum[\"year_when\"], timeUnitSpecifier([\"year\"], {\"year-month\":\"%b %Y \",\"year-month-date\":\"%b %d, %Y \"})))"
+          },
+          "x": {
+            "scale": "x",
+            "field": "sum_amount"
+          },
+          "x2": {
+            "scale": "x",
+            "value": 0
+          },
+          "y": {
+            "scale": "y",
+            "field": "year_when"
+          },
+          "defined": {
+            "signal": "isValid(datum[\"sum_amount\"]) && isFinite(+datum[\"sum_amount\"]) && isValid(datum[\"year_when\"]) && isFinite(+datum[\"year_when\"])"
+          }
+        }
+      }
+    }
+  ],
+  "scales": [
+    {
+      "name": "x",
+      "type": "linear",
+      "domain": {
+        "data": "data_0",
+        "field": "sum_amount"
+      },
+      "range": [
+        0,
+        {
+          "signal": "width"
+        }
+      ],
+      "nice": true,
+      "zero": true
+    },
+    {
+      "name": "y",
+      "type": "time",
+      "domain": {
+        "data": "data_0",
+        "field": "year_when"
+      },
+      "range": [
+        {
+          "signal": "height"
+        },
+        0
+      ]
+    }
+  ],
+  "axes": [
+    {
+      "scale": "x",
+      "orient": "bottom",
+      "gridScale": "y",
+      "grid": true,
+      "tickCount": {
+        "signal": "ceil(width/40)"
+      },
+      "domain": false,
+      "labels": false,
+      "aria": false,
+      "maxExtent": 0,
+      "minExtent": 0,
+      "ticks": false,
+      "zindex": 0
+    },
+    {
+      "scale": "y",
+      "orient": "left",
+      "gridScale": "x",
+      "grid": true,
+      "tickCount": {
+        "signal": "ceil(height/40)"
+      },
+      "tickMinStep": {
+        "signal": "datetime(2002, 0, 1, 0, 0, 0, 0) - datetime(2001, 0, 1, 0, 0, 0, 0)"
+      },
+      "domain": false,
+      "labels": false,
+      "aria": false,
+      "maxExtent": 0,
+      "minExtent": 0,
+      "ticks": false,
+      "zindex": 0
+    },
+    {
+      "scale": "x",
+      "orient": "bottom",
+      "grid": false,
+      "title": "Sum of amount",
+      "labelFlush": true,
+      "labelOverlap": true,
+      "tickCount": {
+        "signal": "ceil(width/40)"
+      },
+      "zindex": 0
+    },
+    {
+      "scale": "y",
+      "orient": "left",
+      "grid": false,
+      "title": "when (year)",
+      "format": {
+        "signal": "timeUnitSpecifier([\"year\"], {\"year-month\":\"%b %Y \",\"year-month-date\":\"%b %d, %Y \"})"
+      },
+      "labelOverlap": true,
+      "tickCount": {
+        "signal": "ceil(height/40)"
+      },
+      "tickMinStep": {
+        "signal": "datetime(2002, 0, 1, 0, 0, 0, 0) - datetime(2001, 0, 1, 0, 0, 0, 0)"
+      },
+      "zindex": 0
+    }
+  ]
+}

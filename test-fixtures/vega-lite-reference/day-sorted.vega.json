@@ -1,0 +1,223 @@
+{
+  "$schema": "https://vega.github.io/schema/vega/v6.json",
+  "description": "Weekdays put in a stated order, which is an order and not an inference.",
+  "background": "white",
+  "padding": 5,
+  "style": "cell",
+  "data": [
+    {
+      "name": "source_0",
+      "url": "data/stocks.csv",
+      "format": {
+        "type": "csv",
+        "parse": {
+          "date": "date"
+        }
+      },
+      "transform": [
+        {
+          "field": "date",
+          "type": "timeunit",
+          "units": [
+            "month"
+          ],
+          "as": [
+            "month_date",
+            "month_date_end"
+          ]
+        },
+        {
+          "field": "date",
+          "type": "timeunit",
+          "units": [
+            "day"
+          ],
+          "as": [
+            "day_date",
+            "day_date_end"
+          ]
+        },
+        {
+          "type": "formula",
+          "expr": "time(datetime(2012, 0, day(datum[\"date\"])+1, 0, 0, 0, 0))===time(datetime(2012, 0, 2, 0, 0, 0, 0)) ? 0 : time(datetime(2012, 0, day(datum[\"date\"])+1, 0, 0, 0, 0))===time(datetime(2012, 0, 3, 0, 0, 0, 0)) ? 1 : time(datetime(2012, 0, day(datum[\"date\"])+1, 0, 0, 0, 0))===time(datetime(2012, 0, 4, 0, 0, 0, 0)) ? 2 : time(datetime(2012, 0, day(datum[\"date\"])+1, 0, 0, 0, 0))===time(datetime(2012, 0, 5, 0, 0, 0, 0)) ? 3 : time(datetime(2012, 0, day(datum[\"date\"])+1, 0, 0, 0, 0))===time(datetime(2012, 0, 6, 0, 0, 0, 0)) ? 4 : time(datetime(2012, 0, day(datum[\"date\"])+1, 0, 0, 0, 0))===time(datetime(2012, 0, 7, 0, 0, 0, 0)) ? 5 : time(datetime(2012, 0, day(datum[\"date\"])+1, 0, 0, 0, 0))===time(datetime(2012, 0, 1, 0, 0, 0, 0)) ? 6 : 7",
+          "as": "y_day_date_sort_index"
+        }
+      ]
+    },
+    {
+      "name": "data_0",
+      "source": "source_0",
+      "transform": [
+        {
+          "type": "aggregate",
+          "groupby": [
+            "month_date",
+            "day_date"
+          ],
+          "ops": [
+            "count"
+          ],
+          "fields": [
+            null
+          ],
+          "as": [
+            "__count"
+          ]
+        }
+      ]
+    }
+  ],
+  "signals": [
+    {
+      "name": "x_step",
+      "value": 20
+    },
+    {
+      "name": "width",
+      "update": "bandspace(domain('x').length, 1, 0.5) * x_step"
+    },
+    {
+      "name": "y_step",
+      "value": 20
+    },
+    {
+      "name": "height",
+      "update": "bandspace(domain('y').length, 1, 0.5) * y_step"
+    }
+  ],
+  "marks": [
+    {
+      "name": "marks",
+      "type": "symbol",
+      "style": [
+        "circle"
+      ],
+      "from": {
+        "data": "data_0"
+      },
+      "encode": {
+        "update": {
+          "fill": {
+            "value": "#4c78a8"
+          },
+          "ariaRoleDescription": {
+            "value": "circle"
+          },
+          "description": {
+            "signal": "\"date (month): \" + (timeFormat(datum[\"month_date\"], timeUnitSpecifier([\"month\"], {\"year-month\":\"%b %Y \",\"year-month-date\":\"%b %d, %Y \"}))) + \"; date (day): \" + (timeFormat(datum[\"day_date\"], timeUnitSpecifier([\"day\"], {\"year-month\":\"%b %Y \",\"year-month-date\":\"%b %d, %Y \"}))) + \"; Count of Records: \" + (format(datum[\"__count\"], \"\"))"
+          },
+          "x": {
+            "scale": "x",
+            "field": "month_date"
+          },
+          "y": {
+            "scale": "y",
+            "field": "day_date"
+          },
+          "size": {
+            "scale": "size",
+            "field": "__count"
+          },
+          "shape": {
+            "value": "circle"
+          }
+        }
+      }
+    }
+  ],
+  "scales": [
+    {
+      "name": "x",
+      "type": "point",
+      "domain": {
+        "data": "data_0",
+        "field": "month_date",
+        "sort": true
+      },
+      "range": {
+        "step": {
+          "signal": "x_step"
+        }
+      },
+      "padding": 0.5
+    },
+    {
+      "name": "y",
+      "type": "point",
+      "domain": {
+        "data": "source_0",
+        "field": "day_date",
+        "sort": {
+          "op": "min",
+          "field": "y_day_date_sort_index"
+        }
+      },
+      "range": {
+        "step": {
+          "signal": "y_step"
+        }
+      },
+      "padding": 0.5
+    },
+    {
+      "name": "size",
+      "type": "linear",
+      "domain": {
+        "data": "data_0",
+        "field": "__count"
+      },
+      "range": [
+        4,
+        361
+      ],
+      "zero": true
+    }
+  ],
+  "axes": [
+    {
+      "scale": "x",
+      "orient": "bottom",
+      "grid": false,
+      "title": "date (month)",
+      "format": {
+        "signal": "timeUnitSpecifier([\"month\"], {\"year-month\":\"%b %Y \",\"year-month-date\":\"%b %d, %Y \"})"
+      },
+      "formatType": "time",
+      "labelOverlap": true,
+      "tickMinStep": {
+        "signal": "datetime(2001, 1, 1, 0, 0, 0, 0) - datetime(2001, 0, 1, 0, 0, 0, 0)"
+      },
+      "zindex": 0
+    },
+    {
+      "scale": "y",
+      "orient": "left",
+      "grid": false,
+      "title": "date (day)",
+      "format": {
+        "signal": "timeUnitSpecifier([\"day\"], {\"year-month\":\"%b %Y \",\"year-month-date\":\"%b %d, %Y \"})"
+      },
+      "formatType": "time",
+      "zindex": 0
+    }
+  ],
+  "legends": [
+    {
+      "size": "size",
+      "symbolType": "circle",
+      "title": "Count of Records",
+      "encode": {
+        "symbols": {
+          "update": {
+            "fill": {
+              "value": "#4c78a8"
+            },
+            "stroke": {
+              "value": "transparent"
+            }
+          }
+        }
+      }
+    }
+  ]
+}

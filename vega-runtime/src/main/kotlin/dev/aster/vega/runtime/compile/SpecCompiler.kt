@@ -201,9 +201,12 @@ public class SpecCompiler(
     // below, once the signals have resolved.
     val sized = spec.signals.mapTo(mutableSetOf()) { it.name }
     if ((spec.width == null && "width" !in sized) || (spec.height == null && "height" !in sized)) {
-      diagnostics.warn(
+      // Not a warning: a chart measured by its own contents is a written form, not an omission, and
+      // a faceted Vega-Lite chart is always written that way. It is worth saying once, at the level
+      // a host shows only when somebody is looking for it.
+      diagnostics.info(
         DiagnosticCodes.PARSE_MISSING_PROPERTY,
-        "Specification has no width or height; using ${DEFAULT_WIDTH}x$DEFAULT_HEIGHT",
+        "Specification declares no width or height; the surface is measured from its contents",
       )
     }
     // `autosize: {"contains": "padding"}` measures the declared size to the *outside* of the
@@ -510,13 +513,15 @@ public class SpecCompiler(
           type = MarkType.GROUP,
           name = "root",
           encode = rootEncode(spec, plot),
-          // `config.group` is the frame's paint, which is why it arrives here rather than through
-          // the
-          // mark-type config chain: the frame is the view, not a mark anyone wrote down.
-          configAboveDefaults = spec.frameConfig,
+          // Two blocks reach the chart's own frame and neither is a mark's. `config.group` is the
+          // frame's own paint — upstream's comment says "top-level group marks" and means the root
+          // rectangle — and the `config.style` blocks the specification named are what a Vega-Lite
+          // chart's plotting area gets its border from. The named styles are the more specific of
+          // the two, so they are applied over it.
+          configAboveDefaults = spec.frameConfig + spec.styleAboveDefaults,
         ),
         listOf(VegaValue.EmptyObject),
-      ) { _, _, _ ->
+      ) { _, _, _, _ ->
         children
       }
     val node = encoded.single() as GroupNode
@@ -564,6 +569,27 @@ public class SpecCompiler(
     )
 
   /**
+   * Grows the measured reach to take in the chart frame's own outline.
+   *
+   * A stroke straddles the edge it is drawn on, so a framed plotting area reaches half a stroke
+   * width beyond its own corner on every side. Upstream measures the root group's painted bounds
+   * and sees that; measuring only what is *inside* the frame does not, and the surface comes out
+   * exactly one unit narrower and shorter than upstream's for every Vega-Lite chart — all of which
+   * carry a `cell` style with a one-unit border.
+   */
+  private fun strokedFrame(reach: RectD, content: GroupNode, plot: PlotSize): RectD {
+    val stroke = content.stroke ?: return reach
+    if (content.size == null) return reach
+    val half = stroke.width / 2.0
+    return RectD(
+      left = minOf(reach.left, -half),
+      top = minOf(reach.top, -half),
+      right = maxOf(reach.right, plot.width + half),
+      bottom = maxOf(reach.bottom, plot.height + half),
+    )
+  }
+
+  /**
    * Places the content group and sizes the scene, implementing `autosize`.
    *
    * `pad`, Vega's default, grows the surface so the content plus its overflow fits inside the
@@ -599,7 +625,12 @@ public class SpecCompiler(
     // canvas is whole pixels, but the surface compared against upstream is the frame's own bounds
     // plus the padding — which is fractional whenever a label ends on a fraction, and upstream's
     // references have the fractions in them to prove it.
-    val bounds = if (reach.isEmpty) RectD(0.0, 0.0, plot.width, plot.height) else reach
+    val bounds =
+      strokedFrame(
+        if (reach.isEmpty) RectD(0.0, 0.0, plot.width, plot.height) else reach,
+        content,
+        plot,
+      )
     val over =
       Overflow(
         left = maxOf(0.0, -bounds.left),
@@ -770,7 +801,19 @@ public class SpecCompiler(
     /** A stand-in where only the reach and the plot size of a [Pass] are wanted. */
     private val EMPTY_COMPILED = CompiledSpec(null, emptyMap(), EMPTY_SIGNALS, emptyList())
 
-    public const val DEFAULT_WIDTH: Double = 200.0
-    public const val DEFAULT_HEIGHT: Double = 200.0
+    /**
+     * The plotting area a specification that declares none asks for: none at all.
+     *
+     * Upstream's `parseView` seeds the `width` and `height` signals with `spec.width || 0`, so a
+     * specification with no size is not an incomplete one — it is a chart measured entirely by what
+     * it draws, which is how every faceted Vega-Lite chart is written. The cells carry their own
+     * `child_width`, and a default plotting area behind them would be a whole phantom chart's worth
+     * of surface: two hundred units of it, on the `faceted` fixture, past the last cell.
+     *
+     * Verified against upstream rather than assumed: a specification with one rect at (10, 10) and
+     * no width renders 30 by 20 plus its padding, not 200 by 200.
+     */
+    public const val DEFAULT_WIDTH: Double = 0.0
+    public const val DEFAULT_HEIGHT: Double = 0.0
   }
 }

@@ -1,0 +1,202 @@
+{
+  "$schema": "https://vega.github.io/schema/vega/v6.json",
+  "description": "A domain written as dates, which Vega takes as expressions rather than objects.",
+  "background": "white",
+  "padding": 5,
+  "width": 300,
+  "height": 300,
+  "style": "cell",
+  "data": [
+    {
+      "name": "source_0",
+      "url": "data/stocks.csv",
+      "format": {
+        "type": "csv",
+        "parse": {
+          "date": "date"
+        }
+      },
+      "transform": [
+        {
+          "field": "date",
+          "type": "timeunit",
+          "units": [
+            "hours"
+          ],
+          "as": [
+            "hours_date",
+            "hours_date_end"
+          ]
+        },
+        {
+          "type": "stack",
+          "groupby": [
+            "hours_date"
+          ],
+          "field": "price",
+          "sort": {
+            "field": [],
+            "order": []
+          },
+          "as": [
+            "price_start",
+            "price_end"
+          ],
+          "offset": "zero"
+        },
+        {
+          "type": "filter",
+          "expr": "(isDate(datum[\"hours_date\"]) || (isValid(datum[\"hours_date\"]) && isFinite(+datum[\"hours_date\"]))) && isValid(datum[\"price\"]) && isFinite(+datum[\"price\"])"
+        }
+      ]
+    }
+  ],
+  "marks": [
+    {
+      "name": "marks",
+      "type": "rect",
+      "style": [
+        "bar"
+      ],
+      "from": {
+        "data": "source_0"
+      },
+      "encode": {
+        "update": {
+          "fill": {
+            "value": "#4c78a8"
+          },
+          "ariaRoleDescription": {
+            "value": "bar"
+          },
+          "description": {
+            "signal": "\"date (hours): \" + (timeFormat(datum[\"hours_date\"], timeUnitSpecifier([\"hours\"], {\"year-month\":\"%b %Y \",\"year-month-date\":\"%b %d, %Y \"}))) + \"; price: \" + (format(datum[\"price\"], \"\"))"
+          },
+          "x2": {
+            "scale": "x",
+            "field": "hours_date",
+            "offset": {
+              "signal": "0.5 + (abs(scale(\"x\", datum[\"hours_date_end\"]) - scale(\"x\", datum[\"hours_date\"])) < 0.25 ? -0.5 * (0.25 - (abs(scale(\"x\", datum[\"hours_date_end\"]) - scale(\"x\", datum[\"hours_date\"])))) : 0.5)"
+            }
+          },
+          "x": {
+            "scale": "x",
+            "field": "hours_date_end",
+            "offset": {
+              "signal": "0.5 + (abs(scale(\"x\", datum[\"hours_date_end\"]) - scale(\"x\", datum[\"hours_date\"])) < 0.25 ? 0.5 * (0.25 - (abs(scale(\"x\", datum[\"hours_date_end\"]) - scale(\"x\", datum[\"hours_date\"])))) : -0.5)"
+            }
+          },
+          "y": {
+            "scale": "y",
+            "field": "price_end"
+          },
+          "y2": {
+            "scale": "y",
+            "field": "price_start"
+          }
+        }
+      }
+    }
+  ],
+  "scales": [
+    {
+      "name": "x",
+      "type": "time",
+      "domain": {
+        "fields": [
+          {
+            "signal": "{data: datetime(2012, 0, 1, 0, 0, 0, 0)}"
+          },
+          {
+            "signal": "{data: datetime(2012, 0, 1, 24, 0, 0, 0)}"
+          }
+        ]
+      },
+      "range": [
+        0,
+        {
+          "signal": "width"
+        }
+      ]
+    },
+    {
+      "name": "y",
+      "type": "linear",
+      "domain": {
+        "data": "source_0",
+        "fields": [
+          "price_start",
+          "price_end"
+        ]
+      },
+      "range": [
+        {
+          "signal": "height"
+        },
+        0
+      ],
+      "nice": true,
+      "zero": true
+    }
+  ],
+  "axes": [
+    {
+      "scale": "x",
+      "orient": "bottom",
+      "gridScale": "y",
+      "grid": true,
+      "tickMinStep": {
+        "signal": "datetime(2001, 0, 1, 1, 0, 0, 0) - datetime(2001, 0, 1, 0, 0, 0, 0)"
+      },
+      "domain": false,
+      "labels": false,
+      "aria": false,
+      "maxExtent": 0,
+      "minExtent": 0,
+      "ticks": false,
+      "zindex": 0
+    },
+    {
+      "scale": "y",
+      "orient": "left",
+      "gridScale": "x",
+      "grid": true,
+      "tickCount": {
+        "signal": "ceil(height/40)"
+      },
+      "domain": false,
+      "labels": false,
+      "aria": false,
+      "maxExtent": 0,
+      "minExtent": 0,
+      "ticks": false,
+      "zindex": 0
+    },
+    {
+      "scale": "x",
+      "orient": "bottom",
+      "grid": false,
+      "title": "date (hours)",
+      "format": {
+        "signal": "timeUnitSpecifier([\"hours\"], {\"year-month\":\"%b %Y \",\"year-month-date\":\"%b %d, %Y \"})"
+      },
+      "labelFlush": true,
+      "labelOverlap": true,
+      "tickMinStep": {
+        "signal": "datetime(2001, 0, 1, 1, 0, 0, 0) - datetime(2001, 0, 1, 0, 0, 0, 0)"
+      },
+      "zindex": 0
+    },
+    {
+      "scale": "y",
+      "orient": "left",
+      "grid": false,
+      "title": "price",
+      "labelOverlap": true,
+      "tickCount": {
+        "signal": "ceil(height/40)"
+      },
+      "zindex": 0
+    }
+  ]
+}

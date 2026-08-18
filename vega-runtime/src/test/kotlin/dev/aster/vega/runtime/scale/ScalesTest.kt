@@ -79,10 +79,15 @@ class ScalesTest {
   }
 
   @Test
-  fun `NaN input produces NaN and a null scaled value`() {
+  fun `a value that is not a number scales to one that is not either`() {
+    // Not to *nothing*: JavaScript reads a null as zero in arithmetic and propagates a NaN, and
+    // Vega-Lite decides whether a bar is too thin to see with `abs(scale(x, a) - scale(x, b))`.
+    // Answering zero there says the bar has no width; answering NaN says the question does not
+    // apply, which is what upstream answers.
     val scale = LinearScale("s", listOf(0.0, 1.0), listOf(0.0, 1.0))
     assertTrue(scale.apply(Double.NaN).isNaN())
-    assertEquals(VegaValue.Null, scale.scale(VegaValue.Str("not a number")))
+    val scaled = scale.scale(VegaValue.Str("not a number"))
+    assertTrue(scaled is VegaValue.Num && scaled.value.isNaN(), scaled.toString())
   }
 
   @Test

@@ -11,6 +11,7 @@ import dev.aster.vega.model.spec.Direction
 import dev.aster.vega.model.spec.LegendOrient
 import dev.aster.vega.model.spec.LegendSpec
 import dev.aster.vega.model.spec.LegendType
+import dev.aster.vega.model.time.TimeFormat
 import dev.aster.vega.model.time.TimeInterval
 import dev.aster.vega.model.time.TimeStepper
 import dev.aster.vega.runtime.scale.BandScale
@@ -56,6 +57,7 @@ import dev.aster.vega.scene.transformedBounds
 import kotlin.math.ceil
 import kotlin.math.floor
 import kotlin.math.sqrt
+import kotlinx.datetime.TimeZone
 
 /**
  * The rectangles legend placement measures against.
@@ -500,6 +502,10 @@ internal class LegendBuilder(
     val outline = symbolOutline(spec)
 
     val sizes = entries.map { symbolSizeFor(spec, it.value, declaredSize) }
+    // A legend over a *shape* scale draws each entry with the shape that scale gives it, rather
+    // than one symbol repeated down the column. The legend exists to say which outline means which
+    // category, so a column of identical circles is not a smaller version of the right answer.
+    val shapes = entries.map { symbolShapeFor(spec, it.value, shape) }
     // A `strokeWidth` scale widens the swatch's outline per entry — and upstream's row-height
     // expression reads that scale, not the `symbolStrokeWidth` property, so a legend keyed to it
     // has
@@ -549,10 +555,11 @@ internal class LegendBuilder(
           x = anchor * 0.5 + symbolOffset,
           y = centre,
           size = sizes[index],
-          shape = shape,
+          // A legend over a *shape* scale draws each entry with the shape that scale gives it.
+          shape = shapes[index],
           customPath = outline,
           fill =
-            symbolFill(spec, entry.value)?.let { fill ->
+            symbolFill(spec, entry)?.let { fill ->
               // `fillOpacity` fades what is inside the swatch and leaves its outline alone, which
               // is not what `symbolOpacity` does — that fades both. There is no property for the
               // first, so it comes from the encode block or not at all.
@@ -566,7 +573,10 @@ internal class LegendBuilder(
           // that dims when its series is deselected writes a conditional rule here, and there is no
           // property that could express one.
           opacity =
-            entryNumber(spec, "symbols", "opacity", entry) ?: spec.symbolStyle.opacity ?: 1.0,
+            entryNumber(spec, "symbols", "opacity", entry)
+              ?: symbolOpacity(spec, entry.value)
+              ?: spec.symbolStyle.opacity
+              ?: 1.0,
           metadata =
             partMetadata(
               spec,
@@ -600,7 +610,17 @@ internal class LegendBuilder(
     val columns =
       numbers.resolveInt(spec.columns, scaleName)?.coerceAtLeast(1)
         ?: if (vertical) 1 else cells.size
-    return place(cells, columns, rowPadding, columnPadding, scaleName, clipHeight, spec.gridAlign)
+    return place(
+      cells,
+      entries,
+      spec,
+      columns,
+      rowPadding,
+      columnPadding,
+      scaleName,
+      clipHeight,
+      spec.gridAlign,
+    )
   }
 
   /**
@@ -611,6 +631,9 @@ internal class LegendBuilder(
    */
   private fun place(
     cells: List<List<SceneNode>>,
+    /** The entries themselves, which the row's own encode block is resolved against. */
+    entries: List<Entry>,
+    spec: LegendSpec,
     columns: Int,
     rowPadding: Double,
     columnPadding: Double,
@@ -658,9 +681,15 @@ internal class LegendBuilder(
 
     return ordered.indices.map { position ->
       val offset = offsets[position]
+      // The `entries` block paints the **row**, which is how a legend a selection is bound to
+      // catches a click anywhere along it: the fill is transparent and the group is still there.
+      val entry = entries.getOrNull(order[position])
+      val painted =
+        entry?.let { entryText(spec, "entries", "fill", it) }?.let { SceneColor.parse(it) }
       GroupNode(
         id = ids.allocate(),
         children = ordered[position],
+        fill = painted?.let { Fill.of(it) },
         transform = Transform2D.translate(offset.x, offset.y),
         // With a `clipHeight` the entry is a **clipped** box: a symbol larger than the row spills
         // out of it, and the legend is sized as though it had not. That is what the property is
@@ -682,7 +711,15 @@ internal class LegendBuilder(
 
   private fun symbolShape(spec: LegendSpec): SymbolShape? {
     val name = spec.symbolType ?: return SymbolShape.CIRCLE
-    return when (name.lowercase()) {
+    // Anything that is not one of the twelve names is an **SVG path string**, exactly as it is on a
+    // mark's `shape` channel: that is how a specification asks for a swatch upstream does not ship.
+    // The path is parsed by `symbolOutline`, which is also what decides whether to report it.
+    return namedShape(name)
+  }
+
+  /** Vega's symbol names, which a `shape` scale's range and a legend's `symbolType` both use. */
+  private fun namedShape(name: String): SymbolShape? =
+    when (name.lowercase()) {
       "circle" -> SymbolShape.CIRCLE
       "square" -> SymbolShape.SQUARE
       "cross" -> SymbolShape.CROSS
@@ -702,7 +739,6 @@ internal class LegendBuilder(
       // The path is parsed by the caller, which is also what decides whether to report it.
       else -> null
     }
-  }
 
   /**
    * A `symbolType` that is a path rather than a name, scaled to the swatch like a mark's shape.
@@ -728,6 +764,22 @@ internal class LegendBuilder(
   }
 
   /** A `size` legend takes each swatch's size from the scale; every other legend uses one size. */
+  /**
+   * The outline one legend entry draws with.
+   *
+   * A `shape` scale maps the entry's own value to a symbol name; anything else repeats the legend's
+   * `symbolType`. An unmappable value falls back to that too, rather than to a blank space.
+   */
+  private fun symbolShapeFor(
+    spec: LegendSpec,
+    value: VegaValue,
+    declared: SymbolShape,
+  ): SymbolShape {
+    val shapeScale = spec.shape?.let { scales[it] } ?: return declared
+    val mapped = (shapeScale.scale(value) as? VegaValue.Str)?.value ?: return declared
+    return namedShape(mapped) ?: declared
+  }
+
   private fun symbolSizeFor(spec: LegendSpec, value: VegaValue, declared: Double): Double {
     val sizeScale = spec.size?.let { scales[it] } ?: return declared
     val mapped = sizeScale.scale(value)
@@ -774,15 +826,35 @@ internal class LegendBuilder(
    * then overwrites the channel from the scale for every legend that maps one, so a `fill` scale
    * wins and a `size` or `shape` legend takes the stated colour. Its own default in that case is
    * `config.symbolBaseFillColor`, which is transparent — an unfilled swatch with a grey outline.
+   *
+   * A swatch's own `encode` block beats both: it is how a legend explaining *some other* channel
+   * still shows the colour its marks are drawn in.
    */
-  private fun symbolFill(spec: LegendSpec, value: VegaValue): Fill? {
+  private fun symbolFill(spec: LegendSpec, entry: Entry): Fill? {
+    entryText(spec, "symbols", "fill", entry)
+      ?.let { SceneColor.parse(it) }
+      ?.let {
+        return Fill.of(it)
+      }
     val fillScale = spec.fill?.let { scales[it] }
     if (fillScale == null) {
       val stated = spec.symbolFillColor?.let { SceneColor.parse(it) }
       return Fill.of(stated ?: SceneColor.Transparent)
     }
-    val colour = SceneColor.parse(fillScale.scale(value).asString()) ?: return null
+    val colour = SceneColor.parse(fillScale.scale(entry.value).asString()) ?: return null
     return Fill.of(colour)
+  }
+
+  /**
+   * A legend over an *opacity* scale fades each swatch by the value it stands for.
+   *
+   * The same idea as a size legend growing its swatches: the legend has to demonstrate the channel
+   * it is explaining, and a column of equally solid symbols beside a fading scale explains nothing.
+   */
+  private fun symbolOpacity(spec: LegendSpec, value: VegaValue): Double? {
+    val scale = spec.opacity?.let { scales[it] } ?: return null
+    val mapped = (scale.scale(value) as? VegaValue.Num)?.value ?: return null
+    return if (mapped.isFinite()) mapped else null
   }
 
   /**
@@ -880,7 +952,13 @@ internal class LegendBuilder(
           ),
         // `gradientOpacity` fades the whole ramp — the outline with the colours — because upstream
         // puts it on the item rather than on either paint.
-        opacity = numbers.resolve(spec.gradientOpacity, scaleName) ?: 1.0,
+        // `encode.gradient` is where a ramp's own opacity is written, and it beats the
+        // property: a legend beside a chart of translucent marks is as translucent as
+        // they are, and reading only the defaults painted it solid.
+        opacity =
+          entryNumber(spec, "gradient", "opacity", Entry(VegaValue.Null, ""))
+            ?: numbers.resolve(spec.gradientOpacity, scaleName)
+            ?: 1.0,
         metadata =
           partMetadata(
             spec,
@@ -1191,6 +1269,30 @@ internal class LegendBuilder(
   }
 
   /**
+   * How a discrete legend entry that is really an instant is written, or null when it is not one.
+   *
+   * `TimeTicks.label` is the no-specifier case, the same multi-format an axis falls back to: it
+   * chooses its own granularity per value rather than writing them all alike.
+   */
+  private fun discreteDateLabeller(spec: LegendSpec, scaleName: String): ((String) -> String)? {
+    val zone =
+      when (spec.formatType) {
+        "time" -> TimeZone.currentSystemDefault()
+        "utc" -> TimeZone.UTC
+        else -> return null
+      }
+    val specifier = spec.format ?: spec.formatExpression?.let { numbers.resolveText(it, scaleName) }
+    return { value ->
+      val instant = value.toDoubleOrNull()
+      when {
+        instant == null -> value
+        specifier == null -> TimeTicks.label(instant, zone)
+        else -> TimeFormat.format(instant, specifier, zone)
+      }
+    }
+  }
+
+  /**
    * `symbolLimit`: the most entries a symbol legend will show.
    *
    * Upstream keeps `limit - 1` of them and spends the last slot on a summary — `…12 entries` — so a
@@ -1235,14 +1337,32 @@ internal class LegendBuilder(
       return explicit.map { Entry(it, it.asString()) }
     }
     val count = numbers.resolveInt(spec.tickCount, scaleName) ?: LegendDefaults.SYMBOL_TICK_COUNT
+    // A discrete domain of *instants* is labelled as dates, which nothing about the scale can say:
+    // its values are its own categories. `formatType` is where the specification says so, and the
+    // specifier beside it may itself be computed — `timeUnitSpecifier([...])` for a bucketed one.
+    val dates = discreteDateLabeller(spec, scaleName)
+    // A scale whose `bins` name cut points has **buckets**, not values, and a symbol legend shows
+    // one swatch per bucket labelled by the interval it covers — `binValues` drops the last
+    // boundary and `formatRange` writes each entry against the next one. Ticking the scale instead
+    // drew a swatch per boundary, one more than there are buckets, each labelled with an edge.
+    val boundaries = scale.bins
+    if (boundaries != null && boundaries.size >= 2) {
+      val decimals = decimalsFor(boundaries)
+      return boundaries.dropLast(1).mapIndexed { index, low ->
+        Entry(
+          VegaValue.Num(low),
+          "${formatTickLabel(low, decimals)} – " + formatTickLabel(boundaries[index + 1], decimals),
+        )
+      }
+    }
     return when (scale) {
       // Nothing to enumerate: an identity scale has no domain of its own, so a legend over one has
       // no
       // entries rather than a made-up set of them.
       is IdentityScale -> emptyList()
-      is OrdinalScale -> scale.domain.map { Entry(VegaValue.Str(it), it) }
-      is BandScale -> scale.domain.map { Entry(VegaValue.Str(it), it) }
-      is PointScale -> scale.domain.map { Entry(VegaValue.Str(it), it) }
+      is OrdinalScale -> scale.domain.map { Entry(VegaValue.Str(it), dates?.invoke(it) ?: it) }
+      is BandScale -> scale.domain.map { Entry(VegaValue.Str(it), dates?.invoke(it) ?: it) }
+      is PointScale -> scale.domain.map { Entry(VegaValue.Str(it), dates?.invoke(it) ?: it) }
       // A legend's own `format` wins over the scale's tick labels, exactly as an axis's does: a
       // rate scale labelled `.1%` reads "10.0%" and not "0.1".
       is LinearScale -> numeric(spec, scale.ticks(count), scale.tickLabels(count), count)
