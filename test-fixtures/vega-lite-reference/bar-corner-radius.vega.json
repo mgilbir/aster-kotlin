@@ -1,0 +1,261 @@
+{
+  "$schema": "https://vega.github.io/schema/vega/v6.json",
+  "description": "Bars with a rounded end, which Vega-Lite draws by wrapping each stack in a group positioned by `y`/`y2` and marked `clip: true` — so the radius rounds the stack rather than every segment in it. That wrapper is why this fixture exists: a group is rect-like and takes its extent from `y2` as readily as from `height`, and reading only `height` made the group zero-high. Because it clips, it clipped away the very bars it was there to round: the chart drew its axes, its gridlines and its labels, and no data, with no diagnostic. A colour ramp is on it too, so the bars are distinguishable from one another and from the background in whatever draws them.",
+  "background": "white",
+  "padding": 5,
+  "width": 200,
+  "height": 120,
+  "style": "cell",
+  "data": [
+    {
+      "name": "source_0",
+      "values": [
+        {
+          "month": "Jan",
+          "rain": 62
+        },
+        {
+          "month": "Feb",
+          "rain": 48
+        },
+        {
+          "month": "Mar",
+          "rain": 31
+        },
+        {
+          "month": "Apr",
+          "rain": 18
+        }
+      ]
+    },
+    {
+      "name": "data_0",
+      "source": "source_0",
+      "transform": [
+        {
+          "type": "stack",
+          "groupby": [
+            "month"
+          ],
+          "field": "rain",
+          "sort": {
+            "field": [
+              "rain"
+            ],
+            "order": [
+              "descending"
+            ]
+          },
+          "as": [
+            "rain_start",
+            "rain_end"
+          ],
+          "offset": "zero"
+        },
+        {
+          "type": "filter",
+          "expr": "isValid(datum[\"rain\"]) && isFinite(+datum[\"rain\"])"
+        }
+      ]
+    }
+  ],
+  "marks": [
+    {
+      "type": "group",
+      "from": {
+        "facet": {
+          "data": "data_0",
+          "name": "stack_group_main",
+          "groupby": [
+            "month"
+          ],
+          "aggregate": {
+            "fields": [
+              "rain_start",
+              "rain_start",
+              "rain_end",
+              "rain_end"
+            ],
+            "ops": [
+              "min",
+              "max",
+              "min",
+              "max"
+            ]
+          }
+        }
+      },
+      "encode": {
+        "update": {
+          "x": {
+            "scale": "x",
+            "field": "month"
+          },
+          "width": {
+            "signal": "max(0.25, bandwidth('x'))"
+          },
+          "y": {
+            "signal": "min(scale('y',datum[\"min_rain_start\"]),scale('y',datum[\"max_rain_start\"]),scale('y',datum[\"min_rain_end\"]),scale('y',datum[\"max_rain_end\"]))"
+          },
+          "y2": {
+            "signal": "max(scale('y',datum[\"min_rain_start\"]),scale('y',datum[\"max_rain_start\"]),scale('y',datum[\"min_rain_end\"]),scale('y',datum[\"max_rain_end\"]))"
+          },
+          "clip": {
+            "value": true
+          },
+          "cornerRadiusTopLeft": {
+            "value": 3
+          },
+          "cornerRadiusTopRight": {
+            "value": 3
+          }
+        }
+      },
+      "marks": [
+        {
+          "type": "group",
+          "encode": {
+            "update": {
+              "y": {
+                "field": {
+                  "group": "y"
+                },
+                "mult": -1
+              },
+              "width": {
+                "field": {
+                  "group": "width"
+                }
+              }
+            }
+          },
+          "marks": [
+            {
+              "name": "marks",
+              "type": "rect",
+              "style": [
+                "bar"
+              ],
+              "from": {
+                "data": "stack_group_main"
+              },
+              "encode": {
+                "update": {
+                  "fill": {
+                    "scale": "color",
+                    "field": "rain"
+                  },
+                  "ariaRoleDescription": {
+                    "value": "bar"
+                  },
+                  "description": {
+                    "signal": "\"month: \" + (isValid(datum[\"month\"]) ? isArray(datum[\"month\"]) ? join(datum[\"month\"], ' ') : datum[\"month\"] : \"\"+datum[\"month\"]) + \"; rainfall (mm): \" + (format(datum[\"rain\"], \"\")) + \"; rain: \" + (format(datum[\"rain\"], \"\"))"
+                  },
+                  "width": {
+                    "field": {
+                      "group": "width"
+                    }
+                  },
+                  "y": {
+                    "scale": "y",
+                    "field": "rain_end"
+                  },
+                  "y2": {
+                    "scale": "y",
+                    "field": "rain_start"
+                  }
+                }
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "scales": [
+    {
+      "name": "x",
+      "type": "band",
+      "domain": {
+        "data": "data_0",
+        "field": "month"
+      },
+      "range": [
+        0,
+        {
+          "signal": "width"
+        }
+      ],
+      "paddingInner": 0.1,
+      "paddingOuter": 0.05
+    },
+    {
+      "name": "y",
+      "type": "linear",
+      "domain": {
+        "data": "data_0",
+        "fields": [
+          "rain_start",
+          "rain_end"
+        ]
+      },
+      "range": [
+        {
+          "signal": "height"
+        },
+        0
+      ],
+      "nice": true,
+      "zero": true
+    },
+    {
+      "name": "color",
+      "type": "linear",
+      "domain": {
+        "data": "data_0",
+        "field": "rain"
+      },
+      "range": "ramp",
+      "interpolate": "hcl",
+      "zero": false
+    }
+  ],
+  "axes": [
+    {
+      "scale": "y",
+      "orient": "left",
+      "gridScale": "x",
+      "grid": true,
+      "tickCount": {
+        "signal": "ceil(height/40)"
+      },
+      "domain": false,
+      "labels": false,
+      "aria": false,
+      "maxExtent": 0,
+      "minExtent": 0,
+      "ticks": false,
+      "zindex": 0
+    },
+    {
+      "scale": "x",
+      "orient": "bottom",
+      "grid": false,
+      "title": "month",
+      "labelAngle": 0,
+      "labelBaseline": "top",
+      "zindex": 0
+    },
+    {
+      "scale": "y",
+      "orient": "left",
+      "grid": false,
+      "title": "rainfall (mm)",
+      "labelOverlap": true,
+      "tickCount": {
+        "signal": "ceil(height/40)"
+      },
+      "zindex": 0
+    }
+  ]
+}
