@@ -53,6 +53,12 @@ jobs:
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
 
+      - name: Record upstream's test vectors
+        # `check.sh` says it will skip the replays without these, but the replay guards also assert
+        # the harness has not *shrunk* — `replayed >= 60` — so on a fresh clone they fail rather than
+        # skip. The vectors are gitignored by design, being derived, so CI records them first.
+        run: ./scripts/record-upstream-vectors.sh
+
       - name: Check
         run: ./scripts/check.sh
 
