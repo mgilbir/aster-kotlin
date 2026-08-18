@@ -646,6 +646,10 @@ public final class dev/aster/vega/model/spec/ConditionalRule {
 	public fun toString ()Ljava/lang/String;
 }
 
+public final class dev/aster/vega/model/spec/ConfigMergeKt {
+	public static final fun mergeConfig ([Ldev/aster/vega/model/VegaValue;)Ljava/util/Map;
+}
+
 public final class dev/aster/vega/model/spec/DataSpec {
 	public fun <init> (Ljava/lang/String;Ljava/util/List;Ldev/aster/vega/model/VegaValue;Ljava/lang/String;Ljava/lang/String;Ljava/util/List;Ljava/util/List;Ljava/util/Map;ZLjava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/util/List;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)V
 	public synthetic fun <init> (Ljava/lang/String;Ljava/util/List;Ldev/aster/vega/model/VegaValue;Ljava/lang/String;Ljava/lang/String;Ljava/util/List;Ljava/util/List;Ljava/util/Map;ZLjava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/util/List;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;ILkotlin/jvm/internal/DefaultConstructorMarker;)V

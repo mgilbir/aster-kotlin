@@ -698,6 +698,8 @@ ConditionalRule.init(test:production:)
 ConditionalRule.isEqual(_:)
 ConditionalRule.production
 ConditionalRule.test
+ConfigMergeKt
+ConfigMergeKt.mergeConfig(configs:)
 Corners
 Corners.Companion
 Corners.Companion.init()
@@ -3770,7 +3772,7 @@ SpecCompiler.Companion.shared
 SpecCompiler.companion
 SpecCompiler.compile(spec:signalOverrides:itemEncodes:)
 SpecCompiler.compileJson(json:signalOverrides:itemEncodes:)
-SpecCompiler.init(textEngine:loader:randomSeed:clock:locale:)
+SpecCompiler.init(textEngine:loader:randomSeed:clock:locale:hostConfig:)
 SpecParser
 SpecParser.init()
 SpecParser.parse(root:)
@@ -4381,7 +4383,7 @@ VegaChartController.contentScale
 VegaChartController.diagnostics
 VegaChartController.dispatch(event:)
 VegaChartController.events
-VegaChartController.init(initialScene:textEngine:clock:loader:scheduler:locale:)
+VegaChartController.init(initialScene:textEngine:clock:loader:scheduler:locale:hostConfig:)
 VegaChartController.inputs
 VegaChartController.lastCompiled
 VegaChartController.report(diagnostic:)
@@ -4429,7 +4431,7 @@ VegaLiteCompilation.vega
 VegaLiteCompiler
 VegaLiteCompiler.compile(spec:)
 VegaLiteCompiler.compileJson(json:)
-VegaLiteCompiler.init()
+VegaLiteCompiler.init(hostConfig:)
 VegaLiteConversion
 VegaLiteConversion.description()
 VegaLiteConversion.diagnostics
@@ -4567,7 +4569,7 @@ curve(points:kind:horizontal:tension:partOfArea:)
 toSvg(options:)
 toSvg(options:).displayLine(line:measure:)
 toSvg(options:).displayLines(measure:)
-toVega(json:)
+toVega(json:hostConfig:)
 transformedBy(transform:)
 transformedBy(transform:).findNode(id:)
 transformedBy(transform:).flatten()

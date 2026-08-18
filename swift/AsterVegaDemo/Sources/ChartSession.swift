@@ -57,7 +57,8 @@ final class ChartSession {
     clock: { KotlinLong(value: Int64(Date().timeIntervalSince1970 * 1000)) },
     loader: SpecLibrary.loader,
     scheduler: nil,
-    locale: VegaLocale.Companion.shared.EnglishUS
+    locale: VegaLocale.Companion.shared.EnglishUS,
+    hostConfig: nil
   )
 
   private var json = ""
@@ -124,7 +125,7 @@ final class ChartSession {
       // **Either grammar.** Translating Vega-Lite is a compile of its own, so it happens here rather
       // than on the main actor, for the same reason the engine's own compile does. A specification
       // that is already Vega passes straight through untouched.
-      let converted = VegaLiteInput.shared.toVega(json: specification)
+      let converted = VegaLiteInput.shared.toVega(json: specification, hostConfig: nil)
       self.grammar = converted.wasVegaLite ? "read as Vega-Lite and compiled" : "read as Vega"
       self.vegaLiteDiagnostics = converted.wasVegaLite ? converted.diagnostics : []
       // Falling back to the text as written where Vega-Lite compilation produced nothing: the runtime

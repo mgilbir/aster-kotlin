@@ -2717,6 +2717,7 @@ final fun (dev.aster.vega.model/VegaValue).dev.aster.vega.model/asNumberOrNull()
 final fun (dev.aster.vega.model/VegaValue).dev.aster.vega.model/asString(): kotlin/String // dev.aster.vega.model/asString|asString@dev.aster.vega.model.VegaValue(){}[0]
 final fun (dev.aster.vega.model/VegaValue).dev.aster.vega.model/field(kotlin/String): dev.aster.vega.model/VegaValue // dev.aster.vega.model/field|field@dev.aster.vega.model.VegaValue(kotlin.String){}[0]
 final fun (kotlinx.serialization.json/JsonElement).dev.aster.vega.model/toVegaValue(): dev.aster.vega.model/VegaValue // dev.aster.vega.model/toVegaValue|toVegaValue@kotlinx.serialization.json.JsonElement(){}[0]
+final fun dev.aster.vega.model.spec/mergeConfig(kotlin/Array<out dev.aster.vega.model/VegaValue?>...): dev.aster.vega.model/VegaValue.Obj? // dev.aster.vega.model.spec/mergeConfig|mergeConfig(kotlin.Array<out|dev.aster.vega.model.VegaValue?>...){}[0]
 final fun dev.aster.vega.model/canonicalNumberString(kotlin/Double, kotlin/Int = ...): kotlin/String // dev.aster.vega.model/canonicalNumberString|canonicalNumberString(kotlin.Double;kotlin.Int){}[0]
 final fun dev.aster.vega.model/finiteOr(kotlin/Double, kotlin/Double = ...): kotlin/Double // dev.aster.vega.model/finiteOr|finiteOr(kotlin.Double;kotlin.Double){}[0]
 final fun dev.aster.vega.model/normalizeZero(kotlin/Double): kotlin/Double // dev.aster.vega.model/normalizeZero|normalizeZero(kotlin.Double){}[0]
