@@ -1,0 +1,292 @@
+name: Release
+
+# Publishes the artifacts for a version tag. The tag is the trigger, so the released bits are always
+# exactly what was tagged.
+#
+# Three jobs, because the work has three homes:
+#
+#   verify   Linux. The suite that does not need a Mac, and the oracles that regenerate upstream's
+#            own output and compare against it. No reason to pay macOS rates for it.
+#   publish  macOS. The only host that can compile every target: Apple targets need Xcode, and
+#            Kotlin/Native cross-compiles the Linux target from macOS, so one host produces the
+#            complete set. `ktecma262` 0.1.2 was built on Linux and shipped with no native variants.
+#   release  Linux. Makes the release page from the changelog and attaches the XCFramework.
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    name: Verify (Linux)
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      - name: Set up node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Check the tag matches the project version
+        # Guards against tagging v0.2.0 while the build still says 0.1.0, which would publish
+        # artifacts that disagree with their own tag.
+        run: |
+          set -euo pipefail
+          if [ "$GITHUB_EVENT_NAME" != "push" ]; then
+            echo "Manual run; skipping tag/version comparison."
+            exit 0
+          fi
+          tag="${GITHUB_REF_NAME#v}"
+          version=$(sed -n 's/^version = "\(.*\)"$/\1/p' build.gradle.kts)
+          if [ "$tag" != "$version" ]; then
+            echo "::error::Tag ${GITHUB_REF_NAME} does not match project version ${version}."
+            exit 1
+          fi
+          echo "Tag ${GITHUB_REF_NAME} matches project version ${version}."
+
+      - name: Check the changelog has a section for this version
+        # Fails here rather than after publishing, when the release notes are the only thing left and
+        # the artifacts are already immutable.
+        run: |
+          set -euo pipefail
+          version=$(sed -n 's/^version = "\(.*\)"$/\1/p' build.gradle.kts)
+          ./.github/scripts/changelog-section.sh "$version" > /dev/null
+          echo "CHANGELOG.md has a section for $version."
+
+      - name: Check
+        # A release is never published from a red build. This is the gate the repository uses, which
+        # compiles every target and runs the JVM and native suites.
+        run: ./scripts/check.sh
+
+      - name: Differential tests against upstream Vega
+        # Regenerates upstream's own scenes with the pinned Vega and compares. The point of the
+        # project, so it gates the release.
+        run: ./scripts/oracle.sh
+
+      - name: Differential tests against upstream Vega-Lite
+        run: ./scripts/vega-lite-oracle.sh
+
+  publish:
+    name: Build and publish (macOS)
+    needs: verify
+    runs-on: macos-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Build every target
+        run: ./gradlew build --stacktrace
+
+      - name: Check every declared target is in the module metadata
+        # The check that would have caught `ktecma262` 0.1.2: a host that cannot build a target
+        # silently drops its variant, and the artifact publishes anyway pointing at nothing.
+        run: ./gradlew verifyPublishedVariants
+
+      - name: Publish to Maven Central
+        env:
+          CENTRAL_TOKEN_USERNAME: ${{ secrets.CENTRAL_TOKEN_USERNAME }}
+          CENTRAL_TOKEN_PASSWORD: ${{ secrets.CENTRAL_TOKEN_PASSWORD }}
+          MAVEN_GPG_PRIVATE_KEY: ${{ secrets.MAVEN_GPG_PRIVATE_KEY }}
+          MAVEN_GPG_PASSPHRASE: ${{ secrets.MAVEN_GPG_PASSPHRASE }}
+        run: |
+          set -euo pipefail
+          if [ -z "${CENTRAL_TOKEN_USERNAME:-}" ] || [ -z "${MAVEN_GPG_PRIVATE_KEY:-}" ]; then
+            echo "::notice::Maven Central credentials or signing key not configured;"
+            echo "::notice::skipping publish. See the Releasing section of README.md."
+            exit 0
+          fi
+          version=$(sed -n 's/^version = "\(.*\)"$/\1/p' build.gradle.kts)
+
+          # One bundle holding every publication, checked before it leaves the runner. Uploading
+          # publications separately lets the server assemble the deployment from whatever it believes
+          # arrived; for `ktecma262` 0.1.3 it assembled four modules out of seven, and the ones it
+          # dropped had uploaded successfully and were never reported as failures.
+          ./gradlew centralBundle verifyCentralBundle --no-configuration-cache
+          bundle="build/distributions/aster-kotlin-$version-bundle.zip"
+          modules="build/central-bundle/io/github/mgilbir/astervega"
+          echo "Modules in the bundle:"
+          ls "$modules" | sed 's/^/  /'
+
+          # Bearer credential is base64("user:pass"). Masked immediately and passed to curl on stdin,
+          # so it never appears in a process argument.
+          auth=$(printf '%s:%s' "$CENTRAL_TOKEN_USERNAME" "$CENTRAL_TOKEN_PASSWORD" | base64 | tr -d '\n')
+          echo "::add-mask::$auth"
+          hdr() { printf 'header = "Authorization: Bearer %s"\n' "$auth"; }
+
+          # publishingType=USER_MANAGED: the Portal validates and waits. Releasing to Central is
+          # irreversible, so it stays a decision rather than a side effect of pushing a tag.
+          id=$(hdr | curl -sS -K - --fail-with-body -X POST \
+            --form "bundle=@$bundle" \
+            "https://central.sonatype.com/api/v1/publisher/upload?name=aster-kotlin%20$version&publishingType=USER_MANAGED")
+          echo "Deployment $id"
+
+          for _ in $(seq 1 60); do
+            hdr | curl -sS -K - -X POST \
+              "https://central.sonatype.com/api/v1/publisher/status?id=$id" > status.json
+            state=$(python3 -c "import json;print(json.load(open('status.json'))['deploymentState'])")
+            echo "  state: $state"
+            case "$state" in
+              VALIDATED|PUBLISHING|PUBLISHED) break ;;
+              FAILED)
+                echo "::error::Deployment $id failed validation."
+                cat status.json
+                exit 1
+                ;;
+            esac
+            sleep 10
+          done
+
+          # The upload returning 200 says nothing about what the deployment contains.
+          .github/scripts/check-deployment.py status.json "$modules"
+          rm -f status.json
+
+          echo "Release it at https://central.sonatype.com/publishing/deployments"
+
+      - name: Build the XCFramework for Swift
+        # Release rather than debug: this is the binary a Swift Package Manager consumer downloads.
+        run: ./gradlew :vega-runtime:assembleAsterVegaReleaseXCFramework
+
+      - name: Collect artifacts
+        run: |
+          set -euo pipefail
+          version=$(sed -n 's/^version = "\(.*\)"$/\1/p' build.gradle.kts)
+          mkdir -p artifacts
+
+          # Zipped at the top of the XCFramework directory, because that is what `binaryTarget`
+          # expects to unpack — a zip of the parent directory resolves to a path SwiftPM cannot find.
+          xc=vega-runtime/build/XCFrameworks/release/AsterVega.xcframework
+          test -d "$xc" || { echo "::error::no XCFramework at $xc"; exit 1; }
+          ( cd "$(dirname "$xc")" && zip -qry "AsterVega-$version.xcframework.zip" AsterVega.xcframework )
+          mv "$(dirname "$xc")/AsterVega-$version.xcframework.zip" artifacts/
+
+          # The checksum SwiftPM verifies. Written beside the zip so the release page carries both.
+          ( cd artifacts && shasum -a 256 "AsterVega-$version.xcframework.zip" | cut -d' ' -f1 \
+              > "AsterVega-$version.xcframework.zip.sha256" )
+          echo "checksum: $(cat "artifacts/AsterVega-$version.xcframework.zip.sha256")"
+
+          # klibs as well as jars: the native targets produce no jar, and attaching only jars would
+          # make the release page look JVM-only.
+          find . -path ./artifacts -prune -o \
+            \( -name '*.jar' -o -name '*.klib' \) -path '*/build/libs/*' -print \
+            -exec cp {} artifacts/ \; | wc -l
+          ls -la artifacts/
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: aster-kotlin-artifacts
+          path: artifacts/
+          retention-days: 90
+
+  release:
+    name: GitHub release
+    needs: publish
+    # Only a tag names a version to release. A manual run publishes to Central but has no tag to hang
+    # a release page on.
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    permissions:
+      # The only job that writes to the repository: the release page, and the Package.swift commit.
+      contents: write
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: aster-kotlin-artifacts
+          path: artifacts
+
+      - name: Create the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          version="${GITHUB_REF_NAME#v}"
+
+          # Notes come from the changelog, so the release page and the file in the repository cannot
+          # drift apart.
+          ./.github/scripts/changelog-section.sh "$version" > notes.md
+          {
+            echo ""
+            echo "## Using it"
+            echo ""
+            echo "Gradle — every module is on Maven Central under \`io.github.mgilbir.astervega\`:"
+            echo ""
+            echo '```kotlin'
+            echo "implementation(\"io.github.mgilbir.astervega:vega-runtime:$version\")"
+            echo "implementation(\"io.github.mgilbir.astervega:vega-lite:$version\")"
+            echo '```'
+            echo ""
+            echo "Swift Package Manager — the XCFramework is attached below."
+            echo "\`Package.swift\` on \`main\` points at it; see the note there about why a tag's"
+            echo "manifest names the previous release's binary."
+          } >> notes.md
+
+          if gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1; then
+            gh release edit "$GITHUB_REF_NAME" --notes-file notes.md --latest
+            gh release upload "$GITHUB_REF_NAME" artifacts/* --clobber
+          else
+            gh release create "$GITHUB_REF_NAME" \
+              --title "Aster Vega $version" \
+              --notes-file notes.md \
+              --latest \
+              artifacts/*
+          fi
+          echo "https://github.com/${GITHUB_REPOSITORY}/releases/tag/${GITHUB_REF_NAME}"
+
+      - name: Point Package.swift at the published XCFramework
+        # After the asset exists, because a checksum cannot be computed before it does. This is why a
+        # tag's own manifest names the previous release's binary, and why Swift consumers track `main`.
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          version="${GITHUB_REF_NAME#v}"
+          checksum=$(cat "artifacts/AsterVega-$version.xcframework.zip.sha256")
+          python3 - "$version" "$checksum" <<'PY'
+          import re, sys
+          version, checksum = sys.argv[1], sys.argv[2]
+          text = open("Package.swift", encoding="utf-8").read()
+          text = re.sub(r'let version = "[^"]*"', f'let version = "{version}"', text)
+          text = re.sub(r'let checksum = "[^"]*"', f'let checksum = "{checksum}"', text)
+          open("Package.swift", "w", encoding="utf-8").write(text)
+          PY
+          if git diff --quiet Package.swift; then
+            echo "Package.swift already points at $version."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add Package.swift
+          git commit -m "Point Package.swift at the $version XCFramework
+
+          Written by the release workflow once the asset exists, a checksum not being
+          knowable before then."
+          git push origin HEAD:main
