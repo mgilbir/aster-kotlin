@@ -1,5 +1,8 @@
 import com.diffplug.gradle.spotless.SpotlessExtension
+import org.gradle.api.publish.maven.tasks.AbstractPublishToMaven
+import org.gradle.api.publish.maven.tasks.PublishToMavenRepository
 import org.gradle.api.tasks.PathSensitivity
+import org.gradle.plugins.signing.Sign
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 import org.jetbrains.kotlin.gradle.dsl.KotlinJvmProjectExtension
 import org.jetbrains.kotlin.gradle.dsl.KotlinMultiplatformExtension
@@ -12,6 +15,14 @@ import org.jetbrains.kotlin.gradle.targets.jvm.KotlinJvmTarget
  * bug that only shows up away from UTC, or only across a transition, shows up here.
  */
 val TEST_TIME_ZONE = "Europe/Amsterdam"
+
+/**
+ * The version every publishable module carries, and the one a release tag has to match.
+ *
+ * One place, because eleven modules publishing at eleven versions is not a release. The release
+ * workflow reads this line, so its shape matters: `version = "x.y.z"` at the top level.
+ */
+version = "0.1.0"
 
 plugins {
   alias(libs.plugins.android.application) apply false
@@ -190,6 +201,253 @@ tasks.register("updateGoldens") {
   doFirst {
     throw GradleException(
       "Run as: ./gradlew test -PupdateGoldens=true --rerun-tasks (see PROJECT_BRIEF.md 18.3)"
+    )
+  }
+}
+
+// ----------------------------------------------------------------- publishing
+
+/**
+ * Publishing, applied to every module that is a library rather than an app or a fixture.
+ *
+ * The shape here is `ktecma262`'s, and it is that shape because of two releases that went wrong
+ * there. Both failures were silent — the upload succeeded and the artifacts were immutable on
+ * Central before anyone noticed — so the checks that came out of them are the point of this file
+ * rather than an embellishment on it.
+ *
+ * What differs is that this project has **eleven** publishable modules where that one had a single
+ * module with several targets. So the bundle is assembled across projects, and both checks run per
+ * project: a module missing from the bundle is exactly the failure mode being guarded against, and
+ * eleven modules is eleven chances to hit it.
+ */
+
+/** Build-relative directory the Central Portal bundle is staged in, under the root project. */
+val centralBundleDir = "central-bundle"
+
+/** Modules that are libraries someone consumes. `demo`, `benchmark` and `test-fixtures` are not. */
+val publishable =
+  setOf(
+    "vega-model",
+    "vega-expression",
+    "vega-dataflow",
+    "vega-scene",
+    "vega-svg",
+    "vega-runtime",
+    "vega-lite",
+    "vega-loader",
+    "vega-compose-multiplatform",
+    "vega-compose",
+    "vega-android-canvas",
+  )
+
+/** What each module is, for its POM. A description that says "part of Aster Vega" says nothing. */
+val descriptions =
+  mapOf(
+    "vega-model" to
+      "The Vega specification as Kotlin types, with the JSON value model the whole engine reads.",
+    "vega-expression" to
+      "Vega's expression language: parser and evaluator for the expressions a specification writes.",
+    "vega-dataflow" to
+      "Vega's dataflow: the transforms, scales, geographic projections and layouts a chart derives.",
+    "vega-scene" to
+      "The scene graph a compiled chart becomes — marks, paints, transforms and text layout.",
+    "vega-svg" to
+      "Serialises a compiled Aster Vega scene to SVG, the way Vega's own renderer does.",
+    "vega-runtime" to
+      "Compiles a Vega specification to a scene, and runs the interactions it declares.",
+    "vega-lite" to
+      "Compiles Vega-Lite to Vega in Kotlin, checked property by property against upstream's own " +
+        "compiler.",
+    "vega-loader" to "Loads a specification's data from the filesystem or the network, on the JVM.",
+    "vega-compose-multiplatform" to
+      "Draws an Aster Vega scene with Compose Multiplatform, on Android, iOS and the desktop.",
+    "vega-compose" to "Draws an Aster Vega scene with Jetpack Compose on Android.",
+    "vega-android-canvas" to
+      "Draws an Aster Vega scene straight onto an Android Canvas, with accessibility nodes.",
+  )
+
+configure(subprojects.filter { it.name in publishable }) {
+  apply(plugin = "maven-publish")
+  apply(plugin = "signing")
+
+  // Captured, because inside the publication and repository blocks below the receiver is no longer
+  // the project.
+  val moduleName = name
+  val bundleTree = java.io.File(rootProject.layout.buildDirectory.get().asFile, centralBundleDir)
+
+  group = "io.github.mgilbir.astervega"
+  version = rootProject.version
+
+  // Maven Central requires a javadoc artifact. The API documentation is KDoc on the source, which
+  // the sources jar already carries, so this is a placeholder rather than a second copy of it.
+  val javadocJar by tasks.registering(Jar::class) { archiveClassifier.set("javadoc") }
+
+  extensions.configure<PublishingExtension> {
+    publications.withType<MavenPublication>().configureEach {
+      artifact(javadocJar)
+      pom {
+        name.set(moduleName)
+        description.set(
+          descriptions[moduleName]
+            ?: error("no POM description for $moduleName; add one to `descriptions` above")
+        )
+        url.set("https://github.com/mgilbir/aster-kotlin")
+        licenses {
+          license {
+            // BSD 3-Clause, because this is a port of Vega and a port is a derivative work.
+            name.set("BSD 3-Clause License")
+            url.set("https://github.com/mgilbir/aster-kotlin/blob/main/LICENSE")
+            distribution.set("repo")
+          }
+        }
+        developers {
+          developer {
+            id.set("mgilbir")
+            name.set("Miguel Eduardo Gil Biraud")
+            url.set("https://github.com/mgilbir")
+          }
+        }
+        scm {
+          url.set("https://github.com/mgilbir/aster-kotlin")
+          connection.set("scm:git:https://github.com/mgilbir/aster-kotlin.git")
+          developerConnection.set("scm:git:ssh://git@github.com/mgilbir/aster-kotlin.git")
+        }
+      }
+    }
+
+    repositories {
+      // A local directory under the **root** project, not a remote server, and shared by every
+      // module so that one bundle holds the whole release.
+      //
+      // Uploading publications separately to the staging API means the server assembles the
+      // deployment from whatever it believes arrived. In `ktecma262` 0.1.3 it assembled four
+      // modules out of seven: the ones it dropped uploaded successfully and were never reported as
+      // failures. There is no way to see that from the upload side. So publish into a tree, zip it,
+      // and hand the Portal one bundle containing exactly what this build produced.
+      maven {
+        name = "centralBundle"
+        url = bundleTree.toURI()
+      }
+    }
+  }
+
+  extensions.configure<SigningExtension> {
+    // Required by Central, irrelevant locally, so it switches itself on only when a key is given.
+    // An ASCII-armoured private key straight from the environment: never written to disk, never a
+    // Gradle property.
+    val key = providers.environmentVariable("MAVEN_GPG_PRIVATE_KEY").orNull
+    val password = providers.environmentVariable("MAVEN_GPG_PASSPHRASE").orNull?.trim()
+    if (!key.isNullOrBlank()) {
+      useInMemoryPgpKeys(key, password)
+      sign(extensions.getByType<PublishingExtension>().publications)
+    }
+  }
+
+  // Gradle cannot infer that each publication's signing task needs the shared javadoc jar first.
+  tasks.withType<AbstractPublishToMaven>().configureEach { dependsOn(tasks.withType<Sign>()) }
+}
+
+/**
+ * The modules the convention publishes. Kept in step by `verifyCentralBundle` failing otherwise.
+ */
+val publishedModules =
+  subprojects.filter { it.plugins.hasPlugin("maven-publish") }.map { it.name }.sorted()
+
+/**
+ * The staging directory accumulates, so a previous version's files would ride along in the next
+ * bundle. Cleared before anything publishes into it.
+ */
+val cleanCentralBundle by
+  tasks.registering(Delete::class) {
+    delete(java.io.File(layout.buildDirectory.get().asFile, centralBundleDir))
+  }
+
+/**
+ * The single zip uploaded to the Central Portal.
+ *
+ * One bundle per deployment, laid out as a Maven repository, so what is uploaded is what is
+ * published — there is no server-side assembly step that can quietly leave a module out.
+ */
+// Each publish task waits for the clean, rather than the zip doing so. Hung off the zip, with
+// `org.gradle.parallel=true` in gradle.properties, the delete races the tasks filling the tree — it
+// failed intermittently exactly that way before this was moved.
+subprojects
+  .filter { it.plugins.hasPlugin("maven-publish") }
+  .forEach { module ->
+    module.tasks.withType<PublishToMavenRepository>().configureEach {
+      if (name.endsWith("ToCentralBundleRepository")) dependsOn(cleanCentralBundle)
+    }
+  }
+
+val centralBundle by
+  tasks.registering(Zip::class) {
+    group = "publishing"
+    description = "Build the Maven Central Portal upload bundle for every published module"
+    subprojects
+      .filter { it.plugins.hasPlugin("maven-publish") }
+      .forEach { dependsOn("${it.path}:publishAllPublicationsToCentralBundleRepository") }
+    from(java.io.File(layout.buildDirectory.get().asFile, centralBundleDir))
+    archiveFileName.set("aster-kotlin-$version-bundle.zip")
+    destinationDirectory.set(layout.buildDirectory.dir("distributions"))
+  }
+
+/**
+ * Checks the bundle before it is uploaded.
+ *
+ * Every module has to be present, each with a POM and Gradle module metadata, and — when signing is
+ * on — a detached signature beside each file. A module missing here is a module the Portal would
+ * have published without it, which is the failure this whole arrangement exists to prevent.
+ */
+val verifyCentralBundle by tasks.registering {
+  group = "verification"
+  description = "Check the upload bundle holds every module, with metadata and signatures"
+  dependsOn(centralBundle)
+  val tree =
+    java.io.File(
+      layout.buildDirectory.get().asFile,
+      "$centralBundleDir/io/github/mgilbir/astervega",
+    )
+  val expected = publishedModules
+  val signed =
+    providers.environmentVariable("MAVEN_GPG_PRIVATE_KEY").map { it.isNotBlank() }.orElse(false)
+
+  doLast {
+    val root = tree
+    check(root.isDirectory) { "no bundle tree at ${root.path}" }
+    val present = root.listFiles().orEmpty().filter { it.isDirectory }.map { it.name }.sorted()
+    check(present.isNotEmpty()) { "the bundle is empty — the check would pass vacuously" }
+
+    // A module in the build but not in the bundle is the 0.1.3 failure, locally and before upload.
+    //
+    // Matched **exactly**, not by prefix. A Kotlin Multiplatform module publishes a root
+    // `<name>` beside a `<name>-<target>` for each target, so a prefix test looks right — and
+    // `vega-compose` then passes on the strength of `vega-compose-multiplatform` being there,
+    // which is how this check first reported eleven modules present when nine were.
+    val missing = expected.filterNot { module -> module in present }
+    check(missing.isEmpty()) {
+      "not in the bundle: ${missing.joinToString(", ")}\nPresent: ${present.joinToString(", ")}"
+    }
+
+    var files = 0
+    for (module in present) {
+      val versions = File(root, module).listFiles().orEmpty().filter { it.isDirectory }
+      check(versions.isNotEmpty()) { "$module has no version directory" }
+      for (dir in versions) {
+        val names = dir.listFiles().orEmpty().map { it.name }
+        files += names.size
+        fun requireOne(suffix: String) =
+          check(names.any { it.endsWith(suffix) }) { "$module/${dir.name}: no *$suffix" }
+        requireOne(".pom")
+        requireOne(".module")
+        if (signed.get()) {
+          requireOne(".pom.asc")
+          requireOne(".module.asc")
+        }
+      }
+    }
+    logger.lifecycle(
+      "bundle holds ${present.size} modules, $files files" +
+        if (signed.get()) ", signed" else " (unsigned — no signing key configured)"
     )
   }
 }
