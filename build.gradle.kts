@@ -6,7 +6,69 @@ import org.gradle.plugins.signing.Sign
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 import org.jetbrains.kotlin.gradle.dsl.KotlinJvmProjectExtension
 import org.jetbrains.kotlin.gradle.dsl.KotlinMultiplatformExtension
+import org.jetbrains.kotlin.gradle.dsl.abi.ExperimentalAbiValidation
 import org.jetbrains.kotlin.gradle.targets.jvm.KotlinJvmTarget
+
+/**
+ * Modules that are libraries someone consumes, and so publish and carry an ABI dump.
+ *
+ * `demo` is an app, `benchmark` is a harness and `test-fixtures` is scaffolding consumed by tests;
+ * none of the three is anybody's dependency.
+ */
+val publishable =
+  setOf(
+    "vega-model",
+    "vega-expression",
+    "vega-dataflow",
+    "vega-scene",
+    "vega-svg",
+    "vega-runtime",
+    "vega-lite",
+    "vega-loader",
+    "vega-compose-multiplatform",
+    "vega-compose",
+    "vega-android-canvas",
+  )
+
+/**
+ * Turns on ABI validation and points its dump at `api/`, for a module someone depends on.
+ *
+ * Eleven modules are published, every one applies `explicitApi()`, and nothing made a change to
+ * what they expose *visible*: a removed function or a widened signature reached a consumer's build
+ * rather than this repository's diff. `checkLegacyAbi` runs as part of `check`; `./gradlew
+ * updateLegacyAbi` rewrites the dumps, and that diff is reviewed as a change to the surface other
+ * people compile against.
+ *
+ * Kotlin's own ABI validation rather than the `binary-compatibility-validator` plugin an external
+ * review asked for, which writes the same `.api` format. Two reasons. It covers the **klib** ABI of
+ * the native targets as well as the JVM one, and a klib is what an iOS consumer links against. And
+ * the plugin keys off the Kotlin plugin ids, which `vega-compose` and `vega-android-canvas` do not
+ * apply: since AGP 9 their Kotlin support comes from `KotlinBaseApiPlugin`, applied by the Android
+ * plugin itself, so the plugin creates no tasks for them at all.
+ *
+ * **Those two are not covered by this either, and the reason is worth writing down.** Kotlin's ABI
+ * validation reads a module's Maven publications, which for an Android library it does not support
+ * — KGP even has a diagnostic named for it, `AbiValidationAndroidPublicationNotSupported` — and
+ * pointing it at the main compilation instead leaves a provider with no value. So the nine modules
+ * that can be dumped are dumped, and the two Android presentation layers are a stated gap rather
+ * than a silent one. Their surface is small (`VegaChartView`, the `VegaChart` composable and their
+ * options) and it is the one place a consumer has to read the diff by hand.
+ *
+ * The API is `@ExperimentalAbiValidation` and says so. The tasks are `checkLegacyAbi` and
+ * `updateLegacyAbi`; the dumps land under each module's `api/`.
+ */
+@OptIn(ExperimentalAbiValidation::class)
+fun KotlinMultiplatformExtension.enableAbiDump() {
+  // Calling it is what turns it on: in Kotlin 2.4 the `enabled` property and the `klib { }` block
+  // are
+  // both gone, and a klib dump is produced for every klib target there is.
+  abiValidation()
+}
+
+@OptIn(ExperimentalAbiValidation::class)
+fun KotlinJvmProjectExtension.enableAbiDump() {
+  abiValidation()
+}
 
 /**
  * The zone every test runs in.
@@ -77,6 +139,7 @@ subprojects {
     extensions.configure<KotlinMultiplatformExtension> {
       compilerOptions { allWarningsAsErrors.set(true) }
       explicitApi()
+      if (name in publishable) enableAbiDump()
       // Bytecode level, not a toolchain: the same JDK builds everything, and 17 is what the Android
       // modules consume. Asking for a 17 *toolchain* would demand a second JDK on every machine
       // that builds this for no gain.
@@ -124,6 +187,7 @@ subprojects {
         allWarningsAsErrors.set(true)
       }
       explicitApi()
+      if (name in publishable) enableAbiDump()
     }
 
     extensions.configure<JavaPluginExtension> {
@@ -223,22 +287,6 @@ tasks.register("updateGoldens") {
 
 /** Build-relative directory the Central Portal bundle is staged in, under the root project. */
 val centralBundleDir = "central-bundle"
-
-/** Modules that are libraries someone consumes. `demo`, `benchmark` and `test-fixtures` are not. */
-val publishable =
-  setOf(
-    "vega-model",
-    "vega-expression",
-    "vega-dataflow",
-    "vega-scene",
-    "vega-svg",
-    "vega-runtime",
-    "vega-lite",
-    "vega-loader",
-    "vega-compose-multiplatform",
-    "vega-compose",
-    "vega-android-canvas",
-  )
 
 /** What each module is, for its POM. A description that says "part of Aster Vega" says nothing. */
 val descriptions =

@@ -1,0 +1,72 @@
+public final class dev/aster/vega/svg/SvgDocument {
+	public fun <init> (Ljava/lang/String;Ljava/util/List;)V
+	public final fun component1 ()Ljava/lang/String;
+	public final fun component2 ()Ljava/util/List;
+	public final fun copy (Ljava/lang/String;Ljava/util/List;)Ldev/aster/vega/svg/SvgDocument;
+	public static synthetic fun copy$default (Ldev/aster/vega/svg/SvgDocument;Ljava/lang/String;Ljava/util/List;ILjava/lang/Object;)Ldev/aster/vega/svg/SvgDocument;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getSvg ()Ljava/lang/String;
+	public final fun getWarnings ()Ljava/util/List;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class dev/aster/vega/svg/SvgExportWarning {
+	public fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)V
+	public final fun component1 ()Ljava/lang/String;
+	public final fun component2 ()Ljava/lang/String;
+	public final fun component3 ()Ljava/lang/String;
+	public final fun copy (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)Ldev/aster/vega/svg/SvgExportWarning;
+	public static synthetic fun copy$default (Ldev/aster/vega/svg/SvgExportWarning;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;ILjava/lang/Object;)Ldev/aster/vega/svg/SvgExportWarning;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getCode ()Ljava/lang/String;
+	public final fun getMessage ()Ljava/lang/String;
+	public final fun getNodeType ()Ljava/lang/String;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class dev/aster/vega/svg/SvgImagePolicy : java/lang/Enum {
+	public static final field REFERENCE Ldev/aster/vega/svg/SvgImagePolicy;
+	public static final field REQUIRE_RESOLVED Ldev/aster/vega/svg/SvgImagePolicy;
+	public static fun getEntries ()Lkotlin/enums/EnumEntries;
+	public static fun valueOf (Ljava/lang/String;)Ldev/aster/vega/svg/SvgImagePolicy;
+	public static fun values ()[Ldev/aster/vega/svg/SvgImagePolicy;
+}
+
+public final class dev/aster/vega/svg/SvgOptions {
+	public fun <init> ()V
+	public fun <init> (IZLjava/lang/String;Ldev/aster/vega/svg/SvgImagePolicy;ZZ)V
+	public synthetic fun <init> (IZLjava/lang/String;Ldev/aster/vega/svg/SvgImagePolicy;ZZILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()I
+	public final fun component2 ()Z
+	public final fun component3 ()Ljava/lang/String;
+	public final fun component4 ()Ldev/aster/vega/svg/SvgImagePolicy;
+	public final fun component5 ()Z
+	public final fun component6 ()Z
+	public final fun copy (IZLjava/lang/String;Ldev/aster/vega/svg/SvgImagePolicy;ZZ)Ldev/aster/vega/svg/SvgOptions;
+	public static synthetic fun copy$default (Ldev/aster/vega/svg/SvgOptions;IZLjava/lang/String;Ldev/aster/vega/svg/SvgImagePolicy;ZZILjava/lang/Object;)Ldev/aster/vega/svg/SvgOptions;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getIdPrefix ()Ljava/lang/String;
+	public final fun getImagePolicy ()Ldev/aster/vega/svg/SvgImagePolicy;
+	public final fun getIncludeAccessibility ()Z
+	public final fun getIncludeMetadata ()Z
+	public final fun getPrecision ()I
+	public final fun getPretty ()Z
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class dev/aster/vega/svg/SvgRenderer {
+	public fun <init> ()V
+	public fun <init> (Ldev/aster/vega/svg/SvgOptions;)V
+	public synthetic fun <init> (Ldev/aster/vega/svg/SvgOptions;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun render (Ldev/aster/vega/scene/Scene;)Ldev/aster/vega/svg/SvgDocument;
+}
+
+public final class dev/aster/vega/svg/SvgRendererKt {
+	public static final fun escapeXml (Ljava/lang/String;)Ljava/lang/String;
+	public static final fun toSvg (Ldev/aster/vega/scene/Scene;Ldev/aster/vega/svg/SvgOptions;)Ljava/lang/String;
+	public static synthetic fun toSvg$default (Ldev/aster/vega/scene/Scene;Ldev/aster/vega/svg/SvgOptions;ILjava/lang/Object;)Ljava/lang/String;
+}
+

@@ -107,6 +107,13 @@ jobs:
         if: matrix.oracles == 'true'
         run: ./scripts/vega-lite-oracle.sh
 
+      - name: Run the suite on an iOS simulator target
+        # macOS only, and the one gate an external adopter asked for by name: `check.sh` runs
+        # `macosArm64Test`, so until now the engine had never been *executed* on an iOS target at all —
+        # only compiled for one. A runner has the simulator runtime this project's own machine does not.
+        if: runner.os == 'macOS'
+        run: ./gradlew iosSimulatorArm64Test
+
       - name: Swift renderer
         # macOS only: it links the framework Kotlin/Native exports, and the API-surface guard in it is
         # what catches a change to what Swift sees.

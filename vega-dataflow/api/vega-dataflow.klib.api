@@ -1,0 +1,674 @@
+// Klib ABI Dump
+// Targets: [iosArm64, iosSimulatorArm64, linuxX64, macosArm64]
+// Rendering settings:
+// - Signature version: 2
+// - Show manifest properties: true
+// - Show declarations: true
+
+// Library unique name: <io.github.mgilbir.astervega:vega-dataflow>
+final enum class dev.aster.vega.dataflow.transform/AggregateOp : kotlin/Enum<dev.aster.vega.dataflow.transform/AggregateOp> { // dev.aster.vega.dataflow.transform/AggregateOp|null[0]
+    enum entry ARGMAX // dev.aster.vega.dataflow.transform/AggregateOp.ARGMAX|null[0]
+    enum entry ARGMIN // dev.aster.vega.dataflow.transform/AggregateOp.ARGMIN|null[0]
+    enum entry AVERAGE // dev.aster.vega.dataflow.transform/AggregateOp.AVERAGE|null[0]
+    enum entry CI0 // dev.aster.vega.dataflow.transform/AggregateOp.CI0|null[0]
+    enum entry CI1 // dev.aster.vega.dataflow.transform/AggregateOp.CI1|null[0]
+    enum entry COUNT // dev.aster.vega.dataflow.transform/AggregateOp.COUNT|null[0]
+    enum entry DISTINCT // dev.aster.vega.dataflow.transform/AggregateOp.DISTINCT|null[0]
+    enum entry EXPONENTIAL // dev.aster.vega.dataflow.transform/AggregateOp.EXPONENTIAL|null[0]
+    enum entry EXPONENTIALB // dev.aster.vega.dataflow.transform/AggregateOp.EXPONENTIALB|null[0]
+    enum entry MAX // dev.aster.vega.dataflow.transform/AggregateOp.MAX|null[0]
+    enum entry MEAN // dev.aster.vega.dataflow.transform/AggregateOp.MEAN|null[0]
+    enum entry MEDIAN // dev.aster.vega.dataflow.transform/AggregateOp.MEDIAN|null[0]
+    enum entry MIN // dev.aster.vega.dataflow.transform/AggregateOp.MIN|null[0]
+    enum entry MISSING // dev.aster.vega.dataflow.transform/AggregateOp.MISSING|null[0]
+    enum entry PRODUCT // dev.aster.vega.dataflow.transform/AggregateOp.PRODUCT|null[0]
+    enum entry Q1 // dev.aster.vega.dataflow.transform/AggregateOp.Q1|null[0]
+    enum entry Q3 // dev.aster.vega.dataflow.transform/AggregateOp.Q3|null[0]
+    enum entry STDERR // dev.aster.vega.dataflow.transform/AggregateOp.STDERR|null[0]
+    enum entry STDEV // dev.aster.vega.dataflow.transform/AggregateOp.STDEV|null[0]
+    enum entry STDEVP // dev.aster.vega.dataflow.transform/AggregateOp.STDEVP|null[0]
+    enum entry SUM // dev.aster.vega.dataflow.transform/AggregateOp.SUM|null[0]
+    enum entry VALID // dev.aster.vega.dataflow.transform/AggregateOp.VALID|null[0]
+    enum entry VALUES // dev.aster.vega.dataflow.transform/AggregateOp.VALUES|null[0]
+    enum entry VARIANCE // dev.aster.vega.dataflow.transform/AggregateOp.VARIANCE|null[0]
+    enum entry VARIANCEP // dev.aster.vega.dataflow.transform/AggregateOp.VARIANCEP|null[0]
+
+    final val entries // dev.aster.vega.dataflow.transform/AggregateOp.entries|#static{}entries[0]
+        final fun <get-entries>(): kotlin.enums/EnumEntries<dev.aster.vega.dataflow.transform/AggregateOp> // dev.aster.vega.dataflow.transform/AggregateOp.entries.<get-entries>|<get-entries>#static(){}[0]
+    final val needsField // dev.aster.vega.dataflow.transform/AggregateOp.needsField|{}needsField[0]
+        final fun <get-needsField>(): kotlin/Boolean // dev.aster.vega.dataflow.transform/AggregateOp.needsField.<get-needsField>|<get-needsField>(){}[0]
+    final val opName // dev.aster.vega.dataflow.transform/AggregateOp.opName|{}opName[0]
+        final fun <get-opName>(): kotlin/String // dev.aster.vega.dataflow.transform/AggregateOp.opName.<get-opName>|<get-opName>(){}[0]
+
+    final fun valueOf(kotlin/String): dev.aster.vega.dataflow.transform/AggregateOp // dev.aster.vega.dataflow.transform/AggregateOp.valueOf|valueOf#static(kotlin.String){}[0]
+    final fun values(): kotlin/Array<dev.aster.vega.dataflow.transform/AggregateOp> // dev.aster.vega.dataflow.transform/AggregateOp.values|values#static(){}[0]
+
+    final object Companion { // dev.aster.vega.dataflow.transform/AggregateOp.Companion|null[0]
+        final fun fromName(kotlin/String): dev.aster.vega.dataflow.transform/AggregateOp? // dev.aster.vega.dataflow.transform/AggregateOp.Companion.fromName|fromName(kotlin.String){}[0]
+    }
+}
+
+abstract interface <#A: kotlin/Any?, #B: kotlin/Any?> dev.aster.vega.dataflow/DataflowOperator { // dev.aster.vega.dataflow/DataflowOperator|null[0]
+    abstract val dependencies // dev.aster.vega.dataflow/DataflowOperator.dependencies|{}dependencies[0]
+        abstract fun <get-dependencies>(): kotlin.collections/Set<dev.aster.vega.dataflow/OperatorId> // dev.aster.vega.dataflow/DataflowOperator.dependencies.<get-dependencies>|<get-dependencies>(){}[0]
+    abstract val id // dev.aster.vega.dataflow/DataflowOperator.id|{}id[0]
+        abstract fun <get-id>(): dev.aster.vega.dataflow/OperatorId // dev.aster.vega.dataflow/DataflowOperator.id.<get-id>|<get-id>(){}[0]
+
+    abstract fun evaluate(#A, dev.aster.vega.dataflow/EvaluationContext): #B // dev.aster.vega.dataflow/DataflowOperator.evaluate|evaluate(1:0;dev.aster.vega.dataflow.EvaluationContext){}[0]
+}
+
+abstract interface dev.aster.vega.dataflow.transform/Transform { // dev.aster.vega.dataflow.transform/Transform|null[0]
+    abstract val type // dev.aster.vega.dataflow.transform/Transform.type|{}type[0]
+        abstract fun <get-type>(): kotlin/String // dev.aster.vega.dataflow.transform/Transform.type.<get-type>|<get-type>(){}[0]
+    open val publishesSignal // dev.aster.vega.dataflow.transform/Transform.publishesSignal|{}publishesSignal[0]
+        open fun <get-publishesSignal>(): kotlin/Boolean // dev.aster.vega.dataflow.transform/Transform.publishesSignal.<get-publishesSignal>|<get-publishesSignal>(){}[0]
+
+    abstract fun apply(kotlin.collections/List<dev.aster.vega.model/VegaValue>, dev.aster.vega.model/VegaValue.Obj, dev.aster.vega.dataflow.transform/TransformContext): kotlin.collections/List<dev.aster.vega.model/VegaValue> // dev.aster.vega.dataflow.transform/Transform.apply|apply(kotlin.collections.List<dev.aster.vega.model.VegaValue>;dev.aster.vega.model.VegaValue.Obj;dev.aster.vega.dataflow.transform.TransformContext){}[0]
+}
+
+abstract interface dev.aster.vega.dataflow.transform/TransformContext { // dev.aster.vega.dataflow.transform/TransformContext|null[0]
+    abstract val diagnostics // dev.aster.vega.dataflow.transform/TransformContext.diagnostics|{}diagnostics[0]
+        abstract fun <get-diagnostics>(): dev.aster.vega.model/DiagnosticCollector // dev.aster.vega.dataflow.transform/TransformContext.diagnostics.<get-diagnostics>|<get-diagnostics>(){}[0]
+    abstract val expressions // dev.aster.vega.dataflow.transform/TransformContext.expressions|{}expressions[0]
+        abstract fun <get-expressions>(): dev.aster.vega.expression/ExpressionCompiler // dev.aster.vega.dataflow.transform/TransformContext.expressions.<get-expressions>|<get-expressions>(){}[0]
+    abstract val scope // dev.aster.vega.dataflow.transform/TransformContext.scope|{}scope[0]
+        abstract fun <get-scope>(): dev.aster.vega.expression/ExpressionScope // dev.aster.vega.dataflow.transform/TransformContext.scope.<get-scope>|<get-scope>(){}[0]
+
+    abstract var tree // dev.aster.vega.dataflow.transform/TransformContext.tree|{}tree[0]
+        abstract fun <get-tree>(): dev.aster.vega.dataflow.transform/TreeSource? // dev.aster.vega.dataflow.transform/TransformContext.tree.<get-tree>|<get-tree>(){}[0]
+        abstract fun <set-tree>(dev.aster.vega.dataflow.transform/TreeSource?) // dev.aster.vega.dataflow.transform/TransformContext.tree.<set-tree>|<set-tree>(dev.aster.vega.dataflow.transform.TreeSource?){}[0]
+
+    abstract fun scopeFor(dev.aster.vega.model/VegaValue): dev.aster.vega.expression/ExpressionScope // dev.aster.vega.dataflow.transform/TransformContext.scopeFor|scopeFor(dev.aster.vega.model.VegaValue){}[0]
+    abstract fun setSignal(kotlin/String, dev.aster.vega.model/VegaValue) // dev.aster.vega.dataflow.transform/TransformContext.setSignal|setSignal(kotlin.String;dev.aster.vega.model.VegaValue){}[0]
+    open fun measureText(kotlin/String, kotlin/Double): kotlin/Double // dev.aster.vega.dataflow.transform/TransformContext.measureText|measureText(kotlin.String;kotlin.Double){}[0]
+    open fun projection(kotlin/String): dev.aster.vega.dataflow.transform/ProjectionDefinition? // dev.aster.vega.dataflow.transform/TransformContext.projection|projection(kotlin.String){}[0]
+}
+
+abstract interface dev.aster.vega.dataflow.transform/TreeSource { // dev.aster.vega.dataflow.transform/TreeSource|null[0]
+    open fun ancestorsOf(kotlin/String): kotlin.collections/List<kotlin/Int>? // dev.aster.vega.dataflow.transform/TreeSource.ancestorsOf|ancestorsOf(kotlin.String){}[0]
+    open fun pathBetween(kotlin/String, kotlin/String): kotlin.collections/List<kotlin/Int>? // dev.aster.vega.dataflow.transform/TreeSource.pathBetween|pathBetween(kotlin.String;kotlin.String){}[0]
+}
+
+abstract interface dev.aster.vega.dataflow/EvaluationContext { // dev.aster.vega.dataflow/EvaluationContext|null[0]
+    abstract val diagnostics // dev.aster.vega.dataflow/EvaluationContext.diagnostics|{}diagnostics[0]
+        abstract fun <get-diagnostics>(): dev.aster.vega.model/DiagnosticCollector // dev.aster.vega.dataflow/EvaluationContext.diagnostics.<get-diagnostics>|<get-diagnostics>(){}[0]
+    abstract val tupleIds // dev.aster.vega.dataflow/EvaluationContext.tupleIds|{}tupleIds[0]
+        abstract fun <get-tupleIds>(): dev.aster.vega.dataflow/TupleIdAllocator // dev.aster.vega.dataflow/EvaluationContext.tupleIds.<get-tupleIds>|<get-tupleIds>(){}[0]
+
+    abstract fun dataset(kotlin/String): kotlin.collections/List<dev.aster.vega.dataflow/Tuple> // dev.aster.vega.dataflow/EvaluationContext.dataset|dataset(kotlin.String){}[0]
+    abstract fun signal(kotlin/String): dev.aster.vega.model/VegaValue // dev.aster.vega.dataflow/EvaluationContext.signal|signal(kotlin.String){}[0]
+}
+
+final class dev.aster.vega.dataflow.transform/ProjectionDefinition { // dev.aster.vega.dataflow.transform/ProjectionDefinition|null[0]
+    constructor <init>(kotlin/String, kotlin/String, kotlin/Double? = ..., kotlin.collections/List<kotlin/Double> = ..., kotlin.collections/List<kotlin/Double> = ..., kotlin.collections/List<kotlin/Double> = ..., kotlin/Double? = ..., kotlin/Double? = ..., kotlin/Boolean = ..., kotlin/Boolean = ..., kotlin.collections/List<kotlin/Double> = ..., kotlin/Double? = ..., kotlin.collections/List<kotlin/Double> = ..., kotlin/Double? = ..., dev.aster.vega.model/VegaValue? = ..., kotlin.collections/List<kotlin/Double> = ..., kotlin.collections/List<kotlin/Double> = ...) // dev.aster.vega.dataflow.transform/ProjectionDefinition.<init>|<init>(kotlin.String;kotlin.String;kotlin.Double?;kotlin.collections.List<kotlin.Double>;kotlin.collections.List<kotlin.Double>;kotlin.collections.List<kotlin.Double>;kotlin.Double?;kotlin.Double?;kotlin.Boolean;kotlin.Boolean;kotlin.collections.List<kotlin.Double>;kotlin.Double?;kotlin.collections.List<kotlin.Double>;kotlin.Double?;dev.aster.vega.model.VegaValue?;kotlin.collections.List<kotlin.Double>;kotlin.collections.List<kotlin.Double>){}[0]
+
+    final val angle // dev.aster.vega.dataflow.transform/ProjectionDefinition.angle|{}angle[0]
+        final fun <get-angle>(): kotlin/Double? // dev.aster.vega.dataflow.transform/ProjectionDefinition.angle.<get-angle>|<get-angle>(){}[0]
+    final val center // dev.aster.vega.dataflow.transform/ProjectionDefinition.center|{}center[0]
+        final fun <get-center>(): kotlin.collections/List<kotlin/Double> // dev.aster.vega.dataflow.transform/ProjectionDefinition.center.<get-center>|<get-center>(){}[0]
+    final val clipAngle // dev.aster.vega.dataflow.transform/ProjectionDefinition.clipAngle|{}clipAngle[0]
+        final fun <get-clipAngle>(): kotlin/Double? // dev.aster.vega.dataflow.transform/ProjectionDefinition.clipAngle.<get-clipAngle>|<get-clipAngle>(){}[0]
+    final val clipExtent // dev.aster.vega.dataflow.transform/ProjectionDefinition.clipExtent|{}clipExtent[0]
+        final fun <get-clipExtent>(): kotlin.collections/List<kotlin/Double> // dev.aster.vega.dataflow.transform/ProjectionDefinition.clipExtent.<get-clipExtent>|<get-clipExtent>(){}[0]
+    final val fit // dev.aster.vega.dataflow.transform/ProjectionDefinition.fit|{}fit[0]
+        final fun <get-fit>(): dev.aster.vega.model/VegaValue? // dev.aster.vega.dataflow.transform/ProjectionDefinition.fit.<get-fit>|<get-fit>(){}[0]
+    final val fitExtent // dev.aster.vega.dataflow.transform/ProjectionDefinition.fitExtent|{}fitExtent[0]
+        final fun <get-fitExtent>(): kotlin.collections/List<kotlin/Double> // dev.aster.vega.dataflow.transform/ProjectionDefinition.fitExtent.<get-fitExtent>|<get-fitExtent>(){}[0]
+    final val fitSize // dev.aster.vega.dataflow.transform/ProjectionDefinition.fitSize|{}fitSize[0]
+        final fun <get-fitSize>(): kotlin.collections/List<kotlin/Double> // dev.aster.vega.dataflow.transform/ProjectionDefinition.fitSize.<get-fitSize>|<get-fitSize>(){}[0]
+    final val name // dev.aster.vega.dataflow.transform/ProjectionDefinition.name|{}name[0]
+        final fun <get-name>(): kotlin/String // dev.aster.vega.dataflow.transform/ProjectionDefinition.name.<get-name>|<get-name>(){}[0]
+    final val parallels // dev.aster.vega.dataflow.transform/ProjectionDefinition.parallels|{}parallels[0]
+        final fun <get-parallels>(): kotlin.collections/List<kotlin/Double> // dev.aster.vega.dataflow.transform/ProjectionDefinition.parallels.<get-parallels>|<get-parallels>(){}[0]
+    final val pointRadius // dev.aster.vega.dataflow.transform/ProjectionDefinition.pointRadius|{}pointRadius[0]
+        final fun <get-pointRadius>(): kotlin/Double? // dev.aster.vega.dataflow.transform/ProjectionDefinition.pointRadius.<get-pointRadius>|<get-pointRadius>(){}[0]
+    final val precision // dev.aster.vega.dataflow.transform/ProjectionDefinition.precision|{}precision[0]
+        final fun <get-precision>(): kotlin/Double? // dev.aster.vega.dataflow.transform/ProjectionDefinition.precision.<get-precision>|<get-precision>(){}[0]
+    final val reflectX // dev.aster.vega.dataflow.transform/ProjectionDefinition.reflectX|{}reflectX[0]
+        final fun <get-reflectX>(): kotlin/Boolean // dev.aster.vega.dataflow.transform/ProjectionDefinition.reflectX.<get-reflectX>|<get-reflectX>(){}[0]
+    final val reflectY // dev.aster.vega.dataflow.transform/ProjectionDefinition.reflectY|{}reflectY[0]
+        final fun <get-reflectY>(): kotlin/Boolean // dev.aster.vega.dataflow.transform/ProjectionDefinition.reflectY.<get-reflectY>|<get-reflectY>(){}[0]
+    final val rotate // dev.aster.vega.dataflow.transform/ProjectionDefinition.rotate|{}rotate[0]
+        final fun <get-rotate>(): kotlin.collections/List<kotlin/Double> // dev.aster.vega.dataflow.transform/ProjectionDefinition.rotate.<get-rotate>|<get-rotate>(){}[0]
+    final val scale // dev.aster.vega.dataflow.transform/ProjectionDefinition.scale|{}scale[0]
+        final fun <get-scale>(): kotlin/Double? // dev.aster.vega.dataflow.transform/ProjectionDefinition.scale.<get-scale>|<get-scale>(){}[0]
+    final val translate // dev.aster.vega.dataflow.transform/ProjectionDefinition.translate|{}translate[0]
+        final fun <get-translate>(): kotlin.collections/List<kotlin/Double> // dev.aster.vega.dataflow.transform/ProjectionDefinition.translate.<get-translate>|<get-translate>(){}[0]
+    final val type // dev.aster.vega.dataflow.transform/ProjectionDefinition.type|{}type[0]
+        final fun <get-type>(): kotlin/String // dev.aster.vega.dataflow.transform/ProjectionDefinition.type.<get-type>|<get-type>(){}[0]
+
+    final fun component1(): kotlin/String // dev.aster.vega.dataflow.transform/ProjectionDefinition.component1|component1(){}[0]
+    final fun component10(): kotlin/Boolean // dev.aster.vega.dataflow.transform/ProjectionDefinition.component10|component10(){}[0]
+    final fun component11(): kotlin.collections/List<kotlin/Double> // dev.aster.vega.dataflow.transform/ProjectionDefinition.component11|component11(){}[0]
+    final fun component12(): kotlin/Double? // dev.aster.vega.dataflow.transform/ProjectionDefinition.component12|component12(){}[0]
+    final fun component13(): kotlin.collections/List<kotlin/Double> // dev.aster.vega.dataflow.transform/ProjectionDefinition.component13|component13(){}[0]
+    final fun component14(): kotlin/Double? // dev.aster.vega.dataflow.transform/ProjectionDefinition.component14|component14(){}[0]
+    final fun component15(): dev.aster.vega.model/VegaValue? // dev.aster.vega.dataflow.transform/ProjectionDefinition.component15|component15(){}[0]
+    final fun component16(): kotlin.collections/List<kotlin/Double> // dev.aster.vega.dataflow.transform/ProjectionDefinition.component16|component16(){}[0]
+    final fun component17(): kotlin.collections/List<kotlin/Double> // dev.aster.vega.dataflow.transform/ProjectionDefinition.component17|component17(){}[0]
+    final fun component2(): kotlin/String // dev.aster.vega.dataflow.transform/ProjectionDefinition.component2|component2(){}[0]
+    final fun component3(): kotlin/Double? // dev.aster.vega.dataflow.transform/ProjectionDefinition.component3|component3(){}[0]
+    final fun component4(): kotlin.collections/List<kotlin/Double> // dev.aster.vega.dataflow.transform/ProjectionDefinition.component4|component4(){}[0]
+    final fun component5(): kotlin.collections/List<kotlin/Double> // dev.aster.vega.dataflow.transform/ProjectionDefinition.component5|component5(){}[0]
+    final fun component6(): kotlin.collections/List<kotlin/Double> // dev.aster.vega.dataflow.transform/ProjectionDefinition.component6|component6(){}[0]
+    final fun component7(): kotlin/Double? // dev.aster.vega.dataflow.transform/ProjectionDefinition.component7|component7(){}[0]
+    final fun component8(): kotlin/Double? // dev.aster.vega.dataflow.transform/ProjectionDefinition.component8|component8(){}[0]
+    final fun component9(): kotlin/Boolean // dev.aster.vega.dataflow.transform/ProjectionDefinition.component9|component9(){}[0]
+    final fun copy(kotlin/String = ..., kotlin/String = ..., kotlin/Double? = ..., kotlin.collections/List<kotlin/Double> = ..., kotlin.collections/List<kotlin/Double> = ..., kotlin.collections/List<kotlin/Double> = ..., kotlin/Double? = ..., kotlin/Double? = ..., kotlin/Boolean = ..., kotlin/Boolean = ..., kotlin.collections/List<kotlin/Double> = ..., kotlin/Double? = ..., kotlin.collections/List<kotlin/Double> = ..., kotlin/Double? = ..., dev.aster.vega.model/VegaValue? = ..., kotlin.collections/List<kotlin/Double> = ..., kotlin.collections/List<kotlin/Double> = ...): dev.aster.vega.dataflow.transform/ProjectionDefinition // dev.aster.vega.dataflow.transform/ProjectionDefinition.copy|copy(kotlin.String;kotlin.String;kotlin.Double?;kotlin.collections.List<kotlin.Double>;kotlin.collections.List<kotlin.Double>;kotlin.collections.List<kotlin.Double>;kotlin.Double?;kotlin.Double?;kotlin.Boolean;kotlin.Boolean;kotlin.collections.List<kotlin.Double>;kotlin.Double?;kotlin.collections.List<kotlin.Double>;kotlin.Double?;dev.aster.vega.model.VegaValue?;kotlin.collections.List<kotlin.Double>;kotlin.collections.List<kotlin.Double>){}[0]
+    final fun equals(kotlin/Any?): kotlin/Boolean // dev.aster.vega.dataflow.transform/ProjectionDefinition.equals|equals(kotlin.Any?){}[0]
+    final fun hashCode(): kotlin/Int // dev.aster.vega.dataflow.transform/ProjectionDefinition.hashCode|hashCode(){}[0]
+    final fun toString(): kotlin/String // dev.aster.vega.dataflow.transform/ProjectionDefinition.toString|toString(){}[0]
+}
+
+final class dev.aster.vega.dataflow.transform/TransformPipeline { // dev.aster.vega.dataflow.transform/TransformPipeline|null[0]
+    constructor <init>(dev.aster.vega.dataflow.transform/TransformRegistry = ...) // dev.aster.vega.dataflow.transform/TransformPipeline.<init>|<init>(dev.aster.vega.dataflow.transform.TransformRegistry){}[0]
+
+    final fun run(kotlin.collections/List<dev.aster.vega.model/VegaValue>, kotlin.collections/List<dev.aster.vega.model/VegaValue>, dev.aster.vega.dataflow.transform/TransformContext): kotlin.collections/List<dev.aster.vega.model/VegaValue> // dev.aster.vega.dataflow.transform/TransformPipeline.run|run(kotlin.collections.List<dev.aster.vega.model.VegaValue>;kotlin.collections.List<dev.aster.vega.model.VegaValue>;dev.aster.vega.dataflow.transform.TransformContext){}[0]
+}
+
+final class dev.aster.vega.dataflow.transform/TransformRegistry { // dev.aster.vega.dataflow.transform/TransformRegistry|null[0]
+    constructor <init>(kotlin.collections/List<dev.aster.vega.dataflow.transform/Transform>) // dev.aster.vega.dataflow.transform/TransformRegistry.<init>|<init>(kotlin.collections.List<dev.aster.vega.dataflow.transform.Transform>){}[0]
+
+    final val types // dev.aster.vega.dataflow.transform/TransformRegistry.types|{}types[0]
+        final fun <get-types>(): kotlin.collections/Set<kotlin/String> // dev.aster.vega.dataflow.transform/TransformRegistry.types.<get-types>|<get-types>(){}[0]
+
+    final fun get(kotlin/String): dev.aster.vega.dataflow.transform/Transform? // dev.aster.vega.dataflow.transform/TransformRegistry.get|get(kotlin.String){}[0]
+
+    final object Companion { // dev.aster.vega.dataflow.transform/TransformRegistry.Companion|null[0]
+        final val Default // dev.aster.vega.dataflow.transform/TransformRegistry.Companion.Default|{}Default[0]
+            final fun <get-Default>(): dev.aster.vega.dataflow.transform/TransformRegistry // dev.aster.vega.dataflow.transform/TransformRegistry.Companion.Default.<get-Default>|<get-Default>(){}[0]
+    }
+}
+
+final class dev.aster.vega.dataflow/ChangeSet { // dev.aster.vega.dataflow/ChangeSet|null[0]
+    constructor <init>(kotlin.collections/List<dev.aster.vega.dataflow/Tuple> = ..., kotlin.collections/List<dev.aster.vega.dataflow/Tuple> = ..., kotlin.collections/List<dev.aster.vega.dataflow/Tuple> = ..., kotlin/Boolean = ...) // dev.aster.vega.dataflow/ChangeSet.<init>|<init>(kotlin.collections.List<dev.aster.vega.dataflow.Tuple>;kotlin.collections.List<dev.aster.vega.dataflow.Tuple>;kotlin.collections.List<dev.aster.vega.dataflow.Tuple>;kotlin.Boolean){}[0]
+
+    final val added // dev.aster.vega.dataflow/ChangeSet.added|{}added[0]
+        final fun <get-added>(): kotlin.collections/List<dev.aster.vega.dataflow/Tuple> // dev.aster.vega.dataflow/ChangeSet.added.<get-added>|<get-added>(){}[0]
+    final val isEmpty // dev.aster.vega.dataflow/ChangeSet.isEmpty|{}isEmpty[0]
+        final fun <get-isEmpty>(): kotlin/Boolean // dev.aster.vega.dataflow/ChangeSet.isEmpty.<get-isEmpty>|<get-isEmpty>(){}[0]
+    final val modified // dev.aster.vega.dataflow/ChangeSet.modified|{}modified[0]
+        final fun <get-modified>(): kotlin.collections/List<dev.aster.vega.dataflow/Tuple> // dev.aster.vega.dataflow/ChangeSet.modified.<get-modified>|<get-modified>(){}[0]
+    final val removed // dev.aster.vega.dataflow/ChangeSet.removed|{}removed[0]
+        final fun <get-removed>(): kotlin.collections/List<dev.aster.vega.dataflow/Tuple> // dev.aster.vega.dataflow/ChangeSet.removed.<get-removed>|<get-removed>(){}[0]
+    final val replacesAll // dev.aster.vega.dataflow/ChangeSet.replacesAll|{}replacesAll[0]
+        final fun <get-replacesAll>(): kotlin/Boolean // dev.aster.vega.dataflow/ChangeSet.replacesAll.<get-replacesAll>|<get-replacesAll>(){}[0]
+
+    final fun component1(): kotlin.collections/List<dev.aster.vega.dataflow/Tuple> // dev.aster.vega.dataflow/ChangeSet.component1|component1(){}[0]
+    final fun component2(): kotlin.collections/List<dev.aster.vega.dataflow/Tuple> // dev.aster.vega.dataflow/ChangeSet.component2|component2(){}[0]
+    final fun component3(): kotlin.collections/List<dev.aster.vega.dataflow/Tuple> // dev.aster.vega.dataflow/ChangeSet.component3|component3(){}[0]
+    final fun component4(): kotlin/Boolean // dev.aster.vega.dataflow/ChangeSet.component4|component4(){}[0]
+    final fun copy(kotlin.collections/List<dev.aster.vega.dataflow/Tuple> = ..., kotlin.collections/List<dev.aster.vega.dataflow/Tuple> = ..., kotlin.collections/List<dev.aster.vega.dataflow/Tuple> = ..., kotlin/Boolean = ...): dev.aster.vega.dataflow/ChangeSet // dev.aster.vega.dataflow/ChangeSet.copy|copy(kotlin.collections.List<dev.aster.vega.dataflow.Tuple>;kotlin.collections.List<dev.aster.vega.dataflow.Tuple>;kotlin.collections.List<dev.aster.vega.dataflow.Tuple>;kotlin.Boolean){}[0]
+    final fun equals(kotlin/Any?): kotlin/Boolean // dev.aster.vega.dataflow/ChangeSet.equals|equals(kotlin.Any?){}[0]
+    final fun hashCode(): kotlin/Int // dev.aster.vega.dataflow/ChangeSet.hashCode|hashCode(){}[0]
+    final fun merge(dev.aster.vega.dataflow/ChangeSet): dev.aster.vega.dataflow/ChangeSet // dev.aster.vega.dataflow/ChangeSet.merge|merge(dev.aster.vega.dataflow.ChangeSet){}[0]
+    final fun toString(): kotlin/String // dev.aster.vega.dataflow/ChangeSet.toString|toString(){}[0]
+
+    final object Companion { // dev.aster.vega.dataflow/ChangeSet.Companion|null[0]
+        final val Empty // dev.aster.vega.dataflow/ChangeSet.Companion.Empty|{}Empty[0]
+            final fun <get-Empty>(): dev.aster.vega.dataflow/ChangeSet // dev.aster.vega.dataflow/ChangeSet.Companion.Empty.<get-Empty>|<get-Empty>(){}[0]
+
+        final fun replaceAll(kotlin.collections/List<dev.aster.vega.dataflow/Tuple>): dev.aster.vega.dataflow/ChangeSet // dev.aster.vega.dataflow/ChangeSet.Companion.replaceAll|replaceAll(kotlin.collections.List<dev.aster.vega.dataflow.Tuple>){}[0]
+    }
+}
+
+final class dev.aster.vega.dataflow/CyclicDataflowException : kotlin/Exception { // dev.aster.vega.dataflow/CyclicDataflowException|null[0]
+    constructor <init>(kotlin.collections/List<dev.aster.vega.dataflow/OperatorId>) // dev.aster.vega.dataflow/CyclicDataflowException.<init>|<init>(kotlin.collections.List<dev.aster.vega.dataflow.OperatorId>){}[0]
+
+    final val cycle // dev.aster.vega.dataflow/CyclicDataflowException.cycle|{}cycle[0]
+        final fun <get-cycle>(): kotlin.collections/List<dev.aster.vega.dataflow/OperatorId> // dev.aster.vega.dataflow/CyclicDataflowException.cycle.<get-cycle>|<get-cycle>(){}[0]
+}
+
+final class dev.aster.vega.dataflow/Tuple { // dev.aster.vega.dataflow/Tuple|null[0]
+    constructor <init>(dev.aster.vega.dataflow/TupleId, dev.aster.vega.model/VegaValue) // dev.aster.vega.dataflow/Tuple.<init>|<init>(dev.aster.vega.dataflow.TupleId;dev.aster.vega.model.VegaValue){}[0]
+
+    final val id // dev.aster.vega.dataflow/Tuple.id|{}id[0]
+        final fun <get-id>(): dev.aster.vega.dataflow/TupleId // dev.aster.vega.dataflow/Tuple.id.<get-id>|<get-id>(){}[0]
+    final val value // dev.aster.vega.dataflow/Tuple.value|{}value[0]
+        final fun <get-value>(): dev.aster.vega.model/VegaValue // dev.aster.vega.dataflow/Tuple.value.<get-value>|<get-value>(){}[0]
+
+    final fun component1(): dev.aster.vega.dataflow/TupleId // dev.aster.vega.dataflow/Tuple.component1|component1(){}[0]
+    final fun component2(): dev.aster.vega.model/VegaValue // dev.aster.vega.dataflow/Tuple.component2|component2(){}[0]
+    final fun copy(dev.aster.vega.dataflow/TupleId = ..., dev.aster.vega.model/VegaValue = ...): dev.aster.vega.dataflow/Tuple // dev.aster.vega.dataflow/Tuple.copy|copy(dev.aster.vega.dataflow.TupleId;dev.aster.vega.model.VegaValue){}[0]
+    final fun equals(kotlin/Any?): kotlin/Boolean // dev.aster.vega.dataflow/Tuple.equals|equals(kotlin.Any?){}[0]
+    final fun hashCode(): kotlin/Int // dev.aster.vega.dataflow/Tuple.hashCode|hashCode(){}[0]
+    final fun toString(): kotlin/String // dev.aster.vega.dataflow/Tuple.toString|toString(){}[0]
+    final fun withValue(dev.aster.vega.model/VegaValue): dev.aster.vega.dataflow/Tuple // dev.aster.vega.dataflow/Tuple.withValue|withValue(dev.aster.vega.model.VegaValue){}[0]
+}
+
+final class dev.aster.vega.dataflow/TupleIdAllocator { // dev.aster.vega.dataflow/TupleIdAllocator|null[0]
+    constructor <init>(kotlin/Long = ...) // dev.aster.vega.dataflow/TupleIdAllocator.<init>|<init>(kotlin.Long){}[0]
+
+    final val allocated // dev.aster.vega.dataflow/TupleIdAllocator.allocated|{}allocated[0]
+        final fun <get-allocated>(): kotlin/Long // dev.aster.vega.dataflow/TupleIdAllocator.allocated.<get-allocated>|<get-allocated>(){}[0]
+
+    final fun allocate(): dev.aster.vega.dataflow/TupleId // dev.aster.vega.dataflow/TupleIdAllocator.allocate|allocate(){}[0]
+}
+
+final value class dev.aster.vega.dataflow/OperatorId { // dev.aster.vega.dataflow/OperatorId|null[0]
+    constructor <init>(kotlin/Int) // dev.aster.vega.dataflow/OperatorId.<init>|<init>(kotlin.Int){}[0]
+
+    final val value // dev.aster.vega.dataflow/OperatorId.value|{}value[0]
+        final fun <get-value>(): kotlin/Int // dev.aster.vega.dataflow/OperatorId.value.<get-value>|<get-value>(){}[0]
+
+    final fun equals(kotlin/Any?): kotlin/Boolean // dev.aster.vega.dataflow/OperatorId.equals|equals(kotlin.Any?){}[0]
+    final fun hashCode(): kotlin/Int // dev.aster.vega.dataflow/OperatorId.hashCode|hashCode(){}[0]
+    final fun toString(): kotlin/String // dev.aster.vega.dataflow/OperatorId.toString|toString(){}[0]
+}
+
+final value class dev.aster.vega.dataflow/TupleId { // dev.aster.vega.dataflow/TupleId|null[0]
+    constructor <init>(kotlin/Long) // dev.aster.vega.dataflow/TupleId.<init>|<init>(kotlin.Long){}[0]
+
+    final val value // dev.aster.vega.dataflow/TupleId.value|{}value[0]
+        final fun <get-value>(): kotlin/Long // dev.aster.vega.dataflow/TupleId.value.<get-value>|<get-value>(){}[0]
+
+    final fun equals(kotlin/Any?): kotlin/Boolean // dev.aster.vega.dataflow/TupleId.equals|equals(kotlin.Any?){}[0]
+    final fun hashCode(): kotlin/Int // dev.aster.vega.dataflow/TupleId.hashCode|hashCode(){}[0]
+    final fun toString(): kotlin/String // dev.aster.vega.dataflow/TupleId.toString|toString(){}[0]
+
+    final object Companion { // dev.aster.vega.dataflow/TupleId.Companion|null[0]
+        final val None // dev.aster.vega.dataflow/TupleId.Companion.None|{}None[0]
+            final fun <get-None>(): dev.aster.vega.dataflow/TupleId // dev.aster.vega.dataflow/TupleId.Companion.None.<get-None>|<get-None>(){}[0]
+    }
+}
+
+final object dev.aster.vega.dataflow.transform/AggregateTransform : dev.aster.vega.dataflow.transform/Transform { // dev.aster.vega.dataflow.transform/AggregateTransform|null[0]
+    final val type // dev.aster.vega.dataflow.transform/AggregateTransform.type|{}type[0]
+        final fun <get-type>(): kotlin/String // dev.aster.vega.dataflow.transform/AggregateTransform.type.<get-type>|<get-type>(){}[0]
+
+    final fun apply(kotlin.collections/List<dev.aster.vega.model/VegaValue>, dev.aster.vega.model/VegaValue.Obj, dev.aster.vega.dataflow.transform/TransformContext): kotlin.collections/List<dev.aster.vega.model/VegaValue> // dev.aster.vega.dataflow.transform/AggregateTransform.apply|apply(kotlin.collections.List<dev.aster.vega.model.VegaValue>;dev.aster.vega.model.VegaValue.Obj;dev.aster.vega.dataflow.transform.TransformContext){}[0]
+}
+
+final object dev.aster.vega.dataflow.transform/BinTransform : dev.aster.vega.dataflow.transform/Transform { // dev.aster.vega.dataflow.transform/BinTransform|null[0]
+    final const val DEFAULT_MAXBINS // dev.aster.vega.dataflow.transform/BinTransform.DEFAULT_MAXBINS|{}DEFAULT_MAXBINS[0]
+        final fun <get-DEFAULT_MAXBINS>(): kotlin/Int // dev.aster.vega.dataflow.transform/BinTransform.DEFAULT_MAXBINS.<get-DEFAULT_MAXBINS>|<get-DEFAULT_MAXBINS>(){}[0]
+
+    final val publishesSignal // dev.aster.vega.dataflow.transform/BinTransform.publishesSignal|{}publishesSignal[0]
+        final fun <get-publishesSignal>(): kotlin/Boolean // dev.aster.vega.dataflow.transform/BinTransform.publishesSignal.<get-publishesSignal>|<get-publishesSignal>(){}[0]
+    final val type // dev.aster.vega.dataflow.transform/BinTransform.type|{}type[0]
+        final fun <get-type>(): kotlin/String // dev.aster.vega.dataflow.transform/BinTransform.type.<get-type>|<get-type>(){}[0]
+
+    final fun apply(kotlin.collections/List<dev.aster.vega.model/VegaValue>, dev.aster.vega.model/VegaValue.Obj, dev.aster.vega.dataflow.transform/TransformContext): kotlin.collections/List<dev.aster.vega.model/VegaValue> // dev.aster.vega.dataflow.transform/BinTransform.apply|apply(kotlin.collections.List<dev.aster.vega.model.VegaValue>;dev.aster.vega.model.VegaValue.Obj;dev.aster.vega.dataflow.transform.TransformContext){}[0]
+    final fun binSettings(kotlin/Double, kotlin/Double, kotlin/Int, kotlin/Double, kotlin/Double?, kotlin.collections/List<kotlin/Double>, kotlin/Double, kotlin/Boolean, kotlin/Double? = ...): dev.aster.vega.dataflow.transform/BinTransform.BinSettings // dev.aster.vega.dataflow.transform/BinTransform.binSettings|binSettings(kotlin.Double;kotlin.Double;kotlin.Int;kotlin.Double;kotlin.Double?;kotlin.collections.List<kotlin.Double>;kotlin.Double;kotlin.Boolean;kotlin.Double?){}[0]
+
+    final class BinSettings { // dev.aster.vega.dataflow.transform/BinTransform.BinSettings|null[0]
+        constructor <init>(kotlin/Double, kotlin/Double, kotlin/Double) // dev.aster.vega.dataflow.transform/BinTransform.BinSettings.<init>|<init>(kotlin.Double;kotlin.Double;kotlin.Double){}[0]
+
+        final val start // dev.aster.vega.dataflow.transform/BinTransform.BinSettings.start|{}start[0]
+            final fun <get-start>(): kotlin/Double // dev.aster.vega.dataflow.transform/BinTransform.BinSettings.start.<get-start>|<get-start>(){}[0]
+        final val step // dev.aster.vega.dataflow.transform/BinTransform.BinSettings.step|{}step[0]
+            final fun <get-step>(): kotlin/Double // dev.aster.vega.dataflow.transform/BinTransform.BinSettings.step.<get-step>|<get-step>(){}[0]
+        final val stop // dev.aster.vega.dataflow.transform/BinTransform.BinSettings.stop|{}stop[0]
+            final fun <get-stop>(): kotlin/Double // dev.aster.vega.dataflow.transform/BinTransform.BinSettings.stop.<get-stop>|<get-stop>(){}[0]
+
+        final fun component1(): kotlin/Double // dev.aster.vega.dataflow.transform/BinTransform.BinSettings.component1|component1(){}[0]
+        final fun component2(): kotlin/Double // dev.aster.vega.dataflow.transform/BinTransform.BinSettings.component2|component2(){}[0]
+        final fun component3(): kotlin/Double // dev.aster.vega.dataflow.transform/BinTransform.BinSettings.component3|component3(){}[0]
+        final fun copy(kotlin/Double = ..., kotlin/Double = ..., kotlin/Double = ...): dev.aster.vega.dataflow.transform/BinTransform.BinSettings // dev.aster.vega.dataflow.transform/BinTransform.BinSettings.copy|copy(kotlin.Double;kotlin.Double;kotlin.Double){}[0]
+        final fun equals(kotlin/Any?): kotlin/Boolean // dev.aster.vega.dataflow.transform/BinTransform.BinSettings.equals|equals(kotlin.Any?){}[0]
+        final fun hashCode(): kotlin/Int // dev.aster.vega.dataflow.transform/BinTransform.BinSettings.hashCode|hashCode(){}[0]
+        final fun toString(): kotlin/String // dev.aster.vega.dataflow.transform/BinTransform.BinSettings.toString|toString(){}[0]
+    }
+}
+
+final object dev.aster.vega.dataflow.transform/CollectTransform : dev.aster.vega.dataflow.transform/Transform { // dev.aster.vega.dataflow.transform/CollectTransform|null[0]
+    final val type // dev.aster.vega.dataflow.transform/CollectTransform.type|{}type[0]
+        final fun <get-type>(): kotlin/String // dev.aster.vega.dataflow.transform/CollectTransform.type.<get-type>|<get-type>(){}[0]
+
+    final fun apply(kotlin.collections/List<dev.aster.vega.model/VegaValue>, dev.aster.vega.model/VegaValue.Obj, dev.aster.vega.dataflow.transform/TransformContext): kotlin.collections/List<dev.aster.vega.model/VegaValue> // dev.aster.vega.dataflow.transform/CollectTransform.apply|apply(kotlin.collections.List<dev.aster.vega.model.VegaValue>;dev.aster.vega.model.VegaValue.Obj;dev.aster.vega.dataflow.transform.TransformContext){}[0]
+}
+
+final object dev.aster.vega.dataflow.transform/CountPatternTransform : dev.aster.vega.dataflow.transform/Transform { // dev.aster.vega.dataflow.transform/CountPatternTransform|null[0]
+    final val type // dev.aster.vega.dataflow.transform/CountPatternTransform.type|{}type[0]
+        final fun <get-type>(): kotlin/String // dev.aster.vega.dataflow.transform/CountPatternTransform.type.<get-type>|<get-type>(){}[0]
+
+    final fun apply(kotlin.collections/List<dev.aster.vega.model/VegaValue>, dev.aster.vega.model/VegaValue.Obj, dev.aster.vega.dataflow.transform/TransformContext): kotlin.collections/List<dev.aster.vega.model/VegaValue> // dev.aster.vega.dataflow.transform/CountPatternTransform.apply|apply(kotlin.collections.List<dev.aster.vega.model.VegaValue>;dev.aster.vega.model.VegaValue.Obj;dev.aster.vega.dataflow.transform.TransformContext){}[0]
+}
+
+final object dev.aster.vega.dataflow.transform/CrossFilterTransform : dev.aster.vega.dataflow.transform/Transform { // dev.aster.vega.dataflow.transform/CrossFilterTransform|null[0]
+    final val publishesSignal // dev.aster.vega.dataflow.transform/CrossFilterTransform.publishesSignal|{}publishesSignal[0]
+        final fun <get-publishesSignal>(): kotlin/Boolean // dev.aster.vega.dataflow.transform/CrossFilterTransform.publishesSignal.<get-publishesSignal>|<get-publishesSignal>(){}[0]
+    final val type // dev.aster.vega.dataflow.transform/CrossFilterTransform.type|{}type[0]
+        final fun <get-type>(): kotlin/String // dev.aster.vega.dataflow.transform/CrossFilterTransform.type.<get-type>|<get-type>(){}[0]
+
+    final fun apply(kotlin.collections/List<dev.aster.vega.model/VegaValue>, dev.aster.vega.model/VegaValue.Obj, dev.aster.vega.dataflow.transform/TransformContext): kotlin.collections/List<dev.aster.vega.model/VegaValue> // dev.aster.vega.dataflow.transform/CrossFilterTransform.apply|apply(kotlin.collections.List<dev.aster.vega.model.VegaValue>;dev.aster.vega.model.VegaValue.Obj;dev.aster.vega.dataflow.transform.TransformContext){}[0]
+}
+
+final object dev.aster.vega.dataflow.transform/CrossTransform : dev.aster.vega.dataflow.transform/Transform { // dev.aster.vega.dataflow.transform/CrossTransform|null[0]
+    final val type // dev.aster.vega.dataflow.transform/CrossTransform.type|{}type[0]
+        final fun <get-type>(): kotlin/String // dev.aster.vega.dataflow.transform/CrossTransform.type.<get-type>|<get-type>(){}[0]
+
+    final fun apply(kotlin.collections/List<dev.aster.vega.model/VegaValue>, dev.aster.vega.model/VegaValue.Obj, dev.aster.vega.dataflow.transform/TransformContext): kotlin.collections/List<dev.aster.vega.model/VegaValue> // dev.aster.vega.dataflow.transform/CrossTransform.apply|apply(kotlin.collections.List<dev.aster.vega.model.VegaValue>;dev.aster.vega.model.VegaValue.Obj;dev.aster.vega.dataflow.transform.TransformContext){}[0]
+}
+
+final object dev.aster.vega.dataflow.transform/CurveSampler { // dev.aster.vega.dataflow.transform/CurveSampler|null[0]
+    final fun sample(kotlin/Function1<kotlin/Double, kotlin/Double>, kotlin/Double, kotlin/Double, kotlin/Int = ..., kotlin/Int = ...): kotlin.collections/List<kotlin/DoubleArray> // dev.aster.vega.dataflow.transform/CurveSampler.sample|sample(kotlin.Function1<kotlin.Double,kotlin.Double>;kotlin.Double;kotlin.Double;kotlin.Int;kotlin.Int){}[0]
+}
+
+final object dev.aster.vega.dataflow.transform/DensityTransform : dev.aster.vega.dataflow.transform/Transform { // dev.aster.vega.dataflow.transform/DensityTransform|null[0]
+    final val type // dev.aster.vega.dataflow.transform/DensityTransform.type|{}type[0]
+        final fun <get-type>(): kotlin/String // dev.aster.vega.dataflow.transform/DensityTransform.type.<get-type>|<get-type>(){}[0]
+
+    final fun apply(kotlin.collections/List<dev.aster.vega.model/VegaValue>, dev.aster.vega.model/VegaValue.Obj, dev.aster.vega.dataflow.transform/TransformContext): kotlin.collections/List<dev.aster.vega.model/VegaValue> // dev.aster.vega.dataflow.transform/DensityTransform.apply|apply(kotlin.collections.List<dev.aster.vega.model.VegaValue>;dev.aster.vega.model.VegaValue.Obj;dev.aster.vega.dataflow.transform.TransformContext){}[0]
+}
+
+final object dev.aster.vega.dataflow.transform/DotBinTransform : dev.aster.vega.dataflow.transform/Transform { // dev.aster.vega.dataflow.transform/DotBinTransform|null[0]
+    final val type // dev.aster.vega.dataflow.transform/DotBinTransform.type|{}type[0]
+        final fun <get-type>(): kotlin/String // dev.aster.vega.dataflow.transform/DotBinTransform.type.<get-type>|<get-type>(){}[0]
+
+    final fun apply(kotlin.collections/List<dev.aster.vega.model/VegaValue>, dev.aster.vega.model/VegaValue.Obj, dev.aster.vega.dataflow.transform/TransformContext): kotlin.collections/List<dev.aster.vega.model/VegaValue> // dev.aster.vega.dataflow.transform/DotBinTransform.apply|apply(kotlin.collections.List<dev.aster.vega.model.VegaValue>;dev.aster.vega.model.VegaValue.Obj;dev.aster.vega.dataflow.transform.TransformContext){}[0]
+}
+
+final object dev.aster.vega.dataflow.transform/ExtentTransform : dev.aster.vega.dataflow.transform/Transform { // dev.aster.vega.dataflow.transform/ExtentTransform|null[0]
+    final val publishesSignal // dev.aster.vega.dataflow.transform/ExtentTransform.publishesSignal|{}publishesSignal[0]
+        final fun <get-publishesSignal>(): kotlin/Boolean // dev.aster.vega.dataflow.transform/ExtentTransform.publishesSignal.<get-publishesSignal>|<get-publishesSignal>(){}[0]
+    final val type // dev.aster.vega.dataflow.transform/ExtentTransform.type|{}type[0]
+        final fun <get-type>(): kotlin/String // dev.aster.vega.dataflow.transform/ExtentTransform.type.<get-type>|<get-type>(){}[0]
+
+    final fun apply(kotlin.collections/List<dev.aster.vega.model/VegaValue>, dev.aster.vega.model/VegaValue.Obj, dev.aster.vega.dataflow.transform/TransformContext): kotlin.collections/List<dev.aster.vega.model/VegaValue> // dev.aster.vega.dataflow.transform/ExtentTransform.apply|apply(kotlin.collections.List<dev.aster.vega.model.VegaValue>;dev.aster.vega.model.VegaValue.Obj;dev.aster.vega.dataflow.transform.TransformContext){}[0]
+}
+
+final object dev.aster.vega.dataflow.transform/FilterTransform : dev.aster.vega.dataflow.transform/Transform { // dev.aster.vega.dataflow.transform/FilterTransform|null[0]
+    final val type // dev.aster.vega.dataflow.transform/FilterTransform.type|{}type[0]
+        final fun <get-type>(): kotlin/String // dev.aster.vega.dataflow.transform/FilterTransform.type.<get-type>|<get-type>(){}[0]
+
+    final fun apply(kotlin.collections/List<dev.aster.vega.model/VegaValue>, dev.aster.vega.model/VegaValue.Obj, dev.aster.vega.dataflow.transform/TransformContext): kotlin.collections/List<dev.aster.vega.model/VegaValue> // dev.aster.vega.dataflow.transform/FilterTransform.apply|apply(kotlin.collections.List<dev.aster.vega.model.VegaValue>;dev.aster.vega.model.VegaValue.Obj;dev.aster.vega.dataflow.transform.TransformContext){}[0]
+}
+
+final object dev.aster.vega.dataflow.transform/FlattenTransform : dev.aster.vega.dataflow.transform/Transform { // dev.aster.vega.dataflow.transform/FlattenTransform|null[0]
+    final val type // dev.aster.vega.dataflow.transform/FlattenTransform.type|{}type[0]
+        final fun <get-type>(): kotlin/String // dev.aster.vega.dataflow.transform/FlattenTransform.type.<get-type>|<get-type>(){}[0]
+
+    final fun apply(kotlin.collections/List<dev.aster.vega.model/VegaValue>, dev.aster.vega.model/VegaValue.Obj, dev.aster.vega.dataflow.transform/TransformContext): kotlin.collections/List<dev.aster.vega.model/VegaValue> // dev.aster.vega.dataflow.transform/FlattenTransform.apply|apply(kotlin.collections.List<dev.aster.vega.model.VegaValue>;dev.aster.vega.model.VegaValue.Obj;dev.aster.vega.dataflow.transform.TransformContext){}[0]
+}
+
+final object dev.aster.vega.dataflow.transform/FoldTransform : dev.aster.vega.dataflow.transform/Transform { // dev.aster.vega.dataflow.transform/FoldTransform|null[0]
+    final val type // dev.aster.vega.dataflow.transform/FoldTransform.type|{}type[0]
+        final fun <get-type>(): kotlin/String // dev.aster.vega.dataflow.transform/FoldTransform.type.<get-type>|<get-type>(){}[0]
+
+    final fun apply(kotlin.collections/List<dev.aster.vega.model/VegaValue>, dev.aster.vega.model/VegaValue.Obj, dev.aster.vega.dataflow.transform/TransformContext): kotlin.collections/List<dev.aster.vega.model/VegaValue> // dev.aster.vega.dataflow.transform/FoldTransform.apply|apply(kotlin.collections.List<dev.aster.vega.model.VegaValue>;dev.aster.vega.model.VegaValue.Obj;dev.aster.vega.dataflow.transform.TransformContext){}[0]
+}
+
+final object dev.aster.vega.dataflow.transform/ForceTransform : dev.aster.vega.dataflow.transform/Transform { // dev.aster.vega.dataflow.transform/ForceTransform|null[0]
+    final val publishesSignal // dev.aster.vega.dataflow.transform/ForceTransform.publishesSignal|{}publishesSignal[0]
+        final fun <get-publishesSignal>(): kotlin/Boolean // dev.aster.vega.dataflow.transform/ForceTransform.publishesSignal.<get-publishesSignal>|<get-publishesSignal>(){}[0]
+    final val type // dev.aster.vega.dataflow.transform/ForceTransform.type|{}type[0]
+        final fun <get-type>(): kotlin/String // dev.aster.vega.dataflow.transform/ForceTransform.type.<get-type>|<get-type>(){}[0]
+
+    final fun apply(kotlin.collections/List<dev.aster.vega.model/VegaValue>, dev.aster.vega.model/VegaValue.Obj, dev.aster.vega.dataflow.transform/TransformContext): kotlin.collections/List<dev.aster.vega.model/VegaValue> // dev.aster.vega.dataflow.transform/ForceTransform.apply|apply(kotlin.collections.List<dev.aster.vega.model.VegaValue>;dev.aster.vega.model.VegaValue.Obj;dev.aster.vega.dataflow.transform.TransformContext){}[0]
+}
+
+final object dev.aster.vega.dataflow.transform/FormulaTransform : dev.aster.vega.dataflow.transform/Transform { // dev.aster.vega.dataflow.transform/FormulaTransform|null[0]
+    final val type // dev.aster.vega.dataflow.transform/FormulaTransform.type|{}type[0]
+        final fun <get-type>(): kotlin/String // dev.aster.vega.dataflow.transform/FormulaTransform.type.<get-type>|<get-type>(){}[0]
+
+    final fun apply(kotlin.collections/List<dev.aster.vega.model/VegaValue>, dev.aster.vega.model/VegaValue.Obj, dev.aster.vega.dataflow.transform/TransformContext): kotlin.collections/List<dev.aster.vega.model/VegaValue> // dev.aster.vega.dataflow.transform/FormulaTransform.apply|apply(kotlin.collections.List<dev.aster.vega.model.VegaValue>;dev.aster.vega.model.VegaValue.Obj;dev.aster.vega.dataflow.transform.TransformContext){}[0]
+}
+
+final object dev.aster.vega.dataflow.transform/GeoJsonTransform : dev.aster.vega.dataflow.transform/Transform { // dev.aster.vega.dataflow.transform/GeoJsonTransform|null[0]
+    final val publishesSignal // dev.aster.vega.dataflow.transform/GeoJsonTransform.publishesSignal|{}publishesSignal[0]
+        final fun <get-publishesSignal>(): kotlin/Boolean // dev.aster.vega.dataflow.transform/GeoJsonTransform.publishesSignal.<get-publishesSignal>|<get-publishesSignal>(){}[0]
+    final val type // dev.aster.vega.dataflow.transform/GeoJsonTransform.type|{}type[0]
+        final fun <get-type>(): kotlin/String // dev.aster.vega.dataflow.transform/GeoJsonTransform.type.<get-type>|<get-type>(){}[0]
+
+    final fun apply(kotlin.collections/List<dev.aster.vega.model/VegaValue>, dev.aster.vega.model/VegaValue.Obj, dev.aster.vega.dataflow.transform/TransformContext): kotlin.collections/List<dev.aster.vega.model/VegaValue> // dev.aster.vega.dataflow.transform/GeoJsonTransform.apply|apply(kotlin.collections.List<dev.aster.vega.model.VegaValue>;dev.aster.vega.model.VegaValue.Obj;dev.aster.vega.dataflow.transform.TransformContext){}[0]
+}
+
+final object dev.aster.vega.dataflow.transform/GeoMeasure { // dev.aster.vega.dataflow.transform/GeoMeasure|null[0]
+    final fun area(dev.aster.vega.dataflow.transform/ProjectionDefinition?, dev.aster.vega.model/VegaValue): kotlin/Double // dev.aster.vega.dataflow.transform/GeoMeasure.area|area(dev.aster.vega.dataflow.transform.ProjectionDefinition?;dev.aster.vega.model.VegaValue){}[0]
+    final fun bounds(dev.aster.vega.dataflow.transform/ProjectionDefinition?, dev.aster.vega.model/VegaValue): kotlin/DoubleArray? // dev.aster.vega.dataflow.transform/GeoMeasure.bounds|bounds(dev.aster.vega.dataflow.transform.ProjectionDefinition?;dev.aster.vega.model.VegaValue){}[0]
+    final fun centroid(dev.aster.vega.dataflow.transform/ProjectionDefinition?, dev.aster.vega.model/VegaValue): kotlin/DoubleArray? // dev.aster.vega.dataflow.transform/GeoMeasure.centroid|centroid(dev.aster.vega.dataflow.transform.ProjectionDefinition?;dev.aster.vega.model.VegaValue){}[0]
+    final fun invert(dev.aster.vega.dataflow.transform/ProjectionDefinition, kotlin/Double, kotlin/Double): kotlin/DoubleArray? // dev.aster.vega.dataflow.transform/GeoMeasure.invert|invert(dev.aster.vega.dataflow.transform.ProjectionDefinition;kotlin.Double;kotlin.Double){}[0]
+    final fun project(dev.aster.vega.dataflow.transform/ProjectionDefinition, kotlin/Double, kotlin/Double): kotlin/DoubleArray? // dev.aster.vega.dataflow.transform/GeoMeasure.project|project(dev.aster.vega.dataflow.transform.ProjectionDefinition;kotlin.Double;kotlin.Double){}[0]
+    final fun scaleOf(dev.aster.vega.dataflow.transform/ProjectionDefinition): kotlin/Double? // dev.aster.vega.dataflow.transform/GeoMeasure.scaleOf|scaleOf(dev.aster.vega.dataflow.transform.ProjectionDefinition){}[0]
+    final fun shape(dev.aster.vega.dataflow.transform/ProjectionDefinition?, dev.aster.vega.model/VegaValue): kotlin/String? // dev.aster.vega.dataflow.transform/GeoMeasure.shape|shape(dev.aster.vega.dataflow.transform.ProjectionDefinition?;dev.aster.vega.model.VegaValue){}[0]
+}
+
+final object dev.aster.vega.dataflow.transform/GeoPathTransform : dev.aster.vega.dataflow.transform/Transform { // dev.aster.vega.dataflow.transform/GeoPathTransform|null[0]
+    final val type // dev.aster.vega.dataflow.transform/GeoPathTransform.type|{}type[0]
+        final fun <get-type>(): kotlin/String // dev.aster.vega.dataflow.transform/GeoPathTransform.type.<get-type>|<get-type>(){}[0]
+
+    final fun apply(kotlin.collections/List<dev.aster.vega.model/VegaValue>, dev.aster.vega.model/VegaValue.Obj, dev.aster.vega.dataflow.transform/TransformContext): kotlin.collections/List<dev.aster.vega.model/VegaValue> // dev.aster.vega.dataflow.transform/GeoPathTransform.apply|apply(kotlin.collections.List<dev.aster.vega.model.VegaValue>;dev.aster.vega.model.VegaValue.Obj;dev.aster.vega.dataflow.transform.TransformContext){}[0]
+}
+
+final object dev.aster.vega.dataflow.transform/GeoPointTransform : dev.aster.vega.dataflow.transform/Transform { // dev.aster.vega.dataflow.transform/GeoPointTransform|null[0]
+    final val type // dev.aster.vega.dataflow.transform/GeoPointTransform.type|{}type[0]
+        final fun <get-type>(): kotlin/String // dev.aster.vega.dataflow.transform/GeoPointTransform.type.<get-type>|<get-type>(){}[0]
+
+    final fun apply(kotlin.collections/List<dev.aster.vega.model/VegaValue>, dev.aster.vega.model/VegaValue.Obj, dev.aster.vega.dataflow.transform/TransformContext): kotlin.collections/List<dev.aster.vega.model/VegaValue> // dev.aster.vega.dataflow.transform/GeoPointTransform.apply|apply(kotlin.collections.List<dev.aster.vega.model.VegaValue>;dev.aster.vega.model.VegaValue.Obj;dev.aster.vega.dataflow.transform.TransformContext){}[0]
+}
+
+final object dev.aster.vega.dataflow.transform/GeoShapeTransform : dev.aster.vega.dataflow.transform/Transform { // dev.aster.vega.dataflow.transform/GeoShapeTransform|null[0]
+    final val type // dev.aster.vega.dataflow.transform/GeoShapeTransform.type|{}type[0]
+        final fun <get-type>(): kotlin/String // dev.aster.vega.dataflow.transform/GeoShapeTransform.type.<get-type>|<get-type>(){}[0]
+
+    final fun apply(kotlin.collections/List<dev.aster.vega.model/VegaValue>, dev.aster.vega.model/VegaValue.Obj, dev.aster.vega.dataflow.transform/TransformContext): kotlin.collections/List<dev.aster.vega.model/VegaValue> // dev.aster.vega.dataflow.transform/GeoShapeTransform.apply|apply(kotlin.collections.List<dev.aster.vega.model.VegaValue>;dev.aster.vega.model.VegaValue.Obj;dev.aster.vega.dataflow.transform.TransformContext){}[0]
+}
+
+final object dev.aster.vega.dataflow.transform/GraticuleTransform : dev.aster.vega.dataflow.transform/Transform { // dev.aster.vega.dataflow.transform/GraticuleTransform|null[0]
+    final val type // dev.aster.vega.dataflow.transform/GraticuleTransform.type|{}type[0]
+        final fun <get-type>(): kotlin/String // dev.aster.vega.dataflow.transform/GraticuleTransform.type.<get-type>|<get-type>(){}[0]
+
+    final fun apply(kotlin.collections/List<dev.aster.vega.model/VegaValue>, dev.aster.vega.model/VegaValue.Obj, dev.aster.vega.dataflow.transform/TransformContext): kotlin.collections/List<dev.aster.vega.model/VegaValue> // dev.aster.vega.dataflow.transform/GraticuleTransform.apply|apply(kotlin.collections.List<dev.aster.vega.model.VegaValue>;dev.aster.vega.model.VegaValue.Obj;dev.aster.vega.dataflow.transform.TransformContext){}[0]
+}
+
+final object dev.aster.vega.dataflow.transform/HeatmapTransform : dev.aster.vega.dataflow.transform/Transform { // dev.aster.vega.dataflow.transform/HeatmapTransform|null[0]
+    final val type // dev.aster.vega.dataflow.transform/HeatmapTransform.type|{}type[0]
+        final fun <get-type>(): kotlin/String // dev.aster.vega.dataflow.transform/HeatmapTransform.type.<get-type>|<get-type>(){}[0]
+
+    final fun apply(kotlin.collections/List<dev.aster.vega.model/VegaValue>, dev.aster.vega.model/VegaValue.Obj, dev.aster.vega.dataflow.transform/TransformContext): kotlin.collections/List<dev.aster.vega.model/VegaValue> // dev.aster.vega.dataflow.transform/HeatmapTransform.apply|apply(kotlin.collections.List<dev.aster.vega.model.VegaValue>;dev.aster.vega.model.VegaValue.Obj;dev.aster.vega.dataflow.transform.TransformContext){}[0]
+}
+
+final object dev.aster.vega.dataflow.transform/IdentifierTransform : dev.aster.vega.dataflow.transform/Transform { // dev.aster.vega.dataflow.transform/IdentifierTransform|null[0]
+    final val type // dev.aster.vega.dataflow.transform/IdentifierTransform.type|{}type[0]
+        final fun <get-type>(): kotlin/String // dev.aster.vega.dataflow.transform/IdentifierTransform.type.<get-type>|<get-type>(){}[0]
+
+    final fun apply(kotlin.collections/List<dev.aster.vega.model/VegaValue>, dev.aster.vega.model/VegaValue.Obj, dev.aster.vega.dataflow.transform/TransformContext): kotlin.collections/List<dev.aster.vega.model/VegaValue> // dev.aster.vega.dataflow.transform/IdentifierTransform.apply|apply(kotlin.collections.List<dev.aster.vega.model.VegaValue>;dev.aster.vega.model.VegaValue.Obj;dev.aster.vega.dataflow.transform.TransformContext){}[0]
+}
+
+final object dev.aster.vega.dataflow.transform/ImputeTransform : dev.aster.vega.dataflow.transform/Transform { // dev.aster.vega.dataflow.transform/ImputeTransform|null[0]
+    final val type // dev.aster.vega.dataflow.transform/ImputeTransform.type|{}type[0]
+        final fun <get-type>(): kotlin/String // dev.aster.vega.dataflow.transform/ImputeTransform.type.<get-type>|<get-type>(){}[0]
+
+    final fun apply(kotlin.collections/List<dev.aster.vega.model/VegaValue>, dev.aster.vega.model/VegaValue.Obj, dev.aster.vega.dataflow.transform/TransformContext): kotlin.collections/List<dev.aster.vega.model/VegaValue> // dev.aster.vega.dataflow.transform/ImputeTransform.apply|apply(kotlin.collections.List<dev.aster.vega.model.VegaValue>;dev.aster.vega.model.VegaValue.Obj;dev.aster.vega.dataflow.transform.TransformContext){}[0]
+}
+
+final object dev.aster.vega.dataflow.transform/IsocontourTransform : dev.aster.vega.dataflow.transform/Transform { // dev.aster.vega.dataflow.transform/IsocontourTransform|null[0]
+    final val type // dev.aster.vega.dataflow.transform/IsocontourTransform.type|{}type[0]
+        final fun <get-type>(): kotlin/String // dev.aster.vega.dataflow.transform/IsocontourTransform.type.<get-type>|<get-type>(){}[0]
+
+    final fun apply(kotlin.collections/List<dev.aster.vega.model/VegaValue>, dev.aster.vega.model/VegaValue.Obj, dev.aster.vega.dataflow.transform/TransformContext): kotlin.collections/List<dev.aster.vega.model/VegaValue> // dev.aster.vega.dataflow.transform/IsocontourTransform.apply|apply(kotlin.collections.List<dev.aster.vega.model.VegaValue>;dev.aster.vega.model.VegaValue.Obj;dev.aster.vega.dataflow.transform.TransformContext){}[0]
+}
+
+final object dev.aster.vega.dataflow.transform/JoinAggregateTransform : dev.aster.vega.dataflow.transform/Transform { // dev.aster.vega.dataflow.transform/JoinAggregateTransform|null[0]
+    final val type // dev.aster.vega.dataflow.transform/JoinAggregateTransform.type|{}type[0]
+        final fun <get-type>(): kotlin/String // dev.aster.vega.dataflow.transform/JoinAggregateTransform.type.<get-type>|<get-type>(){}[0]
+
+    final fun apply(kotlin.collections/List<dev.aster.vega.model/VegaValue>, dev.aster.vega.model/VegaValue.Obj, dev.aster.vega.dataflow.transform/TransformContext): kotlin.collections/List<dev.aster.vega.model/VegaValue> // dev.aster.vega.dataflow.transform/JoinAggregateTransform.apply|apply(kotlin.collections.List<dev.aster.vega.model.VegaValue>;dev.aster.vega.model.VegaValue.Obj;dev.aster.vega.dataflow.transform.TransformContext){}[0]
+}
+
+final object dev.aster.vega.dataflow.transform/Kde2dTransform : dev.aster.vega.dataflow.transform/Transform { // dev.aster.vega.dataflow.transform/Kde2dTransform|null[0]
+    final val type // dev.aster.vega.dataflow.transform/Kde2dTransform.type|{}type[0]
+        final fun <get-type>(): kotlin/String // dev.aster.vega.dataflow.transform/Kde2dTransform.type.<get-type>|<get-type>(){}[0]
+
+    final fun apply(kotlin.collections/List<dev.aster.vega.model/VegaValue>, dev.aster.vega.model/VegaValue.Obj, dev.aster.vega.dataflow.transform/TransformContext): kotlin.collections/List<dev.aster.vega.model/VegaValue> // dev.aster.vega.dataflow.transform/Kde2dTransform.apply|apply(kotlin.collections.List<dev.aster.vega.model.VegaValue>;dev.aster.vega.model.VegaValue.Obj;dev.aster.vega.dataflow.transform.TransformContext){}[0]
+}
+
+final object dev.aster.vega.dataflow.transform/KdeTransform : dev.aster.vega.dataflow.transform/Transform { // dev.aster.vega.dataflow.transform/KdeTransform|null[0]
+    final val type // dev.aster.vega.dataflow.transform/KdeTransform.type|{}type[0]
+        final fun <get-type>(): kotlin/String // dev.aster.vega.dataflow.transform/KdeTransform.type.<get-type>|<get-type>(){}[0]
+
+    final fun apply(kotlin.collections/List<dev.aster.vega.model/VegaValue>, dev.aster.vega.model/VegaValue.Obj, dev.aster.vega.dataflow.transform/TransformContext): kotlin.collections/List<dev.aster.vega.model/VegaValue> // dev.aster.vega.dataflow.transform/KdeTransform.apply|apply(kotlin.collections.List<dev.aster.vega.model.VegaValue>;dev.aster.vega.model.VegaValue.Obj;dev.aster.vega.dataflow.transform.TransformContext){}[0]
+}
+
+final object dev.aster.vega.dataflow.transform/LabelTransform : dev.aster.vega.dataflow.transform/Transform { // dev.aster.vega.dataflow.transform/LabelTransform|null[0]
+    final val type // dev.aster.vega.dataflow.transform/LabelTransform.type|{}type[0]
+        final fun <get-type>(): kotlin/String // dev.aster.vega.dataflow.transform/LabelTransform.type.<get-type>|<get-type>(){}[0]
+
+    final fun apply(kotlin.collections/List<dev.aster.vega.model/VegaValue>, dev.aster.vega.model/VegaValue.Obj, dev.aster.vega.dataflow.transform/TransformContext): kotlin.collections/List<dev.aster.vega.model/VegaValue> // dev.aster.vega.dataflow.transform/LabelTransform.apply|apply(kotlin.collections.List<dev.aster.vega.model.VegaValue>;dev.aster.vega.model.VegaValue.Obj;dev.aster.vega.dataflow.transform.TransformContext){}[0]
+}
+
+final object dev.aster.vega.dataflow.transform/LinkPathTransform : dev.aster.vega.dataflow.transform/Transform { // dev.aster.vega.dataflow.transform/LinkPathTransform|null[0]
+    final val type // dev.aster.vega.dataflow.transform/LinkPathTransform.type|{}type[0]
+        final fun <get-type>(): kotlin/String // dev.aster.vega.dataflow.transform/LinkPathTransform.type.<get-type>|<get-type>(){}[0]
+
+    final fun apply(kotlin.collections/List<dev.aster.vega.model/VegaValue>, dev.aster.vega.model/VegaValue.Obj, dev.aster.vega.dataflow.transform/TransformContext): kotlin.collections/List<dev.aster.vega.model/VegaValue> // dev.aster.vega.dataflow.transform/LinkPathTransform.apply|apply(kotlin.collections.List<dev.aster.vega.model.VegaValue>;dev.aster.vega.model.VegaValue.Obj;dev.aster.vega.dataflow.transform.TransformContext){}[0]
+}
+
+final object dev.aster.vega.dataflow.transform/LoessTransform : dev.aster.vega.dataflow.transform/Transform { // dev.aster.vega.dataflow.transform/LoessTransform|null[0]
+    final val type // dev.aster.vega.dataflow.transform/LoessTransform.type|{}type[0]
+        final fun <get-type>(): kotlin/String // dev.aster.vega.dataflow.transform/LoessTransform.type.<get-type>|<get-type>(){}[0]
+
+    final fun apply(kotlin.collections/List<dev.aster.vega.model/VegaValue>, dev.aster.vega.model/VegaValue.Obj, dev.aster.vega.dataflow.transform/TransformContext): kotlin.collections/List<dev.aster.vega.model/VegaValue> // dev.aster.vega.dataflow.transform/LoessTransform.apply|apply(kotlin.collections.List<dev.aster.vega.model.VegaValue>;dev.aster.vega.model.VegaValue.Obj;dev.aster.vega.dataflow.transform.TransformContext){}[0]
+}
+
+final object dev.aster.vega.dataflow.transform/LookupTransform : dev.aster.vega.dataflow.transform/Transform { // dev.aster.vega.dataflow.transform/LookupTransform|null[0]
+    final val type // dev.aster.vega.dataflow.transform/LookupTransform.type|{}type[0]
+        final fun <get-type>(): kotlin/String // dev.aster.vega.dataflow.transform/LookupTransform.type.<get-type>|<get-type>(){}[0]
+
+    final fun apply(kotlin.collections/List<dev.aster.vega.model/VegaValue>, dev.aster.vega.model/VegaValue.Obj, dev.aster.vega.dataflow.transform/TransformContext): kotlin.collections/List<dev.aster.vega.model/VegaValue> // dev.aster.vega.dataflow.transform/LookupTransform.apply|apply(kotlin.collections.List<dev.aster.vega.model.VegaValue>;dev.aster.vega.model.VegaValue.Obj;dev.aster.vega.dataflow.transform.TransformContext){}[0]
+}
+
+final object dev.aster.vega.dataflow.transform/NestTransform : dev.aster.vega.dataflow.transform/Transform { // dev.aster.vega.dataflow.transform/NestTransform|null[0]
+    final val type // dev.aster.vega.dataflow.transform/NestTransform.type|{}type[0]
+        final fun <get-type>(): kotlin/String // dev.aster.vega.dataflow.transform/NestTransform.type.<get-type>|<get-type>(){}[0]
+
+    final fun apply(kotlin.collections/List<dev.aster.vega.model/VegaValue>, dev.aster.vega.model/VegaValue.Obj, dev.aster.vega.dataflow.transform/TransformContext): kotlin.collections/List<dev.aster.vega.model/VegaValue> // dev.aster.vega.dataflow.transform/NestTransform.apply|apply(kotlin.collections.List<dev.aster.vega.model.VegaValue>;dev.aster.vega.model.VegaValue.Obj;dev.aster.vega.dataflow.transform.TransformContext){}[0]
+}
+
+final object dev.aster.vega.dataflow.transform/PackTransform : dev.aster.vega.dataflow.transform/Transform { // dev.aster.vega.dataflow.transform/PackTransform|null[0]
+    final val type // dev.aster.vega.dataflow.transform/PackTransform.type|{}type[0]
+        final fun <get-type>(): kotlin/String // dev.aster.vega.dataflow.transform/PackTransform.type.<get-type>|<get-type>(){}[0]
+
+    final fun apply(kotlin.collections/List<dev.aster.vega.model/VegaValue>, dev.aster.vega.model/VegaValue.Obj, dev.aster.vega.dataflow.transform/TransformContext): kotlin.collections/List<dev.aster.vega.model/VegaValue> // dev.aster.vega.dataflow.transform/PackTransform.apply|apply(kotlin.collections.List<dev.aster.vega.model.VegaValue>;dev.aster.vega.model.VegaValue.Obj;dev.aster.vega.dataflow.transform.TransformContext){}[0]
+}
+
+final object dev.aster.vega.dataflow.transform/PartitionTransform : dev.aster.vega.dataflow.transform/Transform { // dev.aster.vega.dataflow.transform/PartitionTransform|null[0]
+    final val type // dev.aster.vega.dataflow.transform/PartitionTransform.type|{}type[0]
+        final fun <get-type>(): kotlin/String // dev.aster.vega.dataflow.transform/PartitionTransform.type.<get-type>|<get-type>(){}[0]
+
+    final fun apply(kotlin.collections/List<dev.aster.vega.model/VegaValue>, dev.aster.vega.model/VegaValue.Obj, dev.aster.vega.dataflow.transform/TransformContext): kotlin.collections/List<dev.aster.vega.model/VegaValue> // dev.aster.vega.dataflow.transform/PartitionTransform.apply|apply(kotlin.collections.List<dev.aster.vega.model.VegaValue>;dev.aster.vega.model.VegaValue.Obj;dev.aster.vega.dataflow.transform.TransformContext){}[0]
+}
+
+final object dev.aster.vega.dataflow.transform/PieTransform : dev.aster.vega.dataflow.transform/Transform { // dev.aster.vega.dataflow.transform/PieTransform|null[0]
+    final val type // dev.aster.vega.dataflow.transform/PieTransform.type|{}type[0]
+        final fun <get-type>(): kotlin/String // dev.aster.vega.dataflow.transform/PieTransform.type.<get-type>|<get-type>(){}[0]
+
+    final fun apply(kotlin.collections/List<dev.aster.vega.model/VegaValue>, dev.aster.vega.model/VegaValue.Obj, dev.aster.vega.dataflow.transform/TransformContext): kotlin.collections/List<dev.aster.vega.model/VegaValue> // dev.aster.vega.dataflow.transform/PieTransform.apply|apply(kotlin.collections.List<dev.aster.vega.model.VegaValue>;dev.aster.vega.model.VegaValue.Obj;dev.aster.vega.dataflow.transform.TransformContext){}[0]
+}
+
+final object dev.aster.vega.dataflow.transform/PivotTransform : dev.aster.vega.dataflow.transform/Transform { // dev.aster.vega.dataflow.transform/PivotTransform|null[0]
+    final val type // dev.aster.vega.dataflow.transform/PivotTransform.type|{}type[0]
+        final fun <get-type>(): kotlin/String // dev.aster.vega.dataflow.transform/PivotTransform.type.<get-type>|<get-type>(){}[0]
+
+    final fun apply(kotlin.collections/List<dev.aster.vega.model/VegaValue>, dev.aster.vega.model/VegaValue.Obj, dev.aster.vega.dataflow.transform/TransformContext): kotlin.collections/List<dev.aster.vega.model/VegaValue> // dev.aster.vega.dataflow.transform/PivotTransform.apply|apply(kotlin.collections.List<dev.aster.vega.model.VegaValue>;dev.aster.vega.model.VegaValue.Obj;dev.aster.vega.dataflow.transform.TransformContext){}[0]
+}
+
+final object dev.aster.vega.dataflow.transform/ProjectTransform : dev.aster.vega.dataflow.transform/Transform { // dev.aster.vega.dataflow.transform/ProjectTransform|null[0]
+    final val type // dev.aster.vega.dataflow.transform/ProjectTransform.type|{}type[0]
+        final fun <get-type>(): kotlin/String // dev.aster.vega.dataflow.transform/ProjectTransform.type.<get-type>|<get-type>(){}[0]
+
+    final fun apply(kotlin.collections/List<dev.aster.vega.model/VegaValue>, dev.aster.vega.model/VegaValue.Obj, dev.aster.vega.dataflow.transform/TransformContext): kotlin.collections/List<dev.aster.vega.model/VegaValue> // dev.aster.vega.dataflow.transform/ProjectTransform.apply|apply(kotlin.collections.List<dev.aster.vega.model.VegaValue>;dev.aster.vega.model.VegaValue.Obj;dev.aster.vega.dataflow.transform.TransformContext){}[0]
+}
+
+final object dev.aster.vega.dataflow.transform/QuantileTransform : dev.aster.vega.dataflow.transform/Transform { // dev.aster.vega.dataflow.transform/QuantileTransform|null[0]
+    final val type // dev.aster.vega.dataflow.transform/QuantileTransform.type|{}type[0]
+        final fun <get-type>(): kotlin/String // dev.aster.vega.dataflow.transform/QuantileTransform.type.<get-type>|<get-type>(){}[0]
+
+    final fun apply(kotlin.collections/List<dev.aster.vega.model/VegaValue>, dev.aster.vega.model/VegaValue.Obj, dev.aster.vega.dataflow.transform/TransformContext): kotlin.collections/List<dev.aster.vega.model/VegaValue> // dev.aster.vega.dataflow.transform/QuantileTransform.apply|apply(kotlin.collections.List<dev.aster.vega.model.VegaValue>;dev.aster.vega.model.VegaValue.Obj;dev.aster.vega.dataflow.transform.TransformContext){}[0]
+}
+
+final object dev.aster.vega.dataflow.transform/RegressionTransform : dev.aster.vega.dataflow.transform/Transform { // dev.aster.vega.dataflow.transform/RegressionTransform|null[0]
+    final val type // dev.aster.vega.dataflow.transform/RegressionTransform.type|{}type[0]
+        final fun <get-type>(): kotlin/String // dev.aster.vega.dataflow.transform/RegressionTransform.type.<get-type>|<get-type>(){}[0]
+
+    final fun apply(kotlin.collections/List<dev.aster.vega.model/VegaValue>, dev.aster.vega.model/VegaValue.Obj, dev.aster.vega.dataflow.transform/TransformContext): kotlin.collections/List<dev.aster.vega.model/VegaValue> // dev.aster.vega.dataflow.transform/RegressionTransform.apply|apply(kotlin.collections.List<dev.aster.vega.model.VegaValue>;dev.aster.vega.model.VegaValue.Obj;dev.aster.vega.dataflow.transform.TransformContext){}[0]
+}
+
+final object dev.aster.vega.dataflow.transform/ResolveFilterTransform : dev.aster.vega.dataflow.transform/Transform { // dev.aster.vega.dataflow.transform/ResolveFilterTransform|null[0]
+    final val type // dev.aster.vega.dataflow.transform/ResolveFilterTransform.type|{}type[0]
+        final fun <get-type>(): kotlin/String // dev.aster.vega.dataflow.transform/ResolveFilterTransform.type.<get-type>|<get-type>(){}[0]
+
+    final fun apply(kotlin.collections/List<dev.aster.vega.model/VegaValue>, dev.aster.vega.model/VegaValue.Obj, dev.aster.vega.dataflow.transform/TransformContext): kotlin.collections/List<dev.aster.vega.model/VegaValue> // dev.aster.vega.dataflow.transform/ResolveFilterTransform.apply|apply(kotlin.collections.List<dev.aster.vega.model.VegaValue>;dev.aster.vega.model.VegaValue.Obj;dev.aster.vega.dataflow.transform.TransformContext){}[0]
+}
+
+final object dev.aster.vega.dataflow.transform/SampleTransform : dev.aster.vega.dataflow.transform/Transform { // dev.aster.vega.dataflow.transform/SampleTransform|null[0]
+    final val type // dev.aster.vega.dataflow.transform/SampleTransform.type|{}type[0]
+        final fun <get-type>(): kotlin/String // dev.aster.vega.dataflow.transform/SampleTransform.type.<get-type>|<get-type>(){}[0]
+
+    final fun apply(kotlin.collections/List<dev.aster.vega.model/VegaValue>, dev.aster.vega.model/VegaValue.Obj, dev.aster.vega.dataflow.transform/TransformContext): kotlin.collections/List<dev.aster.vega.model/VegaValue> // dev.aster.vega.dataflow.transform/SampleTransform.apply|apply(kotlin.collections.List<dev.aster.vega.model.VegaValue>;dev.aster.vega.model.VegaValue.Obj;dev.aster.vega.dataflow.transform.TransformContext){}[0]
+}
+
+final object dev.aster.vega.dataflow.transform/SequenceTransform : dev.aster.vega.dataflow.transform/Transform { // dev.aster.vega.dataflow.transform/SequenceTransform|null[0]
+    final val type // dev.aster.vega.dataflow.transform/SequenceTransform.type|{}type[0]
+        final fun <get-type>(): kotlin/String // dev.aster.vega.dataflow.transform/SequenceTransform.type.<get-type>|<get-type>(){}[0]
+
+    final fun apply(kotlin.collections/List<dev.aster.vega.model/VegaValue>, dev.aster.vega.model/VegaValue.Obj, dev.aster.vega.dataflow.transform/TransformContext): kotlin.collections/List<dev.aster.vega.model/VegaValue> // dev.aster.vega.dataflow.transform/SequenceTransform.apply|apply(kotlin.collections.List<dev.aster.vega.model.VegaValue>;dev.aster.vega.model.VegaValue.Obj;dev.aster.vega.dataflow.transform.TransformContext){}[0]
+}
+
+final object dev.aster.vega.dataflow.transform/StackTransform : dev.aster.vega.dataflow.transform/Transform { // dev.aster.vega.dataflow.transform/StackTransform|null[0]
+    final val type // dev.aster.vega.dataflow.transform/StackTransform.type|{}type[0]
+        final fun <get-type>(): kotlin/String // dev.aster.vega.dataflow.transform/StackTransform.type.<get-type>|<get-type>(){}[0]
+
+    final fun apply(kotlin.collections/List<dev.aster.vega.model/VegaValue>, dev.aster.vega.model/VegaValue.Obj, dev.aster.vega.dataflow.transform/TransformContext): kotlin.collections/List<dev.aster.vega.model/VegaValue> // dev.aster.vega.dataflow.transform/StackTransform.apply|apply(kotlin.collections.List<dev.aster.vega.model.VegaValue>;dev.aster.vega.model.VegaValue.Obj;dev.aster.vega.dataflow.transform.TransformContext){}[0]
+}
+
+final object dev.aster.vega.dataflow.transform/StratifyTransform : dev.aster.vega.dataflow.transform/Transform { // dev.aster.vega.dataflow.transform/StratifyTransform|null[0]
+    final val type // dev.aster.vega.dataflow.transform/StratifyTransform.type|{}type[0]
+        final fun <get-type>(): kotlin/String // dev.aster.vega.dataflow.transform/StratifyTransform.type.<get-type>|<get-type>(){}[0]
+
+    final fun apply(kotlin.collections/List<dev.aster.vega.model/VegaValue>, dev.aster.vega.model/VegaValue.Obj, dev.aster.vega.dataflow.transform/TransformContext): kotlin.collections/List<dev.aster.vega.model/VegaValue> // dev.aster.vega.dataflow.transform/StratifyTransform.apply|apply(kotlin.collections.List<dev.aster.vega.model.VegaValue>;dev.aster.vega.model.VegaValue.Obj;dev.aster.vega.dataflow.transform.TransformContext){}[0]
+}
+
+final object dev.aster.vega.dataflow.transform/TimeUnitTransform : dev.aster.vega.dataflow.transform/Transform { // dev.aster.vega.dataflow.transform/TimeUnitTransform|null[0]
+    final val publishesSignal // dev.aster.vega.dataflow.transform/TimeUnitTransform.publishesSignal|{}publishesSignal[0]
+        final fun <get-publishesSignal>(): kotlin/Boolean // dev.aster.vega.dataflow.transform/TimeUnitTransform.publishesSignal.<get-publishesSignal>|<get-publishesSignal>(){}[0]
+    final val type // dev.aster.vega.dataflow.transform/TimeUnitTransform.type|{}type[0]
+        final fun <get-type>(): kotlin/String // dev.aster.vega.dataflow.transform/TimeUnitTransform.type.<get-type>|<get-type>(){}[0]
+
+    final fun apply(kotlin.collections/List<dev.aster.vega.model/VegaValue>, dev.aster.vega.model/VegaValue.Obj, dev.aster.vega.dataflow.transform/TransformContext): kotlin.collections/List<dev.aster.vega.model/VegaValue> // dev.aster.vega.dataflow.transform/TimeUnitTransform.apply|apply(kotlin.collections.List<dev.aster.vega.model.VegaValue>;dev.aster.vega.model.VegaValue.Obj;dev.aster.vega.dataflow.transform.TransformContext){}[0]
+}
+
+final object dev.aster.vega.dataflow.transform/TreeLinksTransform : dev.aster.vega.dataflow.transform/Transform { // dev.aster.vega.dataflow.transform/TreeLinksTransform|null[0]
+    final val type // dev.aster.vega.dataflow.transform/TreeLinksTransform.type|{}type[0]
+        final fun <get-type>(): kotlin/String // dev.aster.vega.dataflow.transform/TreeLinksTransform.type.<get-type>|<get-type>(){}[0]
+
+    final fun apply(kotlin.collections/List<dev.aster.vega.model/VegaValue>, dev.aster.vega.model/VegaValue.Obj, dev.aster.vega.dataflow.transform/TransformContext): kotlin.collections/List<dev.aster.vega.model/VegaValue> // dev.aster.vega.dataflow.transform/TreeLinksTransform.apply|apply(kotlin.collections.List<dev.aster.vega.model.VegaValue>;dev.aster.vega.model.VegaValue.Obj;dev.aster.vega.dataflow.transform.TransformContext){}[0]
+}
+
+final object dev.aster.vega.dataflow.transform/TreeTransform : dev.aster.vega.dataflow.transform/Transform { // dev.aster.vega.dataflow.transform/TreeTransform|null[0]
+    final val type // dev.aster.vega.dataflow.transform/TreeTransform.type|{}type[0]
+        final fun <get-type>(): kotlin/String // dev.aster.vega.dataflow.transform/TreeTransform.type.<get-type>|<get-type>(){}[0]
+
+    final fun apply(kotlin.collections/List<dev.aster.vega.model/VegaValue>, dev.aster.vega.model/VegaValue.Obj, dev.aster.vega.dataflow.transform/TransformContext): kotlin.collections/List<dev.aster.vega.model/VegaValue> // dev.aster.vega.dataflow.transform/TreeTransform.apply|apply(kotlin.collections.List<dev.aster.vega.model.VegaValue>;dev.aster.vega.model.VegaValue.Obj;dev.aster.vega.dataflow.transform.TransformContext){}[0]
+}
+
+final object dev.aster.vega.dataflow.transform/TreemapTransform : dev.aster.vega.dataflow.transform/Transform { // dev.aster.vega.dataflow.transform/TreemapTransform|null[0]
+    final val type // dev.aster.vega.dataflow.transform/TreemapTransform.type|{}type[0]
+        final fun <get-type>(): kotlin/String // dev.aster.vega.dataflow.transform/TreemapTransform.type.<get-type>|<get-type>(){}[0]
+
+    final fun apply(kotlin.collections/List<dev.aster.vega.model/VegaValue>, dev.aster.vega.model/VegaValue.Obj, dev.aster.vega.dataflow.transform/TransformContext): kotlin.collections/List<dev.aster.vega.model/VegaValue> // dev.aster.vega.dataflow.transform/TreemapTransform.apply|apply(kotlin.collections.List<dev.aster.vega.model.VegaValue>;dev.aster.vega.model.VegaValue.Obj;dev.aster.vega.dataflow.transform.TransformContext){}[0]
+}
+
+final object dev.aster.vega.dataflow.transform/VoronoiTransform : dev.aster.vega.dataflow.transform/Transform { // dev.aster.vega.dataflow.transform/VoronoiTransform|null[0]
+    final val type // dev.aster.vega.dataflow.transform/VoronoiTransform.type|{}type[0]
+        final fun <get-type>(): kotlin/String // dev.aster.vega.dataflow.transform/VoronoiTransform.type.<get-type>|<get-type>(){}[0]
+
+    final fun apply(kotlin.collections/List<dev.aster.vega.model/VegaValue>, dev.aster.vega.model/VegaValue.Obj, dev.aster.vega.dataflow.transform/TransformContext): kotlin.collections/List<dev.aster.vega.model/VegaValue> // dev.aster.vega.dataflow.transform/VoronoiTransform.apply|apply(kotlin.collections.List<dev.aster.vega.model.VegaValue>;dev.aster.vega.model.VegaValue.Obj;dev.aster.vega.dataflow.transform.TransformContext){}[0]
+}
+
+final object dev.aster.vega.dataflow.transform/WindowTransform : dev.aster.vega.dataflow.transform/Transform { // dev.aster.vega.dataflow.transform/WindowTransform|null[0]
+    final val type // dev.aster.vega.dataflow.transform/WindowTransform.type|{}type[0]
+        final fun <get-type>(): kotlin/String // dev.aster.vega.dataflow.transform/WindowTransform.type.<get-type>|<get-type>(){}[0]
+
+    final fun apply(kotlin.collections/List<dev.aster.vega.model/VegaValue>, dev.aster.vega.model/VegaValue.Obj, dev.aster.vega.dataflow.transform/TransformContext): kotlin.collections/List<dev.aster.vega.model/VegaValue> // dev.aster.vega.dataflow.transform/WindowTransform.apply|apply(kotlin.collections.List<dev.aster.vega.model.VegaValue>;dev.aster.vega.model.VegaValue.Obj;dev.aster.vega.dataflow.transform.TransformContext){}[0]
+}
+
+final object dev.aster.vega.dataflow/DataflowScheduler { // dev.aster.vega.dataflow/DataflowScheduler|null[0]
+    final fun topologicalOrder(kotlin.collections/List<dev.aster.vega.dataflow/DataflowOperator<*, *>>): kotlin.collections/List<dev.aster.vega.dataflow/OperatorId> // dev.aster.vega.dataflow/DataflowScheduler.topologicalOrder|topologicalOrder(kotlin.collections.List<dev.aster.vega.dataflow.DataflowOperator<*,*>>){}[0]
+}
+
+final fun dev.aster.vega.dataflow.transform/aggregateOver(dev.aster.vega.dataflow.transform/AggregateOp, kotlin/String?, kotlin.collections/List<dev.aster.vega.model/VegaValue>): dev.aster.vega.model/VegaValue // dev.aster.vega.dataflow.transform/aggregateOver|aggregateOver(dev.aster.vega.dataflow.transform.AggregateOp;kotlin.String?;kotlin.collections.List<dev.aster.vega.model.VegaValue>){}[0]
+final fun dev.aster.vega.dataflow.transform/compareFieldValues(dev.aster.vega.model/VegaValue, dev.aster.vega.model/VegaValue): kotlin/Int // dev.aster.vega.dataflow.transform/compareFieldValues|compareFieldValues(dev.aster.vega.model.VegaValue;dev.aster.vega.model.VegaValue){}[0]
+final fun dev.aster.vega.dataflow.transform/groupKey(dev.aster.vega.model/VegaValue, kotlin.collections/List<kotlin/String>): kotlin.collections/List<dev.aster.vega.model/VegaValue> // dev.aster.vega.dataflow.transform/groupKey|groupKey(dev.aster.vega.model.VegaValue;kotlin.collections.List<kotlin.String>){}[0]
+final fun dev.aster.vega.dataflow.transform/groupTuples(kotlin.collections/List<dev.aster.vega.model/VegaValue>, kotlin.collections/List<kotlin/String>): kotlin.collections/Map<kotlin.collections/List<dev.aster.vega.model/VegaValue>, kotlin.collections/List<dev.aster.vega.model/VegaValue>> // dev.aster.vega.dataflow.transform/groupTuples|groupTuples(kotlin.collections.List<dev.aster.vega.model.VegaValue>;kotlin.collections.List<kotlin.String>){}[0]

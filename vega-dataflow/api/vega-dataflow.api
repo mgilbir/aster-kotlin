@@ -1,0 +1,630 @@
+public final class dev/aster/vega/dataflow/ChangeSet {
+	public static final field Companion Ldev/aster/vega/dataflow/ChangeSet$Companion;
+	public fun <init> ()V
+	public fun <init> (Ljava/util/List;Ljava/util/List;Ljava/util/List;Z)V
+	public synthetic fun <init> (Ljava/util/List;Ljava/util/List;Ljava/util/List;ZILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()Ljava/util/List;
+	public final fun component2 ()Ljava/util/List;
+	public final fun component3 ()Ljava/util/List;
+	public final fun component4 ()Z
+	public final fun copy (Ljava/util/List;Ljava/util/List;Ljava/util/List;Z)Ldev/aster/vega/dataflow/ChangeSet;
+	public static synthetic fun copy$default (Ldev/aster/vega/dataflow/ChangeSet;Ljava/util/List;Ljava/util/List;Ljava/util/List;ZILjava/lang/Object;)Ldev/aster/vega/dataflow/ChangeSet;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getAdded ()Ljava/util/List;
+	public final fun getModified ()Ljava/util/List;
+	public final fun getRemoved ()Ljava/util/List;
+	public final fun getReplacesAll ()Z
+	public fun hashCode ()I
+	public final fun isEmpty ()Z
+	public final fun merge (Ldev/aster/vega/dataflow/ChangeSet;)Ldev/aster/vega/dataflow/ChangeSet;
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class dev/aster/vega/dataflow/ChangeSet$Companion {
+	public final fun getEmpty ()Ldev/aster/vega/dataflow/ChangeSet;
+	public final fun replaceAll (Ljava/util/List;)Ldev/aster/vega/dataflow/ChangeSet;
+}
+
+public final class dev/aster/vega/dataflow/CyclicDataflowException : java/lang/Exception {
+	public fun <init> (Ljava/util/List;)V
+	public final fun getCycle ()Ljava/util/List;
+}
+
+public abstract interface class dev/aster/vega/dataflow/DataflowOperator {
+	public abstract fun evaluate (Ljava/lang/Object;Ldev/aster/vega/dataflow/EvaluationContext;)Ljava/lang/Object;
+	public abstract fun getDependencies ()Ljava/util/Set;
+	public abstract fun getId-F96vs-U ()I
+}
+
+public final class dev/aster/vega/dataflow/DataflowScheduler {
+	public static final field INSTANCE Ldev/aster/vega/dataflow/DataflowScheduler;
+	public final fun topologicalOrder (Ljava/util/List;)Ljava/util/List;
+}
+
+public abstract interface class dev/aster/vega/dataflow/EvaluationContext {
+	public abstract fun dataset (Ljava/lang/String;)Ljava/util/List;
+	public abstract fun getDiagnostics ()Ldev/aster/vega/model/DiagnosticCollector;
+	public abstract fun getTupleIds ()Ldev/aster/vega/dataflow/TupleIdAllocator;
+	public abstract fun signal (Ljava/lang/String;)Ldev/aster/vega/model/VegaValue;
+}
+
+public final class dev/aster/vega/dataflow/OperatorId {
+	public static final synthetic fun box-impl (I)Ldev/aster/vega/dataflow/OperatorId;
+	public static fun constructor-impl (I)I
+	public fun equals (Ljava/lang/Object;)Z
+	public static fun equals-impl (ILjava/lang/Object;)Z
+	public static final fun equals-impl0 (II)Z
+	public final fun getValue ()I
+	public fun hashCode ()I
+	public static fun hashCode-impl (I)I
+	public fun toString ()Ljava/lang/String;
+	public static fun toString-impl (I)Ljava/lang/String;
+	public final synthetic fun unbox-impl ()I
+}
+
+public final class dev/aster/vega/dataflow/Tuple {
+	public synthetic fun <init> (JLdev/aster/vega/model/VegaValue;Lkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1-4c9Ivkk ()J
+	public final fun component2 ()Ldev/aster/vega/model/VegaValue;
+	public final fun copy-h3C31dI (JLdev/aster/vega/model/VegaValue;)Ldev/aster/vega/dataflow/Tuple;
+	public static synthetic fun copy-h3C31dI$default (Ldev/aster/vega/dataflow/Tuple;JLdev/aster/vega/model/VegaValue;ILjava/lang/Object;)Ldev/aster/vega/dataflow/Tuple;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getId-4c9Ivkk ()J
+	public final fun getValue ()Ldev/aster/vega/model/VegaValue;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+	public final fun withValue (Ldev/aster/vega/model/VegaValue;)Ldev/aster/vega/dataflow/Tuple;
+}
+
+public final class dev/aster/vega/dataflow/TupleId {
+	public static final field Companion Ldev/aster/vega/dataflow/TupleId$Companion;
+	public static final synthetic fun box-impl (J)Ldev/aster/vega/dataflow/TupleId;
+	public static fun constructor-impl (J)J
+	public fun equals (Ljava/lang/Object;)Z
+	public static fun equals-impl (JLjava/lang/Object;)Z
+	public static final fun equals-impl0 (JJ)Z
+	public final fun getValue ()J
+	public fun hashCode ()I
+	public static fun hashCode-impl (J)I
+	public fun toString ()Ljava/lang/String;
+	public static fun toString-impl (J)Ljava/lang/String;
+	public final synthetic fun unbox-impl ()J
+}
+
+public final class dev/aster/vega/dataflow/TupleId$Companion {
+	public final fun getNone-4c9Ivkk ()J
+}
+
+public final class dev/aster/vega/dataflow/TupleIdAllocator {
+	public fun <init> ()V
+	public fun <init> (J)V
+	public synthetic fun <init> (JILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun allocate-4c9Ivkk ()J
+	public final fun getAllocated ()J
+}
+
+public final class dev/aster/vega/dataflow/transform/AggregateKt {
+	public static final fun aggregateOver (Ldev/aster/vega/dataflow/transform/AggregateOp;Ljava/lang/String;Ljava/util/List;)Ldev/aster/vega/model/VegaValue;
+	public static final fun groupKey (Ldev/aster/vega/model/VegaValue;Ljava/util/List;)Ljava/util/List;
+	public static final fun groupTuples (Ljava/util/List;Ljava/util/List;)Ljava/util/Map;
+}
+
+public final class dev/aster/vega/dataflow/transform/AggregateOp : java/lang/Enum {
+	public static final field ARGMAX Ldev/aster/vega/dataflow/transform/AggregateOp;
+	public static final field ARGMIN Ldev/aster/vega/dataflow/transform/AggregateOp;
+	public static final field AVERAGE Ldev/aster/vega/dataflow/transform/AggregateOp;
+	public static final field CI0 Ldev/aster/vega/dataflow/transform/AggregateOp;
+	public static final field CI1 Ldev/aster/vega/dataflow/transform/AggregateOp;
+	public static final field COUNT Ldev/aster/vega/dataflow/transform/AggregateOp;
+	public static final field Companion Ldev/aster/vega/dataflow/transform/AggregateOp$Companion;
+	public static final field DISTINCT Ldev/aster/vega/dataflow/transform/AggregateOp;
+	public static final field EXPONENTIAL Ldev/aster/vega/dataflow/transform/AggregateOp;
+	public static final field EXPONENTIALB Ldev/aster/vega/dataflow/transform/AggregateOp;
+	public static final field MAX Ldev/aster/vega/dataflow/transform/AggregateOp;
+	public static final field MEAN Ldev/aster/vega/dataflow/transform/AggregateOp;
+	public static final field MEDIAN Ldev/aster/vega/dataflow/transform/AggregateOp;
+	public static final field MIN Ldev/aster/vega/dataflow/transform/AggregateOp;
+	public static final field MISSING Ldev/aster/vega/dataflow/transform/AggregateOp;
+	public static final field PRODUCT Ldev/aster/vega/dataflow/transform/AggregateOp;
+	public static final field Q1 Ldev/aster/vega/dataflow/transform/AggregateOp;
+	public static final field Q3 Ldev/aster/vega/dataflow/transform/AggregateOp;
+	public static final field STDERR Ldev/aster/vega/dataflow/transform/AggregateOp;
+	public static final field STDEV Ldev/aster/vega/dataflow/transform/AggregateOp;
+	public static final field STDEVP Ldev/aster/vega/dataflow/transform/AggregateOp;
+	public static final field SUM Ldev/aster/vega/dataflow/transform/AggregateOp;
+	public static final field VALID Ldev/aster/vega/dataflow/transform/AggregateOp;
+	public static final field VALUES Ldev/aster/vega/dataflow/transform/AggregateOp;
+	public static final field VARIANCE Ldev/aster/vega/dataflow/transform/AggregateOp;
+	public static final field VARIANCEP Ldev/aster/vega/dataflow/transform/AggregateOp;
+	public static fun getEntries ()Lkotlin/enums/EnumEntries;
+	public final fun getNeedsField ()Z
+	public final fun getOpName ()Ljava/lang/String;
+	public static fun valueOf (Ljava/lang/String;)Ldev/aster/vega/dataflow/transform/AggregateOp;
+	public static fun values ()[Ldev/aster/vega/dataflow/transform/AggregateOp;
+}
+
+public final class dev/aster/vega/dataflow/transform/AggregateOp$Companion {
+	public final fun fromName (Ljava/lang/String;)Ldev/aster/vega/dataflow/transform/AggregateOp;
+}
+
+public final class dev/aster/vega/dataflow/transform/AggregateTransform : dev/aster/vega/dataflow/transform/Transform {
+	public static final field INSTANCE Ldev/aster/vega/dataflow/transform/AggregateTransform;
+	public fun apply-0h50GnU (Ljava/util/List;Ljava/util/Map;Ldev/aster/vega/dataflow/transform/TransformContext;)Ljava/util/List;
+	public fun getPublishesSignal ()Z
+	public fun getType ()Ljava/lang/String;
+}
+
+public final class dev/aster/vega/dataflow/transform/BinTransform : dev/aster/vega/dataflow/transform/Transform {
+	public static final field DEFAULT_MAXBINS I
+	public static final field INSTANCE Ldev/aster/vega/dataflow/transform/BinTransform;
+	public fun apply-0h50GnU (Ljava/util/List;Ljava/util/Map;Ldev/aster/vega/dataflow/transform/TransformContext;)Ljava/util/List;
+	public final fun binSettings (DDIDLjava/lang/Double;Ljava/util/List;DZLjava/lang/Double;)Ldev/aster/vega/dataflow/transform/BinTransform$BinSettings;
+	public static synthetic fun binSettings$default (Ldev/aster/vega/dataflow/transform/BinTransform;DDIDLjava/lang/Double;Ljava/util/List;DZLjava/lang/Double;ILjava/lang/Object;)Ldev/aster/vega/dataflow/transform/BinTransform$BinSettings;
+	public fun getPublishesSignal ()Z
+	public fun getType ()Ljava/lang/String;
+}
+
+public final class dev/aster/vega/dataflow/transform/BinTransform$BinSettings {
+	public fun <init> (DDD)V
+	public final fun component1 ()D
+	public final fun component2 ()D
+	public final fun component3 ()D
+	public final fun copy (DDD)Ldev/aster/vega/dataflow/transform/BinTransform$BinSettings;
+	public static synthetic fun copy$default (Ldev/aster/vega/dataflow/transform/BinTransform$BinSettings;DDDILjava/lang/Object;)Ldev/aster/vega/dataflow/transform/BinTransform$BinSettings;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getStart ()D
+	public final fun getStep ()D
+	public final fun getStop ()D
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class dev/aster/vega/dataflow/transform/CollectTransform : dev/aster/vega/dataflow/transform/Transform {
+	public static final field INSTANCE Ldev/aster/vega/dataflow/transform/CollectTransform;
+	public fun apply-0h50GnU (Ljava/util/List;Ljava/util/Map;Ldev/aster/vega/dataflow/transform/TransformContext;)Ljava/util/List;
+	public fun getPublishesSignal ()Z
+	public fun getType ()Ljava/lang/String;
+}
+
+public final class dev/aster/vega/dataflow/transform/CountPatternTransform : dev/aster/vega/dataflow/transform/Transform {
+	public static final field INSTANCE Ldev/aster/vega/dataflow/transform/CountPatternTransform;
+	public fun apply-0h50GnU (Ljava/util/List;Ljava/util/Map;Ldev/aster/vega/dataflow/transform/TransformContext;)Ljava/util/List;
+	public fun getPublishesSignal ()Z
+	public fun getType ()Ljava/lang/String;
+}
+
+public final class dev/aster/vega/dataflow/transform/CrossFilterTransform : dev/aster/vega/dataflow/transform/Transform {
+	public static final field INSTANCE Ldev/aster/vega/dataflow/transform/CrossFilterTransform;
+	public fun apply-0h50GnU (Ljava/util/List;Ljava/util/Map;Ldev/aster/vega/dataflow/transform/TransformContext;)Ljava/util/List;
+	public fun getPublishesSignal ()Z
+	public fun getType ()Ljava/lang/String;
+}
+
+public final class dev/aster/vega/dataflow/transform/CrossTransform : dev/aster/vega/dataflow/transform/Transform {
+	public static final field INSTANCE Ldev/aster/vega/dataflow/transform/CrossTransform;
+	public fun apply-0h50GnU (Ljava/util/List;Ljava/util/Map;Ldev/aster/vega/dataflow/transform/TransformContext;)Ljava/util/List;
+	public fun getPublishesSignal ()Z
+	public fun getType ()Ljava/lang/String;
+}
+
+public final class dev/aster/vega/dataflow/transform/CurveSampler {
+	public static final field INSTANCE Ldev/aster/vega/dataflow/transform/CurveSampler;
+	public final fun sample (Lkotlin/jvm/functions/Function1;DDII)Ljava/util/List;
+	public static synthetic fun sample$default (Ldev/aster/vega/dataflow/transform/CurveSampler;Lkotlin/jvm/functions/Function1;DDIIILjava/lang/Object;)Ljava/util/List;
+}
+
+public final class dev/aster/vega/dataflow/transform/DensityTransform : dev/aster/vega/dataflow/transform/Transform {
+	public static final field INSTANCE Ldev/aster/vega/dataflow/transform/DensityTransform;
+	public fun apply-0h50GnU (Ljava/util/List;Ljava/util/Map;Ldev/aster/vega/dataflow/transform/TransformContext;)Ljava/util/List;
+	public fun getPublishesSignal ()Z
+	public fun getType ()Ljava/lang/String;
+}
+
+public final class dev/aster/vega/dataflow/transform/DotBinTransform : dev/aster/vega/dataflow/transform/Transform {
+	public static final field INSTANCE Ldev/aster/vega/dataflow/transform/DotBinTransform;
+	public fun apply-0h50GnU (Ljava/util/List;Ljava/util/Map;Ldev/aster/vega/dataflow/transform/TransformContext;)Ljava/util/List;
+	public fun getPublishesSignal ()Z
+	public fun getType ()Ljava/lang/String;
+}
+
+public final class dev/aster/vega/dataflow/transform/ExtentTransform : dev/aster/vega/dataflow/transform/Transform {
+	public static final field INSTANCE Ldev/aster/vega/dataflow/transform/ExtentTransform;
+	public fun apply-0h50GnU (Ljava/util/List;Ljava/util/Map;Ldev/aster/vega/dataflow/transform/TransformContext;)Ljava/util/List;
+	public fun getPublishesSignal ()Z
+	public fun getType ()Ljava/lang/String;
+}
+
+public final class dev/aster/vega/dataflow/transform/FilterTransform : dev/aster/vega/dataflow/transform/Transform {
+	public static final field INSTANCE Ldev/aster/vega/dataflow/transform/FilterTransform;
+	public fun apply-0h50GnU (Ljava/util/List;Ljava/util/Map;Ldev/aster/vega/dataflow/transform/TransformContext;)Ljava/util/List;
+	public fun getPublishesSignal ()Z
+	public fun getType ()Ljava/lang/String;
+}
+
+public final class dev/aster/vega/dataflow/transform/FlattenTransform : dev/aster/vega/dataflow/transform/Transform {
+	public static final field INSTANCE Ldev/aster/vega/dataflow/transform/FlattenTransform;
+	public fun apply-0h50GnU (Ljava/util/List;Ljava/util/Map;Ldev/aster/vega/dataflow/transform/TransformContext;)Ljava/util/List;
+	public fun getPublishesSignal ()Z
+	public fun getType ()Ljava/lang/String;
+}
+
+public final class dev/aster/vega/dataflow/transform/FoldTransform : dev/aster/vega/dataflow/transform/Transform {
+	public static final field INSTANCE Ldev/aster/vega/dataflow/transform/FoldTransform;
+	public fun apply-0h50GnU (Ljava/util/List;Ljava/util/Map;Ldev/aster/vega/dataflow/transform/TransformContext;)Ljava/util/List;
+	public fun getPublishesSignal ()Z
+	public fun getType ()Ljava/lang/String;
+}
+
+public final class dev/aster/vega/dataflow/transform/ForceTransform : dev/aster/vega/dataflow/transform/Transform {
+	public static final field INSTANCE Ldev/aster/vega/dataflow/transform/ForceTransform;
+	public fun apply-0h50GnU (Ljava/util/List;Ljava/util/Map;Ldev/aster/vega/dataflow/transform/TransformContext;)Ljava/util/List;
+	public fun getPublishesSignal ()Z
+	public fun getType ()Ljava/lang/String;
+}
+
+public final class dev/aster/vega/dataflow/transform/FormulaTransform : dev/aster/vega/dataflow/transform/Transform {
+	public static final field INSTANCE Ldev/aster/vega/dataflow/transform/FormulaTransform;
+	public fun apply-0h50GnU (Ljava/util/List;Ljava/util/Map;Ldev/aster/vega/dataflow/transform/TransformContext;)Ljava/util/List;
+	public fun getPublishesSignal ()Z
+	public fun getType ()Ljava/lang/String;
+}
+
+public final class dev/aster/vega/dataflow/transform/GeoJsonTransform : dev/aster/vega/dataflow/transform/Transform {
+	public static final field INSTANCE Ldev/aster/vega/dataflow/transform/GeoJsonTransform;
+	public fun apply-0h50GnU (Ljava/util/List;Ljava/util/Map;Ldev/aster/vega/dataflow/transform/TransformContext;)Ljava/util/List;
+	public fun getPublishesSignal ()Z
+	public fun getType ()Ljava/lang/String;
+}
+
+public final class dev/aster/vega/dataflow/transform/GeoMeasure {
+	public static final field INSTANCE Ldev/aster/vega/dataflow/transform/GeoMeasure;
+	public final fun area (Ldev/aster/vega/dataflow/transform/ProjectionDefinition;Ldev/aster/vega/model/VegaValue;)D
+	public final fun bounds (Ldev/aster/vega/dataflow/transform/ProjectionDefinition;Ldev/aster/vega/model/VegaValue;)[D
+	public final fun centroid (Ldev/aster/vega/dataflow/transform/ProjectionDefinition;Ldev/aster/vega/model/VegaValue;)[D
+	public final fun invert (Ldev/aster/vega/dataflow/transform/ProjectionDefinition;DD)[D
+	public final fun project (Ldev/aster/vega/dataflow/transform/ProjectionDefinition;DD)[D
+	public final fun scaleOf (Ldev/aster/vega/dataflow/transform/ProjectionDefinition;)Ljava/lang/Double;
+	public final fun shape (Ldev/aster/vega/dataflow/transform/ProjectionDefinition;Ldev/aster/vega/model/VegaValue;)Ljava/lang/String;
+}
+
+public final class dev/aster/vega/dataflow/transform/GeoPathTransform : dev/aster/vega/dataflow/transform/Transform {
+	public static final field INSTANCE Ldev/aster/vega/dataflow/transform/GeoPathTransform;
+	public fun apply-0h50GnU (Ljava/util/List;Ljava/util/Map;Ldev/aster/vega/dataflow/transform/TransformContext;)Ljava/util/List;
+	public fun getPublishesSignal ()Z
+	public fun getType ()Ljava/lang/String;
+}
+
+public final class dev/aster/vega/dataflow/transform/GeoPointTransform : dev/aster/vega/dataflow/transform/Transform {
+	public static final field INSTANCE Ldev/aster/vega/dataflow/transform/GeoPointTransform;
+	public fun apply-0h50GnU (Ljava/util/List;Ljava/util/Map;Ldev/aster/vega/dataflow/transform/TransformContext;)Ljava/util/List;
+	public fun getPublishesSignal ()Z
+	public fun getType ()Ljava/lang/String;
+}
+
+public final class dev/aster/vega/dataflow/transform/GeoShapeTransform : dev/aster/vega/dataflow/transform/Transform {
+	public static final field INSTANCE Ldev/aster/vega/dataflow/transform/GeoShapeTransform;
+	public fun apply-0h50GnU (Ljava/util/List;Ljava/util/Map;Ldev/aster/vega/dataflow/transform/TransformContext;)Ljava/util/List;
+	public fun getPublishesSignal ()Z
+	public fun getType ()Ljava/lang/String;
+}
+
+public final class dev/aster/vega/dataflow/transform/GraticuleTransform : dev/aster/vega/dataflow/transform/Transform {
+	public static final field INSTANCE Ldev/aster/vega/dataflow/transform/GraticuleTransform;
+	public fun apply-0h50GnU (Ljava/util/List;Ljava/util/Map;Ldev/aster/vega/dataflow/transform/TransformContext;)Ljava/util/List;
+	public fun getPublishesSignal ()Z
+	public fun getType ()Ljava/lang/String;
+}
+
+public final class dev/aster/vega/dataflow/transform/HeatmapTransform : dev/aster/vega/dataflow/transform/Transform {
+	public static final field INSTANCE Ldev/aster/vega/dataflow/transform/HeatmapTransform;
+	public fun apply-0h50GnU (Ljava/util/List;Ljava/util/Map;Ldev/aster/vega/dataflow/transform/TransformContext;)Ljava/util/List;
+	public fun getPublishesSignal ()Z
+	public fun getType ()Ljava/lang/String;
+}
+
+public final class dev/aster/vega/dataflow/transform/IdentifierTransform : dev/aster/vega/dataflow/transform/Transform {
+	public static final field INSTANCE Ldev/aster/vega/dataflow/transform/IdentifierTransform;
+	public fun apply-0h50GnU (Ljava/util/List;Ljava/util/Map;Ldev/aster/vega/dataflow/transform/TransformContext;)Ljava/util/List;
+	public fun getPublishesSignal ()Z
+	public fun getType ()Ljava/lang/String;
+}
+
+public final class dev/aster/vega/dataflow/transform/ImputeTransform : dev/aster/vega/dataflow/transform/Transform {
+	public static final field INSTANCE Ldev/aster/vega/dataflow/transform/ImputeTransform;
+	public fun apply-0h50GnU (Ljava/util/List;Ljava/util/Map;Ldev/aster/vega/dataflow/transform/TransformContext;)Ljava/util/List;
+	public fun getPublishesSignal ()Z
+	public fun getType ()Ljava/lang/String;
+}
+
+public final class dev/aster/vega/dataflow/transform/IsocontourTransform : dev/aster/vega/dataflow/transform/Transform {
+	public static final field INSTANCE Ldev/aster/vega/dataflow/transform/IsocontourTransform;
+	public fun apply-0h50GnU (Ljava/util/List;Ljava/util/Map;Ldev/aster/vega/dataflow/transform/TransformContext;)Ljava/util/List;
+	public fun getPublishesSignal ()Z
+	public fun getType ()Ljava/lang/String;
+}
+
+public final class dev/aster/vega/dataflow/transform/JoinAggregateTransform : dev/aster/vega/dataflow/transform/Transform {
+	public static final field INSTANCE Ldev/aster/vega/dataflow/transform/JoinAggregateTransform;
+	public fun apply-0h50GnU (Ljava/util/List;Ljava/util/Map;Ldev/aster/vega/dataflow/transform/TransformContext;)Ljava/util/List;
+	public fun getPublishesSignal ()Z
+	public fun getType ()Ljava/lang/String;
+}
+
+public final class dev/aster/vega/dataflow/transform/Kde2dTransform : dev/aster/vega/dataflow/transform/Transform {
+	public static final field INSTANCE Ldev/aster/vega/dataflow/transform/Kde2dTransform;
+	public fun apply-0h50GnU (Ljava/util/List;Ljava/util/Map;Ldev/aster/vega/dataflow/transform/TransformContext;)Ljava/util/List;
+	public fun getPublishesSignal ()Z
+	public fun getType ()Ljava/lang/String;
+}
+
+public final class dev/aster/vega/dataflow/transform/KdeTransform : dev/aster/vega/dataflow/transform/Transform {
+	public static final field INSTANCE Ldev/aster/vega/dataflow/transform/KdeTransform;
+	public fun apply-0h50GnU (Ljava/util/List;Ljava/util/Map;Ldev/aster/vega/dataflow/transform/TransformContext;)Ljava/util/List;
+	public fun getPublishesSignal ()Z
+	public fun getType ()Ljava/lang/String;
+}
+
+public final class dev/aster/vega/dataflow/transform/LabelTransform : dev/aster/vega/dataflow/transform/Transform {
+	public static final field INSTANCE Ldev/aster/vega/dataflow/transform/LabelTransform;
+	public fun apply-0h50GnU (Ljava/util/List;Ljava/util/Map;Ldev/aster/vega/dataflow/transform/TransformContext;)Ljava/util/List;
+	public fun getPublishesSignal ()Z
+	public fun getType ()Ljava/lang/String;
+}
+
+public final class dev/aster/vega/dataflow/transform/LinkPathTransform : dev/aster/vega/dataflow/transform/Transform {
+	public static final field INSTANCE Ldev/aster/vega/dataflow/transform/LinkPathTransform;
+	public fun apply-0h50GnU (Ljava/util/List;Ljava/util/Map;Ldev/aster/vega/dataflow/transform/TransformContext;)Ljava/util/List;
+	public fun getPublishesSignal ()Z
+	public fun getType ()Ljava/lang/String;
+}
+
+public final class dev/aster/vega/dataflow/transform/LoessTransform : dev/aster/vega/dataflow/transform/Transform {
+	public static final field INSTANCE Ldev/aster/vega/dataflow/transform/LoessTransform;
+	public fun apply-0h50GnU (Ljava/util/List;Ljava/util/Map;Ldev/aster/vega/dataflow/transform/TransformContext;)Ljava/util/List;
+	public fun getPublishesSignal ()Z
+	public fun getType ()Ljava/lang/String;
+}
+
+public final class dev/aster/vega/dataflow/transform/LookupTransform : dev/aster/vega/dataflow/transform/Transform {
+	public static final field INSTANCE Ldev/aster/vega/dataflow/transform/LookupTransform;
+	public fun apply-0h50GnU (Ljava/util/List;Ljava/util/Map;Ldev/aster/vega/dataflow/transform/TransformContext;)Ljava/util/List;
+	public fun getPublishesSignal ()Z
+	public fun getType ()Ljava/lang/String;
+}
+
+public final class dev/aster/vega/dataflow/transform/NestTransform : dev/aster/vega/dataflow/transform/Transform {
+	public static final field INSTANCE Ldev/aster/vega/dataflow/transform/NestTransform;
+	public fun apply-0h50GnU (Ljava/util/List;Ljava/util/Map;Ldev/aster/vega/dataflow/transform/TransformContext;)Ljava/util/List;
+	public fun getPublishesSignal ()Z
+	public fun getType ()Ljava/lang/String;
+}
+
+public final class dev/aster/vega/dataflow/transform/PackTransform : dev/aster/vega/dataflow/transform/Transform {
+	public static final field INSTANCE Ldev/aster/vega/dataflow/transform/PackTransform;
+	public fun apply-0h50GnU (Ljava/util/List;Ljava/util/Map;Ldev/aster/vega/dataflow/transform/TransformContext;)Ljava/util/List;
+	public fun getPublishesSignal ()Z
+	public fun getType ()Ljava/lang/String;
+}
+
+public final class dev/aster/vega/dataflow/transform/PartitionTransform : dev/aster/vega/dataflow/transform/Transform {
+	public static final field INSTANCE Ldev/aster/vega/dataflow/transform/PartitionTransform;
+	public fun apply-0h50GnU (Ljava/util/List;Ljava/util/Map;Ldev/aster/vega/dataflow/transform/TransformContext;)Ljava/util/List;
+	public fun getPublishesSignal ()Z
+	public fun getType ()Ljava/lang/String;
+}
+
+public final class dev/aster/vega/dataflow/transform/PieTransform : dev/aster/vega/dataflow/transform/Transform {
+	public static final field INSTANCE Ldev/aster/vega/dataflow/transform/PieTransform;
+	public fun apply-0h50GnU (Ljava/util/List;Ljava/util/Map;Ldev/aster/vega/dataflow/transform/TransformContext;)Ljava/util/List;
+	public fun getPublishesSignal ()Z
+	public fun getType ()Ljava/lang/String;
+}
+
+public final class dev/aster/vega/dataflow/transform/PivotTransform : dev/aster/vega/dataflow/transform/Transform {
+	public static final field INSTANCE Ldev/aster/vega/dataflow/transform/PivotTransform;
+	public fun apply-0h50GnU (Ljava/util/List;Ljava/util/Map;Ldev/aster/vega/dataflow/transform/TransformContext;)Ljava/util/List;
+	public fun getPublishesSignal ()Z
+	public fun getType ()Ljava/lang/String;
+}
+
+public final class dev/aster/vega/dataflow/transform/ProjectTransform : dev/aster/vega/dataflow/transform/Transform {
+	public static final field INSTANCE Ldev/aster/vega/dataflow/transform/ProjectTransform;
+	public fun apply-0h50GnU (Ljava/util/List;Ljava/util/Map;Ldev/aster/vega/dataflow/transform/TransformContext;)Ljava/util/List;
+	public fun getPublishesSignal ()Z
+	public fun getType ()Ljava/lang/String;
+}
+
+public final class dev/aster/vega/dataflow/transform/ProjectionDefinition {
+	public fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/Double;Ljava/util/List;Ljava/util/List;Ljava/util/List;Ljava/lang/Double;Ljava/lang/Double;ZZLjava/util/List;Ljava/lang/Double;Ljava/util/List;Ljava/lang/Double;Ldev/aster/vega/model/VegaValue;Ljava/util/List;Ljava/util/List;)V
+	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/Double;Ljava/util/List;Ljava/util/List;Ljava/util/List;Ljava/lang/Double;Ljava/lang/Double;ZZLjava/util/List;Ljava/lang/Double;Ljava/util/List;Ljava/lang/Double;Ldev/aster/vega/model/VegaValue;Ljava/util/List;Ljava/util/List;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()Ljava/lang/String;
+	public final fun component10 ()Z
+	public final fun component11 ()Ljava/util/List;
+	public final fun component12 ()Ljava/lang/Double;
+	public final fun component13 ()Ljava/util/List;
+	public final fun component14 ()Ljava/lang/Double;
+	public final fun component15 ()Ldev/aster/vega/model/VegaValue;
+	public final fun component16 ()Ljava/util/List;
+	public final fun component17 ()Ljava/util/List;
+	public final fun component2 ()Ljava/lang/String;
+	public final fun component3 ()Ljava/lang/Double;
+	public final fun component4 ()Ljava/util/List;
+	public final fun component5 ()Ljava/util/List;
+	public final fun component6 ()Ljava/util/List;
+	public final fun component7 ()Ljava/lang/Double;
+	public final fun component8 ()Ljava/lang/Double;
+	public final fun component9 ()Z
+	public final fun copy (Ljava/lang/String;Ljava/lang/String;Ljava/lang/Double;Ljava/util/List;Ljava/util/List;Ljava/util/List;Ljava/lang/Double;Ljava/lang/Double;ZZLjava/util/List;Ljava/lang/Double;Ljava/util/List;Ljava/lang/Double;Ldev/aster/vega/model/VegaValue;Ljava/util/List;Ljava/util/List;)Ldev/aster/vega/dataflow/transform/ProjectionDefinition;
+	public static synthetic fun copy$default (Ldev/aster/vega/dataflow/transform/ProjectionDefinition;Ljava/lang/String;Ljava/lang/String;Ljava/lang/Double;Ljava/util/List;Ljava/util/List;Ljava/util/List;Ljava/lang/Double;Ljava/lang/Double;ZZLjava/util/List;Ljava/lang/Double;Ljava/util/List;Ljava/lang/Double;Ldev/aster/vega/model/VegaValue;Ljava/util/List;Ljava/util/List;ILjava/lang/Object;)Ldev/aster/vega/dataflow/transform/ProjectionDefinition;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getAngle ()Ljava/lang/Double;
+	public final fun getCenter ()Ljava/util/List;
+	public final fun getClipAngle ()Ljava/lang/Double;
+	public final fun getClipExtent ()Ljava/util/List;
+	public final fun getFit ()Ldev/aster/vega/model/VegaValue;
+	public final fun getFitExtent ()Ljava/util/List;
+	public final fun getFitSize ()Ljava/util/List;
+	public final fun getName ()Ljava/lang/String;
+	public final fun getParallels ()Ljava/util/List;
+	public final fun getPointRadius ()Ljava/lang/Double;
+	public final fun getPrecision ()Ljava/lang/Double;
+	public final fun getReflectX ()Z
+	public final fun getReflectY ()Z
+	public final fun getRotate ()Ljava/util/List;
+	public final fun getScale ()Ljava/lang/Double;
+	public final fun getTranslate ()Ljava/util/List;
+	public final fun getType ()Ljava/lang/String;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class dev/aster/vega/dataflow/transform/QuantileTransform : dev/aster/vega/dataflow/transform/Transform {
+	public static final field INSTANCE Ldev/aster/vega/dataflow/transform/QuantileTransform;
+	public fun apply-0h50GnU (Ljava/util/List;Ljava/util/Map;Ldev/aster/vega/dataflow/transform/TransformContext;)Ljava/util/List;
+	public fun getPublishesSignal ()Z
+	public fun getType ()Ljava/lang/String;
+}
+
+public final class dev/aster/vega/dataflow/transform/RegressionTransform : dev/aster/vega/dataflow/transform/Transform {
+	public static final field INSTANCE Ldev/aster/vega/dataflow/transform/RegressionTransform;
+	public fun apply-0h50GnU (Ljava/util/List;Ljava/util/Map;Ldev/aster/vega/dataflow/transform/TransformContext;)Ljava/util/List;
+	public fun getPublishesSignal ()Z
+	public fun getType ()Ljava/lang/String;
+}
+
+public final class dev/aster/vega/dataflow/transform/ResolveFilterTransform : dev/aster/vega/dataflow/transform/Transform {
+	public static final field INSTANCE Ldev/aster/vega/dataflow/transform/ResolveFilterTransform;
+	public fun apply-0h50GnU (Ljava/util/List;Ljava/util/Map;Ldev/aster/vega/dataflow/transform/TransformContext;)Ljava/util/List;
+	public fun getPublishesSignal ()Z
+	public fun getType ()Ljava/lang/String;
+}
+
+public final class dev/aster/vega/dataflow/transform/SampleTransform : dev/aster/vega/dataflow/transform/Transform {
+	public static final field INSTANCE Ldev/aster/vega/dataflow/transform/SampleTransform;
+	public fun apply-0h50GnU (Ljava/util/List;Ljava/util/Map;Ldev/aster/vega/dataflow/transform/TransformContext;)Ljava/util/List;
+	public fun getPublishesSignal ()Z
+	public fun getType ()Ljava/lang/String;
+}
+
+public final class dev/aster/vega/dataflow/transform/SequenceTransform : dev/aster/vega/dataflow/transform/Transform {
+	public static final field INSTANCE Ldev/aster/vega/dataflow/transform/SequenceTransform;
+	public fun apply-0h50GnU (Ljava/util/List;Ljava/util/Map;Ldev/aster/vega/dataflow/transform/TransformContext;)Ljava/util/List;
+	public fun getPublishesSignal ()Z
+	public fun getType ()Ljava/lang/String;
+}
+
+public final class dev/aster/vega/dataflow/transform/StackTransform : dev/aster/vega/dataflow/transform/Transform {
+	public static final field INSTANCE Ldev/aster/vega/dataflow/transform/StackTransform;
+	public fun apply-0h50GnU (Ljava/util/List;Ljava/util/Map;Ldev/aster/vega/dataflow/transform/TransformContext;)Ljava/util/List;
+	public fun getPublishesSignal ()Z
+	public fun getType ()Ljava/lang/String;
+}
+
+public final class dev/aster/vega/dataflow/transform/StratifyTransform : dev/aster/vega/dataflow/transform/Transform {
+	public static final field INSTANCE Ldev/aster/vega/dataflow/transform/StratifyTransform;
+	public fun apply-0h50GnU (Ljava/util/List;Ljava/util/Map;Ldev/aster/vega/dataflow/transform/TransformContext;)Ljava/util/List;
+	public fun getPublishesSignal ()Z
+	public fun getType ()Ljava/lang/String;
+}
+
+public final class dev/aster/vega/dataflow/transform/TimeUnitTransform : dev/aster/vega/dataflow/transform/Transform {
+	public static final field INSTANCE Ldev/aster/vega/dataflow/transform/TimeUnitTransform;
+	public fun apply-0h50GnU (Ljava/util/List;Ljava/util/Map;Ldev/aster/vega/dataflow/transform/TransformContext;)Ljava/util/List;
+	public fun getPublishesSignal ()Z
+	public fun getType ()Ljava/lang/String;
+}
+
+public abstract interface class dev/aster/vega/dataflow/transform/Transform {
+	public abstract fun apply-0h50GnU (Ljava/util/List;Ljava/util/Map;Ldev/aster/vega/dataflow/transform/TransformContext;)Ljava/util/List;
+	public fun getPublishesSignal ()Z
+	public abstract fun getType ()Ljava/lang/String;
+}
+
+public final class dev/aster/vega/dataflow/transform/Transform$DefaultImpls {
+	public static fun getPublishesSignal (Ldev/aster/vega/dataflow/transform/Transform;)Z
+}
+
+public abstract interface class dev/aster/vega/dataflow/transform/TransformContext {
+	public abstract fun getDiagnostics ()Ldev/aster/vega/model/DiagnosticCollector;
+	public abstract fun getExpressions ()Ldev/aster/vega/expression/ExpressionCompiler;
+	public abstract fun getScope ()Ldev/aster/vega/expression/ExpressionScope;
+	public abstract fun getTree ()Ldev/aster/vega/dataflow/transform/TreeSource;
+	public fun measureText (Ljava/lang/String;D)D
+	public fun projection (Ljava/lang/String;)Ldev/aster/vega/dataflow/transform/ProjectionDefinition;
+	public abstract fun scopeFor (Ldev/aster/vega/model/VegaValue;)Ldev/aster/vega/expression/ExpressionScope;
+	public abstract fun setSignal (Ljava/lang/String;Ldev/aster/vega/model/VegaValue;)V
+	public abstract fun setTree (Ldev/aster/vega/dataflow/transform/TreeSource;)V
+}
+
+public final class dev/aster/vega/dataflow/transform/TransformContext$DefaultImpls {
+	public static fun measureText (Ldev/aster/vega/dataflow/transform/TransformContext;Ljava/lang/String;D)D
+	public static fun projection (Ldev/aster/vega/dataflow/transform/TransformContext;Ljava/lang/String;)Ldev/aster/vega/dataflow/transform/ProjectionDefinition;
+}
+
+public final class dev/aster/vega/dataflow/transform/TransformKt {
+	public static final fun compareFieldValues (Ldev/aster/vega/model/VegaValue;Ldev/aster/vega/model/VegaValue;)I
+}
+
+public final class dev/aster/vega/dataflow/transform/TransformPipeline {
+	public fun <init> ()V
+	public fun <init> (Ldev/aster/vega/dataflow/transform/TransformRegistry;)V
+	public synthetic fun <init> (Ldev/aster/vega/dataflow/transform/TransformRegistry;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun run (Ljava/util/List;Ljava/util/List;Ldev/aster/vega/dataflow/transform/TransformContext;)Ljava/util/List;
+}
+
+public final class dev/aster/vega/dataflow/transform/TransformRegistry {
+	public static final field Companion Ldev/aster/vega/dataflow/transform/TransformRegistry$Companion;
+	public fun <init> (Ljava/util/List;)V
+	public final fun get (Ljava/lang/String;)Ldev/aster/vega/dataflow/transform/Transform;
+	public final fun getTypes ()Ljava/util/Set;
+}
+
+public final class dev/aster/vega/dataflow/transform/TransformRegistry$Companion {
+	public final fun getDefault ()Ldev/aster/vega/dataflow/transform/TransformRegistry;
+}
+
+public final class dev/aster/vega/dataflow/transform/TreeLinksTransform : dev/aster/vega/dataflow/transform/Transform {
+	public static final field INSTANCE Ldev/aster/vega/dataflow/transform/TreeLinksTransform;
+	public fun apply-0h50GnU (Ljava/util/List;Ljava/util/Map;Ldev/aster/vega/dataflow/transform/TransformContext;)Ljava/util/List;
+	public fun getPublishesSignal ()Z
+	public fun getType ()Ljava/lang/String;
+}
+
+public abstract interface class dev/aster/vega/dataflow/transform/TreeSource {
+	public fun ancestorsOf (Ljava/lang/String;)Ljava/util/List;
+	public fun pathBetween (Ljava/lang/String;Ljava/lang/String;)Ljava/util/List;
+}
+
+public final class dev/aster/vega/dataflow/transform/TreeSource$DefaultImpls {
+	public static fun ancestorsOf (Ldev/aster/vega/dataflow/transform/TreeSource;Ljava/lang/String;)Ljava/util/List;
+	public static fun pathBetween (Ldev/aster/vega/dataflow/transform/TreeSource;Ljava/lang/String;Ljava/lang/String;)Ljava/util/List;
+}
+
+public final class dev/aster/vega/dataflow/transform/TreeTransform : dev/aster/vega/dataflow/transform/Transform {
+	public static final field INSTANCE Ldev/aster/vega/dataflow/transform/TreeTransform;
+	public fun apply-0h50GnU (Ljava/util/List;Ljava/util/Map;Ldev/aster/vega/dataflow/transform/TransformContext;)Ljava/util/List;
+	public fun getPublishesSignal ()Z
+	public fun getType ()Ljava/lang/String;
+}
+
+public final class dev/aster/vega/dataflow/transform/TreemapTransform : dev/aster/vega/dataflow/transform/Transform {
+	public static final field INSTANCE Ldev/aster/vega/dataflow/transform/TreemapTransform;
+	public fun apply-0h50GnU (Ljava/util/List;Ljava/util/Map;Ldev/aster/vega/dataflow/transform/TransformContext;)Ljava/util/List;
+	public fun getPublishesSignal ()Z
+	public fun getType ()Ljava/lang/String;
+}
+
+public final class dev/aster/vega/dataflow/transform/VoronoiTransform : dev/aster/vega/dataflow/transform/Transform {
+	public static final field INSTANCE Ldev/aster/vega/dataflow/transform/VoronoiTransform;
+	public fun apply-0h50GnU (Ljava/util/List;Ljava/util/Map;Ldev/aster/vega/dataflow/transform/TransformContext;)Ljava/util/List;
+	public fun getPublishesSignal ()Z
+	public fun getType ()Ljava/lang/String;
+}
+
+public final class dev/aster/vega/dataflow/transform/WindowTransform : dev/aster/vega/dataflow/transform/Transform {
+	public static final field INSTANCE Ldev/aster/vega/dataflow/transform/WindowTransform;
+	public fun apply-0h50GnU (Ljava/util/List;Ljava/util/Map;Ldev/aster/vega/dataflow/transform/TransformContext;)Ljava/util/List;
+	public fun getPublishesSignal ()Z
+	public fun getType ()Ljava/lang/String;
+}
+

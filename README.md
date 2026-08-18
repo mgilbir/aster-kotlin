@@ -368,9 +368,8 @@ Design decisions are recorded in [docs/adr/](docs/adr/).
 
 ## Releasing
 
-Tag it. `.github/workflows/release.yml` does the rest, in three jobs on the hosts that can do the
-work: verification on Linux, publishing from **macOS** because it is the only host that compiles every
-target, and the release page back on Linux.
+Run the **Release** workflow. It verifies on Linux, publishes from macOS, writes the XCFramework's
+checksum into `Package.swift`, commits that, and **then** tags the commit it wrote.
 
 ```sh
 # 1. Bump the one version line and write the changelog section. Both are checked, and the release
@@ -378,28 +377,64 @@ target, and the release page back on Linux.
 $EDITOR build.gradle.kts CHANGELOG.md
 git commit -am "Aster Vega 0.1.0" && git push
 
-# 2. Tag. That is the trigger, so what is released is exactly what was tagged.
-git tag v0.1.0 && git push origin v0.1.0
+# 2. Run the workflow. There is nothing to type: the version comes from build.gradle.kts, and the
+#    run fails if that version is already tagged.
+gh workflow run Release --ref main
 
 # 3. Release the deployment at central.sonatype.com/publishing/deployments — it is uploaded as
 #    USER_MANAGED and waits, because publishing to Central cannot be undone.
 ```
 
+**The workflow creates the tag, and does not react to one.** That is the fix to an ordering problem
+worth stating plainly, because the obvious arrangement cannot work. A Swift `binaryTarget` needs the
+artefact's SHA256 written into `Package.swift`; a checksum cannot be known until the artefact exists;
+and the artefact is built from the tag. Tag first, and the manifest inside the tag names the *previous*
+release's binary — so an adopter pinning `v0.1.0` for Gradle and `0.1.0` for Swift gets two different
+versions, or for a first release, nothing at all. Building first and tagging the commit that carries the
+checksum gives one tag that is correct for both ecosystems, which is what an adopter asked for.
+
+Two guards go with it. The push of the manifest commit to `main` is a fast-forward or nothing: if
+something landed while the release was building, the artefacts on the runner are no longer what `main`
+says, and a failed release is the honest outcome — nothing is public at that point, since the Central
+deployment is still `USER_MANAGED`. And the release job refuses to tag if anything other than
+`Package.swift` differs from the commit the artefacts were built from.
+
 Four secrets are needed, and without them the publish step says so and skips rather than failing:
 `CENTRAL_TOKEN_USERNAME`, `CENTRAL_TOKEN_PASSWORD`, `MAVEN_GPG_PRIVATE_KEY` (ASCII-armoured) and
 `MAVEN_GPG_PASSPHRASE`.
 
-Two things in there are worth knowing rather than discovering. Everything is uploaded as **one
-bundle**, checked by `verifyCentralBundle` before it leaves the runner, because uploading publications
-separately lets the server assemble the deployment from whatever it believes arrived — and for
-`ktecma262` 0.1.3 it assembled four modules out of seven, with the dropped ones reporting success.
-And `verifyPublishedVariants` runs on macOS, because Kotlin creates a publication only for targets the
-host can compile while the root module lists every declared one: `ktecma262` 0.1.2 was published from
-Linux with no native variants at all, and a version on Central cannot be replaced.
+Two more things are worth knowing rather than discovering. Everything is uploaded as **one bundle**,
+checked by `verifyCentralBundle` before it leaves the runner, because uploading publications separately
+lets the server assemble the deployment from whatever it believes arrived — and for `ktecma262` 0.1.3 it
+assembled four modules out of seven, with the dropped ones reporting success. And
+`verifyPublishedVariants` runs on macOS, because Kotlin creates a publication only for targets the host
+can compile while the root module lists every declared one: `ktecma262` 0.1.2 was published from Linux
+with no native variants at all, and a version on Central cannot be replaced.
 
-Swift consumers track `main`. `Package.swift` names an XCFramework attached to a release, and a
-checksum cannot be computed before the artefact exists — so the manifest inside a tag names the
-*previous* release's binary. The release job rewrites it on `main` once the asset is up.
+### The public API
+
+Every published module carries a committed ABI dump under `api/` — `.api` for the JVM surface and
+`.klib.api` for the native one an iOS consumer links against. `./scripts/check.sh` compares them, so a
+change to what other people compile against shows up in this repository's diff rather than in their
+build. `./gradlew updateLegacyAbi` rewrites the dumps; review that diff as an API change.
+
+`vega-compose` and `vega-android-canvas` are the two modules **not** covered, and the reason is a
+tooling gap rather than a decision: since AGP 9 their Kotlin support comes from the Android plugin's own
+`KotlinBaseApiPlugin`, so `binary-compatibility-validator` creates no tasks for them, and Kotlin's own
+ABI validation reads a module's Maven publications, which for an Android library it does not support.
+Their surface is small — `VegaChartView`, the `VegaChart` composable and their options — and it is the
+one place a consumer has to read the diff by hand.
+
+### Platforms
+
+| Target | Published | Note |
+| --- | --- | --- |
+| `jvm` | Yes | What Android consumes and what every test runs on |
+| `android` | Yes | `vega-compose`, `vega-android-canvas`, and the Android target of `vega-compose-multiplatform` |
+| `iosArm64`, `iosSimulatorArm64` | Yes | And both slices of the `AsterVega` XCFramework |
+| `macosArm64` | Yes | The Swift package's tests build against this one |
+| `linuxX64` | Yes | Proves the core's portability rather than shipping |
+| `iosX64` | **No** | Not a decision, and not something this repository can fix on its own: `ktecma262` 0.2.0 — the ECMA-262 regular-expression engine the core needs, because a pattern in a specification is JavaScript's — publishes `iosArm64`, `iosSimulatorArm64`, `macosArm64`, `linuxX64` and `jvm`, and no `iosX64`. Adding the target here fails at dependency resolution. It needs a `ktecma262` release with the slice first; ask if you need an Intel simulator |
 
 ## Licence
 

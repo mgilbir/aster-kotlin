@@ -1,0 +1,84 @@
+// Klib ABI Dump
+// Targets: [iosArm64, iosSimulatorArm64, linuxX64, macosArm64]
+// Rendering settings:
+// - Signature version: 2
+// - Show manifest properties: true
+// - Show declarations: true
+
+// Library unique name: <io.github.mgilbir.astervega:vega-lite>
+final class dev.aster.vegalite/VegaLiteCompilation { // dev.aster.vegalite/VegaLiteCompilation|null[0]
+    constructor <init>(dev.aster.vega.model/VegaValue.Obj?, kotlin.collections/List<dev.aster.vega.model/VegaDiagnostic>) // dev.aster.vegalite/VegaLiteCompilation.<init>|<init>(dev.aster.vega.model.VegaValue.Obj?;kotlin.collections.List<dev.aster.vega.model.VegaDiagnostic>){}[0]
+
+    final val diagnostics // dev.aster.vegalite/VegaLiteCompilation.diagnostics|{}diagnostics[0]
+        final fun <get-diagnostics>(): kotlin.collections/List<dev.aster.vega.model/VegaDiagnostic> // dev.aster.vegalite/VegaLiteCompilation.diagnostics.<get-diagnostics>|<get-diagnostics>(){}[0]
+    final val isUsable // dev.aster.vegalite/VegaLiteCompilation.isUsable|{}isUsable[0]
+        final fun <get-isUsable>(): kotlin/Boolean // dev.aster.vegalite/VegaLiteCompilation.isUsable.<get-isUsable>|<get-isUsable>(){}[0]
+    final val vega // dev.aster.vegalite/VegaLiteCompilation.vega|{}vega[0]
+        final fun <get-vega>(): dev.aster.vega.model/VegaValue.Obj? // dev.aster.vegalite/VegaLiteCompilation.vega.<get-vega>|<get-vega>(){}[0]
+
+    final fun component1(): dev.aster.vega.model/VegaValue.Obj? // dev.aster.vegalite/VegaLiteCompilation.component1|component1(){}[0]
+    final fun component2(): kotlin.collections/List<dev.aster.vega.model/VegaDiagnostic> // dev.aster.vegalite/VegaLiteCompilation.component2|component2(){}[0]
+    final fun copy(dev.aster.vega.model/VegaValue.Obj? = ..., kotlin.collections/List<dev.aster.vega.model/VegaDiagnostic> = ...): dev.aster.vegalite/VegaLiteCompilation // dev.aster.vegalite/VegaLiteCompilation.copy|copy(dev.aster.vega.model.VegaValue.Obj?;kotlin.collections.List<dev.aster.vega.model.VegaDiagnostic>){}[0]
+    final fun equals(kotlin/Any?): kotlin/Boolean // dev.aster.vegalite/VegaLiteCompilation.equals|equals(kotlin.Any?){}[0]
+    final fun hashCode(): kotlin/Int // dev.aster.vegalite/VegaLiteCompilation.hashCode|hashCode(){}[0]
+    final fun toJson(): kotlin/String? // dev.aster.vegalite/VegaLiteCompilation.toJson|toJson(){}[0]
+    final fun toString(): kotlin/String // dev.aster.vegalite/VegaLiteCompilation.toString|toString(){}[0]
+}
+
+final class dev.aster.vegalite/VegaLiteCompiler { // dev.aster.vegalite/VegaLiteCompiler|null[0]
+    constructor <init>() // dev.aster.vegalite/VegaLiteCompiler.<init>|<init>(){}[0]
+
+    final fun compile(dev.aster.vega.model/VegaValue): dev.aster.vegalite/VegaLiteCompilation // dev.aster.vegalite/VegaLiteCompiler.compile|compile(dev.aster.vega.model.VegaValue){}[0]
+    final fun compileJson(kotlin/String): dev.aster.vegalite/VegaLiteCompilation // dev.aster.vegalite/VegaLiteCompiler.compileJson|compileJson(kotlin.String){}[0]
+}
+
+final class dev.aster.vegalite/VegaLiteConversion { // dev.aster.vegalite/VegaLiteConversion|null[0]
+    constructor <init>(kotlin/String?, kotlin/Boolean, kotlin.collections/List<dev.aster.vega.model/VegaDiagnostic>) // dev.aster.vegalite/VegaLiteConversion.<init>|<init>(kotlin.String?;kotlin.Boolean;kotlin.collections.List<dev.aster.vega.model.VegaDiagnostic>){}[0]
+
+    final val diagnostics // dev.aster.vegalite/VegaLiteConversion.diagnostics|{}diagnostics[0]
+        final fun <get-diagnostics>(): kotlin.collections/List<dev.aster.vega.model/VegaDiagnostic> // dev.aster.vegalite/VegaLiteConversion.diagnostics.<get-diagnostics>|<get-diagnostics>(){}[0]
+    final val vegaJson // dev.aster.vegalite/VegaLiteConversion.vegaJson|{}vegaJson[0]
+        final fun <get-vegaJson>(): kotlin/String? // dev.aster.vegalite/VegaLiteConversion.vegaJson.<get-vegaJson>|<get-vegaJson>(){}[0]
+    final val wasVegaLite // dev.aster.vegalite/VegaLiteConversion.wasVegaLite|{}wasVegaLite[0]
+        final fun <get-wasVegaLite>(): kotlin/Boolean // dev.aster.vegalite/VegaLiteConversion.wasVegaLite.<get-wasVegaLite>|<get-wasVegaLite>(){}[0]
+
+    final fun component1(): kotlin/String? // dev.aster.vegalite/VegaLiteConversion.component1|component1(){}[0]
+    final fun component2(): kotlin/Boolean // dev.aster.vegalite/VegaLiteConversion.component2|component2(){}[0]
+    final fun component3(): kotlin.collections/List<dev.aster.vega.model/VegaDiagnostic> // dev.aster.vegalite/VegaLiteConversion.component3|component3(){}[0]
+    final fun copy(kotlin/String? = ..., kotlin/Boolean = ..., kotlin.collections/List<dev.aster.vega.model/VegaDiagnostic> = ...): dev.aster.vegalite/VegaLiteConversion // dev.aster.vegalite/VegaLiteConversion.copy|copy(kotlin.String?;kotlin.Boolean;kotlin.collections.List<dev.aster.vega.model.VegaDiagnostic>){}[0]
+    final fun equals(kotlin/Any?): kotlin/Boolean // dev.aster.vegalite/VegaLiteConversion.equals|equals(kotlin.Any?){}[0]
+    final fun hashCode(): kotlin/Int // dev.aster.vegalite/VegaLiteConversion.hashCode|hashCode(){}[0]
+    final fun toString(): kotlin/String // dev.aster.vegalite/VegaLiteConversion.toString|toString(){}[0]
+}
+
+final object dev.aster.vegalite/VegaLiteDiagnostics { // dev.aster.vegalite/VegaLiteDiagnostics|null[0]
+    final const val INFERRED_TYPE // dev.aster.vegalite/VegaLiteDiagnostics.INFERRED_TYPE|{}INFERRED_TYPE[0]
+        final fun <get-INFERRED_TYPE>(): kotlin/String // dev.aster.vegalite/VegaLiteDiagnostics.INFERRED_TYPE.<get-INFERRED_TYPE>|<get-INFERRED_TYPE>(){}[0]
+    final const val INVALID_ENCODING // dev.aster.vegalite/VegaLiteDiagnostics.INVALID_ENCODING|{}INVALID_ENCODING[0]
+        final fun <get-INVALID_ENCODING>(): kotlin/String // dev.aster.vegalite/VegaLiteDiagnostics.INVALID_ENCODING.<get-INVALID_ENCODING>|<get-INVALID_ENCODING>(){}[0]
+    final const val MISSING_MARK // dev.aster.vegalite/VegaLiteDiagnostics.MISSING_MARK|{}MISSING_MARK[0]
+        final fun <get-MISSING_MARK>(): kotlin/String // dev.aster.vegalite/VegaLiteDiagnostics.MISSING_MARK.<get-MISSING_MARK>|<get-MISSING_MARK>(){}[0]
+    final const val NOT_VEGA_LITE // dev.aster.vegalite/VegaLiteDiagnostics.NOT_VEGA_LITE|{}NOT_VEGA_LITE[0]
+        final fun <get-NOT_VEGA_LITE>(): kotlin/String // dev.aster.vegalite/VegaLiteDiagnostics.NOT_VEGA_LITE.<get-NOT_VEGA_LITE>|<get-NOT_VEGA_LITE>(){}[0]
+    final const val SCHEMA_VERSION // dev.aster.vegalite/VegaLiteDiagnostics.SCHEMA_VERSION|{}SCHEMA_VERSION[0]
+        final fun <get-SCHEMA_VERSION>(): kotlin/String // dev.aster.vegalite/VegaLiteDiagnostics.SCHEMA_VERSION.<get-SCHEMA_VERSION>|<get-SCHEMA_VERSION>(){}[0]
+    final const val UNSUPPORTED_CHANNEL // dev.aster.vegalite/VegaLiteDiagnostics.UNSUPPORTED_CHANNEL|{}UNSUPPORTED_CHANNEL[0]
+        final fun <get-UNSUPPORTED_CHANNEL>(): kotlin/String // dev.aster.vegalite/VegaLiteDiagnostics.UNSUPPORTED_CHANNEL.<get-UNSUPPORTED_CHANNEL>|<get-UNSUPPORTED_CHANNEL>(){}[0]
+    final const val UNSUPPORTED_COMPOSITION // dev.aster.vegalite/VegaLiteDiagnostics.UNSUPPORTED_COMPOSITION|{}UNSUPPORTED_COMPOSITION[0]
+        final fun <get-UNSUPPORTED_COMPOSITION>(): kotlin/String // dev.aster.vegalite/VegaLiteDiagnostics.UNSUPPORTED_COMPOSITION.<get-UNSUPPORTED_COMPOSITION>|<get-UNSUPPORTED_COMPOSITION>(){}[0]
+    final const val UNSUPPORTED_ENCODING_PROPERTY // dev.aster.vegalite/VegaLiteDiagnostics.UNSUPPORTED_ENCODING_PROPERTY|{}UNSUPPORTED_ENCODING_PROPERTY[0]
+        final fun <get-UNSUPPORTED_ENCODING_PROPERTY>(): kotlin/String // dev.aster.vegalite/VegaLiteDiagnostics.UNSUPPORTED_ENCODING_PROPERTY.<get-UNSUPPORTED_ENCODING_PROPERTY>|<get-UNSUPPORTED_ENCODING_PROPERTY>(){}[0]
+    final const val UNSUPPORTED_MARK // dev.aster.vegalite/VegaLiteDiagnostics.UNSUPPORTED_MARK|{}UNSUPPORTED_MARK[0]
+        final fun <get-UNSUPPORTED_MARK>(): kotlin/String // dev.aster.vegalite/VegaLiteDiagnostics.UNSUPPORTED_MARK.<get-UNSUPPORTED_MARK>|<get-UNSUPPORTED_MARK>(){}[0]
+    final const val UNSUPPORTED_PARAMETER // dev.aster.vegalite/VegaLiteDiagnostics.UNSUPPORTED_PARAMETER|{}UNSUPPORTED_PARAMETER[0]
+        final fun <get-UNSUPPORTED_PARAMETER>(): kotlin/String // dev.aster.vegalite/VegaLiteDiagnostics.UNSUPPORTED_PARAMETER.<get-UNSUPPORTED_PARAMETER>|<get-UNSUPPORTED_PARAMETER>(){}[0]
+    final const val UNSUPPORTED_TOP_LEVEL_PROPERTY // dev.aster.vegalite/VegaLiteDiagnostics.UNSUPPORTED_TOP_LEVEL_PROPERTY|{}UNSUPPORTED_TOP_LEVEL_PROPERTY[0]
+        final fun <get-UNSUPPORTED_TOP_LEVEL_PROPERTY>(): kotlin/String // dev.aster.vegalite/VegaLiteDiagnostics.UNSUPPORTED_TOP_LEVEL_PROPERTY.<get-UNSUPPORTED_TOP_LEVEL_PROPERTY>|<get-UNSUPPORTED_TOP_LEVEL_PROPERTY>(){}[0]
+    final const val UNSUPPORTED_TRANSFORM // dev.aster.vegalite/VegaLiteDiagnostics.UNSUPPORTED_TRANSFORM|{}UNSUPPORTED_TRANSFORM[0]
+        final fun <get-UNSUPPORTED_TRANSFORM>(): kotlin/String // dev.aster.vegalite/VegaLiteDiagnostics.UNSUPPORTED_TRANSFORM.<get-UNSUPPORTED_TRANSFORM>|<get-UNSUPPORTED_TRANSFORM>(){}[0]
+}
+
+final object dev.aster.vegalite/VegaLiteInput { // dev.aster.vegalite/VegaLiteInput|null[0]
+    final fun isVegaLite(dev.aster.vega.model/VegaValue): kotlin/Boolean // dev.aster.vegalite/VegaLiteInput.isVegaLite|isVegaLite(dev.aster.vega.model.VegaValue){}[0]
+    final fun toVega(kotlin/String): dev.aster.vegalite/VegaLiteConversion // dev.aster.vegalite/VegaLiteInput.toVega|toVega(kotlin.String){}[0]
+}

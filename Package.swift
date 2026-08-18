@@ -8,12 +8,13 @@ import PackageDescription
 // is Swift source: the CoreGraphics renderer and the accessors that exist because a Kotlin value class
 // has no representation across the Obj-C boundary.
 //
-// The url and checksum below point at a release asset and are rewritten by `.github/workflows/release.yml`
-// when one is published. That has an ordering consequence worth stating plainly rather than discovering:
-// a checksum cannot be known until the artefact exists, so the manifest *inside* a tag names the
-// **previous** release's binary. Swift consumers should therefore track `main`, or a tag one release
-// ahead of the engine they want. `swift/AsterVegaRender/Package.swift` is the other half of this — it
-// builds against a locally compiled framework and is what the tests and `scripts/swift-test.sh` use.
+// The url and checksum below are written by `.github/workflows/release.yml` **before** it tags, so the
+// manifest at tag `vX.Y.Z` names the binary of that same release. That ordering is the reason the
+// workflow creates the tag rather than being triggered by one: a checksum cannot be known until the
+// artefact exists, and an adopter has to be able to pin one tag for Gradle and the same tag for Swift.
+//
+// `swift/AsterVegaRender/Package.swift` is the other half of this — it builds against a locally
+// compiled framework and is what the tests and `scripts/swift-test.sh` use.
 let version = "0.0.0-unreleased"
 let checksum = "0000000000000000000000000000000000000000000000000000000000000000"
 
