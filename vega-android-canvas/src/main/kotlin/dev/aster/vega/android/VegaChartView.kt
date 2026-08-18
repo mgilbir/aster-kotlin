@@ -43,7 +43,21 @@ public open class VegaChartView
 constructor(context: Context, attrs: AttributeSet? = null, defStyleAttr: Int = 0) :
   View(context, attrs, defStyleAttr) {
 
-  private val textEngine = AndroidTextEngine()
+  /**
+   * Measured with the **reader's** text scale, not the specification's.
+   *
+   * `fontScale` is what Android's font-size setting moves, and it has to reach the *layout* rather
+   * than only the drawing: an axis reserves its label box from a measurement, so text drawn larger
+   * inside a box measured smaller is what makes labels overlap. The parameter existed and nothing
+   * ever set it, which an external review pointed out — for a reader-facing chart that is not
+   * chrome.
+   *
+   * A change to the setting restarts the activity unless an app declares
+   * `android:configChanges="fontScale"`, and a restart rebuilds this view and this engine. An app
+   * that *does* declare it keeps the old scale until it builds a new engine and recompiles, which
+   * is the note on [newCompatibleTextEngine].
+   */
+  private val textEngine = AndroidTextEngine(context.resources.configuration.fontScale)
   private val renderer = AndroidCanvasSceneRenderer(textEngine)
   private val viewport = RectF()
 
@@ -103,7 +117,12 @@ constructor(context: Context, attrs: AttributeSet? = null, defStyleAttr: Int = 0
    * are interchangeable — which is what makes compiling on a background thread safe without either
    * side locking. Two *threads* sharing one engine is what is not safe.
    */
-  public fun newCompatibleTextEngine(): AndroidTextEngine = AndroidTextEngine()
+  public fun newCompatibleTextEngine(): AndroidTextEngine =
+    // The **same font scale**, or the claim above is false: an engine measuring at 1 while this
+    // view
+    // draws at 1.3 lays every label out in a box that is too small, which is the defect the scale
+    // exists to avoid, arriving through the seam meant to prevent it.
+    AndroidTextEngine(context.resources.configuration.fontScale)
 
   init {
     isFocusable = true

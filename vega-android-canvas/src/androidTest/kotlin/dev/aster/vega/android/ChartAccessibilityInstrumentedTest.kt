@@ -1,6 +1,7 @@
 package dev.aster.vega.android
 
 import android.view.View
+import androidx.core.view.accessibility.AccessibilityNodeInfoCompat
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
@@ -34,6 +35,7 @@ class ChartAccessibilityInstrumentedTest {
         {"name": "x", "type": "band", "domain": {"data": "t", "field": "c"}, "range": "width"},
         {"name": "y", "type": "linear", "domain": {"data": "t", "field": "v"}, "range": "height"}
       ],
+      "axes": [{"orient": "bottom", "scale": "x", "title": "Month"}],
       "marks": [{
         "type": "rect", "from": {"data": "t"},
         "encode": {"enter": {
@@ -121,5 +123,68 @@ class ChartAccessibilityInstrumentedTest {
       view
     }
     assertEquals("set by the host", view.contentDescription)
+  }
+
+  /**
+   * A guide is announced as text; only a mark is announced as a button.
+   *
+   * Every virtual node used to carry `className = "android.widget.Button"`, so TalkBack told a
+   * reader they could activate an axis caption — and activating it did nothing, because there is no
+   * mark behind it. `AccessibleElement.activatable` is the engine's own answer to which elements a
+   * tap reaches, and this is that answer arriving in Android's node type.
+   */
+  @Test
+  fun onlyAMarkIsAnnouncedAsAButton() {
+    val view = laidOutView()
+    val provider =
+      requireNotNull(view.accessibilityHelperForTesting().getAccessibilityNodeProvider(view))
+    val root = requireNotNull(provider.createAccessibilityNodeInfo(View.NO_ID))
+    assertTrue("no virtual nodes at all", root.childCount > 0)
+
+    val nodes =
+      (0 until root.childCount).map { requireNotNull(provider.createAccessibilityNodeInfo(it)) }
+    val marks = nodes.filter { it.className == "android.widget.Button" }
+    val guides = nodes.filter { it.className != "android.widget.Button" }
+
+    assertTrue(
+      "expected the two bars to be buttons: ${nodes.map { it.contentDescription }}",
+      marks.size >= 2,
+    )
+    assertTrue(
+      "expected the axis caption not to be a button: ${nodes.map { "${it.className}=${it.contentDescription}" }}",
+      guides.isNotEmpty(),
+    )
+    // And the promise matches the offer: a button can be clicked, a caption is not offered a click.
+    assertTrue(
+      marks.all { node ->
+        node.actionList.any { it.id == AccessibilityNodeInfoCompat.ACTION_CLICK }
+      }
+    )
+    assertTrue(
+      guides.none { node ->
+        node.actionList.any { it.id == AccessibilityNodeInfoCompat.ACTION_CLICK }
+      }
+    )
+  }
+
+  /**
+   * What kind of thing it is, in words, and in the chart's own language.
+   *
+   * `aria-roledescription` is what a reader actually hears after the label — "rect mark", "axis" —
+   * and the tree dropped it, so a host could not tell one from the other and both said "button".
+   */
+  @Test
+  fun aVirtualNodeCarriesItsRoleDescription() {
+    val view = laidOutView()
+    val provider =
+      requireNotNull(view.accessibilityHelperForTesting().getAccessibilityNodeProvider(view))
+    val root = requireNotNull(provider.createAccessibilityNodeInfo(View.NO_ID))
+    val descriptions =
+      (0 until root.childCount).mapNotNull {
+        provider.createAccessibilityNodeInfo(it)?.roleDescription?.toString()
+      }
+
+    assertTrue("expected a mark's role: $descriptions", descriptions.any { it == "rect mark" })
+    assertTrue("expected the axis's role: $descriptions", descriptions.any { it == "axis" })
   }
 }

@@ -180,17 +180,19 @@ public interface TextEngine {
  * string in this style. So that is the only thing a subclass answers.
  *
  * This exists because the layout was written three times. [MetricTextEngine] had it,
- * `AndroidTextEngine` has its own copy with a different wrapping rule, and a CoreText engine for
+ * `AndroidTextEngine` had its own copy with a different wrapping rule, and a CoreText engine for
  * iOS would have been the third — at which point "the same implementation must be used for
  * measuring and for drawing" (see [TextEngine]) becomes impossible to keep true by inspection. A
  * label sits where the layout put it, so a second layout is a second answer to where labels go.
  *
- * `AndroidTextEngine` is the one implementation **not** yet moved onto this: it still implements
- * [TextEngine] directly and carries that second copy of the wrapping. Moving it changes where
- * labels land on a device, and the only tests that can see that are instrumented ones, so it is a
- * change to make with an emulator attached rather than one to slip in beside a documentation fix.
- * Until then, the sentence above is a statement about two of the three implementations, and this
- * paragraph is why.
+ * All three are subclasses now. `AndroidTextEngine` was the last to move, and moving it changed one
+ * thing on purpose: it wrapped a constrained run through `StaticLayout` where the other two wrap
+ * greedily on spaces, so a chart's lines broke differently depending on which host drew it.
+ * Upstream Vega does not wrap at all — it breaks on newlines and truncates with `limit` — so a
+ * constraint is this engine's own addition, and an addition that behaves differently per platform
+ * is worse than one that behaves simply. What the platform still decides is every number: advances,
+ * ascent, descent and the font's own line height. `AndroidTextEngineTest` runs on a device and is
+ * what says so.
  *
  * Subclasses are expected from other languages as well: `CoreTextTextEngine` in
  * `swift/AsterVegaRender` is a Swift subclass, which is what makes an iOS chart measure text with
