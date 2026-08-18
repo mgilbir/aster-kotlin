@@ -4993,11 +4993,24 @@ of which compiled to a plausible chart measuring the wrong rows. A cell holds on
 arranges what it drew; a third level would need its own layout inside a cell that has none. So they
 report.
 
-**A composition inside a layer** is the one refusal that cannot become a feature: a layer draws its
-members over one another, so each is a view or a layer of views, and upstream throws on it while
-normalising. It used to be reported as a *missing mark* — a `facet` has no `mark`, so the innermost
-check failed first — which sent the reader looking for a mark in a specification whose trouble was
-the composition around it.
+**A composition inside a layer** is the one refusal that cannot become a feature, and it is worth
+being exact about why. Upstream does not fail to implement it — it rejects it, with `Invalid
+specification`, for all four of `facet`, `repeat`, `hconcat` and `vconcat`. Vega-Lite's grammar says a
+layer's members are single views or layers of them, so there is no chart here to reach later and the
+message says that rather than "not implemented". It used to be reported as a *missing mark* — a
+`facet` has none of its own, so the innermost check failed first — which sent the reader looking for a
+mark in a specification whose trouble was the composition around it.
+
+Two look-alikes **are** allowed and do compile, which is what makes the distinction worth drawing: a
+`layer` inside a `layer`, and a repetition whose copies are layered, `{"repeat": {"layer": […]}}` —
+there the repeat is above the layer rather than inside it. Both are pinned.
+
+Reaching for them found a defect that has nothing to do with layers. `getSort` asks whether a path
+mark's **dimension channel is a field** before ordering its points by it: there is an order to draw
+them in only where the dimension is a column. This compiler ordered by the channel name regardless,
+so a line whose dimension channel held nothing handed Vega `sort: {"field": "y"}` for items with no
+`y` — every item comparing equal, which is a sort that does nothing at some cost.
+`path-mark-no-dimension.vl.json` is that mark on its own, without a layer anywhere near it.
 
 The assertion that an unimplemented composition is reported has now been repointed three times as the
 compositions it named were implemented. It is pointed at the layer case now, which is the only one of
