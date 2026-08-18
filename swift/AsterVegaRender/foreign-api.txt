@@ -4424,6 +4424,7 @@ VegaLiteDiagnostics.INFERRED_TYPE
 VegaLiteDiagnostics.INVALID_ENCODING
 VegaLiteDiagnostics.MISSING_MARK
 VegaLiteDiagnostics.NOT_VEGA_LITE
+VegaLiteDiagnostics.SCHEMA_VERSION
 VegaLiteDiagnostics.UNSUPPORTED_CHANNEL
 VegaLiteDiagnostics.UNSUPPORTED_COMPOSITION
 VegaLiteDiagnostics.UNSUPPORTED_ENCODING_PROPERTY

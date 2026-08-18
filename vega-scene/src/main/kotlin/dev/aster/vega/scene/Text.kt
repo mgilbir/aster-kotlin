@@ -172,14 +172,6 @@ public interface TextEngine {
 }
 
 /**
- * Deterministic, platform-independent text engine used by JVM tests and by SVG export when no
- * platform engine is supplied.
- *
- * Advance widths are a fixed fraction of the font size, so measurements are stable across machines
- * but do not match any real font. Anything comparing against on-device metrics must use the
- * documented wider text tolerances (PROJECT_BRIEF.md 18.4).
- */
-/**
  * A [TextEngine] that owns the **layout** and asks a subclass only how wide the text is.
  *
  * Laying a run out — splitting it on newlines, honouring `limit` and its ellipsis, wrapping to a
@@ -187,11 +179,18 @@ public interface TextEngine {
  * whatever measures the glyphs. What differs between platforms is one question: how wide is this
  * string in this style. So that is the only thing a subclass answers.
  *
- * This exists because it was written three times. [MetricTextEngine] had it, `AndroidTextEngine`
- * had its own copy with a different wrapping rule, and a CoreText engine for iOS would have been
- * the third — at which point "the same implementation must be used for measuring and for drawing"
- * (see [TextEngine]) becomes impossible to keep true by inspection. A label sits where the layout
- * put it, so a second layout is a second answer to where labels go.
+ * This exists because the layout was written three times. [MetricTextEngine] had it,
+ * `AndroidTextEngine` has its own copy with a different wrapping rule, and a CoreText engine for
+ * iOS would have been the third — at which point "the same implementation must be used for
+ * measuring and for drawing" (see [TextEngine]) becomes impossible to keep true by inspection. A
+ * label sits where the layout put it, so a second layout is a second answer to where labels go.
+ *
+ * `AndroidTextEngine` is the one implementation **not** yet moved onto this: it still implements
+ * [TextEngine] directly and carries that second copy of the wrapping. Moving it changes where
+ * labels land on a device, and the only tests that can see that are instrumented ones, so it is a
+ * change to make with an emulator attached rather than one to slip in beside a documentation fix.
+ * Until then, the sentence above is a statement about two of the three implementations, and this
+ * paragraph is why.
  *
  * Subclasses are expected from other languages as well: `CoreTextTextEngine` in
  * `swift/AsterVegaRender` is a Swift subclass, which is what makes an iOS chart measure text with
