@@ -326,3 +326,16 @@ Two demo apps render specifications on a real device: `demo/` on Android, and
 each chart together with everything the engine could not honour. `scripts/ios-demo.sh` builds it.
 
 Design decisions are recorded in [docs/adr/](docs/adr/).
+
+## Licence
+
+BSD 3-Clause — see [LICENSE](LICENSE).
+
+That is Vega's own licence, and this project uses it for that reason rather than
+by preference: a port is a derivative work, so the terms of what it ports come
+with it. Vega, Vega-Lite and the `vega-*` packages are BSD 3-Clause (© University
+of Washington Interactive Data Lab); d3 and TopoJSON, which Vega is built on and
+this port therefore follows, are ISC (© Mike Bostock).
+[THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md) records both texts and which
+parts of this repository derive from each; [test-fixtures/](test-fixtures/) says
+where every expectation came from.
