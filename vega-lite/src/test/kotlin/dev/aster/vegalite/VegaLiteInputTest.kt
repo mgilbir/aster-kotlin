@@ -90,22 +90,21 @@ class VegaLiteInputTest {
   /** A Vega-Lite specification the compiler cannot honour still reports, by name. */
   @Test
   fun `an unimplemented Vega-Lite construct is reported through the conversion`() {
-    // A grid whose cells are grids compiles at the top of a chart; **inside a concatenation** the
-    // levels would have to be lifted per plot, which is the composition still refused by name.
+    // Grids nest, and nest inside a concatenation; a **repetition inside a grid** does not, and is
+    // reported by name rather than half-compiled.
     val nested =
       """
       {
         "${'$'}schema": "https://vega.github.io/schema/vega-lite/v6.json",
         "data": {"values": [{"a": 1, "b": 2}]},
-        "hconcat": [
-          {
-            "facet": {"column": {"field": "a"}},
-            "spec": {
-              "facet": {"row": {"field": "b"}},
-              "spec": {"mark": "bar", "encoding": {"x": {"field": "a", "type": "quantitative"}}}
-            }
+        "facet": {"column": {"field": "a"}},
+        "spec": {
+          "repeat": {"column": ["a", "b"]},
+          "spec": {
+            "mark": "bar",
+            "encoding": {"x": {"field": {"repeat": "column"}, "type": "quantitative"}}
           }
-        ]
+        }
       }
       """
         .trimIndent()
@@ -113,7 +112,7 @@ class VegaLiteInputTest {
     assertTrue(converted.wasVegaLite)
     assertTrue(
       converted.diagnostics.any { it.code == VegaLiteDiagnostics.UNSUPPORTED_COMPOSITION },
-      "a nested grid inside a concatenation should be reported: ${converted.diagnostics}",
+      "a repetition inside a grid should be reported: ${converted.diagnostics}",
     )
   }
 }

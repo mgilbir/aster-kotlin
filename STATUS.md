@@ -4932,10 +4932,29 @@ off upstream's own output for a nested grid in each shape — `facet-in-facet-ro
 rows inline and the three gallery charts load theirs — rather than off the optimizer, and either rule
 alone gets one of the two shapes wrong.
 
-With this the gallery sweep reaches **627 of 627**. A nested grid inside a *concatenation* is still
-refused by name: the levels would have to be lifted per plot, and that plumbing is not here — so it
-says so rather than compiling one crossed grid, which is what folding the levels would silently
-produce.
+With this the gallery sweep reaches **627 of 627**.
+
+**A nest inside a concatenation** needed one more step, and it is the step the earlier per-plot grid
+work already pointed at: the levels belong to the plot that wrote them, so they are peeled where that
+plot's specification is normalised and lifted per plot, and everything the nest publishes runs through
+the plot's own name — `concat_0_cell` holding `concat_0_child_cell`, its cell `concat_0_child_child_width`
+wide. The **split** had to become per plot with them: a concatenation may hold a nest beside a plain
+plot, and only the nest's cells compute their own rows, where the plain plot derives its chain as it
+always did. Nothing about the recursion is two-deep special-casing — three levels compile too, and
+`facet-in-facet-deep.vl.json` pins that, chaining `facet` to `child_facet` to `child_child_facet`.
+
+Probing that turned up a defect **beside** the nesting, in a chart with no nest in it at all: a
+faceted plot was taking part in a concatenation's size merge. `parseConcatLayoutSize` reads each
+plot's own layout size and a grid has none — the size it knows is one cell's — so a trellis merged
+with the plain plot next to it whenever the two happened to be declared the same width, and the
+shared `childWidth` was written into the plain plot's marks and scales. No gallery example puts a
+trellis beside a plain plot of matching size, which is why 627 clean examples had not caught it;
+`facet-concat-size.vl.json` does.
+
+What is still refused by name is a **repetition inside a grid**: a repeat below a facet is not
+normalised where it stands. The two tests that assert an unimplemented composition is reported have
+now been repointed twice as the compositions above them were implemented, which is the honest
+maintenance cost of asserting on a limitation rather than on a rule.
 
 ### A grid belongs to the plot that holds it
 

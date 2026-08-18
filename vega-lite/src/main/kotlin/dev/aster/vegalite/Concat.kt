@@ -19,7 +19,7 @@ import dev.aster.vega.model.VegaValue
 internal class Concat
 private constructor(
   /** Each plot and the name it is compiled under, which a *repetition* supplies for its copies. */
-  val children: List<Pair<String?, VegaValue.Obj>>,
+  val children: List<Child>,
   /**
    * How many plots to a row: 1 for a column, null for a row, and whatever `columns` says otherwise.
    *
@@ -48,6 +48,20 @@ private constructor(
     }
   }
 
+  /**
+   * One plot of the concatenation.
+   *
+   * [nestedFacets] is why this is a class rather than a pair: a plot may be a grid whose cells are
+   * grids, and the levels inside the outermost one have to reach the plot that owns them. They are
+   * peeled here, where the plot's specification is normalised, and lifted per plot later.
+   */
+  class Child(
+    /** The name the plot is compiled under, where it states one — a repetition names its copies. */
+    val name: String?,
+    val spec: VegaValue.Obj,
+    val nestedFacets: List<VegaValue.Obj> = emptyList(),
+  )
+
   companion object {
     /** `config.concat.spacing`. */
     private const val DEFAULT_SPACING = 20.0
@@ -63,7 +77,7 @@ private constructor(
         )
         return null
       }
-      val children = mutableListOf<Pair<String?, VegaValue.Obj>>()
+      val children = mutableListOf<Child>()
       entries.forEachIndexed { index, entry ->
         val declared = entry as? VegaValue.Obj ?: return@forEachIndexed
         // A **repetition** inside a concatenation is a concatenation of its copies, exactly as one
@@ -74,25 +88,11 @@ private constructor(
           else Repeat.normalize(declared, diagnostics) ?: return null
         // A **facet** operator is the same chart as its two channels written in the encoding, here
         // as much as at the top: the grid it lays out is then this plot's rather than the chart's.
-        val child =
-          if (!repeated.has("facet")) repeated
-          else {
-            val peeled = FacetOperator.normalize(repeated, diagnostics) ?: return null
-            // A grid whose cells are grids compiles at the top of a chart, where each level is
-            // lifted in turn. Inside a concatenation the levels would have to be lifted per plot,
-            // and that plumbing is not here — so it is refused by name rather than compiled as one
-            // crossed grid, which is what folding the levels together would silently produce.
-            if (peeled.inner.isNotEmpty()) {
-              diagnostics.fatal(
-                VegaLiteDiagnostics.UNSUPPORTED_COMPOSITION,
-                "A `facet` inside a `facet` inside a `$kind` is not implemented; nested grids " +
-                  "compile at the top of a chart.",
-                jsonPath = "$.$kind[$index].spec.facet",
-              )
-              return null
-            }
-            peeled.spec
-          }
+        // A grid whose cells are grids peels into a level per plot, lifted where that plot is.
+        val peeled =
+          if (!repeated.has("facet")) FacetOperator.Peeled(repeated, emptyList())
+          else FacetOperator.normalize(repeated, diagnostics) ?: return null
+        val child = peeled.spec
         for (nested in listOf("repeat", "facet")) {
           if (child.has(nested)) {
             diagnostics.fatal(
@@ -105,7 +105,8 @@ private constructor(
           }
         }
         children +=
-          child.string("name") to
+          Child(
+            child.string("name"),
             obj {
               put("data", spec.fields["data"])
               putAll(child)
@@ -120,7 +121,9 @@ private constructor(
                 if (child.has("data")) child.array("transform").orEmpty()
                 else spec.array("transform").orEmpty() + child.array("transform").orEmpty()
               put("transform", if (inherited.isEmpty()) null else arr(inherited))
-            }
+            },
+            peeled.inner,
+          )
       }
       val columns =
         when (kind) {

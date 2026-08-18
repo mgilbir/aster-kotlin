@@ -75,28 +75,24 @@ class VegaLiteFixtureTest {
 
   @Test
   fun `an unimplemented composition is refused by name rather than approximated`() {
-    // A grid whose cells are grids compiles at the top of a chart, where each level is lifted in
-    // turn. **Inside a concatenation** the levels would have to be lifted per plot, and that
-    // plumbing is not here — so it is refused by name rather than compiled as one crossed grid,
-    // which is what folding the levels together would silently produce.
+    // A **repetition inside a grid**. Grids nest, and a grid nests inside a concatenation, but a
+    // repeat below one is not normalised where it stands and so is refused by name rather than
+    // half-compiled. Asserting on something actually unsupported is the point of the test: it has
+    // now been repointed twice as the compositions above it were implemented.
     val compiled =
       VegaLiteCompiler()
         .compileJson(
           """
           {
             "data": {"values": [{"a": 1, "b": 2}]},
-            "hconcat": [
-              {
-                "facet": {"column": {"field": "a"}},
-                "spec": {
-                  "facet": {"row": {"field": "b"}},
-                  "spec": {
-                    "mark": "bar",
-                    "encoding": {"x": {"field": "a", "type": "quantitative"}}
-                  }
-                }
+            "facet": {"column": {"field": "a"}},
+            "spec": {
+              "repeat": {"column": ["a", "b"]},
+              "spec": {
+                "mark": "bar",
+                "encoding": {"x": {"field": {"repeat": "column"}, "type": "quantitative"}}
               }
-            ]
+            }
           }
           """
             .trimIndent()
@@ -105,10 +101,10 @@ class VegaLiteFixtureTest {
       compiled.diagnostics.filter { it.code == VegaLiteDiagnostics.UNSUPPORTED_COMPOSITION }
     assertTrue(
       reported.isNotEmpty(),
-      "the nested facet in a concatenation should be reported, got ${compiled.diagnostics}",
+      "the repetition inside a grid should be reported, got ${compiled.diagnostics}",
     )
     assertTrue(
-      reported.first().message.contains("facet"),
+      reported.first().message.contains("repeat"),
       "the report should name the construct: ${reported.first().message}",
     )
   }
@@ -140,6 +136,41 @@ class VegaLiteFixtureTest {
     val vega = requireNotNull(compiled.toJson()) { "no Vega specification" }
     assertTrue(vega.contains("child_child_width"), "the innermost cell is two levels deep")
     assertTrue(vega.contains("child_cell"), "the inner cell group")
+  }
+
+  @Test
+  fun `a facet inside a facet compiles inside a concatenation too`() {
+    // The levels belong to the plot that wrote them, so everything the nest publishes runs through
+    // that plot's own name rather than the chart's.
+    val compiled =
+      VegaLiteCompiler()
+        .compileJson(
+          """
+          {
+            "data": {"values": [{"a": 1, "b": 2}]},
+            "hconcat": [
+              {
+                "facet": {"column": {"field": "a"}},
+                "spec": {
+                  "facet": {"row": {"field": "b"}},
+                  "spec": {
+                    "mark": "bar",
+                    "encoding": {"x": {"field": "a", "type": "quantitative"}}
+                  }
+                }
+              }
+            ]
+          }
+          """
+            .trimIndent()
+        )
+    assertTrue(
+      compiled.diagnostics.none { it.code == VegaLiteDiagnostics.UNSUPPORTED_COMPOSITION },
+      "a nested grid in a concatenation should compile, got ${compiled.diagnostics}",
+    )
+    val vega = requireNotNull(compiled.toJson()) { "no Vega specification" }
+    assertTrue(vega.contains("concat_0_child_cell"), "the inner cell is the plot's own")
+    assertTrue(vega.contains("concat_0_child_child_width"), "and so is its cell's size")
   }
 
   companion object {

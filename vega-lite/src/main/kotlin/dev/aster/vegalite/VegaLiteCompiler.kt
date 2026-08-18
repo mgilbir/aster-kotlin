@@ -215,7 +215,7 @@ private class Compilation(
       // same operation one name deeper. `liftFacet` renames its views `<owner>_child`, so the owner
       // of the next lift is the name the last one gave them — which is how the unit ends up
       // `child_child` and its size `child_child_width`, as upstream names them.
-      for ((depth, level) in nestedFacets.withIndex()) {
+      for ((depth, level) in plot.nestedFacets.withIndex()) {
         if (lifted.second == null) break
         val owner =
           Fields.varName(
@@ -589,11 +589,13 @@ private class Compilation(
     // split below it and no cell scale to place them among, so they simply follow the tables the
     // chart derived.
     for (plot in plots.filter { it.facet != null && concat != null }) {
-      val current = plot.facet!!
+      // The **outermost** level's values stand beside the plot's table; a level inside one breaks
+      // that level's partition down further, so its values are computed inside that level's cell.
+      val current = plot.facets.first()
       val bands =
         plot.axes.filter { (it["grid"] as? VegaValue.Bool)?.value != true && !cellOwnsAxis(it) }
       val across = bands.filter { it.string("orient") == "bottom" || it.string("orient") == "top" }
-      val reads = plot.views.first().mainData
+      val reads = plot.reads ?: plot.views.first().mainData
       val domains =
         current.domainDatasets(
           counted = emptyMap(),
@@ -622,13 +624,14 @@ private class Compilation(
           counted = cellCardinality,
           // The table the **facet** reads, which is the one above the split where there is one:
           // the cells' values are the whole table's values, not one cell's.
-          source = facetReads ?: views.first().mainData,
+          source = plots.single().reads ?: views.first().mainData,
           vertical = (main - horizontal.toSet()).isNotEmpty(),
           horizontal = horizontal.isNotEmpty(),
         )
       // At the point the facet stands in the flow, where the flow splits there; at the end
       // otherwise, nothing else having been derived after it.
-      if (facetDomainsAt >= 0) data.addAll(facetDomainsAt, domains) else data += domains
+      val at = plots.single().domainsAt
+      if (at >= 0) data.addAll(at, domains) else data += domains
     }
 
     val vega = obj {
@@ -1109,6 +1112,32 @@ private class Compilation(
     var facets: List<FacetLayout> = emptyList()
 
     /**
+     * The facet levels inside this plot's outermost one, outermost first — its grids to lift.
+     *
+     * Per plot rather than per chart: a concatenation may hold a nested grid beside a plain plot,
+     * and the levels belong to the plot whose specification wrote them.
+     */
+    var nestedFacets: List<VegaValue.Obj> = emptyList()
+
+    /**
+     * Where this plot's flow splits at its innermost partition, and the partitions above it.
+     *
+     * Per plot for the same reason the grids are: a concatenation may hold a nest beside a plain
+     * plot, and only the nest's own chain is computed inside a cell.
+     */
+    var split: FacetNode? = null
+
+    var splitAbove: List<FacetNode> = emptyList()
+
+    /** The datasets this plot's innermost cell computes for itself, where the flow splits. */
+    var groupData: List<VegaValue> = emptyList()
+
+    /** The table the outermost partition reads, and where in the list it stood. */
+    var reads: String? = null
+
+    var domainsAt: Int = -1
+
+    /**
      * The **innermost** grid, which is the one that owns a cell.
      *
      * Everything about a cell belongs to the level closest to the marks: its style and size, the
@@ -1177,26 +1206,36 @@ private class Compilation(
   private fun plots(): List<Plot>? {
     val leaves = mutableListOf<Plot>()
 
-    fun build(name: String, child: VegaValue.Obj, above: List<String>): Node? {
+    fun build(
+      name: String,
+      child: VegaValue.Obj,
+      above: List<String>,
+      /**
+       * The facet levels inside this plot's outermost one, peeled where its spec was normalised.
+       */
+      nestedFacets: List<VegaValue.Obj> = emptyList(),
+    ): Node? {
       val nested = Concat.of(child, diagnostics, config)
       if (nested == null) {
         val plot = Plot(name, child)
+        plot.nestedFacets = nestedFacets
         plot.views = views(plot.spec, plot.name, above) ?: return null
         plot.views.forEach { plotNames[it] = plot.name }
         leaves += plot
         return Node.Leaf(plot)
       }
       val children =
-        nested.children.mapIndexed { index, (declared, entry) ->
+        nested.children.mapIndexed { index, entry ->
           // A plot that names itself is compiled under that name, which is how a *repetition*'s
           // copies come out `child__b` rather than `concat_0`: upstream's model takes `spec.name`
           // over the name its parent offered it. Below the first level the names compose.
           val here =
-            declared ?: listOf(name, "concat_$index").filter { it.isNotEmpty() }.joinToString("_")
+            entry.name ?: listOf(name, "concat_$index").filter { it.isNotEmpty() }.joinToString("_")
           // A concatenation's own transforms belong to *it*, not to each plot below it: they are
           // one chain in upstream's tree, forking at the plots, and naming them for each plot in
           // turn would leave three copies of one chain with nothing to fold them by.
-          build(here, entry, owning(entry, above, here)) ?: return null
+          build(here, entry.spec, owning(entry.spec, above, here), entry.nestedFacets)
+            ?: return null
         }
       return Node.Nest(name, nested, children, child)
     }
@@ -1210,6 +1249,7 @@ private class Compilation(
         spec.string("name").orEmpty(),
         spec,
         List(spec.array("transform").orEmpty().size) { spec.string("name").orEmpty() },
+        nestedFacets,
       ) ?: return null
     return leaves
   }
@@ -1333,8 +1373,12 @@ private class Compilation(
         // A **faceted** plot's size is its *cell's*: the grid itself is a place its cells are
         // arranged in and has no extent of its own to name, so the signal is `child_width` under
         // the plot's name and no level above may rename it into a size the plot does not have.
-        val cell = (child as? Node.Leaf)?.plot?.facet != null
-        val own = if (cell) "${nameOf(child)}_child_$plain" else name ?: "${nameOf(child)}_$plain"
+        // One `child` per **level**: a plot that is a grid of grids names its innermost cell
+        // `concat_0_child_child_width`, the name belonging to the model that owns the cell.
+        val depth = (child as? Node.Leaf)?.plot?.facets?.size ?: 0
+        val own =
+          if (depth > 0) "${nameOf(child)}_${"child_".repeat(depth)}$plain"
+          else name ?: "${nameOf(child)}_$plain"
         when (child) {
           is Node.Leaf -> {
             child.plot.sizeNames = child.plot.sizeNames + (channel to own)
@@ -1527,14 +1571,21 @@ private class Compilation(
       if (grid != null) {
         put(
           "layout",
-          grid.layout(
-            facetSpacing(plot.spec),
-            HEADER_OFFSET,
-            config,
-            setOf("x", "y")
-              .filter { resolve.scaleIsIndependent(it, defaultIndependent = false) }
-              .toSet(),
-          ),
+          // The **outermost** level arranges the plot's group; a level inside one arranges its
+          // cells
+          // within that level's cell, and its layout is written there.
+          plot.facets
+            .first()
+            .layout(
+              facetSpacing(plot.spec),
+              HEADER_OFFSET,
+              config,
+              setOf("x", "y")
+                .filter { resolve.scaleIsIndependent(it, defaultIndependent = false) }
+                .toSet(),
+              headings = if (plot.facets.size > 1) headingsPerLevel(plot.facets).first() else null,
+              childHasSize = plot.facets.size == 1,
+            ),
         )
         put("marks", arr(marks(plot.views, plot.axes, grid, plot.facets.dropLast(1))))
       } else {
@@ -1991,6 +2042,12 @@ private class Compilation(
   ): List<VegaValue> {
     val drawn = views.flatMap { Marks.marks(it) }
     val current = grid ?: return drawn
+    // The split belongs to the **plot** whose grid this is: a concatenation may hold a nest beside
+    // a
+    // plain plot, and only the nest's cells compute their own rows.
+    val owner = plotOfView(views.first())
+    val reads = owner?.reads
+    val groupData = owner?.groupData.orEmpty()
     // A brush is drawn **in the cell**, where the marks it reacts to are. The rectangle belongs to
     // one cell's plotting area — it is dragged across those rows and no others — and the signals
     // that follow the pointer read that cell's own scales, so both go inside the group.
@@ -2028,7 +2085,7 @@ private class Compilation(
           // The table the **facet** reads: the partition the level above it cut where there is one,
           // and otherwise the table above the split — or the view's own main output where nothing
           // splits at all.
-          above.lastOrNull()?.named("facet") ?: facetReads ?: views.first().mainData,
+          above.lastOrNull()?.named("facet") ?: reads ?: views.first().mainData,
           childMarks,
           gridAxes,
           views.first().widthSignal,
@@ -2041,7 +2098,7 @@ private class Compilation(
           cellCardinality,
           cellScales,
           viewEncode(),
-          facetGroupData,
+          groupData,
           // `assembleAxisSignals` on the **cell**: an axis inside it that draws its grid across no
           // other scale falls back to `width` or `height` by name, and inside the cell those names
           // mean the whole chart until the cell aliases them to its own.
@@ -2075,7 +2132,7 @@ private class Compilation(
             // The table this level partitions: the partition the level above it cut, and for the
             // outermost the table standing above the split — which is the whole of the chart's,
             // since the cells' values are the whole table's values and not one cell's.
-            above.getOrNull(depth - 1)?.named("facet") ?: facetReads ?: views.first().mainData,
+            above.getOrNull(depth - 1)?.named("facet") ?: reads ?: views.first().mainData,
             // `getCardinalityAggregateForChild` asks the child first: where the child is another
             // grid, what this partition counts is that grid's **columns** and nothing else — the
             // per-cell scale cardinality belongs to the level that owns a cell.
@@ -2209,20 +2266,6 @@ private class Compilation(
 
   // -----------------------------------------------------------------------------------------
   // Data
-  // -----------------------------------------------------------------------------------------
-
-  /**
-   * What a **cell** computes for itself, where the flow splits at the facet.
-   *
-   * Empty in the ordinary case, where the whole chain is hoisted above the facet and every cell
-   * reads the partition directly.
-   */
-  private var facetGroupData: List<VegaValue> = emptyList()
-
-  /** The table the facet reads, and where its own domain datasets belong beside it. */
-  private var facetReads: String? = null
-
-  private var facetDomainsAt: Int = -1
 
   private fun assembleData(views: List<UnitView>): List<VegaValue> {
     if (views.any { it.spec.data == null }) {
@@ -2265,18 +2308,24 @@ private class Compilation(
     // below and is computed per cell.
     // A grid whose cells are grids always splits: what stands under the outer partition is the
     // inner grid's own named point, which is exactly the "fork or named output" the walk stops at.
-    val split =
-      facet
-        ?.takeIf {
-          views.size > 1 ||
-            facetLevels.size > 1 ||
-            views.any { view -> DataPipeline.needsRawTable(view) }
-        }
-        ?.let { FacetNode(it.named("facet")) }
-    // The levels above the split, whose partitions the chain passes through on the way down.
-    val splitAbove =
-      if (split == null) emptyList()
-      else facetLevels.dropLast(1).map { FacetNode(it.named("facet")) }
+    // Per plot: a concatenation may hold a grid beside a plain plot, and each grid decides for
+    // itself whether its cells compute their own rows.
+    for (plot in allPlots) {
+      val grid = plot.facet ?: continue
+      plot.split =
+        grid
+          .takeIf {
+            plot.views.size > 1 ||
+              plot.facets.size > 1 ||
+              plot.views.any { view -> DataPipeline.needsRawTable(view) }
+          }
+          ?.let { FacetNode(it.named("facet")) }
+      // The levels above the split, whose partitions the chain passes through on the way down.
+      plot.splitAbove =
+        if (plot.split == null) emptyList()
+        else plot.facets.dropLast(1).map { FacetNode(it.named("facet")) }
+    }
+    val split = if (concat == null) allPlots.singleOrNull()?.split else null
     // `LookupNode.make`: the joined table is given a **named point** of its own on the source it
     // comes from, and the join names that point rather than the table. Two things follow, and both
     // are the reason it is done unconditionally rather than only where the chart also draws from
@@ -2315,11 +2364,11 @@ private class Compilation(
           // scales read. The pre-aggregation table a sorted domain asks for is such a point, and
           // where there is one the chain stays below the facet and a copy of it — with the facet's
           // own fields added to every grouping — is hung beside it for the scales to measure.
-          facetSplit = split,
-          facetAbove = splitAbove,
+          facetSplit = plotOfView(view)?.split,
+          facetAbove = plotOfView(view)?.splitAbove.orEmpty(),
           // Where the flow does not split, the grid is still a node in it, and a node takes a name.
           facetTail =
-            if (split != null) null
+            if (plotOfView(view)?.split != null) null
             else plotOfView(view)?.facet?.let { FacetNode(it.named("facet")) },
           materialized = materialized,
           lookupOutputs = lookupOutputs,
@@ -2358,14 +2407,15 @@ private class Compilation(
         .assemble(order.map { roots[it] ?: it })
     // The facet's own values stand where the facet does: after the table it reads and before what
     // the scales derive beside it. `assembleFacetData` then gives each cell the chain below.
-    if (split != null && facet != null) {
-      facetGroupData = DataAssembler().assembleFacetData(split)
+    for (plot in allPlots) {
+      val own = plot.split ?: continue
+      plot.groupData = DataAssembler().assembleFacetData(own)
       // The **outermost** partition is the one the chart's own walk reached, so it is the one that
       // knows which table it read and where in the list it stood. The inner partitions are inside a
       // cell group, where the chart's numbering does not reach.
-      val read = splitAbove.firstOrNull() ?: split
-      facetReads = read.data
-      facetDomainsAt = read.at
+      val read = plot.splitAbove.firstOrNull() ?: own
+      plot.reads = read.data
+      plot.domainsAt = read.at
     }
     // "now fix the from references in lookup transforms": a join names the *output node* while the
     // flow is being built, because the dataset that node ends up being is not known until the tree
