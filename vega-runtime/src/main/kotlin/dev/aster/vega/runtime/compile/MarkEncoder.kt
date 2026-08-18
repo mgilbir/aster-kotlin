@@ -72,9 +72,10 @@ import kotlin.math.pow
 /**
  * Turns a mark specification plus its data into scene nodes.
  *
- * Implemented: `rect`, `rule`, `symbol`, `text`, `line`, `area`, `arc`, and `group` through
- * [encodeGroup]. Every other type reports `VEGA_TRANSFORM_NOT_IMPLEMENTED` and contributes no
- * nodes, so a chart that needs one is visibly missing it rather than silently short.
+ * Every one of Vega's twelve mark types: `rect`, `rule`, `symbol`, `text`, `line`, `area`, `arc`,
+ * `path`, `shape`, `trail`, `image`, and `group` through [encodeGroup]. A type this does not know
+ * reports `VEGA_TRANSFORM_NOT_IMPLEMENTED` and contributes no nodes, so a chart that needs one is
+ * visibly missing it rather than silently short.
  *
  * Channel resolution follows Vega: `enter` provides the base and `update` overrides it, a scaled
  * channel maps its field through the named scale, and `band` adds a fraction of the scale's
