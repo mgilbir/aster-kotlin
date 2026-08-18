@@ -8,7 +8,8 @@ compares the counts in this file against the code and the corpus and fails when 
 ## Picking this up
 
 - Work happens on a branch and lands on `main` through a pull request. CI (`.github/workflows/ci.yml`)
-  runs the gate on Linux and macOS for every push and pull request.
+  runs the gate on Linux and macOS for every push to `main`, and on request — not on branches, at the
+  rate they land here. So `./scripts/check.sh` locally is what a branch has before it merges.
 - Read `CONTRIBUTING.md` first. The method matters more than the remaining feature list: probe upstream
   before implementing, add a fixture and expect it to fail, report anything unsupported by name.
 - `./scripts/check.sh` is the gate — format, all tests, lint, demo APK. `./scripts/oracle.sh`
