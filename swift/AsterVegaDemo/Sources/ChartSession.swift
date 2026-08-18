@@ -56,7 +56,8 @@ final class ChartSession {
     // which is a different seam with a different job.
     clock: { KotlinLong(value: Int64(Date().timeIntervalSince1970 * 1000)) },
     loader: SpecLibrary.loader,
-    scheduler: nil
+    scheduler: nil,
+    locale: VegaLocale.Companion.shared.EnglishUS
   )
 
   private var json = ""

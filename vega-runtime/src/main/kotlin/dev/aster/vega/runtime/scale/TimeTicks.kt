@@ -1,5 +1,6 @@
 package dev.aster.vega.runtime.scale
 
+import dev.aster.vega.model.locale.VegaLocale
 import dev.aster.vega.model.time.TimeFormat
 import dev.aster.vega.model.time.TimeInterval
 import dev.aster.vega.model.time.TimeStepper
@@ -125,28 +126,36 @@ public object TimeTicks {
    * daily axis read "Jan 01" once a month and "Mon 05" otherwise — the coarser boundary wins, so
    * the reader gets the context back exactly where it changes.
    */
-  public fun label(millis: Double, zone: TimeZone): String {
+  public fun label(
+    millis: Double,
+    zone: TimeZone,
+    locale: VegaLocale = VegaLocale.EnglishUS,
+  ): String {
     val at = localAt(millis, zone)
     return when {
-      at.nanosecond != 0 -> TimeFormat.format(at, ".%L")
-      at.second != 0 -> TimeFormat.format(at, ":%S")
-      at.minute != 0 -> TimeFormat.format(at, "%I:%M")
-      at.hour != 0 -> TimeFormat.format(at, "%I %p")
+      at.nanosecond != 0 -> TimeFormat.format(at, ".%L", locale)
+      at.second != 0 -> TimeFormat.format(at, ":%S", locale)
+      at.minute != 0 -> TimeFormat.format(at, "%I:%M", locale)
+      at.hour != 0 -> TimeFormat.format(at, "%I %p", locale)
       at.day != 1 ->
         // A Sunday is a week boundary, so it gets the month back; any other day only needs its
         // name.
-        if (at.date.dayOfWeek.isoDayNumber == 7) TimeFormat.format(at, "%b %d")
-        else TimeFormat.format(at, "%a %d")
-      at.month.number != 1 -> TimeFormat.format(at, "%B")
-      else -> TimeFormat.format(at, "%Y")
+        if (at.date.dayOfWeek.isoDayNumber == 7) TimeFormat.format(at, "%b %d", locale)
+        else TimeFormat.format(at, "%a %d", locale)
+      at.month.number != 1 -> TimeFormat.format(at, "%B", locale)
+      else -> TimeFormat.format(at, "%Y", locale)
     }
   }
 
   private fun localAt(millis: Double, zone: TimeZone): LocalDateTime = TimeFormat.at(millis, zone)
 
   /** Convenience for callers that already know the pattern they want. */
-  public fun format(millis: Double, pattern: String, zone: TimeZone): String =
-    TimeFormat.format(millis, pattern, zone)
+  public fun format(
+    millis: Double,
+    pattern: String,
+    zone: TimeZone,
+    locale: VegaLocale = VegaLocale.EnglishUS,
+  ): String = TimeFormat.format(millis, pattern, zone, locale)
 
   /**
    * Every boundary of an interval inside a domain, upstream's `interval.range`.

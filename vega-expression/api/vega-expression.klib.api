@@ -409,6 +409,8 @@ final object dev.aster.vega.expression/Functions { // dev.aster.vega.expression/
         final fun <get-functions>(): kotlin.collections/Map<kotlin/String, dev.aster.vega.expression/ExpressionFunction> // dev.aster.vega.expression/Functions.functions.<get-functions>|<get-functions>(){}[0]
     final val knownUnsupported // dev.aster.vega.expression/Functions.knownUnsupported|{}knownUnsupported[0]
         final fun <get-knownUnsupported>(): kotlin.collections/Map<kotlin/String, kotlin/String> // dev.aster.vega.expression/Functions.knownUnsupported.<get-knownUnsupported>|<get-knownUnsupported>(){}[0]
+
+    final fun functionsFor(dev.aster.vega.model.locale/VegaLocale): kotlin.collections/Map<kotlin/String, dev.aster.vega.expression/ExpressionFunction> // dev.aster.vega.expression/Functions.functionsFor|functionsFor(dev.aster.vega.model.locale.VegaLocale){}[0]
 }
 
 final object dev.aster.vega.expression/JsSemantics { // dev.aster.vega.expression/JsSemantics|null[0]
@@ -426,13 +428,13 @@ final object dev.aster.vega.expression/JsSemantics { // dev.aster.vega.expressio
 }
 
 final object dev.aster.vega.expression/NumberFormat { // dev.aster.vega.expression/NumberFormat|null[0]
-    final fun format(kotlin/Double, dev.aster.vega.expression/NumberFormat.Spec, kotlin/String = ...): kotlin/String // dev.aster.vega.expression/NumberFormat.format|format(kotlin.Double;dev.aster.vega.expression.NumberFormat.Spec;kotlin.String){}[0]
-    final fun format(kotlin/Double, kotlin/String): kotlin/String // dev.aster.vega.expression/NumberFormat.format|format(kotlin.Double;kotlin.String){}[0]
+    final fun format(kotlin/Double, dev.aster.vega.expression/NumberFormat.Spec, kotlin/String = ..., dev.aster.vega.model.locale/VegaLocale = ...): kotlin/String // dev.aster.vega.expression/NumberFormat.format|format(kotlin.Double;dev.aster.vega.expression.NumberFormat.Spec;kotlin.String;dev.aster.vega.model.locale.VegaLocale){}[0]
+    final fun format(kotlin/Double, kotlin/String, dev.aster.vega.model.locale/VegaLocale = ...): kotlin/String // dev.aster.vega.expression/NumberFormat.format|format(kotlin.Double;kotlin.String;dev.aster.vega.model.locale.VegaLocale){}[0]
     final fun parse(kotlin/String): dev.aster.vega.expression/NumberFormat.Spec? // dev.aster.vega.expression/NumberFormat.parse|parse(kotlin.String){}[0]
     final fun precisionFixed(kotlin/Double): kotlin/Int // dev.aster.vega.expression/NumberFormat.precisionFixed|precisionFixed(kotlin.Double){}[0]
     final fun precisionPrefix(kotlin/Double, kotlin/Double): kotlin/Int // dev.aster.vega.expression/NumberFormat.precisionPrefix|precisionPrefix(kotlin.Double;kotlin.Double){}[0]
     final fun precisionRound(kotlin/Double, kotlin/Double): kotlin/Int // dev.aster.vega.expression/NumberFormat.precisionRound|precisionRound(kotlin.Double;kotlin.Double){}[0]
-    final fun prefixed(dev.aster.vega.expression/NumberFormat.Spec, kotlin/Double): kotlin/Function1<kotlin/Double, kotlin/String> // dev.aster.vega.expression/NumberFormat.prefixed|prefixed(dev.aster.vega.expression.NumberFormat.Spec;kotlin.Double){}[0]
+    final fun prefixed(dev.aster.vega.expression/NumberFormat.Spec, kotlin/Double, dev.aster.vega.model.locale/VegaLocale = ...): kotlin/Function1<kotlin/Double, kotlin/String> // dev.aster.vega.expression/NumberFormat.prefixed|prefixed(dev.aster.vega.expression.NumberFormat.Spec;kotlin.Double;dev.aster.vega.model.locale.VegaLocale){}[0]
 
     final class Spec { // dev.aster.vega.expression/NumberFormat.Spec|null[0]
         constructor <init>(kotlin/Char = ..., kotlin/Char = ..., kotlin/Char = ..., kotlin/Char? = ..., kotlin/Boolean = ..., kotlin/Int? = ..., kotlin/Boolean = ..., kotlin/Int? = ..., kotlin/Boolean = ..., kotlin/Char? = ...) // dev.aster.vega.expression/NumberFormat.Spec.<init>|<init>(kotlin.Char;kotlin.Char;kotlin.Char;kotlin.Char?;kotlin.Boolean;kotlin.Int?;kotlin.Boolean;kotlin.Int?;kotlin.Boolean;kotlin.Char?){}[0]

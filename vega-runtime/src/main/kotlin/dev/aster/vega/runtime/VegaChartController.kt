@@ -3,12 +3,15 @@ package dev.aster.vega.runtime
 // Aliased: this class already has a `ChartInputEvent`, and the two are different things — one is a
 // gesture the host reports, the other is the Vega event a selector matches.
 import dev.aster.vega.expression.CachingExpressionCompiler
+import dev.aster.vega.expression.Evaluator
+import dev.aster.vega.expression.Functions
 import dev.aster.vega.expression.VegaExpressionCompiler
 import dev.aster.vega.model.DiagnosticCodes
 import dev.aster.vega.model.DiagnosticCollector
 import dev.aster.vega.model.DiagnosticSeverity
 import dev.aster.vega.model.VegaDiagnostic
 import dev.aster.vega.model.VegaValue
+import dev.aster.vega.model.locale.VegaLocale
 import dev.aster.vega.model.spec.EventConfig
 import dev.aster.vega.model.spec.EventStream
 import dev.aster.vega.runtime.compile.CompiledSpec
@@ -117,9 +120,19 @@ public class VegaChartController(
    * that wants either passes one whose lifetime it controls, which on Android means the view's.
    */
   private val scheduler: Scheduler? = null,
+  /**
+   * The language every generated name and number is written in, beside [textEngine] because the two
+   * are the same kind of thing: something the platform knows and the engine cannot.
+   *
+   * A tick label's month name, a thousands separator, the sentence a screen reader is given. See
+   * `VegaLocale`, whose fields are d3's own locale definitions. Defaults to d3's `en-US`, so a
+   * chart built without one is what upstream draws — and does **not** change how a specification's
+   * own dates are parsed, which is part of the wire format rather than of the language.
+   */
+  private val locale: VegaLocale = VegaLocale.EnglishUS,
 ) {
 
-  private val compiler = SpecCompiler(textEngine, loader)
+  private val compiler = SpecCompiler(textEngine, loader, locale = locale)
 
   /** The debounced handlers waiting, by the signal and delay that identify them. */
   private val pendingDebounces = mutableMapOf<Pair<String, Double>, ScheduledTask>()
@@ -272,7 +285,10 @@ public class VegaChartController(
   /** The text of the loaded specification, so a fired handler can recompile it. */
   private var loadedSpecJson: String? = null
 
-  private val expressions = CachingExpressionCompiler(VegaExpressionCompiler())
+  // The same locale-bound function table the compiler uses, so a handler's own `timeFormat` writes
+  // the same month name the axis does.
+  private val expressions =
+    CachingExpressionCompiler(VegaExpressionCompiler(Evaluator(Functions.functionsFor(locale))))
 
   /**
    * What a handler's own evaluation reported — an expression that could not be read, a function
