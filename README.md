@@ -201,6 +201,42 @@ Bitmap, PNG and PDF all render through the same Canvas backend as the live view,
 matches what is on screen. Anything that could not be drawn faithfully comes back in `warnings`
 rather than being silently dropped.
 
+## Theming a chart you did not write
+
+A `config` block the host supplies, which the specification's own beats key by key. A chart arriving
+from a server carries the colours that server chose; an app drawing it on a dark surface says otherwise
+here rather than by rewriting the payload.
+
+```kotlin
+val dark = VegaJson.parse(
+    """
+    {"background": "#101418",
+     "axis": {"labelColor": "#e6e6e6", "titleColor": "#e6e6e6", "domainColor": "#555",
+              "tickColor": "#555", "gridColor": "#2a2f36"},
+     "style": {"cell": {"stroke": null}},
+     "text": {"color": "#e6e6e6"}, "rule": {"color": "#555"},
+     "range": {"category": ["#7aa2f7", "#9ece6a", "#e0af68"]}}
+    """
+)
+
+// Either grammar: the Vega-Lite compiler and the Vega one both take it.
+val controller = VegaChartController(textEngine = engine, hostConfig = dark)
+```
+
+The merge is `vega-util`'s own `mergeConfig`: a block merges property by property, an object *inside* a
+block overwrites, and `legend.layout` and each `style` entry recurse one level further.
+
+Two things a host configuration cannot reach, both of them Vega-Lite's own precedence rather than a
+limitation of this seam:
+
+- **a mark's own encoded property beats every configuration block**, so a specification writing
+  `mark.point.fill` keeps its white point on a dark card;
+- `Normalize.pointOverlay` uses that `point` object **verbatim** as the overlay mark's definition, so
+  the same is true of a line's point overlay.
+
+A host that has to change one of those is rewriting the specification, and can inject its own `config`
+in the same pass. `HostConfigTest` pins both the merge and these two limits.
+
 ## Locale example
 
 Everything the engine *generates* — a month name on a time axis, a thousands separator, the sentence a

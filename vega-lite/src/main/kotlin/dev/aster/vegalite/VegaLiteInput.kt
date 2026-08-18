@@ -35,7 +35,12 @@ public data class VegaLiteConversion(
  */
 public object VegaLiteInput {
 
-  public fun toVega(json: String): VegaLiteConversion {
+  /**
+   * @param hostConfig a `config` block the host supplies, which the specification's own beats key
+   *   by key. Only meaningful for a Vega-Lite specification; a Vega one passes through untouched
+   *   here and the host's configuration reaches it through `SpecCompiler` instead.
+   */
+  public fun toVega(json: String, hostConfig: VegaValue? = null): VegaLiteConversion {
     val diagnostics = DiagnosticCollector()
     val parsed = VegaJson.parseOrNull(json, diagnostics)
     // Not JSON at all: hand the text on unchanged and let the Vega parser produce the one
@@ -44,7 +49,7 @@ public object VegaLiteInput {
 
     if (!isVegaLite(parsed)) return VegaLiteConversion(json, false, emptyList())
 
-    val compiled = VegaLiteCompiler().compile(parsed)
+    val compiled = VegaLiteCompiler(hostConfig).compile(parsed)
     return VegaLiteConversion(compiled.toJson(), true, compiled.diagnostics)
   }
 

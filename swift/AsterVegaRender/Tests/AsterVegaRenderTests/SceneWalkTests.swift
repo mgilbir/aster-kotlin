@@ -25,7 +25,8 @@ final class SceneWalkTests: XCTestCase {
       clock: ClockCompanion.shared.Fixed,
       // Spelled out because a Kotlin default argument has no Obj-C representation: Swift names every
       // parameter or does not compile. `EnglishUS` is what upstream produces.
-      locale: VegaLocale.Companion.shared.EnglishUS
+      locale: VegaLocale.Companion.shared.EnglishUS,
+      hostConfig: nil
     )
     let compiled = compiler.compileJson(json: json, signalOverrides: [:], itemEncodes: [:])
     let complaints = compiled.diagnostics.filter {

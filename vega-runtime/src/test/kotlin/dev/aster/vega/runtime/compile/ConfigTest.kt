@@ -1,6 +1,7 @@
 package dev.aster.vega.runtime.compile
 
 import dev.aster.vega.model.DiagnosticCodes
+import dev.aster.vega.model.VegaJson
 import dev.aster.vega.model.spec.EventConfig
 import dev.aster.vega.model.spec.EventPermit
 import dev.aster.vega.scene.RuleNode
@@ -385,5 +386,54 @@ class ConfigTest {
         )
         .diagnostics
     assertTrue(diagnostics.isEmpty(), diagnostics.toString())
+  }
+
+  /**
+   * The same block, supplied by the **host** instead of by the specification.
+   *
+   * A chart arriving from a server carries the colours that server chose, and an app drawing it on
+   * a dark surface has to be able to say otherwise without rewriting the payload. The
+   * specification's own configuration still wins wherever both name a property, which is what makes
+   * a host's one a *theme* rather than an override.
+   */
+  @Test
+  fun `a host configuration reaches the guides, and a specification's own beats it`() {
+    fun labelColour(json: String, host: String?): String =
+      colourOf(
+        SpecCompiler(hostConfig = host?.let { VegaJson.parse(it) })
+          .compileJson(json)
+          .scene!!
+          .flatten()
+          .map { it.node }
+          .filterIsInstance<TextNode>()
+          .first { it.metadata.role == "axis-label" }
+          .fill!!
+          .paint
+      )
+
+    val plain =
+      """
+      {
+        "width": 150, "height": 80, "padding": 5,
+        "data": [{"name": "t", "values": [{"c": "a"}]}],
+        "scales": [{"name": "x", "type": "band", "domain": {"data": "t", "field": "c"},
+                    "range": "width"}],
+        "axes": [{"orient": "bottom", "scale": "x"}]
+      }
+      """
+        .trimIndent()
+    val themed =
+      plain.replace(
+        """"width": 150""",
+        """"config": {"axis": {"labelColor": "#111111"}}, "width": 150""",
+      )
+
+    val hostTheme = """{"axis": {"labelColor": "#eeeeee"}}"""
+    val untouched = labelColour(plain, null)
+    val hosted = labelColour(plain, hostTheme)
+    val stated = labelColour(themed, hostTheme)
+
+    assertTrue(hosted != untouched, "the host's colour did not reach the axis: $hosted")
+    assertTrue(stated != hosted, "the specification's own colour should have won: $stated")
   }
 }
