@@ -1010,7 +1010,7 @@ internal class DataPipeline(
     // that drop rows for the same two columns are one node whichever channel each column is on.
     // A scatter-plot matrix is where it tells — the cell for (a, b) and the cell for (b, a) drop
     // exactly the same rows, and upstream gives them one dataset between them.
-    FilterInvalidNode(expressions.distinct(), definitions.toSortedMap().toString())
+    FilterInvalidNode(expressions.distinct(), sortedIdentity(definitions))
   }
 
   /**
@@ -1094,6 +1094,17 @@ internal class DataPipeline(
       outputs = transform.array("as").orEmpty().mapNotNull { text(it) },
     )
   }
+
+  /**
+   * A map rendered as a sorted string, which is what identifies a filter-invalid node.
+   *
+   * `toSortedMap().toString()` said this on the JVM and says it nowhere else, and this file is
+   * compiled for five targets. The **format is reproduced exactly** rather than improved: the
+   * string is compared between nodes to decide whether two of them fold, so any change to it is a
+   * change to which datasets a chart comes out with.
+   */
+  private fun sortedIdentity(definitions: Map<String, String>): String =
+    definitions.entries.sortedBy { it.key }.joinToString(", ", "{", "}") { "${it.key}=${it.value}" }
 
   /** Which of a view's transforms a pass writes: everything, an ancestor's, or the view's own. */
   private enum class Written {
