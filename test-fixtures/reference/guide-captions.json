@@ -695,6 +695,16 @@
   "caption": "Y-axis titled 'Price of a gallon of gasoline (adjusted for inflation)' for a linear scale with values from 1.2 to 3.4"
  },
  {
+  "fixture": "continuous-scale-padding",
+  "kind": "axis",
+  "caption": "X-axis for a time scale with values from 19-05 to 18-06"
+ },
+ {
+  "fixture": "continuous-scale-padding",
+  "kind": "axis",
+  "caption": "Y-axis for a linear scale with values from 4 to 19"
+ },
+ {
   "fixture": "contour-plot",
   "kind": "axis",
   "caption": "X-axis titled 'Horsepower' for a linear scale with values from 0 to 240"
@@ -1413,6 +1423,16 @@
   "fixture": "map-with-tooltip",
   "kind": "legend",
   "caption": "Discrete legend titled 'Unemployment' for fill color with 6 boundaries: 2.1%, 4.3%, 6.4%, 8.6%, 10.7%, 12.9%"
+ },
+ {
+  "fixture": "mark-clip",
+  "kind": "axis",
+  "caption": "X-axis for a linear scale with values from 0 to 4"
+ },
+ {
+  "fixture": "mark-clip",
+  "kind": "axis",
+  "caption": "Y-axis for a linear scale with values from 0 to 100"
  },
  {
   "fixture": "mark-descriptions",

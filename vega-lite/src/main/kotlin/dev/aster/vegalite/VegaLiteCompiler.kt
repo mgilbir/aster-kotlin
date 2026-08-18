@@ -205,6 +205,7 @@ private class Compilation(
   private var concat: Concat? = null
 
   fun run(): VegaLiteCompilation {
+    reportSchemaVersion()
     reportUnsupportedTopLevel()
 
     // A repetition is rewritten into a concatenation before anything is compiled, exactly as
@@ -915,6 +916,11 @@ private class Compilation(
       // The theme, as Vega takes it. Without this a chart's guides are drawn in the engine's own
       // colours however carefully the specification restyled them.
       config.forVega()?.let { put("config", it) }
+      // `usermeta` is carried through to the Vega specification, last, which is where upstream's
+      // `assemble` puts it — verified against the pinned compiler rather than read off its
+      // documentation. It is the one top-level property whose whole purpose is to survive
+      // compilation: a host writes what it needs into it and reads it back off the output.
+      spec.fields["usermeta"]?.let { put("usermeta", it) }
     }
 
     // The signals two merged bins agreed to share, applied everywhere they are read. Upstream keeps
@@ -1169,8 +1175,20 @@ private class Compilation(
   }
 
   /** The chart's own name in front of a shared name, where the specification gave it one. */
+  /**
+   * A name inside this chart, prefixed by the chart's own `name` where it has one.
+   *
+   * Run through [Fields.varName], which is upstream's `Model.getName`: a Vega name is read as an
+   * identifier in expressions and signal references, so a chart called `phq9-total` becomes
+   * `phq9_total` and its x scale is `phq9_total_x`. Without the substitution the emitted
+   * specification referred to `phq9-total_x` — which Vega resolves as a name but a **signal
+   * expression** reading it parses as a subtraction, and which disagrees with upstream everywhere
+   * the name appears. Found by the `usermeta` fixture, whose chart carries a hyphenated `name`.
+   */
   private fun prefixed(name: String): String =
-    listOf(spec.string("name").orEmpty(), name).filter { it.isNotEmpty() }.joinToString("_")
+    Fields.varName(
+      listOf(spec.string("name").orEmpty(), name).filter { it.isNotEmpty() }.joinToString("_")
+    )
 
   private fun plotOf(view: UnitView): String = plotNames[view] ?: ""
 
@@ -2394,7 +2412,63 @@ private class Compilation(
   /** The scales a cell holding plots builds inside itself, which is every plot's own. */
   private var cellOwnScales: List<VegaValue> = emptyList()
 
-  private fun reportUnsupportedTopLevel() = Unit
+  /**
+   * Says so when the `$schema` names a Vega-Lite version these rules are not.
+   *
+   * `VegaLiteInput.isVegaLite` accepts any URL with "vega-lite" in it, which is what makes a
+   * specification with no `$schema` at all work — most captured payloads have none — but it also
+   * meant a version 7 payload would be compiled with version 6 rules without a word about it. The
+   * rules here are ported from a **pinned** upstream, `vega-lite@6.4.3`, and every one of the
+   * Vega-Lite fixtures is checked against that compiler; a specification declaring another major
+   * version is outside what has been verified, and saying so is cheaper for whoever reads the chart
+   * than a silent difference in one default.
+   *
+   * A warning and not a refusal. Across a major version most of a specification still means what it
+   * meant, and a host is better served by a chart and a note than by nothing at all — which is the
+   * same reasoning as [reportUnsupportedTopLevel]'s.
+   */
+  private fun reportSchemaVersion() {
+    val schema = spec.string("\$schema") ?: return
+    val declared = SCHEMA_VERSION_PATTERN.find(schema)?.groupValues?.get(1)?.toIntOrNull() ?: return
+    if (declared == VEGA_LITE_MAJOR_VERSION) return
+    val direction = if (declared < VEGA_LITE_MAJOR_VERSION) "an older" else "a newer"
+    diagnostics.warn(
+      VegaLiteDiagnostics.SCHEMA_VERSION,
+      "The specification declares Vega-Lite $declared, which is $direction major version than the " +
+        "$VEGA_LITE_MAJOR_VERSION these rules implement and are verified against. It is compiled " +
+        "with Vega-Lite $VEGA_LITE_MAJOR_VERSION rules, so a default that moved between the two " +
+        "will be this version's.",
+      jsonPath = "$.\$schema",
+    )
+  }
+
+  /**
+   * Says so when the specification's top level holds a key nothing reads.
+   *
+   * This was a `= Unit` stub while `Diagnostics.kt` claimed nothing is silently ignored, so an
+   * unknown top-level property — a typo, a `selection` block from Vega-Lite 4, a property a later
+   * version adds — was dropped without a word. That is the one failure mode this engine is supposed
+   * not to have: a chart that draws confidently having quietly discarded part of what it was asked
+   * for.
+   *
+   * A **warning** rather than an error, because the chart that comes out is still the chart the
+   * rest of the specification describes, and a host showing diagnostics beside it can say what was
+   * left out. The set below is every key something in this module reads; `$schema` is routing
+   * metadata `VegaLiteInput` consumes before the compiler sees the specification.
+   */
+  private fun reportUnsupportedTopLevel() {
+    for (key in spec.fields.keys) {
+      if (key in TOP_LEVEL_PROPERTIES) continue
+      diagnostics.warn(
+        VegaLiteDiagnostics.UNSUPPORTED_TOP_LEVEL_PROPERTY,
+        "Nothing reads the top-level `$key`, so it has no effect on the chart. Vega-Lite 6's " +
+          "top-level properties are: " +
+          TOP_LEVEL_PROPERTIES.sorted().joinToString(", ") { "`$it`" } +
+          ".",
+        jsonPath = "$.$key",
+      )
+    }
+  }
 
   /**
    * `normalizeAutoSize` and `getTopLevelProperties`, which settle the same property in two places.
@@ -3228,4 +3302,56 @@ private class Compilation(
       is VegaValue.Arr -> values.mapNotNull { (it as? VegaValue.Str)?.value }
       else -> emptyList()
     }
+
+  private companion object {
+    /**
+     * Vega-Lite 6's top-level properties, and the one metadata key that is not one.
+     *
+     * Every name here is read by something in this module — the grep is the point of the list,
+     * since a property nobody reads belongs in a diagnostic rather than in a set of known ones.
+     * `$schema` is the exception and is not read at all: `VegaLiteInput` routes on it before the
+     * compiler is handed the specification.
+     */
+    /** The Vega-Lite major version these rules implement, and the fixtures are checked against. */
+    const val VEGA_LITE_MAJOR_VERSION = 6
+
+    /** `https://vega.github.io/schema/vega-lite/v6.json` — the major version out of the URL. */
+    val SCHEMA_VERSION_PATTERN = Regex("""vega-lite/v(\d+)""")
+
+    val TOP_LEVEL_PROPERTIES =
+      setOf(
+        "\$schema",
+        "align",
+        "autosize",
+        "background",
+        "bounds",
+        "center",
+        "columns",
+        "concat",
+        "config",
+        "data",
+        "datasets",
+        "description",
+        "encoding",
+        "facet",
+        "hconcat",
+        "height",
+        "layer",
+        "mark",
+        "name",
+        "padding",
+        "params",
+        "projection",
+        "repeat",
+        "resolve",
+        "spacing",
+        "spec",
+        "title",
+        "transform",
+        "usermeta",
+        "vconcat",
+        "view",
+        "width",
+      )
+  }
 }

@@ -6,7 +6,7 @@ Generated from the corpus by `FixtureIndexTest`, which fails when this file has 
 ./gradlew :vega-runtime:jvmTest -PupdateGoldens=true --rerun-tasks
 ```
 
-191 Vega differential fixtures and 281 Vega-Lite fixtures.
+193 Vega differential fixtures and 282 Vega-Lite fixtures.
 
 Every column is read off disk. A Vega fixture's mark count and mark types come from its
 **upstream** reference, so they are upstream's answer rather than this port's opinion of it.
@@ -57,6 +57,7 @@ Every column is read off disk. A Vega fixture's mark count and mark types come f
 | `config-theme` | 42 | rect, rule, symbol, text | — | band, linear, ordinal |
 | `connected-scatter` | 146 | line, rule, symbol, text | — | linear, ordinal |
 | `container-size` | 2 | rect, text | — | — |
+| `continuous-scale-padding` | 22 | line, rule, symbol, text | — | linear, time |
 | `contour-plot` | 460 | image, path, rule, symbol, text | filter, geopath, heatmap, isocontour, kde2d | linear, ordinal |
 | `county-unemployment` | 3622 | rect, shape, text | filter, geoshape, lookup | quantize |
 | `crossfilter-flights` | 171 | group, rect, rule, text | aggregate, bin, crossfilter, resolvefilter | band, linear |
@@ -127,6 +128,7 @@ Every column is read off disk. A Vega fixture's mark count and mark types come f
 | `log-scale` | 75 | rule, symbol, text | — | log, sqrt |
 | `luminance-contrast` | 24 | rect, text | — | band |
 | `map-with-tooltip` | 3623 | group, rect, shape, text | filter, formula, geoshape, lookup | quantize |
+| `mark-clip` | 39 | line, rule, symbol, text | — | linear |
 | `mark-descriptions` | 25 | rect, rule, text | — | band, linear |
 | `mark-join-key` | 23 | line, rect, rule, symbol, text | — | band, linear, ordinal |
 | `modify-dataset` | 11 | rect, rule, text | — | band, linear |
@@ -490,5 +492,6 @@ Every column is read off disk. A Vega fixture's mark count and mark types come f
 | `trellis-selections` | single view | circle | — |
 | `trellis-sort-array` | single view | bar | — |
 | `trellis-timeunit` | single view | line | — |
+| `usermeta` | single view | line | — |
 | `vconcat` | vconcat | line, tick | — |
 | `view-cursor` | single view | line | — |
