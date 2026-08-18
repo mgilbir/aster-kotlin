@@ -161,6 +161,23 @@ private class Compilation(
   /** The grid this chart's cells are laid out in, if it is faceted at all. */
   private var facet: FacetLayout? = null
 
+  /**
+   * The facet levels **inside** the outermost one, outermost first — a grid whose cells are grids.
+   *
+   * Empty for every ordinary chart, which is why the one-level path below is untouched: the levels
+   * are lifted in turn, each one wrapping what the level under it produced.
+   */
+  private var nestedFacets: List<VegaValue.Obj> = emptyList()
+
+  /**
+   * The chart's own facet levels, outermost first — [facet] is the innermost of them.
+   *
+   * The two are read in different places and mean different things: the **outermost** level
+   * arranges the chart, so the top-level `layout` is its; the **innermost** owns a cell, so
+   * everything about a plotting area is [facet]'s.
+   */
+  private var facetLevels: List<FacetLayout> = emptyList()
+
   /** The concatenation this chart is, if it is one. */
   private var concat: Concat? = null
 
@@ -172,7 +189,13 @@ private class Compilation(
     if (spec.has("repeat")) spec = Repeat.normalize(spec, diagnostics) ?: return failed()
     // A `row`/`column` facet operator is the same chart as the same two channels written in the
     // encoding, so it becomes one before anything else looks at it.
-    if (spec.has("facet")) spec = FacetOperator.normalize(spec, diagnostics) ?: return failed()
+    if (spec.has("facet")) {
+      // Only the outermost level lands in the encoding; a grid whose cells are grids hands the rest
+      // back, and each is lifted in turn below.
+      val peeled = FacetOperator.normalize(spec, diagnostics) ?: return failed()
+      spec = peeled.spec
+      nestedFacets = peeled.inner
+    }
     selections = Selection.of(spec)
     val plots = plots() ?: return failed()
     allPlots = plots
@@ -185,9 +208,27 @@ private class Compilation(
     // Each plot's own grid, where it has one: a concatenation may hold a faceted plot beside a
     // plain one, and the cells then belong inside that plot's group rather than to the chart.
     for (plot in plots) {
-      val lifted = liftFacet(plot.views, plot.name)
+      var lifted = liftFacet(plot.views, plot.name)
       plot.views = lifted.first
-      plot.facet = lifted.second
+      lifted.second?.let { plot.facets += it }
+      // A grid whose cells are grids: each further level is lifted in turn, and each lift is the
+      // same operation one name deeper. `liftFacet` renames its views `<owner>_child`, so the owner
+      // of the next lift is the name the last one gave them — which is how the unit ends up
+      // `child_child` and its size `child_child_width`, as upstream names them.
+      for ((depth, level) in nestedFacets.withIndex()) {
+        if (lifted.second == null) break
+        val owner =
+          Fields.varName(
+            listOf(plot.name, "child").filter { it.isNotEmpty() }.joinToString("_") +
+              "_child".repeat(depth)
+          )
+        // The level's channels never reached any encoding, so they are put back into one for the
+        // lift to read and take out again — the same path the outermost level took.
+        val channels = Parse(config, diagnostics, selections).facetChannels(level, "$.facet")
+        lifted = liftFacet(plot.views.map { it.withEncoding(it.spec.encoding + channels) }, owner)
+        plot.views = lifted.first
+        lifted.second?.let { plot.facets += it }
+      }
       // Lifting a facet builds the cell's views anew, so the plot each belongs to has to be
       // recorded again: a scale resolved per plot is named for the plot that owns it, and a view
       // nothing knows the plot of is named as though it stood alone.
@@ -196,7 +237,10 @@ private class Compilation(
       // lays out its own cells within its group, and everything the chart does about a facet —
       // the split in the data flow, the cell's scales, the machinery in its signals — belongs to
       // that plot rather than to the chart.
-      if (concat == null) facet = lifted.second
+      if (concat == null) {
+        facetLevels = plot.facets
+        facet = plot.facets.lastOrNull()
+      }
     }
     // A **projection** belongs to the unit whose places it puts on the page. A view with a
     // geographic channel has one whether or not the specification stated any properties for it, and
@@ -562,7 +606,10 @@ private class Compilation(
       val at = data.indexOfFirst { it.string("name") == reads }
       if (at >= 0) data.addAll(at + 1, domains) else data += domains
     }
-    facet?.let { current ->
+    // The **outermost** level's values stand beside the chart's table; a level inside one breaks
+    // that level's partition down further, so its values are computed inside that level's cell and
+    // are written there instead.
+    facetLevels.firstOrNull()?.let { current ->
       val main =
         plots.single().axes.filter {
           (it["grid"] as? VegaValue.Bool)?.value != true && !cellOwnsAxis(it)
@@ -626,7 +673,9 @@ private class Compilation(
       )
       if (sizeSignals.isNotEmpty()) put("signals", arr(sizeSignals))
       // A stated `spacing` is the gap between cells, and it beats the configured twenty.
-      facet?.let {
+      // The **outermost** level arranges the chart; a level inside one arranges its cells within
+      // that level's cell group, and its `layout` is written there rather than here.
+      facetLevels.firstOrNull()?.let {
         // `spacing` is a number or a `{row, column}` pair, and a pair states only the side it
         // means: a trellis of rows an inch apart still wants the configured gap between its
         // columns, so the side left out is filled in rather than dropped.
@@ -635,7 +684,17 @@ private class Compilation(
           setOf("x", "y").filter { channel ->
             resolve.scaleIsIndependent(channel, defaultIndependent = false)
           }
-        put("layout", it.layout(spacing, HEADER_OFFSET, config, independent.toSet()))
+        put(
+          "layout",
+          it.layout(
+            spacing,
+            HEADER_OFFSET,
+            config,
+            independent.toSet(),
+            headings = if (facetLevels.size > 1) headingsPerLevel(facetLevels).first() else null,
+            childHasSize = facetLevels.size == 1,
+          ),
+        )
       }
       concat?.let { put("layout", it.layout()) }
       // The cells' own scales are assembled before the marks that read them, the cell group being
@@ -717,7 +776,7 @@ private class Compilation(
         arr(
           if (concat != null) groups(plotTree)
           // A facet's marks are its cell and its headers, and the brush is already inside the cell.
-          else if (facet != null) marks(views, plots.single().axes)
+          else if (facet != null) marks(views, plots.single().axes, facet, facetLevels.dropLast(1))
           else brushed(views, marks(views, plots.single().axes))
         ),
       )
@@ -1041,8 +1100,24 @@ private class Compilation(
     val prefix: String = if (name.isEmpty()) "" else "${name}_"
     var views: List<UnitView> = emptyList()
 
-    /** The grid this plot's cells are laid out in, where the plot is faceted at all. */
-    var facet: FacetLayout? = null
+    /**
+     * The grids this plot's cells are laid out in, outermost first.
+     *
+     * One entry for an ordinary trellis and none for a plain plot. A grid whose every cell is
+     * itself a grid has two, and they are two levels of cell group rather than one crossed grid.
+     */
+    var facets: List<FacetLayout> = emptyList()
+
+    /**
+     * The **innermost** grid, which is the one that owns a cell.
+     *
+     * Everything about a cell belongs to the level closest to the marks: its style and size, the
+     * scales resolved within it, the split in the data flow, the gridlines. The levels above only
+     * caption and arrange what that level produced.
+     */
+    val facet: FacetLayout?
+      get() = facets.lastOrNull()
+
     var scales: LinkedHashMap<String, ScaleComponent> = LinkedHashMap()
     var axes: List<VegaValue> = emptyList()
 
@@ -1173,8 +1248,10 @@ private class Compilation(
     if (concat == null) {
       val plot = plots.single()
       // A cell's size is named through the model, the whole grid's is not: `width` is always the
-      // chart's, and `child_width` belongs to the facet that owns the cell.
-      val prefix = if (facet != null) "child_" else ""
+      // chart's, and `child_width` belongs to the facet that owns the cell. **One `child` per
+      // level**: a grid whose cells are grids names its innermost cell `child_child_width`, because
+      // the name belongs to the model that owns it and each level puts a child under itself.
+      val prefix = "child_".repeat(plot.facets.size)
       plot.sizeNames =
         if (facet == null) mapOf("x" to "width", "y" to "height")
         else mapOf("x" to prefixed("${prefix}width"), "y" to prefixed("${prefix}height"))
@@ -1452,7 +1529,7 @@ private class Compilation(
               .toSet(),
           ),
         )
-        put("marks", arr(marks(plot.views, plot.axes, grid)))
+        put("marks", arr(marks(plot.views, plot.axes, grid, plot.facets.dropLast(1))))
       } else {
         put("marks", arr(brushed(plot.views, plot.views.flatMap { Marks.marks(it) })))
       }
@@ -1854,10 +1931,56 @@ private class Compilation(
     }
   }
 
+  /**
+   * `distinct_<field>` — the column a grid counts its own cells by, or null where it has no
+   * columns.
+   *
+   * Rows stack however many of them there are; columns have to be counted, and inside another grid
+   * counted *per cell*. Both halves of that read this: the outer partition counts it, and the cell
+   * the count lands on reads it back as a field.
+   */
+  private fun columnsOf(grid: FacetLayout): String? =
+    grid.byChannel.firstOrNull { it.first == "column" }?.let { "distinct_${it.second}" }
+
+  /**
+   * The heading each level of a nest actually writes, by channel — `"Origin / Cylinders"`.
+   *
+   * `parseFacetHeader` folds a child's heading into its parent's and nulls the child's, and it does
+   * so **per channel, and only where the parent facets on that channel too**. Two row grids one
+   * inside the other caption the rows once, at the top. A column grid holding row grids captions
+   * its columns at the top and its rows inside each cell — there is no column heading below it to
+   * absorb, and no row heading above to be absorbed into. Levels arrive outermost first, which is
+   * the order the words read in.
+   */
+  private fun headingsPerLevel(levels: List<FacetLayout>): List<Map<String, String>> {
+    val own = levels.map { LinkedHashMap(it.headings(config)) }
+    for (index in own.indices.reversed()) {
+      if (index == 0) break
+      val parent = own[index - 1]
+      val child = own[index]
+      val above = levels[index - 1].byChannel.map { it.first }.toSet()
+      for (channel in child.keys.toList()) {
+        if (channel !in above) continue
+        val text = child.getValue(channel)
+        parent[channel] = parent[channel]?.let { "$it / $text" } ?: text
+        child.remove(channel)
+      }
+    }
+    return own
+  }
+
   private fun marks(
     views: List<UnitView>,
     axes: List<VegaValue>,
     grid: FacetLayout? = facet,
+    /**
+     * The levels **above** [grid], outermost first, each of which wraps what the one below made.
+     *
+     * `parseFacetHeaders` and `assembleFacetMarks` recurse: a grid whose cells are grids is two
+     * cell groups, the outer one arranging what the inner one drew. Everything about a plotting
+     * area belongs to the innermost level, which is [grid]; these only caption and arrange.
+     */
+    above: List<FacetLayout> = emptyList(),
   ): List<VegaValue> {
     val drawn = views.flatMap { Marks.marks(it) }
     val current = grid ?: return drawn
@@ -1881,36 +2004,96 @@ private class Compilation(
     }
     val vertical = mainAxes - horizontal.toSet()
 
-    return current.groups(
-      vertical,
-      horizontal,
-      HEADER_OFFSET,
-      config,
-      views.first().widthSignal,
-      views.first().heightSignal,
-    ) +
-      current.cellGroup(
-        // The table the **facet** reads: above the split where the flow splits there, and the
-        // view's own main output otherwise.
-        facetReads ?: views.first().mainData,
-        childMarks,
-        gridAxes,
+    // The innermost level's own groups and cell: the headers carrying the shared axes, and the cell
+    // the marks are actually drawn in.
+    val inner =
+      current.groups(
+        vertical,
+        horizontal,
+        HEADER_OFFSET,
+        config,
         views.first().widthSignal,
         views.first().heightSignal,
-        HEADER_OFFSET,
-        // A cell is styled by the same rule the chart's own group is: `cell` where it has a
-        // Cartesian position to border, `view` where it has none. A trellis of pies has no
-        // plotting area in any of its cells.
-        (style(views) as? VegaValue.Str)?.value ?: "cell",
-        cellCardinality,
-        cellScales,
-        viewEncode(),
-        facetGroupData,
-        // `assembleAxisSignals` on the **cell**: an axis inside it that draws its grid across no
-        // other scale falls back to `width` or `height` by name, and inside the cell those names
-        // mean the whole chart until the cell aliases them to its own.
-        cellSignals,
-      )
+        // What is left of this level's headings once the levels above absorbed what they could.
+        headings = if (above.isEmpty()) null else headingsPerLevel(above + current).last(),
+      ) +
+        current.cellGroup(
+          // The table the **facet** reads: the partition the level above it cut where there is one,
+          // and otherwise the table above the split — or the view's own main output where nothing
+          // splits at all.
+          above.lastOrNull()?.named("facet") ?: facetReads ?: views.first().mainData,
+          childMarks,
+          gridAxes,
+          views.first().widthSignal,
+          views.first().heightSignal,
+          HEADER_OFFSET,
+          // A cell is styled by the same rule the chart's own group is: `cell` where it has a
+          // Cartesian position to border, `view` where it has none. A trellis of pies has no
+          // plotting area in any of its cells.
+          (style(views) as? VegaValue.Str)?.value ?: "cell",
+          cellCardinality,
+          cellScales,
+          viewEncode(),
+          facetGroupData,
+          // `assembleAxisSignals` on the **cell**: an axis inside it that draws its grid across no
+          // other scale falls back to `width` or `height` by name, and inside the cell those names
+          // mean the whole chart until the cell aliases them to its own.
+          cellSignals,
+        )
+    if (above.isEmpty()) return inner
+
+    // Outwards, one level at a time. Each level wraps what the level below produced in a cell of
+    // its own, and hands that level the facet values it breaks *this* partition down by — which is
+    // why the inner grid's own domain dataset lives inside the outer cell rather than beside the
+    // chart. The heading and header bands are then this level's, drawn around the whole of it.
+    var wrapped = inner
+    var below = current
+    for ((depth, level) in above.withIndex().reversed()) {
+      wrapped =
+        // No axes at this level: they were all consumed by the innermost one, which is
+        // `mergeChildAxis` moving a child's axes into its parent's bands only one step. So what a
+        // level above draws is its heading and its bands of captions, and nothing else.
+        level.groups(
+          emptyList(),
+          emptyList(),
+          HEADER_OFFSET,
+          config,
+          // No size to state: the grid below sizes its own cells, so this band is only keeping
+          // room for a caption — `makeHeaderComponent` asks the child for one and gets none.
+          "",
+          "",
+          headings = headingsPerLevel(above + current)[depth],
+        ) +
+          level.nestedCellGroup(
+            // The table this level partitions: the partition the level above it cut, and for the
+            // outermost the table standing above the split — which is the whole of the chart's,
+            // since the cells' values are the whole table's values and not one cell's.
+            above.getOrNull(depth - 1)?.named("facet") ?: facetReads ?: views.first().mainData,
+            // `getCardinalityAggregateForChild` asks the child first: where the child is another
+            // grid, what this partition counts is that grid's **columns** and nothing else — the
+            // per-cell scale cardinality belongs to the level that owns a cell.
+            listOfNotNull(columnsOf(below)).associateWith { it },
+            below.layout(
+              facetSpacing(spec),
+              HEADER_OFFSET,
+              config,
+              independent.toSet(),
+              // The level below keeps room for whatever heading it still writes of its own.
+              headings = headingsPerLevel(above + current)[depth + 1],
+              childHasSize = below === current,
+              insideFacet = true,
+            ),
+            below.domainDatasets(
+              level.named("facet"),
+              vertical.isNotEmpty(),
+              horizontal.isNotEmpty(),
+            ),
+            wrapped,
+            columnsOf(below),
+          )
+      below = level
+    }
+    return wrapped
   }
 
   private fun reportUnsupportedTopLevel() = Unit
@@ -2073,10 +2256,20 @@ private class Compilation(
     // **fork or named output** below it. A cell of several layers is that fork, and the
     // pre-aggregation table a sorted domain asks for is that output; either way the chain stays
     // below and is computed per cell.
+    // A grid whose cells are grids always splits: what stands under the outer partition is the
+    // inner grid's own named point, which is exactly the "fork or named output" the walk stops at.
     val split =
       facet
-        ?.takeIf { views.size > 1 || views.any { view -> DataPipeline.needsRawTable(view) } }
+        ?.takeIf {
+          views.size > 1 ||
+            facetLevels.size > 1 ||
+            views.any { view -> DataPipeline.needsRawTable(view) }
+        }
         ?.let { FacetNode(it.named("facet")) }
+    // The levels above the split, whose partitions the chain passes through on the way down.
+    val splitAbove =
+      if (split == null) emptyList()
+      else facetLevels.dropLast(1).map { FacetNode(it.named("facet")) }
     // `LookupNode.make`: the joined table is given a **named point** of its own on the source it
     // comes from, and the join names that point rather than the table. Two things follow, and both
     // are the reason it is done unconditionally rather than only where the chart also draws from
@@ -2116,6 +2309,7 @@ private class Compilation(
           // where there is one the chain stays below the facet and a copy of it — with the facet's
           // own fields added to every grouping — is hung beside it for the scales to measure.
           facetSplit = split,
+          facetAbove = splitAbove,
           // Where the flow does not split, the grid is still a node in it, and a node takes a name.
           facetTail =
             if (split != null) null
@@ -2159,8 +2353,12 @@ private class Compilation(
     // the scales derive beside it. `assembleFacetData` then gives each cell the chain below.
     if (split != null && facet != null) {
       facetGroupData = DataAssembler().assembleFacetData(split)
-      facetReads = split.data
-      facetDomainsAt = split.at
+      // The **outermost** partition is the one the chart's own walk reached, so it is the one that
+      // knows which table it read and where in the list it stood. The inner partitions are inside a
+      // cell group, where the chart's numbering does not reach.
+      val read = splitAbove.firstOrNull() ?: split
+      facetReads = read.data
+      facetDomainsAt = read.at
     }
     // "now fix the from references in lookup transforms": a join names the *output node* while the
     // flow is being built, because the dataset that node ends up being is not known until the tree

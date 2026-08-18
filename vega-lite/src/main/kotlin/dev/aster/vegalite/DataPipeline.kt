@@ -59,6 +59,14 @@ internal class DataPipeline(
   private val materialized: Set<String> = emptySet(),
   /** Where each materialised selection's output node is recorded, for the join to be named from. */
   private val lookupOutputs: MutableMap<String, OutputNode> = mutableMapOf(),
+  /**
+   * The partitions standing **above** [facetSplit], outermost first.
+   *
+   * A grid whose cells are grids cuts the table twice: the outer level partitions the whole of it
+   * and the inner level partitions each of those pieces. The chain the marks read hangs below the
+   * innermost partition, which is why the split is there and these only pass through.
+   */
+  private val facetAbove: List<FacetNode> = emptyList(),
 ) {
 
   /** The facet fields the chain being built groups by, which the cell's own chain does not. */
@@ -115,7 +123,14 @@ internal class DataPipeline(
       // that upstream's numbering never spends.
       val facetMain = OutputNode(view.prefixed("facet_main"))
       head.then(facetMain)
-      facetMain.then(facetNode)
+      // Every level's partition in turn, the outermost reading the table and each cutting the piece
+      // the one above handed it.
+      var above: DataNode = facetMain
+      for (outer in facetAbove) {
+        above.then(outer)
+        above = outer
+      }
+      above.then(facetNode)
       facetNode.attachedTo(facetMain)
       val inside = cellChain(facetNode, emptyList())
       val outside = cellChain(facetMain, view.facetFields)
