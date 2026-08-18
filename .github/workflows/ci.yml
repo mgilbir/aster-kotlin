@@ -44,21 +44,25 @@ jobs:
             oracles: "false"
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Set up JDK 21
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: "21"
 
       - name: Set up node
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
           node-version: "20"
 
       - name: Set up Gradle
-        uses: gradle/actions/setup-gradle@v4
+        # v5, not the current v6, and deliberately: v6 moved the caching component out of the
+        # open-source action into a separate library under Gradle's Terms of Use, which upgrading
+        # accepts on the project's behalf. v5 is what clears the Node 20 deprecation without taking
+        # that on. Revisit as a licensing decision, not a version bump.
+        uses: gradle/actions/setup-gradle@v5
 
       - name: Record upstream's test vectors
         # `check.sh` says it will skip the replays without these, but the replay guards also assert
@@ -221,7 +225,7 @@ jobs:
 
       - name: Upload test reports
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: test-reports-${{ matrix.os }}
           path: |
